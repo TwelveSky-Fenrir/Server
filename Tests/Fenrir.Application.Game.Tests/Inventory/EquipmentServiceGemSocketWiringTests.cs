@@ -8,15 +8,6 @@ using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Game.Tests.Inventory;
 
-/// <summary>
-///     Workstream B13-socket-prerequisites -- the full pipeline from a persisted <see cref="ItemStack" />'s
-///     packed <c>SOCKET_GEM_V2</c> columns (<see cref="ItemStack.SocketGem1" />/<see cref="ItemStack.SocketGem2" />/
-///     <see cref="ItemStack.SocketGem3" />, already DB-backed) through <see cref="EquipmentService.BuildEquippedSlots" />
-///     and <see cref="EquipmentService.RecomputeStats" /> into a real gem-socket AttackPower contribution, using
-///     <see cref="WorldDataCache.GemSocketsByTypeAndValue" /> as the effect table. The routing/decode math itself
-///     is pinned by <c>GemSocketContributionTests</c> (Stats project); this file only pins that
-///     <see cref="EquipmentService" /> actually threads the packed columns and the table through end to end.
-/// </summary>
 public class EquipmentServiceGemSocketWiringTests
 {
     private static ItemRowDto Item(int itemId)
@@ -70,7 +61,6 @@ public class EquipmentServiceGemSocketWiringTests
         return new CharacterBaseAttributes(0, 100, 0, 0, 1, 0, 0, 0, 0, 0);
     }
 
-    // Packs SOCKET_GEM_V2 as 3 little-endian ints: [0] unused, [1] count, then up to 5 (type,value) byte pairs.
     private static (int P1, int P2, int P3) Pack(byte count, params (byte Type, byte Value)[] pairs)
     {
         Span<byte> bytes = stackalloc byte[12];
@@ -141,7 +131,6 @@ public class EquipmentServiceGemSocketWiringTests
             [100] = new(Item(100), ImmutableArray<ItemBonusSkillRowDto>.Empty)
         }.ToFrozenDictionary();
         var (p1, p2, p3) = Pack(1, (2, 50));
-        // WorldData's GemSocketsByTypeAndValue defaults to empty -- no (2,50) row exists anywhere.
         var worldData = WorldData(itemsById);
         var attributes = NoBonusAttributes();
 

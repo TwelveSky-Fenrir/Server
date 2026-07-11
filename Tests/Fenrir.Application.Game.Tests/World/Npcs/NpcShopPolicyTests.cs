@@ -84,7 +84,7 @@ public class NpcShopPolicyTests
     [Fact]
     public void Sell_RareItemWithEnchantApplied_IsRejected()
     {
-        var item = Sellable(700, 9, 500, 3); // IRARE
+        var item = Sellable(700, 9, 500, 3);
         var result = NpcShopPolicy.ResolveSell(item, Stack(700, 1, 5), 0);
 
         Assert.False(result.Succeeded);
@@ -311,8 +311,6 @@ public class NpcShopPolicyTests
     [InlineData(93384)]
     public void Sell_CostumeGapItemIds_AreNotRejectedAsCostumes(int itemId)
     {
-        // These fall inside the legacy switch's own commented-out (dead) case labels -- excluded from the
-        // whitelist on purpose, so an item using one of these IDs sells normally.
         var item = Sellable(itemId, 9, 500);
         var result = NpcShopPolicy.ResolveSell(item, Stack(itemId, 1), 0);
 

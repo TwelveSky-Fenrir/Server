@@ -6,15 +6,9 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Covers <see cref="AntiCampingForcedReturnSystem" /> (FIX_HSB_POS_BUG). Every test drives the system
-///     directly via <see cref="AntiCampingForcedReturnSystem.Simulate" /> rather than through
-///     <see cref="Zone.Tick" />'s full pipeline, so the unrelated 3.5 s avatar-rebroadcast keep-alive never
-///     interleaves with the forced-return notification on the same fake pipe.
-/// </summary>
 public class AntiCampingForcedReturnSystemTests
 {
-    private const short GuardedMapId = 2; // one of AntiCampingGuardPointCatalog.GuardedMapIds
+    private const short GuardedMapId = 2;
     private const short UnguardedMapId = 999;
 
     private static AntiCampingGuardPointCatalog CatalogWithSymbolPoints(short mapId,
@@ -43,10 +37,10 @@ public class AntiCampingForcedReturnSystemTests
         var zone = ZoneTestKit.CreateZone(mapId);
         var (session, pipe) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, mapId, posX: posX, posY: posY, posZ: posZ)));
-        zone.Tick(TimeSpan.FromMilliseconds(50)); // just drains the Enter command; too short to simulate
+        zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.True(zone.TryGetPlayer(10, out var state));
-        ZoneTestKit.DrainOutbound(pipe); // discard anything (none expected for a lone occupant, but be safe)
+        ZoneTestKit.DrainOutbound(pipe);
 
         return (zone, state!, pipe);
     }
@@ -120,8 +114,6 @@ public class AntiCampingForcedReturnSystemTests
     [Fact]
     public void VerticalSeparationAlone_TakesTheAvatarOutOfRange()
     {
-        // Same X/Z as the guarded point, but far enough on Y alone that full 3-axis distance exceeds the
-        // radius -- proves the check is NOT horizontal-only (GetLengthXYZ, mapcheck.h:12-15).
         var catalog = CatalogWithSymbolPoints(GuardedMapId, new AntiCampingGuardPoint(100, 0, 100));
         var system = new AntiCampingForcedReturnSystem(catalog);
         var (zone, state, _) = EnterPlayer(GuardedMapId, 100, 1000);
@@ -153,9 +145,9 @@ public class AntiCampingForcedReturnSystemTests
     {
         var near = new AntiCampingGuardPoint(100, 0, 100);
         var far = new AntiCampingGuardPoint(100_000, 0, 100_000);
-        var catalog = CatalogWithSymbolPoints(GuardedMapId, near, far); // near evaluated first, far last
+        var catalog = CatalogWithSymbolPoints(GuardedMapId, near, far);
         var system = new AntiCampingForcedReturnSystem(catalog);
-        var (zone, state, _) = EnterPlayer(GuardedMapId); // standing on `near`, nowhere near `far`
+        var (zone, state, _) = EnterPlayer(GuardedMapId);
 
         system.Simulate(zone, 1);
 
@@ -167,7 +159,7 @@ public class AntiCampingForcedReturnSystemTests
     {
         var far = new AntiCampingGuardPoint(100_000, 0, 100_000);
         var near = new AntiCampingGuardPoint(100, 0, 100);
-        var catalog = CatalogWithSymbolPoints(GuardedMapId, far, near); // far evaluated first, near last
+        var catalog = CatalogWithSymbolPoints(GuardedMapId, far, near);
         var system = new AntiCampingForcedReturnSystem(catalog);
         var (zone, state, _) = EnterPlayer(GuardedMapId);
 
@@ -187,7 +179,6 @@ public class AntiCampingForcedReturnSystemTests
 
         system.Simulate(zone, 1);
 
-        // If the Tower check ran despite the symbol flag already being set, this would have been reset to 0.
         Assert.Equal(1, state.AntiCampingProximityCounter);
     }
 
@@ -218,7 +209,7 @@ public class AntiCampingForcedReturnSystemTests
             Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
         }
 
-        system.Simulate(zone, 1); // the 20th consecutive qualifying tick
+        system.Simulate(zone, 1);
         Assert.Equal(AntiCampingForcedReturnSystem.ForcedReturnThreshold, state.AntiCampingProximityCounter);
 
         var sent = ZoneTestKit.DrainOutbound(pipe);

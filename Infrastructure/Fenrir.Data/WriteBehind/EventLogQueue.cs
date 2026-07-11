@@ -3,34 +3,6 @@ using Fenrir.Data.Abstractions.Game;
 
 namespace Fenrir.Data.WriteBehind;
 
-/// <summary>
-///     Bounded-channel producer/consumer accumulator for the high-frequency EventLog write-behind path --
-///     the channel-backed twin of <see cref="DirtyTracker{TKey}" />/<see cref="WriteBehindFlusher{TKey}" />
-///     for a stream of independent, already-fully-formed rows rather than a per-key "what changed" set.
-/// </summary>
-/// <remarks>
-///     <para>
-///         <b>Why this is a separate implementation, not a reuse of DirtyTracker/WriteBehindFlusher:</b>
-///         <see cref="DirtyFlags" /> is idempotent under merge (OR-ing the same flag twice is a no-op), so a
-///         failed flush can safely re-<see cref="DirtyTracker{TKey}.MarkDirty" /> the whole drained batch back
-///         in without any risk of double-counting or duplication. Every row here is instead an independent,
-///         already-fully-formed fact (an enchant roll that already happened) with no natural key to merge on
-///         -- there is nothing to "OR" two rows together into, and re-inserting the same row twice would
-///         double the audit trail, not correct it. Re-queuing a failed batch would therefore require either
-///         unbounded retry-buffer growth under a sustained DB outage, or an at-least-once/at-most-once
-///         decision this path doesn't need to make. These are documented HIGH-FREQUENCY, LOW-STAKES events
-///         (trades/currency/GM actions/account-security always go through
-///         <c>IEventLogRepository.LogAsync</c> instead, never this queue) -- so a failed flush is logged and
-///         the batch is DROPPED rather than retried, the same "no retry, accepted residual gap" posture
-///         already used for monster-kill money grants (see <c>MonsterLootFlushHost</c>'s remarks).
-///     </para>
-///     <para>
-///         Unlike <see cref="DirtyTracker{TKey}" />, which hand-maintains an Interlocked counter because
-///         <see cref="System.Collections.Concurrent.ConcurrentDictionary{TKey,TValue}" />.Count takes every
-///         partition lock, a bounded <see cref="Channel{T}" />'s <see cref="ChannelReader{T}.Count" /> is O(1)
-///         by construction, so this class reads it directly instead of maintaining its own counter.
-///     </para>
-/// </remarks>
 public sealed class EventLogQueue : IEventLogQueue, IAsyncDisposable
 {
     public const int DefaultCapacity = 4096;
@@ -45,7 +17,6 @@ public sealed class EventLogQueue : IEventLogQueue, IAsyncDisposable
     private readonly Action<int>? _onDropped;
     private readonly Action<Exception, int>? _onFlushError;
 
-    // Cancelled by DisposeAsync so a running loop exits before the timer/channel it awaits are torn down.
     private readonly CancellationTokenSource _shutdownCts = new();
     private int _disposed;
     private int _runStarted;
@@ -69,18 +40,11 @@ public sealed class EventLogQueue : IEventLogQueue, IAsyncDisposable
             SingleReader = true,
             SingleWriter = false,
             AllowSynchronousContinuations = false,
-            // NOT DropWrite: per the Channels source (BoundedChannelWriter.TryWrite), a DropWrite channel's
-            // TryWrite returns TRUE even when it silently discards the item ("just ignore the item being
-            // added but say we added it") -- Enqueue below could never observe or report a drop that way.
-            // Wait mode's TryWrite, by contrast, returns false immediately and synchronously when full
-            // (only WriteAsync actually awaits space) -- exactly the non-blocking, honestly-reported
-            // backpressure signal this queue needs, since Enqueue only ever calls TryWrite, never WriteAsync.
             FullMode = BoundedChannelFullMode.Wait
         });
     }
 
-    /// <summary>Idempotent -- safe whether or not <see cref="RunAsync" /> ever started.</summary>
-    public async ValueTask DisposeAsync()
+        public async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
             return;
@@ -94,8 +58,7 @@ public sealed class EventLogQueue : IEventLogQueue, IAsyncDisposable
         _shutdownCts.Dispose();
     }
 
-    /// <inheritdoc />
-    public bool Enqueue(EventLogEntryTvp entry)
+        public bool Enqueue(EventLogEntryTvp entry)
     {
         if (_channel.Writer.TryWrite(entry))
             return true;
@@ -104,11 +67,7 @@ public sealed class EventLogQueue : IEventLogQueue, IAsyncDisposable
         return false;
     }
 
-    /// <summary>
-    ///     Runs the drain loop until cancelled. Start once -- a second call throws (loops would race the same
-    ///     timer/channel).
-    /// </summary>
-    public async Task RunAsync(CancellationToken ct)
+        public async Task RunAsync(CancellationToken ct)
     {
         if (Interlocked.Exchange(ref _runStarted, 1) != 0)
             throw new InvalidOperationException(
@@ -121,9 +80,6 @@ public sealed class EventLogQueue : IEventLogQueue, IAsyncDisposable
             using var timer = new PeriodicTimer(_interval);
             var reader = _channel.Reader;
 
-            // Each of PeriodicTimer/ChannelReader allows one pending waiter; the losing WhenAny task is
-            // re-awaited, not replaced (re-issuing would throw or miss a signal), same pattern as
-            // WriteBehindFlusher.RunAsync.
             var tickTask = timer.WaitForNextTickAsync(loopCt).AsTask();
             var dataTask = reader.WaitToReadAsync(loopCt).AsTask();
 
@@ -141,7 +97,7 @@ public sealed class EventLogQueue : IEventLogQueue, IAsyncDisposable
                     dataTask = reader.WaitToReadAsync(loopCt).AsTask();
 
                 if (reader.Count == 0)
-                    continue; // bare tick with nothing buffered -- go back to waiting
+                    continue;
 
                 var batch = new List<EventLogEntryTvp>(Math.Min(reader.Count, _batchSize));
                 while (batch.Count < _batchSize && reader.TryRead(out var item))
@@ -150,9 +106,6 @@ public sealed class EventLogQueue : IEventLogQueue, IAsyncDisposable
                 if (batch.Count > 0)
                     await FlushBatchAsync(batch, loopCt).ConfigureAwait(false);
 
-                // If the channel still has a full batch's worth queued (backlog catch-up), dataTask above
-                // is already complete-and-ready again on the next WhenAny, so the loop drains back-to-back
-                // without waiting for the next timer tick.
             }
         }
         finally
@@ -161,8 +114,7 @@ public sealed class EventLogQueue : IEventLogQueue, IAsyncDisposable
         }
     }
 
-    /// <summary>Logs and DROPS the batch on failure -- see class remarks for why this never re-queues.</summary>
-    private async ValueTask FlushBatchAsync(IReadOnlyList<EventLogEntryTvp> batch, CancellationToken loopCt)
+        private async ValueTask FlushBatchAsync(IReadOnlyList<EventLogEntryTvp> batch, CancellationToken loopCt)
     {
         try
         {
@@ -172,14 +124,10 @@ public sealed class EventLogQueue : IEventLogQueue, IAsyncDisposable
         {
             try
             {
-                // batch.Count is passed through so the caller's log can state exactly how many rows were
-                // lost -- this batch is dropped, never requeued (see class remarks), so this count is the
-                // only record that these rows ever existed.
                 _onFlushError?.Invoke(ex, batch.Count);
             }
             catch
             {
-                // Best-effort: a broken logger must not take the drain loop down.
             }
         }
     }

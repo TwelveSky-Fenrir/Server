@@ -58,7 +58,7 @@ public class AllianceProposalCenterStateTests
 
     [Theory]
     [InlineData(1, 2, 1, 2, true)]
-    [InlineData(1, 2, 2, 1, true)] // either order
+    [InlineData(1, 2, 2, 1, true)]
     [InlineData(1, 2, 1, 3, false)]
     [InlineData(1, 2, 3, 4, false)]
     public void SlotMatchesPairEitherOrder_ChecksBothOrderings(byte cellA, byte cellB, byte queryA, byte queryB,
@@ -111,7 +111,6 @@ public class AllianceProposalCenterStateTests
         Assert.True(info.CooldownActive);
         Assert.Equal(20260815, info.ExpiryDateYyyyMmDd);
 
-        // Untouched tribe stays cleared.
         Assert.Equal(AlliancePossibleInfo.Cleared, state.GetPossibleAllianceInfo(0));
     }
 
@@ -154,7 +153,7 @@ public class AllianceProposalCenterStateTests
     {
         var state = new AllianceProposalCenterState();
         state.SetSlot(0, 2, 3);
-        state.SetSlot(1, 0, 1); // pre-existing occupant, overwritten unconditionally
+        state.SetSlot(1, 0, 1);
 
         state.ApplyFinalize(0, 1);
 
@@ -191,7 +190,7 @@ public class AllianceProposalCenterStateTests
         var state = new AllianceProposalCenterState();
         state.SetSlot(0, 1, 2);
 
-        state.ApplyBreak(2, 1, 20260815, 20260816); // opposite order from how the slot was stored
+        state.ApplyBreak(2, 1, 20260815, 20260816);
 
         Assert.True(state.SlotIsEmpty(0));
         var infoTribe2 = state.GetPossibleAllianceInfo(2);
@@ -206,13 +205,13 @@ public class AllianceProposalCenterStateTests
     public void ApplyBreak_SlotZeroDoesNotMatch_FallsBackToSlotOne_UnconditionallyClearingIt()
     {
         var state = new AllianceProposalCenterState();
-        state.SetSlot(0, 3, 0); // unrelated pair
-        state.SetSlot(1, 1, 2); // the actual targeted pair
+        state.SetSlot(0, 3, 0);
+        state.SetSlot(1, 1, 2);
 
         state.ApplyBreak(1, 2, 20260901, 20260902);
 
         Assert.Equal(((byte?)3, (byte?)0), state.GetSlot(0));
-        Assert.True(state.SlotIsEmpty(1)); // cleared even though it genuinely held the pair -- legacy defect preserved
+        Assert.True(state.SlotIsEmpty(1));
     }
 
     [Theory]

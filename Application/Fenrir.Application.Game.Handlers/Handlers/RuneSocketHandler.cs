@@ -8,29 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
-/// <summary>
-///     CZ_RUNE_SYSTEM_SEND (op157). Sort 0 = inventory-&gt;rune (insert), Sort 1 = rune-&gt;inventory (remove),
-///     both delegated to <see cref="IRuneSocketService" />. Any other Sort is silently ignored (no reply, no
-///     disconnect -- the legacy switch has no default case, unlike almost every other opcode in this codebase).
-///     See <c>RuneSocketResolver</c>'s remarks for the client-supplied-item-id quirk on insert.
-/// </summary>
-/// <remarks>
-///     Result correction vs. an earlier reading of this contract: 0 = INSERT ok, 1 = REMOVE ok, 2 = inventory
-///     full (removal only) -- <c>B_RUNE_SYSTEM_RECV(0, ...)</c> terminates the Sort=0 branch and
-///     <c>B_RUNE_SYSTEM_RECV(1, ...)</c> terminates the Sort=1 branch in S04_MyWork03.cpp:8162, the reverse of
-///     <see cref="RuneSocketResponse" />'s original doc comment. Stat recompute (SetBasicAbilityFromEquip +
-///     SetHPMP) happens tick-side, not here: <c>aRuneSystemStat</c> now feeds
-///     <c>EquipmentService.RecomputeStats</c> (via <c>AssembleStatContexts</c> -&gt; <c>CosmeticContext</c>,
-///     workstreams B5/B6), so <c>Zone.ApplyRuneSocketCommand</c> recomputes
-///     <c>PlayerRuntimeState.Stats</c> unconditionally on every socket mutation -- this handler stays a thin
-///     validate-persist-mirror layer and never computes stats itself, same posture as every other
-///     economy-adjacent handler.
-///     A successful Sort=1 withdrawal sends <b>two</b> packets, not one: an <see cref="AddInventoryItemResponse" />
-///     (ZC_ADD_USER_INVENTORY_ITEM_RECV) confirming the rune's resulting inventory position, immediately
-///     followed by the <see cref="RuneSocketResponse" /> confirming the rune-slot withdrawal itself -- same
-///     two-packet ordering/reason as <c>CraftItemHandler</c>'s Advanced Elixir/granted-item branches (client
-///     learns of the new item before the result packet that references its slot).
-/// </remarks>
 public sealed class RuneSocketHandler(IRuneSocketService runeSocketService, ILogger<RuneSocketHandler> logger)
     : IAsyncPacketHandler<RuneSocketRequest>
 {
@@ -106,10 +83,6 @@ public sealed class RuneSocketHandler(IRuneSocketService runeSocketService, ILog
                         "Character {CharacterId} removed rune {RuneIndex} into container {Page} slot {Index}",
                         characterId, packet.RuneIndex, result.Page, result.Index);
 
-                    // B_RUNE_SYSTEM_RECV(1, ...) describes the rune-slot withdrawal itself, not the granted
-                    // inventory stack -- the granted item rides its own ZC_ADD_USER_INVENTORY_ITEM_RECV, sent
-                    // first so the client learns of the new item before the rune-slot result references its
-                    // resulting position. Same ordering/reason as CraftItemHandler's Advanced Elixir branch.
                     var granted = result.GrantedItem!.Value;
                     session.Send(new AddInventoryItemResponse
                     {

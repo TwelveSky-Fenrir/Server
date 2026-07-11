@@ -6,13 +6,6 @@ using Fenrir.Application.Game.Domain.World.Loot;
 
 namespace Fenrir.Application.Game.Tests.Inventory.UseItems.Boxes;
 
-/// <summary>
-///     End-to-end (but pure, I/O-free) coverage for <see cref="LootBoxOpenResolver" /> over the real
-///     <see cref="LootBoxCatalog" /> specs: single opens (rare-band hit, pool path, rental stamp, inventory
-///     full, unknown reward) and bulk opens (count clamp, box consumption, no-progress stop). The reward-and-box
-///     atomicity contract is asserted through the projected pages -- a reward slot is only ever populated
-///     alongside the box slot being decremented, never one without the other.
-/// </summary>
 public class LootBoxOpenResolverTests
 {
     private const int Today = 20260710;
@@ -36,7 +29,6 @@ public class LootBoxOpenResolverTests
     {
         var page0 = ImmutableDictionary<byte, ItemStack>.Empty.SetItem(0, Box(601, 3));
 
-        // Rare draw 49 (< 50) -> id 635; 635 resolves to a non-stackable sort (weapon) -> quantity 0.
         var plan = LootBoxOpenResolver.OpenSingle(MountBox, 0, 0, Box(601, 3), page0,
             ImmutableDictionary<byte, ItemStack>.Empty, Sorts((635, 4)), new ScriptedRandom(49), Today);
 
@@ -48,8 +40,8 @@ public class LootBoxOpenResolverTests
         Assert.Equal(1, plan.RewardSlot);
         Assert.Equal(2, plan.BoxRemainingQuantity);
 
-        Assert.Equal(2, plan.ProjectedPage0[0].Quantity); // box decremented by exactly one
-        Assert.Equal(635, plan.ProjectedPage0[1].ItemId); // reward placed
+        Assert.Equal(2, plan.ProjectedPage0[0].Quantity);
+        Assert.Equal(635, plan.ProjectedPage0[1].ItemId);
     }
 
     [Fact]
@@ -57,7 +49,6 @@ public class LootBoxOpenResolverTests
     {
         var page0 = ImmutableDictionary<byte, ItemStack>.Empty.SetItem(0, Box(601, 1));
 
-        // Rare miss (50), pool-select 5 (<= 10) -> pool0 {92286}, within-pool uniform 0 -> 92286 (a pet sort).
         var plan = LootBoxOpenResolver.OpenSingle(MountBox, 0, 0, Box(601, 1), page0,
             ImmutableDictionary<byte, ItemStack>.Empty, Sorts((92286, BoxRewardPlacementResolver.PetSort)),
             new ScriptedRandom(50, 5, 0), Today);
@@ -65,8 +56,8 @@ public class LootBoxOpenResolverTests
         Assert.Equal(LootBoxOpenResolver.Outcome.Success, plan.Outcome);
         Assert.Equal(92286, plan.RewardItemId);
         Assert.Equal(1, plan.RewardQuantity);
-        Assert.Equal(0, plan.BoxRemainingQuantity); // last box consumed
-        Assert.False(plan.ProjectedPage0.ContainsKey(0)); // box slot cleared at zero
+        Assert.Equal(0, plan.BoxRemainingQuantity);
+        Assert.False(plan.ProjectedPage0.ContainsKey(0));
         Assert.Equal(92286, plan.ProjectedPage0[1].ItemId);
     }
 
@@ -75,7 +66,6 @@ public class LootBoxOpenResolverTests
     {
         var page0 = ImmutableDictionary<byte, ItemStack>.Empty.SetItem(0, Box(76542, 1));
 
-        // Uniform draw 0 -> 76534 (a non-stackable costume sort); 76542 grants a 3-day rental.
         var plan = LootBoxOpenResolver.OpenSingle(LimitedStellar, 0, 0, Box(76542, 1), page0,
             ImmutableDictionary<byte, ItemStack>.Empty, Sorts((76534, 30)), new ScriptedRandom(0), Today);
 
@@ -88,9 +78,6 @@ public class LootBoxOpenResolverTests
     [Fact]
     public void OpenSingle_ResolveRewardSerial_StampsTheOverrideSerial_OnANonStackableReward()
     {
-        // Workstream lucky-ticket-handler-thresholds: resolveRewardSerial lets a caller stamp a fixed serial
-        // (e.g. the Lucky Ticket family's per-ticket constant) instead of the default 0 -- every pre-existing
-        // box (like this same MountBox spec used elsewhere in this file) keeps Serial 0 unless it opts in.
         var page0 = ImmutableDictionary<byte, ItemStack>.Empty.SetItem(0, Box(601, 1));
 
         var plan = LootBoxOpenResolver.OpenSingle(MountBox, 0, 0, Box(601, 1), page0,
@@ -177,7 +164,6 @@ public class LootBoxOpenResolverTests
     [Fact]
     public void OpenBulk_StopsEarly_WhenInventoryFills_WithoutInfiniteLoop()
     {
-        // Two free slots total (page0 slot63, page1 slot63); the box sits in page0 slot0.
         var page0Builder = ImmutableDictionary.CreateBuilder<byte, ItemStack>();
         page0Builder[0] = Box(601, 5);
         for (byte slot = 1; slot <= 62; slot++)
@@ -190,7 +176,7 @@ public class LootBoxOpenResolverTests
         var plan = LootBoxOpenResolver.OpenBulk(MountBox, 0, 0, Box(601, 5), page0Builder.ToImmutable(),
             page1Builder.ToImmutable(), Sorts((635, 4)), new ScriptedRandom(49, 49, 49), Today, requestedCount: 5);
 
-        Assert.Equal(2, plan.OpenedCount); // two free slots filled, the third open finds none and halts
+        Assert.Equal(2, plan.OpenedCount);
         Assert.Equal(3, plan.BoxRemainingQuantity);
     }
 
@@ -202,8 +188,7 @@ public class LootBoxOpenResolverTests
         return builder.ToImmutable();
     }
 
-    /// <summary>Returns queued draws in request order; throws if the code draws more than were scripted.</summary>
-    private sealed class ScriptedRandom(params int[] values) : Random
+        private sealed class ScriptedRandom(params int[] values) : Random
     {
         private int _index;
 

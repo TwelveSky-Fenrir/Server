@@ -112,12 +112,12 @@ public class PvpKillExtendedRewardZonesTests
     }
 
     [Theory]
-    [InlineData((short)1)] // city zone -- owned by PvpKillRewardZoneCatalog, not this extension
+    [InlineData((short)1)]
     [InlineData((short)140)]
-    [InlineData((short)194)] // unconditional-full -- owned by PvpKillRewardZoneCatalog
+    [InlineData((short)194)]
     [InlineData((short)267)]
-    [InlineData((short)335)] // FFA -- owned by PvpKillRewardZoneCatalog
-    [InlineData((short)999)] // truly unlisted
+    [InlineData((short)335)]
+    [InlineData((short)999)]
     public void ZonesOwnedByTheBaseCatalog_ReturnNullSoTheCallerFallsThrough(short zoneId)
     {
         Assert.Null(PvpKillExtendedRewardZones.TryResolve(zoneId, false, PvpKillRewardZoneRuntimeState.Inactive));

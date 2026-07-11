@@ -4,15 +4,10 @@ using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Game.Tests.Commerce;
 
-/// <summary>
-///     Pure port of <c>MyDB::GetBloodShop</c> (S08_MyDB.cpp): BloodNum is unconditionally 50, and rows land at
-///     sequential positions starting at 0 regardless of their own BloodExchangeSlot number.
-/// </summary>
 public class BloodShopBuilderTests
 {
     private static ItemDefinition Item(int itemId, byte sort)
     {
-        // Sort is ItemRowDto's param index 6 (0-based)
         var row = new ItemRowDto(
             itemId, $"Item{itemId}", null, null, null,
             0, sort, 0, 0, 0,
@@ -51,7 +46,7 @@ public class BloodShopBuilderTests
         Assert.Equal(5, shop.Data[0].Price);
         Assert.Equal(1019, shop.Data[1].ItemId);
         Assert.Equal(9999, shop.Data[1].Price);
-        Assert.Equal(0, shop.Data[2].ItemId); // every other slot stays zeroed
+        Assert.Equal(0, shop.Data[2].ItemId);
     }
 
     [Fact]

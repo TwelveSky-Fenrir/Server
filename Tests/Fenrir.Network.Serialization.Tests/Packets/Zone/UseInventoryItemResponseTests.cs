@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Zone;
 
-/// <summary>ZC_USE_INVENTORY_ITEM_RECV (ZONE.h:484-493): 5 ints, not 4 — USE_PREMIUM_LONGTIME is active in EU33.</summary>
 public class ZcUseInventoryItemRecvTests
 {
     [Fact]

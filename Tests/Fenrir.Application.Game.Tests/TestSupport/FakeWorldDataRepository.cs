@@ -3,10 +3,6 @@ using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Game.Tests.TestSupport;
 
-/// <summary>
-///     In-memory stand-in for <see cref="IWorldDataRepository" />: only the cash/blood catalog reload surface
-///     used by <c>CommerceCatalogCacheTests</c> is exercised here; every other member is out of scope.
-/// </summary>
 internal sealed class FakeWorldDataRepository : IWorldDataRepository
 {
     public List<ItemMallProductRowDto> ItemMallProducts { get; set; } = [];

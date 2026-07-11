@@ -15,7 +15,6 @@ internal static class WireTestKit
         Encoding.Latin1.GetBytes(value, destination);
     }
 
-    // Mirrors FixedStringAttribute's contract: null-terminated Latin1.
     public static string ReadFixedString(ReadOnlySpan<byte> source)
     {
         var nul = source.IndexOf((byte)0);
@@ -103,7 +102,6 @@ internal static class WireTestKit
             return values;
         }
 
-        // FieldShape.NestedArray: recurse per element.
         if (type.IsArray && type.GetElementType() is { IsValueType: true, IsPrimitive: false } structElementType)
         {
             var count = property.GetCustomAttribute<FixedArrayAttribute>()!.ElementCount;
@@ -171,7 +169,6 @@ internal static class WireTestKit
                 case string[] a:
                     Assert.True(a.SequenceEqual((string[])actualValue!), propertyPath);
                     break;
-                // FieldShape.NestedArray comparison.
                 case Array a:
                 {
                     var actualArray = (Array)actualValue!;
@@ -194,7 +191,6 @@ internal static class WireTestKit
         }
     }
 
-    // ACTION_INFO: 104 bytes, no padding (wire contract §4.2).
     public static int EncodeActionInfo(Span<byte> destination, ActionInfo action)
     {
         var offset = 0;
@@ -219,7 +215,6 @@ internal static class WireTestKit
         return offset;
     }
 
-    // OBJECT_FOR_AVATAR: 632 bytes; 3-byte padding at offsets 29,41,61,489,533 (§5.9/§7.3).
     public static int EncodeObjectForAvatar(Span<byte> destination, ObjectForAvatar data)
     {
         var offset = 0;
@@ -283,7 +278,6 @@ internal static class WireTestKit
         return offset;
     }
 
-    // ITEM_LINK_INFO: 24 bytes, no padding (STRUCT.h:1009-1014).
     public static int EncodeItemLinkInfo(Span<byte> destination, ItemLinkInfo link)
     {
         var offset = 0;
@@ -294,7 +288,6 @@ internal static class WireTestKit
         return offset;
     }
 
-    // OBJECT_FOR_MONSTER: 112 bytes, no padding — int, ACTION_INFO, int (STRUCT.h:933-938).
     public static int EncodeObjectForMonster(Span<byte> destination, ObjectForMonster data)
     {
         var offset = 0;
@@ -304,7 +297,6 @@ internal static class WireTestKit
         return offset;
     }
 
-    // OBJECT_FOR_ITEM: 84 bytes; 2-byte pad after PartyName (offset 54) aligns DropSort to offset 56 (STRUCT.h:941-955).
     public static int EncodeObjectForItem(Span<byte> destination, ObjectForItem data)
     {
         var offset = 0;
@@ -324,7 +316,6 @@ internal static class WireTestKit
         return offset;
     }
 
-    // ATTACK_FOR_PROTOCOL: 68 bytes, no padding; GXCW-only tail member not compiled in EU33 (STRUCT.h:958-978).
     public static int EncodeAttackForProtocol(Span<byte> destination, AttackForProtocol data)
     {
         var offset = 0;
@@ -346,7 +337,6 @@ internal static class WireTestKit
         return offset;
     }
 
-    // PSHOP_INFO: 1232 bytes; 3-byte pad after Name (offset 4..28) aligns ItemInfo array to offset 32 (STRUCT.h:703-709).
     public static int EncodePshopInfo(Span<byte> destination, PshopInfo data)
     {
         var offset = 0;
@@ -358,7 +348,6 @@ internal static class WireTestKit
         return offset;
     }
 
-    // PROXY_STATE_INFO real fields: 50 bytes, no internal padding; struct's 2 trailing pad bytes excluded (STRUCT.h:1734-1740).
     public static int EncodeProxyStateInfo(Span<byte> destination, ProxyStateInfo data)
     {
         var offset = 0;
@@ -368,7 +357,6 @@ internal static class WireTestKit
         return offset;
     }
 
-    // BLOOD_ITEM: 12 bytes, no padding (STRUCT.h:1423-1428).
     public static int EncodeBloodItem(Span<byte> destination, BloodItem data)
     {
         var offset = 0;
@@ -378,7 +366,6 @@ internal static class WireTestKit
         return offset;
     }
 
-    // BLOOD_SHOP: 604 bytes, no padding — BloodNum + 50 BloodItem slots (STRUCT.h:1429-1433).
     public static int EncodeBloodShop(Span<byte> destination, BloodShop data)
     {
         var offset = 0;
@@ -388,7 +375,6 @@ internal static class WireTestKit
         return offset;
     }
 
-    // PROXY_SHOP_ITEM: 20 bytes, no padding (STRUCT.h:1742-1749).
     public static int EncodeProxyShopItem(Span<byte> destination, ProxyShopItem data)
     {
         var offset = 0;
@@ -400,7 +386,6 @@ internal static class WireTestKit
         return offset;
     }
 
-    // PROXY_SHOP_USER_INFO: 824 bytes; 3-byte pad after AvatarName (offset 13..15) before 25 ProxyShopItem slots (STRUCT.h:1752-1760).
     public static int EncodeProxyShopUserInfo(Span<byte> destination, ProxyShopUserInfo data)
     {
         var offset = 0;

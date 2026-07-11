@@ -3,8 +3,6 @@ using Fenrir.Data.Abstractions.Accounts;
 
 namespace Fenrir.Application.Login.Tests.TestSupport;
 
-// In-memory stand-in for IGiftRepository: drives game.Gifts outcomes (a pending list of any length, a
-// simulated claim failure) without a SQL container.
 internal sealed class FakeGiftRepository : IGiftRepository
 {
     private readonly Exception? _claimFault;

@@ -2,7 +2,6 @@ using Fenrir.Application.Game.Domain.Social.Party;
 
 namespace Fenrir.Application.Game.Abstractions.Social;
 
-/// <summary>Discriminator for how a CZ_PARTY_ANSWER_SEND attempt resolved.</summary>
 public enum PartyAnswerResultKind
 {
     NotFound,

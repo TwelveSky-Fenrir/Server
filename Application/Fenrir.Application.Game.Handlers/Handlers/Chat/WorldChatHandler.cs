@@ -8,11 +8,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Chat;
 
-/// <summary>
-///     CZ_WORLD_CHAT_SEND (opcode 152). Level &lt; 10 aborts (anti-spam-bot gate); muted senders are
-///     silently dropped. Broadcasts to every zone, unfiltered. The wire's <c>TribeRole</c> field for this
-///     opcode is actually the sender's tribe number, not a role -- passed through verbatim.
-/// </summary>
 public sealed class WorldChatHandler(IWorldChatService worldChatService) : IInlinePacketHandler<WorldChatRequest>
 {
     public void Handle(in WorldChatRequest packet, IPacketSession session)

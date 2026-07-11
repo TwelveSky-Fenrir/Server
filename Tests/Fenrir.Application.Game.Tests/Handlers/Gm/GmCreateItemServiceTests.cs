@@ -15,13 +15,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Gm;
 
-// Admin-tier GM-CREATE-ITEM (legacy PROCESS_DATA_SEND, opcode 19, tSort 505 "spawn-item" base form / tSort
-// 523 explicit-quantity form -- Server/ts25zone/S04_MyWork04.cpp:1036-1095) -- there is no dedicated legacy
-// wire opcode for this command; GmCreateItemService decodes GmCreateItemPayload/GmCreateItemQuantityPayload
-// out of the shared opcode-19 GenericActionRequest.Data before creating world drops via
-// Zone.PostTribeProgressCommandAndWaitAsync. Covers: the Admin-tier privilege gate, the id-range/catalog
-// rejection path, the stackable-vs-unique quantity resolution (GmCreateItemService.ResolveDrops's own
-// documented rules), and the game.EventLog (Category=ItemCreate) audit row written once per created object.
 public class GmCreateItemServiceTests
 {
     private const int AccountId = 1;
@@ -30,12 +23,11 @@ public class GmCreateItemServiceTests
     private const int GenericActionDataLength = 130;
 
     private const int StackableItemId = 5000;
-    private const byte StackableSort = 2; // ContainerMatrix.IsStackableSort(2) == true.
+    private const byte StackableSort = 2;
 
     private const int UniqueItemId = 6000;
-    // Default WorldDataTestRows.Item's Sort is 0 -- not 2/99, so it's already a "unique" (non-stackable) item.
 
-    private const int OutOfRangeItemId = 100_000; // > GmCreateItemService's own MaxItemId (99999).
+    private const int OutOfRangeItemId = 100_000;
 
     private static async Task RunToCompletionAsync(ValueTask pending, Zone zone)
     {
@@ -96,14 +88,7 @@ public class GmCreateItemServiceTests
         return data;
     }
 
-    /// <summary>
-    ///     Asserts the response frame was sent, tolerating the ground-item AOI creation broadcast
-    ///     (Zone.SpawnGroundItem -> BroadcastGroundItemAction) that lands on this same pipe FIRST whenever the
-    ///     GM's own drop location has itself as an AOI neighbor -- always true here, since a created item spawns
-    ///     at the caller's own PosX/Y/Z. Only the response frame's own byte-exact shape is asserted (as the
-    ///     tail of whatever is currently buffered), not the unrelated broadcast noise ahead of it.
-    /// </summary>
-    private static async Task AssertResponseSentAsync(FakeDuplexPipe pipe, GenericActionResponse expected)
+        private static async Task AssertResponseSentAsync(FakeDuplexPipe pipe, GenericActionResponse expected)
     {
         var actual = await PacketAssert.ReadSentBytesAsync(pipe);
         var frame = new byte[FrameWriter.FrameSizeOf<GenericActionResponse>()];
@@ -196,15 +181,11 @@ public class GmCreateItemServiceTests
     {
         var (session, pipe, zone, state, eventLog) = SetUp((short)GmCommandTier.Admin);
         var service = CreateService(eventLog);
-        var data = QuantityPayloadData(StackableItemId, 1000); // > 999, and nonzero so it's not "unspecified".
+        var data = QuantityPayloadData(StackableItemId, 1000);
 
         await RunToCompletionAsync(
             service.HandleAsync(523, data, session, state, zone, CancellationToken.None), zone);
 
-        // Server/ts25zone/S04_MyWork04.cpp:1068-1077 -- the stackable branch's own `tResult=2; break;` exits
-        // the outer switch(tSort) directly (unlike the non-stackable branch's identical-looking break, which
-        // sits inside a for loop and falls through to tResult=0), so this out-of-range quantity genuinely
-        // reports the failure code (2) rather than being masked as accepted.
         Assert.Null(session.DisconnectReason);
         await PacketAssert.AssertSentAsync(pipe,
             new GenericActionResponse { Result = 2, Sort = 523, Data = data, RuneValue = 0 });
@@ -217,7 +198,7 @@ public class GmCreateItemServiceTests
     {
         var (session, pipe, zone, state, eventLog) = SetUp((short)GmCommandTier.Admin);
         var service = CreateService(eventLog);
-        var data = QuantityPayloadData(StackableItemId, -5); // negative, and nonzero so it's not "unspecified".
+        var data = QuantityPayloadData(StackableItemId, -5);
 
         await RunToCompletionAsync(
             service.HandleAsync(523, data, session, state, zone, CancellationToken.None), zone);
@@ -232,12 +213,9 @@ public class GmCreateItemServiceTests
     [Fact]
     public async Task HandleAsync_Sort523_UniqueItem_NegativeQuantity_CreatesNothing_ButStillSendsAccepted()
     {
-        // Non-stackable branch keeps legacy's own control-flow defect: `tResult=2; break;` there sits inside a
-        // for loop (Server/ts25zone/S04_MyWork04.cpp:1078-1093), so it only exits the loop and falls through to
-        // the unconditional tResult=0 overwrite -- unlike the stackable branch above.
         var (session, pipe, zone, state, eventLog) = SetUp((short)GmCommandTier.Admin);
         var service = CreateService(eventLog);
-        var data = QuantityPayloadData(UniqueItemId, -3); // negative resolvedCount -> the for loop never runs.
+        var data = QuantityPayloadData(UniqueItemId, -3);
 
         await RunToCompletionAsync(
             service.HandleAsync(523, data, session, state, zone, CancellationToken.None), zone);

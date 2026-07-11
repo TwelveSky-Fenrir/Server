@@ -69,7 +69,6 @@ public class PetActionUpdateServiceTests
         Assert.Equal(5f, player.PetActionTargetLocationY);
         Assert.Equal(6f, player.PetActionTargetLocationZ);
 
-        // no reply and no position change of any kind -- matches the legacy handler exactly
         Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
         Assert.Equal(0, player.ActionSort);
     }
@@ -80,7 +79,7 @@ public class PetActionUpdateServiceTests
         var zone = ZoneTestKit.CreateZone(1);
 
         zone.Post(ZoneCommand.PetAction(999, PetAction(1, 0f, [0f, 0f, 0f], [0f, 0f, 0f])));
-        zone.Tick(TimeSpan.FromMilliseconds(50)); // must not throw
+        zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.False(zone.TryGetPlayer(999, out _));
     }

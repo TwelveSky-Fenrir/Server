@@ -4,7 +4,6 @@ namespace Fenrir.Application.Game.Tests.Social;
 
 public class TradeMoneyPlacementResolverTests
 {
-    // ---- tSort 221 -- ResolveToTradeOffer ----
 
     [Fact]
     public void ResolveToTradeOffer_AmountBelowOne_IsQuantityOutOfRange()
@@ -57,7 +56,6 @@ public class TradeMoneyPlacementResolverTests
         Assert.Equal(500, result.NewTradeOfferMoney);
     }
 
-    // ---- tSort 222 -- ResolveFromTradeOffer ----
 
     [Fact]
     public void ResolveFromTradeOffer_AmountBelowOne_IsQuantityOutOfRange()
@@ -99,8 +97,6 @@ public class TradeMoneyPlacementResolverTests
     [Fact]
     public void ResolveFromTradeOffer_DoesNotTouchBigMoney_OnlyReturnsNormalMoneyBalances()
     {
-        // Purely a documentation-style assertion: the result shape has no BigMoney field at all, so a caller
-        // physically cannot route tSort 221/222 amounts into TradeOfferSide.BigMoney by mistake.
         var result = TradeMoneyPlacementResolver.ResolveToTradeOffer(100, 0, 50);
 
         Assert.True(result.Succeeded);

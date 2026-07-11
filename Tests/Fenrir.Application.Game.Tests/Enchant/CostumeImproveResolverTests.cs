@@ -25,7 +25,6 @@ public class CostumeImproveResolverTests
     [Fact]
     public void Enchant_OrdinaryMaterial_RollBelowRate_Succeeds()
     {
-        // GetHaloCostumeEnchantRate flat success rate is 15; a roll of 14 (< 15) succeeds.
         var result = CostumeImproveResolver.ResolveEnchant(10, CostumeImproveResolver.OrdinaryMaterial,
             new ScriptedRandomSource(14));
 
@@ -39,7 +38,6 @@ public class CostumeImproveResolverTests
     [Fact]
     public void Enchant_OrdinaryMaterial_RollAtRate_NoChange_MaterialStillConsumed()
     {
-        // Roll of 15 (>= 15) fails; the commented-out downgrade block means a plain no-change, not a downgrade.
         var result = CostumeImproveResolver.ResolveEnchant(10, CostumeImproveResolver.OrdinaryMaterial,
             new ScriptedRandomSource(15));
 
@@ -52,7 +50,6 @@ public class CostumeImproveResolverTests
     [Fact]
     public void Enchant_GuaranteedMaterial_SucceedsEvenOnWorstRoll_NoDrawTaken()
     {
-        // Material 724 forces success without consulting the random source.
         var result = CostumeImproveResolver.ResolveEnchant(10, CostumeImproveResolver.GuaranteedSuccessMaterial,
             new ScriptedRandomSource(99));
 

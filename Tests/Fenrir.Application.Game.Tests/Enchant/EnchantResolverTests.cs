@@ -57,9 +57,6 @@ public class EnchantResolverTests
     [Fact]
     public void WingTarget_UsesSameMachineryAsEquipment_SucceedsAndFlagsIsWing()
     {
-        // Sort 6 (wings) now resolves through the identical ResolveStandard path as any other equipment
-        // slot in the 6..29 band -- same p1/material table as StoneMaterial_SuccessRoll_IncrementsEnchantByBaseValue,
-        // only IsWing distinguishes it so the caller routes Cost to CP instead of money.
         var target = Equip(1, 6);
         var result = EnchantResolver.Resolve(target, Target(0), Material(1019), 0, 0,
             0, new ScriptedRandomSource(0));
@@ -95,7 +92,6 @@ public class EnchantResolverTests
     public void StoneMaterial_SuccessRoll_IncrementsEnchantByBaseValue()
     {
         var target = Equip(1);
-        // p1 = 103 - 3*1 + 0 = 100 -- rolling 0 (< 100) always succeeds at +0 -> +1.
         var result = EnchantResolver.Resolve(target, Target(0), Material(1019), 0, 0,
             0, new ScriptedRandomSource(0));
 
@@ -108,12 +104,10 @@ public class EnchantResolverTests
     [Fact]
     public void StoneMaterial_HighEnchant_FailureBelowSafeValue_NeverDestroys()
     {
-        // current=10, +1019(+1) => new=11 <= SAFE_IMPROVE_VALUE(20): destroy roll never happens even on
-        // a guaranteed-fail first roll.
         var target = Equip(1);
         var result = EnchantResolver.Resolve(target, Target(10), Material(1019), 0, 0,
             0, new ScriptedRandomSource(99,
-                0)); // fail the success roll (99 >= p1), then would-be destroy roll unreachable
+                0));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Failed, result.Outcome);
         Assert.Equal(9, result.NewEnchant);
@@ -122,8 +116,6 @@ public class EnchantResolverTests
     [Fact]
     public void StoneMaterial_HighEnchant_FailureAboveSafeValue_DestroyRollFails_IsPlainFailure()
     {
-        // current=25, +1 => new=26 > 20: destroy roll happens. p2 = -57+26*3-0 = 21. Roll 50 (>=21) misses
-        // the destroy, falls through to plain failure.
         var target = Equip(1);
         var result = EnchantResolver.Resolve(target, Target(25), Material(1019), 0, 0,
             0, new ScriptedRandomSource(99, 50));
@@ -157,7 +149,6 @@ public class EnchantResolverTests
     [Fact]
     public void StoneMaterial_FailureAtZero_NeverGoesNegative()
     {
-        // current=0, material 1023 (+5): p1=103-15+0=88, roll 90 fails -- must floor at 0, not go negative
         var target = Equip(1);
         var result = EnchantResolver.Resolve(target, Target(0), Material(1023), 0, 0,
             0, new ScriptedRandomSource(90));
@@ -169,7 +160,6 @@ public class EnchantResolverTests
     [Fact]
     public void StoneMaterial_NearFortyCap_ClampsIncrementToBoundary()
     {
-        // current=38, material 1023 (+5) would reach 43 -- clamped to 40.
         var target = Equip(1);
         var result = EnchantResolver.Resolve(target, Target(38), Material(1023), 0, 0,
             0, new ScriptedRandomSource(0));
@@ -193,7 +183,7 @@ public class EnchantResolverTests
     [Fact]
     public void FillToValueScroll619_RequiresRareOrElite_RejectsOtherwise()
     {
-        var target = Equip(1, type: 0); // neither Rare(3) nor Elite(4)
+        var target = Equip(1, type: 0);
         var result = EnchantResolver.Resolve(target, Target(5), Material(619), 0, 0,
             0, new ScriptedRandomSource(0));
 
@@ -203,7 +193,7 @@ public class EnchantResolverTests
     [Fact]
     public void FillToValueScroll619_JumpsStraightToFortyFromAnyLevel()
     {
-        var target = Equip(1, type: 3); // IRARE
+        var target = Equip(1, type: 3);
         var result = EnchantResolver.Resolve(target, Target(12), Material(619), 0, 0,
             0, new ScriptedRandomSource(0));
 
@@ -224,7 +214,7 @@ public class EnchantResolverTests
     [Fact]
     public void Scroll825_IgnoresFortyCap_JumpsStraightToFiftyFromBelowForty()
     {
-        var target = Equip(1, type: 4); // IELITE
+        var target = Equip(1, type: 4);
         var result = EnchantResolver.Resolve(target, Target(3), Material(825), 0, 0,
             0, new ScriptedRandomSource(0));
 
@@ -330,11 +320,7 @@ public class EnchantResolverTests
         Assert.Equal(50, result.NewEnchant);
     }
 
-    /// <summary>
-    ///     "Sweet potato" (Lucky Enchant Scroll / ImproveItemValue) is consumed on a rolled success just like
-    ///     any other rolled outcome -- see this type's own remarks for why no probability bonus is applied yet.
-    /// </summary>
-    [Fact]
+        [Fact]
     public void ImproveCharge_Present_ConsumedOnRolledSuccess()
     {
         var target = Equip(1);
@@ -345,8 +331,7 @@ public class EnchantResolverTests
         Assert.True(result.ConsumesImproveCharge);
     }
 
-    /// <summary>Not refunded on failure -- consumed regardless of whether the roll actually succeeded.</summary>
-    [Fact]
+        [Fact]
     public void ImproveCharge_Present_ConsumedOnRolledFailure()
     {
         var target = Equip(1);
@@ -367,8 +352,7 @@ public class EnchantResolverTests
         Assert.False(result.ConsumesImproveCharge);
     }
 
-    /// <summary>+40 -&gt; +41 unseal never rolls, so the charge is not consulted/consumed even if present.</summary>
-    [Fact]
+        [Fact]
     public void ImproveCharge_Present_NotConsumedOnNoRollUnseal()
     {
         var target = Equip(1, type: 3);
@@ -379,8 +363,7 @@ public class EnchantResolverTests
         Assert.False(result.ConsumesImproveCharge);
     }
 
-    /// <summary>Advanced (+41..+50) regime consumes the charge on its own rolled outcomes too.</summary>
-    [Fact]
+        [Fact]
     public void ImproveCharge_Present_ConsumedInAdvancedRegime()
     {
         var target = Equip(1, type: 3);

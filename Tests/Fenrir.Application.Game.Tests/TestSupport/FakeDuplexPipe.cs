@@ -2,10 +2,6 @@ using System.IO.Pipelines;
 
 namespace Fenrir.Application.Game.Tests.TestSupport;
 
-/// <summary>
-///     Two <see cref="Pipe" />s wired as one <see cref="IDuplexPipe" />, letting a test build a <c>ClientSession</c>
-///     without a real socket.
-/// </summary>
 internal sealed class FakeDuplexPipe : IDuplexPipe
 {
     private readonly Pipe _inbound = new();

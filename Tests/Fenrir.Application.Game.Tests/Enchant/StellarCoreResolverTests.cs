@@ -51,7 +51,6 @@ public class StellarCoreResolverTests
     {
         var result = StellarCoreResolver.Resolve(Def(90000), Def(90000), true);
 
-        // 50,000,000 - 20% = 40,000,000.
         Assert.Equal(40_000_000, result.Cost);
     }
 

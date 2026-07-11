@@ -9,10 +9,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.Transport;
 
-// Workstream D3 / Contract A (Server/ts25zone/S04_MyWork01.cpp:283-286, :389): the drain loop must re-check the
-// session's disconnect state between buffered frames, so once a handler aborts/quits the session no further
-// already-buffered frame from the same receive is dispatched. Exercises SessionLoop.RunAsync against a real Pipe
-// pair (via ZoneTestKit's FakeDuplexPipe), writing several complete frames into one buffer.
 public sealed class SessionLoopMidDrainDisconnectTests
 {
     private static readonly TimeSpan LoopTimeout = TimeSpan.FromSeconds(5);
@@ -21,10 +17,8 @@ public sealed class SessionLoopMidDrainDisconnectTests
     public async Task RunAsync_TwoFramesInOneBuffer_NoHandlerAbort_DispatchesBoth()
     {
         var (session, pipe) = InWorldSession(1);
-        var dispatcher = new RecordingAbortingDispatcher(); // never aborts
+        var dispatcher = new RecordingAbortingDispatcher();
 
-        // Both complete frames written and the writer completed BEFORE the loop starts, so the first ReadAsync
-        // returns one buffer containing both -- ProcessBufferAsync drains them in a single call.
         await pipe.PeerToSession.WriteAsync(TwoFrames());
         await pipe.PeerToSession.CompleteAsync();
 
@@ -32,8 +26,6 @@ public sealed class SessionLoopMidDrainDisconnectTests
             CancellationToken.None);
         await AwaitLoopAsync(loopTask);
 
-        // Baseline: without any abort, a multi-frame buffer is fully drained -- proves the new re-check does not
-        // over-eagerly stop a healthy session mid-buffer.
         Assert.Equal(2, dispatcher.DispatchCount);
         Assert.Equal(DisconnectReason.ClientClosed, session.DisconnectReason);
     }
@@ -42,8 +34,6 @@ public sealed class SessionLoopMidDrainDisconnectTests
     public async Task RunAsync_TwoFramesInOneBuffer_FirstHandlerAborts_SecondFrameNeverDispatched()
     {
         var (session, pipe) = InWorldSession(2);
-        // The first handler kicks the session (a GM KICK is the canonical mid-buffer, handler-initiated
-        // Quit-equivalent); the second buffered frame must NOT reach the dispatcher afterwards.
         var dispatcher = new RecordingAbortingDispatcher(abortOnCall: 1, abortReason: DisconnectReason.GmKicked);
 
         await pipe.PeerToSession.WriteAsync(TwoFrames());
@@ -54,7 +44,6 @@ public sealed class SessionLoopMidDrainDisconnectTests
         await AwaitLoopAsync(loopTask);
 
         Assert.Equal(1, dispatcher.DispatchCount);
-        // Abort is idempotent -- the handler's own reason sticks, never overwritten by any later loop bookkeeping.
         Assert.Equal(DisconnectReason.GmKicked, session.DisconnectReason);
     }
 
@@ -67,7 +56,6 @@ public sealed class SessionLoopMidDrainDisconnectTests
         return (session, pipe);
     }
 
-    // Two back-to-back HeartbeatRequest frames (allowed in InWorld) concatenated into one contiguous buffer.
     private static byte[] TwoFrames()
     {
         var one = BuildClientFrame(HeartbeatRequest.Opcode, HeartbeatRequest.PayloadSize);
@@ -77,7 +65,6 @@ public sealed class SessionLoopMidDrainDisconnectTests
         return both;
     }
 
-    // Raw CLIENT_PACKET frame (9-byte header, opcode at offset 8); payload content is never parsed here.
     private static byte[] BuildClientFrame(byte opcode, int payloadSize)
     {
         var frame = new byte[WireHeaderSizes.ClientPacketSize + payloadSize];
@@ -92,8 +79,6 @@ public sealed class SessionLoopMidDrainDisconnectTests
         await loopTask;
     }
 
-    // Records each dispatch and, on the configured 1-based call number, aborts the session with the given reason
-    // (mirroring a handler that calls session.Abort/Quit mid-buffer). abortOnCall <= 0 means "never abort".
     private sealed class RecordingAbortingDispatcher(
         int abortOnCall = 0,
         DisconnectReason abortReason = DisconnectReason.GmKicked) : IFrameDispatcher

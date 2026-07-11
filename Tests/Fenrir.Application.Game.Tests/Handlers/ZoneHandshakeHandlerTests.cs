@@ -7,8 +7,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 
-// op11 ZC_TEMP_REGISTER_SEND -- cross-process duplicate-login kick/refusal plus the tribe-population quota
-// gate, Game-side handler branch coverage.
 public class ZoneHandshakeHandlerTests
 {
     private const int AccountId = 7;
@@ -38,8 +36,6 @@ public class ZoneHandshakeHandlerTests
         await PacketAssert.AssertSentAsync(pipe, new ZoneHandshakeResponse { Result = 0 });
     }
 
-    // GM-BLOCK precondition: the account-grade fact carried in the ticket must land on the Zone session
-    // itself, never re-queried per action.
     [Fact]
     public async Task HandleAsync_Accepted_WithGmGradeTicket_MarksSessionGmElevated()
     {
@@ -74,9 +70,6 @@ public class ZoneHandshakeHandlerTests
         Assert.Equal([], ZoneTestKit.DrainOutbound(pipe));
     }
 
-    // Absent/expired/wrong-shard ticket -- the closest analog to legacy's RegisterUserForZone_00 failure,
-    // which legacy always answers with a silent Quit() and zero response bytes, never QuotaFull's explicit
-    // Result=1 (see ZoneHandshakeOutcome.Rejected's own remarks for the resolved product-decision boundary).
     [Fact]
     public async Task HandleAsync_Rejected_AbortsSilently_NoResponseSent_AndDoesNotAssociateAccount()
     {
@@ -94,10 +87,6 @@ public class ZoneHandshakeHandlerTests
         Assert.Equal([], ZoneTestKit.DrainOutbound(pipe));
     }
 
-    // Tribe-population quota gate: full quota is a normal, retry-able rejection (Result=1, no abort) --
-    // mirrors legacy's own quota-full/server-state-gate branches, the one failure class on this packet
-    // legacy answers with a response instead of a silent disconnect. Distinct from Rejected above, which
-    // gets the silent-drop treatment instead.
     [Fact]
     public async Task HandleAsync_QuotaFull_SendsGenericFailure_AndDoesNotAbort()
     {
@@ -113,8 +102,6 @@ public class ZoneHandshakeHandlerTests
         await PacketAssert.AssertSentAsync(pipe, new ZoneHandshakeResponse { Result = 1 });
     }
 
-    // Protocol violation (invalid account index, or declared tribe outside the current map group's valid
-    // range) -- silent drop, no response at all, same posture as CreateAvatarHandler's malformed-input guard.
     [Fact]
     public async Task HandleAsync_ProtocolViolation_AbortsSilently_NoResponseSent()
     {

@@ -3,10 +3,6 @@ using Fenrir.Network.Serialization.Wire.Attributes;
 
 namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 
-/// <summary>
-///     Cross-delivered: each side receives the OTHER player's offer; TradeSocket stays wire-significant
-///     (USE_SOCKET_GEM undef).
-/// </summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.TradeStart, ExpectedSize = 233)]
 public readonly partial record struct TradeStartResponse : IOutgoingPacket
 {

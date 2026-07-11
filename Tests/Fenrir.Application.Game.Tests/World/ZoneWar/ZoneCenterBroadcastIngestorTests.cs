@@ -57,8 +57,6 @@ public class ZoneCenterBroadcastIngestorTests
 
         ingestor.Ingest(70, Payload(2, 5));
 
-        // Code 70 maps to the shared "generic" Zone175 state 23 -- NOT the raw event code (the retired
-        // placeholder). The relayed frame still carries the raw sort/payload unchanged.
         Assert.Equal(23, state.GetZone175(2, 5));
 
         foreach (var pipe in new[] { pipeA, pipeB })
@@ -101,7 +99,6 @@ public class ZoneCenterBroadcastIngestorTests
 
         ingestor.Ingest(70, Payload(99, 0));
 
-        // No throw, no write for any valid cell -- and the relay still happens unconditionally.
         for (var instance = 0; instance < ZoneCenterSiegeState.Zone175Instances; instance++)
         for (var slot = 0; slot < ZoneCenterSiegeState.Zone175Slots; slot++)
             Assert.Equal(0, state.GetZone175(instance, slot));
@@ -121,7 +118,6 @@ public class ZoneCenterBroadcastIngestorTests
 
         ingestor.Ingest(405, Payload(2));
 
-        // Code 405 maps to Zone267 state 3 (not the raw event code).
         Assert.Equal(3, state.GetZone267(2));
         Assert.Equal(0, state.GetZone267(0));
     }
@@ -148,8 +144,6 @@ public class ZoneCenterBroadcastIngestorTests
         var ingestor = new ZoneCenterBroadcastIngestor(state, registry,
             NullLogger<ZoneCenterBroadcastIngestor>.Instance);
 
-        // Code 1503 maps to Zone335 state 2 (not the raw event code); code 1507 is the reset to 0 (there is no
-        // separate 1520 reset code).
         ingestor.Ingest(1503, Payload());
         Assert.Equal(2, state.Zone335);
 
@@ -158,14 +152,14 @@ public class ZoneCenterBroadcastIngestorTests
     }
 
     [Theory]
-    [InlineData(416)] // Field of Loyalty / war-lifecycle
-    [InlineData(500)] // alliance revocation
-    [InlineData(628)] // Valkey of Deceased / monster siege / Valley of Tears (upper bound)
-    [InlineData(665)] // Valley of Deceased (RW) -- dead case labels
-    [InlineData(674)] // rank/RFC/cape/skill notification
-    [InlineData(760)] // Proving Grounds / EXP Tower -- commented-out assignments
-    [InlineData(1512)] // dead popup-state code
-    [InlineData(999999)] // genuinely unrecognized
+    [InlineData(416)]
+    [InlineData(500)]
+    [InlineData(628)]
+    [InlineData(665)]
+    [InlineData(674)]
+    [InlineData(760)]
+    [InlineData(1512)]
+    [InlineData(999999)]
     public void Ingest_DeadOrUnboundOrUnrecognizedCode_WritesNoState_ButStillRelays(int eventCode)
     {
         var registry = CreateRegistry(1);
@@ -202,7 +196,6 @@ public class ZoneCenterBroadcastIngestorTests
         ingestor.Ingest(ZoneCenterBroadcastIngestor.PingEventCode, originalPayload);
 
         var frames = ZoneTestKit.DrainOutbound(pipe);
-        // Two full frames back-to-back on the same pipe.
         Assert.Equal(OneFrame * 2, frames.Length);
 
         var first = ReadFrame(frames[..OneFrame]);
@@ -240,22 +233,12 @@ public class ZoneCenterBroadcastIngestorTests
         ZoneTestKit.DrainOutbound(faultyPipe);
         ZoneTestKit.DrainOutbound(healthyPipe);
 
-        // Simulates an ordinary disconnect race: this recipient's own transport already completed its
-        // outbound pipe (SessionLoop's teardown already ran) while the character is still present in
-        // Zone.Players (the zone's own Leave command hasn't drained yet) -- ClientSession.SendRaw throws
-        // InvalidOperationException the instant it tries to write to an already-completed PipeWriter.
         faultyPipe.Output.Complete();
 
         var state = new ZoneCenterSiegeState();
         var logger = new CapturingLogger<ZoneCenterBroadcastIngestor>();
         var ingestor = new ZoneCenterBroadcastIngestor(state, registry, logger);
 
-        // Regression guard: a bare `foreach (zone) foreach (player) player.Session.Send(...)` relay loop
-        // with no per-recipient try/catch lets the FIRST faulted recipient's exception abort delivery to
-        // every zone/player still left to visit, regardless of which of the two zones above is enumerated
-        // first -- Ingest must never throw for this reason (its own doc comment already promises it "never
-        // throws for an unrecognized or malformed-content event code"; an ordinary disconnect race must be
-        // no worse).
         var exception = Record.Exception(() => ingestor.Ingest(70, Payload(2, 5)));
         Assert.Null(exception);
 
@@ -277,8 +260,6 @@ public class ZoneCenterBroadcastIngestorTests
         ingestor.Ingest(70, Payload(0, 0));
         ingestor.Ingest(ZoneCenterBroadcastIngestor.PingEventCode, Payload());
 
-        // The write still happens locally (it doesn't depend on any zone existing); what this test actually
-        // guards is that relaying to an empty zone-player set never throws. Code 70 maps to Zone175 state 23.
         Assert.Equal(23, state.GetZone175(0, 0));
     }
 

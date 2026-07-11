@@ -7,10 +7,6 @@ namespace Fenrir.Network.Serialization.Tests.Packets.Login;
 
 public class LcUserAvatarRecv2Tests
 {
-    // --- Golden-buffer helpers -------------------------------------------------------------------------
-    // Intentionally re-derived from the ServerDocs-cited scopyAvtXor*/GetMyXor mask description rather than
-    // calling into Fenrir.Network.Compression.WireXor, so this test does not validate Write() against the
-    // very code it delegates to.
 
     private const byte GoldenFirstKey = 0x10;
     private const byte GoldenSteadyKey = 0xFE;
@@ -18,11 +14,9 @@ public class LcUserAvatarRecv2Tests
     [Fact]
     public void PayloadSize_MatchesContractConstant()
     {
-        // ExpectedSize=4579 (1-byte outbound header) -> 4578-byte payload.
         Assert.Equal(4578, AvatarRosterResponse.PayloadSize);
     }
 
-    // Each field is XORed per its [AvatarXorKind]; unlike USE_XOR_UID these keys aren't content-dependent, so re-applying recovers plaintext.
     [Fact]
     public void RoundTrip_PreservesAllFields_ThroughPerFieldAvatarXor()
     {
@@ -105,14 +99,6 @@ public class LcUserAvatarRecv2Tests
         Assert.True(packet.Costume.SequenceEqual(ReadXoredIntArray(buffer, 4538, 10)));
     }
 
-    // Golden-byte regression test: builds the entire 4578-byte expected payload from scratch (plaintext
-    // field values placed at their contract-documented offsets, then masked by a re-implementation of the
-    // XOR rules written independently of Fenrir.Network.Compression.WireXor) and asserts one full-buffer
-    // equality against Write()'s actual output. RoundTrip_PreservesAllFields_ThroughPerFieldAvatarXor only
-    // proves decode(encode(x)) == x per field via the very same WireXor primitives Write() itself calls, so
-    // it cannot catch two adjacent fields swapping offsets, a field bleeding into its neighbor's byte
-    // range, or the unmasked "spare" bytes (last two bytes of every IntArray/Char field) drifting — this
-    // test compares every one of the 4578 bytes against an independently-computed reference sequence.
     [Fact]
     public void Write_ProducesExactGoldenByteSequence_ForEveryAvatarInfoField()
     {
@@ -222,8 +208,6 @@ public class LcUserAvatarRecv2Tests
             plain[0] ^= GoldenFirstKey;
             for (var i = 1; i < length - 2; i++)
                 plain[i] ^= GoldenSteadyKey;
-            // plain[length - 2] and plain[length - 1] (the trailing two bytes of the final int) are left
-            // exactly as written above: scopyAvtXorIntArr's mask loop never reaches them.
         }
 
         plain.CopyTo(buffer.AsSpan(offset, length));
@@ -241,8 +225,7 @@ public class LcUserAvatarRecv2Tests
             plain[0] ^= GoldenFirstKey;
             for (var i = 1; i < length - 2; i++)
                 plain[i] ^= GoldenSteadyKey;
-            // plain[length - 2] stays raw/unmasked (same tail rule as WriteGoldenIntArray)...
-            plain[length - 1] = 0; // ...but scopyAvtXorChar additionally forces the final byte to 0.
+            plain[length - 1] = 0;
         }
 
         plain.CopyTo(buffer.AsSpan(offset, length));

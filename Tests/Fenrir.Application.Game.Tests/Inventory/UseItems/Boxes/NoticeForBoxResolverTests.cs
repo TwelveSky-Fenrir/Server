@@ -2,10 +2,6 @@ using Fenrir.Application.Game.Domain.Inventory.UseItems.Boxes;
 
 namespace Fenrir.Application.Game.Tests.Inventory.UseItems.Boxes;
 
-/// <summary>
-///     Coverage for <see cref="NoticeForBoxResolver" />: the elite-typed gate for the 1035/1036/1037 boxes and
-///     the (currently empty, so never-broadcasting) reward whitelist that gates every box's actual notice.
-/// </summary>
 public class NoticeForBoxResolverTests
 {
     [Fact]

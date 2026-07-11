@@ -13,11 +13,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 
-/// <summary>
-///     Drives the real <see cref="RuneSocketService" /> (opcode 157) over a real <see cref="Zone" />; ticks the
-///     zone while the service's own <c>PostRuneSocketCommandAndWaitAsync</c>/<c>PostInventoryCommandAndWaitAsync</c>
-///     awaits are pending, same pattern as <c>FishingCatchHandlerTests</c>.
-/// </summary>
 public class RuneSocketServiceTests
 {
     private static async Task<T> RunToCompletionAsync<T>(ValueTask<T> pending, Zone zone)
@@ -164,9 +159,6 @@ public class RuneSocketServiceTests
     [Fact]
     public async Task UnknownSort_SilentlyIgnored_NoReplyNoDisconnect()
     {
-        // Sort 0/1 dispatch to InsertAsync/RemoveAsync respectively; any other sort falls straight through the
-        // handler's own switch (no default case, matching the legacy) without ever touching the service --
-        // exercise the real handler here.
         var (session, pipe, zone, _, repo, eventLog) = SetUp();
 
         var handler =

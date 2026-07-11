@@ -8,11 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
-/// <summary>
-///     op30, CZ_MAKE_SKILL_SEND -- 4 fragment-to-skill-book recipes (S04_MyWork02.cpp:5868-6017), delegated to
-///     <see cref="ICraftSkillBookService" />. Recipes 0-2 are unconditional (no roll); recipe 3 (War God)
-///     additionally rolls the granted skill via <c>SkillBookCraftResolver.ResolveWarGod</c>.
-/// </summary>
 public sealed class CraftSkillBookHandler(
     ICraftSkillBookService craftSkillBookService,
     ILogger<CraftSkillBookHandler> logger)
@@ -38,7 +33,6 @@ public sealed class CraftSkillBookHandler(
             return;
         }
 
-        // Serializes the read/SQL/mirror sequence per character to close an item-duplication window.
         await state.EconomyActionLock.WaitAsync(cancellationToken);
         try
         {

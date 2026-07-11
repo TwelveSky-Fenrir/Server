@@ -6,16 +6,6 @@ using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     Covers <see cref="Zone.ApplyDeath" /> and the territorial revive-eligibility gate
-///     (<see cref="DeathGateTickSystem" />/<see cref="Zone.GrantReviveEligibility" />): revive is always in
-///     place -- the legacy only auto-clears death-gate state locally, and cross-zone "return to town" is a
-///     separate, client-driven transfer (<c>ZoneMoveHandler</c>), not this timer. Map id 999 is used for tests
-///     that don't care about the territorial gate's faction/alliance nuance -- it falls outside every
-///     faction-territory block and the always-blocked identity (200), so it behaves unconditionally, same as
-///     the old fixed-delay revive this gate replaces (see <c>DeathGateTickSystemTests</c> for the territorial/
-///     anti-abuse/force-quit behavior itself).
-/// </summary>
 public class ZoneDeathTests
 {
     [Fact]
@@ -39,7 +29,7 @@ public class ZoneDeathTests
     {
         var zone = ZoneTestKit.CreateZone(1);
 
-        zone.ApplyDeath(999); // must not throw
+        zone.ApplyDeath(999);
 
         Assert.False(zone.TryGetPlayer(999, out _));
     }
@@ -58,10 +48,10 @@ public class ZoneDeathTests
         zone.ApplyDeath(10);
         zone.Tick(TimeSpan.FromSeconds(3));
 
-        zone.ApplyDeath(10); // duplicate killing blow -- must not push eligibility further out
+        zone.ApplyDeath(10);
 
         zone.Tick(TimeSpan
-            .FromSeconds(3)); // total elapsed since the FIRST ApplyDeath: 6s = 12 ticks > the 10-tick mark
+            .FromSeconds(3));
 
         Assert.True(zone.TryGetPlayer(10, out var revived));
         Assert.False(revived!.IsDead);
@@ -80,13 +70,12 @@ public class ZoneDeathTests
 
         zone.ApplyDeath(10);
 
-        zone.Tick(TimeSpan.FromSeconds(4)); // 8 legacy ticks -- under the 10-tick eligibility mark
+        zone.Tick(TimeSpan.FromSeconds(4));
         Assert.True(zone.TryGetPlayer(10, out var stillDead));
         Assert.True(stillDead!.IsDead);
         Assert.Equal(500f, stillDead.PosX);
         Assert.Equal(500f, stillDead.PosZ);
 
-        // Past the 10-tick mark: revives in place -- NOT teleported anywhere, regardless of tribe/zone.
         zone.Tick(TimeSpan.FromSeconds(2));
 
         Assert.True(zone.TryGetPlayer(10, out var revived));
@@ -100,7 +89,6 @@ public class ZoneDeathTests
     [Fact]
     public void Revive_NeverInitiatesACrossZoneHandoff()
     {
-        // a bare Zone (no ZoneRegistry backref) proves no cross-zone resolution is even attempted
         var worldState = ZoneTestKit.CreateWorldState();
         var zone = ZoneTestKit.CreateZone(999, worldState: worldState,
             simulationSystems: [new DeathGateTickSystem(worldState)]);
@@ -129,7 +117,7 @@ public class ZoneDeathTests
         source.Tick(TimeSpan.FromMilliseconds(50));
 
         source.ApplyDeath(10);
-        source.Post(ZoneCommand.Leave(10, target)); // e.g. an explicit CZ_DEMAND_ZONE_SERVER_INFO_2 while dead
+        source.Post(ZoneCommand.Leave(10, target));
         source.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.False(source.TryGetPlayer(10, out _));
@@ -153,7 +141,7 @@ public class ZoneDeathTests
 
         source.ApplyDeath(10, DeathCause.MonsterKill);
         Assert.True(source.TryGetPlayer(10, out var beforeHandoff));
-        beforeHandoff!.TicksSinceDeath = 7; // simulate a few ticks already elapsed before the transfer request
+        beforeHandoff!.TicksSinceDeath = 7;
 
         source.Post(ZoneCommand.Leave(10, target));
         source.Tick(TimeSpan.FromMilliseconds(50));
@@ -192,7 +180,6 @@ public class ZoneDeathTests
 
         Assert.True(zone.TryGetPlayer(10, out var state));
         Assert.False(state!.ReviveHackFlag);
-        // Potion permission is still revoked while dead, regardless of cause.
         Assert.False(state.CanUseConsumables);
     }
 
@@ -211,19 +198,10 @@ public class ZoneDeathTests
         ZoneTestKit.DrainOutbound(deadPipe);
         ZoneTestKit.DrainOutbound(moverPipe);
 
-        // MonsterKill cause so ReviveHackFlag actually arms (a Duel death never arms it -- see
-        // ApplyDeath_DuelCause_DoesNotArmTheAntiAbuseFlag above); TicksSinceDeath is then forced straight to
-        // the 30-tick suppression mark, isolating the broadcast filter from the eligibility recheck.
         zone.ApplyDeath(10, DeathCause.MonsterKill);
         Assert.True(zone.TryGetPlayer(10, out var deadState));
-        deadState!.TicksSinceDeath = SimulationClock.DeathBroadcastSuppressionLegacyTicks; // >= 30 ticks
+        deadState!.TicksSinceDeath = SimulationClock.DeathBroadcastSuppressionLegacyTicks;
 
-        // IsReviveHackBroadcastSuppressed gates on the RECIPIENT's own flag (Server/ts25zone/S07_MyGame03.cpp:
-        // 809-831 -- the mProtect_ReviveHack check inside Broadcast11's candidate loop is grouped with that
-        // same loop's not-ready/mid-zone-transfer recipient skips, not with anything about the broadcaster),
-        // so it's neighbor 11 that must move here, and it's the still-flagged character 10's OWN pipe that
-        // must receive nothing -- a death-gate-flagged player goes deaf to everyone else's broadcasts, it does
-        // not go invisible to them.
         zone.Post(ZoneCommand.Move(11, ActionInfo(101f, 0f, 101f)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
@@ -249,8 +227,6 @@ public class ZoneDeathTests
         Assert.True(zone.TryGetPlayer(10, out var deadState));
         deadState!.TicksSinceDeath = SimulationClock.DeathBroadcastSuppressionLegacyTicks;
 
-        // Same recipient-side setup as the 999 case above, but on zone 124 the suppression itself is
-        // disabled, so the still-flagged character 10 receives 11's broadcast anyway.
         zone.Post(ZoneCommand.Move(11, ActionInfo(101f, 0f, 101f)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 

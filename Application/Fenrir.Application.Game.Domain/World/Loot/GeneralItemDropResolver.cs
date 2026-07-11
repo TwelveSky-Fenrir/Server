@@ -2,23 +2,6 @@ using Fenrir.Application.Game.GameData;
 
 namespace Fenrir.Application.Game.Domain.World.Loot;
 
-/// <summary>
-///     Ports <c>ITEMSYSTEM::ReturnDropRareItem</c> + its <c>Return(level,type,sort)</c> helper
-///     (<c>Server/ts25zone/GameSystem/GameSystem_02_Item.cpp:299-1023</c>): picks one random equipment item
-///     matching a rolled (Level, Type, Sort) triple out of the whole <c>world.Items</c> catalog. Used only by
-///     the "general item" drop-category tier -- money/potion/quest/extra items are plain id lookups, not this
-///     random-catalog-search.
-/// </summary>
-/// <remarks>
-///     Legacy indexes items via a prebuilt <c>mPART[level][type][sort]</c> bucket for O(1) random pick;
-///     Fenrir has no such prebuilt index, so this filters <see cref="WorldDataCache.ItemsById" /> linearly per
-///     attempt instead -- acceptable since monster deaths are not a per-network-frame hot path.
-///     <para>
-///         The level==145 (<c>MAX_LIMIT_LEVEL_NUM</c>) high-level/rebirth item bucket is not ported -- Fenrir
-///         has no rebirth/high-level item system yet, so a roll landing on level 145 uses the same plain
-///         level-equality filter as any other level.
-///     </para>
-/// </remarks>
 public static class GeneralItemDropResolver
 {
     private const int Amulet = 7;
@@ -39,30 +22,11 @@ public static class GeneralItemDropResolver
     private const int SkillBook = 5;
 
     private const int
-        Pet = 22; // ports the legacy's "iSort >= IPET" reject -- unreachable via the pool below, kept for parity
+        Pet = 22;
 
     private const int MaxAttempts = 10;
 
-    /// <summary>
-    ///     <paramref name="killerTribe" /> stands in for the legacy's <c>tPreviousTribe</c> (the tribe a
-    ///     character belonged to before its last faction change) -- Fenrir does not track faction-change
-    ///     history, so the character's current tribe is used instead, exact unless the character has
-    ///     transferred factions.
-    /// </summary>
-    /// <param name="includeCape">
-    ///     Whether the pool includes the Cape sort at all (<c>ReturnDropRareItem</c>'s <c>iAddSort</c>
-    ///     parameter) -- the general monster-item-drop call site (<c>S07_MyGame05.cpp:2794</c>) passes this
-    ///     unconditionally true; the Lucky Ticket call site (<c>S04_MyWork03.cpp:3461-3467</c>) passes it only
-    ///     when the resolved tier is IRARE. Defaults to <see langword="true" /> so every pre-existing caller
-    ///     keeps its prior behavior unchanged.
-    /// </param>
-    /// <param name="includeSkillBook">
-    ///     Whether the pool includes the Skill Book sort at all (<c>ReturnDropRareItem</c>'s <c>iAddSort2</c>
-    ///     parameter) -- the general monster-item-drop call site passes this unconditionally true; the Lucky
-    ///     Ticket call site never sets it (always 0/false). Defaults to <see langword="true" /> for the same
-    ///     back-compat reason as <paramref name="includeCape" />.
-    /// </param>
-    public static int? Resolve(WorldDataCache worldData, Random random, byte killerTribe, int itemType,
+        public static int? Resolve(WorldDataCache worldData, Random random, byte killerTribe, int itemType,
         int levelLow, int levelHigh, bool includeCape = true, bool includeSkillBook = true)
     {
         var weapon1 = killerTribe switch
@@ -74,7 +38,7 @@ public static class GeneralItemDropResolver
         };
 
         if (weapon1 < 0)
-            return null; // unknown tribe -- legacy returns null for tPreviousTribe outside 0..2
+            return null;
 
         var weapon2 = killerTribe switch
         {
@@ -92,7 +56,6 @@ public static class GeneralItemDropResolver
             _ => -1
         };
 
-        // tSortSearch in the legacy source: 8 fixed slots, +1 for a live iAddSort, +1 for a live iAddSort2.
         Span<int> pool = stackalloc int[10];
         var poolSize = 0;
         pool[poolSize++] = Amulet;
@@ -122,7 +85,6 @@ public static class GeneralItemDropResolver
                 candidate.Sort >= Pet)
                 continue;
 
-            // iEquipInfo[0] == 1 (usable by every tribe) OR iEquipInfo[0] - 2 == tribe (tribe-restricted: 2/3/4 -> tribe 0/1/2).
             if (candidate.EquipInfo1 == 1 || candidate.EquipInfo1 - 2 == killerTribe)
                 return candidate.ItemId;
         }
@@ -130,11 +92,7 @@ public static class GeneralItemDropResolver
         return null;
     }
 
-    /// <summary>
-    ///     Ports <c>ITEMSYSTEM::Return(level,type,sort)</c>'s "one uniformly random match" semantics over the whole
-    ///     catalog.
-    /// </summary>
-    private static ItemRowDto? ReturnOne(WorldDataCache worldData, Random random, int level, int type, int sort)
+        private static ItemRowDto? ReturnOne(WorldDataCache worldData, Random random, int level, int type, int sort)
     {
         List<ItemRowDto>? matches = null;
         foreach (var definition in worldData.ItemsById.Values)

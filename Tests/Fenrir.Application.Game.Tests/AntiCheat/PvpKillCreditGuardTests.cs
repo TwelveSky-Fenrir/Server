@@ -2,10 +2,6 @@ using Fenrir.Application.Game.Domain.AntiCheat;
 
 namespace Fenrir.Application.Game.Tests.AntiCheat;
 
-/// <summary>
-///     Covers <see cref="PvpKillCreditGuard" /> — the readiness, same-origin (hardened), and level-gap
-///     pre-reward guards of MyUtil::ProcessForKillOtherTribe (Server/ts25zone/S07_MyGame03.cpp:2602 onward).
-/// </summary>
 public class PvpKillCreditGuardTests
 {
     private static PvpKillCreditRequest Request(
@@ -51,7 +47,6 @@ public class PvpKillCreditGuardTests
     [Fact]
     public void SameAccount_DifferentIp_NoCredit_HardeningOverLegacyIpOnly()
     {
-        // Legacy would ALLOW this (different IPs); the hardened same-account signal blocks it.
         var result = PvpKillCreditGuard.Evaluate(Request(killerIp: "203.0.113.10", victimIp: "203.0.113.99",
             killerAccount: 777, victimAccount: 777));
         Assert.Equal(KillCreditDenial.SameOrigin, result);
@@ -73,14 +68,13 @@ public class PvpKillCreditGuardTests
     }
 
     [Theory]
-    [InlineData(64, 50, KillCreditDenial.LevelGap)] // 14 > 13
-    [InlineData(63, 50, KillCreditDenial.None)] // 13 is not > 13
-    [InlineData(50, 50, KillCreditDenial.None)] // equal
-    [InlineData(30, 50, KillCreditDenial.None)] // lower-level killer is never blocked (directional)
+    [InlineData(64, 50, KillCreditDenial.LevelGap)]
+    [InlineData(63, 50, KillCreditDenial.None)]
+    [InlineData(50, 50, KillCreditDenial.None)]
+    [InlineData(30, 50, KillCreditDenial.None)]
     public void LevelGap_IsDirectionalAndBoundedAtThirteen(int killerLevel, int victimLevel,
         KillCreditDenial expected)
     {
-        // Different IPs + accounts so only the level-gap can fire.
         var result = PvpKillCreditGuard.Evaluate(Request(killerLevel: killerLevel, victimLevel: victimLevel));
         Assert.Equal(expected, result);
     }

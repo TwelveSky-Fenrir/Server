@@ -8,11 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
-/// <summary>
-///     op27, CZ_HIGH_ITEM_SEND -- upgrades a +4/combine&gt;=1 Rare/Elite item to the next tier (delegated to
-///     <see cref="IUpgradeItemRankService" />). Cost is charged and the material consumed on both success and
-///     roll-failure; only a missing replacement candidate (Result=2) skips both.
-/// </summary>
 public sealed class UpgradeItemRankHandler(
     IUpgradeItemRankService upgradeItemRankService,
     ILogger<UpgradeItemRankHandler> logger)

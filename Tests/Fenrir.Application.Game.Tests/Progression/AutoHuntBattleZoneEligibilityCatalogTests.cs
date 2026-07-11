@@ -2,15 +2,9 @@ using Fenrir.Application.Game.Domain.Progression;
 
 namespace Fenrir.Application.Game.Tests.Progression;
 
-/// <summary>
-///     Covers <see cref="AutoHuntBattleZoneEligibilityCatalog" /> -- Term C of the CZ_AUTO_CONFIG_SEND
-///     enable blocked-zone gate (contract wave13/B11-autoconfig-blocked.md,
-///     Server/Header/S18_MyZoneInfo.cpp:440-508).
-/// </summary>
 public class AutoHuntBattleZoneEligibilityCatalogTests
 {
     [Theory]
-    // mapId, level band lower bound, level band upper bound
     [InlineData((short)49, 10, 89)]
     [InlineData((short)51, 20, 29)]
     [InlineData((short)53, 30, 39)]
@@ -62,7 +56,6 @@ public class AutoHuntBattleZoneEligibilityCatalogTests
         var shouldBlock = rebirthTier < 7;
         Assert.Equal(shouldBlock, AutoHuntBattleZoneEligibilityCatalog.IsBlocked(295, combinedLevel: 157, rebirthTier));
 
-        // Wrong level never blocks, regardless of rebirth tier.
         Assert.False(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(295, combinedLevel: 156, rebirthTier));
     }
 
@@ -108,9 +101,9 @@ public class AutoHuntBattleZoneEligibilityCatalogTests
 
     [Theory]
     [InlineData((short)1)]
-    [InlineData((short)38)] // Term A's own number -- Term C itself does not recognize it
+    [InlineData((short)38)]
     [InlineData((short)240)]
-    [InlineData((short)241)] // Term B's own "zone 241 type" number -- Term C itself does not recognize it
+    [InlineData((short)241)]
     [InlineData((short)999)]
     public void UnrecognizedServerNumbers_ContributeNothingToBlocking(short mapId)
     {

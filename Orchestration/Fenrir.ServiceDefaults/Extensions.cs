@@ -6,7 +6,6 @@ using OpenTelemetry.Metrics;
 
 namespace Fenrir.ServiceDefaults;
 
-// Deliberately free of any Microsoft.AspNetCore.App dependency: LoginServer/GameServer are TCP-socket-only, never HTTP.
 public static class Extensions
 {
     extension<TBuilder>(TBuilder builder) where TBuilder : IHostApplicationBuilder
@@ -31,7 +30,6 @@ public static class Extensions
             builder.Services.AddOpenTelemetry()
                 .WithMetrics(metrics =>
                 {
-                    // No AddAspNetCoreInstrumentation(): neither server is an ASP.NET Core app, no HTTP pipeline to instrument.
                     metrics.AddRuntimeInstrumentation();
                 })
                 .WithTracing(tracing => { tracing.AddSource(builder.Environment.ApplicationName); });

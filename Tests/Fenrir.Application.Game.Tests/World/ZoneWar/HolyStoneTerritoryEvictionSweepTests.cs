@@ -54,7 +54,7 @@ public class HolyStoneTerritoryEvictionSweepTests
     public void AfterAFullCycle_NonMatchingTribe_IsEvicted()
     {
         var worldState = CreateWorldState();
-        worldState.SetZone038Winner(0); // holder tribe 0
+        worldState.SetZone038Winner(0);
         var registry = CreateRegistry(39);
         var (session, _) = ZoneTestKit.CreateSession(1);
         registry[39].Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 39, tribe: 3)));
@@ -93,7 +93,7 @@ public class HolyStoneTerritoryEvictionSweepTests
     {
         var worldState = CreateWorldState();
         worldState.SetZone038Winner(0);
-        worldState.SetAllianceOffer(0, 3, true); // tribe 3 is now the declared ally of holder tribe 0
+        worldState.SetAllianceOffer(0, 3, true);
         var registry = CreateRegistry(39);
         var (session, _) = ZoneTestKit.CreateSession(1);
         registry[39].Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 39, tribe: 3)));
@@ -111,7 +111,7 @@ public class HolyStoneTerritoryEvictionSweepTests
     [Fact]
     public void NoHolderTribeYet_EverybodyIsEvicted()
     {
-        var worldState = CreateWorldState(); // Zone038WinTribe still null
+        var worldState = CreateWorldState();
         var registry = CreateRegistry(39);
         var (session, _) = ZoneTestKit.CreateSession(1);
         registry[39].Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 39, tribe: 2)));
@@ -131,7 +131,7 @@ public class HolyStoneTerritoryEvictionSweepTests
     {
         var worldState = CreateWorldState();
         worldState.SetZone038Winner(0);
-        var registry = CreateRegistry(99); // not a territory map
+        var registry = CreateRegistry(99);
         var (session, _) = ZoneTestKit.CreateSession(1);
         registry[99].Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 99, tribe: 3)));
         registry[99].Tick(TimeSpan.FromMilliseconds(50));

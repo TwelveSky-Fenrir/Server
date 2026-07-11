@@ -5,10 +5,6 @@ using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Game.Tests.Skills;
 
-/// <summary>
-///     Covers <see cref="SkillCastResolver.TryCast" /> against the skill-ID whitelist in
-///     <see cref="SkillEffectCatalog" />, ported from <c>MyUtil::ProcessForCreateBuff</c>.
-/// </summary>
 public class SkillCastResolverTests
 {
     private static SkillDefinition BuildSkill(int skillId, byte maxUpgradePoint,
@@ -35,17 +31,36 @@ public class SkillCastResolverTests
     }
 
     [Fact]
-    public void SkillNotInEffectCatalog_Fails()
+    public void SkillNotInEffectCatalog_StillChargesManaButProducesNoEffect()
     {
+        // Legacy's op15 mana debit is unconditional on invested grade points alone (S04_MyWork02.cpp:1640-
+        // 1650,1680-1683) -- it never inspects whether the confirm-step dispatch recognizes the skill id
+        // (S07_MyGame04.cpp:1509-1564 has no case/default for an uncatalogued id). A catalog miss must
+        // therefore still succeed and charge mana, just with SkillEffectKind.None (no buff/heal produced).
         var skill = BuildSkill(999, 10, (10, 10), (0, 0), (0, 0));
         var result = SkillCastResolver.TryCast(skill, 5, 100, 1000, null, 1);
-        Assert.Equal(SkillCastResolver.FailureReason.NotCastable, result.Failure);
+        Assert.True(result.Success);
+        Assert.Equal(SkillCastResolver.FailureReason.None, result.Failure);
+        Assert.Equal(10, result.ManaCost);
+        Assert.Equal(SkillEffectKind.None, result.Kind);
+        Assert.Empty(result.BuffWrites);
+        Assert.Equal(0, result.HealAmount);
+    }
+
+    [Fact]
+    public void SkillNotInEffectCatalog_InsufficientMana_StillFails()
+    {
+        // The insufficient-mana gate is unaffected by the catalog-miss case above -- it must still block
+        // the cast (and the mana debit) exactly as it would for any catalogued skill.
+        var skill = BuildSkill(999, 10, (50, 50), (0, 0), (0, 0));
+        var result = SkillCastResolver.TryCast(skill, 5, 10, 1000, null, 1);
+        Assert.False(result.Success);
+        Assert.Equal(SkillCastResolver.FailureReason.InsufficientMana, result.Failure);
     }
 
     [Fact]
     public void InsufficientMana_Fails()
     {
-        // Skill 6 (Charge) -- ManaUse min=50, max=50 (constant across grades for simplicity).
         var skill = BuildSkill(6, 10, (50, 50), (20, 20), (30, 30));
         var result = SkillCastResolver.TryCast(skill, 5, 10, 1000, null, 1);
         Assert.Equal(SkillCastResolver.FailureReason.InsufficientMana, result.Failure);
@@ -55,7 +70,7 @@ public class SkillCastResolverTests
     public void Skill6Charge_WritesBuffSlot8_NoWeaponGate()
     {
         var skill = BuildSkill(6, 10, (50, 50), (20, 20), (10, 90));
-        var result = SkillCastResolver.TryCast(skill, 10, 100, 1000, null, 1); // full grade points -> max value
+        var result = SkillCastResolver.TryCast(skill, 10, 100, 1000, null, 1);
         Assert.True(result.Success);
         Assert.Equal(50, result.ManaCost);
         var write = Assert.Single(result.BuffWrites);
@@ -68,7 +83,7 @@ public class SkillCastResolverTests
     public void Skill15AttackPowerUp_RequiresAtkClassWeapon_RejectsWithoutIt()
     {
         var skill = BuildSkill(15, 10, (10, 10), (5, 5), default, (10, 50));
-        var result = SkillCastResolver.TryCast(skill, 10, 100, 1000, 13 /* "def" class, not atk */, 1);
+        var result = SkillCastResolver.TryCast(skill, 10, 100, 1000, 13, 1);
         Assert.Equal(SkillCastResolver.FailureReason.WrongWeaponClass, result.Failure);
     }
 
@@ -76,7 +91,7 @@ public class SkillCastResolverTests
     public void Skill15AttackPowerUp_WithAtkClassWeapon_Succeeds()
     {
         var skill = BuildSkill(15, 10, (10, 10), (5, 5), default, (10, 50));
-        var result = SkillCastResolver.TryCast(skill, 10, 100, 1000, 14 /* "atk" class */, 1);
+        var result = SkillCastResolver.TryCast(skill, 10, 100, 1000, 14, 1);
         Assert.True(result.Success);
         var write = Assert.Single(result.BuffWrites);
         Assert.Equal(0, write.Slot);
@@ -94,12 +109,12 @@ public class SkillCastResolverTests
     [Fact]
     public void Skill82HolyShield_ValueIsPercentOfCasterMaxLife()
     {
-        var skill = BuildSkill(82, 10, (10, 10), (5, 5), default, shieldLifeUp: (10, 20)); // 20% of MaxLife
+        var skill = BuildSkill(82, 10, (10, 10), (5, 5), default, shieldLifeUp: (10, 20));
         var result = SkillCastResolver.TryCast(skill, 10, 100, 5000, null, 1);
         Assert.True(result.Success);
         var write = Assert.Single(result.BuffWrites);
         Assert.Equal(9, write.Slot);
-        Assert.Equal(1000, write.Value); // 20% of 5000
+        Assert.Equal(1000, write.Value);
     }
 
     [Fact]
@@ -122,29 +137,18 @@ public class SkillCastResolverTests
         Assert.Equal(200, result.HealAmount);
     }
 
-    /// <summary>
-    ///     mSupportSkillTimeUpRatio (behavior contract "buff-application-stacking-decay"): a true self-buff
-    ///     site (skill 82, Holy Shield -- registered via SkillEffectCatalog.AddSelfBuff) must have its
-    ///     duration multiplied by the caller-supplied ratio; the paired value must never be touched by it.
-    /// </summary>
-    [Fact]
+        [Fact]
     public void Skill82HolyShield_AppliesSupportSkillTimeUpRatioToDurationOnly()
     {
         var skill = BuildSkill(82, 10, (10, 10), (5, 5), default, shieldLifeUp: (10, 20));
-        var result = SkillCastResolver.TryCast(skill, 10, 100, 5000, null, 4); // both Premium + BuffX2Time active
+        var result = SkillCastResolver.TryCast(skill, 10, 100, 5000, null, 4);
         Assert.True(result.Success);
         var write = Assert.Single(result.BuffWrites);
-        Assert.Equal(1000, write.Value); // unchanged: 20% of 5000
-        Assert.Equal(20, write.DurationTicks); // base RunTime (5) * ratio (4)
+        Assert.Equal(1000, write.Value);
+        Assert.Equal(20, write.DurationTicks);
     }
 
-    /// <summary>
-    ///     Skill 79 is a "Formation" party-buff collapsed to a self-only cast (SkillEffectCatalog.
-    ///     AddPartyBuffAsSelf) using the identical ShieldLifeUp/RunTime lookup as skill 82 above -- confirms
-    ///     the ratio is scoped to the 14 genuine self-buff sites and never extended to these 4 by analogy,
-    ///     even when a non-neutral ratio is passed in.
-    /// </summary>
-    [Fact]
+        [Fact]
     public void Skill79FormationShieldLifeUp_NeverAppliesSupportSkillTimeUpRatio()
     {
         var skill = BuildSkill(79, 10, (10, 10), (5, 5), default, shieldLifeUp: (10, 20));
@@ -152,6 +156,6 @@ public class SkillCastResolverTests
         Assert.True(result.Success);
         var write = Assert.Single(result.BuffWrites);
         Assert.Equal(1000, write.Value);
-        Assert.Equal(5, write.DurationTicks); // base RunTime only -- ratio never applied
+        Assert.Equal(5, write.DurationTicks);
     }
 }

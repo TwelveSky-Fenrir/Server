@@ -12,11 +12,6 @@ using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     Covers <c>Zone.ApplyCombatCommand</c>'s mCase 5/6 dispatch (<c>Zone.Stun.cs</c>), the anti-stun-hack
-///     veto in <c>Zone.HandleMove</c>, and <c>Zone.ApplyDeath</c>'s stun/buff-clearing side effect, end to end
-///     against real <see cref="Zone" /> instances.
-/// </summary>
 public class ZoneStunCombatTests
 {
     private const int StunActionSort = 11;
@@ -100,17 +95,8 @@ public class ZoneStunCombatTests
         Assert.True(zone.TryGetPlayer(defenderId, out var defender));
         defender!.ActionSort = defenderActionSort;
 
-        // This suite exercises stun/unstun resolution, not the attack sub-packet budget/replay guard (that's
-        // AttackPacketBudgetTests' own job) -- a real client always sends a legal avatar-action packet first
-        // to establish a non-zero ceiling, which this fixture skips. Uncapped here so a raw CombatCommand
-        // (mCase 6, unstun -- ApplyUnstunAttack) posted straight after Enter isn't silently rejected by
-        // AttackPacketBudget.TryConsume. mCase 5 (stun) is unaffected: ProcessAttack05 disables this check
-        // outright, so ApplyStunAttack deliberately never calls it.
         attacker!.AttackSubPacketCeiling = int.MaxValue;
 
-        // Past both sides' zone-entry protect window, else every stun/unstun attempt below is rejected as
-        // Attacker/DefenderProtected -- StunResolver checks CombatResolver.ProtectDuration the same way the
-        // mCase 2 attack path does (see ZoneAttackTests.TwoPlayerZone for the identical pattern).
         zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1));
 
         return (zone, attacker!, defender);
@@ -119,7 +105,6 @@ public class ZoneStunCombatTests
     [Fact]
     public void StunAttempt_Success_SetsStunStateAndBroadcastsPose()
     {
-        // Map 1 is in ZonePvpZoneCatalog's open-enemy-tribe-attack set.
         var zone = ZoneTestKit.CreateZone(1, worldData: StunCatalog(), randomSource: new ScriptedRandomSource(0));
         var (_, attacker, defender) = EnterTwoPlayers(zone, 10, 0, 20, 1);
 
@@ -173,7 +158,6 @@ public class ZoneStunCombatTests
     public void UnstunAttempt_Success_ClearsStunState()
     {
         var zone = ZoneTestKit.CreateZone(1, worldData: StunCatalog(), randomSource: new ScriptedRandomSource(0));
-        // Same tribe on both sides -- cure has no zone/duel gate, just same-or-allied tribe.
         var (_, curer, target) = EnterTwoPlayers(zone, 10, 0, 20, 0);
 
         target.IsStunned = true;
@@ -181,7 +165,6 @@ public class ZoneStunCombatTests
         target.CanUseConsumables = false;
         target.RepeatedStunCount = 3;
 
-        // Grade 20 is the unconditional-success tier -- no roll needed, no skill catalog lookup needed either.
         zone.PostCombatCommand(new CombatCommand
         {
             AttackerCharacterId = curer.CharacterId,
@@ -212,7 +195,7 @@ public class ZoneStunCombatTests
         });
         zone.Tick(SimulationClock.LegacyTick);
 
-        Assert.Equal(2, target.ActionSort); // untouched -- never entered the cure path at all
+        Assert.Equal(2, target.ActionSort);
     }
 
     [Fact]
@@ -228,7 +211,7 @@ public class ZoneStunCombatTests
         var moveAction = new ActionInfo
         {
             Type = 0,
-            Sort = 2, // ordinary move -- not the stun pose (11)
+            Sort = 2,
             Frame = 0,
             Location = [originalX + 500, defender.PosY, defender.PosZ],
             TargetLocation = [originalX + 500, defender.PosY, defender.PosZ],
@@ -250,9 +233,9 @@ public class ZoneStunCombatTests
         zone.Post(ZoneCommand.Move(defender.CharacterId, in moveAction));
         zone.Tick(SimulationClock.LegacyTick);
 
-        Assert.Equal(originalX, defender.PosX); // move discarded, not applied
+        Assert.Equal(originalX, defender.PosX);
         Assert.True(defender.IsStunned);
-        Assert.Equal(StunActionSort, defender.ActionSort); // re-broadcast stun pose, not the move's Sort
+        Assert.Equal(StunActionSort, defender.ActionSort);
     }
 
     [Fact]
@@ -272,12 +255,8 @@ public class ZoneStunCombatTests
 
         Assert.False(defender.IsStunned);
         Assert.Equal(0, defender.StunDurationSeconds);
-        // Deliberately NOT restored here even though the stun-clear path normally does that -- ApplyDeath's own
-        // remarks: the death-gate (mProtect_ReviveHack) owns CanUseConsumables until GrantReviveEligibility
-        // restores it, matching PlayerRuntimeState.CanUseConsumables's own doc (cleared by ApplyDeath, restored
-        // by GrantReviveEligibility, not by the stun clear that happens to run in the same call).
         Assert.False(defender.CanUseConsumables);
-        Assert.Equal(4, defender.RepeatedStunCount); // only a cure/natural expiry resets this, not death
+        Assert.Equal(4, defender.RepeatedStunCount);
         Assert.All(defender.Buffs.Buff, v => Assert.Equal(0, v));
         Assert.True(defender.IsDead);
     }
@@ -291,8 +270,6 @@ public class ZoneStunCombatTests
 
         var (_, attacker, defender) = EnterTwoPlayers(zone, 10, 0, 20, 1);
 
-        // A second party member also present, but the party only has 2 members total -- short of the
-        // required 5.
         var (thirdSession, _) = ZoneTestKit.CreateSession(30);
         zone.Post(ZoneCommand.Enter(30, ZoneTestKit.EnterData(thirdSession, zone.MapId, "Ally", tribe: 0)));
         zone.Tick(SimulationClock.LegacyTick);
@@ -308,7 +285,6 @@ public class ZoneStunCombatTests
         });
         zone.Tick(SimulationClock.LegacyTick);
 
-        // Stun itself still applies (it's unconditional); only the team-stun sub-mechanic aborts.
         Assert.True(defender.IsStunned);
         Assert.Equal(0, defender.RepeatedStunCount);
     }
@@ -317,10 +293,6 @@ public class ZoneStunCombatTests
     public void TeamStun_ExactlyFiveMembersPresent_IncrementsCounter_AndGrantsCreditOnlyWithCriticalBuffOnBothSides()
     {
         var partyRegistry = new PartyRegistry();
-        // Map 1 is one of the four "city" zones (S07_MyGame03.cpp:2841-2852): a stun-trigger kill credit
-        // there still grants daily-mission progress (asserted below) but withholds CP -- see the
-        // PvpKillRewardZoneCatalog CityZone_StunKill_WithholdsOnlyContributionPoints coverage for the
-        // zone-profile assertion this end-to-end test builds on top of.
         var zone = ZoneTestKit.CreateZone(1, worldData: StunCatalog(), randomSource: new ScriptedRandomSource(0),
             partyRegistry: partyRegistry);
 
@@ -347,8 +319,6 @@ public class ZoneStunCombatTests
 
         Assert.Equal(5, partyRegistry.GetMembers(attacker.CharacterId).Count);
 
-        // Both sides must hold the Critical buff (slot 10) active for the kill-credit grant specifically --
-        // the counter increment/full-party gate itself does not depend on this.
         defender.Buffs.Buff[CriticalBuffSlot * 2 + 1] = 10;
         foreach (var member in members)
             member.Buffs.Buff[CriticalBuffSlot * 2 + 1] = 10;
@@ -368,10 +338,6 @@ public class ZoneStunCombatTests
         foreach (var member in members)
             Assert.Equal(1, member.MissionKillOtherTribe);
 
-        // Zone-gating: a city zone withholds CP on a stun-trigger kill (S07_MyGame03.cpp:2845-2848) even
-        // though daily-mission progress (asserted above) is unconditional there. Routing the team-stun credit
-        // through ApplyPvpKillRewards(..., isStunTrigger: true) must reproduce that split, not grant both or
-        // neither.
         Assert.Equal(0, attacker.ContributionPoints);
         foreach (var member in members)
             Assert.Equal(0, member.ContributionPoints);
@@ -380,12 +346,6 @@ public class ZoneStunCombatTests
     [Fact]
     public void TeamStun_ZoneOutsideRewardCatalog_GrantsNoCreditDespiteFullPartyAndCriticalBuffs()
     {
-        // Map 54 authorizes enemy-tribe PvP (ZonePvpZoneCatalog.AllowsEnemyTribeAttack) but is NOT one of
-        // PvpKillRewardZoneCatalog's modeled groups (not a city zone, not FFA, not an unconditional-full
-        // zone) -- it falls through to the default branch, which withholds every reward channel on a
-        // stun-trigger kill (S07_MyGame03.cpp default case, :3031-3040). Before ApplyTeamStunSubMechanic was
-        // routed through ApplyPvpKillRewards, this credit ignored the killing zone entirely and always
-        // granted MissionKillOtherTribe regardless of where the stun happened -- this test pins the fix.
         const short unmodeledZoneId = 54;
         var partyRegistry = new PartyRegistry();
         var zone = ZoneTestKit.CreateZone(unmodeledZoneId, worldData: StunCatalog(),
@@ -427,12 +387,9 @@ public class ZoneStunCombatTests
         });
         zone.Tick(SimulationClock.LegacyTick);
 
-        // The stun and its repeated-stun counter are zone-blind (unconditional in legacy) and still apply...
         Assert.True(defender.IsStunned);
         Assert.Equal(1, defender.RepeatedStunCount);
 
-        // ...but every reward channel this default-branch zone withholds on a stun-trigger kill is actually
-        // withheld, including the daily-mission counter the pre-fix code granted unconditionally.
         Assert.Equal(0, attacker.MissionKillOtherTribe);
         Assert.Equal(0, attacker.ContributionPoints);
         foreach (var member in members)
@@ -470,7 +427,6 @@ public class ZoneStunCombatTests
         }
 
         attacker.Buffs.Buff[CriticalBuffSlot * 2 + 1] = 10;
-        // Defender deliberately does NOT hold the Critical buff.
 
         zone.PostCombatCommand(new CombatCommand
         {
@@ -480,8 +436,8 @@ public class ZoneStunCombatTests
         });
         zone.Tick(SimulationClock.LegacyTick);
 
-        Assert.Equal(1, defender.RepeatedStunCount); // counter still increments...
-        Assert.Equal(0, attacker.MissionKillOtherTribe); // ...but no credit is granted to anyone
+        Assert.Equal(1, defender.RepeatedStunCount);
+        Assert.Equal(0, attacker.MissionKillOtherTribe);
     }
 
     [Fact]
@@ -493,8 +449,6 @@ public class ZoneStunCombatTests
         defender.RepeatedStunCount = 9;
         defender.IsStunned = true;
 
-        // Directly exercises the same force-death path the team-stun sub-mechanic reaches at count 10
-        // (Zone.ApplyDeath(DeathCause.StunLock)) -- the counter bookkeeping itself is covered above.
         defender.RepeatedStunCount = 10;
         zone.ApplyDeath(defender.CharacterId, DeathCause.StunLock);
 
@@ -506,14 +460,12 @@ public class ZoneStunCombatTests
     [Fact]
     public void StunResistSkill_IsScannedInSlotOrder_FirstMatchWins()
     {
-        // Two candidate skills equipped (43 and 5); slot ordering must pick slot 0's skill (43) even though
-        // it's numerically higher and configured with a weaker block, matching "first match in slot order".
         var zone = ZoneTestKit.CreateZone(1,
             worldData: ZoneTestKit.EmptyWorldData(skillsById: new Dictionary<int, SkillDefinition>
             {
                 [StunSkillId] = StunAttackSkill(StunSkillId, 50, 8),
-                [43] = StunResistSkill(43, 0), // weak block -- should win (slot 0)
-                [5] = StunResistSkill(5, 999) // strong block -- should be ignored (slot 1)
+                [43] = StunResistSkill(43, 0),
+                [5] = StunResistSkill(5, 999)
             }.ToFrozenDictionary()), randomSource: new ScriptedRandomSource(10));
 
         var (_, attacker, defender) = EnterTwoPlayers(zone, 10, 0, 20, 1);
@@ -528,8 +480,6 @@ public class ZoneStunCombatTests
         });
         zone.Tick(SimulationClock.LegacyTick);
 
-        // margin = 50 - 0 = 50, roll 10 < 50 -> success. Had skill 5 (block 999) been picked instead, this
-        // would fail.
         Assert.True(defender.IsStunned);
     }
 }

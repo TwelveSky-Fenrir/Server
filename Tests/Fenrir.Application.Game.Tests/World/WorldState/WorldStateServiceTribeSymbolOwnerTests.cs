@@ -4,14 +4,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.World.WorldState;
 
-/// <summary>
-///     Covers <see cref="WorldStateService.GetTribeSymbolOwner" /> (B15, wave15 contract) -- the new per-slot
-///     owner-tribe-id producer added to unblock the PvM tribe-symbol damage-up bonus's cross-tribe-ownership
-///     input, closing the exact gap <c>TribeSymbolCombatModifiers</c>'s own pre-existing GAP remarks flagged:
-///     the durable schema only ever recorded a per-tribe boolean ("does this tribe still hold its OWN slot"),
-///     never the challenger's identity once that boolean flips false. Complements
-///     <c>WorldStateServiceTests</c> (this class's own general-purpose coverage, left untouched).
-/// </summary>
 public class WorldStateServiceTribeSymbolOwnerTests
 {
     private static WorldStateService CreateInitialized()
@@ -38,8 +30,6 @@ public class WorldStateServiceTribeSymbolOwnerTests
         service.ResolveTribeSymbol(slotTribeId: 0, winnerTribeId: 2);
 
         Assert.Equal((byte)2, service.GetTribeSymbolOwner(0));
-        // The durable HasSymbol boolean still only tracks "does slot 0's own tribe (0) still hold it" -- false,
-        // matching the pre-existing behavior this change does not touch.
         Assert.False(service.GetTribe(0).HasSymbol);
     }
 
@@ -47,9 +37,9 @@ public class WorldStateServiceTribeSymbolOwnerTests
     public void ResolveTribeSymbol_SlotOwnTribeKeepsIt_OwnerStaysTheSlotsOwnTribe()
     {
         var service = CreateInitialized();
-        service.ResolveTribeSymbol(0, 2); // first captured by tribe 2...
+        service.ResolveTribeSymbol(0, 2);
 
-        service.ResolveTribeSymbol(0, 0); // ...then reclaimed by its own tribe.
+        service.ResolveTribeSymbol(0, 0);
 
         Assert.Equal((byte)0, service.GetTribeSymbolOwner(0));
         Assert.True(service.GetTribe(0).HasSymbol);
@@ -60,12 +50,9 @@ public class WorldStateServiceTribeSymbolOwnerTests
     {
         var service = CreateInitialized();
 
-        // Slot 1 (tribe 1's own home stone) captured by tribe 3 -- proving this isn't just a boolean flip;
-        // the actual winning tribe's identity (3, not merely "not 1") is preserved.
         service.ResolveTribeSymbol(slotTribeId: 1, winnerTribeId: 3);
 
         Assert.Equal((byte)3, service.GetTribeSymbolOwner(1));
-        // Every OTHER slot is untouched by this single-slot resolution.
         Assert.Equal((byte)0, service.GetTribeSymbolOwner(0));
         Assert.Equal((byte)2, service.GetTribeSymbolOwner(2));
         Assert.Equal((byte)3, service.GetTribeSymbolOwner(3));

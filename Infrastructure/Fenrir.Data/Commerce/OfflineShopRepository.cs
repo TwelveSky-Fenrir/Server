@@ -9,11 +9,10 @@ using Fenrir.Data.Abstractions.Commerce;
 
 namespace Fenrir.Data.Commerce;
 
-// game.OfflineShops/OfflineShopItems/ProxyShopNames access -- the offline/deputy ("proxy") personal-shop-stall feature.
 public sealed record OfflineShopRepository(ICaeriusNetDbContext Db) : IOfflineShopRepository
 {
-    /// <summary>CZ_GET_DEPUTY_PSHOP_SEND sort 1/2; shop row is null if never opened.</summary>
-    public async ValueTask<(OfflineShopRowDto? Shop, IReadOnlyList<OfflineShopItemRowDto> Items)> GetByCharacterAsync(
+
+        public async ValueTask<(OfflineShopRowDto? Shop, IReadOnlyList<OfflineShopItemRowDto> Items)> GetByCharacterAsync(
         int characterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_OfflineShop_GetByCharacter", 32)
@@ -25,18 +24,13 @@ public sealed record OfflineShopRepository(ICaeriusNetDbContext Db) : IOfflineSh
         return (shops.Count > 0 ? shops[0] : null, items);
     }
 
-    /// <summary>CZ_PSHOP_ITEM_INFO_SEND's proxy-shop half; every ShopState=1 shop's for-sale slots, cluster-wide.</summary>
-    public async ValueTask<ReadOnlyCollection<OfflineShopOpenListingRowDto>> GetAllOpenAsync(CancellationToken ct)
+        public async ValueTask<ReadOnlyCollection<OfflineShopOpenListingRowDto>> GetAllOpenAsync(CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_OfflineShop_GetAllOpen", 64).Build();
         return await Db.QueryAsReadOnlyCollectionAsync<OfflineShopOpenListingRowDto>(sp, ct);
     }
 
-    /// <summary>
-    ///     Atomically upserts the shop + item slots and removes the items from live inventory; refuses to open over
-    ///     unclaimed value.
-    /// </summary>
-    public async ValueTask OpenAndReplaceContainersAsync(
+        public async ValueTask OpenAndReplaceContainersAsync(
         int characterId, short? zoneNumber, int shopDate, string shopName, int locationX, int locationY, int locationZ,
         IReadOnlyList<OfflineShopItemSlotTvp> items,
         IReadOnlyList<CharacterItemSlotTvp> inventoryPage0, IReadOnlyList<CharacterItemSlotTvp> inventoryPage1,
@@ -58,8 +52,7 @@ public sealed record OfflineShopRepository(ICaeriusNetDbContext Db) : IOfflineSh
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-    /// <summary>Flips ShopState only -- items/money stay attached (verified legacy close semantics).</summary>
-    public async ValueTask SetStateAsync(int characterId, byte shopState, CancellationToken ct)
+        public async ValueTask SetStateAsync(int characterId, byte shopState, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_OfflineShop_SetState", 0)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
@@ -69,8 +62,7 @@ public sealed record OfflineShopRepository(ICaeriusNetDbContext Db) : IOfflineSh
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>Atomic CAS retrieve-to-inventory; throws SQL 50272 if the slot no longer matches or the shop isn't closed.</summary>
-    public async ValueTask RetrieveItemAndReplaceContainerAsync(int characterId, short slotIndex, int expectedItemId,
+        public async ValueTask RetrieveItemAndReplaceContainerAsync(int characterId, short slotIndex, int expectedItemId,
         int expectedQuantity, int expectedValue, byte container, IReadOnlyList<CharacterItemSlotTvp> items,
         CancellationToken ct)
     {
@@ -87,11 +79,7 @@ public sealed record OfflineShopRepository(ICaeriusNetDbContext Db) : IOfflineSh
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-    /// <summary>
-    ///     Atomic CAS purchase: buyer debit+grant, seller item removal+credit, one transaction. Throws SQL 50272
-    ///     (stale/not open), 50222 (buyer funds), 50261 (buyer cap), 50273 (seller BigMoney cap).
-    /// </summary>
-    public async ValueTask ExecutePurchaseAsync(int sellerCharacterId, short slotIndex, int expectedItemId,
+        public async ValueTask ExecutePurchaseAsync(int sellerCharacterId, short slotIndex, int expectedItemId,
         int expectedQuantity, int expectedValue, int price, int buyerCharacterId, byte buyerContainer,
         IReadOnlyList<CharacterItemSlotTvp> buyerItems, CancellationToken ct)
     {
@@ -110,13 +98,7 @@ public sealed record OfflineShopRepository(ICaeriusNetDbContext Db) : IOfflineSh
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-    /// <summary>
-    ///     Atomic earnings withdrawal; throws SQL 50340 (both pending amounts are zero -- "nothing to
-    ///     withdraw", checked first and independently of the shop row itself), 50276 (stale-client
-    ///     mismatch, shop not closed, or shop expired as of <paramref name="todayDate" />), 50333 (BigMoney
-    ///     cap), or 50261 (money cap).
-    /// </summary>
-    public async ValueTask WithdrawMoneyAsync(int characterId, int expectedMoney, int expectedBigMoney,
+        public async ValueTask WithdrawMoneyAsync(int characterId, int expectedMoney, int expectedBigMoney,
         int todayDate, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_OfflineShop_WithdrawMoney", 0)
@@ -148,8 +130,7 @@ public sealed record OfflineShopRepository(ICaeriusNetDbContext Db) : IOfflineSh
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>No CAS/ROWCOUNT guard by design -- see the interface doc for why a no-op update is a success.</summary>
-    public async ValueTask ExtendRentalAsync(int characterId, int newShopDate, CancellationToken ct)
+        public async ValueTask ExtendRentalAsync(int characterId, int newShopDate, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_OfflineShop_ExtendRental", 0)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)

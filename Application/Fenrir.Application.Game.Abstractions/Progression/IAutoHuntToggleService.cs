@@ -3,10 +3,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Abstractions.Progression;
 
-/// <summary>
-///     Outcome of <see cref="IAutoHuntToggleService.ToggleAsync" />: <see cref="Aborted" /> means the caller must
-///     disconnect the session.
-/// </summary>
 public readonly record struct AutoHuntToggleResult(bool Aborted, bool Enabled);
 
 public interface IAutoHuntToggleService

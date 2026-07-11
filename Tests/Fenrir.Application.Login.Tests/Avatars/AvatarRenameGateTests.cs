@@ -5,8 +5,6 @@ using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Login.Tests.Avatars;
 
-// Op19 CL_CHANGE_AVATAR_NAME_SEND's item gate and five relationship refusals. Réf. C++ :
-// Server/ts25login/S04_MyWork02.cpp:1340-1385.
 public class AvatarRenameGateTests
 {
     [Fact]
@@ -16,9 +14,9 @@ public class AvatarRenameGateTests
     }
 
     [Theory]
-    [InlineData(null)] // empty slot
-    [InlineData(1)] // some other item
-    [InlineData(0)] // legacy "empty" sentinel value, still not 1133
+    [InlineData(null)]
+    [InlineData(1)]
+    [InlineData(0)]
     public void ItemAtSlotIsRenameScroll_EmptyOrWrongItem_False(int? itemId)
     {
         Assert.False(AvatarRenameGate.ItemAtSlotIsRenameScroll(itemId));
@@ -31,8 +29,8 @@ public class AvatarRenameGateTests
     }
 
     [Theory]
-    [InlineData((byte)1)] // tribe master
-    [InlineData((byte)2)] // tribe sub-master
+    [InlineData((byte)1)]
+    [InlineData((byte)2)]
     public void TribeRoleBlocksRename_MasterOrSubMaster_Blocks(byte role)
     {
         Assert.True(AvatarRenameGate.TribeRoleBlocksRename(role, 100, []));

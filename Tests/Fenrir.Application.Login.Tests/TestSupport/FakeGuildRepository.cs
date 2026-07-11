@@ -3,17 +3,11 @@ using Fenrir.Data.Abstractions.Guilds;
 
 namespace Fenrir.Application.Login.Tests.TestSupport;
 
-/// <summary>
-///     In-memory stand-in for IGuildRepository, used for DeleteAvatarService's guild-membership refusal check and
-///     LoginService's character-select GuildName lookup -- every member besides <see cref="GetByCharacterAsync" />
-///     throws, since nothing else on either of those paths calls them.
-/// </summary>
 internal sealed class FakeGuildRepository : IGuildRepository
 {
     private readonly Dictionary<int, CharacterGuildMembershipDto> _membershipByCharacterId = new();
 
-    /// <summary>Every characterId GetByCharacterAsync was called with, in call order -- proves ordering/short-circuit.</summary>
-    public List<int> QueriedCharacterIds { get; } = [];
+        public List<int> QueriedCharacterIds { get; } = [];
 
     public ValueTask<CharacterGuildMembershipDto?> GetByCharacterAsync(int characterId, CancellationToken ct)
     {
@@ -119,8 +113,7 @@ internal sealed class FakeGuildRepository : IGuildRepository
         throw new NotSupportedException();
     }
 
-    /// <summary>No character has any guild membership at all.</summary>
-    public static FakeGuildRepository Empty()
+        public static FakeGuildRepository Empty()
     {
         return new FakeGuildRepository();
     }

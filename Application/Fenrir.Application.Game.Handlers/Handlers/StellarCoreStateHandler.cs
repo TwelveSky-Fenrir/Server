@@ -9,12 +9,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
-/// <summary>
-///     CZ_STELLAR_STATE_SEND (op153). Sort 1-5 (Select/no-op/Equip/Remove/ReturnToInventory) match the legacy
-///     switch exactly -- see <see cref="StellarCoreStateResolver" />'s remarks for why Select/Equip/
-///     Remove/ReturnToInventorySuccess never actually fire against today's always-empty wardrobe. Same shape as
-///     <see cref="CostumeStateHandler" />.
-/// </summary>
 public sealed class StellarCoreStateHandler(IStellarCoreStateService service, ILogger<StellarCoreStateHandler> logger)
     : IAsyncPacketHandler<StellarCoreStateRequest>
 {

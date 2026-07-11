@@ -4,11 +4,6 @@ using Fenrir.Application.Game.Domain.Inventory;
 
 namespace Fenrir.Application.Game.Tests.Consumables;
 
-/// <summary>
-///     C1-vault-expiry-enforcement, trigger 2: covers <see cref="BoxRewardPlacementResolver.Resolve" />'s new
-///     <c>secondPageAccessible</c> parameter. Companion to <see cref="BoxRewardPlacementResolverTests" />, which
-///     only exercises the always-accessible (default) shape.
-/// </summary>
 public class BoxRewardPlacementResolverVaultGateTests
 {
     private static readonly ItemStack Filler = new(999, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1);

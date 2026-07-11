@@ -1,10 +1,5 @@
 namespace Fenrir.Application.Game.Domain.World.Loot;
 
-/// <summary>
-///     Packs/unpacks the legacy "item value" int (<c>SetISIUIMValue</c>, <c>function.h:385-436</c>) to/from the
-///     4 upgrade bytes Fenrir stores as separate columns. Legacy byte order (little-endian): byte0=Enchant,
-///     byte1=Combine, byte2=Refine, byte3=Socket.
-/// </summary>
 public static class ItemValueCodec
 {
     public static int Encode(byte enchant, byte combine, byte refine, byte socket)

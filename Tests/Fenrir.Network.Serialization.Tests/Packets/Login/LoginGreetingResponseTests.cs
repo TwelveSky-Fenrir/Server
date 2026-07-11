@@ -8,7 +8,6 @@ public class LcLoginConnectOkRecvTests
     [Fact]
     public void PayloadSize_MatchesContractConstant()
     {
-        // ExpectedSize=37 (1-byte header + 20-byte padding + 3 int) -> 36-byte payload.
         Assert.Equal(36, LoginGreetingResponse.PayloadSize);
     }
 

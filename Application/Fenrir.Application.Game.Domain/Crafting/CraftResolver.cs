@@ -3,14 +3,6 @@ using Fenrir.Application.Game.Domain.Inventory;
 
 namespace Fenrir.Application.Game.Domain.Crafting;
 
-/// <summary>
-///     Pure resolver for the two CZ_MAKE_ITEM_SEND recipes this pass implements (<see cref="CraftRecipeCatalog" />'s
-///     own remarks). No I/O, no Zone dependency.
-/// </summary>
-/// <remarks>
-///     Every other <c>MK_*</c> family (weighted stone tables, mount/wing fusion, dust recycling, skill-book/pet
-///     crafting) is out of scope -- needs data Fenrir does not catalog.
-/// </remarks>
 public static class CraftResolver
 {
     public enum DustRecycleOutcome
@@ -23,8 +15,7 @@ public static class CraftResolver
     {
         Success,
 
-        /// <summary>The 80% case -- material is still consumed (the legacy runs consumption before the roll's outcome is known).</summary>
-        Failed,
+                Failed,
 
         Rejected
     }
@@ -37,8 +28,8 @@ public static class CraftResolver
 
     public enum JadeOutcome
     {
-        /// <summary>Always succeeds, no roll.</summary>
-        Success,
+
+                Success,
 
         Rejected
     }
@@ -77,15 +68,7 @@ public static class CraftResolver
         DustConsolation
     }
 
-    /// <summary>
-    ///     2 separate Purple Jades (not one stack of 2) become one Red Jade in the first slot; the second slot is
-    ///     cleared.
-    /// </summary>
-    /// <remarks>
-    ///     Both slots must hold exactly 1 unit -- without this check a stack of N&gt;1 would upgrade the whole stack for
-    ///     the cost of one, a duplication vector.
-    /// </remarks>
-    public static JadeResult ResolveJadeUpgrade(ItemStack material1, ItemStack material2)
+        public static JadeResult ResolveJadeUpgrade(ItemStack material1, ItemStack material2)
     {
         if (material1.ItemId != CraftRecipeCatalog.PurpleJadeItemId ||
             material2.ItemId != CraftRecipeCatalog.PurpleJadeItemId)
@@ -94,7 +77,6 @@ public static class CraftResolver
         if (material1.Quantity > 1 || material2.Quantity > 1)
             return new JadeResult(JadeOutcome.Rejected, null);
 
-        // Quantity/Enchant/Combine/Refine/Socket reset to 0 -- a fresh Red Jade, not one inheriting material1's state.
         var result = material1 with
         {
             ItemId = CraftRecipeCatalog.RedJadeItemId, Quantity = 0, Enchant = 0, Combine = 0, Refine = 0,
@@ -103,11 +85,7 @@ public static class CraftResolver
         return new JadeResult(JadeOutcome.Success, result);
     }
 
-    /// <summary>
-    ///     10 units of any one base item -&gt; 20% chance of one random item in [801,806]. Free-slot check happens before
-    ///     the roll, so it applies regardless of outcome.
-    /// </summary>
-    public static ElixirResult ResolveAdvancedElixir(ItemStack material, bool hasFreeInventorySlot,
+        public static ElixirResult ResolveAdvancedElixir(ItemStack material, bool hasFreeInventorySlot,
         IRandomSource random)
     {
         if (!CraftRecipeCatalog.AdvancedElixirBaseItemIds.Contains(material.ItemId))
@@ -132,14 +110,7 @@ public static class CraftResolver
         return new ElixirResult(ElixirOutcome.Failed, remaining, null);
     }
 
-    /// <summary>
-    ///     MK_MATS_01019 -- 4 separate stone-mat items (not one stack of 4) become one random result item.
-    ///     changeResultSort's own item-catalog lookup (:4383) can never actually fail here since
-    ///     randomStoneMat()'s output is this fixed, all-valid 4-item pool -- so unlike the legacy source this
-    ///     resolver has no corresponding rejection path for that step.
-    /// </summary>
-    /// <remarks>Every slot must hold exactly 1 unit -- same duplication guard as <see cref="ResolveJadeUpgrade" />.</remarks>
-    public static StoneMatResult ResolveStoneMatCombine(ItemStack material1, ItemStack material2,
+        public static StoneMatResult ResolveStoneMatCombine(ItemStack material1, ItemStack material2,
         ItemStack material3, ItemStack material4, IRandomSource random)
     {
         if (material1.ItemId != CraftRecipeCatalog.StoneMatMaterialItemId ||
@@ -155,15 +126,7 @@ public static class CraftResolver
         return new StoneMatResult(StoneMatOutcome.Success, pool[random.NextInt32(pool.Count)]);
     }
 
-    /// <summary>
-    ///     MK_ANIMAL_NUM_1/2 -- 3 same-tier mounts + 1 exact catalyst -&gt; a chance at a next-tier mount, else a
-    ///     dust consolation grant (still a wire-level success either way -- :4541-4639).
-    /// </summary>
-    /// <param name="sort">
-    ///     <see cref="CraftRecipeCatalog.MountFusionTier1Sort" /> or
-    ///     <see cref="CraftRecipeCatalog.MountFusionTier2Sort" />.
-    /// </param>
-    public static MountFusionResult ResolveMountFusion(int sort, int material1ItemId, int material2ItemId,
+        public static MountFusionResult ResolveMountFusion(int sort, int material1ItemId, int material2ItemId,
         int material3ItemId, int catalystItemId, IRandomSource random)
     {
         var isTier2 = sort == CraftRecipeCatalog.MountFusionTier2Sort;
@@ -199,14 +162,7 @@ public static class CraftResolver
         return new MountFusionResult(MountFusionOutcome.DustConsolation, CraftRecipeCatalog.DustItemId, dustQuantity);
     }
 
-    /// <summary>
-    ///     MK_WING_0 -- 3x White Feather + 1 of 9 catalyst gems -&gt; a chance at one of 5 wing tiers, else the
-    ///     material is destroyed outright (no dust consolation -- this is the one recipe in the whole family
-    ///     with a genuine hard-failure roll outcome). Town-zone and Contribution-Point preconditions are
-    ///     checked by the caller (need Zone/PlayerRuntimeState access) and passed in already resolved so this
-    ///     stays a pure, Zone-independent resolver -- :5096-5202.
-    /// </summary>
-    public static WingAssemblyResult ResolveWingAssembly(bool isTownZone, bool hasSufficientContributionPoints,
+        public static WingAssemblyResult ResolveWingAssembly(bool isTownZone, bool hasSufficientContributionPoints,
         int material1ItemId, int material2ItemId, int material3ItemId, int catalystItemId, byte previousTribe,
         IRandomSource random)
     {
@@ -237,15 +193,7 @@ public static class CraftResolver
             CraftRecipeCatalog.WingTierItemId(tier, previousTribe));
     }
 
-    /// <summary>
-    ///     MK_WING_1/MK_WING_3 -- deterministic, no RNG: 10 White Feather -&gt; 1 Black Feather, or 10 Black
-    ///     Feather -&gt; 1 Gold Feather -- :5270-5340.
-    /// </summary>
-    /// <param name="sort">
-    ///     <see cref="CraftRecipeCatalog.FeatherTierUpWhiteToBlackSort" /> or
-    ///     <see cref="CraftRecipeCatalog.FeatherTierUpBlackToGoldSort" />.
-    /// </param>
-    public static FeatherTierUpResult ResolveFeatherTierUp(int sort, int materialItemId, int materialQuantity)
+        public static FeatherTierUpResult ResolveFeatherTierUp(int sort, int materialItemId, int materialQuantity)
     {
         var (checkItemId, gainItemId) = sort == CraftRecipeCatalog.FeatherTierUpBlackToGoldSort
             ? (CraftRecipeCatalog.WingFeatherBlackItemId, CraftRecipeCatalog.WingFeatherGoldItemId)
@@ -257,11 +205,7 @@ public static class CraftResolver
         return new FeatherTierUpResult(FeatherTierUpOutcome.Success, gainItemId);
     }
 
-    /// <summary>
-    ///     MK_WING_2 -- 3x tier-1 wing + 1 catalyst (partially consumed, 1 unit) -&gt; a chance at a higher wing
-    ///     tier, else a dust consolation grant (still wire-success) -- :5342-5403.
-    /// </summary>
-    public static WingTierRerollResult ResolveWingTierReroll(int material1ItemId, int material2ItemId,
+        public static WingTierRerollResult ResolveWingTierReroll(int material1ItemId, int material2ItemId,
         int material3ItemId, int catalystItemId, int catalystQuantity, byte previousTribe, IRandomSource random)
     {
         var tier1ItemId = CraftRecipeCatalog.WingTierItemId(1, previousTribe);
@@ -285,17 +229,7 @@ public static class CraftResolver
                 CraftRecipeCatalog.WingTierItemId(tier, previousTribe));
     }
 
-    /// <summary>
-    ///     MK_WING_5 -- 3x item 1401 + 1 catalyst -&gt; a 10% chance at item 1403, else a dust consolation grant
-    ///     (still wire-success) -- :5491-5541. MK_WING_6 shares the outer case but has no compiled inner-switch
-    ///     branch (see <see cref="CraftRecipeCatalog.WingSixthTierUnvalidatedSort" />'s remarks) -- it skips
-    ///     every material check and always lands on the dust branch, which this resolver reproduces exactly.
-    /// </summary>
-    /// <param name="sort">
-    ///     <see cref="CraftRecipeCatalog.WingFifthTierSort" /> or
-    ///     <see cref="CraftRecipeCatalog.WingSixthTierUnvalidatedSort" />.
-    /// </param>
-    public static WingFifthTierResult ResolveWingFifthTier(int sort, int material1ItemId, int material2ItemId,
+        public static WingFifthTierResult ResolveWingFifthTier(int sort, int material1ItemId, int material2ItemId,
         int material3ItemId, int catalystItemId, IRandomSource random)
     {
         if (sort == CraftRecipeCatalog.WingSixthTierUnvalidatedSort)
@@ -312,11 +246,7 @@ public static class CraftResolver
             : new WingFifthTierResult(WingFifthTierOutcome.DustConsolation, CraftRecipeCatalog.DustItemId);
     }
 
-    /// <summary>
-    ///     MK_DUST_WING/CLOAK/ANIMAL/PET1/PET2 -- exchange N units of wing dust for a weighted-random reward
-    ///     item; no true failure branch once the threshold/identity gate passes -- :5553-5858.
-    /// </summary>
-    public static DustRecycleResult ResolveDustRecycle(int sort, int materialItemId, int materialQuantity,
+        public static DustRecycleResult ResolveDustRecycle(int sort, int materialItemId, int materialQuantity,
         byte previousTribe, IRandomSource random)
     {
         var threshold = DustRecycleThreshold(sort);
@@ -337,12 +267,7 @@ public static class CraftResolver
         return new DustRecycleResult(DustRecycleOutcome.Success, resultItemId);
     }
 
-    /// <summary>
-    ///     The exact-vs-over-threshold container-mutation branch (in-place convert vs. reduce + grant a new
-    ///     slot) lives in the caller (needs inventory/free-slot access), so this is exposed for the caller to
-    ///     re-derive the same threshold rather than duplicating the sort-&gt;threshold mapping a second time.
-    /// </summary>
-    public static int DustRecycleThreshold(int sort)
+        public static int DustRecycleThreshold(int sort)
     {
         return sort switch
         {

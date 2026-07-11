@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Zone;
 
-// Field order differs from the ZC 199 response - do not assume symmetry.
 public class CzRuneSystemSendTests
 {
     [Fact]

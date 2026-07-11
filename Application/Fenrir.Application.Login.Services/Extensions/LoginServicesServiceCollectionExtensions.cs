@@ -22,7 +22,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Application.Login.Services.Extensions;
 
-/// <summary>Registers the handler-support services extracted from this project's packet handlers.</summary>
 public static class LoginServicesServiceCollectionExtensions
 {
     public static IServiceCollection AddLoginServices(this IServiceCollection services)

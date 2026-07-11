@@ -17,7 +17,6 @@ public class TowerCpForPvmMilestoneTests
     [Fact]
     public void RegisterKill_GapOfExactlyTen_DoesNotCount()
     {
-        // ReturnFixedLevel(50) - 40 == 10, the boundary the contract states as "strictly under 10 counts".
         var result = TowerCpForPvmMilestone.RegisterKill(5, 50,
             0, 40);
 
@@ -37,12 +36,9 @@ public class TowerCpForPvmMilestoneTests
     [Fact]
     public void RegisterKill_UsesTheSumOfLevel1AndLevel2_NotLevel1Alone()
     {
-        // Level1 alone (50) - monster 55 would be a *favorable* gap (fine); but the milestone's eligibility
-        // basis is level1+level2, so a high level2 pushes the effective level well past the monster's.
         var result = TowerCpForPvmMilestone.RegisterKill(0, 50,
             60, 1);
 
-        // ReturnFixedLevel(110) - 1 = 109, far past the <10 window -- must not count.
         Assert.Equal(0, result.UpdatedCounter);
         Assert.False(result.MilestoneReached);
     }

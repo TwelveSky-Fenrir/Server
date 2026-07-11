@@ -7,11 +7,6 @@ using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Game.Tests.Inventory;
 
-/// <summary>
-///     Covers <see cref="EquipmentService" />'s bridge between the raw <see cref="ItemStack" /> Equipment container
-///     and <see cref="StatCalculator" />'s input shape: the wiring, not MyFactor's formulas (covered by
-///     <c>StatCalculatorTests</c>).
-/// </summary>
 public class EquipmentServiceTests
 {
     private static ItemRowDto Item(int itemId, short vitality = 0)
@@ -109,7 +104,7 @@ public class EquipmentServiceTests
             worldData);
 
         var equipped = ImmutableDictionary<byte, ItemStack>.Empty
-            .Add(2, new ItemStack(200, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0)); // slot 2 = armor
+            .Add(2, new ItemStack(200, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
         var withEquipment = EquipmentService.RecomputeStats(attributes, equipped, worldData);
 
         Assert.True(withEquipment.MaxLife > withoutEquipment.MaxLife);

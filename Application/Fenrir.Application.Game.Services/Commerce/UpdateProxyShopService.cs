@@ -10,30 +10,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Commerce;
 
-/// <remarks>
-///     Legacy replies to CZ_SET_DEPUTY_PSHOP_SEND (opcode 109) with one of ten distinct result codes, and
-///     -- exactly like <see cref="OpenShopStallService" />'s already-preserved personal/proxy 0-vs-100 split
-///     -- the *same* opcode uses two different success codes depending on which sub-operation ran: 0 for a
-///     successful RETRIEVE, 1000 for a successful PURCHASE (contract: Shop Stalls and Proxy Shops,
-///     UpdateProxyShop Outputs section; ServerDocs/12_ts25zone/15_MyGame08_09_EventsCenter_ProxyShops.md
-///     §5.7 confirms <c>case 1</c> of <c>PROXY_SHOP_SYSTEM::Process</c>, Server/ts25zone/S07_MyGame09.cpp:557-884,
-///     is where both sub-operations are dispatched). That success split is preserved below.
-///     The C21-commerce-social.md contract (2026-07-10) refines the failure-side picture: of legacy's ten
-///     total outcomes, only 7 (not 8) are actually coded failure wire values -- two further conditions (an
-///     invalid requested action code, and a stale inventory page detected specifically on the "purchase"
-///     path) bypass the coded response entirely and hard-disconnect instead. The invalid-action-code case was
-///     already handled correctly (<see cref="Validate" />'s <c>BuySort</c> range check); the stale-purchase
-///     case is now handled the same way too, via <see cref="ProxyShopDeputyFailureClassifier" /> (C21a) in
-///     <see cref="PurchaseAsync" />'s catch clause. The remaining 7 legacy failure codes' exact
-///     numeric-value-to-condition mapping is STILL NOT itemized by the C21 contract or by ServerDocs (the
-///     contract's own Edge cases C explicitly preserves this as an open question rather than guessing) -- per
-///     this project's "no legacy parity from memory" rule, they remain intentionally left collapsed to 1
-///     (mismatch, unknown shop, or any other RetrieveItemAndReplaceContainerAsync failure minus the
-///     hard-disconnect case above) / 2 (insufficient funds, a cap, or any other ExecutePurchaseAsync failure
-///     minus the stale-listing hard-disconnect case above) until a dedicated legacy-behavior-translator
-///     follow-up contract supplies the full seven-code enumeration and the exact SQL error each stored
-///     procedure throws per case.
-/// </remarks>
 public sealed class UpdateProxyShopService(
     IOfflineShopRepository offlineShops,
     ICharacterRepository characters,
@@ -41,15 +17,10 @@ public sealed class UpdateProxyShopService(
     IEventLogRepository eventLog,
     ILogger<UpdateProxyShopService> logger) : IUpdateProxyShopService
 {
-    /// <summary>
-    ///     game.EventLog.EventCode for a proxy-shop retrieve row (legacy <c>GL_1001_PXSHOP_ITEM</c>, action
-    ///     label "Retrieved"), scoped within <see cref="EventLogCategory.ProxyShop" /> -- see that enum
-    ///     member's remarks for the full 1-4 numbering.
-    /// </summary>
-    private const short ProxyShopRetrieveEventCode = 2;
 
-    /// <summary>Same legacy call site as <see cref="ProxyShopRetrieveEventCode" />, action label "Purchased".</summary>
-    private const short ProxyShopPurchaseEventCode = 3;
+        private const short ProxyShopRetrieveEventCode = 2;
+
+        private const short ProxyShopPurchaseEventCode = 3;
 
     public UpdateProxyShopValidation Validate(UpdateProxyShopRequest packet)
     {
@@ -119,12 +90,6 @@ public sealed class UpdateProxyShopService(
 
         var response = BuildReply(0, packet.SelfPage, packet.SelfIndex, newStack, packet.Socket, 0);
 
-        // Logged only once RetrieveItemAndReplaceContainerAsync above has durably committed. Money is
-        // unconditionally 0 for a retrieve, matching legacy's own forced-zero before both the response and
-        // the audit write (Server/ts25zone/S07_MyGame09.cpp:838-844) -- never packet.Price, which this branch
-        // never even reads. The shop's own remaining Money/BigMoney are unaffected by a retrieve; re-read
-        // fresh (rather than threaded from elsewhere) purely so this audit row reflects the actually-stored
-        // balance, not an assumption. TargetAccountId/TargetCharacterId are left null: owner == actor here.
         var (shopAfterRetrieve, _) = await offlineShops.GetByCharacterAsync(characterId, cancellationToken);
         await eventLog.LogAsync(ProxyShopRetrieveEventCode, EventLogCategory.ProxyShop, accountId, characterId,
             null, null, null, 0, null, packet.SellItemIndex, packet.Quantity, 1,
@@ -161,8 +126,6 @@ public sealed class UpdateProxyShopService(
             return BuildReply(1, packet.SelfPage, packet.SelfIndex, null, packet.Socket, 0);
         }
 
-        // Buying from one's own open shop would bypass RETRIEVE's "must be closed" gate and refund the
-        // price into the shop's own earnings -- rejected as the safe, conservative choice.
         if (sellerId.Value == characterId)
         {
             logger.LogWarning(
@@ -200,10 +163,6 @@ public sealed class UpdateProxyShopService(
         }
         catch (Exception ex) when (ProxyShopDeputyFailureClassifier.IsStaleListingFailure(ex))
         {
-            // C21 contract, Edge cases C: a stale inventory page detected specifically on the "purchase"
-            // path bypasses the coded response entirely and hard-disconnects -- unlike opcode 35's own
-            // Result=4 coded reply for the identical underlying SQL error (BuyShopItemService.
-            // ProxyListingStaleErrorNumber, same stored procedure).
             logger.LogInformation(ex,
                 "Offline-shop purchase rejected: character {CharacterId} proxy listing changed since it was read (stale purchase) -- session will be disconnected",
                 characterId);
@@ -216,20 +175,8 @@ public sealed class UpdateProxyShopService(
             return BuildReply(2, packet.SelfPage, packet.SelfIndex, null, packet.Socket, 0);
         }
 
-        // Result=1000 marks a successful PURCHASE, distinct from RETRIEVE's Result=0 above -- the same
-        // legacy asymmetry OpenShopStall already preserves via its personal/proxy 0-vs-100 split. If the
-        // legacy client branches its UI/state handling on the specific success code (as it does there), a
-        // purchase misreported as Result=0 would be misinterpreted client-side as a retrieval.
         var response = BuildReply(1000, packet.SelfPage, packet.SelfIndex, newStack, packet.Socket, packet.Price);
 
-        // Logged only once ExecutePurchaseAsync above has durably committed -- ShopMoneyAfter/BigMoneyAfter
-        // re-read fresh from the seller's shop row so this audit row reflects the actual post-credit balance
-        // (including any BigMoney rollover ExecutePurchaseAsync's own CASE WHEN applied), not a value
-        // recomputed here that could drift from the stored procedure's own rounding/rollover logic.
-        // TargetAccountId is deliberately left null: no cheap characterId->accountId lookup exists on
-        // ICharacterRepository today, and the seller may be offline (the whole point of a proxy shop) so no
-        // live PlayerRuntimeState is available either -- TargetCharacterId is still populated, and
-        // game.Characters.AccountId is trivially joinable from it for any downstream audit query.
         var (shopAfterPurchase, _) = await offlineShops.GetByCharacterAsync(sellerId.Value, cancellationToken);
         await eventLog.LogAsync(ProxyShopPurchaseEventCode, EventLogCategory.ProxyShop, accountId, characterId,
             null, sellerId.Value, null, packet.Price, null, packet.SellItemIndex, packet.Quantity, 1,

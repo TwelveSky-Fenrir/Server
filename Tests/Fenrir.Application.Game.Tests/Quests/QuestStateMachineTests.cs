@@ -8,7 +8,7 @@ namespace Fenrir.Application.Game.Tests.Quests;
 public class QuestStateMachineTests
 {
     private const byte Tribe = 0;
-    private const byte Category = 1; // tribe + 1
+    private const byte Category = 1;
 
     private static QuestCatalog Catalog(params QuestRowDto[] quests)
     {
@@ -71,7 +71,7 @@ public class QuestStateMachineTests
             Category = Category, Step = 3, Sort = 1, Solution1 = 5001, Solution2 = 3
         };
         var catalog = Catalog(quest);
-        var progress = new QuestProgress(3, 1, 1, 5001, 2); // 2 kills of 3 required
+        var progress = new QuestProgress(3, 1, 1, 5001, 2);
 
         var state = QuestStateMachine.ComputePresentState(progress, Tribe, 10, catalog, NoItems);
 
@@ -101,7 +101,7 @@ public class QuestStateMachineTests
             Category = Category, Step = 3, Sort = 1, Solution1 = 5001, Solution2 = 3
         };
         var catalog = Catalog(quest);
-        var progress = new QuestProgress(3, 1, 1, 9999, 3); // target mismatch
+        var progress = new QuestProgress(3, 1, 1, 9999, 3);
 
         Assert.Equal(QuestStateMachine.StateInvalid,
             QuestStateMachine.ComputePresentState(progress, Tribe, 10, catalog, NoItems));
@@ -156,10 +156,6 @@ public class QuestStateMachineTests
             QuestStateMachine.ComputePresentState(done, Tribe, 10, catalog, NoItems));
     }
 
-    // qSort 8 "occupation of WaterFall": TargetPhase must equal the quest's own first solution value, then
-    // KillCounter below 1 is In-Progress (2), otherwise Condition-Met (3) -- the exact < 1 gate the two
-    // war-conclusion credit hooks (Zone.HandleZone038OccupationCredit / Zone.HandleRegularWarConclusionCredit)
-    // reproduce. Réf. C++ : Server/ts25zone/S07_MyGame04.cpp:1865-1874.
     [Fact]
     public void PresentState_WaterfallOccupationQuest_ZeroCounter_IsInProgress_OneCounter_IsConditionMet()
     {
@@ -181,7 +177,7 @@ public class QuestStateMachineTests
     {
         var quest = WorldDataTestRows.Quest(1) with { Category = Category, Step = 4, Sort = 8, Solution1 = 38 };
         var catalog = Catalog(quest);
-        var mismatch = new QuestProgress(4, 1, 8, 49, 0); // TargetPhase 49 != Solution1 38
+        var mismatch = new QuestProgress(4, 1, 8, 49, 0);
 
         Assert.Equal(QuestStateMachine.StateInvalid,
             QuestStateMachine.ComputePresentState(mismatch, Tribe, 10, catalog, NoItems));
@@ -195,7 +191,7 @@ public class QuestStateMachineTests
             Category = Category, Step = 5, Sort = 6, Solution1 = 100, Solution2 = 200
         };
         var catalog = Catalog(quest);
-        var progress = new QuestProgress(5, 1, 6, 1, 100); // phase 1, KillCounter holds Solution1 echo
+        var progress = new QuestProgress(5, 1, 6, 1, 100);
 
         Assert.Equal(QuestStateMachine.StateConditionMet,
             QuestStateMachine.ComputePresentState(progress, Tribe, 10, catalog, id => id == 100));
@@ -209,14 +205,13 @@ public class QuestStateMachineTests
             Category = Category, Step = 5, Sort = 6, Solution1 = 100, Solution2 = 200
         };
         var catalog = Catalog(quest);
-        var progress = new QuestProgress(5, 1, 6, 2, 200); // phase 2, KillCounter holds Solution2 echo
+        var progress = new QuestProgress(5, 1, 6, 2, 200);
 
         Assert.Equal(QuestStateMachine.StateExchangeReturnReady,
             QuestStateMachine.ComputePresentState(progress, Tribe, 10, catalog, id => id == 200));
         Assert.True(QuestStateMachine.ComputeEndConditionMet(progress, Tribe, 10, catalog, id => id == 200));
     }
 
-    // qSort 7 "meet NPC" quirk: end condition is PresentState==2, not 3
     [Fact]
     public void PresentState_MeetNpcQuest_MatchingId_IsInProgress_AndImmediatelyCompletable()
     {
@@ -299,9 +294,9 @@ public class QuestStateMachineTests
         };
         var rewards = new[]
         {
-            new QuestRewardRowDto(1, 0, 2, null, 1000), // money
-            new QuestRewardRowDto(1, 1, 3, null, 50), // CP
-            new QuestRewardRowDto(1, 2, 4, null, 200) // XP
+            new QuestRewardRowDto(1, 0, 2, null, 1000),
+            new QuestRewardRowDto(1, 1, 3, null, 50),
+            new QuestRewardRowDto(1, 2, 4, null, 200)
         };
         var catalog = CatalogWithRewards(quest, rewards);
         var progress = new QuestProgress(3, 1, 1, 5001, 1);
@@ -319,7 +314,6 @@ public class QuestStateMachineTests
     [Fact]
     public void Complete_RewardType5_GrantsTeacherPoint()
     {
-        // reward type 5 = aTeacherPoint (GL_614_QUEST_TEACHER_POINT, S04_MyWork02.cpp)
         var quest = WorldDataTestRows.Quest(1) with
         {
             Category = Category, Step = 3, Sort = 1, Solution1 = 5001, Solution2 = 1
@@ -356,7 +350,7 @@ public class QuestStateMachineTests
         var progress = new QuestProgress(2, 1, 2, 7000, 0);
 
         var result = QuestStateMachine.Complete(progress, Tribe, 10, catalog, id => id == 7000,
-            itemId => itemId == 9500 ? 9 : null); // sort 9 -> in [7,29] -> quantity 0
+            itemId => itemId == 9500 ? 9 : null);
 
         Assert.True(result.Success);
         Assert.Equal(9500, result.RewardItemId);
@@ -413,7 +407,7 @@ public class QuestStateMachineTests
             Category = Category, Step = 2, Sort = 1, Solution1 = 700, Solution2 = 1
         };
         var catalog = Catalog(quest);
-        var progress = new QuestProgress(2, 1, 1, 700, 0); // qSort 1, not 3/4/6
+        var progress = new QuestProgress(2, 1, 1, 700, 0);
 
         var ok = QuestStateMachine.TryReceive(progress, Tribe, 10, catalog, NoItems, out _);
 

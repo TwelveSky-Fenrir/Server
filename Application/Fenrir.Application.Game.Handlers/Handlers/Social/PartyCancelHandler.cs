@@ -7,7 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>CZ_PARTY_CANCEL_SEND (opcode 66) -- withdraws the caller's own still-pending ask.</summary>
 public sealed class PartyCancelHandler(
     ZoneRegistry zones,
     IPartyCancelService partyCancelService,

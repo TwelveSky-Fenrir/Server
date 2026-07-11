@@ -2,7 +2,6 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
-/// <summary>Parses <c>005_00001.IMG</c> (<c>LEVEL_INFO</c>); no known runtime patches.</summary>
 internal static class LevelReader
 {
     private const string FileName = "005_00001.IMG";

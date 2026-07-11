@@ -6,10 +6,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>
-///     CZ_DUEL_START_SEND (opcode 46) -- callable by either accepted side. Scope cut: no
-///     ZC_AVATAR_CHANGE_INFO_1 broadcast, no countdown auto-end tick.
-/// </summary>
 public sealed class DuelStartHandler(IDuelService duelService, ILogger<DuelStartHandler>? logger = null)
     : IInlinePacketHandler<DuelStartRequest>
 {

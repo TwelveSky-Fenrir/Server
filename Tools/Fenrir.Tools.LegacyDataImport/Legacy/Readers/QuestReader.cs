@@ -2,14 +2,10 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
-/// <summary>
-///     Parses <c>005_00006.IMG</c> (legacy <c>QUEST_INFO</c> table). No known runtime per-load patches --
-///     <see cref="ReadAll" /> simply delegates to <see cref="ReadAllRaw" />.
-/// </summary>
 internal static class QuestReader
 {
     private const string FileName = "005_00006.IMG";
-    private const int XorKey = 0; // no-op XOR for this dataset -- still validated against the expected count
+    private const int XorKey = 0;
     private const int RecordArrayOffset = 4;
     private const int RecordCount = 1000;
     private const int RecordSize = 8444;
@@ -37,7 +33,7 @@ internal static class QuestReader
 
         var index = reader.ReadInt32();
         var subject = reader.ReadFixedString(51);
-        reader.Skip(1); // compiler padding before qCategory (offset 55 -> 56)
+        reader.Skip(1);
 
         var category = reader.ReadInt32();
         var step = reader.ReadInt32();
@@ -79,12 +75,11 @@ internal static class QuestReader
             callSpeech, callSpeechColor);
     }
 
-    /// <summary>Reads a <c>char[15][51]</c> speech block + 3-byte pad + <c>int[15]</c> colors.</summary>
-    private static (string[] Lines, int[] Colors) ReadSpeechBlock(ref LegacySpanReader reader)
+        private static (string[] Lines, int[] Colors) ReadSpeechBlock(ref LegacySpanReader reader)
     {
         var lines = new string[15];
         for (var i = 0; i < 15; i++) lines[i] = reader.ReadFixedString(51);
-        reader.Skip(3); // compiler padding before the color array
+        reader.Skip(3);
         var colors = reader.ReadInt32Array(15);
         return (lines, colors);
     }

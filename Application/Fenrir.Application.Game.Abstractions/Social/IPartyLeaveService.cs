@@ -1,6 +1,5 @@
 namespace Fenrir.Application.Game.Abstractions.Social;
 
-/// <summary>Result of a CZ_PARTY_LEAVE_SEND attempt.</summary>
 public readonly record struct PartyLeaveResult(
     bool Handled,
     IReadOnlyList<int>? MembersBeforeLeave = null,

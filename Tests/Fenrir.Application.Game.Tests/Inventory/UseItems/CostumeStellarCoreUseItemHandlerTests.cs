@@ -11,18 +11,11 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Inventory.UseItems;
 
-/// <summary>
-///     op23's costume/stellar-core intermediate dispatch (workstream C9-costume-stellar-whitelist) --
-///     <see cref="CostumeStellarCoreUseItemHandler" /> exercised directly, not through
-///     <see cref="UseItemHandlerRegistry" /> (that routing itself is covered in
-///     <see cref="UseItemHandlerRegistryTests" />).
-/// </summary>
 public class CostumeStellarCoreUseItemHandlerTests
 {
     private const int AccountId = 1;
     private const int CharacterId = 10;
 
-    // Live low ends of each whitelist's own transcribed table -- see CostumeStellarCoreWhitelist's own remarks.
     private const int ValidCostumeItemId = 301;
     private const int OtherValidCostumeItemId = 302;
     private const int ValidStellarCoreItemId = 76527;
@@ -82,7 +75,6 @@ public class CostumeStellarCoreUseItemHandlerTests
         return new UseItemContext(zone, state, CharacterId, AccountId, 0, 0, item, Definition(item.ItemId), 0);
     }
 
-    // ---- Whitelist membership --------------------------------------------------------------------------
 
     [Fact]
     public void ClaimsItem_ValidCostumeId_ReturnsTrue()
@@ -102,7 +94,6 @@ public class CostumeStellarCoreUseItemHandlerTests
         Assert.False(CostumeStellarCoreUseItemHandler.ClaimsItem(UnwhitelistedItemId));
     }
 
-    // ---- Costume grant ----------------------------------------------------------------------------------
 
     [Fact]
     public async Task CostumeGrant_FirstFreeSlot_GrantsItem_CopiesDateAndExpireDate_ConsumesSourceItem()
@@ -112,16 +103,16 @@ public class CostumeStellarCoreUseItemHandlerTests
 
         var response =
             await RunToCompletionAsync(handler.HandleAsync(Context(zone, state, item), CancellationToken.None), zone);
-        zone.Tick(TimeSpan.FromMilliseconds(50)); // drain the fire-and-forget CostumeZoneCommand mirror
+        zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.Null(session.DisconnectReason);
         Assert.Equal(0, response.Result);
-        Assert.Equal(0, response.Value); // first free slot
+        Assert.Equal(0, response.Value);
 
         Assert.True(zone.TryGetPlayer(CharacterId, out var after));
         Assert.Equal(ValidCostumeItemId, after!.CostumeWardrobe[0]);
         Assert.Equal(12345, after.CostumeExpireDate[0]);
-        Assert.NotEqual(0, after.CostumeDate[0]); // packed enchant/combine/refine/socket word, non-zero enchant
+        Assert.NotEqual(0, after.CostumeDate[0]);
         Assert.NotNull(characters.LastReplacedContainer);
         Assert.Equal(2, eventLog.LoggedEvents.Count);
     }
@@ -130,7 +121,7 @@ public class CostumeStellarCoreUseItemHandlerTests
     public async Task CostumeGrant_UsesFirstFreeSlot_NotNecessarilySlotZero()
     {
         var (_, zone, state, _, _, handler) = SetUp();
-        state.CostumeWardrobe = state.CostumeWardrobe.SetItem(0, 999); // slot 0 already occupied by something else
+        state.CostumeWardrobe = state.CostumeWardrobe.SetItem(0, 999);
 
         var response = await RunToCompletionAsync(
             handler.HandleAsync(Context(zone, state, Item(ValidCostumeItemId)), CancellationToken.None), zone);
@@ -161,7 +152,6 @@ public class CostumeStellarCoreUseItemHandlerTests
     public async Task CostumeGrant_AllTenSlotsFull_Disconnects_NoConsumption()
     {
         var (session, zone, state, characters, eventLog, handler) = SetUp();
-        // Fill every slot with items distinct from the one being granted.
         for (var slot = 0; slot < 10; slot++)
             state.CostumeWardrobe = state.CostumeWardrobe.SetItem(slot, OtherValidCostumeItemId + slot * 10);
 
@@ -172,7 +162,6 @@ public class CostumeStellarCoreUseItemHandlerTests
         Assert.Empty(eventLog.LoggedEvents);
     }
 
-    // ---- Stellar-core grant -----------------------------------------------------------------------------
 
     [Fact]
     public async Task StellarCoreGrant_FirstFreeSlot_GrantsItem_CopiesExpireDate_ConsumesSourceItem()
@@ -223,13 +212,10 @@ public class CostumeStellarCoreUseItemHandlerTests
         Assert.Empty(eventLog.LoggedEvents);
     }
 
-    // ---- Check-order (costume before stellar-core, matching the legacy call-site order) -----------------
 
     [Fact]
     public async Task CheckOrder_CostumeCheckedBeforeStellarCore_ForADisjointId()
     {
-        // The two tables are confirmed disjoint (see CostumeStellarCoreWhitelist's own remarks), so this only
-        // asserts that a valid costume id never spuriously lands in the stellar-core wardrobe.
         var (_, zone, state, _, _, handler) = SetUp();
 
         await RunToCompletionAsync(

@@ -20,16 +20,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 
-/// <summary>
-///     Drives the real <see cref="UseInventoryItemService" /> (opcode 23) over a real <see cref="Zone" />; ticks
-///     the zone while the service's own <c>PostInventoryCommandAndWaitAsync</c> await is pending, same pattern as
-///     <c>SkyUpgradeItemServiceTests</c>. Covers the Guild Scroll, GP ticket (itemId 723/725), and proxy-shop
-///     rental-extension (itemId 567/592/8422/8423) families added on top of the pre-existing Bottle-only
-///     dispatch, plus one Bottle regression case guarding the dispatch refactor itself. The Faction Transfer
-///     Scroll family (8153/8154) used to be covered here too, against a since-removed permit-banking stub --
-///     see <c>Tests/Fenrir.Application.Game.Tests/Inventory/UseItems/TribeScrollTransferUseItemHandlerTests.cs</c>
-///     for its real coverage now.
-/// </summary>
 public class UseInventoryItemServiceTests
 {
     private const byte BottleSort = 26;
@@ -146,10 +136,6 @@ public class UseInventoryItemServiceTests
         Assert.Null(session.DisconnectReason);
         Assert.Equal(0, response.Result);
 
-        // BuffType/BuffState carried through unchanged. The seeded baseline (1000L ticks -- effectively
-        // year 1) is already in the past relative to "now", so GuildBuffTopUp restarts counting from now
-        // rather than stacking onto that stale timestamp (Server/ts25extra/S08_MyDB.cpp:1151-1186's own
-        // "already expired" branch) -- BuffTime becomes exactly the scroll's 60 minutes, not 5+60.
         var setBuff = guilds.LastSetBuff!.Value;
         Assert.Equal(77, setBuff.GuildId);
         Assert.Equal(2, setBuff.BuffType);
@@ -217,11 +203,6 @@ public class UseInventoryItemServiceTests
         Assert.Null(characters.LastReplacedContainer);
     }
 
-    // The old "TribeTransferScroll_Use_GrantsOnePermit_AndConsumesTheScroll" test was removed here: it covered
-    // a superseded permit-banking stub (ResolveTribeTransferScrollAsync). The real op23 items 8153/8154
-    // mechanism (13-gate precondition chain + atomic best-effort equip/skill remap) is now
-    // TribeScrollTransferUseItemHandler (workstream C11), covered by its own dedicated test file
-    // (Tests/Fenrir.Application.Game.Tests/Inventory/UseItems/TribeScrollTransferUseItemHandlerTests.cs).
 
     [Fact]
     public async Task UnhandledItemFamily_RepliesResultOne_AndLeavesTheItemUntouched()
@@ -251,8 +232,6 @@ public class UseInventoryItemServiceTests
 
         Assert.Null(session.DisconnectReason);
         Assert.Equal(0, response.Result);
-        // Neither value field ever reflects the credited amount -- matches the legacy response's own
-        // inability to convey it (see UseInventoryItemService.ResolveGpTicketAsync's own remarks).
         Assert.Equal(0, response.Value);
         Assert.Equal(0, response.Value2);
 
@@ -300,9 +279,6 @@ public class UseInventoryItemServiceTests
             service.ResolveAsync(zone, state, 10, AccountId, ContainerMatrix.InventoryPage0, 0, 0,
                 CancellationToken.None), zone);
 
-        // Full-stack consumption, not decrement-by-one: a single use of a 5-stack still grants exactly one
-        // 500 credit, and destroys the whole slot -- not just one unit -- unlike GuildScroll_StackedQuantity's
-        // decrement-by-one sibling behavior.
         Assert.Equal(500, await cash.GetBalanceAsync(AccountId, CancellationToken.None));
         Assert.NotNull(characters.LastReplacedContainer);
         Assert.DoesNotContain(characters.LastReplacedContainer!.Value.Items, i => i.Slot == 0);
@@ -324,9 +300,6 @@ public class UseInventoryItemServiceTests
 
         Assert.Null(session.DisconnectReason);
         Assert.Equal(1, response.Result);
-        // Hardening: unlike the legacy call site (which discards the credit call's return value and always
-        // consumes the item / reports success), a failed credit here leaves the item and the audit trail
-        // untouched.
         Assert.Null(characters.LastReplacedContainer);
         Assert.Empty(eventLog.LoggedEvents);
         Assert.Equal(0, await cash.GetBalanceAsync(AccountId, CancellationToken.None));
@@ -342,8 +315,6 @@ public class UseInventoryItemServiceTests
         var response = await RunToCompletionAsync(
             service.ResolveAsync(zone, state, 10, AccountId, ContainerMatrix.InventoryPage0, 0, 0,
                 CancellationToken.None), zone);
-        // The bottle-acquire mirror is posted (fire-and-forget) only after the awaited inventory mirror
-        // resolves, so it needs one more tick of its own to be observable on state.BottleSlots.
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.Null(session.DisconnectReason);
@@ -377,9 +348,6 @@ public class UseInventoryItemServiceTests
 
         Assert.Equal(expected, offlineShops.LastExtendRentalNewShopDate);
 
-        // Always relayed cross-shard on success, regardless of whether this shard's own zone-37 instance
-        // (there is none here) happened to hold a matching entry -- see ProxyShopExpirationRelayHost's own
-        // remarks for why this hardens past the legacy single-process-only limitation.
         var relayed = Assert.Single(relay.Enqueued);
         Assert.Equal(ShardId, relayed.SourceShardId);
         Assert.Equal(10, relayed.CharacterId);
@@ -389,12 +357,8 @@ public class UseInventoryItemServiceTests
         Assert.Equal(10, logged.ActorCharacterId);
         Assert.Equal(ProxyShopOneDayItemId, logged.ItemId);
         Assert.Equal(1, logged.Quantity);
-        // The two auxiliary data values carried alongside the slot (Serial/ExpireDate).
         Assert.Equal("Serial=7;ExpireDate=42", logged.Payload);
 
-        // world.Items 567/592/8422/8423's own stack-safe status is unresolved (see
-        // CashItemStackConsumption's own remarks) -- currently defaults to whole-stack consumption, so a
-        // single-quantity slot is cleared entirely, not merely decremented.
         Assert.NotNull(characters.LastReplacedContainer);
         Assert.DoesNotContain(characters.LastReplacedContainer!.Value.Items, i => i.Slot == 0);
         Assert.True(zone.TryGetPlayer(10, out var refreshed));
@@ -455,8 +419,6 @@ public class UseInventoryItemServiceTests
 
         Assert.Null(session.DisconnectReason);
         Assert.Equal(1, response.Result);
-        // Computed (valid) new expiration is still echoed even though nothing was persisted -- matches the
-        // legacy client's inability to distinguish "unreachable" from "reported failure".
         Assert.Equal(expected, response.Value);
         Assert.Equal(0, response.Value2);
         Assert.Null(characters.LastReplacedContainer);
@@ -471,7 +433,6 @@ public class UseInventoryItemServiceTests
         var (session, _, zone, state, characters, guilds, cash, eventLog) = SetUp();
         SeedInventory(zone, new ItemStack(ProxyShopOneDayItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1));
         var offlineShops = new FakeOfflineShopRepository();
-        // The maximum representable calendar date -- projecting one more day forward overflows.
         offlineShops.SeedShop(new OfflineShopRowDto(10, null, 1, 99991231, 0, 0, 0, 0, 0, ""));
         var relay = new FakeProxyShopExpirationRelayQueue();
         var service = CreateService(characters, guilds, cash, eventLog, offlineShops, relay);

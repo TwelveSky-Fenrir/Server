@@ -9,11 +9,8 @@ namespace Fenrir.Data.Admin;
 
 public sealed record MuteRepository(ICaeriusNetDbContext Db) : IMuteRepository
 {
-    /// <summary>
-    ///     Called once at world entry to seed PlayerRuntimeState.IsMuted -- see GetActiveCharacterIdsAsync for the
-    ///     periodic re-check that follows it.
-    /// </summary>
-    public async ValueTask<bool> IsActiveForCharacterAsync(int characterId, CancellationToken ct)
+
+        public async ValueTask<bool> IsActiveForCharacterAsync(int characterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("admin", "usp_Mute_GetActiveForCharacter", 1)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
@@ -23,11 +20,7 @@ public sealed record MuteRepository(ICaeriusNetDbContext Db) : IMuteRepository
         return rows.Count > 0;
     }
 
-    /// <summary>
-    ///     Never called with an empty characterIds collection by contract; guarded here anyway since SQL Server rejects
-    ///     an empty TVP outright.
-    /// </summary>
-    public async ValueTask<ImmutableArray<int>> GetActiveCharacterIdsAsync(IReadOnlyCollection<int> characterIds,
+        public async ValueTask<ImmutableArray<int>> GetActiveCharacterIdsAsync(IReadOnlyCollection<int> characterIds,
         CancellationToken ct)
     {
         if (characterIds.Count == 0)

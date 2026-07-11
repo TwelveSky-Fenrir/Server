@@ -2,15 +2,11 @@ using Fenrir.Application.Game.Domain.Combat;
 
 namespace Fenrir.Application.Game.Tests.Combat;
 
-/// <summary>
-///     Covers <see cref="MonsterKillHealthGainCalculator" /> against <c>MyUtil::ProcessForExperience</c>'s
-///     health-value-gain step (S07_MyGame03.cpp:304-317).
-/// </summary>
 public class MonsterKillHealthGainCalculatorTests
 {
     [Theory]
     [InlineData(1000, 10)]
-    [InlineData(150, 1)] // integer division, not rounded
+    [InlineData(150, 1)]
     [InlineData(99, 0)]
     [InlineData(0, 0)]
     public void ComputeHealthValueGain_IsOneHundredthOfMonsterLife(int monsterLife, int expected)

@@ -2,10 +2,6 @@ using Fenrir.Data.Abstractions.Runtime;
 
 namespace Fenrir.Application.Game.Tests.TestSupport;
 
-/// <summary>
-///     In-memory stand-in for <see cref="ICharacterShardLocationRepository" /> -- a plain dictionary keyed by
-///     CharacterId, mirroring the real table's two lookup paths (by id, by name).
-/// </summary>
 internal sealed class FakeCharacterShardLocationRepository : ICharacterShardLocationRepository
 {
     private readonly Dictionary<int, CharacterShardLocationDto> _byCharacterId = new();
@@ -34,8 +30,6 @@ internal sealed class FakeCharacterShardLocationRepository : ICharacterShardLoca
 
         RemoveCalls.Add((characterId, shardId));
 
-        // Scoped to shardId, matching usp_CharacterShardLocation_Remove: a stale remove from a shard the
-        // character already reconnected away from must never clobber the fresh row.
         if (_byCharacterId.TryGetValue(characterId, out var row) && row.ShardId == shardId)
             _byCharacterId.Remove(characterId);
 
@@ -58,8 +52,7 @@ internal sealed class FakeCharacterShardLocationRepository : ICharacterShardLoca
             : null);
     }
 
-    /// <summary>Seeds a row as if some other shard already upserted it -- bypasses <see cref="UpsertAsync" /> itself.</summary>
-    public void Seed(CharacterShardLocationDto row)
+        public void Seed(CharacterShardLocationDto row)
     {
         _byCharacterId[row.CharacterId] = row;
     }

@@ -8,11 +8,6 @@ using Fenrir.Application.Game.Tests.TestSupport;
 
 namespace Fenrir.Application.Game.Tests.World.Monsters;
 
-/// <summary>
-///     Covers the tower CP-for-PvM (<see cref="TowerCpForPvmMilestone" />) and XP (<see cref="TowerWarState" />
-///     tribe bonus table) monster-kill consumption hooks wired into <see cref="MonsterSpawnScheduler.Simulate" />
-///     and <see cref="Zone.GrantMonsterKillExperience" />.
-/// </summary>
 public class MonsterSpawnSchedulerTowerRewardTests
 {
     private static WorldDataCache CacheWithOneMonster(int monsterId = 500, short realLevel = 1,
@@ -42,12 +37,6 @@ public class MonsterSpawnSchedulerTowerRewardTests
             Radius = 5
         };
 
-        // MinimalRows()'s own Level(1) row only spans experience [0,100] -- any of this file's monster kills
-        // (generalExperience defaults to 1000) would otherwise blow straight past every uncatalogued level
-        // band and resolve to LevelProgressionCalculator.MaxLevel (145, the deliberate "no matching band"
-        // fallback -- see that class's own ReturnLevel remarks), silently overwriting killer.Level out from
-        // under every test in this file before TowerCpForPvmMilestone ever reads it. Widening level 1's own
-        // band keeps the killer's level exactly what CreateZoneWithKiller asked for, for the whole test.
         var levels = new[] { WorldDataTestRows.Level(1) with { ExpRangeMax = 1_000_000 } };
         var rows = WorldDataTestRows.MinimalRows() with
         {
@@ -91,14 +80,12 @@ public class MonsterSpawnSchedulerTowerRewardTests
     {
         var cache = CacheWithOneMonster(generalExperience: 1000);
 
-        // Baseline: no tower.
         var (baselineZone, _) = CreateZoneWithKiller(cache);
         baselineZone.TryDamageMonster(1, 10_000, 10, out _, out _);
         baselineZone.Tick(SimulationClock.LegacyTick);
         Assert.True(baselineZone.TryGetPlayer(10, out var baselineKiller));
         var baselineGain = baselineKiller!.Experience;
 
-        // Tribe 0's tower index 0 (slot-local 0): level 4 (raw digit 8), type 3 (XP) -- +100% ratio.
         var (boostedZone, towerWar) = CreateZoneWithKiller(cache);
         towerWar.SetTowerState(0, 8 * 100 + 3, true);
         towerWar.RecomputeTribeBonuses();
@@ -107,8 +94,6 @@ public class MonsterSpawnSchedulerTowerRewardTests
         Assert.True(boostedZone.TryGetPlayer(10, out var boostedKiller));
         var boostedGain = boostedKiller!.Experience;
 
-        // rawGain doubles (raw monster XP * 1.0 ratio added on top), then the same rebirth divisor applies to
-        // the combined total -- so the boosted gain is roughly double the baseline, not merely "greater than".
         Assert.True(boostedGain > baselineGain);
         Assert.Equal(baselineGain * 2, boostedGain);
     }
@@ -119,7 +104,6 @@ public class MonsterSpawnSchedulerTowerRewardTests
         var cache = CacheWithOneMonster(generalExperience: 1000);
         var (zone, towerWar) = CreateZoneWithKiller(cache, 1);
 
-        // Tribe 0's tower (index 0-2), not tribe 1's -- must not affect a tribe-1 killer.
         towerWar.SetTowerState(0, 8 * 100 + 3, true);
         towerWar.RecomputeTribeBonuses();
 
@@ -162,7 +146,7 @@ public class MonsterSpawnSchedulerTowerRewardTests
         zone.Tick(SimulationClock.LegacyTick);
 
         Assert.Equal(0, killer.TowerCpMilestoneCounter);
-        Assert.Equal(1, killer.ContributionPoints); // base killcp, no tower CP-for-PvM bonus active
+        Assert.Equal(1, killer.ContributionPoints);
     }
 
     [Fact]
@@ -173,7 +157,6 @@ public class MonsterSpawnSchedulerTowerRewardTests
         Assert.True(zone.TryGetPlayer(10, out var killer));
         killer!.TowerCpMilestoneCounter = 999;
 
-        // Tribe 0's tower index 1 (slot-local 1): level 2 (raw digit 4), type 2 (CP) -- CP-for-PvM +2.
         towerWar.SetTowerState(1, 4 * 100 + 2, true);
         towerWar.RecomputeTribeBonuses();
 
@@ -181,14 +164,12 @@ public class MonsterSpawnSchedulerTowerRewardTests
         zone.Tick(SimulationClock.LegacyTick);
 
         Assert.Equal(0, killer.TowerCpMilestoneCounter);
-        Assert.Equal(3, killer.ContributionPoints); // base 1 + tower bonus 2
+        Assert.Equal(3, killer.ContributionPoints);
     }
 
     [Fact]
     public void MonsterKill_TooLargeALevelGap_NeverCountsTowardTheMilestone()
     {
-        // Killer far above the monster's level (fixedLevel - monsterRealLevel >= 10) -- too easy a kill to
-        // count toward the milestone.
         var cache = CacheWithOneMonster(realLevel: 1);
         var (zone, _) = CreateZoneWithKiller(cache, killerLevel: 50);
         Assert.True(zone.TryGetPlayer(10, out var killer));
@@ -197,7 +178,7 @@ public class MonsterSpawnSchedulerTowerRewardTests
         zone.TryDamageMonster(1, 10_000, 10, out _, out _);
         zone.Tick(SimulationClock.LegacyTick);
 
-        Assert.Equal(500, killer.TowerCpMilestoneCounter); // unchanged -- gap far exceeds the <10 window
+        Assert.Equal(500, killer.TowerCpMilestoneCounter);
     }
 
     [Fact]
@@ -206,9 +187,9 @@ public class MonsterSpawnSchedulerTowerRewardTests
         var cache = CacheWithOneMonster();
         var (zone, _) = CreateZoneWithKiller(cache);
 
-        zone.TryDamageMonster(1, 10_000, 999, out _, out _); // unresolvable killer id
+        zone.TryDamageMonster(1, 10_000, 999, out _, out _);
 
-        zone.Tick(SimulationClock.LegacyTick); // must not throw
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.True(zone.TryGetPlayer(10, out var killer));
         Assert.Equal(0, killer!.TowerCpMilestoneCounter);

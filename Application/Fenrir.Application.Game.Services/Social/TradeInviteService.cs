@@ -13,43 +13,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Services.Social;
 
-/// <summary>
-///     The displayed level sent to the target on a successful ask is <see cref="PlayerRuntimeState.CombinedLevel" />
-///     (aLevel1+aLevel2), per the trade-ask displayed-level behavior contract -- a direct sum with no
-///     additional offset/clamp at this site.
-/// </summary>
-/// <remarks>
-///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:8456-8517 (TradeInvite preconditions) ;
-///     Server/ts25zone/S07_MyGame04.cpp:185-216 (<c>CheckCommunityWork</c>'s shared busy-flag check, true if
-///     any of private-shop, duel, trade, friend, party, guild, or teacher state is non-zero). <see cref="Invite" />
-///     composes that check from this process's own sibling negotiation registries (Duel, Friend, Party,
-///     Mentor, Guild) and the stun/death action-state gate (<see cref="PlayerRuntimeState.IsStunned" />/
-///     <see cref="PlayerRuntimeState.IsDead" />, Server/ts25zone/S07_MyGame04.cpp:438-459,1617-1658), mirroring
-///     <c>GuildInviteService.IsExcludedByCommunityWorkOrStunDeath</c> with Guild and Trade's own-family roles
-///     swapped -- this family's own trade-negotiation flag stays checked separately, and atomically, by
-///     <see cref="TradeRegistry.IsBusy" />/<see cref="TradeRegistry.TryAsk" />, exactly as it did before this
-///     cross-family composition was added.
-///     <para>
-///         The contract's second TradeInvite precondition -- the caller's avatar-action state must not be one
-///         of two specific "locked" action codes -- has no modeled equivalent here: the exact two
-///         <see cref="PlayerRuntimeState.ActionSort" /> values this precondition refers to were not identified
-///         by the behavior contract (Server/ts25zone/S04_MyWork02.cpp:8456-8517) and are left as an open,
-///         explicitly-flagged gap pending a legacy-behavior-translator/cpp-zone-gameplay-analyst re-derivation,
-///         rather than guessed at.
-///     </para>
-/// </remarks>
-/// <remarks>
-///     WS1.4 ASK-PUBLISH-ONLY: <see cref="InviteAsync" />'s cross-shard fallback publishes an Ask row via
-///     <see cref="ISocialCrossShardRelayQueue" /> and registers the asker-side busy gate
-///     (<see cref="TradeRegistry.TryAskCrossShard" />), but no <c>ISocialCrossShardRelayHandler</c> is
-///     registered for <see cref="SocialCrossShardRelayKind.Trade" /> -- see <c>DuelService</c>'s own remarks
-///     for the shared rationale (target-side pre-checks all need live state this shard cannot see; Party and
-///     Friend are the explicitly scoped full reference implementation for this WS1.4 round).
-///     <see cref="TradeRegistry.TryCancel" />/<see cref="TradeRegistry.ClearForDisconnect" /> still consume
-///     the outbound entry, so an asker is never left permanently busy even though the invite itself is never
-///     delivered today. A follow-up closing this gap needs a <c>TradeCrossShardRelayHandler</c> mirroring
-///     <c>FriendCrossShardRelayHandler</c>.
-/// </remarks>
 public sealed class TradeInviteService(
     TradeRegistry trades,
     DuelRegistry duels,
@@ -62,24 +25,8 @@ public sealed class TradeInviteService(
     IOptions<GameServerOptions> options,
     ILogger<TradeInviteService> logger) : ITradeInviteService
 {
-    /// <remarks>
-    ///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:8259-8277,8459-8471,9088-9101,9311-9324 (the shared
-    ///     CZ_DUEL_ASK_SEND/CZ_FRIEND_ASK_SEND/CZ_PARTY_ASK_SEND/CZ_TEACHER_ASK_SEND/CZ_TRADE_ASK_SEND
-    ///     pre-check family) -- legacy checks the requester's OWN busy/pose state before it ever resolves
-    ///     the target avatar by name, so a busy asker naming a nonexistent/offline target gets the busy
-    ///     reply, not "target not found". <see cref="TradeRegistry.IsBusy" /> and
-    ///     <see cref="Fenrir.Application.Game.Domain.Social.CommunityWorkGate.IsBusy" /> are therefore both
-    ///     checked ahead of the by-name target lookup below; the same <see cref="TradeRegistry.IsBusy" /> check inside
-    ///     <see cref="TradeRegistry.TryAsk" /> stays in place for the actual registration.
-    ///     <para>
-    ///         Trade-ask displayed-level combined-level extension: Server/ts25zone/S04_MyWork02.cpp:8456-8517
-    ///         (full CZ_TRADE_ASK_SEND handler) ; Server/ts25zone/S04_MyWork02.cpp:8514 (the exact outward
-    ///         value -- asker's ordinary level plus high level, sent verbatim with no offset) ;
-    ///         Server/ts25zone/S04_MyWork02.cpp:8478-8485 (the three designated inter-tribe zone numbers and
-    ///         the tribe/alliance disconnect check, confirmed unaffected by this).
-    ///     </para>
-    /// </remarks>
-    public async ValueTask<TradeInviteResult> InviteAsync(Zone zone, PlayerRuntimeState asker,
+
+        public async ValueTask<TradeInviteResult> InviteAsync(Zone zone, PlayerRuntimeState asker,
         string targetAvatarName, CancellationToken cancellationToken)
     {
         if (CommunityWorkGate.IsBusy(asker, duels, trades, friends, parties, mentors, guildInvites) ||
@@ -135,8 +82,7 @@ public sealed class TradeInviteService(
         }
     }
 
-    /// <summary>WS1.4 same-shard-miss, ASK-PUBLISH-ONLY fallback -- see this class's own remarks.</summary>
-    private async ValueTask<TradeInviteResult> InviteCrossShardAsync(PlayerRuntimeState asker,
+        private async ValueTask<TradeInviteResult> InviteCrossShardAsync(PlayerRuntimeState asker,
         string targetAvatarName, CancellationToken cancellationToken)
     {
         var remote = await characterShardLocations.FindByNameAsync(targetAvatarName, cancellationToken)

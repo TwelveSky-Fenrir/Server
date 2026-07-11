@@ -7,25 +7,13 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Inventory;
 
-/// <summary>
-///     Coverage for <see cref="BigMoneyTransferService" /> -- the CZ_PROCESS_DATA_SEND BigMoney ("1B"/"1 Md")
-///     Store (tSort 241/244) and Save/vault (tSort 242/245) transfer families. See
-///     <c>BigMoneyTransferPolicyTests</c>/<c>BigMoneyUnitConversionPolicyTests</c> for the pure-policy-level
-///     coverage of the underlying rule set (not directly exercised by this service -- see
-///     <see cref="BigMoneyTransferService" />'s own remarks for why the balance/cap checks are enforced purely
-///     DB-side here, matching <c>GenericActionService.TransferStoreMoneyAsync</c>'s own established
-///     precedent). Also covers the GL_994-GL_997 <c>EventLogCategory.BigMoneyConversion</c> audit record each
-///     successful transfer now writes (see <c>EventLogEmitters</c>'s own remarks table for the full GL/tSort
-///     mapping this pass confirmed).
-/// </summary>
 public class BigMoneyTransferServiceTests
 {
-    /// <summary>Encodes a raw DefaultPData payload (7 sequential little-endian int32 fields, wire order) -- only Quantity1 varies here.</summary>
-    private static byte[] EncodeQuantity1(int quantity1)
+
+        private static byte[] EncodeQuantity1(int quantity1)
     {
         var bytes = new byte[28];
-        // Page1, Index1
-        BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(8, 4), quantity1); // Quantity1 is the 3rd int32 field.
+        BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(8, 4), quantity1);
         return bytes;
     }
 
@@ -44,7 +32,6 @@ public class BigMoneyTransferServiceTests
         Assert.Equal(-5, call.DeltaInventoryBigMoney);
         Assert.Equal(5, call.DeltaStoreBigMoney);
 
-        // GL_994_STORE_MONEY (tSort 241 deposit) -- no account id in scope at this call site.
         var logged = Assert.Single(eventLog.LoggedEvents);
         Assert.Equal(EventLogEmitters.BigMoneyConversionEventCode5, logged.EventCode);
         Assert.Equal(EventLogCategory.BigMoneyConversion, logged.Category);
@@ -68,7 +55,6 @@ public class BigMoneyTransferServiceTests
         Assert.Equal(3, call.DeltaInventoryBigMoney);
         Assert.Equal(-3, call.DeltaStoreBigMoney);
 
-        // GL_995_STORE_MONEY (tSort 244 withdraw) -- from-ledger is Store (debited), to-ledger is Inventory (credited).
         var logged = Assert.Single(eventLog.LoggedEvents);
         Assert.Equal(EventLogEmitters.BigMoneyConversionEventCode6, logged.EventCode);
         Assert.Equal(EventLogCategory.BigMoneyConversion, logged.Category);
@@ -119,7 +105,6 @@ public class BigMoneyTransferServiceTests
         Assert.Equal(99, call.AccountId);
         Assert.Equal(7, call.DeltaVaultBigMoney);
 
-        // GL_996_SAVE_MONEY (tSort 242 deposit) -- account id IS threaded through for this family.
         var logged = Assert.Single(eventLog.LoggedEvents);
         Assert.Equal(EventLogEmitters.BigMoneyConversionEventCode7, logged.EventCode);
         Assert.Equal(EventLogCategory.BigMoneyConversion, logged.Category);
@@ -143,7 +128,6 @@ public class BigMoneyTransferServiceTests
         Assert.Equal(2, call.DeltaInventoryBigMoney);
         Assert.Equal(-2, call.DeltaVaultBigMoney);
 
-        // GL_997_SAVE_MONEY (tSort 245 withdraw) -- from-ledger is Save/vault (debited), to-ledger is Inventory (credited).
         var logged = Assert.Single(eventLog.LoggedEvents);
         Assert.Equal(EventLogEmitters.BigMoneyConversionEventCode8, logged.EventCode);
         Assert.Equal(EventLogCategory.BigMoneyConversion, logged.Category);

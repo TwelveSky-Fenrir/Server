@@ -4,10 +4,6 @@ using Fenrir.Data.Abstractions.Commerce;
 
 namespace Fenrir.Application.Game.Tests.TestSupport;
 
-/// <summary>
-///     In-memory stand-in for ICharacterRepository: only the container-replace/adjust-money paths used by the handler
-///     test suites are exercised here; every other member is out of scope.
-/// </summary>
 internal sealed class FakeCharacterRepository : ICharacterRepository
 {
     public (int CharacterId, byte Container, IReadOnlyList<CharacterItemSlotTvp> Items)? LastReplacedContainer
@@ -29,27 +25,15 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
     public bool ThrowOnReplaceContainer { get; set; }
     public bool ThrowOnAdjustMoney { get; set; }
 
-    /// <summary>
-    ///     Scripted return for <see cref="GetForWorldEntryAsync" /> -- null (the default) exercises the "character
-    ///     vanished" fallback path some callers (e.g. ZoneHandshakeService) defend against.
-    /// </summary>
-    public CharacterWorldEntryDto? WorldEntryToReturn { get; set; }
+        public CharacterWorldEntryDto? WorldEntryToReturn { get; set; }
 
-    /// <summary>
-    ///     Scripted return for <see cref="GetWorldEntryBundleAsync" /> -- null (the default) exercises the
-    ///     "world-entry bundle fetch failed" abort path (e.g. EnterWorldService); set this to exercise a
-    ///     happy-path world entry instead.
-    /// </summary>
-    public CharacterWorldEntryBundle? WorldEntryBundleToReturn { get; set; }
+        public CharacterWorldEntryBundle? WorldEntryBundleToReturn { get; set; }
 
-    /// <summary>Every row ever passed to <see cref="PersistPositionsAsync" />, across every call -- append-only.</summary>
-    public List<CharacterPositionTvp> PersistedPositionRows { get; } = [];
+        public List<CharacterPositionTvp> PersistedPositionRows { get; } = [];
 
-    /// <summary>Every row ever passed to <see cref="PersistProgressAsync" />, across every call -- append-only.</summary>
-    public List<CharacterProgressTvp> PersistedProgressRows { get; } = [];
+        public List<CharacterProgressTvp> PersistedProgressRows { get; } = [];
 
-    /// <summary>Every call ever made to <see cref="ApplyQuestTransitionAsync" />, most-recent last -- append-only.</summary>
-    public List<(int CharacterId, int StepPermanent, int ActiveQuestId, int QSort, int TargetPhase, int KillCounter,
+        public List<(int CharacterId, int StepPermanent, int ActiveQuestId, int QSort, int TargetPhase, int KillCounter,
         long DeltaMoney, byte? Container1, IReadOnlyList<CharacterItemSlotTvp> Items1, byte? Container2,
         IReadOnlyList<CharacterItemSlotTvp> Items2)> QuestTransitions { get; } = [];
 
@@ -57,11 +41,7 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
 
     public (int CharacterId, int Delta)? LastGrantTribeTransferPermit { get; private set; }
 
-    /// <summary>
-    ///     Last call ever made to <see cref="UpsertHotkeySlotAsync" /> -- (Sort, Value1, Value2) is the raw legacy
-    ///     triple.
-    /// </summary>
-    public (int CharacterId, byte Page, byte KeyIndex, int Sort, int Value1, int Value2)? LastUpsertHotkeySlot
+        public (int CharacterId, byte Page, byte KeyIndex, int Sort, int Value1, int Value2)? LastUpsertHotkeySlot
     {
         get;
         private set;
@@ -69,8 +49,7 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
 
     public (int CharacterId, long DeltaMoney, long DeltaStoreMoney)? LastAdjustStoreMoney { get; private set; }
 
-    /// <summary>Last call ever made to <see cref="AdjustMoneyAsync" /> -- (CharacterId, DeltaMoney, DeltaBigMoney).</summary>
-    public (int CharacterId, long DeltaMoney, int DeltaBigMoney)? LastAdjustMoney { get; private set; }
+        public (int CharacterId, long DeltaMoney, int DeltaBigMoney)? LastAdjustMoney { get; private set; }
 
     public bool ThrowOnAdjustZone241Time { get; set; }
 
@@ -78,8 +57,7 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
 
     public int Zone241Time { get; private set; }
 
-    /// <summary>Every call ever made to <see cref="ApplyTribeFourConversionAsync" />, most-recent last -- append-only.</summary>
-    public List<(int CharacterId, byte NewTribe, int StepPermanent, int ActiveQuestId, int QSort, int TargetPhase,
+        public List<(int CharacterId, byte NewTribe, int StepPermanent, int ActiveQuestId, int QSort, int TargetPhase,
         int KillCounter)> TribeFourConversions { get; } = [];
 
     public ValueTask ReplaceContainerAsync(int characterId, byte container,

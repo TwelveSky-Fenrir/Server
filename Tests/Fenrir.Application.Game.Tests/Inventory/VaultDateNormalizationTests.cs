@@ -2,7 +2,6 @@ using Fenrir.Application.Game.Domain.Inventory;
 
 namespace Fenrir.Application.Game.Tests.Inventory;
 
-/// <summary>C1-vault-expiry-enforcement, trigger 4: <see cref="VaultDateNormalization" />.</summary>
 public class VaultDateNormalizationTests
 {
     [Fact]

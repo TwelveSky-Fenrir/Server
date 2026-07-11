@@ -17,9 +17,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Guilds;
 
-// C08(b): GUILD_WORK notice/AGM/title/buff must mirror the refreshed GUILD_INFO onto every other currently
-// connected member -- across zones, not just the acting character (who gets its own copy via Result) or the
-// specific target (who separately gets a GuildMembershipZoneCommand mirror of their own PlayerRuntimeState).
 public class GuildActionServiceBroadcastTests
 {
     private const int GuildId = 10;
@@ -104,9 +101,6 @@ public class GuildActionServiceBroadcastTests
         AssertGuildActionResponse(ZoneTestKit.DrainOutbound(memberPipe), 10);
     }
 
-    // Legacy parity: UpdateGuildBuffType (Server/ts25extra/S08_MyDB.cpp:1188-1191) writes only gBuffType/
-    // gBuffState -- it never references gBuffTime/gBuffTimeForDiff, for a fresh activation or an ordinary
-    // type switch while already active alike. GuildBuffDecayHost is the sole owner of that checkpoint.
     [Fact]
     public async Task Buff_Activation_CarriesThroughExistingCheckpoint_AndBroadcastsToOnlineMember()
     {
@@ -171,8 +165,7 @@ public class GuildActionServiceBroadcastTests
             NullLogger<GuildActionService>.Instance);
     }
 
-    /// <summary>Mirrors <c>GuildActionHandler.Respond</c> -- the actor's own reply is handler-owned plumbing.</summary>
-    private static void Respond(ZoneClientSession session, GuildActionResult result)
+        private static void Respond(ZoneClientSession session, GuildActionResult result)
     {
         if (result.Abort)
         {
@@ -209,9 +202,6 @@ public class GuildActionServiceBroadcastTests
         session.MarkRegistering();
         session.MarkInWorld();
 
-        // Spread far apart (AoiCellSize defaults to 75) so two characters sharing a zone never see each other's
-        // own spawn as an AOI broadcast -- that noise would otherwise land in a pipe already drained below,
-        // right before this test's actual assertions run.
         var zone = zones[mapId];
         zone.Post(ZoneCommand.Enter(characterId,
             ZoneTestKit.EnterData(session, mapId, name, characterId * 10_000f)));

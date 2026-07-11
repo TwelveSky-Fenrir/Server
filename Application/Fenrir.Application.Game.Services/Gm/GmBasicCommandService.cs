@@ -16,28 +16,14 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Gm;
 
-/// <summary>
-///     See <see cref="IGmBasicCommandService" />'s own remarks for the full wire-level contract summary and the
-///     three deliberate simplifications (FIND's process-local lookup, CALL's single-target-only branch,
-///     TRIBEBANK/522's dead-code shape). Citations: Server/ts25zone/S04_MyWork04.cpp:290-339,925-1622,2105-2123
-///     (the whole tSort switch body this type's sixteen methods each cover one case of) ;
-///     Server/ts25zone/S05_MyTransfer.cpp:514-567,1150-1204 (dedicated-response send helpers) ;
-///     Server/ts25zone/H05_MyTransfer.h:28-37 (<c>B_GM_COMMAND_INFO</c>, <see cref="GmCommandResponse" />'s
-///     legacy counterpart) ; Server/ts25zone/UpperCom/S06_MyUpperCom01.cpp:315-338 (FIND's blocking upstream
-///     round trip, NOT reproduced -- see this type's own remarks) ; Server/ts25zone/H07_MyGame.h:592-602,
-///     Server/ts25zone/S07_MyGame03.cpp:4422-4452 (by-name lookup scope: process-local, excludes the invoker) ;
-///     Server/Header/Protocol/CLIENT.h:195-207,520-528 ; Server/Header/Protocol/DEFINE.h:1-80,275-284,365-367,
-///     604-609,700-763 ; Server/Header/Protocol/STRUCT.h:1260-1298,1518-1527 ; Server/Header/Protocol/ZONE.h:
-///     355-468,925-944,1430-1441,1580-1589.
-/// </summary>
 public sealed class GmBasicCommandService(
     ZoneRegistry zones,
     WorldDataCache worldData,
     IEventLogRepository eventLog,
     ILogger<GmBasicCommandService> logger) : IGmBasicCommandService
 {
-    /// <summary>Legacy tResult's own default-initialized/rejected value (S04_MyWork04.cpp:305).</summary>
-    private const int FailureResult = 1;
+
+        private const int FailureResult = 1;
 
     private const int SuccessResult = 0;
 
@@ -57,22 +43,11 @@ public sealed class GmBasicCommandService(
     private const int LevelSort = 521;
     private const int StatEditSort = 522;
 
-    /// <summary>
-    ///     Legacy literal tag <c>B_GM_COMMAND_INFO</c> writes verbatim as <see cref="GmCommandResponse" />.Sort
-    ///     for FIND -- NOT the outer switch's tSort (513). See S05_MyTransfer.cpp:1159-1164 and
-    ///     S04_MyWork04.cpp:1319.
-    /// </summary>
-    private const int FindGmDataTag = 1;
+        private const int FindGmDataTag = 1;
 
-    /// <summary>
-    ///     Legacy literal tag <c>B_GM_COMMAND_INFO</c> writes verbatim as <see cref="GmCommandResponse" />.Sort
-    ///     for both CALL and MOVE-to-target -- NOT the outer switch's tSort (514/515). See
-    ///     S05_MyTransfer.cpp:1159-1164 and S04_MyWork04.cpp:1348,1406.
-    /// </summary>
-    private const int CallMoveGmDataTag = 2;
+        private const int CallMoveGmDataTag = 2;
 
-    /// <summary>AvatarStatUpdateResponse.Sort for the HIDE/SHOW dedicated notification (STRUCT.h:1518-1524).</summary>
-    private const int VisibilityStatSort = 9;
+        private const int VisibilityStatSort = 9;
 
     private const int HiddenVisibleState = 0;
     private const int ShownVisibleState = 1;
@@ -82,18 +57,16 @@ public sealed class GmBasicCommandService(
     private const int EquipSpecialState = 1;
     private const int UnequipSpecialState = 0;
 
-    /// <summary>Tribe selector's special "no PreviousTribe change" value -- see TRIBE's own contract.</summary>
-    private const int Tribe4SpecialValue = 3;
+        private const int Tribe4SpecialValue = 3;
 
-    /// <summary>H01_MainApplication.h:76 -- the live monster-instance table's fixed capacity.</summary>
-    private const int MonsterInstanceCapacity = 3000;
+        private const int MonsterInstanceCapacity = 3000;
 
-    private const int GmDataSize = 100; // MAX_TRIBE_WORK_SIZE, matches GmCommandResponse.GmData
+    private const int GmDataSize = 100;
 
-    private const int BaseLevelCap = 145; // DEFINE.h:604 -- LevelProgressionCalculator.MaxLevel
-    private const int HighLevelSpan = 12; // DEFINE.h:605
+    private const int BaseLevelCap = 145;
+    private const int HighLevelSpan = 12;
     private const int RebirthSpan = 12;
-    private const int LevelCombinedCapacity = BaseLevelCap + HighLevelSpan + RebirthSpan; // 169
+    private const int LevelCombinedCapacity = BaseLevelCap + HighLevelSpan + RebirthSpan;
 
     public async ValueTask HandleVisibilityAsync(int sort, byte[] data, ZoneClientSession zoneSession,
         PlayerRuntimeState state, Zone zone, CancellationToken cancellationToken)
@@ -109,8 +82,6 @@ public sealed class GmBasicCommandService(
                 "Zone {MapId} tribe-progress inbox full: dropped HIDE/SHOW mirror for character {CharacterId} (sort {Sort})",
                 zone.MapId, state.CharacterId, sort);
 
-        // Dedicated visibility-change notification, self-only, THEN the shared generic acknowledgment --
-        // double-acknowledgment shape (S04_MyWork04.cpp:933-958, S05_MyTransfer.cpp:519-541).
         zoneSession.Send(
             new AvatarStatUpdateResponse { Sort = VisibilityStatSort, Value = newVisibleState, Value2 = 0 });
         SendAck(zoneSession, sort, data, SuccessResult);
@@ -156,16 +127,11 @@ public sealed class GmBasicCommandService(
         if (index is >= 0 and < MonsterInstanceCapacity && zone.TryGetMonster(index, out var monster) &&
             monster is not null)
         {
-            // Audit-logged BEFORE the mutation, matching this sub-operation's own citation ordering.
             await eventLog.LogAsync(GmActionEventCodes.MonsterForceKill, EventLogCategory.GmAction,
                 zoneSession.AccountId, zoneSession.CharacterId, null, null, null, null, null,
                 monster.Template.MonsterId,
                 null, 1, $"ServerIndex={index};MonsterName={monster.Template.Name}", cancellationToken);
 
-            // Lethal, unattributed damage -- no attacker credit means MonsterSpawnScheduler.ProcessDeath's own
-            // credited-character gate leaves this kill unattributed, so no loot/experience is granted; the
-            // normal death pipeline still arms this instance's respawn timer from "now", matching this
-            // sub-operation's own contract.
             zone.TryDamageMonster(index, monster.Life, null, out _, out _);
             result = SuccessResult;
         }
@@ -187,7 +153,6 @@ public sealed class GmBasicCommandService(
 
         var selector = payload.Tribe;
         if (selector is < 0 or > Tribe4SpecialValue || selector == state.Tribe)
-            // Silently dropped: no mutation, no disconnect, no acknowledgment of any kind.
             return;
 
         var command = new TribeProgressZoneCommand(state.CharacterId, Tribe: (byte)selector,
@@ -202,7 +167,6 @@ public sealed class GmBasicCommandService(
             "Character {CharacterId} applied the Basic-tier TRIBE self-command (selector {Selector}) -- forcing logout, no reply. PreviousTribe persistence gap: see IGmBasicCommandService.HandleTribeChangeAsync's own remarks.",
             state.CharacterId, selector);
 
-        // Normal successful completion for this command, not an error path -- see this method's own remarks.
         zoneSession.Abort(DisconnectReason.GmCommandLogout);
     }
 
@@ -235,11 +199,6 @@ public sealed class GmBasicCommandService(
             return ValueTask.CompletedTask;
         }
 
-        // Deliberate, flagged simplification of legacy's genuinely cluster-wide blocking upstream lookup -- see
-        // IGmBasicCommandService's own class remarks. Zero-filled GmData ("not found") is an inferred sentinel,
-        // not a confirmed legacy value (flagged for cpp-ts25-explorer re-check in the source contract).
-        // Self-exclusion mirrors this family's other by-name lookups (shared framing) even though real FIND
-        // does not use this process-local search at all.
         var gmData = new byte[GmDataSize];
         if (zones.TryGetPlayerAndZoneByName(payload.TargetName, out var found, out var targetZone) &&
             found!.CharacterId != state.CharacterId)
@@ -339,16 +298,12 @@ public sealed class GmBasicCommandService(
         var found = zones.TryGetPlayerAndZoneByName(payload.TargetName, out var target, out var targetZone);
         if (!found || target!.CharacterId == state.CharacterId)
         {
-            // Not-found falls through to the shared closing step in legacy (a bare `break` inside the
-            // switch, not `return`) -- only the target-FOUND branch below is truly silent. See this
-            // method's own remarks in IGmBasicCommandService.HandleTargetSpecialStateAsync.
             SendAck(zoneSession, sort, data, FailureResult);
             return;
         }
 
         var newSpecialState = sort == NchatSort ? NchatSpecialState : YchatSpecialState;
 
-        // Shared log point for both NCHAT and YCHAT -- see GmActionEventCodes.Chat's own remarks.
         await eventLog.LogAsync(GmActionEventCodes.Chat, EventLogCategory.GmAction, zoneSession.AccountId,
             zoneSession.CharacterId, ((ZoneClientSession)target.Session).AccountId, target.CharacterId, null, null,
             null, null, null, (byte)newSpecialState, $"TargetName={target.Name}", cancellationToken);
@@ -359,7 +314,6 @@ public sealed class GmBasicCommandService(
                 "Zone {MapId} tribe-progress inbox full: dropped NCHAT/YCHAT mirror for target character {CharacterId} (sort {Sort})",
                 targetZone.MapId, target.CharacterId, sort);
 
-        // No acknowledgment of any kind -- matches legacy's own `return` (not `break`) for this case.
     }
 
     public async ValueTask HandleKickAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
@@ -396,8 +350,6 @@ public sealed class GmBasicCommandService(
         if (!MeetsTierOrAbort(zoneSession, TribeBankSort))
             return ValueTask.CompletedTask;
 
-        // Dead code behind a live gate -- see IGmBasicCommandService's own class remarks. Nothing between the
-        // gate and here executes in the shipped legacy binary; always the default-failure outcome.
         SendAck(zoneSession, TribeBankSort, data, FailureResult);
         return ValueTask.CompletedTask;
     }
@@ -436,8 +388,6 @@ public sealed class GmBasicCommandService(
             newLevel2 = 0;
             newRebirthCount = 0;
             newExperience = worldData.LevelsByLevel.TryGetValue(newLevel, out var row) ? row.ExpRangeMin : 0;
-            // Plain base-level tier carries no high-level/rebirth component -- Exp2 is cleared (confirmed,
-            // S04_MyWork04.cpp:1566-1580's own tier-1 branch never touches aExp2).
             newExp2 = 0;
         }
         else if (requested <= BaseLevelCap + HighLevelSpan)
@@ -446,9 +396,6 @@ public sealed class GmBasicCommandService(
             newLevel2 = (short)(requested - BaseLevelCap);
             newRebirthCount = 0;
             newExperience = maxBaseExperience;
-            // wAvatar.aExp2 = mLEVEL.ReturnHighExpValue(wAvatar.aLevel2) -- S04_MyWork04.cpp:1566-1580 ;
-            // GameSystem_01_Level.cpp:712-719,319-330 (mRangeForHigh[Level2-1], ported as
-            // RebirthProgression.HighLevelExpTable).
             newExp2 = RebirthProgression.HighLevelExpTable[newLevel2 - 1];
         }
         else
@@ -457,14 +404,9 @@ public sealed class GmBasicCommandService(
             newLevel2 = HighLevelSpan;
             newRebirthCount = requested - BaseLevelCap - HighLevelSpan;
             newExperience = maxBaseExperience;
-            // wAvatar.aExp2 = mLEVEL.ReturnHighExpValue(MAX_LIMIT_HIGH_LEVEL_NUM) -- Level2 pinned at its own
-            // cap for the rebirth tier, same citations as the high-level branch above.
             newExp2 = RebirthProgression.HighLevelExpTable[RebirthProgression.MaxHighLevel - 1];
         }
 
-        // Recompute derived combat stats from the NEW level/rebirth values and current equipment, then heal to
-        // the newly computed maximum unconditionally (not gated on being alive, unlike ordinary level-up) --
-        // see this method's own contract.
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
         var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack) ? petStack.ItemId : 0;
         var petContribution =
@@ -493,7 +435,6 @@ public sealed class GmBasicCommandService(
         if (!MeetsTierOrAbort(zoneSession, StatEditSort))
             return ValueTask.CompletedTask;
 
-        // Dead code behind a live gate -- see IGmBasicCommandService's own class remarks.
         SendAck(zoneSession, StatEditSort, data, FailureResult);
         return ValueTask.CompletedTask;
     }

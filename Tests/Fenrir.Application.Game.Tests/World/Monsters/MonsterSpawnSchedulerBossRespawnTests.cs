@@ -7,11 +7,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.World.Monsters;
 
-/// <summary>
-///     Covers <see cref="MonsterSpawnScheduler" />'s two named-monster carve-outs: monster 746's fixed 240s
-///     respawn cooldown (<c>RollRespawnTicks</c>) and the disk-persisted "Yanggok" boss deadline for monsters
-///     564-568 (<see cref="MonsterBossRespawnTracker" />).
-/// </summary>
 public class MonsterSpawnSchedulerBossRespawnTests
 {
     private static WorldDataCache CacheWithOneRegion(int monsterId, int regionId, int summonTimeSeconds)
@@ -48,8 +43,6 @@ public class MonsterSpawnSchedulerBossRespawnTests
     [Fact]
     public void Monster746_RespawnsAfterItsFixed240SecondOverride_NotTheCatalogedSummonTime()
     {
-        // Catalog says 9999s -- if the override did not apply, the monster would still be nowhere near ready
-        // 250s later; if it did, 250s comfortably clears the fixed 240s.
         var cache = CacheWithOneRegion(746, 1, 9999);
         var scheduler = new MonsterSpawnScheduler(cache);
         var zone = ZoneTestKit.CreateZone(1, simulationSystems: [scheduler], worldData: cache);
@@ -59,9 +52,9 @@ public class MonsterSpawnSchedulerBossRespawnTests
 
         zone.TryDamageMonster(1, 10_000, null, out var died, out _);
         Assert.True(died);
-        zone.Tick(SimulationClock.LegacyTick); // drains death, arms the 240s override
+        zone.Tick(SimulationClock.LegacyTick);
 
-        for (var i = 0; i < 500; i++) // 250s @ 500ms/tick
+        for (var i = 0; i < 500; i++)
             zone.Tick(SimulationClock.LegacyTick);
 
         Assert.Equal(1, zone.MonsterCount);
@@ -77,11 +70,11 @@ public class MonsterSpawnSchedulerBossRespawnTests
         var zone = ZoneTestKit.CreateZone(1, simulationSystems: [scheduler], worldData: cache);
 
         zone.Tick(SimulationClock.LegacyTick);
-        Assert.False(tracker.TryGetNextSpawnUtc(77, out _)); // nothing armed before any death
+        Assert.False(tracker.TryGetNextSpawnUtc(77, out _));
 
         var beforeKill = DateTime.UtcNow;
         zone.TryDamageMonster(1, 10_000, null, out _, out _);
-        zone.Tick(SimulationClock.LegacyTick); // drains death, arms the deadline
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.True(tracker.TryGetNextSpawnUtc(77, out var deadline));
         var expected = beforeKill.AddSeconds(100);
@@ -102,10 +95,9 @@ public class MonsterSpawnSchedulerBossRespawnTests
         var scheduler = new MonsterSpawnScheduler(cache, bossRespawnTracker: tracker);
         var zone = ZoneTestKit.CreateZone(1, simulationSystems: [scheduler], worldData: cache);
 
-        zone.Tick(SimulationClock.LegacyTick); // first tick after "restart" -- must NOT pop yet
+        zone.Tick(SimulationClock.LegacyTick);
         Assert.Equal(0, zone.MonsterCount);
 
-        // Comfortably past the persisted 3s deadline and the next 10s respawn-scan boundary.
         for (var i = 0; i < 30; i++)
             zone.Tick(SimulationClock.LegacyTick);
 
@@ -119,7 +111,7 @@ public class MonsterSpawnSchedulerBossRespawnTests
         var cache = CacheWithOneRegion(566, regionId, 5);
         var repository = new FakeMonsterBossRespawnTimerRepository
         {
-            Rows = { [regionId] = DateTime.UtcNow.AddSeconds(-30) } // already elapsed before boot
+            Rows = { [regionId] = DateTime.UtcNow.AddSeconds(-30) }
         };
         var tracker = CreateTracker(repository);
         var scheduler = new MonsterSpawnScheduler(cache, bossRespawnTracker: tracker);
@@ -134,14 +126,14 @@ public class MonsterSpawnSchedulerBossRespawnTests
     public void OrdinaryMonsterInThePersistedIdRange_WithNoTrackerWired_BehavesLikeAnyOtherMonster()
     {
         var cache = CacheWithOneRegion(567, 1, 2);
-        var scheduler = new MonsterSpawnScheduler(cache); // bossRespawnTracker left null
+        var scheduler = new MonsterSpawnScheduler(cache);
         var zone = ZoneTestKit.CreateZone(1, simulationSystems: [scheduler], worldData: cache);
 
         zone.Tick(SimulationClock.LegacyTick);
         Assert.Equal(1, zone.MonsterCount);
 
         zone.TryDamageMonster(1, 10_000, null, out _, out _);
-        zone.Tick(SimulationClock.LegacyTick); // must not throw with no tracker present
+        zone.Tick(SimulationClock.LegacyTick);
 
         for (var i = 0; i < 40; i++)
             zone.Tick(SimulationClock.LegacyTick);

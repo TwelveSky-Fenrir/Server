@@ -6,10 +6,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>
-///     CZ_GUILD_ANSWER_SEND (opcode 74) -- accept only reaches negotiation state 3; asker must still send
-///     CZ_GUILD_WORK_SEND tSort 3 to finalize.
-/// </summary>
 public sealed class GuildInviteAnswerHandler(
     IGuildInviteService guildInviteService,
     ILogger<GuildInviteAnswerHandler>? logger = null) : IInlinePacketHandler<GuildInviteAnswerRequest>

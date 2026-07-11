@@ -7,9 +7,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests;
 
-// WS1.4 cross-shard social-negotiation relay poll loop -- point-to-point sibling of
-// GuildTribeBroadcastRelayHost. Constructed directly with fakes (no DI container), same idiom as
-// AccountSessionKickPollHostTests.
 public class SocialCrossShardRelayHostTests
 {
     private const byte ShardId = 3;

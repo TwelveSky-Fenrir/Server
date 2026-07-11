@@ -4,14 +4,12 @@ namespace Fenrir.Application.Game.Abstractions.Progression;
 
 public enum HeroRewardClaimOutcome
 {
-    /// <summary>Caller is not present in the Previous-period standings for their live tribe -- no reply at all.</summary>
-    NotRanked,
 
-    /// <summary>Ranked, but the reward row is already marked claimed -- Result = 3.</summary>
-    AlreadyClaimed,
+        NotRanked,
 
-    /// <summary>Reward granted this call -- Result = 1000.</summary>
-    Claimed
+        AlreadyClaimed,
+
+        Claimed
 }
 
 public readonly record struct HeroRewardClaimResult(HeroRewardClaimOutcome Outcome);

@@ -16,15 +16,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 
-/// <summary>
-///     Drives the real <see cref="CraftPetService" /> (op88, CZ_MAKE_PET_SEND) over a real <see cref="Zone" />;
-///     ticks the zone while the service's own <c>PostInventoryCommandAndWaitAsync</c> await is pending, same
-///     pattern as <c>CraftItemServiceTests</c>. Covers the game.EventLog (Category=ItemCreate) wiring added on
-///     top of the pre-existing pet-fusion craft resolution. Recipe3/Recipe4 are used throughout since neither
-///     draws from an <c>IRandomSource</c> (see <see cref="PetCraftResolver.ResolveRecipe3" />'s and
-///     <see cref="PetCraftResolver.ResolveRecipe4" />'s own signatures) -- deterministic, no multi-trial loop
-///     needed.
-/// </summary>
 public class CraftPetServiceTests
 {
     private const int AccountId = 1;
@@ -199,12 +190,6 @@ public class CraftPetServiceTests
         Assert.Empty(eventLog.LoggedEvents);
     }
 
-    // The two tests below cover the 2026-07-11-recovered "milestone-notice-text-family" finding's Site 3
-    // (CraftPetHandler/CraftPetService's own MakeNotice stand-in): CenterRelayNoticeLog.LogNotableCraft is now
-    // wired into CraftPetService on every applied recipe, matching the precedent already established by
-    // CraftItemService/CraftSkillBookService -- see CraftPetService's own remarks for why this is a log line,
-    // never a client-facing broadcast (the legacy Center-side relay case is a confirmed-dead permanently-empty
-    // stub, not a pending citation).
 
     [Fact]
     public async Task FourSlotRecipe_Recipe3_Success_NotableResultItem_LogsNotableCraftNotice()
@@ -216,8 +201,6 @@ public class CraftPetServiceTests
             (2, Item(PetCraftRecipeCatalog.Recipe3Material3ItemId, 903)),
             (3, Item(PetCraftRecipeCatalog.Recipe3CatalystItemId, 904)));
 
-        // MakeNotice's own default-case fallback rule only notifies for iType >= 4 (NotableItemTypeThreshold,
-        // see CenterRelayNoticeLog's own remarks) -- Type 4 here is a stand-in "notable" (Elite-tier) result.
         var itemsById = new Dictionary<int, ItemDefinition>
         {
             [PetCraftRecipeCatalog.Recipe3ResultItemId] = new(
@@ -250,8 +233,6 @@ public class CraftPetServiceTests
             (0, Item(PetCraftRecipeCatalog.Recipe4MaterialItemId, 901)),
             (1, Item(PetCraftRecipeCatalog.Recipe4MaterialItemId, 902)));
 
-        // Default WorldDataTestRows.Item Type is 0, below NotableItemTypeThreshold (4) -- MakeNotice's own
-        // documented default-case fallback means this recipe's result is never notable enough to notify on.
         var itemsById = new Dictionary<int, ItemDefinition>
         {
             [PetCraftRecipeCatalog.Recipe4ResultItemId] =

@@ -6,11 +6,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.Simulation;
 
-/// <summary>
-///     Covers <see cref="WorldClockPushSystem" />: the self-throttled per-minute "current time" push (A6-
-///     sendtime-push contract) -- the rearm/blocked/just-sent state machine, the packed-time encoding, and
-///     the forced (registration-path) send.
-/// </summary>
 public sealed class WorldClockPushSystemTests
 {
     private static byte[] ExpectedFrame(AvatarStatUpdateResponse packet)
@@ -28,7 +23,7 @@ public sealed class WorldClockPushSystemTests
 
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
-        ZoneTestKit.DrainOutbound(pipe); // discard the world-entry handshake's own traffic
+        ZoneTestKit.DrainOutbound(pipe);
 
         Assert.True(zone.TryGetPlayer(10, out var state));
         return (zone, state!, pipe);
@@ -37,12 +32,10 @@ public sealed class WorldClockPushSystemTests
     [Fact]
     public void EncodePackedTime_PacksMonthZeroBasedDayHourMinuteWeekday_WithNoSeparators()
     {
-        // 2026-07-12 14:07:xx is a Sunday -- month is 0-based (July -> 6), weekday Sunday -> 0.
         var instant = new DateTimeOffset(2026, 7, 12, 14, 7, 30, TimeSpan.Zero);
 
         var packed = WorldClockPushSystem.EncodePackedTime(instant);
 
-        // "06" + "12" + "14" + "07" + "0" concatenated = "061214070" = 61214070
         Assert.Equal(61_214_070, packed);
     }
 
@@ -82,10 +75,10 @@ public sealed class WorldClockPushSystemTests
         var system = new WorldClockPushSystem(time);
         var (zone, state, pipe) = EnterWorld(system);
 
-        zone.Tick(SimulationClock.LegacyTick); // sends, -> JustSent
+        zone.Tick(SimulationClock.LegacyTick);
         ZoneTestKit.DrainOutbound(pipe);
 
-        time.Now = time.Now.AddSeconds(1); // still second 2 -- neither rearm nor block condition fires
+        time.Now = time.Now.AddSeconds(1);
         zone.Tick(SimulationClock.LegacyTick);
 
         Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
@@ -99,11 +92,11 @@ public sealed class WorldClockPushSystemTests
         var system = new WorldClockPushSystem(time);
         var (zone, state, pipe) = EnterWorld(system);
 
-        zone.Tick(SimulationClock.LegacyTick); // second=3 -> Blocked, no send
+        zone.Tick(SimulationClock.LegacyTick);
         ZoneTestKit.DrainOutbound(pipe);
         Assert.Equal(WorldClockPushSystem.ThrottleStateBlocked, state.WorldClockPushThrottleState);
 
-        time.Now = new DateTimeOffset(2026, 7, 12, 14, 8, 0, TimeSpan.Zero); // next minute, second=0 -> rearm window
+        time.Now = new DateTimeOffset(2026, 7, 12, 14, 8, 0, TimeSpan.Zero);
         zone.Tick(SimulationClock.LegacyTick);
 
         var expected = WorldClockPushSystem.BuildPacket(time.Now);
@@ -118,10 +111,9 @@ public sealed class WorldClockPushSystemTests
         var system = new WorldClockPushSystem(time);
         var (zone, state, pipe) = EnterWorld(system);
 
-        zone.Tick(SimulationClock.LegacyTick); // Blocked
+        zone.Tick(SimulationClock.LegacyTick);
         ZoneTestKit.DrainOutbound(pipe);
 
-        // Simulated stall: the next observed sample jumps straight past the [0,2) rearm window.
         time.Now = new DateTimeOffset(2026, 7, 12, 14, 8, 5, TimeSpan.Zero);
         zone.Tick(SimulationClock.LegacyTick);
 
@@ -144,8 +136,7 @@ public sealed class WorldClockPushSystemTests
         Assert.Equal(WorldClockPushSystem.ThrottleStateJustSent, state.WorldClockPushThrottleState);
     }
 
-    /// <summary>A <see cref="TimeProvider" /> whose <see cref="TimeProvider.GetUtcNow" /> returns a settable instant.</summary>
-    private sealed class MutableTimeProvider(DateTimeOffset now) : TimeProvider
+        private sealed class MutableTimeProvider(DateTimeOffset now) : TimeProvider
     {
         public DateTimeOffset Now { get; set; } = now;
 

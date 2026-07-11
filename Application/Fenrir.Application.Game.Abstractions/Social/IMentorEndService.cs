@@ -2,7 +2,6 @@ using Fenrir.Application.Game.Domain.World;
 
 namespace Fenrir.Application.Game.Abstractions.Social;
 
-/// <summary>Discriminator for how a CZ_TEACHER_END_SEND attempt resolved.</summary>
 public enum MentorEndResultKind
 {
     NotBonded,

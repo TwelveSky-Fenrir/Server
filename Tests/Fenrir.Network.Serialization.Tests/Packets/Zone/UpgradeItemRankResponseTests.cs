@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Zone;
 
-/// <summary>ZC_HIGH_ITEM_RECV (ZONE.h:531, 32-byte payload) — same typedef as <see cref="RerollItemResponse" />.</summary>
 public class ZcHighItemRecvTests
 {
     [Fact]

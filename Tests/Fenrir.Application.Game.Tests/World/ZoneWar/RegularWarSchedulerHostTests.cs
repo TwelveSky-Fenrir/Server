@@ -15,8 +15,8 @@ namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
 public class RegularWarSchedulerHostTests
 {
-    /// <summary>Total legacy ticks from a fresh schedule up to (and including) the tick Active war begins.</summary>
-    private static int TicksToActiveWar =>
+
+        private static int TicksToActiveWar =>
         RegularWarSchedule.CooldownTicks +
         RegularWarSchedule.CountdownAnnounceStartValue * RegularWarSchedule.CountdownAnnounceIntervalTicks +
         RegularWarSchedule.FinalWaitTicks +
@@ -43,7 +43,7 @@ public class RegularWarSchedulerHostTests
     [Fact]
     public void UnconfiguredMap_IsNeverScheduled_NoEventsFire()
     {
-        var registry = CreateRegistry(1); // map 1 is not one of the 11 configured Regular War maps
+        var registry = CreateRegistry(1);
         var sink = new RecordingSink();
         var host = new RegularWarSchedulerHost(registry, CreateWorldState(), sink,
             new UnavailableRegularWarRewardValueProvider(), NullLogger<RegularWarSchedulerHost>.Instance);
@@ -57,7 +57,7 @@ public class RegularWarSchedulerHostTests
     [Fact]
     public void ConfiguredHostedMap_ReachesActiveWar_AfterTheFullRampUp()
     {
-        var registry = CreateRegistry(49); // one of the 11 configured maps
+        var registry = CreateRegistry(49);
         var sink = new RecordingSink();
         var host = new RegularWarSchedulerHost(registry, CreateWorldState(), sink,
             new UnavailableRegularWarRewardValueProvider(), NullLogger<RegularWarSchedulerHost>.Instance);
@@ -83,12 +83,9 @@ public class RegularWarSchedulerHostTests
         var host = new RegularWarSchedulerHost(registry, CreateWorldState(), sink,
             new UnavailableRegularWarRewardValueProvider(), NullLogger<RegularWarSchedulerHost>.Instance);
 
-        // Reach Active (only tribe 0 present the whole time, but elimination is only evaluated once Active
-        // starts, so this alone doesn't conclude the war early).
         host.Tick(SimulationClock.LegacyTick * TicksToActiveWar);
         Assert.Single(sink.ActiveWarStarts);
 
-        // One more evaluation cadence: still only tribe 0 present -> immediate elimination win.
         host.Tick(SimulationClock.LegacyTick * RegularWarSchedule.ActiveEvaluationCadenceTicks);
 
         var conclusion = Assert.Single(sink.Conclusions);
@@ -98,9 +95,6 @@ public class RegularWarSchedulerHostTests
         Assert.Equal(2, conclusion.Rewards.Length);
         Assert.All(conclusion.Rewards, r => Assert.True(r.IsWinningSide));
 
-        // War-conclusion daily-mission "join war" credit (S07_MyGame01.cpp:5293-5314): both present
-        // characters get credited, regardless of the reward/outcome side above -- but only once this
-        // host's posted ZoneCommand.CreditRegularWarConclusion is actually drained by the zone's own tick.
         registry[49].Tick(TimeSpan.FromMilliseconds(50));
         Assert.True(registry[49].TryGetPlayer(10, out var playerA));
         Assert.True(registry[49].TryGetPlayer(11, out var playerB));

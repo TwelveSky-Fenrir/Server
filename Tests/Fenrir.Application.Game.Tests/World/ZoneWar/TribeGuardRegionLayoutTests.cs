@@ -2,24 +2,16 @@ using Fenrir.Application.Game.Domain.World.ZoneWar;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Covers <see cref="TribeGuardRegionLayout" /> -- the deterministic object-index ownership the
-///     A4-summonguard contract describes under Side effects ("Object-index ownership is deterministic") and the
-///     region-bounds Preconditions/Edge cases. Pure arithmetic; no <see cref="Fenrir.Application.Game.Domain.World.Zone" />
-///     needed.
-/// </summary>
 public class TribeGuardRegionLayoutTests
 {
     [Fact]
     public void RegionConstants_MatchTheLegacyValues()
     {
-        // START_NORMAL_GUARD_OBJECT_NUM / START_TRIBE_GUARD_OBJECT_NUM, 100 slots each (S01_MainApplication.cpp:35-58).
         Assert.Equal(3400, TribeGuardRegionLayout.NormalGuardRegionLegacyStart);
         Assert.Equal(3500, TribeGuardRegionLayout.TribeGuardRegionLegacyStart);
         Assert.Equal(100, TribeGuardRegionLayout.RegionSlotCount);
         Assert.Equal(5, TribeGuardRegionLayout.SlotsPerTribeSlot);
         Assert.Equal(5, TribeGuardRegionLayout.TribeSlotCount);
-        // At most 5 tribe-slots x 5 posts = 25 slots ever used, inside the 100-slot region budget.
         Assert.Equal(25, TribeGuardRegionLayout.MaxUsedSlots);
         Assert.True(TribeGuardRegionLayout.MaxUsedSlots <= TribeGuardRegionLayout.RegionSlotCount);
     }
@@ -45,7 +37,6 @@ public class TribeGuardRegionLayoutTests
         {
             var index = TribeGuardRegionLayout.RelativeReservedIndex(ordinal, post);
 
-            // Block N is exactly [5N, 5N+5).
             Assert.InRange(index, ordinal * 5, ordinal * 5 + 4);
             Assert.True(seen.Add(index), $"index {index} collided across tribe-slots");
         }
@@ -56,8 +47,6 @@ public class TribeGuardRegionLayoutTests
     [Fact]
     public void TwoDifferentTribeSlots_NeverShareAReservedIndex()
     {
-        // The exact same-map collision the naive "0..4 per post" numbering would cause: tribe-slot 0 post 0 and
-        // tribe-slot 3 post 0 must land on distinct indices.
         var slotZeroPostZero = TribeGuardRegionLayout.RelativeReservedIndex(0, 0);
         var slotThreePostZero = TribeGuardRegionLayout.RelativeReservedIndex(3, 0);
         Assert.NotEqual(slotZeroPostZero, slotThreePostZero);
@@ -88,11 +77,9 @@ public class TribeGuardRegionLayoutTests
         var slots = TribeGuardRegionLayout.BuildDeterministicSlots(2, coords);
 
         Assert.Equal(3, slots.Length);
-        // Tribe-slot 2 owns block [10, 15): posts 0,1,2 -> 10,11,12.
         Assert.Equal(10, slots[0].ReservedSlotIndex);
         Assert.Equal(11, slots[1].ReservedSlotIndex);
         Assert.Equal(12, slots[2].ReservedSlotIndex);
-        // Coordinates carried through in order.
         Assert.Equal(10f, slots[0].X);
         Assert.Equal(1f, slots[0].Y);
         Assert.Equal(60f, slots[2].Z);

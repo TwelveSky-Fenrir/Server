@@ -4,14 +4,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.Inventory.UseItems;
 
-/// <summary>
-///     op23 double-click-to-equip. Confirms the swap via <see cref="EquipSwapResolver" />, then applies it as
-///     one atomic two-container write (the addressed inventory page + the Equipment container) and mirrors the
-///     recomputed equipment stats — reusing <see cref="EquipmentService.RecomputeStats" /> exactly as the
-///     drag-to-equip path (<c>GenericActionService</c>) does, never re-implementing the stat math. Every
-///     rejection (not idle, ineligible item, or a derived slot out of range — each a disconnect in the legacy)
-///     collapses to a clean result-1 reply, the same op23 simplification the service's own families use.
-/// </summary>
 public sealed class EquipSwapUseItemHandler(
     WorldDataCache worldData,
     UseItemInventoryWriter inventoryWriter,
@@ -57,8 +49,7 @@ public sealed class EquipSwapUseItemHandler(
         return UseItemResponses.Success(context.Page, context.Index);
     }
 
-    /// <summary>Registry routing predicate — see <see cref="EquipSwapResolver.ClaimsItem" />.</summary>
-    public static bool ClaimsItem(ItemRowDto item)
+        public static bool ClaimsItem(ItemRowDto item)
     {
         return EquipSwapResolver.ClaimsItem(item);
     }

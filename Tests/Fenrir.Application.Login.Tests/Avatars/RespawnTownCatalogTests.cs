@@ -2,7 +2,6 @@ using Fenrir.Application.Login.Domain.Avatars;
 
 namespace Fenrir.Application.Login.Tests.Avatars;
 
-// Server/Header/mapcheck.h:298-326 (GetReturnBornInTownLocation): switch on Tribe, no default case.
 public class RespawnTownCatalogTests
 {
     [Theory]
@@ -40,8 +39,6 @@ public class RespawnTownCatalogTests
     [Fact]
     public void TryGetTownLocation_MatchesCreateAvatarServicesOwnSpawnMapIdByTribe()
     {
-        // Fenrir.Application.Login.Services.CreateAvatar.CreateAvatarService.SpawnMapIdByTribe = [1, 6, 11, 140],
-        // independently sourced from the same GetReturnBornInTownLocation citation for the zone-number half only.
         short[] expectedZoneByTribe = [1, 6, 11, 140];
 
         for (byte tribe = 0; tribe < expectedZoneByTribe.Length; tribe++)

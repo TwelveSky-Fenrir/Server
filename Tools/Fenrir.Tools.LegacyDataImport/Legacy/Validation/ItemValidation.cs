@@ -4,10 +4,6 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Validation;
 
-/// <summary>
-///     Cross-validates <see cref="ItemReader" /> against <c>ITEM_DUMP_CLEAN.csv</c> (ts25ztool export, 34,416 rows)
-///     -- 0 stat mismatches; text diffs are raw quote/comma bytes in descriptions, not decode bugs.
-/// </summary>
 internal static class ItemValidation
 {
     public static void Run(string dataDir)
@@ -29,7 +25,6 @@ internal static class ItemValidation
 
     private static void VerifyAgainstCsv(IReadOnlyList<ItemRecord> items, string csvPath)
     {
-        // Latin1: raw byte dump, not UTF-8 (UTF-8 would corrupt non-ASCII bytes to U+FFFD).
         var byIndex = items.GroupBy(i => i.Index).ToDictionary(g => g.Key, g => g.First());
         var mismatches = 0;
         var numericMismatches = 0;
@@ -59,7 +54,7 @@ internal static class ItemValidation
                 var actual = fields[i].Trim('"');
                 if (expected[i] == actual) continue;
                 var isNumericField =
-                    i >= 5; // fields 0..4 are Index/Name/Description[0..2]; everything after is numeric
+                    i >= 5;
                 if (isNumericField) numericMismatches++;
                 Console.WriteLine(
                     $"  [DIFF{(isNumericField ? "-NUMERIC" : "-text")}] index {index} field #{i}: parsed='{expected[i]}' csv='{actual}'");

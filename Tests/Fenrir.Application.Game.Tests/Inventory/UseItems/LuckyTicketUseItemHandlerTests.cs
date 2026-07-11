@@ -11,13 +11,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Inventory.UseItems;
 
-/// <summary>
-///     <see cref="LuckyTicketUseItemHandler" /> post-recovery (workstream lucky-ticket-handler-thresholds): the
-///     "no eligible reward" clean-failure path (ticket kept) and the end-to-end success path (reward granted,
-///     ticket consumed, fixed per-ticket-family serial stamped). Exact reward-tier/roll magnitudes are covered
-///     purely at <see cref="LuckyTicketRewardResolverTests" />; this file exercises the handler's own
-///     placement/consumption/mirror wiring around that pure resolver.
-/// </summary>
 public class LuckyTicketUseItemHandlerTests
 {
     private const int AccountId = 1;
@@ -82,7 +75,7 @@ public class LuckyTicketUseItemHandlerTests
         var ticket = new ItemStack(ticketItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1);
         SeedInventory(zone, ContainerMatrix.InventoryPage0, 0, ticket);
 
-        var worldData = ZoneTestKit.EmptyWorldData(); // no items anywhere -> no draw can ever find an eligible reward
+        var worldData = ZoneTestKit.EmptyWorldData();
         var writer = new UseItemInventoryWriter(new FakeCharacterRepository(),
             NullLogger<UseItemInventoryWriter>.Instance);
         var handler = new LuckyTicketUseItemHandler(worldData, writer, NullLogger<LuckyTicketUseItemHandler>.Instance);
@@ -107,11 +100,6 @@ public class LuckyTicketUseItemHandlerTests
         int expectedSerial)
     {
         var (zone, state) = SetUp();
-        // level1 < 5 forces the Common tier regardless of the roll (see LuckyTicketRewardResolverTests for the
-        // exhaustive roll/level cascade coverage); level2 >= 1 collapses the item-level window to the single
-        // fixed value level1+level2 = 6, removing the level pick's own randomness. Every one of the 8 sorts
-        // tribe 0's own pool can pick at the Common tier has a matching item at that one fixed level, so the
-        // draw always succeeds on its first attempt regardless of which sort the handler's live Random picks.
         state.Level = 1;
         state.Level2 = 5;
         state.PreviousTribe = 0;
@@ -119,7 +107,7 @@ public class LuckyTicketUseItemHandlerTests
         var ticket = new ItemStack(ticketItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1);
         SeedInventory(zone, ContainerMatrix.InventoryPage0, 0, ticket);
 
-        byte[] commonSorts = [7, 9, 10, 11, 12, 13, 14, 15]; // Amulet/Armor/Glove/Ring/Boots/Sword/Blade/Marble
+        byte[] commonSorts = [7, 9, 10, 11, 12, 13, 14, 15];
         var itemsById = new Dictionary<int, ItemDefinition>();
         foreach (var sort in commonSorts)
         {
@@ -128,7 +116,7 @@ public class LuckyTicketUseItemHandlerTests
                 WorldDataTestRows.Item(itemId) with
                 {
                     Level = 6,
-                    Type = 1, // ICOMMON
+                    Type = 1,
                     Sort = sort,
                     CheckMonsterDrop = 2,
                     CheckAvatarTrade = 2,
@@ -149,7 +137,7 @@ public class LuckyTicketUseItemHandlerTests
         Assert.Equal(0, response.Result);
 
         Assert.True(zone.TryGetPlayer(CharacterId, out var after));
-        Assert.Null(after!.Inventory.GetSlot(ContainerMatrix.InventoryPage0, 0)); // ticket consumed (slot removed)
+        Assert.Null(after!.Inventory.GetSlot(ContainerMatrix.InventoryPage0, 0));
 
         var page0 = after.Inventory.GetContainer(ContainerMatrix.InventoryPage0);
         var granted = page0.Values.Where(stack => stack.Serial == expectedSerial).ToList();

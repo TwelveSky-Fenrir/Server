@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Zone.Wire;
 
 namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 
-/// <summary>ZoneNumber is ignored by the handler; it always replies with counts for tribes 0-3 of the current process.</summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.TribePopulation,
     ExpectedSize = 13, AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
 public readonly partial record struct TribePopulationRequest : IIncomingPacket<TribePopulationRequest>

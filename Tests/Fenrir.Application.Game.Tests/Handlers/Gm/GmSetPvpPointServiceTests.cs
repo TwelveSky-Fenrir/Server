@@ -8,10 +8,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Gm;
 
-// GM-SETPVPPOINT (legacy PROCESS_DATA_SEND, opcode 19, tSort 598 -- Server/ts25zone/S04_MyWork04.cpp:1755-1769).
-// Confirmed functional no-op once the duel-slot input validates: the point-value field is never read anywhere
-// in the cited legacy source. Same permission-gate-failure -> disconnect-with-no-reply posture as every other
-// GM "Basic"-tier command in this dispatch table.
 public class GmSetPvpPointServiceTests
 {
     private const int Sort = 598;
@@ -62,8 +58,6 @@ public class GmSetPvpPointServiceTests
         var (session, pipe) = CreateSession(1);
         var service = new GmSetPvpPointService(NullLogger<GmSetPvpPointService>.Instance);
 
-        // PointValue is a confirmed dead input -- any value, including a huge/negative one, must never change
-        // this outcome.
         await service.HandleAsync(new GmSetPvpPointPayload { DuelSlot = duelSlot, PointValue = int.MinValue },
             Data, session, CancellationToken.None);
 

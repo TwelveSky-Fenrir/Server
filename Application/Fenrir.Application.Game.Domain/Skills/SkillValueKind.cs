@@ -1,18 +1,12 @@
 namespace Fenrir.Application.Game.Domain.Skills;
 
-/// <summary>
-///     The sFactor argument of the legacy SKILLSYSTEM::ReturnSkillValue(sIndex, sPoint, sFactor) -- selects
-///     which pair of world.SkillGrades columns (grade 0 = min, grade 1 = max) to interpolate between.
-/// </summary>
 public enum SkillValueKind
 {
     ManaUse = 1,
 
-    /// <summary>Meditation regen-per-tick divisor, or a targeted heal's flat HP amount -- same column, two meanings.</summary>
-    RecoverInfo1 = 2,
+        RecoverInfo1 = 2,
 
-    /// <summary>Same dual-interpretation as RecoverInfo1, for MP.</summary>
-    RecoverInfo2 = 3,
+        RecoverInfo2 = 3,
 
     StunAttack = 4,
     StunDefense = 5,
@@ -21,8 +15,7 @@ public enum SkillValueKind
     ElementAttackPowerRatio = 8,
     AttackInfo3 = 9,
 
-    /// <summary>Buff duration in legacy ticks.</summary>
-    RunTime = 10,
+        RunTime = 10,
 
     ChargingDamageUp = 11,
     AttackPowerUp = 12,
@@ -34,8 +27,7 @@ public enum SkillValueKind
     AttackSpeedUp = 18,
     RunSpeedUp = 19,
 
-    /// <summary>Holy Shield value = ratio% x caster MaxLife x 0.01.</summary>
-    ShieldLifeUp = 20,
+        ShieldLifeUp = 20,
 
     LuckUp = 21,
     CriticalUp = 22,

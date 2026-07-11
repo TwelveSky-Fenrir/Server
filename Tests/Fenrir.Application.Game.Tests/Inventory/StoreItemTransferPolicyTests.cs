@@ -2,11 +2,6 @@ using Fenrir.Application.Game.Domain.Inventory;
 
 namespace Fenrir.Application.Game.Tests.Inventory;
 
-/// <summary>
-///     Coverage for <see cref="StoreItemTransferPolicy" />, the pure policy behind tSort 223/250 (deposit),
-///     224/248 (withdraw), and 225 (store-to-store rearrange). Does not depend on any dispatch wiring -- exercises
-///     the static policy methods directly against hand-built <see cref="ItemStack" /> values.
-/// </summary>
 public class StoreItemTransferPolicyTests
 {
     private static ItemStack Stack(int itemId, int quantity = 1, byte enchant = 0, byte combine = 0,
@@ -17,7 +12,6 @@ public class StoreItemTransferPolicyTests
             serial);
     }
 
-    // ---- Container-id mapping helpers ----
 
     [Theory]
     [InlineData(0, ContainerMatrix.StorePage0)]
@@ -57,10 +51,6 @@ public class StoreItemTransferPolicyTests
         Assert.False(StoreItemTransferPolicy.TryResolveInventoryContainer(rawPage, out _));
     }
 
-    // ---- Deposit (223/250) ----
-    // ResolveDepositFromInventory(inventoryContainer, inventorySlot, requestedQuantity, storeContainer, storeSlot,
-    //     source, destination, sourceIsStackable, sourceSupportsSocket, secondInventoryPageAccessible,
-    //     secondStorePageAccessible)
 
     [Fact]
     public void Deposit_SourceOutOfRange_Fails()
@@ -129,7 +119,6 @@ public class StoreItemTransferPolicyTests
         var source = Stack(100, 1, 5, 1, 2, 3, 7, 8, 9,
             20260101, 42);
 
-        // requestedQuantity (999) is deliberately nonsensical -- non-stackable ignores it entirely.
         var result = StoreItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 0, 999, ContainerMatrix.StorePage0, 0,
             source, null, false, true, true, true);
@@ -142,7 +131,7 @@ public class StoreItemTransferPolicyTests
         Assert.Equal(5, dest.Enchant);
         Assert.Equal(1, dest.Combine);
         Assert.Equal(2, dest.Refine);
-        Assert.Equal(3, dest.Socket); // "value" quadruple copied verbatim for a non-stackable move
+        Assert.Equal(3, dest.Socket);
         Assert.Equal(42, dest.Serial);
         Assert.Equal(7, dest.SocketGem1);
         Assert.Equal(8, dest.SocketGem2);
@@ -163,7 +152,7 @@ public class StoreItemTransferPolicyTests
         Assert.Equal(0, dest.SocketGem1);
         Assert.Equal(0, dest.SocketGem2);
         Assert.Equal(0, dest.SocketGem3);
-        Assert.Equal(20260101, dest.ExpireDate); // expiry always copied, regardless of socket support
+        Assert.Equal(20260101, dest.ExpireDate);
     }
 
     [Fact]
@@ -224,11 +213,11 @@ public class StoreItemTransferPolicyTests
 
         Assert.True(result.Succeeded);
         Assert.Equal(7, result.NewSource!.Value.Quantity);
-        Assert.Equal(1, result.NewSource!.Value.SocketGem1); // untouched
+        Assert.Equal(1, result.NewSource!.Value.SocketGem1);
         var dest = result.NewDestination!.Value;
         Assert.Equal(8, dest.Quantity);
-        Assert.Equal(99, dest.SocketGem1); // untouched -- only raw id/quantity counters move on a partial merge
-        Assert.Equal(222, dest.ExpireDate); // NOT overwritten while partial -- contrast with rearrange's quirk
+        Assert.Equal(99, dest.SocketGem1);
+        Assert.Equal(222, dest.ExpireDate);
     }
 
     [Fact]
@@ -281,10 +270,6 @@ public class StoreItemTransferPolicyTests
         Assert.Equal(StoreItemTransferPolicy.TransferOutcome.DestinationConflict, result.Outcome);
     }
 
-    // ---- Withdraw (224/248) ----
-    // ResolveWithdrawToInventory(storeContainer, storeSlot, requestedQuantity, inventoryContainer, inventorySlot,
-    //     destinationXPost, destinationYPost, source, destination, sourceIsStackable, sourceSupportsSocket,
-    //     secondStorePageAccessible, secondInventoryPageAccessible)
 
     [Fact]
     public void Withdraw_SourceOutOfRange_Fails()
@@ -375,9 +360,6 @@ public class StoreItemTransferPolicyTests
         Assert.Equal(StoreItemTransferPolicy.TransferOutcome.DestinationConflict, result.Outcome);
     }
 
-    // ---- Rearrange within Store (225) ----
-    // ResolveRearrangeWithinStore(fromContainer, fromSlot, requestedQuantity, toContainer, toSlot,
-    //     source, destination, sourceIsStackable, secondStorePageAccessible)
 
     [Fact]
     public void Rearrange_SameSlot_IsNoOp()
@@ -476,7 +458,7 @@ public class StoreItemTransferPolicyTests
             source, destination, false, true);
 
         Assert.True(result.Succeeded);
-        Assert.False(result.IsNonStackableTransfer); // rearrange never logs, unlike deposit/withdraw
+        Assert.False(result.IsNonStackableTransfer);
         Assert.Equal(destination, result.NewSource);
         Assert.Equal(source, result.NewDestination);
     }
@@ -486,7 +468,6 @@ public class StoreItemTransferPolicyTests
     {
         var source = Stack(100, 1, 4, gem1: 1, expireDate: 55, serial: 9);
 
-        // requestedQuantity (999) is deliberately nonsensical -- non-stackable ignores it entirely.
         var result = StoreItemTransferPolicy.ResolveRearrangeWithinStore(
             ContainerMatrix.StorePage0, 0, 999, ContainerMatrix.StorePage0, 1,
             source, null, false, true);
@@ -550,7 +531,6 @@ public class StoreItemTransferPolicyTests
         var source = Stack(2, 20, 3, gem1: 1, expireDate: 111);
         var destination = Stack(3, 5, 7, gem1: 2, expireDate: 222);
 
-        // requestedQuantity (20) equals source's entire stack -- the only way a mismatched item earns a swap.
         var result = StoreItemTransferPolicy.ResolveRearrangeWithinStore(
             ContainerMatrix.StorePage0, 0, 20, ContainerMatrix.StorePage0, 1,
             source, destination, true, true);
@@ -566,7 +546,6 @@ public class StoreItemTransferPolicyTests
         var source = Stack(2, 20);
         var destination = Stack(3, 5);
 
-        // requestedQuantity (10) is less than source's entire stack -- rejected, not swapped.
         var result = StoreItemTransferPolicy.ResolveRearrangeWithinStore(
             ContainerMatrix.StorePage0, 0, 10, ContainerMatrix.StorePage0, 1,
             source, destination, true, true);
@@ -577,8 +556,6 @@ public class StoreItemTransferPolicyTests
     [Fact]
     public void Rearrange_Stackable_SameItemMerge_OverwritesExpiryEvenOnPartialMerge()
     {
-        // The documented legacy quirk: unlike deposit/withdraw, rearrange overwrites the destination's expiry-date
-        // from source unconditionally, even though this merge leaves quantity behind in the source slot.
         var source = Stack(2, 20, gem1: 1, expireDate: 111);
         var destination = Stack(2, 5, gem1: 99, expireDate: 222);
 
@@ -592,7 +569,7 @@ public class StoreItemTransferPolicyTests
         Assert.Equal(10, dest.Quantity);
         Assert.Equal(0, dest.Enchant);
         Assert.Equal(0, dest.Serial);
-        Assert.Equal(111, dest.ExpireDate); // overwritten despite the partial (non-emptying) merge
+        Assert.Equal(111, dest.ExpireDate);
     }
 
     [Fact]

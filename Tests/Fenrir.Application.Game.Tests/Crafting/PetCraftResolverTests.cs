@@ -102,8 +102,6 @@ public class PetCraftResolverTests
         Assert.False(result.Succeeded);
     }
 
-    // The C++ source rolls rand_mir()%100 here too, but immediately discards it (tValue[0] is unconditionally
-    // overwritten to 1012 right after) -- verifying the outcome never varies regardless of roll is the point.
     [Fact]
     public void Recipe3_ValidMaterials_AlwaysProduces1012()
     {

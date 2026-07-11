@@ -9,10 +9,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Simulation;
 
-/// <summary>
-///     Covers <see cref="CashCatalogStaleNotifySystem" />: the proactive "your cash catalog is stale, come ask
-///     again" notify, its reset-after-notify no-repeat guard, and the fresh-session exclusion.
-/// </summary>
 public class CashCatalogStaleNotifySystemTests
 {
     private static readonly int InvalidatedFrameSize = FrameWriter.FrameSizeOf<CashCatalogInvalidatedResponse>();
@@ -35,7 +31,7 @@ public class CashCatalogStaleNotifySystemTests
 
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
-        ZoneTestKit.DrainOutbound(pipe); // discard the world-entry handshake's own traffic
+        ZoneTestKit.DrainOutbound(pipe);
 
         Assert.True(zone.TryGetPlayer(10, out var state));
         return (zone, state!, pipe);
@@ -73,7 +69,7 @@ public class CashCatalogStaleNotifySystemTests
     {
         var cache = await CacheAtVersionAsync(7);
         var (zone, state, pipe) = EnterWorld(cache);
-        state.KnownCashCatalogVersion = 3; // stale vs. the live version (7)
+        state.KnownCashCatalogVersion = 3;
 
         zone.Tick(SimulationClock.LegacyTick);
 
@@ -88,10 +84,10 @@ public class CashCatalogStaleNotifySystemTests
         var (zone, state, pipe) = EnterWorld(cache);
         state.KnownCashCatalogVersion = 3;
 
-        zone.Tick(SimulationClock.LegacyTick); // first firing -- notifies and resets to the sentinel
+        zone.Tick(SimulationClock.LegacyTick);
         ZoneTestKit.DrainOutbound(pipe);
 
-        zone.Tick(SimulationClock.LegacyTick); // second firing -- must not re-notify
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
     }
@@ -102,13 +98,11 @@ public class CashCatalogStaleNotifySystemTests
         var cache = await CacheAtVersionAsync(7);
         var (zone, state, pipe) = EnterWorld(cache);
         state.KnownCashCatalogVersion = 3;
-        zone.Tick(SimulationClock.LegacyTick); // notifies, resets to sentinel
+        zone.Tick(SimulationClock.LegacyTick);
         ZoneTestKit.DrainOutbound(pipe);
 
-        // Simulates the client re-requesting and the service recording the (now current) live version.
         state.KnownCashCatalogVersion = 7;
 
-        // A subsequent catalog bump makes this session stale again -- it must be notified once more.
         var repository = new FakeWorldDataRepository
         {
             ItemMallProducts = [new ItemMallProductRowDto(100000, 5, 8, 0, 0, true)]

@@ -4,23 +4,13 @@ using Fenrir.Data.Abstractions.Commerce;
 
 namespace Fenrir.Application.Login.Tests.TestSupport;
 
-// In-memory stand-in for ICharacterRepository: GetByAccountAsync/GetForWorldEntryAsync/CreateWithStarterKitAsync
-// are exercised by the handlers under test here (op16/op17); every other member is out of scope for those flows.
 internal sealed class FakeCharacterRepository : ICharacterRepository
 {
     private readonly Dictionary<(int CharacterId, byte Container, byte Slot), int> _itemIdBySlot = new();
 
-    /// <summary>Seeded rows for <see cref="GetAccountRosterAsync" />'s RS1 -- empty by default (no items).</summary>
-    private readonly List<CharacterRosterItemDto> _rosterItems = [];
+        private readonly List<CharacterRosterItemDto> _rosterItems = [];
 
-    /// <summary>
-    ///     Overrides <see cref="GetAccountRosterAsync" />'s auto-derived RS0 row for a character -- only needed
-    ///     by tests exercising the roster-overlay scalar/potion/progression fields
-    ///     <see cref="CharacterSummaryDto" /> alone can't carry (LoginService/LoginTrain roster tests). Every
-    ///     other test that never calls <see cref="WithRosterCharacter" /> gets a row auto-derived from the
-    ///     matching <see cref="CharacterSummaryDto" />, with every field beyond that DTO's own 8 defaulted to 0.
-    /// </summary>
-    private readonly Dictionary<int, CharacterRosterDto> _rosterOverridesByCharacterId = new();
+        private readonly Dictionary<int, CharacterRosterDto> _rosterOverridesByCharacterId = new();
 
     private readonly List<CharacterSummaryDto> _summaries;
     private readonly Dictionary<int, CharacterWorldEntryDto> _worldEntriesByCharacterId;
@@ -34,26 +24,17 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         _worldEntriesByCharacterId = worldEntries.ToDictionary(w => w.CharacterId);
     }
 
-    /// <summary>Set by a test to make the next <see cref="CreateWithStarterKitAsync" /> call throw instead.</summary>
-    public Exception? CreateWithStarterKitException { get; set; }
+        public Exception? CreateWithStarterKitException { get; set; }
 
-    /// <summary>
-    ///     Set by a test to make the next <see cref="DeleteAsync" /> call throw instead -- for exercising
-    ///     DeleteAvatarService's mapped database-delete-failure path (DeleteAvatarOutcome.SqlError).
-    /// </summary>
-    public Exception? DeleteException { get; set; }
+        public Exception? DeleteException { get; set; }
 
-    /// <summary>Every argument CreateAvatarHandler passed to the most recent CreateWithStarterKitAsync call.</summary>
-    public CreateWithStarterKitCall? LastCreateWithStarterKit { get; private set; }
+        public CreateWithStarterKitCall? LastCreateWithStarterKit { get; private set; }
 
-    /// <summary>Every (characterId, container, slot) tuple GetItemIdAtSlotAsync was queried with, in call order.</summary>
-    public List<(int CharacterId, byte Container, byte Slot)> QueriedItemSlots { get; } = [];
+        public List<(int CharacterId, byte Container, byte Slot)> QueriedItemSlots { get; } = [];
 
-    /// <summary>Every (accountId, slot) pair passed to DeleteAsync, in call order -- for DeleteAvatarService tests.</summary>
-    public List<(int AccountId, byte Slot)> DeleteCalls { get; } = [];
+        public List<(int AccountId, byte Slot)> DeleteCalls { get; } = [];
 
-    /// <summary>Every argument the most recent ClampVitalsFloorAsync call received, for ZoneTransferService tests.</summary>
-    public ClampVitalsFloorCall? LastClampVitalsFloor { get; private set; }
+        public ClampVitalsFloorCall? LastClampVitalsFloor { get; private set; }
 
     public ValueTask<int?> GetItemIdAtSlotAsync(int characterId, byte container, byte slot, CancellationToken ct)
     {
@@ -299,11 +280,7 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         throw new NotSupportedException();
     }
 
-    /// <summary>
-    ///     The auto-derivation <see cref="GetAccountRosterAsync" /> falls back to for any character not seeded via
-    ///     <see cref="WithRosterCharacter" />.
-    /// </summary>
-    private static CharacterRosterDto ToRosterDto(CharacterSummaryDto summary)
+        private static CharacterRosterDto ToRosterDto(CharacterSummaryDto summary)
     {
         return new CharacterRosterDto(
             summary.CharacterId,
@@ -335,28 +312,19 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
             0);
     }
 
-    /// <summary>
-    ///     Seeds a richer RS0 row for a character already present via <see cref="WithSummaries" />/<see cref="With" /> --
-    ///     see <see cref="_rosterOverridesByCharacterId" />'s own remarks.
-    /// </summary>
-    public FakeCharacterRepository WithRosterCharacter(CharacterRosterDto rosterCharacter)
+        public FakeCharacterRepository WithRosterCharacter(CharacterRosterDto rosterCharacter)
     {
         _rosterOverridesByCharacterId[rosterCharacter.CharacterId] = rosterCharacter;
         return this;
     }
 
-    /// <summary>
-    ///     Seeds one occupied RS1 item row for <see cref="GetAccountRosterAsync" /> -- roster
-    ///     equip/inventory/store-overlay tests.
-    /// </summary>
-    public FakeCharacterRepository WithRosterItem(CharacterRosterItemDto item)
+        public FakeCharacterRepository WithRosterItem(CharacterRosterItemDto item)
     {
         _rosterItems.Add(item);
         return this;
     }
 
-    /// <summary>Seeds one occupied item slot for <see cref="GetItemIdAtSlotAsync" /> -- RenameAvatarService tests.</summary>
-    public FakeCharacterRepository WithItemAtSlot(int characterId, byte container, byte slot, int itemId)
+        public FakeCharacterRepository WithItemAtSlot(int characterId, byte container, byte slot, int itemId)
     {
         _itemIdBySlot[(characterId, container, slot)] = itemId;
         return this;
@@ -367,17 +335,12 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         return new FakeCharacterRepository([summary], [worldEntry]);
     }
 
-    /// <summary>A fresh account with no characters yet (e.g. straight after CL_LOGIN_SEND's first-ever login).</summary>
-    public static FakeCharacterRepository WithNone()
+        public static FakeCharacterRepository WithNone()
     {
         return new FakeCharacterRepository([], []);
     }
 
-    /// <summary>
-    ///     One or more character-select-screen rows with no backing world-entry data -- for DeleteAvatarService
-    ///     tests, which only ever read the roster (to resolve a slot to a CharacterId/Tribe) and call DeleteAsync.
-    /// </summary>
-    public static FakeCharacterRepository WithSummaries(params CharacterSummaryDto[] summaries)
+        public static FakeCharacterRepository WithSummaries(params CharacterSummaryDto[] summaries)
     {
         return new FakeCharacterRepository(summaries, []);
     }

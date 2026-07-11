@@ -9,11 +9,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
-/// <summary>
-///     op93, CZ_SKY_UP_ITEM_SEND -- Warlord-item-only upgrade (delegated to <see cref="ISkyUpgradeItemService" />).
-///     Money is always deducted and the material always consumed regardless of outcome (matches the legacy's
-///     own unconditional <c>wAvatar.aMoney -= tCost</c>/<c>DecreaseMaterial</c> placement before the roll).
-/// </summary>
 public sealed class SkyUpgradeItemHandler(
     ISkyUpgradeItemService skyUpgradeItemService,
     ILogger<SkyUpgradeItemHandler> logger)

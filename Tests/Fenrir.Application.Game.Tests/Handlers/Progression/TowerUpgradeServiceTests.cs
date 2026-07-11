@@ -11,11 +11,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Progression;
 
-/// <summary>
-///     Drives the real <see cref="TowerUpgradeService" /> (opcode 120) over a real <see cref="Zone" />, same
-///     tick-while-pending pattern as <c>UseInventoryItemServiceTests</c>. Zone 2 -&gt; TowerZoneIndexTable
-///     towerIndex 0, tribe 0's own block.
-/// </summary>
 public class TowerUpgradeServiceTests
 {
     private const short TowerZoneNumber = 2;
@@ -50,7 +45,7 @@ public class TowerUpgradeServiceTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(pipe);
         Assert.True(zone.TryGetPlayer(10, out var state));
-        state!.TribeRole = 1; // Force Leader -- only 1/2 may submit CZ_CHUGSOUNG_WAR_UP_SEND
+        state!.TribeRole = 1;
 
         return (session, pipe, zone, state, new FakeCharacterRepository(), new TowerWarState());
     }
@@ -75,7 +70,7 @@ public class TowerUpgradeServiceTests
     {
         var (session, _, zone, state, characters, towerWar) = SetUp();
         SeedHerbAndBar(zone);
-        towerWar.SetTowerState(TowerIndex, 201, true); // level 2, type 1 (Silver), armed for upgrade
+        towerWar.SetTowerState(TowerIndex, 201, true);
         var service = CreateService(characters, towerWar);
 
         var result = await RunToCompletionAsync(
@@ -86,15 +81,13 @@ public class TowerUpgradeServiceTests
         Assert.Null(session.DisconnectReason);
         Assert.Equal(TowerUpgradeOutcome.Success, result.Outcome);
 
-        // Both materials removed from the same container (page 0) in one replace call.
         Assert.NotNull(characters.LastReplacedContainer);
         Assert.Equal(ContainerMatrix.InventoryPage0, characters.LastReplacedContainer!.Value.Container);
         Assert.DoesNotContain(characters.LastReplacedContainer.Value.Items, i => i.ItemId == HerbItemId);
         Assert.DoesNotContain(characters.LastReplacedContainer.Value.Items, i => i.ItemId == BarItemId);
 
-        // Armed, not yet advanced -- TowerGuardianSystem's own tick promotes this to Active.
         Assert.False(towerWar.IsValid(TowerIndex));
-        Assert.Equal(201, towerWar.GetPackedState(TowerIndex)); // unchanged until the guardian actually respawns
+        Assert.Equal(201, towerWar.GetPackedState(TowerIndex));
         Assert.Equal(TowerSiegePhase.Building, towerWar.GetPhase(TowerIndex));
         Assert.Equal(401, towerWar.GetPendingPackedStateForBuilding(TowerIndex));
     }
@@ -103,7 +96,7 @@ public class TowerUpgradeServiceTests
     public async Task RegularMember_CannotSubmit_LeavesTheTowerUntouched()
     {
         var (session, _, zone, state, characters, towerWar) = SetUp();
-        state.TribeRole = 0; // regular member, not Force Leader/Assistant
+        state.TribeRole = 0;
         SeedHerbAndBar(zone);
         towerWar.SetTowerState(TowerIndex, 201, true);
         var service = CreateService(characters, towerWar);
@@ -116,7 +109,7 @@ public class TowerUpgradeServiceTests
         Assert.Null(session.DisconnectReason);
         Assert.Equal(TowerUpgradeOutcome.Aborted, result.Outcome);
         Assert.Null(characters.LastReplacedContainer);
-        Assert.True(towerWar.IsValid(TowerIndex)); // never armed -- rejected before any mutation
+        Assert.True(towerWar.IsValid(TowerIndex));
         Assert.Equal(TowerSiegePhase.Active, towerWar.GetPhase(TowerIndex));
     }
 
@@ -125,7 +118,7 @@ public class TowerUpgradeServiceTests
     {
         var (session, _, zone, state, characters, towerWar) = SetUp();
         SeedHerbAndBar(zone);
-        towerWar.SetTowerState(TowerIndex, 201, false); // not currently valid for an upgrade
+        towerWar.SetTowerState(TowerIndex, 201, false);
         var service = CreateService(characters, towerWar);
 
         var result = await RunToCompletionAsync(

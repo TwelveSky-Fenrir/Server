@@ -17,304 +17,127 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.World;
 
-/// <summary>
-///     Already-decided, purely cosmetic/self-mutation mirrors for the smaller per-opcode subsystems (drink
-///     bottle, hero-ranking throttle, fishing, mount, costume, stellar core, playtime/rank buff, rune socket,
-///     auto-buff, pshop stall) that don't warrant their own dedicated partial. Same posture throughout: the
-///     posting handler already validated/persisted the change; this only mirrors it into the tick-owned
-///     <see cref="PlayerRuntimeState" /> and optionally rebroadcasts.
-/// </summary>
 public sealed partial class Zone
 {
-    /// <summary>
-    ///     <c>S904UPDATE_HERO_POINT</c> (Server/Header/Protocol/STRUCT.h:1650) -- the <c>AvatarStatUpdateResponse</c>
-    ///     Sort code the weekly hero-rank rollover reset (<see cref="ApplyHeroRankingRolloverReset" />) pushes.
-    ///     Also used, per the same wire tag, by the separate per-kill grant path
-    ///     (<c>MyCenterCom::AddHeroRankPoint</c>, Server/ts25zone/UpperCom/S06_MyUpperCom02.cpp:774-820) and the
-    ///     on-login initial-state sync (Server/ts25zone/S04_MyWork02.cpp:1113-1116) -- neither of those two is
-    ///     wired to push this packet yet; only the rollover reset below is in scope here.
-    /// </summary>
-    private const int HeroRankPointStatSort = 904;
 
-    /// <summary>
-    ///     Bounded capacity for <see cref="_autoBuffInbox" /> -- also the basis for
-    ///     <see cref="AutoBuffInboxDrainCapPerTick" />.
-    /// </summary>
-    private const int AutoBuffInboxCapacity = 256;
+        private const int HeroRankPointStatSort = 904;
 
-    /// <summary>
-    ///     Per-tick drain cap for <see cref="_autoBuffInbox" /> -- same "half of this channel's own bounded
-    ///     capacity" convention as <see cref="InboxDrainCapPerTick" /> (see that constant's own remarks for the
-    ///     full rationale and the Fenrir-side-safeguard-not-legacy-parity caveat). Every channel declared in
-    ///     this file follows the same pairing.
-    /// </summary>
-    private const int AutoBuffInboxDrainCapPerTick = AutoBuffInboxCapacity / 2;
+        private const int AutoBuffInboxCapacity = 256;
 
-    /// <summary>
-    ///     Bounded capacity for <see cref="_avatarBuffInbox" /> -- also the basis for
-    ///     <see cref="AvatarBuffInboxDrainCapPerTick" />.
-    /// </summary>
-    private const int AvatarBuffInboxCapacity = 256;
+        private const int AutoBuffInboxDrainCapPerTick = AutoBuffInboxCapacity / 2;
 
-    /// <summary>
-    ///     Per-tick drain cap for <see cref="_avatarBuffInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own
-    ///     remarks.
-    /// </summary>
-    private const int AvatarBuffInboxDrainCapPerTick = AvatarBuffInboxCapacity / 2;
+        private const int AvatarBuffInboxCapacity = 256;
 
-    /// <summary>
-    ///     Bounded capacity for <see cref="_bottleInbox" /> -- also the basis for
-    ///     <see cref="BottleInboxDrainCapPerTick" />.
-    /// </summary>
-    private const int BottleInboxCapacity = 256;
+        private const int AvatarBuffInboxDrainCapPerTick = AvatarBuffInboxCapacity / 2;
 
-    /// <summary>Per-tick drain cap for <see cref="_bottleInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own remarks.</summary>
-    private const int BottleInboxDrainCapPerTick = BottleInboxCapacity / 2;
+        private const int BottleInboxCapacity = 256;
 
-    /// <summary>
-    ///     Bounded capacity for <see cref="_hotkeySlotInbox" /> -- also the basis for
-    ///     <see cref="HotkeySlotInboxDrainCapPerTick" />.
-    /// </summary>
-    private const int HotkeySlotInboxCapacity = 256;
+        private const int BottleInboxDrainCapPerTick = BottleInboxCapacity / 2;
 
-    /// <summary>
-    ///     Per-tick drain cap for <see cref="_hotkeySlotInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own
-    ///     remarks.
-    /// </summary>
-    private const int HotkeySlotInboxDrainCapPerTick = HotkeySlotInboxCapacity / 2;
+        private const int HotkeySlotInboxCapacity = 256;
 
-    /// <summary>
-    ///     Bounded capacity for <see cref="_costumeInbox" /> -- also the basis for
-    ///     <see cref="CostumeInboxDrainCapPerTick" />.
-    /// </summary>
-    private const int CostumeInboxCapacity = 256;
+        private const int HotkeySlotInboxDrainCapPerTick = HotkeySlotInboxCapacity / 2;
 
-    /// <summary>Per-tick drain cap for <see cref="_costumeInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own remarks.</summary>
-    private const int CostumeInboxDrainCapPerTick = CostumeInboxCapacity / 2;
+        private const int CostumeInboxCapacity = 256;
 
-    /// <summary>
-    ///     Bounded capacity for <see cref="_fishingInbox" /> -- also the basis for
-    ///     <see cref="FishingInboxDrainCapPerTick" />.
-    /// </summary>
-    private const int FishingInboxCapacity = 512;
+        private const int CostumeInboxDrainCapPerTick = CostumeInboxCapacity / 2;
 
-    /// <summary>Per-tick drain cap for <see cref="_fishingInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own remarks.</summary>
-    private const int FishingInboxDrainCapPerTick = FishingInboxCapacity / 2;
+        private const int FishingInboxCapacity = 512;
 
-    /// <summary>
-    ///     Bounded capacity for <see cref="_heroRankingInbox" /> -- also the basis for
-    ///     <see cref="HeroRankingInboxDrainCapPerTick" />.
-    /// </summary>
-    private const int HeroRankingInboxCapacity = 256;
+        private const int FishingInboxDrainCapPerTick = FishingInboxCapacity / 2;
 
-    /// <summary>
-    ///     Per-tick drain cap for <see cref="_heroRankingInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own
-    ///     remarks.
-    /// </summary>
-    private const int HeroRankingInboxDrainCapPerTick = HeroRankingInboxCapacity / 2;
+        private const int HeroRankingInboxCapacity = 256;
 
-    /// <summary>
-    ///     Bounded capacity for <see cref="_heroRankingRolloverInbox" /> -- also the basis for
-    ///     <see cref="HeroRankingRolloverInboxDrainCapPerTick" />. In practice this cap can never bind: this
-    ///     channel carries at most one real item per rollover event per zone (see the field's own remarks).
-    /// </summary>
-    private const int HeroRankingRolloverInboxCapacity = 4;
+        private const int HeroRankingInboxDrainCapPerTick = HeroRankingInboxCapacity / 2;
 
-    /// <summary>
-    ///     Per-tick drain cap for <see cref="_heroRankingRolloverInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s
-    ///     own remarks.
-    /// </summary>
-    private const int HeroRankingRolloverInboxDrainCapPerTick = HeroRankingRolloverInboxCapacity / 2;
+        private const int HeroRankingRolloverInboxCapacity = 4;
 
-    /// <summary>
-    ///     Bounded capacity for <see cref="_mountInbox" /> -- also the basis for <see cref="MountInboxDrainCapPerTick" />
-    ///     .
-    /// </summary>
-    private const int MountInboxCapacity = 256;
+        private const int HeroRankingRolloverInboxDrainCapPerTick = HeroRankingRolloverInboxCapacity / 2;
 
-    /// <summary>Per-tick drain cap for <see cref="_mountInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own remarks.</summary>
-    private const int MountInboxDrainCapPerTick = MountInboxCapacity / 2;
+        private const int MountInboxCapacity = 256;
 
-    /// <summary>
-    ///     Bounded capacity for <see cref="_pshopInbox" /> -- also the basis for <see cref="PshopInboxDrainCapPerTick" />
-    ///     .
-    /// </summary>
-    private const int PshopInboxCapacity = 256;
+        private const int MountInboxDrainCapPerTick = MountInboxCapacity / 2;
 
-    /// <summary>Per-tick drain cap for <see cref="_pshopInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own remarks.</summary>
-    private const int PshopInboxDrainCapPerTick = PshopInboxCapacity / 2;
+        private const int PshopInboxCapacity = 256;
 
-    /// <summary>Bounded capacity for <see cref="_runeInbox" /> -- also the basis for <see cref="RuneInboxDrainCapPerTick" />.</summary>
-    private const int RuneInboxCapacity = 256;
+        private const int PshopInboxDrainCapPerTick = PshopInboxCapacity / 2;
 
-    /// <summary>Per-tick drain cap for <see cref="_runeInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own remarks.</summary>
-    private const int RuneInboxDrainCapPerTick = RuneInboxCapacity / 2;
+        private const int RuneInboxCapacity = 256;
 
-    /// <summary>
-    ///     Bounded capacity for <see cref="_stellarCoreInbox" /> -- also the basis for
-    ///     <see cref="StellarCoreInboxDrainCapPerTick" />.
-    /// </summary>
-    private const int StellarCoreInboxCapacity = 256;
+        private const int RuneInboxDrainCapPerTick = RuneInboxCapacity / 2;
 
-    /// <summary>
-    ///     Per-tick drain cap for <see cref="_stellarCoreInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own
-    ///     remarks.
-    /// </summary>
-    private const int StellarCoreInboxDrainCapPerTick = StellarCoreInboxCapacity / 2;
+        private const int StellarCoreInboxCapacity = 256;
 
-    /// <summary>
-    ///     S011CHARACTER_MP -- the mana counterpart of <see cref="CharacterHpStatSort" />
-    ///     (Server/Header/Protocol/STRUCT.h:1526).
-    /// </summary>
-    private const int CharacterMpStatSort = 11;
+        private const int StellarCoreInboxDrainCapPerTick = StellarCoreInboxCapacity / 2;
 
-    /// <summary>
-    ///     Op 94/95 (<c>ContinueSkillStat</c>/<c>ContinueSkillUse</c>) auto-buff registration + activation
-    ///     mirror. See <see cref="ApplyAutoBuffCommand" />'s remarks for what it does and deliberately does not mirror.
-    /// </summary>
-    private readonly Channel<AutoBuffZoneCommand> _autoBuffInbox =
+        private const int CharacterMpStatSort = 11;
+
+        private readonly Channel<AutoBuffZoneCommand> _autoBuffInbox =
         Channel.CreateBounded<AutoBuffZoneCommand>(
             new BoundedChannelOptions(AutoBuffInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-    /// <summary>
-    ///     Reusable scratch buffer for <see cref="ApplyAutoBuffCommand" />'s self-plus-neighbors broadcast
-    ///     recipient list -- see <see cref="_fishingNeighborScratch" />'s own remarks for the reuse
-    ///     justification.
-    /// </summary>
-    private readonly List<int> _autoBuffNeighborScratch = [];
+        private readonly List<int> _autoBuffNeighborScratch = [];
 
-    /// <summary>
-    ///     Op 97/111 (<c>PlaytimeBuff</c>/<c>RankBuff</c>) self-mutation mirror. See
-    ///     <see cref="ApplyAvatarBuffCommand" />'s remarks for what it does and deliberately does not mirror.
-    /// </summary>
-    private readonly Channel<AvatarBuffZoneCommand> _avatarBuffInbox =
+        private readonly Channel<AvatarBuffZoneCommand> _avatarBuffInbox =
         Channel.CreateBounded<AvatarBuffZoneCommand>(
             new BoundedChannelOptions(AvatarBuffInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-    /// <summary>
-    ///     Reusable scratch buffer for <see cref="BroadcastAvatarStateFlag" />'s recipient list -- replaces a
-    ///     per-call, self-filtered <c>AoiGrid.Neighbors(...)</c> iterator with the non-allocating
-    ///     <see cref="AoiGrid.NeighborsExcludingSelf(List{int},ValueTuple{int,int},int,float,float,float,int)" />
-    ///     overload. <see cref="BroadcastAvatarStateFlag" /> is shared by every mount/costume/stellar-core/pet
-    ///     state-flag push in this file family, but all run on this zone's own single tick thread, so no two
-    ///     calls ever overlap this buffer.
-    /// </summary>
-    private readonly List<int> _avatarStateFlagNeighborScratch = [];
+        private readonly List<int> _avatarStateFlagNeighborScratch = [];
 
-    /// <summary>Op 129 <c>DrinkBottle</c> self-mutation mirror. See <see cref="ApplyDrinkBottleCommand" />'s remarks.</summary>
-    private readonly Channel<DrinkBottleZoneCommand> _bottleInbox =
+        private readonly Channel<DrinkBottleZoneCommand> _bottleInbox =
         Channel.CreateBounded<DrinkBottleZoneCommand>(
             new BoundedChannelOptions(BottleInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-    /// <summary>
-    ///     Reusable scratch buffer for <see cref="ApplyCostumeCommand" />'s op-139 full-avatar-action rebroadcast
-    ///     recipient list -- replaces a per-call <c>AoiGrid.Neighbors(...).Where(id =&gt; id != characterId).ToArray()</c>
-    ///     LINQ pipeline (iterator + closure + array) with
-    ///     <see cref="AoiGrid.NeighborsExcludingSelf(List{int},ValueTuple{int,int},int,float,float,float,int)" />.
-    /// </summary>
-    private readonly List<int> _costumeFullActionNeighborScratch = [];
+        private readonly List<int> _costumeFullActionNeighborScratch = [];
 
-    /// <summary>
-    ///     Op 90/139 (<c>CostumeState</c>/<c>CostumeVisibility</c>) self-mutation mirror. See
-    ///     <see cref="ApplyCostumeCommand" />'s remarks for what it does and deliberately does not mirror.
-    /// </summary>
-    private readonly Channel<CostumeZoneCommand> _costumeInbox =
+        private readonly Channel<CostumeZoneCommand> _costumeInbox =
         Channel.CreateBounded<CostumeZoneCommand>(
             new BoundedChannelOptions(CostumeInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-    /// <summary>
-    ///     Op 103/104/105 (<c>FishingLine</c>/<c>FishingProgress</c>/<c>FishingCatch</c>) shared state-machine
-    ///     mirror. See <see cref="ApplyFishingCommand" />'s remarks -- awaiting new PlayerRuntimeState fields.
-    /// </summary>
-    private readonly Channel<FishingZoneCommand> _fishingInbox =
+        private readonly Channel<FishingZoneCommand> _fishingInbox =
         Channel.CreateBounded<FishingZoneCommand>(
             new BoundedChannelOptions(FishingInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-    /// <summary>
-    ///     Reusable scratch buffer for <see cref="ApplyFishingCommand" />'s self-plus-neighbors broadcast
-    ///     recipient list -- same non-allocating shape and reuse justification as
-    ///     <c>Zone.PlayerLifecycle.cs</c>'s own <c>_moveNeighborScratch</c>: single tick thread, cleared before
-    ///     use, consumed entirely by the immediately-following broadcast call before this command's handling
-    ///     returns.
-    /// </summary>
-    private readonly List<int> _fishingNeighborScratch = [];
+        private readonly List<int> _fishingNeighborScratch = [];
 
-    /// <summary>
-    ///     Op 118 <c>HeroRanking</c> throttle-timestamp mirror -- the ranking query itself is read-only and answered
-    ///     directly by the handler.
-    /// </summary>
-    private readonly Channel<HeroRankingQueryZoneCommand> _heroRankingInbox =
+        private readonly Channel<HeroRankingQueryZoneCommand> _heroRankingInbox =
         Channel.CreateBounded<HeroRankingQueryZoneCommand>(
             new BoundedChannelOptions(HeroRankingInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-    /// <summary>
-    ///     Weekly hero-ranking Current-&gt;Previous rollover reset trigger -- posted once per successful flip by
-    ///     <c>HeroRankingRolloverHost</c> (Hosting), once per hosted zone. Carries no per-instance data: draining
-    ///     one just means "sweep every currently connected player once," see
-    ///     <see cref="ApplyHeroRankingRolloverReset" />. A 4-slot capacity is generous for an event this rare
-    ///     (weekly, at most one post per host check interval).
-    /// </summary>
-    private readonly Channel<HeroRankingRolloverZoneCommand> _heroRankingRolloverInbox =
+        private readonly Channel<HeroRankingRolloverZoneCommand> _heroRankingRolloverInbox =
         Channel.CreateBounded<HeroRankingRolloverZoneCommand>(
             new BoundedChannelOptions(HeroRankingRolloverInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-    /// <summary>
-    ///     Op22 <c>CZ_USE_HOTKEY_ITEM_SEND</c> self-mutation mirror for <see cref="PlayerRuntimeState.Hotkeys" />
-    ///     -- the posting handler (<c>UseHotkeyItemService</c>) already validated/decremented and persisted the
-    ///     slot to SQL; this only mirrors that decision into the tick-owned <see cref="PlayerRuntimeState" />.
-    ///     See <see cref="ApplyHotkeySlotMirrorCommand" />.
-    /// </summary>
-    private readonly Channel<HotkeySlotMirrorZoneCommand> _hotkeySlotInbox =
+        private readonly Channel<HotkeySlotMirrorZoneCommand> _hotkeySlotInbox =
         Channel.CreateBounded<HotkeySlotMirrorZoneCommand>(
             new BoundedChannelOptions(HotkeySlotInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-    /// <summary>
-    ///     Op 87/113 (<c>MountState</c>/<c>MountAbsorb</c>) self-mutation mirror. See
-    ///     <see cref="ApplyMountCommand" />'s remarks for what it does and deliberately does not mirror.
-    /// </summary>
-    private readonly Channel<MountZoneCommand> _mountInbox =
+        private readonly Channel<MountZoneCommand> _mountInbox =
         Channel.CreateBounded<MountZoneCommand>(
             new BoundedChannelOptions(MountInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-    /// <summary>
-    ///     Reusable scratch buffer for <see cref="ApplyPshopCommand" />'s stall-closed full-avatar-action
-    ///     rebroadcast recipient list -- same LINQ-pipeline-avoidance rationale as
-    ///     <see cref="_costumeFullActionNeighborScratch" />.
-    /// </summary>
-    private readonly List<int> _pshopCloseFullActionNeighborScratch = [];
+        private readonly List<int> _pshopCloseFullActionNeighborScratch = [];
 
-    /// <summary>
-    ///     Fire-and-forget, purely cosmetic PShop-stall mirrors posted by <c>BuyShopItemHandler</c> onto the
-    ///     seller's own hosting zone after a purchase already durably committed.
-    /// </summary>
-    private readonly Channel<PshopZoneCommand> _pshopInbox =
+        private readonly Channel<PshopZoneCommand> _pshopInbox =
         Channel.CreateBounded<PshopZoneCommand>(
             new BoundedChannelOptions(PshopInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-    /// <summary>
-    ///     Op 157 <c>RuneSocket</c> self-mutation mirror. See <see cref="ApplyRuneSocketCommand" />'s remarks
-    ///     for what it does and deliberately does not mirror.
-    /// </summary>
-    private readonly Channel<RuneSocketZoneCommand> _runeInbox =
+        private readonly Channel<RuneSocketZoneCommand> _runeInbox =
         Channel.CreateBounded<RuneSocketZoneCommand>(
             new BoundedChannelOptions(RuneInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-    /// <summary>
-    ///     Op 153 <c>StellarCoreState</c> self-mutation mirror, same shape as <see cref="_costumeInbox" />. See
-    ///     <see cref="ApplyStellarCoreCommand" />'s remarks.
-    /// </summary>
-    private readonly Channel<StellarCoreZoneCommand> _stellarCoreInbox =
+        private readonly Channel<StellarCoreZoneCommand> _stellarCoreInbox =
         Channel.CreateBounded<StellarCoreZoneCommand>(
             new BoundedChannelOptions(StellarCoreInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
@@ -324,8 +147,7 @@ public sealed partial class Zone
         return _pshopInbox.Writer.TryWrite(command);
     }
 
-    /// <summary>Same contract as <see cref="PostInventoryCommandAndWaitAsync" />.</summary>
-    public async Task<bool> PostPshopCommandAndWaitAsync(PshopZoneCommand command, CancellationToken ct,
+        public async Task<bool> PostPshopCommandAndWaitAsync(PshopZoneCommand command, CancellationToken ct,
         TimeSpan? timeout = null)
     {
         var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -360,10 +182,7 @@ public sealed partial class Zone
         return _heroRankingInbox.Writer.TryWrite(command);
     }
 
-    /// <summary>
-    ///     Posted once per successful weekly rollover flip -- see <see cref="ApplyHeroRankingRolloverReset" />.
-    /// </summary>
-    public bool PostHeroRankingRolloverReset()
+        public bool PostHeroRankingRolloverReset()
     {
         return _heroRankingRolloverInbox.Writer.TryWrite(default);
     }
@@ -373,8 +192,7 @@ public sealed partial class Zone
         return _fishingInbox.Writer.TryWrite(command);
     }
 
-    /// <summary>Same contract as <see cref="PostInventoryCommandAndWaitAsync" />.</summary>
-    public async Task<bool> PostFishingCommandAndWaitAsync(FishingZoneCommand command, CancellationToken ct,
+        public async Task<bool> PostFishingCommandAndWaitAsync(FishingZoneCommand command, CancellationToken ct,
         TimeSpan? timeout = null)
     {
         var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -399,15 +217,7 @@ public sealed partial class Zone
         return _mountInbox.Writer.TryWrite(command);
     }
 
-    /// <summary>
-    ///     Same contract as <see cref="PostInventoryCommandAndWaitAsync" />. Callers must already hold
-    ///     <see cref="PlayerRuntimeState.EconomyActionLock" /> and leave <see cref="MountZoneCommand.Applied" />
-    ///     at its default -- overwritten here. Used by Sort 5/7's own I/O-backed success paths
-    ///     (<c>MountStateService</c>) so the acknowledgment is only sent once the garage/attribute mirror is
-    ///     actually applied, matching every other economy-adjacent handler's own
-    ///     "wait for the mirror before replying" posture.
-    /// </summary>
-    public async Task<bool> PostMountCommandAndWaitAsync(MountZoneCommand command, CancellationToken ct,
+        public async Task<bool> PostMountCommandAndWaitAsync(MountZoneCommand command, CancellationToken ct,
         TimeSpan? timeout = null)
     {
         var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -447,12 +257,7 @@ public sealed partial class Zone
         return _runeInbox.Writer.TryWrite(command);
     }
 
-    /// <summary>
-    ///     Same contract as <see cref="PostInventoryCommandAndWaitAsync" />. Callers must already hold
-    ///     <see cref="PlayerRuntimeState.EconomyActionLock" /> and leave <see cref="RuneSocketZoneCommand.Applied" />
-    ///     at its default -- overwritten here.
-    /// </summary>
-    public async Task<bool> PostRuneSocketCommandAndWaitAsync(RuneSocketZoneCommand command, CancellationToken ct,
+        public async Task<bool> PostRuneSocketCommandAndWaitAsync(RuneSocketZoneCommand command, CancellationToken ct,
         TimeSpan? timeout = null)
     {
         var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -537,16 +342,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_hotkeySlotInbox.Reader, "hotkey-slot", HotkeySlotInboxDrainCapPerTick);
     }
 
-    /// <summary>
-    ///     No-op if the character already left -- a stale mirror for a departed character is harmless.
-    ///     <see cref="HotkeySlotMirrorZoneCommand.NewLife" />/<see cref="HotkeySlotMirrorZoneCommand.NewMana" />
-    ///     (op22 potion-type-1-5 life/mana gain, see <c>HotkeyItemConsumptionResolver</c>) and
-    ///     <see cref="HotkeySlotMirrorZoneCommand.BuffWrites" /> (potion-types 12-15's own BUFF_INFO write) are
-    ///     applied and notified AFTER the slot mirror, matching the legacy handler's own "decrement/ack first,
-    ///     stat effect second" ordering -- the ack itself is already sent by <c>UseHotkeyItemHandler</c> before
-    ///     this command was ever posted.
-    /// </summary>
-    private void ApplyHotkeySlotMirrorCommand(in HotkeySlotMirrorZoneCommand command)
+        private void ApplyHotkeySlotMirrorCommand(in HotkeySlotMirrorZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -599,8 +395,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_heroRankingInbox.Reader, "hero-ranking-query", HeroRankingInboxDrainCapPerTick);
     }
 
-    /// <summary>Same posture as <see cref="ApplyInventoryCommand" />.</summary>
-    private void ApplyHeroRankingQueryCommand(in HeroRankingQueryZoneCommand command)
+        private void ApplyHeroRankingQueryCommand(in HeroRankingQueryZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -633,26 +428,7 @@ public sealed partial class Zone
                 HeroRankingRolloverInboxDrainCapPerTick);
     }
 
-    /// <summary>
-    ///     Legacy per-tick Monday-00:00 wall-clock check (<c>FIX_HERO_RANK_RESET_PROBLEM</c>, unconditionally
-    ///     compiled, Server/ts25zone/S07_MyGame01.cpp:2507-2515): every connected character whose live,
-    ///     session-scoped <see cref="PlayerRuntimeState.HeroRankPoints" /> mirror is currently greater than zero
-    ///     has it reset to zero and receives a single <see cref="HeroRankPointStatSort" />-coded
-    ///     <c>AvatarStatUpdateResponse</c> (value 0) on their own connection only -- never an AOI/zone-wide
-    ///     broadcast, matching the legacy <c>B_AVATAR_CHANGE_INFO_2</c> <c>MyUser*</c>-targeted overload
-    ///     (Server/ts25zone/S05_MyTransfer.cpp:519-542), not the AOI-broadcast one. A character whose mirror is
-    ///     already zero is left untouched and receives no notice, matching legacy's own "counter &gt; 0" gate.
-    /// </summary>
-    /// <remarks>
-    ///     Fires at most once per rollover event per zone (one <see cref="HeroRankingRolloverZoneCommand" />
-    ///     posted per flip detected by <c>HeroRankingRolloverHost</c>, drained exactly once here) -- unlike
-    ///     legacy's own "re-evaluate every tick while the current second is still 0 or 1" gate, this does not
-    ///     rely on the counter happening to already be zero to avoid re-notifying within the same rollover event.
-    ///     Only ever changes this zone's own live <see cref="PlayerRuntimeState" /> instances -- never a database
-    ///     write; the durable Current-&gt;Previous flip already happened, atomically, inside
-    ///     <c>game.usp_HeroRanking_Rollover</c> before this is ever posted.
-    /// </remarks>
-    private void ApplyHeroRankingRolloverReset()
+        private void ApplyHeroRankingRolloverReset()
     {
         foreach (var state in _players.Values)
         {
@@ -687,14 +463,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_fishingInbox.Reader, "fishing", FishingInboxDrainCapPerTick);
     }
 
-    /// <summary>
-    ///     Mirrors the fishing state machine decided by <c>FishingLineHandler</c>/<c>FishingProgressHandler</c>/
-    ///     <c>FishingCatchHandler</c> (op 103/104/105) and, when <see cref="FishingZoneCommand.Broadcast" /> is
-    ///     set, rebroadcasts the avatar action to self + AOI neighbors -- matching the legacy's own <c>Broadcast11</c>
-    ///     (self included) / <c>Broadcast22</c>+<c>USEND</c> (self direct-sent, neighbors excluded) pair, which
-    ///     are net-equivalent "everyone in range including self."
-    /// </summary>
-    private void ApplyFishingCommand(in FishingZoneCommand command)
+        private void ApplyFishingCommand(in FishingZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -735,9 +504,6 @@ public sealed partial class Zone
             SkillValue = 0
         };
 
-        // Uses _fishingNeighborScratch instead of AoiGrid.Neighbors(...).Where(...).ToList() + Add(...) --
-        // see that field's own remarks. Self is appended at the tail (never excluded outright), preserving
-        // this call site's existing "self included, last" recipient ordering exactly.
         var fisherId = command.CharacterId;
         _fishingNeighborScratch.Clear();
         _grid.NeighborsExcludingSelf(_fishingNeighborScratch, state.CurrentCell, fisherId, state.PosX, state.PosY,
@@ -769,11 +535,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_mountInbox.Reader, "mount", MountInboxDrainCapPerTick);
     }
 
-    /// <summary>
-    ///     Op 87/113 (<c>MountState</c>/<c>MountAbsorb</c>) self-mutation mirror. <see cref="MountZoneCommand.Broadcast" />
-    ///     decides which AOI/self packets follow, matching the legacy's own per-case B_AVATAR_CHANGE_INFO_1/2 pairing.
-    /// </summary>
-    private void ApplyMountCommand(in MountZoneCommand command)
+        private void ApplyMountCommand(in MountZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -811,10 +573,6 @@ public sealed partial class Zone
         if (command.UpdatedStats is { } stats)
             state.Stats = stats;
 
-        // Sort 5 (Delete Mount)/7 (Delete Rolled Attribute) garage/attribute mirrors -- session-only state
-        // with no persisted column yet (see PlayerRuntimeState.MountGarage/MountRolledAttributes' own
-        // remarks), so neither branch marks progression dirty, matching CostumeWardrobe's own
-        // WardrobeSlotCleared precedent in ApplyCostumeCommand.
         if (command.DeleteGarageSlot is { } deleteGarageSlot)
         {
             state.MountGarage = state.MountGarage.SetItem(deleteGarageSlot, 0);
@@ -852,12 +610,7 @@ public sealed partial class Zone
         }
     }
 
-    /// <summary>
-    ///     Builds one B_AVATAR_CHANGE_INFO_1-equivalent frame and sends it once to <paramref name="state" />
-    ///     itself plus every other AOI neighbor (unlike the legacy's own Broadcast11, which re-sends to the
-    ///     source player too -- functionally a no-op duplicate there, so intentionally not reproduced).
-    /// </summary>
-    private void BroadcastAvatarStateFlag(PlayerRuntimeState state, int sort, int value01, int value02, int value03)
+        private void BroadcastAvatarStateFlag(PlayerRuntimeState state, int sort, int value01, int value02, int value03)
     {
         var response = new AvatarStateFlagResponse
         {
@@ -869,9 +622,6 @@ public sealed partial class Zone
             Value03 = value03
         };
 
-        // Rent-once/write-once/copy-N-times -- same idiom as BroadcastAvatarAction (Zone.PlayerLifecycle.cs):
-        // the frame is encoded exactly once and copied into each recipient's own transport, with a
-        // per-recipient failure isolated (logged, skipped) rather than aborting the rest of this broadcast.
         var total = FrameWriter.FrameSizeOf<AvatarStateFlagResponse>();
         var rented = ArrayPool<byte>.Shared.Rent(total);
 
@@ -931,13 +681,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_costumeInbox.Reader, "costume", CostumeInboxDrainCapPerTick);
     }
 
-    /// <summary>
-    ///     Op 90/139 (<c>CostumeState</c>/<c>CostumeVisibility</c>) self-mutation mirror.
-    ///     <see cref="CostumeZoneCommand.Broadcast" /> covers op 90's AvatarStateFlag pair;
-    ///     <see cref="CostumeZoneCommand.FullActionRebroadcast" /> covers op 139's full avatar-action rebroadcast
-    ///     instead (matches the legacy's own B_AVATAR_ACTION_RECV + Broadcast11 for that opcode specifically).
-    /// </summary>
-    private void ApplyCostumeCommand(in CostumeZoneCommand command)
+        private void ApplyCostumeCommand(in CostumeZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -959,10 +703,6 @@ public sealed partial class Zone
         if (command.WardrobeSlotCleared is { } clearedSlot)
             state.CostumeWardrobe = state.CostumeWardrobe.SetItem(clearedSlot, 0);
 
-        // Workstream C9-costume-stellar-whitelist: op23 costume grant -- writes the new item id (plus its
-        // packed costume-date word and expire-date) into the first free wardrobe slot. Never marks
-        // DirtyFlags.Progression -- no persisted column exists for any of these three arrays yet, same
-        // posture ApplyMountCommand's own MountGarage handling already documents for itself.
         if (command.WardrobeSlotGranted is { } grantedSlot)
         {
             state.CostumeWardrobe = state.CostumeWardrobe.SetItem(grantedSlot, command.GrantedItemId ?? 0);
@@ -1030,14 +770,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_stellarCoreInbox.Reader, "stellar-core", StellarCoreInboxDrainCapPerTick);
     }
 
-    /// <summary>
-    ///     Op 153 <c>StellarCoreState</c> self-mutation mirror. <see cref="StellarCoreZoneCommand.Broadcast" />
-    ///     covers the equip/remove AvatarStateFlag pair (sort 37/38), matching the legacy's own
-    ///     B_AVATAR_CHANGE_INFO_1 + Broadcast11 pairing for CZ cases 3/4 exactly (same posture as
-    ///     <see cref="ApplyCostumeCommand" />'s case 3/4 -- Broadcast11 there re-sends the just-composed
-    ///     AVATAR_CHANGE_INFO_1 frame, it does not build a separate full-action packet).
-    /// </summary>
-    private void ApplyStellarCoreCommand(in StellarCoreZoneCommand command)
+        private void ApplyStellarCoreCommand(in StellarCoreZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -1056,10 +789,6 @@ public sealed partial class Zone
         if (command.WardrobeSlotCleared is { } clearedSlot)
             state.StellarCoreWardrobe = CompactStellarCoreWardrobe(state.StellarCoreWardrobe, clearedSlot);
 
-        // Workstream C9-costume-stellar-whitelist: op23 stellar-core grant -- writes the new item id (plus
-        // its expire-date) into the first free wardrobe slot. Never marks DirtyFlags.Progression -- no
-        // persisted column exists for either array yet, same posture as ApplyCostumeCommand's own grant
-        // handling.
         if (command.WardrobeSlotGranted is { } grantedSlot)
         {
             state.StellarCoreWardrobe = state.StellarCoreWardrobe.SetItem(grantedSlot, command.GrantedItemId ?? 0);
@@ -1096,14 +825,7 @@ public sealed partial class Zone
         }
     }
 
-    /// <summary>
-    ///     Left-shift compaction for CZ case 5 (extract): the legacy clears <paramref name="clearedSlot" /> and
-    ///     then shifts every following entry down by one, so the array never has a gap in the middle -- a later
-    ///     Select (sort 1) or Equip (sort 3) always sees a contiguous slot list. Without this, a subsequent
-    ///     select/extract cycle can address a slot the legacy would never have left populated at that index.
-    /// </summary>
-    /// <remarks>Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:15511-15629 (CZ_STELLAR_STATE_SEND case 5).</remarks>
-    private static ImmutableArray<int> CompactStellarCoreWardrobe(ImmutableArray<int> wardrobe, int clearedSlot)
+        private static ImmutableArray<int> CompactStellarCoreWardrobe(ImmutableArray<int> wardrobe, int clearedSlot)
     {
         var builder = wardrobe.ToBuilder();
         for (var i = clearedSlot; i < builder.Count - 1; i++)
@@ -1135,24 +857,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_avatarBuffInbox.Reader, "avatar-buff", AvatarBuffInboxDrainCapPerTick);
     }
 
-    /// <summary>
-    ///     Op 97/111 (<c>PlaytimeBuff</c>/<c>RankBuff</c>) self-mutation mirror. Both opcodes' own
-    ///     AvatarStatUpdateResponse self-unicast is sent directly by the handler (the value is already known
-    ///     before the tick mirrors it, same posture as <c>DrinkBottleHandler</c>) -- this only mirrors the
-    ///     already-decided state. <see cref="AvatarBuffZoneCommand.HealToMax" /> is deliberately a request
-    ///     ("heal this character to their current cap"), not a literal life/mana value: the posting handler
-    ///     runs on the session thread and cannot know the character's true <see cref="PlayerRuntimeState.MaxLife" />/
-    ///     <see cref="PlayerRuntimeState.MaxMana" /> at the moment this command is actually drained here on the
-    ///     tick thread (a concurrent buff expiry, gear change, or level-up could have moved the cap in between).
-    ///     Deriving Life/Mana from <c>state.Stats</c>/<c>state.MaxLife</c>/<c>state.MaxMana</c> here, at apply
-    ///     time, closes that stale-cap race -- see the items-skills-fenrir-self-critique finding this fixes.
-    ///     <see cref="AvatarBuffZoneCommand.PlayTime2" /> reproduces op97's second legacy defect (see
-    ///     <see cref="Buffs.PlaytimeBuffResolver" />'s remarks): it clobbers <see cref="PlayerRuntimeState.PlayTime2" />
-    ///     on every op97 request, unconditionally, independently of whether
-    ///     <see cref="AvatarBuffZoneCommand.StateTimeEffect" />
-    ///     was set for that same request -- so it is applied here regardless of the other fields' presence.
-    /// </summary>
-    private void ApplyAvatarBuffCommand(in AvatarBuffZoneCommand command)
+        private void ApplyAvatarBuffCommand(in AvatarBuffZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -1205,30 +910,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_runeInbox.Reader, "rune-socket", RuneInboxDrainCapPerTick);
     }
 
-    /// <summary>
-    ///     Op 157 <c>RuneSocket</c> self-mutation mirror. <c>RuneItemId</c>/<c>RuneStat</c> null means "clear
-    ///     this slot" (both sort 0 insert and sort 1 remove always write the full new value for
-    ///     <see cref="RuneSocketZoneCommand.RuneIndex" />, never "leave untouched"). The paired inventory-slot
-    ///     mirror rides the existing <see cref="_inventoryInbox" /> separately, same as every other
-    ///     economy-adjacent handler.
-    ///     <para>
-    ///         B5/B6 made the rune arrays a live <see cref="Inventory.EquipmentService.RecomputeStats" /> input
-    ///         (via <c>AssembleStatContexts</c> -&gt; <c>CosmeticContext</c>), so <see cref="PlayerRuntimeState.Stats" />
-    ///         is recomputed unconditionally, right here, after every socket mutation -- same "recompute on the
-    ///         tick thread, at apply time" posture as <see cref="RecomputeStatsAndBroadcastBuffs" />, minus that
-    ///         method's buff-slot broadcast (a rune change has no changed-buff-slots payload to push). Passing
-    ///         <c>runtimeState: state</c> is the critical bit: it is what makes
-    ///         <c>EquipmentService.AssembleStatContexts</c> read the just-mutated <see cref="PlayerRuntimeState.RuneSystem" />/
-    ///         <see cref="PlayerRuntimeState.RuneSystemStat" /> (plus every other live cosmetic/zone/consumable/mount
-    ///         context) instead of silently defaulting all four to neutral.
-    ///     </para>
-    ///     <para>
-    ///         <see cref="RuneSocketZoneCommand.UpdatedStats" /> is always null from every real caller today (see
-    ///         <c>RuneSocketService</c>'s remarks) -- when a future caller does supply one, it still wins last over
-    ///         this recompute, same precedence <see cref="ApplyAvatarBuffCommand" /> gives its own <c>UpdatedStats</c>.
-    ///     </para>
-    /// </summary>
-    private void ApplyRuneSocketCommand(in RuneSocketZoneCommand command)
+        private void ApplyRuneSocketCommand(in RuneSocketZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -1276,25 +958,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_autoBuffInbox.Reader, "auto-buff", AutoBuffInboxDrainCapPerTick);
     }
 
-    /// <summary>
-    ///     Op 94/95 (<c>ContinueSkillStat</c>/<c>ContinueSkillUse</c>) mirror. <c>RegisteredSkills</c> (op 94)
-    ///     lands on <see cref="PlayerRuntimeState.AutoBuffSkill" />; <c>ActivateAutoBuff</c>/<c>ActionSort</c>
-    ///     (op 95 <c>tSort==1</c>) mirror <see cref="PlayerRuntimeState.Mana" />/<see cref="PlayerRuntimeState.ActionSort" />
-    ///     and, when <see cref="AutoBuffZoneCommand.Broadcast" /> is set, rebroadcast the resulting avatar action
-    ///     to self + AOI neighbors -- same self-inclusive <c>Broadcast11</c> posture as <see cref="ApplyFishingCommand" />.
-    ///     Op 95 <c>tSort==2</c>'s per-tick buff-application logic (<c>ProcessForCreateEffectValue</c>) is out of
-    ///     scope -- see <see cref="Skills.AutoBuffActivationResolver" />'s remarks.
-    /// </summary>
-    /// <remarks>
-    ///     <c>ActivateAutoBuff</c> is a request flag, not a literal post-activation mana value: the posting
-    ///     handler's activate/no-reply/disconnect decision (<see cref="AutoBuffActivationResolver.Resolve" />)
-    ///     still runs on the session thread against a snapshot read, but the actual 90%-mana debit is deferred
-    ///     to and recomputed here, on the tick thread, against whatever <c>state.Mana</c> is *at apply time* via
-    ///     <see cref="AutoBuffActivationResolver.ManaAfterActivation" />. This closes the stale-mana race the
-    ///     previous "compute on the session thread, apply verbatim here" shape had -- see the
-    ///     items-skills-fenrir-self-critique finding this fixes.
-    /// </remarks>
-    private void ApplyAutoBuffCommand(in AutoBuffZoneCommand command)
+        private void ApplyAutoBuffCommand(in AutoBuffZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -1341,8 +1005,6 @@ public sealed partial class Zone
             SkillValue = 0
         };
 
-        // Uses _autoBuffNeighborScratch instead of AoiGrid.Neighbors(...).Where(...).ToList() + Add(...) --
-        // see _fishingNeighborScratch's own remarks; same self-appended-at-tail ordering preserved.
         var casterId = command.CharacterId;
         _autoBuffNeighborScratch.Clear();
         _grid.NeighborsExcludingSelf(_autoBuffNeighborScratch, state.CurrentCell, casterId, state.PosX, state.PosY,
@@ -1374,16 +1036,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_pshopInbox.Reader, "pshop", PshopInboxDrainCapPerTick);
     }
 
-    /// <summary>
-    ///     No-op if the character left, or their stall was already re-opened/re-populated since (a stale mirror is
-    ///     harmless). Otherwise clears the sold slot unconditionally, then delivers the seller-only
-    ///     notifications the purchase itself never reaches without this hop -- B_BUY_PSHOP_RECV(6) "your item
-    ///     sold", B_DEMAND_PSHOP_RECV(3) self-view listing refresh, and -- if that was the stall's last
-    ///     occupied slot -- B_END_PSHOP_RECV(1) "your stall closed" plus an avatar-action broadcast to nearby
-    ///     players (Server/ts25zone/S04_MyWork02.cpp:7067-7071,7096-7100,7102-7120). The buyer never receives
-    ///     any message sent from here -- see <c>BuyShopItemHandler</c>'s own remarks.
-    /// </summary>
-    private void ApplyPshopCommand(in PshopZoneCommand command)
+        private void ApplyPshopCommand(in PshopZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state) || state.PshopListing is not { } listing)
             return;
@@ -1393,22 +1046,13 @@ public sealed partial class Zone
         for (var k = 0; k < 9; k++)
             itemInfo[baseIndex + k] = 0;
 
-        // B_BUY_PSHOP_RECV(6) "your item just sold" -- seller-only, carries the seller's own source-slot
-        // coordinates and the sold item's value/socket details, already built by BuyShopItemService
-        // (Server/ts25zone/S04_MyWork02.cpp:7070-7071).
         state.Session.Send(command.SellerSoldNotification);
 
-        // B_DEMAND_PSHOP_RECV(3) self-view listing refresh -- seller-only. listing.ItemInfo is the same
-        // backing array just cleared above, so this already reflects the post-clear state
-        // (Server/ts25zone/S04_MyWork02.cpp:7099-7100).
         state.Session.Send(new ViewShopStallResponse { Result = 3, PshopInfo = listing });
 
         if (!command.CloseShop)
             return;
 
-        // Stall fully emptied by this sale: clear the open flag, notify the seller with B_END_PSHOP_RECV(1),
-        // and broadcast the shop-closed avatar-action cue to nearby players -- seller-only, never the buyer
-        // (Server/ts25zone/S04_MyWork02.cpp:7116-7120).
         state.PshopOpen = false;
         state.Session.Send(new CloseShopStallResponse { Result = 1 });
 
@@ -1421,12 +1065,6 @@ public sealed partial class Zone
     }
 }
 
-/// <summary>
-///     Op 23/129 (<c>UseInventoryItem</c> iSort==26 acquisition / <c>DrinkBottle</c> consumption) shared
-///     self-mutation mirror for <see cref="PlayerRuntimeState.BottleSlots" />. <c>NewItemId</c> is null for a
-///     consumption (the slot's item id is unchanged, only its count decrements) and non-null for an
-///     acquisition (the slot now holds this item id, freshly refilled).
-/// </summary>
 public readonly record struct DrinkBottleZoneCommand(
     int CharacterId,
     int BottleIndex,
@@ -1436,28 +1074,6 @@ public readonly record struct DrinkBottleZoneCommand(
     EffectiveStats? UpdatedStats = null,
     TaskCompletionSource? Applied = null);
 
-/// <summary>
-///     Op22 <c>CZ_USE_HOTKEY_ITEM_SEND</c> hotkey-slot mirror -- see
-///     <see cref="Zone.ApplyHotkeySlotMirrorCommand" />. <paramref name="NewSlot" /> is the full post-decrement
-///     (or post-clear) content, already computed by <c>HotkeyItemConsumptionResolver</c>/<c>UseHotkeyItemService</c>.
-///     <paramref name="NewLife" />/<paramref name="NewMana" /> are the absolute post-gain values (already
-///     clamped by <c>HotkeyItemConsumptionResolver</c>) for potion types 1-5 -- null means "this pool was not
-///     affected by this activation," matching <see cref="DrinkBottleZoneCommand.NewItemId" />'s own
-///     null-means-unchanged convention.
-/// </summary>
-/// <summary>
-///     <see cref="LifeGain" />/<see cref="ManaGain" /> are DELTAS applied against the LIVE
-///     <see cref="PlayerRuntimeState.Life" />/<see cref="PlayerRuntimeState.Mana" /> at apply time
-///     (<see cref="Zone.ApplyHotkeySlotMirrorCommand" />), not precomputed absolute values -- the posting
-///     handler runs on the session thread and cannot see concurrent tick-thread mutations (combat damage,
-///     HP/MP regen, another potion) between its snapshot read and this command's drain, so an absolute
-///     value would silently clobber/revert whatever the tick thread applied in that window. Same
-///     recompute-at-apply-time pattern already used by <see cref="AutoBuffZoneCommand" />/
-///     <see cref="ApplyAutoBuffCommand" /> and <see cref="AvatarBuffZoneCommand" />/<see cref="ApplyAvatarBuffCommand" />.
-///     <see cref="BuffWrites" /> is potion types 12-15's own BUFF_INFO write (<c>HotkeyItemConsumptionResolver</c>) --
-///     default/empty for every other potion type, applied via the same <c>Zone.ApplyBuffWrites</c> the manual
-///     self-buff skill-cast confirm and <c>AutoHuntTickSystem</c>'s bot-buff loop already share.
-/// </summary>
 public readonly record struct HotkeySlotMirrorZoneCommand(
     int CharacterId,
     byte Page,
@@ -1467,26 +1083,10 @@ public readonly record struct HotkeySlotMirrorZoneCommand(
     int? ManaGain = null,
     ImmutableArray<SkillCastResolver.BuffWrite> BuffWrites = default);
 
-/// <summary>
-///     Op 118 <c>HeroRanking</c> throttle-timestamp mirror -- the ranking query itself is read-only and answered
-///     directly by the handler.
-/// </summary>
 public readonly record struct HeroRankingQueryZoneCommand(int CharacterId, bool Previous, TimeSpan QueriedAtZoneClock);
 
-/// <summary>
-///     Weekly hero-ranking rollover reset trigger -- see <see cref="Zone.ApplyHeroRankingRolloverReset" />. Carries
-///     no per-instance data; posting one just means "sweep every currently connected player once."
-/// </summary>
 public readonly record struct HeroRankingRolloverZoneCommand;
 
-/// <summary>
-///     Op 103/104/105 (<c>FishingLine</c>/<c>FishingProgress</c>/<c>FishingCatch</c>) shared state-machine
-///     mirror -- the handler has already decided the outcome (water/geometry check, elapsed-time gate, RNG
-///     roll all happen on the request thread reading <see cref="PlayerRuntimeState" /> directly); this command
-///     only carries the already-resolved values across to the tick for the single-writer mutation + optional
-///     AOI broadcast. <see cref="CastAtUtc" /> is null unless this specific call restamps the cast clock
-///     (legacy <c>mFishingTickCount</c>).
-/// </summary>
 public readonly record struct FishingZoneCommand(
     int CharacterId,
     int NewFishingState,
@@ -1497,10 +1097,6 @@ public readonly record struct FishingZoneCommand(
     DateTime? CastAtUtc = null,
     TaskCompletionSource? Applied = null);
 
-/// <summary>
-///     Which AvatarStateFlag/AvatarStatUpdate pair (if any) <see cref="Zone.ApplyMountCommand" /> sends after
-///     mirroring a <see cref="MountZoneCommand" />.
-/// </summary>
 public enum MountBroadcastKind : byte
 {
     None,
@@ -1509,21 +1105,6 @@ public enum MountBroadcastKind : byte
     AbsorbToggle
 }
 
-/// <summary>
-///     Op 87/113 (<c>MountState</c>/<c>MountAbsorb</c>) self-mutation mirror. Nullable/optional-field shape,
-///     same convention as <see cref="TribeProgressZoneCommand" />.
-/// </summary>
-/// <param name="DeleteGarageSlot">
-///     Sort 5 (Delete Mount) success -- the owned-mount garage slot to clear (item id, accumulated exp, and
-///     rolled-attribute total/values all reset to 0). See <see cref="Zone.ApplyMountCommand" />'s own remarks
-///     for why this never marks <see cref="PlayerRuntimeState.MarkProgressDirty" />.
-/// </param>
-/// <param name="AttributeDeleteGarageSlot">
-///     Sort 7 (Delete Rolled Attribute) success -- paired with <see cref="AttributeDeleteStatSlotIndex" />
-///     (both must be set together); zeroes that one (garage slot, stat slot) entry in
-///     <see cref="PlayerRuntimeState.MountRolledAttributes" />.
-/// </param>
-/// <param name="AttributeDeleteStatSlotIndex">See <see cref="AttributeDeleteGarageSlot" />.</param>
 public readonly record struct MountZoneCommand(
     int CharacterId,
     int? AnimalIndex = null,
@@ -1538,11 +1119,6 @@ public readonly record struct MountZoneCommand(
     int? AttributeDeleteStatSlotIndex = null,
     TaskCompletionSource? Applied = null);
 
-/// <summary>
-///     Which AvatarStateFlag broadcast (if any) <see cref="Zone.ApplyCostumeCommand" /> sends for a
-///     <see cref="CostumeZoneCommand" /> (op 90 only -- op 139 uses
-///     <see cref="CostumeZoneCommand.FullActionRebroadcast" /> instead).
-/// </summary>
 public enum CostumeBroadcastKind : byte
 {
     None,
@@ -1550,28 +1126,6 @@ public enum CostumeBroadcastKind : byte
     Remove
 }
 
-/// <summary>
-///     Op 90/139 (<c>CostumeState</c>/<c>CostumeVisibility</c>) self-mutation mirror, same shape as
-///     <see cref="MountZoneCommand" />.
-/// </summary>
-/// <param name="WardrobeSlotGranted">
-///     Workstream C9-costume-stellar-whitelist (op23's costume intermediate dispatch): the first free
-///     <see cref="PlayerRuntimeState.CostumeWardrobe" /> slot a newly-consumed costume item was just granted
-///     into. Always paired with <see cref="GrantedItemId" /> (both set together, never independently) --
-///     distinct from <see cref="WardrobeSlotCleared" />, which only ever zeroes an existing slot.
-/// </param>
-/// <param name="GrantedItemId">See <see cref="WardrobeSlotGranted" />.</param>
-/// <param name="GrantedCostumeDate">
-///     The granted item's packed enchant/combine/refine/socket word, written into
-///     <see cref="PlayerRuntimeState.CostumeDate" /> at <see cref="WardrobeSlotGranted" /> -- see
-///     <see cref="Inventory.UseItems.CostumeStellarCoreUseItemHandler" />'s own remarks for why this
-///     translation was chosen. Null means "grant with no costume-date payload" (defensive default; the
-///     posting handler always supplies one alongside <see cref="WardrobeSlotGranted" />).
-/// </param>
-/// <param name="GrantedExpireDate">
-///     The granted item's own ExpireDate, written into <see cref="PlayerRuntimeState.CostumeExpireDate" /> at
-///     <see cref="WardrobeSlotGranted" />.
-/// </param>
 public readonly record struct CostumeZoneCommand(
     int CharacterId,
     int? CostumeIndex = null,
@@ -1589,10 +1143,6 @@ public readonly record struct CostumeZoneCommand(
     int? GrantedExpireDate = null,
     TaskCompletionSource? Applied = null);
 
-/// <summary>
-///     Which AvatarStateFlag broadcast (if any) <see cref="Zone.ApplyStellarCoreCommand" /> sends for a
-///     <see cref="StellarCoreZoneCommand" />.
-/// </summary>
 public enum StellarCoreBroadcastKind : byte
 {
     None,
@@ -1600,19 +1150,6 @@ public enum StellarCoreBroadcastKind : byte
     Remove
 }
 
-/// <summary>Op 153 <c>StellarCoreState</c> self-mutation mirror, same shape as <see cref="CostumeZoneCommand" />.</summary>
-/// <param name="WardrobeSlotGranted">
-///     Workstream C9-costume-stellar-whitelist (op23's stellar-core intermediate dispatch): the first free
-///     <see cref="PlayerRuntimeState.StellarCoreWardrobe" /> slot a newly-consumed stellar-core item was just
-///     granted into. Always paired with <see cref="GrantedItemId" />. Unlike
-///     <see cref="CostumeZoneCommand.WardrobeSlotGranted" />, there is no "granted date" companion -- see
-///     <see cref="PlayerRuntimeState.StellarCoreExpireDate" />'s own remarks for why no such field exists.
-/// </param>
-/// <param name="GrantedItemId">See <see cref="WardrobeSlotGranted" />.</param>
-/// <param name="GrantedExpireDate">
-///     The granted item's own ExpireDate, written into <see cref="PlayerRuntimeState.StellarCoreExpireDate" />
-///     at <see cref="WardrobeSlotGranted" />.
-/// </param>
 public readonly record struct StellarCoreZoneCommand(
     int CharacterId,
     int? CoreIndex = null,
@@ -1627,15 +1164,6 @@ public readonly record struct StellarCoreZoneCommand(
     int? GrantedExpireDate = null,
     TaskCompletionSource? Applied = null);
 
-/// <summary>
-///     Op 97/111 (<c>PlaytimeBuff</c>/<c>RankBuff</c>) self-mutation mirror, same shape as
-///     <see cref="MountZoneCommand" />. <see cref="HealToMax" /> is a request ("heal to whatever the current
-///     cap is"), not a literal Life/Mana value -- see <see cref="Zone.ApplyAvatarBuffCommand" />'s remarks for
-///     why the derivation must happen on the tick thread, at apply time, rather than on the posting session
-///     thread. <see cref="PlayTime2" /> carries op97's second, independent legacy defect -- see
-///     <see cref="Buffs.PlaytimeBuffResolver" />'s remarks for why it is set on every op97 request regardless
-///     of <see cref="StateTimeEffect" />.
-/// </summary>
 public readonly record struct AvatarBuffZoneCommand(
     int CharacterId,
     int? StateTimeEffect = null,
@@ -1645,10 +1173,6 @@ public readonly record struct AvatarBuffZoneCommand(
     int? PlayTime2 = null,
     TaskCompletionSource? Applied = null);
 
-/// <summary>
-///     Op 157 <c>RuneSocket</c> self-mutation mirror; economy-adjacent, always posted via
-///     <see cref="Zone.PostRuneSocketCommandAndWaitAsync" />.
-/// </summary>
 public readonly record struct RuneSocketZoneCommand(
     int CharacterId,
     int RuneIndex,
@@ -1657,12 +1181,6 @@ public readonly record struct RuneSocketZoneCommand(
     EffectiveStats? UpdatedStats,
     TaskCompletionSource? Applied = null);
 
-/// <summary>
-///     Op 94/95 (<c>ContinueSkillStat</c>/<c>ContinueSkillUse</c>) auto-buff registration + activation mirror.
-///     <see cref="ActivateAutoBuff" /> is a request flag, not a precomputed post-activation mana value -- see
-///     <see cref="Zone.ApplyAutoBuffCommand" />'s remarks for why the mana debit must be recomputed on the
-///     tick thread, at apply time, rather than on the posting session thread.
-/// </summary>
 public readonly record struct AutoBuffZoneCommand(
     int CharacterId,
     ImmutableArray<(int SkillId, int Grade)>? RegisteredSkills = null,

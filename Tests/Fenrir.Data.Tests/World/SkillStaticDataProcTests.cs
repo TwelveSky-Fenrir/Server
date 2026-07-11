@@ -8,16 +8,9 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.World;
 
-// world.usp_Skill_GetAll (the read path) and the 9 world.Skills / 25 world.SkillGrades CHECK constraints
-// added by Database/Migrations/032_skill_static_data_range_checks.sql, against real SQL Server 2025. Neither
-// table has a runtime C# write path (both are seed-only), so the CHECK-violation tests below insert directly
-// via SqlCommand rather than through IWorldDataRepository -- same pattern as
-// StarterKitProcTests.CreateWithStarterKitAsync_PreviousTribeOutOfRange_ThrowsCheckConstraintViolation.
 [Collection("SqlServer")]
 public class SkillStaticDataProcTests
 {
-    // The 293 seeded SkillIds top out at 293 (Migrations/Seed/world/070_skills.sql); anything from here up is
-    // guaranteed unused by seed data.
     private static int _nextSkillId = 900_001;
     private readonly string _connectionString;
     private readonly IWorldDataRepository _repository;
@@ -34,17 +27,6 @@ public class SkillStaticDataProcTests
         _connectionString = fixture.ConnectionString;
     }
 
-    // Confirms the read path (world.usp_Skill_GetAll -> SkillRowDto/SkillGradeRowDto) still loads the full
-    // seeded catalog correctly now that the CHECK constraints sit underneath it, and that every seeded row
-    // genuinely falls inside every new bound -- not just the migration header's own prose claim.
-    //
-    // NOTE: Migrations/032_skill_static_data_range_checks.sql's own header claims "293 seeded skill rows and
-    // 586 seeded grade rows" -- that is the highest SkillId used (070_skills.sql seeds up to SkillId 293), not
-    // the row count. The actual seeded row count, confirmed against the real database here, is 153 skills (2
-    // rows per skill = 306 grades), matching Database/Tables/world/Skills.sql's own comment ("147 of 300 raw
-    // records are blank filler rows all sharing Index == 0" => 300 - 147 = 153). This does not affect the
-    // migration's correctness (every seeded row still passes every new bound, verified below) but the header's
-    // row-count prose is inaccurate and worth a follow-up correction.
     [Fact]
     public async Task GetSkillsAsync_LoadsSeededCatalog_AllRowsWithinTheNewCheckConstraintBounds()
     {
@@ -62,10 +44,7 @@ public class SkillStaticDataProcTests
             Assert.InRange(skill.TribeInfo1, (byte)1, (byte)4);
             Assert.InRange(skill.TribeInfo2, (byte)1, (byte)10);
             Assert.InRange(skill.LearnSkillPoint, (byte)1,
-                byte.MaxValue); // CHECK ceiling is 1000, unreachable under TINYINT's 255
-            // MaxUpgradePoint's floor of 1 is the divide-by-zero guard for SKILLSYSTEM::ReturnSkillValue
-            // (Server/ts25zone/GameSystem/GameSystem_03_Skill.cpp:186) -- the highest-severity bound in the
-            // migration, asserted explicitly rather than folded into Assert.InRange.
+                byte.MaxValue);
             Assert.True(skill.MaxUpgradePoint >= 1,
                 $"SkillId {skill.SkillId} has MaxUpgradePoint {skill.MaxUpgradePoint}, which would divide-by-zero " +
                 "in SKILLSYSTEM::ReturnSkillValue.");
@@ -77,7 +56,7 @@ public class SkillStaticDataProcTests
         {
             Assert.InRange(grade.ManaUse, (short)0, (short)10000);
             Assert.InRange(grade.RecoverInfo1, (byte)0,
-                byte.MaxValue); // CHECK ceiling is 10000, unreachable under TINYINT's 255
+                byte.MaxValue);
             Assert.InRange(grade.RecoverInfo2, (byte)0, byte.MaxValue);
             Assert.InRange(grade.StunAttack, (byte)0, (byte)100);
             Assert.InRange(grade.StunDefense, (byte)0, (byte)100);
@@ -87,8 +66,6 @@ public class SkillStaticDataProcTests
         }
     }
 
-    // MaxUpgradePoint is the highest-severity constraint added by this migration -- see the migration's own
-    // header and the assertion above.
     [Fact]
     public async Task InsertSkill_MaxUpgradePointZero_ThrowsCheckConstraintViolation()
     {
@@ -108,8 +85,6 @@ public class SkillStaticDataProcTests
     [Fact]
     public async Task InsertSkill_ValidRow_Succeeds()
     {
-        // Proves the two failing tests above (and the helper below) actually fail because of the single
-        // overridden field, not because the baseline row is itself invalid.
         var skillId = NewSkillId();
 
         var ex = await Record.ExceptionAsync(() => InsertSkillAsync(skillId));

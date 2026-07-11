@@ -6,7 +6,6 @@ using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Data.World;
 
-// Boot-time bulk reader over world.usp_*_GetAll; world.* is read-mostly, loaded once into an in-memory cache, never queried per-tick. Capacity hints are the real row counts.
 public sealed record WorldDataRepository(ICaeriusNetDbContext Db) : IWorldDataRepository
 {
     public async ValueTask<(ReadOnlyCollection<ItemRowDto> Items, ReadOnlyCollection<ItemBonusSkillRowDto> BonusSkills)>
@@ -24,7 +23,6 @@ public sealed record WorldDataRepository(ICaeriusNetDbContext Db) : IWorldDataRe
         return await Db.QueryAsReadOnlyCollectionAsync<MonsterRowDto>(sp, ct);
     }
 
-    // Fixed result-set order: money, potions, extra items, category rates, quest items.
     public async ValueTask<(
             ReadOnlyCollection<MonsterDropMoneyRowDto> Money,
             ReadOnlyCollection<MonsterDropPotionRowDto> Potions,
@@ -204,8 +202,6 @@ public sealed record WorldDataRepository(ICaeriusNetDbContext Db) : IWorldDataRe
         return await Db.QueryAsReadOnlyCollectionAsync<RewardBundleItemRowDto>(sp, ct);
     }
 
-    // Fixed result-set order: skill, item, costume equivalences. Capacity is the summed real row count
-    // across all 3 result sets (40*3 + 131*3 + 27*3 = 594 -- see Tables/world/Tribe*Equivalences.sql).
     public async ValueTask<(
             ReadOnlyCollection<TribeSkillEquivalenceRowDto> SkillEquivalences,
             ReadOnlyCollection<TribeItemEquivalenceRowDto> ItemEquivalences,

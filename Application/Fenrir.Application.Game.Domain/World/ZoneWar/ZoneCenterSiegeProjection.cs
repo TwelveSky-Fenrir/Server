@@ -3,33 +3,6 @@ using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
-/// <summary>
-///     Projects <see cref="ZoneCenterSiegeState" /> and <see cref="TribeGuardCorridorState" /> onto WorldInfo's own
-///     fields -- same "overlay onto an otherwise-zeroed template" shape as
-///     <see cref="Guilds.GuildRankingProjection" />/<see cref="WorldStateProjection" />. This covers exactly the
-///     WorldInfo field groups that already have a real, process-wide backing model (Zone049/Zone175/Zone267/
-///     Zone241/Zone335 siege-event state, the per-tribe Zone038 DTM value, the three tribe bonus-ratio arrays plus
-///     the kill-other-tribe bonus, and the tribe-guard corridor passability table) but that neither sibling
-///     projection merges onto the outbound packet -- both those classes' own remarks explicitly flag this as an
-///     open gap (see the "WORLD_INFO field-group backing state" behavior contract's Outputs section).
-///     <para>
-///         Every other WorldInfo field is passed through unchanged: no backing state exists yet for the
-///         remaining numbered zone-siege machines, alliance/vote bookkeeping, guild battle, four-guild,
-///         Tribe4Quest, NokSanStone, WaterRainHeaven, PopUp, TribeMasterCallAbility, or any field this task's
-///         contract found has no cited sort-code binding at all -- those stay on whatever the caller's own
-///         template already carries.
-///     </para>
-///     <para>
-///         Zone049/Zone175/Zone267/Zone241/Zone335 now surface the byte-exact legacy state constants
-///         (<see cref="SiegeEventStateMap" />), not the old raw-event-code placeholder -- and Zone241 now has a
-///         real write path (<see cref="ZoneCenterBroadcastIngestor" /> cases 411-415). The one group still
-///         reading back as its type's default is the three tribe bonus-ratio arrays plus the kill-other-tribe
-///         bonus: their producing event code and payload sub-selector are still unbound
-///         (<see cref="ZoneCenterBroadcastIngestor" />'s GAP 2), so those four continue to read back as zero
-///         until a fresh contract supplies the missing binding -- this projection exists so that binding starts
-///         reaching the wire the moment it lands, without a second follow-up change here.
-///     </para>
-/// </summary>
 public static class ZoneCenterSiegeProjection
 {
     public static WorldInfo Apply(WorldInfo template, ZoneCenterSiegeState siege, TribeGuardCorridorState tribeGuard)

@@ -2,12 +2,6 @@ using Fenrir.Application.Game.Domain.World.Loot;
 
 namespace Fenrir.Application.Game.Tests.World.Loot;
 
-/// <summary>
-///     Guards the item-8115 ("15% Mount Box" per in-code comment) reward + pity table (workstream
-///     C10-remaining-box-pools) -- <see cref="MountVariantBox8115RewardTable" />. Single-open only, no
-///     bulk-path counterpart; pity reward is a 50/50 coin flip (like box 8111, unlike box 8114's deterministic
-///     guarantee).
-/// </summary>
 public class MountVariantBox8115RewardTableTests
 {
     [Fact]
@@ -96,8 +90,7 @@ public class MountVariantBox8115RewardTableTests
         Assert.False(result.WasPityTriggered);
     }
 
-    /// <summary>Returns queued draws in request order; throws if the code draws more than were scripted.</summary>
-    private sealed class ScriptedRandom(params int[] values) : Random
+        private sealed class ScriptedRandom(params int[] values) : Random
     {
         private int _index;
 

@@ -2,11 +2,6 @@ using Fenrir.Application.Game.Domain.World.ZoneWar;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Pins the literal event-code values <see cref="SiegeZoneLiteralEventCatalog" /> names, and confirms
-///     they agree with the raw numbers <see cref="SiegeEventStateMap" />/<see cref="ZoneCenterBroadcastIngestor" />
-///     already dispatch on -- the catalog must never drift from the numeric mapping it names.
-/// </summary>
 public class SiegeZoneLiteralEventCatalogTests
 {
     [Theory]
@@ -70,7 +65,6 @@ public class SiegeZoneLiteralEventCatalogTests
         foreach (var code in expected)
             Assert.Contains(code, SiegeZoneLiteralEventCatalog.PureRelayEventCodes);
 
-        // Never contains the Zone267/Zone241 ranges, nor the known 417 gap.
         Assert.DoesNotContain(417, SiegeZoneLiteralEventCatalog.PureRelayEventCodes);
         Assert.DoesNotContain(402, SiegeZoneLiteralEventCatalog.PureRelayEventCodes);
         Assert.DoesNotContain(411, SiegeZoneLiteralEventCatalog.PureRelayEventCodes);
@@ -137,11 +131,11 @@ public class SiegeZoneLiteralEventCatalogTests
     }
 
     [Theory]
-    [InlineData(417)] // the genuine, unrecoverable gap
-    [InlineData(423)] // has a named constant, but no descriptive text -- blank trailing comment in the source
-    [InlineData(64)] // Zone175 -- no descriptive label exists for any individual code, only a state number
-    [InlineData(402)] // Zone267 -- likewise no descriptive label
-    [InlineData(999999)] // genuinely unrecognized
+    [InlineData(417)]
+    [InlineData(423)]
+    [InlineData(64)]
+    [InlineData(402)]
+    [InlineData(999999)]
     public void TryGetLegacyLabel_ReturnsFalse_ForCodesWithNoRecoverableLabel(int eventCode)
     {
         Assert.False(SiegeZoneLiteralEventCatalog.TryGetLegacyLabel(eventCode, out var label));

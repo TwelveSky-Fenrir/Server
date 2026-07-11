@@ -4,11 +4,6 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Seeding;
 
-/// <summary>
-///     Generates <c>70_seed/world/060_levels.sql</c> from <see cref="LevelReader.ReadAll" /> (005_00001.IMG),
-///     one row per level (all 145, verified no gaps/duplicates). RangeInfo[0..1] is a verified contiguous
-///     EXP-threshold band; RangeInfo[2] is an unrelated 0-50 value with unconfirmed meaning, kept as RangeInfo3.
-/// </summary>
 public static class LevelSeedGenerator
 {
     private const string LevelColumns =

@@ -13,13 +13,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Simulation;
 
-/// <summary>
-///     Covers <see cref="PendingSocialRequestAutoCancelSystem" />: per-tick pending-social-request auto-cancel
-///     across all 5 kinds (behavior contract C21§G). Uses a real <see cref="ZoneRegistry" /> (not a lone
-///     <see cref="Zone" />) because the system's own "counterpart still reachable" check is shard-wide, via
-///     <see cref="ZoneRegistry.TryGetPlayer" />, matching every one of the 5 registries' own process-wide
-///     scope.
-/// </summary>
 public class PendingSocialRequestAutoCancelSystemTests
 {
     private static (Zone Zone, TradeRegistry Trade, FriendRegistry Friend, MentorRegistry Mentor,
@@ -37,10 +30,6 @@ public class PendingSocialRequestAutoCancelSystemTests
         var party = new PartyRegistry();
         var guild = new GuildInviteRegistry();
 
-        // Lazy<ZoneRegistry> circular-init: the system needs a back-reference to the very ZoneRegistry that
-        // is constructing it (same "Lazy<T> breaks the constructor-graph cycle" pattern this system's own
-        // remarks document for the real DI container) -- captured by reference, assigned only once the
-        // registry itself is fully constructed, resolved lazily well after that (inside Simulate).
         ZoneRegistry? registryRef = null;
         var zoneRegistryLazy = new Lazy<ZoneRegistry>(() => registryRef!);
         var system = new PendingSocialRequestAutoCancelSystem(trade, friend, mentor, party, guild, zoneRegistryLazy);
@@ -66,7 +55,7 @@ public class PendingSocialRequestAutoCancelSystemTests
         var (zone, trade, _, _, _, _) = SetUp(37);
         Enter(zone, 1, "Alice");
 
-        Assert.Equal(TradeAskOutcome.Sent, trade.TryAsk(1, 2)); // character 2 never enters any zone
+        Assert.Equal(TradeAskOutcome.Sent, trade.TryAsk(1, 2));
         Assert.True(trade.IsBusy(1));
 
         zone.Tick(TimeSpan.FromMilliseconds(500));
@@ -92,9 +81,6 @@ public class PendingSocialRequestAutoCancelSystemTests
     [Fact]
     public void Trade_ActiveSession_NeverAutoCancelled_OnlyThePendingAskStateIsSwept()
     {
-        // An actually-started TradeSession (state "4", mid-trade confirmed) is a DIFFERENT precondition from
-        // this system's own "pending, awaiting response" scope (Precondition G's own note) -- must never be
-        // touched by this sweep, even once its counterpart later disconnects.
         var (zone, trade, _, _, _, _) = SetUp(37);
         Enter(zone, 1, "Alice");
 
@@ -113,7 +99,7 @@ public class PendingSocialRequestAutoCancelSystemTests
         var (zone, _, friend, _, _, _) = SetUp(37);
         Enter(zone, 2, "Bob");
 
-        Assert.Equal(FriendAskOutcome.Sent, friend.TryAsk(1, 2)); // character 1 (asker) never enters any zone
+        Assert.Equal(FriendAskOutcome.Sent, friend.TryAsk(1, 2));
         Assert.True(friend.IsNegotiating(2));
 
         zone.Tick(TimeSpan.FromMilliseconds(500));

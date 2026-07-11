@@ -4,10 +4,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Zone;
 
-/// <summary>
-///     CZ_MAKE_ITEM_SEND (CLIENT.h:278-289, 36-byte payload) — same typedef as <see cref="CraftSkillBookRequest" />/
-///     <see cref="CraftPetRequest" />/<see cref="CraftLegendaryPetRequest" />.
-/// </summary>
 public class CzMakeItemSendTests
 {
     [Fact]

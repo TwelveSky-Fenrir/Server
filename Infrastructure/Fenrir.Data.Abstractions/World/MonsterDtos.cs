@@ -2,7 +2,6 @@ using CaeriusNet.Attributes.Dto;
 
 namespace Fenrir.Data.Abstractions.World;
 
-// world.usp_Monster_GetAll: monster columns then MonsterAnimationFrames columns, in that order; ordinal-mapped.
 [GenerateDto]
 public sealed partial record MonsterRowDto(
     int MonsterId,
@@ -60,7 +59,6 @@ public sealed partial record MonsterRowDto(
     short BulletInfo1,
     short BulletInfo2);
 
-/// <summary>world.MonsterDropMoney row -- world.usp_Monster_GetDrops RS0 (dense, at most 1 per monster).</summary>
 [GenerateDto]
 public sealed partial record MonsterDropMoneyRowDto(
     int MonsterId,
@@ -68,7 +66,6 @@ public sealed partial record MonsterDropMoneyRowDto(
     int MinAmount,
     int MaxAmount);
 
-/// <summary>world.MonsterDropPotions row -- world.usp_Monster_GetDrops RS1 (populated slots only, SlotIndex 0-4).</summary>
 [GenerateDto]
 public sealed partial record MonsterDropPotionRowDto(
     int MonsterId,
@@ -76,7 +73,6 @@ public sealed partial record MonsterDropPotionRowDto(
     int DropRate,
     int PotionItemId);
 
-/// <summary>world.usp_Monster_GetDrops RS2 (SlotIndex 0-49); ItemId null when the slot had no item wired up.</summary>
 [GenerateDto]
 public sealed partial record MonsterDropExtraItemRowDto(
     int MonsterId,
@@ -84,14 +80,12 @@ public sealed partial record MonsterDropExtraItemRowDto(
     int DropRate,
     int? ItemId);
 
-/// <summary>world.MonsterDropCategoryRates row -- world.usp_Monster_GetDrops RS3 (CategoryIndex 0-11).</summary>
 [GenerateDto]
 public sealed partial record MonsterDropCategoryRateRowDto(
     int MonsterId,
     byte CategoryIndex,
     int Value);
 
-/// <summary>world.MonsterDropQuestItems row -- world.usp_Monster_GetDrops RS4 (at most 1 per monster).</summary>
 [GenerateDto]
 public sealed partial record MonsterDropQuestItemRowDto(
     int MonsterId,

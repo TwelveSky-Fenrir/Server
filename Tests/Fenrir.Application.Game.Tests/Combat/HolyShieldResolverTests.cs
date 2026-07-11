@@ -2,15 +2,11 @@ using Fenrir.Application.Game.Domain.Combat;
 
 namespace Fenrir.Application.Game.Tests.Combat;
 
-/// <summary>
-///     Covers <see cref="HolyShieldResolver" /> (base-slot-9 absorption + hard-clear) --
-///     <c>DecreaseHolyShield</c>/<c>RemoveHolyShield</c> (<c>Server/ts25zone/S07_MyGame04.cpp:2689-2749</c>).
-/// </summary>
 public class HolyShieldResolverTests
 {
     private static int[] EmptyBuff()
     {
-        return new int[70]; // 35 slots x [value, duration]
+        return new int[70];
     }
 
     [Fact]
@@ -28,13 +24,13 @@ public class HolyShieldResolverTests
     {
         var buff = EmptyBuff();
         buff[HolyShieldResolver.BaseSlot * 2] = 1000;
-        buff[HolyShieldResolver.BaseSlot * 2 + 1] = 42; // some remaining duration
+        buff[HolyShieldResolver.BaseSlot * 2 + 1] = 42;
 
         var absorbed = HolyShieldResolver.Absorb(buff, 300);
 
         Assert.Equal(300, absorbed);
         Assert.Equal(700, buff[HolyShieldResolver.BaseSlot * 2]);
-        Assert.Equal(42, buff[HolyShieldResolver.BaseSlot * 2 + 1]); // still active -> duration untouched
+        Assert.Equal(42, buff[HolyShieldResolver.BaseSlot * 2 + 1]);
     }
 
     [Fact]
@@ -46,9 +42,9 @@ public class HolyShieldResolverTests
 
         var absorbed = HolyShieldResolver.Absorb(buff, 160);
 
-        Assert.Equal(100, absorbed); // only what the shield held
+        Assert.Equal(100, absorbed);
         Assert.Equal(0, buff[HolyShieldResolver.BaseSlot * 2]);
-        Assert.Equal(0, buff[HolyShieldResolver.BaseSlot * 2 + 1]); // consumed -> duration cleared too
+        Assert.Equal(0, buff[HolyShieldResolver.BaseSlot * 2 + 1]);
     }
 
     [Fact]

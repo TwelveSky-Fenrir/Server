@@ -7,7 +7,6 @@ public class ZoneConfigTests
     [Fact]
     public void Unconfigured_MatchesLegacyPerSlotDefault()
     {
-        // Server/Header/S18_MyZoneInfo.cpp:15-18 -- level band 0-0, owner -1, secondary 0.
         var config = ZoneConfig.Unconfigured;
 
         Assert.Equal(0, config.MinLevel);
@@ -43,8 +42,6 @@ public class ZoneConfigTests
     [Fact]
     public void DefaultStruct_OwnerTribeIsZero_NotMinusOne_WhichIsWhyUnconfiguredExists()
     {
-        // Documents the trap the static Unconfigured exists to avoid: default(ZoneConfig) reports owner 0 (a real
-        // tribe), NOT the legacy "no owner" -1. Callers that need the neutral snapshot must use Unconfigured.
         var raw = default(ZoneConfig);
 
         Assert.Equal(0, raw.OwnerTribe);

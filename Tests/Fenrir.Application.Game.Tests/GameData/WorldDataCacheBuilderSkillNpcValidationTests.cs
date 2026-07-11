@@ -4,16 +4,8 @@ using static Fenrir.Application.Game.Tests.GameData.WorldDataTestRows;
 
 namespace Fenrir.Application.Game.Tests.GameData;
 
-/// <summary>
-///     Per-row SKILL/NPC validation, the 300-skill capacity cap, and the lowest-index boot self-test added to
-///     <see cref="WorldDataCacheBuilder" /> (A13). Legacy refs: <c>Skill_CheckValidElement</c>
-///     (Server/Header/S15_MyShare.cpp:1277-1497), <c>Npc_CheckValidElement</c> (:1836-1963), and the
-///     <c>MyGame::Init</c> lowest-index probe (Server/ts25zone/S07_MyGame01.cpp:1611-1636). Every case here drives
-///     the full <see cref="WorldDataCacheBuilder.Build" /> path, since that is where the validators run.
-/// </summary>
 public class WorldDataCacheBuilderSkillNpcValidationTests
 {
-    // ---- Positive: a fully-populated, legacy-valid skill+npc graph round-trips ----------------------------------
 
     [Fact]
     public void Build_Accepts_ValidSkillAndNpcRowsWithChildren()
@@ -48,15 +40,12 @@ public class WorldDataCacheBuilderSkillNpcValidationTests
         Assert.Single(cache.NpcsById[1].SkillOffers);
     }
 
-    // ---- SKILL per-row scalar bounds ---------------------------------------------------------------------------
 
     [Theory]
-    [InlineData(301)] // above the 300-slot capacity cap
+    [InlineData(301)]
     [InlineData(400)]
     public void Build_Throws_WhenSkillIdExceedsThe300Cap(int skillId)
     {
-        // Keep SkillId 1 present via a second valid row so the lowest-index self-test isn't what trips -- this
-        // isolates the 300-cap check on the offending row.
         var rows = MinimalRows() with
         {
             Skills = [ValidSkill(1), ValidSkill(skillId)]
@@ -216,7 +205,6 @@ public class WorldDataCacheBuilderSkillNpcValidationTests
     [Fact]
     public void Build_Accepts_SkillIdZero_SkippingAllPerRowValidation()
     {
-        // SkillId 0 is the empty-slot sentinel: its (deliberately out-of-range) fields are never validated.
         var rows = MinimalRows() with
         {
             Skills =
@@ -231,7 +219,6 @@ public class WorldDataCacheBuilderSkillNpcValidationTests
         Assert.True(cache.SkillsById.ContainsKey(0));
     }
 
-    // ---- SKILL child-table bounds (descriptions, grades) -------------------------------------------------------
 
     [Fact]
     public void Build_Throws_WhenSkillDescriptionExceedsMaxLength()
@@ -305,14 +292,12 @@ public class WorldDataCacheBuilderSkillNpcValidationTests
         Assert.Contains("RunTime=", exception.Message);
     }
 
-    // ---- NPC per-row scalar bounds -----------------------------------------------------------------------------
 
     [Theory]
-    [InlineData(501)] // above the 500-slot capacity cap
+    [InlineData(501)]
     [InlineData(600)]
     public void Build_Throws_WhenNpcIdExceedsThe500Cap(int npcId)
     {
-        // Keep NpcId 1 present so the lowest-index self-test isn't what trips -- this isolates the 500-cap check.
         var rows = MinimalRows() with
         {
             Npcs = [ValidNpc(1), ValidNpc(npcId)]
@@ -328,7 +313,6 @@ public class WorldDataCacheBuilderSkillNpcValidationTests
     [Fact]
     public void Build_Accepts_NpcIdZero_SkippingAllPerRowValidation()
     {
-        // NpcId 0 is the empty-slot sentinel: its (deliberately out-of-range) fields are never validated.
         var rows = MinimalRows() with
         {
             Npcs =
@@ -417,7 +401,6 @@ public class WorldDataCacheBuilderSkillNpcValidationTests
         Assert.Contains("Size1/Size2/Size3", exception.Message);
     }
 
-    // ---- NPC child-table bounds --------------------------------------------------------------------------------
 
     [Theory]
     [InlineData(0)]
@@ -511,13 +494,10 @@ public class WorldDataCacheBuilderSkillNpcValidationTests
         Assert.Contains("Value=", exception.Message);
     }
 
-    // ---- Lowest-index self-test --------------------------------------------------------------------------------
 
     [Fact]
     public void Build_Throws_WhenCanonicalSkillOneIsMissing()
     {
-        // A valid, non-empty skill table that simply lacks SkillId 1 passes per-row validation but fails the
-        // lowest-index self-test.
         var rows = MinimalRows() with
         {
             Skills = [ValidSkill(2)]
@@ -546,8 +526,6 @@ public class WorldDataCacheBuilderSkillNpcValidationTests
     [Fact]
     public void Build_Accepts_EmptyNpcs_SelfTestSkipsTheNpcProbe()
     {
-        // world.Npcs is deliberately allowed to be empty in Fenrir (not a critical dataset), unlike legacy -- the
-        // NPC lowest-index probe must not fire in that case.
         var (cache, _) = WorldDataCacheBuilder.Build(MinimalRows());
 
         Assert.Empty(cache.NpcsById);

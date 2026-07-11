@@ -5,21 +5,12 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Login.Services.CreateMousePin;
 
-/// <summary>op13 CL_CREATE_MOUSE_PASSWORD_SEND business logic: first-time PIN creation, stored hashed.</summary>
 public sealed class CreateMousePinService(IAccountPinRepository pins, ILogger<CreateMousePinService> logger)
     : ICreateMousePinService
 {
     public async ValueTask<CreateMousePinResult> CreateMousePinAsync(int accountId, string mousePassword,
         CancellationToken cancellationToken)
     {
-        // Legacy: creating over an existing PIN is a protocol violation (client should send op15/op14
-        // instead). Checked before format -- existence-before-format, matching the cited legacy guard
-        // order exactly: Server/ts25login/S04_MyWork02.cpp:461 (!IsEmptyString(uMousePassword) => Quit)
-        // runs before :468 (CheckMousePassword(...) => Quit). Previously this project checked format
-        // first; the pincode-second-password audit's Minor finding flagged the inversion. The two orders
-        // only disagree on the "PIN already exists AND the submitted format is also malformed" double-
-        // violation case, which stays wire-unobservable either way (silent Abort both ways) but this order
-        // now correctly attributes that rejection to AlreadyExists rather than InvalidFormat.
         if (await pins.GetAsync(accountId, cancellationToken) is not null)
             return new CreateMousePinResult(CreateMousePinOutcome.AlreadyExists);
 
@@ -33,15 +24,10 @@ public sealed class CreateMousePinService(IAccountPinRepository pins, ILogger<Cr
         }
         catch (Exception ex)
         {
-            // Legacy: storage failure is a silent Quit(), no reply (S04_MyWork02.cpp l.476-479). Previously
-            // swallowed with no trace at all -- logged here (the only place the exception itself is still in
-            // scope) so a real PIN-storage failure is diagnosable instead of vanishing silently.
             logger.LogWarning(ex, "PIN creation storage failed for account {AccountId}", accountId);
             return new CreateMousePinResult(CreateMousePinOutcome.StorageFailure);
         }
 
-        // Success is announced by CreateMousePinHandler (matching DeleteAvatarService/CreateAvatarService's
-        // own posture: this service layer only logs the failure/exception path it alone can see).
         return new CreateMousePinResult(CreateMousePinOutcome.Success);
     }
 }

@@ -76,10 +76,6 @@ public class HeroRewardResolverTests
         Assert.Equal(HeroRewardResolver.Outcome.AlreadyClaimed, result.Outcome);
     }
 
-    // Resolve now goes through HeroRankAcceptStateRules.FromClaimedFlag/IsClaimable instead of a bare
-    // `row.RewardClaimed == true` comparison -- these two cases pin that the tri-state mapping still treats
-    // an explicit false exactly like a null (both Unclaimed/Claim), not just the null case the other tests
-    // above already exercise via the Row helper's own `claimed = null` default.
     [Fact]
     public void ExplicitlyFalseRewardClaimed_IsStillClaimable()
     {

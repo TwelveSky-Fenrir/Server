@@ -10,7 +10,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Login.Hosting.Extensions;
 
-/// <summary>Registers the LoginServer's TCP connection listener.</summary>
 public static class HostingServiceCollectionExtensions
 {
     public static IServiceCollection AddLoginHosting(this IServiceCollection services)
@@ -18,27 +17,14 @@ public static class HostingServiceCollectionExtensions
         services.AddSingleton<IOpcodeFrameSizeProvider>(LoginOpcodeRegistry.Provider);
         services.AddHostedService<LoginConnectionHost>();
 
-        // Forcibly disconnects any Login TCP connection -- pre-auth or post-auth alike -- idle 60+ seconds
-        // (Server/ts25login/S07_MyGame01.cpp:37-73), the Login-side counterpart to GameServer's own
-        // SessionLivenessSweep. Singleton (not just AddHostedService<T>) so a future direct-resolve caller (e.g.
-        // a health check) can share the same instance the generic host also drives.
         services.AddSingleton<LoginSessionLivenessSweep>();
         services.AddHostedService<LoginSessionLivenessSweepHost>();
 
-        // Cross-process duplicate-login kick/refusal: keeps this process's live sessions' runtime.AccountSessions
-        // rows warm, and reaps rows any process (Login or Game) abandoned without running its own teardown path.
         services.AddHostedService<AccountSessionLivenessHost>();
         services.AddHostedService<AccountSessionReapHost>();
 
-        // Sweeps runtime.SessionTickets rows left behind by a zone-transfer handshake that never completed
-        // (client crash, dropped Login<->Game connection); the table is memory-optimized/SCHEMA_ONLY with no
-        // cleanup of its own besides this timer and the create/consume paths' own supersede/always-delete behavior.
         services.AddHostedService<SessionTicketPurgeHost>();
 
-        // Keeps LoginCapacityState fresh for the CL_LOGIN_SEND maintenance-lockdown/server-full quota gates.
-        // Registered as its own concrete singleton (not just AddHostedService<T>) so Program.cs can resolve it
-        // directly and call InitializeAsync() once, synchronously, before the host starts accepting connections
-        // -- the same instance the generic host later starts as an IHostedService.
         services.AddSingleton<ServerQuotaRefreshHost>();
         services.AddHostedService(sp => sp.GetRequiredService<ServerQuotaRefreshHost>());
 
@@ -56,12 +42,6 @@ public static class HostingServiceCollectionExtensions
                 logger: sp.GetRequiredService<ILogger<IpFloodGuard>>());
         });
 
-        // Legacy ts25firewall RemoveIPTick allowlist reconcile (~120s). The reconcile delegate is the DB half
-        // (workstream D3): IFirewallRuleRepository.ReconcileAllowlistAsync, a single atomic stored-procedure
-        // call -- see that method's own remarks for exactly which of legacy's three reconcile sub-steps this
-        // implements (prune stale allow rows) and which two are deliberately not reproduced (infra-IP reseed;
-        // per-account IP resync -- both need data Fenrir's schema doesn't have and this project's rules forbid
-        // guessing).
         services.AddSingleton(sp => new FirewallAllowlistReconcileService(
             sp.GetRequiredService<IFirewallRuleRepository>().ReconcileAllowlistAsync,
             logger: sp.GetService<ILogger<FirewallAllowlistReconcileService>>()));

@@ -34,7 +34,6 @@ public class PetGrowthCalculatorTests
     [Fact]
     public void Compute_NotAGrowablePetSort_ReturnsDefault()
     {
-        // item 1004 is a pet-family Life id, but here it is catalogued as sort 28 (Phoenix amulet), not 22.
         var result = PetGrowthCalculator.Compute(1004, 1000, 100, Items((1004, 28)));
 
         Assert.Equal(default, result);
@@ -43,11 +42,10 @@ public class PetGrowthCalculatorTests
     [Fact]
     public void Compute_LifeFamily0_LinearBelowMax_UsesK2000()
     {
-        // item 1004 -> Life family 0, max 40,000,000. Half-max growth -> half of the K=2000 cap.
         var items = Items((1004, 22));
         var result = PetGrowthCalculator.Compute(1004, 20_000_000, 100, items);
 
-        Assert.Equal(1000, result.Life); // 20_000_000 * 2000 / 40_000_000
+        Assert.Equal(1000, result.Life);
     }
 
     [Fact]
@@ -56,15 +54,14 @@ public class PetGrowthCalculatorTests
         var items = Items((1004, 22));
         var result = PetGrowthCalculator.Compute(1004, 100_000_000, 100, items);
 
-        Assert.Equal(2200, result.Life); // normal cap
+        Assert.Equal(2200, result.Life);
     }
 
     [Fact]
     public void Compute_LifePremiumId1310_UsesDoubleKAndCap()
     {
-        // 1310 is both a Life-family-3 member AND the verified Life premium id (K=4000, cap=4400).
         var items = Items((1310, 22));
-        var result = PetGrowthCalculator.Compute(1310, 320_000_000, 100, items); // == family-3 max
+        var result = PetGrowthCalculator.Compute(1310, 320_000_000, 100, items);
 
         Assert.Equal(4400, result.Life);
     }
@@ -72,7 +69,7 @@ public class PetGrowthCalculatorTests
     [Fact]
     public void Compute_AttackPower_GatedByActivity_ZeroWhenInactive()
     {
-        var items = Items((541, 22)); // Attack family 0
+        var items = Items((541, 22));
 
         var active = PetGrowthCalculator.Compute(541, 20_000_000, 1, items);
         var inactive = PetGrowthCalculator.Compute(541, 20_000_000, 0, items);
@@ -84,7 +81,6 @@ public class PetGrowthCalculatorTests
     [Fact]
     public void Compute_LifeAndDefense_NotGatedByActivity_VerifiedSourceNuance()
     {
-        // GameSystem_07_Pet.cpp: ReturnLifeValue/ReturnDefensePower never reference pActivityValue -- only ReturnAttackPower does
         var items = Items((1004, 22), (542, 22));
 
         var lifeInactive = PetGrowthCalculator.Compute(1004, 20_000_000, 0, items);
@@ -100,7 +96,7 @@ public class PetGrowthCalculatorTests
         var items = Items((1312, 22));
         var result = PetGrowthCalculator.Compute(1312, 320_000_000, 1, items);
 
-        Assert.Equal(2200, result.AttackPower); // premium cap, family 3 max = 320,000,000
+        Assert.Equal(2200, result.AttackPower);
     }
 
     [Fact]
@@ -109,6 +105,6 @@ public class PetGrowthCalculatorTests
         var items = Items((1311, 22));
         var result = PetGrowthCalculator.Compute(1311, 320_000_000, 1, items);
 
-        Assert.Equal(4400, result.DefensePower); // 1311's own premium cap (K=4000/cap4400)
+        Assert.Equal(4400, result.DefensePower);
     }
 }

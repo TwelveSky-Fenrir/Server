@@ -57,7 +57,7 @@ public class CpTicketResolverTests
 
         Assert.True(result.Succeeded);
         Assert.Equal(4, result.UnitsConsumed);
-        Assert.Equal(20, result.CreditedAmount); // 4 * 5
+        Assert.Equal(20, result.CreditedAmount);
         Assert.Equal(120, result.NewContributionPoints);
     }
 

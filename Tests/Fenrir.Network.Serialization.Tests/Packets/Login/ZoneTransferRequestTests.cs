@@ -8,7 +8,6 @@ public class ClDemandZoneServerInfoSendTests
     [Fact]
     public void PayloadSize_MatchesContractConstant()
     {
-        // ExpectedSize=13 (9-byte inbound header) -> 4-byte payload (1 int).
         Assert.Equal(4, ZoneTransferRequest.PayloadSize);
     }
 

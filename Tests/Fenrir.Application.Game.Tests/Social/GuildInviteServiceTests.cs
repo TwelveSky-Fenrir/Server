@@ -15,24 +15,21 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Social;
 
-/// <summary>
-///     GUILD_ASK_SEND's CheckCommunityWork()/stunned-dead exclusivity gate (Server/ts25zone/S04_MyWork02.cpp:
-///     9827-9884, Server/ts25zone/S07_MyGame04.cpp:185-216) -- <see cref="GuildInviteService.AskAsync" /> must
-///     reject an asker or target who is busy in any OTHER community-interaction family, not just an existing
-///     guild negotiation, and must reject either side while stunned or dead.
-/// </summary>
 public class GuildInviteServiceTests
 {
-    private static (Zone Zone, PlayerRuntimeState Asker, PlayerRuntimeState Target) MakeAskerAndTarget(
-        byte tribe = 1)
+
+        private static (ZoneRegistry Zones, PlayerRuntimeState Asker, PlayerRuntimeState Target) MakeAskerAndTarget(
+        byte tribe = 1, short mapId = 5)
     {
-        var zone = ZoneTestKit.CreateZone(5);
+        var zones = ZoneTestKit.CreateRegistry();
+        zones.Initialize([mapId]);
+        zones.TryGet(mapId, out var zone);
 
         var (askerSession, _) = ZoneTestKit.CreateSession(1);
-        zone.Post(ZoneCommand.Enter(1, ZoneTestKit.EnterData(askerSession, 5, "Asker", tribe: tribe)));
+        zone!.Post(ZoneCommand.Enter(1, ZoneTestKit.EnterData(askerSession, mapId, "Asker", tribe: tribe)));
 
         var (targetSession, _) = ZoneTestKit.CreateSession(2);
-        zone.Post(ZoneCommand.Enter(2, ZoneTestKit.EnterData(targetSession, 5, "Target", tribe: tribe)));
+        zone.Post(ZoneCommand.Enter(2, ZoneTestKit.EnterData(targetSession, mapId, "Target", tribe: tribe)));
 
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
@@ -41,17 +38,18 @@ public class GuildInviteServiceTests
         Assert.NotNull(asker);
         Assert.NotNull(target);
 
-        asker.GuildId = 10;
-        asker.GuildRoleDb = 2; // DB role 2 == master (GuildRoleCodec.IsMasterOrSubMaster)
+        asker!.GuildId = 10;
+        asker.GuildRoleDb = 2;
 
-        return (zone, asker, target);
+        return (zones, asker, target!);
     }
 
-    private static GuildInviteService CreateService(DuelRegistry? duels = null, TradeRegistry? trades = null,
-        FriendRegistry? friends = null, PartyRegistry? parties = null, MentorRegistry? mentors = null,
-        ICharacterShardLocationRepository? directory = null, FakeSocialCrossShardRelayQueue? relay = null)
+    private static GuildInviteService CreateService(ZoneRegistry zones, DuelRegistry? duels = null,
+        TradeRegistry? trades = null, FriendRegistry? friends = null, PartyRegistry? parties = null,
+        MentorRegistry? mentors = null, ICharacterShardLocationRepository? directory = null,
+        FakeSocialCrossShardRelayQueue? relay = null)
     {
-        return new GuildInviteService(ZoneTestKit.CreateRegistry(), new GuildInviteRegistry(),
+        return new GuildInviteService(zones, new GuildInviteRegistry(),
             duels ?? new DuelRegistry(), trades ?? new TradeRegistry(), friends ?? new FriendRegistry(),
             parties ?? new PartyRegistry(), mentors ?? new MentorRegistry(),
             directory ?? new FakeCharacterShardLocationRepository(), relay ?? new FakeSocialCrossShardRelayQueue(),
@@ -61,10 +59,38 @@ public class GuildInviteServiceTests
     [Fact]
     public async Task Ask_NeitherSideBusy_Sends()
     {
-        var (zone, asker, target) = MakeAskerAndTarget();
-        var service = CreateService();
+        var (zones, asker, target) = MakeAskerAndTarget();
+        var service = CreateService(zones);
 
-        var result = await service.AskAsync(zone, asker, target.Name, CancellationToken.None);
+        var result = await service.AskAsync(asker, target.Name, CancellationToken.None);
+
+        Assert.Equal(GuildInviteAskResultKind.Sent, result);
+    }
+
+        [Fact]
+    public async Task Ask_TargetOnDifferentMapSameShard_Sends()
+    {
+        var zones = ZoneTestKit.CreateRegistry();
+        zones.Initialize([5, 6]);
+
+        zones.TryGet(5, out var askerZone);
+        var (askerSession, _) = ZoneTestKit.CreateSession(1);
+        askerZone!.Post(ZoneCommand.Enter(1, ZoneTestKit.EnterData(askerSession, 5, "Asker")));
+        askerZone.Tick(TimeSpan.FromMilliseconds(50));
+        askerZone.TryGetPlayer(1, out var asker);
+        Assert.NotNull(asker);
+        asker!.GuildId = 10;
+        asker.GuildRoleDb = 2;
+
+        zones.TryGet(6, out var targetZone);
+        var (targetSession, _) = ZoneTestKit.CreateSession(2);
+        targetZone!.Post(ZoneCommand.Enter(2, ZoneTestKit.EnterData(targetSession, 6, "Target")));
+        targetZone.Tick(TimeSpan.FromMilliseconds(50));
+        Assert.True(targetZone.TryGetPlayer(2, out _));
+
+        var service = CreateService(zones);
+
+        var result = await service.AskAsync(asker, "Target", CancellationToken.None);
 
         Assert.Equal(GuildInviteAskResultKind.Sent, result);
     }
@@ -72,13 +98,11 @@ public class GuildInviteServiceTests
     [Fact]
     public async Task Ask_AskerHasOpenPersonalShop_ReturnsAskerBusy_WithoutResolvingTarget()
     {
-        var (zone, asker, _) = MakeAskerAndTarget();
+        var (zones, asker, _) = MakeAskerAndTarget();
         asker.PshopOpen = true;
-        var service = CreateService();
+        var service = CreateService(zones);
 
-        // Even an unresolvable target name must still short-circuit to AskerBusy -- legacy checks the asker's
-        // own CheckCommunityWork()/stun-dead state before ever resolving the target.
-        var result = await service.AskAsync(zone, asker, "NoSuchAvatar", CancellationToken.None);
+        var result = await service.AskAsync(asker, "NoSuchAvatar", CancellationToken.None);
 
         Assert.Equal(GuildInviteAskResultKind.AskerBusy, result);
     }
@@ -86,11 +110,11 @@ public class GuildInviteServiceTests
     [Fact]
     public async Task Ask_AskerStunned_ReturnsAskerBusy()
     {
-        var (zone, asker, target) = MakeAskerAndTarget();
+        var (zones, asker, target) = MakeAskerAndTarget();
         asker.IsStunned = true;
-        var service = CreateService();
+        var service = CreateService(zones);
 
-        var result = await service.AskAsync(zone, asker, target.Name, CancellationToken.None);
+        var result = await service.AskAsync(asker, target.Name, CancellationToken.None);
 
         Assert.Equal(GuildInviteAskResultKind.AskerBusy, result);
     }
@@ -98,11 +122,11 @@ public class GuildInviteServiceTests
     [Fact]
     public async Task Ask_AskerDead_ReturnsAskerBusy()
     {
-        var (zone, asker, target) = MakeAskerAndTarget();
+        var (zones, asker, target) = MakeAskerAndTarget();
         asker.IsDead = true;
-        var service = CreateService();
+        var service = CreateService(zones);
 
-        var result = await service.AskAsync(zone, asker, target.Name, CancellationToken.None);
+        var result = await service.AskAsync(asker, target.Name, CancellationToken.None);
 
         Assert.Equal(GuildInviteAskResultKind.AskerBusy, result);
     }
@@ -110,12 +134,12 @@ public class GuildInviteServiceTests
     [Fact]
     public async Task Ask_AskerNegotiatingADuel_ReturnsAskerBusy()
     {
-        var (zone, asker, target) = MakeAskerAndTarget();
+        var (zones, asker, target) = MakeAskerAndTarget();
         var duels = new DuelRegistry();
         duels.TryAsk(asker.CharacterId, 999, false);
-        var service = CreateService(duels);
+        var service = CreateService(zones, duels);
 
-        var result = await service.AskAsync(zone, asker, target.Name, CancellationToken.None);
+        var result = await service.AskAsync(asker, target.Name, CancellationToken.None);
 
         Assert.Equal(GuildInviteAskResultKind.AskerBusy, result);
     }
@@ -123,12 +147,12 @@ public class GuildInviteServiceTests
     [Fact]
     public async Task Ask_TargetNegotiatingATrade_ReturnsTargetBusy()
     {
-        var (zone, asker, target) = MakeAskerAndTarget();
+        var (zones, asker, target) = MakeAskerAndTarget();
         var trades = new TradeRegistry();
         trades.TryAsk(target.CharacterId, 999);
-        var service = CreateService(trades: trades);
+        var service = CreateService(zones, trades: trades);
 
-        var result = await service.AskAsync(zone, asker, target.Name, CancellationToken.None);
+        var result = await service.AskAsync(asker, target.Name, CancellationToken.None);
 
         Assert.Equal(GuildInviteAskResultKind.TargetBusy, result);
     }
@@ -136,12 +160,12 @@ public class GuildInviteServiceTests
     [Fact]
     public async Task Ask_TargetHasPendingFriendRequest_ReturnsTargetBusy()
     {
-        var (zone, asker, target) = MakeAskerAndTarget();
+        var (zones, asker, target) = MakeAskerAndTarget();
         var friends = new FriendRegistry();
         friends.TryAsk(999, target.CharacterId);
-        var service = CreateService(friends: friends);
+        var service = CreateService(zones, friends: friends);
 
-        var result = await service.AskAsync(zone, asker, target.Name, CancellationToken.None);
+        var result = await service.AskAsync(asker, target.Name, CancellationToken.None);
 
         Assert.Equal(GuildInviteAskResultKind.TargetBusy, result);
     }
@@ -149,12 +173,12 @@ public class GuildInviteServiceTests
     [Fact]
     public async Task Ask_TargetHasPendingPartyInvite_ReturnsTargetBusy()
     {
-        var (zone, asker, target) = MakeAskerAndTarget();
+        var (zones, asker, target) = MakeAskerAndTarget();
         var parties = new PartyRegistry();
         parties.TryInvite(999, 1, target.Tribe, target.CharacterId, 1, target.Tribe);
-        var service = CreateService(parties: parties);
+        var service = CreateService(zones, parties: parties);
 
-        var result = await service.AskAsync(zone, asker, target.Name, CancellationToken.None);
+        var result = await service.AskAsync(asker, target.Name, CancellationToken.None);
 
         Assert.Equal(GuildInviteAskResultKind.TargetBusy, result);
     }
@@ -162,12 +186,12 @@ public class GuildInviteServiceTests
     [Fact]
     public async Task Ask_TargetNegotiatingAsAMentor_ReturnsTargetBusy()
     {
-        var (zone, asker, target) = MakeAskerAndTarget();
+        var (zones, asker, target) = MakeAskerAndTarget();
         var mentors = new MentorRegistry();
         mentors.TryAsk(target.CharacterId, 999, false, false);
-        var service = CreateService(mentors: mentors);
+        var service = CreateService(zones, mentors: mentors);
 
-        var result = await service.AskAsync(zone, asker, target.Name, CancellationToken.None);
+        var result = await service.AskAsync(asker, target.Name, CancellationToken.None);
 
         Assert.Equal(GuildInviteAskResultKind.TargetBusy, result);
     }
@@ -175,11 +199,11 @@ public class GuildInviteServiceTests
     [Fact]
     public async Task Ask_TargetStunned_ReturnsTargetBusy()
     {
-        var (zone, asker, target) = MakeAskerAndTarget();
+        var (zones, asker, target) = MakeAskerAndTarget();
         target.IsStunned = true;
-        var service = CreateService();
+        var service = CreateService(zones);
 
-        var result = await service.AskAsync(zone, asker, target.Name, CancellationToken.None);
+        var result = await service.AskAsync(asker, target.Name, CancellationToken.None);
 
         Assert.Equal(GuildInviteAskResultKind.TargetBusy, result);
     }
@@ -187,59 +211,49 @@ public class GuildInviteServiceTests
     [Fact]
     public async Task Ask_TargetDead_ReturnsTargetBusy()
     {
-        var (zone, asker, target) = MakeAskerAndTarget();
+        var (zones, asker, target) = MakeAskerAndTarget();
         target.IsDead = true;
-        var service = CreateService();
+        var service = CreateService(zones);
 
-        var result = await service.AskAsync(zone, asker, target.Name, CancellationToken.None);
+        var result = await service.AskAsync(asker, target.Name, CancellationToken.None);
 
         Assert.Equal(GuildInviteAskResultKind.TargetBusy, result);
     }
 
-    /// <summary>
-    ///     Legacy <c>IsMovingZone()</c> gate (Server/ts25zone/H03_MyUser.h:15), target-only -- re-verified
-    ///     2026-07-11 and wired into the target-busy check alongside stun/death.
-    /// </summary>
-    [Fact]
+        [Fact]
     public async Task Ask_TargetMovingZone_ReturnsTargetBusy()
     {
-        var (zone, asker, target) = MakeAskerAndTarget();
+        var (zones, asker, target) = MakeAskerAndTarget();
         target.IsMovingZone = true;
-        var service = CreateService();
+        var service = CreateService(zones);
 
-        var result = await service.AskAsync(zone, asker, target.Name, CancellationToken.None);
+        var result = await service.AskAsync(asker, target.Name, CancellationToken.None);
 
         Assert.Equal(GuildInviteAskResultKind.TargetBusy, result);
     }
 
-    /// <summary>
-    ///     Legacy's <c>IsMovingZone()</c> gate only ever checks the target, never the requester (matching
-    ///     <c>UnstunResolver</c>'s own cure-attempt pattern) -- an asker mid zone-transfer must NOT be rejected
-    ///     by this flag.
-    /// </summary>
-    [Fact]
+        [Fact]
     public async Task Ask_AskerMovingZone_DoesNotBlockAsk()
     {
-        var (zone, asker, target) = MakeAskerAndTarget();
+        var (zones, asker, target) = MakeAskerAndTarget();
         asker.IsMovingZone = true;
-        var service = CreateService();
+        var service = CreateService(zones);
 
-        var result = await service.AskAsync(zone, asker, target.Name, CancellationToken.None);
+        var result = await service.AskAsync(asker, target.Name, CancellationToken.None);
 
         Assert.Equal(GuildInviteAskResultKind.Sent, result);
     }
 
-    /// <summary>WS1.4 ASK-PUBLISH-ONLY: a same-shard miss that resolves cross-shard publishes an Ask.</summary>
-    [Fact]
+        [Fact]
     public async Task Ask_SameShardMiss_ResolvesCrossShard_PublishesAskAndReturnsSentCrossShard()
     {
-        var (zone, asker, _) = MakeAskerAndTarget();
+        var (zones, asker, _) = MakeAskerAndTarget();
         var directory = new FakeCharacterShardLocationRepository();
-        directory.Seed(new CharacterShardLocationDto(2, 9, 77, "RemoteTarget", asker.Tribe, DateTime.UtcNow));
+        directory.Seed(new CharacterShardLocationDto(3, 9, 77, "RemoteTarget", asker.Tribe, DateTime.UtcNow));
         var relay = new FakeSocialCrossShardRelayQueue();
-        var service = CreateService(directory: directory, relay: relay);
+        var service = CreateService(zones, directory: directory, relay: relay);
 
-        var result = await service.AskAsync(zone, asker, "RemoteTarget", CancellationToken.None);
+        var result = await service.AskAsync(asker, "RemoteTarget", CancellationToken.None);
 
         Assert.Equal(GuildInviteAskResultKind.SentCrossShard, result);
         Assert.Single(relay.Enqueued);

@@ -4,7 +4,6 @@ namespace Fenrir.Application.Game.Tests.Mounts;
 
 public class MountPowerCodecTests
 {
-    // Power 12345678: place7=1, place6=2, ... place1=7, place0=8.
     private const int Power = 12345678;
 
     [Theory]
@@ -18,16 +17,16 @@ public class MountPowerCodecTests
     }
 
     [Theory]
-    [InlineData(1, 7)] // wire attribute-index 1 == highest place (place 7)
-    [InlineData(8, 0)] // wire attribute-index 8 == ones place (place 0)
+    [InlineData(1, 7)]
+    [InlineData(8, 0)]
     public void AttributeIndexToPlace_MapsHighestPlaceFirst(int attributeIndex, int expectedPlace)
     {
         Assert.Equal(expectedPlace, MountPowerCodec.AttributeIndexToPlace(attributeIndex));
     }
 
     [Theory]
-    [InlineData(1, 1)] // attribute-index 1 == place 7 == digit 1
-    [InlineData(8, 8)] // attribute-index 8 == place 0 == digit 8
+    [InlineData(1, 1)]
+    [InlineData(8, 8)]
     public void DigitByAttributeIndex_UsesHighestPlaceFirstMapping(int attributeIndex, int expectedDigit)
     {
         Assert.Equal(expectedDigit, MountPowerCodec.DigitByAttributeIndex(Power, attributeIndex));
@@ -44,8 +43,8 @@ public class MountPowerCodecTests
     [Fact]
     public void DigitSum_TotalsAllEightDigits()
     {
-        Assert.Equal(36, MountPowerCodec.DigitSum(Power)); // 1+2+3+4+5+6+7+8
+        Assert.Equal(36, MountPowerCodec.DigitSum(Power));
         Assert.Equal(0, MountPowerCodec.DigitSum(0));
-        Assert.Equal(72, MountPowerCodec.DigitSum(99999999)); // eight maxed digits
+        Assert.Equal(72, MountPowerCodec.DigitSum(99999999));
     }
 }

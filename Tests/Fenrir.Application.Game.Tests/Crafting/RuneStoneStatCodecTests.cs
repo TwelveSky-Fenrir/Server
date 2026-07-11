@@ -19,8 +19,6 @@ public class RuneStoneStatCodecTests
     [Fact]
     public void EncodeThenDecode_RoundTrips_NegativeComponents()
     {
-        // The 92298 branch's emptiness check treats a negative raw value as non-empty (unlike the other 2
-        // branches' "<= 0" check) -- the codec must be able to represent that pre-existing/legacy state.
         var packed = RuneStoneStatCodec.Encode(-5, 0, -1, 127);
         var (str, dex, vit, intel) = RuneStoneStatCodec.Decode(packed);
 

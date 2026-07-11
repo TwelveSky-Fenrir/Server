@@ -3,20 +3,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.World.WorldState;
 
-/// <summary>
-///     Process-wide, thread-safe home for RvR world state -- the in-process merge of the legacy ts25center hub's
-///     mWorldInfo/mTribeInfo singleton (every legacy ts25zone process reached the one ts25center over
-///     ZCP_ZONE_BROADCAST_FOR_CENTER_SEND; Fenrir runs every zone actor in one process, so they all reach this
-///     one instance directly instead). Boot-loads from game.WorldState/WorldStateTribes/WorldStateAllianceOffers
-///     via <see cref="InitializeAsync" />, mutated by any zone's tick or handler through the methods below, and
-///     flushed back by a periodic write-behind host -- SQL is a durability journal, never read again once loaded.
-///     <para>
-///         Only models the slice of WORLD_INFO/TRIBE_INFO the current schema persists: tribe symbol ownership,
-///         Zone038 ownership, tribe points/gate, and tribe alliance offers. The remaining WorldInfo wire fields
-///         (the numbered zone-siege state machines, guild battle, four-guild, etc.) have no backing table yet --
-///         they are the responsibility of whichever system builds that feature's own state next to this one.
-///     </para>
-/// </summary>
 public sealed class WorldStateService(IWorldStateRepository repository, ILogger<WorldStateService> logger)
 {
     public const int TribeCount = 4;
@@ -24,85 +10,22 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
     private readonly Dictionary<(byte From, byte To), AllianceOfferState> _allianceOffers = new();
     private readonly Lock _lock = new();
 
-    /// <summary>
-    ///     Cross-shard convergence accumulator for <see cref="AddTribePoints" />/<see cref="SetTribePoints" />:
-    ///     the amount still owed to game.WorldStateTribes.Points via
-    ///     <see cref="IWorldStateRepository.AddTribePointsAsync" /> since the last successful
-    ///     <see cref="FlushIfDirtyAsync" />. Additive, not a coarse dirty bit, because a delta (unlike an
-    ///     absolute overwrite) is not naturally retry-safe -- a failed flush must restore the exact amount,
-    ///     not just re-mark "something changed".
-    /// </summary>
-    private readonly int[] _pendingTribePointDeltas = new int[TribeCount];
+        private readonly int[] _pendingTribePointDeltas = new int[TribeCount];
 
-    /// <summary>
-    ///     B10 branch A (Formation ability) -- legacy <c>mWorldInfo-&gt;mTribeMasterCallAbility[tribe]</c>
-    ///     (Server/Header/Protocol/STRUCT.h:623), one code per tribe: 0 = inactive, 1-4 = an active ability
-    ///     (see <see cref="Combat.FormationCombatResolver" /> for what each code does to combat math).
-    ///     Declared by <see cref="SetTribeFormationAbility" /> (the "Tribe Work" sub-command-5 request's
-    ///     hub-side write, Server/ts25center/S04_MyWork02.cpp:921-925, reached only after the zone side has
-    ///     already run every eligibility gate -- Server/ts25zone/S04_MyWork02.cpp:11054-11093); cleared for
-    ///     every tribe, unconditionally, when the Tribe Symbol Battle world event ends
-    ///     (<see cref="EndTribeSymbolBattle" />, the same legacy dispatch site,
-    ///     Server/ts25center/S04_MyWork02.cpp:400-407).
-    ///     <para>
-    ///         Fenrir-local divergence from legacy, left open rather than silently assumed away: in legacy
-    ///         this value lives in the cluster's physically shared memory segment
-    ///         (Server/Header/H15_MyShare.h:3-5, Server/Header/S15_MyShare.cpp:101-109), so one hub write is
-    ///         instantaneously visible to every zone shard, the login process, and the "extra" process, with
-    ///         no propagation step and no per-process copy. This schema has no DB column backing this field
-    ///         (unlike every other field this class caches, it never participates in
-    ///         <see cref="_dirty" />/<see cref="FlushIfDirtyAsync" />/<see cref="ReconcileAsync" />), so this
-    ///         array is this ONE shard process's own local copy only -- a declaration made on one shard is
-    ///         NOT currently visible to a different shard's own <see cref="WorldStateService" /> instance.
-    ///         Closing that gap (a DB column plus flush/reconcile participation, or an equivalent cross-shard
-    ///         channel) is future work; see this task's own wiring-manifest notes rather than assuming it
-    ///         already converges cross-shard the way the rest of this class does.
-    ///     </para>
-    /// </summary>
-    private readonly byte[] _tribeFormationAbility = new byte[TribeCount];
+        private readonly byte[] _tribeFormationAbility = new byte[TribeCount];
 
-    /// <summary>
-    ///     B15 -- <c>mWorldInfo-&gt;mTribeSymbol[MAX_TRIBE_NUM]</c> (Server/Header/Protocol/STRUCT.h:595): the
-    ///     current OWNER tribe id (0-3) of each of the four tribe-home stone slots, one entry per slot -- richer
-    ///     than <see cref="TribeRvrState.HasSymbol" /> (a per-tribe boolean: "does THIS tribe still hold its OWN
-    ///     slot"), which can never answer "which tribe currently holds slot Y" once Y's own tribe has lost it.
-    ///     Added to unblock the PvM tribe-symbol damage-up bonus's cross-tribe-ownership input (see
-    ///     <see cref="ZoneWar.TribeSymbolDamageModifierSystem" />'s bonus half) -- the exact "no unbuilt
-    ///     world-state producer/accessor" gap <see cref="ZoneWar.TribeSymbolCombatModifiers" />'s own pre-existing
-    ///     GAP remarks flagged as blocking that computation.
-    ///     <para>
-    ///         Same Fenrir-local divergence as <see cref="_tribeFormationAbility" /> above (see its own remarks
-    ///         for the general pattern): no DB column backs this array (unlike <c>HasSymbol</c>/<c>SymbolDate</c>,
-    ///         which ARE persisted via <see cref="IWorldStateRepository.UpdateTribeSymbolStateAsync" />), so it
-    ///         never participates in <see cref="_dirty" />/<see cref="FlushIfDirtyAsync" />/
-    ///         <see cref="ReconcileAsync" /> -- this is this ONE shard process's own local, best-effort copy.
-    ///         Reset to "every tribe owns its own slot" at boot (<see cref="InitializeAsync" />) regardless of
-    ///         what the persisted <c>HasSymbol</c> boolean says at that moment, because the persisted boolean
-    ///         cannot recover WHICH tribe actually captured a lost slot -- a slot captured before this process's
-    ///         last boot is conservatively (and incorrectly, until the next live capture) treated as reclaimed by
-    ///         its own tribe. A real, accepted limitation on process restart mid-siege, not silently glossed
-    ///         over; corrected the moment the next live <see cref="ResolveTribeSymbol" /> call for that slot runs.
-    ///     </para>
-    /// </summary>
-    private readonly byte[] _tribeSymbolOwner = new byte[TribeCount];
+        private readonly byte[] _tribeSymbolOwner = new byte[TribeCount];
 
     private readonly TribeRvrState[] _tribes = new TribeRvrState[TribeCount];
 
     private bool _dirty;
     private bool _initialized;
 
-    /// <summary>
-    ///     Bumped by every mutator EXCEPT <see cref="AddTribePoints" />/<see cref="SetTribePoints" /> (Points
-    ///     converges through <see cref="_pendingTribePointDeltas" /> instead, which is always safe to merge).
-    ///     <see cref="ReconcileAsync" /> compares this before/after its DB re-read so it never overwrites a
-    ///     genuinely concurrent local mutation with a now-stale read.
-    /// </summary>
-    private int _scalarVersion;
+        private int _scalarVersion;
 
     private WorldRvrState _world;
 
-    /// <summary>True if any mutation happened since the last successful <see cref="FlushIfDirtyAsync" />.</summary>
-    public bool IsDirty
+        public bool IsDirty
     {
         get
         {
@@ -113,8 +36,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-    /// <summary>Current WorldState singleton snapshot. Throws until <see cref="InitializeAsync" /> has completed.</summary>
-    public WorldRvrState World
+        public WorldRvrState World
     {
         get
         {
@@ -126,11 +48,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-    /// <summary>
-    ///     Idempotent-bootstrap-then-load: seeds the DB rows if this is a first boot, then reads them into the
-    ///     in-memory cache. Must complete before any zone accepts a connection. One-shot -- a second call throws.
-    /// </summary>
-    public async Task InitializeAsync(CancellationToken ct)
+        public async Task InitializeAsync(CancellationToken ct)
     {
         if (_initialized)
             throw new InvalidOperationException("WorldStateService.InitializeAsync must only be called once, at boot.");
@@ -153,8 +71,6 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
                         new TribeRvrState(tribe.TribeId, tribe.SymbolDate, tribe.HasSymbol, tribe.Points,
                             tribe.IsClosed);
 
-            // See _tribeSymbolOwner's own remarks: every slot conservatively reclaimed by its own tribe at
-            // boot -- the persisted HasSymbol boolean cannot recover which tribe actually holds a lost slot.
             for (byte i = 0; i < TribeCount; i++)
                 _tribeSymbolOwner[i] = i;
 
@@ -181,15 +97,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-    /// <summary>
-    ///     B10 branch A: the current Formation ability code (0 = inactive, 1-4 -- see
-    ///     <see cref="Combat.FormationCombatResolver" />) held by <paramref name="tribeId" />'s tribe. Read
-    ///     live at attack-resolution time, never cached per-character -- see
-    ///     <see cref="Combat.CombatResolver" />'s own <c>attackerFormationCode</c>/<c>defenderFormationCode</c>
-    ///     parameter remarks for the intended call-site shape, and this field's own remarks for the current
-    ///     Fenrir-local (not yet cross-shard-converged) scope.
-    /// </summary>
-    public byte GetTribeFormationAbility(byte tribeId)
+        public byte GetTribeFormationAbility(byte tribeId)
     {
         EnsureInitialized();
         ValidateTribeId(tribeId);
@@ -199,12 +107,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-    /// <summary>
-    ///     B15 -- the current owner tribe id (0-3) of tribe <paramref name="slotTribeId" />'s own home-stone
-    ///     slot. See <see cref="_tribeSymbolOwner" />'s own remarks for why this is richer than, and tracked
-    ///     independently of, <see cref="TribeRvrState.HasSymbol" />.
-    /// </summary>
-    public byte GetTribeSymbolOwner(byte slotTribeId)
+        public byte GetTribeSymbolOwner(byte slotTribeId)
     {
         EnsureInitialized();
         ValidateTribeId(slotTribeId);
@@ -241,17 +144,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-    /// <summary>
-    ///     Legacy <c>ReturnAlliance</c> (Header/function.h:2964-2975): the *other* tribe of whichever active
-    ///     alliance pair <paramref name="tribeId" /> belongs to, or null if it is in no active pair -- never
-    ///     returns <paramref name="tribeId" /> itself (a real ally lookup can never be reflexive, which is
-    ///     exactly the fact <see cref="Progression.TowerFriendlyFireGate" />'s own fix rests on). An "active"
-    ///     pair is one where either recorded direction between the two tribes carries
-    ///     <see cref="AllianceOfferState.IsAccepted" /> -- the propose/accept/reject flow this schema tracks
-    ///     writes one directed (from, to) row per <see cref="SetAllianceOffer" /> call, so a real acceptance
-    ///     may land on either (A,B) or (B,A) depending on which side's own accept call fired last.
-    /// </summary>
-    public byte? GetAllyOf(byte tribeId)
+        public byte? GetAllyOf(byte tribeId)
     {
         EnsureInitialized();
         ValidateTribeId(tribeId);
@@ -271,15 +164,8 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-    // ---- Mutations -- legacy ZCP_ZONE_BROADCAST_FOR_CENTER_SEND tSort 38/40/42/45/46 equivalents ----
-    // (S04_MyWork02.cpp:357-472). Everything else the legacy switch touches (Zone049/051/175/241/etc,
-    // TribeGuardState, GuildBattle...) has no column in this schema yet -- out of scope here.
-    // SetTribeFormationAbility below is the one exception sourced from a DIFFERENT hub-side sub-command
-    // dispatch value (302, S04_MyWork02.cpp:921-925) than the 38/40/42/45/46 family above -- grouped here
-    // because its own reset is tSort 45's own dispatch site, not because it shares 302's own numbering.
 
-    /// <summary>tSort 38 (ZONE_038): records the deciding tribe and moment.</summary>
-    public void SetZone038Winner(byte tribeId)
+        public void SetZone038Winner(byte tribeId)
     {
         ValidateTribeId(tribeId);
         lock (_lock)
@@ -290,23 +176,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-    /// <summary>
-    ///     B10 branch A, declaration path terminus -- the "Tribe Work" sub-command-5 request's hub-side
-    ///     write (Server/ts25center/S04_MyWork02.cpp:921-925): unconditionally overwrites
-    ///     <paramref name="tribeId" />'s own Formation ability slot with <paramref name="formationCode" />,
-    ///     always a full replace, never additive/stacking with whatever code that tribe previously held.
-    ///     Every gate on WHETHER a declaration is allowed at all (requester is the exact Tribe Master, all
-    ///     four tribes' points above the floor, requester's tribe is the strict single lowest, that lowest
-    ///     tribe's share is under twenty percent, Tribe Symbol Battle currently active) is the caller's own
-    ///     responsibility, resolved before this method is ever reached -- this method, like the legacy hub
-    ///     write site it models, performs no re-validation of <paramref name="formationCode" />'s own 0-4
-    ///     range either (an open question the source contract flags rather than resolves: no second,
-    ///     unvalidated caller was found in the legacy source, but its absence was not proven exhaustively).
-    ///     Does not bump <see cref="_dirty" />/<see cref="_scalarVersion" /> -- see
-    ///     <see cref="_tribeFormationAbility" />'s own remarks for why this field never participates in the
-    ///     DB flush/reconcile cycle the rest of this class's mutators do.
-    /// </summary>
-    public void SetTribeFormationAbility(byte tribeId, byte formationCode)
+        public void SetTribeFormationAbility(byte tribeId, byte formationCode)
     {
         ValidateTribeId(tribeId);
         lock (_lock)
@@ -315,8 +185,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-    /// <summary>tSort 40: opens the tribe-symbol battle window; every tribe starts back on its own symbol.</summary>
-    public void StartTribeSymbolBattle()
+        public void StartTribeSymbolBattle()
     {
         var now = DateTime.UtcNow;
         lock (_lock)
@@ -325,7 +194,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
             for (byte i = 0; i < TribeCount; i++)
             {
                 _tribes[i] = _tribes[i] with { TribeId = i, HasSymbol = true, SymbolDate = now };
-                _tribeSymbolOwner[i] = i; // see _tribeSymbolOwner's own remarks -- kept in sync with HasSymbol
+                _tribeSymbolOwner[i] = i;
             }
 
             _dirty = true;
@@ -335,15 +204,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         logger.LogInformation("WorldState: tribe symbol battle window opened at {SymbolBattleStarted:O}", now);
     }
 
-    /// <summary>
-    ///     tSort 45: closes the tribe-symbol battle window. Per-tribe symbol ownership is left as-is, but
-    ///     every tribe's Formation ability slot (<see cref="_tribeFormationAbility" />) is unconditionally
-    ///     cleared back to inactive (0) here too -- the same legacy hub dispatch site
-    ///     (Server/ts25center/S04_MyWork02.cpp:400-407) performs both resets as one atomic step, including
-    ///     for a tribe that never activated a Formation ability in the first place (B10 contract Reset-path
-    ///     step 2: the reset is unconditional on prior state, not a no-op for an already-inactive tribe).
-    /// </summary>
-    public void EndTribeSymbolBattle()
+        public void EndTribeSymbolBattle()
     {
         lock (_lock)
         {
@@ -356,16 +217,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         logger.LogInformation("WorldState: tribe symbol battle window closed");
     }
 
-    /// <summary>
-    ///     tSort 42, tTribeSymbolIndex 0-3: tribe <paramref name="slotTribeId" />'s own symbol slot is contested.
-    ///     The DURABLE (DB-backed) schema only records ownership as a bool on the slot's own row
-    ///     (game.WorldStateTribes.HasSymbol) -- <paramref name="winnerTribeId" /> decides whether the slot's own
-    ///     tribe keeps it (winner == slot) or loses it (winner != slot) for that column. The IN-MEMORY-ONLY
-    ///     <see cref="_tribeSymbolOwner" /> (B15) additionally preserves the challenger's own identity when the
-    ///     slot's own tribe loses it -- see that field's own remarks for why this one extra fact cannot be
-    ///     recovered from the durable boolean alone, and is therefore tracked separately rather than persisted.
-    /// </summary>
-    public void ResolveTribeSymbol(byte slotTribeId, byte winnerTribeId)
+        public void ResolveTribeSymbol(byte slotTribeId, byte winnerTribeId)
     {
         ValidateTribeId(slotTribeId);
         ValidateTribeId(winnerTribeId);
@@ -388,8 +240,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
             slotTribeId, winnerTribeId, winnerTribeId == slotTribeId);
     }
 
-    /// <summary>tSort 42, tTribeSymbolIndex 4: the neutral monster-guarded symbol is won by <paramref name="winnerTribeId" />.</summary>
-    public void ResolveMonsterSymbol(byte winnerTribeId)
+        public void ResolveMonsterSymbol(byte winnerTribeId)
     {
         ValidateTribeId(winnerTribeId);
         lock (_lock)
@@ -402,19 +253,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         logger.LogInformation("WorldState: neutral monster symbol resolved -- winner={WinnerTribeId}", winnerTribeId);
     }
 
-    /// <summary>
-    ///     Absolute set (e.g. an admin/reset tool). Prefer <see cref="AddTribePoints" /> for RvR kill-scoring.
-    ///     Unlike every other field this class caches, Points converges across shards through the additive
-    ///     <see cref="_pendingTribePointDeltas" /> path (<see cref="IWorldStateRepository.AddTribePointsAsync" />),
-    ///     not a whole-row overwrite -- so this method locally applies the absolute value (readers of
-    ///     <see cref="GetTribe" /> see it immediately) but queues the equivalent DELTA against the
-    ///     locally-cached baseline, so the next flush still reaches the DB via the same concurrency-safe
-    ///     additive proc instead of silently never persisting (a blind local overwrite here would be
-    ///     durably invisible under the new split flush, contradicting this class's own "zero lost updates on
-    ///     Points" contract). Does not bump <see cref="_scalarVersion" />: Points is not part of the
-    ///     "everything else" reconcile bucket.
-    /// </summary>
-    public void SetTribePoints(byte tribeId, int points)
+        public void SetTribePoints(byte tribeId, int points)
     {
         ValidateTribeId(tribeId);
         lock (_lock)
@@ -426,15 +265,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-    /// <summary>
-    ///     Atomic delta under the same lock every reader uses -- safe for concurrent scoring across zones AND
-    ///     across shards: the delta is queued into <see cref="_pendingTribePointDeltas" /> and flushed via
-    ///     <see cref="IWorldStateRepository.AddTribePointsAsync" />, additive at the DB, so two shards' deltas
-    ///     always sum correctly regardless of interleaving. Returns the new LOCAL total (this shard's own
-    ///     up-to-date view; <see cref="ReconcileAsync" /> converges it with any other shard's concurrent
-    ///     deltas within one flush interval). Does not bump <see cref="_scalarVersion" />.
-    /// </summary>
-    public int AddTribePoints(byte tribeId, int delta)
+        public int AddTribePoints(byte tribeId, int delta)
     {
         ValidateTribeId(tribeId);
         lock (_lock)
@@ -447,34 +278,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-    /// <summary>
-    ///     Writes real, durable per-tribe backing state (<c>game.WorldStateTribes.IsClosed</c>) -- but has no
-    ///     production caller today, and this method does not by itself give that state any wire-visible or
-    ///     gameplay meaning.
-    ///     <para>
-    ///         Investigated and deliberately left unwired rather than guessed at: the column's name suggests it
-    ///         backs <c>WorldInfo.TribeCloseInfo</c> (legacy <c>mTribeCloseInfo[2]</c>), but that legacy field is
-    ///         itself dead state in the C++ source -- it is written exactly once, to the constant pair
-    ///         <c>{0, -1}</c>, at ts25center boot, and round-tripped through the DB SELECT/UPDATE/INSERT column
-    ///         mapping, but is never read or reassigned by any gameplay logic in ts25center, ts25zone, or any
-    ///         other executable. No tribe-vote/zone-war mechanic in this codebase naturally owns calling this
-    ///         method either: <see cref="ZoneWar.TribeVoteElection" />'s own <c>Phase</c> already models the
-    ///         unrelated legacy <c>mTribeVoteState</c>/<c>mCloseVoteState</c> pair (itself a separate, still
-    ///         entirely unbacked-in-DB gap, documented on that class), and
-    ///         <see cref="ZoneWar.TribeGuardCorridorState" /> models the unrelated
-    ///         <c>mTribeGuardState[4][4]</c> checkpoint table. Inventing a caller here would be assigning this
-    ///         column gameplay semantics the legacy source does not have -- see
-    ///         <see cref="WorldStateProjection" />'s own remarks for why <c>TribeCloseInfo</c> is left as a
-    ///         template pass-through rather than projected from this column.
-    ///     </para>
-    /// </summary>
-    /// <remarks>
-    ///     Réf. C++ : Server/ts25center/S07_MyGame01.cpp:34-35 (the only two writes to
-    ///     <c>mWorldInfo-&gt;mTribeCloseInfo</c> in the entire tree, both boot-time constants) ;
-    ///     Server/Header/CSQLWorldTribe.cpp:33-34 (DB column mapping only, no gameplay read/write) ;
-    ///     Server/Header/unity.h:334, Server/Header/Protocol/STRUCT.h:599 (struct definition).
-    /// </remarks>
-    public void SetTribeClosed(byte tribeId, bool isClosed)
+        public void SetTribeClosed(byte tribeId, bool isClosed)
     {
         ValidateTribeId(tribeId);
         lock (_lock)
@@ -498,15 +302,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-    /// <summary>
-    ///     Raw passthrough of the legacy cross-process flag (ts25playuser writes 1 when it has fresh daily tribe
-    ///     points pending; ts25center consumes it -&gt; 2 -&gt; back to 0 next hour). The daily recompute job that
-    ///     drove it (ts25playuser S07_MyGame01.cpp:449-478, USE_NEW_CLAN_POINT) is out of scope for this cluster.
-    ///     Deferred to the next <see cref="FlushIfDirtyAsync" /> cycle like every other scalar setter here -- see
-    ///     <see cref="TryConsumeUpdateTribePointFlagAsync" /> for the one caller that instead needs an immediate,
-    ///     success-gated write of this same field.
-    /// </summary>
-    public void SetUpdateTribePointFlag(short value)
+        public void SetUpdateTribePointFlag(short value)
     {
         lock (_lock)
         {
@@ -516,30 +312,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-    /// <summary>
-    ///     tSort=1234 poll's step 1 (S07_MyGame01.cpp:253-266): flips <see cref="WorldRvrState.UpdateTribePoint" />
-    ///     from <paramref name="expectedPendingValue" /> to <paramref name="consumedValue" />, persisting the
-    ///     change immediately -- NOT deferred to the next <see cref="FlushIfDirtyAsync" /> cycle like every other
-    ///     scalar mutator on this class -- because the caller (<see cref="FavoredTribeRankBonusLadderService" />)
-    ///     must know, on this same tick, whether the rewrite durably succeeded before it is safe to run the rest
-    ///     of the sequence the flag gates (the biased recompute and its broadcast). Every other already-cached
-    ///     scalar field is round-tripped through the write unchanged.
-    ///     <para>
-    ///         A no-op that returns false without touching the repository at all when the flag does not
-    ///         currently hold <paramref name="expectedPendingValue" /> -- the contract's documented steady
-    ///         state, not a failure. Returns false, with the flag left exactly as read, if the write throws --
-    ///         the next poll retries the whole sequence from the start, since the flag was never actually
-    ///         changed. Returns true, with the in-memory flag already advanced to
-    ///         <paramref name="consumedValue" />, only once the write has actually completed successfully.
-    ///     </para>
-    /// </summary>
-    /// <remarks>
-    ///     Réf. C++ : Server/ts25center/S07_MyGame01.cpp:253-266 -- reads the flag, and only on the triggering
-    ///     value flips it to consumed FIRST, as its own distinct write, before anything else in the sequence
-    ///     runs ; Server/ts25center/S07_MyGame01.cpp:199-267 (<c>MyGame::Logic</c>) -- confirms this whole block
-    ///     is unguarded by any build macro.
-    /// </remarks>
-    public async ValueTask<bool> TryConsumeUpdateTribePointFlagAsync(short expectedPendingValue, short consumedValue,
+        public async ValueTask<bool> TryConsumeUpdateTribePointFlagAsync(short expectedPendingValue, short consumedValue,
         CancellationToken ct)
     {
         WorldRvrState snapshot;
@@ -576,37 +349,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         return true;
     }
 
-    /// <summary>
-    ///     tSort=1234 poll's step 2 (S08_MyDB.cpp:138-193): immediately overwrites all <see cref="TribeCount" />
-    ///     tribes' Points totals -- a full, absolute overwrite, never the additive
-    ///     <see cref="AddTribePoints" />/<see cref="IWorldStateRepository.AddTribePointsAsync" /> path, so this
-    ///     method must never also queue a pending delta that a later flush would double-apply on top of the
-    ///     value it just wrote directly (unlike <see cref="SetTribePoints" />, which is exactly that deferred/
-    ///     additive path and is deliberately NOT reused here). The in-memory mirror is overwritten BEFORE the
-    ///     persist is attempted -- matching the contract's documented "mirror changes even on eventual failure"
-    ///     edge case -- and is never rolled back if the persist then fails: the caller must treat a false return
-    ///     as "this recompute is now permanently lost for this request", not something to retry.
-    ///     <para>
-    ///         Legacy parity note: the legacy schema writes all 4 totals in one UPDATE statement against a
-    ///         single denormalized worldinfo row; this schema normalizes one row per tribe
-    ///         (game.WorldStateTribes), so this method issues one <see cref="IWorldStateRepository.UpdateTribeAsync" />
-    ///         call per tribe instead of one combined statement -- behaviorally equivalent for this contract (all
-    ///         4 succeed, or the whole recompute is treated as failed), not a byte-for-byte reproduction of the
-    ///         single-statement shape. Every other column on each tribe's row (SymbolDate/HasSymbol/IsClosed) is
-    ///         round-tripped unchanged.
-    ///     </para>
-    ///     <para>
-    ///         Fenrir-only divergence from the narrow "mirror not rolled back" legacy window: unlike the legacy's
-    ///         single-process ts25center (which never re-read this row again until next boot), this shard's own
-    ///         periodic <see cref="ReconcileAsync" /> unconditionally re-derives each tribe's Points from the DB
-    ///         value plus any pending delta on its very next cycle -- for a tribe whose persist failed here, that
-    ///         will pull the in-memory mirror back down to the stale DB value rather than leaving it diverged
-    ///         indefinitely. This is a deliberate, documented behavior difference introduced by Fenrir's
-    ///         cross-shard reconcile mechanism, which has no legacy equivalent -- it is not a bug in either the
-    ///         legacy source or this port.
-    ///     </para>
-    /// </summary>
-    public async ValueTask<bool> TryOverwriteTribePointTotalsAsync(IReadOnlyList<int> totals, CancellationToken ct)
+        public async ValueTask<bool> TryOverwriteTribePointTotalsAsync(IReadOnlyList<int> totals, CancellationToken ct)
     {
         if (totals.Count != TribeCount)
             throw new ArgumentException($"Expected exactly {TribeCount} totals.", nameof(totals));
@@ -640,12 +383,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         return allSucceeded;
     }
 
-    /// <summary>
-    ///     tSort 46/47/49: direct upsert of one offer pair. Accept/reject-slot semantics
-    ///     (mAllianceState/mPossibleAllianceInfo in the legacy) are not modeled by this schema yet -- see
-    ///     game.WorldStateAllianceOffers.sql.
-    /// </summary>
-    public void SetAllianceOffer(byte fromTribeId, byte toTribeId, bool isAccepted)
+        public void SetAllianceOffer(byte fromTribeId, byte toTribeId, bool isAccepted)
     {
         ValidateTribeId(fromTribeId);
         ValidateTribeId(toTribeId);
@@ -661,15 +399,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-    /// <summary>
-    ///     Dissolves whichever active alliance pairing currently links <paramref name="tribeA" /> and
-    ///     <paramref name="tribeB" />, if any -- flips whichever directed (from, to) row is the accepted one
-    ///     back to not-accepted, so <see cref="GetAllyOf" /> stops returning it for either tribe. A no-op if
-    ///     the two are not currently allied to each other. Used by
-    ///     <see cref="ZoneWar.AllianceDiplomacyCeremony" />'s already-allied-negotiation completion
-    ///     (S04_MyWork02.cpp:427-448 case 47) and the separate alliance-stone-destruction mechanism.
-    /// </summary>
-    public void DissolveAlliance(byte tribeA, byte tribeB)
+        public void DissolveAlliance(byte tribeA, byte tribeB)
     {
         ValidateTribeId(tribeA);
         ValidateTribeId(tribeB);
@@ -694,21 +424,13 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-    /// <summary>TRIBE_WORK tSort 55's tally read -- the Force Leader candidate list, highest VotePoint first.</summary>
-    public ValueTask<ReadOnlyCollection<TribeVoteDto>> GetTribeVotesAsync(byte tribeId, CancellationToken ct)
+        public ValueTask<ReadOnlyCollection<TribeVoteDto>> GetTribeVotesAsync(byte tribeId, CancellationToken ct)
     {
         ValidateTribeId(tribeId);
         return repository.GetTribeVotesAsync(tribeId, ct);
     }
 
-    /// <summary>
-    ///     TRIBE_WORK tSort 1/57 (TRIBE_VOTE_V2 branch): registers a Force Leader candidate into
-    ///     <paramref name="slotIndex" />, displacing whoever is there today. Straight passthrough -- unlike
-    ///     the scalar WorldState/Tribe fields above, candidate slots are never cached in-process (the election
-    ///     is a low-frequency, DB-of-record feature, not a per-tick read), so there is nothing to mark dirty
-    ///     here.
-    /// </summary>
-    public ValueTask RegisterTribeVoteCandidateAsync(byte tribeId, byte slotIndex, int candidateCharacterId,
+        public ValueTask RegisterTribeVoteCandidateAsync(byte tribeId, byte slotIndex, int candidateCharacterId,
         short candidateLevel, int killOtherTribeCount, CancellationToken ct)
     {
         ValidateTribeId(tribeId);
@@ -716,37 +438,19 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
             killOtherTribeCount, ct);
     }
 
-    /// <summary>TRIBE_WORK tSort 3/59 (vote): adds one voter's computed points onto their chosen candidate slot.</summary>
-    public ValueTask CastTribeVoteAsync(byte tribeId, byte slotIndex, int points, CancellationToken ct)
+        public ValueTask CastTribeVoteAsync(byte tribeId, byte slotIndex, int points, CancellationToken ct)
     {
         ValidateTribeId(tribeId);
         return repository.AddTribeVotePointsAsync(tribeId, slotIndex, points, ct);
     }
 
-    /// <summary>TRIBE_WORK tSort 52/56: wipes every candidate slot for one tribe ahead of a fresh election cycle.</summary>
-    public ValueTask ResetTribeVotesAsync(byte tribeId, CancellationToken ct)
+        public ValueTask ResetTribeVotesAsync(byte tribeId, CancellationToken ct)
     {
         ValidateTribeId(tribeId);
         return repository.ClearTribeVotesAsync(tribeId, ct);
     }
 
-    /// <summary>
-    ///     Persists the whole cache if anything changed since the last flush; no-ops otherwise. Mirrors the
-    ///     legacy ts25center tick (S07_MyGame01.cpp:241-267), which unconditionally re-wrote the whole
-    ///     worldinfo/tribeinfo row every 6 ticks -- this only skips the round trip when nothing actually
-    ///     changed. Never throws: a failed flush is logged and left dirty for the next interval to retry.
-    ///     <para>
-    ///         Split in two independent halves so a Points-delta failure can never re-dirty the (usually
-    ///         unrelated) scalar/symbol-state/alliance-offer writes, and vice versa: the world/symbol-state/
-    ///         offer half persists the always-single-writer-by-construction fields exactly like before
-    ///         (<see cref="IWorldStateRepository.UpdateAsync" />/
-    ///         <see cref="IWorldStateRepository.UpdateTribeSymbolStateAsync" />/
-    ///         <see cref="IWorldStateRepository.SetAllianceOfferAsync" />); the Points-delta half calls
-    ///         <see cref="IWorldStateRepository.AddTribePointsAsync" /> only for tribes with a nonzero pending
-    ///         delta, additive at the DB so concurrent shards' deltas can never clobber each other.
-    ///     </para>
-    /// </summary>
-    public async ValueTask FlushIfDirtyAsync(CancellationToken ct)
+        public async ValueTask FlushIfDirtyAsync(CancellationToken ct)
     {
         WorldRvrState world;
         TribeRvrState[] tribes;
@@ -762,8 +466,6 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
             tribes = (TribeRvrState[])_tribes.Clone();
             allianceOffers = [.. _allianceOffers.Values];
 
-            // Zeroed optimistically -- any call below that fails restores its own share of this snapshot
-            // (see the two catch blocks), never leaving a partial amount silently unaccounted for.
             pointDeltaSnapshot = (int[])_pendingTribePointDeltas.Clone();
             Array.Clear(_pendingTribePointDeltas);
         }
@@ -789,7 +491,6 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
         catch (Exception ex)
         {
-            // Compensate: the whole snapshot goes back, since none of it is confirmed persisted.
             lock (_lock)
             {
                 for (byte i = 0; i < TribeCount; i++)
@@ -811,8 +512,6 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
             }
             catch (Exception ex)
             {
-                // Compensate this tribe's own share only -- restore the exact amount (not a coarse dirty
-                // bit) and re-arm _dirty so the next interval's early-return doesn't skip retrying it.
                 lock (_lock)
                 {
                     _pendingTribePointDeltas[i] += pointDeltaSnapshot[i];
@@ -825,25 +524,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-    /// <summary>
-    ///     Cross-shard convergence: re-reads game.WorldState/WorldStateTribes/WorldStateAllianceOffers and
-    ///     merges the result into the in-process cache without stomping this shard's own not-yet-flushed
-    ///     local mutations. Called every <c>WorldStateWriteBehindHost</c> cycle, immediately after
-    ///     <see cref="FlushIfDirtyAsync" />, so a competing shard's just-flushed change (including this
-    ///     shard's own delta, already summed into game.WorldStateTribes.Points by
-    ///     <see cref="IWorldStateRepository.AddTribePointsAsync" />) becomes visible here within one flush
-    ///     interval. Never throws -- a failed reconcile is logged and simply retried next interval, same
-    ///     posture as <see cref="FlushIfDirtyAsync" />.
-    ///     <para>
-    ///         Points always merges safely: DB total + whatever this shard has queued locally since the read
-    ///         started (<see cref="_pendingTribePointDeltas" />) -- a plain sum, never a stomp, so it needs no
-    ///         dirty-flag guard. Every other field only swaps in the fresh DB value if <see cref="_scalarVersion" />
-    ///         is unchanged from just before the read; otherwise this cycle is skipped for those fields and the
-    ///         next cycle retries, so a genuinely concurrent local mutation can never be clobbered by a now-stale
-    ///         read.
-    ///     </para>
-    /// </summary>
-    public async ValueTask ReconcileAsync(CancellationToken ct)
+        public async ValueTask ReconcileAsync(CancellationToken ct)
     {
         if (!_initialized)
             return;
@@ -931,12 +612,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
             throw new ArgumentOutOfRangeException(nameof(tribeId), tribeId, $"TribeId must be 0-{TribeCount - 1}.");
     }
 
-    /// <summary>
-    ///     Mirrors the legacy's <c>ReturnNowTime()</c> (datetime.h:85-90): hour*100+minute, display-only --
-    ///     ts25zone comments confirm every reader of this field just shows it, never does elapsed-time math
-    ///     against it (S07_MyGame08.cpp:205,292 "use realtime").
-    /// </summary>
-    private static int NowAsLegacyHhMm()
+        private static int NowAsLegacyHhMm()
     {
         var now = DateTime.UtcNow;
         return now.Hour * 100 + now.Minute;

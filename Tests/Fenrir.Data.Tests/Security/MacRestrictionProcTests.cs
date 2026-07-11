@@ -9,11 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Security;
 
-// admin.usp_MacRestriction_* against real SQL Server 2025, driven through MacRestrictionRepository -- exercises
-// the MAC-wide-default-vs-per-install-override precedence documented on IMacRestrictionRepository.
-// MacRestrictionRepository caches GetAll for 2s (CaeriusNet's cache is process-wide static storage, not scoped
-// per test -- see GameServerDirectoryRepositoryTests), so every assertion that must see a just-inserted row
-// waits past that TTL first.
 [Collection("SqlServer")]
 public class MacRestrictionProcTests
 {
@@ -58,8 +53,8 @@ public class MacRestrictionProcTests
     public async Task IsBannedAsync_PerInstallOverride_TakesPrecedenceOverTheMacWideDefault()
     {
         var mac = UniqueMac();
-        await AddAsync(mac, null, 0); // MAC banned by default...
-        await AddAsync(mac, "trusted-adapter", 5); // ...except this one specific install.
+        await AddAsync(mac, null, 0);
+        await AddAsync(mac, "trusted-adapter", 5);
         await Task.Delay(CacheBypassDelay);
 
         Assert.False(await _restrictions.IsBannedAsync(mac, "trusted-adapter", CancellationToken.None));

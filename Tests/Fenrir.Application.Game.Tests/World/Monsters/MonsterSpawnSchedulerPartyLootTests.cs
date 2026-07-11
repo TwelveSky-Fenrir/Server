@@ -10,13 +10,6 @@ using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Game.Tests.World.Monsters;
 
-/// <summary>
-///     Covers <see cref="MonsterSpawnScheduler.ProcessDeath" />'s party-loot-share wiring: a partied killer's
-///     drop must carry DropSort=1 and the party's own name (the leader's character name -- legacy's
-///     <c>aPartyName</c>, <c>S04_MyWork02.cpp:9720-9721</c>) instead of the previously-hardcoded
-///     <c>PartyName=""/DropSort=0</c>, so <see cref="GroundItemEntity.IsClaimableBy" />'s party-share window
-///     actually becomes reachable.
-/// </summary>
 public class MonsterSpawnSchedulerPartyLootTests
 {
     private const int PotionItemId = 8001;
@@ -58,32 +51,28 @@ public class MonsterSpawnSchedulerPartyLootTests
         var parties = new PartyRegistry();
         Assert.Equal(PartyInviteOutcome.Sent, parties.TryInvite(10, 1, 0, 11, 1, 0));
         Assert.True(parties.TryAnswer(11, true, out _, out _));
-        Assert.Equal(new[] { 10, 11 }, parties.GetMembers(10)); // leader (10, "Leader") first
+        Assert.Equal(new[] { 10, 11 }, parties.GetMembers(10));
 
         var zone = CreateZoneWithGuaranteedDrop(parties);
         var (leaderSession, _) = ZoneTestKit.CreateSession(1);
         var (mateSession, _) = ZoneTestKit.CreateSession(2);
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(leaderSession, 1, "Leader", 0, posZ: 0, level: 1)));
         zone.Post(ZoneCommand.Enter(11, ZoneTestKit.EnterData(mateSession, 1, "Mate", 50, posZ: 50, level: 1)));
-        zone.Tick(SimulationClock.LegacyTick); // enters + pops the monster
+        zone.Tick(SimulationClock.LegacyTick);
 
-        // The non-leader member lands the kill -- PartyName must resolve to the *leader's* name, not the killer's own.
         zone.TryDamageMonster(1, 10_000, 11, out var died, out _);
         Assert.True(died);
-        zone.Tick(SimulationClock.LegacyTick); // drains the death: rolls the guaranteed potion drop
+        zone.Tick(SimulationClock.LegacyTick);
         Assert.Equal(1, zone.GroundItemCount);
 
-        // Too early (before the 10s party-share delay) -- not the killer, not expired, not yet party-shareable.
         var tooEarly = zone.TryClaimGroundItem(1, 1u, "Leader", "Leader", 50, 0, 50, out _);
         Assert.Equal(GroundItemClaimOutcome.NotOwned, tooEarly);
 
-        // Wrong party name -- never claimable through the party-share branch, no matter how long it waits.
-        for (var i = 0; i < 25; i++) // 12.5s -- past the party-share delay, still short of free-for-all
+        for (var i = 0; i < 25; i++)
             zone.Tick(SimulationClock.LegacyTick);
         var wrongParty = zone.TryClaimGroundItem(1, 1u, "Stranger", "SomeoneElse", 50, 0, 50, out _);
         Assert.Equal(GroundItemClaimOutcome.NotOwned, wrongParty);
 
-        // Correct party name, correct member, after the share delay -- now claimable.
         var shared = zone.TryClaimGroundItem(1, 1u, "Leader", "Leader", 50, 0, 50, out var item);
         Assert.Equal(GroundItemClaimOutcome.Success, shared);
         Assert.Equal(PotionItemId, item!.ItemId);
@@ -101,8 +90,6 @@ public class MonsterSpawnSchedulerPartyLootTests
         zone.Tick(SimulationClock.LegacyTick);
         Assert.Equal(1, zone.GroundItemCount);
 
-        // Past the party-share delay: a solo drop has no party name to match, so this must still fail --
-        // only the killer (or the free-for-all window) can claim it.
         for (var i = 0; i < 25; i++)
             zone.Tick(SimulationClock.LegacyTick);
         var strangerAttempt = zone.TryClaimGroundItem(1, 1u, "Stranger", "AnyPartyName", 50, 0, 50, out _);

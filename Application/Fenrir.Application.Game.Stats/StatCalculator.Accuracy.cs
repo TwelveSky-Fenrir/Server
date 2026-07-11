@@ -4,11 +4,7 @@ namespace Fenrir.Application.Game.Stats;
 
 public static partial class StatCalculator
 {
-    // ---- GetBaseAttackSuccess (HIT) ----
 
-    // mount (grade whole-value multiplier on hit) context is a B1 plumbing seam -- not read yet. WORKSTREAM B2:
-    // zone/consumable are trailing optional adds -- the dexterity-elixir counter (consumable.EatDexPotion) feeds
-    // hit at +2/elixir when the zone is elixir-eligible (MyFactor.cpp:694,699).
     private static int ComputeAttackSuccess(int strength, LevelRowDto levelRow, int setNumber,
         EquippedItemSlot?[] bySlot, MountContext mount = default, ZoneContext zone = default,
         ConsumableContext consumable = default)
@@ -20,7 +16,7 @@ public static partial class StatCalculator
         {
             if (bySlot[i] is not { } slot) continue;
             hit += slot.Item.AttackSuccess;
-            if (i != 8) // EPET: flat contribution above always counts, coefSet term skips slot 8
+            if (i != 8)
                 hit += (int)(slot.Item.AttackSuccess *
                              SetBonusTables.GetCoefficients(setNumber, i, IsLegendary(slot.Item)).AttackSuccess);
         }
@@ -28,10 +24,8 @@ public static partial class StatCalculator
         hit += ComputeGlovesAttackSuccessBonus(bySlot[3]);
         hit += ComputeWeaponAttackSuccessBonus(bySlot[7]);
 
-        // B7 layered the four-guild/event override on top of B2's raw +2/elixir floor (MyFactor.cpp:694,699).
         hit += AccuracyElixirContributionWithOverride(consumable, zone);
 
-        // B3-deco effect-sort 3 (hit ramp): weapon slot only, IU count = Combine (MyFactor.cpp:3144).
         if (bySlot[7] is { } weaponIu3)
             hit += IUEffectSlotContribution(3, weaponIu3.Item.Sort, weaponIu3.Item.Level, weaponIu3.Combine);
 
@@ -55,7 +49,6 @@ public static partial class StatCalculator
         {
             total += SetBonusTables.LinearByCombine(gloves.Combine, 200);
             var enchant = gloves.Enchant;
-            // 0<IS<=50 clamp assumed shared with every other set2 IS-combo term in this file.
             if (enchant is > 0 and <= 50)
                 total += (int)(item.AttackSuccess * enchant * 0.03f);
         }
@@ -70,23 +63,19 @@ public static partial class StatCalculator
             : 0;
     }
 
-    // ---- GetBaseAttackBlock (DODGE) ----
 
-    // mount (grade whole-value multiplier on block) context is a B1 plumbing seam -- not read yet. WORKSTREAM B2:
-    // zone/consumable are trailing optional adds -- the dexterity-elixir counter (consumable.EatDexPotion) feeds
-    // dodge at +2/elixir when the zone is elixir-eligible (MyFactor.cpp:726,731).
     private static int ComputeAttackBlock(int wisdom, int vitality, LevelRowDto levelRow, int setNumber,
         EquippedItemSlot?[] bySlot, MountContext mount = default, ZoneContext zone = default,
         ConsumableContext consumable = default)
     {
-        var dodge = (int)(wisdom * 1.67f) + (int)(vitality * 0.90f); // two separate truncations
+        var dodge = (int)(wisdom * 1.67f) + (int)(vitality * 0.90f);
         dodge += levelRow.AttackBlock;
 
         for (var i = 0; i < bySlot.Length; i++)
         {
             if (bySlot[i] is not { } slot) continue;
             dodge += slot.Item.AttackBlock;
-            if (i != 8) // EPET
+            if (i != 8)
                 dodge += (int)(slot.Item.AttackBlock *
                                SetBonusTables.GetCoefficients(setNumber, i, IsLegendary(slot.Item)).AttackBlock);
         }
@@ -94,17 +83,13 @@ public static partial class StatCalculator
         dodge += ComputeArmorAttackBlockBonus(bySlot[2]);
         dodge += ComputeBootsAttackBlockBonus(bySlot[5]);
 
-        // B3-deco effect-sort 4 (dodge ramp): armor slot 2 AND boots slot 5, IU count = Combine
-        // (MyFactor.cpp:3280, :3303-3304).
         if (bySlot[2] is { } armorIu4)
             dodge += IUEffectSlotContribution(4, armorIu4.Item.Sort, armorIu4.Item.Level, armorIu4.Combine);
         if (bySlot[5] is { } bootsIu4)
             dodge += IUEffectSlotContribution(4, bootsIu4.Item.Sort, bootsIu4.Item.Level, bootsIu4.Combine);
 
-        // B3-deco decoration ReturnNewStat (slots 9-12, IS octet only -- see DecorationStatContribution remarks).
         dodge += DecorationStatContribution(DecorationStatKind.AttackBlock, bySlot);
 
-        // B7 layered the four-guild/event override on top of B2's raw +2/elixir floor (MyFactor.cpp:726,731).
         dodge += BlockElixirContributionWithOverride(consumable, zone);
 
         return dodge;

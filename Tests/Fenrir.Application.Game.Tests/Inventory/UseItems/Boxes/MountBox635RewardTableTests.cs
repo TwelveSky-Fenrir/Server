@@ -5,15 +5,6 @@ using Fenrir.Application.Game.Domain.World.Loot;
 
 namespace Fenrir.Application.Game.Tests.Inventory.UseItems.Boxes;
 
-/// <summary>
-///     Covers the C10-mountbox635 reward-table DATA (<see cref="MountBox635RewardTable" />) layered on top of the
-///     pre-existing, pre-tested C10 box-open mechanism (<see cref="LootBoxOpenResolver" />,
-///     <see cref="Fenrir.Application.Game.Domain.Consumables.LootBoxRewardResolver.RollUniform" />).
-///     Deliberately exercises <see cref="MountBox635RewardTable.CreateSpec" /> directly rather than through
-///     <see cref="LootBoxCatalog.Default" />: the catalog splice itself is a separate, serial wiring-manifest
-///     step (see this workstream's wiring manifest) not yet applied to the shared static instance when this test
-///     runs.
-/// </summary>
 public class MountBox635RewardTableTests
 {
     private const int Today = 20260710;
@@ -74,8 +65,6 @@ public class MountBox635RewardTableTests
         var spec = MountBox635RewardTable.CreateSpec();
         var page0 = ImmutableDictionary<byte, ItemStack>.Empty.SetItem(0, Box(635, 3));
 
-        // Draw index 3 -> 1315 (bear). The reward's own world.Items Sort value is out of this slice's scope, so
-        // an arbitrary non-stackable sort stands in here purely to exercise the shared placement path.
         var plan = LootBoxOpenResolver.OpenSingle(spec, 0, 0, Box(635, 3), page0,
             ImmutableDictionary<byte, ItemStack>.Empty, Sorts((1315, 4)), new ScriptedRandom(3), Today);
 
@@ -97,17 +86,13 @@ public class MountBox635RewardTableTests
 
         Assert.Equal(LootBoxOpenResolver.Outcome.Success, plan.Outcome);
         Assert.Equal(0, plan.BoxRemainingQuantity);
-        Assert.False(plan.ProjectedPage0.ContainsKey(0)); // box slot cleared once its quantity drops below 1
+        Assert.False(plan.ProjectedPage0.ContainsKey(0));
         Assert.Equal(1307, plan.ProjectedPage0[1].ItemId);
     }
 
     [Fact]
     public void BoxItemId_IsNotInBulkOpenWhitelist_SoAnyRequestedOpenCountIsIgnored()
     {
-        // Contract edge case: item 635's own unconditional handler returns before the bulk dispatch is ever
-        // reached, and its own case in the bulk-eligibility switch is source-commented out in legacy -- reproduced
-        // here by this box id being absent from the whitelist, so LootBoxUseItemHandler always takes the
-        // single-open path for 635 regardless of the client's requested open count.
         Assert.DoesNotContain(MountBox635RewardTable.BoxItemId, LootBoxCatalog.BulkOpenWhitelist);
     }
 
@@ -122,8 +107,7 @@ public class MountBox635RewardTableTests
         return id => map.TryGetValue(id, out var sort) ? sort : null;
     }
 
-    /// <summary>Returns queued draws in request order; throws if the code draws more than were scripted.</summary>
-    private sealed class ScriptedRandom(params int[] values) : Random
+        private sealed class ScriptedRandom(params int[] values) : Random
     {
         private int _index;
 

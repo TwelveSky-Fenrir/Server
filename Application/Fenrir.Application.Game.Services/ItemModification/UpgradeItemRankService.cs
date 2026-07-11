@@ -11,10 +11,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.ItemModification;
 
-/// <summary>
-///     Business logic for op27, CZ_HIGH_ITEM_SEND -- extracted from <see cref="UpgradeItemRankHandler" />, see
-///     that handler's remarks.
-/// </summary>
 public sealed class UpgradeItemRankService(
     ICharacterRepository characters,
     WorldDataCache worldData,
@@ -23,15 +19,10 @@ public sealed class UpgradeItemRankService(
     ILogger<UpgradeItemRankService> logger)
     : IUpgradeItemRankService
 {
-    /// <summary>
-    ///     game.EventLog.EventCode for an upgrade-rank attempt -- the wire opcode (op27) itself, same
-    ///     "app-owned numbering scheme, caller-interpreted alongside Category" posture as every other
-    ///     EventCode in this codebase.
-    /// </summary>
-    private const short UpgradeItemRankEventCode = 27;
 
-    /// <summary>game.EventLog.Outcome for this EventCode: 0 success, 1 failed.</summary>
-    private const byte SuccessOutcome = 0;
+        private const short UpgradeItemRankEventCode = 27;
+
+        private const byte SuccessOutcome = 0;
 
     private const byte FailedOutcome = 1;
 
@@ -99,20 +90,9 @@ public sealed class UpgradeItemRankService(
 
             if (warlordDraw.Outcome != WarlordRerollBonusTable.WarlordRerollOutcome.NoCandidate)
             {
-                // Contract side effect B.3: the sub-counter is reset then re-incremented by one on an
-                // accepted swap (984-material dead-code exclusion already guaranteed upstream by
-                // RankChangeResolver's own material gate -- materialItem.ItemId is not (1024 or 1025) is
-                // already rejected before this point, so the re-increment always applies in practice).
                 resultItemId = warlordDraw.ReplacementItemId;
                 resultCombine = 1;
 
-                // Contract side effect B.4: the unconditional legacy notice-broadcast ATTEMPT on an accepted
-                // swap (S04_MyWork02.cpp:4092-4095) -- CenterRelayNoticeLog.LogWarlordSwap is this codebase's
-                // established log-only stand-in for that same MakeNotice mechanism (see EnchantItemService's
-                // LogEnchantCap / CraftItemService's LogNotableCraft call sites for the identical pattern),
-                // since the true receiving-side packet for this legacy family was never resolved (see
-                // CenterRelayNoticeLog's own remarks). NoticeReachesRecipients already encodes that this only
-                // ever actually reaches anyone for an elite-tier swap.
                 if (WarlordRerollBonusTable.NoticeReachesRecipients(targetDefinition.Item.Type))
                     CenterRelayNoticeLog.LogWarlordSwap(logger, state.Tribe, state.Name, warlordDraw.ReplacementItemId);
             }
@@ -165,11 +145,6 @@ public sealed class UpgradeItemRankService(
             return new UpgradeItemRankResult(UpgradeItemRankOutcome.Rejected, false, 0, [0, 0, 0, 0, 0, 0]);
         }
 
-        // Server/ts25zone/S04_MyWork02.cpp:4077-4078 -- AddTribeBankInfo2 credits 1% of the already-charged
-        // upgrade cost to the tribe bank immediately after the debit. Never reached on the NoCandidate/
-        // result-2 path above -- matching legacy exactly, since the replacement-lookup failure there
-        // returns before either the debit or this credit line (S04_MyWork02.cpp:4060-4067 precedes the
-        // debit/credit at :4077-4078).
         zone.CreditNpcServiceTribeTax(state.Tribe, resolved.Cost);
 
         if (!eventLogQueue.Enqueue(new EventLogEntryTvp(UpgradeItemRankEventCode, (byte)EventLogCategory.Enchant,

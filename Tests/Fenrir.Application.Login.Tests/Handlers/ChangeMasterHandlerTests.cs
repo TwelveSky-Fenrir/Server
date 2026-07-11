@@ -7,8 +7,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
-// op24 CL_CHANGE_MASTER_SEND -- legacy body is empty (S04_MyWork02.cpp l.1655-1658): no read, no reply, no
-// Quit, no state change.
 public class ClChangeMasterSendHandlerTests
 {
     [Fact]

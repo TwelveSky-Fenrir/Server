@@ -12,12 +12,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Progression;
 
-/// <summary>
-///     A11 -- drives the real <see cref="TowerUpgradeService" /> item-665 construct (<c>ConstructAsync</c>) and
-///     item-667 heal (<c>HealAsync</c>) paths over a real <see cref="Zone" />, same tick-while-pending pattern as
-///     <see cref="TowerUpgradeServiceTests" />. Zone 2 -&gt; <see cref="TowerZoneIndexTable" /> tower index 0,
-///     owning tribe 0, guardian stand point (-1276, -5, 1826).
-/// </summary>
 public class TowerConstructAndHealServiceTests
 {
     private const short TowerZoneNumber = 2;
@@ -41,7 +35,7 @@ public class TowerConstructAndHealServiceTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(pipe);
         Assert.True(zone.TryGetPlayer(10, out var state));
-        state!.TribeRole = 1; // Force Leader -- one of the two accepted tower-build leadership roles
+        state!.TribeRole = 1;
 
         var characters = new FakeCharacterRepository();
         var service = new TowerUpgradeService(towerWar, characters, NullLogger<TowerUpgradeService>.Instance);
@@ -68,7 +62,7 @@ public class TowerConstructAndHealServiceTests
         var template = WorldDataTestRows.Monster(Level1GuardianMonsterId) with { Life = 5000 };
         var guardian = MonsterEntity.Create(guardianIndex, 500u, template, guardianIndex, -1276f, -5f, 1826f, 300f);
         if (damaged)
-            guardian.TakeDamage(1000, out _); // 5000 -> 4000, so it is below MaxLife
+            guardian.TakeDamage(1000, out _);
 
         zone.SpawnMonster(guardian);
         return guardian;
@@ -97,7 +91,6 @@ public class TowerConstructAndHealServiceTests
         return await task;
     }
 
-    // ---- item-665 construct -----------------------------------------------------------------------------------
 
     [Fact]
     public async Task Construct_ValidLeadershipOnOwnIdleTower_ConsumesItem_AndArmsConstruction()
@@ -110,8 +103,8 @@ public class TowerConstructAndHealServiceTests
             zone);
 
         Assert.Null(session.DisconnectReason);
-        Assert.Equal(0, result.Result); // success
-        Assert.Equal(1, towerWar.GetPendingConstructKind(TowerIndex)); // Silver tower armed
+        Assert.Equal(0, result.Result);
+        Assert.Equal(1, towerWar.GetPendingConstructKind(TowerIndex));
         Assert.NotNull(characters.LastReplacedContainer);
         Assert.DoesNotContain(characters.LastReplacedContainer!.Value.Items, i => i.ItemId == ConstructItemId);
     }
@@ -120,14 +113,14 @@ public class TowerConstructAndHealServiceTests
     public async Task Construct_RegularMember_Rejected_ItemRetained_TowerUntouched()
     {
         var (_, _, zone, state, characters, towerWar, service) = SetUp();
-        state.TribeRole = 0; // not a Force Leader/Assistant
+        state.TribeRole = 0;
         SeedItem(zone, ConstructItemId);
 
         var result = await RunAsync(
             service.ConstructAsync(10, zone, state, Page, Slot, Item(ConstructItemId), 1, CancellationToken.None),
             zone);
 
-        Assert.Equal(1, result.Result); // soft failure, item retained
+        Assert.Equal(1, result.Result);
         Assert.Equal(0, towerWar.GetPendingConstructKind(TowerIndex));
         Assert.Null(characters.LastReplacedContainer);
     }
@@ -164,7 +157,7 @@ public class TowerConstructAndHealServiceTests
     [Fact]
     public async Task Construct_InAnotherTribesTowerZone_Rejected()
     {
-        var (_, _, zone, state, _, towerWar, service) = SetUp(tribe: 1); // zone 2's tower is owned by tribe 0
+        var (_, _, zone, state, _, towerWar, service) = SetUp(tribe: 1);
         SeedItem(zone, ConstructItemId);
 
         var result = await RunAsync(
@@ -194,7 +187,7 @@ public class TowerConstructAndHealServiceTests
     {
         var (_, _, zone, state, _, towerWar, service) = SetUp();
         SeedItem(zone, ConstructItemId);
-        towerWar.SetTowerState(TowerIndex, 201, true); // already an Active tower
+        towerWar.SetTowerState(TowerIndex, 201, true);
 
         var result = await RunAsync(
             service.ConstructAsync(10, zone, state, Page, Slot, Item(ConstructItemId), 1, CancellationToken.None),
@@ -209,8 +202,6 @@ public class TowerConstructAndHealServiceTests
         var (_, _, zone, state, characters, towerWar, service) = SetUp();
         SeedItem(zone, ConstructItemId);
 
-        // Four kind-1 towers already exist cluster-wide, none in tower 0's own {0,1,2} group -- the max-of-a-kind
-        // gate fires before the group-adjacency gate.
         towerWar.SetTowerState(3, 201, true);
         towerWar.SetTowerState(4, 201, true);
         towerWar.SetTowerState(5, 201, true);
@@ -221,7 +212,7 @@ public class TowerConstructAndHealServiceTests
             zone);
 
         Assert.Equal(1, result.Result);
-        Assert.Null(characters.LastReplacedContainer); // never consumed
+        Assert.Null(characters.LastReplacedContainer);
     }
 
     [Fact]
@@ -229,7 +220,7 @@ public class TowerConstructAndHealServiceTests
     {
         var (_, _, zone, state, _, towerWar, service) = SetUp();
         SeedItem(zone, ConstructItemId);
-        towerWar.SetTowerState(1, 201, true); // slot 1 shares tower 0's own 3-slot group
+        towerWar.SetTowerState(1, 201, true);
 
         var result = await RunAsync(
             service.ConstructAsync(10, zone, state, Page, Slot, Item(ConstructItemId), 1, CancellationToken.None),
@@ -239,7 +230,6 @@ public class TowerConstructAndHealServiceTests
         Assert.Equal(0, towerWar.GetPendingConstructKind(TowerIndex));
     }
 
-    // ---- item-667 heal --------------------------------------------------------------------------------------
 
     [Fact]
     public async Task Heal_ValidWithinRangeOnADamagedGuardian_ConsumesItem_AndArmsTheTickSideHeal()
@@ -280,7 +270,6 @@ public class TowerConstructAndHealServiceTests
         var (_, _, zone, state, _, towerWar, service) = SetUp();
         SeedItem(zone, HealItemId);
         SpawnGuardian(zone, damaged: true);
-        // Player left at the default (100, 0, 100) spawn -- far from the (-1276, -5, 1826) tower.
 
         var result = await RunAsync(
             service.HealAsync(10, zone, state, Page, Slot, Item(HealItemId), CancellationToken.None), zone);
@@ -294,7 +283,7 @@ public class TowerConstructAndHealServiceTests
     {
         var (_, _, zone, state, _, towerWar, service) = SetUp();
         SeedItem(zone, HealItemId);
-        SpawnGuardian(zone, damaged: false); // full life
+        SpawnGuardian(zone, damaged: false);
         PlaceAtGuardian(state);
 
         var result = await RunAsync(

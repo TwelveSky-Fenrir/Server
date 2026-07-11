@@ -8,7 +8,6 @@ public enum HeartbeatOutcome
     Accepted
 }
 
-/// <summary>Business logic for CZ_HEARTBEAT_SEND (op151) -- see <c>HeartbeatHandler</c>'s remarks.</summary>
 public interface IHeartbeatService
 {
     public HeartbeatOutcome Process(PlayerRuntimeState state, uint lastSend);

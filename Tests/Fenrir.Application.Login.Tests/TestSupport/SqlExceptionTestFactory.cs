@@ -4,15 +4,6 @@ using Microsoft.Data.SqlClient;
 
 namespace Fenrir.Application.Login.Tests.TestSupport;
 
-/// <summary>
-///     Builds a real <see cref="SqlException" /> carrying a caller-chosen <see cref="SqlException.Number" />, for
-///     tests that exercise a <c>catch (SqlException ex) when (ex.Number == ...)</c> branch (e.g.
-///     ClaimGiftService's translation of usp_Gift_ClaimIntoVault's THROWn 50220/50274). <see cref="SqlException" />
-///     has no public constructor and is only ever created by SqlClient itself from a real server round trip, so
-///     this reflects into SqlClient's own internal <c>SqlError</c>/<c>SqlErrorCollection</c>/
-///     <c>SqlException.CreateException</c> plumbing rather than fabricating an unrelated fake type -- the
-///     resulting exception is a genuine <see cref="SqlException" /> instance, just built without a live server.
-/// </summary>
 [UnconditionalSuppressMessage("Trimming", "IL2026",
     Justification = "Test-only helper, never published/trimmed -- reflects into SqlClient's own internal " +
                     "SqlError/SqlErrorCollection/SqlException.CreateException plumbing to build a real SqlException.")]

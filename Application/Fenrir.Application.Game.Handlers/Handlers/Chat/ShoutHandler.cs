@@ -8,10 +8,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Chat;
 
-/// <summary>
-///     CZ_GENERAL_SHOUT_SEND (opcode 40). Silently ignored outside shout-enabled maps
-///     (<see cref="ChatRouter.IsShoutEnabledOnMap" />) -- matches the legacy's silent ignore, not a Quit.
-/// </summary>
 public sealed class ShoutHandler(IShoutService shoutService) : IInlinePacketHandler<ShoutRequest>
 {
     public void Handle(in ShoutRequest packet, IPacketSession session)

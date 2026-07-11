@@ -6,8 +6,8 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.GuildAnnouncement, ExpectedSize = 75)]
 public readonly partial record struct GuildAnnouncementResponse : IOutgoingPacket
 {
-    /// <summary>Guild master (sender) name.</summary>
-    [FixedString(13)]
+
+        [FixedString(13)]
     public required string AvatarName { get; init; }
 
     [FixedString(61)] public required string Content { get; init; }

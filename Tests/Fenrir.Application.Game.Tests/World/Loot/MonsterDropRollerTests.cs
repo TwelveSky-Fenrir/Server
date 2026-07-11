@@ -10,11 +10,7 @@ public class MonsterDropRollerTests
 {
     private static readonly Func<int, bool> NeverHasItem = _ => false;
 
-    /// <summary>
-    ///     world.Items must be non-empty for <see cref="WorldDataCacheBuilder.Build" />'s critical-dataset gate; these
-    ///     tests only exercise money/potion rolls.
-    /// </summary>
-    private static WorldDataCache EmptyCache()
+        private static WorldDataCache EmptyCache()
     {
         return WorldDataCacheBuilder.Build(WorldDataTestRows.MinimalRows()).Cache;
     }
@@ -57,7 +53,6 @@ public class MonsterDropRollerTests
     [Fact]
     public void IsEligible_MartialItemLevelMonsters_NeverEligible_InThisPass()
     {
-        // Documented open issue: Fenrir has no Level2/rebirth-level field yet -- see IsEligible's own remarks.
         var monster = WorldDataTestRows.Monster(1) with { ItemLevel = 10, MartialItemLevel = 1 };
 
         Assert.False(MonsterDropRoller.IsEligible(monster, 10));
@@ -79,7 +74,6 @@ public class MonsterDropRollerTests
     [Fact]
     public void Roll_MoneyDropRateAtMaximum_AlwaysDrops_WithLnw33Adjustment()
     {
-        // DropRate at the RandomNumber() ceiling (1_000_000) always succeeds regardless of the RNG draw.
         var monster = WorldDataTestRows.Monster(2) with { ItemLevel = 1, MartialItemLevel = 0 };
         var definition = Definition(monster,
             new MonsterDropMoneyRowDto(2, 1_000_000, 1000, 1000));
@@ -87,7 +81,6 @@ public class MonsterDropRollerTests
 
         var result = roller.Roll(definition, 1, 0, 0, QuestProgress.None, NeverHasItem);
 
-        // LNW33: size > 500 -> -30%, then +2000. 1000 -> 700 -> 2700.
         Assert.Equal(2700, result.Money);
     }
 
@@ -130,8 +123,6 @@ public class MonsterDropRollerTests
     [Fact]
     public void Roll_QuestItemDropRateAtMaximum_MatchingActiveQuestWithoutItem_DropsQuestItem()
     {
-        // killerLevel is 199 above the monster's ItemLevel -- IsEligible would reject every other tier, but
-        // DROP_QUEST_ITEM (S07_MyGame05.cpp:2878) isn't gated by it, so the quest item must still drop.
         var monster = WorldDataTestRows.Monster(10) with { ItemLevel = 1, MartialItemLevel = 0 };
         var definition = DefinitionWithQuestItem(monster, new MonsterDropQuestItemRowDto(10, 1_000_000, 9001));
         var roller = new MonsterDropRoller(EmptyCache(), new Random(1));

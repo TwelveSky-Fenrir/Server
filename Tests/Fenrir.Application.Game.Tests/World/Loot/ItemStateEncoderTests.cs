@@ -2,13 +2,8 @@ using Fenrir.Application.Game.Domain.World.Loot;
 
 namespace Fenrir.Application.Game.Tests.World.Loot;
 
-/// <summary>
-///     wave13/B5-rune-encoders: the general Change/Reset/Set encoder catalog (Server/Header/function.h:345-447)
-///     -- the mirror-image encode direction of <see cref="ItemValueCodec.Decode" />.
-/// </summary>
 public class ItemStateEncoderTests
 {
-    // ---- Additive (Change*) family: adds a delta onto the existing byte, preserves the other three ----
 
     [Fact]
     public void ChangeEnchant_AddsDeltaOntoExistingByte_PreservesTheOtherThree()
@@ -52,7 +47,6 @@ public class ItemStateEncoderTests
         Assert.Equal(40, socket);
     }
 
-    // ---- Zero-out (Reset*) family: zeroes exactly one byte, preserves the other three ----
 
     [Theory]
     [InlineData(0)]
@@ -80,7 +74,6 @@ public class ItemStateEncoderTests
         Assert.Equal(expected[3], socket);
     }
 
-    // ---- Direct-assign (Set*, no additive counterpart) family: overwrites one byte outright ----
 
     [Fact]
     public void SetRefine_OverwritesRefineByteOutright_IgnoringPriorValue_PreservesTheOtherThree()
@@ -110,7 +103,6 @@ public class ItemStateEncoderTests
         Assert.Equal(7, socket);
     }
 
-    // ---- Full-rebuild (SetAll / SetISIUIMValue): discards the entire prior state ----
 
     [Fact]
     public void SetAll_DiscardsPriorPackedValue_BuildsFromScratch()
@@ -119,7 +111,6 @@ public class ItemStateEncoderTests
 
         var rebuilt = ItemStateEncoder.SetAll(1, 2, 3, 4);
 
-        // The prior packed value is irrelevant -- SetAll never reads it.
         Assert.NotEqual(priorPacked, rebuilt);
         var (enchant, combine, refine, socket) = ItemValueCodec.Decode(rebuilt);
         Assert.Equal(1, enchant);
@@ -143,15 +134,7 @@ public class ItemStateEncoderTests
         Assert.Equal(ItemValueCodec.Encode(45, 6, 0, 0), ItemStateEncoder.SetAll(45, 6, 0, 0));
     }
 
-    /// <summary>
-    ///     Specification-level check only (see <see cref="ItemStateEncoder" />'s own remarks on why the
-    ///     starter-equip stamp itself is deliberately NOT wired to CreateAvatarService): confirms the
-    ///     full-rebuild encoder reproduces the exact packed values the legacy EU33 stamp
-    ///     (Server/ts25login/S04_MyWork02.cpp:1100-1168) would have produced for the 6 equip slots
-    ///     (Enchant=45, Combine=6, Refine=0, Socket=0) and the cosmetic wing slot (Enchant=40, Combine=0,
-    ///     Refine=0, Socket=0).
-    /// </summary>
-    [Fact]
+        [Fact]
     public void SetAll_ReproducesLegacyStarterEquipStampLiterals_SpecificationOnly()
     {
         var equipSlotPacked = ItemStateEncoder.SetAll(45, 6, 0, 0);
@@ -169,17 +152,12 @@ public class ItemStateEncoderTests
         Assert.Equal(0, wingSocket);
     }
 
-    // ---- Round-trip byte-overflow hazard: no method here clamps or validates ----
 
     [Fact]
     public void ChangeEnchant_DeltaOverflowingOneByte_SilentlyWrapsToLowByte()
     {
         var packed = ItemValueCodec.Encode(0, 0, 0, 0);
 
-        // No encoder in this family clamps or validates: a delta that overflows a single byte's storage
-        // wraps modulo 256 instead of being rejected or saturated -- exactly the round-trip-safe-range
-        // hazard the contract documents (no live legacy call site was found supplying such a delta; this is
-        // a documented input-domain constraint, not reproduction of an observed defect).
         var wrappedToZero = ItemStateEncoder.ChangeEnchant(packed, 256);
         var (enchantAt256, _, _, _) = ItemValueCodec.Decode(wrappedToZero);
         Assert.Equal(0, enchantAt256);

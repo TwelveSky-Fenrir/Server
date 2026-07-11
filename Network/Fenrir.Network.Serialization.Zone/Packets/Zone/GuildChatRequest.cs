@@ -5,7 +5,6 @@ using Fenrir.Network.Serialization.Zone.Wire;
 
 namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 
-/// <summary>Unlike PartyChatRequest, Link is relayed here rather than dropped.</summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.GuildChat, ExpectedSize = 94,
     AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
 public readonly partial record struct GuildChatRequest : IIncomingPacket<GuildChatRequest>

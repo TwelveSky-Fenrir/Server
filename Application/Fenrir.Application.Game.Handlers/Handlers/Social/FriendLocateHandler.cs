@@ -8,12 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>
-///     CZ_FRIEND_FIND_SEND (opcode 57) -- friend lookup is process-wide (unlike FriendAsk's own-zone-only
-///     search), falling back to the cross-shard character-location directory on a same-shard miss. Async
-///     (not inline): the fallback is an awaited DB call on the miss branch, and both handler kinds already
-///     run on the per-connection session loop, never the zone tick.
-/// </summary>
 public sealed class FriendLocateHandler(IFriendService friendService, ILogger<FriendLocateHandler> logger)
     : IAsyncPacketHandler<FriendLocateRequest>
 {

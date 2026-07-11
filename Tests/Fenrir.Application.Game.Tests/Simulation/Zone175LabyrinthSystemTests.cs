@@ -8,11 +8,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Simulation;
 
-/// <summary>
-///     Exercises the live-<see cref="Zone" />-backed pieces: the alloc-free world helpers in
-///     <c>Zone.Zone175Labyrinth.cs</c> and the <see cref="Zone175LabyrinthSystem" /> config gating + full
-///     lifecycle smoke over a real zone.
-/// </summary>
 public sealed class Zone175LabyrinthSystemTests
 {
     private const short LabyrinthMapId = 175;
@@ -54,9 +49,9 @@ public sealed class Zone175LabyrinthSystemTests
     public void CountLivingZone175WaveBosses_CountsOnlyTheGivenSpecialType()
     {
         var zone = ZoneTestKit.CreateZone(LabyrinthMapId);
-        SpawnMonster(zone, 500, 40); // wave-1 boss
-        SpawnMonster(zone, 501, 40); // a second wave-1 boss
-        SpawnMonster(zone, 502, 5); // an ordinary (non-mission) monster
+        SpawnMonster(zone, 500, 40);
+        SpawnMonster(zone, 501, 40);
+        SpawnMonster(zone, 502, 5);
 
         Assert.Equal(2, zone.CountLivingZone175WaveBosses(40));
         Assert.Equal(0, zone.CountLivingZone175WaveBosses(41));
@@ -66,9 +61,9 @@ public sealed class Zone175LabyrinthSystemTests
     public void RemoveZone175MissionMonsters_RemovesWaveBossesOnly()
     {
         var zone = ZoneTestKit.CreateZone(LabyrinthMapId);
-        SpawnMonster(zone, 500, 40); // wave boss
-        SpawnMonster(zone, 501, 44); // wave boss
-        SpawnMonster(zone, 502, 5); // ordinary monster
+        SpawnMonster(zone, 500, 40);
+        SpawnMonster(zone, 501, 44);
+        SpawnMonster(zone, 502, 5);
 
         zone.RemoveZone175MissionMonsters();
 
@@ -84,15 +79,15 @@ public sealed class Zone175LabyrinthSystemTests
         var state = EnterPlayer(zone, 10);
         Assert.True(zone.HasAnyZone175QualifyingPlayer());
 
-        state.VisibleState = 0; // GM-hidden -> not present
+        state.VisibleState = 0;
         Assert.False(zone.HasAnyZone175QualifyingPlayer());
 
         state.VisibleState = 1;
-        state.IsMovingZone = true; // mid zone-transition -> not present
+        state.IsMovingZone = true;
         Assert.False(zone.HasAnyZone175QualifyingPlayer());
 
         state.IsMovingZone = false;
-        state.IsDead = true; // dead but present -> STILL counts as present
+        state.IsDead = true;
         Assert.True(zone.HasAnyZone175QualifyingPlayer());
     }
 
@@ -121,11 +116,11 @@ public sealed class Zone175LabyrinthSystemTests
 
         zone.GrantZone175WaveReward(1, 1f);
 
-        Assert.Equal(20, state.ContributionPoints); // stage-1 CP
-        Assert.Equal(0, state.Zone175BossDamage); // reset
+        Assert.Equal(20, state.ContributionPoints);
+        Assert.Equal(0, state.Zone175BossDamage);
         var grant = Assert.Single(zone.DrainPendingMoneyGrants());
         Assert.Equal(10, grant.CharacterId);
-        Assert.Equal(100_000_000L, grant.Amount); // fixed stage-1 money
+        Assert.Equal(100_000_000L, grant.Amount);
     }
 
     [Fact]
@@ -149,13 +144,13 @@ public sealed class Zone175LabyrinthSystemTests
         var state = EnterPlayer(zone, 10);
         state.ContributionPoints = 7;
         state.Zone175BossDamage = 55;
-        state.IsDead = true; // reward-ineligible (present, but dead)
+        state.IsDead = true;
 
         zone.GrantZone175WaveReward(3, 1f);
 
-        Assert.Equal(7, state.ContributionPoints); // unchanged
-        Assert.Equal(55, state.Zone175BossDamage); // NOT reset
-        Assert.Empty(zone.DrainPendingMoneyGrants()); // no money
+        Assert.Equal(7, state.ContributionPoints);
+        Assert.Equal(55, state.Zone175BossDamage);
+        Assert.Empty(zone.DrainPendingMoneyGrants());
     }
 
     [Fact]
@@ -175,7 +170,7 @@ public sealed class Zone175LabyrinthSystemTests
     public void System_ConfiguredMap_OffSchedule_StaysIdle()
     {
         var zone = ZoneTestKit.CreateZone(LabyrinthMapId);
-        var time = new MutableTimeProvider(NextSunday2100().AddDays(1)); // Monday
+        var time = new MutableTimeProvider(NextSunday2100().AddDays(1));
         var system = new Zone175LabyrinthSystem(EnabledConfig(), NullLogger<Zone175LabyrinthSystem>.Instance, time);
 
         system.Simulate(zone, 1);
@@ -191,25 +186,24 @@ public sealed class Zone175LabyrinthSystemTests
         var time = new MutableTimeProvider(NextSunday2100());
         var system = new Zone175LabyrinthSystem(EnabledConfig(), NullLogger<Zone175LabyrinthSystem>.Instance, time);
 
-        system.Simulate(zone, 1); // open -> PreOpen
+        system.Simulate(zone, 1);
         Assert.True(system.TryGetPhase(LabyrinthMapId, out var afterOpen));
         Assert.Equal(Zone175MissionPhase.PreOpen, afterOpen);
 
-        system.Simulate(zone, 10 * OneMinute); // countdown -> wave 1 boss-summon
-        system.Simulate(zone, 1); // boss-summon -> combat
-        system.Simulate(zone, 1); // combat: empty zone -> empty-abort -> Terminal
+        system.Simulate(zone, 10 * OneMinute);
+        system.Simulate(zone, 1);
+        system.Simulate(zone, 1);
 
         Assert.True(system.TryGetPhase(LabyrinthMapId, out var afterAbort));
         Assert.Equal(Zone175MissionPhase.Terminal, afterAbort);
 
-        system.Simulate(zone, Zone175RewardTables.TerminalHoldLegacyTicks); // hold elapses -> kick + reset
+        system.Simulate(zone, Zone175RewardTables.TerminalHoldLegacyTicks);
 
         Assert.True(system.TryGetPhase(LabyrinthMapId, out var afterReset));
         Assert.Equal(Zone175MissionPhase.Idle, afterReset);
     }
 
-    /// <summary>A <see cref="TimeProvider" /> whose <see cref="TimeProvider.GetUtcNow" /> returns a settable instant.</summary>
-    private sealed class MutableTimeProvider(DateTimeOffset now) : TimeProvider
+        private sealed class MutableTimeProvider(DateTimeOffset now) : TimeProvider
     {
         public DateTimeOffset Now { get; set; } = now;
 

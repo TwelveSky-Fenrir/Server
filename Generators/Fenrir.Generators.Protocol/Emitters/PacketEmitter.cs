@@ -5,7 +5,6 @@ using Fenrir.Generators.Analysis.Support;
 
 namespace Fenrir.Generators.Protocol.Emitters;
 
-/// <summary>Emits the missing <c>partial</c> part of a <c>[FenrirPacket]</c>/<c>[FenrirWireType]</c>.</summary>
 internal static class PacketEmitter
 {
     public static string Emit(TypeModel model)
@@ -82,8 +81,6 @@ internal static class PacketEmitter
 
             var localName = "v_" + field.PropertyName;
 
-            // Switch EXPRESSION (not statement): an unhandled FieldShape trips CS8509, a solution-wide
-            // build ERROR via TreatWarningsAsErrors, instead of silently emitting zero bytes for that field.
             Action emitField = field.Shape switch
             {
                 FieldShape.Int32 => () => writer.Line($"var {localName} = reader.ReadInt32();"),
@@ -124,13 +121,6 @@ internal static class PacketEmitter
                     writer.CloseBrace();
                     writer.CloseBrace();
                 },
-                // Roslyn never treats a switch expression over an enum as exhaustive from named members
-                // alone (the underlying integral type can hold unnamed values), so a discard-free version
-                // of this switch fails to build unconditionally rather than only on a genuinely missed
-                // case. This throwing discard is therefore load-bearing, not decorative: every FieldShape
-                // above is named explicitly, so this arm is only reachable if FieldShape gains a new
-                // member that isn't added here too - turning that into a loud generator-time failure
-                // instead of the silent zero-byte emission this switch used to produce.
                 _ => () => throw new NotSupportedException(
                     $"PacketEmitter.EmitTryRead has no case for FieldShape.{field.Shape} (field '{field.PropertyName}').")
             };
@@ -174,19 +164,10 @@ internal static class PacketEmitter
 
             var access = field.PropertyName;
 
-            // Nested/NestedArray always capture the reserved slice locally: Nested needs it as the argument
-            // to the nested type's own Write(Span<byte>) (whose return is the nested PayloadSize, not a
-            // span, so it can't double as the post-processing target below); NestedArray needs it to slice
-            // per element in the loop. Every other shape only captures its written slice into a local when
-            // [AvatarXorKind]/[ObfuscatedUidField] actually needs to XOR it afterward - otherwise the typed
-            // Write* call below is emitted as a bare statement, since capturing an unread local would trip
-            // CS0219 (a build ERROR here via TreatWarningsAsErrors).
             var needsSliceLocal = field.AvatarXor != AvatarXorKind.None || field.IsLegacyUidField;
             var localName = "v_" + field.PropertyName + "_slice";
             var assignPrefix = needsSliceLocal ? $"var {localName} = " : "";
 
-            // Switch EXPRESSION (not statement): an unhandled FieldShape trips CS8509, a solution-wide
-            // build ERROR via TreatWarningsAsErrors, instead of silently emitting zero bytes for that field.
             Action emitField = field.Shape switch
             {
                 FieldShape.Int32 => () => writer.Line($"{assignPrefix}writer.WriteInt32({access});"),
@@ -217,10 +198,6 @@ internal static class PacketEmitter
                     writer.Line($"{access}[i].Write({localName}.Slice(i * {field.NestedSize}, {field.NestedSize}));");
                     writer.CloseBrace();
                 },
-                // See the matching discard arm in EmitTryRead: Roslyn can't prove enum-switch exhaustiveness
-                // from named members alone, so this throwing discard is what stands in for a compile-time
-                // CS8509 here - every named FieldShape is handled above, so this only fires if the enum
-                // gains a member this switch wasn't updated for.
                 _ => () => throw new NotSupportedException(
                     $"PacketEmitter.EmitWrite has no case for FieldShape.{field.Shape} (field '{field.PropertyName}').")
             };

@@ -125,7 +125,6 @@ public class CombineResolverTests
     {
         var target = TargetItem(level: 100, martialLevel: 0);
         var material = NormalMaterial(level: 100, martialLevel: 0);
-        // combine=0 -> probability 65 (+luck 0); roll 10 < 65 succeeds.
         var result = CombineResolver.Resolve(target, TargetStack(0), material, MaterialStack(2), 0, 0,
             new ScriptedRandomSource(10));
 
@@ -139,7 +138,6 @@ public class CombineResolverTests
     {
         var target = TargetItem(level: 100, martialLevel: 0);
         var material = NormalMaterial(level: 100, martialLevel: 0);
-        // combine=0 -> probability 65; roll 90 >= 65 fails.
         var result = CombineResolver.Resolve(target, TargetStack(0), material, MaterialStack(2), 0, 0,
             new ScriptedRandomSource(90));
 
@@ -242,7 +240,6 @@ public class CombineResolverTests
     {
         var target = TargetItem(level: 100);
         var material = NormalMaterial(level: 100);
-        // combine=0 -> base probability 65, +5 lucky = 70; roll 68 fails without charge, succeeds with it.
         var result = CombineResolver.Resolve(target, TargetStack(0), material, MaterialStack(2), 0, 1,
             new ScriptedRandomSource(68));
 

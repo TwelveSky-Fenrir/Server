@@ -8,18 +8,8 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.Simulation;
 
-/// <summary>
-///     Covers <see cref="DuelMaintenanceSystem" />: the per-tick opponent-not-found / opponent-dead / self-dead /
-///     180-legacy-tick auto-timeout resolution for every character in an Active duel, and the map-124
-///     exclusion. Duels are seeded directly through <see cref="DuelRegistry" /> (bypassing the ask/accept/start
-///     handshake, which is a separate, already-covered behavior) since only the Active-duel resolution itself
-///     is this system's concern.
-/// </summary>
 public class DuelMaintenanceSystemTests
 {
-    // Far enough apart (AoiGrid's default 75-unit cell, 3x3 neighbor radius) that the two duelists are never
-    // mutual AOI neighbors -- isolates each participant's own pipe to exactly the packets this system sends
-    // them directly, with no incidental proximity-broadcast noise from the other's own EndActiveDuel call.
     private const float FarApartX = 100_000f;
 
     private static Zone SetUp(short mapId, out DuelRegistry duels)
@@ -57,14 +47,14 @@ public class DuelMaintenanceSystemTests
         ZoneTestKit.DrainOutbound(pipeA);
         ZoneTestKit.DrainOutbound(pipeB);
 
-        zone.ApplyDeath(20); // the opponent (from 10's perspective) dies
+        zone.ApplyDeath(20);
 
-        zone.Tick(TimeSpan.FromMilliseconds(500)); // one legacy tick -- re-evaluated immediately
+        zone.Tick(TimeSpan.FromMilliseconds(500));
 
         Assert.True(zone.TryGetPlayer(10, out var winner));
         Assert.True(zone.TryGetPlayer(20, out var loser));
         Assert.True(winner!.CanUseConsumables);
-        Assert.True(loser!.CanUseConsumables); // lifted unconditionally, even though 20 is also now dead
+        Assert.True(loser!.CanUseConsumables);
 
         AssertEndResponse(pipeA, DuelEndReason.OpponentDied);
         AssertEndResponse(pipeB, DuelEndReason.SelfDied);
@@ -86,7 +76,7 @@ public class DuelMaintenanceSystemTests
         ZoneTestKit.DrainOutbound(pipeA);
         ZoneTestKit.DrainOutbound(pipeB);
 
-        zone.ApplyDeath(10); // the initiator (PlayerA) itself dies, opponent still alive
+        zone.ApplyDeath(10);
 
         zone.Tick(TimeSpan.FromMilliseconds(500));
 
@@ -113,8 +103,6 @@ public class DuelMaintenanceSystemTests
 
         zone.Tick(TimeSpan.FromMilliseconds(500));
 
-        // Opponent-dead is always checked (and fires) before self-dead, from PlayerA's own fixed canonical
-        // side -- a same-tick double death is never a true draw.
         AssertEndResponse(pipeA, DuelEndReason.OpponentDied);
         AssertEndResponse(pipeB, DuelEndReason.SelfDied);
     }
@@ -127,8 +115,6 @@ public class DuelMaintenanceSystemTests
         Enter(zone, 10, sessionA, 0f, 0f);
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
-        // 20 is seeded directly into the registry as 10's active-duel opponent but never actually enters this
-        // zone (e.g. disconnected/transferred out before the natural cleanup ran).
         StartDuel(duels, 10, 20);
         ZoneTestKit.DrainOutbound(pipeA);
 
@@ -155,9 +141,8 @@ public class DuelMaintenanceSystemTests
         ZoneTestKit.DrainOutbound(pipeA);
         ZoneTestKit.DrainOutbound(pipeB);
 
-        zone.Tick(TimeSpan.FromMilliseconds(500)); // exactly one legacy tick
+        zone.Tick(TimeSpan.FromMilliseconds(500));
 
-        // Decremented by exactly 1 (not double-decremented despite both participants being iterated).
         AssertCountdown(pipeA, 179);
         AssertCountdown(pipeB, 179);
         Assert.True(duels.TryGetActiveDuel(10, out var stillActive));
@@ -175,13 +160,13 @@ public class DuelMaintenanceSystemTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
         StartDuel(duels, 10, 20);
 
-        zone.Tick(TimeSpan.FromMilliseconds(500 * 179)); // 179 ticks -- one short of expiry
+        zone.Tick(TimeSpan.FromMilliseconds(500 * 179));
         ZoneTestKit.DrainOutbound(pipeA);
         ZoneTestKit.DrainOutbound(pipeB);
         Assert.True(duels.TryGetActiveDuel(10, out var almostExpired));
         Assert.Equal(1, almostExpired!.RemainingTicks);
 
-        zone.Tick(TimeSpan.FromMilliseconds(500)); // the 180th tick
+        zone.Tick(TimeSpan.FromMilliseconds(500));
 
         AssertEndResponse(pipeA, DuelEndReason.TimeExpired);
         AssertEndResponse(pipeB, DuelEndReason.TimeExpired);
@@ -204,7 +189,7 @@ public class DuelMaintenanceSystemTests
         ZoneTestKit.DrainOutbound(pipeA);
         ZoneTestKit.DrainOutbound(pipeB);
 
-        zone.Tick(TimeSpan.FromMilliseconds(500 * 250)); // one stalled-host burst, well past 180 ticks in one jump
+        zone.Tick(TimeSpan.FromMilliseconds(500 * 250));
 
         AssertEndResponse(pipeA, DuelEndReason.TimeExpired);
         AssertEndResponse(pipeB, DuelEndReason.TimeExpired);
@@ -223,7 +208,7 @@ public class DuelMaintenanceSystemTests
         ZoneTestKit.DrainOutbound(pipeA);
         ZoneTestKit.DrainOutbound(pipeB);
 
-        zone.Tick(TimeSpan.FromMilliseconds(500 * 500)); // would otherwise time out several times over
+        zone.Tick(TimeSpan.FromMilliseconds(500 * 500));
 
         Assert.True(duels.TryGetActiveDuel(10, out var untouched));
         Assert.Equal(DuelRegistry.DurationTicks, untouched!.RemainingTicks);
@@ -240,7 +225,7 @@ public class DuelMaintenanceSystemTests
         var (observerSession, observerPipe) = ZoneTestKit.CreateSession(3);
         Enter(zone, 10, sessionA, 100f, 100f);
         Enter(zone, 20, sessionB, FarApartX, FarApartX);
-        Enter(zone, 30, observerSession, 101f, 101f); // same AOI cell as 10
+        Enter(zone, 30, observerSession, 101f, 101f);
         zone.Tick(TimeSpan.FromMilliseconds(50));
         StartDuel(duels, 10, 20);
         ZoneTestKit.DrainOutbound(pipeA);
@@ -250,7 +235,6 @@ public class DuelMaintenanceSystemTests
         zone.ApplyDeath(20);
         zone.Tick(TimeSpan.FromMilliseconds(500));
 
-        // The observer (nearby 10, not 20) receives a proximity refresh reflecting "not dueling" for 10.
         Assert.NotEmpty(ZoneTestKit.DrainOutbound(observerPipe));
     }
 

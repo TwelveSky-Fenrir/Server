@@ -2,21 +2,13 @@ using Fenrir.Application.Game.Domain.World.Loot;
 
 namespace Fenrir.Application.Game.Tests.World.Loot;
 
-/// <summary>
-///     Covers the C10-remaining-box-pools reward-table DATA and roll primitive for item 720 (Chest / Reward
-///     Box) -- <see cref="ChestBox720RewardTable" />. Both branches are now fully recovered: the tribe-keyed
-///     &lt;15% branch, and the 85% branch's 8 equally-likely slots (including the <c>GetRandomAnimal5()</c>
-///     tier-1 animal pool a fresh legacy re-verification pass located).
-/// </summary>
 public class ChestBox720RewardTableTests
 {
     private static readonly HashSet<int> AllKnownRewardIds =
     [
-        // Tribe-keyed <15% branch: 7 base ids x 3 tribe offsets (0/+20000/+40000).
         15157, 15267, 15135, 15179, 15223, 15245, 15289,
         35157, 35267, 35135, 35179, 35223, 35245, 35289,
         55157, 55267, 55135, 55179, 55223, 55245, 55289,
-        // 85% branch: 8 slots, 2 of them composite pools.
         1301, 1302, 1303, 1313, 1317, 1320, 1323, 1326,
         1449, 1072,
         801, 802, 803, 804, 805, 806,
@@ -31,7 +23,6 @@ public class ChestBox720RewardTableTests
     public void Roll_TribePoolBranch_BaseIdPlusTribeOffset(byte previousTribe, int withinPoolDraw,
         int expectedRewardId)
     {
-        // outer draw < 15 -> tribe pool branch; within-pool draw picks the base id, then the tribe offset is added.
         var result = ChestBox720RewardTable.Roll(previousTribe, new ScriptedRandom(0, withinPoolDraw));
 
         Assert.True(result.Success);
@@ -50,9 +41,6 @@ public class ChestBox720RewardTableTests
     [Fact]
     public void Roll_TribePoolBranch_UnrecognizedTribe_FailsClosed_ConsumesOnlyOneDraw()
     {
-        // Hardening choice: the single-path copy would otherwise attempt a modulo-by-zero on an empty pool;
-        // Fenrir always fails closed instead, the bulk-path's own shape. Only ONE scripted value: ScriptedRandom
-        // throws if a second (within-pool) draw were consumed after the tribe lookup fails.
         var result = ChestBox720RewardTable.Roll(99, new ScriptedRandom(0));
 
         Assert.False(result.Success);
@@ -71,7 +59,6 @@ public class ChestBox720RewardTableTests
     public void Roll_EightyFivePercentBranch_AnimalSlot_UniformDrawMapsToExpectedTierOneAnimalId(int withinPoolDraw,
         int expectedRewardId)
     {
-        // outer=15 (bottom boundary of the 85% branch); slot draw 0 -> the GetRandomAnimal5 slot (slot 1 of 8).
         var result = ChestBox720RewardTable.Roll(0, new ScriptedRandom(15, 0, withinPoolDraw));
 
         Assert.True(result.Success);
@@ -81,7 +68,6 @@ public class ChestBox720RewardTableTests
     [Fact]
     public void Roll_EightyFivePercentBranch_AnimalSlot_UnrecognizedTribe_StillSucceeds()
     {
-        // The 85% branch has no tribe dependency at all -- an unrecognized tribe never fails it.
         var result = ChestBox720RewardTable.Roll(99, new ScriptedRandom(50, 0, 3));
 
         Assert.True(result.Success);
@@ -98,7 +84,6 @@ public class ChestBox720RewardTableTests
     public void Roll_EightyFivePercentBranch_ElixirPlusSlot_UniformDrawMapsToExpectedId(int withinPoolDraw,
         int expectedRewardId)
     {
-        // slot draw 3 -> the GetRandomElixirPlus slot (slot 4 of 8).
         var result = ChestBox720RewardTable.Roll(0, new ScriptedRandom(50, 3, withinPoolDraw));
 
         Assert.True(result.Success);
@@ -115,7 +100,6 @@ public class ChestBox720RewardTableTests
     public void Roll_EightyFivePercentBranch_FixedIdSlots_ReturnsExpectedId_ConsumingExactlyTwoDraws(int slotDraw,
         int expectedRewardId)
     {
-        // Only two scripted values: ScriptedRandom throws if a third draw were consumed for a non-composite slot.
         var result = ChestBox720RewardTable.Roll(0, new ScriptedRandom(50, slotDraw));
 
         Assert.True(result.Success);
@@ -160,12 +144,7 @@ public class ChestBox720RewardTableTests
         Assert.Equal(expected, ChestBox720RewardTable.ElixirPlusPoolIds.ToArray());
     }
 
-    /// <summary>
-    ///     Across many real (non-scripted) random draws and every recognized tribe, every reward this table ever
-    ///     produces is a member of its own known, bounded id set -- covering both branches and all 8+2 composite
-    ///     possibilities of the 85% branch, not just the deterministic boundary cases above.
-    /// </summary>
-    [Fact]
+        [Fact]
     public void Roll_AcrossManyRealRandomDraws_EveryRewardIsAlwaysWithinTheKnownTable()
     {
         var random = new Random(20260711);
@@ -180,8 +159,7 @@ public class ChestBox720RewardTableTests
             }
     }
 
-    /// <summary>Returns queued draws in request order; throws if the code draws more than were scripted.</summary>
-    private sealed class ScriptedRandom(params int[] values) : Random
+        private sealed class ScriptedRandom(params int[] values) : Random
     {
         private int _index;
 

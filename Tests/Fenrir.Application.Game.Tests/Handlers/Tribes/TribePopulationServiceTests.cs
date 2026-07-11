@@ -37,8 +37,6 @@ public class TribePopulationServiceTests
 
         var service = new TribePopulationService(NullLogger<TribePopulationService>.Instance);
 
-        // Requester on map 1 only sees map 1's population, not map 2's -- matching the legacy
-        // one-process-per-map semantics (TribePopulation behavior contract).
         var counts = service.GetConnectedUserCounts(registry[1]);
 
         Assert.Equal(4, counts.Count);

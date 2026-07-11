@@ -10,10 +10,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.ItemModification;
 
-/// <summary>
-///     Business logic for op25, CZ_ADD_ITEM_SEND -- extracted from <see cref="CombineItemHandler" />, see that
-///     handler's remarks.
-/// </summary>
 public sealed class CombineItemService(
     ICharacterRepository characters,
     WorldDataCache worldData,
@@ -105,11 +101,6 @@ public sealed class CombineItemService(
             return new CombineItemResult(CombineItemOutcome.Rejected, 0, 0);
         }
 
-        // Server/ts25zone/S04_MyWork02.cpp:3690-3698 -- AddTribeBankInfo2 credits 1% of the already-charged
-        // combine cost to the paying character's tribe bank immediately after the debit, unconditionally
-        // (before the scroll/material-vs-equip roll). CombineResolver itself stays Zone-free (see its own
-        // remarks, now stale on this point); the credit is applied here once the debit has actually
-        // succeeded, via Zone.CreditNpcServiceTribeTax.
         zone.CreditNpcServiceTribeTax(state.Tribe, resolved.Cost);
 
         var containers = page1 == page2

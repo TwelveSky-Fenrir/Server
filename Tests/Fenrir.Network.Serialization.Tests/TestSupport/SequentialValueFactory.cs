@@ -1,6 +1,5 @@
 namespace Fenrir.Network.Serialization.Tests.TestSupport;
 
-// Deterministic increasing values (never repeating) so an offset bug reading/writing the wrong field is detectable.
 internal sealed class SequentialValueFactory
 {
     private int _counter;
@@ -30,7 +29,6 @@ internal sealed class SequentialValueFactory
         return (byte)(NextInt() & 0xFF);
     }
 
-    // Truncated to fixedLength-1 so there's always room for a trailing zero byte, even as the counter grows.
     public string NextString(int fixedLength)
     {
         var value = "S" + NextInt();

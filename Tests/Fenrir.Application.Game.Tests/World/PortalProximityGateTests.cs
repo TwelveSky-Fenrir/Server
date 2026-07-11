@@ -3,12 +3,6 @@ using Fenrir.Application.Game.Domain.World;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     Covers <see cref="PortalProximityGate" /> and <see cref="PortalProximityCatalog" /> in isolation --
-///     pure decision logic, no session/repository dependencies. This is a Fenrir-only hardening mechanism (see
-///     both types' own remarks): there is no legacy call site to mirror, only a recovered, never-called routine
-///     whose distance formula and 30-unit radius are reproduced faithfully.
-/// </summary>
 public class PortalProximityGateTests
 {
     private const short SourceZone = 10;
@@ -38,7 +32,7 @@ public class PortalProximityGateTests
 
         var outcome = PortalProximityGate.Evaluate(catalog, SourceZone,
             requesterX: 10_000, requesterY: 10_000, requesterZ: 10_000,
-            moveReasonSort: 7 /* "return", not portal */, targetZoneNumber: TargetZone);
+            moveReasonSort: 7, targetZoneNumber: TargetZone);
 
         Assert.Equal(PortalProximityOutcome.Allowed, outcome);
     }
@@ -48,7 +42,6 @@ public class PortalProximityGateTests
     {
         var catalog = CatalogWithOnePortal(100, 100, 0);
 
-        // Distance = sqrt(20^2 + 0 + 0) = 20 < 30.
         var outcome = PortalProximityGate.Evaluate(catalog, SourceZone,
             requesterX: 80, requesterY: 100, requesterZ: 0,
             moveReasonSort: PortalProximityGate.PortalMoveReasonSort, targetZoneNumber: TargetZone);
@@ -61,7 +54,6 @@ public class PortalProximityGateTests
     {
         var catalog = CatalogWithOnePortal(100, 100, 0);
 
-        // Distance = sqrt(40^2 + 0 + 0) = 40 > 30.
         var outcome = PortalProximityGate.Evaluate(catalog, SourceZone,
             requesterX: 60, requesterY: 100, requesterZ: 0,
             moveReasonSort: PortalProximityGate.PortalMoveReasonSort, targetZoneNumber: TargetZone);
@@ -74,8 +66,6 @@ public class PortalProximityGateTests
     {
         var catalog = CatalogWithOnePortal(0, 0, 0);
 
-        // Requester is horizontally exactly on the portal, but 40 units above it vertically -- outside the
-        // 30-unit spherical radius (S07_MyGame03.cpp:5040-5043: true 3D distance, vertical axis included).
         var outcome = PortalProximityGate.Evaluate(catalog, SourceZone,
             requesterX: 0, requesterY: 0, requesterZ: 40,
             moveReasonSort: PortalProximityGate.PortalMoveReasonSort, targetZoneNumber: TargetZone);

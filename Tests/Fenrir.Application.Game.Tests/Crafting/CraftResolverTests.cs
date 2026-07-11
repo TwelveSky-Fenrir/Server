@@ -32,7 +32,6 @@ public class CraftResolverTests
         Assert.Equal(0, result.ResultStack.Value.Combine);
         Assert.Equal(0, result.ResultStack.Value.Refine);
         Assert.Equal(0, result.ResultStack.Value.Socket);
-        // tValue[3]=0 (S04_MyWork02.cpp): quantity column is explicitly zeroed, not inherited from material1
         Assert.Equal(0, result.ResultStack.Value.Quantity);
         Assert.Equal(m1.Serial, result.ResultStack.Value.Serial);
     }
@@ -53,7 +52,6 @@ public class CraftResolverTests
     [InlineData(5, 5)]
     public void Jade_EitherSlotQuantityAboveOne_IsRejected(int quantity1, int quantity2)
     {
-        // legacy quits if either slot's quantity exceeds 1 (S04_MyWork02.cpp) -- else a stack could dupe on upgrade
         var result = CraftResolver.ResolveJadeUpgrade(
             Stack(CraftRecipeCatalog.PurpleJadeItemId, quantity1),
             Stack(CraftRecipeCatalog.PurpleJadeItemId, quantity2));

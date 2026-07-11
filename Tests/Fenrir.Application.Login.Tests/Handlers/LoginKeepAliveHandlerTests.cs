@@ -7,8 +7,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
-// op12 CL_CLIENT_OK_FOR_LOGIN_SEND / keepalive -- only promotes Authenticated -> CharSelect, must never
-// bypass the PinRequired gate (only ops 13/14/15 may open it), and never replies either way.
 public class LoginKeepAliveHandlerTests
 {
     [Fact]

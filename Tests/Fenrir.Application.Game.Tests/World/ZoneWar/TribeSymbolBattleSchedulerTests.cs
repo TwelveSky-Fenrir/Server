@@ -15,7 +15,6 @@ namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
 public class TribeSymbolBattleSchedulerTests
 {
-    // Wednesday, chosen only because it's a stable, arbitrary reference day for these tests.
     private static readonly DateTime OpeningHour = new(2026, 7, 8, 20, 0, 0, DateTimeKind.Utc);
     private static readonly DateTime ClosingHour = new(2026, 7, 8, 22, 0, 0, DateTimeKind.Utc);
 
@@ -90,7 +89,6 @@ public class TribeSymbolBattleSchedulerTests
         var scheduler = new TribeSymbolBattleScheduler(worldState, broadcaster,
             NullLogger<TribeSymbolBattleScheduler>.Instance, new HashSet<DayOfWeek>(), true);
 
-        // Wrong day, but test mode -- the hour still matches, so it must arm.
         scheduler.Tick(TimeSpan.Zero, OpeningHour);
         Assert.Equal(TribeSymbolBattleSchedulePhase.Counting, scheduler.Phase);
 
@@ -128,9 +126,8 @@ public class TribeSymbolBattleSchedulerTests
         }
 
         Assert.Equal(10, pulses);
-        Assert.False(worldState.World.TribeSymbolBattle); // not open yet -- one more minute of grace remains
+        Assert.False(worldState.World.TribeSymbolBattle);
 
-        // 11th minute: the grace minute -- flips the flag and broadcasts sort 40, not another sort-39 pulse.
         scheduler.Tick(TimeSpan.FromMinutes(1), OpeningHour);
 
         Assert.True(worldState.World.TribeSymbolBattle);
@@ -149,7 +146,6 @@ public class TribeSymbolBattleSchedulerTests
         var scheduler = new TribeSymbolBattleScheduler(worldState, broadcaster,
             NullLogger<TribeSymbolBattleScheduler>.Instance, new HashSet<DayOfWeek> { ClosingHour.DayOfWeek });
 
-        // The opening hour must NOT arm it while the flag already reads open.
         scheduler.Tick(TimeSpan.Zero, OpeningHour);
         Assert.Equal(TribeSymbolBattleSchedulePhase.WaitingForHour, scheduler.Phase);
 
@@ -173,7 +169,7 @@ public class TribeSymbolBattleSchedulerTests
             NullLogger<TribeSymbolBattleScheduler>.Instance, new HashSet<DayOfWeek> { OpeningHour.DayOfWeek });
 
         scheduler.Tick(TimeSpan.Zero, OpeningHour);
-        Assert.Equal(0, scheduler.MinutesRemainingInCountdown); // armed, but no minute has elapsed yet
+        Assert.Equal(0, scheduler.MinutesRemainingInCountdown);
 
         scheduler.Tick(TimeSpan.FromMinutes(1), OpeningHour);
         Assert.Equal(10, scheduler.MinutesRemainingInCountdown);
@@ -195,8 +191,6 @@ public class TribeSymbolBattleSchedulerTests
         scheduler.Tick(TimeSpan.Zero, OpeningHour.AddMinutes(1));
         scheduler.Tick(TimeSpan.Zero, OpeningHour.AddMinutes(2));
 
-        // Still just one countdown in progress -- MinutesElapsed only advances via the elapsed-time accumulator,
-        // never re-armed by the still-matching wall-clock hour on subsequent ticks.
         Assert.Equal(TribeSymbolBattleSchedulePhase.Counting, scheduler.Phase);
         Assert.Equal(0, scheduler.MinutesRemainingInCountdown);
     }

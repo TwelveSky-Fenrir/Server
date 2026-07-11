@@ -76,8 +76,6 @@ public class AllianceDiplomacyCeremonyHostTests
     [Fact]
     public void Tick_NoZoneHosted_DoesNotThrow()
     {
-        // AllianceTribeMapId configured to a map this shard does NOT host (host stays unarmed, but Tick()
-        // itself must still be a safe no-op if ever called directly).
         var (host, _) = CreateHost([1], allianceTribeMapId: AllianceMapId);
 
         var exception = Record.Exception(host.Tick);

@@ -8,10 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>
-///     CZ_FRIEND_ASK_SEND (opcode 53) -- map 124 silently ignored (scripted-duel server). Tribe mismatch
-///     always refuses; no inter-tribe exception here unlike duel/trade/party.
-/// </summary>
 public sealed class FriendAskHandler(IFriendService friendService, ILogger<FriendAskHandler> logger)
     : IAsyncPacketHandler<FriendRequest>
 {
@@ -51,9 +47,6 @@ public sealed class FriendAskHandler(IFriendService friendService, ILogger<Frien
                 session.Send(new FriendAnswerResponse { Answer = 5 });
                 return;
             case FriendAskResultKind.SentCrossShard:
-                // Nothing to send yet -- the target (on another shard) is notified asynchronously once
-                // SocialCrossShardRelayHost delivers the Ask; see FriendAskResultKind.SentCrossShard's own
-                // remarks.
                 return;
         }
     }

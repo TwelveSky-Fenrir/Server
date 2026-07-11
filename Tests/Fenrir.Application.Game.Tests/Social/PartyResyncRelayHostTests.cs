@@ -7,11 +7,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Social;
 
-// D1 cross-shard party-resync relay poll loop -- fan-out sibling of GuildTribeBroadcastRelayHost (poll excludes
-// the source shard), but routing delivered rows to an IPartyResyncRelayHandler rather than delivering directly
-// (party reconciliation needs each shard's own in-memory PartyRegistry, the same "route to a handler" split
-// SocialCrossShardRelayHost uses). Constructed directly with fakes (no DI container), same idiom as
-// SocialCrossShardRelayHostTests.
 public class PartyResyncRelayHostTests
 {
     private const byte ShardId = 3;

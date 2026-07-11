@@ -3,11 +3,6 @@ using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Login.Tests.TestSupport;
 
-/// <summary>
-///     In-memory stand-in for IWorldStateRepository, used only for DeleteAvatarService's tribe-role/election-
-///     candidacy refusal check -- every member besides <see cref="GetTribeVotesAsync" /> throws, since nothing
-///     else on this path calls them.
-/// </summary>
 internal sealed class FakeWorldStateRepository : IWorldStateRepository
 {
     private readonly Dictionary<byte, List<TribeVoteDto>> _votesByTribe = new();
@@ -74,8 +69,7 @@ internal sealed class FakeWorldStateRepository : IWorldStateRepository
         throw new NotSupportedException();
     }
 
-    /// <summary>No tribe has any registered Force Leader election candidates.</summary>
-    public static FakeWorldStateRepository Empty()
+        public static FakeWorldStateRepository Empty()
     {
         return new FakeWorldStateRepository();
     }

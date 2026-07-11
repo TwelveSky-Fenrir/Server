@@ -6,10 +6,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Commerce;
 
-/// <summary>
-///     CZ_GET_REWARD_ITEM_SEND (opcode 154) -- the 7-day login-reward catalog plus this character's claim
-///     cursor.
-/// </summary>
 public sealed class GetDailyRewardCatalogHandler(
     IGetDailyRewardCatalogService service,
     ILogger<GetDailyRewardCatalogHandler> logger)

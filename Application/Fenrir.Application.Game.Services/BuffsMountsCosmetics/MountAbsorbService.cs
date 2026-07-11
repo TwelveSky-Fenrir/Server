@@ -4,7 +4,6 @@ using Fenrir.Application.Game.Domain.World;
 
 namespace Fenrir.Application.Game.Services.BuffsMountsCosmetics;
 
-/// <inheritdoc cref="IMountAbsorbService" />
 public sealed class MountAbsorbService : IMountAbsorbService
 {
     public bool TryAbsorb(Zone zone, PlayerRuntimeState state, int characterId)

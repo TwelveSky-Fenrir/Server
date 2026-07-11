@@ -5,7 +5,6 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Seeding;
 
-/// <summary>Row counts produced by <see cref="QuestSeedGenerator.Generate" />.</summary>
 public sealed record QuestSeedStats(
     int TotalRawRecords,
     int PaddingRecordsExcluded,
@@ -13,25 +12,16 @@ public sealed record QuestSeedStats(
     int QuestRewardRowCount,
     int QuestSpeechRowCount);
 
-/// <summary>
-///     Generates the idempotent world.Quests / world.QuestRewards / world.QuestSpeeches seed script from
-///     005_00006.IMG.
-/// </summary>
 public static class QuestSeedGenerator
 {
-    // qReward[slot][0] is a (RewardType, Value) tagged union, not (itemId, quantity) -- confirmed via the
-    // switch in S04_MyWork02.cpp and the bounds check in S15_MyShare.cpp.
-    private const int RewardTypeNone = 1; // case 1: break -- a deliberate no-op/"empty slot" sentinel
+    private const int RewardTypeNone = 1;
     private const int RewardTypeMoney = 2;
     private const int RewardTypeKillOtherTribeCount = 3;
     private const int RewardTypeExperience = 4;
     private const int RewardTypeTeacherPoint = 5;
 
-    // Value is an ItemId; quantity is derived at grant-time from the item's own iSort (S07_MyGame04.cpp),
-    // never itself stored in qReward.
     private const int RewardTypeItem = 6;
 
-    // SpeechKind is our own invented discriminator (QUEST_INFO has none) -- must match the SQL table comment.
     private const byte SpeechStart = 0;
     private const byte SpeechHurry = 1;
     private const byte SpeechProcess1 = 2;
@@ -45,14 +35,11 @@ public static class QuestSeedGenerator
 
     private const int MaxRowsPerInsert = 500;
 
-    /// <summary>Writes 050_quests.sql, 051_quest_rewards.sql, 052_quest_speeches.sql into <paramref name="outputDir" />.</summary>
-    public static QuestSeedStats Generate(string dataDir, string outputDir)
+        public static QuestSeedStats Generate(string dataDir, string outputDir)
     {
         Directory.CreateDirectory(outputDir);
 
         var all = QuestReader.ReadAll(dataDir);
-        // Slots 689-1000 are unused padding (empty Subject, confirmed by inspection) -- Subject emptiness is
-        // the "used" signal here (Index is never 0, unlike some other legacy tables).
         var quests = all.Where(q => !string.IsNullOrEmpty(q.Subject)).ToList();
         var includedIds = new HashSet<int>(quests.Select(q => q.Index));
 
@@ -98,7 +85,7 @@ public static class QuestSeedGenerator
             "StartNPCNumber, KeyNpcNumber1, KeyNpcNumber2, KeyNpcNumber3, KeyNpcNumber4, KeyNpcNumber5, EndNPCNumber, " +
             "Solution1, Solution2, Solution3, Solution4, NextIndex",
             questRows,
-            int.MaxValue); // single statement (688 rows, well under the 1000-row VALUES cap)
+            int.MaxValue);
         File.WriteAllText(Path.Combine(outputDir, "050_quests.sql"), questsSb.ToString());
 
         var rewardsSb = new StringBuilder();
@@ -130,12 +117,10 @@ public static class QuestSeedGenerator
 
     private static string BuildQuestRow(QuestRecord q, HashSet<int> includedIds)
     {
-        // NextIndex==0 or pointing at an excluded padding slot (e.g. 589->689) both mean "end of chain" -> NULL.
         var nextIndex = q.NextIndex == 0 || !includedIds.Contains(q.NextIndex)
             ? "NULL"
             : q.NextIndex.ToString(CultureInfo.InvariantCulture);
 
-        // SummonInfo is only populated for Sort=5 boss quests: [0]=zone, [1..3]=X/Y/Z (S15_MyShare.cpp/SummonQuestBoss).
         var summonZone = q.SummonInfo[0] == 0 ? "NULL" : q.SummonInfo[0].ToString(CultureInfo.InvariantCulture);
         var summonX = q.SummonInfo[1] == 0 ? "NULL" : q.SummonInfo[1].ToString(CultureInfo.InvariantCulture);
         var summonY = q.SummonInfo[2] == 0 ? "NULL" : q.SummonInfo[2].ToString(CultureInfo.InvariantCulture);

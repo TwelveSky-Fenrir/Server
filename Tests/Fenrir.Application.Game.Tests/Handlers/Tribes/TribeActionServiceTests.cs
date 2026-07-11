@@ -21,15 +21,11 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Tribes;
 
-// CZ_TRIBE_WORK_SEND tSort 11 (Max Rebirth) -- cluster C14: HandleRebirthAsync's own gates against the newly
-// real Level2/Exp2/RebirthCount fields, and its success mutation (Exp2 reset, RebirthCount+1, CP debit, full
-// heal, sort-14 AOI broadcast).
 public class TribeActionServiceTests
 {
     private const int CharacterId = 10;
     private const int NeighborId = 20;
 
-    // The threshold ReturnHighExpValue(12) resolves to -- see HighLevelExpTable's own remarks.
     private const int MaxHighLevelExp = 1_481_117_817;
 
     private static int RebirthFrame => FrameWriter.FrameSizeOf<TribeActionResponse>();
@@ -67,8 +63,6 @@ public class TribeActionServiceTests
             new DirtyTracker<int>(), NullLogger<Zone>.Instance, ZoneTestKit.EmptyWorldData(), []);
         registry.Initialize([1]);
 
-        // A level-145 catalog row is needed for EquipmentService.RecomputeStats' own MaxLife/MaxMana lookup
-        // (the success test's "full heal" assertion reads it back from the freshly recomputed Stats).
         var levels = new Dictionary<short, LevelRowDto> { [145] = WorldDataTestRows.Level(145) }
             .ToFrozenDictionary();
 
@@ -89,8 +83,7 @@ public class TribeActionServiceTests
         return new TribeActionRequest { Sort = 11, Data = new byte[100] };
     }
 
-    /// <summary>Mirrors <c>TribeActionHandler.Respond</c> -- the actor's own reply is handler-owned plumbing.</summary>
-    private static void Respond(ZoneClientSession session, TribeActionRequest packet, TribeActionOutcome outcome)
+        private static void Respond(ZoneClientSession session, TribeActionRequest packet, TribeActionOutcome outcome)
     {
         if (outcome.Aborted)
         {
@@ -101,31 +94,22 @@ public class TribeActionServiceTests
         session.Send(new TribeActionResponse { Result = outcome.Result, Sort = packet.Sort, Data = packet.Data });
     }
 
-    // CZ_TRIBE_WORK_SEND tSort 7 (Halo Enchant) -- HaloEnchantAsync's own same-tick reentry guard
-    // (mTickCountCPRFC, see that method's own remarks). PlayerRuntimeState.LastHaloEnchantAttemptUtc is
-    // stamped unconditionally the instant the guard passes, BEFORE the CP/halo-cap check below it, so a
-    // legitimate first attempt that itself goes on to fail that check still stamps the timestamp -- the two
-    // tests below rely on that ordering to isolate the reentry guard from every other precondition in this
-    // method without ever reaching its own money-debit/zone-command-post tail (avoiding
-    // PostTribeProgressCommandAndWaitAsync's 2s internal wait, since nothing here ticks the zone
-    // concurrently).
     [Fact]
     public async Task HaloEnchant_FirstAttempt_PassesTheReentryGuard_ButFailsTheSeparateHaloCapCheck()
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (_, _, state) = Setup(zone, CharacterId, contributionPoints: 1_000);
-        state.Halo = 96; // at the cap -- the check immediately after the guard aborts, without ever
-        // reaching AdjustMoneyAsync/the resolver/the zone-command post.
-        state.LastHaloEnchantAttemptUtc = DateTime.UtcNow - TimeSpan.FromSeconds(1); // clears the guard
+        state.Halo = 96;
+        state.LastHaloEnchantAttemptUtc = DateTime.UtcNow - TimeSpan.FromSeconds(1);
         var logger = new CapturingLogger<TribeActionService>();
         var service = CreateService(logger: logger);
 
         var outcome = await service.HaloEnchantAsync(zone, state, CharacterId, CancellationToken.None);
 
-        Assert.True(outcome.Aborted); // aborted, but by the halo-cap check, NOT the reentry guard
+        Assert.True(outcome.Aborted);
         Assert.DoesNotContain(logger.Entries, e => e.Message.Contains("same-tick repeat request"));
         Assert.Equal(96, state.Halo);
-        Assert.Equal(1_000, state.ContributionPoints); // untouched -- the abort precedes any CP/money debit
+        Assert.Equal(1_000, state.ContributionPoints);
     }
 
     [Fact]
@@ -133,56 +117,42 @@ public class TribeActionServiceTests
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (_, _, state) = Setup(zone, CharacterId, contributionPoints: 1_000);
-        state.Halo = 96; // guarantees a fast, synchronous abort on EVERY call that passes the guard, so
-        // neither attempt below ever reaches AdjustMoneyAsync/PostTribeProgressCommandAndWaitAsync -- keeping
-        // the two calls back-to-back in real wall-clock time, which is exactly what this test needs to prove.
-        state.LastHaloEnchantAttemptUtc = DateTime.UtcNow - TimeSpan.FromSeconds(1); // clears the guard for
-        // attempt #1 only
+        state.Halo = 96;
+        state.LastHaloEnchantAttemptUtc = DateTime.UtcNow - TimeSpan.FromSeconds(1);
         var logger = new CapturingLogger<TribeActionService>();
         var service = CreateService(logger: logger);
 
         var first = await service.HaloEnchantAsync(zone, state, CharacterId, CancellationToken.None);
-        Assert.True(first.Aborted); // halo-cap abort (see the sibling test above) -- guard already passed once
+        Assert.True(first.Aborted);
         var stampedAfterFirst = state.LastHaloEnchantAttemptUtc;
 
-        // Same-tick retry: real elapsed time between these two awaited calls is a tiny fraction of the 500ms
-        // legacy tick (SimulationClock.LegacyTick) this guard is measured against.
         var second = await service.HaloEnchantAsync(zone, state, CharacterId, CancellationToken.None);
 
         Assert.True(second.Aborted);
         Assert.Contains(logger.Entries,
             e => e.Level == LogLevel.Warning && e.Message.Contains("same-tick repeat request"));
-        // The rejected retry must never re-stamp the guard's own timestamp (only a guard-PASSING attempt
-        // does that) -- otherwise a fast enough attacker could perpetually push the window forward with
-        // rejected retries alone.
         Assert.Equal(stampedAfterFirst, state.LastHaloEnchantAttemptUtc);
         Assert.Equal(96, state.Halo);
         Assert.Equal(1_000, state.ContributionPoints);
     }
 
-    /// <summary>
-    ///     Companion acceptance-path check: a genuine (non-same-tick) attempt is never blocked by the reentry
-    ///     guard itself -- CP and money are debited unconditionally once the guard and halo-cap check both
-    ///     pass, regardless of the halo-enchant roll's own random outcome (Success/Downgraded/NeutralFail all
-    ///     debit the same fixed CP/money cost, see <c>TribeActionService.HaloEnchantAsync</c>'s own remarks).
-    /// </summary>
-    [Fact]
+        [Fact]
     public async Task HaloEnchant_NonSameTickAttempt_PassesTheGuard_AndDebitsMoneyAndCp()
     {
         var zone = ZoneTestKit.CreateZone(1);
         var characters = new FakeCharacterRepository();
         var (_, _, state) = Setup(zone, CharacterId, contributionPoints: 1_000);
-        state.Halo = 10; // well below the 96 cap
-        state.LastHaloEnchantAttemptUtc = DateTime.UtcNow - TimeSpan.FromSeconds(1); // clears the guard
+        state.Halo = 10;
+        state.LastHaloEnchantAttemptUtc = DateTime.UtcNow - TimeSpan.FromSeconds(1);
         var service = CreateService(characters);
 
         var outcome = await service.HaloEnchantAsync(zone, state, CharacterId, CancellationToken.None);
-        zone.Tick(TimeSpan.FromMilliseconds(50)); // drains the posted TribeProgressZoneCommand mirror
+        zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.False(outcome.Aborted);
         Assert.True(zone.TryGetPlayer(CharacterId, out var after));
-        Assert.Equal(900, after!.ContributionPoints); // 1_000 - HaloEnchantCpCost(100), unconditional on outcome
-        Assert.Equal((CharacterId, -1_000_000L, 0), characters.LastAdjustMoney); // HaloEnchantMoneyCost
+        Assert.Equal(900, after!.ContributionPoints);
+        Assert.Equal((CharacterId, -1_000_000L, 0), characters.LastAdjustMoney);
     }
 
     [Fact]
@@ -195,11 +165,6 @@ public class TribeActionServiceTests
         var outcome = await service.RebirthAsync(zone, state, CharacterId, CancellationToken.None);
         Respond(session, RebirthRequest(), outcome);
 
-        // Hardened against the legacy quirk (Rebirth-advancement contract, Edge cases): this specific failure
-        // -- the path-specific cap of 6, distinct from the absolute cap of 12 -- is a graceful in-band
-        // response, never a disconnect, and unlike the legacy, nothing is mutated merely by hitting it: not
-        // Exp2 (the legacy unconditionally resets this one BEFORE the cap check, destroying an already-grown
-        // bar for zero reward), not RebirthCount, not ContributionPoints, not Zone241Time.
         Assert.Null(session.DisconnectReason);
         Assert.Equal(6, state.RebirthCount);
         Assert.Equal(MaxHighLevelExp, state.Exp2);
@@ -208,7 +173,7 @@ public class TribeActionServiceTests
 
         var frame = ZoneTestKit.DrainOutbound(pipe);
         Assert.Equal(RebirthFrame, frame.Length);
-        Assert.Equal(1, BinaryPrimitives.ReadInt32LittleEndian(frame.AsSpan(1))); // Result=1, generic failure
+        Assert.Equal(1, BinaryPrimitives.ReadInt32LittleEndian(frame.AsSpan(1)));
     }
 
     [Fact]
@@ -286,7 +251,7 @@ public class TribeActionServiceTests
         state.Mana = 1;
         var service = CreateService();
         var request = RebirthRequest();
-        request.Data[3] = 77; // arbitrary payload byte -- must round-trip verbatim on the echo
+        request.Data[3] = 77;
 
         var outcome = await service.RebirthAsync(zone, state, CharacterId, CancellationToken.None);
         Respond(session, request, outcome);
@@ -297,12 +262,7 @@ public class TribeActionServiceTests
         Assert.Equal(1, after!.RebirthCount);
         Assert.Equal(0, after.Exp2);
         Assert.Equal(0, after.ContributionPoints);
-        // aZone241Time += 10 (durably persisted via ICharacterRepository.AdjustZone241TimeAsync, then
-        // mirrored back onto PlayerRuntimeState) -- Path B's own side effect the Rebirth-Pill path (A) never
-        // triggers.
         Assert.Equal(10, after.Zone241Time);
-        // Full heal to the FRESHLY recomputed max (not whatever MaxLife/MaxMana happened to hold before) --
-        // same "SetIntegerUp to the new max, not a clamp" posture as tSort 6/10 elsewhere in this service.
         Assert.NotNull(after.Stats);
         var stats = after.Stats!.Value;
         Assert.True(stats.MaxLife > 0);
@@ -315,15 +275,14 @@ public class TribeActionServiceTests
         var echo = frame.AsSpan(1);
         Assert.Equal(0, BinaryPrimitives.ReadInt32LittleEndian(echo));
         Assert.Equal(11, BinaryPrimitives.ReadInt32LittleEndian(echo[4..]));
-        Assert.Equal(77, echo[8 + 3]); // Data echoed back verbatim
+        Assert.Equal(77, echo[8 + 3]);
 
-        // RebirthFrame already includes its own 1-byte header; skip it whole, then the second frame's own header.
         var stateFlag = frame.AsSpan(RebirthFrame + 1);
         Assert.Equal(CharacterId, BinaryPrimitives.ReadInt32LittleEndian(stateFlag));
-        Assert.Equal(14, BinaryPrimitives.ReadInt32LittleEndian(stateFlag[8..])); // Sort
-        Assert.Equal(0, BinaryPrimitives.ReadInt32LittleEndian(stateFlag[12..])); // Value01 = ContributionPoints
-        Assert.Equal(1, BinaryPrimitives.ReadInt32LittleEndian(stateFlag[16..])); // Value02 = RebirthCount
-        Assert.Equal(10, BinaryPrimitives.ReadInt32LittleEndian(stateFlag[20..])); // Value03 = Zone241Time
+        Assert.Equal(14, BinaryPrimitives.ReadInt32LittleEndian(stateFlag[8..]));
+        Assert.Equal(0, BinaryPrimitives.ReadInt32LittleEndian(stateFlag[12..]));
+        Assert.Equal(1, BinaryPrimitives.ReadInt32LittleEndian(stateFlag[16..]));
+        Assert.Equal(10, BinaryPrimitives.ReadInt32LittleEndian(stateFlag[20..]));
     }
 
     [Fact]
@@ -332,7 +291,7 @@ public class TribeActionServiceTests
         var zone = ZoneTestKit.CreateZone(1);
         var (session, pipe, state) = Setup(zone, CharacterId);
         var (_, neighborPipe, _) = Setup(zone, NeighborId);
-        ZoneTestKit.DrainOutbound(pipe); // neighbor's own Enter-broadcast join packet, not under test
+        ZoneTestKit.DrainOutbound(pipe);
         var service = CreateService();
 
         var outcome = await service.RebirthAsync(zone, state, CharacterId, CancellationToken.None);
@@ -365,15 +324,12 @@ public class TribeActionServiceTests
     [Fact]
     public async Task Rebirth_CannotBeRepeated_WithoutExp2BeingRegrownToFullBetweenAttempts()
     {
-        // Proves a second Max Rebirth attempt immediately after a successful one is rejected -- Exp2 was
-        // reset to 0 by the first success, so the second attempt fails the "100% of Level2's threshold"
-        // precondition, exactly like any other under-threshold Exp2 value would.
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, state) = Setup(zone, CharacterId);
         var service = CreateService();
 
         var first = await service.RebirthAsync(zone, state, CharacterId, CancellationToken.None);
-        zone.Tick(TimeSpan.FromMilliseconds(50)); // drains the posted TribeProgressZoneCommand mirror
+        zone.Tick(TimeSpan.FromMilliseconds(50));
         Assert.False(first.Aborted);
         Assert.True(zone.TryGetPlayer(CharacterId, out state));
         Assert.Equal(1, state!.RebirthCount);
@@ -383,7 +339,7 @@ public class TribeActionServiceTests
         Respond(session, RebirthRequest(), second);
 
         Assert.Equal(DisconnectReason.Faulted,
-            session.DisconnectReason); // combined-precondition failure, not the 6-cap
-        Assert.Equal(1, state.RebirthCount); // unchanged by the rejected second attempt
+            session.DisconnectReason);
+        Assert.Equal(1, state.RebirthCount);
     }
 }

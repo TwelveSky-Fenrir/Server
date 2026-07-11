@@ -3,14 +3,6 @@ using Fenrir.Data.Abstractions.Game;
 
 namespace Fenrir.Application.Game.Tests.Audit;
 
-/// <summary>
-///     Pure call-shape tests for <see cref="EventLogEmitters" /> (workstream C20 "GameLog/EventLog audit
-///     coverage" contract) -- asserts each wrapper resolves the correct (Category, EventCode) pair and field
-///     mapping against <see cref="FakeEventLogRepository" />, without any real database. These do NOT
-///     exercise the still-open wiring at each production call site (BuyCashItemService,
-///     GenericActionService.PickupGroundItemAsync, LootBoxUseItemHandler) -- see this workstream's
-///     wiringManifest report for those insertions, tracked separately.
-/// </summary>
 public class EventLogEmittersTests
 {
     [Fact]
@@ -28,8 +20,6 @@ public class EventLogEmittersTests
         Assert.Equal(20, e.ActorCharacterId);
         Assert.Equal(5001, e.ItemId);
         Assert.Equal(3, e.Quantity);
-        // Legacy discards the cash-cost fields before they ever reach a durable record (C20 contract, Side
-        // effects (A)) -- DeltaMoney must stay null, never the charged amount.
         Assert.Null(e.DeltaMoney);
         Assert.Null(e.Payload);
     }
@@ -132,9 +122,6 @@ public class EventLogEmittersTests
     [Fact]
     public void TradeStagingCodes_DoNotCollideWithTradeCommitCodes()
     {
-        // usp_CharacterTrade_Execute / usp_CharacterTradeCommit_ExecuteIdempotent already claim EventCode 1
-        // (item transfer, GL_615) and 2 (money transfer, GL_616) under EventLogCategory.Trade for the
-        // COMMIT itself -- staging must never reuse either value.
         short[] stagingCodes =
         [
             EventLogEmitters.TradeItemStagedToWindowEventCode, EventLogEmitters.TradeItemStagedToInventoryEventCode,
@@ -160,8 +147,6 @@ public class EventLogEmittersTests
         Assert.Equal(expectedCode, e.EventCode);
         Assert.Equal(EventLogCategory.PetInventoryTransfer, e.Category);
 
-        // Legacy hardcodes the SAME marker (1) for both directions (C20 contract's own flagged ambiguity) --
-        // Fenrir deliberately closes that gap, so the two directions must resolve to DIFFERENT codes.
         Assert.NotEqual(EventLogEmitters.PetInventoryToPetEventCode, EventLogEmitters.PetInventoryFromPetEventCode);
     }
 
@@ -170,7 +155,6 @@ public class EventLogEmittersTests
     {
         var fake = new FakeEventLogRepository();
 
-        // The GL_990 quirk: debit the full requested amount from Money, credit exactly +1 BigMoney unit.
         await fake.LogBigMoneyConversionAsync(EventLogEmitters.BigMoneyConversionEventCode1, accountId: 1,
             characterId: 2, fromLedgerDelta: -1_500_000_000, toLedgerDelta: 1, CancellationToken.None);
 
@@ -185,8 +169,6 @@ public class EventLogEmittersTests
     {
         var fake = new FakeEventLogRepository();
 
-        // BigMoneyTransferService.TransferStoreAsync (tSort 241/244) has no account id in scope -- the
-        // wrapper must allow accountId: null rather than forcing a guessed value.
         await fake.LogBigMoneyConversionAsync(EventLogEmitters.BigMoneyConversionEventCode5, accountId: null,
             characterId: 10, fromLedgerDelta: -5, toLedgerDelta: 5, CancellationToken.None);
 

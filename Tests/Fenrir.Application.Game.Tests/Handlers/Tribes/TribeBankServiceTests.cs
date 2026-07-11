@@ -69,9 +69,6 @@ public class TribeBankServiceTests
     [Fact]
     public async Task View_NoTribeRoleButStaffTier_BypassesGateAndReturnsBankArray()
     {
-        // uUserSort < 1 GM bypass (Server/ts25zone/S04_MyWork02.cpp:11560-11607): a staff/GM-tier caller
-        // (GmCommandTier.Basic or higher) skips the ReturnTribeRole != 0 check entirely and can view any
-        // tribe's bank, scoped to whatever tribe id is recorded on their own avatar.
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, state) = Setup(zone, 3, 0, 1);
         var repository = new FakeTribeRepository();
@@ -89,10 +86,6 @@ public class TribeBankServiceTests
     [Fact]
     public async Task UnknownSort_Aborts()
     {
-        // Sort 1/2 dispatch to View/Withdraw (via TribeBankWithdrawService) respectively; any other sort --
-        // including the removed, never-legacy Sort 3 a previous revision of this handler mistakenly
-        // recognized as "deposit" -- is a handler-owned fallback neither service ever sees; exercise the
-        // real handler here.
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, _) = Setup(zone, 1, 1);
         var repository = new FakeTribeRepository();
@@ -108,9 +101,6 @@ public class TribeBankServiceTests
     [Fact]
     public async Task FabricatedSort3_NoLongerRecognized_Aborts()
     {
-        // Regression test for the confirmed audit gap: there is no legacy Sort 3 on this opcode. Sort 3 must
-        // hit the same unrecognized-sub-command fallback as any other invalid value, and must invoke neither
-        // the (now-orphaned) deposit path nor the withdraw path.
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, _) = Setup(zone, 1, 1);
         var repository = new FakeTribeRepository();
@@ -132,12 +122,6 @@ public class TribeBankServiceTests
     [Fact]
     public async Task Sort2ThroughHandler_InvokesWithdraw_NotDeposit()
     {
-        // Regression test for the confirmed economy bug this fix closes: a fresh, definitive full read of
-        // Server/ts25zone/S04_MyWork02.cpp:11560-11607 and Server/ts25playuser/S04_MyWork02.cpp:269-377
-        // resolved a 3-way source contradiction -- CZ_TRIBE_BANK_SEND sort 2 is EXCLUSIVELY a withdraw
-        // (bank slot -> player money). Legacy has no client-invocable deposit path anywhere; deposits only
-        // happen via the automatic 10-minute server-internal tax-skim flush, never a packet. This test used
-        // to assert the opposite (that sort 2 invoked deposit), which was itself the bug.
         var zone = ZoneTestKit.CreateZone(1);
         var (session, pipe, _) = Setup(zone, 1, 1);
         var repository = new FakeTribeRepository { MoneyAfterWithdraw = 12_345 };
@@ -158,10 +142,6 @@ public class TribeBankServiceTests
         ZoneTestKit.DrainOutbound(pipe);
     }
 
-    // The following tests exercise TribeBankService.DepositAsync directly at the service level. As of the
-    // sort-2 correction above, this method is no longer reachable from any opcode (there is no legacy
-    // client-invocable deposit path at all) -- it is retained, not deleted, pending a separate decision on
-    // whether to remove it outright, so these tests intentionally keep covering its still-existing behavior.
     [Fact]
     public async Task Deposit_SlotIndexOutOfRange_Aborts()
     {
@@ -179,9 +159,6 @@ public class TribeBankServiceTests
     [Fact]
     public async Task Deposit_NotForceLeader_Aborts()
     {
-        // Legacy's one mutating tribe-bank operation (Server/ts25zone/S04_MyWork02.cpp:11560-11607) requires
-        // Force Leader role plus a 3-sub-master quorum regardless of a sub-master's ability to view --
-        // sub-masters can view the bank but never deposit into it.
         var zone = ZoneTestKit.CreateZone(1);
         var (_, _, state) = Setup(zone, 1, 2);
         var repository = new FakeTribeRepository();

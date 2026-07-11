@@ -3,13 +3,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.World.WorldState;
 
-/// <summary>
-///     B10 branch A (Formation ability): <see cref="WorldStateService.GetTribeFormationAbility" />/
-///     <see cref="WorldStateService.SetTribeFormationAbility" />, and the reset <see cref="WorldStateService.EndTribeSymbolBattle" />
-///     performs on them as the same legacy dispatch site (Server/ts25center/S04_MyWork02.cpp:398-407).
-///     Kept in its own file rather than added to <see cref="WorldStateServiceTests" /> to avoid touching a
-///     file a concurrent pass may also be editing.
-/// </summary>
 public class WorldStateServiceFormationAbilityTests
 {
     private static WorldStateService CreateInitialized()
@@ -68,8 +61,6 @@ public class WorldStateServiceFormationAbilityTests
         var service = CreateInitialized();
         service.SetTribeFormationAbility(0, 1);
         service.SetTribeFormationAbility(3, 4);
-        // Tribes 1 and 2 never declared anything -- the reset must still "rewrite" them to the same
-        // inactive value rather than skip them, per the B10 contract's Reset-path step 2.
 
         service.EndTribeSymbolBattle();
 
@@ -82,7 +73,7 @@ public class WorldStateServiceFormationAbilityTests
     {
         var service = CreateInitialized();
         service.StartTribeSymbolBattle();
-        service.ResolveTribeSymbol(1, 2); // tribe 1 loses its own symbol to tribe 2
+        service.ResolveTribeSymbol(1, 2);
         service.SetTribeFormationAbility(1, 3);
 
         service.EndTribeSymbolBattle();

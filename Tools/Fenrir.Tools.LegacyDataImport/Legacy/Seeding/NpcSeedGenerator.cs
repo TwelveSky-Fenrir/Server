@@ -3,12 +3,6 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Seeding;
 
-/// <summary>
-///     Generates <c>70_seed/world/Npcs.sql</c> from <see cref="NpcReader.ReadAll" /> (005_00005.IMG): one row
-///     per NPC with Index != 0 (131 of 500 slots; the rest are confirmed all-blank placeholders). Each
-///     fixed-size sub-array is normalized into its own child table, one row per populated slot -- except
-///     Menu/GambleCostInfo, which are 100% dense (no filtering removes anything), unlike ShopInfo/SkillInfo*.
-/// </summary>
 public static class NpcSeedGenerator
 {
     private const string NpcColumns =
@@ -70,8 +64,6 @@ public static class NpcSeedGenerator
                     SqlSeedWriter.Number(n.Index), page.ToString(), slot.ToString(), itemId.ToString()));
             }
 
-            // ArrayKind 1 = SkillInfo1[tier][slot]; ArrayKind 2 = SkillInfo2[a][b][c][slot] (flattened as
-            // a*72+b*24+c*8+slot); the 4-D indexing's real meaning is unconfirmed.
             for (var tier = 0; tier < n.SkillInfo1.Length; tier++)
             for (var slot = 0; slot < n.SkillInfo1[tier].Length; slot++)
             {

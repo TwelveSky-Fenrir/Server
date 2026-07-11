@@ -8,13 +8,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Gm;
 
-// Admin-tier GM-MAX stat-cheat (legacy PROCESS_DATA_SEND, opcode 19, tSort 509 -- there is no dedicated
-// legacy wire opcode for this action, and it reads no request payload at all --
-// Server/ts25zone/S04_MyWork04.cpp:1188-1202). GmMaxStatService's own contract: unconditionally sets
-// VIT/STR/INT/DEX=10000 and SkillPoints=3000 on success, NEVER sends a response packet on either the
-// gate-fail or success path (both end in a forced full-logout disconnect instead), and -- unlike the cited
-// legacy body, which writes no audit row -- Fenrir adds a game.EventLog (Category=GmAction) row as a
-// project-decision audit trail for this tier.
 public class GmMaxStatServiceTests
 {
     private const int AccountId = 1;
@@ -86,16 +79,10 @@ public class GmMaxStatServiceTests
         Assert.Equal(10000, state.StatDex);
         Assert.Equal(3000, state.SkillPoints);
 
-        // Legacy's case 509 body bypasses the shared response epilogue entirely -- silence is the "it worked"
-        // signal here, same posture as GmBlockAvatarService's success path; only the forced disconnect is
-        // observable to the client.
         PacketAssert.AssertNothingSent(pipe);
         Assert.Equal(DisconnectReason.GmCommandLogout, session.DisconnectReason);
 
         var logged = Assert.Single(eventLog.LoggedEvents);
-        // GmActionEventCodes is internal to Fenrir.Application.Game.Services (no InternalsVisibleTo to this
-        // test project) -- 1 is GmActionEventCodes.MaxStatCheat, the locally-scoped EventCode documented on
-        // that type for this exact command.
         Assert.Equal((short)1, logged.EventCode);
         Assert.Equal(EventLogCategory.GmAction, logged.Category);
         Assert.Equal(AccountId, logged.ActorAccountId);

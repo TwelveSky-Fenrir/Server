@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Zone;
 
-/// <summary>CZ_LOW_ITEM_SEND (CLIENT.h:264, 20-byte payload) — same typedef as <see cref="EnchantItemRequest" />.</summary>
 public class CzLowItemSendTests
 {
     [Fact]

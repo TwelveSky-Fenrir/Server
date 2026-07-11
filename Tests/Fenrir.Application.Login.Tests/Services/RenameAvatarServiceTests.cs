@@ -9,10 +9,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Login.Tests.Services;
 
-// Op19 CL_CHANGE_AVATAR_NAME_SEND: the rename-scroll item gate, then the five read-only relationship
-// refusals (tribe role, guild, friend, teacher, student, in that fixed order), first failure wins, and
-// only if none of them fire does the atomic rename-scroll consumption + rename itself run. Réf. C++ :
-// Server/ts25login/S04_MyWork02.cpp:1340-1385.
 public class RenameAvatarServiceTests
 {
     private const int AccountId = 42;
@@ -66,8 +62,6 @@ public class RenameAvatarServiceTests
         Assert.Contains("NewName", logged.Payload);
     }
 
-    // Server/ts25login/S04_MyWork02.cpp:1325-1329: the identical-name short circuit runs first, before the
-    // item gate and before any relationship refusal -- a same-name request never requires a rename scroll.
     [Fact]
     public async Task RenameAvatarAsync_NameUnchanged_ReturnsNameTakenWithoutQueryingItemSlotOrRelationships()
     {
@@ -85,8 +79,6 @@ public class RenameAvatarServiceTests
         Assert.Empty(guilds.QueriedCharacterIds);
     }
 
-    // Case-insensitive: a pure case change is "no change" under the schema's default (case-insensitive)
-    // collation, matching the underlying uniqueness check's own self-inclusive semantics.
     [Fact]
     public async Task RenameAvatarAsync_NameUnchangedDifferentCase_ReturnsNameTaken()
     {
@@ -101,9 +93,6 @@ public class RenameAvatarServiceTests
         Assert.Null(renames.LastCall);
     }
 
-    // A same-name request from a relationship-blocked character still gets "name unchanged" (Result=2), not
-    // the relationship refusal (Result=3) -- the identical-name short circuit runs strictly before the
-    // relationship checks, matching legacy's ordering.
     [Fact]
     public async Task RenameAvatarAsync_NameUnchangedFromTribeRoleBlockedCharacter_ReturnsNameTakenNotTribeRoleRefusal()
     {
@@ -137,8 +126,8 @@ public class RenameAvatarServiceTests
     }
 
     [Theory]
-    [InlineData(null)] // empty slot
-    [InlineData(1)] // wrong item
+    [InlineData(null)]
+    [InlineData(1)]
     public async Task RenameAvatarAsync_ItemAtSlotIsNotRenameScroll_ReturnsItemMismatchWithoutRelationshipChecks(
         int? itemIdAtSlot)
     {
@@ -158,8 +147,8 @@ public class RenameAvatarServiceTests
     }
 
     [Theory]
-    [InlineData((byte)1)] // tribe master
-    [InlineData((byte)2)] // tribe sub-master
+    [InlineData((byte)1)]
+    [InlineData((byte)2)]
     public async Task RenameAvatarAsync_TribeMasterOrSubMaster_RefusesWithoutRenamingOrQueryingLaterChecks(byte role)
     {
         var characters = FakeCharacterRepository.WithSummaries(Summary)

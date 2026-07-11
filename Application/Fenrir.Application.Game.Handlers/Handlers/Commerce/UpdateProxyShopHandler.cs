@@ -8,12 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Commerce;
 
-/// <summary>
-///     CZ_SET_DEPUTY_PSHOP_SEND (opcode 109). <c>BuySort</c> 1 = RETRIEVE an unsold item from the caller's
-///     own closed shop back to inventory; <c>BuySort</c> 2 = PURCHASE from another character's open shop.
-///     Only the buyer/retriever is ever a live participant -- the seller's shop lives purely in SQL, so no
-///     dual-lock is needed here (unlike <c>BuyShopItemHandler</c>'s live-PShop twin).
-/// </summary>
 public sealed class UpdateProxyShopHandler(IUpdateProxyShopService service, ILogger<UpdateProxyShopHandler> logger)
     : IAsyncPacketHandler<UpdateProxyShopRequest>
 {

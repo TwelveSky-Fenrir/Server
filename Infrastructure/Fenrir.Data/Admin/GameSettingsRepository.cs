@@ -5,7 +5,6 @@ using Fenrir.Data.Abstractions.Admin;
 
 namespace Fenrir.Data.Admin;
 
-// The one settings row an admin can retune without a redeploy; cached 5 min (not boot-time Frozen) so edits propagate without a restart.
 public sealed record GameSettingsRepository(ICaeriusNetDbContext Db) : IGameSettingsRepository
 {
     public async ValueTask<GameSettingsDto> GetAsync(CancellationToken ct)

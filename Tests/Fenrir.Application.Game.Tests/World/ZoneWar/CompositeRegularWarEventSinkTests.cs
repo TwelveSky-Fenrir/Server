@@ -5,11 +5,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Covers <see cref="CompositeRegularWarEventSink" /> -- the C15-regwar-reward wiring seam that lets
-///     <c>ZoneCenterRegularWarEventSink</c> and <see cref="RegularWarRewardGrantSink" /> both observe
-///     <c>RegularWarSchedulerHost</c>'s single-slot <c>IRegularWarEventSink</c> constructor parameter.
-/// </summary>
 public class CompositeRegularWarEventSinkTests
 {
     [Fact]
@@ -34,7 +29,7 @@ public class CompositeRegularWarEventSinkTests
         var composite = new CompositeRegularWarEventSink([broken, healthy],
             NullLogger<CompositeRegularWarEventSink>.Instance);
 
-        composite.OnWarConcluded(49, RegularWarOutcome.Draw, null, [], false); // must not throw
+        composite.OnWarConcluded(49, RegularWarOutcome.Draw, null, [], false);
 
         Assert.Equal(1, broken.WarConcludedCalls);
         Assert.Equal(1, healthy.WarConcludedCalls);

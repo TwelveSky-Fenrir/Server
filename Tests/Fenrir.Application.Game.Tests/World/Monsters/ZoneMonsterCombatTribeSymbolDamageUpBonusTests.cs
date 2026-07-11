@@ -13,15 +13,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.World.Monsters;
 
-/// <summary>
-///     Covers the end-to-end wiring of the <c>tribesymbol-damage-magnitude</c> contract's flat damage-up bonus
-///     through <c>Zone.Combat.cs</c>'s <c>ResolvePvmAttack</c> call site: <see cref="Zone" />'s own
-///     <c>tribeSymbolCombatModifiers</c> collaborator, populated by a real
-///     <see cref="TribeSymbolDamageModifierSystem" /> tick, actually reaches
-///     <see cref="MonsterCombatResolver.ResolvePvmAttack" /> and increases the applied damage. Complements
-///     <c>MonsterCombatResolverTribeSymbolDamageUpBonusTests</c> (the same term's pure resolver-level coverage)
-///     and <c>ZoneMonsterCombatTribeSymbolMalusTests</c> (the companion malus term's own end-to-end coverage).
-/// </summary>
 public class ZoneMonsterCombatTribeSymbolDamageUpBonusTests
 {
     private static readonly EffectiveStats StrongAttacker = new(1000, 1000, 1000, 0, 1000, 0, 0, 0, 0, 0, 0);
@@ -66,8 +57,6 @@ public class ZoneMonsterCombatTribeSymbolDamageUpBonusTests
             randomSource: new ScriptedRandomSource(0), tribeSymbolCombatModifiers: modifiers);
 
         var (session, pipe) = ZoneTestKit.CreateSession(1);
-        // EnterData's own default tribe is 1 -- relied on here rather than overridden, so the bonus below
-        // targets this exact attacker's own tribe.
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Attacker")));
         zone.Tick(SimulationClock.LegacyTick);
 
@@ -76,16 +65,11 @@ public class ZoneMonsterCombatTribeSymbolDamageUpBonusTests
 
         Assert.True(zone.TryGetPlayer(10, out var attacker));
         attacker!.Stats = StrongAttacker;
-        attacker.Level = 1; // strictly below MalusMinimumAttackerLevel -- isolates the bonus from the malus
+        attacker.Level = 1;
         attacker.AttackSubPacketCeiling = int.MaxValue;
 
         arrangeWorldState(worldState);
 
-        // Populate Zone's own tribeSymbolCombatModifiers exactly the way the real per-tick simulation system
-        // would, using the SAME WorldStateService the bonus is derived from -- not a direct internal-setter
-        // poke (TribeSymbolCombatModifiers.SetDamageUpBonusIncrementCount is internal to
-        // Fenrir.Application.Game.Domain and deliberately not exercised directly from this test assembly,
-        // matching TribeSymbolDamageUpBonusTests's own documented convention).
         new TribeSymbolDamageModifierSystem(worldState, modifiers).Simulate(zone, 1);
 
         zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1));
@@ -119,7 +103,7 @@ public class ZoneMonsterCombatTribeSymbolDamageUpBonusTests
     public void AttackerTribeOwnsOneOtherSlot_DamageIsIncreasedByOneFlatIncrement()
     {
         var (zone, modifiers, _) = CreateZoneWithSpawnedMonster(worldState =>
-            worldState.ResolveTribeSymbol(2, 1)); // tribe 1 (this attacker's own tribe) captures tribe 2's slot
+            worldState.ResolveTribeSymbol(2, 1));
         Assert.True(zone.TryGetMonster(1, out var monster));
         Assert.Equal(1, modifiers.GetDamageUpBonusIncrementCount(1));
         var startingLife = monster!.Life;
@@ -129,7 +113,6 @@ public class ZoneMonsterCombatTribeSymbolDamageUpBonusTests
         zone.Tick(SimulationClock.LegacyTick);
 
         Assert.True(zone.TryGetMonster(1, out var damaged));
-        // 1000 base attack power + (1 increment * 500) = 1500.
         Assert.Equal(startingLife - 1_500, damaged!.Life);
     }
 

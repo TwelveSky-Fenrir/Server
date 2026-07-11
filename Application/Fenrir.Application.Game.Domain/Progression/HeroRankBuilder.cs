@@ -2,12 +2,6 @@ using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Domain.Progression;
 
-/// <summary>
-///     Builds the wire <see cref="HeroRank" /> grid (flat index = tribe*10+rank) from
-///     <c>usp_HeroRanking_GetByPeriod</c>'s rows, which are globally Points-DESC ordered but not
-///     partitioned by tribe -- mirrors the legacy's own per-tribe "ORDER BY hPoint DESC LIMIT 10" query
-///     (S08_MyDB.cpp:258/295) by taking each tribe's first 10 matches off the shared, already-sorted list.
-/// </summary>
 public static class HeroRankBuilder
 {
     public const int TribeCount = 4;

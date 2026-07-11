@@ -65,7 +65,7 @@ public class MountAbsorbServiceTests
         var zone = ZoneTestKit.CreateZone(1);
         var (session, pipe, state) = Setup(zone, 10);
         var (_, neighborPipe, _) = Setup(zone, 20, 12f, 12f);
-        ZoneTestKit.DrainOutbound(pipe); // neighbor's own Enter-broadcast join packet, not under test
+        ZoneTestKit.DrainOutbound(pipe);
         state.AnimalIndex = 13;
         state.AnimalAbsorbTime = 5;
         var service = new MountAbsorbService();
@@ -108,8 +108,6 @@ public class MountAbsorbServiceTests
     [Fact]
     public void UnknownSort_Aborts()
     {
-        // Sort 1/2 dispatch to TryAbsorb/Release respectively; any other sort is a handler-owned fallback
-        // abort the service itself never sees -- exercise the real handler here.
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, _) = Setup(zone, 10);
         var handler = new MountAbsorbHandler(new MountAbsorbService(), NullLogger<MountAbsorbHandler>.Instance);

@@ -8,8 +8,6 @@ public class CzChangeToTribe4SendTests
     [Fact]
     public void PayloadSize_MatchesContract()
     {
-        // ExpectedSize=9 (inbound header only) -> 0-byte payload: empty struct. The character undergoing
-        // conversion is resolved from the session, never from anything client-supplied.
         Assert.Equal(0, TribeMigrationRequest.PayloadSize);
         Assert.Equal(Opcodes.Zone.Incoming.TribeMigration, TribeMigrationRequest.Opcode);
     }

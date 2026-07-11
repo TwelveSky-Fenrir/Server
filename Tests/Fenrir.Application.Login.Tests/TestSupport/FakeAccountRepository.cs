@@ -2,7 +2,6 @@ using Fenrir.Data.Abstractions.Accounts;
 
 namespace Fenrir.Application.Login.Tests.TestSupport;
 
-// In-memory stand-in for IAccountRepository: single-account, mirrors FakeAccountPinRepository's scope.
 internal sealed class FakeAccountRepository : IAccountRepository
 {
     private readonly AuthenticateAccountDto? _account;

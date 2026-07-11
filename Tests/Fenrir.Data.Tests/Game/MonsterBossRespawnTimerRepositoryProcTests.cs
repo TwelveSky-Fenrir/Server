@@ -7,15 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Game;
 
-/// <summary>
-///     game.usp_MonsterBossRespawnTimer_{GetAll,Set} against real SQL Server 2025, through
-///     <see cref="MonsterBossRespawnTimerRepository" /> exactly as <c>MonsterBossRespawnTracker</c> calls it.
-/// </summary>
-/// <remarks>
-///     game.MonsterBossRespawnTimers is shared by every test in the "SqlServer" collection for the whole
-///     assembly run, in no guaranteed order -- every assertion below reads back only what THIS test itself
-///     just wrote (a region id unique to it), never assuming the table starts empty.
-/// </remarks>
 [Collection("SqlServer")]
 public class MonsterBossRespawnTimerRepositoryProcTests
 {
@@ -35,7 +26,6 @@ public class MonsterBossRespawnTimerRepositoryProcTests
     [Fact]
     public async Task SetAsync_ThenGetAllAsync_RoundTripsTheDeadline()
     {
-        // world.MonsterSpawnRegions row 1 always exists (world.* is seeded once for the whole test database).
         const int regionId = 1;
         var deadline = new DateTime(2026, 3, 15, 12, 30, 45, 250, DateTimeKind.Utc);
 

@@ -9,9 +9,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Login.Tests.Services;
 
-// Op18 CL_DELETE_AVATAR_SEND (delete branch): the three read-only business-rule refusals, run in a fixed order
-// (tribe role, then guild, then proxy shop), first failure wins. Réf. C++ :
-// Server/ts25login/S04_MyWork02.cpp:1237-1274.
 public class DeleteAvatarServiceTests
 {
     private const int AccountId = 42;
@@ -54,8 +51,8 @@ public class DeleteAvatarServiceTests
     }
 
     [Theory]
-    [InlineData((byte)1)] // tribe master
-    [InlineData((byte)2)] // tribe sub-master
+    [InlineData((byte)1)]
+    [InlineData((byte)2)]
     public async Task DeleteAvatarAsync_TribeMasterOrSubMaster_RefusesWithoutDeletingOrQueryingLaterChecks(
         byte role)
     {
@@ -133,13 +130,9 @@ public class DeleteAvatarServiceTests
         var result = await service.DeleteAvatarAsync(AccountId, Slot, CancellationToken.None);
 
         Assert.Equal(DeleteAvatarOutcome.TribeRoleRefusal, result.Outcome);
-        // The guild check never runs once the tribe-role check has already failed.
         Assert.Empty(guilds.QueriedCharacterIds);
     }
 
-    // Legacy has a dedicated B_DELETE_AVATAR_RECV Result=1 for exactly this case
-    // (Server/ts25login/S04_MyWork02.cpp:1275-1283): a faulting usp_Character_Delete call must surface as a
-    // normal mapped outcome, not an unhandled exception that tears down the whole session.
     [Fact]
     public async Task DeleteAvatarAsync_DatabaseDeleteFails_ReturnsSqlErrorWithoutThrowing()
     {

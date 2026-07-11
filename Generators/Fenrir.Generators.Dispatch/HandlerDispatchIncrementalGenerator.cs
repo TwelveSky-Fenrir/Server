@@ -9,10 +9,6 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Fenrir.Generators.Dispatch;
 
-/// <summary>
-///     Discovers handlers in the current compilation and emits <c>MessageDispatcher</c>/<c>PacketHandlerHub</c>.
-///     Not wired on Fenrir.Contracts itself: two assemblies both emitting the same dispatch type would collide.
-/// </summary>
 [Generator(LanguageNames.CSharp)]
 public sealed class HandlerDispatchIncrementalGenerator : IIncrementalGenerator
 {
@@ -124,11 +120,7 @@ public sealed class HandlerDispatchIncrementalGenerator : IIncrementalGenerator
         context.AddSource("MessageDispatcher.g.cs", writer.ToString());
     }
 
-    /// <summary>
-    ///     Registers every dispatched handler as a DI singleton from the same discovery pass, so dispatch and
-    ///     registration can't drift.
-    /// </summary>
-    private static void EmitRegistration(IndentedWriter writer, ImmutableArray<HandlerModel> handlers)
+        private static void EmitRegistration(IndentedWriter writer, ImmutableArray<HandlerModel> handlers)
     {
         var handlerTypes = handlers
             .Select(h => h.HandlerTypeFullName)
@@ -153,8 +145,7 @@ public sealed class HandlerDispatchIncrementalGenerator : IIncrementalGenerator
         writer.CloseBrace();
     }
 
-    /// <summary>FEN015: reports a diagnostic per (Server, Opcode) claimed by more than one handler in this bucket.</summary>
-    private static void ReportCollisions(SourceProductionContext context, IEnumerable<HandlerModel> handlers)
+        private static void ReportCollisions(SourceProductionContext context, IEnumerable<HandlerModel> handlers)
     {
         var (_, diagnostics) = HandlerCollisionChecker.Check(handlers.ToImmutableArray());
 

@@ -3,11 +3,6 @@ using Fenrir.Application.Game.Domain.World.ZoneWar;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Covers <see cref="WarZoneEntryCatalog" />'s frozen table in isolation -- the exact cited numbers per
-///     zone, and that the rebirth-tier split for 295/296/322/323 partitions correctly (no overlap, no gap at the
-///     boundary).
-/// </summary>
 public class WarZoneEntryCatalogTests
 {
     [Fact]
@@ -68,9 +63,9 @@ public class WarZoneEntryCatalogTests
     [InlineData((short)1)]
     [InlineData((short)38)]
     [InlineData((short)124)]
-    [InlineData((short)251)] // Odawa custom zone -- deliberately not in this table, see catalog remarks
+    [InlineData((short)251)]
     [InlineData((short)266)]
-    [InlineData((short)319)] // unconditional-pass auto-hunt zone, a DIFFERENT routine -- not this gate's table
+    [InlineData((short)319)]
     public void ZonesOutsideTheCitedSet_HaveNoRule(short zoneNumber)
     {
         Assert.False(WarZoneEntryCatalog.TryGetRule(zoneNumber, out _));

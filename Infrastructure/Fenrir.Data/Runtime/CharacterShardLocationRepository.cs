@@ -7,11 +7,8 @@ using Fenrir.Data.Abstractions.Runtime;
 
 namespace Fenrir.Data.Runtime;
 
-// Cross-shard character-location directory (runtime.CharacterShardLocation) -- see
-// ICharacterShardLocationRepository for the per-method contract.
 public sealed record CharacterShardLocationRepository(ICaeriusNetDbContext Db) : ICharacterShardLocationRepository
 {
-    // In-memory OLTP table, sub-millisecond procs -- a short timeout fails fast instead of masking a stuck request.
     private const int CommandTimeoutSeconds = 5;
 
     public ValueTask UpsertAsync(int characterId, byte shardId, short mapId, string avatarName, byte tribe,

@@ -9,14 +9,6 @@ using K4os.Compression.LZ4;
 
 namespace Fenrir.IntegrationTests.Wire;
 
-/// <summary>
-///     Drives Fenrir.GameServer's wire protocol over a real socket: handshake -&gt; enter world -&gt; ready, then
-///     a background pump keeps draining unsolicited broadcasts (monster/ground-item replication, attack
-///     results, ...) into small snapshots the scenario test can poll, while <see cref="AttackAsync" />/
-///     <see cref="MoveAsync" />/etc. keep sending. See WireScalars's doc comment for why top-level packet
-///     fields are hand-built/hand-parsed; nested [FenrirWireType] sub-structs use their own real
-///     Write/TryRead.
-/// </summary>
 public sealed class ZoneBotClient : IAsyncDisposable
 {
     private readonly ConcurrentQueue<AttackForProtocol> _attackResults = new();
@@ -44,7 +36,6 @@ public sealed class ZoneBotClient : IAsyncDisposable
             }
             catch
             {
-                // Pump loop already swallows its own expected faults; a leftover exception here is never fatal to teardown.
             }
 
         _pumpCts.Dispose();
@@ -59,8 +50,7 @@ public sealed class ZoneBotClient : IAsyncDisposable
         return bot;
     }
 
-    /// <summary>op0 ZC_CONNECT_OK_RECV -- unlike Login's, carries no packet-level XOR, only seeds the stream cipher.</summary>
-    private async Task ReadGreetingAsync(CancellationToken ct)
+        private async Task ReadGreetingAsync(CancellationToken ct)
     {
         var frame = await _connection.ReadExactAsync(1 + ZoneGreetingResponse.PayloadSize, ct);
         if (frame[0] != ZoneGreetingResponse.Opcode)
@@ -71,8 +61,7 @@ public sealed class ZoneBotClient : IAsyncDisposable
         _connection.SeedOutboundStreamKey(randomNumber);
     }
 
-    /// <summary>op11 CL_ZONE_INFO_SEND -- consumes the single-use ticket ZoneTransferHandler minted.</summary>
-    public async Task<int> HandshakeAsync(int accountId, int tribe, int userSort, CancellationToken ct)
+        public async Task<int> HandshakeAsync(int accountId, int tribe, int userSort, CancellationToken ct)
     {
         var payload = new byte[ZoneHandshakeRequest.PayloadSize];
         WriteObfuscatedAccountId(payload.AsSpan(0, 255), accountId);
@@ -87,14 +76,7 @@ public sealed class ZoneBotClient : IAsyncDisposable
         return WireScalars.ReadInt32(frame.AsSpan(1, 4));
     }
 
-    /// <summary>
-    ///     op12 CL_REGISTER_AVATAR_SEND. Reads the full self-registration train: compressed EnterWorldResponse,
-    ///     compressed WorldSnapshotResponse, the (uncompressed, plain <c>Send</c>) TowerStatusResponse legacy
-    ///     pairs with that same broadcast unconditionally for every zone entry (see EnterWorldService's own
-    ///     remarks -- Server/ts25zone/S04_MyWork02.cpp:1203-1204, not gated on this being a tower zone), then
-    ///     the self-spawn AvatarActionResponse (see EnterWorldHandler).
-    /// </summary>
-    public async Task<EnterWorldResult> EnterWorldAsync(int accountId, string avatarName, CancellationToken ct)
+        public async Task<EnterWorldResult> EnterWorldAsync(int accountId, string avatarName, CancellationToken ct)
     {
         var payload = new byte[EnterWorldRequest.PayloadSize];
         WriteObfuscatedAccountId(payload.AsSpan(0, 255), accountId);
@@ -106,7 +88,7 @@ public sealed class ZoneBotClient : IAsyncDisposable
         if (!AvatarInfo.TryRead(enterWorldPayload.AsSpan(0, AvatarInfo.WireSize), out var avatarInfo))
             throw new InvalidOperationException("Failed to decode AvatarInfo from EnterWorldResponse.");
 
-        await ReadCompressedPayloadAsync(Opcodes.Zone.Outgoing.WorldSnapshot, ct); // WorldSnapshotResponse, unused
+        await ReadCompressedPayloadAsync(Opcodes.Zone.Outgoing.WorldSnapshot, ct);
 
         var towerStatusFrame = await _connection.ReadExactAsync(1 + TowerStatusResponse.PayloadSize, ct);
         if (towerStatusFrame[0] != TowerStatusResponse.Opcode)
@@ -126,14 +108,13 @@ public sealed class ZoneBotClient : IAsyncDisposable
         return new EnterWorldResult(avatarInfo, selfServerIndex, selfUniqueNumber, selfObject);
     }
 
-    /// <summary>op13 CL_MOVE_ZONE_OK_SEND -- final ack, no reply, session becomes InWorld. Safe to start the pump right after.</summary>
-    public async Task ReadyAsync(int tribe, CancellationToken ct)
+        public async Task ReadyAsync(int tribe, CancellationToken ct)
     {
         var payload = new byte[ZoneReadyRequest.PayloadSize];
         WireScalars.WriteInt32(payload.AsSpan(0, 4), tribe);
-        WireScalars.WriteInt32(payload.AsSpan(4, 4), 0); // AutoTime
-        WireScalars.WriteInt32(payload.AsSpan(8, 4), 0); // AutoTime2
-        WireScalars.WriteInt32(payload.AsSpan(12, 4), 0); // AutoState
+        WireScalars.WriteInt32(payload.AsSpan(4, 4), 0);
+        WireScalars.WriteInt32(payload.AsSpan(8, 4), 0);
+        WireScalars.WriteInt32(payload.AsSpan(12, 4), 0);
         await SendAsync(ZoneReadyRequest.Opcode, payload, ct);
     }
 
@@ -153,7 +134,7 @@ public sealed class ZoneBotClient : IAsyncDisposable
                 if (opcode is Opcodes.Zone.Outgoing.EnterWorld or Opcodes.Zone.Outgoing.WorldSnapshot)
                 {
                     await ReadCompressedBodyAsync(
-                        ct); // periodic full re-snapshot, if the server ever sends one; discarded
+                        ct);
                     continue;
                 }
 
@@ -167,7 +148,6 @@ public sealed class ZoneBotClient : IAsyncDisposable
         }
         catch (IOException)
         {
-            // Peer closed (e.g. test disposed the connection) -- the pump's job ends with the socket.
         }
     }
 
@@ -187,8 +167,6 @@ public sealed class ZoneBotClient : IAsyncDisposable
             var uniqueNumber = WireScalars.ReadUInt32(payload.AsSpan(4, 4));
             if (!ObjectForItem.TryRead(payload.AsSpan(8, ObjectForItem.WireSize), out var data))
                 return;
-            // No despawn/removal tracking: the scenario only needs "a ground item appeared near me", picked up
-            // by ServerIndex/UniqueNumber, and TryClaimGroundItem itself is the authority on whether it's still there.
             GroundItems[serverIndex] = new GroundItemSnapshot(serverIndex, uniqueNumber, data);
         }
         else if (opcode == Opcodes.Zone.Outgoing.Attack)
@@ -224,8 +202,7 @@ public sealed class ZoneBotClient : IAsyncDisposable
         return _zoneMoveResults.TryDequeue(out result);
     }
 
-    /// <summary>op15 CZ_AVATAR_ACTION_SEND -- movement AND every other unified avatar action (sit/skill/...).</summary>
-    public async Task MoveAsync(float x, float y, float z, float heading, CancellationToken ct)
+        public async Task MoveAsync(float x, float y, float z, float heading, CancellationToken ct)
     {
         var payload = new byte[AvatarActionRequest.PayloadSize];
         var action = new ActionInfo
@@ -253,18 +230,7 @@ public sealed class ZoneBotClient : IAsyncDisposable
         await SendAsync(AvatarActionRequest.Opcode, payload, ct);
     }
 
-    /// <summary>op18 CZ_PROCESS_ATTACK_SEND. mCase 3 = Avatar -&gt; Monster (see MonsterCombatResolver.ResolvePvmAttack).</summary>
-    /// <remarks>
-    ///     Declares a legal single-hit swing (op15 CZ_AVATAR_ACTION_SEND, Sort 5) immediately before the
-    ///     attack sub-packet itself -- <c>Zone.ApplyPvmAttack</c> now enforces
-    ///     <c>AttackPacketBudget.TryConsume</c> (mirrors <c>CheckAttackPacket</c>,
-    ///     Server/ts25zone/S07_MyGame02.cpp:1718-1761), which silently drops any mCase 3 sub-packet unless a
-    ///     prior avatar action already established a non-zero ceiling and a matching replay-guard value. One
-    ///     declare per call keeps this bot's retry loop (<c>KillMonsterUntilDeadAsync</c>) always within
-    ///     budget without needing to track cross-call state; the declared position mirrors the caller's own
-    ///     current position, so it is never rejected as an implausible move.
-    /// </remarks>
-    public async Task AttackMonsterAsync(int attackerServerIndex, uint attackerUniqueNumber, int monsterServerIndex,
+        public async Task AttackMonsterAsync(int attackerServerIndex, uint attackerUniqueNumber, int monsterServerIndex,
         uint monsterUniqueNumber, float x, float y, float z, CancellationToken ct)
     {
         const int singleHitSwingSort = 5;
@@ -317,11 +283,7 @@ public sealed class ZoneBotClient : IAsyncDisposable
         await SendAsync(AttackRequest.Opcode, payload, ct);
     }
 
-    /// <summary>
-    ///     op19 CZ_PROCESS_DATA_SEND, tSort 201 -- ground pickup (Page1/Index1 repurposed as the item's
-    ///     ServerIndex/UniqueNumber).
-    /// </summary>
-    public async Task PickupGroundItemAsync(int itemServerIndex, uint itemUniqueNumber, byte destinationContainer,
+        public async Task PickupGroundItemAsync(int itemServerIndex, uint itemUniqueNumber, byte destinationContainer,
         byte destinationSlot, CancellationToken ct)
     {
         var move = new DefaultPData
@@ -337,8 +299,7 @@ public sealed class ZoneBotClient : IAsyncDisposable
         await SendGenericActionAsync(201, move, ct);
     }
 
-    /// <summary>op19 CZ_PROCESS_DATA_SEND, tSort 215 -- NPC shop buy (Page1/Index1 repurposed as NpcId/ItemId).</summary>
-    public async Task BuyFromNpcShopAsync(int npcId, int itemId, int quantity, byte destinationContainer,
+        public async Task BuyFromNpcShopAsync(int npcId, int itemId, int quantity, byte destinationContainer,
         byte destinationSlot, CancellationToken ct)
     {
         var move = new DefaultPData
@@ -364,14 +325,7 @@ public sealed class ZoneBotClient : IAsyncDisposable
         await SendAsync(GenericActionRequest.Opcode, payload, ct);
     }
 
-    /// <summary>
-    ///     op19 CZ_PROCESS_DATA_SEND, tSort 206 -- ProcessForStatPlus. STAT_PLUS_RECV is a bare two-int payload
-    ///     (tStatSort then tAddValue, back-to-back at offset 0) rather than DefaultPData's 7-field/28-byte shape
-    ///     -- see GenericActionHandler's own sort-206 remarks and StatAllocationResolver for the category-code
-    ///     table (9-12 = variable-regime Str/Dex/Vit/Int, crediting exactly <paramref name="addValue" /> and
-    ///     debiting the same amount from the character's StatPoints balance).
-    /// </summary>
-    public async Task AllocateStatPointAsync(int statSort, int addValue, CancellationToken ct)
+        public async Task AllocateStatPointAsync(int statSort, int addValue, CancellationToken ct)
     {
         var payload = new byte[GenericActionRequest.PayloadSize];
         WireScalars.WriteInt32(payload.AsSpan(0, 4), 206);
@@ -382,18 +336,16 @@ public sealed class ZoneBotClient : IAsyncDisposable
         await SendAsync(GenericActionRequest.Opcode, payload, ct);
     }
 
-    /// <summary>op20 CZ_DEMAND_ZONE_SERVER_INFO_2 -- in-process zone transfer (ZoneMoveHandler); Sort 4 = portal.</summary>
-    public async Task ZoneMoveAsync(int targetZoneNumber, int presentZoneNumber, CancellationToken ct)
+        public async Task ZoneMoveAsync(int targetZoneNumber, int presentZoneNumber, CancellationToken ct)
     {
         var payload = new byte[ZoneMoveRequest.PayloadSize];
-        WireScalars.WriteInt32(payload.AsSpan(0, 4), 4); // Sort=4 (portal)
+        WireScalars.WriteInt32(payload.AsSpan(0, 4), 4);
         WireScalars.WriteInt32(payload.AsSpan(4, 4), targetZoneNumber);
         WireScalars.WriteInt32(payload.AsSpan(8, 4), presentZoneNumber);
         await SendAsync(ZoneMoveRequest.Opcode, payload, ct);
     }
 
-    /// <summary>op38 CZ_LOCAL_CHAT_SEND.</summary>
-    public async Task LocalChatAsync(string content, CancellationToken ct)
+        public async Task LocalChatAsync(string content, CancellationToken ct)
     {
         var payload = new byte[LocalChatRequest.PayloadSize];
         WireScalars.WriteFixedString(payload.AsSpan(0, 61), content);
@@ -427,8 +379,7 @@ public sealed class ZoneBotClient : IAsyncDisposable
         };
     }
 
-    /// <summary>Mirrors ObfuscatedUidCodec.TryDecodeAccountId's encoding half: Latin1("MG"+id), then USE_XOR_UID.</summary>
-    private static void WriteObfuscatedAccountId(Span<byte> destination, int accountId)
+        private static void WriteObfuscatedAccountId(Span<byte> destination, int accountId)
     {
         WireScalars.WriteFixedString(destination, "MG" + accountId);
         WireXor.ApplyUidXor(destination);
@@ -442,8 +393,7 @@ public sealed class ZoneBotClient : IAsyncDisposable
         return await ReadCompressedBodyAsync(ct);
     }
 
-    /// <summary>ZC_ZPACKET_OK_SEND envelope (§3.5): isCompress(4) + originalSize(4) + compressSize(4) + payload.</summary>
-    private async Task<byte[]> ReadCompressedBodyAsync(CancellationToken ct)
+        private async Task<byte[]> ReadCompressedBodyAsync(CancellationToken ct)
     {
         var header = await _connection.ReadExactAsync(12, ct);
         var isCompress = BinaryPrimitives.ReadInt32LittleEndian(header.AsSpan(0, 4));
@@ -463,16 +413,7 @@ public sealed class ZoneBotClient : IAsyncDisposable
         return decoded;
     }
 
-    /// <summary>
-    ///     Every client-&gt;server frame is <c>CLIENT_PACKET</c>-framed on the wire (<c>WireHeaderSizes.ClientPacketSize</c>
-    ///     = 9: <c>int tPacket1 + int tPacket2 + BYTE tProtocol</c>, opcode at header offset 8), not the bare
-    ///     opcode-then-payload shape a server response uses -- <see cref="Fenrir.Network.Framing.FrameReader" />
-    ///     unconditionally requires and slices off those leading 9 bytes before locating the opcode/payload for
-    ///     any INCOMING frame, on both LoginServer and GameServer. tPacket1/tPacket2 carry no framing
-    ///     information the server ever validates (see FrameReader's own remarks), so any filler value works --
-    ///     left zero here.
-    /// </summary>
-    private async Task SendAsync(byte opcode, byte[] payload, CancellationToken ct)
+        private async Task SendAsync(byte opcode, byte[] payload, CancellationToken ct)
     {
         var frame = new byte[WireHeaderSizes.ClientPacketSize + payload.Length];
         frame[8] = opcode;

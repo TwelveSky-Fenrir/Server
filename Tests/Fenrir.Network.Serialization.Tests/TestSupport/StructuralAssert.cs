@@ -3,7 +3,6 @@ using System.Reflection;
 
 namespace Fenrir.Network.Serialization.Tests.TestSupport;
 
-// Needed because record struct equality compares array fields (int[]/float[]/byte[]/string[]) by reference, not value.
 internal static class StructuralAssert
 {
     public static void DeepEqual<T>(T expected, T actual)
@@ -31,7 +30,6 @@ internal static class StructuralAssert
             case string[] expectedStrings:
                 Assert.Equal(expectedStrings, (string[])actual!);
                 return;
-            // Nested struct arrays need element-wise deep comparison too, for the same reference-equality reason.
             case Array expectedArray:
             {
                 var actualArray = (Array)actual!;

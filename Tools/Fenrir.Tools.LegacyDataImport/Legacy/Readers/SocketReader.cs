@@ -2,7 +2,6 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
-/// <summary>Parses <c>005_00010.IMG</c> (<c>SOCKET_INFO</c>, gem socket definitions); no known runtime patches.</summary>
 internal static class SocketReader
 {
     private const string FileName = "005_00010.IMG";

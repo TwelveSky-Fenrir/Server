@@ -9,12 +9,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     The real <see cref="ZoneCenterRegularWarEventSink" /> (which replaces the inert
-///     <see cref="LoggingRegularWarEventSink" />) translates each Regular War lifecycle event into the matching
-///     Zone049 sub-code and drives <see cref="ZoneCenterBroadcastIngestor.Ingest" />, giving that method its first
-///     production caller. Server 49 is Zone049 slot 0 in <see cref="RegularWarMapCatalog" />; server 146 is slot 1.
-/// </summary>
 public class ZoneCenterRegularWarEventSinkTests
 {
     private const short SlotZeroMapId = 49;
@@ -58,7 +52,6 @@ public class ZoneCenterRegularWarEventSinkTests
     {
         var (sink, state) = CreateSink();
 
-        // Drive the slot to Active first, then conclude+disconnect: the observable end state is idle (0).
         sink.OnActiveWarStarted(SlotZeroMapId);
         Assert.Equal(3, state.GetZone049State(0));
 
@@ -74,7 +67,6 @@ public class ZoneCenterRegularWarEventSinkTests
 
         sink.OnCountdownAnnounced(SlotZeroMapId, 5);
 
-        // Sub-code 1 carries no state mutation (countdown/diagnostic relay only).
         for (var slot = 0; slot < ZoneCenterSiegeState.Zone049Slots; slot++)
             Assert.Equal(0, state.GetZone049State(slot));
     }
@@ -131,7 +123,7 @@ public class ZoneCenterRegularWarEventSinkTests
 
         var entry = Assert.Single(relayQueue.Enqueued);
         Assert.Equal((byte)4, entry.SourceShardId);
-        Assert.Equal(4, entry.Sort); // sub-code 4 (active war started)
-        Assert.Equal(1, BinaryPrimitives.ReadInt32LittleEndian(entry.Data)); // slot 1 for server 146
+        Assert.Equal(4, entry.Sort);
+        Assert.Equal(1, BinaryPrimitives.ReadInt32LittleEndian(entry.Data));
     }
 }

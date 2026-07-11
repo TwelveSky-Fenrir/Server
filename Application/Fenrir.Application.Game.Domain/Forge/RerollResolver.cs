@@ -2,17 +2,6 @@ using Fenrir.Application.Game.Domain.Combat;
 
 namespace Fenrir.Application.Game.Domain.Forge;
 
-/// <summary>
-///     Pure resolver for CZ_EXCHANGE_ITEM_SEND (S04_MyWork02.cpp:3795), the "reroll" mechanic. USE_EXCHANGE_ITEM_V2
-///     is off in this build (matching <c>RerollItemRequest</c>'s own docstring), so only the V1 path is
-///     reproduced. No I/O, no Zone dependency.
-/// </summary>
-/// <remarks>
-///     The <c>#ifndef LNW33</c> 1/10000-chance "legendary 1401" branch (S04_MyWork02.cpp:3860-3872) does not
-///     compile in this (LNW33/EU33) build -- verified dead code, not reproduced. <c>IsExcludeDrop</c>
-///     (GameSystem_02_Item.cpp:1025) unconditionally returns FALSE in this build (its switch body is entirely
-///     commented out) -- also not reproduced, since it would be a no-op filter anyway.
-/// </remarks>
 public static class RerollResolver
 {
     public enum RerollOutcome
@@ -27,8 +16,7 @@ public static class RerollResolver
     private const int MaxBaseLevel = 145;
     private const int MaxMartialLevel = 12;
 
-    /// <summary>MG5ORIGIN top-tier set-item price override (Server/Header/function.h:1489-1497,1584-1592).</summary>
-    private const int Mg5OriginRareTopPrice = 250_000_000;
+        private const int Mg5OriginRareTopPrice = 250_000_000;
 
     private const int Mg5OriginEliteTopPrice = 500_000_000;
 
@@ -54,13 +42,7 @@ public static class RerollResolver
     private static readonly short[] EliteLevelTiers =
         [100, 110, 113, 115, 118, 121, 124, 127, 130, 133, 136, 139, 142];
 
-    /// <summary>
-    ///     <paramref name="previousTribe" /> only has legacy switch cases for 0/1/2 -- any other value (tribe 3,
-    ///     the fourth faction) leaves its 3 weapon-category slots at the array's zero-initialized default, which
-    ///     <see cref="FindReplacement" /> then always fails to match (a genuine, reproduced legacy gap, not an
-    ///     invented one).
-    /// </summary>
-    public static RerollResult Resolve(
+        public static RerollResult Resolve(
         ItemRowDto targetItem, byte previousTribe,
         IEnumerable<ItemRowDto> catalog, IRandomSource random)
     {
@@ -160,21 +142,10 @@ public static class RerollResolver
         return candidates.Count == 0 ? null : candidates[random.NextInt32(candidates.Count)];
     }
 
-    /// <summary>
-    ///     Verified against every literal case in GetExchangeMoney (function.h:1385-1596): a flat 200,000
-    ///     (Rare) / 400,000 (Elite) increment per tier index, tiers 45..144 (Rare) / 100..142 (Elite) followed
-    ///     by 13 level-145 martial sub-tiers (0..12). Level values outside the table return 0, matching the
-    ///     legacy switch falling through with tMoney's zero-initialized default. The normal top-tier value
-    ///     (level 145, martial 12) works out to 7,000,000 (Rare) / 14,000,000 (Elite) -- but the MG5ORIGIN
-    ///     override (DEFINE.h:18, defined unconditionally -- live) replaces that with a flat 250,000,000 /
-    ///     500,000,000 when the target is a set item at that exact top tier (function.h:1489-1497,1584-1592).
-    /// </summary>
-    private static int GetExchangeMoney(ItemRowDto item)
+        private static int GetExchangeMoney(ItemRowDto item)
     {
         var isRare = item.Type == RareItemType;
 
-        // MG5ORIGIN premium override: a set item (CheckSetItem > 1) at the absolute top tier costs the flat
-        // override instead of the normal table value. Checked first, since it wholly replaces the table result.
         if (item.Level == MaxBaseLevel && item.MartialLevel == MaxMartialLevel && item.CheckSetItem > 1)
             return isRare ? Mg5OriginRareTopPrice : Mg5OriginEliteTopPrice;
 

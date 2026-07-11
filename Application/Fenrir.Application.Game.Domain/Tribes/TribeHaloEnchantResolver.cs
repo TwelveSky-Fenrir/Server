@@ -2,35 +2,22 @@ using Fenrir.Application.Game.Domain.Combat;
 
 namespace Fenrir.Application.Game.Domain.Tribes;
 
-/// <summary>Outcome of one TRIBE_WORK tSort 7 halo-enchant attempt (ZC_TRIBE_WORK_RECV tResult 0/1/2).</summary>
 public enum TribeHaloEnchantOutcome
 {
-    /// <summary>tResult 0 -- aHalo += 1.</summary>
-    Success,
 
-    /// <summary>tResult 1 -- a consumable aProtectForHalo charge absorbed the downgrade.</summary>
-    ProtectionConsumed,
+        Success,
 
-    /// <summary>tResult 2 -- aHalo -= 1.</summary>
-    Downgraded,
+        ProtectionConsumed,
 
-    /// <summary>tResult 1 -- neither success nor downgrade; also the only outcome possible at aHalo==0.</summary>
-    NeutralFail
+        Downgraded,
+
+        NeutralFail
 }
 
-/// <summary>
-///     Port of GetHaloCostumeEnchantRate (function.h:2165-2214) plus the two-roll decision tree around it
-///     (S04_MyWork02.cpp:11128-11230, TRIBE_WORK tSort 7). No I/O -- TribeActionHandler supplies the current
-///     aHalo/aProtectForHalo and reads the result back.
-/// </summary>
 public static class TribeHaloEnchantResolver
 {
-    /// <summary>
-    ///     currentHalo is aHalo (the C++ adds 1 internally, "pCurrentImprove"). SuccessRate is a flat 15
-    ///     regardless of tier; only DecreaseRate varies, +3 per 10-point bracket, up to 30 at 90+. Both are
-    ///     percentage points for a rand() % 100 roll.
-    /// </summary>
-    public static (int SuccessRate, int DecreaseRate) GetRates(int currentHalo)
+
+        public static (int SuccessRate, int DecreaseRate) GetRates(int currentHalo)
     {
         var pCurrentImprove = currentHalo + 1;
 
@@ -51,16 +38,11 @@ public static class TribeHaloEnchantResolver
         return (15, decrease);
     }
 
-    /// <summary>
-    ///     Preconditions (CP/money/halo-cap) are the caller's job (TribeActionHandler debits the fixed cost
-    ///     before calling this). Consumes 1 or 2 draws from <paramref name="random" /> in source order:
-    ///     success roll, then -- only on failure -- the downgrade roll.
-    /// </summary>
-    public static (TribeHaloEnchantOutcome Outcome, int NewHalo, int NewProtectForHalo) Resolve(
+        public static (TribeHaloEnchantOutcome Outcome, int NewHalo, int NewProtectForHalo) Resolve(
         int currentHalo, int currentProtectForHalo, IRandomSource random)
     {
         var (successRate, decreaseRate) = GetRates(currentHalo);
-        var successThreshold = successRate + 2; // +2 flat bonus applied after the table lookup
+        var successThreshold = successRate + 2;
 
         if (random.NextInt32(100) < successThreshold)
             return (TribeHaloEnchantOutcome.Success, currentHalo + 1, currentProtectForHalo);

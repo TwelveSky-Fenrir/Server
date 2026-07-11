@@ -11,10 +11,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.World.Loot;
 
-/// <summary>
-///     Covers ground-item lifecycle end-to-end through <see cref="Zone" />'s public surface: spawning via a
-///     guaranteed monster-kill drop, claiming (<see cref="Zone.TryClaimGroundItem" />), and the 60 s expiry sweep.
-/// </summary>
 public class ZoneGroundItemTests
 {
     private const int PotionItemId = 8001;
@@ -55,13 +51,13 @@ public class ZoneGroundItemTests
         killerCharacterId = 20;
         zone.Post(ZoneCommand.Enter(killerCharacterId,
             ZoneTestKit.EnterData(session, 1, "Looter", 50, posZ: 50,
-                level: 1))); // matches monster.ItemLevel (drop eligibility gap <= 9)
-        zone.Tick(SimulationClock.LegacyTick); // enters + pops the monster
+                level: 1)));
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.True(zone.TryGetMonster(1, out var monster1));
         zone.TryDamageMonster(1, 10_000, killerCharacterId, out var died, out _);
         Assert.True(died);
-        zone.Tick(SimulationClock.LegacyTick); // drains the death: rolls the guaranteed potion drop
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.Equal(1, zone.GroundItemCount);
         return zone;
@@ -89,7 +85,7 @@ public class ZoneGroundItemTests
 
         Assert.Equal(GroundItemClaimOutcome.NotOwned, outcome);
         Assert.Null(item);
-        Assert.Equal(1, zone.GroundItemCount); // never removed on a rejected claim
+        Assert.Equal(1, zone.GroundItemCount);
     }
 
     [Fact]
@@ -131,8 +127,7 @@ public class ZoneGroundItemTests
     {
         var zone = CreateZoneWithGuaranteedPotionDrop(out _);
 
-        // Advance the zone clock past the 30 s free-for-all window (LegacyTick = 500 ms per Tick call).
-        for (var i = 0; i < 61; i++) // 61 * 0.5s = 30.5s
+        for (var i = 0; i < 61; i++)
             zone.Tick(TimeSpan.FromMilliseconds(500));
 
         var outcome = zone.TryClaimGroundItem(1, 1u, "SomeoneElse", null, 50, 0, 50, out var item);
@@ -146,7 +141,7 @@ public class ZoneGroundItemTests
     {
         var zone = CreateZoneWithGuaranteedPotionDrop(out _);
 
-        for (var i = 0; i < 130; i++) // 130 * 0.5s = 65s > 60s lifetime
+        for (var i = 0; i < 130; i++)
             zone.Tick(TimeSpan.FromMilliseconds(500));
 
         Assert.Equal(0, zone.GroundItemCount);
@@ -157,7 +152,6 @@ public class ZoneGroundItemTests
     {
         var zone = CreateZoneWithGuaranteedPotionDrop(out _);
 
-        // dedicated OS threads released via a barrier, not Parallel.For -- the thread pool could stagger starts enough to never actually race
         const int attempts = 20;
         var outcomes = new GroundItemClaimOutcome[attempts];
         var exceptions = new Exception?[attempts];
@@ -191,15 +185,7 @@ public class ZoneGroundItemTests
         Assert.Equal(0, zone.GroundItemCount);
     }
 
-    /// <summary>
-    ///     Covers <c>Zone.BroadcastGroundItemAction</c>'s <see cref="AoiGrid.HasAnyNeighbor" /> emptiness
-    ///     pre-check, the ground-item counterpart of the same refactor already covered for monsters
-    ///     (<c>ZoneMonsterAoiGridTests</c>) and proxy shops (<c>ZoneProxyShopTests.ShopWithNoNeighbors_IsNeverBroadcastTo</c>
-    ///     ):
-    ///     a drop with nobody nearby must neither throw nor send anything, while a drop next to a player must
-    ///     still reach them exactly as before.
-    /// </summary>
-    [Fact]
+        [Fact]
     public void SpawnGroundItem_WithNoNeighborsAnywhere_SendsNothing_AndDoesNotThrow()
     {
         var zone = ZoneTestKit.CreateZone(1);
@@ -215,7 +201,6 @@ public class ZoneGroundItemTests
         var zone = ZoneTestKit.CreateZone(1);
         var (session, pipe) = ZoneTestKit.CreateSession(1);
 
-        // Same AOI cell as the drop below (default cell size, both floor to the same coarse cell).
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, posX: 50f, posZ: 50f)));
         zone.Tick(SimulationClock.LegacyTick);
         ZoneTestKit.DrainOutbound(pipe);
@@ -226,11 +211,7 @@ public class ZoneGroundItemTests
             ZoneTestKit.DrainOutbound(pipe).Length);
     }
 
-    /// <summary>
-    ///     Always draws the maximum value, so the guaranteed potion drop succeeds and the unconditional item-864 roll
-    ///     (threshold 1000/1,000,000) stays unreachable.
-    /// </summary>
-    private sealed class MaxValueRandom : Random
+        private sealed class MaxValueRandom : Random
     {
         public override int Next(int minValue, int maxValue)
         {

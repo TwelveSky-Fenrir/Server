@@ -86,12 +86,10 @@ public class MonsterSpawnSchedulerTests
         zone.TryDamageMonster(1, 10_000, null, out var died, out _);
         Assert.True(died);
 
-        // Drain the death (loot/respawn arming) on the next tick.
         zone.Tick(SimulationClock.LegacyTick);
 
         Assert.Equal(0, zone.MonsterCount);
 
-        // Advance well past the respawn scan cadence (10 s) but nowhere near the 100 s respawn timer.
         for (var i = 0; i < 30; i++)
             zone.Tick(SimulationClock.LegacyTick);
 
@@ -107,8 +105,7 @@ public class MonsterSpawnSchedulerTests
 
         zone.TryDamageMonster(1, 10_000, null, out _, out _);
 
-        // 2 s respawn timer + up to 10 s until the next scan boundary -- well past both.
-        for (var i = 0; i < 40; i++) // 40 * 500ms = 20 s
+        for (var i = 0; i < 40; i++)
             zone.Tick(SimulationClock.LegacyTick);
 
         Assert.Equal(1, zone.MonsterCount);
@@ -128,7 +125,6 @@ public class MonsterSpawnSchedulerTests
 
         zone.Tick(SimulationClock.LegacyTick);
 
-        // money is queued for the background flush host, not applied to PlayerRuntimeState directly
         var grants = zone.DrainPendingMoneyGrants();
         var grant = Assert.Single(grants);
         Assert.Equal(10, grant.CharacterId);
@@ -147,7 +143,7 @@ public class MonsterSpawnSchedulerTests
 
         zone.TryDamageMonster(1, 10_000, 999, out _, out _);
 
-        zone.Tick(SimulationClock.LegacyTick); // must not throw
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.Empty(zone.DrainPendingMoneyGrants());
     }

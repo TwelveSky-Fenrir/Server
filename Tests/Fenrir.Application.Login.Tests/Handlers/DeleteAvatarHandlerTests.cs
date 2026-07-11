@@ -11,8 +11,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
-// Op18 CL_DELETE_AVATAR_SEND. Réf. C++ : Server/ts25login/S04_MyWork02.cpp:1186-1285 ;
-// Server/ts25login/S05_MyTransfer.cpp:216-221 (B_DELETE_AVATAR_RECV: a single result code, no other payload).
 public class DeleteAvatarHandlerTests
 {
     private const int AccountId = 42;
@@ -127,8 +125,6 @@ public class DeleteAvatarHandlerTests
         PacketAssert.AssertNothingSent(pipe);
     }
 
-    // Server/ts25login/S04_MyWork02.cpp:1231-1235: mode indicator 2 ("transfer") is a legal wire value the
-    // legacy server never implemented -- treated identically to malformed input (silent disconnect).
     [Fact]
     public async Task HandleAsync_TransferMode_AbortsWithoutReplyingOrDeleting()
     {
@@ -165,9 +161,6 @@ public class DeleteAvatarHandlerTests
         PacketAssert.AssertNothingSent(pipe);
     }
 
-    // Legacy answers with a dedicated B_DELETE_AVATAR_RECV Result=1 for exactly this case
-    // (Server/ts25login/S04_MyWork02.cpp:1275-1283): a faulting usp_Character_Delete call must reply with a
-    // normal Result=1 response, not tear down the session with an unhandled exception.
     [Fact]
     public async Task HandleAsync_DatabaseDeleteFails_RepliesResultOneWithoutDisconnecting()
     {

@@ -24,7 +24,6 @@ public class ItemValueCodecTests
     [Fact]
     public void Encode_MatchesLittleEndianByteLayout()
     {
-        // Server/Header/function.h's SetISIUIMValue: byte0=IS/Enchant, byte1=IU/Combine, byte2=IM/Refine, byte3=IZ/Socket.
         var value = ItemValueCodec.Encode(1, 2, 3, 4);
 
         Assert.Equal(1 | (2 << 8) | (3 << 16) | (4 << 24), value);

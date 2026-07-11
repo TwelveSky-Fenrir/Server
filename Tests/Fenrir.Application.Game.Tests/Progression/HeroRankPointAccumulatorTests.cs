@@ -101,8 +101,6 @@ public class HeroRankPointAccumulatorTests
 
         accumulator.AddPending(1, 0, null, null);
 
-        // Nothing to assert on the accumulator's private state directly -- verified indirectly: a flush
-        // right after must not call the repository at all.
         Assert.True(true);
     }
 

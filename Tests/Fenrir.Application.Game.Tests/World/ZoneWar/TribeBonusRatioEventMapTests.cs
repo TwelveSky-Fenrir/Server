@@ -3,16 +3,10 @@ using Fenrir.Application.Game.Domain.World.ZoneWar;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Covers <see cref="TribeBonusRatioEventMap" /> -- sub-mechanic A of the C6-zone241-bonus contract
-///     (<c>tSort=301</c>'s tribe-wide bonus-ratio sub-selector, <c>Server/ts25center/S04_MyWork02.cpp:854-920</c>).
-/// </summary>
 public class TribeBonusRatioEventMapTests
 {
     private static byte[] Payload(int eventSort, int eventValue)
     {
-        // Mirror ZoneCenterBroadcastIngestor.PayloadSize (130) even though TribeBonusRatioEventMap.Apply
-        // itself only reads the first 8 bytes.
         var data = new byte[130];
         BinaryPrimitives.WriteInt32LittleEndian(data.AsSpan(0), eventSort);
         BinaryPrimitives.WriteInt32LittleEndian(data.AsSpan(4), eventValue);
@@ -31,7 +25,6 @@ public class TribeBonusRatioEventMapTests
         TribeBonusRatioEventMap.Apply(state, Payload(eventSort, 1));
 
         Assert.Equal(0.1f, state.GetExperienceBonusRatio(expectedTribe));
-        // Every other tribe's slot in this family is left untouched.
         for (byte tribe = 0; tribe < 4; tribe++)
             if (tribe != expectedTribe)
                 Assert.Equal(0f, state.GetExperienceBonusRatio(tribe));
@@ -90,9 +83,9 @@ public class TribeBonusRatioEventMapTests
     public void KillOtherTribeAddValueFamily_SettingOneTribe_ZeroesTheOtherThree()
     {
         var state = new ZoneCenterSiegeState();
-        state.SetKillOtherTribeBonus(1, 9); // seed a prior value on a different tribe
+        state.SetKillOtherTribeBonus(1, 9);
 
-        TribeBonusRatioEventMap.Apply(state, Payload(51, 4)); // tribe 0
+        TribeBonusRatioEventMap.Apply(state, Payload(51, 4));
 
         Assert.Equal(4, state.GetKillOtherTribeBonus(0));
         Assert.Equal(0, state.GetKillOtherTribeBonus(1));
@@ -103,8 +96,6 @@ public class TribeBonusRatioEventMapTests
     [Fact]
     public void OneLiveProductionTriggerShape_EventValueOfOne_YieldsExactlyTenPercent()
     {
-        // ProcessForWin194's single call site always hardcodes tEventValue=1
-        // (Server/ts25zone/S07_MyGame01.cpp:10505,10517,10529,10541).
         var state = new ZoneCenterSiegeState();
 
         TribeBonusRatioEventMap.Apply(state, Payload(21, 1));
@@ -121,14 +112,14 @@ public class TribeBonusRatioEventMapTests
     [Theory]
     [InlineData(0)]
     [InlineData(20)]
-    [InlineData(25)] // just past the 21-24 family
+    [InlineData(25)]
     [InlineData(30)]
-    [InlineData(35)] // just past the 31-34 family
+    [InlineData(35)]
     [InlineData(40)]
-    [InlineData(45)] // just past the 41-44 family
+    [InlineData(45)]
     [InlineData(50)]
-    [InlineData(55)] // just past the 51-54 family
-    [InlineData(302)] // the unrelated, adjacent case 302 (mTribeMasterCallAbility) -- out of this map's scope
+    [InlineData(55)]
+    [InlineData(302)]
     public void UnrecognizedEventSort_WritesNothingToAnyOfTheFourArrays(int eventSort)
     {
         var state = new ZoneCenterSiegeState();
@@ -149,8 +140,8 @@ public class TribeBonusRatioEventMapTests
     {
         var state = new ZoneCenterSiegeState();
 
-        TribeBonusRatioEventMap.Apply(state, Payload(23, -5)); // experience-up, tribe 2
-        TribeBonusRatioEventMap.Apply(state, Payload(53, -2)); // kill-other-tribe, tribe 2
+        TribeBonusRatioEventMap.Apply(state, Payload(23, -5));
+        TribeBonusRatioEventMap.Apply(state, Payload(53, -2));
 
         Assert.Equal(-0.5f, state.GetExperienceBonusRatio(2));
         Assert.Equal(-2, state.GetKillOtherTribeBonus(2));

@@ -2,7 +2,6 @@ using Microsoft.CodeAnalysis;
 
 namespace Fenrir.Generators.Analysis.Support;
 
-/// <summary>Compares symbol names structurally instead of via <c>ToDisplayString()</c>, which is format-ambiguous.</summary>
 internal static class SymbolNameHelpers
 {
     public static string GetFullNamespace(INamespaceSymbol? ns)

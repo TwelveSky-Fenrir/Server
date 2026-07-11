@@ -21,8 +21,8 @@ public class TribePointLevelRecomputeServiceTests
         {
             Roster =
             [
-                new TribeRosterCharacterSnapshot(0, 200, 0, 0), // +88
-                new TribeRosterCharacterSnapshot(3, 145, 0, 0) // +33, plus tribe-3's own +800
+                new TribeRosterCharacterSnapshot(0, 200, 0, 0),
+                new TribeRosterCharacterSnapshot(3, 145, 0, 0)
             ]
         };
         var service = new TribePointLevelRecomputeService(gateway, worldState,
@@ -40,7 +40,7 @@ public class TribePointLevelRecomputeServiceTests
     public async Task RosterUnavailable_Null_AbortsWithoutWritingAnyTotals()
     {
         var (worldState, _) = CreateInitializedWorldState();
-        worldState.SetTribePoints(0, 4242); // pre-existing standing that must survive an aborted run
+        worldState.SetTribePoints(0, 4242);
         var gateway = new FakeRosterGateway { Roster = null };
         var service = new TribePointLevelRecomputeService(gateway, worldState,
             NullLogger<TribePointLevelRecomputeService>.Instance);
@@ -48,10 +48,6 @@ public class TribePointLevelRecomputeServiceTests
         await service.RecomputeAsync(CancellationToken.None);
 
         Assert.Equal(4242, worldState.GetTribe(0).Points);
-        // Never recomputed at all in this aborted run, so tribe 1 keeps whatever it was zero-initialized to
-        // at boot (per TribePointLevelRecomputeService's own remarks: "the tribe-point totals are
-        // zero-initialized at boot, the value that persists if every recompute attempt fails") -- 0, not
-        // TribePointLevelRecompute.Baseline (1000), which only ever appears once a recompute has actually run.
         Assert.Equal(0, worldState.GetTribe(1).Points);
     }
 
@@ -86,7 +82,7 @@ public class TribePointLevelRecomputeServiceTests
         var (worldState, _) = CreateInitializedWorldState();
         var gateway = new FakeRosterGateway
         {
-            Roster = [new TribeRosterCharacterSnapshot(0, 200, 0, 0)] // +88
+            Roster = [new TribeRosterCharacterSnapshot(0, 200, 0, 0)]
         };
         var service = new TribePointLevelRecomputeService(gateway, worldState,
             NullLogger<TribePointLevelRecomputeService>.Instance);
@@ -94,8 +90,6 @@ public class TribePointLevelRecomputeServiceTests
         await service.RecomputeAsync(CancellationToken.None);
         Assert.Equal(1000 + 88, worldState.GetTribe(0).Points);
 
-        // A second recompute with a shrunk roster must land on the freshly recomputed value, not add on top of
-        // the previous run's result.
         gateway.Roster = [];
         await service.RecomputeAsync(CancellationToken.None);
         Assert.Equal(1000, worldState.GetTribe(0).Points);

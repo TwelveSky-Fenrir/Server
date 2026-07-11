@@ -60,8 +60,6 @@ public class RerollResolverTests
     [Fact]
     public void LowTier_MatchingCandidate_SelfInclusionAllowed()
     {
-        // IARMOR = 9, tribe 0's weapon slots are ISWORD/IBLADE/IMARBLE -- force the roll onto category index 2
-        // (IARMOR, the 3rd of 9 Rare categories) so a self-match (only candidate in the catalog) is picked.
         var target = Item(1, RerollResolver.RareItemType, 9, 55, equipInfo1: 3);
         var result = RerollResolver.Resolve(target, 0, [target], new ScriptedRandomSource(2, 0));
 
@@ -96,8 +94,6 @@ public class RerollResolverTests
     [Fact]
     public void TribeThree_WeaponCategorySlotsAreZero_YieldsNoCandidateWhenPicked()
     {
-        // Rare category list is [Amulet,Cape,Armor,Glove,Ring,Boots,w1,w2,w3] -- roll index 6 (w1) which is 0
-        // for tribe 3 (no switch case in the legacy), so ReturnForExchangeItem's own iSort<1 guard rejects it.
         var target = Item(1, RerollResolver.RareItemType, 9, 100);
         var candidate = Item(2, RerollResolver.RareItemType, 9, 100, equipInfo1: 1);
         var result = RerollResolver.Resolve(target, 3, [target, candidate], new ScriptedRandomSource(6, 0));

@@ -13,7 +13,6 @@ public class FriendRegistryTests
         Assert.True(registry.TryAnswer(2, true, out var askerId));
         Assert.Equal(1, askerId);
 
-        // ONE-DIRECTIONAL: each side independently consumes its own accepted flag.
         Assert.True(registry.TryConsumeAccepted(1, out var otherForAsker));
         Assert.Equal(2, otherForAsker);
         Assert.True(registry.TryConsumeAccepted(2, out var otherForTarget));

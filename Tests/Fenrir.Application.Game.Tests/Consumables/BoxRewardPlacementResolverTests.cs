@@ -17,8 +17,8 @@ public class BoxRewardPlacementResolverTests
     public void Resolve_ExistingStackElsewhere_Merges()
     {
         var page0 = ImmutableDictionary<byte, ItemStack>.Empty
-            .SetItem(0, new ItemStack(200, 5, 0, 0, 0, 0, 0, 0, 0, 0, 1)) // box's own slot
-            .SetItem(3, new ItemStack(500, 10, 0, 0, 0, 0, 0, 0, 0, 0, 2)); // existing reward stack
+            .SetItem(0, new ItemStack(200, 5, 0, 0, 0, 0, 0, 0, 0, 0, 1))
+            .SetItem(3, new ItemStack(500, 10, 0, 0, 0, 0, 0, 0, 0, 0, 2));
 
         var result = BoxRewardPlacementResolver.Resolve(Reward(500, 4, true), 0, 0,
             page0, ImmutableDictionary<byte, ItemStack>.Empty);
@@ -32,8 +32,6 @@ public class BoxRewardPlacementResolverTests
     [Fact]
     public void Resolve_MatchingStackSitsInTheBoxsOwnSlot_IsExcludedFromMerge_FallsToEmptySlot()
     {
-        // The box itself happens to share an id with the reward -- must not merge into the slot the box's own
-        // removal is about to zero out.
         var page0 = ImmutableDictionary<byte, ItemStack>.Empty
             .SetItem(0, new ItemStack(500, 5, 0, 0, 0, 0, 0, 0, 0, 0, 1));
 
@@ -49,7 +47,7 @@ public class BoxRewardPlacementResolverTests
     public void Resolve_MergeWouldExceedStackCeiling_SkipsToEmptySlotInstead()
     {
         var page0 = ImmutableDictionary<byte, ItemStack>.Empty
-            .SetItem(0, Filler) // box's own slot
+            .SetItem(0, Filler)
             .SetItem(1, new ItemStack(500, 998, 0, 0, 0, 0, 0, 0, 0, 0, 2));
 
         var result = BoxRewardPlacementResolver.Resolve(Reward(500, 5, true), 0, 0,
@@ -121,7 +119,6 @@ public class BoxRewardPlacementResolverTests
         Assert.Equal(2, result.Slot);
     }
 
-    // ---- Serial (workstream lucky-ticket-handler-thresholds) --------------------------------------------
 
     [Fact]
     public void Resolve_NonStackableReward_CarriesTheCallerSuppliedSerial()
@@ -141,8 +138,6 @@ public class BoxRewardPlacementResolverTests
     {
         var page0 = ImmutableDictionary<byte, ItemStack>.Empty.SetItem(0, Filler);
 
-        // Even though a non-zero Serial is supplied, a stackable reward is always stripped back to 0 -- the
-        // same stackable-safety step that already strips value/expiry.
         var reward = new BoxRewardPlacementResolver.ResolvedReward(700, 1, true, 0, 0, 0, 0, 0, 100000001);
         var result = BoxRewardPlacementResolver.Resolve(reward, 0, 0, page0,
             ImmutableDictionary<byte, ItemStack>.Empty);

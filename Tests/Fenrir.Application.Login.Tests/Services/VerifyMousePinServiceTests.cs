@@ -6,11 +6,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Login.Tests.Services;
 
-// op15 CL_LOGIN_MOUSE_PASSWORD_SEND business logic: the Fenrir-only account-scoped, cross-reconnect PIN
-// lockout (Migrations/028_account_pin_lockout.sql) added to close the pincode-second-password security
-// audit's Major finding -- LoginClientSession.PinFailureCount alone resets on every reconnect
-// (MarkPinRequired), so only a durable, account-scoped counter can actually blunt brute forcing across
-// reconnects.
 public class VerifyMousePinServiceTests
 {
     private const int AccountId = 42;
@@ -47,11 +42,6 @@ public class VerifyMousePinServiceTests
     [Fact]
     public async Task VerifyMousePinAsync_FifthCumulativeMismatchAcrossReconnects_LocksTheAccount()
     {
-        // Simulates 5 wrong attempts spread across what would be several reconnects at the wire level
-        // (each reconnect resets LoginClientSession.PinFailureCount to 0 via MarkPinRequired, but never
-        // touches this account-scoped counter) -- the exact scenario the audit's Major finding describes:
-        // an attacker who never lets a single session reach the 3-strike disconnect can still be stopped
-        // by the durable counter.
         var pins = FakeAccountPinRepository.WithPin("4242");
         var eventLog = new FakeEventLogRepository();
         var service = new VerifyMousePinService(pins, eventLog, NullLogger<VerifyMousePinService>.Instance);
@@ -74,16 +64,13 @@ public class VerifyMousePinServiceTests
         var eventLog = new FakeEventLogRepository();
         var service = new VerifyMousePinService(pins, eventLog, NullLogger<VerifyMousePinService>.Instance);
 
-        // Correct PIN, but the account-scoped lockout must short-circuit before PasswordHasher.Verify --
-        // otherwise a locked-out account could still be probed for the right answer.
         var result = await service.VerifyMousePinAsync(AccountId, "4242", CancellationToken.None);
 
         Assert.Equal(VerifyMousePinOutcome.Locked, result.Outcome);
-        // A rejected-before-comparison outcome never reports to the lockout counter itself.
         Assert.Equal(0, pins.RecordAttemptCallCount);
 
         var logged = Assert.Single(eventLog.LoggedEvents);
-        Assert.Equal((short)6, logged.EventCode); // MousePinAttemptRejectedLocked
+        Assert.Equal((short)6, logged.EventCode);
         Assert.Equal(EventLogCategory.AccountSecurity, logged.Category);
         Assert.Equal(AccountId, logged.ActorAccountId);
     }

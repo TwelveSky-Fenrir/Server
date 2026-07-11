@@ -4,10 +4,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Social;
 
-/// <summary>
-///     No-op if not partied or is the leader (leader must use CZ_PARTY_BREAK_SEND). Deviation: dropping to 1
-///     member auto-disbands here; legacy leaves a lone leader "partied" until an explicit Break.
-/// </summary>
 public sealed class PartyLeaveService(PartyRegistry parties, ILogger<PartyLeaveService> logger) : IPartyLeaveService
 {
     public PartyLeaveResult Leave(int characterId)

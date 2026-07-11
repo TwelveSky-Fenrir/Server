@@ -9,27 +9,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
-/// <summary>
-///     CZ_RANK_BUFF_SEND (op111). On success, heals Life/Mana to max and replies via a self-unicast
-///     <see cref="AvatarStatUpdateResponse" /> echoing the new <c>aRankBuffType</c>. See
-///     <see cref="RankBuffResolver" />'s remarks for the stone-count gating (only Sort=1 is reachable today) and
-///     for the two wire preconditions (mid-zone-transfer disconnect, world-battle silent no-op) this handler
-///     delegates to it.
-/// </summary>
-/// <remarks>
-///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:13994-14112 (progression-and-misc-systems behavior contract,
-///     2026-07 round). Both preconditions this handler's own remarks previously tracked as open follow-ups --
-///     the acting avatar's own <see cref="PlayerRuntimeState.IsMovingZone" /> disconnect gate and the
-///     world-wide tribe-symbol-battle silent no-op -- are now closed via <see cref="RankBuffResolver.Resolve" />;
-///     see that type's remarks for the full citation trail, including why the world-battle flag is no longer
-///     "always 0 in Fenrir" as this file previously claimed. <c>MyFactor.cpp</c>'s per-<c>aRankBuffType</c> stat
-///     bonuses (7 separate formula sites) are modeled in
-///     <see cref="Fenrir.Application.Game.Stats.StatCalculator" />'s <c>RankBuffContribution</c> partial (see its
-///     remarks for the full tier-&gt;stat-&gt;magnitude table and citations) -- this handler only owns the wire
-///     mechanic, the state mirror (<see cref="PlayerRuntimeState.RankBuffType" />), and the HP/MP heal; the stat
-///     bonuses are read live off that same field by <c>ZoneContext.RankBuffType</c> wherever effective stats are
-///     computed.
-/// </remarks>
 public sealed class RankBuffHandler(IRankBuffService service, ILogger<RankBuffHandler> logger)
     : IInlinePacketHandler<RankBuffRequest>
 {
@@ -52,8 +31,6 @@ public sealed class RankBuffHandler(IRankBuffService service, ILogger<RankBuffHa
 
         if (result.SilentlyIgnored)
         {
-            // World-wide tribe-symbol (RvR) battle is active -- complete silent no-op: no reply, no disconnect,
-            // no state change, distinct from every other rejection below (RankBuffResolver.Outcome.WorldBattleActive).
             logger.LogDebug(
                 "Rank-buff silently ignored for character {CharacterId}: world tribe-symbol battle in progress",
                 characterId);

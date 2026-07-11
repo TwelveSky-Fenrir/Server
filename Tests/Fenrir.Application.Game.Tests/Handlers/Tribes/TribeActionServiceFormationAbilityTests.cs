@@ -11,39 +11,11 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Tribes;
 
-/// <summary>
-///     CZ_TRIBE_WORK_SEND tSort 5 (<see cref="TribeActionService.ValidateTribeSkill" />) -- the declaration
-///     path for B10 branch A (tribe Formation ability). Kept in its own file rather than added to
-///     <c>TribeActionServiceTests</c> to avoid touching a file a concurrent pass may also be editing (same
-///     rationale as <c>WorldStateServiceFormationAbilityTests</c>, which covers the
-///     <see cref="WorldStateService.SetTribeFormationAbility" />/<see cref="WorldStateService.GetTribeFormationAbility" />
-///     primitives themselves -- this file only covers the one caller that arms them).
-///     <para>
-///         All five eligibility gates named by <see cref="WorldStateService.SetTribeFormationAbility" />'s own
-///         remarks are now enforced by <see cref="TribeActionService.ValidateTribeSkill" /> and covered here:
-///         Force Leader role and payload shape/range (the two gates this file originally covered), plus gates
-///         (a)-(d) -- four-tribe point floor, strict-lowest-tribe tie-break, twenty-percent share, and Tribe
-///         Symbol Battle active. The pure numeric edges of gates (a)-(c) (exact floor/share boundaries, the
-///         tie-break rule itself) are covered in isolation by
-///         <c>TribeFormationAbilityEligibilityTests</c> against <see cref="TribeFormationAbilityEligibility" />
-///         directly -- this file instead covers gate (d) (a <see cref="WorldStateService.World" /> flag read,
-///         not a pure function those tests can exercise) and the full five-gate END-TO-END composition: each
-///         gate failing alone must abort without arming anything, and all five passing must reach
-///         <see cref="WorldStateService.SetTribeFormationAbility" />.
-///     </para>
-/// </summary>
 public class TribeActionServiceFormationAbilityTests
 {
     private const int CharacterId = 10;
 
-    /// <summary>
-    ///     Default per-tribe point totals that make every one of gates (a)-(c) pass regardless of which tribe
-    ///     is chosen as <paramref name="requesterTribe" />: the requester's own tribe sits at 101 (one over
-    ///     <see cref="TribeFormationAbilityEligibility.PointFloor" />, and strictly below every other tribe's
-    ///     1000, so it is always the sole lowest-point tribe and its 101-of-3101 share is comfortably under
-    ///     <see cref="TribeFormationAbilityEligibility.SharePercentThreshold" />).
-    /// </summary>
-    private static int[] DefaultPassingTribePoints(byte requesterTribe)
+        private static int[] DefaultPassingTribePoints(byte requesterTribe)
     {
         var points = new int[4];
         for (byte i = 0; i < 4; i++)
@@ -70,9 +42,6 @@ public class TribeActionServiceFormationAbilityTests
         var worldState = new WorldStateService(new FakeWorldStateRepository(), NullLogger<WorldStateService>.Instance);
         worldState.InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
 
-        // Gates (a)-(d): seed a baseline where every gate passes by default (see DefaultPassingTribePoints),
-        // so tests unrelated to a specific gate don't need to think about it -- a test targeting one gate's
-        // failure passes its own tribePoints/symbolBattleActive override instead.
         var points = tribePoints ?? DefaultPassingTribePoints(tribe);
         for (byte i = 0; i < 4; i++)
             worldState.SetTribePoints(i, points[i]);
@@ -195,8 +164,6 @@ public class TribeActionServiceFormationAbilityTests
     [Fact]
     public void FloorGate_OneTribeAtExactFloor_Aborts_NeverArmsFormationAbility()
     {
-        // Tribe 0 sits exactly at the floor (100) -- gate (a) is a GLOBAL floor across all four tribes, so
-        // this fails even though the requester (tribe 2) individually clears every other gate.
         var points = DefaultPassingTribePoints(2);
         points[0] = TribeFormationAbilityEligibility.PointFloor;
         var (state, worldState, service) = Setup(tribe: 2, tribePoints: points);
@@ -210,8 +177,6 @@ public class TribeActionServiceFormationAbilityTests
     [Fact]
     public void LowestTribeGate_RequesterTribeIsNotTheLowest_Aborts_NeverArmsFormationAbility()
     {
-        // Tribe 1 holds the true lowest total (101); tribe 2 (the requester) sits well above it -- gate (b)
-        // must reject even though every tribe individually clears the floor from gate (a).
         var (state, worldState, service) = Setup(tribe: 2, tribePoints: [1000, 101, 1000, 1000]);
 
         var outcome = service.ValidateTribeSkill(state, SkillPayload(3));
@@ -223,9 +188,6 @@ public class TribeActionServiceFormationAbilityTests
     [Fact]
     public void ShareGate_RequesterShareAtOrAboveTwentyPercent_Aborts_NeverArmsFormationAbility()
     {
-        // Requester tribe 0 is still the strict lowest (150 < 200 for every other tribe), so gates (a)-(b)
-        // pass, but its share of the combined 750 total is exactly 20% -- at-or-above the threshold, so gate
-        // (c) must still abort.
         var (state, worldState, service) = Setup(tribe: 0, tribePoints: [150, 200, 200, 200]);
 
         var outcome = service.ValidateTribeSkill(state, SkillPayload(3));
@@ -237,8 +199,6 @@ public class TribeActionServiceFormationAbilityTests
     [Fact]
     public void SymbolBattleGate_Inactive_Aborts_NeverArmsFormationAbility()
     {
-        // Gates (a)-(c) pass (the default seeded points), but the Tribe Symbol Battle world event was never
-        // started -- gate (d) must reject.
         var (state, worldState, service) = Setup(tribe: 2, symbolBattleActive: false);
 
         var outcome = service.ValidateTribeSkill(state, SkillPayload(3));
@@ -261,10 +221,6 @@ public class TribeActionServiceFormationAbilityTests
     [Fact]
     public void AllFiveGates_Pass_ReachesSetTribeFormationAbility()
     {
-        // Explicit, fully-worked positive case for every one of the five gates at once: Force Leader role
-        // (tribeRole 1), payload shape/range (code 3, within 0-4), all four tribes above the floor
-        // (101/1000/1000/1000), the requester (tribe 0) is the strict single lowest, its 101-of-3101 share is
-        // well under twenty percent, and the Tribe Symbol Battle world event is active.
         var (state, worldState, service) = Setup(tribe: 0, tribeRole: 1,
             tribePoints: [TribeFormationAbilityEligibility.PointFloor + 1, 1000, 1000, 1000],
             symbolBattleActive: true);

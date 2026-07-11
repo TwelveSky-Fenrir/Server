@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Zone;
 
-/// <summary>ZC_MAKE_SKILL_RECV (ZONE.h:537, 28-byte payload) — same typedef as <see cref="CraftItemResponse" />.</summary>
 public class ZcMakeSkillRecvTests
 {
     [Fact]

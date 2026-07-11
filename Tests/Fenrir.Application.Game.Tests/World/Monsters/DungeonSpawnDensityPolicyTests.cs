@@ -2,11 +2,6 @@ using Fenrir.Application.Game.Domain.World.Monsters;
 
 namespace Fenrir.Application.Game.Tests.World.Monsters;
 
-/// <summary>
-///     Covers <see cref="DungeonSpawnDensityPolicy" />'s four-condition per-row density bump and its
-///     dungeon-flagged capacity-ceiling doubling -- the wave-12 <c>A4-dungeon-density</c> contract's Side
-///     effect 1 (bump) and the process-wide capacity precondition it depends on.
-/// </summary>
 public class DungeonSpawnDensityPolicyTests
 {
     [Theory]

@@ -4,13 +4,8 @@ using Microsoft.Data.SqlClient;
 
 namespace Fenrir.Data.Tests.Fixtures;
 
-// Boots one shared SQL Server 2025 container for the whole test suite, applying every script in
-// Database/_manifest.txt (mirrors Fenrir.Tools.DbMigrator's batch-splitting; no journaling needed since the
-// container is thrown away afterward).
 public sealed class SqlServerFixture : IAsyncLifetime
 {
-    // CreateAsync<TEntryPoint>/CreateAsync(Type) require an actual AppHost entry point; Create(string[]) is
-    // the only factory that builds a standalone builder without one.
     private static readonly string[] NoArgs = [];
 
     private DistributedApplication? _app;
@@ -28,8 +23,6 @@ public sealed class SqlServerFixture : IAsyncLifetime
         _app = await builder.BuildAsync();
         await _app.StartAsync();
 
-        // Wait on the database resource, not just "sqlserver": it only reports healthy once its creation
-        // script has actually run, avoiding a race against FenrirDbTest not existing yet.
         using var readyCts = new CancellationTokenSource(TimeSpan.FromMinutes(3));
         await _app.ResourceNotifications.WaitForResourceHealthyAsync("FenrirDbTest", readyCts.Token);
 
@@ -76,8 +69,6 @@ public sealed class SqlServerFixture : IAsyncLifetime
         }
     }
 
-    // Mirrors Fenrir.Tools.DbMigrator.Program.SplitBatches: splits on a lone "GO" line since some statements
-    // (CREATE SCHEMA, CREATE/ALTER PROCEDURE...) must be alone in their batch.
     private static IEnumerable<string> SplitBatches(string script)
     {
         var batch = new StringBuilder();

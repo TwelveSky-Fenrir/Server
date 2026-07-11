@@ -6,12 +6,6 @@ using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Game.Tests.Progression;
 
-/// <summary>
-///     Covers <see cref="HighLevelExperienceInputFactory" /> -- the B17-rebirth-hook adapter bridging the
-///     live, tick-owned <see cref="PlayerRuntimeState" /> onto <see cref="HighLevelExperienceResolver" />'s
-///     own pure, state-independent input shape. <see cref="HighLevelExperienceResolverTests" /> covers the
-///     resolver's own math in isolation; this covers only the read side of the bridge.
-/// </summary>
 public class HighLevelExperienceInputFactoryTests
 {
     private static FrozenDictionary<short, LevelRowDto> LevelsWithCapRow(int capExpRangeMin)

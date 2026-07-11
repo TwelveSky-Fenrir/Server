@@ -15,12 +15,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Social;
 
-/// <summary>
-///     WS1.4 <see cref="FriendCrossShardRelayHandler" /> -- target-shard delivery (
-///     <see cref="ISocialCrossShardRelayHandler.HandleAskAsync" />)
-///     and asker-shard completion (<see cref="ISocialCrossShardRelayHandler.HandleAnswerAsync" />) for the
-///     cross-shard half of CZ_FRIEND_ASK_SEND/CZ_FRIEND_ANSWER_SEND.
-/// </summary>
 public class FriendCrossShardRelayHandlerTests
 {
     private const byte OwnShardId = 3;
@@ -40,11 +34,7 @@ public class FriendCrossShardRelayHandlerTests
         return (handler, zones, friends, relay);
     }
 
-    /// <summary>
-    ///     Enters a character into map 1 -- the caller's own <see cref="ZoneRegistry" /> must already be
-    ///     initialized (once) by <see cref="CreateHandler" />; this never re-initializes it.
-    /// </summary>
-    private static (PlayerRuntimeState State, FakeDuplexPipe Pipe) Enter(ZoneRegistry zones, short mapId,
+        private static (PlayerRuntimeState State, FakeDuplexPipe Pipe) Enter(ZoneRegistry zones, short mapId,
         int characterId, string name)
     {
         zones.TryGet(mapId, out var zone);
@@ -81,7 +71,7 @@ public class FriendCrossShardRelayHandlerTests
     {
         var (handler, zones, friends, relay) = CreateHandler();
         var (target, _) = Enter(zones, 1, 100, "Target");
-        friends.TryAsk(target.CharacterId, 999); // already negotiating something else
+        friends.TryAsk(target.CharacterId, 999);
 
         await handler.HandleAskAsync(MakeAsk(targetCharacterId: 100), CancellationToken.None);
 
@@ -98,9 +88,9 @@ public class FriendCrossShardRelayHandlerTests
 
         await handler.HandleAskAsync(MakeAsk(42, 100), CancellationToken.None);
 
-        Assert.Empty(relay.Enqueued); // no auto-decline
+        Assert.Empty(relay.Enqueued);
         Assert.True(friends.IsNegotiating(target.CharacterId));
-        Assert.NotEmpty(ZoneTestKit.DrainOutbound(pipe)); // FriendResponse prompt
+        Assert.NotEmpty(ZoneTestKit.DrainOutbound(pipe));
     }
 
     [Fact]
@@ -130,10 +120,7 @@ public class FriendCrossShardRelayHandlerTests
 
         await handler.HandleAnswerAsync(answer, CancellationToken.None);
 
-        Assert.NotEmpty(ZoneTestKit.DrainOutbound(pipe)); // FriendAnswerResponse
-        // Still "negotiating" by design -- accepted state (_acceptedFor) intentionally keeps IsNegotiating
-        // true until the asker's own CZ_FRIEND_MAKE_SEND consumes it (see FriendRegistry's own remarks); the
-        // outbound cross-shard entry itself, specifically, is what got consumed here.
+        Assert.NotEmpty(ZoneTestKit.DrainOutbound(pipe));
         Assert.True(friends.IsNegotiating(asker.CharacterId));
         Assert.True(friends.TryConsumeAccepted(asker.CharacterId, out var otherId));
         Assert.Equal(200, otherId);

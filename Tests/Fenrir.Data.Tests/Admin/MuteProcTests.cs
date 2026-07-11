@@ -12,8 +12,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Admin;
 
-// admin.usp_Mute_* against real SQL Server 2025; mutes are loaded once at world entry, never re-queried per
-// chat message. Raw ADO.NET since the mute repository isn't wired up yet.
 [Collection("SqlServer")]
 public class MuteProcTests
 {
@@ -41,11 +39,9 @@ public class MuteProcTests
 
         Assert.Equal(0, await CountActiveAsync(characterId));
 
-        // Character-level mute (permanent -- NULL expiry).
         await CreateMuteAsync(null, characterId, 1, null);
         Assert.Equal(1, await CountActiveAsync(characterId));
 
-        // Account-level mute must also hit every character of the account (no dodging via alts).
         await CreateMuteAsync(accountId, null, 2, DateTime.UtcNow.AddHours(1));
         Assert.Equal(2, await CountActiveAsync(characterId));
 
@@ -65,7 +61,6 @@ public class MuteProcTests
 
         Assert.Equal(0, await CountActiveAsync(characterId));
 
-        // The audit row survives the lift, and a replayed (or unknown-id) lift never rewrites the first stamp.
         Assert.Equal(1, await ScalarAsync<int>($"SELECT COUNT(*) FROM admin.Mutes WHERE MuteId = {muteId};"));
 
         var firstLift = await ScalarAsync<DateTime>($"SELECT LiftedAtUtc FROM admin.Mutes WHERE MuteId = {muteId};");

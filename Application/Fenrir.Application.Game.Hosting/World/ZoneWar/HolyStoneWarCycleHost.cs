@@ -8,16 +8,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Hosting.World.ZoneWar;
 
-/// <summary>
-///     Per-tick driver for <see cref="HolyStoneWarCycle" />, armed only on whichever live shard currently
-///     hosts <see cref="GameServerOptions.HolyStoneMapId" /> with <see cref="GameServerOptions.HolyStoneWarEnabled" />
-///     set -- every other shard's instance of this host is permanently inert. Same shape as
-///     <see cref="TribeSymbolBattleSchedulerHost" />/<see cref="TribeVoteElectionCalendarHost" />.
-/// </summary>
-/// <remarks>
-///     Réf. C++ : Server/ts25zone/S07_MyGame01.cpp:793-819 -- legacy gates the equivalent on server number 38;
-///     Fenrir shards by map, so "the shard hosting the designated map" is the natural translation.
-/// </remarks>
 public sealed class HolyStoneWarCycleHost(
     IOptions<GameServerOptions> options,
     ZoneRegistry zoneRegistry,
@@ -48,14 +38,11 @@ public sealed class HolyStoneWarCycleHost(
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    // A missed tick just delays this cycle's Holy Stone War advance to the next legacy tick --
-                    // never worth crashing the GameServer.
                     logger.LogError(ex, "Holy Stone War cycle tick failed");
                 }
         }
         catch (OperationCanceledException)
         {
-            // Expected on shutdown.
         }
     }
 }

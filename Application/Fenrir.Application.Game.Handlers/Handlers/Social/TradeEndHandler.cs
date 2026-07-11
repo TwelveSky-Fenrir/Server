@@ -7,10 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>
-///     CZ_TRADE_END_SEND (opcode 52) -- abandons an in-progress trade; nothing was ever committed, so no rollback is
-///     needed.
-/// </summary>
 public sealed class TradeEndHandler(
     ZoneRegistry zones,
     ITradeEndService tradeEndService,

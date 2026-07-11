@@ -8,11 +8,6 @@ using Fenrir.Application.Game.Tests.TestSupport;
 
 namespace Fenrir.Application.Game.Tests.World.Monsters;
 
-/// <summary>
-///     Covers the two AI states added for cluster C15: <see cref="MonsterAiState.RangedAttackWindup" /> (the
-///     Zone175-type-boss ranged opening <see cref="MonsterAiSystem.RunChase" /> can take instead of always
-///     closing to melee range) and <see cref="MonsterAiState.Flinch" /> (hit-stagger tick-countdown).
-/// </summary>
 public class MonsterAiSystemBossAndFlinchTests
 {
     private static WorldDataCache CacheWithOneRegion(byte specialType, short radiusInfo1, short radiusInfo2,
@@ -41,7 +36,7 @@ public class MonsterAiSystemBossAndFlinchTests
             LocationX = 0,
             LocationY = 0,
             LocationZ = 0,
-            Radius = 50 // spawn scatter radius only -- chase give-up is gated on RadiusInfo2, not this value
+            Radius = 50
         };
 
         var rows = WorldDataTestRows.MinimalRows() with { Monsters = [monster], MonsterSpawnRegions = [region] };
@@ -51,9 +46,6 @@ public class MonsterAiSystemBossAndFlinchTests
     private static Zone CreateZone(WorldDataCache cache)
     {
         var scheduler = new MonsterSpawnScheduler(cache, static () => new ZeroScatterRandom());
-        // Detection now includes a 50% per-candidate coin flip (SelectAvatarIndexForPossibleAttack,
-        // S07_MyGame05.cpp:208-213) -- ScriptedRandomSource(0) always resolves it to a guaranteed success so
-        // these tests stay deterministic instead of flaking on an unlucky flip.
         var ai = new MonsterAiSystem(new ScriptedRandomSource(0));
         var options = new GameServerOptions { AoiCellSize = 100_000f };
         return ZoneTestKit.CreateZone(1, options, simulationSystems: [scheduler, ai], worldData: cache);
@@ -62,8 +54,6 @@ public class MonsterAiSystemBossAndFlinchTests
     [Fact]
     public void Zone175TypeBoss_OutOfMeleeRangeButWithinDetectionRadius_OpensWithARangedAttack()
     {
-        // Melee radius (RadiusInfo1=2) is far smaller than the target's actual distance (10); a non-boss
-        // monster would have to keep closing in. RadiusInfo2=1000 easily covers it.
         var zone = CreateZone(CacheWithOneRegion(40, 2, 1000));
         var (session, _) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Target", 10, posZ: 0)));
@@ -83,8 +73,6 @@ public class MonsterAiSystemBossAndFlinchTests
     [Fact]
     public void NonBossMonster_SamePlacement_MustCloseToMeleeRange_NeverEntersRangedAttackWindup()
     {
-        // SpecialType 1 is the legacy "no special designation" value real ordinary monsters use (e.g.
-        // Migrations/Seed/world/090_monsters.sql's MonsterId=1) -- outside the 40-44 Zone175-boss band.
         var zone = CreateZone(CacheWithOneRegion(1, 2, 1000));
         var (session, _) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Target", 10, posZ: 0)));
@@ -120,11 +108,11 @@ public class MonsterAiSystemBossAndFlinchTests
         Assert.True(zone.TryGetMonster(1, out var windingUp));
         Assert.Equal(0, windingUp!.StateTicks);
 
-        zone.Tick(SimulationClock.LegacyTick); // StateTicks 0->1, still < 2
+        zone.Tick(SimulationClock.LegacyTick);
         Assert.True(zone.TryGetMonster(1, out var stillWindingUp));
         Assert.Equal(MonsterAiState.RangedAttackWindup, stillWindingUp!.AiState);
 
-        zone.Tick(SimulationClock.LegacyTick); // StateTicks 1->2 >= 2 -> Decision
+        zone.Tick(SimulationClock.LegacyTick);
         Assert.True(zone.TryGetMonster(1, out var afterWindup));
         Assert.Equal(MonsterAiState.Decision, afterWindup!.AiState);
     }
@@ -133,27 +121,25 @@ public class MonsterAiSystemBossAndFlinchTests
     public void Flinch_ReturnsToDecision_AfterFrameInfo2Ticks()
     {
         var zone = CreateZone(CacheWithOneRegion(1, 0, 0));
-        zone.Tick(SimulationClock.LegacyTick); // pop + Spawning -> Decision (FrameInfo1=1)
+        zone.Tick(SimulationClock.LegacyTick);
         Assert.True(zone.TryGetMonster(1, out var monster));
         Assert.Equal(MonsterAiState.Decision, monster!.AiState);
 
-        // Directly drive the monster into Flinch, as if some (not-yet-wired) big-hit trigger had just fired.
         monster.AiState = MonsterAiState.Flinch;
         monster.StateTicks = 0;
 
-        zone.Tick(SimulationClock.LegacyTick); // StateTicks 0->1, still < FrameInfo2=3
+        zone.Tick(SimulationClock.LegacyTick);
         Assert.Equal(MonsterAiState.Flinch, monster.AiState);
 
-        zone.Tick(SimulationClock.LegacyTick); // StateTicks 1->2, still < 3
+        zone.Tick(SimulationClock.LegacyTick);
         Assert.Equal(MonsterAiState.Flinch, monster.AiState);
 
-        zone.Tick(SimulationClock.LegacyTick); // StateTicks 2->3 >= 3 -> Decision
+        zone.Tick(SimulationClock.LegacyTick);
         Assert.Equal(MonsterAiState.Decision, monster.AiState);
         Assert.Equal(0, monster.StateTicks);
     }
 
-    /// <summary>Forces the spawn scheduler's scatter radius to exactly 0 (same helper as <see cref="MonsterAiSystemTests" />).</summary>
-    private sealed class ZeroScatterRandom : Random
+        private sealed class ZeroScatterRandom : Random
     {
         public override double NextDouble()
         {

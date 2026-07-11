@@ -5,23 +5,10 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.Inventory.UseItems;
 
-/// <summary>
-///     The shared "consume the used stack, persist it, mirror it onto the zone cache" tail every op23
-///     <see cref="IUseItemHandler" /> ends with — the registry-side equivalent of
-///     <c>UseInventoryItemService.ConsumeAndMirrorAsync</c>, so a handler never re-hand-rolls the
-///     project/replace/mirror sequence (or the "SQL is durable, cache self-heals" full-inbox log line). The
-///     durable SQL write happens first and is awaited; the in-memory mirror is best-effort (a dropped mirror
-///     self-heals on the character's next world entry). Reference: Server/ts25zone/S04_MyWork03.cpp:613-628
-///     (<c>DecreaseQunatity</c>) / :756-761 (the shared item-removal routine).
-/// </summary>
 public sealed class UseItemInventoryWriter(ICharacterRepository characters, ILogger<UseItemInventoryWriter> logger)
 {
-    /// <summary>
-    ///     Writes the addressed slot down to <paramref name="remainingQuantity" /> (removing the slot outright
-    ///     when that is zero), persists the whole page atomically, then mirrors the page (and any recomputed
-    ///     stats) onto the zone. Returns the projected page content so a caller can assert on it if needed.
-    /// </summary>
-    public async ValueTask<ImmutableDictionary<byte, ItemStack>> ConsumeAndMirrorAsync(Zone zone,
+
+        public async ValueTask<ImmutableDictionary<byte, ItemStack>> ConsumeAndMirrorAsync(Zone zone,
         PlayerRuntimeState state, int characterId, byte page, byte index, ItemStack item, int remainingQuantity,
         EffectiveStats? stats, CancellationToken cancellationToken)
     {
@@ -42,14 +29,7 @@ public sealed class UseItemInventoryWriter(ICharacterRepository characters, ILog
         return projected;
     }
 
-    /// <summary>
-    ///     Atomically replaces two pages at once — the inventory page and the Equipment container for a
-    ///     double-click-to-equip swap — then mirrors both (plus the recomputed stats) onto the zone. The two
-    ///     writes MUST be one durable operation (a swap that half-committed would duplicate or destroy an
-    ///     item), so this routes through <see cref="ICharacterRepository.ReplaceTwoContainersAsync" /> rather
-    ///     than two independent <see cref="ICharacterRepository.ReplaceContainerAsync" /> round trips.
-    /// </summary>
-    public async ValueTask ReplaceTwoAndMirrorAsync(Zone zone, int characterId, byte pageContainer,
+        public async ValueTask ReplaceTwoAndMirrorAsync(Zone zone, int characterId, byte pageContainer,
         ImmutableDictionary<byte, ItemStack> pageProjected, byte equipmentContainer,
         ImmutableDictionary<byte, ItemStack> equipmentProjected, EffectiveStats? stats,
         CancellationToken cancellationToken)
@@ -68,17 +48,7 @@ public sealed class UseItemInventoryWriter(ICharacterRepository characters, ILog
                 zone.MapId, characterId);
     }
 
-    /// <summary>
-    ///     Persists whichever of the two inventory pages a projection actually changed (one or both, atomically
-    ///     when both) and mirrors them onto the zone -- the same "diff against the original, write only what
-    ///     changed" shape <c>LootBoxUseItemHandler.PersistAndMirrorAsync</c> already established for the
-    ///     box-open family, shared here so a second family that also nets a "consume one slot, grant into
-    ///     another" projected-pages pair (e.g. <c>LuckyTicketUseItemHandler</c>, via
-    ///     <c>LootBoxOpenResolver.OpenSingle</c>) does not need to re-hand-roll the same diff/atomic-write
-    ///     decision. A no-op (no page differs from its original) is a silent return, since a caller only
-    ///     reaches this after a reported success.
-    /// </summary>
-    public async ValueTask ReplaceProjectedPagesAndMirrorAsync(Zone zone, int characterId,
+        public async ValueTask ReplaceProjectedPagesAndMirrorAsync(Zone zone, int characterId,
         ImmutableDictionary<byte, ItemStack> originalPage0, ImmutableDictionary<byte, ItemStack> originalPage1,
         ImmutableDictionary<byte, ItemStack> projectedPage0, ImmutableDictionary<byte, ItemStack> projectedPage1,
         EffectiveStats? stats, CancellationToken cancellationToken)

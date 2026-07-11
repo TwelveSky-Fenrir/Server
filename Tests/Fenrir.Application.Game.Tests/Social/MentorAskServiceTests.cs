@@ -14,11 +14,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Social;
 
-/// <summary>
-///     Covers <see cref="MentorAskService.AskAsync" />'s response-code-order: the master's own still-negotiating
-///     busy state must be checked before the target student is resolved by name
-///     (Server/ts25zone/S04_MyWork02.cpp:9311-9324).
-/// </summary>
 public class MentorAskServiceTests
 {
     private const short MasterLevel = 120;
@@ -59,7 +54,7 @@ public class MentorAskServiceTests
         var master = Enter(zones, 1, 1, "Master");
         Enter(zones, 1, 2, "PendingStudent", level: 1);
 
-        Assert.Equal(MentorAskOutcome.Sent, mentors.TryAsk(1, 2, false, false)); // still pending, never answered
+        Assert.Equal(MentorAskOutcome.Sent, mentors.TryAsk(1, 2, false, false));
 
         var result = await service.AskAsync(zones[1], master, "NoSuchAvatar", CancellationToken.None);
 
@@ -83,15 +78,14 @@ public class MentorAskServiceTests
         var (service, zones, mentors) = CreateService(1);
         var master = Enter(zones, 1, 1, "Master", level: 50);
         Enter(zones, 1, 2, "PendingStudent", level: 1);
-        Assert.Equal(MentorAskOutcome.Sent, mentors.TryAsk(1, 2, false, false)); // also busy, must not matter
+        Assert.Equal(MentorAskOutcome.Sent, mentors.TryAsk(1, 2, false, false));
 
         var result = await service.AskAsync(zones[1], master, "NoSuchAvatar", CancellationToken.None);
 
         Assert.Equal(MentorAskResultKind.AskerMustDisconnect, result.Kind);
     }
 
-    /// <summary>WS1.4 ASK-PUBLISH-ONLY: a same-shard miss that resolves cross-shard publishes an Ask.</summary>
-    [Fact]
+        [Fact]
     public async Task Ask_SameShardMiss_ResolvesCrossShard_PublishesAskAndReturnsSentCrossShard()
     {
         var directory = new FakeCharacterShardLocationRepository();

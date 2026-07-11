@@ -8,17 +8,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Pins down two facts for the Valley of the Deceased (Zone 200/297/298/299) Center-relay range
-///     (601-675, see <see cref="ValleyWarCenterRelayCodes" />): (1) the catalog's own range/cluster
-///     membership helpers, and (2) that <see cref="ZoneCenterBroadcastIngestor" />'s existing
-///     <c>ApplyStateEffect</c> switch -- which already has no case label anywhere in this range -- produces
-///     zero state effect plus an unconditional relay for every representative code across the whole 601-675
-///     span, not just the two spot-checked values <c>ZoneCenterBroadcastIngestorTests</c> already covers
-///     (628, 665). This is a pure regression/documentation guard: nothing here changes
-///     <see cref="ZoneCenterBroadcastIngestor" /> itself, and this class's own remarks explain why no case
-///     label should ever be added for this range.
-/// </summary>
 public class ValleyWarCenterRelayCodesTests
 {
     private static int OneFrame => FrameWriter.FrameSizeOf<ZoneEventInfoResponse>();
@@ -71,18 +60,18 @@ public class ValleyWarCenterRelayCodesTests
     }
 
     [Theory]
-    [InlineData(601)] // God index=2 cluster, lower bound
-    [InlineData(605)] // God index=2 cluster, interior
-    [InlineData(610)] // God index=2 cluster, upper bound
-    [InlineData(611)] // Monster Siege cluster, lower bound
-    [InlineData(613)] // Monster Siege cluster, interior
-    [InlineData(615)] // Monster Siege cluster, upper bound
-    [InlineData(616)] // between the two dead clusters and the live gate/door/kill/win subset
-    [InlineData(640)] // unassigned interior of the whole range
-    [InlineData(658)] // immediately below the confirmed-live gate/door/kill/win subset (659-669)
-    [InlineData(661)] // inside the live subset's own numeric span but itself never sent for this family
-    [InlineData(670)] // immediately above the confirmed-live subset
-    [InlineData(675)] // whole-range upper bound
+    [InlineData(601)]
+    [InlineData(605)]
+    [InlineData(610)]
+    [InlineData(611)]
+    [InlineData(613)]
+    [InlineData(615)]
+    [InlineData(616)]
+    [InlineData(640)]
+    [InlineData(658)]
+    [InlineData(661)]
+    [InlineData(670)]
+    [InlineData(675)]
     public void Ingest_EveryCodeAcrossTheValleyOfDeceasedCenterRelayRange_WritesNoState_ButStillRelays(
         int eventCode)
     {
@@ -100,11 +89,6 @@ public class ValleyWarCenterRelayCodesTests
         var beforeZone049 = ZoneCenterSiegeState.Zone049Slots;
         ingestor.Ingest(eventCode, Payload(0, 0));
 
-        // No case label anywhere in this range means every mutable field this ingestor could have touched
-        // stays at its own default -- spot-check the ones the switch could plausibly have mis-routed into
-        // given adjacent ranges (Zone049 ends at 9, Zone267 starts at 402, Zone335 starts at 1501; none of
-        // this range overlaps any of them, but a regression that widened a neighboring range's bounds would
-        // show up here).
         for (var slot = 0; slot < beforeZone049; slot++)
             Assert.Equal(0, state.GetZone049State(slot));
         Assert.Equal(0, state.Zone335);

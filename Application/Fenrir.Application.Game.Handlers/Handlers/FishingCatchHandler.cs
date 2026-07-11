@@ -8,14 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
-/// <summary>
-///     CZ_FISHING_REWARD_SEND (opcode 105) -- same zone-52 gating as <see cref="FishingLineHandler" />.
-///     Silently ignored unless currently in the "catch" state (step 4/5, <c>CatchingFish</c>). Step 4 rolls a
-///     koi item and grants it (Result=2/inventory-full resets fishing to idle with no further reply, matching
-///     the legacy's early return); step 5 is a pure miss -- no item, straight to the echoed progress reply.
-///     Legacy quirk (kept, not "fixed" per D8): a successful/miss catch does NOT reset FishingState/FishingStep,
-///     so a repeated CZ_FISHING_REWARD_SEND while still in step 4 re-rolls and re-grants another item.
-/// </summary>
 public sealed class FishingCatchHandler(IFishingCatchService fishingCatchService, ILogger<FishingCatchHandler> logger)
     : IAsyncPacketHandler<FishingCatchRequest>
 {

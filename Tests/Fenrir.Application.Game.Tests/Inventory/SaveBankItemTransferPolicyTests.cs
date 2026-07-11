@@ -2,11 +2,6 @@ using Fenrir.Application.Game.Domain.Inventory;
 
 namespace Fenrir.Application.Game.Tests.Inventory;
 
-/// <summary>
-///     Coverage for <see cref="SaveBankItemTransferPolicy" />, the pure policy behind tSort 228/251 (deposit),
-///     229/249 (withdraw), and 230 (bank-to-bank rearrange). Does not depend on any dispatch wiring -- exercises the
-///     static policy methods directly against hand-built <see cref="ItemStack" /> values.
-/// </summary>
 public class SaveBankItemTransferPolicyTests
 {
     private static ItemStack Stack(int itemId, int quantity = 1, byte enchant = 0, byte combine = 0,
@@ -27,7 +22,6 @@ public class SaveBankItemTransferPolicyTests
         Assert.Equal(expected, SaveBankItemTransferPolicy.IsValidSlot(slot));
     }
 
-    // ---- Deposit (228/251) ----
 
     [Fact]
     public void Deposit_SourceOutOfRange_Fails()
@@ -96,7 +90,6 @@ public class SaveBankItemTransferPolicyTests
         var source = Stack(100, 1, 5, 1, 2, 3, 7, 8, 9,
             20260101, 42);
 
-        // requestedQuantity (999) is deliberately nonsensical -- non-stackable transfers must ignore it entirely.
         var result = SaveBankItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 0, 999, 0,
             source, null, false, true, true);
@@ -130,7 +123,7 @@ public class SaveBankItemTransferPolicyTests
         Assert.Equal(0, dest.SocketGem1);
         Assert.Equal(0, dest.SocketGem2);
         Assert.Equal(0, dest.SocketGem3);
-        Assert.Equal(20260101, dest.ExpireDate); // expiry always copied, regardless of socket support
+        Assert.Equal(20260101, dest.ExpireDate);
     }
 
     [Fact]
@@ -193,10 +186,10 @@ public class SaveBankItemTransferPolicyTests
 
         Assert.True(result.Succeeded);
         Assert.Equal(7, result.NewSource!.Value.Quantity);
-        Assert.Equal(1, result.NewSource!.Value.SocketGem1); // untouched
+        Assert.Equal(1, result.NewSource!.Value.SocketGem1);
         var dest = result.NewDestination!.Value;
         Assert.Equal(8, dest.Quantity);
-        Assert.Equal(99, dest.SocketGem1); // untouched -- only raw id/quantity counters move on a partial merge
+        Assert.Equal(99, dest.SocketGem1);
         Assert.Equal(222, dest.ExpireDate);
     }
 
@@ -255,7 +248,6 @@ public class SaveBankItemTransferPolicyTests
         Assert.Equal(SaveBankItemTransferPolicy.TransferOutcome.DestinationConflict, result.Outcome);
     }
 
-    // ---- Withdraw (229/249) ----
 
     [Fact]
     public void Withdraw_SourceOutOfRange_Fails()
@@ -338,7 +330,6 @@ public class SaveBankItemTransferPolicyTests
         Assert.Equal(6, result.NewSource!.Value.Quantity);
     }
 
-    // ---- Rearrange within bank (230) ----
 
     [Fact]
     public void Rearrange_SameSlot_IsNoOp()

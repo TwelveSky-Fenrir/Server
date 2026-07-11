@@ -11,12 +11,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Inventory.UseItems;
 
-/// <summary>
-///     The op23 per-item dispatch table (<see cref="UseItemHandlerRegistry" />): the id-keyed direct
-///     handlers (891/2193/8100), the loot-box handler (which now also claims 635, see C10-mountbox635),
-///     the category-based equip-swap claiming a genuine equip item, and an item no family owns resolving to
-///     null (the service then falls through to its generic failure).
-/// </summary>
 public class UseItemHandlerRegistryTests
 {
     private static ItemStack Stack(int itemId)
@@ -56,8 +50,6 @@ public class UseItemHandlerRegistryTests
             new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()), worldData, new GameServerOptions(),
             NullLogger<TribeScrollTransferUseItemHandler>.Instance);
 
-        // C9-tickets-tower: no test in this file exercises these 6 handlers' own routing yet -- they only
-        // need to exist so the registry's constructor is satisfied.
         var cpTicket = new CpTicketUseItemHandler(writer, eventLog, NullLogger<CpTicketUseItemHandler>.Instance);
         var eliteDungeonTicket = new EliteDungeonTicketUseItemHandler(writer, eventLog,
             NullLogger<EliteDungeonTicketUseItemHandler>.Instance);
@@ -114,9 +106,6 @@ public class UseItemHandlerRegistryTests
     [Fact]
     public void Resolve_MountBox635_RoutesToLootBoxHandler()
     {
-        // C10-mountbox635: item 635 is now a fully-populated LootBoxCatalog entry (uniform 1-in-8 over eight
-        // tier-3 mount ids), so it routes through the shared loot-box handler like every other
-        // catalog-registered box, not a dedicated per-item stub (the former MountBoxUseItemHandler, deleted).
         var (registry, lootBox, _, _, _) = BuildRegistry();
         Assert.Same(lootBox, registry.Resolve(Stack(635), Def(635)));
     }
@@ -138,9 +127,6 @@ public class UseItemHandlerRegistryTests
     [Fact]
     public void Resolve_ValidCostumeItem_RoutesToCostumeStellarCoreHandler()
     {
-        // C9-costume-stellar-whitelist: 301 is the low end of IsValidCostume's live table -- Sort 3 (this
-        // file's own Def() default) is well outside the equip category range, so only the new third fallback
-        // can claim it.
         var (registry, _, _, _, _) = BuildRegistry();
         Assert.IsType<CostumeStellarCoreUseItemHandler>(registry.Resolve(Stack(301), Def(301)));
     }
@@ -148,7 +134,6 @@ public class UseItemHandlerRegistryTests
     [Fact]
     public void Resolve_ValidStellarCoreItem_RoutesToCostumeStellarCoreHandler()
     {
-        // 76527 is the low end of IsValidStellarCore's live table.
         var (registry, _, _, _, _) = BuildRegistry();
         Assert.IsType<CostumeStellarCoreUseItemHandler>(registry.Resolve(Stack(76527), Def(76527)));
     }
@@ -156,8 +141,6 @@ public class UseItemHandlerRegistryTests
     [Fact]
     public void Resolve_IdKeyedHandlerWinsOverCategory_EvenIfItAlsoLooksEquip()
     {
-        // An id-keyed family (891) must resolve to its direct handler even if its catalog row happened to
-        // carry an equip-shaped Sort/tag -- the id table is consulted before the equip predicate.
         var (registry, _, title, _, _) = BuildRegistry();
         Assert.Same(title, registry.Resolve(Stack(891), Def(891, sort: 6, equipInfo2: 2)));
     }

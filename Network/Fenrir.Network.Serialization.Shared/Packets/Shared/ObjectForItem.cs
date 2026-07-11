@@ -19,7 +19,6 @@ public readonly partial record struct ObjectForItem : IFenrirWireType<ObjectForI
 
     [FixedString(13)] public required string PartyName { get; init; }
 
-    // 2-byte pad after PartyName (char[13]) to align DropSort.
     [Reserved(2)] public required int DropSort { get; init; }
 
     public required uint CreateTime { get; init; }
@@ -28,6 +27,5 @@ public readonly partial record struct ObjectForItem : IFenrirWireType<ObjectForI
 
     public required int CreateState { get; init; }
 
-    // Always zero on the wire: USE_SOCKET_GEM is #undef in EU33, but the field is still transmitted.
     [FixedArray(3)] public required int[] SocketGem { get; init; }
 }

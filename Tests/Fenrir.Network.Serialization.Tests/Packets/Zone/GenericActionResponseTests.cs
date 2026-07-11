@@ -9,7 +9,6 @@ public class ZcProcessDataRecvTests
     [Fact]
     public void PayloadSize_MatchesContract()
     {
-        // USE_ITEM_LINK_V2 is ON in EU33: MAX_BROADCAST_DATA_SIZE = 130 (not 100).
         Assert.Equal(142, GenericActionResponse.PayloadSize);
         Assert.Equal(4 + 4 + 130 + 4, GenericActionResponse.PayloadSize);
         Assert.Equal(Opcodes.Zone.Outgoing.GenericAction, GenericActionResponse.Opcode);

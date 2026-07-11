@@ -15,14 +15,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 
-/// <summary>
-///     Drives the real <see cref="DestroyItemService" /> (opcode 89) over a real <see cref="Zone" />; ticks the
-///     zone while the service's own <c>PostInventoryCommandAndWaitAsync</c> await is pending, same pattern as
-///     <c>SkyUpgradeItemServiceTests</c>. Covers the game.EventLog (Category=ItemDestroy) success-path audit
-///     row wired in alongside the pre-existing exception-only LogWarning/LogError telemetry -- the enchant-tier
-///     -&gt; money/stone mapping itself is covered deterministically by <c>DestroyResolverTests</c>, not
-///     re-verified here.
-/// </summary>
 public class DestroyItemServiceTests
 {
     private const int RareItemId = 87000;
@@ -88,7 +80,6 @@ public class DestroyItemServiceTests
     public async Task SuccessfulDestroy_WritesAnItemDestroyEventLogRow_WithTheDestroyedItemAndMoneyGranted()
     {
         var (session, _, zone, state, characters, eventLog) = SetUp();
-        // Enchant 10 -> tier 1: 1,000,000 money, stone 1021 (see DestroyResolverTests.EnchantTier_MapsToExpectedMoneyAndStone).
         SeedInventory(zone, new ItemStack(RareItemId, 1, 10, 0, 0, 0, 0, 0, 0, 0, 777));
         var service = CreateService(characters, eventLog);
 
@@ -119,7 +110,6 @@ public class DestroyItemServiceTests
     public async Task RejectedDestroy_EnchantBelowThreshold_WritesNoEventLogRow()
     {
         var (session, _, zone, state, characters, eventLog) = SetUp();
-        // Enchant 0 is always rejected by DestroyResolver (see DestroyResolverTests.EnchantZero_IsRejected).
         SeedInventory(zone, new ItemStack(RareItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 777));
         var service = CreateService(characters, eventLog);
 

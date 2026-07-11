@@ -46,8 +46,8 @@ public class TribeQuotaGateTests
     }
 
     [Theory]
-    [InlineData(99, 99)] // Capacity/3 == 33; population 99 already far past
-    [InlineData(99, 33)] // exactly at threshold -- full, not "one under"
+    [InlineData(99, 99)]
+    [InlineData(99, 33)]
     public void Evaluate_ThreeWay_AtOrAboveThreshold_IsQuotaFull(int maxConnections, int population)
     {
         Assert.Equal(TribeQuotaOutcome.QuotaFull,
@@ -57,14 +57,12 @@ public class TribeQuotaGateTests
     [Fact]
     public void Evaluate_ThreeWay_OneUnderThreshold_IsAccepted()
     {
-        // Capacity 99 -> threshold 33; population 32 is the last accepted slot.
         Assert.Equal(TribeQuotaOutcome.Accepted, TribeQuotaGate.Evaluate(TribeQuotaGroup.ThreeWay, 99, 32));
     }
 
     [Fact]
     public void Evaluate_FourWay_UsesQuarterThreshold()
     {
-        // Capacity 100 -> threshold 25.
         Assert.Equal(TribeQuotaOutcome.Accepted, TribeQuotaGate.Evaluate(TribeQuotaGroup.FourWay, 100, 24));
         Assert.Equal(TribeQuotaOutcome.QuotaFull, TribeQuotaGate.Evaluate(TribeQuotaGroup.FourWay, 100, 25));
     }
@@ -72,7 +70,6 @@ public class TribeQuotaGateTests
     [Fact]
     public void Evaluate_ThresholdComputation_UsesTruncatingIntegerDivision()
     {
-        // Capacity 10 -> 10/3 == 3 (not 3.33): population 3 is already full.
         Assert.Equal(TribeQuotaOutcome.QuotaFull, TribeQuotaGate.Evaluate(TribeQuotaGroup.ThreeWay, 10, 3));
         Assert.Equal(TribeQuotaOutcome.Accepted, TribeQuotaGate.Evaluate(TribeQuotaGroup.ThreeWay, 10, 2));
     }

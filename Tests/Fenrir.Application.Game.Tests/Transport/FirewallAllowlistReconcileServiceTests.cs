@@ -2,10 +2,6 @@ using Fenrir.Network.Dispatch.FloodProtection;
 
 namespace Fenrir.Application.Game.Tests.Transport;
 
-// Workstream D3 / Contract C (Server/ts25firewall/main.cpp:645,:654-659,:682-698): the application-layer analog
-// of legacy's periodic RemoveIPTick reconcile. These cover the cadence/resilience half this service owns (the
-// atomic DB reconcile itself is an injected delegate); see the service's own remarks for why the finding's
-// "IP bans never expire / ~60s" framing is corrected to "allowlist reconcile / ~120s".
 public sealed class FirewallAllowlistReconcileServiceTests
 {
     private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(5);
@@ -37,8 +33,6 @@ public sealed class FirewallAllowlistReconcileServiceTests
         var calls = 0;
         var firstCall = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        // A deliberately long interval so no second tick can fire during the test -- isolating the startup run,
-        // which legacy performs before entering its tick loop (Server/ts25firewall/main.cpp:645).
         var service = new FirewallAllowlistReconcileService(_ =>
         {
             if (Interlocked.Increment(ref calls) == 1)
@@ -52,10 +46,10 @@ public sealed class FirewallAllowlistReconcileServiceTests
         Assert.Equal(1, calls);
 
         await cts.CancelAsync();
-        await runTask.WaitAsync(TestTimeout); // completes cleanly (cancellation is not surfaced as a fault)
+        await runTask.WaitAsync(TestTimeout);
 
         Assert.True(runTask.IsCompletedSuccessfully);
-        Assert.Equal(1, calls); // no extra reconcile ran after the single startup pass
+        Assert.Equal(1, calls);
     }
 
     [Fact]
@@ -69,7 +63,6 @@ public sealed class FirewallAllowlistReconcileServiceTests
         {
             var n = Interlocked.Increment(ref calls);
 
-            // First reconcile fails hard (a transient DB failure): the loop must log-and-continue, never crash.
             if (n == 1)
                 throw new InvalidOperationException("transient reconcile failure");
 
@@ -82,7 +75,7 @@ public sealed class FirewallAllowlistReconcileServiceTests
         var runTask = service.RunAsync(cts.Token);
 
         await reachedThird.Task.WaitAsync(TestTimeout);
-        Assert.True(calls >= 3); // survived the throw on call #1 and kept reconciling
+        Assert.True(calls >= 3);
 
         await cts.CancelAsync();
         await runTask.WaitAsync(TestTimeout);
@@ -92,11 +85,8 @@ public sealed class FirewallAllowlistReconcileServiceTests
     [Fact]
     public void DefaultInterval_IsTheCorrected120SecondCadence()
     {
-        // Contract correction: 48 ticks × 2.5s = ~120s, double the finding's "~60s"
-        // (Server/ts25firewall/main.cpp:558,:654-659,:803-821).
         Assert.Equal(TimeSpan.FromSeconds(120), FirewallAllowlistReconcileService.DefaultInterval);
 
-        // The default is used when no interval is supplied.
         var service = new FirewallAllowlistReconcileService(_ => ValueTask.CompletedTask);
         Assert.Equal(FirewallAllowlistReconcileService.DefaultInterval, service.Interval);
     }

@@ -8,15 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Quests;
 
-/// <summary>
-///     CZ_PROCESS_QUEST_SEND (opcode 36) -- the 5-action quest state machine (<see cref="Quests.QuestStateMachine" />).
-///     Every rejection aborts; there is no clean <c>tResult</c> failure path for this opcode.
-/// </summary>
-/// <remarks>
-///     Business logic (validation, container edits, persistence, and zone-command mirroring) lives in
-///     <see cref="IQuestProgressService" />; this handler only resolves session-scoped state, holds the
-///     per-character economy lock while the service runs, and translates the result into a wire response.
-/// </remarks>
 public sealed class QuestProgressHandler(
     IQuestProgressService questProgressService,
     ILogger<QuestProgressHandler> logger)

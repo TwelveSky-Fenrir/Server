@@ -40,10 +40,6 @@ public class TribeVoteServiceTests
 
         zone.TryGetPlayer(CharacterId, out var state);
         state!.ContributionPoints = contributionPoints;
-        // 145 (default level) + 12 (Level2) + 6 (RebirthCount) = 163, exactly
-        // TribeVoteElection.MinimumEligibilityLevel -- keeps every pre-existing call site that doesn't care
-        // about the eligibility gate itself passing without having to touch each one individually (mirrors
-        // TribeVoteElectionTests.CreatePlayer's own default shape).
         state.Level2 = 12;
         state.RebirthCount = 6;
 
@@ -68,8 +64,6 @@ public class TribeVoteServiceTests
     [InlineData(3, 999)]
     public async Task OutOfBoundsSlot_Aborts(int sort, int value)
     {
-        // Sort/slot-range validation lives on the handler itself, ahead of the service call -- exercise the
-        // real handler here, which the service's own (Sort-less) API can't express at all.
         var (session, _, _, election, _) = Setup();
         var handler = new TribeVoteHandler(new TribeVoteService(election, NullLogger<TribeVoteService>.Instance));
 

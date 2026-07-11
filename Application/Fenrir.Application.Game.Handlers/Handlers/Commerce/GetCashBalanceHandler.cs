@@ -6,10 +6,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Commerce;
 
-/// <summary>
-///     CZ_GET_CASH_SIZE_SEND (opcode 41) -- reads the account's cash balance. <c>Sort</c> is a pure
-///     client-side UI routing echo, never inspected server-side.
-/// </summary>
 public sealed class GetCashBalanceHandler(IGetCashBalanceService service, ILogger<GetCashBalanceHandler> logger)
     : IAsyncPacketHandler<GetCashBalanceRequest>
 {

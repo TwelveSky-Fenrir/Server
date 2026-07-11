@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Commerce;
 
-/// <summary>CZ_DEMAND_PSHOP_SEND (opcode 33) -- inspect another live personal shop stall, same-zone only.</summary>
 public sealed class ViewShopStallHandler(IViewShopStallService service, ILogger<ViewShopStallHandler> logger)
     : IInlinePacketHandler<ViewShopStallRequest>
 {

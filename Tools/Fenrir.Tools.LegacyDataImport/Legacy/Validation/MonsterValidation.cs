@@ -4,17 +4,12 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Validation;
 
-/// <summary>
-///     Cross-validates <see cref="MonsterReader" /> against two <c>ts25ztool</c> CSV dumps of 005_00004.IMG:
-///     <c>005_00004DROP.CSV</c> (no header, mIndex|mName + the 127 drop-only fields) and <c>005_00004.CSV</c>
-///     (type-annotated header, not reliable for column counts on large arrays; 181 scalar values per row).
-/// </summary>
 internal static class MonsterValidation
 {
     private const int FullCsvFieldCount = 181;
 
     private const int
-        DropSectionStartIndex = 54; // index into the full 181-field flattening where mDropMoneyInfo[0] begins
+        DropSectionStartIndex = 54;
 
     public static void Run(string dataDir)
     {
@@ -111,7 +106,7 @@ internal static class MonsterValidation
         var skippedRows = 0;
         var missingRows = 0;
 
-        var lines = File.ReadLines(csvPath, Encoding.Latin1).Skip(1); // skip type-annotated header row
+        var lines = File.ReadLines(csvPath, Encoding.Latin1).Skip(1);
 
         foreach (var line in lines)
         {
@@ -135,7 +130,7 @@ internal static class MonsterValidation
             {
                 var actual = fields[i].Trim('"');
                 if (expected[i] == actual) continue;
-                var isTextField = i is 1 or 2 or 3; // Name, ChatInfo[0], ChatInfo[1]
+                var isTextField = i is 1 or 2 or 3;
                 if (isTextField) textMismatches++;
                 else numericMismatches++;
                 mismatches++;
@@ -149,11 +144,7 @@ internal static class MonsterValidation
             $"{mismatches} total mismatches ({textMismatches} text, {numericMismatches} numeric).");
     }
 
-    /// <summary>
-    ///     Flattens to the 181 CSV fields in struct declaration order (matches both CSVs; drop CSV starts at
-    ///     <see cref="DropSectionStartIndex" />).
-    /// </summary>
-    private static List<string> FlattenToCsvFields(MonsterRecord monster)
+        private static List<string> FlattenToCsvFields(MonsterRecord monster)
     {
         List<string> fields =
         [

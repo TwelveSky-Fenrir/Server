@@ -3,7 +3,6 @@ using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Game.Tests.World.Monsters;
 
-/// <summary>In-memory stand-in for <see cref="IMonsterBossRespawnTimerRepository" />.</summary>
 internal sealed class FakeMonsterBossRespawnTimerRepository : IMonsterBossRespawnTimerRepository
 {
     public Dictionary<int, DateTime> Rows { get; } = new();

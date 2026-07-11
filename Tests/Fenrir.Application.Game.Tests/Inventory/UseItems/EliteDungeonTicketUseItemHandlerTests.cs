@@ -10,18 +10,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Inventory.UseItems;
 
-/// <summary>
-///     Drives <see cref="EliteDungeonTicketUseItemHandler" /> (op23 item 1047/1097/1098) directly -- not
-///     through <see cref="UseItemHandlerRegistry" />, since wiring the handler into that registry's
-///     constructor is a verbatim edit to an existing file reported separately (see this workstream's
-///     wiringManifest).
-///     <para>
-///         WIRING-PENDING: this test file (like the handler it drives) references
-///         <c>TribeProgressZoneCommand.EliteDungeonTime</c>, a field that does not exist on that record as of
-///         this file's introduction -- it will not compile until this workstream's wiringManifest is applied.
-///         Written now, ready to run unchanged the moment that lands.
-///     </para>
-/// </summary>
 public class EliteDungeonTicketUseItemHandlerTests
 {
     private const int AccountId = 1;

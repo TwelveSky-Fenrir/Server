@@ -8,10 +8,6 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Fenrir.Generators.Protocol;
 
-/// <summary>
-///     Detects <c>[FenrirPacket]</c>/<c>[FenrirWireType]</c>, emits per-type members, then the aggregated dispatch
-///     tables.
-/// </summary>
 [Generator(LanguageNames.CSharp)]
 public sealed class ProtocolIncrementalGenerator : IIncrementalGenerator
 {
@@ -57,10 +53,6 @@ public sealed class ProtocolIncrementalGenerator : IIncrementalGenerator
         foreach (var diagnostic in collisionDiagnostics)
             context.ReportDiagnostic(diagnostic);
 
-        // No [FenrirPacket] in this compilation (e.g. Fenrir.Network.Serialization.Shared, [FenrirWireType]
-        // only) -- must not emit an empty OpcodeRegistry/SessionStateGate here: any project referencing both
-        // this one and a real Login/Zone protocol project would see two same-named, same-namespace types
-        // (CS0433) the moment both assemblies are in scope together.
         if (deduplicated.IsEmpty)
             return;
 

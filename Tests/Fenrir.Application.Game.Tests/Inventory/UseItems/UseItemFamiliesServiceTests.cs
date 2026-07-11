@@ -21,14 +21,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Inventory.UseItems;
 
-/// <summary>
-///     Drives the real <see cref="UseInventoryItemService" /> with the C9 <see cref="UseItemHandlerRegistry" />
-///     wired in, over a real <see cref="Zone" />, covering the registry-dispatched families this workstream
-///     implements: the title Lv12→13 ticket (891), the palace rank +1 ticket (2193), the mount-box family (635),
-///     and the dated-vault last-page access gate. The equip-swap family is covered purely by
-///     <see cref="EquipSwapResolverTests" /> (its two-container persist path is out of reach of the shared fake
-///     repository, which does not track <c>ReplaceTwoContainersAsync</c>).
-/// </summary>
 public class UseItemFamiliesServiceTests
 {
     private const int AccountId = 1;
@@ -129,13 +121,12 @@ public class UseItemFamiliesServiceTests
         return new ItemStack(itemId, quantity, 0, 0, 0, 0, 0, 0, 0, 0, 1);
     }
 
-    // ---- Title Lv12->13 ticket (891) ----------------------------------------------------------------
 
     [Fact]
     public async Task TitleTicket_AtLevel12WithEnoughCp_AdvancesTitle_Deducts10000Cp_AndConsumesTheTicket()
     {
         var (session, zone, state, characters) = SetUp();
-        state.Title = 112; // title level 12
+        state.Title = 112;
         state.ContributionPoints = 15000;
         SeedInventory(zone, ContainerMatrix.InventoryPage0, Ticket(TitleTicketItemId));
         var service = CreateService(characters);
@@ -157,7 +148,7 @@ public class UseItemFamiliesServiceTests
     public async Task TitleTicket_NotExactlyLevel12_FailsCleanly_NoCpDeduction_NoTitleChange()
     {
         var (session, zone, state, characters) = SetUp();
-        state.Title = 111; // level 11, not the single 12->13 step
+        state.Title = 111;
         state.ContributionPoints = 15000;
         SeedInventory(zone, ContainerMatrix.InventoryPage0, Ticket(TitleTicketItemId));
         var service = CreateService(characters);
@@ -177,7 +168,7 @@ public class UseItemFamiliesServiceTests
     {
         var (session, zone, state, characters) = SetUp();
         state.Title = 112;
-        state.ContributionPoints = 9999; // one below the 10000 requirement
+        state.ContributionPoints = 9999;
         SeedInventory(zone, ContainerMatrix.InventoryPage0, Ticket(TitleTicketItemId));
         var service = CreateService(characters);
 
@@ -191,7 +182,6 @@ public class UseItemFamiliesServiceTests
         Assert.Null(characters.LastReplacedContainer);
     }
 
-    // ---- Palace rank +1 ticket (2193) ---------------------------------------------------------------
 
     [Fact]
     public async Task PalaceRankTicket_BelowCeiling_RaisesRankByOne_AndConsumesTheTicket()
@@ -217,7 +207,7 @@ public class UseItemFamiliesServiceTests
     public async Task PalaceRankTicket_AtCeiling_FailsCleanly_LeavesRankAndTicketUntouched()
     {
         var (session, zone, state, characters) = SetUp();
-        state.Halo = 96; // already at the ceiling
+        state.Halo = 96;
         SeedInventory(zone, ContainerMatrix.InventoryPage0, Ticket(PalaceRankTicketItemId));
         var service = CreateService(characters);
 
@@ -230,7 +220,6 @@ public class UseItemFamiliesServiceTests
         Assert.Null(characters.LastReplacedContainer);
     }
 
-    // ---- Mount box (635) ------------------------------------------------------------------------------
 
     [Fact]
     public async Task MountBox_RollsAReward_NotInThisTestsFakeWorldData_FailsCleanly_WithoutConsumingTheBox()
@@ -244,35 +233,27 @@ public class UseItemFamiliesServiceTests
 
         Assert.Null(session.DisconnectReason);
         Assert.Equal(1, response.Result);
-        // C10-mountbox635: 635 is now a fully-populated LootBoxCatalog entry (uniform 1-in-8 over eight
-        // tier-3 mount ids: 1307/1308/1309/1315/1319/1322/1325/1328), routed through the shared
-        // LootBoxUseItemHandler -- not a stub anymore. This test's fake world data simply never registers
-        // any of those eight reward ids, so every roll hits RewardNotFound and the box is correctly left
-        // unconsumed (never a silent success). See MountBox635RewardTable for the real reward-table data
-        // and MountBox635RewardTableTests for coverage of the actual roll/placement mechanics.
         Assert.Null(characters.LastReplacedContainer);
         Assert.NotNull(state.Inventory.GetSlot(ContainerMatrix.InventoryPage0, 0));
     }
 
-    // ---- Dated-vault last-page access gate ----------------------------------------------------------
 
     [Fact]
     public async Task DatedVaultGate_LastPageExpired_FailsCleanly_BeforeAnyFamilyDispatch()
     {
         var (session, zone, state, characters) = SetUp();
-        state.InventoryDate = 0; // lapsed vault access
+        state.InventoryDate = 0;
         state.Title = 112;
         state.ContributionPoints = 15000;
-        // A would-otherwise-succeed title ticket, but on the dated last page: the gate rejects it first.
         SeedInventory(zone, ContainerMatrix.InventoryPage1, Ticket(TitleTicketItemId));
         var service = CreateService(characters);
 
         var response = await service.ResolveAsync(zone, state, CharacterId, AccountId,
             ContainerMatrix.InventoryPage1, 0, 0, CancellationToken.None);
 
-        Assert.Null(session.DisconnectReason); // clean failure, not a disconnect
+        Assert.Null(session.DisconnectReason);
         Assert.Equal(1, response.Result);
-        Assert.Equal(112, state.Title); // dispatch never ran
+        Assert.Equal(112, state.Title);
         Assert.Null(characters.LastReplacedContainer);
     }
 
@@ -280,7 +261,7 @@ public class UseItemFamiliesServiceTests
     public async Task DatedVaultGate_LastPageStillValid_LetsDispatchProceed()
     {
         var (session, zone, state, characters) = SetUp();
-        state.InventoryDate = GameDate.Today() + 1; // vault access still in the future
+        state.InventoryDate = GameDate.Today() + 1;
         state.Title = 112;
         state.ContributionPoints = 15000;
         SeedInventory(zone, ContainerMatrix.InventoryPage1, Ticket(TitleTicketItemId));

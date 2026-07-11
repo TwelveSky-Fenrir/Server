@@ -2,25 +2,13 @@ using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.GameData;
 
-/// <summary>
-///     Builds the 50-slot <see cref="BloodShop" /> wire snapshot. <c>BloodNum</c> is unconditionally 50, not a count
-///     of valid entries (verified against legacy).
-/// </summary>
 public static class BloodShopBuilder
 {
     public const int MaxBloodSlots = 50;
 
-    /// <summary>
-    ///     Same "coupon" convention as NpcShopPolicy/GroundItemPickupPolicy: a zero Quantity is forced to 1 for a
-    ///     Sort==99 item.
-    /// </summary>
-    private const byte ItemSort99 = 99;
+        private const byte ItemSort99 = 99;
 
-    /// <summary>
-    ///     <paramref name="rows" /> need not be pre-sorted or pre-filtered -- the sentinel (slot 100000) is excluded
-    ///     here.
-    /// </summary>
-    public static BloodShop Build(IEnumerable<BloodExchangeCatalogRowDto> rows,
+        public static BloodShop Build(IEnumerable<BloodExchangeCatalogRowDto> rows,
         IReadOnlyDictionary<int, ItemDefinition> itemsById)
     {
         var data = new BloodItem[MaxBloodSlots];
@@ -30,7 +18,7 @@ public static class BloodShopBuilder
                      .OrderBy(static r => r.BloodExchangeSlot))
         {
             if (i >= MaxBloodSlots)
-                break; // overflow guard -- never hit by real seed data (2 rows)
+                break;
 
             var quantity = row.Quantity;
             if (quantity == 0 && itemsById.TryGetValue(row.ItemId!.Value, out var itemDefinition) &&
@@ -47,13 +35,7 @@ public static class BloodShopBuilder
         return new BloodShop { BloodNum = MaxBloodSlots, Data = data };
     }
 
-    /// <summary>
-    ///     Version is the ItemId of the BloodExchangeSlot=100000 sentinel row (repurposed column, not a real
-    ///     item -- same convention as <see cref="CashCatalogBuilder.ResolveVersion" />); 0 if absent. Unlike
-    ///     world.ItemMallProducts, this table has no secondary "type" column, so the reserved slot number alone
-    ///     identifies the sentinel row.
-    /// </summary>
-    public static int ResolveVersion(IEnumerable<BloodExchangeCatalogRowDto> rows)
+        public static int ResolveVersion(IEnumerable<BloodExchangeCatalogRowDto> rows)
     {
         foreach (var row in rows)
             if (row.BloodExchangeSlot == 100000)

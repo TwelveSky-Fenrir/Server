@@ -2,11 +2,6 @@ using Fenrir.Application.Game.Domain.World.Loot;
 
 namespace Fenrir.Application.Game.Tests.Inventory.UseItems.Boxes;
 
-/// <summary>
-///     Guards the fully-recoverable loot-box data in <see cref="LootBoxCatalog" />: which boxes are populated,
-///     their exact reward-table shapes, and the bulk-open / notice sets. The "only fully-recoverable ids are
-///     wired" rule is itself asserted -- a future edit that adds a box must add it here deliberately.
-/// </summary>
 public class LootBoxCatalogTests
 {
     private static readonly LootBoxCatalog Catalog = LootBoxCatalog.Default;
@@ -14,11 +9,6 @@ public class LootBoxCatalogTests
     [Fact]
     public void RegisteredBoxIds_AreExactlyTheFullyRecoverableBoxes()
     {
-        // 76543/1378/1379/1236/8005/8108/720 (workstreams C10-remaining-boxes / C10-remaining-box-pools) are
-        // deliberately NOT here: each has a fully- or mostly-recovered reward table but does not fit
-        // BoxRewardSpec's Uniform/Weighted/RareBandThenPools shapes -- their reward pool (or one band of it) is
-        // keyed by the opening character's own previous-tribe code, which BoxRewardSpec.RollRewardId has no
-        // parameter to receive. See LootBoxCatalog's own class remarks ("Deliberately NOT registered here").
         int[] expected = [601, 602, 635, 2249, 7105, 8112, 8113, 76542, 1240, 8111, 8114, 8115];
         Assert.Equal(expected.OrderBy(x => x), Catalog.RegisteredBoxIds.OrderBy(x => x));
     }
@@ -193,11 +183,6 @@ public class LootBoxCatalogTests
     [Fact]
     public void TryGetSpec_TribeKeyedBoxesNotYetIntegrated_ReturnNull()
     {
-        // 76543/1378/1379/1236/8005/8108/720 have fully- or mostly-tested standalone reward tables
-        // (CostumeChest76543RewardTable, WarlordChestRewardTable, HeavenlyJadeChest1236RewardTable,
-        // WingLuckyBox8005RewardTable, LoyKrathongBox8108RewardTable, ChestBox720RewardTable) but are not
-        // spliced into this catalog -- see RegisteredBoxIds_AreExactlyTheFullyRecoverableBoxes and
-        // LootBoxCatalog's own class remarks.
         Assert.Null(Catalog.TryGetSpec(76543));
         Assert.Null(Catalog.TryGetSpec(1378));
         Assert.Null(Catalog.TryGetSpec(1379));
@@ -213,7 +198,6 @@ public class LootBoxCatalogTests
         foreach (var id in new[] { 512, 601, 602, 8112, 8113, 664, 720, 1236, 1240, 2249, 7105, 8108, 8111, 76543, 76544, 8005 })
             Assert.True(LootBoxCatalog.BulkOpenWhitelist.Contains(id), $"expected {id} in bulk whitelist");
 
-        // 635 is explicitly commented out of the whitelist; 76542 is single-open only.
         Assert.DoesNotContain(635, LootBoxCatalog.BulkOpenWhitelist);
         Assert.DoesNotContain(76542, LootBoxCatalog.BulkOpenWhitelist);
     }

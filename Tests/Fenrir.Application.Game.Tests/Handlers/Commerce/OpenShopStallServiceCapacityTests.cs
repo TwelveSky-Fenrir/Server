@@ -13,30 +13,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Commerce;
 
-/// <summary>
-///     Covers <see cref="Zone.MaxProxyShopSlots" /> (<c>MAX_PROXY_SHOP_NUM</c>, Server/Header/Protocol/DEFINE.h:369)
-///     as enforced by <see cref="OpenShopStallService.OpenProxyShopAsync" />'s capacity check
-///     (Server/ts25zone/S07_MyGame09.cpp:380-392): acceptance with exactly one slot free, rejection with result
-///     105 and zero side effects once the global table is full, and that a freed slot -- via either an explicit
-///     close (<see cref="CloseShopStallService.CloseOfflineShopAsync" />) or the periodic expiry sweep
-///     (<c>Zone.RebroadcastProxyShops</c>) -- is immediately available to a subsequent open.
-/// </summary>
-/// <remarks>
-///     Private, file-scoped fakes (not <c>TestSupport/FakeOfflineShopRepository.cs</c>), same rationale as
-///     <see cref="Handlers.Commerce.OpenShopStallServiceProxyRegistrationTests" />'s own remarks: that shared
-///     fake is scoped to a different test suite's needs and throws <see cref="NotImplementedException" /> on the
-///     members this file exercises.
-/// </remarks>
 public class OpenShopStallServiceCapacityTests
 {
-    /// <summary>
-    ///     Pumps <see cref="Zone.Tick" /> while <paramref name="pending" /> is outstanding -- needed because
-    ///     <see cref="OpenShopStallService.OpenProxyShopAsync" />'s success path awaits
-    ///     <c>Zone.PostInventoryCommandAndWaitAsync</c>, which only resolves once this same zone's tick drains
-    ///     its inventory-mirror inbox. Same pattern as
-    ///     <see cref="Handlers.Commerce.OpenShopStallServiceProxyRegistrationTests.RunToCompletionAsync" />.
-    /// </summary>
-    private static async Task<OpenShopStallResponse> RunToCompletionAsync(ValueTask<OpenShopStallResponse> pending,
+
+        private static async Task<OpenShopStallResponse> RunToCompletionAsync(ValueTask<OpenShopStallResponse> pending,
         Zone zone)
     {
         var task = pending.AsTask();
@@ -67,14 +47,7 @@ public class OpenShopStallServiceCapacityTests
         };
     }
 
-    /// <summary>
-    ///     Registers <paramref name="count" /> distinct filler entries directly against the zone's
-    ///     periodic-broadcast table (bypassing the service/repository entirely, since only the table's own
-    ///     <see cref="Zone.ProxyShopCount" /> matters for the capacity check under test) using character ids
-    ///     <c>1..count</c>, none of which collide with the real characters (ids &gt;= 90000) these tests open
-    ///     shops for.
-    /// </summary>
-    private static void FillZoneToCapacity(Zone zone, int count, int shopDate)
+        private static void FillZoneToCapacity(Zone zone, int count, int shopDate)
     {
         for (var characterId = 1; characterId <= count; characterId++)
             zone.RegisterProxyShop(new ProxyShopBroadcastEntry(characterId, characterId * 2 + 1, "Filler",
@@ -135,8 +108,6 @@ public class OpenShopStallServiceCapacityTests
         var packet = ProxyOpenRequest("OverflowStall");
         var listing = packet.PshopInfo with { UniqueNumber = unchecked(characterId * 2 + 1) };
 
-        // Deliberately NOT run through RunToCompletionAsync: the capacity rejection must return synchronously,
-        // never reaching the PostInventoryCommandAndWaitAsync await at all.
         var response = await service.OpenProxyShopAsync(packet, zone, state, characterId, 1, listing, [],
             CancellationToken.None);
 
@@ -144,7 +115,6 @@ public class OpenShopStallServiceCapacityTests
         Assert.Equal(listing.Name, response.PshopInfo.Name);
         Assert.Equal(listing.UniqueNumber, response.PshopInfo.UniqueNumber);
 
-        // No side effects: table unchanged, no DB write attempted, no audit row logged.
         Assert.Equal(Zone.MaxProxyShopSlots, zone.ProxyShopCount);
         Assert.Null(offlineShops.LastOpenedCharacterId);
         Assert.Equal(0, offlineShops.OpenCallCount);
@@ -160,7 +130,6 @@ public class OpenShopStallServiceCapacityTests
         var offlineShops = new CapacityTrackingOfflineShopRepository();
         var closeService = new CloseShopStallService(offlineShops, NullLogger<CloseShopStallService>.Instance);
 
-        // Frees filler character 1's slot.
         await closeService.CloseOfflineShopAsync(1, zone, CancellationToken.None);
         Assert.Equal(Zone.MaxProxyShopSlots - 1, zone.ProxyShopCount);
 
@@ -190,8 +159,6 @@ public class OpenShopStallServiceCapacityTests
             "ExpiredStall", 0f, 0f, 0f, GameDate.Today() - 1));
         Assert.Equal(Zone.MaxProxyShopSlots, zone.ProxyShopCount);
 
-        // Expiration is checked unconditionally every tick (Zone.RebroadcastProxyShops), independent of the
-        // 5s keep-alive throttle -- a single small tick force-closes the already-expired filler.
         zone.Tick(TimeSpan.FromMilliseconds(50));
         Assert.Equal(Zone.MaxProxyShopSlots - 1, zone.ProxyShopCount);
         Assert.Contains(999_999, zone.DrainPendingProxyShopCloses());
@@ -214,12 +181,7 @@ public class OpenShopStallServiceCapacityTests
         Assert.Equal(Zone.MaxProxyShopSlots, zone.ProxyShopCount);
     }
 
-    /// <summary>
-    ///     Only the two members <see cref="OpenShopStallService.OpenProxyShopAsync" />/
-    ///     <see cref="CloseShopStallService" /> call, plus an open-call counter for the no-side-effects
-    ///     assertion in the over-capacity rejection test.
-    /// </summary>
-    private sealed class CapacityTrackingOfflineShopRepository : IOfflineShopRepository
+        private sealed class CapacityTrackingOfflineShopRepository : IOfflineShopRepository
     {
         public List<(int CharacterId, byte ShopState)> ClosedStates { get; } = [];
         public int? LastOpenedCharacterId { get; private set; }

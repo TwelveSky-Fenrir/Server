@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Zone;
 
-/// <summary>CZ_DESTROY_ITEM_SEND (CLIENT.h:231, 8-byte payload) — same typedef as <see cref="UseHotkeyItemRequest" />.</summary>
 public class CzDestroyItemSendTests
 {
     [Fact]

@@ -12,21 +12,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.ItemModification;
 
-/// <summary>
-///     Business logic for op127, CZ_UP_LEVEL_ITEM_SEND -- extracted from <see cref="UpgradeCapeHandler" />, see
-///     that handler's remarks.
-/// </summary>
-/// <remarks>
-///     <c>premiumActive</c> (Server/Header/function.h:449-461, <c>GetDiscountForPremium</c>) is resolved here
-///     from <see cref="PlayerRuntimeState.PremiumExpireUtc" /> against the current wall clock and handed to
-///     <see cref="CapeUpgradeResolver.Resolve" />, which applies the flat 20% discount to the cost it returns
-///     -- see <see cref="CapeUpgradeResolver" />'s own remarks. Unlike that resolver's own doc comment (written
-///     before this notice was wired up), the legacy "RANKUP" chat notice (<c>BroadcastNotice</c>,
-///     Server/ts25zone/S04_MyWork02.cpp:14746-14750) now IS reproduced, via <see cref="IWorldNoticeService" />
-///     -- see that interface's own remarks for why this specific relay (sort 102) has a safe, already-shipped
-///     Fenrir equivalent that EnchantItem's/CraftItem's OWN cap/notable-craft notices (a different relay
-///     mechanism, sorts 115/2000/2001) do not.
-/// </remarks>
 public sealed class UpgradeCapeService(
     ICharacterRepository characters,
     IEventLogQueue eventLogQueue,
@@ -35,15 +20,10 @@ public sealed class UpgradeCapeService(
     ILogger<UpgradeCapeService> logger)
     : IUpgradeCapeService
 {
-    /// <summary>
-    ///     game.EventLog.EventCode for a cape-upgrade attempt -- the wire opcode (op127) itself, same
-    ///     "app-owned numbering scheme, caller-interpreted alongside Category" posture as every other
-    ///     EventCode in this codebase.
-    /// </summary>
-    private const short UpgradeCapeEventCode = 127;
 
-    /// <summary>game.EventLog.Outcome for this EventCode: 0 success, 1 failed.</summary>
-    private const byte SuccessOutcome = 0;
+        private const short UpgradeCapeEventCode = 127;
+
+        private const byte SuccessOutcome = 0;
 
     private const byte FailedOutcome = 1;
 
@@ -147,10 +127,6 @@ public sealed class UpgradeCapeService(
             }
             : [0, 0, 0, 0, 0, 0];
 
-        // Server/ts25zone/S04_MyWork02.cpp:14746-14750 -- fires on EVERY ordinary success, not gated by any
-        // tier/allow-list (unlike EnchantItem's/CraftItem's own notices), so this is unconditional here too.
-        // Content format is byte-for-byte the legacy sprintf: "%s RANKUP [%s]!!!" (avatar name, result item's
-        // display name).
         if (resolved.Succeeded && worldData.ItemsById.TryGetValue(resolved.NewItemId, out var resultDefinition))
             worldNotice.Broadcast($"{state.Name} RANKUP [{resultDefinition.Item.Name}]!!!");
 

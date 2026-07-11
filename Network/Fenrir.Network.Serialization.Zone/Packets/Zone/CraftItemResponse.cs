@@ -3,7 +3,6 @@ using Fenrir.Network.Serialization.Wire.Attributes;
 
 namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 
-// Result has recipe-specific codes: 1001-1003 / 10001-10003 / 100000 / 100001.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.CraftItem, ExpectedSize = 29)]
 public readonly partial record struct CraftItemResponse : IOutgoingPacket
 {

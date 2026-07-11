@@ -54,8 +54,6 @@ public sealed class EnterWorldService(
         var accountId = zoneSession.AccountId!.Value;
         var characterId = zoneSession.CharacterId!.Value;
 
-        // Re-checked here (not just at Login): Login and Zone are separate TCP listeners (ADR-0012), so an IP
-        // blocked after that account's Login session already happened would otherwise never be re-evaluated.
         if (!await firewall.IsAllowedAsync(zoneSession.RemoteEndPoint, cancellationToken))
         {
             logger.LogWarning(
@@ -65,8 +63,6 @@ public sealed class EnterWorldService(
             return;
         }
 
-        // A GM-banned character (admin.Bans, ZONE_BLOCK_USER_FOR_PLAYUSER's Fenrir equivalent) must never reach
-        // the world, unlike a mute -- checked before the bundle fetch below to not waste it on a rejected entry.
         if (await bans.IsActiveForCharacterAsync(characterId, cancellationToken))
         {
             logger.LogWarning("Enter-world rejected for character {CharacterId}: character is GM-banned",
@@ -75,7 +71,6 @@ public sealed class EnterWorldService(
             return;
         }
 
-        // tID must still name the account this socket was ticketed for.
         if (!ObfuscatedUidCodec.TryDecodeAccountId(packet.Id, out var decodedAccountId) ||
             decodedAccountId != accountId)
         {
@@ -86,9 +81,6 @@ public sealed class EnterWorldService(
             return;
         }
 
-        // A client cannot enter the world already mid-action (move/skill/etc) -- Server/ts25zone/
-        // S04_MyWork02.cpp:773-782 rejects unless action type is 0 and action sort is 0 or 1, for every
-        // player, unconditionally.
         if (packet.Action.Type != 0 || packet.Action.Sort is not (0 or 1))
         {
             logger.LogWarning(
@@ -109,7 +101,6 @@ public sealed class EnterWorldService(
 
         var character = bundle.Character;
 
-        // Resolve against the ticket-committed CharacterId; AvatarName only re-confirms it, never picks it.
         if (packet.AvatarName != character.Name)
         {
             logger.LogWarning(
@@ -119,12 +110,6 @@ public sealed class EnterWorldService(
             return;
         }
 
-        // Tribe/PreviousTribe self-consistency (Server/ts25zone/S04_MyWork02.cpp:880-901): a main-faction
-        // tribe (0-2) must carry a PreviousTribe exactly equal to itself; the fourth faction (3) must carry a
-        // PreviousTribe in {0,1,2} (the one legitimate case where the two fields differ -- "transferred in
-        // from an original tribe"); any other Tribe value is never valid. This checks the just-loaded
-        // record's own internal consistency, never anything the client asserts, and -- matching legacy -- ends
-        // the session outright with no response on any mismatch rather than a structured failure code.
         if (!IsTribeAndPreviousTribeConsistent(character.Tribe, character.PreviousTribe))
         {
             logger.LogWarning(
@@ -134,7 +119,6 @@ public sealed class EnterWorldService(
             return;
         }
 
-        // The character's persisted map must be one this shard hosts (ADR-0012).
         if (!zones.TryGet(character.MapId, out var zone))
         {
             logger.LogWarning(
@@ -144,13 +128,6 @@ public sealed class EnterWorldService(
             return;
         }
 
-        // War-zone registration eligibility (WarZoneEntryGate, Server/ts25zone/S04_MyWork02.cpp:902,
-        // CheckRegisterAvatar) -- a character whose persisted combined level/rebirth count no longer qualifies
-        // for the war zone it was last saved on (an operator/DB edit, or a product rule change since its last
-        // session) must never be allowed to materialize back into it. Denial is a hard disconnect
-        // ("out-of-range eviction"), matching this gate's sibling use in ZoneMoveService. This also covers the
-        // cross-shard-transfer re-entry case: the client reconnects to the destination shard and re-sends
-        // EnterWorldRequest there, routing back through this same check.
         var combinedLevel = character.Level + character.Level2;
         if (WarZoneEntryGate.Evaluate(character.MapId, combinedLevel, character.RebirthCount) ==
             WarZoneEntryOutcome.RejectedOutOfRange)
@@ -162,14 +139,6 @@ public sealed class EnterWorldService(
             return;
         }
 
-        // Fenrir-only failure boundary -- no Server/ citation applies (there is no legacy counterpart to
-        // mirror here; this segment's shape is purely a Fenrir C# call-chain composition concern). Before
-        // this try/catch, any exception raised anywhere from here through zone.Post() below -- equipment/
-        // stat computation, the six-way concurrent repository batch, either response send, or the Post
-        // itself -- propagated uncaught up through ZoneFrameDispatcher/SessionLoop/GameConnectionHost with
-        // no account/character context anywhere in the trail. CompleteWorldEntryAsync is kept as a local
-        // function (rather than reindenting this whole segment in place) purely so the try/catch below reads
-        // as this segment's single failure boundary without an oversized reindentation diff.
         async ValueTask CompleteWorldEntryAsync()
         {
             var equipmentContainer = BuildEquipmentContainer(bundle.Items);
@@ -184,38 +153,19 @@ public sealed class EnterWorldService(
             var stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
                 pet: petContribution);
 
-            // Seeds PlayerRuntimeState.IsMuted for this world entry; MuteRefreshPollHost (Application/
-            // Fenrir.Application.Game.Hosting) keeps it fresh on a fixed interval afterwards -- see that
-            // host's own remarks for why a per-chat-message requery is not the right shape here.
             var isMutedTask = mutes.IsActiveForCharacterAsync(characterId, cancellationToken);
             var guildTask = guilds.GetByCharacterAsync(characterId, cancellationToken);
             var tribeRoleTask = tribes.GetRoleForCharacterAsync(characterId, cancellationToken);
             var friendsTask = friends.GetByCharacterAsync(characterId, cancellationToken);
             var mentorTask = mentors.GetForCharacterAsync(characterId, cancellationToken);
 
-            // World-entry hydration for PlayerRuntimeState.HeroRankPoints (legacy MyDB::GetHeroPoint,
-            // Server/ts25login/S08_MyDB.cpp:1178-1188 -- read here, Zone-side, rather than threaded through
-            // the Login-side session ticket; see Migrations/030_hero_rank_points_world_entry_hydration.sql's
-            // own header for why that deviation from the legacy trigger point is accepted). Null (no row for
-            // this character/period yet) legitimately means zero, matching legacy's own collapsed
-            // no-row/query-failure semantics -- see IHeroRankingRepository.GetPointsAsync's own remarks.
             var heroRankPointsTask = heroRankings.GetPointsAsync(characterId,
                 HeroRankPointAccumulator.CurrentPeriodKind,
                 cancellationToken);
 
-            // Cross-shard character-location directory (runtime.CharacterShardLocation): a same-shard-miss
-            // fallback for whisper/friend-locate/guild-find. Per-connection, once-per-world-entry cost, not a
-            // tick or per-packet hot path, so an extra awaited stored-procedure call here alongside the others is
-            // unremarkable. Intra-shard zone-to-zone handoffs never call this again -- ShardId never changes on a
-            // same-shard hop, and MapId staleness for a character who has since wandered to another map on the
-            // SAME shard is an accepted bound (this directory is a same-shard-miss fallback only).
             var shardLocationUpsertTask = characterShardLocations.UpsertAsync(characterId, options.Value.ShardId,
                 character.MapId, character.Name, character.Tribe, cancellationToken);
 
-            // B5: world-entry rune-socket hydration (usp_Character_GetRunes) -- a returning character's
-            // already-persisted game.CharacterRunes rows must seed PlayerRuntimeState.RuneSystem/RuneSystemStat,
-            // not leave them at their all-zero "never socketed" default. Deliberately a separate read from
-            // GetWorldEntryBundleAsync -- see IRuneRepository.GetRunesAsync's own remarks.
             var runeRowsTask = runes.GetRunesAsync(characterId, cancellationToken);
 
             await Task.WhenAll(isMutedTask.AsTask(), guildTask.AsTask(), tribeRoleTask.AsTask(),
@@ -241,18 +191,8 @@ public sealed class EnterWorldService(
                 guildRoleWire,
                 guildMembership?.CallName ?? "");
 
-            // Legacy parity note (do not gate this pair behind ZoneReadyRequest/op13): Server/ts25zone/
-            // S04_MyWork02.cpp:979-980 sends ZCP_REGISTER_AVATAR_RECV (op12 response) and
-            // ZCP_BROADCAST_WORLD_INFO (op13-numbered response) back to back, unconditionally, inside the SAME
-            // op12 (P_REGISTER_AVATAR_SEND) handler -- neither waits on the client's own op13
-            // (CZ_CLIENT_OK_FOR_ZONE_SEND), which per ZoneReadyHandler/ZoneReadyService never sends a response
-            // packet under any branch. ServerDocs/19_Header_Lib/03_Protocol_Liaisons_Client_Zone.md's sequence
-            // diagram groups these by opcode number, not causal order -- Server/ wins that disagreement. Both
-            // sends below must stay unconditional and synchronous with this handler's own success path.
             var registerRecv = new EnterWorldResponse
             {
-                // A brand-new character legitimately has no buff rows yet (creation never writes any); a
-                // returning character's own persisted snapshot must ride along here instead of a flat zero.
                 AvatarInfo = AvatarInfoFactory.CreateForCharacter(character, bundle.Items, socialSnapshot,
                     bundle.Skills, bundle.Hotkeys),
                 BuffInfo = BuildBuffInfo(bundle.Buffs)
@@ -261,71 +201,33 @@ public sealed class EnterWorldService(
 
             var broadcastWorldInfo = new WorldSnapshotResponse
             {
-                // Three overlays stacked onto the zeroed template, each covering a disjoint field slice: guild
-                // ranking board, live RvR tribe-symbol/points snapshot, and (the newest) the numbered zone-siege
-                // state machines + tribe-guard corridor passability that already have a real in-process backing
-                // model (ZoneCenterSiegeState/TribeGuardCorridorState) but previously never reached this packet
-                // -- see ZoneCenterSiegeProjection's own remarks.
                 WorldInfo = ZoneCenterSiegeProjection.Apply(
                     WorldStateProjection.Apply(
                         GuildRankingProjection.Apply(WorldStateTemplates.ZeroedWorldInfo, guildRanking.Top),
                         worldState),
                     zoneCenterSiegeState, tribeGuardCorridorState),
-                // No repository currently projects tribe master/sub-master NAMES or the vote/honor-rank rosters
-                // (ITribeRepository only ever returns CharacterIds) -- the zeroed template is the correct
-                // placeholder until that surface exists, not a regression introduced here.
                 TribeInfo = WorldStateTemplates.ZeroedTribeInfo
             };
             zoneSession.Send(in broadcastWorldInfo);
 
-            // Legacy pairs the full 12-tower ownership/status snapshot with the RvR world-info broadcast
-            // immediately above, unconditionally, inside this same registration-completion sequence
-            // (Server/ts25zone/S04_MyWork02.cpp:1203-1204, B_BROADCAST_CHUGSOUNG_INFO) -- for every zone
-            // entry, not just tower zones, and regardless of any tower's current siege phase. Previously
-            // Fenrir's only equivalent send fired solely from Zone.Combat.cs's ApplyTowerGuardianHitSideEffects
-            // (a guardian's own first landed hit), so a player who never witnessed that event received zero
-            // tower-ownership information for their whole session. TowerStatusResponse is not Compressed, so
-            // (unlike the two SendRaw/Encode calls above) it goes out via the plain Send<T> path -- the same
-            // call shape Zone.Combat.cs's own BroadcastTowerStatus already uses for this exact packet type.
             zoneSession.Send(towerWar.BuildStatusSnapshot());
 
-            // Self-spawn: Zone doesn't know this player exists yet (ZoneCommand.Enter below is only posted, not ticked).
             zoneSession.Send(new AvatarActionResponse
             {
                 ServerIndex = characterId,
                 UniqueNumber = unchecked((uint)characterId),
                 Data = new ObjectForAvatar
                 {
-                    // Legacy sources this from the character's own persisted record at this exact moment
-                    // (Server/ts25zone/S04_MyWork02.cpp:994-999), not a fixed value -- but no VisibleState column
-                    // exists yet anywhere in game.Characters to source it from (a schema gap, not just a
-                    // wrong-constant one). Until that column -- and a GM hide/show command
-                    // (Server/ts25zone/S04_MyWork04.cpp:933-958) -- both exist on the Fenrir side, every
-                    // character's real value IS 1: creation sets it unconditionally
-                    // (Server/ts25login/S04_MyWork02.cpp:739-741), the DB column default agrees
-                    // (Server/BuildEU33/DB/nxtserver.sql:28), and no write site ever sets it to 0 without a GM
-                    // action Fenrir doesn't implement yet. 0 is the exact value legacy reserves for "this avatar
-                    // is GM-hidden" (Server/ts25zone/H07_MyGame.h:971's IsHiding) -- hardcoding it here made every
-                    // character appear self-invisible on every zone entry (the "own character not visible" bug).
-                    // 1 is legacy-accurate for every character Fenrir can currently represent, not a safer guess.
                     VisibleState = 1,
-                    // Out of scope for the VisibleState fix above -- SpecialState's own creation-time default and
-                    // write-site semantics were not independently verified, so it stays untouched pending its own
-                    // legacy-behavior-translator contract.
                     SpecialState = 0,
                     KillOtherTribe = 0,
                     GoodFellow = 0,
                     GuildName = socialSnapshot.GuildName,
                     GuildRole = socialSnapshot.GuildRoleWire,
                     CallName = socialSnapshot.CallName,
-                    // Legacy zeroes this only for a guild-less character; a real guild member's mark-effect
-                    // value has no source anywhere in the current guild repository surface yet (no MarkEffect
-                    // column/DTO field exists) -- flagged, not silently assumed correct.
                     GuildMarkEffect = 0,
                     Name = character.Name,
                     Tribe = character.Tribe,
-                    // The Noble Dragon/Royal Serpent/Grand Tiger starter-kit template (0-2), genuinely independent
-                    // of Tribe -- now a real persisted column (Migrations/018), no longer synthesized as 0.
                     PreviousTribe = character.PreviousTribe,
                     Gender = character.Gender,
                     HeadType = character.HeadType,
@@ -333,9 +235,6 @@ public sealed class EnterWorldService(
                     Level1 = character.Level,
                     Level2 = character.Level2,
                     EquipForView = EquipmentViewCodec.BuildEquipForView(bundle.Items),
-                    // character.MountItemId/MountSlotIndex are readable since Migrations/018, but the legacy's
-                    // exact "currently mounted" condition (S04_MyWork02.cpp:935-940) isn't confirmed yet -- needs
-                    // a legacy-behavior-translator contract before this stops being a flat 0.
                     AnimalNumber = 0,
                     Title = character.Title,
                     Halo = character.Halo,
@@ -350,13 +249,6 @@ public sealed class EnterWorldService(
                         TargetLocation = [character.PosX, character.PosY, character.PosZ],
                         Front = character.Heading,
                         TargetFront = character.Heading,
-                        // Companion-pet follow sub-fields (PlayerRuntimeState.PetActionSort and its five
-                        // siblings, see that field's own remarks): correctly zero here, not a remaining
-                        // instance of the companion-pet-follow-rebroadcast gap -- this self-spawn packet is
-                        // sent before HandleEnter ever creates this character's PlayerRuntimeState, so no
-                        // CZ_UPDATE_PET_ACTION_SEND (op156) value has ever been recorded for this session yet.
-                        // Every subsequent avatar-action broadcast (built via Zone.BuildAvatarActionRecv /
-                        // Zone.PetActionFieldsOf once the character is tracked) reads the live stored value.
                         PetLocation = new float[3],
                         PetTargetLocation = new float[3],
                         PetFront = 0,
@@ -374,10 +266,6 @@ public sealed class EnterWorldService(
                     MaxManaValue = character.MaxMana,
                     ManaValue = character.Mana,
                     EffectValueForView = BuildEffectValueForView(bundle.Buffs),
-                    // Legacy copies the character's own persisted party name here (S04_MyWork02.cpp:1036), not
-                    // blank -- no party-name column/DTO field is persisted anywhere on the Fenrir side yet
-                    // (PartyRegistry is in-memory-only and does not survive a reconnect), so this stays "" pending
-                    // a database-engineer schema addition, not a silent regression.
                     PartyName = "",
                     DuelState = new int[3],
                     PShopState = 0,
@@ -394,8 +282,6 @@ public sealed class EnterWorldService(
                     AnimalAbsorbState = 0,
                     PetValid = 0,
                     Unk1 = 0,
-                    // Top-level PetLocation (distinct from Action.PetLocation above): legacy sets this to the
-                    // avatar's own current position, not zero (S04_MyWork02.cpp:1058-1060).
                     PetLocation = [character.PosX, character.PosY, character.PosZ],
                     PetFrame = 0,
                     Unk624 = 0,
@@ -408,18 +294,6 @@ public sealed class EnterWorldService(
                 CheckChangeActionState = 0
             });
 
-            // B5 wiring closed: PlayerRuntimeState.RuneSystem/RuneSystemStat are now seeded from the character's
-            // already-persisted game.CharacterRunes rows (runeSystem/runeSystemStat above), via the new
-            // PlayerEnterData.RuneSystem/RuneSystemStat fields Zone.HandleEnter copies onto the freshly-created
-            // state -- so RuneStatDecoder's contribution is live the moment this character's next rune-socket
-            // mutation runs (Zone.ApplyRuneSocketCommand, the one production RecomputeStats call site that
-            // already passes runtimeState: state -- see that method's own remarks). Still open, and
-            // deliberately NOT guessed at here: EquipmentService.RecomputeStats's runtimeState parameter (the
-            // call just above, line ~183) has no PlayerRuntimeState to pass yet at THIS specific call site --
-            // HandleEnter hasn't run -- so the very FIRST post-login stat snapshot still excludes the rune (and
-            // every other cosmetic/zone/consumable/mount context) contribution, a structural gap unique to this
-            // one call site, not a data gap this pass can close. See EquipmentService.RecomputeStats's own
-            // remarks for the full, corrected picture of which call sites do/don't pass runtimeState today.
             var entered = zone.Post(ZoneCommand.Enter(characterId, new PlayerEnterData(
                 zoneSession,
                 character.Name,
@@ -477,69 +351,26 @@ public sealed class EnterWorldService(
                 TeacherPoint: character.TeacherPoint,
                 Level2: character.Level2,
                 Exp2: character.Exp2,
-                // aZone241Time -- game.Characters already persisted this, but nothing read it back into
-                // PlayerRuntimeState until now. See PlayerRuntimeState.Zone241Time's own remarks.
                 Zone241Time: character.Zone241Time,
                 HeroRankPoints: heroRankPoints,
-                // Stat/elixir-potion lifetime counters (item-usage-consumables finding, Critical) --
-                // game.Characters already persisted these five, but nothing read them back into
-                // PlayerRuntimeState until now. See PlayerRuntimeState.EatLifePotion's own remarks.
                 EatLifePotion: character.EatLifePotion,
                 EatManaPotion: character.EatManaPotion,
                 EatStrPotion: character.EatStrPotion,
                 EatDexPotion: character.EatDexPotion,
                 EatElePotion: character.EatElePotion,
-                // Lucky Drop/"Acquisition" Scroll minutes counter -- game.Characters.DropItemTime already
-                // persisted this, but nothing read it back into PlayerRuntimeState until now. See
-                // PlayerRuntimeState.DropItemTime's own remarks.
                 DropItemTime: character.DropItemTime,
-                // War Point currency balance -- game.Characters.WarPoint already persisted this
-                // (Migrations/041_characters_warpoint_currency.sql), but nothing read it back into
-                // PlayerRuntimeState until now. See PlayerRuntimeState.WarPoint's own remarks.
                 WarPoint: character.WarPoint,
-                // mSupportSkillTimeUpRatio's Premium source field (behavior contract
-                // "buff-application-stacking-decay") -- the character's real persisted
-                // game.Characters.PremiumExpireUtc, not the PlayerEnterData default of 0. BuffX2Time stays at
-                // its default (no persisted source exists yet -- see PlayerRuntimeState.BuffX2Time's own
-                // remarks), so a fresh world entry always starts with that factor inactive.
                 PremiumExpireUtc: character.PremiumExpireUtc,
-                // The character's real persisted origin tribe (0-2) -- must travel here too, or
-                // PlayerRuntimeState.PreviousTribe would silently mirror Tribe instead for a tribe-3 (Fujin)
-                // character, breaking the fourth-tribe (Fujin) conversion/return behavior's return branch.
-                // Already loaded and self-consistency-checked above (IsTribeAndPreviousTribeConsistent).
                 PreviousTribe: character.PreviousTribe,
-                // Store/coffre money pool + second-page expiry dates -- game.Characters already persisted
-                // these three, but nothing read them back into PlayerRuntimeState until now (npc-talk
-                // Store/Save transfer gap fix). See PlayerRuntimeState.Vault.cs's own remarks.
                 StoreMoney: character.StoreMoney,
-                // C1-vault-expiry-enforcement, trigger 4: normalized once per avatar registration (never once
-                // per tick) -- an already-lapsed InventoryDate collapses to the zero sentinel here; a
-                // currently-valid one passes through unchanged. See VaultDateNormalization's own remarks.
-                // StoreDate is a sibling field this contract does not cover -- deliberately left un-normalized.
                 InventoryDate: VaultDateNormalization.NormalizeIfExpired(character.InventoryDate, GameDate.Today()),
                 StoreDate: character.StoreDate,
-                // aPetBagDate -- game.Characters already persists this (Migrations/047_characters_petbagdate_
-                // column.sql), but nothing read it back into PlayerRuntimeState until now. See
-                // PlayerRuntimeState.PetBagDate's own remarks. Deliberately NOT run through
-                // VaultDateNormalization -- that contract is scoped to InventoryDate only (see StoreDate's own
-                // un-normalized treatment immediately above), and no equivalent contract covers this field.
                 PetBagDate: character.PetBagDate,
-                // The M15 Pet Lucky Box (8111) pity counter -- game.Characters already persists this
-                // (Migrations/048_characters_m15petluckybox_pity_column.sql, confirmation-pass follow-up), but
-                // nothing read it back into PlayerRuntimeState until now. See
-                // PlayerRuntimeState.M15PetLuckyBoxPity's own remarks.
                 M15PetLuckyBoxPity: character.M15PetLuckyBoxPity,
-                // D2 hook 2: canonical source-IP for the PvP same-origin kill-credit guard
-                // (AntiCheat.PvpKillCreditGuard.IsSameOrigin) -- captured from this session's own accepted
-                // socket at world entry. See PlayerRuntimeState.SourceIp's own remarks.
                 SourceIp: SessionSourceIp.Normalize(zoneSession.RemoteEndPoint),
-                // B5: world-entry rune-socket hydration (usp_Character_GetRunes, folded above) -- see
-                // PlayerEnterData.RuneSystem's own remarks.
                 RuneSystem: runeSystem,
                 RuneSystemStat: runeSystemStat)));
 
-            // A dropped Enter is never replayed -- the character would stay permanently invisible despite the two
-            // packets above already telling the client registration succeeded, so treat it as fatal.
             if (!entered)
             {
                 logger.LogError(
@@ -556,17 +387,6 @@ public sealed class EnterWorldService(
                 "Character {CharacterId} (account {AccountId}) entered world on map {MapId} -- awaiting zone-ready",
                 characterId, accountId, character.MapId);
 
-            // D1 logout-info capture (Server/Header/Protocol/DEFINE.h:750-757's UPDATE_LOGOUT_INFO[6]: element
-            // 0 = zone, 1-3 = position, 4 = life, 5 = mana): re-anchor game.CharacterLogoutState to this
-            // character's just-loaded, authoritative placement so a later reconnect can carry its last-session
-            // zone/position/life/mana back to it -- a snapshot Fenrir never populated before (workstream D1).
-            // Best-effort and isolated in its own try/catch, PAST the point of no return above: this write is a
-            // client-facing snapshot / login-redirect hint only, never the world-spawn source (game.Characters
-            // already owns that via the write-behind flush), so a failure here must never undo an entry the
-            // client was already told succeeded. Position floats are truncated to whole numbers exactly like
-            // the legacy capture. The continuous in-session re-capture (movement/teleport/periodic/quit --
-            // Server/ts25zone/S04_MyWork02.cpp:1778,1920, ZoneWorker.cpp:53-62) is a deferred follow-up owned by
-            // the write-behind/disconnect path, not this enter-world segment.
             try
             {
                 await logoutState.UpsertAsync(characterId, character.MapId,
@@ -588,15 +408,6 @@ public sealed class EnterWorldService(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            // Distinct from every explicit Abort(DisconnectReason.Faulted) call above and inside
-            // CompleteWorldEntryAsync (firewall/ban/ticket-mismatch/tribe-consistency/map-not-hosted/dropped-
-            // Enter): those are all validated precondition rejections with no exception involved.
-            // ProcessingFault instead marks "an unhandled exception actually reached here", carrying the
-            // account/character/map context that the generic SessionLoop/GameConnectionHost catches above this
-            // one can never have, and is the same idempotent Abort() every other rejection path in this
-            // service already uses (see ClientSession.Abort's own remarks) -- calling it here does not race or
-            // conflict with the CompleteWorldEntryAsync's own explicit Abort(Faulted) on the dropped-Enter
-            // path, since that path already returned before any exception could reach this catch.
             logger.LogError(ex,
                 "Enter-world processing faulted for account {AccountId} character {CharacterId} on map {MapId} -- " +
                 "the client may already hold a partial handshake if some of the three response payloads were " +
@@ -606,12 +417,7 @@ public sealed class EnterWorldService(
         }
     }
 
-    /// <summary>
-    ///     Server/ts25zone/S04_MyWork02.cpp:880-901 -- the zone-entry self-consistency switch, all four
-    ///     branches: a main-faction Tribe (0-2) requires PreviousTribe == Tribe; the fourth faction (3)
-    ///     requires PreviousTribe in {0,1,2}; any other Tribe value is rejected outright.
-    /// </summary>
-    private static bool IsTribeAndPreviousTribeConsistent(byte tribe, byte previousTribe)
+        private static bool IsTribeAndPreviousTribeConsistent(byte tribe, byte previousTribe)
     {
         return tribe switch
         {
@@ -633,13 +439,7 @@ public sealed class EnterWorldService(
         return builder.ToImmutable();
     }
 
-    /// <summary>
-    ///     Buff[slot*2]/[slot*2+1] pairing (value, remaining-ticks) -- same convention
-    ///     <see cref="Fenrir.Application.Game.Domain.World.Zone" />'s own ClearAllBuffs/ApplyBuffWrites use for
-    ///     this identical wire array. A brand-new character has no rows at all (creation never writes any buff), so
-    ///     an empty <paramref name="buffs" /> collapses to the same all-zero snapshot the previous hardcode produced.
-    /// </summary>
-    private static BuffInfo BuildBuffInfo(IReadOnlyList<CharacterBuffDto> buffs)
+        private static BuffInfo BuildBuffInfo(IReadOnlyList<CharacterBuffDto> buffs)
     {
         var buff = new int[70];
 
@@ -655,11 +455,7 @@ public sealed class EnterWorldService(
         return WorldStateTemplates.ZeroedBuffInfo with { Buff = buff };
     }
 
-    /// <summary>
-    ///     One value per slot (not the id/duration pair <see cref="BuildBuffInfo" /> produces) -- ObjectForAvatar's own
-    ///     view of the same buff snapshot.
-    /// </summary>
-    private static int[] BuildEffectValueForView(IReadOnlyList<CharacterBuffDto> buffs)
+        private static int[] BuildEffectValueForView(IReadOnlyList<CharacterBuffDto> buffs)
     {
         var effectValueForView = new int[35];
 
@@ -670,15 +466,7 @@ public sealed class EnterWorldService(
         return effectValueForView;
     }
 
-    /// <summary>
-    ///     Folds game.CharacterRunes rows (occupied sockets only, <see cref="IRuneRepository.GetRunesAsync" />'s
-    ///     own contract) into two length-<see cref="RuneStatDecoder.SocketCount" /> arrays keyed by SocketIndex --
-    ///     an absent socket stays 0 in both, matching PlayerRuntimeState.RuneSystem/RuneSystemStat's own all-zero
-    ///     "never socketed" default (B5 wiring: world-entry rune hydration). An out-of-range SocketIndex is
-    ///     silently skipped, same defensive posture as <see cref="BuildBuffInfo" />/<see cref="BuildEffectValueForView" />
-    ///     above.
-    /// </summary>
-    private static (ImmutableArray<int> RuneSystem, ImmutableArray<int> RuneSystemStat) BuildRuneArrays(
+        private static (ImmutableArray<int> RuneSystem, ImmutableArray<int> RuneSystemStat) BuildRuneArrays(
         IReadOnlyCollection<CharacterRuneSocketDto> rows)
     {
         var runeSystem = new int[RuneStatDecoder.SocketCount];

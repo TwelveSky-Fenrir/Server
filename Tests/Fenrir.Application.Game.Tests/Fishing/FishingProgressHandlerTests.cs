@@ -11,7 +11,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Fishing;
 
-/// <summary>Drives the real <see cref="FishingProgressHandler" /> (opcode 104) over a real <see cref="Zone" />.</summary>
 public class FishingProgressHandlerTests
 {
     private static readonly int ProgressFrame = FrameWriter.FrameSizeOf<FishingProgressResponse>();

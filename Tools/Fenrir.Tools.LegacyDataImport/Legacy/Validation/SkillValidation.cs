@@ -4,10 +4,6 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Validation;
 
-/// <summary>
-///     Cross-validates <see cref="SkillReader" /> against <c>005_00003TH.csv</c>; the CSV only dumps description
-///     lines 0-2 of the char[10][51] field, so only <see cref="SkillRecord.Description" />[0..2] are compared.
-/// </summary>
 internal static class SkillValidation
 {
     public static void Run(string dataDir)
@@ -17,7 +13,6 @@ internal static class SkillValidation
 
         var csvPath = Path.Combine(dataDir, "..", "005_00003TH.csv");
         if (!File.Exists(csvPath))
-            // fallback: dataDir may already be the BuildEU33 root, not BuildEU33/DATA.
             csvPath = Path.Combine(dataDir, "005_00003TH.csv");
 
         if (!File.Exists(csvPath))
@@ -32,7 +27,6 @@ internal static class SkillValidation
 
     private static void VerifyAgainstCsv(IReadOnlyList<SkillRecord> skills, string csvPath)
     {
-        // Latin1: raw byte dump, not UTF-8 (UTF-8 would corrupt non-ASCII bytes to U+FFFD).
         var mismatches = 0;
         var numericMismatches = 0;
         var checkedRows = 0;
@@ -42,7 +36,7 @@ internal static class SkillValidation
 
         foreach (var line in lines)
         {
-            var csvRowIndex = rowNumber; // CSV has no header and no explicit key column tying 1:1 to slot order
+            var csvRowIndex = rowNumber;
             rowNumber++;
 
             var fields = line.Split('|');
@@ -68,7 +62,7 @@ internal static class SkillValidation
                 var actual = fields[i].Trim('"');
                 if (expected[i] == actual) continue;
                 var isNumericField =
-                    i >= 5; // fields 0..4 are Index/Name/Description[0..2]; everything after is numeric
+                    i >= 5;
                 if (isNumericField) numericMismatches++;
                 Console.WriteLine(
                     $"  [DIFF{(isNumericField ? "-NUMERIC" : "-text")}] row {csvRowIndex} field #{i}: parsed='{expected[i]}' csv='{actual}'");

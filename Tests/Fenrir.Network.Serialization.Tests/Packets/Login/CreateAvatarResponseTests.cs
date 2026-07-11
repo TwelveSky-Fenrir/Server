@@ -9,7 +9,6 @@ public class LcCreateAvatarRecvTests
     [Fact]
     public void PayloadSize_MatchesContractConstant()
     {
-        // ExpectedSize=11173 (1-byte outbound header) -> 11172-byte payload (4 + AvatarInfo 11168 bytes).
         Assert.Equal(11172, CreateAvatarResponse.PayloadSize);
         Assert.Equal(11168, AvatarInfo.WireSize);
     }
@@ -34,7 +33,6 @@ public class LcCreateAvatarRecvTests
         AssertAvatarInfoEqual(avatar, decodedAvatar);
     }
 
-    // Unique increasing values (not all-zero) so an offset bug shifts values detectably.
     private static AvatarInfo CreateSampleAvatarInfo()
     {
         var n = 0;
@@ -310,7 +308,6 @@ public class LcCreateAvatarRecvTests
         };
     }
 
-    // Field-by-field: record equality compares arrays by reference, so Equals/== would fail here.
     private static void AssertAvatarInfoEqual(AvatarInfo expected, AvatarInfo actual)
     {
         Assert.Equal(expected.VisibleState, actual.VisibleState);

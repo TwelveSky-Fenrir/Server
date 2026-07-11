@@ -2,10 +2,6 @@ using Fenrir.Application.Game.Domain.Inventory;
 
 namespace Fenrir.Application.Game.Tests.Inventory;
 
-/// <summary>
-///     Coverage for <see cref="StoreMoneyPolicy" />, the pure policy behind tSort 226 (deposit money) and 227
-///     (withdraw money). Does not depend on any dispatch wiring.
-/// </summary>
 public class StoreMoneyPolicyTests
 {
     [Fact]
@@ -79,7 +75,6 @@ public class StoreMoneyPolicyTests
     [Fact]
     public void Resolve_NoFixedPerRequestCapBeyondOverflowGuard()
     {
-        // Unlike the 999 stackable-item cap, money has no fixed per-request ceiling besides the overflow guard.
         var result = StoreMoneyPolicy.ResolveDeposit(1_500_000_000,
             1_500_000_000, 0);
 
@@ -90,8 +85,6 @@ public class StoreMoneyPolicyTests
     [Fact]
     public void Resolve_NeverTouchesBigMoneyPools()
     {
-        // Documentation-as-test: StoreMoneyPolicy's signature has no BigMoney/BigStoreMoney parameter at all --
-        // the 1B pool is explicitly out of scope for tSort 226/227 and must not be inferred from this policy.
         var result = StoreMoneyPolicy.ResolveWithdraw(1, 1, 0);
 
         Assert.True(result.Succeeded);

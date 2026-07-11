@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Tests.TestSupport;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Shared;
 
-// Field order matters: Price comes before Quantity here, unlike ProxyShopItem.
 public class BloodItemTests
 {
     [Fact]

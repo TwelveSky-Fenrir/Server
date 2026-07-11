@@ -7,7 +7,6 @@ public class PvpKillContributionPointBonusesTests
     [Fact]
     public void ComputeGameWideAddValue_DoublesTheConfiguredValueForRebirth()
     {
-        // Shipped BuildEU33 configured value 3 -> effective 6 under the always-active rebirth build macro.
         Assert.Equal(6, PvpKillContributionPointBonuses.ComputeGameWideAddValue(3));
         Assert.Equal(0, PvpKillContributionPointBonuses.ComputeGameWideAddValue(0));
     }
@@ -32,7 +31,6 @@ public class PvpKillContributionPointBonusesTests
     [Fact]
     public void Server160Bonus_WithheldWhenNoAddedCpTribeDesignated()
     {
-        // mTribeAddCP defaults to -1 (no tribe designated) -> no match, no bonus.
         var bonus = PvpKillContributionPointBonuses.ComputeConditionalBonuses(
             160, attackerTribe: 0, addedCpTribe: -1, attackerBaseLevel: 1, symbolBattleActive: false);
 
@@ -104,7 +102,6 @@ public class PvpKillContributionPointBonusesTests
     [Fact]
     public void MinorityCapitalBonus_WithheldWhenHomeTribeMappingUnknown()
     {
-        // serverHomeTribe defaults to -1 (mapping not recoverable from the contract) -> never granted.
         var bonus = PvpKillContributionPointBonuses.ComputeConditionalBonuses(
             1, attackerTribe: 0, addedCpTribe: -1, attackerBaseLevel: 1, symbolBattleActive: false);
 

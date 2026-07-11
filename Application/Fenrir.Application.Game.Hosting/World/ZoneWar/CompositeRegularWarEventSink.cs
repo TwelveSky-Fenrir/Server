@@ -4,17 +4,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Hosting.World.ZoneWar;
 
-/// <summary>
-///     C15-regwar-reward wiring seam: fans one <see cref="IRegularWarEventSink" /> lifecycle event out to every
-///     entry in <paramref name="sinks" />, in order, isolating each inner sink's own failure (logged, skipped)
-///     so one broken sink can never suppress delivery to the others -- the same "one bad unit must never take
-///     the rest down" posture <c>Zone.DrainInbox</c>'s own per-command try/catch already established elsewhere
-///     in this codebase. Exists specifically because <see cref="RegularWarSchedulerHost" />'s constructor only
-///     ever accepts a single <see cref="IRegularWarEventSink" />, but two independent, unrelated concerns both
-///     need to observe the exact same event stream: <see cref="ZoneCenterRegularWarEventSink" /> (siege-state
-///     relay to center) and <see cref="RegularWarRewardGrantSink" /> (C15's real money/xp/CP/hero-rank/
-///     item-drop reward payout). See this cluster's wiring report for the DI registration this composes.
-/// </summary>
 public sealed class CompositeRegularWarEventSink(
     IReadOnlyList<IRegularWarEventSink> sinks,
     ILogger<CompositeRegularWarEventSink> logger) : IRegularWarEventSink

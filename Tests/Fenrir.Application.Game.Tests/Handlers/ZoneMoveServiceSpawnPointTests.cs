@@ -14,11 +14,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 
-/// <summary>
-///     Covers <see cref="ZoneMoveService" />'s arrival-position resolution: the target zone's
-///     <c>ZoneSpawnPoints</c>/<c>DefaultSpawn*</c> data, never the client, is what places a transferring
-///     character. Closes the coverage gap <see cref="ZoneMoveServiceTests" /> explicitly disclaims.
-/// </summary>
 public class ZoneMoveServiceSpawnPointTests
 {
     private const int CharacterId = 10;
@@ -73,8 +68,8 @@ public class ZoneMoveServiceSpawnPointTests
         var (service, session, sourceZone, targetZone) = CreateService(targetDefinition);
 
         await service.HandleAsync(Request(SourceMapId, TargetMapId), session, CancellationToken.None);
-        sourceZone.Tick(TimeSpan.FromMilliseconds(50)); // drains the posted Leave, hands off Enter to targetZone
-        targetZone.Tick(TimeSpan.FromMilliseconds(50)); // drains the handed-off Enter
+        sourceZone.Tick(TimeSpan.FromMilliseconds(50));
+        targetZone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.False(sourceZone.TryGetPlayer(CharacterId, out _));
         Assert.True(targetZone.TryGetPlayer(CharacterId, out var state));

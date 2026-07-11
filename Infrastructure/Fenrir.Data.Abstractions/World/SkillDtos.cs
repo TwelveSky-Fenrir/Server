@@ -2,7 +2,6 @@ using CaeriusNet.Attributes.Dto;
 
 namespace Fenrir.Data.Abstractions.World;
 
-// world.usp_Skill_GetAll RS0; ordinal-mapped, ctor order must match the SELECT.
 [GenerateDto]
 public sealed partial record SkillRowDto(
     int SkillId,
@@ -17,14 +16,12 @@ public sealed partial record SkillRowDto(
     byte TotalHitNumber,
     short ValidRadius);
 
-/// <summary>One populated world.SkillDescriptions line -- world.usp_Skill_GetAll RS1 (LineIndex 0-9).</summary>
 [GenerateDto]
 public sealed partial record SkillDescriptionRowDto(
     int SkillId,
     byte LineIndex,
     string Text);
 
-/// <summary>world.usp_Skill_GetAll RS2 (GradeIndex 0/1 = legacy base/upgraded grade pair).</summary>
 [GenerateDto]
 public sealed partial record SkillGradeRowDto(
     int SkillId,

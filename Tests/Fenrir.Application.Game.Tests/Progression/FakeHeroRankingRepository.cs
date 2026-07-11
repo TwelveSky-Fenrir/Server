@@ -3,10 +3,6 @@ using Fenrir.Data.Abstractions.Progression;
 
 namespace Fenrir.Application.Game.Tests.Progression;
 
-/// <summary>
-///     In-memory stand-in for <see cref="IHeroRankingRepository" /> -- mirrors
-///     game.usp_HeroRanking_AddPoints's own "accumulate, seed on first grant" semantics.
-/// </summary>
 internal sealed class FakeHeroRankingRepository : IHeroRankingRepository
 {
     public Dictionary<(int CharacterId, byte PeriodKind), int> Points { get; } = new();
@@ -43,8 +39,7 @@ internal sealed class FakeHeroRankingRepository : IHeroRankingRepository
         return ValueTask.FromResult(newTotal);
     }
 
-    /// <summary>Mirrors game.usp_HeroRanking_GetPoints -- null (not 0) when the key was never seeded/added-to.</summary>
-    public ValueTask<int?> GetPointsAsync(int characterId, byte periodKind, CancellationToken ct)
+        public ValueTask<int?> GetPointsAsync(int characterId, byte periodKind, CancellationToken ct)
     {
         var key = (characterId, periodKind);
         return ValueTask.FromResult<int?>(Points.TryGetValue(key, out var points) ? points : null);

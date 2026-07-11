@@ -4,8 +4,6 @@ using Fenrir.Network.Serialization.Tests.TestSupport;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Shared;
 
-// CZ_PROCESS_DATA_SEND tSort 519, "[GM]-BLOCK" (Server/ts25zone/S04_MyWork04.cpp:1487-1515). Rides inside
-// GenericActionRequest's (opcode 19) tData blob -- there is no dedicated legacy wire opcode for this command.
 public class GmBlockAvatarPayloadTests
 {
     [Fact]
@@ -50,8 +48,6 @@ public class GmBlockAvatarPayloadTests
     [Fact]
     public void TryRead_DecodesFromFirst13BytesOfLargerBuffer()
     {
-        // GenericActionHandler reads this out of the first 13 bytes of GenericActionRequest.Data (130 bytes),
-        // not a dedicated 13-byte packet -- this exercises that "leading slice of a larger buffer" shape.
         var data = new byte[130];
         Encoding.Latin1.GetBytes("Griefer", data.AsSpan(0, 13));
 

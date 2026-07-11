@@ -81,7 +81,7 @@ public class SiegeEventStateMapTests
     }
 
     [Theory]
-    [InlineData(402)] // documented no-op
+    [InlineData(402)]
     [InlineData(401)]
     [InlineData(411)]
     public void Zone267_NoOpAndOutOfRangeCodes_DoNotMap(int code)
@@ -103,8 +103,8 @@ public class SiegeEventStateMapTests
     }
 
     [Theory]
-    [InlineData(1501)] // pre-start countdown -- leaves the scalar at 0
-    [InlineData(1520)] // there is no separate 1520 reset code
+    [InlineData(1501)]
+    [InlineData(1520)]
     [InlineData(1508)]
     public void Zone335_NoOpAndUnknownCodes_DoNotMap(int code)
     {
@@ -126,8 +126,6 @@ public class SiegeEventStateMapTests
     [Fact]
     public void Zone241_FailureAndSuccessCodes_CollapseToTheSameEndedState()
     {
-        // 412 (fail), 413 (fail), 414 (success) all collapse -- the center-stored state cannot distinguish a
-        // won challenge from a lost one.
         SiegeEventStateMap.TryMapZone241(412, out var fail1);
         SiegeEventStateMap.TryMapZone241(413, out var fail2);
         SiegeEventStateMap.TryMapZone241(414, out var success);

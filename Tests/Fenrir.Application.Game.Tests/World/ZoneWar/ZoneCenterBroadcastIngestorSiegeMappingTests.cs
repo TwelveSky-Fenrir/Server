@@ -6,11 +6,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     End-to-end checks that <see cref="ZoneCenterBroadcastIngestor" /> now writes the byte-exact legacy state
-///     constants (via <see cref="SiegeEventStateMap" />) instead of the retired raw-event-code placeholder, and
-///     that the newly-bound Zone241 (Den of Rebirth) range writes a real challenge state.
-/// </summary>
 public class ZoneCenterBroadcastIngestorSiegeMappingTests
 {
     private static ZoneRegistry CreateRegistry(params short[] maps)
@@ -36,7 +31,7 @@ public class ZoneCenterBroadcastIngestorSiegeMappingTests
 
     [Theory]
     [InlineData(64, 1)]
-    [InlineData(70, 23)] // collapsing code -> shared state 23
+    [InlineData(70, 23)]
     [InlineData(99, 22)]
     [InlineData(100, 23)]
     public void Ingest_Zone175_WritesTheMappedState_NotTheRawCode(int eventCode, int expectedState)
@@ -52,13 +47,12 @@ public class ZoneCenterBroadcastIngestorSiegeMappingTests
     [Theory]
     [InlineData(403, 1)]
     [InlineData(408, 4)]
-    [InlineData(410, 0)] // reset-to-idle is a real write, distinct from the 402 no-op
+    [InlineData(410, 0)]
     public void Ingest_Zone267_WritesTheMappedState_NotTheRawCode(int eventCode, int expectedState)
     {
         var state = new ZoneCenterSiegeState();
         var ingestor = CreateIngestor(state, CreateRegistry(1));
 
-        // Seed a non-zero value so 410's reset-to-0 is observable.
         state.SetZone267(2, 9);
         ingestor.Ingest(eventCode, Payload(2));
 
@@ -89,7 +83,7 @@ public class ZoneCenterBroadcastIngestorSiegeMappingTests
         var state = new ZoneCenterSiegeState();
         var ingestor = CreateIngestor(state, CreateRegistry(1));
 
-        ingestor.Ingest(eventCode, Payload(3)); // instance index 3
+        ingestor.Ingest(eventCode, Payload(3));
 
         Assert.Equal(expected, state.GetZone241(3));
         Assert.Equal(DenOfRebirthChallengeState.Idle, state.GetZone241(0));
@@ -110,13 +104,13 @@ public class ZoneCenterBroadcastIngestorSiegeMappingTests
     [Theory]
     [InlineData(1502, 1)]
     [InlineData(1504, 3)]
-    [InlineData(1507, 0)] // 1507 is the reset -- there is no separate 1520 code
+    [InlineData(1507, 0)]
     public void Ingest_Zone335_WritesTheMappedScalar_NotTheRawCode(int eventCode, int expectedState)
     {
         var state = new ZoneCenterSiegeState();
         var ingestor = CreateIngestor(state, CreateRegistry(1));
 
-        state.SetZone335(9); // seed so 1507's reset-to-0 is observable
+        state.SetZone335(9);
         ingestor.Ingest(eventCode, Payload());
 
         Assert.Equal(expectedState, state.Zone335);

@@ -1,11 +1,5 @@
 namespace Fenrir.Tools.LegacyDataImport.Tests;
 
-/// <summary>
-///     Covers <c>MonsterReader</c>'s Thunder Giant <c>AttackType</c> override
-///     (<c>Load_Monster</c>, S15_MyShare.cpp:603-604): an unconditional overwrite of physical array slot 80
-///     (zero-based), which in this data file's current layout coincides with the record self-reporting
-///     Index 81 and name "Thunder Giant".
-/// </summary>
 public sealed class MonsterReaderPatchTests(MonsterReaderFixture fixture) : IClassFixture<MonsterReaderFixture>
 {
     private const int ThunderGiantSlot = 80;
@@ -23,9 +17,6 @@ public sealed class MonsterReaderPatchTests(MonsterReaderFixture fixture) : ICla
     [Fact]
     public void ThunderGiantOverride_RawFileHadADifferentAttackType()
     {
-        // Confirms the patch actually changes something rather than the raw file already matching by luck --
-        // if this ever starts failing because the raw data changed to already be 1, the override becomes a
-        // no-op and this assertion (not the production code) should be revisited.
         var raw = fixture.Raw[ThunderGiantSlot];
 
         Assert.Equal(81, raw.Index);

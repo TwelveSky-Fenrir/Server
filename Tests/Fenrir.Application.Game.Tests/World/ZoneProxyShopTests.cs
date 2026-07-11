@@ -9,13 +9,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     Covers <c>Zone.RebroadcastProxyShops</c> (the offline/deputy "proxy" shop periodic in-world rebroadcast +
-///     expiry force-close sweep) end-to-end through <see cref="Zone" />'s public surface --
-///     <see cref="Zone.RegisterProxyShop" />/<see cref="Zone.RemoveProxyShop" />/
-///     <see cref="Zone.DrainPendingProxyShopCloses" />/<see cref="Zone.ProxyShopCount" /> -- driven purely by
-///     <see cref="Zone.Tick" />, no timers/sleeps.
-/// </summary>
 public class ZoneProxyShopTests
 {
     private static readonly int OneFrame = FrameWriter.FrameSizeOf<ProxyShopStallStateResponse>();
@@ -33,7 +26,6 @@ public class ZoneProxyShopTests
         var zone = ZoneTestKit.CreateZone(ProxyShopZonePolicy.ZoneNumber);
         var (session, pipe) = ZoneTestKit.CreateSession(1);
 
-        // Same AOI cell as the shop (cell size 75, both floor to (0, 0)).
         zone.Post(ZoneCommand.Enter(20, ZoneTestKit.EnterData(session, ProxyShopZonePolicy.ZoneNumber, posX: 20f,
             posZ: 20f)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -41,8 +33,6 @@ public class ZoneProxyShopTests
 
         zone.RegisterProxyShop(Entry());
 
-        // No instant-visibility special case at registration (there is no cited legacy behavior for one) --
-        // the shop's first keep-alive waits for the same 5 s throttle as every later one.
         zone.Tick(SimulationClock.ProxyShopRebroadcastInterval);
 
         Assert.Equal(OneFrame, ZoneTestKit.DrainOutbound(pipe).Length);
@@ -95,7 +85,6 @@ public class ZoneProxyShopTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
         zone.Tick(SimulationClock.ProxyShopRebroadcastInterval + TimeSpan.FromSeconds(1));
 
-        // No exception, no recipient -- and the shop is still tracked (still open, just unseen).
         Assert.Equal(1, zone.ProxyShopCount);
     }
 
@@ -105,7 +94,6 @@ public class ZoneProxyShopTests
         var zone = ZoneTestKit.CreateZone(ProxyShopZonePolicy.ZoneNumber);
         var (session, pipe) = ZoneTestKit.CreateSession(1);
 
-        // Far away: a different AOI cell (cell size 75) than the shop at (10, 10).
         zone.Post(ZoneCommand.Enter(20, ZoneTestKit.EnterData(session, ProxyShopZonePolicy.ZoneNumber, posX: 5000f,
             posZ: 5000f)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -120,7 +108,6 @@ public class ZoneProxyShopTests
     [Fact]
     public void MapThatIsNotTheProxyShopZone_NeverRunsTheSweep_EvenWithARegisteredShopAndANeighbor()
     {
-        // ProxyShopZonePolicy.ZoneNumber (37) is the only map this sweep ever runs on -- see its own remarks.
         var zone = ZoneTestKit.CreateZone(1);
         var (session, pipe) = ZoneTestKit.CreateSession(1);
 
@@ -145,22 +132,16 @@ public class ZoneProxyShopTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(pipe);
 
-        // Shop A registers one 50 ms tick before shop B does, so their two 5 s throttle windows (each
-        // starting from its own registration moment) are offset by that same 50 ms gap in absolute
-        // zone-clock terms.
         zone.RegisterProxyShop(Entry(101, "SellerA", "StallA"));
         zone.Tick(TimeSpan.FromMilliseconds(50));
-        Assert.Empty(ZoneTestKit.DrainOutbound(pipe)); // neither shop is due yet
+        Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
 
         zone.RegisterProxyShop(Entry(102, "SellerB", "StallB"));
         zone.Tick(TimeSpan.FromMilliseconds(50));
-        Assert.Empty(ZoneTestKit.DrainOutbound(pipe)); // still neither shop is due
+        Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
 
-        // Lands strictly inside shop A's first 5 s due window (registered 50 ms before shop B's), but
-        // strictly before shop B's own window opens.
         zone.Tick(SimulationClock.ProxyShopRebroadcastInterval - TimeSpan.FromMilliseconds(90));
 
-        // Exactly one shop's worth of traffic this tick (shop A only) -- shop B stays silent on its own clock.
         Assert.Equal(OneFrame, ZoneTestKit.DrainOutbound(pipe).Length);
     }
 
@@ -172,7 +153,7 @@ public class ZoneProxyShopTests
         zone.RegisterProxyShop(Entry(999, "Seller", "OldName"));
         zone.RegisterProxyShop(Entry(999, "Seller", "NewName", 99f, posZ: 99f));
 
-        Assert.Equal(1, zone.ProxyShopCount); // never two entries for the same character
+        Assert.Equal(1, zone.ProxyShopCount);
     }
 
     [Fact]
@@ -202,7 +183,7 @@ public class ZoneProxyShopTests
     {
         var zone = ZoneTestKit.CreateZone(ProxyShopZonePolicy.ZoneNumber);
 
-        zone.RemoveProxyShop(12345); // never registered -- must not throw
+        zone.RemoveProxyShop(12345);
 
         Assert.Equal(0, zone.ProxyShopCount);
     }
@@ -212,7 +193,7 @@ public class ZoneProxyShopTests
     {
         var zone = ZoneTestKit.CreateZone(ProxyShopZonePolicy.ZoneNumber);
 
-        zone.RegisterProxyShop(Entry(shopDate: GameDate.Today() - 1)); // expired yesterday
+        zone.RegisterProxyShop(Entry(shopDate: GameDate.Today() - 1));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.Equal(0, zone.ProxyShopCount);
@@ -224,7 +205,7 @@ public class ZoneProxyShopTests
     {
         var zone = ZoneTestKit.CreateZone(ProxyShopZonePolicy.ZoneNumber);
 
-        zone.RegisterProxyShop(Entry(shopDate: GameDate.Today())); // expires strictly before today, not on it
+        zone.RegisterProxyShop(Entry(shopDate: GameDate.Today()));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.Equal(1, zone.ProxyShopCount);
@@ -242,7 +223,7 @@ public class ZoneProxyShopTests
 
         var drained = zone.DrainPendingProxyShopCloses();
         Assert.Equal([101, 102], drained.OrderBy(x => x));
-        Assert.Empty(zone.DrainPendingProxyShopCloses()); // drained exactly once
+        Assert.Empty(zone.DrainPendingProxyShopCloses());
     }
 
     [Fact]
@@ -250,12 +231,12 @@ public class ZoneProxyShopTests
     {
         var zone = ZoneTestKit.CreateZone(ProxyShopZonePolicy.ZoneNumber);
 
-        zone.RegisterProxyShop(Entry(shopDate: GameDate.Today() - 1)); // would otherwise expire on the next sweep
+        zone.RegisterProxyShop(Entry(shopDate: GameDate.Today() - 1));
         Assert.True(zone.TryUpdateProxyShopExpiration(999, GameDate.Today() + 30));
 
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
-        Assert.Equal(1, zone.ProxyShopCount); // survived the sweep
+        Assert.Equal(1, zone.ProxyShopCount);
         Assert.Empty(zone.DrainPendingProxyShopCloses());
     }
 
@@ -284,8 +265,6 @@ public class ZoneProxyShopTests
         var frame = ZoneTestKit.DrainOutbound(pipe);
         Assert.Equal(OneFrame, frame.Length);
 
-        // 1-byte opcode header, then the payload: ServerIndex, UniqueNumber, ProxyStateInfo, 2-byte pad,
-        // CheckChangeActionState -- see ProxyShopStallStateResponse/ProxyStateInfo's own wire layout.
         var payload = frame.AsSpan(1);
         Assert.Equal(777, BinaryPrimitives.ReadInt32LittleEndian(payload));
         Assert.Equal(777 * 2 + 1, BinaryPrimitives.ReadInt32LittleEndian(payload[4..]));

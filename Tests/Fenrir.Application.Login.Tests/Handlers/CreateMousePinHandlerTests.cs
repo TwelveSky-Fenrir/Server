@@ -9,8 +9,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
-// op13 CL_CREATE_MOUSE_PASSWORD_SEND -- legacy precondition failures all Quit() with no reply; Fenrir maps
-// every one to ClientSession.Abort.
 public class ClCreateMousePasswordSendHandlerTests
 {
     private const int AccountId = 42;
@@ -50,11 +48,6 @@ public class ClCreateMousePasswordSendHandlerTests
         PacketAssert.AssertNothingSent(pipe);
     }
 
-    // Regression test for the pincode-second-password audit's Minor finding (existence-before-format
-    // guard order, see CreateMousePinServiceTests for the service-level equivalent): a malformed PIN
-    // against an account that already has a PIN must abort as StateViolation (AlreadyExists), not
-    // Malformed (InvalidFormat) -- these two outcomes map to genuinely different wire-observable
-    // DisconnectReason values, so this is verifiable end-to-end through the handler.
     [Fact]
     public async Task HandleAsync_PinAlreadyExistsAndSubmittedFormatAlsoMalformed_AbortsAsStateViolationNotMalformed()
     {
@@ -73,9 +66,9 @@ public class ClCreateMousePasswordSendHandlerTests
     }
 
     [Theory]
-    [InlineData("123")] // too short
-    [InlineData("12345")] // too long
-    [InlineData("12a4")] // non-digit
+    [InlineData("123")]
+    [InlineData("12345")]
+    [InlineData("12a4")]
     [InlineData("")]
     public async Task HandleAsync_InvalidFormat_AbortsAsMalformed(string malformedPin)
     {

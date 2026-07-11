@@ -2,14 +2,6 @@ using Fenrir.Application.Game.Domain.World.Loot;
 
 namespace Fenrir.Application.Game.Tests.World.Loot;
 
-/// <summary>
-///     Guards the item-8111 "M15 Pet Lucky Box" reward + pity table (workstream C10-remaining-box-pools) --
-///     <see cref="M15PetLuckyBox8111RewardTable" />. Exercises <see cref="M15PetLuckyBox8111RewardTable.Roll" />
-///     directly (not through <see cref="LootBoxCatalog" />/<see cref="LootBoxOpenResolver" />), the same
-///     isolation <see cref="CloakBoxRewardTable" />'s own tests use -- this box's pity gate is threaded through
-///     <c>LootBoxUseItemHandler.ResolveRewardIdOverride</c>, not through <see cref="M15PetLuckyBox8111RewardTable.Spec" />
-///     directly.
-/// </summary>
 public class M15PetLuckyBox8111RewardTableTests
 {
     [Fact]
@@ -56,8 +48,6 @@ public class M15PetLuckyBox8111RewardTableTests
     [Fact]
     public void Roll_PityCounterAt199_Triggers_ConsumesExactlyOneDraw_ForTheCoinFlip_AndResetsToZero()
     {
-        // Exactly one scripted value: ScriptedRandom throws if a second draw were consumed, proving the
-        // guaranteed-reward coin flip -- unlike box 2249/8114's zero-draw guarantee -- spends exactly one draw.
         var result = M15PetLuckyBox8111RewardTable.Roll(199, new ScriptedRandom(0));
 
         Assert.Equal(1012, result.RewardItemId);
@@ -98,7 +88,6 @@ public class M15PetLuckyBox8111RewardTableTests
     public void Roll_PityBelowCeiling_RegularRollBoundary_SelectsExpectedPoolFirstId(int poolSelectDraw,
         int expectedRewardId)
     {
-        // Within-pool uniform draw scripted as 0 -> first id in whichever pool the boundary lands in.
         var result = M15PetLuckyBox8111RewardTable.Roll(10, new ScriptedRandom(poolSelectDraw, 0));
 
         Assert.Equal(expectedRewardId, result.RewardItemId);
@@ -109,15 +98,13 @@ public class M15PetLuckyBox8111RewardTableTests
     [Fact]
     public void Roll_PityBelowCeiling_SinglePool_IgnoresWithinPoolDraw_AlwaysReturns1012()
     {
-        // Pool 1 has only one id -- RollUniform still consumes a within-pool draw, but any value maps to 1012.
         var result = M15PetLuckyBox8111RewardTable.Roll(5, new ScriptedRandom(0, 0));
 
         Assert.Equal(1012, result.RewardItemId);
         Assert.Equal(6, result.NewPityCounter);
     }
 
-    /// <summary>Returns queued draws in request order; throws if the code draws more than were scripted.</summary>
-    private sealed class ScriptedRandom(params int[] values) : Random
+        private sealed class ScriptedRandom(params int[] values) : Random
     {
         private int _index;
 

@@ -2,13 +2,9 @@ using Fenrir.Application.Game.Domain.Simulation;
 
 namespace Fenrir.Application.Game.Tests.Simulation;
 
-/// <summary>
-///     Covers <see cref="AutoHuntBudgetPolicy" /> -- the two-tier paid auto-hunt-time budget decrement
-///     (S07_MyGame04.cpp:787-824), including the deliberate present-based engagement gate.
-/// </summary>
 public class AutoHuntBudgetPolicyTests
 {
-    private const int OneMinuteTicks = SimulationClock.PlayTimeAccrualLegacyTicks; // 120
+    private const int OneMinuteTicks = SimulationClock.PlayTimeAccrualLegacyTicks;
     private const int Today = 20_260_710;
 
     [Fact]
@@ -24,13 +20,12 @@ public class AutoHuntBudgetPolicyTests
     [Fact]
     public void DayBudgetPresentAndNotExpired_NoOp_MinuteTierUntouched()
     {
-        // Day-tier takes precedence: while it is valid the minute-tier is never consumed.
         var result = AutoHuntBudgetPolicy.Advance(20_260_711, 5, OneMinuteTicks - 1, OneMinuteTicks * 10, Today);
 
         Assert.Equal(AutoHuntBudgetPolicy.Signal.None, result.Signal);
         Assert.Equal(20_260_711, result.DayBudget);
         Assert.Equal(5, result.MinuteBudget);
-        Assert.Equal(OneMinuteTicks - 1, result.MinuteAccrualTicks); // accumulator did NOT advance
+        Assert.Equal(OneMinuteTicks - 1, result.MinuteAccrualTicks);
     }
 
     [Fact]
@@ -70,7 +65,7 @@ public class AutoHuntBudgetPolicyTests
 
         Assert.Equal(AutoHuntBudgetPolicy.Signal.MinuteBudgetDecremented, result.Signal);
         Assert.Equal(4, result.MinuteBudget);
-        Assert.Equal(10, result.MinuteAccrualTicks); // 10 + 120 - 120
+        Assert.Equal(10, result.MinuteAccrualTicks);
     }
 
     [Fact]
@@ -85,7 +80,6 @@ public class AutoHuntBudgetPolicyTests
     [Fact]
     public void MinuteTier_BurstOfManyMinutes_CatchesUpTheWholeAmount()
     {
-        // 3 whole minutes of catch-up in one pass consumes 3 minutes at once (floored to zero if it overshoots).
         var result = AutoHuntBudgetPolicy.Advance(0, 10, 0, OneMinuteTicks * 3, Today);
 
         Assert.Equal(AutoHuntBudgetPolicy.Signal.MinuteBudgetDecremented, result.Signal);

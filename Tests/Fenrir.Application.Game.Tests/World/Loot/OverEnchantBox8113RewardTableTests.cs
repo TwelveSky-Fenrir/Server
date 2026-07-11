@@ -5,15 +5,6 @@ using Fenrir.Application.Game.Domain.World.Loot;
 
 namespace Fenrir.Application.Game.Tests.World.Loot;
 
-/// <summary>
-///     Covers the C10-remaining-boxes reward-table DATA for item 8113 (<see cref="OverEnchantBox8113RewardTable" />)
-///     layered on top of the pre-existing, pre-tested C10 box-open mechanism (<see cref="LootBoxOpenResolver" />,
-///     <see cref="Fenrir.Application.Game.Domain.Consumables.LootBoxRewardResolver.RollUniform" />). Deliberately
-///     exercises <see cref="OverEnchantBox8113RewardTable.Spec" /> directly rather than through
-///     <see cref="LootBoxCatalog.Default" />: the catalog splice itself is a separate, serial wiring-manifest
-///     step (see this workstream's wiring manifest) not yet applied to the shared static instance when this test
-///     runs.
-/// </summary>
 public class OverEnchantBox8113RewardTableTests
 {
     private const int Today = 20260710;
@@ -73,7 +64,6 @@ public class OverEnchantBox8113RewardTableTests
         var spec = OverEnchantBox8113RewardTable.Spec;
         var page0 = ImmutableDictionary<byte, ItemStack>.Empty.SetItem(0, Box(8113, 3));
 
-        // Draw index 4 -> 1126.
         var plan = LootBoxOpenResolver.OpenSingle(spec, 0, 0, Box(8113, 3), page0,
             ImmutableDictionary<byte, ItemStack>.Empty, Sorts((1126, 4)), new ScriptedRandom(4), Today);
 
@@ -110,8 +100,7 @@ public class OverEnchantBox8113RewardTableTests
         return id => map.TryGetValue(id, out var sort) ? sort : null;
     }
 
-    /// <summary>Returns queued draws in request order; throws if the code draws more than were scripted.</summary>
-    private sealed class ScriptedRandom(params int[] values) : Random
+        private sealed class ScriptedRandom(params int[] values) : Random
     {
         private int _index;
 

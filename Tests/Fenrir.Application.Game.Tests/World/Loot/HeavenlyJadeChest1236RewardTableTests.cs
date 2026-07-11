@@ -2,13 +2,6 @@ using Fenrir.Application.Game.Domain.World.Loot;
 
 namespace Fenrir.Application.Game.Tests.World.Loot;
 
-/// <summary>
-///     Covers the C10-remaining-box-pools reward-table DATA and roll primitive for item 1236 (Heavenly Jade
-///     Chest) -- <see cref="HeavenlyJadeChest1236RewardTable" />. Neither of this box's two tribe-keyed branches
-///     fits any existing <see cref="BoxRewardSpec" /> shape, so this file exercises
-///     <see cref="HeavenlyJadeChest1236RewardTable.Roll" /> directly, the same isolation
-///     <see cref="WarlordChestRewardTable" />'s own tests use.
-/// </summary>
 public class HeavenlyJadeChest1236RewardTableTests
 {
     [Theory]
@@ -18,7 +11,6 @@ public class HeavenlyJadeChest1236RewardTableTests
     public void Roll_ZeroBranch_CatHairBandSubBranch_MapsRecognizedTribeToExpectedId(byte previousTribe,
         int expectedRewardId)
     {
-        // outer draw 0 -> zero branch; inner draw 0 -> cat-hair-band sub-branch.
         var result = HeavenlyJadeChest1236RewardTable.Roll(previousTribe, new ScriptedRandom(0, 0));
 
         Assert.True(result.Success);
@@ -28,7 +20,6 @@ public class HeavenlyJadeChest1236RewardTableTests
     [Fact]
     public void Roll_ZeroBranch_CatHairBandSubBranch_UnrecognizedTribe_FailsClosed()
     {
-        // Hardening choice: the single-path copy has no guard here; Fenrir always fails closed.
         var result = HeavenlyJadeChest1236RewardTable.Roll(99, new ScriptedRandom(0, 0));
 
         Assert.False(result.Success);
@@ -81,8 +72,6 @@ public class HeavenlyJadeChest1236RewardTableTests
     [Fact]
     public void Roll_ThirtyOneToFiftyBranch_UnrecognizedTribe_FailsClosed()
     {
-        // Hardening choice: the single-path copy would otherwise passthrough whatever value the reward field
-        // held (the client's own request) -- Fenrir always fails closed instead, the bulk-path's own shape.
         var result = HeavenlyJadeChest1236RewardTable.Roll(200, new ScriptedRandom(50));
 
         Assert.False(result.Success);
@@ -120,15 +109,13 @@ public class HeavenlyJadeChest1236RewardTableTests
     [InlineData(999)]
     public void Roll_SevenHundredBranch_Returns1045_ConsumingOnlyOneDraw(int outerRoll)
     {
-        // Only one scripted value: ScriptedRandom throws if a second draw were consumed.
         var result = HeavenlyJadeChest1236RewardTable.Roll(0, new ScriptedRandom(outerRoll));
 
         Assert.True(result.Success);
         Assert.Equal(1045, result.RewardItemId);
     }
 
-    /// <summary>Returns queued draws in request order; throws if the code draws more than were scripted.</summary>
-    private sealed class ScriptedRandom(params int[] values) : Random
+        private sealed class ScriptedRandom(params int[] values) : Random
     {
         private int _index;
 

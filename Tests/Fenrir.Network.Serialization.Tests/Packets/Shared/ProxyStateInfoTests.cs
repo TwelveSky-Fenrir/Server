@@ -5,7 +5,6 @@ using Fenrir.Network.Serialization.Tests.TestSupport;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Shared;
 
-// C++ sizeof is 52, but WireSize=50: the trailing 2-byte padding belongs to the parent packet's [Reserved(2)], not this type.
 public class ProxyStateInfoTests
 {
     [Fact]

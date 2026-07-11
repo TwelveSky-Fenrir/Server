@@ -9,27 +9,15 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Gm;
 
-/// <summary>
-///     See <see cref="IGmExpGrantService" />'s own remarks for the wire-level contract summary. Citations:
-///     Server/ts25zone/S04_MyWork04.cpp:959-1005 (case 503 full handler body: tier gate at :961-965, inline
-///     <c>GMEXP_DATA{type,exp}</c> at :966-971, mode-0 branch and the huge-magnitude shortcut at :972-986,
-///     mode-1 branch at :987-990, dead mode-3 block commented at :991-1001, unconditional <c>tResult = 0</c> at
-///     :1003) ; Server/ts25zone/S07_MyGame03.cpp:161-322 (<c>MyUtil::ProcessForExperience</c>, the shared
-///     leveling/experience routine both branches deposit into -- see <see cref="Zone" />'s own
-///     <c>ApplyGmSelfExperienceGrantCommand</c>/<c>ApplyGmCharacterExperienceGrant</c> for where the actual
-///     read-decide-mutate work happens, since it must run on the target zone's own tick thread).
-/// </summary>
 public sealed class GmExpGrantService(
     IEventLogRepository eventLog,
     ILogger<GmExpGrantService> logger) : IGmExpGrantService
 {
     private const int Sort = 503;
 
-    /// <summary>Unconditional once the tier gate passes -- see the source behavior contract's own Outputs/Error semantics.</summary>
-    private const int AcceptedResult = 0;
+        private const int AcceptedResult = 0;
 
-    /// <summary>game.EventLog.Outcome for this audit row -- always success, mirroring <see cref="AcceptedResult" />.</summary>
-    private const byte SuccessOutcome = 1;
+        private const byte SuccessOutcome = 1;
 
     public async ValueTask HandleAsync(GmExpGrantPayload packet, byte[] data, ZoneClientSession zoneSession,
         PlayerRuntimeState state, Zone zone, CancellationToken cancellationToken)

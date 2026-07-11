@@ -7,13 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Runtime;
 
-/// <summary>
-///     runtime.usp_CharacterShardLocation_{Upsert,Remove,FindByName,FindByCharacterId} against real SQL Server
-///     2025, through <see cref="CharacterShardLocationRepository" /> exactly as the application calls it.
-///     Every Find* test heartbeats its own shard first via <see cref="IGameServerDirectoryRepository" />: the
-///     lookup procs INNER JOIN runtime.GameServerDirectory and require a live heartbeat, mirroring
-///     usp_GameServer_GetDirectory's own freshness contract.
-/// </summary>
 [Collection("SqlServer")]
 public sealed class CharacterShardLocationRepositoryTests : IDisposable
 {
@@ -88,9 +81,6 @@ public sealed class CharacterShardLocationRepositoryTests : IDisposable
         const int characterId = 900212;
         await HeartbeatAsync(shardId);
 
-        // AvatarName is NVARCHAR(13) (matches game.Characters.Name / MAX_AVATAR_NAME_LENGTH, see
-        // CharacterShardLocation.sql's own remarks) -- both literals below are exactly 13 characters so this
-        // test exercises the update path itself, not silent truncation.
         await _repository.UpsertAsync(characterId, shardId, 1, "ShardLoc212Od", 0,
             CancellationToken.None);
         await _repository.UpsertAsync(characterId, shardId, 2, "ShardLoc212Nw", 1,
@@ -103,7 +93,6 @@ public sealed class CharacterShardLocationRepositoryTests : IDisposable
         Assert.Equal("ShardLoc212Nw", row.AvatarName);
         Assert.Equal((byte)1, row.Tribe);
 
-        // Never a duplicate: the old name must no longer resolve to anything.
         Assert.Null(await _repository.FindByNameAsync("ShardLoc212Od", CancellationToken.None));
     }
 
@@ -118,12 +107,9 @@ public sealed class CharacterShardLocationRepositoryTests : IDisposable
 
         await _repository.UpsertAsync(characterId, originalShardId, 1, "ShardLoc213", 0,
             CancellationToken.None);
-        // Character reconnected to a different shard, whose own EnterWorldService already upserted the fresh row.
         await _repository.UpsertAsync(characterId, newShardId, 2, "ShardLoc213", 0,
             CancellationToken.None);
 
-        // A stale disconnect-cleanup from the ORIGINAL shard arrives late -- must be scoped away, not delete
-        // the fresh row.
         await _repository.RemoveAsync(characterId, originalShardId, CancellationToken.None);
 
         var row = await _repository.FindByCharacterIdAsync(characterId, CancellationToken.None);
@@ -154,8 +140,6 @@ public sealed class CharacterShardLocationRepositoryTests : IDisposable
     [Fact]
     public async Task FindByCharacterIdAsync_OwningShardHasNeverHeartbeated_ReturnsNull()
     {
-        // No HeartbeatAsync call for this shard at all -- the lookup's own INNER JOIN against
-        // runtime.GameServerDirectory has nothing to match, same outcome as a stale heartbeat.
         const byte neverHeartbeatedShardId = 216;
         const int characterId = 900216;
 

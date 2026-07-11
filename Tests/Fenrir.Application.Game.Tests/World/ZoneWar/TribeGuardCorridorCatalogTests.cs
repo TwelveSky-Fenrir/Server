@@ -3,17 +3,10 @@ using Fenrir.Application.Game.Domain.World.ZoneWar;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Covers <see cref="TribeGuardCorridorCatalog" />'s structural bookkeeping (destination -&gt; segment
-///     reverse lookup, origin-segment resolution, owning-zone segment sets) against a synthetic two-tribe
-///     catalog -- the real sixteen-zone/hub table is not reproduced anywhere in this codebase yet (see that
-///     class's own remarks).
-/// </summary>
 public class TribeGuardCorridorCatalogTests
 {
     private const short HubZoneId = 100;
 
-    // Tribe 0's own chain: 1 -> 2 -> 3 -> 4 (home). Tribe 1's own chain: 10 -> 11 -> 12 -> 13 (home).
     private static readonly ImmutableArray<short> Tribe0Chain = [1, 2, 3, 4];
     private static readonly ImmutableArray<short> Tribe1Chain = [10, 11, 12, 13];
 
@@ -74,7 +67,6 @@ public class TribeGuardCorridorCatalogTests
         Assert.Equal(0, catalog.GetOriginSegmentIndex(0, 1));
         Assert.Equal(2, catalog.GetOriginSegmentIndex(0, 3));
 
-        // Zone 10 belongs to tribe 1's own chain, not tribe 0's -- unrelated from tribe 0's point of view.
         Assert.Null(catalog.GetOriginSegmentIndex(0, 10));
     }
 
@@ -95,11 +87,11 @@ public class TribeGuardCorridorCatalogTests
     {
         var catalog = CreateCatalog();
 
-        var ownedByZone1 = catalog.GetSegmentsOwnedByZone(1); // tribe 0's chain[0]
+        var ownedByZone1 = catalog.GetSegmentsOwnedByZone(1);
         Assert.Single(ownedByZone1);
         Assert.Equal(((byte)0, (byte)1), ownedByZone1[0]);
 
-        var ownedByZone2 = catalog.GetSegmentsOwnedByZone(2); // tribe 0's chain[1]
+        var ownedByZone2 = catalog.GetSegmentsOwnedByZone(2);
         Assert.Single(ownedByZone2);
         Assert.Equal(((byte)0, (byte)2), ownedByZone2[0]);
     }
@@ -109,7 +101,7 @@ public class TribeGuardCorridorCatalogTests
     {
         var catalog = CreateCatalog();
 
-        Assert.Empty(catalog.GetSegmentsOwnedByZone(4)); // tribe 0's chain[3] == home
+        Assert.Empty(catalog.GetSegmentsOwnedByZone(4));
     }
 
     [Fact]
@@ -136,9 +128,6 @@ public class TribeGuardCorridorCatalogTests
         var catalog = CreateCatalog(slots);
 
         Assert.True(catalog.TryGetGuardPostSlots(0, 0, out var resolved));
-        // .ToArray() -- ImmutableArray<T>'s own IEquatable<T> is backing-array reference equality, not
-        // elementwise, so comparing it directly against a collection-expression literal here would take that
-        // reference-equality path (via T,T type inference) and spuriously fail despite identical contents.
         Assert.Equal([500, 501, 502, 503, 504], resolved.ToArray());
     }
 

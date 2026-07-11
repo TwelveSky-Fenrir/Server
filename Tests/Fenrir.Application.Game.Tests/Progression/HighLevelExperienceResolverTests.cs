@@ -2,11 +2,6 @@ using Fenrir.Application.Game.Domain.Progression;
 
 namespace Fenrir.Application.Game.Tests.Progression;
 
-/// <summary>
-///     Covers <see cref="HighLevelExperienceResolver" /> -- the post-cap (Level == 145) experience routine:
-///     Stage A (general-pool fill) and Stage B (the rebirth-tier <c>aLevel2</c> ladder, legacy
-///     <c>ProcessForExperience2</c>). Pure-function tests, no zone/wire dependency.
-/// </summary>
 public class HighLevelExperienceResolverTests
 {
     private const long Floor145 = 1_000_000_000;
@@ -17,7 +12,6 @@ public class HighLevelExperienceResolverTests
         return new HighLevelExperienceInput(level, mainExp, Floor145, level2, exp2, gain, antiCheat);
     }
 
-    // --- Drift guards / table wiring ------------------------------------------------------------------------
 
     [Fact]
     public void Ceiling_EqualsLevel12Threshold()
@@ -51,7 +45,6 @@ public class HighLevelExperienceResolverTests
         Assert.Equal(expected, HighLevelExperienceResolver.AppliesAt(level));
     }
 
-    // --- Below the general cap ------------------------------------------------------------------------------
 
     [Fact]
     public void Resolve_BelowGeneralCap_IsNone()
@@ -61,12 +54,10 @@ public class HighLevelExperienceResolverTests
         Assert.Equal(HighLevelExperienceOutcomeKind.None, outcome.Kind);
     }
 
-    // --- Stage A: general-pool fill -------------------------------------------------------------------------
 
     [Fact]
     public void Resolve_StageA_FillsPoolAndGrantsStatPointsPerPercent()
     {
-        // Band = [1e9, 2e9] = 1e9. Filling 900M crosses 90% of the band -> 90 stat points.
         var outcome = HighLevelExperienceResolver.Resolve(
             At(145, mainExp: 1_000_000_000, level2: 0, exp2: 0, gain: 900_000_000));
 
@@ -83,14 +74,12 @@ public class HighLevelExperienceResolverTests
 
         Assert.Equal(HighLevelExperienceOutcomeKind.MainPoolFill, outcome.Kind);
         Assert.Equal(HighLevelExperienceResolver.MaxMainExperience, outcome.NewMainExperience);
-        // Only 100M of the 500M gain lands (1.9e9 -> 2.0e9): 90% -> 100% = 10 stat points.
         Assert.Equal(10, outcome.StatPointsGranted);
     }
 
     [Fact]
     public void Resolve_StageA_AntiCheatFlag_IsIgnored()
     {
-        // The general-path anti-cheat gate is dead in the shipped build: a flagged session still fills Stage A.
         var outcome = HighLevelExperienceResolver.Resolve(
             At(145, mainExp: 1_000_000_000, level2: 0, exp2: 0, gain: 100_000_000, antiCheat: true));
 
@@ -98,12 +87,10 @@ public class HighLevelExperienceResolverTests
         Assert.Equal(1_100_000_000L, outcome.NewMainExperience);
     }
 
-    // --- Stage B: rebirth-tier level-up ---------------------------------------------------------------------
 
     [Fact]
     public void Resolve_StageB_Level0_LevelsUpImmediatelyWithZone101Bonus()
     {
-        // Level-0 threshold is zero, so any positive gain levels up to 1; the 0->1 transition grants zone-101 time.
         var outcome = HighLevelExperienceResolver.Resolve(
             At(145, mainExp: HighLevelExperienceResolver.MaxMainExperience, level2: 0, exp2: 0, gain: 5000));
 
@@ -127,13 +114,11 @@ public class HighLevelExperienceResolverTests
         Assert.Equal(0, outcome.Zone101TimeBonus);
     }
 
-    // --- Stage B: proportional accumulation -----------------------------------------------------------------
 
     [Fact]
     public void Resolve_StageB_Accrual_GrantsStatPointsAndGrowsPool()
     {
-        var threshold1 = RebirthProgression.HighLevelExpTable[0]; // 962_105_896
-        // From 0, adding ~10% of the band grants ~10 stat points.
+        var threshold1 = RebirthProgression.HighLevelExpTable[0];
         var gain = 100_000_000;
         var outcome = HighLevelExperienceResolver.Resolve(
             At(145, mainExp: HighLevelExperienceResolver.MaxMainExperience, level2: 1, exp2: 0, gain: gain));
@@ -147,8 +132,6 @@ public class HighLevelExperienceResolverTests
     public void Resolve_StageB_Accrual_ClampsGainToCurrentLevelThreshold()
     {
         var threshold1 = RebirthProgression.HighLevelExpTable[0];
-        // Overshoot the threshold in one award: the pool is clamped exactly to the threshold, and filling the
-        // whole band grants a full 100 stat points.
         var outcome = HighLevelExperienceResolver.Resolve(
             At(145, mainExp: HighLevelExperienceResolver.MaxMainExperience, level2: 1, exp2: 0,
                 gain: threshold1 + 500_000));
@@ -161,8 +144,6 @@ public class HighLevelExperienceResolverTests
     [Fact]
     public void Resolve_StageB_LevelUpFiresTickAfterThresholdReached()
     {
-        // After the accrual clamps the pool to the threshold, the very next award (pool already == threshold)
-        // levels up, discarding that award's gain.
         var threshold1 = RebirthProgression.HighLevelExpTable[0];
         var outcome = HighLevelExperienceResolver.Resolve(
             At(145, mainExp: HighLevelExperienceResolver.MaxMainExperience, level2: 1, exp2: threshold1,
@@ -172,7 +153,6 @@ public class HighLevelExperienceResolverTests
         Assert.Equal(2, outcome.NewLevel2);
     }
 
-    // --- Stage B: level-12 cap --------------------------------------------------------------------------------
 
     [Fact]
     public void Resolve_StageB_Level12_AtCeiling_IsNone()
@@ -211,7 +191,6 @@ public class HighLevelExperienceResolverTests
         Assert.Equal(ceiling, outcome.NewExp2);
     }
 
-    // --- Stage B: guards --------------------------------------------------------------------------------------
 
     [Fact]
     public void Resolve_StageB_AntiCheatFlag_IsSilentNoOp()

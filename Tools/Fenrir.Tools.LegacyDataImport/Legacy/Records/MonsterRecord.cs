@@ -1,6 +1,5 @@
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
-/// <summary>Faithful in-memory shape of a legacy <c>MONSTER_INFO</c> record (Header/Protocol/STRUCT.h:156-204).</summary>
 internal sealed record MonsterRecord(
     int Index,
     string Name,

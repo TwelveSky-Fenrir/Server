@@ -13,7 +13,6 @@ public class AvatarInfoTests
         Assert.Equal(11168, AvatarInfo.WireSize);
     }
 
-    // Property order matters here, not values; binary offsets are owned by the generator/[FenrirWireType].
     [Fact]
     public void RoundTrip_PreservesAllFields()
     {
@@ -286,7 +285,6 @@ public class AvatarInfoTests
         Assert.True(AvatarInfo.TryRead(buffer, out var roundTripped));
         StructuralAssert.DeepEqual(avatar, roundTripped);
 
-        // Re-checked individually: these fields sit next to padding (offset 10056), most exposed to an offset bug.
         Assert.Equal(name, roundTripped.Name);
         Assert.Equal(tribe, roundTripped.Tribe);
         Assert.Equal(guildName, roundTripped.GuildName);
@@ -295,9 +293,6 @@ public class AvatarInfoTests
         Assert.Equal(premium, roundTripped.Premium);
     }
 
-    // Offsets independently computed from the [FixedString]/[Reserved]/[FixedArray] layout in AvatarInfo.cs,
-    // spanning the Name/Tribe padding boundary (offset 33-35), the Premium long-alignment boundary (offset
-    // 10056) and the trailing RuneSystemStat array (tail ends exactly at WireSize).
     [Fact]
     public void TryRead_DecodesGoldenBytes()
     {

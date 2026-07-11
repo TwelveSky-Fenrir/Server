@@ -2,10 +2,6 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Validation;
 
-/// <summary>
-///     Ad-hoc console spot-checks for <see cref="LevelReader" />, <see cref="SocketReader" /> and
-///     <see cref="QuestReader" /> against the real BuildEU33 data files.
-/// </summary>
 internal static class QuestLevelSocketValidation
 {
     public static void Run(string dataDir)

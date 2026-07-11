@@ -9,10 +9,6 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Fenrir.Generators.Analysis.Scanning;
 
-/// <summary>
-///     Scans properties in source order (not symbol order — source order is the binary layout) with cumulative
-///     offsets.
-/// </summary>
 internal static class FieldScanner
 {
     public static ImmutableArray<FieldModel> Scan(
@@ -297,11 +293,7 @@ internal static class FieldScanner
             SymbolEqualityComparer.Default.Equals(candidate.TypeArguments[0], candidateType));
     }
 
-    /// <summary>
-    ///     <paramref name="visiting" /> guards recursive resolution against cycles, though none exist in the real
-    ///     protocol.
-    /// </summary>
-    private static int ResolveNestedSize(INamedTypeSymbol nestedType, Compilation compilation,
+        private static int ResolveNestedSize(INamedTypeSymbol nestedType, Compilation compilation,
         HashSet<INamedTypeSymbol> visiting)
     {
         var wireTypeAttribute = nestedType.GetAttributes().Find(WellKnownNames.FenrirWireTypeAttribute);

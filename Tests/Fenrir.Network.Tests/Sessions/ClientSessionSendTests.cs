@@ -8,10 +8,8 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Network.Tests.Sessions;
 
-/// <summary>Confirms <c>ClientSession</c>'s two send paths put the exact expected bytes on the wire.</summary>
 public class ClientSessionSendTests
 {
-    // ZoneGreetingResponse declares no Obfuscation, so FrameWriter takes the no-XOR path.
     [Fact]
     public async Task Send_WritesOpcodeAndPayload_ForPacketWithoutObfuscation()
     {
@@ -28,7 +26,6 @@ public class ClientSessionSendTests
         Assert.Equal(new byte[] { 0x00, 0x78, 0x56, 0x34, 0x12 }, bytes);
     }
 
-    // SendRaw is the pre-built-frame path (LZ4/ZPACKET) -- it must never reinterpret the caller's bytes.
     [Fact]
     public async Task SendRaw_WritesSuppliedBytesUnchanged()
     {
@@ -45,8 +42,6 @@ public class ClientSessionSendTests
         Assert.Equal(raw, bytes);
     }
 
-    // Regression test for the GetSpan/Advance/FlushAsync race: PipeWriter forbids concurrent use, so many
-    // threads hammering Send() on one session must still serialize into exactly the expected byte stream.
     [Fact]
     public async Task Send_FromManyConcurrentCallers_NeverCorruptsTheStreamOrThrows()
     {
@@ -84,9 +79,6 @@ public class ClientSessionSendTests
         Assert.Null(session.DisconnectReason);
     }
 
-    // Drives a real (tiny-threshold) Pipe whose reader only ever drains what's asked, so every flush hits
-    // backpressure; once that persists across consecutive sends the session must self-disconnect rather than
-    // silently stall forever.
     [Fact]
     public async Task Send_DisconnectsAsSlowConsumer_WhenBackpressurePersistsAcrossConsecutiveSends()
     {
@@ -116,12 +108,6 @@ public class ClientSessionSendTests
             }
         });
 
-        // Send never blocks the caller anymore, even while a previous send on this same session is still
-        // draining under backpressure (see ClientSession's own _pendingSends remarks) -- every one of these 12
-        // calls returns immediately regardless of how far behind the pipe is, queuing instead of waiting. The
-        // five-streak eviction itself only completes once each queued frame's own flush has actually resolved
-        // against the reader above, which happens on a background continuation rather than inline here, so
-        // this polls for it instead of assuming the send loop itself drives the eviction to completion.
         for (var i = 0; i < 12; i++)
             session.Send(packet);
 
@@ -146,8 +132,6 @@ public class ClientSessionSendTests
         }
     }
 
-    // Packet-level observability (Fenrir.Network.Dispatch.Logging.PacketLog): Send<T> must emit exactly one
-    // Debug-level "packet sent" entry, carrying the session id/opcode/byte size, when Debug is enabled.
     [Fact]
     public async Task Send_LogsPacketSentAtDebug_WhenDebugEnabled()
     {
@@ -166,8 +150,6 @@ public class ClientSessionSendTests
         Assert.Contains(ZoneGreetingResponse.Opcode.ToString(), entry.Message);
     }
 
-    // Mirrors the generated method's own IsEnabled(LogLevel.Debug) short-circuit -- at Information (both
-    // servers' appsettings.json default floor) not a single log entry should be produced per packet.
     [Fact]
     public async Task Send_LogsNothing_WhenDebugDisabled()
     {
@@ -183,9 +165,6 @@ public class ClientSessionSendTests
         Assert.Empty(logger.Entries);
     }
 
-    // SendRaw has no TPacket to read Opcode from -- it must recover the opcode from the pre-built frame's own
-    // first byte instead (every producer, FrameWriter.WriteFrame and FrameWriter.WriteCompressedFrame,
-    // writes it there).
     [Fact]
     public async Task SendRaw_LogsPacketSentWithOpcodeFromFirstByte_WhenDebugEnabled()
     {
@@ -201,11 +180,9 @@ public class ClientSessionSendTests
         var entry = Assert.Single(logger.Entries);
         Assert.Equal(LogLevel.Debug, entry.Level);
         Assert.Contains("7", entry.Message);
-        Assert.Contains("171", entry.Message); // 0xAB == 171, the opcode byte
+        Assert.Contains("171", entry.Message);
     }
 
-    // A session with no logger wired up (the common case in every other test in this file) must behave
-    // exactly as before this feature existed -- Send/SendRaw never touch a null logger.
     [Fact]
     public async Task Send_NeverThrows_WhenNoLoggerWired()
     {
@@ -218,12 +195,6 @@ public class ClientSessionSendTests
         await DrainAsync(pipe);
     }
 
-    // Regression test: SessionLoop.RunAsync's own finally-block contract guarantees Abort() always precedes
-    // CompleteAsync() on every disconnect path (~150 call sites). A zone's broadcast fan-out (its own tick
-    // thread iterating every AOI neighbor) can still reach a just-departed recipient before the zone's queued
-    // Leave command is drained -- Send/SendRaw must silently no-op once the transport is torn down rather than
-    // throwing InvalidOperationException("Writing is not allowed after writer was completed"), which previously
-    // fired once per broadcast for every tick until the Leave was processed.
     [Fact]
     public async Task Send_AfterAbortAndComplete_IsSilentNoOp()
     {

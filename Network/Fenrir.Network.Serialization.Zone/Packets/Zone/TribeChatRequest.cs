@@ -5,7 +5,6 @@ using Fenrir.Network.Serialization.Zone.Wire;
 
 namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 
-/// <summary>Local to the zone only (unlike the announcement opcode, no relay); reaches same/allied tribe members.</summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.TribeChat, ExpectedSize = 94,
     AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
 public readonly partial record struct TribeChatRequest : IIncomingPacket<TribeChatRequest>

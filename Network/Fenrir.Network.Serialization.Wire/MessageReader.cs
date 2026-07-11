@@ -2,26 +2,17 @@ using System.Buffers.Binary;
 
 namespace Fenrir.Network.Serialization.Wire;
 
-/// <summary>
-///     Zero-allocation, stack-only sequential cursor over an incoming packet's payload. Every
-///     <c>[FenrirPacket]</c>/<c>[FenrirWireType]</c>'s generated <c>TryRead</c> constructs one of these over its
-///     <c>source</c> span and reads fields in declaration order — the cursor's own running position IS the field
-///     offset, so there is exactly one place that computes it (here), never duplicated against the offsets
-///     <c>FieldScanner</c> computes at generator time for <c>PayloadSize</c>/<c>ExpectedSize</c> bookkeeping.
-/// </summary>
 public ref struct MessageReader(ReadOnlySpan<byte> source)
 {
     private readonly ReadOnlySpan<byte> _source = source;
     private int _offset;
 
-    /// <summary><c>[Reserved(N)]</c> padding before a field — the bytes are never meaningful, only skipped.</summary>
-    public void Skip(int length)
+        public void Skip(int length)
     {
         _offset += length;
     }
 
-    /// <summary>Escape hatch for nested <see cref="IFenrirWireType{TSelf}" /> fields (`TryRead` needs a span, not a cursor).</summary>
-    public ReadOnlySpan<byte> ReadSlice(int length)
+        public ReadOnlySpan<byte> ReadSlice(int length)
     {
         var slice = _source.Slice(_offset, length);
         _offset += length;

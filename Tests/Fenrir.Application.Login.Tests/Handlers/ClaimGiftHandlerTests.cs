@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
-// op21 CL_WANT_GIFT_SEND -- gift claim backed by the real game.Gifts pending queue + usp_Gift_ClaimIntoVault.
 public class ClWantGiftSendHandlerTests
 {
     [Fact]
@@ -56,8 +55,6 @@ public class ClWantGiftSendHandlerTests
         await PacketAssert.AssertSentAsync(pipe, new ClaimGiftResponse { Result = 1 });
     }
 
-    // usp_Gift_ClaimIntoVault.sql THROWs SQL 50274 when the account's 28-slot vault has no free slot -- the
-    // gift itself was claimable, so this must not be confused with "no gift at index" (Result=1).
     [Fact]
     public async Task HandleAsync_ClaimThrowsVaultFullSqlError_RepliesResultTwoWithoutDisconnecting()
     {
@@ -73,10 +70,6 @@ public class ClWantGiftSendHandlerTests
         await PacketAssert.AssertSentAsync(pipe, new ClaimGiftResponse { Result = 2 });
     }
 
-    // usp_Gift_ClaimIntoVault.sql THROWs SQL 50220 when the gift was already claimed/removed by a racing
-    // request between GiftListHandler's read and this claim -- must read as "no gift at index" (Result=1),
-    // never "vault full" (Result=2), which would misdirect the player to clear vault space that was never
-    // the actual problem.
     [Fact]
     public async Task HandleAsync_ClaimThrowsGiftUnavailableSqlError_RepliesResultOneWithoutDisconnecting()
     {
@@ -92,8 +85,6 @@ public class ClWantGiftSendHandlerTests
         await PacketAssert.AssertSentAsync(pipe, new ClaimGiftResponse { Result = 1 });
     }
 
-    // Anything else -- a dropped connection, a command timeout, an unrelated SqlException -- is neither of
-    // the two known business outcomes above and must not be collapsed into either one.
     [Fact]
     public async Task HandleAsync_ClaimThrowsUnexpectedError_RepliesResult101WithoutDisconnecting()
     {

@@ -5,8 +5,6 @@ namespace Fenrir.Network.Tests.RateLimiting;
 
 public class SessionRateLimiterTests
 {
-    // Heartbeat's tiny capacity makes exhaustion cheap to reach without flaking on timing; capacity is read
-    // from the policy rather than hard-coded so the test survives re-tuning.
     private const FenrirServer Server = FenrirServer.Zone;
     private const byte Opcode = Opcodes.Zone.Incoming.Heartbeat;
 
@@ -24,7 +22,6 @@ public class SessionRateLimiterTests
 
         Assert.False(limiter.TryConsume(sessionA, Server, Opcode));
 
-        // Session B's bucket must start full, unaffected by A's exhaustion.
         Assert.True(limiter.TryConsume(sessionB, Server, Opcode));
     }
 
@@ -43,7 +40,6 @@ public class SessionRateLimiterTests
 
         limiter.Remove(sessionId);
 
-        // Evidence Remove purged the exhausted bucket: the next TryConsume gets a fresh, full one.
         Assert.True(limiter.TryConsume(sessionId, Server, Opcode));
     }
 
@@ -52,7 +48,6 @@ public class SessionRateLimiterTests
     {
         var limiter = new SessionRateLimiter();
 
-        // Pins down that Remove on a never-added session (e.g. a double-disconnect race) is safe.
         var exception = Record.Exception(() => limiter.Remove(999));
 
         Assert.Null(exception);

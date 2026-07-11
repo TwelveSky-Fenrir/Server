@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Zone.Wire;
 
 namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 
-// Requires the caller to be in a guild; silent no-op otherwise.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.FindGuildMember, ExpectedSize = 22,
     AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
 public readonly partial record struct FindGuildMemberRequest : IIncomingPacket<FindGuildMemberRequest>

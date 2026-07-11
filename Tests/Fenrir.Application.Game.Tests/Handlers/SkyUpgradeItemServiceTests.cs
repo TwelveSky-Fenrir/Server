@@ -14,11 +14,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 
-/// <summary>
-///     Drives the real <see cref="SkyUpgradeItemService" /> (opcode 93) over a real <see cref="Zone" />; ticks the
-///     zone while the service's own <c>PostInventoryCommandAndWaitAsync</c> await is pending, same pattern as
-///     <c>FishingCatchHandlerTests</c>.
-/// </summary>
 public class SkyUpgradeItemServiceTests
 {
     private const int WarlordItemId = 87000;
@@ -76,11 +71,6 @@ public class SkyUpgradeItemServiceTests
     [Fact]
     public async Task ValidPreconditions_AlwaysDeductsMoneyAndConsumesMaterial_RegardlessOfRandomOutcome()
     {
-        // SkyUpgradeItemService rolls via SystemRandomSource.Instance (no DI seam, matching EnchantItemHandler's
-        // own precedent) -- success/failure branch fidelity is covered deterministically by
-        // SkyUpgradeResolverTests. This asserts only what's true on BOTH outcomes: money is always deducted and
-        // the material is always consumed (S04_MyWork02.cpp:12862's own unconditional placement of both before
-        // the roll).
         var (session, _, zone, state, repo, eventLog) = SetUp();
         SeedInventory(zone, new ItemStack(WarlordItemId, 1, 30, 0, 0, 0, 0, 0, 0, 0, 1),
             new ItemStack(501, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
@@ -111,7 +101,6 @@ public class SkyUpgradeItemServiceTests
     public async Task RejectedPrecondition_Rejected()
     {
         var (_, _, zone, state, repo, eventLog) = SetUp();
-        // Enchant below the required +30 threshold.
         SeedInventory(zone, new ItemStack(WarlordItemId, 1, 10, 0, 0, 0, 0, 0, 0, 0, 1),
             new ItemStack(501, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
         var service = CreateService(repo, eventLog);

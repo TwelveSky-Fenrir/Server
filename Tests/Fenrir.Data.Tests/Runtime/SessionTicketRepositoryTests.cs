@@ -7,8 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Runtime;
 
-// runtime.SessionTickets is a natively compiled, memory-optimized table (ADR-0005); its semantics live
-// entirely in T-SQL, so this must run against a real server.
 [Collection("SqlServer")]
 public sealed class SessionTicketRepositoryTests : IDisposable
 {
@@ -46,7 +44,6 @@ public sealed class SessionTicketRepositoryTests : IDisposable
         Assert.Equal((short)0, consumed.AccountGrade);
     }
 
-    // GM-BLOCK precondition: the account-grade fact must round-trip through the ticket table untouched.
     [Fact]
     public async Task CreateAsync_ThenConsumeAsync_RoundTripsANonZeroAccountGrade()
     {
@@ -62,8 +59,6 @@ public sealed class SessionTicketRepositoryTests : IDisposable
     [Fact]
     public async Task ConsumeAsync_CalledASecondTimeForTheSameAccount_ReturnsNull()
     {
-        // Single-use ticket: usp_SessionTicket_Consume's DELETE runs alongside the read, so a replay
-        // must find nothing the second time.
         const int accountId = 900_002;
         await _repository.CreateAsync(accountId, 7, 1, 15, Guid.NewGuid(), 0, CancellationToken.None);
 
@@ -87,7 +82,6 @@ public sealed class SessionTicketRepositoryTests : IDisposable
     [Fact]
     public async Task ConsumeAsync_AfterTheTtlHasElapsed_ReturnsNull()
     {
-        // usp_SessionTicket_Consume still deletes an expired row but returns no result set.
         const int accountId = 900_004;
         await _repository.CreateAsync(accountId, 9, 2, 1, Guid.NewGuid(), 0, CancellationToken.None);
 
@@ -100,7 +94,6 @@ public sealed class SessionTicketRepositoryTests : IDisposable
     [Fact]
     public async Task CreateAsync_CalledTwiceWithoutConsuming_TheSecondCallSupersedesTheFirst()
     {
-        // DELETE-then-INSERT, never MERGE: a second login before the ticket is consumed replaces it.
         const int accountId = 900_005;
         var secondToken = Guid.NewGuid();
         await _repository.CreateAsync(accountId, 10, 1, 15, Guid.NewGuid(), 0, CancellationToken.None);

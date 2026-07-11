@@ -7,13 +7,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Services.Chat;
 
-/// <summary>
-///     Same-shard delivery is synchronous, via <see cref="ZoneRegistry" />, exactly as before. Cross-shard
-///     delivery (a tribe member connected to a map hosted by a DIFFERENT live shard) is handed off to
-///     <see cref="IGuildTribeBroadcastRelayQueue" /> -- see that interface and <c>GuildTribeBroadcastRelayHost</c>'s
-///     own remarks for the full cluster-wide fan-out design (Fenrir's SQL-mediated stand-in for legacy's
-///     <c>ts25zone</c>&lt;-&gt;<c>ts25center</c> relay uplink).
-/// </summary>
 public sealed class TribeAnnouncementService(
     ZoneRegistry zones,
     IGuildTribeBroadcastRelayQueue relay,
@@ -22,9 +15,6 @@ public sealed class TribeAnnouncementService(
 {
     public bool TrySendAnnouncement(PlayerRuntimeState sender, string content)
     {
-        // Legacy gate is "if (tTribeRole == 0) return;" -- any non-zero role passes: tribe master (1),
-        // sub-master (2), or an elected tribe-council member seated via the tribe-vote mechanism (3).
-        // Server/ts25zone/S04_MyWork02.cpp:11496-11500; Server/Header/function.h:92-114 (ReturnTribeRole).
         if (sender.TribeRole == 0)
         {
             logger.LogDebug(

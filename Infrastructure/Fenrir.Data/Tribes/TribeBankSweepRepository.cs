@@ -6,8 +6,6 @@ using Fenrir.Data.Abstractions.Tribes;
 
 namespace Fenrir.Data.Tribes;
 
-// Durable 10-minute tribe-bank income-tax sweep merge (C17 side effect A3): the scan-for-room / cap-fallback
-// whole-grid merge game.usp_TribeBank_Deposit never provided. See game.usp_TribeBank_ApplyTaxSweep's header.
 public sealed record TribeBankSweepRepository(ICaeriusNetDbContext Db) : ITribeBankSweepRepository
 {
     public async ValueTask ApplyTaxSweepAsync(long tribe0Amount, long tribe1Amount, long tribe2Amount,

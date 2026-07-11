@@ -4,16 +4,13 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Seeding;
 
-/// <summary>Row count produced by <see cref="GemSocketSeedGenerator.Generate" />.</summary>
 public sealed record GemSocketSeedStats(int RowCount);
 
-/// <summary>Generates the idempotent world.GemSockets seed script from 005_00010.IMG.</summary>
 public static class GemSocketSeedGenerator
 {
     private const int MaxRowsPerInsert = 500;
 
-    /// <summary>Writes 060_gem_sockets.sql into <paramref name="outputDir" />.</summary>
-    public static GemSocketSeedStats Generate(string dataDir, string outputDir)
+        public static GemSocketSeedStats Generate(string dataDir, string outputDir)
     {
         Directory.CreateDirectory(outputDir);
 
@@ -23,7 +20,7 @@ public static class GemSocketSeedGenerator
         for (var i = 0; i < sockets.Count; i++)
         {
             var s = sockets[i];
-            var gemSocketId = i + 1; // SOCKET_INFO has no explicit index field -- 1-based array slot position
+            var gemSocketId = i + 1;
             rows.Add(
                 $"({gemSocketId.ToString(CultureInfo.InvariantCulture)}, {s.Type}, {s.Value01}, {s.Value02}, {s.Value03}, {s.Value04})");
         }

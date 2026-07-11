@@ -8,7 +8,6 @@ using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Data.World;
 
-/// <summary>Thin proc wrapper -- every method maps 1:1 onto one game.usp_WorldState*/usp_TribeVote_GetByTribe call.</summary>
 public sealed record WorldStateRepository(ICaeriusNetDbContext Db) : IWorldStateRepository
 {
     public async ValueTask EnsureInitializedAsync(CancellationToken ct)
@@ -17,8 +16,7 @@ public sealed record WorldStateRepository(ICaeriusNetDbContext Db) : IWorldState
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>3 result sets (singleton row, per-tribe rows, alliance offers) in one round trip -- boot load.</summary>
-    public async ValueTask<(WorldStateRowDto? Row, ReadOnlyCollection<WorldStateTribeDto> Tribes,
+        public async ValueTask<(WorldStateRowDto? Row, ReadOnlyCollection<WorldStateTribeDto> Tribes,
             ReadOnlyCollection<WorldStateAllianceOfferDto> AllianceOffers)>
         GetAsync(CancellationToken ct)
     {

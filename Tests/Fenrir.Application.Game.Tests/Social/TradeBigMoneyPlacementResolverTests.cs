@@ -2,14 +2,8 @@ using Fenrir.Application.Game.Domain.Social.Trade;
 
 namespace Fenrir.Application.Game.Tests.Social;
 
-/// <summary>
-///     Coverage for <see cref="TradeBigMoneyPlacementResolver" />, the pure policy behind tSort 240
-///     (Inventory -&gt; Trade BigMoney) and 243 (Trade -&gt; Inventory BigMoney), including the trade-lock guard
-///     unique to this pair. Does not depend on any dispatch/trade-registry wiring.
-/// </summary>
 public class TradeBigMoneyPlacementResolverTests
 {
-    // ---- tSort 240 -- ResolveToTradeOffer ----
 
     [Fact]
     public void ResolveToTradeOffer_NeitherSideConfirmed_IsNotLocked()
@@ -42,8 +36,6 @@ public class TradeBigMoneyPlacementResolverTests
     [Fact]
     public void ResolveToTradeOffer_TradeLockedTakesPrecedenceOverQuantityCheck()
     {
-        // Even a would-otherwise-be-invalid amount is reported as TradeLocked first, matching the legacy's
-        // trade-lock-guard-before-anything-else ordering.
         var result = TradeBigMoneyPlacementResolver.ResolveToTradeOffer(
             1, 10, 0, 0);
 
@@ -102,7 +94,6 @@ public class TradeBigMoneyPlacementResolverTests
         Assert.Equal(13, result.NewTradeOfferBigMoney);
     }
 
-    // ---- tSort 243 -- ResolveFromTradeOffer ----
 
     [Fact]
     public void ResolveFromTradeOffer_OwnSideLocked_IsTradeLocked()
@@ -156,7 +147,6 @@ public class TradeBigMoneyPlacementResolverTests
     [Fact]
     public void ResolveFromTradeOffer_NoTradeLockGuard_WhenNeitherSideHasConfirmed()
     {
-        // The guard only fires at MenuState >= 1 -- an open-but-unconfirmed trade window (state 0) never blocks.
         var result = TradeBigMoneyPlacementResolver.ResolveFromTradeOffer(
             0, 15, 5, 10);
 

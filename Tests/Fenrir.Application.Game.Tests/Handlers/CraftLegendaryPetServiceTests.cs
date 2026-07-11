@@ -15,23 +15,13 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 
-/// <summary>
-///     Drives the real <see cref="CraftLegendaryPetService" /> (op131, CZ_MAKE_ITEM2_SEND tSort==2) over a real
-///     <see cref="Zone" />; ticks the zone while the service's own <c>PostInventoryCommandAndWaitAsync</c>/
-///     <c>PostTribeProgressCommandAndWaitAsync</c> awaits are pending, same pattern as
-///     <c>CraftItemServiceTests</c>/<c>CraftPetServiceTests</c>. Covers the game.EventLog (Category=ItemCreate)
-///     wiring added on top of the pre-existing legendary-pet re-roll resolution. Once material/catalyst/CP
-///     preconditions are met, <see cref="LegendaryPetCraftResolver.Resolve" /> always returns
-///     <c>Outcome.Success</c> (only the specific pooled item id varies by roll) -- no multi-trial loop needed.
-/// </summary>
 public class CraftLegendaryPetServiceTests
 {
     private const int AccountId = 1;
     private const int CharacterId = 10;
     private const int Material1ItemId = 5000;
 
-    /// <summary>Registered in the test catalog with the default (non-31/32) Sort, for the wrong-sort rejection test.</summary>
-    private const int WrongSortItemId = 5001;
+        private const int WrongSortItemId = 5001;
 
     private static readonly IReadOnlySet<int> AllPossibleResultItemIds = new HashSet<int>(
         LegendaryPetCraftCatalog.LegendaryPool1
@@ -164,7 +154,6 @@ public class CraftLegendaryPetServiceTests
     {
         var (session, _, zone, state, characters, eventLog) = SetUp();
         state.ContributionPoints = LegendaryPetCraftCatalog.ContributionPointCost;
-        // WrongSortItemId's catalog sort is 0 (default WorldDataTestRows.Item), not 31/32, so this must fail.
         SeedInventory(zone,
             (0, Item(WrongSortItemId, 0, 901)),
             (1, Item(1878, 1, 902)),

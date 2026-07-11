@@ -3,36 +3,6 @@ using Fenrir.Application.Game.Domain.World.Geometry;
 
 namespace Fenrir.Application.Game.Domain.World.Pathfinding;
 
-/// <summary>
-///     Immutable triangle-connectivity graph over one zone's <c>.WM</c> navmesh (<see cref="ZoneGeometry" />),
-///     built once per geometry and shareable/thread-safe to read. Two walkable floor triangles
-///     (<see cref="WorldTriangle.PlaneInfo" /><c>.Y &gt; 0</c>, the same upward-facing cull
-///     <see cref="ZoneGeometry.TryGetGroundHeight" /> applies) are adjacent iff they share an edge -- two
-///     coincident vertex positions. The shared edge is retained as a "portal" (its two XZ endpoints) so the
-///     funnel/string-pull step (<see cref="MonsterPathfinder" />) can tighten an A* triangle corridor into a
-///     minimal set of turning points.
-/// </summary>
-/// <remarks>
-///     This is a Fenrir-owned superset of legacy's own step-and-reject <c>mWORLD.Path</c>
-///     (<c>Server/ts25zone/S09_MyWorld.cpp</c>), which never routed around obstacles; there is no legacy
-///     byte-parity requirement for the graph or the search, only for the ground-snap/walkability primitives it
-///     builds on (already in <see cref="ZoneGeometry" />).
-///     <para>
-///         Edge identity uses <b>exact</b> 3D <see cref="Vector3" /> equality, deliberately, not a quantized or
-///         epsilon-tolerant key: the source mesh is a shared-index structure, so the two triangles either side
-///         of a real edge carry bit-identical vertex positions for that edge. Full 3D (not XZ-projected)
-///         equality is required so a bridge and the floor beneath it -- coincident in XZ but not in Y -- are
-///         never treated as adjacent. Should a future mesh ever violate the shared-index guarantee (hairline
-///         cracks from independently-authored vertices), the fix is to quantize <see cref="EdgeKey" /> to a
-///         small world-unit grid; that is a deliberate, documented change, not a default.
-///     </para>
-///     <para>
-///         Connectivity is stored in a compressed-sparse-row (CSR) layout -- <see cref="_adjacencyStart" /> plus
-///         the parallel <see cref="_neighborTriangles" />/<see cref="_portalA" />/<see cref="_portalB" />
-///         arrays -- so a triangle's neighbours iterate as a contiguous slice with no per-node
-///         <see cref="List{T}" /> and no allocation on the search hot path.
-///     </para>
-/// </remarks>
 public sealed class TriangleAdjacencyGraph
 {
     private readonly int[] _adjacencyStart;
@@ -53,14 +23,9 @@ public sealed class TriangleAdjacencyGraph
         _walkable = walkable;
     }
 
-    /// <summary>Total triangle count of the source mesh (walkable and not) -- the sizing basis for A* scratch.</summary>
-    public int TriangleCount => _centroidsXz.Length;
+        public int TriangleCount => _centroidsXz.Length;
 
-    /// <summary>
-    ///     Builds the connectivity graph for <paramref name="triangles" />. O(triangles), called once (lazily) per
-    ///     geometry.
-    /// </summary>
-    public static TriangleAdjacencyGraph Build(IReadOnlyList<WorldTriangle> triangles)
+        public static TriangleAdjacencyGraph Build(IReadOnlyList<WorldTriangle> triangles)
     {
         var count = triangles.Count;
         var walkable = new bool[count];
@@ -74,8 +39,6 @@ public sealed class TriangleAdjacencyGraph
                 centroids[i] = CentroidXz(triangle);
         }
 
-        // First pass: pair walkable triangles that share an exact 3D edge. Each directed adjacency is
-        // accumulated once here (build-time allocation only), then packed into the CSR arrays below.
         var edgeOwner = new Dictionary<EdgeKey, EdgeOwner>();
         var adjacencies = new List<DirectedAdjacency>();
 
@@ -90,7 +53,6 @@ public sealed class TriangleAdjacencyGraph
             AddEdge(edgeOwner, adjacencies, t, triangle.Vertex2, triangle.Vertex0);
         }
 
-        // Second pass: CSR pack. Count per source triangle, prefix-sum into start offsets, then scatter.
         var start = new int[count + 1];
         foreach (var adjacency in adjacencies)
             start[adjacency.From + 1]++;
@@ -124,10 +86,6 @@ public sealed class TriangleAdjacencyGraph
 
         if (edgeOwner.TryGetValue(key, out var owner))
         {
-            // Shared edge: connect both triangles, using the owner's already-projected XZ portal endpoints so
-            // both directions reference identical portal geometry. A well-formed navmesh edge is shared by at
-            // most two triangles; a non-manifold third+ triangle would simply pair with the same first owner,
-            // which is harmless for monster routing (documented rather than special-cased).
             adjacencies.Add(new DirectedAdjacency(owner.TriangleIndex, triangleIndex, owner.PortalA, owner.PortalB));
             adjacencies.Add(new DirectedAdjacency(triangleIndex, owner.TriangleIndex, owner.PortalA, owner.PortalB));
             return;
@@ -143,38 +101,32 @@ public sealed class TriangleAdjacencyGraph
         return new Vector2(x, z);
     }
 
-    /// <summary>True if triangle <paramref name="triangleIndex" /> is a walkable floor (participates in the graph).</summary>
-    public bool IsWalkable(int triangleIndex)
+        public bool IsWalkable(int triangleIndex)
     {
         return _walkable[triangleIndex];
     }
 
-    /// <summary>XZ centroid of triangle <paramref name="triangleIndex" /> -- the A* cost/heuristic reference point.</summary>
-    public Vector2 CentroidXz(int triangleIndex)
+        public Vector2 CentroidXz(int triangleIndex)
     {
         return _centroidsXz[triangleIndex];
     }
 
-    /// <summary>Inclusive lower bound of <paramref name="triangleIndex" />'s neighbour slice in the CSR arrays.</summary>
-    public int NeighborStart(int triangleIndex)
+        public int NeighborStart(int triangleIndex)
     {
         return _adjacencyStart[triangleIndex];
     }
 
-    /// <summary>Exclusive upper bound of <paramref name="triangleIndex" />'s neighbour slice in the CSR arrays.</summary>
-    public int NeighborEnd(int triangleIndex)
+        public int NeighborEnd(int triangleIndex)
     {
         return _adjacencyStart[triangleIndex + 1];
     }
 
-    /// <summary>Neighbour triangle index at CSR slot <paramref name="slot" /> (between the start/end bounds above).</summary>
-    public int NeighborAt(int slot)
+        public int NeighborAt(int slot)
     {
         return _neighborTriangles[slot];
     }
 
-    /// <summary>True if <paramref name="a" /> and <paramref name="b" /> share an edge (both must be walkable).</summary>
-    public bool AreAdjacent(int a, int b)
+        public bool AreAdjacent(int a, int b)
     {
         for (var slot = _adjacencyStart[a]; slot < _adjacencyStart[a + 1]; slot++)
             if (_neighborTriangles[slot] == b)
@@ -183,11 +135,7 @@ public sealed class TriangleAdjacencyGraph
         return false;
     }
 
-    /// <summary>
-    ///     The shared-edge portal (two XZ endpoints) crossed when travelling from <paramref name="fromTriangle" />
-    ///     into <paramref name="toTriangle" /> -- the funnel's per-corridor-step portal.
-    /// </summary>
-    public bool TryGetPortal(int fromTriangle, int toTriangle, out Vector2 a, out Vector2 b)
+        public bool TryGetPortal(int fromTriangle, int toTriangle, out Vector2 a, out Vector2 b)
     {
         for (var slot = _adjacencyStart[fromTriangle]; slot < _adjacencyStart[fromTriangle + 1]; slot++)
             if (_neighborTriangles[slot] == toTriangle)
@@ -202,8 +150,7 @@ public sealed class TriangleAdjacencyGraph
         return false;
     }
 
-    /// <summary>Order-independent exact-3D edge key; two triangles sharing an edge hash and compare equal.</summary>
-    private readonly record struct EdgeKey(Vector3 First, Vector3 Second)
+        private readonly record struct EdgeKey(Vector3 First, Vector3 Second)
     {
         public static EdgeKey Of(Vector3 p, Vector3 q)
         {

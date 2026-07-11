@@ -8,13 +8,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Services.Chat;
 
-/// <summary>
-///     Same-shard delivery is synchronous, via <see cref="ZoneRegistry" />, exactly as before. Cross-shard
-///     delivery (a guild member connected to a map hosted by a DIFFERENT live shard) is handed off to
-///     <see cref="IGuildTribeBroadcastRelayQueue" /> -- see that interface and <c>GuildTribeBroadcastRelayHost</c>'s
-///     own remarks for the full cluster-wide fan-out design (Fenrir's SQL-mediated stand-in for legacy's
-///     <c>ts25zone</c>&lt;-&gt;<c>ts25center</c> relay uplink).
-/// </summary>
 public sealed class GuildChatService(
     ZoneRegistry zones,
     IGuildTribeBroadcastRelayQueue relay,
@@ -31,8 +24,6 @@ public sealed class GuildChatService(
 
         if (sender.IsMuted)
         {
-            // A moderation action (mute) actively being enforced -- worth surfacing by default rather than
-            // burying it at Debug, so an operator can confirm a mute is actually taking effect.
             logger.LogInformation("Character {CharacterId} guild chat dropped: caller is muted", sender.CharacterId);
             return false;
         }
@@ -60,14 +51,10 @@ public sealed class GuildChatService(
             link.Index,
             link.Activity,
             link.Value,
-            // Socket is a fixed 3-element array on the wire ([FixedArray(3)]) -- always present, never
-            // shorter, so direct indexing is safe.
             link.Socket[0],
             link.Socket[1],
             link.Socket[2]));
 
-        // Debug, not Information: routine per-message chatter, matching how WhisperHandler's own successful
-        // delivery path stays silent beyond PacketLog's packet-sent trace -- content itself is never logged.
         logger.LogDebug(
             "Character {CharacterId} sent guild chat to guild {GuildId} ({RecipientCount} same-shard recipients, {ContentLength} chars)",
             sender.CharacterId, guildId, recipientCount, content.Length);

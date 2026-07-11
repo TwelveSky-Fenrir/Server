@@ -10,13 +10,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     When a <see cref="ZoneCenterBroadcastIngestor" /> is wired, <see cref="HolyStoneWarCycle" />'s capture
-///     resolution now persists the per-tribe Zone038-DTM value through the ingestor's code-1510 path (the two
-///     legacy emits at S07_MyGame01.cpp:4175/:4184): the losing holder's value is cleared to 0, the new holder's
-///     value is set to the fresh 1-3 roll. Without an ingestor the writes are no-ops (the existing
-///     <see cref="HolyStoneWarCycleTests" /> cover that null path, which stays behaviorally unchanged).
-/// </summary>
 public class HolyStoneWarCycleDtmTests
 {
     private const short StoneMapId = 38;
@@ -48,7 +41,6 @@ public class HolyStoneWarCycleDtmTests
         var gateway =
             new LoggingOnlyHolyStoneCaptureRewardGateway(NullLogger<LoggingOnlyHolyStoneCaptureRewardGateway>.Instance);
 
-        // ScriptedRandomSource([n]) yields n % 3 for NextInt32(3), so bonus == (n % 3) + 1.
         return new HolyStoneWarCycle(worldState, broadcaster, registry, gateway,
             NullLogger<HolyStoneWarCycle>.Instance, Site, new ScriptedRandomSource(bonusRoll), false, ingestor);
     }
@@ -59,7 +51,7 @@ public class HolyStoneWarCycleDtmTests
         for (var i = 0; i < HolyStoneWarCycle.OpeningCountdownMinutes + 1; i++)
             cycle.Tick(TimeSpan.FromMinutes(1));
 
-        cycle.Tick(TimeSpan.Zero); // finds the candidate
+        cycle.Tick(TimeSpan.Zero);
         Assert.Equal(HolyStoneWarPhase.ChallengePending, cycle.Phase);
 
         for (var i = 0; i < HolyStoneWarCycle.ChallengeCountdownMinutes; i++)
@@ -79,7 +71,7 @@ public class HolyStoneWarCycleDtmTests
             ZoneTestKit.EnterData(session, StoneMapId, tribe: 1, posX: Site.StoneX, posZ: Site.StoneZ)));
         registry[StoneMapId].Tick(TimeSpan.FromMilliseconds(50));
 
-        var cycle = CreateCycle(worldState, registry, siegeState, bonusRoll: 1); // roll -> bonus 2
+        var cycle = CreateCycle(worldState, registry, siegeState, bonusRoll: 1);
         DriveThroughCapture(cycle);
 
         Assert.Equal((byte?)1, worldState.World.Zone038WinTribe);
@@ -90,21 +82,21 @@ public class HolyStoneWarCycleDtmTests
     public void Capture_WithPreviousHolder_ClearsThePreviousHolderDtmValue_AndSetsTheNewHolders()
     {
         var worldState = CreateWorldState();
-        worldState.SetZone038Winner(2); // tribe 2 currently holds
+        worldState.SetZone038Winner(2);
         var registry = CreateRegistry(StoneMapId);
         var siegeState = new ZoneCenterSiegeState();
-        siegeState.SetZone038DtmValue(2, 5); // previous holder had a bonus
+        siegeState.SetZone038DtmValue(2, 5);
         var (session, _) = ZoneTestKit.CreateSession(1);
         registry[StoneMapId].Post(ZoneCommand.Enter(10,
             ZoneTestKit.EnterData(session, StoneMapId, tribe: 1, posX: Site.StoneX, posZ: Site.StoneZ)));
         registry[StoneMapId].Tick(TimeSpan.FromMilliseconds(50));
 
-        var cycle = CreateCycle(worldState, registry, siegeState, bonusRoll: 2); // roll -> bonus 3
+        var cycle = CreateCycle(worldState, registry, siegeState, bonusRoll: 2);
         DriveThroughCapture(cycle);
 
         Assert.Equal((byte?)1, worldState.World.Zone038WinTribe);
-        Assert.Equal(0, siegeState.GetZone038DtmValue(2)); // previous holder cleared
-        Assert.Equal(3, siegeState.GetZone038DtmValue(1)); // new holder set to the roll
+        Assert.Equal(0, siegeState.GetZone038DtmValue(2));
+        Assert.Equal(3, siegeState.GetZone038DtmValue(1));
     }
 
     [Fact]
@@ -120,7 +112,6 @@ public class HolyStoneWarCycleDtmTests
             ZoneTestKit.EnterData(session, StoneMapId, tribe: 1, posX: Site.StoneX, posZ: Site.StoneZ)));
         registry[StoneMapId].Tick(TimeSpan.FromMilliseconds(50));
 
-        // No siegeIngestor argument -- the DTM emit is a documented no-op.
         var cycle = new HolyStoneWarCycle(worldState, broadcaster, registry, gateway,
             NullLogger<HolyStoneWarCycle>.Instance, Site, new ScriptedRandomSource(0));
 

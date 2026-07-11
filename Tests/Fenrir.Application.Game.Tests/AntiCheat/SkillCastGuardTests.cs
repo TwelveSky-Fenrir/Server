@@ -5,12 +5,6 @@ using Fenrir.Application.Game.Domain.Skills;
 
 namespace Fenrir.Application.Game.Tests.AntiCheat;
 
-/// <summary>
-///     Covers <see cref="SkillCastGuard.Evaluate" /> — the hotkey/learned-slot match, the client-bonus-grade
-///     consistency check, and the "Skill Hack1" grade-bound check
-///     (Server/ts25zone/S04_MyWork02.cpp:1560-1722), plus the two deliberate hardening choices (uniform
-///     disconnect on a bonus mismatch; validate-before-mutate so this guard never charges mana).
-/// </summary>
 public class SkillCastGuardTests
 {
     private const int SkillNumber = 41;
@@ -21,7 +15,7 @@ public class SkillCastGuardTests
         int skillNumber, int investedGrade)
     {
         return ImmutableDictionary<(byte, byte), HotkeySlot>.Empty
-            .Add((0, 5), new HotkeySlot(HotkeyBindingKind.Item, 9001, 1)) // noise: a non-skill binding
+            .Add((0, 5), new HotkeySlot(HotkeyBindingKind.Item, 9001, 1))
             .Add((1, 2), new HotkeySlot(HotkeyBindingKind.Skill, skillNumber, investedGrade));
     }
 
@@ -55,7 +49,6 @@ public class SkillCastGuardTests
     [InlineData(3)]
     public void NonValidatedCategories_AlwaysAllowed(int category)
     {
-        // Codes 0/3 fall through with no skill guard, even with a wildly inconsistent claim.
         var context = Context(category, claimedSkill: 12345, claimedInvested: 999, claimedBonus: 999,
             serverBonus: 0, serverMax: 0);
         Assert.Equal(SkillCastOffense.None, SkillCastGuard.Evaluate(context));
@@ -74,7 +67,6 @@ public class SkillCastGuardTests
     [InlineData(2)]
     public void HotkeyMismatch_Disconnects(int category)
     {
-        // Bound hotkey exists but for a different skill number.
         var context = Context(category, hotkeys: HotkeyBoundTo(SkillNumber + 1, InvestedGrade));
         Assert.Equal(SkillCastOffense.HotkeyMismatch, SkillCastGuard.Evaluate(context));
     }
@@ -82,7 +74,6 @@ public class SkillCastGuardTests
     [Fact]
     public void HotkeyMatch_RequiresBothSkillNumberAndGrade()
     {
-        // Right skill, wrong invested grade on the bound slot → no match.
         var context = Context(1, hotkeys: HotkeyBoundTo(SkillNumber, InvestedGrade + 1));
         Assert.Equal(SkillCastOffense.HotkeyMismatch, SkillCastGuard.Evaluate(context));
     }
@@ -107,8 +98,6 @@ public class SkillCastGuardTests
     [InlineData(2)]
     public void BonusGradeMismatch_UniformlyDisconnects_BothCategories(int category)
     {
-        // Client claims a bonus that disagrees with server state (under-claim) — legacy silently aborted this
-        // for category 2; Fenrir disconnects uniformly.
         var context = Context(category, claimedBonus: 1, serverBonus: 2);
         Assert.Equal(SkillCastOffense.BonusGradeMismatch, SkillCastGuard.Evaluate(context));
     }
@@ -116,7 +105,6 @@ public class SkillCastGuardTests
     [Fact]
     public void SkillHack1_InvestedGradeOverServerMax_Disconnects()
     {
-        // Bonus matches so the equality gate passes; invested grade exceeds the server max → Skill Hack1.
         var context = Context(1, claimedInvested: 6, serverMax: 5, claimedBonus: 2, serverBonus: 2);
         Assert.Equal(SkillCastOffense.SkillHack1, SkillCastGuard.Evaluate(context));
     }
@@ -124,7 +112,6 @@ public class SkillCastGuardTests
     [Fact]
     public void SkillHack1_NotAppliedToSpecialCaseCast()
     {
-        // isRealSkillCast=false models the enumerated buff/party-buff/bottle exclusion: the bound check is skipped.
         var context = Context(1, claimedInvested: 6, serverMax: 5, isRealSkillCast: false);
         Assert.Equal(SkillCastOffense.None, SkillCastGuard.Evaluate(context));
     }

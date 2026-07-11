@@ -5,13 +5,6 @@ using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Tests.Stats;
 
-/// <summary>
-///     Hand-computed reference vectors for <see cref="StatCalculator" /> (MyFactor), not the implementation's own
-///     echo. MyFactor's coefficients (9.63f, 3.80f, 15.3100004196167f...) aren't exactly representable in binary
-///     float, so a product that looks like a clean integer (e.g. 100*3.80=380.0) can truncate one below once real
-///     float rounding is accounted for -- inputs here are chosen with a comfortable (&gt;=0.25) fractional part to
-///     sidestep that ambiguity.
-/// </summary>
 public class StatCalculatorTests
 {
     private static readonly EquippedItemSlot[] NoEquipment = [];
@@ -21,9 +14,6 @@ public class StatCalculatorTests
         short level = 1, byte tribe = 0, byte? previousTribe = null, int title = 0, int halo = 0,
         int rebirthCount = 0)
     {
-        // previousTribe defaults to tribe, matching PlayerRuntimeState.PreviousTribe's own real-world default
-        // (see PlayerRuntimeState.Misc.cs) -- pass previousTribe explicitly only when a test needs the two to
-        // genuinely diverge (e.g. a fourth-faction character).
         return new CharacterBaseAttributes(vitality, strength, intelligence, dexterity, level, tribe,
             previousTribe ?? tribe, title, halo, rebirthCount);
     }
@@ -85,7 +75,6 @@ public class StatCalculatorTests
         return new EquippedItemSlot(slotIndex, item, enchant, combine, refine, socket);
     }
 
-    // MaxLife = (int)(Vit*20) + LevelFactor, pet-double applied right after
     [Fact]
     public void ComputeBaseStats_NoEquipment_MaxLifeIsVitalityTimesTwentyPlusLevelFactor()
     {
@@ -94,51 +83,45 @@ public class StatCalculatorTests
 
         var stats = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels);
 
-        // (int)(100*20) = 2000, +50 level factor, pet-double is a no-op with no pet (2050 >= 0).
         Assert.Equal(2050, stats.MaxLife);
     }
 
     [Fact]
     public void ComputeBaseStats_LevelInHighBand_ClampsToLevelOneFortyFiveForFactorLookup()
     {
-        // levels 146-157 clamp down to the level-145 row (not a zero factor); 150 is inside that band
         var attributes = Attributes(10, level: 150);
-        var levels = Levels(LevelRow(145, 999)); // only 145 is seeded -- level 150 must resolve to it
+        var levels = Levels(LevelRow(145, 999));
 
         var stats = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels);
 
-        Assert.Equal(1199, stats.MaxLife); // (int)(10*20)=200 + 999
+        Assert.Equal(1199, stats.MaxLife);
     }
 
     [Fact]
     public void ComputeBaseStats_LevelBeyondHighBand_ContributesZeroLevelFactor()
     {
-        // a level past the high band is not clamped to 145 either -- it reads as a zero level-factor contribution
         var attributes = Attributes(10, level: 200);
-        var levels = Levels(LevelRow(145, 999)); // must NOT be consulted for level 200
+        var levels = Levels(LevelRow(145, 999));
 
         var stats = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels);
 
-        Assert.Equal(200, stats.MaxLife); // (int)(10*20)=200 + 0 (zero level row), not +999
+        Assert.Equal(200, stats.MaxLife);
     }
 
-    // MaxMana = (int)(Ki*15.3100004196167f) -- the exact literal, not a rounded 15.31f
     [Fact]
     public void ComputeBaseStats_NoEquipment_MaxManaUsesExactKiCoefficientPlusLevelFactor()
     {
-        // Ki=50 -> 50*15.3100004196167 = 765.50002... (comfortably past the 765.5 half-boundary either way).
         var attributes = Attributes(intelligence: 50, level: 1);
         var levels = Levels(LevelRow(1, mana: 100));
 
         var stats = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels);
 
-        Assert.Equal(865, stats.MaxMana); // 765 + 100
+        Assert.Equal(865, stats.MaxMana);
     }
 
     [Fact]
     public void ComputeBaseStats_Unarmed_AttackPowerUsesDefaultWeaponCoefficients()
     {
-        // No weapon -> fStr=2.25 (exact in binary: 2.25=9/4), fKi=1.67. Str=53 -> 53*2.25=119.25 exactly.
         var attributes = Attributes(strength: 53, level: 1);
         var levels = Levels(LevelRow(1));
 
@@ -150,10 +133,9 @@ public class StatCalculatorTests
     [Fact]
     public void ComputeBaseStats_AtkClassWeapon_AttackPowerUsesHigherCoefficients()
     {
-        // Weapon Sort 14 ("atk" class): fStr=3.80. 53*3.80=201.4, a safe 0.4 away from the 201/202 boundary.
         var attributes = Attributes(strength: 53, level: 1);
         var levels = Levels(LevelRow(1));
-        var weapon = Item(90001, 14, 50); // item Level 50 only feeds the (unrelated) IU-effect branch
+        var weapon = Item(90001, 14, 50);
         IReadOnlyList<EquippedItemSlot> equipment = [Equip(7, weapon)];
 
         var stats = StatCalculator.ComputeBaseStats(attributes, equipment, levels);
@@ -164,7 +146,6 @@ public class StatCalculatorTests
     [Fact]
     public void ComputeBaseStats_DefClassWeapon_AttackPowerUsesDefClassCoefficients()
     {
-        // Weapon Sort 13 ("def" class): fStr=3.65. 53*3.65=193.45, safe.
         var attributes = Attributes(strength: 53, level: 1);
         var levels = Levels(LevelRow(1));
         var weapon = Item(90002, 13, 50);
@@ -178,7 +159,6 @@ public class StatCalculatorTests
     [Fact]
     public void ComputeBaseStats_NoEquipment_DefensePowerUsesWisdomCoefficient()
     {
-        // Dexterity=50 -> 50*9.63=481.5 (decimal), a safe 0.5 away from either neighboring integer.
         var attributes = Attributes(dexterity: 50, level: 1);
         var levels = Levels(LevelRow(1));
 
@@ -190,7 +170,6 @@ public class StatCalculatorTests
     [Fact]
     public void ComputeBaseStats_LegendaryArmor_DefensePowerAddsEnchantBonus()
     {
-        // Armor Sort 1 (legendary/type-6): += Enchant*1000 (pure int math, no float ambiguity)
         var attributes = Attributes(dexterity: 50, level: 1);
         var levels = Levels(LevelRow(1));
         var armor = Item(90003, 1);
@@ -210,7 +189,7 @@ public class StatCalculatorTests
     [Fact]
     public void ApplyPetDoubleRule_StatExactlyEqualsPet_TreatsAsMeetingIt()
     {
-        Assert.Equal(100, StatCalculator.ApplyPetDoubleRule(50, 50)); // >= is inclusive
+        Assert.Equal(100, StatCalculator.ApplyPetDoubleRule(50, 50));
     }
 
     [Fact]
@@ -222,9 +201,9 @@ public class StatCalculatorTests
     [Fact]
     public void ComputeBaseStats_PetLifeAboveRunningTotal_DoublesMaxLifeInsteadOfAdding()
     {
-        var attributes = Attributes(10, level: 1); // (int)(10*20)=200, no level factor
+        var attributes = Attributes(10, level: 1);
         var levels = Levels(LevelRow(1));
-        var pet = new PetStatContribution(500); // 200 < 500 -> double
+        var pet = new PetStatContribution(500);
 
         var stats = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels, pet: pet);
 
@@ -234,27 +213,26 @@ public class StatCalculatorTests
     [Fact]
     public void ComputeBaseStats_PetLifeAtOrBelowRunningTotal_AddsPetLifeToMaxLife()
     {
-        var attributes = Attributes(100, level: 1); // (int)(100*20)=2000
+        var attributes = Attributes(100, level: 1);
         var levels = Levels(LevelRow(1));
-        var pet = new PetStatContribution(100); // 2000 >= 100 -> add
+        var pet = new PetStatContribution(100);
 
         var stats = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels, pet: pet);
 
         Assert.Equal(2100, stats.MaxLife);
     }
 
-    // NXT sets: 77000-77023, tribe-scoped, tiers 101/102/103 at 2/4/6 matched pieces
     [Fact]
     public void DetectNxtSetNumber_AllSixCanonicalSlotsMatchTribeZero_ReturnsTierOneOhThree()
     {
         IReadOnlyList<EquippedItemSlot> equipment =
         [
-            Equip(0, Item(77003)), // ring
-            Equip(2, Item(77004)), // armor
-            Equip(3, Item(77005)), // gloves
-            Equip(4, Item(77006)), // amulet
-            Equip(5, Item(77007)), // boots
-            Equip(7, Item(77000)) // weapon (any of the 3 tribe-0 weapons)
+            Equip(0, Item(77003)),
+            Equip(2, Item(77004)),
+            Equip(3, Item(77005)),
+            Equip(4, Item(77006)),
+            Equip(5, Item(77007)),
+            Equip(7, Item(77000))
         ];
 
         Assert.Equal(103, SetBonusTables.DetectNxtSetNumber(0, equipment));
@@ -265,8 +243,8 @@ public class StatCalculatorTests
     {
         IReadOnlyList<EquippedItemSlot> equipment =
         [
-            Equip(0, Item(77003)), // ring
-            Equip(7, Item(77000)) // weapon
+            Equip(0, Item(77003)),
+            Equip(7, Item(77000))
         ];
 
         Assert.Equal(101, SetBonusTables.DetectNxtSetNumber(0, equipment));
@@ -283,7 +261,6 @@ public class StatCalculatorTests
     [Fact]
     public void ComputeBaseStats_FullNxtTribeZeroSet_AppliesFlatBonusesAcrossHpMpAtkDef()
     {
-        // isolates the NXT tier-103 flat bonuses + the MY_HP "+15000 any set" rule (fires since mSetNumber=103 > 0)
         var attributes = Attributes(level: 1);
         var levels = Levels(LevelRow(1));
         IReadOnlyList<EquippedItemSlot> equipment =
@@ -298,22 +275,15 @@ public class StatCalculatorTests
 
         var stats = StatCalculator.ComputeBaseStats(attributes, equipment, levels);
 
-        Assert.Equal(3000 + 15000, stats.MaxLife); // NXT-103 +3000, MY_HP "any set" +15000
-        Assert.Equal(3000, stats.MaxMana); // NXT-103 +3000, no MY_HP-equivalent for mana
-        Assert.Equal(1500, stats.AttackPower); // NXT-103 +1500
-        Assert.Equal(3000, stats.DefensePower); // NXT-103 +3000
+        Assert.Equal(3000 + 15000, stats.MaxLife);
+        Assert.Equal(3000, stats.MaxMana);
+        Assert.Equal(1500, stats.AttackPower);
+        Assert.Equal(3000, stats.DefensePower);
     }
 
-    // G12 custom-set HP bonus and NXT tier detection both key off aPreviousTribe, never the character's
-    // current playable Tribe (Server/Header/Protocol/MyFactor.cpp:2032-2094,
-    // Server/ts25zone/S07_MyGame03.cpp:7516-7626). A fourth-faction character (Tribe=3) keeps a genuinely
-    // distinct PreviousTribe (their origin race, 0-2) -- these two tests guard against a regression back to
-    // reading Tribe for either mechanic.
     [Fact]
     public void ComputeBaseStats_G12FullSetForOriginTribe_GrantsBonusByPreviousTribeEvenForFourthFactionTribe()
     {
-        // Tribe=3 (fourth faction) but PreviousTribe=0 (Noble Dragon origin): the full 6-slot 84500-84699 set
-        // at Combine>=12 must still grant the +15000 bonus, keyed on PreviousTribe, not the playable Tribe=3.
         var attributes = Attributes(level: 1, tribe: 3, previousTribe: 0);
         var levels = Levels(LevelRow(1));
         IReadOnlyList<EquippedItemSlot> equipment =
@@ -334,8 +304,6 @@ public class StatCalculatorTests
     [Fact]
     public void ComputeBaseStats_G12FullSetButUnrecognizedPreviousTribe_GrantsNoBonusDespiteMatchingTribeZeroIds()
     {
-        // Tribe=0 (would match the 84500-84699 range if the bug used Tribe) but PreviousTribe=3
-        // (unrecognized by G12/NXT, no fallback branch in legacy) -- must grant nothing.
         var attributes = Attributes(level: 1, tribe: 0, previousTribe: 3);
         var levels = Levels(LevelRow(1));
         IReadOnlyList<EquippedItemSlot> equipment =
@@ -356,8 +324,6 @@ public class StatCalculatorTests
     [Fact]
     public void ComputeBaseStats_NxtSetForOriginTribe_DetectsTierByPreviousTribeEvenForFourthFactionTribe()
     {
-        // Same fourth-faction shape as the G12 test above, but for NXT tier detection via ComputeBaseStats's
-        // own SetBonusTables.ResolveEffectiveSetNumber(attributes.PreviousTribe, ...) call.
         var attributes = Attributes(level: 1, tribe: 3, previousTribe: 0);
         var levels = Levels(LevelRow(1));
         IReadOnlyList<EquippedItemSlot> equipment =
@@ -372,14 +338,12 @@ public class StatCalculatorTests
 
         var stats = StatCalculator.ComputeBaseStats(attributes, equipment, levels);
 
-        Assert.Equal(3000 + 15000, stats.MaxLife); // NXT-103 +3000, MY_HP "any set" +15000
+        Assert.Equal(3000 + 15000, stats.MaxLife);
     }
 
     [Fact]
     public void ComputeBaseStats_NxtSetButUnrecognizedPreviousTribe_DetectsNoTierDespiteMatchingTribeZeroIds()
     {
-        // Tribe=0 (would match the tribe-0 NXT catalog if the bug used Tribe) but PreviousTribe=3
-        // (unrecognized -- DetectNxtSetNumber returns 0 rather than indexing out of bounds).
         var attributes = Attributes(level: 1, tribe: 0, previousTribe: 3);
         var levels = Levels(LevelRow(1));
         IReadOnlyList<EquippedItemSlot> equipment =
@@ -397,80 +361,66 @@ public class StatCalculatorTests
         Assert.Equal(0, stats.MaxLife);
     }
 
-    // EPET (slot 8) must be excluded from the coefSet multiplier in every per-slot stat loop, not just AttackPower
 
     [Fact]
     public void ComputeBaseStats_SetItemInPetSlot_AttackSuccessCountsFlatContributionButNotSetCoefficient()
     {
-        // Set 5 grants a x1.0 AttackSuccess coefficient -- if the EPET guard were missing, the pet-slot item's
-        // flat AttackSuccess would be doubled by the coefficient bonus.
         var attributes = Attributes(strength: 0, level: 1);
         var levels = Levels(LevelRow(1));
         IReadOnlyList<EquippedItemSlot> equipment =
         [
-            Equip(0, Item(1, 2, attackSuccess: 100)), // set-5 member elsewhere is assumed via legacySetNumber
-            Equip(8, Item(2, 2, attackSuccess: 100)) // pet slot (EPET=8)
+            Equip(0, Item(1, 2, attackSuccess: 100)),
+            Equip(8, Item(2, 2, attackSuccess: 100))
         ];
 
         var stats = StatCalculator.ComputeBaseStats(attributes, equipment, levels, 5);
 
-        // slot0: 100 flat + 100*1.0 coef = 200; slot8 (EPET): 100 flat ONLY, no coef bonus = 100. Total 300.
         Assert.Equal(300, stats.AttackSuccess);
     }
 
     [Fact]
     public void ComputeBaseStats_SetItemInPetSlot_LuckCountsFlatContributionButNotSetCoefficient()
     {
-        // Set 20 grants a x0.10 Luck coefficient -- same EPET guard, different stat/table
         var attributes = Attributes(level: 1);
         var levels = Levels(LevelRow(1));
         IReadOnlyList<EquippedItemSlot> equipment = [Equip(8, Item(3, 2, luck: 100))];
 
         var stats = StatCalculator.ComputeBaseStats(attributes, equipment, levels, 20);
 
-        Assert.Equal(100, stats.Luck); // flat only -- 110 would mean the coefficient leaked onto EPET
+        Assert.Equal(100, stats.Luck);
     }
 
-    // buffs and the ATK/DEF pet-double rule apply at the wrapper layer, not in the base cache
     [Fact]
     public void ComputeEffectiveStats_BuffPercent_AppliesToAttackPower()
     {
-        var attributes = Attributes(strength: 100, level: 1); // unarmed, exact: (int)(100*2.25)=225
+        var attributes = Attributes(strength: 100, level: 1);
         var levels = Levels(LevelRow(1));
         var buffs = new BuffInfo { Buff = new int[70] };
-        buffs.Buff[0] = 50; // aBuff[0][0] = +50% on AttackPower
+        buffs.Buff[0] = 50;
 
         var stats = StatCalculator.ComputeEffectiveStats(attributes, NoEquipment, levels, buffs);
 
-        // (int)(225 * 150 * 0.01) = 337 (comfortably clear of the 337.5 boundary either way).
         Assert.Equal(337, stats.AttackPower);
     }
 
     [Fact]
     public void ComputeEffectiveStats_PetDoubleForAttackPower_AppliesAtWrapperLevelNotBaseLevel()
     {
-        // pet-double for ATK/DEF lives in the Get* wrappers, unlike HP/MP where it's part of the cached GetBase* value
-        var attributes = Attributes(strength: 13, level: 1); // unarmed, exact: (int)(13*2.25)=29
+        var attributes = Attributes(strength: 13, level: 1);
         var levels = Levels(LevelRow(1));
-        var pet = new PetStatContribution(AttackPower: 100); // 29 < 100 -> double
+        var pet = new PetStatContribution(AttackPower: 100);
 
         var baseStats = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels, pet: pet);
         var effectiveStats = StatCalculator.ComputeEffectiveStats(attributes, NoEquipment, levels, pet: pet);
 
-        Assert.Equal(29, baseStats.AttackPower); // undoubled at the base/cache layer
-        Assert.Equal(58, effectiveStats.AttackPower); // doubled once the wrapper applies the pet rule
+        Assert.Equal(29, baseStats.AttackPower);
+        Assert.Equal(58, effectiveStats.AttackPower);
     }
 
-    // ---- B3-deco wiring: effect-sort 2-6 getter insertions + the IS-only decoration contribution ----
-    // Delta tests (with vs. without the one varying input) rather than full hand-computed totals, so each
-    // isolates exactly the new term without needing to re-derive every other contribution in the pipeline.
 
     [Fact]
     public void ComputeBaseStats_CapeEffectSort2_AddsDefenseRampContribution()
     {
-        // Cape slot (1) only, IU count = Combine (MyFactor.cpp:2846). Category 8 -> (base 2.00, K 0.10); at
-        // item level 100, r=6.0 -> (int)(2.00 + 6*0.10) = 2 per IU point (pinned by
-        // ReturnIUEffectValue_Sorts2To6_BaseKRows[2,8] above).
         var attributes = Attributes(level: 1);
         var levels = Levels(LevelRow(1));
         var cape = Item(90010, 8, 100);
@@ -480,14 +430,12 @@ public class StatCalculatorTests
         var without = StatCalculator.ComputeBaseStats(attributes, withoutIu, levels);
         var with = StatCalculator.ComputeBaseStats(attributes, withIu, levels);
 
-        Assert.Equal(10, with.DefensePower - without.DefensePower); // 2 * 5
+        Assert.Equal(10, with.DefensePower - without.DefensePower);
     }
 
     [Fact]
     public void ComputeBaseStats_WeaponEffectSort3_AddsHitRampContribution()
     {
-        // Weapon slot (7) only, IU count = Combine (MyFactor.cpp:3144). Category 14 is within the shared
-        // 13-21 weapon-class row (base 5.73, K 0.29); at item level 100, r=6.0 -> (int)(5.73 + 6*0.29) = 7.
         var attributes = Attributes(strength: 0, level: 1);
         var levels = Levels(LevelRow(1));
         var weapon = Item(90011, 14, 100);
@@ -497,17 +445,12 @@ public class StatCalculatorTests
         var without = StatCalculator.ComputeBaseStats(attributes, withoutIu, levels);
         var with = StatCalculator.ComputeBaseStats(attributes, withIu, levels);
 
-        Assert.Equal(35, with.AttackSuccess - without.AttackSuccess); // 7 * 5
+        Assert.Equal(35, with.AttackSuccess - without.AttackSuccess);
     }
 
     [Fact]
     public void ComputeBaseStats_DecorationSlot_OnlyIsOctetContributesToMaxLife()
     {
-        // B3-deco decoration ReturnNewStat: ONLY the IS (Enchant) octet is packed for decoration items -- see
-        // StatCalculator.DecorationStatContribution's own remarks (the re-verified B3-octet-mapping contract
-        // states IS is "the only octet decoded for decoration-category items"). Enchant=45 falls in MaxLife's
-        // IS band [41,60] -> 100*(45-40)=500; Combine=99 is deliberately nonzero to prove it is NOT read for a
-        // decoration slot (unlike effect-sort 2-6 above, which DOES read Combine for non-decoration slots).
         var attributes = Attributes(level: 1);
         var levels = Levels(LevelRow(1));
         var deco = Item(90012, type: 5, equipInfo2: 11);
@@ -522,12 +465,9 @@ public class StatCalculatorTests
     [Fact]
     public void ComputeBaseStats_DecorationSlot_WrongEquipInfoCategory_ContributesNothing()
     {
-        // EquipInfo2 must be one of 11-14 (MyUtil::ReturnItemSort==2, S07_MyGame03.cpp:7484-7513) -- confirms
-        // the wiring reads EquipInfo2 (not EquipInfo1, which stays 0 in this fixture either way) and that the
-        // gate is actually enforced, not a pass-through.
         var attributes = Attributes(level: 1);
         var levels = Levels(LevelRow(1));
-        var wrongCategory = Item(90013, type: 5, equipInfo2: 10); // 10 is one below the valid 11-14 band
+        var wrongCategory = Item(90013, type: 5, equipInfo2: 10);
         IReadOnlyList<EquippedItemSlot> equipment = [Equip(9, wrongCategory, enchant: 45)];
 
         var without = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels);

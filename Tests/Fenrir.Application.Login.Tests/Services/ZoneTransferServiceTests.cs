@@ -9,10 +9,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Login.Tests.Services;
 
-// op22 CL_DEMAND_ZONE_SERVER_INFO_SEND -- Life/Mana floor-clamp sub-behavior of the per-login avatar
-// realignment contract (Server/ts25login/S04_MyWork02.cpp:357-358, SetIntegerLow). Re-timed to op22 request
-// time per ZoneTransferService's own <remarks>; see that file for why the zone/tribe realignment and
-// item-purge sibling corrections are deliberately not covered here.
 public class ZoneTransferServiceTests
 {
     private const short HostedMapId = 42;
@@ -87,10 +83,9 @@ public class ZoneTransferServiceTests
     public async Task RequestZoneTransferAsync_CharacterVanishedBeforeClamp_ReturnsCharacterNotFoundWithoutThrowing()
     {
         var characters = FakeCharacterRepository.With(Summary,
-            WorldEntryWith(0, 0)); // FakeCharacterRepository.With always seeds one world entry
+            WorldEntryWith(0, 0));
         var service = CreateService(characters);
 
-        // A slot the account doesn't actually have a character in (per-slot occupancy check).
         var result = await service.RequestZoneTransferAsync(AccountId, 2, Guid.NewGuid(),
             0, CancellationToken.None);
 
@@ -150,11 +145,6 @@ public class ZoneTransferServiceTests
         Assert.Null(tickets.LastCreatedTicket);
     }
 
-    // gameserver-directory-heartbeat-liveness: the shard directory only proves a heartbeat within the last
-    // ~17s, not that the shard is still alive right now -- a crashed shard would otherwise still get a
-    // ticket minted for it. This is the dead-end-handoff fix: a failed TCP reachability probe on the
-    // resolved shard must reject exactly like "no shard claims this map" (no ticket) and proactively evict
-    // the dead shard's directory row instead of waiting for it to age out on its own.
     [Fact]
     public async Task
         RequestZoneTransferAsync_ResolvedShardFailsReachabilityProbe_ReturnsShardUnavailableMintsNoTicketAndEvictsTheShard()

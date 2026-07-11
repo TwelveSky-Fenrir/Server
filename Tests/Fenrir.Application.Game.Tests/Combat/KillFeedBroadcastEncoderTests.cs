@@ -5,12 +5,6 @@ using Fenrir.Application.Game.Domain.Combat;
 
 namespace Fenrir.Application.Game.Tests.Combat;
 
-/// <summary>
-///     Covers <see cref="KillFeedBroadcastEncoder" />'s own documented, self-consistent placeholder byte
-///     layout -- NOT a byte-exact-verified transcription of the legacy wire format (see that class's own
-///     remarks). These tests assert the encoder round-trips its own chosen layout correctly, which is what
-///     this agent can verify without a wire-protocol specialist's confirmation.
-/// </summary>
 public class KillFeedBroadcastEncoderTests
 {
     [Fact]
@@ -55,7 +49,6 @@ public class KillFeedBroadcastEncoderTests
         var payload = new KillFeedBroadcastPayload("Killer", 0, "Victim", 1, top3);
         var data = KillFeedBroadcastEncoder.Encode(payload);
 
-        // Top-three block starts right after killer name+tribe (14) + victim name+tribe (14) = 28.
         const int topThreeOffset = 2 * (13 + 1);
         const int entrySize = 13 + 1 + 4;
 
@@ -82,7 +75,6 @@ public class KillFeedBroadcastEncoderTests
         const int topThreeOffset = 2 * (13 + 1);
         const int entrySize = 13 + 1 + 4;
 
-        // Second slot should be blank (single-space name, zero tribe/kills).
         var secondOffset = topThreeOffset + entrySize;
         var secondName = ReadFixedAsciiName(data, secondOffset);
         Assert.Equal(" ", secondName);

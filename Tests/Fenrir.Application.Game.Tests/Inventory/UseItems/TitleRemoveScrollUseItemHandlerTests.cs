@@ -10,10 +10,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Inventory.UseItems;
 
-/// <summary>
-///     Drives <see cref="TitleRemoveScrollUseItemHandler" /> (op23 items 1200/8419/1494) directly over a real
-///     <see cref="Zone" /> so its <c>PostTribeProgressCommandAndWaitAsync</c> mirror actually applies.
-/// </summary>
 public class TitleRemoveScrollUseItemHandlerTests
 {
     private const int AccountId = 1;
@@ -78,7 +74,7 @@ public class TitleRemoveScrollUseItemHandlerTests
     public async Task Item1200_FullRefund_ClearsTitle_RefundsCumulativeCost_ConsumesScroll()
     {
         var (zone, state, characters, eventLog, handler) = SetUp();
-        state.Title = 203; // family 2, rank 3 -- cumulative cost of ranks 0-2: 800+1700+2500 = 5000
+        state.Title = 203;
         state.ContributionPoints = 1000;
 
         var response = await RunToCompletionAsync(
@@ -103,7 +99,7 @@ public class TitleRemoveScrollUseItemHandlerTests
     public async Task Item1494_ReducedRefund_Returns70PercentOfCumulativeCost()
     {
         var (zone, state, characters, eventLog, handler) = SetUp();
-        state.Title = 104; // rank 4 -- cumulative cost of ranks 0-3: 800+1700+2500+3400 = 8400, 70% = 5880
+        state.Title = 104;
         state.ContributionPoints = 0;
 
         var response = await RunToCompletionAsync(
@@ -120,7 +116,7 @@ public class TitleRemoveScrollUseItemHandlerTests
     public async Task Item8419_TreatedIdenticallyToItem1200_FullRefund()
     {
         var (zone, state, characters, eventLog, handler) = SetUp();
-        state.Title = 101; // rank 1 -- cumulative cost of rank 0 only: 800
+        state.Title = 101;
         state.ContributionPoints = 0;
 
         var response = await RunToCompletionAsync(
@@ -149,8 +145,8 @@ public class TitleRemoveScrollUseItemHandlerTests
     public async Task RefundWouldOverflowCeiling_FailsCleanly_NoStateChange()
     {
         var (zone, state, characters, eventLog, handler) = SetUp();
-        state.Title = 203; // refund 5000
-        state.ContributionPoints = 2_000_000_000; // already at the ceiling -- any positive refund overflows
+        state.Title = 203;
+        state.ContributionPoints = 2_000_000_000;
 
         var response = await handler.HandleAsync(Context(zone, state, 1200), CancellationToken.None);
 
@@ -164,7 +160,7 @@ public class TitleRemoveScrollUseItemHandlerTests
     public async Task Level13Title_UnreachableInAnyLiveBuild_StillClearsTitleAndConsumesScroll_ForZeroRefund()
     {
         var (zone, state, characters, eventLog, handler) = SetUp();
-        state.Title = 213; // portion 13 -- outside 1-12, CumulativeRefund floors this to 0
+        state.Title = 213;
         state.ContributionPoints = 1000;
 
         var response = await RunToCompletionAsync(
@@ -181,9 +177,6 @@ public class TitleRemoveScrollUseItemHandlerTests
     [Fact]
     public async Task StackedQuantity_ConsumptionUsesTheSharedPlaceholderWholeStackRule()
     {
-        // CashItemStackConsumption.IsStackSafe is a shared, explicitly-flagged placeholder (returns false for
-        // every item id today) -- this asserts THIS handler inherits that same posture rather than inventing
-        // its own, not that a specific "correct" consumption behavior has been confirmed for these 3 ids.
         var (zone, state, characters, eventLog, handler) = SetUp();
         state.Title = 101;
         state.ContributionPoints = 0;

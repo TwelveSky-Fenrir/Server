@@ -7,7 +7,6 @@ using Fenrir.Data.Abstractions.Inventory;
 
 namespace Fenrir.Data.Inventory;
 
-/// <inheritdoc cref="IPetBagRepository" />
 public sealed record PetBagRepository(ICaeriusNetDbContext Db) : IPetBagRepository
 {
     public async ValueTask DepositAsync(int characterId, byte inventoryContainer,

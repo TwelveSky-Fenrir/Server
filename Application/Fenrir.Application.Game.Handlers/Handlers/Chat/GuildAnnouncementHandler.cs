@@ -8,10 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Chat;
 
-/// <summary>
-///     CZ_GUILD_NOTICE_SEND (opcode 76). Restricted to the guild master (<c>GuildRoleCodec.IsMaster</c>);
-///     a non-master sender is silently ignored, not disconnected. No mute gate applies to this channel.
-/// </summary>
 public sealed class GuildAnnouncementHandler(
     IGuildAnnouncementService guildAnnouncementService,
     ILogger<GuildAnnouncementHandler>? logger = null) : IInlinePacketHandler<GuildAnnouncementRequest>

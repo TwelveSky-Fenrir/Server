@@ -5,25 +5,6 @@ using System.Collections.Immutable;
 
 namespace Fenrir.Generators.Analysis.Model;
 
-/// <summary>
-///     Wraps an <see cref="ImmutableArray{T}" /> with real element-wise equality/hashing, for use on any
-///     record (<see cref="TypeModel" />, <see cref="GeneratedTypeResult" />) that flows through an
-///     <c>IIncrementalGenerator</c> pipeline stage.
-/// </summary>
-/// <remarks>
-///     <see cref="ImmutableArray{T}" /> implements <see cref="IEquatable{T}" /> itself, but its
-///     <c>Equals</c>/<c>GetHashCode</c> compare the underlying array <em>reference</em>, not its contents —
-///     converting a model from <c>class</c> to <c>record</c> does nothing to fix this, since the compiler-
-///     synthesized record equality just forwards to each member's own <c>Equals</c>. Every
-///     <c>FieldScanner.Scan</c>/<c>TypeModelBuilder.Build*</c> pass rebuilds a brand-new backing array from
-///     scratch even when its contents are byte-for-byte identical to the previous pass, so two structurally
-///     identical <see cref="TypeModel" />/<see cref="GeneratedTypeResult" /> instances across consecutive
-///     incremental passes would never compare equal with a raw <see cref="ImmutableArray{T}" /> member, and
-///     Roslyn would never skip the (redundant) downstream recompute/re-emit — this is called out explicitly
-///     in Roslyn's own incremental-generator cookbook ("Pipeline model design": wrap array-typed members with
-///     value-equatable collections). Any record property that flows through the pipeline must use this
-///     wrapper instead of a raw <see cref="ImmutableArray{T}" />.
-/// </remarks>
 internal readonly struct EquatableArray<T> : IEquatable<EquatableArray<T>>, IReadOnlyList<T>
 {
     private readonly ImmutableArray<T> _array;
@@ -37,11 +18,7 @@ internal readonly struct EquatableArray<T> : IEquatable<EquatableArray<T>>, IRea
 
     private ImmutableArray<T> ArrayOrEmpty => _array.IsDefault ? ImmutableArray<T>.Empty : _array;
 
-    /// <summary>
-    ///     Named to match <see cref="ImmutableArray{T}" />'s own <c>Length</c>, not <c>Count</c>, so call
-    ///     sites (including C# property patterns like <c>AllowedStates.Length: > 0</c>) don't need to change.
-    /// </summary>
-    public int Length => ArrayOrEmpty.Length;
+        public int Length => ArrayOrEmpty.Length;
 
     int IReadOnlyCollection<T>.Count => Length;
 

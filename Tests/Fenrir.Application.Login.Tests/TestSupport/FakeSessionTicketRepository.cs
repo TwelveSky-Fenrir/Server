@@ -2,8 +2,6 @@ using Fenrir.Data.Abstractions.Runtime;
 
 namespace Fenrir.Application.Login.Tests.TestSupport;
 
-// In-memory stand-in for ISessionTicketRepository: ConsumeAsync/PurgeExpiredAsync are GameServer/maintenance
-// concerns, never exercised from the Login-side handoff handler under test here.
 internal sealed class FakeSessionTicketRepository : ISessionTicketRepository
 {
     public (int AccountId, int CharacterId, byte ShardId, int TtlSeconds, Guid SessionToken, short AccountGrade)?

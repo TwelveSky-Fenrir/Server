@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Zone;
 
-/// <summary>ZC_DESTROY_ITEM_RECV (ZONE.h:991-996, 32-byte payload): Result/Money/Value[6].</summary>
 public class ZcDestroyItemRecvTests
 {
     [Fact]

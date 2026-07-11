@@ -9,7 +9,6 @@ public class LcCreateMousePasswordRecvTests
     [Fact]
     public void PayloadSize_MatchesContractConstant()
     {
-        // ExpectedSize=10 (1-byte outbound header) -> 9-byte payload (int + char[5]).
         Assert.Equal(9, CreateMousePinResponse.PayloadSize);
     }
 

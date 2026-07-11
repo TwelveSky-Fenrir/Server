@@ -4,9 +4,6 @@ using Fenrir.Network.Serialization.Tests.TestSupport;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Shared;
 
-// CZ_PROCESS_DATA_SEND tSort 507, GM "Basic"-tier self-teleport-to-coordinate
-// (Server/ts25zone/S04_MyWork04.cpp:1146-1164). Rides inside GenericActionRequest's (opcode 19) tData blob --
-// there is no dedicated legacy wire opcode for this command.
 public class GmMoveCoordinatePayloadTests
 {
     [Fact]
@@ -52,8 +49,6 @@ public class GmMoveCoordinatePayloadTests
     [Fact]
     public void TryRead_DecodesFromFirst12BytesOfLargerBuffer()
     {
-        // GenericActionHandler reads this out of the first 12 bytes of GenericActionRequest.Data (130 bytes),
-        // not a dedicated 12-byte packet -- no bounds/map-validity check applies to the values before use.
         var data = new byte[130];
         BinaryPrimitives.WriteSingleLittleEndian(data.AsSpan(0, 4), 1f);
         BinaryPrimitives.WriteSingleLittleEndian(data.AsSpan(4, 4), 2f);

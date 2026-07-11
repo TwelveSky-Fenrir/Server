@@ -3,10 +3,6 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Validation;
 
-/// <summary>
-///     Ad-hoc sanity check for <see cref="NpcReader" />; NpcMenu.CSV/NpcShop.CSV appear to be a different
-///     locale/version (Thai names vs. this build's EN), so comparisons below are low-confidence spot-checks only.
-/// </summary>
 internal static class NpcValidation
 {
     public static void Run(string dataDir)

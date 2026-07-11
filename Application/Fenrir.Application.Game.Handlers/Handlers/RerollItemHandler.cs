@@ -8,11 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
-/// <summary>
-///     op26, CZ_EXCHANGE_ITEM_SEND -- rerolls a Rare/Elite equip item into a random same-tier/category
-///     replacement (delegated to <see cref="IRerollItemService" />). <c>Sort</c>/<c>Value1</c>/<c>Value2</c> are
-///     dead wire fields the legacy handler itself never reads.
-/// </summary>
 public sealed class RerollItemHandler(IRerollItemService rerollItemService, ILogger<RerollItemHandler> logger)
     : IAsyncPacketHandler<RerollItemRequest>
 {

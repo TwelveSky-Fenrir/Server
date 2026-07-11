@@ -12,9 +12,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Game;
 
-// game.usp_HeroRanking_GetPoints against real SQL Server 2025 -- the world-entry hydration read
-// (Migrations/030_hero_rank_points_world_entry_hydration.sql) EnterWorldService uses to seed
-// PlayerRuntimeState.HeroRankPoints from the character's already-persisted Current-period total.
 [Collection("SqlServer")]
 public sealed class HeroRankingGetPointsProcTests
 {

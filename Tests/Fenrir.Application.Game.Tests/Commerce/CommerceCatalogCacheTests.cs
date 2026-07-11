@@ -5,11 +5,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Commerce;
 
-/// <summary>
-///     Covers <see cref="CommerceCatalogCache" />'s reload-trigger/publish mechanics: version-compare-then-
-///     reload, the CRC-written-before-the-reload-is-attempted-and-never-rolled-back ordering, and cash/blood
-///     independence.
-/// </summary>
 public class CommerceCatalogCacheTests
 {
     private static ItemMallProductRowDto Product(int id, byte type, int itemId, int quantity, int cost, bool active)
@@ -45,8 +40,6 @@ public class CommerceCatalogCacheTests
 
         await cache.RefreshCashCatalogAsync(repository, CancellationToken.None);
 
-        // No 100000/type-5 sentinel row -> ResolveVersion returns 0, which already equals InitialVersion:
-        // a same-version no-op, matching the "no error, no log, simple no-op" edge case.
         Assert.Equal(0, cache.CashCatalogVersion);
         Assert.False(cache.CashCatalog.CostInfoByIndex[0].IsAssigned);
     }
@@ -60,8 +53,8 @@ public class CommerceCatalogCacheTests
             ItemMallProducts =
             [
                 Product(1, 1, 100, 0, 20, true),
-                Product(100000, 5, 7, 0, 0, true), // version sentinel -> 7
-                Product(100001, 5, 42, 0, 0, true) // Fenrir-chosen CRC sentinel -> 42
+                Product(100000, 5, 7, 0, 0, true),
+                Product(100001, 5, 42, 0, 0, true)
             ]
         };
 
@@ -88,12 +81,11 @@ public class CommerceCatalogCacheTests
         };
         await cache.RefreshCashCatalogAsync(repository, CancellationToken.None);
 
-        // A second reload attempt with the exact same rows/version -- CRC must not even be re-derived.
         repository.ItemMallProducts =
         [
             Product(1, 1, 100, 0, 20, true),
-            Product(100000, 5, 7, 0, 0, true), // same version
-            Product(100001, 5, 999, 0, 0, true) // CRC row changed, but version didn't -- must be ignored
+            Product(100000, 5, 7, 0, 0, true),
+            Product(100001, 5, 999, 0, 0, true)
         ];
         await cache.RefreshCashCatalogAsync(repository, CancellationToken.None);
 
@@ -127,7 +119,7 @@ public class CommerceCatalogCacheTests
             BloodExchangeCatalog =
             [
                 new BloodExchangeCatalogRowDto(1, 12, 5, 0),
-                new BloodExchangeCatalogRowDto(100000, 6, 0, 0) // version sentinel -> 6
+                new BloodExchangeCatalogRowDto(100000, 6, 0, 0)
             ]
         };
 
@@ -166,8 +158,8 @@ public class CommerceCatalogCacheTests
 
         await cache.RefreshAllAsync(repository, CancellationToken.None);
 
-        Assert.Equal(CommerceCatalogCache.InitialVersion, cache.CashCatalogVersion); // untouched
-        Assert.Equal(6, cache.BloodCatalogVersion); // still reloaded
+        Assert.Equal(CommerceCatalogCache.InitialVersion, cache.CashCatalogVersion);
+        Assert.Equal(6, cache.BloodCatalogVersion);
     }
 
     [Fact]
@@ -182,7 +174,7 @@ public class CommerceCatalogCacheTests
 
         await cache.RefreshAllAsync(repository, CancellationToken.None);
 
-        Assert.Equal(7, cache.CashCatalogVersion); // still reloaded
-        Assert.Equal(CommerceCatalogCache.InitialVersion, cache.BloodCatalogVersion); // untouched
+        Assert.Equal(7, cache.CashCatalogVersion);
+        Assert.Equal(CommerceCatalogCache.InitialVersion, cache.BloodCatalogVersion);
     }
 }

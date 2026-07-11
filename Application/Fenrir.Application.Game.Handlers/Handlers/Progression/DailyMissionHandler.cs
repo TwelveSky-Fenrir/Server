@@ -9,21 +9,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Progression;
 
-/// <summary>
-///     CZ_MISSION_COMPLETE_SEND (opcode 126) -- daily mission view/claim. Claim gates on level &gt;= LV_M1 and
-///     war/kill-tribe thresholds; <c>aKillMonster</c>/<c>aPlayTime</c> gates are compiled out in EU33 so they
-///     never block a claim. A full inventory on claim is a clean failure (<c>Result = 3</c>).
-/// </summary>
-/// <remarks>
-///     <see cref="PlayerRuntimeState.MissionJoinWar" /> now increments too -- Regular War (Zone049)
-///     conclusion credits every ready, non-zone-transferring character present on that map (see
-///     <c>Zone.HandleRegularWarConclusionCredit</c>) -- so a claim is reachable end to end once a character
-///     has both been present for at least one Regular War conclusion since the last daily reset and reached
-///     the kill-other-tribe cap below.
-///     <see cref="PlayerRuntimeState.MissionKillOtherTribe" /> DOES increment now --
-///     <c>Zone.ApplyPvpKillMissionProgress</c>,
-///     gated by <see cref="Combat.KillCooldownTracker" /> (C05).
-/// </remarks>
 public sealed class DailyMissionHandler(IDailyMissionService dailyMissionService, ILogger<DailyMissionHandler> logger)
     : IAsyncPacketHandler<DailyMissionRequest>
 {

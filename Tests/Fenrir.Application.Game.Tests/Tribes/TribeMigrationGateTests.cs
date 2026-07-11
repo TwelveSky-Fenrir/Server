@@ -4,14 +4,11 @@ namespace Fenrir.Application.Game.Tests.Tribes;
 
 public class TribeMigrationGateTests
 {
-    // Saturday 2024-01-06 -- a fixed, known Saturday for every "within window" fixture.
     private static readonly DateTime SaturdayWithinWindow = new(2024, 1, 6, 17, 0, 0);
     private static readonly DateTime WednesdayOutsideWindow = new(2024, 1, 10, 17, 0, 0);
 
     private static TribeMigrationEligibilityContext OutboundValid()
     {
-        // Tribe 0: raw 200 (unique max among 0/1/2, >=100), alliance-adjusted 200 (no allies) is also the
-        // unique max, and tribe 3's own 0 points is nowhere near that bloc -- every outbound gate passes.
         return new TribeMigrationEligibilityContext(
             true,
             SaturdayWithinWindow,
@@ -30,11 +27,9 @@ public class TribeMigrationGateTests
 
     private static TribeMigrationEligibilityContext ReturnValid()
     {
-        // Tribe 3 (current), origin tribe 1 -- origin's 50 points does not exceed tribe 3's own 60, and one
-        // banked return allowance is available.
         return new TribeMigrationEligibilityContext(
             true,
-            WednesdayOutsideWindow, // deliberately NOT a Saturday -- the return branch must not care
+            WednesdayOutsideWindow,
             TribeMigrationGate.TribeFour,
             1,
             TribeMigrationGate.MinLevel,
@@ -81,19 +76,17 @@ public class TribeMigrationGateTests
     [Fact]
     public void Evaluate_Return_IgnoresConversionWindow()
     {
-        // ReturnValid() is already fixtured with a non-Saturday NowLocal and still succeeds -- the return
-        // branch is never time-gated (contract: "only when the character is not already in tribe 3").
         var context = ReturnValid() with { NowLocal = WednesdayOutsideWindow };
 
         Assert.Equal(TribeMigrationOutcome.Success, TribeMigrationGate.Evaluate(context));
     }
 
     [Theory]
-    [InlineData(2024, 1, 6, 16, 0, 0, true)] // Saturday, window open
-    [InlineData(2024, 1, 6, 18, 59, 59, true)] // Saturday, last legal second
-    [InlineData(2024, 1, 6, 15, 59, 59, false)] // Saturday, one second too early
-    [InlineData(2024, 1, 6, 19, 0, 0, false)] // Saturday, one hour too late
-    [InlineData(2024, 1, 5, 17, 0, 0, false)] // Friday, same hour
+    [InlineData(2024, 1, 6, 16, 0, 0, true)]
+    [InlineData(2024, 1, 6, 18, 59, 59, true)]
+    [InlineData(2024, 1, 6, 15, 59, 59, false)]
+    [InlineData(2024, 1, 6, 19, 0, 0, false)]
+    [InlineData(2024, 1, 5, 17, 0, 0, false)]
     public void IsWithinConversionWindow_MatchesSaturday16To18Inclusive(int year, int month, int day, int hour,
         int minute, int second, bool expected)
     {
@@ -133,9 +126,6 @@ public class TribeMigrationGateTests
     [Fact]
     public void Evaluate_Outbound_TribeThreeAlreadyAtOrAheadOfStrongestBloc_Blocks()
     {
-        // Tribe 0's raw 150 would otherwise be dominant, but tribe 3 already holds 200 -- at least as strong
-        // as the strongest combat-tribe bloc -- so CheckPossibleChangeToTribe4's "tribe 3 already dominant"
-        // branch fires first.
         var context = OutboundValid() with { TribePoints = new[] { 150, 50, 100, 200 } };
 
         Assert.Equal(TribeMigrationOutcome.NotEligibleByWorldState, TribeMigrationGate.Evaluate(context));
@@ -144,8 +134,6 @@ public class TribeMigrationGateTests
     [Fact]
     public void Evaluate_Outbound_OwnTribeIsAllianceAdjustedWeakest_Blocks()
     {
-        // Own tribe clears the raw >=100 floor but is strictly behind both rivals once alliance adjustment is
-        // applied (here, no alliances at all -- raw IS the alliance-adjusted total).
         var context = OutboundValid() with { TribePoints = new[] { 100, 500, 500, 0 } };
 
         Assert.Equal(TribeMigrationOutcome.NotEligibleByWorldState, TribeMigrationGate.Evaluate(context));
@@ -154,9 +142,6 @@ public class TribeMigrationGateTests
     [Fact]
     public void Evaluate_Outbound_NotRawDominant_Blocks()
     {
-        // Tribe 0 (150) is allied with tribe 1 (200): alliance-adjusted totals tie at 350 each, so the
-        // alliance-adjusted world-state check passes (neither "tribe 3 dominant" nor "uniquely weakest"), but
-        // tribe 0's own RAW total (150) is still behind tribe 1's raw total (200) -- ReturnBigTribe fails.
         var context = OutboundValid() with
         {
             TribePoints = new[] { 150, 200, 100, 0 },
@@ -177,7 +162,6 @@ public class TribeMigrationGateTests
     [Fact]
     public void Evaluate_Return_OriginTribeExactlyTiedWithTribeThree_Succeeds()
     {
-        // The contract blocks the return specifically when the origin is STRICTLY ahead -- a tie is allowed.
         var context = ReturnValid() with { TribePoints = new[] { 0, 100, 0, 100 } };
 
         Assert.Equal(TribeMigrationOutcome.Success, TribeMigrationGate.Evaluate(context));
@@ -194,9 +178,6 @@ public class TribeMigrationGateTests
     [Fact]
     public void Evaluate_Return_AllowanceCannotBeReusedAfterItIsSpent()
     {
-        // Proves the one-shot/no-farming property at the gate level: a single banked charge is enough for
-        // exactly one accepted return, and re-evaluating with the post-decrement allowance (0) blocks the
-        // very next attempt outright, regardless of every other input being unchanged and still eligible.
         var oneCharge = ReturnValid() with { ReturnAllowance = 1 };
         Assert.Equal(TribeMigrationOutcome.Success, TribeMigrationGate.Evaluate(oneCharge));
 

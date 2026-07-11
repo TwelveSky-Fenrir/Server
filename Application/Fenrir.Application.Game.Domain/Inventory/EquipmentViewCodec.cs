@@ -3,13 +3,11 @@ using Fenrir.Application.Game.Domain.World.Loot;
 
 namespace Fenrir.Application.Game.Domain.Inventory;
 
-/// <summary>Builds ObjectForAvatar.EquipForView (int[13][2] of ItemId/Enchant pairs) from the Equipment container.</summary>
 public static class EquipmentViewCodec
 {
     private const int EquipmentSlotCount = 13;
 
-    /// <summary>From freshly-loaded world-entry SQL rows (Equipment container only).</summary>
-    public static int[] BuildEquipForView(IReadOnlyList<CharacterItemSlotDto> items)
+        public static int[] BuildEquipForView(IReadOnlyList<CharacterItemSlotDto> items)
     {
         var view = new int[EquipmentSlotCount * 2];
 
@@ -27,8 +25,7 @@ public static class EquipmentViewCodec
         return view;
     }
 
-    /// <summary>From the live in-memory Equipment container.</summary>
-    public static int[] BuildEquipForView(IReadOnlyDictionary<byte, ItemStack> equipmentContainer)
+        public static int[] BuildEquipForView(IReadOnlyDictionary<byte, ItemStack> equipmentContainer)
     {
         var view = new int[EquipmentSlotCount * 2];
 

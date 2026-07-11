@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Tests.TestSupport;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Shared;
 
-// Golden encoder is hand-built from the C++ ITEM_LINK_INFO layout, independent of the generated Write.
 public class ItemLinkInfoTests
 {
     [Fact]

@@ -2,11 +2,6 @@ using Fenrir.Application.Game.Domain.Tribes;
 
 namespace Fenrir.Application.Game.Tests.Tribes;
 
-/// <summary>
-///     Pure, I/O-free coverage of <see cref="ForcedNeutralTribeResetGate" /> (item 8100's precondition chain)
-///     -- every gate in isolation, plus the fixed evaluation order the legacy source itself checks in
-///     (level → already-neutral → tribe role → guild/mentor → friends → neutral-home-zone-online).
-/// </summary>
 public class ForcedNeutralTribeResetGateTests
 {
     private static ForcedNeutralTribeResetEligibilityContext Eligible()
@@ -50,9 +45,9 @@ public class ForcedNeutralTribeResetGateTests
     }
 
     [Theory]
-    [InlineData((byte)1)] // tribe master
-    [InlineData((byte)2)] // sub-master
-    [InlineData((byte)3)] // elected vote candidate
+    [InlineData((byte)1)]
+    [InlineData((byte)2)]
+    [InlineData((byte)3)]
     public void HoldsAnyTribeRoleTier_FailsWithHoldsTribeRole(byte tribeRole)
     {
         var ctx = Eligible() with { TribeRole = tribeRole };
@@ -98,8 +93,6 @@ public class ForcedNeutralTribeResetGateTests
     [Fact]
     public void LevelGate_IsCheckedBeforeAlreadyNeutral_MatchingLegacyEvaluationOrder()
     {
-        // Both LevelTooLow and AlreadyNeutral apply; legacy checks level first (S04_MyWork03.cpp:7226 before
-        // :7231-7235), so LevelTooLow must win.
         var ctx = Eligible() with { Level = 100, CurrentTribe = ForcedNeutralTribeResetGate.NeutralTribe };
         Assert.Equal(ForcedNeutralTribeResetOutcome.LevelTooLow, ForcedNeutralTribeResetGate.Evaluate(ctx));
     }
@@ -115,7 +108,6 @@ public class ForcedNeutralTribeResetGateTests
     public void NeutralHomeZoneGate_IsCheckedLast()
     {
         var ctx = Eligible() with { NeutralHomeZoneOnline = false };
-        // Every other gate still passes -- confirms this is the terminal check, not merely "some" check.
         Assert.Equal(ForcedNeutralTribeResetOutcome.NeutralHomeZoneOffline,
             ForcedNeutralTribeResetGate.Evaluate(ctx));
     }

@@ -10,15 +10,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.ItemModification;
 
-/// <summary>
-///     Business logic for op88, CZ_MAKE_PET_SEND -- extracted from <see cref="CraftPetHandler" />, see that
-///     handler's remarks. On a qualifying recipe success, also stands in for legacy's shared <c>MakeNotice</c>
-///     helper (Server/ts25zone/S04_MyWork02.cpp:309-493, this feature's own call site at :12276) via
-///     <see cref="CenterRelayNoticeLog.LogNotableCraft" /> -- see that type's own remarks for why this is a log
-///     line, not a client-facing broadcast, and for the 2026-07-11 confirmation that no such broadcast is
-///     recoverable (the Center-side relay case for this notice family is a permanently-empty stub with no
-///     default fallback).
-/// </summary>
 public sealed class CraftPetService(
     ICharacterRepository characters,
     IEventLogRepository eventLog,
@@ -26,18 +17,12 @@ public sealed class CraftPetService(
     ILogger<CraftPetService> logger)
     : ICraftPetService
 {
-    /// <summary>
-    ///     game.EventLog.EventCode for the 3-material-plus-catalyst fusion recipes (Recipe1-3) -- scoped
-    ///     independently within <see cref="EventLogCategory.ItemCreate" />, same "app-owned, per-class
-    ///     numbering" posture as <see cref="CraftItemService" />'s own EventCode constants.
-    /// </summary>
-    private const short FourSlotRecipeEventCode = 1;
 
-    /// <summary>game.EventLog.EventCode for the 2-material recipes (Recipe4-6).</summary>
-    private const short TwoSlotRecipeEventCode = 2;
+        private const short FourSlotRecipeEventCode = 1;
 
-    /// <summary>Recipes 1-3: 3 fusion materials (page1-3) + 1 catalyst (page4, consumed 1 unit at a time).</summary>
-    public async ValueTask<CraftPetResult> ResolveFourSlotRecipeAsync(CraftPetRequest packet, Zone zone,
+        private const short TwoSlotRecipeEventCode = 2;
+
+        public async ValueTask<CraftPetResult> ResolveFourSlotRecipeAsync(CraftPetRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, int accountId, CancellationToken cancellationToken)
     {
         if (!IsValidSlot(packet.Page1, packet.Index1) || !IsValidSlot(packet.Page2, packet.Index2) ||
@@ -91,8 +76,7 @@ public sealed class CraftPetService(
             working, resolved, newPet, 10000, RecipeLabel(packet.Sort), cancellationToken);
     }
 
-    /// <summary>Recipes 4-6: exactly 2 materials (page1/page2), page2 always fully consumed (never decremented).</summary>
-    public async ValueTask<CraftPetResult> ResolveTwoSlotRecipeAsync(CraftPetRequest packet, Zone zone,
+        public async ValueTask<CraftPetResult> ResolveTwoSlotRecipeAsync(CraftPetRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, int accountId, CancellationToken cancellationToken)
     {
         if (!IsValidSlot(packet.Page1, packet.Index1) || !IsValidSlot(packet.Page2, packet.Index2))
@@ -131,8 +115,7 @@ public sealed class CraftPetService(
             resolved, newPet, 0, RecipeLabel(packet.Sort), cancellationToken);
     }
 
-    /// <summary>Human-readable recipe tag for <see cref="CenterRelayNoticeLog.LogNotableCraft" />'s log line only -- no legacy equivalent, purely for log correlation.</summary>
-    private static string RecipeLabel(int sort)
+        private static string RecipeLabel(int sort)
     {
         return $"pet-recipe-{sort + 1}";
     }
@@ -151,12 +134,6 @@ public sealed class CraftPetService(
             await characters.ReplaceTwoContainersAsync(characterId, pages[0], ToTvps(working[pages[0]]), pages[1],
                 ToTvps(working[pages[1]]), cancellationToken);
 
-        // Logged only once the container replace(s) above have durably committed -- an ItemCreate row must
-        // never assert a mint that the DB write didn't actually persist (same posture as CraftItemService's
-        // own craft-family logging). ResultQuantity 0 is the "a single fresh pet unit" convention (see
-        // PetCraftResolver's own remarks); the roll-miss "consolation" branches genuinely stack, so the logged
-        // Quantity floors at 1 rather than asserting a false 0-unit mint, same convention CraftItemService's
-        // MountFusion/WingTierReroll/WingFifthTier logging already uses.
         await eventLog.LogAsync(eventCode, EventLogCategory.ItemCreate, accountId, characterId, null, null, null,
             null, null, resolved.ResultItemId, Math.Max(resolved.ResultQuantity, 1), 1, null, cancellationToken);
 

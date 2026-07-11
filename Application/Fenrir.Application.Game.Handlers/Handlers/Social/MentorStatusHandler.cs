@@ -8,11 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>
-///     CZ_TEACHER_STATE_SEND (opcode 64). See <c>MentorStatusService</c>'s own remarks for why a character
-///     holding both a teacher and a student simultaneously is structurally unreachable under the legacy
-///     Mentor-Ask gate, not an unresolved teacher-vs-student precedence rule.
-/// </summary>
 public sealed class MentorStatusHandler(IMentorStatusService mentorStatusService, ILogger<MentorStatusHandler> logger)
     : IInlinePacketHandler<MentorStatusRequest>
 {

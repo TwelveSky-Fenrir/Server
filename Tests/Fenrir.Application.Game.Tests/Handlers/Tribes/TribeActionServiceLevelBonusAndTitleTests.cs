@@ -16,13 +16,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Tribes;
 
-/// <summary>
-///     tSort 6 (title purchase) and tSort 8 (level-milestone bonus claim) -- the two
-///     <see cref="TribeActionService" /> methods C19's wiring pass moved onto
-///     <see cref="TitleContributionCost" />/<see cref="LevelMilestoneBonus" /> instead of their own
-///     previously-duplicated private tables. Halo/Rebirth coverage lives in the sibling
-///     <c>TribeActionServiceTests</c>; this file is scoped to just these two.
-/// </summary>
 public class TribeActionServiceLevelBonusAndTitleTests
 {
     private const int CharacterId = 10;
@@ -64,14 +57,13 @@ public class TribeActionServiceLevelBonusAndTitleTests
             ZoneTestKit.EmptyWorldData(levelsByLevel: levels), worldState, NullLogger<TribeActionService>.Instance);
     }
 
-    // --- tSort 8: level-milestone bonus claim -------------------------------------------------------------
 
     [Fact]
     public async Task ClaimLevelBonus_NoMilestoneArmed_Aborts()
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (_, _, state) = Setup(zone, CharacterId);
-        Assert.Equal(0, state.BonusItemLevel); // never armed
+        Assert.Equal(0, state.BonusItemLevel);
         var service = CreateService();
 
         var outcome = await service.ClaimLevelBonusAsync(zone, state, CharacterId, CancellationToken.None);
@@ -82,44 +74,33 @@ public class TribeActionServiceLevelBonusAndTitleTests
     [Fact]
     public async Task ClaimLevelBonus_UnrecognizedStoredLevel_Aborts_WithoutGrantingAnything()
     {
-        // Every one of the 11 named legacy milestone levels now has a known claim table (the
-        // level-milestone-bonus-item-ids recovery pass supplied the last six, the M-tier levels), so a
-        // genuinely-unrecognized stored level can no longer be one of those -- use an arbitrary value that was
-        // never a legacy milestone at all. ClaimLevelBonusAsync must still refuse it defensively rather than
-        // fall through to an unhandled case.
         var zone = ZoneTestKit.CreateZone(1);
         var (_, _, state) = Setup(zone, CharacterId);
-        state.BonusItemLevel = 999; // never a legacy milestone level
+        state.BonusItemLevel = 999;
         var service = CreateService();
 
         var outcome = await service.ClaimLevelBonusAsync(zone, state, CharacterId, CancellationToken.None);
 
         Assert.True(outcome.Aborted);
-        Assert.Equal(999, state.BonusItemLevel); // untouched -- never cleared on abort
+        Assert.Equal(999, state.BonusItemLevel);
     }
 
     [Fact]
     public async Task ClaimLevelBonus_MTierLevel132_GrantsTheResolvedDrops_AndClearsTheArmedState()
     {
-        // Regression guard for the level-milestone-bonus-item-ids recovery: the M-tier levels (114-144) were
-        // previously deferred/unarmable; this proves one of the upper-tier cases (which additionally grants
-        // item 1458) now claims successfully end-to-end through the delegating service.
         var zone = ZoneTestKit.CreateZone(1);
         var (_, _, state) = Setup(zone, CharacterId);
-        state.BonusItemLevel = LevelMilestoneBonus.LvM20; // 132
+        state.BonusItemLevel = LevelMilestoneBonus.LvM20;
         state.BonusItemValue = true;
         var service = CreateService();
 
         var outcome = await service.ClaimLevelBonusAsync(zone, state, CharacterId, CancellationToken.None);
-        zone.Tick(TimeSpan.FromMilliseconds(50)); // drains the posted TribeProgressZoneCommand mirror
+        zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.False(outcome.Aborted);
         Assert.True(zone.TryGetPlayer(CharacterId, out var after));
         Assert.Equal(0, after!.BonusItemLevel);
         Assert.False(after.BonusItemValue);
-        // The exact item set (850/539x2/1458) for tier 132 is pinned by
-        // LevelMilestoneBonusTests.TryResolveClaimDrops_Level132_LvM20_GrantsItem850PlusItem539PlusItem1458;
-        // this test only proves the claim succeeds end-to-end through the now-delegating service.
     }
 
     [Fact]
@@ -132,7 +113,7 @@ public class TribeActionServiceLevelBonusAndTitleTests
         var service = CreateService();
 
         var outcome = await service.ClaimLevelBonusAsync(zone, state, CharacterId, CancellationToken.None);
-        zone.Tick(TimeSpan.FromMilliseconds(50)); // drains the posted TribeProgressZoneCommand mirror
+        zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.False(outcome.Aborted);
         Assert.True(zone.TryGetPlayer(CharacterId, out var after));
@@ -143,37 +124,29 @@ public class TribeActionServiceLevelBonusAndTitleTests
     [Fact]
     public async Task ClaimLevelBonus_Tier145_StampsExactlyOneUnitOfThePreviousTribeItem_NotTwenty()
     {
-        // Regression guard for the C19-flagged bug: the pre-wiring switch misread the legacy's "one item
-        // stamped with enchant value 20" as a quantity of 20 (new TribeGroundItemDrop(tribeItemId, 20)).
-        // LevelMilestoneBonus.TryResolveClaimDrops grants quantity 1 instead -- this proves the delegation
-        // actually replaced the buggy inline switch rather than merely compiling alongside it.
         var zone = ZoneTestKit.CreateZone(1);
         var (_, _, state) = Setup(zone, CharacterId);
         state.BonusItemLevel = 145;
         state.BonusItemValue = true;
-        state.PreviousTribe = 0; // -> tribe item 83809
+        state.PreviousTribe = 0;
         var service = CreateService();
 
         var outcome = await service.ClaimLevelBonusAsync(zone, state, CharacterId, CancellationToken.None);
-        zone.Tick(TimeSpan.FromMilliseconds(50)); // drains the posted TribeProgressZoneCommand mirror
+        zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.False(outcome.Aborted);
         Assert.True(zone.TryGetPlayer(CharacterId, out var after));
         Assert.Equal(0, after!.BonusItemLevel);
         Assert.False(after.BonusItemValue);
-        // The exact quantity=1 (not 20) drop shape for tier 145's previous-tribe item is pinned by
-        // LevelMilestoneBonusTests.TryResolveClaimDrops_Level145_AppendsPreviousTribeItemAsSingleUnit; this
-        // test only proves the claim succeeds end-to-end for tier 145 through the now-delegating service.
     }
 
-    // --- tSort 6: title purchase ---------------------------------------------------------------------------
 
     [Fact]
     public async Task PurchaseTitle_Rank0_CostsExactlyTheFirstTitleContributionCostTableEntry()
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (_, _, state) = Setup(zone, CharacterId, contributionPoints: TitleContributionCost.CostTable[0]);
-        state.Title = 0; // rank 0
+        state.Title = 0;
         var service = CreateService();
         var data = new byte[100];
         new TribeWorkTitlePayload { TitleSort = 1, TitleLv = 0 }.Write(data);
@@ -183,8 +156,6 @@ public class TribeActionServiceLevelBonusAndTitleTests
 
         Assert.False(outcome.Aborted);
         Assert.True(zone.TryGetPlayer(CharacterId, out var after));
-        // Exactly TitleContributionCost.CostTable[0] (800) CP spent -- proves PurchaseTitleAsync now reads its
-        // cost from the shared table instead of its own now-deleted private duplicate.
         Assert.Equal(0, after!.ContributionPoints);
     }
 
@@ -199,6 +170,6 @@ public class TribeActionServiceLevelBonusAndTitleTests
         var outcome = await service.PurchaseTitleAsync(zone, state, CharacterId, new byte[100], CancellationToken.None);
 
         Assert.True(outcome.Aborted);
-        Assert.Equal(TitleContributionCost.CostTable[0] - 1, state.ContributionPoints); // untouched
+        Assert.Equal(TitleContributionCost.CostTable[0] - 1, state.ContributionPoints);
     }
 }

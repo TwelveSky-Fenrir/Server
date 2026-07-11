@@ -2,10 +2,6 @@ using Fenrir.Application.Game.Domain.Hotkeys;
 
 namespace Fenrir.Application.Game.Tests.Hotkeys;
 
-/// <summary>
-///     Covers <see cref="BotHotKeyResupplyPolicy" /> -- the auto-hunt bot's HP/MP/pet-prey/pet-food hotkey
-///     resupply decision (BotHotKey, S07_MyGame04.cpp:2499-2559).
-/// </summary>
 public class BotHotKeyResupplyPolicyTests
 {
     private static readonly BotHotKeyResupplyPolicy.BoundCategories NothingBound = new(false, false, false, false, false);
@@ -29,7 +25,7 @@ public class BotHotKeyResupplyPolicyTests
     [InlineData(5, BotHotKeyResupplyPolicy.ResupplyCategory.HpMp)]
     [InlineData(0, BotHotKeyResupplyPolicy.ResupplyCategory.None)]
     [InlineData(9, BotHotKeyResupplyPolicy.ResupplyCategory.None)]
-    [InlineData(16, BotHotKeyResupplyPolicy.ResupplyCategory.None)] // pet/mount types are NOT auto-classified (uncited)
+    [InlineData(16, BotHotKeyResupplyPolicy.ResupplyCategory.None)]
     public void ClassifyHpMpByPotionType_MapsOnlyTheCitedTypes(int potionType1,
         BotHotKeyResupplyPolicy.ResupplyCategory expected)
     {
@@ -51,7 +47,7 @@ public class BotHotKeyResupplyPolicyTests
         Assert.Equal(0, move.DestinationPage);
         Assert.Equal(0, move.DestinationIndex);
         Assert.Equal(1364, move.ItemId);
-        Assert.Equal(9, move.Quantity); // whole stack, not one unit
+        Assert.Equal(9, move.Quantity);
     }
 
     [Fact]
@@ -84,12 +80,11 @@ public class BotHotKeyResupplyPolicyTests
     [Fact]
     public void SharedHpMpSource_SatisfiesTheHpRefill()
     {
-        // A shared HP+MP consumable is an acceptable source for the HP (and MP) refill, not only for the tally.
         var moves = BotHotKeyResupplyPolicy.Resolve(NothingBound,
             [Candidate(3, BotHotKeyResupplyPolicy.ResupplyCategory.HpMp)], TwoEmptySlots,
             false, false, false, false);
 
-        var move = Assert.Single(moves); // one HpMp stack fills the HP refill; the MP refill then finds no source
+        var move = Assert.Single(moves);
         Assert.Equal(3, move.SourceSlot);
     }
 
@@ -104,8 +99,8 @@ public class BotHotKeyResupplyPolicyTests
             TwoEmptySlots, false, false, false, false);
 
         Assert.Equal(2, moves.Length);
-        Assert.Equal((byte)0, moves[0].DestinationIndex); // HP into the first empty slot
-        Assert.Equal((byte)1, moves[1].DestinationIndex); // MP into the next empty slot
+        Assert.Equal((byte)0, moves[0].DestinationIndex);
+        Assert.Equal((byte)1, moves[1].DestinationIndex);
         Assert.Equal(10, moves[0].ItemId);
         Assert.Equal(20, moves[1].ItemId);
     }
@@ -123,14 +118,13 @@ public class BotHotKeyResupplyPolicyTests
     [Fact]
     public void NoMatchingSourceForOneCategory_OtherCategoriesStillRefill()
     {
-        // Only an MP source exists: the HP refill is silently skipped, the MP refill still fires.
         var moves = BotHotKeyResupplyPolicy.Resolve(NothingBound,
             [Candidate(2, BotHotKeyResupplyPolicy.ResupplyCategory.Mp, itemId: 20)],
             TwoEmptySlots, false, false, false, false);
 
         var move = Assert.Single(moves);
         Assert.Equal(20, move.ItemId);
-        Assert.Equal((byte)0, move.DestinationIndex); // took the first empty slot (HP left it untouched)
+        Assert.Equal((byte)0, move.DestinationIndex);
     }
 
     [Fact]
@@ -139,9 +133,9 @@ public class BotHotKeyResupplyPolicyTests
         var candidates = new[] { Candidate(4, BotHotKeyResupplyPolicy.ResupplyCategory.PetPrey, itemId: 40) };
 
         Assert.Empty(BotHotKeyResupplyPolicy.Resolve(NothingBound, candidates, TwoEmptySlots,
-            animalPreyCmd: false, petEquipped: true, false, false)); // flag off
+            animalPreyCmd: false, petEquipped: true, false, false));
         Assert.Empty(BotHotKeyResupplyPolicy.Resolve(NothingBound, candidates, TwoEmptySlots,
-            animalPreyCmd: true, petEquipped: false, false, false)); // no pet
+            animalPreyCmd: true, petEquipped: false, false, false));
 
         var moves = BotHotKeyResupplyPolicy.Resolve(NothingBound, candidates, TwoEmptySlots,
             animalPreyCmd: true, petEquipped: true, false, false);
@@ -166,9 +160,9 @@ public class BotHotKeyResupplyPolicyTests
         var candidates = new[] { Candidate(6, BotHotKeyResupplyPolicy.ResupplyCategory.PetFood, itemId: 60) };
 
         Assert.Empty(BotHotKeyResupplyPolicy.Resolve(NothingBound, candidates, TwoEmptySlots,
-            false, false, animalFoodCmd: false, animalPresent: true)); // flag off
+            false, false, animalFoodCmd: false, animalPresent: true));
         Assert.Empty(BotHotKeyResupplyPolicy.Resolve(NothingBound, candidates, TwoEmptySlots,
-            false, false, animalFoodCmd: true, animalPresent: false)); // no animal
+            false, false, animalFoodCmd: true, animalPresent: false));
 
         var moves = BotHotKeyResupplyPolicy.Resolve(NothingBound, candidates, TwoEmptySlots,
             false, false, animalFoodCmd: true, animalPresent: true);
@@ -191,10 +185,10 @@ public class BotHotKeyResupplyPolicyTests
             animalPreyCmd: true, petEquipped: true, animalFoodCmd: true, animalPresent: true);
 
         Assert.Equal(4, moves.Length);
-        Assert.Equal(10, moves[0].ItemId); // HP first
-        Assert.Equal(20, moves[1].ItemId); // MP second
-        Assert.Equal(30, moves[2].ItemId); // pet-prey third
-        Assert.Equal(40, moves[3].ItemId); // pet-food fourth
+        Assert.Equal(10, moves[0].ItemId);
+        Assert.Equal(20, moves[1].ItemId);
+        Assert.Equal(30, moves[2].ItemId);
+        Assert.Equal(40, moves[3].ItemId);
         Assert.Equal((byte)3, moves[3].DestinationIndex);
     }
 }

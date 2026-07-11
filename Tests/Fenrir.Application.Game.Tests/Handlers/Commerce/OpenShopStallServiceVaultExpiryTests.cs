@@ -15,16 +15,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Commerce;
 
-/// <summary>
-///     C1-vault-expiry-enforcement: depositing into a proxy/personal shop listing is one of this protocol's
-///     "move between containers" stand-ins for a literal drop/move request (no such request exists at all --
-///     see the originating contract's own Edge cases). Covers <see cref="OpenShopStallService.PrepareAsync" />'s
-///     new dated-vault last-page gate. Companion to <see cref="OpenShopStallServiceCapacityTests" />/
-///     <see cref="OpenShopStallServiceProxyRegistrationTests" />, neither of which exercises
-///     <c>PrepareAsync</c>'s per-slot validation loop or a non-empty listing at all. Every scenario here seeds
-///     a LIVE inventory slot that exactly matches the declared listing, so a rejection can only be attributed
-///     to the vault gate itself, never to an incidental live-inventory mismatch.
-/// </summary>
 public class OpenShopStallServiceVaultExpiryTests
 {
     private const int ListedItemId = 500;
@@ -38,18 +28,13 @@ public class OpenShopStallServiceVaultExpiryTests
             ZoneTestKit.EnterData(session, ProxyShopZonePolicy.ZoneNumber, "Seller", 15f, posZ: 25f)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
         Assert.True(zone.TryGetPlayer(characterId, out var state));
-        state!.ActionSort = 1; // idle/stationary, required before any shop-open gate is evaluated
+        state!.ActionSort = 1;
 
         await Task.CompletedTask;
         return state;
     }
 
-    /// <summary>
-    ///     Directly replaces <paramref name="page" />/<paramref name="index" /> on <paramref name="state" />'s
-    ///     own <see cref="InventoryState" /> -- <see cref="OpenShopStallService.PrepareAsync" /> reads live
-    ///     inventory synchronously, so no zone tick/command round trip is needed to make a seed visible to it.
-    /// </summary>
-    private static void SeedLiveSlot(PlayerRuntimeState state, byte page, byte index, ItemStack? stack)
+        private static void SeedLiveSlot(PlayerRuntimeState state, byte page, byte index, ItemStack? stack)
     {
         var updated = stack is { } s
             ? state.Inventory.GetContainer(page).SetItem(index, s)
@@ -57,20 +42,19 @@ public class OpenShopStallServiceVaultExpiryTests
         state.Inventory.ReplaceContainer(page, updated);
     }
 
-    /// <summary>A single occupied pshop slot (page0/slot0) whose declared coordinate is caller-supplied.</summary>
-    private static OpenShopStallRequest RequestWithOneOccupiedSlot(byte inventoryPage, byte inventoryIndex)
+        private static OpenShopStallRequest RequestWithOneOccupiedSlot(byte inventoryPage, byte inventoryIndex)
     {
         var itemInfo = new int[225];
         var i = PshopPurchasePolicy.FlatIndex(0, 0);
         itemInfo[i] = ListedItemId;
-        itemInfo[i + 1] = 1; // Quantity
-        itemInfo[i + 2] = 0; // Value (enchant/combine/refine/socket all zero)
-        itemInfo[i + 3] = 0; // Serial (unused by ValidateOpenSlot)
-        itemInfo[i + 4] = 1; // Price
+        itemInfo[i + 1] = 1;
+        itemInfo[i + 2] = 0;
+        itemInfo[i + 3] = 0;
+        itemInfo[i + 4] = 1;
         itemInfo[i + 5] = inventoryPage;
         itemInfo[i + 6] = inventoryIndex;
-        itemInfo[i + 7] = 0; // PosX
-        itemInfo[i + 8] = 0; // PosY
+        itemInfo[i + 7] = 0;
+        itemInfo[i + 8] = 0;
 
         return new OpenShopStallRequest
         {
@@ -89,9 +73,6 @@ public class OpenShopStallServiceVaultExpiryTests
             [ListedItemId] = new(WorldDataTestRows.Item(ListedItemId), [])
         }.ToFrozenDictionary();
 
-        // Sort=2 (proxy) requests never reach either repository from PrepareAsync itself -- the personal-shop
-        // (Sort=1) IPC round trip and OpenProxyShopAsync's own durable write are both later/different code
-        // paths -- so an unseeded FakeOfflineShopRepository and a never-invoked settings stub are sufficient.
         return new OpenShopStallService(new FakeOfflineShopRepository(), new UnusedGameSettingsRepository(),
             ZoneTestKit.EmptyWorldData(itemsById), new FakeEventLogRepository(),
             NullLogger<OpenShopStallService>.Instance);
@@ -101,7 +82,7 @@ public class OpenShopStallServiceVaultExpiryTests
     public async Task LastPageExpired_SlotReferencingItAborts_EvenThoughTheLiveSlotMatchesExactly()
     {
         var state = await EnterPlayerAsync(90101);
-        state.InventoryDate = 20200101; // long past
+        state.InventoryDate = 20200101;
         SeedLiveSlot(state, ContainerMatrix.InventoryPage1, 5, ListedStack);
 
         var service = CreateService();
@@ -116,7 +97,7 @@ public class OpenShopStallServiceVaultExpiryTests
     public async Task LastPageStillValid_SlotReferencingItPasses_ReachesProxyReady()
     {
         var state = await EnterPlayerAsync(90102);
-        state.InventoryDate = 99991231; // far future -- still valid
+        state.InventoryDate = 99991231;
         SeedLiveSlot(state, ContainerMatrix.InventoryPage1, 5, ListedStack);
 
         var service = CreateService();
@@ -133,7 +114,7 @@ public class OpenShopStallServiceVaultExpiryTests
     public async Task FirstPage_NeverBlockedByVaultExpiry_RegardlessOfInventoryDate()
     {
         var state = await EnterPlayerAsync(90103);
-        state.InventoryDate = 20200101; // expired -- irrelevant, this slot targets page0
+        state.InventoryDate = 20200101;
         SeedLiveSlot(state, ContainerMatrix.InventoryPage0, 5, ListedStack);
 
         var service = CreateService();

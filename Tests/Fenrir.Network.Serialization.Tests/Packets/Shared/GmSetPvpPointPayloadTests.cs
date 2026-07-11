@@ -4,8 +4,6 @@ using Fenrir.Network.Serialization.Tests.TestSupport;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Shared;
 
-// CZ_PROCESS_DATA_SEND tSort 598, "GM-SETPVPPOINT" (Server/ts25zone/S04_MyWork04.cpp:1755-1769). Rides inside
-// GenericActionRequest's (opcode 19) tData blob -- there is no dedicated legacy wire opcode for this command.
 public class GmSetPvpPointPayloadTests
 {
     [Fact]
@@ -49,8 +47,6 @@ public class GmSetPvpPointPayloadTests
     [Fact]
     public void TryRead_DecodesFromFirst8BytesOfLargerBuffer()
     {
-        // GenericActionHandler reads this out of the first 8 bytes of GenericActionRequest.Data (130 bytes),
-        // not a dedicated 8-byte packet.
         var data = new byte[130];
         BinaryPrimitives.WriteInt32LittleEndian(data.AsSpan(0, 4), 1);
         BinaryPrimitives.WriteInt32LittleEndian(data.AsSpan(4, 4), 42);

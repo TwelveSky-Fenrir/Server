@@ -8,12 +8,8 @@ using Fenrir.Data.Abstractions.Runtime;
 
 namespace Fenrir.Data.Runtime;
 
-// Cross-shard fan-out for the guild-buff-reserve-exhaustion immediate strip-effect push -- see
-// IGuildBuffExpiryRelayRepository for the per-method contract.
 public sealed record GuildBuffExpiryRelayRepository(ICaeriusNetDbContext Db) : IGuildBuffExpiryRelayRepository
 {
-    // Small, rare round trips against a memory-optimized table that should never itself be slow -- a short
-    // timeout fails fast instead of masking a stuck request. Same value as GuildTribeBroadcastRelayRepository.
     private const int CommandTimeoutSeconds = 5;
 
     public async ValueTask PublishAsync(GuildBuffExpiryRelayEntry entry, CancellationToken ct)

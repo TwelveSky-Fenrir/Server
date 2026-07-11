@@ -5,8 +5,6 @@ using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Login.Tests.Avatars;
 
-// Op18 CL_DELETE_AVATAR_SEND (delete branch)'s three read-only business-rule refusals. Réf. C++ :
-// Server/ts25login/S04_MyWork02.cpp:1237-1274 ; Server/Header/function.h:92-114 (ReturnTribeRole).
 public class AvatarDeletionGateTests
 {
     [Fact]
@@ -16,8 +14,8 @@ public class AvatarDeletionGateTests
     }
 
     [Theory]
-    [InlineData((byte)1)] // tribe master
-    [InlineData((byte)2)] // tribe sub-master
+    [InlineData((byte)1)]
+    [InlineData((byte)2)]
     public void TribeRoleBlocksDeletion_MasterOrSubMaster_Blocks(byte role)
     {
         Assert.True(AvatarDeletionGate.TribeRoleBlocksDeletion(role, 100, []));
@@ -26,9 +24,6 @@ public class AvatarDeletionGateTests
     [Fact]
     public void TribeRoleBlocksDeletion_RegisteredVoteCandidateForOwnTribe_Blocks()
     {
-        // Rank 3 (active election candidate) has no dedicated ReturnTribeRole return value in Fenrir's own
-        // usp_TribeRole_GetForCharacter (deliberately not resolved there); it collapses to the same refusal via
-        // a separate TribeVotes lookup instead -- ServerDocs/12_ts25zone/04_MyWork02_PartieA.md:498-502.
         var votes = new[]
         {
             new TribeVoteDto(0, 0, 100, 50, 0, 10, DateTime.UtcNow),
@@ -60,9 +55,9 @@ public class AvatarDeletionGateTests
     }
 
     [Theory]
-    [InlineData(1, 0, 0)] // nonzero ShopState
-    [InlineData(0, 1, 0)] // nonzero Money
-    [InlineData(0, 0, 1)] // nonzero BigMoney
+    [InlineData(1, 0, 0)]
+    [InlineData(0, 1, 0)]
+    [InlineData(0, 0, 1)]
     public void ProxyShopBlocksDeletion_NonzeroStateOrMoney_BlocksRegardlessOfItems(byte state, int money,
         int bigMoney)
     {

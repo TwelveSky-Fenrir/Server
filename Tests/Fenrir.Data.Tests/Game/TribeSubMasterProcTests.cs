@@ -12,9 +12,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Game;
 
-// game.usp_TribeSubMaster_Set/Clear against real SQL Server 2025. game.Tribes has no seed script (only 4
-// fixed rows normally created via usp_WorldState_EnsureInitialized) -- each test seeds its own TribeId row
-// directly to stay independent of that bootstrap ordering.
 [Collection("SqlServer")]
 public class TribeSubMasterProcTests
 {
@@ -48,12 +45,10 @@ public class TribeSubMasterProcTests
         Assert.Equal(characterId, await ScalarAsync<int>(
             $"SELECT CharacterId FROM game.TribeSubMasters WHERE TribeId = {tribeId} AND SlotIndex = 0;"));
 
-        // Same slot, different character -> 50310 (slot already occupied).
         var slotTaken = await Assert.ThrowsAsync<SqlException>(() => ExecProcAsync("game.usp_TribeSubMaster_Set",
             ("TribeId", tribeId), ("SlotIndex", (byte)0), ("CharacterId", otherCharacterId)));
         Assert.Equal(50310, slotTaken.Number);
 
-        // Same character, a DIFFERENT slot -> 50311 (already holds a slot in this tribe).
         var alreadySubMaster = await Assert.ThrowsAsync<SqlException>(() => ExecProcAsync(
             "game.usp_TribeSubMaster_Set",
             ("TribeId", tribeId), ("SlotIndex", (byte)1), ("CharacterId", characterId)));
@@ -67,7 +62,6 @@ public class TribeSubMasterProcTests
             ExecProcAsync("game.usp_TribeSubMaster_Clear", ("TribeId", tribeId), ("CharacterId", characterId)));
         Assert.Null(clearAgain);
 
-        // The freed slot can now be reused by a different character.
         await ExecProcAsync("game.usp_TribeSubMaster_Set",
             ("TribeId", tribeId), ("SlotIndex", (byte)0), ("CharacterId", otherCharacterId));
         Assert.Equal(otherCharacterId, await ScalarAsync<int>(
@@ -76,7 +70,6 @@ public class TribeSubMasterProcTests
 
     private async Task<byte> CreateTribeAsync()
     {
-        // TribeId is a fixed 0-3 domain value (CK_Tribes_TribeId); no throwaway ids are possible here.
         const byte tribeId = 0;
 
         await using var connection = new SqlConnection(_connectionString);

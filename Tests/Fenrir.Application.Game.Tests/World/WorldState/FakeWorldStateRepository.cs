@@ -3,10 +3,6 @@ using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Game.Tests.World.WorldState;
 
-/// <summary>
-///     In-memory stand-in for <see cref="IWorldStateRepository" />, seeded like a fresh
-///     usp_WorldState_EnsureInitialized boot (1 singleton row, 4 tribe rows, no alliance offers).
-/// </summary>
 internal sealed class FakeWorldStateRepository : IWorldStateRepository
 {
     public int EnsureInitializedCallCount { get; private set; }
@@ -20,8 +16,6 @@ internal sealed class FakeWorldStateRepository : IWorldStateRepository
     public List<(byte TribeId, DateTime? SymbolDate, bool HasSymbol, bool IsClosed)> SymbolStateUpdateCalls { get; } =
         [];
 
-    // Named distinctly from AddPointsCalls below, which tracks usp_TribeVote_AddPoints (Force Leader voting),
-    // an unrelated feature that happens to share the "add points" shape.
     public List<(byte TribeId, int Delta)> TribePointsDeltaCalls { get; } = [];
     public bool ThrowOnAddTribePoints { get; set; }
     public List<(byte From, byte To, bool IsAccepted)> AllianceOfferCalls { get; } = [];
@@ -43,8 +37,7 @@ internal sealed class FakeWorldStateRepository : IWorldStateRepository
     public (byte? Zone038WinTribe, int? Zone038WinTribeTime, bool TribeSymbolBattle, byte? MonsterSymbol,
         int? MonsterSymbolEndTime, byte? HighTribe, short UpdateTribePoint)? LastWorldUpdate { get; private set; }
 
-    /// <summary>When set, <see cref="UpdateTribeAsync" /> throws for exactly these tribe ids (others still succeed).</summary>
-    public HashSet<byte> ThrowOnUpdateTribeForIds { get; } = [];
+        public HashSet<byte> ThrowOnUpdateTribeForIds { get; } = [];
 
     public List<(byte TribeId, byte SlotIndex, int CandidateCharacterId, short CandidateLevel, int
         KillOtherTribeCount)> RegisterCalls { get; } = [];

@@ -1,21 +1,9 @@
 namespace Fenrir.Application.Game.Domain.Progression;
 
-/// <summary>
-///     Static facts about the 12 towers' guardian monster the legacy hardcoded rather than storing per-tower:
-///     which world.Monsters row stands watch at a given level/type (<c>MySummon::SummonMonsterForTribeTower</c>,
-///     S10_MySummon.cpp:2159-2225), and where it stands in its zone (<c>MyGame::mTowerLocation</c>,
-///     S07_MyGame01.cpp:1341-1352). Both are pure structural formulas/tables, same footing as
-///     <see cref="TowerZoneIndexTable" />'s own zone-number switch -- the monster's own stats (life, damage,
-///     experience...) are fully database-driven via world.Monsters, not duplicated here.
-/// </summary>
 public static class TowerGuardianCatalog
 {
-    /// <summary>
-    ///     world.Monsters IDs 589-600: 3 types (Silver/CP/EXP) x 4 levels, seeded in that exact 12-row block
-    ///     (Database/70_seed/world/090_monsters.sql). Returns 0 (no such monster) for any out-of-range input --
-    ///     callers should treat that as "stay in Building, retry next tick" rather than throw.
-    /// </summary>
-    public static int ResolveMonsterId(int level, int towerType)
+
+        public static int ResolveMonsterId(int level, int towerType)
     {
         var levelIndex = level switch
         {
@@ -30,18 +18,14 @@ public static class TowerGuardianCatalog
 
         var typeBase = towerType switch
         {
-            1 => 589, // Silver Tower
-            2 => 593, // CP Tower
-            _ => 597 // EXP Tower
+            1 => 589,
+            2 => 593,
+            _ => 597
         };
         return typeBase + levelIndex;
     }
 
-    /// <summary>
-    ///     The guardian's fixed stand point for the tower hosted by <paramref name="zoneNumber" />, or false if
-    ///     that zone hosts no tower.
-    /// </summary>
-    public static bool TryGetGuardianLocation(short zoneNumber, out float x, out float y, out float z)
+        public static bool TryGetGuardianLocation(short zoneNumber, out float x, out float y, out float z)
     {
         (x, y, z) = zoneNumber switch
         {

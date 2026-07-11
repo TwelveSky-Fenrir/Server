@@ -24,7 +24,6 @@ public class RuneStoneCraftResolverTests
             destinationItemId, destinationPackedStat, statSlotSelector, secondInventoryPageAccessible);
     }
 
-    // --- Disconnect (malformed input) cases -------------------------------------------------------------
 
     [Theory]
     [InlineData(-1, 0)]
@@ -83,9 +82,9 @@ public class RuneStoneCraftResolverTests
     }
 
     [Theory]
-    [InlineData(0)] // empty slot
-    [InlineData(1234)] // not a rune-stone item
-    [InlineData(93514)] // a destination id, not a source id
+    [InlineData(0)]
+    [InlineData(1234)]
+    [InlineData(93514)]
     public void SourceItemNotOneOfTheThreeWhitelistedIds_Disconnects(int sourceItemId)
     {
         var result = RuneStoneCraftResolver.Resolve(Request(sourceItemId), new ScriptedRandomSource(0));
@@ -108,9 +107,9 @@ public class RuneStoneCraftResolverTests
     }
 
     [Theory]
-    [InlineData(0)] // empty slot
-    [InlineData(1234)] // not a rune-core item
-    [InlineData(92296)] // a source id, not a destination id
+    [InlineData(0)]
+    [InlineData(1234)]
+    [InlineData(92296)]
     public void DestinationItemNotOneOfTheFourRuneCoreIds_Disconnects(int destinationItemId)
     {
         var result = RuneStoneCraftResolver.Resolve(Request(destinationItemId: destinationItemId),
@@ -132,7 +131,6 @@ public class RuneStoneCraftResolverTests
         Assert.NotEqual(RuneStoneCraftOutcome.Disconnect, result.Outcome);
     }
 
-    // --- 92296: add one random stat to the first empty slot ---------------------------------------------
 
     [Fact]
     public void AddStat_AllFourSlotsAlreadyFilled_IsRefusedWithResultCode10()
@@ -153,7 +151,7 @@ public class RuneStoneCraftResolverTests
     {
         var result = RuneStoneCraftResolver.Resolve(
             Request(),
-            new ScriptedRandomSource(199)); // top tier => 30
+            new ScriptedRandomSource(199));
 
         Assert.True(result.Succeeded);
         Assert.Equal(RuneStoneCraftCatalog.ResultCodeSuccess, result.ResultCode);
@@ -213,7 +211,6 @@ public class RuneStoneCraftResolverTests
         Assert.Equal(30, intel);
     }
 
-    // --- 92297: reroll all four stats at once ------------------------------------------------------------
 
     [Theory]
     [InlineData(0, 1, 1, 1)]
@@ -250,7 +247,6 @@ public class RuneStoneCraftResolverTests
         Assert.Equal(RuneStoneCraftCatalog.NoSpecificSlot, result.LogSlotIndicator);
     }
 
-    // --- 92298: reroll one selected stat -------------------------------------------------------------------
 
     [Theory]
     [InlineData(RuneStoneCraftCatalog.StatSlotSelectorStrength, 1)]
@@ -292,7 +288,6 @@ public class RuneStoneCraftResolverTests
     [Fact]
     public void RerollOne_SelectedSlotNegative_IsNotTreatedAsEmpty_UnlikeTheOtherTwoBranches()
     {
-        // Deliberate legacy asymmetry: 92298's emptiness test is strictly "== 0", not "<= 0" like 92296/92297.
         var packed = RuneStoneStatCodec.Encode(-5, 0, 0, 0);
         var result = RuneStoneCraftResolver.Resolve(
             Request(RuneStoneCraftCatalog.RerollOneStatItemId, destinationPackedStat: packed,
@@ -304,7 +299,6 @@ public class RuneStoneCraftResolverTests
         Assert.Equal(30, str);
     }
 
-    // --- Roll generation happens up front regardless of branch/selector ----------------------------------
 
     [Fact]
     public void FourRollsAreAlwaysDrawn_RegardlessOfWhichBranchRuns()
@@ -315,7 +309,6 @@ public class RuneStoneCraftResolverTests
                 statSlotSelector: RuneStoneCraftCatalog.StatSlotSelectorStrength),
             random);
 
-        // Refused (selected slot empty) still draws all 4 rolls up front before the branch even inspects them.
         Assert.Equal(4, random.CallCount);
     }
 

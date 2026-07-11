@@ -5,10 +5,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Covers <see cref="WeakestTribeByPoints" /> (legacy <c>ReturnSmallTribe</c>,
-///     <c>Server/Header/function.h:3145-3165</c>): strictly-lowest tribe-point total, ties to the lowest index.
-/// </summary>
 public class WeakestTribeByPointsTests
 {
     [Fact]
@@ -20,7 +16,6 @@ public class WeakestTribeByPointsTests
     [Fact]
     public void TieResolvesToLowestTribeIndex()
     {
-        // Tribes 1 and 3 tie at the lowest total (10); the lower index (1) wins.
         Assert.Equal(1, WeakestTribeByPoints.Resolve([50, 10, 50, 10]));
     }
 

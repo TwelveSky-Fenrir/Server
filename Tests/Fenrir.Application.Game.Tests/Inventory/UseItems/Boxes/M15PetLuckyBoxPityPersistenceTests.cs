@@ -14,23 +14,12 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Inventory.UseItems.Boxes;
 
-/// <summary>
-///     Confirmation-pass follow-up: proves box 8111's <see cref="PlayerRuntimeState.M15PetLuckyBoxPity" />
-///     counter is no longer session-scoped only -- opening the box now also marks
-///     <see cref="DirtyFlags.Progression" /> dirty (via <c>LootBoxUseItemHandler.MirrorM15PetLuckyBoxPityAsync</c>
-///     posting a <c>TribeProgressZoneCommand</c>), so the write-behind flush actually persists it. Complements
-///     <c>M15PetLuckyBox8111RewardTableTests</c> (pure roll-table math, no handler/zone involved) and
-///     <see cref="LootBoxUseItemHandlerTribeKeyedDispatchTests" /> (handler wiring for other boxes) -- this
-///     file is the first end-to-end handler-level coverage for box 8111 itself.
-/// </summary>
 public class M15PetLuckyBoxPityPersistenceTests
 {
     private const int AccountId = 1;
     private const int CharacterId = 10;
-    private const byte RewardSort = 4; // arbitrary non-stackable, non-pet sort -- exercises placement only.
+    private const byte RewardSort = 4;
 
-    // Every id M15PetLuckyBox8111RewardTable.Roll can ever return (5 ordinary pools + the 2-id pity coin-flip),
-    // so a roll always resolves to a known item regardless of which branch Random.Shared happens to take.
     private static readonly int[] AllRewardIds =
     [
         1012, 1013, 1014, 1015, 1190, 1491, 1492, 506, 507, 508, 509, 578, 579,
@@ -71,8 +60,6 @@ public class M15PetLuckyBoxPityPersistenceTests
         ZoneTestKit.DrainOutbound(pipe);
         Assert.True(zone.TryGetPlayer(CharacterId, out var state));
 
-        // Entering the zone itself already marks Position dirty -- drain that now so each test only observes
-        // the flags ITS OWN box-open call produces.
         dirtyTracker.DrainAll();
 
         var characters = new FakeCharacterRepository();
@@ -159,7 +146,7 @@ public class M15PetLuckyBoxPityPersistenceTests
 
         Assert.Equal(0, response.Result);
         Assert.True(zone.TryGetPlayer(CharacterId, out var after));
-        Assert.Equal(13, after!.M15PetLuckyBoxPity); // 3 boxes opened -> 3 pity increments
+        Assert.Equal(13, after!.M15PetLuckyBoxPity);
 
         var drained = dirtyTracker.DrainAll();
         Assert.True(drained.TryGetValue(CharacterId, out var flags));
@@ -169,8 +156,6 @@ public class M15PetLuckyBoxPityPersistenceTests
     [Fact]
     public async Task Open_OtherBoxId_DoesNotMarkProgressionDirty_ViaThisMirror()
     {
-        // Sanity check that MirrorM15PetLuckyBoxPityAsync is a true no-op for a box that isn't 8111 -- box 601
-        // is a plain, non-pity-gated catalog box.
         var (zone, state, dirtyTracker, handler) = SetUp();
         var box = new ItemStack(601, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0);
         SeedBox(zone, box);
@@ -179,8 +164,6 @@ public class M15PetLuckyBoxPityPersistenceTests
             new UseItemContext(zone, state, CharacterId, AccountId, ContainerMatrix.InventoryPage0, 0, box,
                 new ItemDefinition(WorldDataTestRows.Item(601), []), 0), CancellationToken.None);
 
-        // Whatever this open marked dirty (inventory-mirror flows do not touch Progression on their own),
-        // Progression specifically must still be absent -- unlike the box-8111 tests above.
         var drained = dirtyTracker.DrainAll();
         if (drained.TryGetValue(CharacterId, out var flags))
             Assert.Equal(DirtyFlags.None, flags & DirtyFlags.Progression);

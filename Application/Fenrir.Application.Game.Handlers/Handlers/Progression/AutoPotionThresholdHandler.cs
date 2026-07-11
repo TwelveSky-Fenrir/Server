@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Progression;
 
-/// <summary>CZ_CHANGE_AUTO_INFO (opcode 86) -- persists auto-potion HP/MP thresholds; silent on success (verified).</summary>
 public sealed class AutoPotionThresholdHandler(
     IAutoPotionThresholdService autoPotionThresholdService,
     ILogger<AutoPotionThresholdHandler> logger)

@@ -4,13 +4,6 @@ using Fenrir.Application.Game.Tests.TestSupport;
 
 namespace Fenrir.Application.Game.Tests.Progression;
 
-/// <summary>
-///     Covers <see cref="HighLevelExperienceOutcomeApplier" /> -- the B17-rebirth-hook adapter that applies a
-///     resolved <see cref="HighLevelExperienceOutcome" /> onto a character's plain runtime counters (no I/O,
-///     no derived-stat recompute, no broadcast -- see the class's own remarks for why
-///     <see cref="HighLevelExperienceOutcomeKind.RebirthTierLevelUp" />'s stat-recompute/heal/broadcast tail
-///     is deliberately NOT this class's concern).
-/// </summary>
 public class HighLevelExperienceOutcomeApplierTests
 {
     private static (Zone Zone, int CharacterId) SetUpCharacter(long experience = 0, short level2 = 0,
@@ -55,7 +48,7 @@ public class HighLevelExperienceOutcomeApplierTests
         HighLevelExperienceOutcomeApplier.Apply(target!, outcome);
 
         Assert.Equal(1_950_000_000, target!.Experience);
-        Assert.Equal(12, target.StatPoints); // 5 + 7, additive not overwritten
+        Assert.Equal(12, target.StatPoints);
     }
 
     [Fact]
@@ -68,8 +61,8 @@ public class HighLevelExperienceOutcomeApplierTests
         HighLevelExperienceOutcomeApplier.Apply(target!, outcome);
 
         Assert.Equal(4, target!.Level2);
-        Assert.Equal(0, target.Exp2); // pool resets on level-up
-        Assert.Equal(140, target.SkillPoints); // 40 + 100, additive
+        Assert.Equal(0, target.Exp2);
+        Assert.Equal(140, target.SkillPoints);
     }
 
     [Fact]
@@ -96,7 +89,7 @@ public class HighLevelExperienceOutcomeApplierTests
 
         HighLevelExperienceOutcomeApplier.Apply(target, outcome);
 
-        Assert.Equal(500, target.Zone101Time); // unchanged -- bonus only fires on the 0-to-1 transition
+        Assert.Equal(500, target.Zone101Time);
     }
 
     [Fact]
@@ -109,9 +102,8 @@ public class HighLevelExperienceOutcomeApplierTests
         HighLevelExperienceOutcomeApplier.Apply(target!, outcome);
 
         Assert.Equal(200_000_000, target!.Exp2);
-        Assert.Equal(25, target.StatPoints); // 15 + 10, additive
+        Assert.Equal(25, target.StatPoints);
 
-        // Level2 untouched by an accrual-only outcome.
         Assert.Equal(2, target.Level2);
     }
 }

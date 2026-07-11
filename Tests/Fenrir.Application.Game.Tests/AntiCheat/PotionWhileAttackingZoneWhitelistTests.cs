@@ -2,11 +2,6 @@ using Fenrir.Application.Game.Domain.AntiCheat;
 
 namespace Fenrir.Application.Game.Tests.AntiCheat;
 
-/// <summary>
-///     Covers <see cref="PotionWhileAttackingZoneWhitelist" /> — the 40-zone list transcribed verbatim from
-///     CheckPossibleEatPotionAttack (Server/ts25zone/S04_MyWork05.cpp:4995-5071). Pins the transcription;
-///     asserts nothing about permit-vs-flag semantics (unresolved — see the type remarks).
-/// </summary>
 public class PotionWhileAttackingZoneWhitelistTests
 {
     private static readonly int[] Listed =
@@ -30,7 +25,6 @@ public class PotionWhileAttackingZoneWhitelistTests
     }
 
     [Theory]
-    // Gaps deliberately absent from the hand-curated list.
     [InlineData(0)]
     [InlineData(5)]
     [InlineData(10)]

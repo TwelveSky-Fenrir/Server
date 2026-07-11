@@ -14,17 +14,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.LoginServer.Tests;
 
-// Regression coverage for the Major db-worker-persistence-durability gap: LoginConnectionHost used to rely
-// on the default (non-overridden) BackgroundService.StopAsync, which returns as soon as the accept loop
-// itself exits -- while FenrirTcpListener<TSession> keeps every already-accepted connection's own
-// OnAcceptedAsync (and its finally-block TearDownAccountSessionAsync/LogLoginSessionEndedAsync writes)
-// running fully detached and unawaited. LoginConnectionHost now overrides StopAsync to track every
-// in-flight connection and await its full teardown before returning -- an exact port of the fix already
-// shipped for Fenrir.Application.Game.Hosting.GameConnectionHost. This test proves the override actually
-// drains: it accepts one real loopback connection, marks it authenticated (so the finally block's
-// account-session teardown + EventLog write both fire), and asserts that by the time StopAsync returns,
-// both artificially-delayed fake-repository writes have already completed -- which is only possible if
-// StopAsync genuinely awaited OnAcceptedAsync's own task rather than returning immediately.
 public sealed class LoginConnectionHostShutdownDrainTests
 {
     private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(10);
@@ -42,8 +31,8 @@ public sealed class LoginConnectionHostShutdownDrainTests
 
         var host = new LoginConnectionHost(
             Options.Create(new LoginServerOptions { Port = port }),
-            null!, // IFrameDispatcher: never invoked -- this test sends zero bytes over the accepted socket
-            null!, // IOpcodeFrameSizeProvider: same -- no frame is ever decoded on this connection
+            null!,
+            null!,
             new SessionRateLimiter(),
             registry,
             new LoginCapacityState(),
@@ -60,19 +49,11 @@ public sealed class LoginConnectionHostShutdownDrainTests
         {
             await client.ConnectAsync(IPAddress.Loopback, port, ct);
 
-            // Wait for OnAcceptedAsync to register the session (registry.Register runs before anything that
-            // could block), then mark it authenticated so the finally block's teardown branch actually runs
-            // (LoginConnectionHost skips TearDownAccountSessionAsync entirely for a session whose AccountId
-            // was never set).
             await WaitUntilAsync(() => registry.Count == 1, ct);
             Assert.True(registry.TryGet(1, out var session));
             var loginSession = Assert.IsType<LoginClientSession>(session);
             loginSession.MarkAuthenticated(4242);
 
-            // Cancels the internal stoppingToken (unblocking the connection's pending PipeReader.ReadAsync,
-            // which is otherwise parked forever since this test never sends a byte) and then -- this is the
-            // behavior under test -- awaits OnAcceptedAsync's own task, including its finally block's two
-            // artificially-delayed fake-repository writes, before returning.
             await host.StopAsync(ct);
 
             Assert.True(accountSessions.TearDownCompleted,
@@ -80,8 +61,6 @@ public sealed class LoginConnectionHostShutdownDrainTests
             Assert.True(eventLog.LogCompleted,
                 "StopAsync returned before LogLoginSessionEndedAsync's delayed repository write completed");
 
-            // The connection's own finally block also unregisters itself -- draining is full teardown, not
-            // just "the delayed writes happened to fire".
             Assert.Equal(0, registry.Count);
         }
         finally
@@ -91,9 +70,6 @@ public sealed class LoginConnectionHostShutdownDrainTests
         }
     }
 
-    // Binds to port 0 to let the OS pick a free port, then releases it so LoginConnectionHost's own
-    // FenrirTcpListener (which never reports back what it bound to) can bind that same number itself --
-    // same pattern as SocketConnectionSmokeTests.ReserveEphemeralLoopbackPort.
     private static int ReserveEphemeralLoopbackPort()
     {
         using var probe = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -110,9 +86,6 @@ public sealed class LoginConnectionHostShutdownDrainTests
         }
     }
 
-    // Artificially slow (but real-shaped) IAccountSessionRepository: the delay simulates a genuine SQL round
-    // trip, so a StopAsync that returns WITHOUT actually awaiting this connection's teardown would race past
-    // TearDownCompleted still being false -- exactly the bug this test guards against.
     private sealed class DelayedAccountSessionRepository : IAccountSessionRepository
     {
         public volatile bool TearDownCompleted;

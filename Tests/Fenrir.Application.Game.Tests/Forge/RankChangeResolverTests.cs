@@ -123,7 +123,6 @@ public class RankChangeResolverTests
     [Fact]
     public void Upgrade_Material1024_LowerTierProbability_FailsWhereMaterial1025Succeeds()
     {
-        // Level 45 tier: P(1024)=520, P(1025)=577 (out of 1000); roll 550 falls strictly between them.
         var target = Def(Row(1, RankChangeResolver.RareItemType, 9, 45));
         var candidate = Def(Row(2, RankChangeResolver.RareItemType, 9, 55));
 
@@ -171,10 +170,6 @@ public class RankChangeResolverTests
         var target = Def(Row(1, RankChangeResolver.RareItemType, 9, 45));
         var candidate = Def(Row(2, RankChangeResolver.RareItemType, 9, 55));
 
-        // P(1024)=520; roll 550 fails whether or not a lucky-upgrade charge is available -- unlike
-        // CombineResolver's lucky-combo charge, this charge is consumed/reported unconditionally but does
-        // NOT add a probability bonus (S04_MyWork02.cpp:4051-4078: the charge is spent before the roll, but
-        // the roll's probability value is untouched by it).
         var withoutCharge = RankChangeResolver.ResolveUpgrade(target, Stack(4, 1), Material1024(), 0, 0,
             [target, candidate], new ScriptedRandomSource(0, 550));
         var withCharge = RankChangeResolver.ResolveUpgrade(target, Stack(4, 1), Material1024(), 0, 1,
@@ -261,7 +256,6 @@ public class RankChangeResolverTests
         var target = Def(Row(1, RankChangeResolver.RareItemType, 9, 55));
         var candidate = Def(Row(2, RankChangeResolver.RareItemType, 9, 45));
 
-        // Down tier 55->45: P(1024)=52; roll 10 succeeds.
         var result = RankChangeResolver.ResolveDowngrade(target, Stack(7, 3), Material1024(), 0, 0,
             [target, candidate], new ScriptedRandomSource(0, 10));
 

@@ -8,12 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
-/// <summary>
-///     op127, CZ_UP_LEVEL_ITEM_SEND -- re-skins a cape into a randomly rolled higher tier (delegated to
-///     <see cref="IUpgradeCapeService" />). Money is always deducted and the material always consumed regardless
-///     of outcome; on failure the response's <c>Value</c> is all-zero (matches the legacy's own
-///     zero-initialized, never-repopulated <c>tValue[6]</c> on that path -- NOT an echo of the original item).
-/// </summary>
 public sealed class UpgradeCapeHandler(IUpgradeCapeService upgradeCapeService, ILogger<UpgradeCapeHandler> logger)
     : IAsyncPacketHandler<UpgradeCapeRequest>
 {

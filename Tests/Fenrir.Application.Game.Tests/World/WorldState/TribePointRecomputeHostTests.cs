@@ -47,7 +47,7 @@ public class TribePointRecomputeHostTests
 
         Assert.Equal(0, gateway.CallCount);
 
-        await host.TickAsync(CancellationToken.None); // the 6th tick
+        await host.TickAsync(CancellationToken.None);
 
         Assert.Equal(1, gateway.CallCount);
     }
@@ -66,15 +66,12 @@ public class TribePointRecomputeHostTests
     [Fact]
     public async Task DueTick_RunsLevelRecomputeBeforeTheLadderCheck_MatchingLegacyCallOrder()
     {
-        // The ladder is a no-op here (flag never armed), but this proves both mechanisms fire from the same
-        // due tick without one throwing/short-circuiting the other.
         var (worldState, _, host) = CreateHost();
         worldState.SetHighTribe(1);
 
         for (var i = 0; i < TribePointRecomputeHost.TickGate; i++)
             await host.TickAsync(CancellationToken.None);
 
-        // Level recompute ran (empty roster -> baseline), ladder did not (flag not pending).
         Assert.Equal(1000, worldState.GetTribe(0).Points);
     }
 

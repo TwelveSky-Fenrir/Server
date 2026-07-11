@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.BuffsMountsCosmetics;
 
-/// <inheritdoc cref="IStellarCoreStateService" />
 public sealed class StellarCoreStateService(
     ICharacterRepository characters,
     WorldDataCache worldData,

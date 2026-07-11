@@ -8,10 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>
-///     CZ_TEACHER_END_SEND (opcode 63) -- clears only the caller's own pointers; the partner's opposite
-///     pointer is deliberately left untouched (legacy asymmetry).
-/// </summary>
 public sealed class MentorEndHandler(IMentorEndService mentorEndService, ILogger<MentorEndHandler> logger)
     : IAsyncPacketHandler<MentorEndRequest>
 {

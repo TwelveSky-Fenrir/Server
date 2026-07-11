@@ -7,24 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>
-///     CZ_TEACHER_START_SEND (opcode 62) -- master-only; consumes the accepted negotiation and bonds both
-///     sides in one transaction.
-/// </summary>
-/// <remarks>
-///     <para>
-///         Master/student may be hosted by different zones/tick threads: only the master-side field is mutated
-///         directly here; the student's side is mirrored via a zone command.
-///     </para>
-///     <para>
-///         <b>LEGACY-PARITY RISK (open, not resolved by inference):</b> the "master-only" restriction below
-///         (delegated to <see cref="Fenrir.Application.Game.Domain.Social.Mentor.MentorRegistry.TryConsumeStart" />)
-///         is an uncorroborated assumption -- see that method's own remarks for the full citation and
-///         correction. Direct re-reading of Server/ts25zone/S04_MyWork02.cpp:9406-9499 shows the server itself
-///         does not gate MentorStart to the original asker; do not change this handler to permit a
-///         student-side start without a fresh legacy-research finding confirming that reading is correct.
-///     </para>
-/// </remarks>
 public sealed class MentorStartHandler(
     ZoneRegistry zones,
     IMentorStartService mentorStartService,

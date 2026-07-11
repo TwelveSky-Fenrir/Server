@@ -9,9 +9,6 @@ using Fenrir.Network.Serialization.Login.Packets.Login;
 
 namespace Fenrir.Application.Login.Tests;
 
-// Legacy SEND_LOGIN train (S04_MyWork02.cpp l.42-67): every CL_LOGIN_SEND, success or failure, must produce
-// exactly LC_LOGIN_RECV + 3x LC_USER_AVATAR_RECV2 + LC_RECOMMAND_WORLD_RECV + LC_RECOMMAND_WORLD2_RECV,
-// byte-for-byte, in that order.
 public class LoginTrainTests
 {
     [Fact]
@@ -108,9 +105,6 @@ public class LoginTrainTests
         Assert.Equal(5, slots[2].Level1);
     }
 
-    // Major audit gap fix: GuildName must reflect actual live guild membership, resolved by the caller
-    // (LoginService, via IGuildRepository) and folded into each AvatarRosterEntry -- Domain itself stays
-    // I/O-free, see LoginTrain.BuildAvatarSlots' own remarks.
     [Fact]
     public void BuildAvatarSlots_EntryCarriesAGuildName_OverlaysItOntoTheWireField()
     {
@@ -124,13 +118,9 @@ public class LoginTrainTests
 
         Assert.Equal("TestGuild", slots[0].GuildName);
         Assert.Equal("", slots[1].GuildName);
-        // Empty slot (no character in it at all) is unaffected.
         Assert.Equal("", slots[2].GuildName);
     }
 
-    // Confirmed root-cause fix: the roster response used to always show zeroed equipment/inventory/stats for a
-    // returning character. BuildAvatarSlots now overlays the real equipped-item array and every progression
-    // scalar/potion counter the wire response carries, from the entry's own CharacterRosterDto/Items.
     [Fact]
     public void BuildAvatarSlots_OccupiedSlot_OverlaysEquipmentAndProgressionScalars()
     {
@@ -177,18 +167,12 @@ public class LoginTrainTests
         Assert.Equal(4, slots[0].EatDexPotion);
         Assert.Equal(5, slots[0].EatElePotion);
 
-        // Equip[13][4]: slot 7 (weapon) -> ItemId at index 28.
         Assert.Equal(9001, slots[0].Equip[7 * 4]);
-        // Inventory[2][64][6]: page 0 slot 5 -> ItemId at index 0, Quantity at index 3.
         Assert.Equal(500, slots[0].Inventory[5 * 6]);
         Assert.Equal(3, slots[0].Inventory[5 * 6 + 3]);
-        // StoreItem[2][28][4]: page 0 (Container 3) slot 2 -> ItemId at index 0.
         Assert.Equal(700, slots[0].StoreItem[2 * 4]);
     }
 
-    // A pet occupying the equipment's pet slot packs Activity/Growth as plain values in ints 1/2 instead of the
-    // generic ExpireDate/packed-upgrade-byte pair every other equip slot uses -- see
-    // AvatarInfoFactory.BuildEquipArrayFromRosterItems' own remarks for the citation.
     [Fact]
     public void BuildAvatarSlots_OccupiedSlot_PetEquipSlotPacksActivityAndGrowthInsteadOfExpireDateAndUpgradeByte()
     {
@@ -212,8 +196,6 @@ public class LoginTrainTests
         Assert.Equal(60, slots[0].Equip[8 * 4 + 2]);
     }
 
-    // Friend/Teacher/Student are resolved live by the caller (IFriendRepository/IMentorRepository) and folded
-    // into the entry -- unfilled friend slots stay "" (sparse by design, client-chosen indices).
     [Fact]
     public void BuildAvatarSlots_OccupiedSlot_OverlaysFriendTeacherAndStudentNames()
     {
@@ -231,9 +213,6 @@ public class LoginTrainTests
         Assert.Equal("Apprentice", slots[0].Student);
     }
 
-    // No characters at all (fresh account straight after CL_LOGIN_SEND, before CL_CREATE_AVATAR_SEND2) must be
-    // indistinguishable from "nobody has a guild/friend/teacher/student" -- every field stays at the
-    // wire-zero/-1 template for all three slots.
     [Fact]
     public void BuildAvatarSlots_NoCharacters_EveryFieldStaysAtTheZeroTemplateForAllThreeSlots()
     {
@@ -275,12 +254,7 @@ public class LoginTrainTests
         return result;
     }
 
-    /// <summary>
-    ///     CharacterRosterDto has 27 positional constructor parameters; this mutable builder lets each test only
-    ///     spell out the fields it actually cares about (mirroring the old 8-arg CharacterSummaryDto call sites)
-    ///     instead of repeating all 26 named arguments in every case.
-    /// </summary>
-    private sealed class CharacterRosterDtoBuilder(
+        private sealed class CharacterRosterDtoBuilder(
         int characterId,
         byte slot,
         string name,

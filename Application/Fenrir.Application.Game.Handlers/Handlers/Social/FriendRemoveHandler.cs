@@ -8,15 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>
-///     CZ_FRIEND_DELETE_SEND (opcode 58) -- out-of-range slot is a silent no-op, an in-range but already-empty
-///     slot ⇒ Quit(); otherwise clears then mirrors <see cref="PlayerRuntimeState.Friends" />.
-/// </summary>
-/// <remarks>
-///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:9286-9301 (FriendRemove/CZ_FRIEND_DELETE_SEND handler
-///     body) -- silent no-op if the slot index is out of range, disconnect if the slot is in range but
-///     already empty. Mirrors the FriendLocate (opcode 57) split in <see cref="FriendLocateHandler" />.
-/// </remarks>
 public sealed class FriendRemoveHandler(IFriendService friendService, ILogger<FriendRemoveHandler> logger)
     : IAsyncPacketHandler<FriendRemoveRequest>
 {

@@ -2,11 +2,6 @@ using Fenrir.Application.Game.Domain.World.ZoneWar;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Boss-561 (Regular War / Zone049 boss-war, server 295) summon data -- see
-///     <see cref="RegularWarBossSummonCatalog" />'s own remarks for wiring status (not yet consumed by any
-///     production sink as of this test).
-/// </summary>
 public class RegularWarBossSummonCatalogTests
 {
     [Fact]

@@ -3,10 +3,6 @@ using Fenrir.Application.Game.Tests.TestSupport;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     <see cref="Zone.TryUpdateProxyShopExpiration" /> -- the best-effort live-registry mirror used by
-///     <c>UseInventoryItemService</c>'s proxy-shop-rental-extension branch.
-/// </summary>
 public class ZoneProxyShopsTests
 {
     private static ProxyShopBroadcastEntry Entry(int characterId, int shopDate)
@@ -36,8 +32,6 @@ public class ZoneProxyShopsTests
 
         Assert.True(updated);
         Assert.Equal(1, zone.ProxyShopCount);
-        // Registration keeps this exact instance -- reading it back directly is a stronger assertion than
-        // ProxyShopCount alone, since Zone exposes no public getter for an individual entry.
         Assert.Equal(20260714, entry.ShopDate);
     }
 

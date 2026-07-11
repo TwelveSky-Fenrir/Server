@@ -13,26 +13,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Commerce;
 
-/// <summary>
-///     Covers the <see cref="Zone.RegisterProxyShop" />/<see cref="Zone.RemoveProxyShop" /> wiring added to
-///     <see cref="OpenShopStallService" />/<see cref="CloseShopStallService" /> so a durably-opened/closed
-///     proxy shop enters/leaves <see cref="Zone" />'s periodic-broadcast table (<c>Zone.ProxyShops.cs</c>) --
-///     not the DB round trips themselves, which have their own coverage elsewhere.
-/// </summary>
-/// <remarks>
-///     Private, file-scoped fakes (not <c>TestSupport/FakeOfflineShopRepository.cs</c>): that shared fake is
-///     already scoped to a different test suite's (proxy-shop rental-extension) needs and throws
-///     <see cref="NotImplementedException" /> on the two members this file actually exercises.
-/// </remarks>
 public class OpenShopStallServiceProxyRegistrationTests
 {
-    /// <summary>
-    ///     Pumps <see cref="Zone.Tick" /> while <paramref name="pending" /> is outstanding -- needed because
-    ///     <see cref="OpenShopStallService.OpenProxyShopAsync" />'s success path awaits
-    ///     <c>Zone.PostInventoryCommandAndWaitAsync</c>, which only resolves once this same zone's tick drains
-    ///     its inventory-mirror inbox. Same pattern as <c>UseInventoryItemServiceTests.RunToCompletionAsync</c>.
-    /// </summary>
-    private static async Task<OpenShopStallResponse> RunToCompletionAsync(ValueTask<OpenShopStallResponse> pending,
+
+        private static async Task<OpenShopStallResponse> RunToCompletionAsync(ValueTask<OpenShopStallResponse> pending,
         Zone zone)
     {
         var task = pending.AsTask();
@@ -139,11 +123,7 @@ public class OpenShopStallServiceProxyRegistrationTests
         Assert.Contains((characterId, (byte)0), offlineShops.ClosedStates);
     }
 
-    /// <summary>
-    ///     Only the two members <see cref="OpenShopStallService.OpenProxyShopAsync" />/
-    ///     <see cref="CloseShopStallService" /> call.
-    /// </summary>
-    private sealed class OpenTrackingOfflineShopRepository : IOfflineShopRepository
+        private sealed class OpenTrackingOfflineShopRepository : IOfflineShopRepository
     {
         public List<(int CharacterId, byte ShopState)> ClosedStates { get; } = [];
         public int? LastOpenedCharacterId { get; private set; }

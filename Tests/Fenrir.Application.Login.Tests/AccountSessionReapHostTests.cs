@@ -6,8 +6,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Login.Tests;
 
-// Cross-process duplicate-login kick/refusal, single unsharded backstop: reaps runtime.AccountSessions rows any
-// process (Login or Game) abandoned without running its own teardown path.
 public class AccountSessionReapHostTests
 {
     [Fact]

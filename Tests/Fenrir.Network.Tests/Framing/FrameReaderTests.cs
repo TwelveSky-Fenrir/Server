@@ -10,7 +10,6 @@ public class FrameReaderTests
 {
     private const FenrirServer Server = FenrirServer.Zone;
 
-    // Login Incoming tops out at 25, Zone Incoming at 151 -- 250 is registered nowhere.
     private const byte UnregisteredOpcode = 250;
     private static readonly IOpcodeFrameSizeProvider Registry = ZoneOpcodeRegistry.Provider;
 
@@ -82,11 +81,11 @@ public class FrameReaderTests
     [InlineData(0)]
     [InlineData(1)]
     [InlineData(4)]
-    [InlineData(8)] // one byte short of the 9-byte CLIENT_PACKET header
+    [InlineData(8)]
     public void TryReadFrame_BufferShorterThanHeader_ReturnsFalse_NeverThrows_NeverConsumes(int length)
     {
         var bytes = new byte[length];
-        Array.Fill(bytes, (byte)0xFF); // must never be inspected before 9 bytes exist
+        Array.Fill(bytes, (byte)0xFF);
         var buffer = new ReadOnlySequence<byte>(bytes);
         var originalLength = buffer.Length;
 
@@ -107,9 +106,6 @@ public class FrameReaderTests
         Assert.Equal(0, buffer.Length);
     }
 
-    // Fragmentation at every byte boundary must never corrupt or drop a frame. A flat byte[]-backed
-    // ReadOnlySequence is always single-segment, so this builds an explicit two-segment chain, re-cut at
-    // every position, to reproduce the header/payload-straddles-segment case a real Pipe delivers.
     [Fact]
     public void TryReadFrame_CzTempRegisterSend_FragmentedAtEveryByteBoundary_NeverCorruptsNeverMisfires()
     {
@@ -152,8 +148,6 @@ public class FrameReaderTests
     {
         var frame = new byte[WireHeaderSizes.ClientPacketSize + payloadSize];
 
-        // tPacket1/tPacket2 (offsets 0..7) carry no framing info in BuildEU33 -- noise proves FrameReader
-        // never looks at them.
         Array.Fill(frame, (byte)(seed | 0x80), 0, 8);
         frame[8] = opcode;
 
@@ -163,7 +157,6 @@ public class FrameReaderTests
         return frame;
     }
 
-    // Splits data[0..length) into a genuine two-segment ReadOnlySequence at splitAt.
     private static ReadOnlySequence<byte> TwoSegments(byte[] data, int length, int splitAt)
     {
         var first = new Segment(data.AsMemory(0, splitAt));

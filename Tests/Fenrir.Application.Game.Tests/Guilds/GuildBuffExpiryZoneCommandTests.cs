@@ -7,9 +7,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.Guilds;
 
-// guild-buff-expiry: Server/ts25zone/UpperCom/S06_MyUpperCom02.cpp:359-378's own per-session loop -- every
-// hosted member of the expiring guild has both in-memory buff-on/off fields flipped unconditionally, but only
-// a non-transferring member additionally gets the client-facing notification.
 public class GuildBuffExpiryZoneCommandTests
 {
     private static readonly int StateFlagFrame = FrameWriter.FrameSizeOf<AvatarStateFlagResponse>();
@@ -75,7 +72,7 @@ public class GuildBuffExpiryZoneCommandTests
         var (_, pipeB, stateB) = Enter(zone, 20, 5);
         stateA.GuildBuffActive = true;
         stateB.GuildBuffActive = true;
-        ZoneTestKit.DrainOutbound(pipeA); // the second Enter's own AOI join broadcast, not under test
+        ZoneTestKit.DrainOutbound(pipeA);
         ZoneTestKit.DrainOutbound(pipeB);
 
         zone.PostGuildBuffExpiryCommand(new GuildBuffExpiryZoneCommand(5, 0));
@@ -97,7 +94,6 @@ public class GuildBuffExpiryZoneCommandTests
         session.MarkRegistering();
         session.MarkInWorld();
 
-        // Spread far apart so two characters in the same zone never see each other's own Enter as AOI noise.
         zone.Post(ZoneCommand.Enter(characterId,
             ZoneTestKit.EnterData(session, zone.MapId, posX: characterId * 10_000f)));
         zone.Tick(TimeSpan.FromMilliseconds(50));

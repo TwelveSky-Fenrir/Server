@@ -17,13 +17,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 
-/// <summary>
-///     Covers the consumable families added on top of <c>UseInventoryItemServiceTests</c>'s own coverage: the
-///     LOD round ticket (1434), Stats Clear/Stat Cleanse, the protection-charm and scroll sub-groups, and the
-///     two unambiguous banked cash-timer ids (Faction Notice 566, Taiyan Key 1049). Kept in a separate file
-///     from <c>UseInventoryItemServiceTests</c> deliberately, to avoid two concurrently-evolving test suites
-///     touching the same shared setup helpers.
-/// </summary>
 public class UseInventoryItemConsumablesServiceTests
 {
     private const byte SpecialUseSort = 3;
@@ -146,7 +139,7 @@ public class UseInventoryItemConsumablesServiceTests
     public async Task StatsClear_MatchingLevelBand_RefundsAllFourStats_AndResetsThemToFloor()
     {
         var (session, _, zone, state, characters) = SetUp();
-        state.Level = 50; // UpTo99 band
+        state.Level = 50;
         state.StatVit = 10;
         state.StatStr = 5;
         state.StatInt = 1;
@@ -167,7 +160,6 @@ public class UseInventoryItemConsumablesServiceTests
         Assert.Equal(1, refreshed.StatStr);
         Assert.Equal(1, refreshed.StatInt);
         Assert.Equal(1, refreshed.StatDex);
-        // (10-1)+(5-1)+(1-1)+(8-1) = 9+4+0+7 = 20, refunded on top of the existing 100.
         Assert.Equal(120, refreshed.StatPoints);
         Assert.Equal(1, refreshed.Life);
         Assert.Equal(0, refreshed.Mana);
@@ -177,7 +169,7 @@ public class UseInventoryItemConsumablesServiceTests
     public async Task StatsClear_WrongLevelBandForTheUsedId_FailsCleanly_AndLeavesStatsUntouched()
     {
         var (session, _, zone, state, characters) = SetUp();
-        state.Level = 145; // wrong band for the UpTo99-only item id seeded below
+        state.Level = 145;
         state.RebirthCount = 1;
         state.StatVit = 10;
         SeedInventory(zone, new ItemStack(StatsClearUpTo99ItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1));
@@ -196,14 +188,13 @@ public class UseInventoryItemConsumablesServiceTests
     public async Task StatCleanse_ValidSelector_RefundsOnlyTheTargetedStat()
     {
         var (session, _, zone, state, characters) = SetUp();
-        state.Level = 50; // UpTo99 band
+        state.Level = 50;
         state.StatStr = 20;
         state.StatVit = 10;
         state.StatPoints = 0;
         SeedInventory(zone, new ItemStack(StatCleanseUpTo99ItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1));
         var service = CreateService(characters);
 
-        // selector value 1 == Strength (see StatResetResolver.StatSelector).
         var response = await RunToCompletionAsync(
             service.ResolveAsync(zone, state, 10, AccountId, ContainerMatrix.InventoryPage0, 0, 1,
                 CancellationToken.None), zone);
@@ -213,7 +204,7 @@ public class UseInventoryItemConsumablesServiceTests
 
         Assert.True(zone.TryGetPlayer(10, out var refreshed));
         Assert.Equal(1, refreshed!.StatStr);
-        Assert.Equal(10, refreshed.StatVit); // untouched
+        Assert.Equal(10, refreshed.StatVit);
         Assert.Equal(19, refreshed.StatPoints);
     }
 
@@ -296,7 +287,6 @@ public class UseInventoryItemConsumablesServiceTests
         SeedInventory(zone, new ItemStack(LuckyEnchantScrollItemId, 5, 0, 0, 0, 0, 0, 0, 0, 0, 1));
         var service = CreateService(characters);
 
-        // Even though value=3 requests bulk, the scroll sub-group has no bulk support at all.
         var response = await RunToCompletionAsync(
             service.ResolveAsync(zone, state, 10, AccountId, ContainerMatrix.InventoryPage0, 0, 3,
                 CancellationToken.None), zone);

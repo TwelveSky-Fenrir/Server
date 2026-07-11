@@ -7,16 +7,6 @@ using Fenrir.Data.WriteBehind;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     Covers <see cref="Zone.ApplyHighLevelExperienceGain" /> -- the B17-rebirth-hook orchestration method
-///     that resolves a post-general-level-cap award via <see cref="HighLevelExperienceResolver" /> and applies
-///     it. Most tests here call the method directly to isolate its own branches; see
-///     <see cref="ZoneHighLevelExperienceWiringTests" /> for coverage of the actual fork inside
-///     <c>Zone.Combat.cs</c>'s <c>ApplyCharacterExperienceGain</c> that routes <see cref="Zone.GrantMonsterKillExperience" />/
-///     PvP-kill awards here once a recipient is at the general-level cap. <c>HighLevelExperienceInputFactoryTests</c>/
-///     <c>HighLevelExperienceOutcomeApplierTests</c> (under <c>Tests.Progression</c>) cover the two adapter
-///     halves in isolation; this covers the zone-scoped tail (stat recompute, heal, dirty-mark, broadcast).
-/// </summary>
 public class ZoneHighLevelExperienceTests
 {
     private static FrozenDictionary<short, LevelRowDto> LevelsWithCapRow()
@@ -45,7 +35,6 @@ public class ZoneHighLevelExperienceTests
         zone.Post(ZoneCommand.Enter(1, enterData));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
-        // Isolate what THIS test's own call sends/marks dirty from whatever Enter/Tick already did.
         dirtyTracker.DrainAll();
         ZoneTestKit.DrainOutbound(pipe);
 
@@ -69,7 +58,6 @@ public class ZoneHighLevelExperienceTests
     [Fact]
     public void StageA_PoolFill_UpdatesExperienceGrantsStatPointsMarksDirty_ButSendsNoBroadcast()
     {
-        // Band [1e9, 2e9]; filling 200M of it (1e9 -> 1.2e9) crosses 20% -> 20 stat points.
         var (zone, dirtyTracker, pipe, target) = SetUpCharacter(145, 1_000_000_000, 0, 0);
         var priorStatPoints = target.StatPoints;
 
@@ -77,14 +65,12 @@ public class ZoneHighLevelExperienceTests
 
         Assert.Equal(1_200_000_000, target.Experience);
         Assert.Equal(priorStatPoints + 20, target.StatPoints);
-        Assert.Equal(0, target.Level2); // Stage A never touches the rebirth-tier ladder
+        Assert.Equal(0, target.Level2);
 
         var drained = dirtyTracker.DrainAll();
         Assert.True(drained.TryGetValue(1, out var flags));
         Assert.Equal(DirtyFlags.Progression, flags & DirtyFlags.Progression);
 
-        // Open question (see Zone.HighLevelExperience.cs's own remarks): the live client-sync sub-code for
-        // Stage A is unresolved, so nothing is pushed yet -- state is still durable via the dirty-mark above.
         Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
     }
 
@@ -114,8 +100,6 @@ public class ZoneHighLevelExperienceTests
 
         zone.ApplyHighLevelExperienceGain(target, 5000);
 
-        // Level-145 row's own Life/Mana factors (400/200), no Vitality/equipment -> MaxLife/MaxMana move to
-        // those exact values, and the (alive) character is healed to them, not left at the pre-levelup value.
         Assert.Equal(400, target.MaxLife);
         Assert.Equal(200, target.MaxMana);
         Assert.Equal(400, target.Life);
@@ -131,8 +115,8 @@ public class ZoneHighLevelExperienceTests
 
         zone.ApplyHighLevelExperienceGain(target, 5000);
 
-        Assert.Equal(400, target.MaxLife); // cache-write is unconditional
-        Assert.Equal(0, target.Life); // no heal while already dead
+        Assert.Equal(400, target.MaxLife);
+        Assert.Equal(0, target.Life);
     }
 
     [Fact]
@@ -148,9 +132,6 @@ public class ZoneHighLevelExperienceTests
         Assert.Equal(DirtyFlags.Progression, flags & DirtyFlags.Progression);
         Assert.Equal(DirtyFlags.Vitals, flags & DirtyFlags.Vitals);
 
-        // Discriminator-11 state-flag broadcast plus the one-shot zone-101 bonus push -- both confirmed
-        // sub-codes (see Zone.HighLevelExperience.cs's own remarks); asserting non-empty rather than decoding
-        // the exact frame bytes, matching this suite's existing ZoneLevelUpTests convention.
         Assert.NotEmpty(ZoneTestKit.DrainOutbound(pipe));
     }
 
@@ -165,7 +146,7 @@ public class ZoneHighLevelExperienceTests
         zone.ApplyHighLevelExperienceGain(target, 50);
 
         Assert.Equal(2, target.Level2);
-        Assert.Equal(priorZone101, target.Zone101Time); // unchanged -- bonus is 0-to-1 only
+        Assert.Equal(priorZone101, target.Zone101Time);
     }
 
     [Fact]
@@ -181,13 +162,13 @@ public class ZoneHighLevelExperienceTests
 
         Assert.Equal(gain, target.Exp2);
         Assert.Equal(priorStatPoints + (int)((long)gain * 100 / threshold1), target.StatPoints);
-        Assert.Equal(1, target.Level2); // accrual never moves the tier itself
+        Assert.Equal(1, target.Level2);
 
         var drained = dirtyTracker.DrainAll();
         Assert.True(drained.TryGetValue(1, out var flags));
         Assert.Equal(DirtyFlags.Progression, flags & DirtyFlags.Progression);
 
-        Assert.Empty(ZoneTestKit.DrainOutbound(pipe)); // same unresolved-sub-code gap as Stage A
+        Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
     }
 
     [Fact]

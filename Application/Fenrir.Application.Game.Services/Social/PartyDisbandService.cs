@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Social;
 
-/// <summary>Leader-only, unconditional full disband.</summary>
 public sealed class PartyDisbandService(PartyRegistry parties, ILogger<PartyDisbandService> logger)
     : IPartyDisbandService
 {

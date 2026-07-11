@@ -2,15 +2,6 @@ using Fenrir.Application.Game.Tests.TestSupport;
 
 namespace Fenrir.Application.Game.Tests.Commerce;
 
-/// <summary>
-///     Executable spec for <c>IGiftRepository.EnqueueAsync</c>'s "mint one gift" contract -- see that
-///     member's XML remarks for the full legacy-dead-code disclosure this shape was designed after
-///     (<c>MyDB::UpdateGift</c>, Server/ts25playuser/S08_MyDB.cpp:331-381, never reached in any shipped
-///     build). No production caller wires this yet: deciding the actual trigger (a specific cash-item
-///     purchase, a future GM command) is explicitly out of scope for this contract, so these tests exercise
-///     the repository surface directly against <see cref="FakeGiftRepository" /> rather than a handler or
-///     service.
-/// </summary>
 public sealed class GiftEnqueueContractTests
 {
     [Fact]
@@ -41,8 +32,8 @@ public sealed class GiftEnqueueContractTests
     }
 
     [Theory]
-    [InlineData(0, 0)] // zero quantity/value: no floor is applied, matching the dead legacy shape.
-    [InlineData(-5, -1)] // negative quantity/value: copied through unchanged, never rejected.
+    [InlineData(0, 0)]
+    [InlineData(-5, -1)]
     public async Task EnqueueAsync_DoesNotValidateQuantityOrValue(int quantity, int value)
     {
         var repository = new FakeGiftRepository();
@@ -59,8 +50,6 @@ public sealed class GiftEnqueueContractTests
     [Fact]
     public async Task EnqueueAsync_AcceptsANullProductId()
     {
-        // ProductId is an unenforced reference in both the dead legacy shape and the new game.Gifts schema
-        // (no catalog check observed anywhere in the cited range) -- null must round-trip cleanly.
         var repository = new FakeGiftRepository();
 
         await repository.EnqueueAsync(1000000001, null, 1, 0, CancellationToken.None);

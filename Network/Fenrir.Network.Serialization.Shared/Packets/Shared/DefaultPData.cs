@@ -2,8 +2,6 @@ using Fenrir.Network.Serialization.Wire.Attributes;
 
 namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 
-// Not a packet of its own: re-read layer over CZ_PROCESS_DATA_SEND's tData blob (offset 4) for
-// "container move" tSort values (208-232, 240-256, 3000, 250-253...).
 [FenrirWireType(28)]
 public readonly partial record struct DefaultPData : IFenrirWireType<DefaultPData>
 {

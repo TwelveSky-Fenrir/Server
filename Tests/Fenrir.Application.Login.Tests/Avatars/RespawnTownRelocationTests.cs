@@ -2,9 +2,6 @@ using Fenrir.Application.Login.Domain.Avatars;
 
 namespace Fenrir.Application.Login.Tests.Avatars;
 
-// Server/ts25login/S04_MyWork02.cpp:330-356: relocate only when the logged-out zone's owning tribe differs
-// from the avatar's own tribe. Still unwired in LoginTrain (blocked on the owning-tribe table -- see
-// RespawnTownRelocation's own remarks) -- this test covers the pure decision function in isolation.
 public class RespawnTownRelocationTests
 {
     [Fact]

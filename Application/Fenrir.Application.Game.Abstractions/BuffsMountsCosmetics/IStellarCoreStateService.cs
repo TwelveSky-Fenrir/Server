@@ -2,7 +2,6 @@ using Fenrir.Application.Game.Domain.World;
 
 namespace Fenrir.Application.Game.Abstractions.BuffsMountsCosmetics;
 
-/// <summary>Business logic behind <see cref="StellarCoreStateHandler" /> (CZ_STELLAR_STATE_SEND, op153).</summary>
 public interface IStellarCoreStateService
 {
     public ValueTask<StellarCoreStateResult> ApplyAsync(Zone zone, PlayerRuntimeState state, int characterId, int sort,

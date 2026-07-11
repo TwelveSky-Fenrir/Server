@@ -8,7 +8,6 @@ using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Data.World;
 
-/// <summary>Thin proc wrapper -- every method maps 1:1 onto one game.usp_MonsterBossRespawnTimer_* call.</summary>
 public sealed record MonsterBossRespawnTimerRepository(ICaeriusNetDbContext Db) : IMonsterBossRespawnTimerRepository
 {
     public async ValueTask<ReadOnlyCollection<MonsterBossRespawnTimerRowDto>> GetAllAsync(CancellationToken ct)

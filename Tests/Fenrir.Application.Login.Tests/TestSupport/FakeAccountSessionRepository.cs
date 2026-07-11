@@ -4,21 +4,13 @@ using Microsoft.Data.SqlClient;
 
 namespace Fenrir.Application.Login.Tests.TestSupport;
 
-// In-memory stand-in for IAccountSessionRepository: defaults to always claiming successfully (Registered), the
-// path every existing LoginService test exercises. Tests of the duplicate-login conflict branches configure
-// ClaimOutcome/PreviousShardId explicitly.
 internal sealed class FakeAccountSessionRepository : IAccountSessionRepository
 {
     public AccountSessionClaimOutcome ClaimOutcome { get; set; } = AccountSessionClaimOutcome.Registered;
     public byte? PreviousShardId { get; set; }
     public bool TransitionResult { get; set; } = true;
 
-    /// <summary>
-    ///     Simulates AccountSessionRepository.ClaimOrSignalKickAsync exhausting its bounded retry budget (or
-    ///     hitting an unrelated SqlException) -- the present-day analog to legacy's PlayUser _failed2/_failed3
-    ///     exits LoginService's ResultSessionRegistrationFailed remarks cite.
-    /// </summary>
-    public SqlException? ClaimException { get; set; }
+        public SqlException? ClaimException { get; set; }
 
     public ImmutableArray<ReapedAccountSessionDto> ReapResult { get; set; } =
         ImmutableArray<ReapedAccountSessionDto>.Empty;

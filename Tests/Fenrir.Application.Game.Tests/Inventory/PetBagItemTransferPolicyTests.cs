@@ -2,12 +2,6 @@ using Fenrir.Application.Game.Domain.Inventory;
 
 namespace Fenrir.Application.Game.Tests.Inventory;
 
-/// <summary>
-///     Coverage for <see cref="PetBagItemTransferPolicy" />, the pure policy behind tSort 254 (deposit from general
-///     inventory), 255 (withdraw to general inventory), and 256 (pet-bag-to-pet-bag rearrange). Does not depend on
-///     any dispatch wiring -- exercises the static policy methods directly against hand-built
-///     <see cref="ItemStack" /> values and plain nullable catalog ids for the bag side.
-/// </summary>
 public class PetBagItemTransferPolicyTests
 {
     private const byte EligibleSort = PetBagItemTransferPolicy.PetBagEligibleSort;
@@ -19,7 +13,6 @@ public class PetBagItemTransferPolicyTests
         return new ItemStack(itemId, quantity, enchant, combine, refine, socket, 0, 0, 0, 0, serial);
     }
 
-    // ---- Bounds helpers ----
 
     [Theory]
     [InlineData(-1, false)]
@@ -41,7 +34,6 @@ public class PetBagItemTransferPolicyTests
         Assert.Equal(expected, PetBagItemTransferPolicy.RequiresUpperHalfEntitlement(slot));
     }
 
-    // ---- Deposit (254) ----
 
     [Fact]
     public void Deposit_SourceOutOfRange_Fails()
@@ -133,11 +125,11 @@ public class PetBagItemTransferPolicyTests
     }
 
     [Theory]
-    [InlineData(1, 0, 0, 0, 0)] // quantity above zero
-    [InlineData(0, 1, 0, 0, 0)] // enchant non-zero
-    [InlineData(0, 0, 1, 0, 0)] // combine non-zero
-    [InlineData(0, 0, 0, 1, 0)] // refine non-zero
-    [InlineData(0, 0, 0, 0, 1)] // socket non-zero
+    [InlineData(1, 0, 0, 0, 0)]
+    [InlineData(0, 1, 0, 0, 0)]
+    [InlineData(0, 0, 1, 0, 0)]
+    [InlineData(0, 0, 0, 1, 0)]
+    [InlineData(0, 0, 0, 0, 1)]
     public void Deposit_SourceNotAtRest_Fails(int quantity, int enchant, int combine, int refine, int socket)
     {
         var result = PetBagItemTransferPolicy.ResolveDepositFromInventory(
@@ -186,7 +178,6 @@ public class PetBagItemTransferPolicyTests
         Assert.True(result.ShouldEmitAuditLog);
     }
 
-    // ---- Withdraw (255) ----
 
     [Fact]
     public void Withdraw_SourceOutOfRange_Fails()
@@ -328,9 +319,6 @@ public class PetBagItemTransferPolicyTests
     [Fact]
     public void Withdraw_DoesNotValidateCatalogSortCode_UnlikeDepositAndRearrange()
     {
-        // No sourceItemSort parameter exists on this method at all -- the withdrawn item's catalog category is
-        // never re-checked, unlike Deposit/Rearrange. This test documents that structural difference: a success
-        // here proves no such gate exists to fail against.
         var result = PetBagItemTransferPolicy.ResolveWithdrawToInventory(
             0, 1,
             ContainerMatrix.InventoryPage0, 0, 0, 0,
@@ -340,7 +328,6 @@ public class PetBagItemTransferPolicyTests
         Assert.True(result.Succeeded);
     }
 
-    // ---- Rearrange within pet bag (256) ----
 
     [Fact]
     public void Rearrange_SameSlot_IsNoOp_BypassingEveryOtherGuard()
@@ -390,8 +377,8 @@ public class PetBagItemTransferPolicyTests
     }
 
     [Theory]
-    [InlineData(10, 0)] // source in upper half
-    [InlineData(0, 10)] // destination in upper half
+    [InlineData(10, 0)]
+    [InlineData(0, 10)]
     public void Rearrange_EitherSideUpperHalfWithoutEntitlement_Fails(int sourceSlot, int destinationSlot)
     {
         var result = PetBagItemTransferPolicy.ResolveRearrangeWithinPetBag(

@@ -8,18 +8,9 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.World;
 
-// world.usp_Npc_GetAll/usp_NpcMenuOption_GetAll/usp_NpcGambleCost_GetAll (the read path) and the 7
-// world.Npcs / 1 world.NpcMenuOptions / 1 world.NpcGambleCosts CHECK constraints added by
-// Database/Migrations/033_npc_static_data_range_checks.sql, against real SQL Server 2025. None of these three
-// tables has a runtime C# write path (all seed-only), so the CHECK-violation tests below insert directly via
-// SqlCommand rather than through IWorldDataRepository -- same pattern as
-// SkillStaticDataProcTests (Migrations/032) and
-// StarterKitProcTests.CreateWithStarterKitAsync_PreviousTribeOutOfRange_ThrowsCheckConstraintViolation.
 [Collection("SqlServer")]
 public class NpcStaticDataProcTests
 {
-    // The 131 seeded NpcIds top out well below this (world.Npcs is currently populated 1-424 per the
-    // migration's own header); anything from here up is guaranteed unused by seed data.
     private static int _nextNpcId = 900_001;
 
     private readonly string _connectionString;
@@ -37,16 +28,6 @@ public class NpcStaticDataProcTests
         _connectionString = fixture.ConnectionString;
     }
 
-    // Confirms the read path (world.usp_Npc_GetAll/usp_NpcMenuOption_GetAll/usp_NpcGambleCost_GetAll ->
-    // NpcRowDto/NpcMenuOptionRowDto/NpcGambleCostRowDto) still loads the full seeded catalog correctly now
-    // that the CHECK constraints sit underneath it, and that every seeded row genuinely falls inside every
-    // new bound -- not just the migration header's own prose claim. Counts are asserted per
-    // Migrations/033_npc_static_data_range_checks.sql's own header (131 NPCs, 13,100 menu options, 13,050
-    // gamble costs), filtered to the seeded NpcId range (<= 500): this class's own CHECK-violation tests
-    // below share this same [Collection("SqlServer")] database and commit real NpcId >= 900_001 rows as
-    // FK-satisfying setup (or as valid-boundary-row proof), and xUnit does not guarantee method execution
-    // order within a class -- an unfiltered count here would be flaky depending on how many of those had
-    // already committed by the time this test happened to run.
     [Fact]
     public async Task GetNpcsAsync_LoadsSeededCatalog_AllRowsWithinTheNewCheckConstraintBounds()
     {
@@ -154,9 +135,6 @@ public class NpcStaticDataProcTests
     [Fact]
     public async Task InsertNpc_ValidRowAtLowerBounds_Succeeds()
     {
-        // Proves the seven failing theories above (and the helper below) actually fail because of the
-        // single overridden field, not because the baseline row is itself invalid. Every default in
-        // InsertNpcAsync is already the lower bound of its own CHECK constraint.
         var ex = await Record.ExceptionAsync(() => InsertNpcAsync(NewNpcId()));
 
         Assert.Null(ex);

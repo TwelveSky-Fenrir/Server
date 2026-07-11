@@ -6,13 +6,6 @@ using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     Covers the <c>game.EventLog</c> (Category=Death) wiring added to <see cref="Zone.ApplyDeath" /> /
-///     <c>Zone.ApplyDeathExperienceLoss</c>: every death queues a <see cref="Zone.PendingDeathEventLog" />
-///     row (drained by <c>DeathEventLogFlushHost</c>, covered separately in
-///     <c>DeathEventLogFlushHostTests</c>), and a monster-kill death that actually costs XP or CP queues a
-///     second row for that consequence.
-/// </summary>
 public class ZoneDeathEventLogTests
 {
     private const short TestLevel = 50;
@@ -49,7 +42,6 @@ public class ZoneDeathEventLogTests
     [Fact]
     public void ApplyDeath_DefaultUnknownCause_StillQueuesARow()
     {
-        // Covers a GM-forced kill, which calls ApplyDeath with no cause argument.
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, level: 5)));
@@ -71,7 +63,7 @@ public class ZoneDeathEventLogTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         zone.ApplyDeath(10);
-        zone.ApplyDeath(10); // duplicate killing blow -- must not queue a second row
+        zone.ApplyDeath(10);
 
         var entries = zone.DrainPendingDeathEventLogs();
         Assert.Single(entries);
@@ -92,7 +84,6 @@ public class ZoneDeathEventLogTests
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _) = ZoneTestKit.CreateSession(1);
-        // Below ExperienceFormulas.MinimumLevelForDeathExperienceLoss (10) -- no XP-loss row.
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, level: 9)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
@@ -112,7 +103,7 @@ public class ZoneDeathEventLogTests
             session, "Victim", 1, 0, 2, 3, TestLevel,
             1, 0f, 0f, 0f, 0f,
             1, 1, 1, 1, 1,
-            Experience: 3000); // loss = (3000-1000)*0.05 = 100
+            Experience: 3000);
         zone.Post(ZoneCommand.Enter(10, enterData));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
@@ -126,7 +117,7 @@ public class ZoneDeathEventLogTests
 
         var lossRow = entries[1];
         Assert.Equal(10, lossRow.ActorCharacterId);
-        Assert.Equal((byte)0, lossRow.Outcome); // ExperienceLossOutcome
+        Assert.Equal((byte)0, lossRow.Outcome);
         Assert.NotNull(lossRow.Payload);
         Assert.Contains("Kind=Experience", lossRow.Payload);
         Assert.Contains("Loss=100", lossRow.Payload);
@@ -154,7 +145,7 @@ public class ZoneDeathEventLogTests
         Assert.Equal(2, entries.Count);
 
         var lossRow = entries[1];
-        Assert.Equal((byte)1, lossRow.Outcome); // ContributionPointsLossOutcome
+        Assert.Equal((byte)1, lossRow.Outcome);
         Assert.NotNull(lossRow.Payload);
         Assert.Contains("Kind=ContributionPoints", lossRow.Payload);
         Assert.Contains($"Loss={ExperienceFormulas.CpLossAtLevelCap}", lossRow.Payload);

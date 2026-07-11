@@ -2,10 +2,6 @@ using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Domain.Combat;
 
-/// <summary>
-///     Raw, unvalidated wire request -- all guard checks, RNG rolls, and HP mutation happen in
-///     <c>Zone.ApplyCombatCommand</c> on the zone's own tick thread.
-/// </summary>
 public readonly struct CombatCommand
 {
     public required int AttackerCharacterId { get; init; }

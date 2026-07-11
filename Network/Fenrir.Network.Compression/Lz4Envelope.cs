@@ -4,12 +4,6 @@ using K4os.Compression.LZ4;
 
 namespace Fenrir.Network.Compression;
 
-/// <summary>
-///     ZC_ZPACKET_OK_SEND envelope (§3.5): tProtocol(1) + isCompress(4) + originalSize(4) + compressSize(4) +
-///     payload. Falls back to uncompressed (isCompress=0, payload=originalSize bytes) if
-///     <see cref="LZ4Codec.Encode(System.ReadOnlySpan{byte},System.Span{byte},LZ4Level)" /> returns &lt;= 0.
-///     S→C only, never received by the server -- no symmetric decode exists here.
-/// </summary>
 public static class Lz4Envelope
 {
     public static byte[] Encode(byte opcode, ReadOnlySpan<byte> plainPayload)

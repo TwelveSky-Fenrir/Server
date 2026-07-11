@@ -9,9 +9,5 @@ public interface IAccountRepository
 
     public ValueTask RecordLoginAttemptAsync(int accountId, bool success, CancellationToken ct);
 
-    /// <summary>
-    ///     Sets AccountGrade (legacy uUserSort) to an absolute value; throws if <paramref name="loginName" /> does not
-    ///     exist.
-    /// </summary>
-    public ValueTask SetGradeAsync(string loginName, short accountGrade, CancellationToken ct);
+        public ValueTask SetGradeAsync(string loginName, short accountGrade, CancellationToken ct);
 }

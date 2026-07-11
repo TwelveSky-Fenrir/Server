@@ -2,10 +2,6 @@ using Fenrir.Application.Game.Domain.World.Loot;
 
 namespace Fenrir.Application.Game.Tests.World.Loot;
 
-/// <summary>
-///     Coverage for <see cref="TreasureChestDropTable" />, the C14 port of <c>MyUtil::ProcessForDropTresureChest</c>'s
-///     single-0-99-roll five-outcome weighted table (78% 1145 / 10% 8109 / 8% pet / 3% 8110 / 1% 695).
-/// </summary>
 public class TreasureChestDropTableTests
 {
     [Theory]
@@ -33,7 +29,7 @@ public class TreasureChestDropTableTests
         var outcome = TreasureChestDropTable.Resolve(roll);
 
         Assert.Equal(TreasureChestOutcomeKind.RandomLevel1Pet, outcome.Kind);
-        Assert.Equal(0, outcome.ItemId); // marker -- caller draws from Level1PetPool
+        Assert.Equal(0, outcome.ItemId);
     }
 
     [Fact]
@@ -65,7 +61,7 @@ public class TreasureChestDropTableTests
         Assert.Equal(8, pet);
         Assert.Equal(3, fourth);
         Assert.Equal(1, rare);
-        Assert.Equal(100, jackpot + second + pet + fourth + rare); // no remainder bucket
+        Assert.Equal(100, jackpot + second + pet + fourth + rare);
     }
 
     [Theory]
@@ -79,7 +75,6 @@ public class TreasureChestDropTableTests
     [Fact]
     public void Roll_UsesPlainUniformDraw_DeterministicForAFixedSeed()
     {
-        // Two Random(seed) instances yield the same first draw, so Roll must agree with a direct Resolve of it.
         var expected = TreasureChestDropTable.Resolve(new Random(12345).Next(TreasureChestDropTable.RollExclusiveUpperBound));
         var actual = TreasureChestDropTable.Roll(new Random(12345));
 

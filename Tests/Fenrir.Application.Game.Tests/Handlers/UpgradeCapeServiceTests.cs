@@ -11,11 +11,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 
-/// <summary>
-///     Drives the real <see cref="UpgradeCapeService" /> (opcode 127) over a real <see cref="Zone" />; ticks the
-///     zone while the service's own <c>PostInventoryCommandAndWaitAsync</c> await is pending, same pattern as
-///     <c>FishingCatchHandlerTests</c>.
-/// </summary>
 public class UpgradeCapeServiceTests
 {
     private static async Task<UpgradeCapeResult> RunToCompletionAsync(ValueTask<UpgradeCapeResult> pending, Zone zone)
@@ -59,9 +54,6 @@ public class UpgradeCapeServiceTests
     [Fact]
     public async Task ValidPreconditions_AlwaysDeductsMoneyAndConsumesMaterial_RegardlessOfRandomOutcome()
     {
-        // UpgradeCapeService rolls via SystemRandomSource.Instance (no DI seam, matching EnchantItemHandler's
-        // own precedent) -- success/failure branch fidelity (including the all-zero Value on failure) is
-        // covered deterministically by CapeUpgradeResolverTests.
         var (session, _, zone, state, repo, eventLog) = SetUp();
         SeedInventory(zone, new ItemStack(1401, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1),
             new ItemStack(984, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
@@ -80,8 +72,6 @@ public class UpgradeCapeServiceTests
         var items = repo.LastAdjustMoneyAndReplaceContainer.Value.Items;
         Assert.DoesNotContain(items, i => i.Slot == 1);
 
-        // A real attempt (success or failure) always logs exactly one Category=Enchant, EventCode=127 row --
-        // outcome is coin-flip so only the shape is asserted here, not the Outcome byte's specific value.
         var logged = Assert.Single(eventLog.Enqueued);
         Assert.Equal(127, logged.EventCode);
         Assert.Equal((byte)EventLogCategory.Enchant, logged.Category);

@@ -2,8 +2,6 @@ using Fenrir.Data.Abstractions.Security;
 
 namespace Fenrir.Application.Game.Tests.TestSupport;
 
-// In-memory stand-in for IBanRepository: EnterWorldHandler only ever calls IsActiveForCharacterAsync;
-// GmBlockAvatarService is the one caller that exercises CreateAsync, recorded here for assertion.
 internal sealed class FakeBanRepository(bool characterBanned = false, int nextBanId = 1) : IBanRepository
 {
     public (int? AccountId, int? CharacterId, BanReason Reason, DateTime? ExpiresAtUtc, int? ActorAccountId,

@@ -61,20 +61,6 @@ public sealed class FishingCatchService(ICharacterRepository characters, ILogger
                 return;
             }
 
-            // Legacy quirk: the response's 4th field (FishingCatchResponse.XY) carries only the row-equivalent
-            // inventory-position value the item-add routine computes, discarding the column value it also
-            // computes -- confirmed at the call sites (Server/ts25zone/S04_MyWork02.cpp:13895, 13935, 13942,
-            // which pass the row out-param and discard the column one) and inside the routine itself
-            // (MyUtil::SendItemToInventory, Server/ts25zone/S07_MyGame03.cpp:4744-4782). Legacy actually derives
-            // that row from a second, distinct "visual grid position" index that a fragmentation-aware search
-            // (MyUtil::FindEmptyInvenForItem, Server/ts25zone/S07_MyGame03.cpp:4557-4612) computes separately
-            // from the raw storage slot; Fenrir's InventoryState has no equivalent split-index concept (a slot
-            // here already IS the grid position), so this reproduces the row the same way it's already
-            // decomposed elsewhere in this codebase for an 8-wide inventory grid (SkyUpgradeItemService,
-            // UpgradeCapeService: slot % 8 = column, slot / 8 = row). This matches legacy exactly whenever the
-            // visual grid position and the storage slot coincide (the common case); a follow-up
-            // legacy-behavior-translator contract is needed to fully resolve the fragmented-inventory edge case
-            // where they diverge.
             var rowPosition = destination.Slot / 8;
 
             session.Send(new FishingCatchResponse

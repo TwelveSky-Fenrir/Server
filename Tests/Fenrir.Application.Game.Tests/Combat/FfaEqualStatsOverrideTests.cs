@@ -3,10 +3,6 @@ using Fenrir.Application.Game.Stats;
 
 namespace Fenrir.Application.Game.Tests.Combat;
 
-/// <summary>
-///     Covers <see cref="FfaEqualStatsOverride" /> -- the FFA zone (335) "equal real stats" override
-///     (<c>Server/Header/Protocol/MyFactor.cpp:58-96</c>, <c>:4009-4478</c>).
-/// </summary>
 public class FfaEqualStatsOverrideTests
 {
     private static EffectiveStats RealStats()

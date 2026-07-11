@@ -66,12 +66,7 @@ public interface IWorldDataRepository
 
     public ValueTask<ReadOnlyCollection<RewardBundleItemRowDto>> GetRewardBundleItemsAsync(CancellationToken ct);
 
-    /// <summary>
-    ///     The 3 tribe-conversion equivalence catalogs (skill, equipped-gear, worn-costume) consumed by the
-    ///     Book of Noble Dragon/Royal Serpent/Grand Tiger V2 mechanic (world.Items 99014/99015/99016) --
-    ///     see game.usp_Character_ApplyTribeConversion's own header for what it does and does not remap.
-    /// </summary>
-    public ValueTask<(
+        public ValueTask<(
             ReadOnlyCollection<TribeSkillEquivalenceRowDto> SkillEquivalences,
             ReadOnlyCollection<TribeItemEquivalenceRowDto> ItemEquivalences,
             ReadOnlyCollection<TribeCostumeEquivalenceRowDto> CostumeEquivalences)>

@@ -13,7 +13,6 @@ public class WorldInfoTests
         Assert.Equal(1384, WorldInfo.WireSize);
     }
 
-    // TribeGuardState/Zone038DTMValue sizes come from the offset gap between table rows, not the raw C++ type column.
     [Fact]
     public void RoundTrip_PreservesAllFields()
     {
@@ -88,7 +87,6 @@ public class WorldInfoTests
         StructuralAssert.DeepEqual(worldInfo, roundTripped);
     }
 
-    // GuildScore sits right after GuildName3 (39 bytes, not 4-aligned) plus its 3-byte compiler pad at offset 897.
     [Fact]
     public void TryRead_DecodesGoldenBytes()
     {

@@ -9,23 +9,11 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Commerce;
 
-/// <summary>
-///     CZ_START_PSHOP_SEND (opcode 31). <c>Sort</c> 1 = live personal shop (a pure display overlay -- items
-///     never leave <see cref="PlayerRuntimeState.Inventory" />), 2 = offline/deputy shop (items physically
-///     leave into game.OfflineShopItems). Both sorts gated to zone 37.
-/// </summary>
-/// <remarks>
-///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:6067-6095 -- the cross-type "shop already open"
-///     exclusivity gate (<see cref="OpenShopStallPrepareOutcome.Blocked" />, results 101/102/103), enforced
-///     by <see cref="IOpenShopStallService.PrepareAsync" /> before either shop type is opened. The one
-///     same-type case (a PERSONAL request while a PERSONAL shop is already open) instead disconnects the
-///     session via <see cref="OpenShopStallPrepareOutcome.Abort" />, matching legacy's <c>Quit()</c>.
-/// </remarks>
 public sealed class OpenShopStallHandler(IOpenShopStallService service, ILogger<OpenShopStallHandler> logger)
     : IAsyncPacketHandler<OpenShopStallRequest>
 {
-    /// <summary>Single source of truth: <see cref="ProxyShopZonePolicy.ZoneNumber" />; see its remarks.</summary>
-    public const short PshopZoneNumber = ProxyShopZonePolicy.ZoneNumber;
+
+        public const short PshopZoneNumber = ProxyShopZonePolicy.ZoneNumber;
 
     public async ValueTask HandleAsync(OpenShopStallRequest packet, IPacketSession session,
         CancellationToken cancellationToken)

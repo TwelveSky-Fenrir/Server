@@ -9,20 +9,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Services.Tribes;
 
-/// <summary>See <see cref="ITribeMigrationService" />.</summary>
-/// <remarks>
-///     Réf. "Fourth-tribe (Fujin) conversion and return" behavior contract (legacy-behavior-translator),
-///     itself citing Server/ts25zone/S04_MyWork02.cpp:7565-7758. Orchestrates
-///     <see cref="Tribes.TribeMigrationGate" /> (every character-specific precondition), the shared global
-///     quota (checked LAST -- see <see cref="TribeMigrationOutcome.QuotaExhausted" />'s own remarks for the
-///     deliberate hardening reorder), and the atomic tribe+quest-state commit
-///     (<see cref="ICharacterRepository.ApplyTribeFourConversionAsync" />) plus its
-///     <see cref="PlayerRuntimeState" /> mirror. The legacy's own cross-server "joined/returned" broadcast
-///     (S04_MyWork02.cpp:7748, S04_MyWork02.cpp's return-branch equivalent) is a confirmed structural no-op on
-///     the legacy central process (empty case arms, Server/ts25center/S04_MyWork02.cpp:474,:991-992) and is
-///     deliberately not reproduced here -- the behavior contract leaves whether Fenrir should implement a real
-///     announcement as an open product question, not a legacy behavior to carry forward.
-/// </remarks>
 public sealed class TribeMigrationService(
     ICharacterRepository characters,
     ITribeFourQuotaRepository quota,
@@ -43,9 +29,6 @@ public sealed class TribeMigrationService(
 
         var context = new TribeMigrationEligibilityContext(
             options.Value.TribeFourConversionEnabled,
-            // "The current wall-clock time as read by the zone process's own local clock" (contract) --
-            // TimeProvider.GetLocalNow() rather than a bare DateTime.Now call, so this is deterministically
-            // testable (see TribeMigrationServiceTests' own fixed-Saturday fake).
             timeProvider.GetLocalNow().DateTime,
             oldTribe,
             state.PreviousTribe,
@@ -68,13 +51,8 @@ public sealed class TribeMigrationService(
             return outcome;
         }
 
-        // Hardened ordering (deliberate deviation from the legacy's own quota-first bug): every
-        // character-specific gate above already passed, so this attempt is the only kind allowed to spend the
-        // shared quota -- see TribeMigrationOutcome.QuotaExhausted's own remarks.
         if (!await quota.TryConsumeAsync(ct).ConfigureAwait(false))
         {
-            // Worth Information, not Debug: a server-wide shared quota just blocked an otherwise-eligible
-            // character, which affects every other character attempting the same conversion today.
             logger.LogInformation(
                 "Character {CharacterId} fourth-tribe conversion rejected: shared daily quota exhausted",
                 characterId);

@@ -2,11 +2,6 @@ using Fenrir.Application.Game.Domain.World;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     Pure-rule coverage for <see cref="ReviveEligibilityZones" />, <see cref="ReviveEligibilityRules" />, and
-///     <see cref="ZoneTransferAntiAbuseRules" /> -- the territorial revive-eligibility gate and its
-///     zone-transfer companion check, independent of any <see cref="Zone" /> wiring.
-/// </summary>
 public class DeathGateTests
 {
     [Theory]
@@ -45,8 +40,8 @@ public class DeathGateTests
     [Theory]
     [InlineData(322)]
     [InlineData(323)]
-    [InlineData(5)] // the gap between the faction-0 and faction-1 blocks
-    [InlineData(10)] // the gap between the faction-1 and faction-2 blocks
+    [InlineData(5)]
+    [InlineData(10)]
     [InlineData(999)]
     public void Classify_EverythingElse_IsUnconditional(short mapId)
     {
@@ -64,7 +59,6 @@ public class DeathGateTests
     [Fact]
     public void IsEligible_FactionTerritory_AlliedFactionMatch_IsEligible()
     {
-        // Avatar is tribe 1, dead on a faction-0 territory block, but tribe 1 is currently allied with tribe 0.
         Assert.True(ReviveEligibilityRules.IsEligible(2, 1, 0));
     }
 
@@ -77,7 +71,6 @@ public class DeathGateTests
     [Fact]
     public void IsEligible_FactionTerritory_AlliedWithADifferentFaction_IsNotEligible()
     {
-        // Tribe 1 allied with tribe 2 does not help against a faction-0 owned block.
         Assert.False(ReviveEligibilityRules.IsEligible(2, 1, 2));
     }
 
@@ -130,9 +123,6 @@ public class DeathGateTests
     [Fact]
     public void ZoneTransfer_Faction0Block_NeverGrantsAllianceLeniency_EvenWhenOwningFactionHasSomeAlly()
     {
-        // Legacy quirk: faction-0 territory's companion check never grants alliance-based leniency at all --
-        // only an exact faction-0 match on the avatar avoids the kick. Here the owning faction (0) is
-        // "allied" with faction 2, which must NOT suspend the kick.
         var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(
             2, 50, 1, owner => owner == 0 ? 2 : null);
 
@@ -142,8 +132,6 @@ public class DeathGateTests
     [Fact]
     public void ZoneTransfer_NonFaction0Block_OwningFactionAlliedWithFaction0_SuspendsKick_ForEveryAvatar()
     {
-        // Legacy quirk: for the OTHER three blocks, an owning-faction alliance with faction 0 SPECIFICALLY
-        // suspends the kick for every avatar leaving the zone, not just members of the allied faction.
         var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(
             7, 50, 3, owner => owner == 1 ? 0 : null);
 
@@ -153,7 +141,6 @@ public class DeathGateTests
     [Fact]
     public void ZoneTransfer_NonFaction0Block_OwningFactionAlliedWithNonZeroFaction_DoesNotSuspendKick()
     {
-        // The quirk specifically keys on faction 0 -- an alliance with any other faction does not help.
         var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(
             7, 50, 3, owner => owner == 1 ? 2 : null);
 

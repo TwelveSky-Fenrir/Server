@@ -50,7 +50,6 @@ public sealed class TradeLockService(
 
         if (planA.Overflowed || planB.Overflowed)
         {
-            // No wire error code for overflow: reset both menus to locked (not cleared) so players can retry.
             logger.LogInformation(
                 "Trade commit rejected: character {PlayerAId}/{PlayerBId} would overflow inventory (side A overflowed {PlanAOverflowed}, side B overflowed {PlanBOverflowed}) -- both menus reset to locked for retry",
                 trade.PlayerAId, trade.PlayerBId, planA.Overflowed, planB.Overflowed);
@@ -64,15 +63,6 @@ public sealed class TradeLockService(
         var moneyDeltaB = trade.SideA.Money - trade.SideB.Money;
         var bigMoneyDeltaB = trade.SideA.BigMoney - trade.SideB.BigMoney;
 
-        // C8-trade-finalize: commit through the anti-dupe/idempotent repository rather than the plain
-        // ICharacterRepository.ExecuteTradeAsync -- see ITradeCommitRepository's own doc for why (a retried
-        // usp_CharacterTradeCommit_ExecuteIdempotent call carrying the SAME token is a guaranteed no-op via
-        // game.TradeCommitLedger, closing a "transport hiccup after the DB actually committed" double-credit
-        // risk on this economy-sensitive path). The token is generated once per commit attempt: this call site
-        // never re-invokes CommitAsync for an already-committed trade (TryLock's MenuState>=2 guard rejects a
-        // second lock-in from either side once committed), so today this token's only value is defending
-        // against a lower-level ADO.NET/transport retry of this exact call -- not a higher-level application
-        // retry, which doesn't exist yet at this call site.
         var tradeToken = TradeCommitToken.NewForCommit();
 
         try
@@ -128,14 +118,7 @@ public sealed class TradeLockService(
         return list;
     }
 
-    /// <summary>
-    ///     A side's own contributed trade-window offer (GL_615_TRADE_ITEM2 audit rows) -- one row per occupied
-    ///     escrow slot, keyed by trade-offer slot index (0-7), not by the source inventory container/slot the
-    ///     item came from. usp_CharacterTrade_Execute only reads the item-identity columns off this TVP for
-    ///     logging, never the Slot column itself, so the exact index carries no functional meaning beyond
-    ///     matching TradeOfferCodec's own per-slot iteration order.
-    /// </summary>
-    private static List<CharacterItemSlotTvp> ToTradedTvps(TradeOfferSide side)
+        private static List<CharacterItemSlotTvp> ToTradedTvps(TradeOfferSide side)
     {
         var list = new List<CharacterItemSlotTvp>(TradeLimits.SlotCount);
         for (byte i = 0; i < TradeLimits.SlotCount; i++)

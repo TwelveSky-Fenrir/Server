@@ -57,12 +57,11 @@ public class ZoneConfigCatalogTests
     }
 
     [Theory]
-    [InlineData(0)] // below the valid 1..350 range
-    [InlineData(351)] // above the valid range
-    [InlineData(999)] // simply not configured
+    [InlineData(0)]
+    [InlineData(351)]
+    [InlineData(999)]
     public void Accessors_ForUnconfiguredOrOutOfRangeMap_YieldLegacyDefaults(int mapId)
     {
-        // Server/Header/S18_MyZoneInfo.cpp:399-433 -- 0 for level accessors, -1 for the owner accessor, silently.
         var catalog = Build((5, new ZoneConfig { MinLevel = 10, MaxLevel = 20, OwnerTribe = 1 }));
 
         Assert.Equal(0, catalog.GetMinLevel(mapId));
@@ -78,7 +77,7 @@ public class ZoneConfigCatalogTests
         var catalog = Build((3, new ZoneConfig { MaxUser = 250 }));
 
         Assert.Equal(250, catalog.GetMaxUser(3));
-        Assert.Equal(0, catalog.GetMaxUser(4)); // 0 => no per-zone cap configured (fail-open)
+        Assert.Equal(0, catalog.GetMaxUser(4));
     }
 
     [Fact]
@@ -93,7 +92,6 @@ public class ZoneConfigCatalogTests
     [Fact]
     public void IsWithinLevelBand_UngatedWhenMaxLevelIsZero()
     {
-        // The legacy per-slot 0-0 default zone: no band, always eligible.
         var catalog = Build((9, new ZoneConfig { MinLevel = 0, MaxLevel = 0 }));
 
         Assert.True(catalog.IsWithinLevelBand(9, 0));
@@ -101,11 +99,11 @@ public class ZoneConfigCatalogTests
     }
 
     [Theory]
-    [InlineData(100, true)] // at min bound (inclusive)
-    [InlineData(120, true)] // inside
-    [InlineData(145, true)] // at max bound (inclusive)
-    [InlineData(99, false)] // below min
-    [InlineData(146, false)] // above max
+    [InlineData(100, true)]
+    [InlineData(120, true)]
+    [InlineData(145, true)]
+    [InlineData(99, false)]
+    [InlineData(146, false)]
     public void IsWithinLevelBand_InclusiveBand(int level, bool expected)
     {
         var catalog = Build((11, new ZoneConfig { MinLevel = 100, MaxLevel = 145 }));
@@ -151,7 +149,7 @@ public class ZoneConfigCatalogTests
     [InlineData(0, false)]
     [InlineData(1001, false)]
     [InlineData(-5, false)]
-    [InlineData(101, true)] // guard is 1..1000, NOT the misworded "1-100" legacy error text
+    [InlineData(101, true)]
     public void IsValidMaxUser_EnforcesOneToOneThousand_NotTheMiswordedOneHundred(int maxUser, bool expected)
     {
         Assert.Equal(expected, ZoneConfigCatalog.IsValidMaxUser(maxUser));

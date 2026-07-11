@@ -16,10 +16,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Social;
 
-/// <summary>
-///     <see cref="FriendService.LocateAsync" />'s same-shard-first, cross-shard-directory-fallback shape,
-///     including re-applying the same-tribe gate against the directory's own denormalized Tribe column.
-/// </summary>
 public class FriendServiceTests
 {
     private static PlayerRuntimeState MakePlayer(int characterId, string name, byte tribe)
@@ -52,12 +48,7 @@ public class FriendServiceTests
             new CapturingLogger<FriendService>());
     }
 
-    /// <summary>
-    ///     Response-code-order regression: the asker's own busy/pose state must be checked before the target
-    ///     avatar is resolved by name, so a busy asker naming a nonexistent avatar still gets the busy reply,
-    ///     not "target not found" (Server/ts25zone/S04_MyWork02.cpp:8459-8471).
-    /// </summary>
-    [Fact]
+        [Fact]
     public async Task Ask_AskerBusy_AndTargetNameDoesNotExist_ReturnsAskerBusy_NotTargetNotFound()
     {
         var friends = new FriendRegistry();
@@ -72,7 +63,7 @@ public class FriendServiceTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.True(zone.TryGetPlayer(1, out var asker));
-        Assert.Equal(FriendAskOutcome.Sent, friends.TryAsk(1, 2)); // still pending, never answered
+        Assert.Equal(FriendAskOutcome.Sent, friends.TryAsk(1, 2));
 
         var service = CreateService(zones, friends, new FakeCharacterShardLocationRepository());
 
@@ -81,11 +72,7 @@ public class FriendServiceTests
         Assert.Equal(FriendAskResultKind.AskerBusy, result);
     }
 
-    /// <summary>
-    ///     WS1.4: a same-shard miss that DOES resolve on the cross-shard directory publishes an Ask and
-    ///     reports SentCrossShard, not TargetNotFound.
-    /// </summary>
-    [Fact]
+        [Fact]
     public async Task Ask_SameShardMiss_ResolvesCrossShard_PublishesAskAndReturnsSentCrossShard()
     {
         var friends = new FriendRegistry();

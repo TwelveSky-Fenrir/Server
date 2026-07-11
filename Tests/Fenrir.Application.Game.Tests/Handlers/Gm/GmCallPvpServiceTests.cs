@@ -12,14 +12,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Gm;
 
-// GM-CALLPVP (legacy PROCESS_DATA_SEND, opcode 19, tSort 599 -- Server/ts25zone/S04_MyWork04.cpp:1770-1823).
-// The success acknowledgment is sent to the calling GM BEFORE any relocation work runs -- the caller has no way
-// to distinguish "found and moved" from "matched nobody" from the response alone. Matching is exact,
-// case-sensitive, full-string equality (deliberately NOT the case-insensitive lookup this dispatch table's
-// sibling by-name commands use). The two fixed relocation coordinates are the REAL recovered legacy values --
-// (-232, 36, 2) for duel slot 1 and (232, 36, 2) for duel slot 2, transcribed from
-// Server/ts25zone/S04_MyWork04.cpp:1785-1790 and cross-confirmed by the sibling case 600 (DUEL READY)
-// re-declaration at :1839-1844 -- see GmCallPvpService's own remarks.
 public class GmCallPvpServiceTests
 {
     private const int CallerId = 10;
@@ -27,18 +19,10 @@ public class GmCallPvpServiceTests
     private const int TargetAccountId = 200;
     private const int Sort = 599;
 
-    // Server/ts25zone/S04_MyWork04.cpp:1785-1790 / :1839-1844 -- slot 2 mirrors slot 1 by negating only the
-    // first component.
     private static (float X, float Y, float Z) Slot1Coordinate => (-232f, 36f, 2f);
     private static (float X, float Y, float Z) Slot2Coordinate => (232f, 36f, 2f);
 
-    /// <summary>
-    ///     Asserts the pipe's very next buffered frame (not necessarily the ONLY one) matches
-    ///     <paramref name="expected" /> -- the head-of-buffer counterpart to GmBasicTestSupport's own
-    ///     AssertTailFrameAsync, needed here because this command's own explicit ordering guarantee is
-    ///     "ack sent before relocation work runs," not "ack sent last."
-    /// </summary>
-    private static async Task AssertHeadFrameAsync<TPacket>(FakeDuplexPipe pipe, TPacket expected)
+        private static async Task AssertHeadFrameAsync<TPacket>(FakeDuplexPipe pipe, TPacket expected)
         where TPacket : struct, IOutgoingPacket
     {
         var actual = await PacketAssert.ReadSentBytesAsync(pipe);
@@ -65,7 +49,7 @@ public class GmCallPvpServiceTests
         PacketAssert.AssertNothingSent(pipe);
         PacketAssert.AssertNothingSent(targetPipe);
         Assert.Empty(eventLog.LoggedEvents);
-        Assert.Equal(100f, targetState.PosX); // ZoneTestKit.EnterData's own default, untouched
+        Assert.Equal(100f, targetState.PosX);
     }
 
     [Theory]
@@ -104,7 +88,6 @@ public class GmCallPvpServiceTests
         await service.HandleAsync(new GmCallPvpPayload { DuelSlot = 1, TargetName = "NobodyHome" }, data, session,
             CancellationToken.None);
 
-        // Success is unconditional on a valid duel slot -- there is no distinct "target not found" signal.
         await PacketAssert.AssertSentAsync(pipe,
             new GenericActionResponse { Result = 0, Sort = Sort, Data = data, RuneValue = 0 });
         Assert.Empty(eventLog.LoggedEvents);
@@ -120,7 +103,6 @@ public class GmCallPvpServiceTests
         var service = new GmCallPvpService(registry, eventLog, NullLogger<GmCallPvpService>.Instance);
         var data = GmBasicTestSupport.RequestData();
 
-        // Deliberately NOT the case-insensitive match this dispatch table's sibling by-name commands use.
         await service.HandleAsync(new GmCallPvpPayload { DuelSlot = 1, TargetName = "WANDERER" }, data, session,
             CancellationToken.None);
 
@@ -139,14 +121,12 @@ public class GmCallPvpServiceTests
         var (session, pipe, _) = GmBasicTestSupport.Enter(zone, CallerId, "TheGm", 1);
         var (_, targetPipe, targetState) =
             GmBasicTestSupport.Enter(zone, TargetId, "Wanderer", accountId: TargetAccountId);
-        ZoneTestKit.DrainOutbound(pipe); // target's own Enter-broadcast join packet, not under test
+        ZoneTestKit.DrainOutbound(pipe);
         ZoneTestKit.DrainOutbound(targetPipe);
         var eventLog = new FakeEventLogRepository();
         var service = new GmCallPvpService(registry, eventLog, NullLogger<GmCallPvpService>.Instance);
         var data = GmBasicTestSupport.RequestData();
 
-        // Ack must land on the caller's pipe as the FIRST frame -- it is sent before the relocation loop even
-        // starts, not after it completes.
         await GmBasicTestSupport.RunToCompletionAsync(
             service.HandleAsync(new GmCallPvpPayload { DuelSlot = 1, TargetName = "Wanderer" }, data, session,
                 CancellationToken.None), zone);
@@ -160,7 +140,7 @@ public class GmCallPvpServiceTests
         Assert.Equal(z, targetState.PosZ);
 
         var logged = Assert.Single(eventLog.LoggedEvents);
-        Assert.Equal((short)12, logged.EventCode); // GmDuelAndInventoryActionEventCodes.CallPvpRelocate (internal, not visible here)
+        Assert.Equal((short)12, logged.EventCode);
         Assert.Equal(EventLogCategory.GmAction, logged.Category);
         Assert.Equal(GmBasicTestSupport.AccountId, logged.ActorAccountId);
         Assert.Equal(CallerId, logged.ActorCharacterId);
@@ -202,7 +182,6 @@ public class GmCallPvpServiceTests
         var (session, _, _) = GmBasicTestSupport.Enter(zone, CallerId, "TheGm", 1);
         var (_, _, targetState) = GmBasicTestSupport.Enter(zone, TargetId, "Busy", accountId: TargetAccountId);
         var duelRegistry = new DuelRegistry();
-        // Puts TargetId into a pending duel negotiation -- DuelRegistry.IsNegotiating(TargetId) becomes true.
         duelRegistry.TryAsk(TargetId, 999, false);
         var eventLog = new FakeEventLogRepository();
         var service = new GmCallPvpService(registry, eventLog, NullLogger<GmCallPvpService>.Instance, duelRegistry);
@@ -211,16 +190,13 @@ public class GmCallPvpServiceTests
             service.HandleAsync(new GmCallPvpPayload { DuelSlot = 1, TargetName = "Busy" },
                 GmBasicTestSupport.RequestData(), session, CancellationToken.None), zone);
 
-        Assert.Equal(100f, targetState.PosX); // untouched -- skipped, not a near-miss
+        Assert.Equal(100f, targetState.PosX);
         Assert.Empty(eventLog.LoggedEvents);
     }
 
     [Fact]
     public async Task HandleAsync_CallerNameExactlyMatchesOwnRequestedTarget_NoSelfExclusion_CallerIsRelocatedToo()
     {
-        // Deliberately NOT the self-exclusion this dispatch table's sibling by-name commands (FIND/CALL/MOVE/
-        // NCHAT/YCHAT/KICK) apply via their own shared SearchAvatar-equivalent helper -- see GmCallPvpService's
-        // own remarks. This command's citation iterates every connected character with no such guard.
         var (registry, zone) = GmBasicTestSupport.CreateWorld();
         var (session, _, callerState) = GmBasicTestSupport.Enter(zone, CallerId, "TheGm", 1);
         var eventLog = new FakeEventLogRepository();
@@ -266,9 +242,6 @@ public class GmCallPvpServiceTests
     public async Task HandleAsync_DuelSlotSelectsTheRecoveredFixedCoordinateTriple(int duelSlot, float expectedX,
         float expectedY, float expectedZ)
     {
-        // Server/ts25zone/S04_MyWork04.cpp:1785-1790 (case 599, "CALL PVP") and :1839-1844 (case 600, "DUEL
-        // READY", identical sibling re-declaration) -- newly recovered by the "gm-call-pvp-magnitudes" legacy
-        // re-verification pass. Slot 2 mirrors slot 1 by negating only the first component.
         var (registry, zone) = GmBasicTestSupport.CreateWorld();
         var (session, _, _) = GmBasicTestSupport.Enter(zone, CallerId, "TheGm", 1);
         var (_, _, targetState) = GmBasicTestSupport.Enter(zone, TargetId, "Wanderer");

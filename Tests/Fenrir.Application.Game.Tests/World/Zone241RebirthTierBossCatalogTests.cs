@@ -2,11 +2,6 @@ using Fenrir.Application.Game.Domain.World;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     <see cref="Zone241RebirthTierBossCatalog" /> -- the concrete <see cref="IPersonalDungeonBossCatalog" />
-///     built from <see cref="PersonalDungeonBossTables.ResolveCatalogE" />, the table that actually wins the
-///     confirmed three-way Zone-241 summon race (see that class's own remarks).
-/// </summary>
 public class Zone241RebirthTierBossCatalogTests
 {
     [Theory]

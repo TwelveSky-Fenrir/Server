@@ -9,14 +9,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     <see cref="Zone.Tick" />'s proxy/deputy-shop periodic sweep (<c>Zone.RebroadcastProxyShops</c>,
-///     Server/ts25zone/S07_MyGame01.cpp:2586-2608): per-shop 5 s throttle, strict-less-than expiry
-///     force-close (broadcasting the distinct "gone" action state before queuing the durable close), and the
-///     periodic "still here" refresh broadcast otherwise. <see cref="World.ZoneProxyShopsTests" /> already
-///     covers <see cref="Zone.TryUpdateProxyShopExpiration" /> in isolation; this file covers the sweep's own
-///     broadcast/throttle/expiry behavior end to end.
-/// </summary>
 public class ZoneProxyShopSweepTests
 {
     private const int NotExpired = 20991231;
@@ -38,11 +30,10 @@ public class ZoneProxyShopSweepTests
     {
         var zone = ZoneTestKit.CreateZone(ProxyShopZonePolicy.ZoneNumber);
         var (session, pipe) = ZoneTestKit.CreateSession(1);
-        // same AOI cell as the shop entries below (cell size 75, both floor to (0, 0))
         zone.Post(ZoneCommand.Enter(1, ZoneTestKit.EnterData(session, ProxyShopZonePolicy.ZoneNumber, posX: 10f,
             posZ: 10f)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
-        ZoneTestKit.DrainOutbound(pipe); // discard the entry handshake noise
+        ZoneTestKit.DrainOutbound(pipe);
         return (zone, pipe);
     }
 
@@ -68,8 +59,8 @@ public class ZoneProxyShopSweepTests
 
         var frame = ZoneTestKit.DrainOutbound(pipe);
         Assert.Equal(OneFrame, frame.Length);
-        Assert.Equal(0, ReadActionState(frame)); // periodic re-broadcast, not a despawn
-        Assert.Equal(1, zone.ProxyShopCount); // still tracked -- not force-closed
+        Assert.Equal(0, ReadActionState(frame));
+        Assert.Equal(1, zone.ProxyShopCount);
     }
 
     [Fact]
@@ -82,8 +73,8 @@ public class ZoneProxyShopSweepTests
 
         var frame = ZoneTestKit.DrainOutbound(pipe);
         Assert.Equal(OneFrame, frame.Length);
-        Assert.Equal(3, ReadActionState(frame)); // distinct "stall gone" code, not the refresh code
-        Assert.Equal(0, zone.ProxyShopCount); // force-closed -- no longer tracked
+        Assert.Equal(3, ReadActionState(frame));
+        Assert.Equal(0, zone.ProxyShopCount);
     }
 
     [Fact]
@@ -98,7 +89,6 @@ public class ZoneProxyShopSweepTests
         Assert.Single(pending);
         Assert.Equal(10, pending[0]);
 
-        // Already removed from the broadcast table -- a later tick must not enqueue it again.
         zone.Tick(SimulationClock.ProxyShopRebroadcastInterval);
         Assert.Empty(zone.DrainPendingProxyShopCloses());
     }
@@ -113,14 +103,13 @@ public class ZoneProxyShopSweepTests
 
         var frame = ZoneTestKit.DrainOutbound(pipe);
         Assert.Equal(OneFrame, frame.Length);
-        Assert.Equal(0, ReadActionState(frame)); // still the refresh code -- expiring "today" isn't past-due yet
+        Assert.Equal(0, ReadActionState(frame));
         Assert.Equal(1, zone.ProxyShopCount);
     }
 
     [Fact]
     public void WrongZone_SweepNeverRuns_EvenForAnAlreadyExpiredEntry()
     {
-        // Deliberately NOT ProxyShopZonePolicy.ZoneNumber.
         var zone = ZoneTestKit.CreateZone(ProxyShopZonePolicy.ZoneNumber + 1);
         var (session, pipe) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(1,
@@ -132,7 +121,7 @@ public class ZoneProxyShopSweepTests
         zone.Tick(SimulationClock.ProxyShopRebroadcastInterval);
 
         Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
-        Assert.Equal(1, zone.ProxyShopCount); // never even evaluated, let alone force-closed
+        Assert.Equal(1, zone.ProxyShopCount);
         Assert.Empty(zone.DrainPendingProxyShopCloses());
     }
 
@@ -140,7 +129,7 @@ public class ZoneProxyShopSweepTests
     public void NoNeighborsNearby_StillForceClosesAndQueuesTheWrite_JustSendsNoPacket()
     {
         var zone = ZoneTestKit.CreateZone(ProxyShopZonePolicy.ZoneNumber);
-        zone.RegisterProxyShop(Entry(10, Expired, 5000f, 5000f)); // far outside any AOI neighbor
+        zone.RegisterProxyShop(Entry(10, Expired, 5000f, 5000f));
 
         zone.Tick(SimulationClock.ProxyShopRebroadcastInterval);
 

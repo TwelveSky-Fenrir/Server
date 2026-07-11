@@ -85,7 +85,7 @@ public class StellarCoreStateServiceTests
         var zone = ZoneTestKit.CreateZone(1);
         var (_, pipe, state) = Setup(zone, 10);
         var (_, neighborPipe, _) = Setup(zone, 20);
-        ZoneTestKit.DrainOutbound(pipe); // neighbor's own Enter-broadcast join packet, not under test
+        ZoneTestKit.DrainOutbound(pipe);
         state.StellarCoreIndex = 4;
         state.StellarCoreWardrobe = state.StellarCoreWardrobe.SetItem(4, 76527);
         state.MaxLife = 800;

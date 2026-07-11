@@ -2,7 +2,6 @@ using CaeriusNet.Attributes.Tvp;
 
 namespace Fenrir.Data.Abstractions.Characters;
 
-// Mirrors game.tvp_CharacterPosition column order; GenerateTvp streams one reused SqlDataRecord per batch (1 round trip, minimal GC).
 [GenerateTvp(Schema = "game", TvpName = "tvp_CharacterPosition")]
 public sealed partial record CharacterPositionTvp(
     int CharacterId,

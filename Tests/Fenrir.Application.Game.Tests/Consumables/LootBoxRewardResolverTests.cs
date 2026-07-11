@@ -3,20 +3,13 @@ using Fenrir.Application.Game.Domain.Consumables;
 
 namespace Fenrir.Application.Game.Tests.Consumables;
 
-/// <summary>
-///     Deterministic-RNG coverage for <see cref="LootBoxRewardResolver" />'s weighted-roll shapes. Every test
-///     drives a <see cref="Random" /> stand-in that returns a fixed, caller-chosen value regardless of the
-///     requested range -- this is what makes these tests deterministic rather than merely seeded (a seed alone
-///     is not guaranteed stable across .NET runtime versions, since <see cref="Random" />'s algorithm is not a
-///     documented contract).
-/// </summary>
 public class LootBoxRewardResolverTests
 {
     private static readonly ImmutableArray<LootBoxRewardResolver.WeightedReward> ThreeTierTable =
     [
-        new(100, 70), // cumulative [0,70)
-        new(200, 20), // cumulative [70,90)
-        new(300, 10) // cumulative [90,100)
+        new(100, 70),
+        new(200, 20),
+        new(300, 10)
     ];
 
     [Fact]
@@ -71,7 +64,6 @@ public class LootBoxRewardResolverTests
     [Fact]
     public void RollBandedThenWeighted_RollWithinTheOnlyBand_ReturnsTheBandReward()
     {
-        // Mount Box shape: single 0.5% (50-in-10000) rare band.
         var bands = ImmutableArray.Create(new LootBoxRewardResolver.RewardBand(50, 9999));
 
         var itemId = LootBoxRewardResolver.RollBandedThenWeighted(new FixedRandom(0), bands, ThreeTierTable);
@@ -86,13 +78,12 @@ public class LootBoxRewardResolverTests
 
         var itemId = LootBoxRewardResolver.RollBandedThenWeighted(new FixedRandom(50), bands, ThreeTierTable);
 
-        Assert.Equal(100, itemId); // FixedRandom always returns 50 for the fallback roll too -> first tier of [0,70).
+        Assert.Equal(100, itemId);
     }
 
     [Fact]
     public void RollBandedThenWeighted_TwoBands_SecondBandUsesCumulativeThreshold()
     {
-        // Pet Box shape: two 0.4% bands (40+40-in-10000).
         var bands = ImmutableArray.Create(
             new LootBoxRewardResolver.RewardBand(40, 7001),
             new LootBoxRewardResolver.RewardBand(40, 7002));
@@ -133,8 +124,6 @@ public class LootBoxRewardResolverTests
             2249, 60, 5000,
             ThreeTierTable);
 
-        // FixedRandom(60) misses the 60-in-10000 threshold (roll < 60 required) and is then reused for the
-        // fallback weighted roll, landing in the second tier of [0,70)/[70,90).
         Assert.Equal(100, result.RewardItemId);
         Assert.Equal(11, result.NewPityCounter);
         Assert.False(result.WasGuaranteed);

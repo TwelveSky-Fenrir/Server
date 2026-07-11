@@ -12,157 +12,69 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.World;
 
-/// <summary>
-///     Already-validated-and-SQL-durable self-mutation mirrors for the "economy/progression" family of
-///     handlers (inventory, skills, mentor, guild, tribe progress, quest, daily mission) -- every command here
-///     has already been decided and persisted by its posting handler before reaching the inbox; this partial
-///     only mirrors it into the tick-owned <see cref="PlayerRuntimeState" />.
-/// </summary>
 public sealed partial class Zone
 {
-    /// <summary>
-    ///     Bounded capacity for <see cref="_guildInbox" /> -- also the basis for <see cref="GuildInboxDrainCapPerTick" />
-    ///     .
-    /// </summary>
-    private const int GuildInboxCapacity = 512;
 
-    /// <summary>
-    ///     Per-tick drain cap for <see cref="_guildInbox" /> -- same "half of this channel's own bounded
-    ///     capacity" convention as <see cref="InboxDrainCapPerTick" /> (see that constant's own remarks for the
-    ///     full rationale and the Fenrir-side-safeguard-not-legacy-parity caveat). Every channel declared in
-    ///     this file follows the same pairing.
-    /// </summary>
-    private const int GuildInboxDrainCapPerTick = GuildInboxCapacity / 2;
+        private const int GuildInboxCapacity = 512;
 
-    /// <summary>
-    ///     Bounded capacity for <see cref="_inventoryInbox" /> -- also the basis for
-    ///     <see cref="InventoryInboxDrainCapPerTick" />.
-    /// </summary>
-    private const int InventoryInboxCapacity = 2048;
+        private const int GuildInboxDrainCapPerTick = GuildInboxCapacity / 2;
 
-    /// <summary>
-    ///     Per-tick drain cap for <see cref="_inventoryInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own
-    ///     remarks.
-    /// </summary>
-    private const int InventoryInboxDrainCapPerTick = InventoryInboxCapacity / 2;
+        private const int InventoryInboxCapacity = 2048;
 
-    /// <summary>
-    ///     Bounded capacity for <see cref="_mentorInbox" /> -- also the basis for
-    ///     <see cref="MentorInboxDrainCapPerTick" />.
-    /// </summary>
-    private const int MentorInboxCapacity = 256;
+        private const int InventoryInboxDrainCapPerTick = InventoryInboxCapacity / 2;
 
-    /// <summary>Per-tick drain cap for <see cref="_mentorInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own remarks.</summary>
-    private const int MentorInboxDrainCapPerTick = MentorInboxCapacity / 2;
+        private const int MentorInboxCapacity = 256;
 
-    /// <summary>
-    ///     Bounded capacity for <see cref="_missionInbox" /> -- also the basis for
-    ///     <see cref="MissionInboxDrainCapPerTick" />.
-    /// </summary>
-    private const int MissionInboxCapacity = 256;
+        private const int MentorInboxDrainCapPerTick = MentorInboxCapacity / 2;
 
-    /// <summary>Per-tick drain cap for <see cref="_missionInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own remarks.</summary>
-    private const int MissionInboxDrainCapPerTick = MissionInboxCapacity / 2;
+        private const int MissionInboxCapacity = 256;
 
-    /// <summary>
-    ///     Bounded capacity for <see cref="_questInbox" /> -- also the basis for <see cref="QuestInboxDrainCapPerTick" />
-    ///     .
-    /// </summary>
-    private const int QuestInboxCapacity = 512;
+        private const int MissionInboxDrainCapPerTick = MissionInboxCapacity / 2;
 
-    /// <summary>Per-tick drain cap for <see cref="_questInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own remarks.</summary>
-    private const int QuestInboxDrainCapPerTick = QuestInboxCapacity / 2;
+        private const int QuestInboxCapacity = 512;
 
-    /// <summary>
-    ///     Bounded capacity for <see cref="_skillInbox" /> -- also the basis for <see cref="SkillInboxDrainCapPerTick" />
-    ///     .
-    /// </summary>
-    private const int SkillInboxCapacity = 1024;
+        private const int QuestInboxDrainCapPerTick = QuestInboxCapacity / 2;
 
-    /// <summary>Per-tick drain cap for <see cref="_skillInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own remarks.</summary>
-    private const int SkillInboxDrainCapPerTick = SkillInboxCapacity / 2;
+        private const int SkillInboxCapacity = 1024;
 
-    /// <summary>
-    ///     Bounded capacity for <see cref="_tribeInbox" /> -- also the basis for <see cref="TribeInboxDrainCapPerTick" />
-    ///     .
-    /// </summary>
-    private const int TribeInboxCapacity = 512;
+        private const int SkillInboxDrainCapPerTick = SkillInboxCapacity / 2;
 
-    /// <summary>Per-tick drain cap for <see cref="_tribeInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own remarks.</summary>
-    private const int TribeInboxDrainCapPerTick = TribeInboxCapacity / 2;
+        private const int TribeInboxCapacity = 512;
 
-    /// <summary>
-    ///     Reusable scratch buffer for the tribe-progress command's GM "Basic"-tier CALL (tSort 514) relocation
-    ///     notice (see the <c>NeighborActionBroadcast</c> branch of <see cref="ApplyTribeProgressCommand" />) --
-    ///     same non-allocating reuse posture as <see cref="_statPotionFullActionNeighborScratch" />.
-    /// </summary>
-    private readonly List<int> _gmTeleportNeighborScratch = [];
+        private const int TribeInboxDrainCapPerTick = TribeInboxCapacity / 2;
 
-    /// <summary>
-    ///     Already-durably-persisted guild-membership mirrors, posted by <c>GuildActionHandler</c> onto this
-    ///     character's own hosting zone, whether the target is the actor or a different guild member.
-    /// </summary>
-    private readonly Channel<GuildMembershipZoneCommand> _guildInbox =
+        private readonly List<int> _gmTeleportNeighborScratch = [];
+
+        private readonly Channel<GuildMembershipZoneCommand> _guildInbox =
         Channel.CreateBounded<GuildMembershipZoneCommand>(
             new BoundedChannelOptions(GuildInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-    /// <summary>
-    ///     Separate inbox for already-validated-and-SQL-durable inventory results, posted by
-    ///     <c>GenericActionHandler</c>. Kept out of <see cref="_inbox" />/<see cref="ZoneCommand" />'s union so
-    ///     this concern stays additive-only. Drop-on-full is safe here: the SQL write already committed, so a
-    ///     dropped command only leaves the in-memory mirror stale (self-heals on next world entry).
-    /// </summary>
-    private readonly Channel<InventoryZoneCommand> _inventoryInbox = Channel.CreateBounded<InventoryZoneCommand>(
+        private readonly Channel<InventoryZoneCommand> _inventoryInbox = Channel.CreateBounded<InventoryZoneCommand>(
         new BoundedChannelOptions(InventoryInboxCapacity)
             { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-    /// <summary>
-    ///     Mirrors one cross-character field write (mentor bonding, posted by <c>MentorStartHandler</c>) onto
-    ///     the target character's own hosting zone rather than mutating it directly from another thread.
-    /// </summary>
-    private readonly Channel<MentorZoneCommand> _mentorInbox =
+        private readonly Channel<MentorZoneCommand> _mentorInbox =
         Channel.CreateBounded<MentorZoneCommand>(
             new BoundedChannelOptions(MentorInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-    /// <summary>Already-validated, already-SQL-durable daily-mission claims, posted by <c>DailyMissionHandler</c>.</summary>
-    private readonly Channel<MissionZoneCommand> _missionInbox =
+        private readonly Channel<MissionZoneCommand> _missionInbox =
         Channel.CreateBounded<MissionZoneCommand>(
             new BoundedChannelOptions(MissionInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-    /// <summary>Already-validated, already-SQL-durable quest-state transitions, posted by <c>QuestProgressHandler</c>.</summary>
-    private readonly Channel<QuestZoneCommand> _questInbox = Channel.CreateBounded<QuestZoneCommand>(
+        private readonly Channel<QuestZoneCommand> _questInbox = Channel.CreateBounded<QuestZoneCommand>(
         new BoundedChannelOptions(QuestInboxCapacity)
             { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-    /// <summary>
-    ///     Already-validated, already-SQL-durable skill learn/upgrade results, posted by
-    ///     <c>GenericActionHandler</c>. Kept as its own channel rather than folded into
-    ///     <see cref="_inventoryInbox" />'s union, same additive-only rationale.
-    /// </summary>
-    private readonly Channel<SkillZoneCommand> _skillInbox = Channel.CreateBounded<SkillZoneCommand>(
+        private readonly Channel<SkillZoneCommand> _skillInbox = Channel.CreateBounded<SkillZoneCommand>(
         new BoundedChannelOptions(SkillInboxCapacity)
             { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-    /// <summary>
-    ///     Reusable scratch buffer for the tribe-progress command's op-23 stat-potion full-avatar-action
-    ///     rebroadcast recipient list (see the <c>FullActionRebroadcast</c> branch of
-    ///     <see cref="ApplyTribeProgressCommand" />) -- replaces a per-call
-    ///     <c>AoiGrid.Neighbors(...).Where(id =&gt; id != characterId).ToArray()</c> LINQ pipeline (iterator +
-    ///     closure + array) with the non-allocating
-    ///     <see cref="AoiGrid.NeighborsExcludingSelf(List{int},ValueTuple{int,int},int,float,float,float,int)" />
-    ///     overload. Single tick thread, cleared before use, consumed entirely before that command's handling
-    ///     returns.
-    /// </summary>
-    private readonly List<int> _statPotionFullActionNeighborScratch = [];
+        private readonly List<int> _statPotionFullActionNeighborScratch = [];
 
-    /// <summary>
-    ///     Already-decided tribe-progress self-mutations posted by <c>TribeActionHandler</c> for the actor's own hosting
-    ///     zone.
-    /// </summary>
-    private readonly Channel<TribeProgressZoneCommand> _tribeInbox =
+        private readonly Channel<TribeProgressZoneCommand> _tribeInbox =
         Channel.CreateBounded<TribeProgressZoneCommand>(
             new BoundedChannelOptions(TribeInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
@@ -172,22 +84,14 @@ public sealed partial class Zone
         return _inventoryInbox.Writer.TryWrite(command);
     }
 
-    /// <summary>
-    ///     Posts <paramref name="command" /> (its <see cref="InventoryZoneCommand.Applied" /> is overwritten --
-    ///     leave it default) and waits until this zone's tick has actually mirrored it, not merely accepted it.
-    ///     Every economy-affecting handler must call this (never the bare <see cref="PostInventoryCommand" />)
-    ///     while holding <see cref="PlayerRuntimeState.EconomyActionLock" /> -- see that property's remarks for
-    ///     the duplication race this closes. A timeout still returns true: the SQL write is already durable, a
-    ///     timed-out mirror just stays stale until next world entry.
-    /// </summary>
-    public async Task<bool> PostInventoryCommandAndWaitAsync(InventoryZoneCommand command, CancellationToken ct,
+        public async Task<bool> PostInventoryCommandAndWaitAsync(InventoryZoneCommand command, CancellationToken ct,
         TimeSpan? timeout = null)
     {
         var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var withSignal = command with { Applied = applied };
 
         if (!PostInventoryCommand(in withSignal))
-            return false; // inbox full -- caller logs this; nothing to wait for.
+            return false;
 
         try
         {
@@ -195,7 +99,6 @@ public sealed partial class Zone
         }
         catch (TimeoutException)
         {
-            // SQL is already durable; only the in-memory mirror timing is affected.
         }
 
         return true;
@@ -216,13 +119,7 @@ public sealed partial class Zone
         return _guildInbox.Writer.TryWrite(command);
     }
 
-    /// <summary>
-    ///     Same contract as <see cref="PostInventoryCommandAndWaitAsync" />. Callers acting on the requester's
-    ///     own guild membership (anything that also touches money) must call this while holding
-    ///     <see cref="PlayerRuntimeState.EconomyActionLock" />; callers mirroring a different, possibly-offline
-    ///     member may use the bare <see cref="PostGuildCommand" /> instead.
-    /// </summary>
-    public async Task<bool> PostGuildCommandAndWaitAsync(GuildMembershipZoneCommand command,
+        public async Task<bool> PostGuildCommandAndWaitAsync(GuildMembershipZoneCommand command,
         CancellationToken ct, TimeSpan? timeout = null)
     {
         var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -237,7 +134,6 @@ public sealed partial class Zone
         }
         catch (TimeoutException)
         {
-            // SQL is already durable; only the in-memory mirror timing is affected.
         }
 
         return true;
@@ -248,11 +144,7 @@ public sealed partial class Zone
         return _tribeInbox.Writer.TryWrite(command);
     }
 
-    /// <summary>
-    ///     Same contract as <see cref="PostInventoryCommandAndWaitAsync" />. Must be called while holding
-    ///     <see cref="PlayerRuntimeState.EconomyActionLock" /> for any action that also debits money/CP.
-    /// </summary>
-    public async Task<bool> PostTribeProgressCommandAndWaitAsync(TribeProgressZoneCommand command,
+        public async Task<bool> PostTribeProgressCommandAndWaitAsync(TribeProgressZoneCommand command,
         CancellationToken ct, TimeSpan? timeout = null)
     {
         var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -267,7 +159,6 @@ public sealed partial class Zone
         }
         catch (TimeoutException)
         {
-            // SQL is already durable; only the in-memory mirror timing is affected.
         }
 
         return true;
@@ -278,12 +169,7 @@ public sealed partial class Zone
         return _questInbox.Writer.TryWrite(command);
     }
 
-    /// <summary>
-    ///     Same contract as <see cref="PostInventoryCommandAndWaitAsync" />. Callers must already hold
-    ///     <see cref="PlayerRuntimeState.EconomyActionLock" /> and leave <see cref="QuestZoneCommand.Applied" />
-    ///     at its default -- overwritten here.
-    /// </summary>
-    public async Task<bool> PostQuestCommandAndWaitAsync(QuestZoneCommand command, CancellationToken ct,
+        public async Task<bool> PostQuestCommandAndWaitAsync(QuestZoneCommand command, CancellationToken ct,
         TimeSpan? timeout = null)
     {
         var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -298,7 +184,6 @@ public sealed partial class Zone
         }
         catch (TimeoutException)
         {
-            // SQL is already durable; only the in-memory mirror timing is affected.
         }
 
         return true;
@@ -309,12 +194,7 @@ public sealed partial class Zone
         return _missionInbox.Writer.TryWrite(command);
     }
 
-    /// <summary>
-    ///     Same contract as <see cref="PostQuestCommandAndWaitAsync" />. Callers must already hold
-    ///     <see cref="PlayerRuntimeState.EconomyActionLock" /> and leave
-    ///     <see cref="Progression.MissionZoneCommand.Applied" /> at its default -- overwritten here.
-    /// </summary>
-    public async Task<bool> PostMissionCommandAndWaitAsync(MissionZoneCommand command,
+        public async Task<bool> PostMissionCommandAndWaitAsync(MissionZoneCommand command,
         CancellationToken ct, TimeSpan? timeout = null)
     {
         var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -329,7 +209,6 @@ public sealed partial class Zone
         }
         catch (TimeoutException)
         {
-            // SQL is already durable; only the in-memory mirror timing is affected.
         }
 
         return true;
@@ -348,12 +227,8 @@ public sealed partial class Zone
             }
             catch (Exception ex)
             {
-                // Same containment posture as DrainInbox: one bad inventory command must never take the whole
-                // tick loop down for every other player in the zone.
                 logger.LogError(ex, "Zone {MapId} inventory command for character {CharacterId} failed", MapId,
                     command.CharacterId);
-                // Still signal as faulted (not merely completed) so a caller awaiting Applied to release its
-                // EconomyActionLock never hangs on a command that blew up.
                 command.Applied?.TrySetException(ex);
             }
         }
@@ -362,12 +237,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_inventoryInbox.Reader, "inventory", InventoryInboxDrainCapPerTick);
     }
 
-    /// <summary>
-    ///     No validation/I/O here on purpose -- already decided and persisted by the posting handler before
-    ///     reaching the inbox. A no-op if the character already left this zone by the time the tick drains
-    ///     this: their SQL write is already durable, so there is nothing left to mirror.
-    /// </summary>
-    private void ApplyInventoryCommand(in InventoryZoneCommand command)
+        private void ApplyInventoryCommand(in InventoryZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -376,7 +246,6 @@ public sealed partial class Zone
         {
             state.Inventory.ReplaceContainer(snapshot.Container, snapshot.Slots);
 
-            // A pet SWAP (not just any equip touch) resets growth/activity to the newly-equipped pet's fresh state.
             if (snapshot.Container == ContainerMatrix.Equipment)
             {
                 var newPetItemId = snapshot.Slots.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
@@ -396,25 +265,9 @@ public sealed partial class Zone
         {
             state.Stats = stats;
 
-            // SetBasicAbilityFromEquip (S07_MyGame04.cpp:158-183, called from both equip's and unequip's call
-            // sites at S04_MyWork05.cpp:1303/1615) recomputes MaxLife/MaxMana unconditionally as part of the
-            // same recompute that produced `stats` above -- there is exactly one stored max-life/max-mana
-            // value in the legacy model, not a separate "internal" copy vs. "reported" copy. Mirror it into
-            // the flat fields here too, since those (not Stats.MaxLife/Stats.MaxMana) are what the outbound
-            // broadcast (BuildAvatarActionRecv) and write-behind persistence (ProgressWriteBehindHost/
-            // PositionWriteBehindHost) actually read.
             state.MaxLife = stats.MaxLife;
             state.MaxMana = stats.MaxMana;
 
-            // Unequip's own inline clamp (S04_MyWork05.cpp:1616-1617: SetIntegerUp(aLifeValue, GetMaxLife(),
-            // GetMaxLife()) and the symmetric mana call; function.h:237-240 confirms SetIntegerUp is
-            // downward-only -- it overwrites only when the current value exceeds the check value, never
-            // raises it) guards against a lower max after removing a VIT/INT-boosting item. Equip's call site
-            // performs no equivalent clamp, but equip is never expected to lower Max (no cited scenario where
-            // it does), so applying this same downward-only guard regardless of direction is behaviorally
-            // identical to the legacy equip/unequip split while avoiding an equip/unequip flag threaded
-            // through InventoryZoneCommand just to gate a clamp that can only ever fire on the unequip side in
-            // practice.
             if (state.Life > state.MaxLife)
                 state.Life = state.MaxLife;
             if (state.Mana > state.MaxMana)
@@ -445,8 +298,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_skillInbox.Reader, "skill", SkillInboxDrainCapPerTick);
     }
 
-    /// <summary>Same posture as <see cref="ApplyInventoryCommand" />.</summary>
-    private void ApplySkillCommand(in SkillZoneCommand command)
+        private void ApplySkillCommand(in SkillZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -477,8 +329,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_mentorInbox.Reader, "mentor", MentorInboxDrainCapPerTick);
     }
 
-    /// <summary>Same posture as <see cref="ApplyInventoryCommand" />.</summary>
-    private void ApplyMentorCommand(in MentorZoneCommand command)
+        private void ApplyMentorCommand(in MentorZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -509,8 +360,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_guildInbox.Reader, "guild", GuildInboxDrainCapPerTick);
     }
 
-    /// <summary>Same posture as <see cref="ApplyInventoryCommand" />.</summary>
-    private void ApplyGuildMembershipCommand(in GuildMembershipZoneCommand command)
+        private void ApplyGuildMembershipCommand(in GuildMembershipZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -544,11 +394,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_tribeInbox.Reader, "tribe-progress", TribeInboxDrainCapPerTick);
     }
 
-    /// <summary>
-    ///     Same posture as <see cref="ApplyInventoryCommand" />. Every field is independently optional: null means "not
-    ///     touched," never "reset to zero/false."
-    /// </summary>
-    private void ApplyTribeProgressCommand(in TribeProgressZoneCommand command)
+        private void ApplyTribeProgressCommand(in TribeProgressZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -645,8 +491,6 @@ public sealed partial class Zone
             changed = true;
         }
 
-        // GM "Basic"-tier LEVEL self-command's (tSort 521) own recomputed-stats cache write -- see
-        // TribeProgressZoneCommand.MaxLife's own remarks.
         if (command.MaxLife is { } maxLife)
         {
             state.MaxLife = maxLife;
@@ -680,9 +524,6 @@ public sealed partial class Zone
             changed = true;
         }
 
-        // aZone241Time -- already synchronously persisted by ICharacterRepository.AdjustZone241TimeAsync
-        // before this command is posted (same posture as Tribe/QuestProgress/TribeFourReturnAllowance
-        // further below), so this does not set `changed`/mark progress-dirty; there is nothing left to flush.
         if (command.Zone241Time is { } zone241Time)
             state.Zone241Time = zone241Time;
 
@@ -830,16 +671,9 @@ public sealed partial class Zone
             changed = true;
         }
 
-        // Op37 (CZ_CHANGE_TO_TRIBE4_SEND) success -- already synchronously persisted by
-        // game.usp_Character_ApplyTribeFourConversion before this command is posted, so -- same posture as
-        // ApplyQuestCommand's own StepPermanent/ActiveFlag/QSort/TargetPhase/KillCounter mirror -- none of
-        // these three set `changed`/mark progress-dirty; there is nothing left to flush.
         if (command.Tribe is { } newTribe)
             state.Tribe = newTribe;
 
-        // GM "Basic"-tier TRIBE self-command (tSort 510) only -- see TribeProgressZoneCommand.PreviousTribe's
-        // own remarks for the flagged persistence gap this leaves (no existing repository call durably writes
-        // a plain PreviousTribe update outside the unrelated op37/book-conversion mechanics).
         if (command.PreviousTribe is { } newPreviousTribe)
             state.PreviousTribe = newPreviousTribe;
 
@@ -855,10 +689,6 @@ public sealed partial class Zone
         if (command.TribeFourReturnAllowance is { } tribeFourReturnAllowance)
             state.TribeFourReturnAllowance = tribeFourReturnAllowance;
 
-        // CZ_PROCESS_DATA_SEND tSort 226/227 -- already synchronously persisted by
-        // ICharacterRepository.AdjustStoreMoneyAsync before this command is posted (same posture as
-        // Tribe/QuestProgress/TribeFourReturnAllowance/Zone241Time above), so this does not set
-        // `changed`/mark progress-dirty; there is nothing left to flush.
         if (command.StoreMoney is { } storeMoney)
             state.StoreMoney = storeMoney;
 
@@ -868,23 +698,18 @@ public sealed partial class Zone
             changed = true;
         }
 
-        // GM "Basic"-tier HIDE(501)/SHOW(502) self-commands.
         if (command.VisibleState is { } visibleState)
         {
             state.VisibleState = visibleState;
             changed = true;
         }
 
-        // GM "Basic"-tier EQUIP(511)/UNEQUIP(512) self-commands, or NCHAT(516)/YCHAT(517) target mirrors
-        // (posted onto the target's own zone).
         if (command.SpecialState is { } specialState)
         {
             state.SpecialState = specialState;
             changed = true;
         }
 
-        // GM "Basic"-tier LEVEL self-command (tSort 521) -- see IGmBasicCommandService's own remarks for the
-        // three-tier decomposition this mirrors verbatim (already resolved by the caller).
         if (command.Level is { } newLevel)
         {
             state.Level = newLevel;
@@ -903,12 +728,6 @@ public sealed partial class Zone
             changed = true;
         }
 
-        // M15 Pet Lucky Box (8111) pity-counter persistence mirror (confirmation-pass follow-up) --
-        // LootBoxUseItemHandler's reward-id-override closure has already written the same value directly onto
-        // PlayerRuntimeState.M15PetLuckyBoxPity synchronously; applying it again here is a no-op mutation-wise
-        // (self-assignment), but marking `changed`/DirtyFlags.Progression is the actual payload, since
-        // DirtyTracker is Zone-internal state a handler cannot reach directly. See
-        // TribeProgressZoneCommand.M15PetLuckyBoxPity's own remarks.
         if (command.M15PetLuckyBoxPity is { } m15PetLuckyBoxPity)
         {
             state.M15PetLuckyBoxPity = m15PetLuckyBoxPity;
@@ -918,10 +737,6 @@ public sealed partial class Zone
         if (changed)
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
 
-        // GM "Basic"-tier self-teleport-to-coordinate (507), CALL's target-warped-to-invoker branch (514), and
-        // MOVE-to-target's invoker-warped-to-target branch (515) -- see TribeProgressZoneCommand.TeleportTo's
-        // own remarks. Own dedicated DirtyFlags.Position mark, same convention as Zone.PlayerLifecycle's
-        // HandleMove for every other position write in this codebase.
         if (command.TeleportTo is { } teleportTo)
         {
             state.PosX = teleportTo.X;
@@ -935,9 +750,6 @@ public sealed partial class Zone
             dirtyTracker.MarkDirty(command.CharacterId, DirtyFlags.Position);
         }
 
-        // CALL's (514) own AOI-neighbor-only relocation notice -- see
-        // TribeProgressZoneCommand.NeighborActionBroadcast's own remarks. Runs AFTER TeleportTo above so the
-        // neighbor scan and the broadcast packet both reflect the character's already-updated position.
         if (command.NeighborActionBroadcast)
         {
             _gmTeleportNeighborScratch.Clear();
@@ -951,20 +763,12 @@ public sealed partial class Zone
                 SpawnGroundItem(drop.ItemId, drop.Quantity, state.PosX, state.PosY, state.PosZ, state.Name, "",
                     drop.DropSort);
 
-        // Elevated-tier "moncall" GM command (tSort 506) -- see TribeProgressZoneCommand.GmSummonMonsterTemplateId's
-        // own remarks.
         if (command.GmSummonMonsterTemplateId is { } gmSummonMonsterTemplateId)
             SpawnGmSummonedMonster(gmSummonMonsterTemplateId, state);
 
-        // tSort 11 Max Rebirth's own B_AVATAR_CHANGE_INFO_1(sort 14)+Broadcast11 pairing (S04_MyWork02.cpp:11367),
-        // also posted by the Rebirth-Pill item-consumption path (Path A). Value03 (aZone241Time) is read from
-        // the just-mirrored state.Zone241Time above (0 for Path A, which never touches this counter).
         if (command.RebirthBroadcast)
             BroadcastAvatarStateFlag(state, 14, state.ContributionPoints, state.RebirthCount, state.Zone241Time);
 
-        // Op 23 (CZ_USE_INVENTORY_ITEM_SEND) stat-potion family's own post-consumption avatar-action refresh
-        // -- see TribeProgressZoneCommand.FullActionRebroadcast's own remarks for why this sends the
-        // self-refresh once (not legacy's literal twice) plus the AOI-neighbor broadcast.
         if (command.FullActionRebroadcast)
         {
             var characterId = command.CharacterId;
@@ -999,8 +803,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_questInbox.Reader, "quest", QuestInboxDrainCapPerTick);
     }
 
-    /// <summary>Same posture as <see cref="ApplyInventoryCommand" />.</summary>
-    private void ApplyQuestCommand(in QuestZoneCommand command)
+        private void ApplyQuestCommand(in QuestZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -1047,8 +850,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_missionInbox.Reader, "mission", MissionInboxDrainCapPerTick);
     }
 
-    /// <summary>Same posture as <see cref="ApplyInventoryCommand" />.</summary>
-    private void ApplyMissionCommand(in MissionZoneCommand command)
+        private void ApplyMissionCommand(in MissionZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;

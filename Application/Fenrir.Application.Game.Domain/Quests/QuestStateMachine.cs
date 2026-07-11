@@ -1,10 +1,5 @@
 namespace Fenrir.Application.Game.Domain.Quests;
 
-/// <summary>
-///     Port of AVATAR_OBJECT::ReturnQuestPresentState/ReturnQuestEndConditionState and the 5
-///     CZ_PROCESS_QUEST_SEND transitions (S07_MyGame04.cpp:1685-2130, S04_MyWork02.cpp:7307-7563). The source
-///     has 8 qSort branches, not the 6 documented elsewhere -- see cases 7/8.
-/// </summary>
 public static class QuestStateMachine
 {
     public const int StateInvalid = 0;
@@ -35,27 +30,27 @@ public static class QuestStateMachine
         var q = quest.Quest;
         switch (progress.QSort)
         {
-            case 1: // kill monsters
+            case 1:
                 if (progress.TargetPhase != (q.Solution1 ?? 0)) return StateInvalid;
                 return progress.KillCounter < (q.Solution2 ?? 0) ? StateInProgress : StateConditionMet;
 
-            case 2: // item acquisition
-            case 3: // item delivery
-            case 4: // receiving items
+            case 2:
+            case 3:
+            case 4:
                 if (progress.TargetPhase != (q.Solution1 ?? 0)) return StateInvalid;
                 return hasItem(q.Solution1 ?? 0) ? StateConditionMet : StateInProgress;
 
-            case 5: // kill the captain
+            case 5:
                 if (progress.TargetPhase != (q.Solution1 ?? 0)) return StateInvalid;
                 return progress.KillCounter < 1 ? StateInProgress : StateConditionMet;
 
-            case 6: // exchange items (2 phases)
+            case 6:
                 switch (progress.TargetPhase)
                 {
-                    case 1: // before exchange
+                    case 1:
                         if (progress.KillCounter != (q.Solution1 ?? 0)) return StateInvalid;
                         return hasItem(q.Solution1 ?? 0) ? StateConditionMet : StateInProgress;
-                    case 2: // after exchange
+                    case 2:
                         if (progress.KillCounter != (q.Solution2 ?? 0)) return StateInvalid;
                         return hasItem(q.Solution2 ?? 0) ? StateExchangeReturnReady : StateExchangeAwaitingReturn;
                     default:
@@ -63,19 +58,10 @@ public static class QuestStateMachine
                 }
 
             case 7
-                : // meet NPC: end condition is PresentState == 2, holding the matching TargetPhase already satisfies it
+                :
                 return progress.TargetPhase == (q.Solution1 ?? 0) ? StateInProgress : StateInvalid;
 
-            case 8: // "occupation of WaterFall" (qSort 8): the counter (0 -> 1) is moved once, at a war
-                // conclusion, by BOTH cited increment hooks -- there is no continuous per-tick occupation
-                // accrual anywhere in the legacy source. Zone.HandleZone038OccupationCredit credits every
-                // winning-tribe, alive holder present when the Holy Stone / Waterfall (Zone038) war concludes
-                // (Server/ts25zone/S07_MyGame01.cpp:4212-4241), and Zone.HandleRegularWarConclusionCredit
-                // credits any holder present when a Regular War (Zone049) map whose id matches this quest's own
-                // TargetPhase concludes (Server/ts25zone/S07_MyGame01.cpp:5293-5314). The present-state rule
-                // itself is at Server/ts25zone/S07_MyGame04.cpp:1865-1874: TargetPhase must equal the quest's
-                // own first solution value (else Invalid), then KillCounter below 1 is In-Progress (2),
-                // otherwise Condition-Met (3) -- which is exactly the < 1 gate both credit hooks reproduce.
+            case 8:
                 if (progress.TargetPhase != (q.Solution1 ?? 0)) return StateInvalid;
                 return progress.KillCounter < 1 ? StateInProgress : StateConditionMet;
 
@@ -97,8 +83,7 @@ public static class QuestStateMachine
         };
     }
 
-    /// <summary>Caller owns the qSort-3/6 slot-occupancy/bounds guards; this only checks whether an item id is present.</summary>
-    public static AcceptResult Accept(QuestProgress progress, byte tribe, short level, QuestCatalog catalog,
+        public static AcceptResult Accept(QuestProgress progress, byte tribe, short level, QuestCatalog catalog,
         Func<int, bool> hasItem)
     {
         if (ComputePresentState(progress, tribe, level, catalog, hasItem) != StateCanAccept)
@@ -122,11 +107,7 @@ public static class QuestStateMachine
         return new AcceptResult(true, newProgress, depositItemId);
     }
 
-    /// <summary>
-    ///     Reward-item resolution mirrors ReturnItemNumberForQuestReward/ReturnItemQuantityForQuestReward:
-    ///     first RewardType==6 slot gives the item id; quantity is 0 for equipment-like items (Sort 7-29), else 1.
-    /// </summary>
-    public static CompleteResult Complete(QuestProgress progress, byte tribe, short level, QuestCatalog catalog,
+        public static CompleteResult Complete(QuestProgress progress, byte tribe, short level, QuestCatalog catalog,
         Func<int, bool> hasItem, Func<int, byte?> itemSort)
     {
         if (!ComputeEndConditionMet(progress, tribe, level, catalog, hasItem))
@@ -175,8 +156,7 @@ public static class QuestStateMachine
             teacherPoint);
     }
 
-    /// <summary>Deposits qSolution[0] into a client-chosen empty slot; does not mutate QuestProgress.</summary>
-    public static bool TryReceive(QuestProgress progress, byte tribe, short level, QuestCatalog catalog,
+        public static bool TryReceive(QuestProgress progress, byte tribe, short level, QuestCatalog catalog,
         Func<int, bool> hasItem, out int depositItemId)
     {
         depositItemId = 0;
@@ -215,8 +195,7 @@ public static class QuestStateMachine
         return new ExchangeResult(true, newProgress, q.Solution1 ?? 0, q.Solution2 ?? 0);
     }
 
-    /// <summary>Legal only when not idle/can-accept, qType == 2 (abandonable), and the end condition isn't already met.</summary>
-    public static bool TryAbandon(QuestProgress progress, byte tribe, short level, QuestCatalog catalog,
+        public static bool TryAbandon(QuestProgress progress, byte tribe, short level, QuestCatalog catalog,
         Func<int, bool> hasItem, out QuestProgress newProgress)
     {
         newProgress = progress;

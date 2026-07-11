@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>CZ_DUEL_ASK_SEND (opcode 43) -- map 124 (scripted-duel server) always refuses immediately.</summary>
 public sealed class DuelAskHandler(IDuelService duelService, ILogger<DuelAskHandler>? logger = null)
     : IAsyncPacketHandler<DuelChallengeRequest>
 {
@@ -44,8 +43,6 @@ public sealed class DuelAskHandler(IDuelService duelService, ILogger<DuelAskHand
                 zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             case DuelAskResultKind.ChallengerAlreadyDueling:
-                // A desynced/leaked is-dueling flag on the requester's own side -- not an ordinary "busy"
-                // rejection, see DuelAskResultKind.ChallengerAlreadyDueling's own remarks.
                 zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             case DuelAskResultKind.ChallengerBusy:
@@ -55,8 +52,6 @@ public sealed class DuelAskHandler(IDuelService duelService, ILogger<DuelAskHand
                 session.Send(new DuelAnswerResponse { Answer = 5 });
                 return;
             case DuelAskResultKind.SentCrossShard:
-                // Ask-publish-only today -- see DuelAskResultKind.SentCrossShard's own remarks; nothing to
-                // send (no target-side delivery exists yet to ever produce a reply).
                 return;
         }
     }

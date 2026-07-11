@@ -9,19 +9,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Progression;
 
-/// <summary>
-///     CZ_CHUGSOUNG_WAR_UP_SEND (opcode 120). Every gate before the herb/bar lookup disconnects on
-///     failure, matching the legacy's own Quit()-only error handling here. <c>FindInventoryItem</c>'s own
-///     contract (S04_MyWork05.cpp:4867) never returns a hit with a -1 page/index, so the caller's
-///     subsequent "page/index == -1" checks (S04_MyWork02.cpp:14396-14403) are dead code in the traced
-///     source -- ZC_CHUGSOUNG_WAR_UP_RECV's Result=1/2 ("missing herb"/"missing bar") values are never
-///     actually reachable; a missing herb or bar disconnects instead, same as every earlier gate.
-///     <para>
-///         Material consumption only arms the upgrade (<see cref="TowerWarState.BeginUpgrade" />); the actual
-///         level change, guardian-monster respawn, and the later siege/destruction cycle all run off that
-///         tower's own zone tick -- see <see cref="TowerGuardianSystem" />.
-///     </para>
-/// </summary>
 public sealed class TowerUpgradeHandler(ITowerUpgradeService towerUpgradeService, ILogger<TowerUpgradeHandler> logger)
     : IAsyncPacketHandler<TowerUpgradeRequest>
 {

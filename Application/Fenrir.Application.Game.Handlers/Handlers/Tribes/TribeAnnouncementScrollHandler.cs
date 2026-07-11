@@ -8,13 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Tribes;
 
-/// <summary>
-///     CZ_TRIBE_NOTIFY_SEND (opcode 112). Consumes one <see cref="PlayerRuntimeState.TribeNotifyScrollCount" />
-///     charge and relays same-tribe, across every zone of this process (this build's <c>LNW33</c> branch;
-///     the "send to everyone" branch is dead code here) -- unlike <see cref="TribeAnnouncementHandler" />
-///     (op 80), there is no role gate at all. <see cref="TribeAnnouncementScrollResponse.TribeRole" /> on the
-///     wire actually carries the sender's tribe number, not a role (see that contract's own docstring).
-/// </summary>
 public sealed class TribeAnnouncementScrollHandler(
     ITribeAnnouncementScrollService announcementService,
     ILogger<TribeAnnouncementScrollHandler>? logger = null) : IInlinePacketHandler<TribeAnnouncementScrollRequest>

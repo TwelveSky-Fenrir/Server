@@ -15,10 +15,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Simulation;
 
-/// <summary>
-///     Covers <see cref="AutoHuntTickSystem" />: the auto-hunt bot's configured-buff auto-cast loop
-///     (<c>AVATAR_OBJECT::BotBuff</c>).
-/// </summary>
 public class AutoHuntTickSystemTests
 {
     private static (Zone Zone, PlayerRuntimeState State) SetUp(
@@ -43,8 +39,7 @@ public class AutoHuntTickSystemTests
         return (zone, state!);
     }
 
-    /// <summary>Fills a 16-int BuffStore from (skillId, grade) pairs, front-loaded, the rest left at 0 (empty).</summary>
-    private static AutoHunt Config(params int[] buffStorePairs)
+        private static AutoHunt Config(params int[] buffStorePairs)
     {
         var buffStore = new int[16];
         Array.Copy(buffStorePairs, buffStore, buffStorePairs.Length);
@@ -64,7 +59,6 @@ public class AutoHuntTickSystemTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
     }
 
-    // Holy Shield (82): no weapon requirement, slot 9, value = shieldPercent% of MaxLife.
     private static SkillDefinition HolyShieldSkill(byte maxUpgradePoint, short manaUse, byte shieldPercent,
         short runTime)
     {
@@ -87,7 +81,6 @@ public class AutoHuntTickSystemTests
             0, 0);
     }
 
-    // Critical (83): no weapon requirement, slot 10.
     private static SkillDefinition CriticalSkill(byte maxUpgradePoint, short manaUse, byte criticalUp, short runTime)
     {
         var row = new SkillRowDto(83, "Critical", 0, 0, 0,
@@ -108,7 +101,6 @@ public class AutoHuntTickSystemTests
             0, 0);
     }
 
-    // Damage (15): requires an equipped weapon of Sort 14/16/20, slot 0.
     private static SkillDefinition DamageSkill(byte maxUpgradePoint, short manaUse, byte attackPowerUp,
         short runTime)
     {
@@ -136,7 +128,7 @@ public class AutoHuntTickSystemTests
         var skillsById = new Dictionary<int, SkillDefinition> { [82] = HolyShieldSkill(10, 30, 20, 40) }
             .ToFrozenDictionary();
         var (zone, state) = SetUp(skillsById);
-        var manaBefore = state.Mana; // 300 (EnterData default), MaxLife=840
+        var manaBefore = state.Mana;
 
         state.AutoHuntEnabled = true;
         state.AutoHuntConfig = Config(82, 10);
@@ -145,7 +137,7 @@ public class AutoHuntTickSystemTests
         zone.Tick(SimulationClock.LegacyTick);
 
         Assert.Equal(manaBefore - 30, state.Mana);
-        Assert.Equal(168, state.Buffs.Buff[9 * 2]); // 20% of MaxLife(840)
+        Assert.Equal(168, state.Buffs.Buff[9 * 2]);
         Assert.Equal(40, state.Buffs.Buff[9 * 2 + 1]);
     }
 
@@ -172,7 +164,7 @@ public class AutoHuntTickSystemTests
     {
         var (zone, state) = SetUp();
         var manaBefore = state.Mana;
-        state.AutoHuntEnabled = true; // AutoHuntConfig left null
+        state.AutoHuntEnabled = true;
 
         zone.Tick(SimulationClock.LegacyTick);
 
@@ -191,7 +183,7 @@ public class AutoHuntTickSystemTests
         state.AutoHuntConfig = Config(82, 10);
         state.LearnedSkills = ImmutableDictionary<byte, LearnedSkill>.Empty.Add(0, new LearnedSkill(82, 10));
         state.Buffs.Buff[9 * 2] = 100;
-        state.Buffs.Buff[9 * 2 + 1] = 5; // still active
+        state.Buffs.Buff[9 * 2 + 1] = 5;
 
         zone.Tick(SimulationClock.LegacyTick);
 
@@ -203,8 +195,6 @@ public class AutoHuntTickSystemTests
     [Fact]
     public void ChargeSkill_IsNeverAutoCast_EvenThoughItIsAnOrdinarySelfBuffForManualCasts()
     {
-        // Skill 6 (Charge) deliberately absent from worldData -- the whitelist gate must reject it before any
-        // catalog lookup is even attempted.
         var (zone, state) = SetUp();
         var manaBefore = state.Mana;
 
@@ -319,11 +309,7 @@ public class AutoHuntTickSystemTests
         Assert.Equal(manaBefore, state.Mana);
     }
 
-    /// <summary>
-    ///     BotBuff's own <c>!mCheckStun</c> top-level gate (S07_MyGame04.cpp:341) -- previously undocumented as a
-    ///     real gap (no stun state existed), now modeled via <see cref="PlayerRuntimeState.IsStunned" />.
-    /// </summary>
-    [Fact]
+        [Fact]
     public void Stunned_DoesNothing()
     {
         var skillsById = new Dictionary<int, SkillDefinition> { [82] = HolyShieldSkill(10, 30, 20, 40) }
@@ -342,17 +328,12 @@ public class AutoHuntTickSystemTests
         Assert.Equal(0, state.Buffs.Buff[9 * 2]);
     }
 
-    /// <summary>
-    ///     BotBuff/BotHotKey's own four-way zone-server-type gate (S07_MyGame04.cpp:341-350) -- Regular War term:
-    ///     any of the 11 configured Regular War (zone 049) maps suppresses the auto-cast outright, statically,
-    ///     for the whole time the avatar is connected there.
-    /// </summary>
-    [Fact]
+        [Fact]
     public void RegularWarMap_DoesNothing()
     {
         var skillsById = new Dictionary<int, SkillDefinition> { [82] = HolyShieldSkill(10, 30, 20, 40) }
             .ToFrozenDictionary();
-        var (zone, state) = SetUp(skillsById, mapId: 49); // one of RegularWarMapCatalog.ConfiguredMaps
+        var (zone, state) = SetUp(skillsById, mapId: 49);
         var manaBefore = state.Mana;
 
         state.AutoHuntEnabled = true;
@@ -365,8 +346,7 @@ public class AutoHuntTickSystemTests
         Assert.Equal(0, state.Buffs.Buff[9 * 2]);
     }
 
-    /// <summary>Sacred-Stone/"zone 038" term: armed only when both the designated map id AND HolyStoneWarEnabled match.</summary>
-    [Fact]
+        [Fact]
     public void HolyStoneMapArmed_DoesNothing()
     {
         var skillsById = new Dictionary<int, SkillDefinition> { [82] = HolyShieldSkill(10, 30, 20, 40) }
@@ -387,11 +367,7 @@ public class AutoHuntTickSystemTests
         Assert.Equal(0, state.Buffs.Buff[9 * 2]);
     }
 
-    /// <summary>
-    ///     The Sacred-Stone map id alone, without <see cref="GameServerOptions.HolyStoneWarEnabled" /> armed, does
-    ///     NOT suppress -- the two conditions are independent, matching legacy's own two-condition requirement.
-    /// </summary>
-    [Fact]
+        [Fact]
     public void HolyStoneMapIdWithoutArmedFlag_StillCasts()
     {
         var skillsById = new Dictionary<int, SkillDefinition> { [82] = HolyShieldSkill(10, 30, 20, 40) }
@@ -412,8 +388,7 @@ public class AutoHuntTickSystemTests
         Assert.Equal(168, state.Buffs.Buff[9 * 2]);
     }
 
-    /// <summary>Rebirth-chain (zone 241) term: any map configured in Zone241DungeonMapIds suppresses.</summary>
-    [Fact]
+        [Fact]
     public void Zone241DungeonMap_DoesNothing()
     {
         var skillsById = new Dictionary<int, SkillDefinition> { [82] = HolyShieldSkill(10, 30, 20, 40) }
@@ -433,8 +408,7 @@ public class AutoHuntTickSystemTests
         Assert.Equal(0, state.Buffs.Buff[9 * 2]);
     }
 
-    /// <summary>An ordinary map matching none of the four zone-server types is unaffected by this gate.</summary>
-    [Fact]
+        [Fact]
     public void OrdinaryMap_UnaffectedByZoneServerTypeGate()
     {
         var skillsById = new Dictionary<int, SkillDefinition> { [82] = HolyShieldSkill(10, 30, 20, 40) }
@@ -469,10 +443,10 @@ public class AutoHuntTickSystemTests
 
         zone.Tick(SimulationClock.LegacyTick);
 
-        Assert.True(state.Buffs.Buff[9 * 2 + 1] > 0); // Holy Shield (first slot) applied
-        Assert.Equal(0, state.Buffs.Buff[10 * 2 + 1]); // Critical (second slot) NOT applied this same tick
+        Assert.True(state.Buffs.Buff[9 * 2 + 1] > 0);
+        Assert.Equal(0, state.Buffs.Buff[10 * 2 + 1]);
 
-        zone.Tick(SimulationClock.LegacyTick); // slot 0 already active -> falls through to slot 1
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.True(state.Buffs.Buff[10 * 2 + 1] > 0);
     }
@@ -487,11 +461,10 @@ public class AutoHuntTickSystemTests
 
         state.AutoHuntEnabled = true;
         state.AutoHuntConfig = Config(82, 10);
-        // LearnedSkills left empty -- the character never actually learned skill 82.
 
         zone.Tick(SimulationClock.LegacyTick);
 
-        Assert.Equal(manaBefore, state.Mana); // grade clamps to -1 -> ManaCost resolves to 0
+        Assert.Equal(manaBefore, state.Mana);
         Assert.Equal(0, state.Buffs.Buff[9 * 2]);
         Assert.Equal(0, state.Buffs.Buff[9 * 2 + 1]);
     }
@@ -505,17 +478,16 @@ public class AutoHuntTickSystemTests
         var manaBefore = state.Mana;
 
         state.AutoHuntEnabled = true;
-        // Slot index 2 (the 3rd configured pair) is only reachable once slotCount == 8.
         state.AutoHuntConfig = Config(0, 0, 0, 0, 82, 10);
         state.LearnedSkills = ImmutableDictionary<byte, LearnedSkill>.Empty.Add(0, new LearnedSkill(82, 10));
-        state.AutoBuffTime = 0; // < GameDate.Today() -> slotCount == 2
+        state.AutoBuffTime = 0;
 
         zone.Tick(SimulationClock.LegacyTick);
 
         Assert.Equal(manaBefore, state.Mana);
         Assert.Equal(0, state.Buffs.Buff[9 * 2]);
 
-        state.AutoBuffTime = 99_991_231; // >= GameDate.Today() -> slotCount == 8
+        state.AutoBuffTime = 99_991_231;
 
         zone.Tick(SimulationClock.LegacyTick);
 

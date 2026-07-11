@@ -19,7 +19,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.GenericAction;
 
-/// <inheritdoc cref="IGenericActionService" />
 public sealed class GenericActionService(
     ICharacterRepository characters,
     WorldDataCache worldData,
@@ -31,48 +30,27 @@ public sealed class GenericActionService(
     IWarPointShopService? warPointShop = null)
     : IGenericActionService
 {
-    /// <summary>game.EventLog.EventCode for TimeExchange (legacy <c>GL_851_PLAYTIME_EXCHANGE</c>).</summary>
-    private const short TimeExchangeEventCode = 1;
+
+        private const short TimeExchangeEventCode = 1;
 
     private const byte TimeExchangeOutcome = 1;
 
-    /// <summary>
-    ///     game.EventLog.EventCode for a sale to an NPC shop, scoped independently within
-    ///     <see cref="EventLogCategory.NpcShopTrade" /> -- see that category's own remarks for the numbering
-    ///     scheme and legacy <c>GL_621_NSHOP_ITEM</c> citation.
-    /// </summary>
-    private const short NpcShopSellEventCode = 1;
+        private const short NpcShopSellEventCode = 1;
 
-    /// <summary>game.EventLog.EventCode for a purchase from an NPC shop -- see <see cref="NpcShopSellEventCode" />.</summary>
-    private const short NpcShopBuyEventCode = 2;
+        private const short NpcShopBuyEventCode = 2;
 
     private const byte NpcShopTradeOutcome = 1;
 
-    /// <summary>
-    ///     Shared EventCode convention across every Store/Save (account vault) transfer category this type
-    ///     writes (StoreSlotItem/SaveSlotItem/StoreSlotMoney/SaveSlotMoney): 1 = deposit, 2 = withdraw --
-    ///     matching each category's own legacy GAMELOG citation (GL_624/625/626/627's own direction/action
-    ///     parameter).
-    /// </summary>
-    private const short VaultTransferDepositEventCode = 1;
+        private const short VaultTransferDepositEventCode = 1;
 
     private const short VaultTransferWithdrawEventCode = 2;
     private const byte VaultTransferOutcome = 1;
 
-    /// <summary>Server/ts25zone/S04_MyWork05.cpp:4808-4826 -- 694 teacher points per accrued play-time-event minute.</summary>
-    private const int TeacherPointsPerPlayTimeMinute = 694;
+        private const int TeacherPointsPerPlayTimeMinute = 694;
 
-    /// <summary>Server/ts25zone/S04_MyWork05.cpp:4808-4826 -- 400 pet experience per accrued play-time-event minute.</summary>
-    private const int PetExperiencePerPlayTimeMinute = 400;
+        private const int PetExperiencePerPlayTimeMinute = 400;
 
-    /// <summary>
-    ///     mDATA.aAction.aSort's idle/ready pose sentinel -- the same value already independently established by
-    ///     the post-cure/expiry reset (Server/ts25zone/S07_MyGame04.cpp:449, mirrored by <c>Zone</c>'s own private
-    ///     <c>IdleActionSort</c> in Zone.Stun.cs) and by the identical <c>ActionSort != 1</c> gate
-    ///     <see cref="AutoBuffActivationResolver" /> and <c>MountStateResolver</c> already apply for their own,
-    ///     unrelated actions.
-    /// </summary>
-    private const int IdleActionSort = 1;
+        private const int IdleActionSort = 1;
 
     public async ValueTask<GenericActionResult> MoveContainerAsync(int sort, byte[] data, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
@@ -101,8 +79,6 @@ public sealed class GenericActionService(
             return GenericActionResult.Failed;
         }
 
-        // Bounds-checked before any byte cast: an out-of-range Index must never be truncated into a byte that
-        // could accidentally alias a real slot.
         var sourceStack = ContainerMatrix.IsValidSlot(fromContainer, move.Index1)
             ? state.Inventory.GetSlot(fromContainer, (byte)move.Index1)
             : null;
@@ -128,15 +104,6 @@ public sealed class GenericActionService(
         if (resolved.Outcome == ContainerMatrix.MoveOutcome.NoOp)
             return GenericActionResult.Succeeded;
 
-        // Idle-pose precondition, both equip (210) and unequip (213) directions: ProcessForInventoryToEquip/
-        // ProcessForEquipToInventory each soft-refuse (no disconnect) when the avatar's own currently-tracked
-        // action isn't the idle/ready pose (Server/ts25zone/S04_MyWork05.cpp:1261-1265 for 210, :1575-1579 for
-        // 213) -- what the non-idle codes represent (attack windup, stun, cast, etc.) wasn't itself observed in
-        // those cited ranges, only that any value other than the idle sentinel fails this check. A well-formed
-        // request the domain cleanly rejects (GenericActionResult.Failed --> wire Result=1), never a disconnect;
-        // this runs ahead of the equip-legality gate and the transfer itself, matching both cited call sites'
-        // own ordering. Never reached for 208 (plain inventory rearrange): neither side of a 208 move is ever
-        // Equipment (see ContainerMatrix.TryResolveContainers).
         if ((toContainer == ContainerMatrix.Equipment || fromContainer == ContainerMatrix.Equipment) &&
             state.ActionSort != IdleActionSort)
         {
@@ -146,14 +113,6 @@ public sealed class GenericActionService(
             return GenericActionResult.Failed;
         }
 
-        // tSort 210 (Inventory->Equip) only: CheckPossibleEquipItem's tribe/slot-tag/level/rebirth/final-category
-        // gate. Not applied to 208/213 -- neither ordinary inventory rearrange nor unequip re-checks equip
-        // legality in the legacy (Server/ts25zone/S04_MyWork05.cpp:1234-1306 is the InventoryToEquip-only call
-        // site). This is safe for the 213 (unequip, Equipment->Inventory) direction specifically because
-        // ContainerMatrix.ResolveMove no longer swaps an occupied destination's contents into the vacated
-        // Equipment slot -- an occupied, non-mergeable destination is now a hard reject for all 3 directions
-        // (see ResolveMove's own remarks), so no path exists for an arbitrary/unvalidated item to reach
-        // Equipment through this branch. resolved.Succeeded already guarantees sourceStack is non-null here.
         if (toContainer == ContainerMatrix.Equipment)
         {
             EquipItemValidationGate.EquipCandidate? candidate = null;
@@ -165,13 +124,6 @@ public sealed class GenericActionService(
                     equipRow.Sort);
             }
 
-            // itemSortClassification stands in for the legacy ReturnItemSort(...) helper: its own derivation
-            // logic is outside EquipItemValidationGate's citation range (see that type's own remarks), so 0 is
-            // passed as a documented placeholder rather than a guessed formula -- it never matches any of the
-            // hardcoded rebirth-12 classification codes, meaning only that one sub-check of the overall
-            // rebirth gate is skipped here; tribe/slot-tag/level/final-category and the per-item-id/CheckSetItem
-            // rebirth gates all run for real (including ItemNotFound when the item id itself doesn't resolve).
-            // Flagged for a follow-up legacy finding, not guessed at.
             var equipOutcome = EquipItemValidationGate.Evaluate(candidate, 0,
                 state.PreviousTribe, move.Index2, state.Level + state.Level2, state.RebirthCount);
 
@@ -196,9 +148,6 @@ public sealed class GenericActionService(
                 state.StatDex, state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo,
                 state.RebirthCount, state.Level2);
 
-            // Pet stat contribution uses the PROJECTED equipment but the still-current growth/activity -- a pet
-            // swap within one request can transiently keep the old pet's growth for the new one until the next
-            // stat-affecting event self-corrects it (documented, minor, non-observable window).
             var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
                 ? petStack.ItemId
                 : 0;
@@ -256,10 +205,6 @@ public sealed class GenericActionService(
             return GenericActionResult.Aborted;
         }
 
-        // Resolved live from PartyRegistry at claim time (never a hardcoded absent value) -- see
-        // PartyIdentityResolver's own remarks and GroundItemEntity.IsClaimableBy's rule 5/6 citations for why
-        // this must be the claimant's real current party identity, not null, for a partied claim to ever
-        // succeed.
         var claimantPartyName = PartyIdentityResolver.ResolveCurrentPartyName(partyRegistry, characterId,
             state.Name, memberId => zone.TryGetPlayer(memberId, out var member) ? member?.Name : null);
 
@@ -329,15 +274,9 @@ public sealed class GenericActionService(
                 "Zone {MapId} inventory inbox full: dropped pickup mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
 
-        // GL_619_GAIN_ITEM (+ conditional GL_607_GAIN_SIN_ITEM for an elite-typed item) -- C20 audit-log
-        // contract. Only the fresh-slot ("Placed") outcome reaches here; Money/Stacked outcomes return
-        // earlier above and log nothing, matching legacy's own silent branches.
         await eventLog.LogGroundItemGainAsync(accountId, characterId, groundItem.ItemId,
             resolved.NewSlot!.Value.Quantity, itemDefinition.Item.Type, cancellationToken);
 
-        // Quest pickup hook: a pure notification (no quest-state mutation), sent only when the picked-up item
-        // matches the active qSort-2 quest's target and the quest is still in-progress at this instant. Reads
-        // state.Inventory AFTER the mirror above so it observes the just-picked-up item.
         var notifyQuestProgress = false;
         if (state.QuestActiveFlag == 1 && state.QuestSort == 2 && state.QuestTargetPhase == groundItem.ItemId)
         {
@@ -362,12 +301,7 @@ public sealed class GenericActionService(
         return new GenericActionResult(GenericActionStatus.Succeeded, notifyQuestProgress);
     }
 
-    /// <summary>
-    ///     tSort 207 -- paying-NPC instant teleport toll. Carries only the toll amount; the actual zone transfer
-    ///     is the separate CZ_DEMAND_ZONE_SERVER_INFO_2 (opcode 20, Sort=5) which <c>ZoneMoveHandler</c> already
-    ///     accepts generically. This action's job is gating the transfer on a successful money debit first.
-    /// </summary>
-    public async ValueTask<GenericActionResult> PayTeleportTollAsync(byte[] data, int characterId,
+        public async ValueTask<GenericActionResult> PayTeleportTollAsync(byte[] data, int characterId,
         CancellationToken cancellationToken)
     {
         if (!TeleportTollData.TryRead(data, out var toll))
@@ -403,8 +337,7 @@ public sealed class GenericActionService(
         return GenericActionResult.Succeeded;
     }
 
-    /// <summary>tSort 202/233 -- learn a new skill from an NPC's skill-tree offer.</summary>
-    public async ValueTask<GenericActionResult> LearnSkillAsync(int sort, byte[] data, Zone zone,
+        public async ValueTask<GenericActionResult> LearnSkillAsync(int sort, byte[] data, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
     {
         if (!NpcSkillLearnData.TryRead(data, out var request))
@@ -457,8 +390,7 @@ public sealed class GenericActionService(
         return GenericActionResult.Succeeded;
     }
 
-    /// <summary>tSort 203 -- upgrade an already-learned skill's grade. No NPC-proximity gate applies here.</summary>
-    public async ValueTask<GenericActionResult> UpgradeSkillAsync(byte[] data, Zone zone, PlayerRuntimeState state,
+        public async ValueTask<GenericActionResult> UpgradeSkillAsync(byte[] data, Zone zone, PlayerRuntimeState state,
         int characterId, CancellationToken cancellationToken)
     {
         if (!SkillUpgradeData.TryRead(data, out var request))
@@ -503,8 +435,7 @@ public sealed class GenericActionService(
         return GenericActionResult.Succeeded;
     }
 
-    /// <summary>tSort 212/252 -- sell to an NPC shop.</summary>
-    public async ValueTask<GenericActionResult> SellToNpcShopAsync(Zone zone, PlayerRuntimeState state,
+        public async ValueTask<GenericActionResult> SellToNpcShopAsync(Zone zone, PlayerRuntimeState state,
         int accountId, int characterId, DefaultPData move, CancellationToken cancellationToken)
     {
         if (!NpcShopPolicy.TownZoneNumbers.Contains(zone.MapId) ||
@@ -565,10 +496,6 @@ public sealed class GenericActionService(
             return GenericActionResult.Aborted;
         }
 
-        // Logged only once AdjustMoneyAndReplaceContainerAsync above has durably committed -- an audit row must
-        // never assert a sale the DB write didn't actually persist. Sold quantity is derived from the
-        // before/after stack rather than echoing move.Quantity1 verbatim, since NpcShopPolicy.ResolveSell
-        // ignores the requested quantity entirely for a non-stackable item (S04_MyWork05.cpp:1398-1542).
         var soldQuantity = source.Quantity - (resolved.RemainingSourceStack?.Quantity ?? 0);
         await eventLog.LogAsync(NpcShopSellEventCode, EventLogCategory.NpcShopTrade, accountId, characterId,
             null, null, null, resolved.MoneyGained, null, source.ItemId, soldQuantity, NpcShopTradeOutcome, null,
@@ -588,11 +515,7 @@ public sealed class GenericActionService(
         return GenericActionResult.Succeeded;
     }
 
-    /// <summary>
-    ///     tSort 215 -- buy from an NPC shop. <paramref name="move" />.Page1/Index1 repurpose the wire shape as
-    ///     (NpcId, ItemId), not an inventory slot.
-    /// </summary>
-    public async ValueTask<GenericActionResult> BuyFromNpcShopAsync(Zone zone, PlayerRuntimeState state,
+        public async ValueTask<GenericActionResult> BuyFromNpcShopAsync(Zone zone, PlayerRuntimeState state,
         int accountId, int characterId, DefaultPData move, CancellationToken cancellationToken)
     {
         if (!NpcShopPolicy.TownZoneNumbers.Contains(zone.MapId) ||
@@ -628,14 +551,6 @@ public sealed class GenericActionService(
 
         var destinationSlot = state.Inventory.GetSlot((byte)page2, (byte)index2);
 
-        // War-Point NPC-shop routing (C13, USE_WAR_POINT_SYSTEM): offered BEFORE NpcShopPolicy.ResolveBuy, because
-        // a War-Point item bypasses the ordinary iCheckNPCShop==2/rent gates entirely -- it is validated by the
-        // global WarPointShopCatalog price table alone. move.Page1 is the npcId and move.Index1 the itemId (see
-        // the NPC/item resolution above). NotHandled means "not a War-Point NPC, or item absent from the price
-        // table" -- fall through to the ordinary shop path unchanged. Every other outcome short-circuits this
-        // method entirely: WarPointShopService.TryBuyAsync already performs its own atomic WP debit + item grant,
-        // inventory mirror, audit log, and balance-update packets on success, so there is nothing left for the
-        // ordinary path below to do.
         if (warPointShop is not null)
         {
             var warPointResult = await warPointShop.TryBuyAsync(zone, state, accountId, characterId, move.Page1,
@@ -659,7 +574,7 @@ public sealed class GenericActionService(
                     return GenericActionResult.Succeeded;
 
                 case WarPointBuyStatus.NotHandled:
-                    break; // Not a War-Point transaction -- fall through to the ordinary shop path below.
+                    break;
             }
         }
 
@@ -690,10 +605,6 @@ public sealed class GenericActionService(
             return GenericActionResult.Aborted;
         }
 
-        // Logged only once AdjustMoneyAndReplaceContainerAsync above has durably committed -- an audit row must
-        // never assert a purchase the DB write didn't actually persist. Purchased quantity is derived from the
-        // before/after destination stack (rather than echoing move.Quantity1 verbatim) so a merge into an
-        // already-occupied slot logs only the newly-added units, not the destination's post-merge total.
         var purchasedQuantity = resolved.NewDestinationStack!.Value.Quantity - (destinationSlot?.Quantity ?? 0);
         await eventLog.LogAsync(NpcShopBuyEventCode, EventLogCategory.NpcShopTrade, accountId, characterId,
             null, null, null, -(long)resolved.MoneyCost, null, itemDefinition.Item.ItemId, purchasedQuantity,
@@ -706,9 +617,6 @@ public sealed class GenericActionService(
                 "Zone {MapId} inventory inbox full: dropped NPC-buy mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
 
-        // Contribution Points (BuyCost2) aren't debited by the SQL call above -- unlike Money, they're a
-        // write-behind field on PlayerRuntimeState (same posture as CraftLegendaryPetHandler's CP spend), so the
-        // in-memory mirror IS the durable-enough record until the next flush.
         if (resolved.CpCost > 0 &&
             !await zone.PostTribeProgressCommandAndWaitAsync(
                 new TribeProgressZoneCommand(characterId, state.ContributionPoints - resolved.CpCost),
@@ -724,17 +632,7 @@ public sealed class GenericActionService(
         return GenericActionResult.Succeeded;
     }
 
-    /// <summary>
-    ///     tSort 223/250 (deposit), 224/248 (withdraw), 225 (store-to-store rearrange) -- the Store/coffre
-    ///     item-move family. Every rejection is a clean failure (<see cref="GenericActionResult.Failed" />),
-    ///     never a disconnect -- <see cref="StoreItemTransferPolicy" />'s own citation confirms every one of
-    ///     its three backing legacy functions unconditionally returns TRUE (with tResult left at its initial
-    ///     failure value) on every rejection branch, the same "clean echo, no Quit()" posture as the
-    ///     already-implemented 208/210/213 container-move family. No NPC-proximity gate applies (the "Remote
-    ///     Storage Fix" patch already disabled it in the reference source -- see the umbrella NPC-interaction
-    ///     behavior contract's Preconditions section).
-    /// </summary>
-    public async ValueTask<GenericActionResult> TransferStoreItemAsync(int sort, byte[] data, Zone zone,
+        public async ValueTask<GenericActionResult> TransferStoreItemAsync(int sort, byte[] data, Zone zone,
         PlayerRuntimeState state, int accountId, int characterId, CancellationToken cancellationToken)
     {
         if (!DefaultPData.TryRead(data, out var move))
@@ -856,9 +754,6 @@ public sealed class GenericActionService(
             await characters.ReplaceTwoContainersAsync(characterId, fromContainer, ToTvps(newFrom), toContainer,
                 ToTvps(newTo), cancellationToken);
 
-        // Logged only once the SQL write above has durably committed, and only for the non-stackable
-        // whole-slot path -- matching StoreItemTransferPolicy's own IsNonStackableTransfer remarks (rearrange,
-        // sort 225, never sets this flag, so this never fires for that direction).
         if (resolved.IsNonStackableTransfer)
             await eventLog.LogAsync(auditEventCode, EventLogCategory.StoreSlotItem, accountId, characterId,
                 null, null, null, null, null, resolved.NewDestination?.ItemId ?? resolved.NewSource?.ItemId,
@@ -883,26 +778,7 @@ public sealed class GenericActionService(
         return GenericActionResult.Succeeded;
     }
 
-    /// <summary>
-    ///     tSort 226 (deposit)/227 (withdraw) -- Store/coffre money transfer between wallet Money and
-    ///     StoreMoney. Every failure here is a hard disconnect, matching the legacy's own uniform Quit() --
-    ///     see <see cref="StoreMoneyPolicy" />'s own remarks (Server/ts25zone/S04_MyWork05.cpp:2903-2969: the
-    ///     non-positive-amount, insufficient-source, and destination-cap-overflow checks each independently
-    ///     call Quit(), with no distinguishable in-band response for any of them).
-    /// </summary>
-    /// <remarks>
-    ///     Only the request-shape check (amount must be positive,
-    ///     <see cref="StoreMoneyPolicy.TransferOutcome.InvalidQuantity" />) is evaluated directly here --
-    ///     unlike <see cref="StoreMoneyPolicy" />'s own InsufficientSource/DestinationOverflow branches, which
-    ///     need the wallet's live Money balance. <see cref="PlayerRuntimeState" /> deliberately never caches
-    ///     wallet Money (same posture as every other money-spending action in this file --
-    ///     <see cref="BuyFromNpcShopAsync" />/<see cref="SellToNpcShopAsync" />/<see cref="PayTeleportTollAsync" />
-    ///     all rely on the atomic SQL call's own guard plus a catch block instead of a pre-fetched balance), so
-    ///     those two checks are enforced entirely by <c>ICharacterRepository.AdjustStoreMoneyAsync</c>'s own
-    ///     guarded UPDATE; any resulting SQL exception (either reason) is caught below and treated identically
-    ///     to the legacy's own Quit()-on-any-failure semantics.
-    /// </remarks>
-    public async ValueTask<GenericActionResult> TransferStoreMoneyAsync(int sort, byte[] data, Zone zone,
+        public async ValueTask<GenericActionResult> TransferStoreMoneyAsync(int sort, byte[] data, Zone zone,
         PlayerRuntimeState state, int accountId, int characterId, CancellationToken cancellationToken)
     {
         if (!DefaultPData.TryRead(data, out var move))
@@ -955,19 +831,7 @@ public sealed class GenericActionService(
         return GenericActionResult.Succeeded;
     }
 
-    /// <summary>
-    ///     tSort 228/251 (deposit), 229/249 (withdraw), 230 (bank-to-bank rearrange) -- the Save/vault
-    ///     (account-scoped bank) item-move family. Every rejection is a hard disconnect
-    ///     (<see cref="GenericActionResult.Aborted" />), unlike the Store item family's clean-failure posture
-    ///     above -- see <see cref="SaveBankItemTransferPolicy" />'s own citation: every rejection branch in
-    ///     all three backing legacy functions (Server/ts25zone/S04_MyWork05.cpp:2971-3273) calls
-    ///     <c>Quit()</c> before returning FALSE (verified directly this session; this is a stronger claim than
-    ///     the umbrella NPC-interaction behavior contract's own "not fully traced" caveat for other,
-    ///     unspecified ProcessForXxx helpers -- this specific family IS fully traced, and it is uniformly
-    ///     Quit()). No NPC-proximity gate applies here either, same "Remote Save Storage Fix" disabled-patch
-    ///     posture as the Store family.
-    /// </summary>
-    public async ValueTask<GenericActionResult> TransferBankItemAsync(int sort, byte[] data, Zone zone,
+        public async ValueTask<GenericActionResult> TransferBankItemAsync(int sort, byte[] data, Zone zone,
         PlayerRuntimeState state, int accountId, int characterId, CancellationToken cancellationToken)
     {
         if (!DefaultPData.TryRead(data, out var move))
@@ -978,8 +842,6 @@ public sealed class GenericActionService(
             return GenericActionResult.Aborted;
         }
 
-        // Always re-fetched, never cached on PlayerRuntimeState -- see that type's own Vault.cs remarks on why
-        // an account-scoped pool can't safely be cached per-character.
         var (_, vaultRows) = await accountVault.GetAsync(accountId, cancellationToken);
         var vaultBySlot = new Dictionary<short, ItemStack>(vaultRows.Count);
         foreach (var row in vaultRows)
@@ -1110,10 +972,6 @@ public sealed class GenericActionService(
                 ApplyVaultSlotChange(vaultBySlot, (short)move.Index1, resolved.NewSource);
                 ApplyVaultSlotChange(vaultBySlot, (short)move.Index2, resolved.NewDestination);
 
-                // Vault-only mutation -- no character container touched, so this reuses the plain whole-list
-                // replace rather than the joint character+vault procedure. Never audit-logged, matching
-                // SaveBankItemTransferPolicy's own remarks (ProcessForSaveToSave has no GL_626_SAVESLOT_ITEM
-                // call anywhere in its body, unlike its deposit/withdraw siblings).
                 await accountVault.SetItemsAsync(accountId, ToVaultTvps(vaultBySlot), cancellationToken);
                 logger.LogInformation(
                     "Character {CharacterId} Save-item-transfer applied: rearrange, vault {Index1} <-> {Index2}",
@@ -1125,16 +983,7 @@ public sealed class GenericActionService(
         }
     }
 
-    /// <summary>
-    ///     tSort 231 (deposit)/232 (withdraw) -- Save/vault (account bank) money transfer between wallet Money
-    ///     and the account's shared <c>game.AccountVault.Money</c>. Every failure here is a hard disconnect,
-    ///     same posture as <see cref="TransferStoreMoneyAsync" /> -- see that method's own remarks for why the
-    ///     balance-dependent <see cref="SaveBankMoneyPolicy" /> branches aren't invoked directly here (no
-    ///     cached wallet balance to validate against; <c>IAccountVaultRepository.TransferMoneyWithCharacterAsync</c>'s
-    ///     own atomic guarded UPDATE is the sole enforcement point, matching Server/ts25zone/S04_MyWork05.cpp:3275-3341's
-    ///     own uniform Quit()-on-any-failure shape).
-    /// </summary>
-    public async ValueTask<GenericActionResult> TransferBankMoneyAsync(int sort, byte[] data, int accountId,
+        public async ValueTask<GenericActionResult> TransferBankMoneyAsync(int sort, byte[] data, int accountId,
         int characterId, CancellationToken cancellationToken)
     {
         if (!DefaultPData.TryRead(data, out var move))
@@ -1181,28 +1030,7 @@ public sealed class GenericActionService(
         return GenericActionResult.Succeeded;
     }
 
-    /// <summary>
-    ///     tSort 206 -- spends unspent stat points (aStatPoint) to raise Strength/Dexterity/Vitality/Intelligence.
-    ///     Every rejection is a bare <see cref="GenericActionResult.Aborted" />: the legacy disconnects the
-    ///     session for any illegal category code or unaffordable amount here, never a soft failure reply.
-    ///     Reached from <c>GenericActionHandler</c>'s dispatch switch -- see
-    ///     <see cref="IGenericActionService.AllocateStatPointAsync" />.
-    /// </summary>
-    /// <remarks>
-    ///     Réf. C++ : Server/ts25zone/S04_MyWork05.cpp:705-791 (<c>ProcessForStatPlus</c> -- debit, attribute
-    ///     increment, and terminal <c>SetBasicAbilityFromEquip</c> call, all completing as one unit once the
-    ///     category code is legal and affordable) ; Server/ts25zone/S07_MyGame04.cpp:158-183
-    ///     (<c>SetBasicAbilityFromEquip</c>'s refreshed field list -- mirrored here by
-    ///     <see cref="EquipmentService.RecomputeStats" />; the mount/costume/stellar-core inputs it also reads
-    ///     are not modeled by <see cref="StatCalculator" /> yet, same documented gap as that type's own remarks)
-    ///     ; Server/ts25zone/S05_MyTransfer.cpp:544-559 (the acknowledgment echoes the raw request payload
-    ///     unmodified -- this method never touches the wire payload itself, matching that). No stored-procedure
-    ///     write happens here, matching the legacy's own lack of one for this tSort: the mutation is mirrored
-    ///     onto <see cref="PlayerRuntimeState" /> via the same already-established <see cref="TribeProgressZoneCommand" />
-    ///     channel <see cref="BuyFromNpcShopAsync" /> already uses for its own CP debit, which marks the
-    ///     character dirty for the next write-behind progress flush.
-    /// </remarks>
-    public async ValueTask<GenericActionResult> AllocateStatPointAsync(int statSort, int addValue, Zone zone,
+        public async ValueTask<GenericActionResult> AllocateStatPointAsync(int statSort, int addValue, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
     {
         var resolved = StatAllocationResolver.Resolve(statSort, addValue, state.StatPoints);
@@ -1247,13 +1075,9 @@ public sealed class GenericActionService(
         return GenericActionResult.Succeeded;
     }
 
-    /// <inheritdoc cref="IGenericActionService.TimeExchangeAsync" />
-    public async ValueTask<GenericActionResult> TimeExchangeAsync(Zone zone, PlayerRuntimeState state,
+        public async ValueTask<GenericActionResult> TimeExchangeAsync(Zone zone, PlayerRuntimeState state,
         int accountId, int characterId, CancellationToken cancellationToken)
     {
-        // The only precondition this action has (S04_MyWork05.cpp:4808-4826's own guard): fewer than 1
-        // accrued minute is a silent no-op -- no log entry, no state change, still a success echo (see
-        // GenericActionHandler.Respond).
         var accruedMinutes = state.PlayTimeEvent;
         if (accruedMinutes < 1)
         {
@@ -1275,9 +1099,6 @@ public sealed class GenericActionService(
         var credited = PetExperienceCreditResolver.Resolve(petItemId, state.PetGrowth, state.PetActivity,
             petExperienceGranted, worldData.ItemsById);
 
-        // Audit log BEFORE either reward is actually applied (S04_MyWork05.cpp:4808-4826's own ordering) --
-        // captures the PRE-grant pet-slot snapshot (identifier via ItemId, activity flag + stored
-        // growth/experience in the payload), not the post-grant one.
         await eventLog.LogAsync(TimeExchangeEventCode, EventLogCategory.PlayTimeExchange, accountId, characterId,
             null, null, null, null, null, petItemId, teacherPointsGranted, TimeExchangeOutcome,
             $"PetActivity={preGrantPetActivity};PetGrowth={preGrantPetGrowth};PetExperienceGranted={petExperienceGranted}",
@@ -1285,9 +1106,6 @@ public sealed class GenericActionService(
 
         var newTeacherPoint = state.TeacherPoint + teacherPointsGranted;
 
-        // Same combined guard Zone.CreditPetGrowthFromMonsterKill already applies for its own (unrelated)
-        // call site: skip the pet-slot mirror entirely when nothing about it would actually change, rather
-        // than posting a no-op mutation.
         int? petGrowthToApply = null;
         byte? petActivityToApply = null;
         if (credited.IsEligible && (credited.CreditedAmount > 0 || credited.ReactivationApplied))
@@ -1305,9 +1123,6 @@ public sealed class GenericActionService(
                 "Zone {MapId} tribe-progress inbox full: dropped TimeExchange mirror for character {CharacterId}",
                 zone.MapId, characterId);
 
-        // GrantedPetExperienceGrowth only when the credit was actually positive -- the reactivation-only
-        // (CreditedAmount == 0) case still mutates PetActivity above but sends no experience-changed
-        // notification, matching PetExperienceCreditResult's own remarks.
         var grantedPetGrowth = credited is { IsEligible: true, CreditedAmount: > 0 } ? credited.NewGrowth : (int?)null;
 
         logger.LogInformation(
@@ -1317,8 +1132,7 @@ public sealed class GenericActionService(
         return new GenericActionResult(GenericActionStatus.Succeeded, GrantedPetExperienceGrowth: grantedPetGrowth);
     }
 
-    /// <summary>Bounds-checked-before-cast slot read -- see <see cref="MoveContainerAsync" />'s own identical pattern.</summary>
-    private static ItemStack? GetSlotOrNull(PlayerRuntimeState state, byte container, int slot)
+        private static ItemStack? GetSlotOrNull(PlayerRuntimeState state, byte container, int slot)
     {
         return ContainerMatrix.IsValidSlot(container, slot) ? state.Inventory.GetSlot(container, (byte)slot) : null;
     }
@@ -1353,16 +1167,7 @@ public sealed class GenericActionService(
         return newValue is { } value ? current.SetItem(slot, value) : current.Remove(slot);
     }
 
-    /// <summary>
-    ///     Resolves <paramref name="candidate" />'s catalog definition, collapsing both "truly empty" and "item
-    ///     id no longer resolves to a known item definition" into a single null <c>Source</c> -- the exact
-    ///     collapse <see cref="StoreItemTransferPolicy" />/<see cref="SaveBankItemTransferPolicy" />'s own
-    ///     <c>SourceEmpty</c> remarks document, since neither pure policy touches the item catalog itself.
-    ///     <c>SupportsSocket</c> is always <see langword="false" /> -- Fenrir's <c>ItemDefinition</c> has no
-    ///     <c>IsValidSocket</c>-equivalent flag yet, same pre-existing gap both policies' own remarks flag,
-    ///     conservative default until that data exists rather than a guessed formula.
-    /// </summary>
-    private (ItemStack? Source, bool IsStackable, bool SupportsSocket) ResolveTransferSource(ItemStack? candidate)
+        private (ItemStack? Source, bool IsStackable, bool SupportsSocket) ResolveTransferSource(ItemStack? candidate)
     {
         if (candidate is not { } stack || !worldData.ItemsById.TryGetValue(stack.ItemId, out var definition))
             return (null, false, false);

@@ -12,8 +12,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Game;
 
-// game.usp_Guild_* / usp_GuildMember_* write procs against real SQL Server 2025, exercised via raw ADO.NET
-// since the C# repository isn't wired up yet -- every documented THROW still needs coverage.
 [Collection("SqlServer")]
 public class GuildProcTests
 {
@@ -43,17 +41,14 @@ public class GuildProcTests
         var guildId = await CreateGuildAsync(name, masterId);
         Assert.True(guildId > 0);
 
-        // The master is enrolled with Role 2 in the same transaction.
         var role = await ScalarAsync<byte>(
             $"SELECT Role FROM game.GuildMembers WHERE GuildId = {guildId} AND CharacterId = {masterId};");
         Assert.Equal(2, role);
 
-        // Same name again -> 50230, even with a different master.
         var otherId = await CreateCharacterAsync();
         var nameTaken = await Assert.ThrowsAsync<SqlException>(() => CreateGuildAsync(name, otherId));
         Assert.Equal(50230, nameTaken.Number);
 
-        // A character already in a guild cannot found another one -> 50231.
         var alreadyMember = await Assert.ThrowsAsync<SqlException>(() => CreateGuildAsync(NewGuildName(), masterId));
         Assert.Equal(50231, alreadyMember.Number);
     }
@@ -65,7 +60,6 @@ public class GuildProcTests
         var memberId = await CreateCharacterAsync();
         var guildId = await CreateGuildAsync(NewGuildName(), masterId);
 
-        // Add into an unknown guild -> 50235.
         var unknownGuild = await Assert.ThrowsAsync<SqlException>(() => ExecProcAsync("game.usp_GuildMember_Add",
             ("GuildId", -1), ("CharacterId", memberId), ("Role", (byte)0)));
         Assert.Equal(50235, unknownGuild.Number);
@@ -73,12 +67,10 @@ public class GuildProcTests
         await ExecProcAsync("game.usp_GuildMember_Add",
             ("GuildId", guildId), ("CharacterId", memberId), ("Role", (byte)0));
 
-        // The same character cannot be added twice / to another guild -> 50231.
         var doubleAdd = await Assert.ThrowsAsync<SqlException>(() => ExecProcAsync("game.usp_GuildMember_Add",
             ("GuildId", guildId), ("CharacterId", memberId), ("Role", (byte)0)));
         Assert.Equal(50231, doubleAdd.Number);
 
-        // Promote to sub-master; a role change landing on nobody -> 50233.
         await ExecProcAsync("game.usp_GuildMember_SetRole",
             ("GuildId", guildId), ("CharacterId", memberId), ("Role", (byte)1));
         Assert.Equal(1, await ScalarAsync<byte>(
@@ -88,7 +80,6 @@ public class GuildProcTests
             ("GuildId", guildId), ("CharacterId", -1), ("Role", (byte)1)));
         Assert.Equal(50233, notAMember.Number);
 
-        // Leadership transfer keeps all three leadership facts consistent.
         await ExecProcAsync("game.usp_Guild_SetMaster",
             ("GuildId", guildId), ("NewMasterCharacterId", memberId));
         Assert.Equal(memberId, await ScalarAsync<int>(
@@ -98,13 +89,11 @@ public class GuildProcTests
         Assert.Equal(0, await ScalarAsync<byte>(
             $"SELECT Role FROM game.GuildMembers WHERE GuildId = {guildId} AND CharacterId = {masterId};"));
 
-        // Transferring to a non-member -> 50233.
         var strangerId = await CreateCharacterAsync();
         var notMember = await Assert.ThrowsAsync<SqlException>(() => ExecProcAsync("game.usp_Guild_SetMaster",
             ("GuildId", guildId), ("NewMasterCharacterId", strangerId)));
         Assert.Equal(50233, notMember.Number);
 
-        // Remove is a silent, idempotent row deletion.
         await ExecProcAsync("game.usp_GuildMember_Remove", ("GuildId", guildId), ("CharacterId", masterId));
         var removeAgain = await Record.ExceptionAsync(() =>
             ExecProcAsync("game.usp_GuildMember_Remove", ("GuildId", guildId), ("CharacterId", masterId)));
@@ -149,7 +138,6 @@ public class GuildProcTests
         Assert.Equal(6, await ScalarAsync<int>($"SELECT Points FROM game.Guilds WHERE GuildId = {guildId};"));
     }
 
-    // C08(c): the RvR ranking board query -- usp_Guild_AdjustPoints had no reader until this.
     [Fact]
     public async Task Guild_GetTopByPoints_OrdersDescending_AndRespectsCount()
     {
@@ -177,11 +165,9 @@ public class GuildProcTests
         Assert.Equal(midId, reader.GetInt32(reader.GetOrdinal("GuildId")));
         Assert.Equal(500, reader.GetInt32(reader.GetOrdinal("Points")));
 
-        // TOP 2: lowId (10 points) exists but must not appear in the third row.
         Assert.False(await reader.ReadAsync());
     }
 
-    // C08(a): usp_Guild_GetAll had no C# caller until GuildBuffDecayHost's periodic scan.
     [Fact]
     public async Task Guild_GetAll_IncludesEveryGuild_WithItsBuffFields()
     {
@@ -220,7 +206,6 @@ public class GuildProcTests
         var masterId = await CreateCharacterAsync();
         var guildId = await CreateGuildAsync(NewGuildName(), masterId);
 
-        // Notice row proves the memory-optimized child table is swept too.
         await ExecProcAsync("game.usp_GuildNotice_Set",
             ("GuildId", guildId), ("NoticeIndex", (byte)0), ("Text", "farewell"));
 
@@ -235,10 +220,6 @@ public class GuildProcTests
         Assert.Equal(50235, again.Number);
     }
 
-    // Guild-money-movement event logging (not legacy parity -- see Database/Migrations/
-    // 014_guild_money_event_log.sql for the full rationale and legacy citations): usp_Guild_CreateAndDebitMoney/
-    // usp_Guild_UpgradeAndDebitMoney/usp_Guild_Disband each write one game.EventLog row (Category=11,
-    // GuildMoney) in the same transaction as the mutation they perform.
     [Fact]
     public async Task Guild_CreateAndDebitMoney_WritesAGuildMoneyEventLogRow_WithTheDebitedAmount()
     {
@@ -349,7 +330,6 @@ public class GuildProcTests
         Assert.Equal("Duke", await ScalarAsync<string>(
             $"SELECT CallName FROM game.GuildMembers WHERE GuildId = {guildId} AND CharacterId = {memberId};"));
 
-        // Clearing it back to "" is a valid, deliberate no-title state.
         await ExecProcAsync("game.usp_GuildMember_SetCallName",
             ("GuildId", guildId), ("CharacterId", memberId), ("CallName", ""));
         Assert.Equal("", await ScalarAsync<string>(
@@ -379,8 +359,7 @@ public class GuildProcTests
         await using var reader = await command.ExecuteReaderAsync();
         Assert.True(await reader.ReadAsync());
         Assert.Equal(guildId, reader.GetInt32(reader.GetOrdinal("GuildId")));
-        Assert.Equal(1, reader.GetInt32(reader.GetOrdinal("Grade"))); // fresh guilds start at grade 1
-        // MemberCount is INT (plain COUNT(*)), not BIGINT.
+        Assert.Equal(1, reader.GetInt32(reader.GetOrdinal("Grade")));
         Assert.Equal(2, reader.GetInt32(reader.GetOrdinal("MemberCount")));
         Assert.False(await reader.ReadAsync());
         await reader.CloseAsync();
@@ -403,8 +382,7 @@ public class GuildProcTests
             CancellationToken.None);
     }
 
-    /// <summary>A fresh character topped up with <paramref name="money" /> -- fresh characters start at Money=0.</summary>
-    private async Task<int> CreateCharacterWithMoneyAsync(long money)
+        private async Task<int> CreateCharacterWithMoneyAsync(long money)
     {
         var characterId = await CreateCharacterAsync();
         await _characters.AdjustMoneyAsync(characterId, money, 0, CancellationToken.None);
@@ -458,7 +436,6 @@ public class GuildProcTests
         return (T)(await command.ExecuteScalarAsync())!;
     }
 
-    // NVARCHAR(12), globally unique (UQ_Guilds_Name).
     private static string NewGuildName()
     {
         return $"G{Guid.NewGuid():N}"[..10];

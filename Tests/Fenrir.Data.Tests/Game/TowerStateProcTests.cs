@@ -8,15 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Game;
 
-/// <summary>
-///     game.usp_TowerState_{EnsureInitialized,GetAll,SetController} against real SQL Server 2025, through
-///     <see cref="TowerRepository" /> exactly as <c>TowerWarState</c> calls it.
-/// </summary>
-/// <remarks>
-///     game.TowerState is a true fixed-12-row singleton set (TowerIndex 0-11) shared by every test in the
-///     "SqlServer" collection for the whole assembly run -- each test below uses its own TowerIndex so it
-///     never depends on, or clobbers, what any other test just wrote to a different row.
-/// </remarks>
 [Collection("SqlServer")]
 public class TowerStateProcTests
 {
@@ -39,7 +30,7 @@ public class TowerStateProcTests
     public async Task EnsureInitializedAsync_IsIdempotent_AndSeedsAllTwelveUncontrolledTowers()
     {
         await _towers.EnsureInitializedAsync(CancellationToken.None);
-        await _towers.EnsureInitializedAsync(CancellationToken.None); // second call must not throw or duplicate
+        await _towers.EnsureInitializedAsync(CancellationToken.None);
 
         var rows = await _towers.GetAllAsync(CancellationToken.None);
 
@@ -48,7 +39,7 @@ public class TowerStateProcTests
         {
             var row = Assert.Single(rows, r => r.TowerIndex == i);
             Assert.True(
-                row.Level == 0 || row.ControllingTribeId is not null, // some other test may have progressed this row
+                row.Level == 0 || row.ControllingTribeId is not null,
                 $"TowerIndex {i} should exist regardless of its current progress.");
         }
     }

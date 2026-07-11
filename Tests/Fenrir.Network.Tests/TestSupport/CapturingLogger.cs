@@ -2,14 +2,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Network.Tests.TestSupport;
 
-/// <summary>
-///     Minimal <see cref="ILogger" /> test double that records every <see cref="Log{TState}" /> call (level +
-///     formatted message), so tests can assert on the source-generated packet-level log entries
-///     (<c>Fenrir.Network.Dispatch.Logging.PacketLog</c>) without standing up a real OTEL/console logging
-///     pipeline. <see cref="IsEnabled" /> is configurable per instance -- required to exercise both the
-///     "Debug enabled" and "Debug disabled" branches <c>SessionLoop</c>/<c>ClientSession</c> take around the
-///     packet-level log calls.
-/// </summary>
 internal sealed class CapturingLogger(LogLevel minimumLevel = LogLevel.Trace) : ILogger
 {
     public List<(LogLevel Level, string Message)> Entries { get; } = [];

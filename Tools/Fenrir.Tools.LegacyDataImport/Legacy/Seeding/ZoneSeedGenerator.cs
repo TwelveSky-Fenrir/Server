@@ -4,20 +4,11 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Seeding;
 
-/// <summary>
-///     Generates the five <c>world.*</c> zone-topology seed scripts (Zones, ZoneNpcSpawns, ZonePortals,
-///     ZoneSpawnPoints, MonsterSpawnRegions) from <c>002.BIN</c>/<c>003.BIN</c>/<c>*.WREGION.csv</c>, restricted
-///     to the ~117 zone numbers "live" in this build (have a matching <c>DATA/WORLD/Z0NN.WM</c> file).
-/// </summary>
 internal static class ZoneSeedGenerator
 {
-    private const int ChunkSize = 500; // SQL Server hard cap is 1000 rows/VALUES list; 500 gives headroom.
+    private const int ChunkSize = 500;
 
-    /// <summary>
-    ///     Reads <paramref name="dataDir" /> (Server/BuildEU33/DATA layout) and writes the five seed .sql files into
-    ///     <paramref name="outputDir" />.
-    /// </summary>
-    public static string Generate(string dataDir, string outputDir)
+        public static string Generate(string dataDir, string outputDir)
     {
         Directory.CreateDirectory(outputDir);
 
@@ -183,8 +174,6 @@ internal static class ZoneSeedGenerator
             $"world.ZoneSpawnPoints: {spawnPointRows.Count} rows (theoretical max {spawnPointTheoreticalMax}; full legacy array 35000). " +
             $"FromZoneNumber nulled for out-of-live-set reference: {spawnPointSourcesOutsideLiveSet}.");
 
-        // ~49% of *.WREGION.csv region rows reference a non-live zone -- ZoneNumber is nullable (not a
-        // NOT NULL FK) so SourceFileName preserves the raw zone number as a lossless fallback.
         var regionRows = new List<string[]>();
         var regionZonesOutsideLiveSet = 0;
         foreach (var region in spawnRegions)
@@ -231,7 +220,7 @@ internal static class ZoneSeedGenerator
         var totalNormalizedRows = zoneRows.Count + npcSpawnRows.Count + portalRows.Count + spawnPointRows.Count +
                                   regionRows.Count;
         var totalTheoreticalMax =
-            350 + 35000 + 35000 + 35000 + regionRows.Count; // regions have no fixed-array analogue
+            350 + 35000 + 35000 + 35000 + regionRows.Count;
         report.AppendLine(
             $"TOTAL seeded rows across all 5 tables: {totalNormalizedRows} vs. theoretical fixed-array max ~{totalTheoreticalMax} " +
             "(350 zones * 100 slots * 3 sparse tables + Zones itself; MonsterSpawnRegions has no fixed-array analogue to compare against).");

@@ -3,24 +3,13 @@ using Fenrir.Data.Abstractions.Runtime;
 
 namespace Fenrir.Application.Game.Tests.TestSupport;
 
-/// <summary>
-///     In-memory stand-in for <see cref="IChatCrossShardRelayRepository" /> -- records every published whisper
-///     (append-only) and returns a scripted set of rows from <see cref="PollAsync" />, so
-///     <c>ChatCrossShardRelayHost</c>'s own poll-loop tests can assert publish/deliver behavior without a real
-///     SQL round trip. Mirrors <see cref="FakeSocialCrossShardRelayRepository" />.
-/// </summary>
 internal sealed class FakeChatCrossShardRelayRepository : IChatCrossShardRelayRepository
 {
     public List<ChatCrossShardWhisperEntry> Published { get; } = [];
 
-    /// <summary>
-    ///     Rows <see cref="PollAsync" /> returns on its NEXT call, then clears (single-shot, like a real poll
-    ///     cursor advancing).
-    /// </summary>
-    public List<ChatCrossShardWhisperDto> NextPoll { get; set; } = [];
+        public List<ChatCrossShardWhisperDto> NextPoll { get; set; } = [];
 
-    /// <summary>When set, <see cref="PublishAsync" /> throws this instead of recording the entry.</summary>
-    public Exception? ThrowOnPublish { get; set; }
+        public Exception? ThrowOnPublish { get; set; }
 
     public ValueTask PublishAsync(ChatCrossShardWhisperEntry entry, CancellationToken ct)
     {

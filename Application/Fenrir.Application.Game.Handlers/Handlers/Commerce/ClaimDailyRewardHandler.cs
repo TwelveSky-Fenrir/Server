@@ -8,11 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Commerce;
 
-/// <summary>
-///     CZ_CLAIM_REWARD_ITEM_SEND (opcode 155). "Already claimed today" is modeled as a date comparison
-///     against game.Characters.RewardClaimDate rather than a per-session flag. Granted quantity is always
-///     1 -- the legacy's quantity param is really just a Sort==99 coupon display flag, not a stack size.
-/// </summary>
 public sealed class ClaimDailyRewardHandler(IClaimDailyRewardService service, ILogger<ClaimDailyRewardHandler> logger)
     : IAsyncPacketHandler<ClaimDailyRewardRequest>
 {

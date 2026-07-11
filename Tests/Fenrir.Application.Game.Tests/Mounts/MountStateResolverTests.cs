@@ -121,9 +121,6 @@ public class MountStateResolverTests
     [Fact]
     public void DeleteMount_ValueZero_NeverMatchesEmptySlot_Disconnects()
     {
-        // Verified legacy quirk closed: a raw equality search would match tValue=0 against the first
-        // always-empty (0) garage slot and grant free CP with no real mount. See MountStateResolver's own
-        // <remarks>.
         var ctx = Ctx(0, 0, 0);
         var result = MountStateResolver.Resolve(5, 0, in ctx);
 
@@ -166,8 +163,6 @@ public class MountStateResolverTests
         var ctx = Ctx(3, 0, 0, accumulatedExp: exp);
         var result = MountStateResolver.Resolve(6, 0, in ctx);
 
-        // The gating chain passes (exp==100000, total<25), but the roll itself has no cataloged probability
-        // table yet -- always the documented "roll produced zero" failure branch. See this type's <remarks>.
         Assert.Equal(MountStateResolver.ResultKind.Disconnect, result.Kind);
     }
 
@@ -248,8 +243,6 @@ public class MountStateResolverTests
         var ctx = Ctx(3, 0, 0, hasAttributeTransferMaterial: true);
         var result = MountStateResolver.Resolve(8, 3, in ctx);
 
-        // Every documented gate passes, but the transfer mechanic itself has no cataloged formula -- always
-        // the documented "zero-result transfer" revert-then-disconnect branch. See this type's <remarks>.
         Assert.Equal(MountStateResolver.ResultKind.Disconnect, result.Kind);
     }
 

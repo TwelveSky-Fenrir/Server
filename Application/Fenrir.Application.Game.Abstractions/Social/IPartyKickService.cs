@@ -1,6 +1,5 @@
 namespace Fenrir.Application.Game.Abstractions.Social;
 
-/// <summary>Discriminator for how a CZ_PARTY_EXILE_SEND attempt resolved.</summary>
 public enum PartyKickResultKind
 {
     NotLeader,

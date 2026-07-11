@@ -17,7 +17,6 @@ public class ZcClaimRewardItemRecvTests
     [Fact]
     public void Write_ProducesGoldenBytes()
     {
-        // iSort==99 case: Value[0]=itemID, Value[3]=1, rest 0 (spec note).
         var value = new[] { 5000, 0, 0, 1, 0, 0 };
         var packet = new ClaimDailyRewardResponse
         {

@@ -4,8 +4,6 @@ using Fenrir.Network.Dispatch.Zone.Sessions;
 
 namespace Fenrir.Network.Tests.Sessions;
 
-// SessionRegistry enforces one live connection per account: the new connection wins, the old one is torn
-// down with DisconnectReason.Evicted.
 public class SessionRegistryTests
 {
     [Fact]
@@ -73,8 +71,6 @@ public class SessionRegistryTests
         Assert.Null(sessionB.DisconnectReason);
     }
 
-    // TryGetByAccount/SnapshotAssociatedAccountIds back the cross-process duplicate-login kick/refusal
-    // design: the Login-side eviction check and the per-shard liveness/kick poll both read through these.
     [Fact]
     public void TryGetByAccount_AfterAssociate_ReturnsTheAssociatedSession()
     {
@@ -141,8 +137,6 @@ public class SessionRegistryTests
         Assert.DoesNotContain(10L, registry.SnapshotAssociatedAccountIds());
     }
 
-    // Backs IpFloodGuard's kick-matching-sessions step -- exact string equality only, mirroring legacy's own
-    // IsMatchString/strcmp matching (no CIDR/prefix/wildcard matching).
     [Fact]
     public void SnapshotByRemoteAddress_ReturnsOnlySessionsWithThatExactAddress()
     {
@@ -189,10 +183,6 @@ public class SessionRegistryTests
         Assert.Empty(snapshot);
     }
 
-    // Backs the per-server idle-connection sweeps (GameServer's SessionLivenessSweep, Login's own
-    // LoginSessionLivenessSweep) -- the comparison is deliberately strict `>`, not `>=`: a connection whose
-    // silence exactly equals the threshold at the instant of a sweep pass is not yet idle, it is caught on a
-    // later pass once the threshold is strictly exceeded (matches legacy's own comparison).
     [Fact]
     public void SnapshotIdle_ExcludesASessionExactlyAtTheThreshold()
     {

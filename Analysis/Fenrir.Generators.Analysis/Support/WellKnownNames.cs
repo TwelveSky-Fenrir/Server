@@ -1,6 +1,5 @@
 namespace Fenrir.Generators.Analysis.Support;
 
-/// <summary>Fully-qualified names on the never-referenced <c>Fenrir.Contracts</c> side, for Roslyn symbol resolution.</summary>
 internal static class WellKnownNames
 {
     public const string FenrirPacketAttribute = "Fenrir.Network.Serialization.Wire.Attributes.FenrirPacketAttribute";

@@ -3,7 +3,6 @@ using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 
-/// <summary>Business logic for CZ_PROCESS_ATTACK_SEND (op18) -- see <c>AttackHandler</c>'s remarks.</summary>
 public interface IAttackService
 {
     public bool IsValidCase(int caseValue);

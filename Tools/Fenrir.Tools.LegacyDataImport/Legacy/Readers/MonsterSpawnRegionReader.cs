@@ -5,16 +5,11 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
-/// <summary>
-///     Parses every <c>*.WREGION.csv</c> under DATA/SUMMON (STRUCT.h:1327-1335, <c>WORLD_REGION_INFO</c>) --
-///     the live format (S10_MySummon.cpp); sibling <c>.WREGION</c> binaries are dead code, never read.
-/// </summary>
 internal static class MonsterSpawnRegionReader
 {
     private const string SearchPattern = "*.WREGION.csv";
     private const int ExpectedFieldCount = 8;
 
-    // Only the leading "Z0NN_" zone number is parsed; the rest of the filename (kind/variant) stays in SourceFileName.
     private static readonly Regex ZoneNumberPattern = new(@"^Z(\d+)_", RegexOptions.Compiled);
 
     public static IReadOnlyList<MonsterSpawnRegionRecord> ReadAllRaw(string summonDirectory)
@@ -22,8 +17,7 @@ internal static class MonsterSpawnRegionReader
         return ReadAllRaw(summonDirectory, out _, out _);
     }
 
-    /// <summary>Same as <see cref="ReadAllRaw(string)" />, plus file/skipped-line diagnostics.</summary>
-    public static IReadOnlyList<MonsterSpawnRegionRecord> ReadAllRaw(string summonDirectory, out int fileCount,
+        public static IReadOnlyList<MonsterSpawnRegionRecord> ReadAllRaw(string summonDirectory, out int fileCount,
         out int skippedLineCount)
     {
         var files = Directory.EnumerateFiles(summonDirectory, SearchPattern, SearchOption.AllDirectories)
@@ -79,21 +73,18 @@ internal static class MonsterSpawnRegionReader
         return records;
     }
 
-    /// <summary>No per-load patches for this dataset -- identical to <see cref="ReadAllRaw(string)" />.</summary>
-    public static IReadOnlyList<MonsterSpawnRegionRecord> ReadAll(string summonDirectory)
+        public static IReadOnlyList<MonsterSpawnRegionRecord> ReadAll(string summonDirectory)
     {
         return ReadAllRaw(summonDirectory);
     }
 
-    /// <summary>Diagnostics-returning overload of <see cref="ReadAll(string)" />.</summary>
-    public static IReadOnlyList<MonsterSpawnRegionRecord> ReadAll(string summonDirectory, out int fileCount,
+        public static IReadOnlyList<MonsterSpawnRegionRecord> ReadAll(string summonDirectory, out int fileCount,
         out int skippedLineCount)
     {
         return ReadAllRaw(summonDirectory, out fileCount, out skippedLineCount);
     }
 
-    /// <summary>Splits into 8 int columns; tolerates the writer's (MySummonToFile) trailing '|' producing an empty 9th field.</summary>
-    private static bool TryParseLine(string line, out int[] values)
+        private static bool TryParseLine(string line, out int[] values)
     {
         values = [];
         var fields = line.Split('|');

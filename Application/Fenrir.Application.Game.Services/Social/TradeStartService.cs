@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Social;
 
-/// <summary>Callable by either accepted side; ZC_TRADE_START_RECV is crossed (each player receives the OTHER's offer).</summary>
 public sealed class TradeStartService(TradeRegistry trades, ILogger<TradeStartService> logger) : ITradeStartService
 {
     public TradeStartResult Start(int callerId)
@@ -21,14 +20,7 @@ public sealed class TradeStartService(TradeRegistry trades, ILogger<TradeStartSe
         return new TradeStartResult(true, trade);
     }
 
-    /// <remarks>
-    ///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:8600-8639 (TradeStart handler, full body) ;
-    ///     S04_MyWork02.cpp:8607-8628 (the post-commit partner re-validation failure path specifically --
-    ///     unlike TradeCancel/TradeAnswer/TradeEnd, which leave an already-applied caller-side state change
-    ///     standing on a failed partner lookup, TradeStart's failure path resets the caller's own
-    ///     trade-process state back to 0 while leaving the partner's side untouched).
-    /// </remarks>
-    public void AbortStart(int callerId)
+        public void AbortStart(int callerId)
     {
         if (trades.TryAbortStartForCaller(callerId))
             logger.LogDebug(

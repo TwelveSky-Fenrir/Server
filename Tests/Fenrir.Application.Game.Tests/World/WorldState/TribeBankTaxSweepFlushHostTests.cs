@@ -25,8 +25,8 @@ public class TribeBankTaxSweepFlushHostTests
     {
         var registry = ZoneTestKit.CreateRegistry();
         registry.Initialize([1, 2]);
-        registry[1].CreditNpcServiceTribeTax(0, 1000); // 10
-        registry[2].CreditMonsterKillTribeTax(1, 1000); // 90
+        registry[1].CreditNpcServiceTribeTax(0, 1000);
+        registry[2].CreditMonsterKillTribeTax(1, 1000);
 
         registry[1].Tick(TimeSpan.FromMinutes(10));
         registry[2].Tick(TimeSpan.FromMinutes(10));
@@ -42,7 +42,6 @@ public class TribeBankTaxSweepFlushHostTests
         Assert.Equal(10, zone1Sweep.Tribe0);
         Assert.Equal(90, zone2Sweep.Tribe1);
 
-        // Already drained -- a second flush pass finds nothing new until each zone's own next 10-minute mark.
         gateway.Sweeps.Clear();
         await host.FlushOnceAsync(CancellationToken.None);
         Assert.Empty(gateway.Sweeps);
@@ -62,7 +61,6 @@ public class TribeBankTaxSweepFlushHostTests
         var host = new TribeBankTaxSweepFlushHost(registry, throwingGateway,
             NullLogger<TribeBankTaxSweepFlushHost>.Instance);
 
-        // Must not throw -- a failed send is logged and simply loses that window's tax (fire-and-forget by contract).
         await host.FlushOnceAsync(CancellationToken.None);
 
         Assert.Empty(throwingGateway.Sweeps);

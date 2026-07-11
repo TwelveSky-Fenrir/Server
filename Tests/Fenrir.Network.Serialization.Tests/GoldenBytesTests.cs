@@ -7,7 +7,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Network.Serialization.Tests;
 
-// Byte vectors are hand-built from Docs/protocol/M1_Legacy_Wire_Contract.md, independent of the Write/TryRead under test.
 public class GoldenBytesTests
 {
     private static void WriteFixedString(Span<byte> destination, string value)
@@ -19,7 +18,6 @@ public class GoldenBytesTests
     [Fact]
     public void LcLoginConnectOkRecv_GoldenBytes_AndPacketXor()
     {
-        // tPad0..tPad4 (offsets 0..19) are dead residue, zeroed on the wire; real fields start at offset 20.
         var packet = new LoginGreetingResponse
         {
             RandomNumber = 0x1A2B3C4D,
@@ -42,7 +40,6 @@ public class GoldenBytesTests
 
         Assert.Equal(expectedPayload, payload);
 
-        // XOR_PACKET: buf[0]^=0x10, buf[1..size-2]^=0xFE, buf[size-1] untouched (simulated here on the full frame).
         var frame = new byte[1 + payload.Length];
         frame[0] = LoginGreetingResponse.Opcode;
         payload.CopyTo(frame, 1);
@@ -107,7 +104,6 @@ public class GoldenBytesTests
     [Fact]
     public void ZcConnectOkRecv_GoldenBytes_Write()
     {
-        // RandomNumber is the plaintext stream seed; out of Contracts' scope to XOR it.
         var packet = new ZoneGreetingResponse { RandomNumber = unchecked(0x77AABBCC) };
 
         Assert.Equal(4, ZoneGreetingResponse.PayloadSize);
@@ -132,32 +128,32 @@ public class GoldenBytesTests
         WriteFixedString(payload.AsSpan(255, 13), "HeroAvatar");
 
         const int actionOffset = 268;
-        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(actionOffset + 0, 4), 1); // Type
-        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(actionOffset + 4, 4), 2); // Sort
-        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 8, 4), 3.5f); // Frame
-        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 12, 4), 1f); // Location[0]
-        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 16, 4), 2f); // Location[1]
-        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 20, 4), 3f); // Location[2]
-        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 24, 4), 4f); // TargetLocation[0]
-        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 28, 4), 5f); // TargetLocation[1]
-        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 32, 4), 6f); // TargetLocation[2]
-        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 36, 4), 30.5f); // Front
-        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 40, 4), 31.5f); // TargetFront
-        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 44, 4), 40f); // PetLocation[0]
-        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 48, 4), 41f); // PetLocation[1]
-        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 52, 4), 42f); // PetLocation[2]
-        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 56, 4), 50f); // PetTargetLocation[0]
-        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 60, 4), 51f); // PetTargetLocation[1]
-        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 64, 4), 52f); // PetTargetLocation[2]
-        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 68, 4), 60.5f); // PetFront
-        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(actionOffset + 72, 4), 70); // PetSort
-        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(actionOffset + 76, 4), 71); // TargetObjectSort
-        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(actionOffset + 80, 4), 72); // TargetObjectIndex
-        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(actionOffset + 84, 4), 73); // TargetObjectUniqueNumber
-        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(actionOffset + 88, 4), 74); // SkillNumber
-        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(actionOffset + 92, 4), 75); // SkillGradeNum1
-        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(actionOffset + 96, 4), 76); // SkillGradeNum2
-        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(actionOffset + 100, 4), 77); // SkillValue
+        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(actionOffset + 0, 4), 1);
+        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(actionOffset + 4, 4), 2);
+        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 8, 4), 3.5f);
+        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 12, 4), 1f);
+        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 16, 4), 2f);
+        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 20, 4), 3f);
+        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 24, 4), 4f);
+        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 28, 4), 5f);
+        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 32, 4), 6f);
+        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 36, 4), 30.5f);
+        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 40, 4), 31.5f);
+        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 44, 4), 40f);
+        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 48, 4), 41f);
+        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 52, 4), 42f);
+        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 56, 4), 50f);
+        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 60, 4), 51f);
+        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 64, 4), 52f);
+        BinaryPrimitives.WriteSingleLittleEndian(payload.AsSpan(actionOffset + 68, 4), 60.5f);
+        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(actionOffset + 72, 4), 70);
+        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(actionOffset + 76, 4), 71);
+        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(actionOffset + 80, 4), 72);
+        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(actionOffset + 84, 4), 73);
+        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(actionOffset + 88, 4), 74);
+        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(actionOffset + 92, 4), 75);
+        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(actionOffset + 96, 4), 76);
+        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(actionOffset + 100, 4), 77);
 
         Assert.True(EnterWorldRequest.TryRead(payload, out var packet));
         Assert.Equal("Hero", packet.Id);
@@ -185,7 +181,6 @@ public class GoldenBytesTests
     [Fact]
     public void ZcAvatarActionRecv_GoldenBytes_Write()
     {
-        // OBJECT_FOR_AVATAR has five 3-byte natural-alignment padding gaps (the Skip(3) calls below).
         var action = new ActionInfo
         {
             Type = 500,

@@ -2,15 +2,11 @@ using Fenrir.Application.Game.Domain.World.ZoneWar;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Covers <see cref="WrapCheckSpecialDestinationGate" /> -- the win-zone-038/rebirth-exact/instanced groups,
-///     plus its fall-through composition with <see cref="TribeGuardCorridorGate" /> for everything else.
-/// </summary>
 public class WrapCheckSpecialDestinationGateTests
 {
     private const short WinZone038Destination = 39;
-    private const short RebirthGatedDestination = 241; // requires exactly rebirth 1
-    private const short InstancedDestination = 325; // requires rebirth >= 1
+    private const short RebirthGatedDestination = 241;
+    private const short InstancedDestination = 325;
 
     private static TribeGuardCorridorMoveOutcome Evaluate(
         byte requesterTribe,
@@ -142,8 +138,6 @@ public class WrapCheckSpecialDestinationGateTests
     [Fact]
     public void NotASpecialDestination_FallsThroughToTheCorridorGatesOwnDefaultAllow()
     {
-        // 9999 belongs to none of the four groups (three special + tribe-corridor) -- TribeGuardCorridorGate's
-        // own unconditional default-allow applies.
         var outcome = Evaluate(requesterTribe: 1, origin: 1, destination: 9999);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.Allowed, outcome);
@@ -154,8 +148,6 @@ public class WrapCheckSpecialDestinationGateTests
     {
         var catalog = TribeGuardCorridorCatalogFactory.BuildLive();
 
-        // Zone 1 is tribe 0's own town (a real tribe-corridor destination, not one of the three special
-        // groups) -- an enemy (tribe 1) advancing into it with every segment closed must still be rejected.
         var outcome = Evaluate(requesterTribe: 1, origin: 2, destination: 1, corridorCatalog: catalog);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.RejectedSoft, outcome);

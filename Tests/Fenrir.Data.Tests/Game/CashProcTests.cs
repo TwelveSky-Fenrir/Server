@@ -10,8 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Game;
 
-// game.usp_Cash_* against real SQL Server 2025. The debit test matters: legacy cash-shop v2 shipped with the
-// overdraft guard commented out; this pins the reactivated guard.
 [Collection("SqlServer")]
 public class CashProcTests
 {
@@ -50,7 +48,6 @@ public class CashProcTests
 
         Assert.Equal(750, await GetBalanceAsync(accountId));
 
-        // Two audit rows, in the same transactions as the credits, with self-checking BalanceAfter.
         Assert.Equal(2, await ScalarAsync<int>(
             $"SELECT COUNT(*) FROM game.CashLog WHERE AccountId = {accountId};"));
         Assert.Equal(750, await ScalarAsync<int>(
@@ -73,7 +70,6 @@ public class CashProcTests
         Assert.Equal(12809, await ScalarAsync<int>(
             $"SELECT ProductId FROM game.CashLog WHERE AccountId = {accountId} AND Delta < 0;"));
 
-        // Overdraft -> THROW 50240, balance untouched, no audit row leaked.
         var overdraft = await Assert.ThrowsAsync<SqlException>(() => ExecProcAsync("game.usp_Cash_Debit",
             ("AccountId", accountId), ("Amount", 181), ("Reason", (byte)2)));
         Assert.Equal(50240, overdraft.Number);
@@ -81,7 +77,6 @@ public class CashProcTests
         Assert.Equal(2, await ScalarAsync<int>(
             $"SELECT COUNT(*) FROM game.CashLog WHERE AccountId = {accountId};"));
 
-        // An account with no cash row at all is insufficient funds, not an error class of its own.
         var neverCredited = await CreateAccountAsync();
         var missingRow = await Assert.ThrowsAsync<SqlException>(() => ExecProcAsync("game.usp_Cash_Debit",
             ("AccountId", neverCredited), ("Amount", 1), ("Reason", (byte)2)));

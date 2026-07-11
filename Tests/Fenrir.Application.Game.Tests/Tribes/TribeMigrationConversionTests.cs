@@ -42,8 +42,6 @@ public class TribeMigrationConversionTests
     [Fact]
     public void Resolve_Return_TribeRestoredToPreviousTribe_QuestSlotZeroSetToTerminalStep()
     {
-        // Tribe 1's own quest chain (Category 2) has two steps; the restored tribe's quest slot 0 must land
-        // on the HIGHER one (already-complete), never reset to 0/the beginning.
         var stepOne = WorldDataTestRows.Quest(1) with { Category = 2, Step = 1 };
         var stepTwo = WorldDataTestRows.Quest(2) with { Category = 2, Step = 2 };
         var catalog = Catalog(stepOne, stepTwo);
@@ -56,8 +54,6 @@ public class TribeMigrationConversionTests
         Assert.Equal(0, result.NewQuestProgress.QSort);
         Assert.Equal(0, result.NewQuestProgress.TargetPhase);
         Assert.Equal(0, result.NewQuestProgress.KillCounter);
-        // Idle by the state machine's own definition (survives StepPermanent), but never touches money/items --
-        // Resolve itself never mints a reward, only quest bookkeeping.
         Assert.True(result.NewQuestProgress.IsIdle);
     }
 

@@ -30,7 +30,6 @@ public class DuelRegistryTests
         registry.TryAsk(1, 2, false);
         registry.TryAnswer(2, true, out _);
 
-        // challenger (not the accepter) calls start -- still succeeds
         Assert.True(registry.TryStart(1, out var duel));
         Assert.False(duel.NoPotions);
     }
@@ -41,7 +40,6 @@ public class DuelRegistryTests
         var registry = new DuelRegistry();
         registry.TryAsk(1, 2, false);
 
-        // 1 is still pending (never answered) -- a soft "busy" reply, not the desynced/active case.
         Assert.Equal(DuelAskOutcome.ChallengerBusy, registry.TryAsk(1, 3, false));
     }
 
@@ -53,8 +51,6 @@ public class DuelRegistryTests
         registry.TryAnswer(2, true, out _);
         registry.TryStart(1, out _);
 
-        // 1's own is-dueling indicator (Active, not just negotiating) is still set -- the desynced/leaked
-        // case (Server/ts25zone/S04_MyWork02.cpp:8259-8263), distinct from the ordinary ChallengerBusy reply.
         Assert.Equal(DuelAskOutcome.ChallengerAlreadyDueling, registry.TryAsk(1, 3, false));
     }
 
@@ -66,8 +62,6 @@ public class DuelRegistryTests
         registry.TryAnswer(2, true, out _);
         registry.TryStart(1, out _);
 
-        // Only the REQUESTER's own active-duel state gets the forced-disconnect treatment -- the target side
-        // is untouched and still collapses to the ordinary busy reply.
         Assert.Equal(DuelAskOutcome.TargetBusy, registry.TryAsk(4, 2, false));
     }
 
@@ -134,8 +128,6 @@ public class DuelRegistryTests
         registry.ForceClearOnZoneEntry(1);
 
         Assert.False(registry.TryGetActiveDuel(1, out _));
-        // The opponent's own key still resolves to the (now one-sided) duel -- left for that character's own
-        // natural "opponent not found" tick resolution, not short-circuited here.
         Assert.True(registry.TryGetActiveDuel(2, out var stillThere));
         Assert.NotNull(stillThere);
     }
@@ -146,9 +138,8 @@ public class DuelRegistryTests
         var registry = new DuelRegistry();
         registry.TryAsk(1, 2, false);
 
-        registry.ForceClearOnZoneEntry(2); // the target re-enters/reconnects before ever answering
+        registry.ForceClearOnZoneEntry(2);
 
-        // Neither side is left dangling -- 1 can ask someone new, and 2 is no longer seen as a pending target.
         Assert.Equal(DuelAskOutcome.Sent, registry.TryAsk(1, 3, false));
         Assert.Equal(DuelAskOutcome.Sent, registry.TryAsk(4, 2, false));
     }
@@ -160,7 +151,7 @@ public class DuelRegistryTests
         registry.TryAsk(1, 2, false);
         registry.TryAnswer(2, true, out _);
 
-        registry.ForceClearOnZoneEntry(1); // challenger re-enters before ever calling Start
+        registry.ForceClearOnZoneEntry(1);
 
         Assert.False(registry.TryStart(1, out _));
         Assert.False(registry.TryStart(2, out _));
@@ -172,7 +163,7 @@ public class DuelRegistryTests
     {
         var registry = new DuelRegistry();
 
-        registry.ForceClearOnZoneEntry(42); // must not throw
+        registry.ForceClearOnZoneEntry(42);
 
         Assert.Equal(DuelAskOutcome.Sent, registry.TryAsk(42, 43, false));
     }

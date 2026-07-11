@@ -2,27 +2,23 @@ using Fenrir.Application.Game.Domain.Progression;
 
 namespace Fenrir.Application.Game.Tests.Progression;
 
-/// <summary>
-///     Covers <see cref="AutoHuntEnableGate" /> -- the CZ_AUTO_CONFIG_SEND enable blocked-zone FrozenSet
-///     (S04_MyWork02.cpp:13540-13553).
-/// </summary>
 public class AutoHuntEnableGateTests
 {
     [Theory]
-    [InlineData((short)38)] // sacred-stone
+    [InlineData((short)38)]
     [InlineData((short)319)]
     [InlineData((short)320)]
     [InlineData((short)321)]
     [InlineData((short)322)]
     [InlineData((short)323)]
-    [InlineData((short)241)] // start of the 20-number "zone 241 type" set
+    [InlineData((short)241)]
     [InlineData((short)249)]
     [InlineData((short)292)]
     [InlineData((short)294)]
     [InlineData((short)311)]
     [InlineData((short)312)]
     [InlineData((short)325)]
-    [InlineData((short)330)] // end of the "zone 241 type" set
+    [InlineData((short)330)]
     public void CitedBlockedMapNumbers_AreRefused(short mapId)
     {
         Assert.True(AutoHuntEnableGate.IsEnableBlocked(mapId));
@@ -34,10 +30,10 @@ public class AutoHuntEnableGateTests
     [InlineData((short)39)]
     [InlineData((short)124)]
     [InlineData((short)126)]
-    [InlineData((short)240)] // just below the zone-241 set
-    [InlineData((short)250)] // just above 241-249
-    [InlineData((short)324)] // between 323 and 325
-    [InlineData((short)331)] // just above 330
+    [InlineData((short)240)]
+    [InlineData((short)250)]
+    [InlineData((short)324)]
+    [InlineData((short)331)]
     public void OrdinaryMaps_AreNotRefused(short mapId)
     {
         Assert.False(AutoHuntEnableGate.IsEnableBlocked(mapId));

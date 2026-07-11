@@ -36,7 +36,6 @@ public class FrameWriterTests
         Assert.Equal(FrameWriter.FrameSizeOf<ZoneGreetingResponse>(), written);
         Assert.Equal(1 + ZoneGreetingResponse.PayloadSize, written);
 
-        // Undeclared Obfuscation -> WriteFrame never enters the XOR branch.
         Assert.Equal(ZoneGreetingResponse.Opcode, destination[0]);
 
         Span<byte> expectedPayload = stackalloc byte[ZoneGreetingResponse.PayloadSize];
@@ -80,16 +79,13 @@ public class FrameWriterTests
         Assert.Equal(FrameWriter.FrameSizeOf<LoginGreetingResponse>(), written);
         Assert.Equal(1 + LoginGreetingResponse.PayloadSize, written);
 
-        // ApplyPacketXor: buf[0] ^= 0x10.
         Assert.Equal((byte)(LoginGreetingResponse.Opcode ^ 0x10), destination[0]);
 
         Span<byte> rawPayload = stackalloc byte[LoginGreetingResponse.PayloadSize];
         packet.Write(rawPayload);
 
-        // Last byte is spared by ApplyPacketXor.
         Assert.Equal(rawPayload[^1], destination[^1]);
 
-        // Interior bytes carry the steady 0xFE key on top of the raw Write() bytes.
         for (var i = 0; i < rawPayload.Length - 1; i++)
             Assert.Equal((byte)(rawPayload[i] ^ 0xFE), destination[i + 1]);
     }

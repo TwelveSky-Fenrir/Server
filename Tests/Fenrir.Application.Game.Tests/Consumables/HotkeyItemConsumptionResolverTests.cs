@@ -4,11 +4,6 @@ using Fenrir.Application.Game.Domain.Simulation;
 
 namespace Fenrir.Application.Game.Tests.Consumables;
 
-/// <summary>
-///     Covers <see cref="HotkeyItemConsumptionResolver" />'s potion-type 12-15 self-buff branches (Assassin
-///     Scroll/Departed Spirit Scroll/Attack Increase Book/Dodge Increase Book, world.Items
-///     1364/1156/1471/1472) added on top of its pre-existing life/mana/no-op coverage.
-/// </summary>
 public class HotkeyItemConsumptionResolverTests
 {
     private const byte ConsumableSort = HotkeyItemConsumptionResolver.ConsumableItemCategory;
@@ -34,7 +29,7 @@ public class HotkeyItemConsumptionResolverTests
         Assert.Equal(15, write.Slot);
         Assert.Equal(3, write.Value);
         Assert.Equal(SimulationClock.ToWholeLegacyTicks(TimeSpan.FromSeconds(40)), write.DurationTicks);
-        Assert.Equal(80, write.DurationTicks); // 40s @ the shipped 500ms legacy tick
+        Assert.Equal(80, write.DurationTicks);
     }
 
     [Fact]
@@ -47,7 +42,7 @@ public class HotkeyItemConsumptionResolverTests
         var write = Assert.Single(result.BuffWrites);
         Assert.Equal(15, write.Slot);
         Assert.Equal(3, write.Value);
-        Assert.Equal(120, write.DurationTicks); // 60s @ the shipped 500ms legacy tick
+        Assert.Equal(120, write.DurationTicks);
     }
 
     [Fact]
@@ -116,8 +111,7 @@ public class HotkeyItemConsumptionResolverTests
         Assert.Equal(0, result.ManaGain);
     }
 
-    /// <summary>Regression guard: every non-buff EffectKind still reports an empty BuffWrites array.</summary>
-    [Fact]
+        [Fact]
     public void FlatLifeGain_PotionType1_ReportsNoBuffWrites()
     {
         var slot = new HotkeySlot(HotkeyBindingKind.Item, 2, 1);
@@ -131,8 +125,7 @@ public class HotkeyItemConsumptionResolverTests
         Assert.Empty(result.BuffWrites);
     }
 
-    /// <summary>Regression guard: pet-activity (6) and mount-activity (16) remain a clean reject, not a buff write.</summary>
-    [Theory]
+        [Theory]
     [InlineData(6)]
     [InlineData(16)]
     public void StillUnwiredPotionTypes_AreCleanlyRejected_NotTreatedAsABuff(int potionType1)

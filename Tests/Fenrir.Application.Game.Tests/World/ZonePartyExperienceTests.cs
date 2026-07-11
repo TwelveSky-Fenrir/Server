@@ -3,11 +3,6 @@ using Fenrir.Application.Game.Tests.TestSupport;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     Covers <see cref="Zone.GrantMonsterKillExperience" />'s flat party bonus: granted to every present (same zone,
-///     not dead) party member, including the killer again on top of their own solo gain (
-///     <c>Server/ts25zone/S07_MyGame05.cpp</c>).
-/// </summary>
 public class ZonePartyExperienceTests
 {
     private static (Zone Zone, int KillerId, int MemberId) SetUpTwoPresentPartyMembers()
@@ -35,9 +30,7 @@ public class ZonePartyExperienceTests
         zone.TryGetPlayer(killerId, out var killer);
         zone.TryGetPlayer(memberId, out var member);
 
-        // Killer: solo base gain (equal levels, gap=0 -> raw=1000, /3 below LV_M1 -> 333) + 10% party bonus (100).
         Assert.Equal(333 + 100, killer!.Experience);
-        // Non-killing member: ONLY the flat bonus, no share of the base kill gain.
         Assert.Equal(100, member!.Experience);
     }
 
@@ -67,7 +60,6 @@ public class ZonePartyExperienceTests
         zone.TryGetPlayer(killerId, out var killer);
         zone.TryGetPlayer(memberId, out var member);
 
-        // Only 1 present member (the killer) -- below the 2-member threshold, so no bonus at all.
         Assert.Equal(333, killer!.Experience);
         Assert.Equal(0, member!.Experience);
     }
@@ -80,11 +72,10 @@ public class ZonePartyExperienceTests
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Killer", level: 50)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
-        // characterId 20 is a party member per the roster, but never entered this zone
         zone.GrantMonsterKillExperience(10, 50, 1000,
             [10, 20]);
 
         zone.TryGetPlayer(10, out var killer);
-        Assert.Equal(333, killer!.Experience); // no bonus -- only 1 present member found
+        Assert.Equal(333, killer!.Experience);
     }
 }

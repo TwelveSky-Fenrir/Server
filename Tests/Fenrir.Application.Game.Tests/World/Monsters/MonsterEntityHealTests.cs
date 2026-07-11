@@ -3,12 +3,6 @@ using Fenrir.Application.Game.Tests.GameData;
 
 namespace Fenrir.Application.Game.Tests.World.Monsters;
 
-/// <summary>
-///     A11 -- <see cref="MonsterEntity.Heal" />, the tower item-667 guardian-heal drain's own life mutation
-///     (<see cref="Fenrir.Application.Game.Domain.Progression.TowerLifecycleSystem" />). Mirrors
-///     <see cref="MonsterEntityTests" />'s own <c>CreateEntity</c> helper rather than sharing it -- kept as a
-///     separate file per this task's own scope.
-/// </summary>
 public class MonsterEntityHealTests
 {
     private static MonsterEntity CreateEntity(int life, int maxLife)
@@ -86,8 +80,6 @@ public class MonsterEntityHealTests
     [Fact]
     public void Heal_TenPercentOfMaxLife_MatchesTheItem667Magnitude()
     {
-        // The A11 contract's own heal magnitude (+10% of max life) -- exercised here as the exact call shape
-        // TowerLifecycleSystem.ApplyPendingGuardianHeal makes: guardian.Heal(guardian.MaxLife / 10).
         var monster = CreateEntity(500, 1000);
 
         monster.Heal(monster.MaxLife / 10);

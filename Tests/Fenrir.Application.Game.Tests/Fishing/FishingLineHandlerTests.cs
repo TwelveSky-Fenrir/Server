@@ -10,7 +10,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Fishing;
 
-/// <summary>Drives the real <see cref="FishingLineHandler" /> (opcode 103) over a real <see cref="Zone" />.</summary>
 public class FishingLineHandlerTests
 {
     private static int ReadResult(byte[] frame)

@@ -5,10 +5,6 @@ using Fenrir.Application.Game.Tests.TestSupport;
 
 namespace Fenrir.Application.Game.Tests.Combat;
 
-/// <summary>
-///     Covers <see cref="UnstunResolver.Resolve" /> (mCase 6, <c>ProcessAttack06</c>) against
-///     <c>Server/ts25zone/S07_MyGame02.cpp:3737-3819</c>.
-/// </summary>
 public class UnstunResolverTests
 {
     private static CombatantSnapshot Combatant(int characterId, byte tribe, bool isDead = false)
@@ -147,9 +143,9 @@ public class UnstunResolverTests
     {
         var curer = Combatant(1, 0);
         var target = Combatant(2, 0);
-        var skill = FlatSkill(5, 30); // doubled = 60
+        var skill = FlatSkill(5, 30);
         var outcome = UnstunResolver.Resolve(Request(curer, target, usedSkillGradePoints: 10, usedSkill: skill),
-            new ScriptedRandomSource(59)); // 59 < 60
+            new ScriptedRandomSource(59));
         Assert.True(outcome.Success);
     }
 
@@ -158,9 +154,9 @@ public class UnstunResolverTests
     {
         var curer = Combatant(1, 0);
         var target = Combatant(2, 0);
-        var skill = FlatSkill(5, 30); // doubled = 60
+        var skill = FlatSkill(5, 30);
         var outcome = UnstunResolver.Resolve(Request(curer, target, usedSkillGradePoints: 10, usedSkill: skill),
-            new ScriptedRandomSource(60)); // 60 is not < 60
+            new ScriptedRandomSource(60));
         Assert.False(outcome.Rejected);
         Assert.False(outcome.Success);
     }

@@ -33,13 +33,7 @@ public class TribeVoteElectionTests
         return service;
     }
 
-    /// <summary>
-    ///     Default shape (145+12+6=163) sits exactly at <see cref="TribeVoteElection.MinimumEligibilityLevel" />
-    ///     -- most tests below don't care about the eligibility gate itself and just need a player who clears
-    ///     it, so defaulting to "exactly eligible" keeps every pre-existing call site (added before Level2/
-    ///     RebirthCount were folded into this gate) passing without having to touch each one individually.
-    /// </summary>
-    private static PlayerRuntimeState CreatePlayer(int characterId, byte tribe, short level = 145,
+        private static PlayerRuntimeState CreatePlayer(int characterId, byte tribe, short level = 145,
         int contributionPoints = 1000, int rebirthCount = 6, short level2 = 12)
     {
         var (session, _) = ZoneTestKit.CreateSession(characterId);
@@ -104,8 +98,6 @@ public class TribeVoteElectionTests
         var election = new TribeVoteElection(worldState, new FakeTribeRepository(), CreateRegistry(),
             NullLogger<TribeVoteElection>.Instance);
         await election.OpenCandidacyWindowAsync(CancellationToken.None);
-        // 145 + 11 + 6 = 162, one short of the 163 threshold -- proves Level2 (not just Level) is part of
-        // the comparison, since ordinary Level here is still at its own cap.
         var player = CreatePlayer(500, 1, level2: 11);
 
         var outcome = await election.TryRegisterCandidacyAsync(player, 0, CancellationToken.None);
@@ -120,7 +112,6 @@ public class TribeVoteElectionTests
         var election = new TribeVoteElection(worldState, new FakeTribeRepository(), CreateRegistry(),
             NullLogger<TribeVoteElection>.Instance);
         await election.OpenCandidacyWindowAsync(CancellationToken.None);
-        // 145 + 12 + 6 = 163 exactly -- CreatePlayer's own default shape.
         var player = CreatePlayer(500, 1);
 
         var outcome = await election.TryRegisterCandidacyAsync(player, 0, CancellationToken.None);
@@ -132,9 +123,6 @@ public class TribeVoteElectionTests
     public async Task
         TryRegisterCandidacyAsync_OrdinaryLevelCappedWithNoHighLevelOrRebirthProgress_NeverSatisfiesTheGate()
     {
-        // Ordinary level alone caps at 145 (9 short of the 163 threshold), so a character who never advanced
-        // past that cap with zero high-level and zero rebirth progress can never pass this gate under any
-        // circumstance -- per the originating contract's own Edge cases.
         var worldState = CreateWorldState(out _);
         var election = new TribeVoteElection(worldState, new FakeTribeRepository(), CreateRegistry(),
             NullLogger<TribeVoteElection>.Instance);
@@ -183,7 +171,7 @@ public class TribeVoteElectionTests
             NullLogger<TribeVoteElection>.Instance);
         await election.OpenCandidacyWindowAsync(CancellationToken.None);
         repository.VotesByTribe[1] = [new TribeVoteDto(1, 0, 999, 150, 5000, 0, DateTime.UtcNow)];
-        var player = CreatePlayer(500, 1, contributionPoints: 5000); // equal, not strictly greater
+        var player = CreatePlayer(500, 1, contributionPoints: 5000);
 
         var outcome = await election.TryRegisterCandidacyAsync(player, 0, CancellationToken.None);
 
@@ -245,7 +233,6 @@ public class TribeVoteElectionTests
             NullLogger<TribeVoteElection>.Instance);
         await election.OpenCandidacyWindowAsync(CancellationToken.None);
         election.OpenVotingWindow();
-        // 145 + 11 + 6 = 162, one short of the 163 threshold -- the same gate candidacy registration uses.
         var voter = CreatePlayer(500, 1, level2: 11);
 
         var outcome = await election.TryCastVoteAsync(voter, 0, CancellationToken.None);
@@ -262,16 +249,12 @@ public class TribeVoteElectionTests
         await election.OpenCandidacyWindowAsync(CancellationToken.None);
         repository.VotesByTribe[1] = [new TribeVoteDto(1, 0, 999, 150, 1200, 0, DateTime.UtcNow)];
         election.OpenVotingWindow();
-        // Level+Level2+RebirthCount = 150+10+3 = 163, exactly at the eligibility threshold -- deliberately
-        // three distinct numbers so the assertion below cannot pass by accident if any one term were dropped
-        // or the wrong two were multiplied together.
         var voter = CreatePlayer(500, 1, 150, rebirthCount: 3, level2: 10);
 
         var outcome = await election.TryCastVoteAsync(voter, 0, CancellationToken.None);
 
         Assert.Equal(TribeVoteCastOutcome.Cast, outcome);
         var votes = await worldState.GetTribeVotesAsync(1, CancellationToken.None);
-        // aLevel1 + (aLevel2 + aRebirthNum) * 3 - 112 => 150 + (10 + 3) * 3 - 112 = 77
         Assert.Equal(77, votes[0].VotePoint);
     }
 
@@ -305,7 +288,7 @@ public class TribeVoteElectionTests
         var voter = CreatePlayer(500, 1, 150);
         await election.TryCastVoteAsync(voter, 0, CancellationToken.None);
 
-        election.OpenVotingWindow(); // a fresh cycle -- clears the per-window voted set
+        election.OpenVotingWindow();
 
         var outcome = await election.TryCastVoteAsync(voter, 0, CancellationToken.None);
 
@@ -333,13 +316,13 @@ public class TribeVoteElectionTests
         ZoneTestKit.DrainOutbound(oldLeaderPipe);
         ZoneTestKit.DrainOutbound(winnerPipe);
         registry[1].TryGetPlayer(100, out var oldLeaderBefore);
-        oldLeaderBefore!.TribeRole = 1; // was Force Leader before this tally
+        oldLeaderBefore!.TribeRole = 1;
 
         var election = new TribeVoteElection(worldState, tribeRepository, registry,
             NullLogger<TribeVoteElection>.Instance);
 
         var winnerId = await election.TallyForceLeaderAsync(1, CancellationToken.None);
-        registry[1].Tick(TimeSpan.FromMilliseconds(50)); // drains the posted TribeProgressZoneCommand mirrors
+        registry[1].Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.Equal(200, winnerId);
         Assert.Equal((byte)1, tribeRepository.SetMasterCalls[0].TribeId);
@@ -390,7 +373,7 @@ public class TribeVoteElectionTests
         election.OpenVotingWindow();
         election.CloseWindow();
 
-        Assert.Equal(3, logger.Scopes.Count); // one scope per phase transition
+        Assert.Equal(3, logger.Scopes.Count);
         var cycleIds = logger.Scopes
             .Select(CapturingLogger<TribeVoteElection>.PropertiesOf)
             .Select(props => (Guid)props.Single(p => p.Key == "TribeVoteCycleId").Value)
@@ -425,7 +408,7 @@ public class TribeVoteElectionTests
         var tribeRepository = new FakeTribeRepository { Tribes = [new TribeSummaryDto(1, 100, null)] };
         var logger = new CapturingLogger<TribeVoteElection>();
         var election = new TribeVoteElection(worldState, tribeRepository, CreateRegistry(), logger);
-        await election.OpenCandidacyWindowAsync(CancellationToken.None); // mints the cycle id the tally scope reuses
+        await election.OpenCandidacyWindowAsync(CancellationToken.None);
         repository.VotesByTribe[1] = [new TribeVoteDto(1, 0, 555, 150, 1000, 7, DateTime.UtcNow)];
 
         var winnerId = await election.TallyForceLeaderAsync(1, CancellationToken.None);
@@ -474,9 +457,6 @@ public class TribeVoteElectionTests
         tribeRepository.SubMasters.Add(new TribeSubMasterDto(2, 1, 888));
         var election = new TribeVoteElection(worldState, tribeRepository, CreateRegistry(),
             NullLogger<TribeVoteElection>.Instance);
-        // Seeded after OpenCandidacyWindowAsync, which unconditionally wipes every tribe's previous-cycle
-        // votes (see OpenCandidacyWindowAsync_ClearsEveryTribesVotesAndOpensCandidacy) -- seeding earlier
-        // would have the candidacy window immediately erase these candidates before the tally ever runs.
         await election.OpenCandidacyWindowAsync(CancellationToken.None);
         repository.VotesByTribe[0] = [new TribeVoteDto(0, 0, 100, 150, 1000, 5, DateTime.UtcNow)];
         repository.VotesByTribe[1] = [new TribeVoteDto(1, 0, 200, 150, 1000, 9, DateTime.UtcNow)];
@@ -498,10 +478,6 @@ public class TribeVoteElectionTests
         var worldState = CreateWorldState(out var repository);
         var election = new TribeVoteElection(worldState, new FakeTribeRepository(), CreateRegistry(),
             NullLogger<TribeVoteElection>.Instance);
-        // Seeded after the phase transitions (rather than OpenCandidacyWindowAsync-then-seed) so this test's
-        // own ClearCalls assertion below observes only ResetToIdleAsync's own clear pass, not a second one
-        // from OpenCandidacyWindowAsync's identical per-tribe clear (see
-        // OpenCandidacyWindowAsync_ClearsEveryTribesVotesAndOpensCandidacy for that behavior in isolation).
         election.OpenVotingWindow();
         repository.VotesByTribe[2] = [new TribeVoteDto(2, 0, 500, 150, 1200, 3, DateTime.UtcNow)];
         election.CloseVotingWindow();

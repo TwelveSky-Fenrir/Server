@@ -59,15 +59,15 @@ public class ZoneWarTickServiceTests
 
         var service = new ZoneWarTickService(registry, NullLogger<ZoneWarTickService>.Instance);
         service.StartWar(ZoneWarKind.Zone049, 30);
-        service.ReportStanding(0, 999); // must be ignored -- Zone049 always computes this live
+        service.ReportStanding(0, 999);
 
         service.Tick(SimulationClock.LegacyTick);
 
         var payload = ZoneTestKit.DrainOutbound(pipeA).AsSpan(1);
-        Assert.Equal(2, BinaryPrimitives.ReadInt32LittleEndian(payload)); // tribe 0
-        Assert.Equal(0, BinaryPrimitives.ReadInt32LittleEndian(payload[4..])); // tribe 1
-        Assert.Equal(1, BinaryPrimitives.ReadInt32LittleEndian(payload[8..])); // tribe 2
-        Assert.Equal(0, BinaryPrimitives.ReadInt32LittleEndian(payload[12..])); // tribe 3
+        Assert.Equal(2, BinaryPrimitives.ReadInt32LittleEndian(payload));
+        Assert.Equal(0, BinaryPrimitives.ReadInt32LittleEndian(payload[4..]));
+        Assert.Equal(1, BinaryPrimitives.ReadInt32LittleEndian(payload[8..]));
+        Assert.Equal(0, BinaryPrimitives.ReadInt32LittleEndian(payload[12..]));
         Assert.Equal(30, BinaryPrimitives.ReadInt32LittleEndian(payload[16..]));
     }
 
@@ -115,7 +115,7 @@ public class ZoneWarTickServiceTests
                 Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
         }
 
-        service.Tick(SimulationClock.LegacyTick); // 10th tick: due again
+        service.Tick(SimulationClock.LegacyTick);
         Assert.Equal(5, BinaryPrimitives.ReadInt32LittleEndian(ZoneTestKit.DrainOutbound(pipe).AsSpan(1)));
         Assert.Equal(5, service.RemainTime);
     }
@@ -132,11 +132,11 @@ public class ZoneWarTickServiceTests
         var service = new ZoneWarTickService(registry, NullLogger<ZoneWarTickService>.Instance);
         service.StartWar(ZoneWarKind.Zone335, 1);
 
-        service.Tick(SimulationClock.LegacyTick); // tick 1: broadcast RemainTime=1, no decrement yet
+        service.Tick(SimulationClock.LegacyTick);
         Assert.Equal(1, BinaryPrimitives.ReadInt32LittleEndian(ZoneTestKit.DrainOutbound(pipe).AsSpan(1)));
         Assert.True(service.IsActive);
 
-        service.Tick(SimulationClock.LegacyTick); // tick 2: decrements to 0 -> ends, still broadcasts the 0
+        service.Tick(SimulationClock.LegacyTick);
         Assert.Equal(0, BinaryPrimitives.ReadInt32LittleEndian(ZoneTestKit.DrainOutbound(pipe).AsSpan(1)));
         Assert.False(service.IsActive);
         Assert.Null(service.ActiveKind);

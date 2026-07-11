@@ -1,14 +1,5 @@
 namespace Fenrir.Application.Game.Domain.Enchant;
 
-/// <summary>
-///     Static material tables for CZ_IMPROVE_ITEM_SEND's normal-equipment/wings regime -- shared by both,
-///     see <see cref="EnchantResolver" />'s remarks for why wings use the identical tables. The
-///     costume/stellar-core branches remain out of scope.
-/// </summary>
-/// <remarks>
-///     <c>USE_IMPROVE_RATE_100</c> is unconditionally defined, so all materials here are live in every build (not
-///     conditional as elsewhere assumed).
-/// </remarks>
 public static class EnchantMaterialCatalog
 {
     public enum TypeRequirement : byte
@@ -19,8 +10,7 @@ public static class EnchantMaterialCatalog
         RareOrElite
     }
 
-    /// <summary>The only material that advances +40 -&gt; +41 (no roll, always succeeds, cost 0).</summary>
-    public const int UnsealItemId = 1422;
+        public const int UnsealItemId = 1422;
 
     public static readonly IReadOnlyDictionary<int, StandardMaterial> StandardMaterials =
         new Dictionary<int, StandardMaterial>
@@ -30,12 +20,7 @@ public static class EnchantMaterialCatalog
             [1021] = new(1021, 3, 50000, false, false, TypeRequirement.None, null, false),
             [1022] = new(1022, 4, 70000, false, false, TypeRequirement.None, null, false),
             [1023] = new(1023, 5, 90000, false, false, TypeRequirement.None, null, false),
-            // Alternate id for the same +1 stone, at 1000x the money cost (verified, not a typo). Unlike every
-            // other stone it is a "no-change" material: it forces the destroy chance to 0 and, on a failed
-            // success roll, leaves the enchant untouched (ZC result 8) rather than downgrading or destroying
-            // (Server/ts25zone/S04_MyWork02.cpp:3315-3318,3370-3378) -- hence NoChangeOnFailure: true.
             [8101] = new(8101, 1, 10000000, false, false, TypeRequirement.None, null, false, true),
-            // These 7 all force p1=100 -- the destroy roll is unreachable for any of them.
             [633] = new(633, 1, 0, false, true, TypeRequirement.None, null, false),
             [619] = new(619, 40, 0, true, true, TypeRequirement.RareOrElite, null, false),
             [540] = new(540, 30, 0, true, true, TypeRequirement.RareOnly, 30, false),
@@ -45,8 +30,7 @@ public static class EnchantMaterialCatalog
             [825] = new(825, 50, 0, true, true, TypeRequirement.RareOrElite, null, true)
         };
 
-    /// <summary>Item 1422 (the +40-&gt;+41 "unseal" step) is handled separately -- it never rolls.</summary>
-    public static readonly IReadOnlyDictionary<int, AdvancedMaterial> AdvancedMaterials =
+        public static readonly IReadOnlyDictionary<int, AdvancedMaterial> AdvancedMaterials =
         new Dictionary<int, AdvancedMaterial>
         {
             [1023] = new(1023, 1, 90000, false),
@@ -57,14 +41,7 @@ public static class EnchantMaterialCatalog
             [825] = new(825, 10, 0, true)
         };
 
-    /// <summary>
-    ///     <see cref="IsFillToValue" />: <see cref="Value" /> is a target absolute level, not a flat increment.
-    ///     <see cref="IgnoresFortyCap" /> (material 825 only): the sole material allowed to jump straight past +40.
-    ///     <see cref="NoChangeOnFailure" /> (material 8101 only): destroy chance forced to 0 and a failed roll
-    ///     leaves the enchant untouched (ZC result 8) instead of downgrading/destroying. Defaults false, so the
-    ///     existing entries need no change.
-    /// </summary>
-    public readonly record struct StandardMaterial(
+        public readonly record struct StandardMaterial(
         int ItemId,
         int Value,
         int MoneyCost,

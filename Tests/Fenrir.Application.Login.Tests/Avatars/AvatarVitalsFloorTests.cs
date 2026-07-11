@@ -2,8 +2,6 @@ using Fenrir.Application.Login.Domain.Avatars;
 
 namespace Fenrir.Application.Login.Tests.Avatars;
 
-// Server/Header/function.h:242-245 (SetIntegerLow) applied at Server/ts25login/S04_MyWork02.cpp:357-358:
-// Life floors to 1, Mana floors to 0, each independently.
 public class AvatarVitalsFloorTests
 {
     [Theory]

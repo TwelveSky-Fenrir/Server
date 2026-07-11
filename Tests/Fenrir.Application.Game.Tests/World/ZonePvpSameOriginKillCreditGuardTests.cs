@@ -7,15 +7,6 @@ using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     Covers D2 hook 2/3 end-to-end: <c>PlayerRuntimeState.SourceIp</c> plumbed through
-///     <c>EnterWorldService</c>/<c>ZoneTransfer.CreateEnterData</c>/<c>Zone.HandleEnter</c>, and
-///     <c>Zone.ApplyPvpKillRewards</c>'s same-origin guard (<c>PvpKillCreditGuard.IsSameOrigin</c>)
-///     that denies PvP-kill reward credit -- never the kill itself -- when killer and victim share a captured
-///     source IP. Reuses <c>ZonePvpKillRewardsTests</c>' own <c>SetUpZone</c>/<c>KillDefender</c> shape so the
-///     "same origin" case is a minimal, additive delta over that suite's already-covered default-zone-kill
-///     reward path, not a parallel reimplementation of it.
-/// </summary>
 public class ZonePvpSameOriginKillCreditGuardTests
 {
     private static readonly EffectiveStats StrongAttacker =
@@ -64,17 +55,17 @@ public class ZonePvpSameOriginKillCreditGuardTests
         attacker!.Stats = StrongAttacker;
         Assert.True(zone.TryGetPlayer(2, out var defender));
         defender!.Stats = WeakDefender;
-        defender.ActionSort = 1; // legal, already-acting pose -- see ZoneAttackTests' own TwoPlayerZone remarks
-        attacker.AttackSubPacketCeiling = int.MaxValue; // see ZonePvpKillRewardsTests' own remarks
+        defender.ActionSort = 1;
+        attacker.AttackSubPacketCeiling = int.MaxValue;
 
-        zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1)); // past the zone-entry protect window
+        zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1));
         return zone;
     }
 
     private static void KillDefender(Zone zone)
     {
         Assert.True(zone.TryGetPlayer(2, out var defender));
-        defender!.Life = 1; // one hit will kill regardless of exact damage roll
+        defender!.Life = 1;
 
         zone.PostCombatCommand(new CombatCommand { AttackerCharacterId = 1, AttackInfo = MeleeRequest(1, 2) });
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -89,7 +80,7 @@ public class ZonePvpSameOriginKillCreditGuardTests
         Assert.True(zone.TryGetPlayer(1, out var attackerBefore));
         var experienceBefore = attackerBefore!.Experience;
 
-        KillDefender(zone); // still asserts IsDead internally -- the guard only withholds reward credit
+        KillDefender(zone);
 
         Assert.True(zone.TryGetPlayer(1, out var attacker));
         Assert.Equal(0, attacker!.ContributionPoints);
@@ -105,8 +96,6 @@ public class ZonePvpSameOriginKillCreditGuardTests
         KillDefender(zone);
 
         Assert.True(zone.TryGetPlayer(1, out var attacker));
-        // Same CP-formula composition as ZonePvpKillRewardsTests.DefaultZoneKill_GrantsFormulaBasedContributionPoints
-        // -- proves the guard does not withhold credit for two genuinely distinct hosts.
         var expectedCp = PvpKillContributionPointCalculator.ComputeBaseAmount(false, false,
                 basePerKillAmount: PvpKillContributionPointBonuses.ComputeGameWideAddValue(3))
             + PvpKillContributionPointBonuses.ComputeConditionalBonuses(1, 0, addedCpTribe: -1,
@@ -114,15 +103,7 @@ public class ZonePvpSameOriginKillCreditGuardTests
         Assert.Equal(expectedCp, attacker!.ContributionPoints);
     }
 
-    /// <summary>
-    ///     Regression guard for <see cref="SessionSourceIp.AreSameHost" />'s own "fail open" contract:
-    ///     an absent source IP on both sides (the default for every test fixture across this codebase that
-    ///     doesn't explicitly seed one, including every pre-existing <c>ZonePvpKillRewardsTests</c> case) must
-    ///     never be treated as a same-origin match -- a null-vs-null pair proves nothing about shared origin.
-    ///     If this regressed, activating D2 hooks 2/3 would have silently zeroed out PvP-kill rewards for every
-    ///     test (and, more importantly, every real player) whose source IP was never captured for any reason.
-    /// </summary>
-    [Fact]
+        [Fact]
     public void BothSourceIpsNull_DoesNotFalselyBlockReward()
     {
         var zone = SetUpZone(1, null, null);
@@ -142,20 +123,10 @@ public class ZonePvpSameOriginKillCreditGuardTests
         Assert.True(attacker!.ContributionPoints > 0);
     }
 
-    /// <summary>
-    ///     D2 hook 3 layers additively on top of the pre-existing level-gap cap
-    ///     (<c>Zone.CombinedLevelGapCap</c>) -- this proves the two guards are independent, not that one
-    ///     subsumes the other: a level gap past the cap still withholds every reward on its own (already
-    ///     covered by <c>ZonePvpKillRewardsTests.CombinedLevelGapPast13_GrantsNothingAtAll_ButKillStillHappens</c>),
-    ///     and this same-origin guard produces the identical all-zero outcome through its own, earlier check
-    ///     even when the level gap alone would have allowed the reward.
-    /// </summary>
-    [Fact]
+        [Fact]
     public void SameSourceIp_WithinLevelGap_StillGrantsNothing()
     {
         var zone = SetUpZone(1, "203.0.113.7", "203.0.113.7");
-        // Re-affirm this isn't a level-gap artifact: both casters share SetUpZone's default level (42), well
-        // inside CombinedLevelGapCap (13).
         Assert.True(zone.TryGetPlayer(1, out var attacker));
         Assert.True(zone.TryGetPlayer(2, out var defender));
         Assert.Equal(attacker!.Level, defender!.Level);

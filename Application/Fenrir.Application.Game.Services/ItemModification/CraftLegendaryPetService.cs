@@ -11,10 +11,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.ItemModification;
 
-/// <summary>
-///     Business logic for op131, CZ_MAKE_ITEM2_SEND -- extracted from <see cref="CraftLegendaryPetHandler" />,
-///     see that handler's remarks.
-/// </summary>
 public sealed class CraftLegendaryPetService(
     ICharacterRepository characters,
     WorldDataCache worldData,
@@ -22,12 +18,8 @@ public sealed class CraftLegendaryPetService(
     ILogger<CraftLegendaryPetService> logger)
     : ICraftLegendaryPetService
 {
-    /// <summary>
-    ///     game.EventLog.EventCode for op131's single reachable recipe (tSort==2) -- scoped independently
-    ///     within <see cref="EventLogCategory.ItemCreate" />, same "app-owned, per-class numbering" posture as
-    ///     <see cref="CraftItemService" />'s own EventCode constants.
-    /// </summary>
-    private const short LegendaryPetCraftEventCode = 1;
+
+        private const short LegendaryPetCraftEventCode = 1;
 
     public async ValueTask<CraftLegendaryPetResult> ResolveAsync(CraftLegendaryPetRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, int accountId, CancellationToken cancellationToken)
@@ -83,10 +75,6 @@ public sealed class CraftLegendaryPetService(
             await characters.ReplaceTwoContainersAsync(characterId, pages[0], ToTvps(working[pages[0]]), pages[1],
                 ToTvps(working[pages[1]]), cancellationToken);
 
-        // Logged only once the container replace(s) above have durably committed -- an ItemCreate row must
-        // never assert a mint that the DB write didn't actually persist (same posture as CraftItemService's
-        // own craft-family logging). newPet.Quantity is always 0 (a single fresh unit), so the logged
-        // Quantity is hardcoded 1 rather than echoing the raw 0-unit convention.
         await eventLog.LogAsync(LegendaryPetCraftEventCode, EventLogCategory.ItemCreate, accountId, characterId,
             null, null, null, null, null, resolved.ResultItemId, 1, 1, null, cancellationToken);
 

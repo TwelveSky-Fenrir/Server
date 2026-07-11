@@ -26,7 +26,6 @@ public class TradeItemPlacementResolverTests
             serial);
     }
 
-    // ---- Shared gates (SourceEmpty / UnknownItem), exercised once via ResolveDeposit ----
 
     [Fact]
     public void ResolveDeposit_NoSourceItem_IsSourceEmpty()
@@ -58,7 +57,6 @@ public class TradeItemPlacementResolverTests
     [Fact]
     public void ResolveWithdrawal_CheckAvatarTradeFlagged_IsNeverRechecked()
     {
-        // Withdrawal must NOT re-check iCheckAvatarTrade -- only deposit gates on it.
         var item = StackableItem(1, 1);
 
         var result = TradeItemPlacementResolver.ResolveWithdrawal(Stack(1, 1), 1, null, item, true);
@@ -76,7 +74,6 @@ public class TradeItemPlacementResolverTests
         Assert.True(result.Succeeded);
     }
 
-    // ---- Stackable branch ----
 
     [Theory]
     [InlineData(0)]
@@ -128,7 +125,7 @@ public class TradeItemPlacementResolverTests
         var result = TradeItemPlacementResolver.ResolveDeposit(source, 10, null, StackableItem(50), true);
 
         Assert.True(result.Succeeded);
-        Assert.Null(result.NewSource); // fully emptied source is cleared
+        Assert.Null(result.NewSource);
         var destination = result.NewDestination!.Value;
         Assert.Equal(50, destination.ItemId);
         Assert.Equal(10, destination.Quantity);
@@ -140,7 +137,6 @@ public class TradeItemPlacementResolverTests
         Assert.Equal(7, destination.SocketGem1);
         Assert.Equal(8, destination.SocketGem2);
         Assert.Equal(9, destination.SocketGem3);
-        // Never assigned by SetInventoryQuantity: a fresh destination's ExpireDate is 0, not carried from source.
         Assert.Equal(0, destination.ExpireDate);
     }
 
@@ -166,9 +162,8 @@ public class TradeItemPlacementResolverTests
         var result = TradeItemPlacementResolver.ResolveDeposit(source, 4, destination, StackableItem(50), true);
 
         Assert.True(result.Succeeded);
-        Assert.Equal(6, result.NewSource!.Value.Quantity); // 10 - 4 remains behind
-        Assert.Equal(9, result.NewDestination!.Value.Quantity); // 5 + 4
-        // Partial split never carries or clears socket-gem data at the destination.
+        Assert.Equal(6, result.NewSource!.Value.Quantity);
+        Assert.Equal(9, result.NewDestination!.Value.Quantity);
         Assert.Equal(111, result.NewDestination.Value.SocketGem1);
         Assert.Equal(222, result.NewDestination.Value.SocketGem2);
         Assert.Equal(333, result.NewDestination.Value.SocketGem3);
@@ -201,7 +196,6 @@ public class TradeItemPlacementResolverTests
         Assert.Equal(20261231, result.NewDestination!.Value.ExpireDate);
     }
 
-    // ---- Non-stackable branch ----
 
     [Fact]
     public void ResolveDeposit_NonStackable_DestinationOccupied_IsRejected_NoSwap()
@@ -222,7 +216,7 @@ public class TradeItemPlacementResolverTests
         var result = TradeItemPlacementResolver.ResolveDeposit(source, 0, null, NonStackableItem(700), true);
 
         Assert.True(result.Succeeded);
-        Assert.Null(result.NewSource); // source unconditionally cleared
+        Assert.Null(result.NewSource);
         var destination = result.NewDestination!.Value;
         Assert.Equal(700, destination.ItemId);
         Assert.Equal(4, destination.Enchant);
@@ -230,7 +224,6 @@ public class TradeItemPlacementResolverTests
         Assert.Equal(2, destination.Refine);
         Assert.Equal(1, destination.Socket);
         Assert.Equal(999, destination.Serial);
-        // Deliberate deviation from legacy data-loss: ExpireDate carries through instead of being stripped.
         Assert.Equal(20260615, destination.ExpireDate);
     }
 
@@ -245,7 +238,7 @@ public class TradeItemPlacementResolverTests
         Assert.Equal(0, destination.SocketGem1);
         Assert.Equal(0, destination.SocketGem2);
         Assert.Equal(0, destination.SocketGem3);
-        Assert.Equal(5, destination.Enchant); // unrelated "value" byte still carries through
+        Assert.Equal(5, destination.Enchant);
     }
 
     [Fact]
@@ -272,7 +265,6 @@ public class TradeItemPlacementResolverTests
         Assert.Equal(4, result.NewDestination!.Value.SocketGem1);
     }
 
-    // ---- Bound-check helpers ----
 
     [Theory]
     [InlineData(-1, false)]

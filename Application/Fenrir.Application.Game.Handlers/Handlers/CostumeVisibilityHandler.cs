@@ -8,10 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
-/// <summary>
-///     CZ_COSTUME_STATE2_SEND (op139). Sort must be strictly 0 or 1, else Quit(). Unlike op90, the AOI
-///     broadcast here is a full avatar-action rebroadcast, not an AvatarStateFlag pair.
-/// </summary>
 public sealed class CostumeVisibilityHandler(
     ICostumeVisibilityService service,
     ILogger<CostumeVisibilityHandler> logger)

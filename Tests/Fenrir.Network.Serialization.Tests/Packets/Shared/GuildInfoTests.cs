@@ -5,7 +5,6 @@ using Fenrir.Network.Serialization.Tests.TestSupport;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Shared;
 
-// Golden encoder is hand-built from the C++ GUILD_INFO layout (3 natural-alignment padding zones), independent of the generated Write.
 public class GuildInfoTests
 {
     [Fact]

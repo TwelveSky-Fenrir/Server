@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Zone;
 
-// No tTribe field: USE_EXCHANGE_ITEM_V2 wasn't compiled in EU33, so payload stays 20 bytes.
 public class CzExchangeItemSendTests
 {
     [Fact]

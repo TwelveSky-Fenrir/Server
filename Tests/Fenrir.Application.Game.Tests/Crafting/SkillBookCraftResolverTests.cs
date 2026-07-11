@@ -47,8 +47,6 @@ public class SkillBookCraftResolverTests
     [Fact]
     public void ResolveWarGod_PreviousTribeThree_IsRejected()
     {
-        // The legacy's own i8th[3][3] lookup table has no row for tribe 3 -- an out-of-bounds read in the
-        // original, rejected here instead (D8: fix genuine UB, don't reproduce a crash).
         var result = SkillBookCraftResolver.ResolveWarGod(99301, 99302, 99303, 99304, 3,
             new ScriptedRandomSource(0));
 

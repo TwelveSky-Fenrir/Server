@@ -4,13 +4,6 @@ using Fenrir.Data.Abstractions.Commerce;
 
 namespace Fenrir.Application.Game.Tests.TestSupport;
 
-/// <summary>
-///     In-memory stand-in for IOfflineShopRepository: only the shop-lookup/rental-extension/all-open-listing
-///     surface used by <c>UseInventoryItemServiceTests</c>' proxy-shop-rental-extension coverage and
-///     <c>SearchShopListingsServiceTests</c>' proxy-shop-merge coverage is exercised here; every other
-///     member is out of scope for this test project (offline-shop lifecycle itself has its own coverage
-///     elsewhere).
-/// </summary>
 internal sealed class FakeOfflineShopRepository : IOfflineShopRepository
 {
     private OfflineShopOpenListingRowDto[] _openListings = [];

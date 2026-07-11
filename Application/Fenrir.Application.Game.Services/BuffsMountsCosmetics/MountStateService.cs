@@ -8,27 +8,20 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.BuffsMountsCosmetics;
 
-/// <inheritdoc cref="IMountStateService" />
 public sealed class MountStateService(
     ICharacterRepository characters,
     IEventLogRepository eventLog,
     ILogger<MountStateService> logger)
     : IMountStateService
 {
-    /// <summary>Sort 5 (Delete Mount) -- a compensation grant, not a cost. Server/ts25zone/S04_MyWork02.cpp:11910.</summary>
-    private const int DeleteMountContributionPointsGrant = 250;
 
-    /// <summary>Sort 7 (Delete Rolled Attribute)'s consumed material.</summary>
-    private const int AttributeDeleteItemId = 1225;
+        private const int DeleteMountContributionPointsGrant = 250;
 
-    /// <summary>
-    ///     Sort 8 (Transfer Rolled Attribute)'s primary consumed material -- checked before
-    ///     <see cref="AttributeTransferItemIdSecondary" />.
-    /// </summary>
-    private const int AttributeTransferItemIdPrimary = 8425;
+        private const int AttributeDeleteItemId = 1225;
 
-    /// <summary>Sort 8 (Transfer Rolled Attribute)'s fallback consumed material.</summary>
-    private const int AttributeTransferItemIdSecondary = 1226;
+        private const int AttributeTransferItemIdPrimary = 8425;
+
+        private const int AttributeTransferItemIdSecondary = 1226;
 
     private const short MountDeleteEventCode = 1;
     private const short MountAttributeDeleteEventCode = 2;
@@ -41,9 +34,6 @@ public sealed class MountStateService(
         var materialPage = ContainerMatrix.InventoryPage0;
         var materialSlot = (byte)0;
 
-        // Only Sort 7/8 need an inventory scan -- every other sort resolves purely from already-loaded
-        // PlayerRuntimeState fields, same "don't pay for I/O you don't need" posture as CraftPetService's
-        // own per-recipe slot lookups.
         if (sort == 7)
         {
             var page0 = state.Inventory.GetContainer(ContainerMatrix.InventoryPage0);
@@ -116,14 +106,7 @@ public sealed class MountStateService(
         }
     }
 
-    /// <summary>
-    ///     Sort 5 success: +250 CP (compensation, not a cost -- see <see cref="DeleteMountContributionPointsGrant" />'s
-    ///     own remarks) mirrored through the same <see cref="Zone.PostTribeProgressCommandAndWaitAsync" />
-    ///     pathway <c>CraftLegendaryPetService</c> already uses for its own CP debit, plus the garage-slot
-    ///     clear mirrored through <see cref="Zone.PostMountCommandAndWaitAsync" />. Réf. C++ :
-    ///     Server/ts25zone/S04_MyWork02.cpp:11907-11919.
-    /// </summary>
-    private async ValueTask ApplyDeleteMountAsync(Zone zone, PlayerRuntimeState state, int characterId,
+        private async ValueTask ApplyDeleteMountAsync(Zone zone, PlayerRuntimeState state, int characterId,
         int accountId, int garageSlot, CancellationToken cancellationToken)
     {
         var newContributionPoints = state.ContributionPoints + DeleteMountContributionPointsGrant;
@@ -141,8 +124,6 @@ public sealed class MountStateService(
                 "Zone {MapId} mount inbox full: dropped garage-slot clear mirror for character {CharacterId} after mount delete",
                 zone.MapId, characterId);
 
-        // Logged after both mirrors are posted -- see this class's own note on EventLogCategory.MountAttribute
-        // for why deltaMoney carries the CP delta here rather than actual wallet money.
         await eventLog.LogAsync(MountDeleteEventCode, EventLogCategory.MountAttribute, accountId, characterId,
             null, null, null, DeleteMountContributionPointsGrant, null, null, null, 1, null, cancellationToken);
 
@@ -151,13 +132,7 @@ public sealed class MountStateService(
             garageSlot, DeleteMountContributionPointsGrant);
     }
 
-    /// <summary>
-    ///     Sort 7 success: zeroes the addressed rolled-attribute slot, consumes one unit of item 1225 (found by
-    ///     <paramref name="materialPage" />/<paramref name="materialSlot" />, already resolved by
-    ///     <see cref="ApplyAsync" /> before the resolver ran), and mirrors both. Réf. C++ :
-    ///     Server/ts25zone/S04_MyWork02.cpp:11977-11991.
-    /// </summary>
-    private async ValueTask ApplyDeleteAttributeAsync(Zone zone, PlayerRuntimeState state, int characterId,
+        private async ValueTask ApplyDeleteAttributeAsync(Zone zone, PlayerRuntimeState state, int characterId,
         int accountId, int garageSlot, int statSlotIndex, byte materialPage, byte materialSlot,
         CancellationToken cancellationToken)
     {
@@ -188,8 +163,7 @@ public sealed class MountStateService(
             characterId, garageSlot, statSlotIndex + 1);
     }
 
-    /// <summary>Port of FindInventoryItem's scan order: page 0 ascending slot, then page 1 ascending slot.</summary>
-    private static bool TryFindItem(ImmutableDictionary<byte, ItemStack> page0,
+        private static bool TryFindItem(ImmutableDictionary<byte, ItemStack> page0,
         ImmutableDictionary<byte, ItemStack> page1, int itemId, out byte page, out byte slot)
     {
         for (var i = 0; i <= 63; i++)

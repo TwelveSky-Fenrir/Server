@@ -9,11 +9,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
-/// <summary>
-///     CZ_COSTUME_STATE_SEND (op90). Sort 1-5 (Select/no-op/Equip/Remove/ReturnToInventory) match the legacy
-///     switch exactly -- see <see cref="CostumeStateResolver" />'s remarks for why Select/Equip/Remove/
-///     ReturnToInventorySuccess never actually fire against today's always-empty wardrobe.
-/// </summary>
 public sealed class CostumeStateHandler(ICostumeStateService service, ILogger<CostumeStateHandler> logger)
     : IAsyncPacketHandler<CostumeStateRequest>
 {

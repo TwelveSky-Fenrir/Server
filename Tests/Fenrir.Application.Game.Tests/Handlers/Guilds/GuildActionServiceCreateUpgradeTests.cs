@@ -10,18 +10,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Guilds;
 
-// Guild-tx-hygiene fix (GUILD_WORK tSort 1/7, not legacy parity -- see the behavior contract's Part B):
-// usp_Guild_CreateAndDebitMoney/usp_Guild_UpgradeAndDebitMoney fold the guild mutation and its money debit
-// into one round trip, so GuildActionService no longer needs (and no longer has) an app-level compensating
-// Disband/SetGradeAsync rollback call on a failed debit. FakeGuildRepository's SetGradeAsync still throws
-// NotImplementedException by its own documented out-of-scope contract -- if a compensating grade rollback
-// were ever reinstated, the Upgrade *_ReturnsAGracefulFailure_* test below would blow up with that exception
-// instead of returning the expected graceful GuildActionResult, so its passing is itself proof no
-// compensating call happens. DisbandAsync itself no longer throws (see GuildActionServiceDisbandTests,
-// which exercises it directly for the guild-money-event-logging behavior contract), so that same
-// throw-as-tripwire trick no longer applies to Create's own catch block -- its
-// CreateGuild_CombinedProcedureThrows_ReturnsAGracefulFailure_WithNoCompensatingDisbandCall test below
-// instead asserts directly that LastDisband stays null.
 public class GuildActionServiceCreateUpgradeTests
 {
     private const int CharacterId = 1;
@@ -37,8 +25,6 @@ public class GuildActionServiceCreateUpgradeTests
         var data = new byte[500];
         new GuildWorkCreatePayload { GuildName = "Aesir" }.Write(data);
 
-        // CreateGuildAsync only reaches the zone's guild-mirror wait after the combined procedure already
-        // succeeded; drive the wait to completion with an explicit Tick instead of eating its ~2s fallback.
         var resultTask = service.CreateGuildAsync(new GuildActionRequest { Sort = 1, Data = data }, zones[1], state,
             CharacterId, CancellationToken.None).AsTask();
         zones[1].Tick(TimeSpan.FromMilliseconds(50));

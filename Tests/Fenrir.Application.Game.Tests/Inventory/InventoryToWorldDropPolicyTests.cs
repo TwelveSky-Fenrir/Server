@@ -5,13 +5,6 @@ using Fenrir.Application.Game.Tests.GameData;
 
 namespace Fenrir.Application.Game.Tests.Inventory;
 
-/// <summary>
-///     Coverage for <see cref="InventoryToWorldDropPolicy" />, the pure policy behind tSort 209
-///     ("drop item from inventory to the ground at the player's own location"). Exercises the static
-///     <see cref="InventoryToWorldDropPolicy.Resolve" /> method directly against hand-built
-///     <see cref="ItemStack" />/<see cref="ItemDefinition" /> values -- does not depend on any dispatch wiring,
-///     <c>Zone</c>, or DI container.
-/// </summary>
 public class InventoryToWorldDropPolicyTests
 {
     private static readonly Func<ItemDefinition, GroundItemSpawnEligibility> AlwaysEligible =
@@ -53,7 +46,6 @@ public class InventoryToWorldDropPolicyTests
             dropperPosZ, dropperName, dropperPartyName);
     }
 
-    // ---- Malformed input (caller must disconnect) ----
 
     [Theory]
     [InlineData(-1, 0)]
@@ -146,7 +138,6 @@ public class InventoryToWorldDropPolicyTests
         Assert.True(result.Succeeded);
     }
 
-    // ---- Soft failure (standard ack, code 1; source untouched; no disconnect) ----
 
     [Fact]
     public void UnsupportedItemType_IsSoftFailure()
@@ -189,7 +180,6 @@ public class InventoryToWorldDropPolicyTests
         Assert.True(result.Succeeded);
     }
 
-    // ---- Success: stackable partial/full drop ----
 
     [Fact]
     public void StackablePartialDrop_ReducesSourceQuantityOnly_RestUnchanged()
@@ -222,14 +212,12 @@ public class InventoryToWorldDropPolicyTests
     [Fact]
     public void StackableZeroQuantityDrop_SpawnsOneUnit_ButNeverTouchesSourceStack()
     {
-        // Faithfully-reproduced legacy duplication quirk: 0 is neither negative/over-cap nor "more than held",
-        // so it sails through every malformed check, and the shared spawn routine substitutes exactly 1 unit.
         var result = Resolve(requestedQuantity: 0, source: Stack(50, 25), itemDefinition: StackableItem(50));
 
         Assert.True(result.Succeeded);
         Assert.NotNull(result.NewSource);
-        Assert.Equal(25, result.NewSource!.Value.Quantity); // untouched
-        Assert.Equal(1, result.Spawn!.Value.Quantity); // ground copy still gets exactly 1 unit
+        Assert.Equal(25, result.NewSource!.Value.Quantity);
+        Assert.Equal(1, result.Spawn!.Value.Quantity);
     }
 
     [Fact]
@@ -263,7 +251,6 @@ public class InventoryToWorldDropPolicyTests
         Assert.Equal(0, result.Spawn.Value.SerialNumber);
     }
 
-    // ---- Success: unique item drop ----
 
     [Fact]
     public void UniqueItemDrop_AlwaysClearsSourceSlot_RegardlessOfRequestedQuantity()
@@ -297,7 +284,6 @@ public class InventoryToWorldDropPolicyTests
         Assert.Equal(2, socket);
     }
 
-    // ---- Owner resolution ----
 
     [Fact]
     public void Unpartied_OwnerIsDropperOwnName()
@@ -326,7 +312,6 @@ public class InventoryToWorldDropPolicyTests
         Assert.Equal("Solo", result.Spawn!.Value.Owner);
     }
 
-    // ---- Position pass-through ----
 
     [Fact]
     public void GroundSpawnPosition_MatchesDropperCurrentPosition()
@@ -339,7 +324,6 @@ public class InventoryToWorldDropPolicyTests
         Assert.Equal(678f, result.Spawn.Value.PosZ);
     }
 
-    // ---- Eligibility predicate receives the resolved item definition ----
 
     [Fact]
     public void EligibilityPredicate_IsInvokedWithTheResolvedItemDefinition()

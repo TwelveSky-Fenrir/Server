@@ -4,10 +4,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Social;
 
-/// <summary>
-///     Clears only the caller's own pointers; the partner's opposite pointer is deliberately left untouched
-///     (legacy asymmetry).
-/// </summary>
 public sealed class MentorEndService(IMentorRepository repository, ILogger<MentorEndService> logger)
     : IMentorEndService
 {
@@ -15,7 +11,6 @@ public sealed class MentorEndService(IMentorRepository repository, ILogger<Mento
     {
         if (state.TeacherCharacterId is null && state.StudentCharacterId is null)
         {
-            // Client-visible as a session disconnect (MentorEndHandler aborts on this outcome).
             logger.LogWarning(
                 "Mentor end rejected: character {CharacterId} is not bonded as either teacher or student -- session will be disconnected",
                 state.CharacterId);

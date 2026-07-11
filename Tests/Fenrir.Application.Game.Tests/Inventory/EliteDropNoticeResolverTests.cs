@@ -2,10 +2,6 @@ using Fenrir.Application.Game.Domain.Inventory;
 
 namespace Fenrir.Application.Game.Tests.Inventory;
 
-/// <summary>
-///     Coverage for <see cref="EliteDropNoticeResolver" />, the C14 port of <c>MyUtil::ProcessForDropItem</c>'s
-///     ELITE_NOTICE (center broadcast command 2000) "show name" gate and per-origin type codes.
-/// </summary>
 public class EliteDropNoticeResolverTests
 {
     [Theory]

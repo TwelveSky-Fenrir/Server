@@ -2,11 +2,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Domain.Social.Trade;
 
-/// <summary>Projects a TradeOfferSide onto ZC_TRADE_START_RECV/ZC_TRADE_STATE_RECV's flattened wire arrays.</summary>
-/// <remarks>
-///     Slot layout ([0]=ItemId, [1]=Quantity, [2]=packed upgrade bytes, [3]=ExpireDate) is a documented
-///     inference by analogy with AvatarInfoFactory.PackUpgradeBytes, not an independently verified layout.
-/// </remarks>
 public static class TradeOfferCodec
 {
     public static TradeStartResponse BuildStart(TradeOfferSide side)

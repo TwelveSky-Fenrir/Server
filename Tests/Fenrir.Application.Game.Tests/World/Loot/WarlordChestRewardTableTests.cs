@@ -2,14 +2,6 @@ using Fenrir.Application.Game.Domain.World.Loot;
 
 namespace Fenrir.Application.Game.Tests.World.Loot;
 
-/// <summary>
-///     Covers the C10-remaining-boxes reward-table DATA and roll primitive for items 1378 (Sky/Heaven Warlord
-///     Chest, elite tier) and 1379 (Earth Warlord Chest, rare tier) -- <see cref="WarlordChestRewardTable" />.
-///     Neither box fits any existing <see cref="BoxRewardSpec" /> shape (tribe-keyed pool plus a level/rebirth
-///     precondition the shared mechanism does not otherwise check), so this file exercises
-///     <see cref="WarlordChestRewardTable.TryRollReward" /> and <see cref="WarlordChestRewardTable.MeetsLevelGate" />
-///     directly rather than through <see cref="LootBoxOpenResolver" />.
-/// </summary>
 public class WarlordChestRewardTableTests
 {
     [Fact]
@@ -150,8 +142,7 @@ public class WarlordChestRewardTableTests
             previousTribe, new ScriptedRandom(0), out _));
     }
 
-    /// <summary>Returns queued draws in request order; throws if the code draws more than were scripted.</summary>
-    private sealed class ScriptedRandom(params int[] values) : Random
+        private sealed class ScriptedRandom(params int[] values) : Random
     {
         private int _index;
 

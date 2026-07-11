@@ -4,9 +4,6 @@ using Fenrir.Data.Abstractions.Tribes;
 
 namespace Fenrir.Application.Game.Tests.World.WorldState;
 
-// SqlTribeBankTaxSweepGateway forwards one zone's already-detached 10-minute sweep payload to the durable
-// merge procedure via ITribeBankSweepRepository. Verifies the empty-payload short-circuit, the field forward,
-// and that a persistence fault propagates (TribeBankTaxSweepFlushHost catches it).
 public class SqlTribeBankTaxSweepGatewayTests
 {
     [Fact]

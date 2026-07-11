@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Zone;
 
-/// <summary>ZC_USE_HOTKEY_ITEM_RECV (ZONE.h:477-482, 12-byte payload): Result/Page/Index.</summary>
 public class ZcUseHotkeyItemRecvTests
 {
     [Fact]

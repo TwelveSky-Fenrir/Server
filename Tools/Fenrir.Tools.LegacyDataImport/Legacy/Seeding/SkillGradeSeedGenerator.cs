@@ -4,10 +4,6 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Seeding;
 
-/// <summary>
-///     Generates <c>70_seed/world/072_skill_grades.sql</c> from <see cref="SkillReader.ReadAll" />
-///     (005_00003.IMG): exactly 2 rows (grade 0/1) per real (Index != 0) skill, never sparse.
-/// </summary>
 public static class SkillGradeSeedGenerator
 {
     private const string GradeColumns =

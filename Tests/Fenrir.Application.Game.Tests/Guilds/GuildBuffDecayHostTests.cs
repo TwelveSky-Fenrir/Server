@@ -23,8 +23,6 @@ public class GuildBuffDecayHostTests
     [Fact]
     public async Task DecayOnceAsync_ExpiredGuild_PersistsOnlyTheFlooredBuffTime_LeavesTypeAndStateUntouched()
     {
-        // Legacy parity (Server/ts25center/S07_MyGame01.cpp:316-330): the expiry write only ever rewrites
-        // gBuffTime -- BuffType/BuffState must reach the repository unchanged from the seeded row.
         var repository = new FakeGuildRepository();
         repository.Seed(Guild(1, 1, 5, DateTime.UtcNow.AddMinutes(-10).Ticks));
         var host = CreateHost(repository);
@@ -54,9 +52,6 @@ public class GuildBuffDecayHostTests
     [Fact]
     public async Task DecayOnceAsync_NeverActivated_ButReserveAndCheckpointBothPresent_StillPersistsTheDecrementedTime()
     {
-        // Legacy parity (Server/ts25center/S07_MyGame01.cpp:291-331): MyGame::LogicGuildBuff's row-selection
-        // query has no gBuffState condition -- a guild that topped up its reserve but never chose/activated a
-        // buff type (BuffState=0) still decays every pass exactly like an already-active one.
         var repository = new FakeGuildRepository();
         repository.Seed(Guild(1, 0, 60, DateTime.UtcNow.AddMinutes(53).AddSeconds(30).Ticks));
         var host = CreateHost(repository);
@@ -65,7 +60,7 @@ public class GuildBuffDecayHostTests
 
         Assert.NotNull(repository.LastSetBuff);
         var (_, _, buffState, buffTime, _) = repository.LastSetBuff!.Value;
-        Assert.Equal(0, buffState); // decay never itself flips BuffState to "activated"
+        Assert.Equal(0, buffState);
         Assert.Equal(53, buffTime);
     }
 
@@ -89,11 +84,9 @@ public class GuildBuffDecayHostTests
     {
         var host = CreateHost(new ThrowingGuildRepository());
 
-        await host.DecayOnceAsync(CancellationToken.None); // must not throw
+        await host.DecayOnceAsync(CancellationToken.None);
     }
 
-    // guild-buff-expiry: the edge-triggered push (Server/ts25center/S07_MyGame01.cpp:316-330's own
-    // gBuffTime < 1 branch) fires exactly once, at the pass the reserve first reaches exhaustion.
     [Fact]
     public async Task DecayOnceAsync_ReserveReachesZero_EnqueuesOneClusterWideExpiryPush()
     {
@@ -126,8 +119,6 @@ public class GuildBuffDecayHostTests
     [Fact]
     public async Task DecayOnceAsync_AlreadyExhausted_StructurallyNeverReselected_NeverReEnqueues()
     {
-        // Guild.BuffTime already 0 -- GuildBuffDecay.Apply's own eligibility gate excludes it from the pass
-        // entirely (matches legacy's own row-selection query, which cannot select an already-zero reserve).
         var repository = new FakeGuildRepository();
         repository.Seed(Guild(1, 1, 0, DateTime.UtcNow.AddMinutes(-10).Ticks));
         var relay = new FakeGuildBuffExpiryRelayQueue();
@@ -267,12 +258,7 @@ public class GuildBuffDecayHostTests
         }
     }
 
-    /// <summary>
-    ///     One decay-eligible guild on scan, but <see cref="SetBuffAsync" /> always throws -- exercises
-    ///     <c>GuildBuffDecayHost.DecayOnceAsync</c>'s own "persist failed, skip this guild's expiry push
-    ///     entirely" branch.
-    /// </summary>
-    private sealed class ThrowingSetBuffGuildRepository : IGuildRepository
+        private sealed class ThrowingSetBuffGuildRepository : IGuildRepository
     {
         public ValueTask<CharacterGuildMembershipDto?> GetByCharacterAsync(int characterId, CancellationToken ct)
         {

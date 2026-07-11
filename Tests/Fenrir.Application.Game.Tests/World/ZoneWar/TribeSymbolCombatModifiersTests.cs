@@ -3,11 +3,6 @@ using Fenrir.Application.Game.Domain.World.ZoneWar;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Covers <see cref="TribeSymbolCombatModifiers" />'s own public surface (the read side and the constant).
-///     The write side (<c>SetDamageDownPenalty</c>, internal) is exercised indirectly through
-///     <see cref="TribeSymbolDamageModifierSystemTests" />, the one production caller.
-/// </summary>
 public class TribeSymbolCombatModifiersTests
 {
     [Fact]

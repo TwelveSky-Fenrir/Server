@@ -2,11 +2,6 @@ using Fenrir.Application.Game.Domain.World.Monsters;
 
 namespace Fenrir.Application.Game.Tests.World.Monsters;
 
-/// <summary>
-///     Pure unit tests for the <c>SummonBossMonster</c> state machine core (<see cref="MonsterBossSpawnMachine" />)
-///     driven through a fake <see cref="IMonsterBossSpawnSink" />, plus the catalog's even-count load rule --
-///     no live <see cref="Fenrir.Application.Game.Domain.World.Zone" /> required.
-/// </summary>
 public class MonsterBossSpawnMachineTests
 {
     private const int Base = MonsterBossSpawnMachine.DefaultBossSlotBase;
@@ -58,16 +53,16 @@ public class MonsterBossSpawnMachineTests
     [Fact]
     public void Reload_UnresolvableId_DoesNotSpawnOrAdvance_ThenRetriesNextInvocation()
     {
-        var sink = new FakeBossSpawnSink(); // nothing resolvable yet
+        var sink = new FakeBossSpawnSink();
         var state = NewState(sink, Candidate(500));
 
         MonsterBossSpawnMachine.Advance(state, 20);
 
         Assert.Empty(sink.Spawns);
-        Assert.Equal(MonsterBossSummonState.Reload, state.State); // stalled, did NOT advance
+        Assert.Equal(MonsterBossSummonState.Reload, state.State);
 
         sink.AddResolvable(500);
-        MonsterBossSpawnMachine.Advance(state, 20); // next invocation re-rolls and now succeeds
+        MonsterBossSpawnMachine.Advance(state, 20);
 
         Assert.Equal(5, sink.Spawns.Count);
         Assert.Equal(MonsterBossSummonState.Check, state.State);
@@ -77,7 +72,6 @@ public class MonsterBossSpawnMachineTests
     public void Reload_WithFewerThanFiveFreeSlots_SpawnsOnlyThoseFree()
     {
         var sink = new FakeBossSpawnSink(500);
-        // Occupy 17 of the 20 slots, leaving exactly 3 free (the last three).
         for (var i = 0; i < MonsterBossSpawnMachine.BossSlotWindowSize - 3; i++)
             sink.Occupy(Base + i);
         var state = NewState(sink, Candidate(500));
@@ -86,7 +80,7 @@ public class MonsterBossSpawnMachineTests
 
         Assert.Equal(3, sink.Spawns.Count);
         Assert.Equal(new[] { Base + 17, Base + 18, Base + 19 }, sink.Spawns.ConvertAll(s => s.ServerIndex));
-        Assert.Equal(MonsterBossSummonState.Check, state.State); // still advances even with fewer than 5 spawned
+        Assert.Equal(MonsterBossSummonState.Check, state.State);
     }
 
     [Fact]
@@ -109,11 +103,11 @@ public class MonsterBossSpawnMachineTests
         var sink = new FakeBossSpawnSink(500);
         var state = NewState(sink, Candidate(500));
 
-        MonsterBossSpawnMachine.Advance(state, 20); // Reload -> Check
-        MonsterBossSpawnMachine.Advance(state, 20); // Check  -> Wait
+        MonsterBossSpawnMachine.Advance(state, 20);
+        MonsterBossSpawnMachine.Advance(state, 20);
 
         Assert.Equal(MonsterBossSummonState.Wait, state.State);
-        Assert.Equal(40, state.AnchorTick); // = ElapsedLegacyTicks at the Check invocation
+        Assert.Equal(40, state.AnchorTick);
     }
 
     [Fact]
@@ -122,14 +116,12 @@ public class MonsterBossSpawnMachineTests
         var sink = new FakeBossSpawnSink(500);
         var state = NewState(sink, Candidate(500));
 
-        MonsterBossSpawnMachine.Advance(state, 20); // Reload -> Check (anchor 20)
-        MonsterBossSpawnMachine.Advance(state, 20); // Check  -> Wait  (anchor 40)
+        MonsterBossSpawnMachine.Advance(state, 20);
+        MonsterBossSpawnMachine.Advance(state, 20);
 
-        // One tick short of 3 hours from the anchor: still holding.
         MonsterBossSpawnMachine.Advance(state, (int)MonsterBossSpawnMachine.WaitDurationLegacyTicks - 1);
         Assert.Equal(MonsterBossSummonState.Wait, state.State);
 
-        // Crossing the full 3-hour mark: reset to Reload (no spawn happens on the reset itself).
         var spawnsBefore = sink.Spawns.Count;
         MonsterBossSpawnMachine.Advance(state, 20);
         Assert.Equal(MonsterBossSummonState.Reload, state.State);
@@ -140,7 +132,7 @@ public class MonsterBossSpawnMachineTests
     public void EmptyPool_IsInert_NeverSpawns_AndNeverLeavesReload()
     {
         var sink = new FakeBossSpawnSink(500);
-        var state = NewState(sink); // no candidates
+        var state = NewState(sink);
 
         for (var i = 0; i < 10; i++)
             MonsterBossSpawnMachine.Advance(state, 20);
@@ -156,10 +148,10 @@ public class MonsterBossSpawnMachineTests
         var state = NewState(sink, Candidate(500));
 
         MonsterBossSpawnMachine.Advance(state, MonsterBossSpawnMachine.InvocationIntervalLegacyTicks - 1);
-        Assert.Empty(sink.Spawns); // 19 ticks: below the boundary, nothing happened
+        Assert.Empty(sink.Spawns);
         Assert.Equal(MonsterBossSummonState.Reload, state.State);
 
-        MonsterBossSpawnMachine.Advance(state, 1); // crosses to 20: one Reload fires
+        MonsterBossSpawnMachine.Advance(state, 1);
         Assert.Equal(5, sink.Spawns.Count);
         Assert.Equal(MonsterBossSummonState.Check, state.State);
     }
@@ -170,11 +162,9 @@ public class MonsterBossSpawnMachineTests
         var sink = new FakeBossSpawnSink(500);
         var state = NewState(sink, Candidate(500));
 
-        MonsterBossSpawnMachine.Advance(state, 20); // first Reload fills 3800..3804 (kept occupied by the sink)
+        MonsterBossSpawnMachine.Advance(state, 20);
         Assert.Equal(5, sink.Spawns.Count);
 
-        // Simulate a fresh cycle back to Reload without waiting out 3 hours: the prior bosses are still alive, so
-        // the next Reload must skip 3800..3804 and fill the next five free slots.
         state.State = MonsterBossSummonState.Reload;
         MonsterBossSpawnMachine.Advance(state, 20);
 
@@ -197,9 +187,9 @@ public class MonsterBossSpawnMachineTests
 
     [Theory]
     [InlineData(0, 0)]
-    [InlineData(1, 0)] // odd, drops to 0 -> discarded
+    [InlineData(1, 0)]
     [InlineData(2, 2)]
-    [InlineData(3, 2)] // odd, last row dropped
+    [InlineData(3, 2)]
     [InlineData(4, 4)]
     [InlineData(5, 4)]
     public void NormalizeBossRows_AppliesTheBossOnlyEvenCountRule(int inputCount, int expectedCount)
@@ -212,7 +202,7 @@ public class MonsterBossSpawnMachineTests
 
         Assert.Equal(expectedCount, normalized.Length);
         for (var i = 0; i < expectedCount; i++)
-            Assert.Equal(rows[i], normalized[i]); // survivors are the leading rows, in order
+            Assert.Equal(rows[i], normalized[i]);
     }
 
     private sealed class FakeBossSpawnSink : IMonsterBossSpawnSink

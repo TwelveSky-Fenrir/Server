@@ -4,11 +4,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Hosting.Guilds;
 
-/// <summary>
-///     Keeps <see cref="GuildRankingCache" /> warm after boot. The initial fill happens once, synchronously,
-///     at Program.cs startup (mirroring <c>WorldStateService.InitializeAsync</c>) so the very first op12/op20 of
-///     the shard's life doesn't broadcast an empty ranking board; this host only covers every refresh after that.
-/// </summary>
 public sealed class GuildRankingRefreshHost(
     IGuildRepository guilds,
     GuildRankingCache cache,
@@ -27,7 +22,6 @@ public sealed class GuildRankingRefreshHost(
         }
         catch (OperationCanceledException)
         {
-            // Expected on shutdown.
         }
     }
 

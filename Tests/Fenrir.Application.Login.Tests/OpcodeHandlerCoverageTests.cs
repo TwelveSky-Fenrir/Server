@@ -7,8 +7,6 @@ using Fenrir.Network.Serialization.Wire.Attributes;
 
 namespace Fenrir.Application.Login.Tests;
 
-// Closes the gap where a missing handler was only discoverable via LoginFrameDispatcher's runtime
-// "No handler registered" warning on first packet receipt.
 public class OpcodeHandlerCoverageTests
 {
     private static readonly byte[] LegacyNoOpAllowList = [];

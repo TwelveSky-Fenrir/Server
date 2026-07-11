@@ -23,7 +23,6 @@ public class StatResetResolverTests
     [Fact]
     public void TryResolveLevelBand_AmbiguousMidRange_ReturnsFalse_RatherThanGuessing()
     {
-        // Base level 113-144 with at least one rebirth: not unambiguously covered by either citation.
         Assert.False(StatResetResolver.TryResolveLevelBand(120, 1, out _));
         Assert.False(StatResetResolver.TryResolveLevelBand(113, 2, out _));
         Assert.False(StatResetResolver.TryResolveLevelBand(144, 1, out _));
@@ -38,7 +37,6 @@ public class StatResetResolverTests
         Assert.Equal(1, result.NewStatStr);
         Assert.Equal(1, result.NewStatInt);
         Assert.Equal(1, result.NewStatDex);
-        // (10-1) + (25-1) + (1-1) + (4-1) = 9 + 24 + 0 + 3 = 36
         Assert.Equal(36, result.RefundedPoints);
     }
 

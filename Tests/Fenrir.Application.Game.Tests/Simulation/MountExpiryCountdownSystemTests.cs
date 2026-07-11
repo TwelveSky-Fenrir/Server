@@ -4,12 +4,6 @@ using Fenrir.Application.Game.Tests.TestSupport;
 
 namespace Fenrir.Application.Game.Tests.Simulation;
 
-/// <summary>
-///     Covers <see cref="MountExpiryCountdownSystem" />: the once-per-real-minute expired-mount auto-dismount
-///     (Server/ts25zone/S07_MyGame03.cpp:6360-6363). The system deliberately does NOT decrement the mount timer
-///     (the per-minute decrement is uncited -- see the system's own remarks); these tests drive an
-///     already-expired mounted state and assert the check-and-dismount.
-/// </summary>
 public class MountExpiryCountdownSystemTests
 {
     private static readonly TimeSpan OneMinute =
@@ -32,14 +26,14 @@ public class MountExpiryCountdownSystemTests
     public void ExpiredMountedPlayer_IsForceDismounted_AfterOneMinute()
     {
         var (zone, state) = EnterPlayer();
-        state.AnimalIndex = 12; // mounted band, garage slot 2
+        state.AnimalIndex = 12;
         state.AnimalNumber = 1301;
         state.AnimalAbsorbState = 1;
-        state.AnimalTime = 0; // rental time run out
+        state.AnimalTime = 0;
 
         zone.Tick(OneMinute);
 
-        Assert.Equal(2, state.AnimalIndex); // left the mounted band (12 - 10)
+        Assert.Equal(2, state.AnimalIndex);
         Assert.Equal(0, state.AnimalNumber);
         Assert.Equal(0, state.AnimalAbsorbState);
         Assert.True(state.MountAutoDismountPending);
@@ -64,7 +58,7 @@ public class MountExpiryCountdownSystemTests
     public void UnmountedPlayer_IsUntouched()
     {
         var (zone, state) = EnterPlayer();
-        state.AnimalIndex = -1; // no mount selected
+        state.AnimalIndex = -1;
         state.AnimalTime = 0;
 
         zone.Tick(OneMinute);
@@ -80,7 +74,7 @@ public class MountExpiryCountdownSystemTests
         state.AnimalIndex = 12;
         state.AnimalTime = 0;
 
-        zone.Tick(TimeSpan.FromSeconds(30)); // half a minute -- below the cadence boundary
+        zone.Tick(TimeSpan.FromSeconds(30));
 
         Assert.Equal(12, state.AnimalIndex);
         Assert.False(state.MountAutoDismountPending);

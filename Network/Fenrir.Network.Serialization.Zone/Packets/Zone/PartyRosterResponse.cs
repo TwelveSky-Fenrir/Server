@@ -3,7 +3,6 @@ using Fenrir.Network.Serialization.Wire.Attributes;
 
 namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 
-// Slot 1 = leader; roster capped at 5 members.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.PartyRoster, ExpectedSize = 70)]
 public readonly partial record struct PartyRosterResponse : IOutgoingPacket
 {

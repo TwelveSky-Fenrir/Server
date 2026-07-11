@@ -7,12 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>
-///     CZ_GUILD_FIND_SEND (opcode 78) -- lookup is process-wide via <see cref="ZoneRegistry" />, falling back
-///     to the cross-shard character-location directory on a same-shard miss. Async (not inline): the
-///     fallback is an awaited DB call on the miss branch, and both handler kinds already run on the
-///     per-connection session loop, never the zone tick.
-/// </summary>
 public sealed class FindGuildMemberHandler(
     IFindGuildMemberService findGuildMemberService,
     ILogger<FindGuildMemberHandler>? logger = null) : IAsyncPacketHandler<FindGuildMemberRequest>
@@ -36,7 +30,7 @@ public sealed class FindGuildMemberHandler(
         var result = await findGuildMemberService.FindZoneAsync(asker, packet.AvatarName, cancellationToken)
             .ConfigureAwait(false);
         if (!result.HasGuild)
-            return; // No guild: silent return, not Quit (matches legacy's bare return).
+            return;
 
         session.Send(new FindGuildMemberResponse { Result = result.ZoneNumber });
     }

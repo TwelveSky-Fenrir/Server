@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Zone.Wire;
 
 namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 
-// Page1/Index1 = target slot, Page2/Index2 = material slot, Luck = lucky-item flag.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.EnchantItem, ExpectedSize = 29,
     AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
 public readonly partial record struct EnchantItemRequest : IIncomingPacket<EnchantItemRequest>

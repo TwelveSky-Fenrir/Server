@@ -38,7 +38,6 @@ public class ZoneRegistryTests
         Assert.Same(zone, registry[2]);
     }
 
-    // must return false, not throw -- a character persisted on a map this shard doesn't host relies on this
     [Fact]
     public void TryGet_UnhostedMap_ReturnsFalse()
     {

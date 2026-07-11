@@ -7,14 +7,8 @@ using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Game.Tests.World.Loot;
 
-/// <summary>
-///     The Lucky Ticket family's recovered draw data (workstream C9-tickets-tower follow-up): per-ticket
-///     thresholds, the roll/level tier cascade (including the deployment-stage-gated top tier), the
-///     evolution-tier-aware item-level window, the fixed family serial, and the end-to-end draw retry.
-/// </summary>
 public class LuckyTicketRewardResolverTests
 {
-    // ---- TryGetThresholds ----------------------------------------------------------------------------
 
     [Theory]
     [InlineData(1035, 1, 300)]
@@ -34,7 +28,6 @@ public class LuckyTicketRewardResolverTests
         Assert.False(LuckyTicketRewardResolver.TryGetThresholds(17124, out _, out _));
     }
 
-    // ---- ResolveFamilySerial ---------------------------------------------------------------------------
 
     [Theory]
     [InlineData(1035, 100000001)]
@@ -45,7 +38,6 @@ public class LuckyTicketRewardResolverTests
         Assert.Equal(expectedSerial, LuckyTicketRewardResolver.ResolveFamilySerial(ticketItemId));
     }
 
-    // ---- ResolveItemLevelWindow (GetLLevel/GetHLevel) -------------------------------------------------
 
     [Fact]
     public void ResolveItemLevelWindow_BelowFirstEvolutionTier_IsPlusMinus5AroundLevel()
@@ -79,35 +71,28 @@ public class LuckyTicketRewardResolverTests
         Assert.Equal(146, high);
     }
 
-    // ---- ResolveTier (roll/level cascade) --------------------------------------------------------------
 
     [Theory]
-    // Bracket 1: roll < firstThreshold.
     [InlineData(0, 4, false, LuckyTicketRewardResolver.Common)]
     [InlineData(0, 5, false, LuckyTicketRewardResolver.Unique)]
     [InlineData(0, 44, false, LuckyTicketRewardResolver.Unique)]
     [InlineData(0, 45, false, LuckyTicketRewardResolver.Rare)]
     [InlineData(0, 99, false, LuckyTicketRewardResolver.Rare)]
-    [InlineData(0, 100, false, LuckyTicketRewardResolver.Rare)] // elite disabled -> falls back to Rare
-    [InlineData(0, 100, true, LuckyTicketRewardResolver.Elite)] // elite enabled -> promotes to Elite
-    // Bracket 2: firstThreshold <= roll < secondThreshold -- never reaches Elite, regardless of level/flag.
+    [InlineData(0, 100, false, LuckyTicketRewardResolver.Rare)]
+    [InlineData(0, 100, true, LuckyTicketRewardResolver.Elite)]
     [InlineData(150, 4, true, LuckyTicketRewardResolver.Common)]
     [InlineData(150, 5, true, LuckyTicketRewardResolver.Unique)]
     [InlineData(150, 44, true, LuckyTicketRewardResolver.Unique)]
     [InlineData(150, 45, true, LuckyTicketRewardResolver.Rare)]
     [InlineData(150, 200, true, LuckyTicketRewardResolver.Rare)]
-    // Bracket 3: secondThreshold <= roll < 9000.
     [InlineData(8000, 4, true, LuckyTicketRewardResolver.Common)]
     [InlineData(8000, 5, true, LuckyTicketRewardResolver.Unique)]
     [InlineData(8000, 200, true, LuckyTicketRewardResolver.Unique)]
-    // Bracket 4: roll >= 9000 -- always the lowest tier, regardless of level or the elite flag.
     [InlineData(9000, 200, true, LuckyTicketRewardResolver.Common)]
     [InlineData(9999, 200, true, LuckyTicketRewardResolver.Common)]
     public void ResolveTier_MatchesTheLegacyRollLevelCascade(int roll, int level1, bool eliteTierEnabled,
         int expectedTier)
     {
-        // Uses ticket 1037's own thresholds (3/500) -- the widest bracket 1 -- so the InlineData rolls above
-        // line up cleanly against all four brackets without per-row threshold bookkeeping.
         Assert.Equal(expectedTier, LuckyTicketRewardResolver.ResolveTier(roll, level1, eliteTierEnabled, 3, 500));
     }
 
@@ -117,7 +102,6 @@ public class LuckyTicketRewardResolverTests
         Assert.False(LuckyTicketRewardResolver.ShippedProductionEliteTierEnabled);
     }
 
-    // ---- TryDraw (end-to-end, delegating to GeneralItemDropResolver) ----------------------------------
 
     private static ItemRowDto EligibleItem(int itemId, int level, byte type, byte sort)
     {
@@ -160,14 +144,8 @@ public class LuckyTicketRewardResolverTests
     [Fact]
     public void TryDraw_LevelBelow5_AlwaysCommonTier_AndOnlyCommonTierItemsAreEverEligible()
     {
-        // level1 < 5 forces the Common tier regardless of the roll (every bracket falls back to Common below
-        // level 5) -- and level2 >= 1 collapses the level window to the single fixed value level1+level2,
-        // removing the level pick's own randomness too. Every one of the 8 sorts tribe 0's own pool can ever
-        // pick (Rare's cape-widening never applies -- tier is always Common here) has a matching Common-tier
-        // item at that one fixed level, so the draw always succeeds on its very first attempt regardless of
-        // which sort a live, uncontrolled Random happens to pick.
-        const int fixedLevel = 1 + 5; // level1=1, level2=5
-        var commonSorts = new byte[] { 7, 9, 10, 11, 12, 13, 14, 15 }; // Amulet/Armor/Glove/Ring/Boots/Sword/Blade/Marble
+        const int fixedLevel = 1 + 5;
+        var commonSorts = new byte[] { 7, 9, 10, 11, 12, 13, 14, 15 };
         var itemsById = new Dictionary<int, ItemDefinition>();
         var expectedIds = new HashSet<int>();
         foreach (var sort in commonSorts)
@@ -190,15 +168,10 @@ public class LuckyTicketRewardResolverTests
     [Fact]
     public void TryDraw_RareTierRoll_WidensThePoolToIncludeCape_AndDrawsTheCapeItem()
     {
-        // Scripted sequence: roll=0 (below every ticket's own firstThreshold, forcing bracket 1); level1=50
-        // (in [45,100), so bracket 1 resolves to Rare -- the only tier that widens the pool to include Cape);
-        // chosenSort index 8 (the 9th/last slot of the 9-element pool -- Amulet/Armor/Glove/Ring/Boots/Sword/
-        // Blade/Marble/Cape -- reachable ONLY because includeCape widened the pool to 9 slots at all); level
-        // pick index 5 (level1-5+5 = 50, landing on the one seeded item).
         var random = new ScriptedRandom(0, 8, 5);
         var worldData = ZoneTestKit.EmptyWorldData(new Dictionary<int, ItemDefinition>
         {
-            [55000] = new(EligibleItem(55000, 50, LuckyTicketRewardResolver.Rare, sort: 8 /* Cape */), [])
+            [55000] = new(EligibleItem(55000, 50, LuckyTicketRewardResolver.Rare, sort: 8), [])
         }.ToFrozenDictionary());
 
         var found = LuckyTicketRewardResolver.TryDraw(worldData, random, 1037, previousTribe: 0, level1: 50,
@@ -208,8 +181,7 @@ public class LuckyTicketRewardResolverTests
         Assert.Equal(55000, rewardItemId);
     }
 
-    /// <summary>Deterministic <see cref="Random" /> stand-in identical in shape to <c>GeneralItemDropResolverTests</c>' own.</summary>
-    private sealed class ScriptedRandom(params int[] sequence) : Random
+        private sealed class ScriptedRandom(params int[] sequence) : Random
     {
         private int _index;
 

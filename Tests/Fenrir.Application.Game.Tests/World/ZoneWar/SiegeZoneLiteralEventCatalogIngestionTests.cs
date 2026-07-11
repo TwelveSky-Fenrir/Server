@@ -8,13 +8,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     End-to-end proof that <see cref="SiegeZoneLiteralEventCatalog" />'s named constants drive
-///     <see cref="ZoneCenterBroadcastIngestor.Ingest" /> identically to the raw numbers the existing
-///     Zone267/Zone241/pure-relay tests already pin -- the catalog is purely a naming layer, never a second
-///     source of truth for the numeric dispatch <see cref="SiegeEventStateMap" />/
-///     <see cref="ZoneCenterBroadcastIngestor" /> already own.
-/// </summary>
 public class SiegeZoneLiteralEventCatalogIngestionTests
 {
     private static int OneFrame => FrameWriter.FrameSizeOf<ZoneEventInfoResponse>();
@@ -47,7 +40,7 @@ public class SiegeZoneLiteralEventCatalogIngestionTests
     public void Ingest_ByNamedZone267Constant_WritesTheSameStateAsTheRawCode(int namedEventCode, int expectedState)
     {
         var state = new ZoneCenterSiegeState();
-        state.SetZone267(2, 9); // seed so a reset-to-0 is observable
+        state.SetZone267(2, 9);
         var ingestor = new ZoneCenterBroadcastIngestor(state, CreateRegistry(1),
             NullLogger<ZoneCenterBroadcastIngestor>.Instance);
 
@@ -108,7 +101,6 @@ public class SiegeZoneLiteralEventCatalogIngestionTests
 
         ingestor.Ingest(namedEventCode, Payload(0, 0));
 
-        // No Zone267/Zone241/Zone175/Zone335/DTM/tribe-bonus state anywhere changed from its default.
         for (byte tribeId = 0; tribeId < 4; tribeId++)
         {
             Assert.Equal(0, state.GetZone267(tribeId));

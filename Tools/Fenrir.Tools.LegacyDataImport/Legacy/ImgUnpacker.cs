@@ -3,12 +3,6 @@ using System.IO.Compression;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy;
 
-/// <summary>
-///     Decodes the legacy <c>ts25sharemem</c> "005_0000N.IMG" container (reverse-engineered from
-///     ZlibScope.h's Unpack005Copy/GetZData): 4-byte size + 4-byte compressed size + zlib stream. The
-///     inflated payload's first 4 bytes are a record count XOR'd with a per-dataset key (integrity check);
-///     the record array at <paramref name="recordArrayOffset" /> is never itself obfuscated.
-/// </summary>
 internal static class ImgUnpacker
 {
     public static byte[] UnpackRecordArray(string imgFilePath, int xorKey, int recordArrayOffset,

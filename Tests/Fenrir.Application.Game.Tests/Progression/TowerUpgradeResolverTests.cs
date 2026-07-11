@@ -49,7 +49,6 @@ public class TowerUpgradeResolverTests
     [Fact]
     public void TowerOutsideCallersTribeBlock_Disconnects()
     {
-        // Zone 8 -> tower index 4, which belongs to tribe 1's block (3-6), not tribe 0's (0-3).
         var result = TowerUpgradeResolver.Validate(1, 8, 8, 0,
             1, 2, 201, true);
 
@@ -109,7 +108,6 @@ public class TowerUpgradeResolverTests
     [Fact]
     public void RequestedNextLevelDoesNotFollowCurrentLevel_Disconnects()
     {
-        // Current level is 2 (next tier is 4), but the client claims the current level is 4 (tValue02=4).
         var result = TowerUpgradeResolver.Validate(1, ZoneNumberForTower0, ZoneNumberForTower0, 0,
             1, 4, 201, true);
 
@@ -139,7 +137,6 @@ public class TowerUpgradeResolverTests
     [Fact]
     public void BoundaryTowerIndex_BelongsToBothAdjacentTribes()
     {
-        // Zone 7 -> tower index 3, the shared boundary of tribe 0's block (0-3) and tribe 1's block (3-6).
         var forTribe0 = TowerUpgradeResolver.Validate(1, ZoneNumberForBoundaryTower3,
             ZoneNumberForBoundaryTower3, 0, 3, 2,
             203, true);

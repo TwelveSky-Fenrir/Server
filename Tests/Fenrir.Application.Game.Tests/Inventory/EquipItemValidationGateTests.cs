@@ -38,7 +38,6 @@ public class EquipItemValidationGateTests
     [Fact]
     public void Evaluate_TribeRestrictionMatchesAfterOffset_Success()
     {
-        // TribeRestriction 2 => (2 - offset 2) == tribe 0.
         var candidate = Candidate(tribeRestriction: 2);
 
         var outcome = EquipItemValidationGate.Evaluate(candidate, 0, 0, EquipItemValidationGate.SkipSlotCheck, 100, 0);
@@ -49,7 +48,7 @@ public class EquipItemValidationGateTests
     [Fact]
     public void Evaluate_TribeRestrictionMismatch_WrongTribe()
     {
-        var candidate = Candidate(tribeRestriction: 2); // only tribe 0 is legal
+        var candidate = Candidate(tribeRestriction: 2);
 
         var outcome = EquipItemValidationGate.Evaluate(candidate, 0, 1, EquipItemValidationGate.SkipSlotCheck, 100, 0);
 
@@ -59,7 +58,7 @@ public class EquipItemValidationGateTests
     [Fact]
     public void Evaluate_SkipSlotCheckSentinel_SlotTagNeverConsulted()
     {
-        var candidate = Candidate(equipPartTag: 99); // would mismatch any real slot's tag
+        var candidate = Candidate(equipPartTag: 99);
 
         var outcome = EquipItemValidationGate.Evaluate(candidate, 0, 0,
             EquipItemValidationGate.SkipSlotCheck, 100, 0);
@@ -68,9 +67,9 @@ public class EquipItemValidationGateTests
     }
 
     [Theory]
-    [InlineData(0, 2)] // mEquipPart[0] == 2
-    [InlineData(6, 0)] // mEquipPart[6] == 0
-    [InlineData(12, 14)] // mEquipPart[12] == 14
+    [InlineData(0, 2)]
+    [InlineData(6, 0)]
+    [InlineData(12, 14)]
     public void Evaluate_SlotTagMatchesLookupTable_Success(int slotIndex, int expectedTag)
     {
         var candidate = Candidate(equipPartTag: expectedTag);
@@ -83,9 +82,9 @@ public class EquipItemValidationGateTests
     [Fact]
     public void Evaluate_SlotTagMismatch_WrongSlotTag()
     {
-        var candidate = Candidate(equipPartTag: 2); // slot 0 expects 2
+        var candidate = Candidate(equipPartTag: 2);
 
-        var outcome = EquipItemValidationGate.Evaluate(candidate, 0, 1, 1, 100, 0); // slot 1 expects 3
+        var outcome = EquipItemValidationGate.Evaluate(candidate, 0, 1, 1, 100, 0);
 
         Assert.Equal(EquipItemValidationGate.Outcome.WrongSlotTag, outcome);
     }
@@ -95,8 +94,6 @@ public class EquipItemValidationGateTests
     [InlineData(100)]
     public void Evaluate_SlotIndexOutOfBounds_WrongSlotTag(int slotIndex)
     {
-        // -1 is reserved for SkipSlotCheck and covered separately; any other out-of-[0,12]-range index is
-        // a defensive fallback, not expected from a caller that already bounds-checked.
         var candidate = Candidate();
 
         var outcome = EquipItemValidationGate.Evaluate(candidate, 0, 0, slotIndex, 100, 0);
@@ -107,7 +104,7 @@ public class EquipItemValidationGateTests
     [Fact]
     public void Evaluate_CombinedLevelBelowRequirement_LevelTooLow()
     {
-        var candidate = Candidate(levelLimit: 80, martialLevelLimit: 30); // requires combined level 110
+        var candidate = Candidate(levelLimit: 80, martialLevelLimit: 30);
 
         var outcome = EquipItemValidationGate.Evaluate(candidate, 0, 0,
             EquipItemValidationGate.SkipSlotCheck, 109, 0);
@@ -276,8 +273,6 @@ public class EquipItemValidationGateTests
     [Fact]
     public void Evaluate_FinalCategoryGate_RunsLastEvenAfterEveryOtherCheckPasses()
     {
-        // Passes tribe/slot/level/rebirth but fails the final sort whitelist -- proves ordering: this must
-        // still reject even though every earlier gate was satisfied.
         var candidate = Candidate(13553, sort: 99);
 
         var outcome = EquipItemValidationGate.Evaluate(candidate, 0, 0,

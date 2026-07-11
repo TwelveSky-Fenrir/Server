@@ -41,7 +41,6 @@ public class DailyResetBroadcastSchedulerTests
 
         Assert.True(scheduler.TryConsumeDueFire(new DateTime(2026, 7, 10, 0, 1, 0, DateTimeKind.Utc)));
 
-        // A whole day of intervening polls, including the same minute-of-day recurring at other hours.
         Assert.False(scheduler.TryConsumeDueFire(new DateTime(2026, 7, 10, 0, 2, 0, DateTimeKind.Utc)));
         Assert.False(scheduler.TryConsumeDueFire(new DateTime(2026, 7, 10, 12, 0, 0, DateTimeKind.Utc)));
         Assert.False(scheduler.TryConsumeDueFire(new DateTime(2026, 7, 10, 23, 59, 0, DateTimeKind.Utc)));

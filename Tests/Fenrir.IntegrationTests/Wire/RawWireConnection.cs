@@ -3,14 +3,6 @@ using Fenrir.Network.Compression;
 
 namespace Fenrir.IntegrationTests.Wire;
 
-/// <summary>
-///     Bare-socket transport shared by <see cref="LoginBotClient" />/<see cref="ZoneBotClient" />: every byte
-///     the bot sends after the greeting must carry the legacy stream cipher (<c>mPacketEncryptionValue</c>,
-///     §3.4) the server seeds via <c>LoginGreetingResponse</c>/<c>ZoneGreetingResponse.RandomNumber</c> --
-///     <see cref="Fenrir.Network.Transport.SocketConnection" /> only ever decodes the INBOUND (client-&gt;server)
-///     side with that key, so the client is the one that must apply it before writing. Server-&gt;client bytes
-///     carry no stream cipher at all (see ZoneGreetingResponse's own doc comment).
-/// </summary>
 public sealed class RawWireConnection : IAsyncDisposable
 {
     private readonly TcpClient _client;
@@ -37,8 +29,7 @@ public sealed class RawWireConnection : IAsyncDisposable
         return connection;
     }
 
-    /// <summary>Set once, right after decoding the greeting's RandomNumber -- every byte sent from then on is XORed with it.</summary>
-    public void SeedOutboundStreamKey(int randomNumber)
+        public void SeedOutboundStreamKey(int randomNumber)
     {
         _outboundStreamKey = unchecked((byte)randomNumber);
     }

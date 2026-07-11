@@ -4,13 +4,6 @@ using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Game.Tests.GameData;
 
-/// <summary>
-///     Workstream B13-socket-prerequisites -- <see cref="WorldDataCache.GemSocketsByTypeAndValue" />, the
-///     (Type,Value02)-keyed index <see cref="WorldDataCacheBuilder" /> builds alongside
-///     <see cref="WorldDataCache.GemSocketsById" /> from the same validated <c>world.GemSockets</c> rows, so
-///     <c>StatCalculator.SumGemSocketContribution</c> can look a gem up by (gem type, gem value) instead of by
-///     GemSocketId.
-/// </summary>
 public class GemSocketTypeValueIndexTests
 {
     [Fact]
@@ -23,7 +16,6 @@ public class GemSocketTypeValueIndexTests
 
         var (cache, _) = WorldDataCacheBuilder.Build(rows);
 
-        // Present in both indexes, but under different keys.
         Assert.True(cache.GemSocketsById.ContainsKey(42));
         Assert.False(cache.GemSocketsByTypeAndValue.ContainsKey(42));
 
@@ -36,9 +28,6 @@ public class GemSocketTypeValueIndexTests
     [Fact]
     public void Build_OnDuplicateTypeAndValue02_FirstGemSocketIdWins()
     {
-        // Two rows sharing the same (Type,Value02) key -- GemSocketId 3 must win over GemSocketId 9, matching
-        // legacy's own first-match linear scan (GSOCKET::Search, GameSystem_08_Socket.cpp:22-32), regardless of
-        // which order they appear in the source list.
         var rows = WorldDataTestRows.MinimalRows() with
         {
             GemSockets =
@@ -78,11 +67,6 @@ public class GemSocketTypeValueIndexTests
     [Fact]
     public void Build_KeyFormula_MatchesStatCalculatorGemSocketTypeValueKey_AcrossValidRange()
     {
-        // GameData cannot reference the Stats project, so WorldDataCacheBuilder duplicates
-        // StatCalculator.GemSocketTypeValueKey's formula -- this test is the regression guard that the two
-        // stay byte-for-byte identical. Types 2-29 (the "mid" band) is the one legacy band whose Value02 range
-        // (1-100) spans the formula's full plausible byte domain without also having to satisfy a narrower
-        // per-band Value02 ceiling (Type=1 caps at 33, Types 39-46 cap at 10).
         var rows = new List<GemSocketRowDto>();
         var gemSocketId = 1;
         for (var type = 2; type <= 29; type++)

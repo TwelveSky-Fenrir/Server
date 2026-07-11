@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
-/// <summary>CZ_AVATAR_ACTION_SEND (op15).</summary>
 public sealed class AvatarActionHandler(IAvatarActionService service, ILogger<AvatarActionHandler>? logger = null)
     : IInlinePacketHandler<AvatarActionRequest>
 {
@@ -16,7 +15,6 @@ public sealed class AvatarActionHandler(IAvatarActionService service, ILogger<Av
     {
         var zoneSession = (ZoneClientSession)session;
 
-        // Benign staleness window around a zone handoff.
         if (zoneSession.CurrentZone is not Zone zone)
             return;
 

@@ -9,7 +9,6 @@ public readonly partial record struct LoginResponse : IOutgoingPacket
 {
     public required int Result { get; init; }
 
-    // Pre-XORed (USE_XOR_UID) before the packet-wide XOR is applied on top -> double-XOR.
     [FixedString(255)]
     [ObfuscatedUidField]
     public required string Id { get; init; }

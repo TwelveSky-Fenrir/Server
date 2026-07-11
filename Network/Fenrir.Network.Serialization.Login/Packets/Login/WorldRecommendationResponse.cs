@@ -3,7 +3,6 @@ using Fenrir.Network.Serialization.Wire.Attributes;
 
 namespace Fenrir.Network.Serialization.Login.Packets.Login;
 
-// AddKillOtherTribeN fields are never assigned by the legacy serializer -- always zero on the wire.
 [FenrirPacket(FenrirServer.Login, FenrirDirection.Outgoing, Opcodes.Login.Outgoing.WorldRecommendation,
     ExpectedSize = 13)]
 public readonly partial record struct WorldRecommendationResponse : IOutgoingPacket

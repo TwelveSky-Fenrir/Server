@@ -119,7 +119,6 @@ public class PopupEventScheduleTimerTests
         timer.Tick(Utc(0, 59, 0));
         Assert.True(state.IsEnabled(PopupEventType.YanggokPvp));
 
-        // Manually close it to prove a second same-minute tick doesn't re-open it.
         state.SetEnabled(PopupEventType.YanggokPvp, false);
         timer.Tick(Utc(0, 59, 30));
 
@@ -145,7 +144,6 @@ public class PopupEventScheduleTimerTests
         var state = new PopupEventState();
         var timer = new PopupEventScheduleTimer(state, NullLogger<PopupEventScheduleTimer>.Instance);
 
-        // Sweep every open/close/countdown minute this timer knows about.
         foreach (var hour in new[] { 0, 1, 2, 3, 11, 12, 13, 14, 16, 18, 20, 21, 23 })
         foreach (var minute in new[] { 0, 49, 54, 58, 59 })
             timer.Tick(Utc(hour, minute));

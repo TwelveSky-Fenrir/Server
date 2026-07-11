@@ -6,8 +6,6 @@ using Fenrir.Network.Serialization.Login.Wire;
 
 namespace Fenrir.Application.Login.Tests;
 
-// The PIN gate state machine between Authenticated and CharSelect (P2ndPassword=1): LoginClientSession's
-// state transitions and the SessionStateGate opcode gates that key off them.
 public class LoginSessionPinStateTests
 {
     [Fact]
@@ -48,7 +46,6 @@ public class LoginSessionPinStateTests
         Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.ChangeMousePin));
         Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.VerifyMousePin));
 
-        // Legacy Quit() on !IsSecondLogin(): char-select opcodes stay closed until the PIN gate opens.
         Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.CreateAvatar));
         Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.DeleteAvatar));
         Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.RenameAvatar));
@@ -72,7 +69,6 @@ public class LoginSessionPinStateTests
         Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.ClaimGift));
         Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.GiftList));
 
-        // Ops 13/14/15 are only legal while the gate is still closed.
         Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.CreateMousePin));
         Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.ChangeMousePin));
         Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.VerifyMousePin));
@@ -81,7 +77,6 @@ public class LoginSessionPinStateTests
     [Fact]
     public void Authenticated_WithoutPinRequired_AlreadyAllowsCharSelectOpcodes()
     {
-        // RequireSecondPassword=false path: the session never visits PinRequired at all.
         var session = new LoginClientSession(1, new FakeDuplexPipe());
         session.MarkAuthenticated(1);
 

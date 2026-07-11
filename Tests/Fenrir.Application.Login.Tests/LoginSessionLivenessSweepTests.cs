@@ -6,9 +6,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Login.Tests;
 
-// Login-side counterpart to GameServer's SessionLivenessSweep: any Login connection -- pre-auth or
-// post-auth alike -- idle strictly more than 60 seconds is forcibly disconnected
-// (Server/ts25login/S07_MyGame01.cpp:37-73).
 public class LoginSessionLivenessSweepTests
 {
     [Fact]
@@ -37,7 +34,6 @@ public class LoginSessionLivenessSweepTests
         Assert.Null(session.DisconnectReason);
     }
 
-    // Strict `>`, not `>=` -- see SessionRegistry.SnapshotIdle's own remarks.
     [Fact]
     public void Sweep_LeavesASessionExactlyAtTheThresholdConnected()
     {

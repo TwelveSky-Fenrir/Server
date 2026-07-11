@@ -17,18 +17,12 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.GenericAction;
 
-/// <summary>
-///     tSort 212/252 (<see cref="GenericActionService.SellToNpcShopAsync" />) and 215
-///     (<see cref="GenericActionService.BuyFromNpcShopAsync" />) -- covers the game.EventLog
-///     (Category=NpcShopTrade) wiring added on top of the pre-existing NPC-shop trade resolution; see
-///     <c>NpcShopPolicyTests</c> for the pure-domain outcome coverage this does not duplicate.
-/// </summary>
 public class NpcShopTradeServiceTests
 {
     private const int AccountId = 1;
     private const int CharacterId = 10;
     private const int NpcId = 1;
-    private const short ZoneNumber = 1; // NpcShopPolicy.TownZoneNumbers
+    private const short ZoneNumber = 1;
 
     private static async Task<T> RunToCompletionAsync<T>(ValueTask<T> pending, Zone zone)
     {
@@ -55,15 +49,7 @@ public class NpcShopTradeServiceTests
         return WorldDataTestRows.Item(itemId) with { Sort = sort, BuyCost = buyCost, CheckNpcShop = 2 };
     }
 
-    /// <summary>
-    ///     Builds a single-NPC, single-zone <see cref="WorldDataCache" />: the NPC offers
-    ///     <see cref="NpcFunctionGate.NpcShop" /> and sits at the same position <see cref="ZoneTestKit.EnterData" />
-    ///     places the player, so <c>NpcFunctionGate.IsAvailable</c> is always satisfied.
-    ///     <paramref name="shopCatalogItemIds" />
-    ///     defaults to every item in <paramref name="itemsById" /> when omitted; pass a narrower set to exercise
-    ///     <see cref="NpcShopPolicy.BuyOutcome.NotInCatalog" />.
-    /// </summary>
-    private static WorldDataCache BuildWorldData(ItemRowDto[] itemsById, int[]? shopCatalogItemIds = null)
+        private static WorldDataCache BuildWorldData(ItemRowDto[] itemsById, int[]? shopCatalogItemIds = null)
     {
         var catalogIds = shopCatalogItemIds ?? itemsById.Select(row => row.ItemId).ToArray();
 
@@ -201,7 +187,7 @@ public class NpcShopTradeServiceTests
     [Fact]
     public async Task Sell_Rejected_LogsNothing()
     {
-        var worldData = BuildWorldData([SellableItem(700, 9, 500, 1)]); // CheckNpcSell=1 -> Rejected
+        var worldData = BuildWorldData([SellableItem(700, 9, 500, 1)]);
         var (zone, state, characters, eventLog) = SetUp(worldData);
         SeedInventory(zone, (0, new ItemStack(700, 1, 0, 0, 0, 0, 0, 0, 0, 0, 555)));
         var service = CreateService(worldData, characters, eventLog);
@@ -255,7 +241,6 @@ public class NpcShopTradeServiceTests
         Assert.Equal(GenericActionStatus.Succeeded, result.Status);
         var logged = Assert.Single(eventLog.LoggedEvents);
         Assert.Equal(-500, logged.DeltaMoney);
-        // 5 units purchased, not the merged destination total (10 already held + 5 bought = 15).
         Assert.Equal(5, logged.Quantity);
     }
 

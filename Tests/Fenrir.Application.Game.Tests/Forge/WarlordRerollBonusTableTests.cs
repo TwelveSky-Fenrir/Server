@@ -3,12 +3,6 @@ using Fenrir.Application.Game.Tests.TestSupport;
 
 namespace Fenrir.Application.Game.Tests.Forge;
 
-/// <summary>
-///     Covers <see cref="WarlordRerollBonusTable" /> (workstream C12-warlord-chest, "part B") -- per-slot
-///     top/mid/base outcome selection for both tiers, the weapon-family-vs-tribe offset split, the
-///     process-wide <see cref="WarlordPityLockState" /> engagement/forced-draw interaction, and the
-///     rejection edge cases (cape/unmapped sort, out-of-range tribe, invalid item type).
-/// </summary>
 public class WarlordRerollBonusTableTests
 {
     private const byte CapeSort = 8;
@@ -76,7 +70,6 @@ public class WarlordRerollBonusTableTests
     [Fact]
     public void RareAmulet_HasNoMidTier_FallsStraightToBase()
     {
-        // draw=5 is exactly at the rare top-tier boundary (5%); Amulet has no mid band, so it must land Base.
         var result = WarlordRerollBonusTable.TryDrawReplacement(IAmulet, RankChangeResolver.RareItemType, 0,
             new WarlordPityLockState(), new ScriptedRandomSource(5));
 
@@ -97,8 +90,6 @@ public class WarlordRerollBonusTableTests
     [Fact]
     public void RareArmor_ForcedPityDrawOfFifty_FallsToBase_NotMid()
     {
-        // The contract's own worked example: a forced draw of 50 is NOT <= 45, so even the widest mid band
-        // (rare armor, 41%) is missed and the outcome falls through to Base.
         var pityLock = new WarlordPityLockState();
         pityLock.Engage();
 
@@ -115,8 +106,6 @@ public class WarlordRerollBonusTableTests
     [InlineData(IMarble, 87015)]
     public void RareSwordFamily_TopDraw_UsesFamilyOffset_NotTribeOffset(byte sort, int expectedItemId)
     {
-        // previousTribe deliberately varies from the "natural" tribe-0 sword family to prove weapon-family
-        // slots ignore tribe offset entirely.
         var result = WarlordRerollBonusTable.TryDrawReplacement(sort, RankChangeResolver.RareItemType, 2,
             new WarlordPityLockState(), new ScriptedRandomSource(0));
 
@@ -157,8 +146,6 @@ public class WarlordRerollBonusTableTests
         var pityLock = new WarlordPityLockState();
         pityLock.Engage();
 
-        // Elite boots at forced draw 50: top=1%, mid=1..15 (16 values) so mid band is [1,16); 50 misses both,
-        // falls to Base.
         var result = WarlordRerollBonusTable.TryDrawReplacement(IBoots, RankChangeResolver.EliteItemType, 0,
             pityLock, new ScriptedRandomSource(0));
 
@@ -172,8 +159,6 @@ public class WarlordRerollBonusTableTests
         var pityLock = new WarlordPityLockState();
         pityLock.Engage();
 
-        // Even a scripted draw of 0 (which would ordinarily hit the 1% top tier) is overridden to the forced
-        // value once the lock is engaged.
         var result = WarlordRerollBonusTable.TryDrawReplacement(IAmulet, RankChangeResolver.EliteItemType, 0,
             pityLock, new ScriptedRandomSource(0));
 

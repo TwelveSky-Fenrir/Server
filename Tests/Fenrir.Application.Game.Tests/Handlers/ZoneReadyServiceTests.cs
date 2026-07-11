@@ -50,7 +50,6 @@ public class ZoneReadyServiceTests
         var (_, _, state) = Setup(zone, 10);
         var service = new ZoneReadyService();
 
-        // Client claims tribe 3 while the world-entry snapshot loaded tribe 1 -- a patched client.
         var result = service.Validate(state, 3, 0);
 
         Assert.Equal(ZoneReadyOutcome.Rejected, result);
@@ -88,7 +87,7 @@ public class ZoneReadyServiceTests
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (_, _, state) = Setup(zone, 10);
-        Assert.Null(state.LastSentHeartbeat); // never sent, matching legacy's mLastSentHeartbeat == -1
+        Assert.Null(state.LastSentHeartbeat);
         var service = new ZoneReadyService();
 
         var result = service.Validate(state, 1, 0);
@@ -144,13 +143,10 @@ public class ZoneReadyServiceTests
     [Fact]
     public void DuplicateSend_WhileAlreadyInWorld_IsSafeNoOp()
     {
-        // AllowedStates spans Registering+InWorld (the blanket rule other Zone opcodes use), so a resend is
-        // no longer rejected upstream by SessionStateGate -- the handler itself must treat it as a no-op.
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, state) = Setup(zone, 10, 2);
         var handler = new ZoneReadyHandler(new ZoneReadyService());
 
-        // First (legitimate) op13 completes the handshake.
         handler.Handle(new ZoneReadyRequest { Tribe = 2, AutoTime = 0, AutoTime2 = 0, AutoState = 0 }, session);
         Assert.Equal(ZoneSessionState.InWorld, session.State);
         Assert.Null(session.DisconnectReason);
@@ -158,9 +154,6 @@ public class ZoneReadyServiceTests
 
         state.AutoHuntEnabled = false;
 
-        // A duplicate send while already InWorld -- one that would fail every guard if re-run (wrong tribe,
-        // auto-hunt claimed without server-side auto-hunt enabled) -- must be a safe no-op: no Abort, no
-        // re-stamped ConnectTime, no accumulated anti-hack strike.
         handler.Handle(new ZoneReadyRequest { Tribe = 999, AutoTime = 0, AutoTime2 = 0, AutoState = 1 }, session);
 
         Assert.Equal(ZoneSessionState.InWorld, session.State);
@@ -172,13 +165,9 @@ public class ZoneReadyServiceTests
     [Fact]
     public void PlayerNotYetTickedIntoZone_SkipsGuardsButStillMarksInWorld()
     {
-        // No PlayerRuntimeState exists yet to hand the service -- the skip-guards-but-still-admit fallback is
-        // handler-owned plumbing, not service business logic, so exercise the real handler here.
         var (session, _) = ZoneTestKit.CreateSession(10);
         session.MarkTicketConsumed(1, 10);
         session.MarkRegistering();
-        // Deliberately never posted/ticked ZoneCommand.Enter, nor set CurrentZone -- the benign staleness
-        // window this handler already tolerated before C04 (nothing to validate against yet).
         var handler = new ZoneReadyHandler(new ZoneReadyService());
 
         handler.Handle(new ZoneReadyRequest { Tribe = 999, AutoTime = 0, AutoTime2 = 0, AutoState = 1 }, session);

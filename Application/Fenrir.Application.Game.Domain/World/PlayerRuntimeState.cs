@@ -7,32 +7,19 @@ using Fenrir.Network.Abstractions;
 
 namespace Fenrir.Application.Game.Domain.World;
 
-/// <summary>
-///     A player's in-memory, authoritative state while <c>InWorld</c>. Mutated only by <see cref="Zone.RunAsync" />
-///     -- every other thread posts a <see cref="ZoneCommand" /> and waits for the next tick instead.
-/// </summary>
 public sealed partial class PlayerRuntimeState
 {
     public required int CharacterId { get; init; }
     public required IPacketSession Session { get; init; }
     public required string Name { get; init; }
 
-    /// <summary>
-    ///     aTribe. Was <c>init</c>-only until the fourth-tribe (Fujin) conversion/return behavior
-    ///     (CZ_CHANGE_TO_TRIBE4_SEND, op37) needed to change it mid-session -- every other mutation site
-    ///     still only ever assigns this once, at world entry/zone transfer.
-    /// </summary>
-    public required byte Tribe { get; set; }
+        public required byte Tribe { get; set; }
 
     public required byte Gender { get; init; }
     public required byte HeadType { get; init; }
     public required byte FaceType { get; init; }
 
-    /// <summary>
-    ///     aLevel1. Mutated only by <see cref="Zone.GrantMonsterKillExperience" /> on a level-up -- every other
-    ///     read site treats this as the character's current level.
-    /// </summary>
-    public required short Level { get; set; }
+        public required short Level { get; set; }
 
     public short MapId { get; set; }
     public float PosX { get; set; }
@@ -44,209 +31,56 @@ public sealed partial class PlayerRuntimeState
     public int Mana { get; set; }
     public int MaxMana { get; set; }
 
-    /// <summary>
-    ///     Spent base stat points (legacy aVit/aStr/aInt/aDex). Note: StatInt feeds the Ki stat and StatDex
-    ///     feeds Wisdom in <see cref="StatCalculator" />, not Intelligence/Dexterity literally.
-    /// </summary>
-    public int StatVit { get; set; }
+        public int StatVit { get; set; }
 
     public int StatStr { get; set; }
     public int StatInt { get; set; }
     public int StatDex { get; set; }
 
-    /// <summary>Unspent stat/skill points (aStatPoint/aSkillPoint) — spend-on-levelup UI reads these, not StatCalculator.</summary>
-    public int StatPoints { get; set; }
+        public int StatPoints { get; set; }
 
     public int SkillPoints { get; set; }
 
-    /// <summary>
-    ///     Learned-skill slots (legacy <c>aSkill[40][0..1]</c>) -- an absent slot is "empty," same convention
-    ///     as <see cref="Inventory" />. Mutated only by <see cref="Zone" />'s own tick.
-    /// </summary>
-    public ImmutableDictionary<byte, LearnedSkill> LearnedSkills { get; set; } =
+        public ImmutableDictionary<byte, LearnedSkill> LearnedSkills { get; set; } =
         ImmutableDictionary<byte, LearnedSkill>.Empty;
 
-    /// <summary>Total XP (aExp1/aExp2 combined).</summary>
-    public long Experience { get; set; }
+        public long Experience { get; set; }
 
-    /// <summary>
-    ///     aLevel2, the post-cap "high level" rebirth ladder (1-12, MAX_LIMIT_HIGH_LEVEL_NUM) -- only reachable
-    ///     once <see cref="Level" /> reaches <see cref="Stats.LevelProgressionCalculator.MaxLevel" />. No
-    ///     Fenrir-side kill-experience path grants this yet (see <see cref="Stats.LevelProgressionCalculator" />'s
-    ///     own remarks, and <see cref="Progression.RebirthProgression" />'s own remarks on
-    ///     <c>ProcessForExperience2</c> being a distinct, unimplemented prerequisite subsystem) -- both rebirth
-    ///     paths (<c>TribeActionService.RebirthAsync</c>, the CP-funded path capped at generation 6; and
-    ///     <c>UseInventoryItemService</c>'s Rebirth-Pill branch, the only path reaching generations 7-12) and
-    ///     the three combined-level sites (<see cref="CombinedLevel" />'s own consumers) read this field.
-    /// </summary>
-    public short Level2 { get; set; }
+        public short Level2 { get; set; }
 
-    /// <summary>aExp2 -- Level2's own XP counter, reset to 0 on every successful rebirth transition.</summary>
-    public int Exp2 { get; set; }
+        public int Exp2 { get; set; }
 
-    /// <summary>
-    ///     aRebirthNum (0-12, MAX_REBIRTH_LIMIT) -- the CP-funded path (<c>TribeActionService.RebirthAsync</c>)
-    ///     is app-enforced-capped at generation 6; the Rebirth-Pill item-consumption path
-    ///     (<c>UseInventoryItemService</c>) is the only one reaching generations 7-12. Read by StatCalculator's
-    ///     CriticalDefence and Critical wrapper bonuses, and by the tribe-vote eligibility/vote-weight formulas
-    ///     (<see cref="ZoneWar.TribeVoteElection" />).
-    /// </summary>
-    public int RebirthCount { get; set; }
+        public int RebirthCount { get; set; }
 
-    /// <summary>
-    ///     aLevel1+aLevel2 -- the "combined level" value <c>MyFactor.cpp</c>'s <c>GetLevel()</c> accessor
-    ///     returns and a broad set of level-scaled stat formulas consume (see
-    ///     <see cref="Progression.RebirthProgression" />'s own remarks). The three sites that previously
-    ///     compared <see cref="Level" /> alone -- <c>PartyInviteService</c>'s party-invite level-gap gate,
-    ///     <c>TradeInviteService</c>'s trade-ask displayed level, and this type's own consumer
-    ///     <see cref="ZoneWar.TribeVoteElection" /> (which additionally folds in <see cref="RebirthCount" />
-    ///     for its own eligibility/vote-weight formulas, so does not use this property directly) -- all read
-    ///     this instead now.
-    /// </summary>
-    /// <remarks>Réf. C++ : Server/Header/Protocol/MyFactor.cpp:508-511 (GetLevel()).</remarks>
-    public int CombinedLevel => Level + Level2;
+        public int CombinedLevel => Level + Level2;
 
-    /// <summary>aTitle (category*100 + rank 1-14) -- read by StatCalculator's title-rank bonus tables.</summary>
-    public int Title { get; set; }
+        public int Title { get; set; }
 
-    /// <summary>
-    ///     aHalo -- read twice independently by StatCalculator: added directly to all 4 base stats, and again for its own
-    ///     CriticalDefence bonus.
-    /// </summary>
-    public int Halo { get; set; }
+        public int Halo { get; set; }
 
-    /// <summary>aKillOtherTribe (CP) -- quest reward type 3 income; not consumed by StatCalculator.</summary>
-    public int ContributionPoints { get; set; }
+        public int ContributionPoints { get; set; }
 
-    /// <summary>
-    ///     aTeacherPoint -- quest reward type 5 income. A separate counter from the Mentor system's
-    ///     TeacherCharacterId/StudentCharacterId bond.
-    /// </summary>
-    public int TeacherPoint { get; set; }
+        public int TeacherPoint { get; set; }
 
-    /// <summary>
-    ///     aZone241Time -- an unrelated "zone241 time" counter with two independent increment sources: every
-    ///     successful CP-funded rebirth transition (<c>TribeActionService.RebirthAsync</c>'s Path B only, +10;
-    ///     the Rebirth-Pill Path A never touches it) and, separately, a CZ_MISSION_COMPLETE_SEND daily-mission
-    ///     claim landing while the avatar sits exactly at the second-tier level cap
-    ///     (<c>DailyMissionService.ClaimAsync</c>'s own <c>GrantSecondTierZone241TimeBonusAsync</c>, +1). Wire-
-    ///     exposed via <c>AvatarInfo.Zone241Time</c> and as Value03 of an AVATAR_CHANGE_INFO_1 sort-14 push from
-    ///     either source (AOI-wide for the rebirth-transition broadcast; a direct self-only unicast for the
-    ///     daily-mission bonus -- see that method's own remarks for why). Durably persisted via
-    ///     <c>ICharacterRepository.AdjustZone241TimeAsync</c> (game.Characters.Zone241Time --
-    ///     Database/Tables/game/Characters.sql's own column comment for the column's citation) -- already
-    ///     synchronously persisted by the time a <c>TribeProgressZoneCommand</c> mirrors the new value here,
-    ///     same "no dirty mark, nothing left to flush" posture as <see cref="Tribe" />/<c>QuestProgress</c>/
-    ///     <c>TribeFourReturnAllowance</c>.
-    /// </summary>
-    public int Zone241Time { get; set; }
+        public int Zone241Time { get; set; }
 
-    /// <summary>
-    ///     War Point stat -- wire-exposed via <c>AvatarInfo.WarPoint</c> (now reflects the real persisted
-    ///     value via <c>AvatarInfoFactory</c>). Hydrated at world entry from <c>game.Characters.WarPoint</c>
-    ///     (<c>Migrations/041_characters_warpoint_currency.sql</c>, via <c>CharacterWorldSnapshotDto.WarPoint</c>
-    ///     / <c>PlayerEnterData.WarPoint</c> / <c>EnterWorldService</c>) and carried through an in-process zone
-    ///     transfer by <see cref="ZoneTransfer.CreateEnterData" />, closing that migration's own flagged
-    ///     read-side follow-up. Granted only via <see cref="Zone.GrantWarPoints" /> -- the Regular-War-host
-    ///     kill-reward override (<c>Zone.ApplyRegularWarCpOverride</c>) and the boss/event monster-drop tier
-    ///     (<c>World.Loot.BossEventDropResolver</c>, identifiers 746/9001). The GRANT side remains unpersisted,
-    ///     deliberately: unlike the five Eat*Potion counters, War-Point is a spendable balance in the same
-    ///     family as Money/BloodCoin/BigMoney (see <c>IWarPointRepository</c>'s own header), which this
-    ///     codebase always keeps OUT of the write-behind progress batch so a last-write-wins flush can never
-    ///     clobber a balance -- <c>usp_Character_BuyWarPointItem</c> is the only existing atomic mutator, and
-    ///     it only debits. Adding a credit-side atomic procedure for <see cref="Zone.GrantWarPoints" /> is a
-    ///     genuine new-stored-procedure design decision, not a mechanical wiring gap, and is intentionally left
-    ///     open rather than guessed at here -- a mid-session grant is still correctly reflected to the granted
-    ///     client (the existing <c>AvatarStatUpdateResponse</c> push) and in this in-memory mirror, but does
-    ///     not yet survive a relog/disconnect.
-    /// </summary>
-    public int WarPoint { get; set; }
+        public int WarPoint { get; set; }
 
-    /// <summary>
-    ///     DS/Blood Point stat (legacy <c>aBloodCoin</c>) -- wire-exposed via <c>AvatarInfo.BloodCoin</c> (same
-    ///     "always sent as 0, not yet persisted" posture as <see cref="WarPoint" />). Granted only via
-    ///     <see cref="Zone.GrantBloodPoints" />.
-    /// </summary>
-    public int BloodCoin { get; set; }
+        public int BloodCoin { get; set; }
 
-    /// <summary>
-    ///     Cached output of <see cref="StatCalculator.ComputeEffectiveStats" /> -- null until first computed.
-    ///     Recompute only on an equipment/buff/level/title/halo change event, never once per tick.
-    /// </summary>
-    public EffectiveStats? Stats { get; set; }
+        public EffectiveStats? Stats { get; set; }
 
-    /// <summary>
-    ///     This character's item containers (inventory pages, equipment, store pages) while <c>InWorld</c> --
-    ///     mutated only by <see cref="Zone" />'s own tick, same single-writer contract as every other field.
-    /// </summary>
-    public InventoryState Inventory { get; } = new();
+        public InventoryState Inventory { get; } = new();
 
-    /// <summary>
-    ///     Serializes every economy-affecting request-thread action for this character (NPC buy/sell, enchant,
-    ///     craft) across its read-<see cref="Inventory" />-snapshot / await-SQL / post-mirror-command
-    ///     sequence. Without this, two concurrent requests for the same character could both read the same
-    ///     stale pre-mirror snapshot and duplicate an item or money. Acquire before reading
-    ///     <see cref="Inventory" />, release only after the mirror command is posted.
-    /// </summary>
-    public SemaphoreSlim EconomyActionLock { get; } = new(1, 1);
+        public SemaphoreSlim EconomyActionLock { get; } = new(1, 1);
 
-    /// <summary>
-    ///     Wall-clock instant of this character's last accepted op23 (CZ_USE_INVENTORY_ITEM_SEND) request --
-    ///     the per-avatar, item-agnostic anti-flood gate mirroring legacy's single <c>mTickForUseInventoryItem</c>
-    ///     field (Server/Header/H07_MyGame.h:901): one shared stamp across every item id, never a per-item-type
-    ///     cooldown table. Defaulted to <see cref="DateTime.UtcNow" /> at construction time so a freshly
-    ///     (re)registered avatar (every zone entry/transfer constructs a fresh <see cref="PlayerRuntimeState" />)
-    ///     starts the gate the same way legacy (re)initializes it to the current tick at avatar registration
-    ///     (Server/ts25zone/S04_MyWork02.cpp:877) -- the very first item-use attempt after entering a zone is
-    ///     subject to the exact same gate as any later one. Checked and stamped by
-    ///     <c>UseInventoryItemHandler</c>, before any item-specific dispatch, mirroring legacy's own ordering
-    ///     (Server/ts25zone/S04_MyWork03.cpp:1861-1866).
-    /// </summary>
-    public DateTime LastItemUseUtc { get; set; } = DateTime.UtcNow;
+        public DateTime LastItemUseUtc { get; set; } = DateTime.UtcNow;
 
-    /// <summary>
-    ///     Wall-clock instant of this character's last op24 (CZ_IMPROVE_ITEM_SEND) enchant attempt -- the
-    ///     per-avatar same-tick anti-spam gate mirroring legacy's own tick-marker equality check
-    ///     (Server/ts25zone/S04_MyWork02.cpp:2523-2528): stamped unconditionally, before any further
-    ///     validation, so a same-tick retry is rejected even if the rest of that first attempt later fails
-    ///     its own validation. Modeled as a continuous wall-clock comparison against
-    ///     <see cref="Simulation.SimulationClock.LegacyTick" /> (500 ms) rather than a discrete tick-counter
-    ///     equality check, for the same request-thread/Zone-tick-thread split documented on
-    ///     <see cref="LastItemUseUtc" /> -- <c>EnchantItemHandler</c> also runs on the request thread, not the
-    ///     Zone tick thread that owns the only Zone-wide simulated clock in this codebase. Defaulted to
-    ///     <see cref="DateTime.UtcNow" /> at construction time so a freshly (re)registered avatar's very first
-    ///     enchant attempt is subject to the same gate as any later one. Checked and stamped by
-    ///     <c>EnchantItemService.EnchantAsync</c>, immediately after the town-zone gate and before any
-    ///     item-slot validation, matching legacy's own ordering.
-    /// </summary>
-    public DateTime LastEnchantAttemptUtc { get; set; } = DateTime.UtcNow;
+        public DateTime LastEnchantAttemptUtc { get; set; } = DateTime.UtcNow;
 
-    /// <summary>
-    ///     Server-side monotonic counter, independent of the DB's own FlushSequence baseline -- incremented
-    ///     once per accepted move (<c>Zone.PlayerLifecycle.HandleMove</c>) or once per call to
-    ///     <see cref="MarkProgressDirty" />, never reset, so <c>usp_Character_PersistBatch</c> AND
-    ///     <c>usp_Character_PersistProgressBatch</c> -- which share this single per-character column -- always
-    ///     see a strictly increasing value for this character's lifetime in this zone.
-    /// </summary>
-    public long FlushSequence { get; set; }
+        public long FlushSequence { get; set; }
 
-    /// <summary>
-    ///     Every Vitals/Progression dirty-mark site (combat, death/XP-loss, revive, skill cast/mana, quest/pet/
-    ///     rebirth/CP mirrors) must route through here instead of calling <c>dirtyTracker.MarkDirty</c> directly.
-    ///     Centralizing the <see cref="FlushSequence" /> bump here (rather than duplicating
-    ///     <c>state.FlushSequence++;</c> at each of the ~25 call sites across 8 files) is what makes
-    ///     <c>Fenrir.Application.Game.Hosting.World.ProgressWriteBehindHost</c>'s flush actually durable:
-    ///     without it, a Vitals/Progression-only change with no accompanying move would never bump the shared
-    ///     counter, so <c>usp_Character_PersistProgressBatch</c>'s "FlushSequence &gt; stored" guard would
-    ///     silently no-op every progress flush after the very first one each session -- the exact
-    ///     zero-net-cost item/CP-duplication shape this fix closes. Safe to call unsynchronized: every one of
-    ///     these call sites already runs on this character's own zone tick thread (single-writer), the same
-    ///     contract <see cref="FlushSequence" /> and every other field on this type already relies on. Position
-    ///     keeps its own separate, pre-existing <c>state.FlushSequence++;</c> inline in <c>HandleMove</c> --
-    ///     deliberately not routed through here, so its historical exactly-once-per-accepted-move cadence is
-    ///     untouched by this change.
-    /// </summary>
-    public void MarkProgressDirty(DirtyTracker<int> dirtyTracker, DirtyFlags flags)
+        public void MarkProgressDirty(DirtyTracker<int> dirtyTracker, DirtyFlags flags)
     {
         FlushSequence++;
         dirtyTracker.MarkDirty(CharacterId, flags);

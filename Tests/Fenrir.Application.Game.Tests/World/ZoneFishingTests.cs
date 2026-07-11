@@ -5,7 +5,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>Covers <c>Zone.ApplyFishingCommand</c> directly -- the mirror + broadcast half of op 103/104/105.</summary>
 public class ZoneFishingTests
 {
     private static readonly int OneFrame = FrameWriter.FrameSizeOf<AvatarActionResponse>();

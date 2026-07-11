@@ -8,21 +8,14 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.BuffsMountsCosmetics;
 
-/// <inheritdoc cref="ICostumeStateService" />
 public sealed class CostumeStateService(
     ICharacterRepository characters,
     WorldDataCache worldData,
     IEventLogRepository eventLog,
     ILogger<CostumeStateService> logger) : ICostumeStateService
 {
-    /// <summary>
-    ///     game.EventLog.EventCode for op90 Sort 5 (ReturnToInventorySuccess) -- the only EventCode this
-    ///     service logs, scoped independently within <see cref="EventLogCategory.CosmeticDelete" />, same
-    ///     "app-owned, per-class numbering" posture as
-    ///     <see cref="Fenrir.Application.Game.Services.ItemModification.CraftItemService" />'s own EventCode
-    ///     constants.
-    /// </summary>
-    private const short CostumeReturnEventCode = 1;
+
+        private const short CostumeReturnEventCode = 1;
 
     public async ValueTask<CostumeStateResult> ApplyAsync(Zone zone, PlayerRuntimeState state, int characterId,
         int accountId, int sort, int value, CancellationToken cancellationToken)
@@ -103,9 +96,6 @@ public sealed class CostumeStateService(
         await characters.ReplaceContainerAsync(characterId, destination.Container, ToTvps(projectedContainer),
             cancellationToken);
 
-        // Logged only once the container replace above has durably committed -- a CosmeticDelete row must
-        // never assert a wardrobe-slot deletion that the DB write didn't actually persist (same "log after
-        // persist" ordering CraftItemService's own craft-family logging uses).
         await eventLog.LogAsync(CostumeReturnEventCode, EventLogCategory.CosmeticDelete, accountId, characterId,
             null, null, null, null, null, result.GrantedItemId, 1, 1, $"ClearedWardrobeSlot={result.ClearedSlot}",
             cancellationToken);

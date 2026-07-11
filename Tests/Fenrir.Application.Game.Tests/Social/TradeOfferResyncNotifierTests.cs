@@ -6,12 +6,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.Social;
 
-/// <summary>
-///     Covers <see cref="TradeOfferResyncNotifier" />: mutation-triggered trade-window resync (behavior
-///     contract C21§F). Deliberately NOT driven through <see cref="Zone.Tick" /> -- this helper is designed to
-///     be called synchronously from a request-thread trade-offer-mutation handler, matching the contract's own
-///     "not a per-tick behavior" correction.
-/// </summary>
 public class TradeOfferResyncNotifierTests
 {
     private static (ZoneRegistry Registry, TradeRegistry Trades, FakeDuplexPipe PipeA, FakeDuplexPipe PipeB)
@@ -111,7 +105,6 @@ public class TradeOfferResyncNotifierTests
         ZoneTestKit.DrainOutbound(pipeA);
 
         var trades = new TradeRegistry();
-        // Character 2 never entered any zone -- simulates a partner who has since disconnected.
         StartSession(trades, 1, 2);
 
         var handled = TradeOfferResyncNotifier.TryNotifyOpponent(trades, registry, 1);

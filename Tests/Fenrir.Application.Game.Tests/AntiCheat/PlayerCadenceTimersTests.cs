@@ -2,10 +2,6 @@ using Fenrir.Application.Game.Domain.AntiCheat;
 
 namespace Fenrir.Application.Game.Tests.AntiCheat;
 
-/// <summary>
-///     Covers <see cref="PlayerCadenceTimers" /> — the twelve named cadence baselines, their name-derived
-///     intervals, and the reset-to-now behavior. Asserts nothing about consumption (none is modeled).
-/// </summary>
 public class PlayerCadenceTimersTests
 {
     [Theory]

@@ -8,7 +8,6 @@ public class ClDeleteAvatarSendTests
     [Fact]
     public void PayloadSize_MatchesContractConstant()
     {
-        // ExpectedSize=21 (9-byte inbound header) -> 12-byte payload (3 int).
         Assert.Equal(12, DeleteAvatarRequest.PayloadSize);
     }
 

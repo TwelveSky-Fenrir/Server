@@ -10,11 +10,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
-// op14 CL_CHANGE_MOUSE_PASSWORD_SEND -- legacy quirk (S04_MyWork02.cpp l.532): success proceeds straight
-// to CharSelect. Every mismatch is also recorded as a game.EventLog AccountSecurity row, mirroring op15's
-// own audit trail (pincode-second-password security audit's Major finding: closes the asymmetry where an
-// attacker could previously brute-force the shared PinFailureCount counter entirely through op14 and
-// leave no durable trace).
 public class ClChangeMousePasswordSendHandlerTests
 {
     private const int AccountId = 42;
@@ -98,10 +93,6 @@ public class ClChangeMousePasswordSendHandlerTests
         await PacketAssert.AssertSentAsync(pipe, new ChangeMousePinResponse { Result = 1, MousePassword = "0000" });
         Assert.Equal(DisconnectReason.StateViolation, session.DisconnectReason);
 
-        // Closes the audit-trail asymmetry: op14 mismatches are now recorded exactly like op15's own
-        // VerifyMousePinHandler suite (ClLoginMousePasswordSendHandlerTests.
-        // HandleAsync_WrongPin_TwiceThenThird_StaysUntilThirdStrikeDisconnects), just with the distinct
-        // MousePinChangeMismatch/MousePinChangeLockout event codes.
         Assert.Equal(3, eventLog.LoggedEvents.Count);
         Assert.All(eventLog.LoggedEvents,
             e =>
@@ -109,11 +100,11 @@ public class ClChangeMousePasswordSendHandlerTests
                 Assert.Equal(EventLogCategory.AccountSecurity, e.Category);
                 Assert.Equal(AccountId, e.ActorAccountId);
             });
-        Assert.Equal((short)4, eventLog.LoggedEvents[0].EventCode); // MousePinChangeMismatch
+        Assert.Equal((short)4, eventLog.LoggedEvents[0].EventCode);
         Assert.Equal((byte)1, eventLog.LoggedEvents[0].Outcome);
         Assert.Equal((short)4, eventLog.LoggedEvents[1].EventCode);
         Assert.Equal((byte)2, eventLog.LoggedEvents[1].Outcome);
-        Assert.Equal((short)5, eventLog.LoggedEvents[2].EventCode); // MousePinChangeLockout
+        Assert.Equal((short)5, eventLog.LoggedEvents[2].EventCode);
         Assert.Equal((byte)3, eventLog.LoggedEvents[2].Outcome);
     }
 
@@ -131,13 +122,11 @@ public class ClChangeMousePasswordSendHandlerTests
             new ChangeMousePinRequest { MousePassword = "1111", ChangeMousePassword = "2222" }, session,
             CancellationToken.None);
 
-        // Fenrir-only account-scoped lockout (Migrations/028_account_pin_lockout.sql): silent abort, no
-        // wire reply -- matching NoPinConfigured/InvalidFormat's posture, unlike WrongPassword's Result=1.
         Assert.Equal(DisconnectReason.StateViolation, session.DisconnectReason);
         PacketAssert.AssertNothingSent(pipe);
         Assert.Equal(0, pins.SetCallCount);
         var logged = Assert.Single(eventLog.LoggedEvents);
-        Assert.Equal((short)6, logged.EventCode); // MousePinAttemptRejectedLocked
+        Assert.Equal((short)6, logged.EventCode);
     }
 
     [Fact]

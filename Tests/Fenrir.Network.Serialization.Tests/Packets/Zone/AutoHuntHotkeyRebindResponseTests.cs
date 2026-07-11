@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Zone;
 
-/// <summary>ZC_SET_HOTKEY_INVENTORY_RECV (ZONE.h:1129-1138, 28-byte payload), no padding.</summary>
 public class ZcSetHotkeyInventoryRecvTests
 {
     [Fact]

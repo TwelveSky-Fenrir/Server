@@ -3,10 +3,6 @@ using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Tests.Progression;
 
-/// <summary>
-///     Covers <see cref="AutoHuntConfigValidator" /> -- the server-side validation of the client-supplied 112-byte
-///     AUTO_HUNT blob (the security-hardening target: legacy stored it verbatim with no field validation).
-/// </summary>
 public class AutoHuntConfigValidatorTests
 {
     private static AutoHunt Valid()

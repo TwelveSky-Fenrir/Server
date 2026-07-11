@@ -7,13 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>
-///     CZ_TEACHER_ANSWER_SEND (opcode 61) -- on accept, the master (not the student) later consumes it via
-///     CZ_TEACHER_START_SEND. See
-///     <see cref="Fenrir.Application.Game.Domain.Social.Mentor.MentorRegistry.TryConsumeStart" />
-///     for an open LEGACY-PARITY RISK note: whether that master-only restriction on MentorStart is
-///     legacy-accurate is unconfirmed.
-/// </summary>
 public sealed class MentorAnswerHandler(
     ZoneRegistry zones,
     IMentorAnswerService mentorAnswerService,

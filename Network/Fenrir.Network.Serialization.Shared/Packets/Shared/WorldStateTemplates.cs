@@ -1,16 +1,7 @@
 namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 
-// Wire-zero templates for world-state structs embedded in ZC_BROADCAST_WORLD_INFO/ZC_REGISTER_AVATAR_RECV.
-// Every field starts zeroed here; callers overlay whichever slice they have a real backing source for (e.g.
-// Fenrir.Application.Game.Domain.Guilds.GuildRankingProjection for GuildName3/GuildScore,
-// Fenrir.Application.Game.Domain.World.WorldState.WorldStateProjection for the RvR tribe-symbol/points slice)
-// rather than this project (Network) depending upward on Application to do it here -- the remaining fields
-// on both WorldInfo and TribeInfo (and all of BuffInfo for a brand-new character) genuinely have no backing
-// state anywhere yet and are correctly left zeroed until they do.
 public static class WorldStateTemplates
 {
-    // Array lengths must match each property's own [FixedArray] attribute; string arrays must be
-    // filled with "" not left as bare `new string[N]`, or the codec hits null entries.
     public static readonly WorldInfo ZeroedWorldInfo = new()
     {
         Zone038WinTribe = 0,

@@ -6,11 +6,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Progression;
 
-/// <summary>
-///     Business logic extracted from <c>HeroRankingHandler</c> (CZ_HERORANK_INFO_SEND, opcode 118). See that
-///     handler's own remarks for why a flat per-connection 2.5s throttle stands in for the legacy's
-///     server-wide ranking-refresh cadence.
-/// </summary>
 public sealed class HeroRankingService(IHeroRankingRepository heroRankings, ILogger<HeroRankingService> logger)
     : IHeroRankingService
 {

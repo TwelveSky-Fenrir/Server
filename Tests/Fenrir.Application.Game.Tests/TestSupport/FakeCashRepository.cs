@@ -3,10 +3,6 @@ using Fenrir.Data.Abstractions.Commerce;
 
 namespace Fenrir.Application.Game.Tests.TestSupport;
 
-/// <summary>
-///     In-memory stand-in for ICashRepository: tracks per-account balance and the last credit/debit call so
-///     handler test suites can assert on both without a real SQL Server 2025 instance.
-/// </summary>
 internal sealed class FakeCashRepository : ICashRepository
 {
     private readonly Dictionary<int, int> _balances = new();

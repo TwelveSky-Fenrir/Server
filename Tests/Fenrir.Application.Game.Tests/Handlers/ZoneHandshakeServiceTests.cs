@@ -11,10 +11,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 
-// op11 ZC_TEMP_REGISTER_SEND -- cross-process duplicate-login kick/refusal, plus the tribe-population quota
-// gate, Game-side half: a resolved, shard-matched ticket must still be re-checked against
-// runtime.AccountSessions before world-entry is granted, since the account may have logged in again elsewhere
-// between ticket mint and ticket consume.
 public class ZoneHandshakeServiceTests
 {
     private const int AccountId = 7;
@@ -44,8 +40,6 @@ public class ZoneHandshakeServiceTests
         Assert.Equal((AccountId, SessionToken, ShardId), accountSessions.LastTransition);
     }
 
-    // GM-BLOCK precondition: the ticket's own AccountGrade column must ride through to ZoneHandshakeResult
-    // untouched -- never re-derived, never re-queried.
     [Fact]
     public async Task ConsumeTicketAsync_TicketCarriesGmGrade_PropagatesItToTheResult()
     {
@@ -66,9 +60,6 @@ public class ZoneHandshakeServiceTests
     [Fact]
     public async Task ConsumeTicketAsync_ANewerLoginAlreadyClaimedTheAccount_ReturnsSessionSuperseded()
     {
-        // runtime.AccountSessions moved on since this ticket was minted (e.g. the account logged in again
-        // elsewhere) -- usp_AccountSession_TransitionToGame refuses the claim even though the ticket itself
-        // was perfectly valid.
         var tickets = new FakeSessionTicketRepository
         {
             TicketToReturn = new ConsumedTicketDto(CharacterId, ShardId, SessionToken)
@@ -110,7 +101,6 @@ public class ZoneHandshakeServiceTests
         var service = CreateService(tickets, accountSessions);
         var (session, _) = ZoneTestKit.CreateSession(1);
 
-        // "MG0" decodes to accountId 0 -- outside the valid index range (function.h:38-44's precondition).
         var result = await service.ConsumeTicketAsync(EncodeObfuscatedAccountId(0), 0, session,
             CancellationToken.None);
 
@@ -149,7 +139,6 @@ public class ZoneHandshakeServiceTests
         var accountSessions = new FakeAccountSessionRepository();
         var quota = new TribeQuotaRegistry();
 
-        // Capacity 9 -> threshold 3 for ThreeWay. Fill tribe 1's slots to the threshold with other connections.
         for (var i = 0; i < 3; i++)
         {
             var (other, _) = ZoneTestKit.CreateSession(100 + i);
@@ -163,7 +152,7 @@ public class ZoneHandshakeServiceTests
             CancellationToken.None);
 
         Assert.Equal(ZoneHandshakeOutcome.QuotaFull, result.Outcome);
-        Assert.Null(accountSessions.LastTransition); // never reached ticket consumption
+        Assert.Null(accountSessions.LastTransition);
     }
 
     [Fact]
@@ -177,8 +166,6 @@ public class ZoneHandshakeServiceTests
         var quota = new TribeQuotaRegistry();
         var characters = new FakeCharacterRepository
         {
-            // The character's true, persisted tribe (2) differs from what will be declared below (1) --
-            // the recorded tribe must be the resolved one, never the declared one.
             WorldEntryToReturn = new CharacterWorldEntryDto(CharacterId, AccountId, 0, "Hero", 2, 0, 0, 0,
                 1, 1, 0, 0, 0, 0, 100, 100, 50, 50, 1)
         };
@@ -191,8 +178,8 @@ public class ZoneHandshakeServiceTests
             session, CancellationToken.None);
 
         Assert.Equal(ZoneHandshakeOutcome.Accepted, result.Outcome);
-        Assert.Equal(1, quota.CountForTribe(2)); // recorded under the resolved tribe...
-        Assert.Equal(0, quota.CountForTribe(1)); // ...not the declared one.
+        Assert.Equal(1, quota.CountForTribe(2));
+        Assert.Equal(0, quota.CountForTribe(1));
     }
 
     [Fact]
@@ -227,8 +214,7 @@ public class ZoneHandshakeServiceTests
                 { ShardId = ShardId, TribeQuotaGroup = quotaGroup, Capacity = capacity }));
     }
 
-    /// <summary>Mirrors ObfuscatedUidCodec.TryDecodeAccountId's encoding half: Latin1("MG"+id), then USE_XOR_UID.</summary>
-    private static string EncodeObfuscatedAccountId(int accountId)
+        private static string EncodeObfuscatedAccountId(int accountId)
     {
         var bytes = Encoding.Latin1.GetBytes("MG" + accountId);
         WireXor.ApplyUidXor(bytes);

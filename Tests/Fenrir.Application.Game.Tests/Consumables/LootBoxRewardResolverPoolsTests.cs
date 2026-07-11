@@ -3,17 +3,8 @@ using Fenrir.Application.Game.Domain.Consumables;
 
 namespace Fenrir.Application.Game.Tests.Consumables;
 
-/// <summary>
-///     Deterministic coverage for the C10 additions to <see cref="LootBoxRewardResolver" />: the Mount-Box
-///     banded-pool draw (<see cref="LootBoxRewardResolver.RollPools" /> /
-///     <see cref="LootBoxRewardResolver.RollRareBandThenPools" />) and the shared pity counter step
-///     (<see cref="LootBoxRewardResolver.PityStep" />). <see cref="ScriptedRandom" /> returns the draws in the
-///     exact order the code requests them, so multi-draw shapes (rare band, then pool selection, then
-///     within-pool uniform pick) are pinned rather than merely seeded.
-/// </summary>
 public class LootBoxRewardResolverPoolsTests
 {
-    // Mount Box's five pools over an inclusive 0..200 draw: ceilings 10/40/100/160/200.
     private static readonly ImmutableArray<LootBoxRewardResolver.RewardPool> MountPools =
     [
         new(10, [92286]),
@@ -26,7 +17,6 @@ public class LootBoxRewardResolverPoolsTests
     [Fact]
     public void RollPools_DrawAtFirstPoolCeiling_PicksFirstPool()
     {
-        // Pool-select draw 10 (<= ceiling 10) -> pool0; within-pool uniform draw 0 -> 92286.
         var id = LootBoxRewardResolver.RollPools(new ScriptedRandom(10, 0), MountPools);
 
         Assert.Equal(92286, id);
@@ -35,7 +25,6 @@ public class LootBoxRewardResolverPoolsTests
     [Fact]
     public void RollPools_DrawJustAboveFirstCeiling_FallsToSecondPool()
     {
-        // Pool-select draw 11 (> 10, <= 40) -> pool1; within-pool uniform draw 7 -> the eighth mount id.
         var id = LootBoxRewardResolver.RollPools(new ScriptedRandom(11, 7), MountPools);
 
         Assert.Equal(1326, id);
@@ -61,7 +50,6 @@ public class LootBoxRewardResolverPoolsTests
     {
         var rareBands = ImmutableArray.Create(new LootBoxRewardResolver.RewardBand(50, 635));
 
-        // Rare draw 49 (< 50) -> 635. No pool draw is consumed (ScriptedRandom would throw if a second draw ran).
         var id = LootBoxRewardResolver.RollRareBandThenPools(new ScriptedRandom(49), rareBands, MountPools);
 
         Assert.Equal(635, id);
@@ -72,7 +60,6 @@ public class LootBoxRewardResolverPoolsTests
     {
         var rareBands = ImmutableArray.Create(new LootBoxRewardResolver.RewardBand(50, 635));
 
-        // Rare draw 50 (>= 50, miss); pool-select 45 (<= 100) -> pool2 {611,612,652}; uniform 2 -> 652.
         var id = LootBoxRewardResolver.RollRareBandThenPools(new ScriptedRandom(50, 45, 2), rareBands, MountPools);
 
         Assert.Equal(652, id);
@@ -95,8 +82,7 @@ public class LootBoxRewardResolverPoolsTests
         Assert.Equal(expectNewCounter, result.NewCounter);
     }
 
-    /// <summary>Returns queued draws in request order; throws if the code draws more than were scripted.</summary>
-    private sealed class ScriptedRandom(params int[] values) : Random
+        private sealed class ScriptedRandom(params int[] values) : Random
     {
         private int _index;
 

@@ -2,7 +2,6 @@ using Fenrir.Application.Game.Domain.World;
 
 namespace Fenrir.Application.Game.Abstractions.BuffsMountsCosmetics;
 
-/// <summary>Business logic behind <see cref="CostumeStateHandler" /> (CZ_COSTUME_STATE_SEND, op90).</summary>
 public interface ICostumeStateService
 {
     public ValueTask<CostumeStateResult> ApplyAsync(Zone zone, PlayerRuntimeState state, int characterId,

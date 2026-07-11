@@ -8,9 +8,6 @@ using Fenrir.Data.Abstractions.Guilds;
 
 namespace Fenrir.Data.Guilds;
 
-// Four-guild live-scoring data access (C17 Part B): enemy-tribe-kill point accrual (silent on unknown guild)
-// and the top-N-positive leaderboard read. See game.usp_Guild_AddFourGuildPoints /
-// game.usp_Guild_GetTopFourGuild headers for how these differ from the general guild-point surface.
 public sealed record FourGuildScoringRepository(ICaeriusNetDbContext Db) : IFourGuildScoringRepository
 {
     public async ValueTask AddPointsAsync(int guildId, int delta, CancellationToken ct)

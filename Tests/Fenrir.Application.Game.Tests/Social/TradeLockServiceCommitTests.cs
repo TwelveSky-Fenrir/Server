@@ -11,16 +11,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Social;
 
-/// <summary>
-///     C8-trade-finalize: covers <see cref="TradeLockService.CommitAsync" />'s wiring onto
-///     <see cref="Fenrir.Data.Abstractions.Characters.ITradeCommitRepository" /> (game.usp_CharacterTradeCommit_ExecuteIdempotent,
-///     the anti-dupe variant of
-///     <see cref="Fenrir.Data.Abstractions.Characters.ICharacterRepository.ExecuteTradeAsync" />) -- the one piece of the finalize/commit
-///     path (mTradeProcessState==4, CZ_TRADE_MENU_SEND's second 1-&gt;2 notch) that had not yet been wired to the
-///     idempotent repository built alongside it. Deliberately does NOT re-test the menu-state handshake itself
-///     (0-&gt;1-&gt;2, both-sides-must-reach-2) -- that is <see cref="TradeLockService.TryLock" />'s own contract,
-///     unrelated to this slice.
-/// </summary>
 public class TradeLockServiceCommitTests
 {
     private static async Task RunToCompletionAsync(ValueTask pending, Zone zone)
@@ -91,14 +81,11 @@ public class TradeLockServiceCommitTests
         await RunToCompletionAsync(
             service.CommitAsync(session, stateA, zone, stateB, zone, 10, CancellationToken.None), zone);
 
-        // The anti-dupe repository (not the plain ICharacterRepository.ExecuteTradeAsync) is the ONLY commit
-        // path exercised, and it receives exactly one call bearing a real, non-empty idempotency token.
         var call = Assert.Single(repo.Calls);
         Assert.NotEqual(Guid.Empty, call.TradeToken);
         Assert.Equal(10, call.CharacterA);
         Assert.Equal(20, call.CharacterB);
 
-        // A offered 500 money and one item to B; B offered nothing -- net deltas mirror that one-way flow.
         Assert.Equal(-500L, call.DeltaMoneyA);
         Assert.Equal(500L, call.DeltaMoneyB);
         Assert.Equal(500L, call.OfferedMoneyA);
@@ -110,9 +97,6 @@ public class TradeLockServiceCommitTests
         Assert.NotNull(call.TradedItemsB);
         Assert.Empty(call.TradedItemsB!);
 
-        // Post-commit: the trade session is torn down for both participants and each receives the
-        // "success" TradeEndResponse (Result=0), distinguishing it from TradeEndHandler's manual-close
-        // Result=1 (Application/Fenrir.Application.Game.Handlers/Handlers/Social/TradeEndHandler.cs).
         Assert.False(trades.TryGetSession(10, out _));
         Assert.False(trades.TryGetSession(20, out _));
         Assert.Null(sessionA.DisconnectReason);
@@ -123,8 +107,6 @@ public class TradeLockServiceCommitTests
         Assert.Equal(FrameWriter.FrameSizeOf<TradeEndResponse>(), toA.Length);
         Assert.Equal(FrameWriter.FrameSizeOf<TradeEndResponse>(), toB.Length);
 
-        // The swap itself: A's offered item left A's container and landed in B's (first free slot); A's
-        // offered slot is now empty.
         Assert.False(stateA.Inventory.GetContainer(ContainerMatrix.InventoryPage0).ContainsKey(0));
         var bContainer = stateB.Inventory.GetContainer(ContainerMatrix.InventoryPage0);
         Assert.True(bContainer.ContainsKey(0));
@@ -145,8 +127,6 @@ public class TradeLockServiceCommitTests
         ZoneTestKit.DrainOutbound(pipeA);
         ZoneTestKit.DrainOutbound(pipeB);
 
-        // The first commit's own trades.TryEnd(...) already cleared both participants' registry entries, so a
-        // second, genuinely independent trade between the same two characters can start cleanly.
         var secondSession = StartSession(trades, 10, 20);
         await RunToCompletionAsync(
             service.CommitAsync(secondSession, stateA, zone, stateB, zone, 10, CancellationToken.None), zone);
@@ -169,9 +149,6 @@ public class TradeLockServiceCommitTests
             RunToCompletionAsync(
                 service.CommitAsync(session, stateA, zone, stateB, zone, 10, CancellationToken.None), zone));
 
-        // A rejected commit attempt must never claim/clear the session -- the DB-side transaction (and its
-        // ledger row, per ITradeCommitRepository's own exception contract) rolled back, so the in-memory
-        // negotiation state must not be torn down out from under a legitimate retry.
         Assert.True(trades.TryGetSession(10, out _));
         Assert.True(trades.TryGetSession(20, out _));
     }

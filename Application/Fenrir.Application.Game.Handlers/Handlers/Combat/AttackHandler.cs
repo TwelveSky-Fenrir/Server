@@ -9,10 +9,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Combat;
 
-/// <summary>
-///     CZ_PROCESS_ATTACK_SEND (opcode 18). Only validates <c>mCase</c> is 1-6 (anti-fuzzing); guards, RNG
-///     rolls and HP mutation all happen later on the zone's own tick thread.
-/// </summary>
 public sealed class AttackHandler(IAttackService service, ILogger<AttackHandler>? logger = null)
     : IInlinePacketHandler<AttackRequest>
 {
@@ -26,9 +22,6 @@ public sealed class AttackHandler(IAttackService service, ILogger<AttackHandler>
 
         if (!service.IsValidCase(attackInfo.Case))
         {
-            // Anti-fuzzing rejection (AttackRequest's own remarks) -- Information, not Debug: an operator
-            // watching live logs should see a session-terminating anti-cheat gate without raising the
-            // default log level, even though it isn't a "successful" outcome.
             logger?.LogInformation(
                 "Attack rejected and character {CharacterId}'s session will be terminated: case {CaseValue} is outside the valid 1-6 range (anti-fuzzing)",
                 characterId, attackInfo.Case);
@@ -36,7 +29,6 @@ public sealed class AttackHandler(IAttackService service, ILogger<AttackHandler>
             return;
         }
 
-        // Benign staleness window around a zone handoff.
         if (zoneSession.CurrentZone is not Zone zone)
             return;
 

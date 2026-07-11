@@ -7,11 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>
-///     CZ_PARTY_LEAVE_SEND (opcode 69) -- no-op if not partied or is the leader (leader must use
-///     CZ_PARTY_BREAK_SEND). Deviation: dropping to 1 member auto-disbands here; legacy leaves a lone
-///     leader "partied" until an explicit Break.
-/// </summary>
 public sealed class PartyLeaveHandler(
     ZoneRegistry zones,
     IPartyLeaveService partyLeaveService,

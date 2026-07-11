@@ -2,34 +2,10 @@ using Fenrir.Application.Game.GameData;
 
 namespace Fenrir.Application.Game.Domain.Skills;
 
-/// <summary>
-///     Port of SKILLSYSTEM::ReturnSkillValue: linear interpolation between a skill's two SkillGrades rows
-///     (GradeIndex 0 = min, 1 = max) by the caster's invested grade points, out of MaxUpgradePoint.
-/// </summary>
 public static class SkillCatalog
 {
-    /// <summary>
-    ///     <paramref name="gradePoints" /> is the legacy <c>sPoint</c> argument. Which grade the caller must
-    ///     pass depends on what it is computing, and the two are NOT interchangeable:
-    ///     <list type="bullet">
-    ///         <item>
-    ///             EFFECT values (buff magnitude/duration, targeted heal amount, attack ratio -- every factor
-    ///             except <see cref="SkillValueKind.ManaUse" />) use the COMBINED grade
-    ///             <c>aSkillGradeNum1 + aSkillGradeNum2</c> (invested points plus the item-granted
-    ///             <c>GetBonusSkillValue</c>). Réf. C++ : <c>ProcessForCreateBuff</c>,
-    ///             Server/ts25zone/S07_MyGame03.cpp:9328-9618.
-    ///         </item>
-    ///         <item>
-    ///             The <see cref="SkillValueKind.ManaUse" /> cost uses the INVESTED grade
-    ///             <c>aSkillGradeNum1</c> ALONE -- never the item bonus. Réf. C++ :
-    ///             Server/ts25zone/S04_MyWork02.cpp:1640 (op15 skill-cast charge) and
-    ///             Server/ts25zone/S07_MyGame04.cpp:2463 (auto-hunt charge), both passing
-    ///             <c>aSkillGradeNum1</c> alone to factor 1. This method cannot enforce that split itself; the
-    ///             caller (<c>Zone.ApplySkillCastManaCharge</c> / <c>Zone.ApplyCombatCommand</c>) owns it.
-    ///         </item>
-    ///     </list>
-    /// </summary>
-    public static float ReturnSkillValue(SkillDefinition skill, int gradePoints, SkillValueKind kind)
+
+        public static float ReturnSkillValue(SkillDefinition skill, int gradePoints, SkillValueKind kind)
     {
         if (gradePoints < 1)
             return 0f;
@@ -39,7 +15,7 @@ public static class SkillCatalog
 
         var maxUpgradePoint = skill.Skill.MaxUpgradePoint;
         if (maxUpgradePoint <= 0)
-            return 0f; // defensive: the C++ divides unconditionally here (UB on 0), never observed in real data.
+            return 0f;
 
         var minValue = ReadField(grade0, kind);
         var maxValue = ReadField(grade1, kind);

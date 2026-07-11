@@ -4,11 +4,6 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Seeding;
 
-/// <summary>
-///     Generates <c>70_seed/world/070_skills.sql</c> from <see cref="SkillReader.ReadAll" /> (005_00003.IMG),
-///     one row per skill where Index != 0: 147 of 300 raw records are blank placeholders all sharing
-///     Index == 0, which would collide with SkillId's non-IDENTITY primary key if not filtered out.
-/// </summary>
 public static class SkillSeedGenerator
 {
     private const string SkillColumns =

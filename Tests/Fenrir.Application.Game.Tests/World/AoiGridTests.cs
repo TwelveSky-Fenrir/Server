@@ -2,12 +2,6 @@ using Fenrir.Application.Game.Domain.World;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     Covers <see cref="AoiGrid.HasAnyNeighbor" /> -- the cheap 9-cell emptiness pre-check that replaced
-///     <c>Neighbors(...).ToArray().Length == 0</c> at every hot broadcast call site (<c>Zone.Monsters.cs</c>,
-///     <c>Zone.GroundItems.cs</c>, <c>Zone.ProxyShops.cs</c>). Every assertion here is checked against
-///     <see cref="AoiGrid.Neighbors" />'s own established 3x3 semantics, never against a re-derived formula.
-/// </summary>
 public class AoiGridTests
 {
     private static readonly float CellSize = 100f;
@@ -93,13 +87,7 @@ public class AoiGridTests
         Assert.True(grid.HasAnyNeighbor((50, 50)));
     }
 
-    /// <summary>
-    ///     Cross-checks <see cref="AoiGrid.HasAnyNeighbor" /> against <see cref="AoiGrid.Neighbors" /> itself
-    ///     (the pre-existing, already-trusted enumeration) across a populated grid and every cell in and around
-    ///     it -- the two must never disagree, since <see cref="HasAnyNeighbor" /> exists purely as a cheaper way
-    ///     to ask the same question <see cref="Neighbors" />'s own non-emptiness already answers.
-    /// </summary>
-    [Fact]
+        [Fact]
     public void HasAnyNeighbor_AgreesWithNeighbors_AcrossARandomlyPopulatedGrid()
     {
         var grid = new AoiGrid(CellSize);

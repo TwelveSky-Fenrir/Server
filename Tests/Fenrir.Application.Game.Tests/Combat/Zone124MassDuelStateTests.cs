@@ -2,12 +2,6 @@ using Fenrir.Application.Game.Domain.Combat;
 
 namespace Fenrir.Application.Game.Tests.Combat;
 
-/// <summary>
-///     Covers <see cref="Zone124MassDuelState" /> -- the C-supporting zone-wide mass-duel countdown of the B10
-///     contract: start (60), decrement/broadcast per qualifying tick, early empty-team teardown, and the
-///     headcount winner at the final unit (<c>Process_Zone_124_TYPE</c>,
-///     <c>Server/ts25zone/S07_MyGame01.cpp:4351-4494</c>; <c>S04_MyWork04.cpp:1879-2013</c>).
-/// </summary>
 public class Zone124MassDuelStateTests
 {
     [Fact]
@@ -41,7 +35,7 @@ public class Zone124MassDuelStateTests
         var state = new Zone124MassDuelState();
         state.Start(2, 2);
 
-        var step = state.Advance(); // 60 -> 59
+        var step = state.Advance();
 
         Assert.Equal(Zone124CountdownAction.Decremented, step.Action);
         Assert.Equal(59, step.RemainingUnits);
@@ -52,14 +46,12 @@ public class Zone124MassDuelStateTests
     public void Advance_BroadcastTime_OnFiveUnitCadence()
     {
         var state = new Zone124MassDuelState();
-        state.Start(2, 2); // 60
+        state.Start(2, 2);
 
-        // First decrement lands on 59 (not a multiple of 5) -> no broadcast.
         Assert.Equal(Zone124CountdownAction.Decremented, state.Advance().Action);
 
-        // Advance down to 55, which IS a multiple of 5 -> broadcast due.
         Zone124CountdownStep step = default;
-        for (var i = 0; i < 4; i++) // 59 -> 58 -> 57 -> 56 -> 55
+        for (var i = 0; i < 4; i++)
             step = state.Advance();
 
         Assert.Equal(55, step.RemainingUnits);
@@ -71,14 +63,14 @@ public class Zone124MassDuelStateTests
     {
         var state = new Zone124MassDuelState();
         state.Start(5, 2);
-        state.SetTeamCounts(3, 1); // team one leads
+        state.SetTeamCounts(3, 1);
         DriveDownTo(state, 1);
 
         var step = state.Advance();
 
         Assert.Equal(Zone124CountdownAction.Concluded, step.Action);
         Assert.Equal(Zone124DuelWinner.Team1, step.Winner);
-        Assert.False(state.Active); // torn down
+        Assert.False(state.Active);
         Assert.Equal(0, state.RemainingUnits);
     }
 
@@ -111,12 +103,12 @@ public class Zone124MassDuelStateTests
     {
         var state = new Zone124MassDuelState();
         state.Start(3, 2);
-        state.SetTeamCounts(3, 0); // team two wiped mid-event
+        state.SetTeamCounts(3, 0);
 
         var step = state.Advance();
 
         Assert.Equal(Zone124CountdownAction.TornDownEmptyTeam, step.Action);
-        Assert.Equal(Zone124DuelWinner.Draw, step.Winner); // empty-case result indicator is unspecified -> neutral
+        Assert.Equal(Zone124DuelWinner.Draw, step.Winner);
         Assert.False(state.Active);
         Assert.Equal(0, state.RemainingUnits);
     }
@@ -127,9 +119,8 @@ public class Zone124MassDuelStateTests
         var state = new Zone124MassDuelState();
         state.Start(3, 2);
         DriveDownTo(state, 1);
-        state.SetTeamCounts(3, 0); // at the final unit, but a team is empty
+        state.SetTeamCounts(3, 0);
 
-        // Empty-teardown is checked before the countdown, so it takes precedence over Concluded.
         Assert.Equal(Zone124CountdownAction.TornDownEmptyTeam, state.Advance().Action);
     }
 
@@ -158,8 +149,7 @@ public class Zone124MassDuelStateTests
         Assert.Equal(Zone124DuelWinner.Team2, state.DecideWinner());
     }
 
-    /// <summary>Applies qualifying ticks until the countdown reads <paramref name="target" />, without concluding.</summary>
-    private static void DriveDownTo(Zone124MassDuelState state, int target)
+        private static void DriveDownTo(Zone124MassDuelState state, int target)
     {
         while (state.RemainingUnits > target)
             state.Advance();

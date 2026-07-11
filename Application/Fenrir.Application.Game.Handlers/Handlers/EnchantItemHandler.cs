@@ -8,20 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
-/// <summary>
-///     op24, CZ_IMPROVE_ITEM_SEND -- normal-equipment/wings enchant (delegated to
-///     <see cref="IEnchantItemService" />, which now resolves wings too -- see <c>EnchantResolver</c>'s
-///     remarks). Costumes and stellar cores remain out of scope; those targets fall outside the resolver's
-///     slot-type band and are reported as <see cref="EnchantItemOutcome.Rejected" />, which this handler
-///     disconnects on, same as every other legacy Quit() condition in this cluster.
-/// </summary>
-/// <remarks>
-///     <c>ProtectForDestroy</c> (Protection Charm) and <c>ImproveItemValue</c> ("sweet potato" Lucky Enchant
-///     Scroll) both have real acquisition paths via <c>UseInventoryItemService</c> (op23) and are read from
-///     live character state by <see cref="IEnchantItemService" /> -- <c>EnchantOutcome.Protected</c> is
-///     reachable in production, not dead code. See <c>EnchantResolver</c>'s own remarks for the sweet-potato
-///     bonus-probability magnitude, which is still not cited/applied.
-/// </remarks>
 public sealed class EnchantItemHandler(IEnchantItemService enchantItemService, ILogger<EnchantItemHandler> logger)
     : IAsyncPacketHandler<EnchantItemRequest>
 {
@@ -45,7 +31,6 @@ public sealed class EnchantItemHandler(IEnchantItemService enchantItemService, I
             return;
         }
 
-        // Serializes the read/SQL/mirror sequence per character to close an item/money-duplication window.
         await state.EconomyActionLock.WaitAsync(cancellationToken);
         try
         {

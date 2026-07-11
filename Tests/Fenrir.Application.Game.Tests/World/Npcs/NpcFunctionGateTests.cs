@@ -64,7 +64,6 @@ public class NpcFunctionGateTests
         var zone = ZoneWith((NpcId: 10, X: 0, Y: 0, Z: 0));
         var world = WorldWithNpcs(NpcOffering(10, NpcFunctionGate.NpcShop));
 
-        // 100.1 units away -- just past the sqrt(10000)=100 radius.
         var available = NpcFunctionGate.IsAvailable(zone, world, NpcFunctionGate.NpcShop, 100.1f, 0, 0);
 
         Assert.False(available);

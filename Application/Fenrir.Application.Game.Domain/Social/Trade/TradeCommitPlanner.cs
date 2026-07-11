@@ -3,18 +3,10 @@ using Fenrir.Application.Game.Domain.Inventory;
 
 namespace Fenrir.Application.Game.Domain.Social.Trade;
 
-/// <summary>
-///     Pure logic that projects a completed TradeSession onto the final InventoryPage0/Page1 contents: this
-///     side's offered slots are removed, the other side's offered items fill the first free slots (page 0
-///     then page 1).
-/// </summary>
 public static class TradeCommitPlanner
 {
-    /// <summary>
-    ///     Plan.Overflowed means the receiving side had no free slot for one or more incoming items -- the caller must
-    ///     abort the whole trade, never drop an item silently.
-    /// </summary>
-    public static Plan BuildFinalContainers(
+
+        public static Plan BuildFinalContainers(
         ImmutableDictionary<byte, ItemStack> currentPage0,
         ImmutableDictionary<byte, ItemStack> currentPage1,
         IReadOnlyList<(byte Container, byte Slot, ItemStack Stack)?> ownOfferedSlots,

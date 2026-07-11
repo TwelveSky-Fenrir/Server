@@ -2,10 +2,6 @@ using Fenrir.Application.Game.Domain.Combat;
 
 namespace Fenrir.Application.Game.Tests.Combat;
 
-/// <summary>
-///     Covers <see cref="MonsterKillExperienceGate" /> against <c>MyUtil::ProcessForExperience</c>'s outer
-///     guard (S07_MyGame03.cpp:163-166).
-/// </summary>
 public class MonsterKillExperienceGateTests
 {
     [Fact]

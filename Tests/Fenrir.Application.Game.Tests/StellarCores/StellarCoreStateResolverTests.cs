@@ -40,7 +40,6 @@ public class StellarCoreStateResolverTests
     [Fact]
     public void Equip_NegativeIndexDefault_NoReply_NotOutOfRangeCrash()
     {
-        // Legacy UB: aStellarCoreIndex == -1 indexes the array with a negative subscript. Fixed per D8.
         var ctx = new StellarCoreStateResolver.Context(-1, EmptyWardrobe);
         var result = StellarCoreStateResolver.Resolve(3, 0, in ctx);
 

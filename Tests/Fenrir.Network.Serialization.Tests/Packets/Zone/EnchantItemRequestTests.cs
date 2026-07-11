@@ -4,10 +4,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Zone;
 
-/// <summary>
-///     CZ_IMPROVE_ITEM_SEND (CLIENT.h:257-264, 20-byte payload), no padding — same typedef as
-///     <see cref="CombineItemRequest" />/<see cref="UpgradeItemRankRequest" />/<see cref="DowngradeItemRankRequest" />.
-/// </summary>
 public class CzImproveItemSendTests
 {
     [Fact]

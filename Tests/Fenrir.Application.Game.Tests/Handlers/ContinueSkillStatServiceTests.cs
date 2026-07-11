@@ -6,7 +6,6 @@ using Fenrir.Network.Dispatch.Zone.Sessions;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 
-/// <summary>Drives the real <see cref="ContinueSkillStatService" /> (opcode 94) over a real <see cref="Zone" />.</summary>
 public class ContinueSkillStatServiceTests
 {
     private static (ZoneClientSession Session, FakeDuplexPipe Pipe, PlayerRuntimeState State) Setup(Zone zone,

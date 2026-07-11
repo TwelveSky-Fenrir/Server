@@ -2,12 +2,6 @@ using Fenrir.Application.Game.Domain.World.ZoneWar;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Covers <see cref="Zone195NokSanState" />: the process-wide Zone195 "Nok-San" stone state (per-slot
-///     owner array + per-tribe stones-held counts), its atomic capture-flip commit
-///     (Server/ts25zone/S07_MyGame01.cpp:8528-8577), and the combat-path monster-damage bonus consumer
-///     (Server/ts25zone/S07_MyGame02.cpp:2326-2331).
-/// </summary>
 public class Zone195NokSanStateTests
 {
     [Fact]
@@ -35,12 +29,10 @@ public class Zone195NokSanStateTests
 
         state.CommitCapture(0, 1);
 
-        // Owner encoding is tribe + 1.
         Assert.Equal(2, state.GetOwner(0));
         Assert.Equal((byte)1, state.GetOwningTribe(0));
         Assert.Equal(1, state.GetStonesHeld(1));
 
-        // No other tribe was touched.
         Assert.Equal(0, state.GetStonesHeld(0));
         Assert.Equal(0, state.GetStonesHeld(2));
         Assert.Equal(0, state.GetStonesHeld(3));
@@ -50,14 +42,14 @@ public class Zone195NokSanStateTests
     public void CommitCapture_Flip_DebitsPriorOwner_CreditsNewOwner()
     {
         var state = new Zone195NokSanState();
-        state.CommitCapture(0, 1); // tribe 1 holds slot 0 (count 1)
+        state.CommitCapture(0, 1);
 
-        state.CommitCapture(0, 2); // tribe 2 flips slot 0
+        state.CommitCapture(0, 2);
 
         Assert.Equal((byte)2, state.GetOwningTribe(0));
-        Assert.Equal(0, state.GetStonesHeld(1)); // prior owner debited to zero
-        Assert.Equal(1, state.GetStonesHeld(2)); // new owner credited
-        Assert.Equal(3, state.GetOwner(0)); // tribe 2 + 1
+        Assert.Equal(0, state.GetStonesHeld(1));
+        Assert.Equal(1, state.GetStonesHeld(2));
+        Assert.Equal(3, state.GetOwner(0));
     }
 
     [Fact]
@@ -65,7 +57,6 @@ public class Zone195NokSanStateTests
     {
         var state = new Zone195NokSanState();
 
-        // Five distinct slots captured by the same tribe -- the fifth credit must clamp at the max of 4.
         for (var slot = 0; slot < 5; slot++)
             state.CommitCapture(slot, 1);
 
@@ -80,10 +71,10 @@ public class Zone195NokSanStateTests
         Assert.Equal(0, state.GetMonsterDamageBonus(1));
 
         state.CommitCapture(0, 1);
-        Assert.Equal(Zone195NokSanState.MonsterDamageBonusPerStone, state.GetMonsterDamageBonus(1)); // 1 * 100
+        Assert.Equal(Zone195NokSanState.MonsterDamageBonusPerStone, state.GetMonsterDamageBonus(1));
 
         state.CommitCapture(1, 1);
-        Assert.Equal(2 * Zone195NokSanState.MonsterDamageBonusPerStone, state.GetMonsterDamageBonus(1)); // 2 * 100
+        Assert.Equal(2 * Zone195NokSanState.MonsterDamageBonusPerStone, state.GetMonsterDamageBonus(1));
     }
 
     [Fact]
@@ -99,13 +90,13 @@ public class Zone195NokSanStateTests
         Assert.Equal(Zone195NokSanState.TribeCount, snapshot.StonesHeld.Length);
         Assert.Equal(Zone195NokSanState.StoneSlotCount, snapshot.Owners.Length);
 
-        Assert.Equal(2, snapshot.StonesHeld[1]); // tribe 1 holds slots 0 and 4
-        Assert.Equal(1, snapshot.StonesHeld[2]); // tribe 2 holds slot 8
+        Assert.Equal(2, snapshot.StonesHeld[1]);
+        Assert.Equal(1, snapshot.StonesHeld[2]);
 
-        Assert.Equal(2, snapshot.Owners[0]); // tribe 1 + 1
-        Assert.Equal(2, snapshot.Owners[4]); // tribe 1 + 1
-        Assert.Equal(3, snapshot.Owners[8]); // tribe 2 + 1
-        Assert.Equal(0, snapshot.Owners[1]); // uncaptured
+        Assert.Equal(2, snapshot.Owners[0]);
+        Assert.Equal(2, snapshot.Owners[4]);
+        Assert.Equal(3, snapshot.Owners[8]);
+        Assert.Equal(0, snapshot.Owners[1]);
     }
 
     [Theory]

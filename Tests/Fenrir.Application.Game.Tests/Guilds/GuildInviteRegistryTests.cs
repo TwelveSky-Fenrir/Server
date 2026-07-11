@@ -35,7 +35,6 @@ public class GuildInviteRegistryTests
         registry.TryAsk(1, 2);
         registry.TryAnswer(2, true, out _);
 
-        // GUILD_WORK tSort 3 is finalized by the asker, never the target
         Assert.False(registry.TryConsumeAccepted(2, out _));
     }
 

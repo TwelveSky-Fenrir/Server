@@ -10,11 +10,6 @@ using Fenrir.Application.Game.Tests.TestSupport;
 
 namespace Fenrir.Application.Game.Tests.Social;
 
-/// <summary>
-///     Covers <see cref="CommunityWorkGate.IsBusy" />'s 7-flag OR: personal-shop-open plus the 6 per-family
-///     registries' own <c>IsNegotiating</c>/<c>IsBusy</c> state, matching legacy <c>CheckCommunityWork</c>
-///     (Server/ts25zone/S07_MyGame04.cpp:185-216).
-/// </summary>
 public class CommunityWorkGateTests
 {
     private const int PlayerId = 10;
@@ -131,9 +126,6 @@ public class CommunityWorkGateTests
     [Fact]
     public void IsBusy_TargetSideNegotiating_AlsoReturnsTrueForTarget()
     {
-        // The SAME registries are shared across both the requester's and the target's own IsBusy evaluation --
-        // an ask target who is already mid-negotiation elsewhere is excluded too, matching legacy applying
-        // CheckCommunityWork to both sides of every *_ASK_SEND handler.
         var target = MakePlayer(OtherId);
         var (duels, trades, friends, parties, mentors, guildInvites) = MakeRegistries();
 
@@ -148,7 +140,6 @@ public class CommunityWorkGateTests
         var player = MakePlayer(PlayerId);
         var (duels, trades, friends, parties, mentors, guildInvites) = MakeRegistries();
 
-        // Some other pair of characters negotiating a duel must not leak into PlayerId's own busy check.
         Assert.Equal(DuelAskOutcome.Sent, duels.TryAsk(30, 40, false));
 
         Assert.False(CommunityWorkGate.IsBusy(player, duels, trades, friends, parties, mentors, guildInvites));

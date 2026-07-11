@@ -11,16 +11,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Gm;
 
-// Elevated-tier zone-wide FFA-start "GM-FFASTART" (legacy PROCESS_DATA_SEND, opcode 19, tSort 333 -- there
-// is no dedicated legacy wire opcode for this command; GenericActionHandler decodes GmFfaEventStartPayload
-// out of GenericActionRequest.Data before calling into this service -- Server/ts25zone/S04_MyWork04.cpp:
-// 1097-1131). GmFfaEventStartService only reproduces the two process-local writes the cited case body
-// performs (Zone335StartTrigger's countdown + start-trigger flag) once its own idle-state precondition
-// (ZoneCenterSiegeState.Zone335 == 0) passes -- the FFA-335 autonomous consuming tick is a separate,
-// unmodeled subsystem (see that service's own remarks). Covers: the Elevated-tier privilege gate, the
-// idle-vs-busy acceptance/rejection branch, the zero/negative-duration-defaults-to-ten-minutes rule, and the
-// game.EventLog (Category=GmAction) audit row written on every invocation past the tier gate regardless of
-// whether the idle check accepted or rejected the request.
 public class GmFfaEventStartServiceTests
 {
     private const int AccountId = 1;
@@ -64,7 +54,7 @@ public class GmFfaEventStartServiceTests
         HandleAsync_ElevatedTier_IdleFfaState_ArmsTriggerWithRequestedDuration_AcksAccepted_AndLogsAuditRow()
     {
         var (session, pipe, siegeState, startTrigger, eventLog) = SetUp((short)GmCommandTier.Elevated);
-        Assert.Equal(0, siegeState.Zone335); // idle by construction.
+        Assert.Equal(0, siegeState.Zone335);
         var service = new GmFfaEventStartService(siegeState, startTrigger, eventLog,
             NullLogger<GmFfaEventStartService>.Instance);
         var data = RequestData(5);
@@ -78,7 +68,7 @@ public class GmFfaEventStartServiceTests
             new GenericActionResponse { Result = 0, Sort = Sort, Data = data, RuneValue = 0 });
 
         var logged = Assert.Single(eventLog.LoggedEvents);
-        Assert.Equal((short)5, logged.EventCode); // GmActionEventCodes.FfaEventStart (internal, not visible here).
+        Assert.Equal((short)5, logged.EventCode);
         Assert.Equal(EventLogCategory.GmAction, logged.Category);
         Assert.Equal(AccountId, logged.ActorAccountId);
         Assert.Equal(CharacterId, logged.ActorCharacterId);
@@ -104,7 +94,7 @@ public class GmFfaEventStartServiceTests
     public async Task HandleAsync_ElevatedTier_FfaStateNotIdle_RejectsRequest_DoesNotArmTrigger_ButStillLogsAuditRow()
     {
         var (session, pipe, siegeState, startTrigger, eventLog) = SetUp((short)GmCommandTier.Elevated);
-        siegeState.SetZone335(1501); // any non-idle phase value.
+        siegeState.SetZone335(1501);
         var service = new GmFfaEventStartService(siegeState, startTrigger, eventLog,
             NullLogger<GmFfaEventStartService>.Instance);
         var data = RequestData(5);

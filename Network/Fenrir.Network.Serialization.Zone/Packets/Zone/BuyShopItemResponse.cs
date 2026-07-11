@@ -3,7 +3,6 @@ using Fenrir.Network.Serialization.Wire.Attributes;
 
 namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 
-// Result: 0=ok, 1=seller not found/moving, 2=stall closed, 3=empty slot, 7=stale UniqueNumber (4-6=funds/inventory). Fields zero on error.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.BuyShopItem, ExpectedSize = 53)]
 public readonly partial record struct BuyShopItemResponse : IOutgoingPacket
 {

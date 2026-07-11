@@ -30,7 +30,7 @@ public class MountActivityExpCodecTests
 
     [Theory]
     [InlineData(-5, 0)]
-    [InlineData(0, 0)] // "below 1 becomes 0" -- for whole numbers, the lower clamp bound
+    [InlineData(0, 0)]
     [InlineData(50, 50)]
     [InlineData(100, 100)]
     [InlineData(101, 100)]

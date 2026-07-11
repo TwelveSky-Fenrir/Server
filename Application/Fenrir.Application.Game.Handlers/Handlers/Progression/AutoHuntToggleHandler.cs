@@ -8,11 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Progression;
 
-/// <summary>
-///     CZ_AUTO_CONFIG_SEND (opcode 99) -- auto-hunt on/off toggle. Enabling requires an equipped weapon and a
-///     configured attack skill. OPEN ISSUE: legacy also mentions unenumerated "level-gated battle zones", not
-///     modeled here.
-/// </summary>
 public sealed class AutoHuntToggleHandler(
     IAutoHuntToggleService autoHuntToggleService,
     ILogger<AutoHuntToggleHandler> logger)

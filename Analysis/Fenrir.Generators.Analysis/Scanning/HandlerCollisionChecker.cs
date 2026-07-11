@@ -6,11 +6,6 @@ using Microsoft.CodeAnalysis;
 
 namespace Fenrir.Generators.Analysis.Scanning;
 
-/// <summary>
-///     FEN015: two packet handlers cannot both claim the same (Server, Opcode). Callers dedupe inline and
-///     async handlers into separate buckets before calling <see cref="Check" />, so this only ever sees one
-///     <c>IsAsync</c> bucket at a time — mirrors <see cref="OpcodeCollisionChecker.Check" />.
-/// </summary>
 internal static class HandlerCollisionChecker
 {
     public static (ImmutableArray<HandlerModel> Deduplicated, ImmutableArray<Diagnostic> Diagnostics) Check(

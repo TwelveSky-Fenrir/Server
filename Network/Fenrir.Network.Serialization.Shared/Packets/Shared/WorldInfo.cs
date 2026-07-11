@@ -14,10 +14,8 @@ public readonly partial record struct WorldInfo : IFenrirWireType<WorldInfo>
     [FixedArray(4)] public required int[] TribePoint { get; init; }
     [FixedArray(2)] public required int[] TribeCloseInfo { get; init; }
 
-    // Flattened row-major int[4][2] (8 total).
     [FixedArray(8)] public required int[] PossibleAllianceInfo { get; init; }
 
-    // Flattened row-major int[2][2] (4 total).
     [FixedArray(4)] public required int[] AllianceState { get; init; }
 
     [FixedArray(4)] public required int[] TribeVoteState { get; init; }
@@ -32,10 +30,8 @@ public readonly partial record struct WorldInfo : IFenrirWireType<WorldInfo>
     [FixedArray(10)] public required int[] Zone053TypeState { get; init; }
     [FixedArray(10)] public required int[] Zone053TypeStateTime { get; init; }
 
-    // Flattened row-major int[4][8] (32 total).
     [FixedArray(32)] public required int[] Zone175TypeState { get; init; }
 
-    // Confirmed 16 ints, not int[4][16]=256 bytes as the name suggests (offsetof delta = 64).
     [FixedArray(16)] public required int[] TribeGuardState { get; init; }
 
     public required int Zone194TypeState { get; init; }
@@ -56,13 +52,11 @@ public readonly partial record struct WorldInfo : IFenrirWireType<WorldInfo>
 
     [FixedArray(3)] [FixedString(13)] public required string[] GuildName3 { get; init; }
 
-    // GuildName3 (39 bytes) isn't 4-aligned; compiler pads 3 bytes before GuildScore.
     [Reserved(3)] [FixedArray(3)] public required int[] GuildScore { get; init; }
 
     public required int Zone088WinTribe { get; init; }
     [FixedArray(4)] public required int[] FourGuildState { get; init; }
 
-    // Flattened row-major char[4][4][13]: 16 rows of 13 bytes.
     [FixedArray(16)] [FixedString(13)] public required string[] FourGuildName { get; init; }
 
     [FixedArray(4)] [FixedString(13)] public required string[] DecideChallengeFourGuildName { get; init; }

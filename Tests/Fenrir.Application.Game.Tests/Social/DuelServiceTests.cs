@@ -17,13 +17,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Social;
 
-/// <summary>
-///     Covers <see cref="DuelService" />'s CZ_DUEL_ASK_SEND/CZ_DUEL_START_SEND behavior most relevant to
-///     Active-duel resolution: the requester's-own-already-dueling desync outcome
-///     (<see cref="DuelAskResultKind.ChallengerAlreadyDueling" />), and that the 180-legacy-tick countdown
-///     seeded at Start is the single <see cref="DuelRegistry.DurationTicks" /> source of truth, not a
-///     separately duplicated literal.
-/// </summary>
 public class DuelServiceTests
 {
     private static (DuelService Service, ZoneRegistry Zones, DuelRegistry Duels) CreateService(short mapId)
@@ -68,7 +61,6 @@ public class DuelServiceTests
         Enter(zones, 1, 20, "PriorOpponent", 1);
         Enter(zones, 1, 30, "NewTarget", 1);
 
-        // 10 is already Active-dueling 20 (seeded directly, bypassing the ask/accept/start round trip).
         Assert.Equal(DuelAskOutcome.Sent, duels.TryAsk(10, 20, false));
         Assert.True(duels.TryAnswer(20, true, out _));
         Assert.True(duels.TryStart(10, out _));
@@ -86,34 +78,28 @@ public class DuelServiceTests
         Enter(zones, 1, 20, "PendingTarget", 1);
         Enter(zones, 1, 30, "NewTarget", 1);
 
-        Assert.Equal(DuelAskOutcome.Sent, duels.TryAsk(10, 20, false)); // still pending, never answered
+        Assert.Equal(DuelAskOutcome.Sent, duels.TryAsk(10, 20, false));
 
         var result = await service.AskAsync(zones[1], challenger, "NewTarget", 0, CancellationToken.None);
 
         Assert.Equal(DuelAskResultKind.ChallengerBusy, result);
     }
 
-    /// <summary>
-    ///     Response-code-order regression: the challenger's own busy/pose state must be checked before the
-    ///     target avatar is resolved by name, so a busy challenger naming a nonexistent avatar still gets
-    ///     the busy reply, not "target not found" (Server/ts25zone/S04_MyWork02.cpp:8259-8277).
-    /// </summary>
-    [Fact]
+        [Fact]
     public async Task Ask_ChallengerBusy_AndTargetNameDoesNotExist_ReturnsChallengerBusy_NotTargetNotFound()
     {
         var (service, zones, duels) = CreateService(1);
         var challenger = Enter(zones, 1, 10, "Challenger", 1);
         Enter(zones, 1, 20, "PendingTarget", 1);
 
-        Assert.Equal(DuelAskOutcome.Sent, duels.TryAsk(10, 20, false)); // still pending, never answered
+        Assert.Equal(DuelAskOutcome.Sent, duels.TryAsk(10, 20, false));
 
         var result = await service.AskAsync(zones[1], challenger, "NoSuchAvatar", 0, CancellationToken.None);
 
         Assert.Equal(DuelAskResultKind.ChallengerBusy, result);
     }
 
-    /// <summary>Same response-code-order regression as above, for the desynced-Active-duel outcome.</summary>
-    [Fact]
+        [Fact]
     public async Task Ask_ChallengerAlreadyActivelyDueling_AndTargetNameDoesNotExist_ReturnsChallengerAlreadyDueling()
     {
         var (service, zones, duels) = CreateService(1);
@@ -129,8 +115,7 @@ public class DuelServiceTests
         Assert.Equal(DuelAskResultKind.ChallengerAlreadyDueling, result);
     }
 
-    /// <summary>WS1.4 ASK-PUBLISH-ONLY: a same-shard miss that resolves cross-shard publishes an Ask.</summary>
-    [Fact]
+        [Fact]
     public async Task Ask_SameShardMiss_ResolvesCrossShard_PublishesAskAndReturnsSentCrossShard()
     {
         var directory = new FakeCharacterShardLocationRepository();

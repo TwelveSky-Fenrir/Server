@@ -106,8 +106,8 @@ public class ZoneEventBroadcasterTests
     }
 
     [Theory]
-    [InlineData((byte)2, (byte)1)] // tribe slot 2 contested, tribe 1 wins it
-    [InlineData((byte)4, (byte)3)] // the neutral monster-guarded slot, tribe 3 wins it
+    [InlineData((byte)2, (byte)1)]
+    [InlineData((byte)4, (byte)3)]
     public void AnnounceSymbolResolved_UpdatesTheRightSlot_AndBroadcastsSort42WithIndexAndWinner(byte symbolIndex,
         byte winnerTribeId)
     {
@@ -170,20 +170,12 @@ public class ZoneEventBroadcasterTests
         ZoneTestKit.DrainOutbound(faultyPipe);
         ZoneTestKit.DrainOutbound(healthyPipe);
 
-        // Simulates an ordinary disconnect race: this recipient's own transport already completed its
-        // outbound pipe (SessionLoop's teardown already ran) while the character is still present in
-        // Zone.Players (the zone's own Leave command hasn't drained yet) -- ClientSession.SendRaw throws
-        // InvalidOperationException the instant it tries to write to an already-completed PipeWriter.
         faultyPipe.Output.Complete();
 
         var worldState = CreateWorldState();
         var logger = new CapturingLogger<ZoneEventBroadcaster>();
         var broadcaster = new ZoneEventBroadcaster(worldState, registry, logger);
 
-        // Regression guard for the bug this test locks in: a bare `foreach (zone) foreach (player)
-        // player.Session.Send(...)` loop with no per-recipient try/catch lets the FIRST faulted recipient's
-        // exception abort delivery to every zone/player still left to visit -- regardless of which of the
-        // two zones above happens to be enumerated first, the call must never throw.
         var exception = Record.Exception(() => broadcaster.AnnounceZone038Winner(2));
         Assert.Null(exception);
 
@@ -214,7 +206,7 @@ public class ZoneEventBroadcasterTests
 
         broadcaster.AnnounceMonsterSymbolAttackWindow();
 
-        Assert.Equal(worldBefore, worldState.World); // unlike every other Announce* method, no state mutation
+        Assert.Equal(worldBefore, worldState.World);
 
         foreach (var pipe in new[] { pipeA, pipeB })
         {
@@ -222,7 +214,6 @@ public class ZoneEventBroadcasterTests
             Assert.Equal(OneFrame, frame.Length);
             var payload = frame.AsSpan(1);
             Assert.Equal(401, BinaryPrimitives.ReadInt32LittleEndian(payload));
-            // No payload beyond the sort itself.
             Assert.Equal(0, BinaryPrimitives.ReadInt32LittleEndian(payload[4..]));
         }
     }
@@ -234,7 +225,6 @@ public class ZoneEventBroadcasterTests
         var worldState = CreateWorldState();
         var broadcaster = new ZoneEventBroadcaster(worldState, registry, NullLogger<ZoneEventBroadcaster>.Instance);
 
-        // No player ever entered -- must not throw when every zone's player list is empty.
         broadcaster.AnnounceZone038Winner(0);
 
         Assert.Equal((byte?)0, worldState.World.Zone038WinTribe);

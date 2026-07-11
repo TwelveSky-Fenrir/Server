@@ -3,11 +3,6 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Seeding;
 
-/// <summary>
-///     Generates <c>70_seed/world/081_item_bonus_skills.sql</c> from <see cref="ItemReader.ReadAll" />
-///     (005_00002.IMG): one row per populated <c>BonusSkillInfo[8][2]</c> slot. Verified pair semantics:
-///     pair[0] is SkillId (nullable, "0 = no skill"), pair[1] is Value (always present when populated).
-/// </summary>
 public static class ItemBonusSkillSeedGenerator
 {
     private const string BonusSkillColumns = "ItemId, SlotIndex, SkillId, Value";

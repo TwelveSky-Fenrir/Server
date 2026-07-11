@@ -8,10 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>
-///     CZ_TRADE_ASK_SEND (opcode 47) -- the displayed level delegates to <c>TradeInviteService.Invite</c>,
-///     which uses <see cref="PlayerRuntimeState.CombinedLevel" /> (aLevel1+aLevel2).
-/// </summary>
 public sealed class TradeInviteHandler(ITradeInviteService tradeInviteService, ILogger<TradeInviteHandler> logger)
     : IAsyncPacketHandler<TradeInviteRequest>
 {
@@ -53,8 +49,6 @@ public sealed class TradeInviteHandler(ITradeInviteService tradeInviteService, I
                     { AvatarName = result.AskerName!, Level = result.AskerLevel });
                 return;
             case TradeInviteResultKind.SentCrossShard:
-                // Ask-publish-only today -- see TradeInviteResultKind.SentCrossShard's own remarks; nothing
-                // to send (no target-side delivery exists yet to ever produce a reply).
                 return;
         }
     }

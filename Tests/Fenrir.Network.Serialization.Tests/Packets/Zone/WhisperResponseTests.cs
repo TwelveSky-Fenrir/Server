@@ -49,7 +49,6 @@ public class ZcSecretChatRecvTests
     [Fact]
     public void Write_RoundTrips_ViaManualDecode_TargetOfflineResult()
     {
-        // Result=1 (target offline): ZoneNumber=0, AvatarName is the (unreachable) target, no link.
         var packet = new WhisperResponse
         {
             Result = 1,
@@ -75,7 +74,6 @@ public class ZcSecretChatRecvTests
     [Fact]
     public void Write_RoundTrips_ViaManualDecode_SystemMessageResult()
     {
-        // Result=3 (delivery/system message): AvatarName is the SENDER (e.g. "-Server-"), per contract remarks.
         var link = new ItemLinkInfo { Index = 0, Activity = 0, Value = 0, Socket = [0, 0, 0] };
         var packet = new WhisperResponse
         {

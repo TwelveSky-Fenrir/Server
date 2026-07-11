@@ -13,8 +13,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Game;
 
-// game.usp_TribeBank_Withdraw against real SQL Server 2025 -- verifies the atomic tribe-bank-debit +
-// character-credit replacement for the legacy PlayUser process's ZONE_TRIBE_BANK_LOAD_FOR_PLAYUSER_SEND.
 [Collection("SqlServer")]
 public class TribeBankWithdrawProcTests
 {
@@ -87,7 +85,6 @@ public class TribeBankWithdrawProcTests
 
     private async Task<byte> CreateTribeAsync()
     {
-        // TribeId is a fixed 0-3 domain value (CK_Tribes_TribeId); no throwaway ids are possible here.
         const byte tribeId = 0;
 
         await using var connection = new SqlConnection(_connectionString);
@@ -147,8 +144,6 @@ public class TribeBankWithdrawProcTests
         return (T)(await command.ExecuteScalarAsync())!;
     }
 
-    // CaeriusNet wraps the driver's SqlException in its own CaeriusNetSqlException; unwrap by walking
-    // InnerException rather than depending on that wrapper type directly.
     private static async Task AssertSqlErrorAsync(int expectedNumber, Func<Task> action)
     {
         var thrown = await Record.ExceptionAsync(action);

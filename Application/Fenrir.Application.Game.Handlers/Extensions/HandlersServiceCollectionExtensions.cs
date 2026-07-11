@@ -5,11 +5,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Application.Game.Handlers.Extensions;
 
-/// <summary>
-///     Registers the zone frame dispatcher plus every packet handler via
-///     <see cref="GeneratedHandlerRegistration.AddGeneratedPacketHandlers" />, so one is never missed and left
-///     unconstructible.
-/// </summary>
 public static class HandlersServiceCollectionExtensions
 {
     public static IServiceCollection AddGameHandlers(this IServiceCollection services)

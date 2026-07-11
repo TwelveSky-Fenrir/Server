@@ -8,11 +8,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     End-to-end coverage of the merged write-behind loop: <see cref="PositionWriteBehindHost" /> is the sole
-///     owner of the one <see cref="WriteBehindFlusher{TKey}" /> draining the shared <see cref="DirtyTracker{TKey}" />,
-///     and delegates the Vitals/Progression side of every drained batch to <see cref="ProgressWriteBehindHost" />.
-/// </summary>
 public sealed class PositionWriteBehindHostTests
 {
     private static readonly TimeSpan BoundedWait = TimeSpan.FromSeconds(5);
@@ -80,8 +75,6 @@ public sealed class PositionWriteBehindHostTests
         const int characterId = 21;
         var (registry, dirtyTracker) = CreateRegistryWithOnePlayer(1, characterId, out var state);
 
-        // Simulate HandleMove's own move-then-mark sequence, then a same-cycle combat hit -- both land in the
-        // SAME drained batch, both wanting the shared per-character FlushSequence slot.
         state.PosX = 999f;
         state.FlushSequence++;
         dirtyTracker.MarkDirty(characterId, DirtyFlags.Position);
@@ -97,17 +90,12 @@ public sealed class PositionWriteBehindHostTests
         await host.StartAsync(CancellationToken.None);
         host.RequestImmediateFlush();
 
-        // Progress must win this cycle -- it is the exploit/durability-critical side.
         Assert.True(await WaitUntilAsync(() => characters.PersistedProgressRows.Count == 1, BoundedWait));
-        Assert.Equal(760, characters.PersistedProgressRows[0].Life); // 800 default - 40
+        Assert.Equal(760, characters.PersistedProgressRows[0].Life);
 
-        // Position must NOT have been persisted with the identical FlushSequence value this same cycle (that
-        // would have silently no-op'd against usp_Character_PersistBatch's real "> " guard) -- instead it was
-        // re-marked dirty so a later drain (or the player's next move) picks it up.
         Assert.Empty(characters.PersistedPositionRows);
         Assert.True(dirtyTracker.Count > 0, "Position should have been re-marked dirty for the next drain cycle");
 
-        // That next cycle (still no further movement) now succeeds, since nothing else claims the slot this time.
         host.RequestImmediateFlush();
         Assert.True(await WaitUntilAsync(() => characters.PersistedPositionRows.Count == 1, BoundedWait));
         Assert.Equal(999f, characters.PersistedPositionRows[0].PosX);
@@ -115,14 +103,7 @@ public sealed class PositionWriteBehindHostTests
         await host.StopAsync(CancellationToken.None);
     }
 
-    /// <summary>
-    ///     Disconnect-path fix (fenrir-disconnect-persistence-guarantee):
-    ///     <see cref="PositionWriteBehindHost.FlushCharacterNowAsync" />
-    ///     must persist a live character's CURRENT Progress AND Position rows synchronously, without going
-    ///     through the background <see cref="WriteBehindFlusher{TKey}" /> loop at all -- the host is never
-    ///     started here, proving this path doesn't depend on that loop having woken up.
-    /// </summary>
-    [Fact]
+        [Fact]
     public async Task
         FlushCharacterNowAsync_CharacterLiveInRegistry_PersistsProgressAndPositionWithoutTheBackgroundLoop()
     {
@@ -137,8 +118,6 @@ public sealed class PositionWriteBehindHostTests
         await using var host = new PositionWriteBehindHost(registry, dirtyTracker, characters, progress,
             NullLogger<PositionWriteBehindHost>.Instance);
 
-        // Deliberately never started (no StartAsync/RunAsync): this call must not depend on the shared drain
-        // loop being alive to durably capture the disconnecting character's state.
         await host.FlushCharacterNowAsync(characterId, CancellationToken.None);
 
         var progressRow = Assert.Single(characters.PersistedProgressRows);
@@ -150,19 +129,10 @@ public sealed class PositionWriteBehindHostTests
         Assert.Equal(characterId, positionRow.CharacterId);
         Assert.Equal(123f, positionRow.PosX);
 
-        // Position is persisted at FlushSequence + 1 (not the same value Progress just used) so it can never be
-        // silently no-op'd by usp_Character_PersistBatch's "strictly greater than stored" idempotence guard,
-        // which the Progress write above has just advanced to originalFlushSequence.
         Assert.Equal(originalFlushSequence + 1, positionRow.FlushSequence);
     }
 
-    /// <summary>
-    ///     A character no longer present in any zone's live registry by the time
-    ///     <see cref="PositionWriteBehindHost.FlushCharacterNowAsync" />
-    ///     runs (e.g. an already-completed handoff, or called twice) is documented as a no-op -- must not throw,
-    ///     and must not persist anything.
-    /// </summary>
-    [Fact]
+        [Fact]
     public async Task FlushCharacterNowAsync_CharacterNotInAnyZonesRegistry_IsANoOp()
     {
         var (registry, dirtyTracker) = CreateRegistryWithOnePlayer(1, 40, out _);

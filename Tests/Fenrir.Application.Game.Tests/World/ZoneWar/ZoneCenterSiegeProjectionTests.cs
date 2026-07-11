@@ -3,13 +3,6 @@ using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Covers <see cref="ZoneCenterSiegeProjection" />: the WorldInfo fields backed by <see cref="ZoneCenterSiegeState" />
-///     /
-///     <see cref="TribeGuardCorridorState" /> (Zone175/Zone267/Zone241/Zone335, the per-tribe Zone038 DTM value, the
-///     three tribe bonus-ratio arrays, kill-other-tribe bonus, and TribeGuardState) must reflect those models' live
-///     values instead of the zeroed template, while every other WorldInfo field passes through unchanged.
-/// </summary>
 public class ZoneCenterSiegeProjectionTests
 {
     [Fact]
@@ -31,11 +24,8 @@ public class ZoneCenterSiegeProjectionTests
         Assert.Equal(new float[4], result.TribeItemDropUpRatioForMyoungInfo);
         Assert.Equal(new int[4], result.TribeKillOtherTribeAddValueInfo);
         Assert.Equal(0, result.ZoneFFATypeState);
-        // TribeGuardCorridorState's own boot default is fully closed (false), which is itself 0 on the wire --
-        // identical to the zeroed template, but for a different reason (a real "closed" reading, not "unbacked").
         Assert.Equal(new int[16], result.TribeGuardState);
 
-        // Untouched fields must still be the template's own zeroed defaults, not silently overwritten.
         Assert.Equal(WorldStateTemplates.ZeroedWorldInfo.TribeCloseInfo, result.TribeCloseInfo);
         Assert.Equal(WorldStateTemplates.ZeroedWorldInfo.GuildName1, result.GuildName1);
     }
@@ -66,7 +56,6 @@ public class ZoneCenterSiegeProjectionTests
 
         var result = ZoneCenterSiegeProjection.Apply(WorldStateTemplates.ZeroedWorldInfo, siege, tribeGuard);
 
-        // Row-major int[4][8]: instance 2, slot 5 -> index 2*8+5 = 21.
         Assert.Equal(77, result.Zone175TypeState[21]);
         Assert.Equal(0, result.Zone175TypeState[20]);
         Assert.Equal(0, result.Zone175TypeState[13]);
@@ -126,7 +115,6 @@ public class ZoneCenterSiegeProjectionTests
         Assert.Equal([1.5f, 0f, 0f, 0f], result.TribeGeneralExperienceUpRatioInfo);
         Assert.Equal([0f, 2.0f, 0f, 0f], result.TribeItemDropUpRatioInfo);
         Assert.Equal([0f, 0f, 0.5f, 0f], result.TribeItemDropUpRatioForMyoungInfo);
-        // SetKillOtherTribeBonus's own documented atomic-write shape: setting tribe 3 zeroes the other three.
         Assert.Equal([0, 0, 0, 10], result.TribeKillOtherTribeAddValueInfo);
     }
 
@@ -139,7 +127,6 @@ public class ZoneCenterSiegeProjectionTests
 
         var result = ZoneCenterSiegeProjection.Apply(WorldStateTemplates.ZeroedWorldInfo, siege, tribeGuard);
 
-        // Row-major int[4][4]: tribe 2, segment 1 -> index 2*4+1 = 9.
         Assert.Equal(1, result.TribeGuardState[9]);
         Assert.Equal(0, result.TribeGuardState[8]);
         Assert.Equal(0, result.TribeGuardState[5]);

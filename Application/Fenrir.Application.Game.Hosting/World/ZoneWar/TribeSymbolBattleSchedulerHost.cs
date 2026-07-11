@@ -8,18 +8,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Hosting.World.ZoneWar;
 
-/// <summary>
-///     Per-tick driver for <see cref="TribeSymbolBattleScheduler" />, armed only on whichever live shard
-///     currently hosts <see cref="GameServerOptions.TribeSymbolBattleMapId" /> with
-///     <see cref="GameServerOptions.HolyStoneBattleEnabled" /> set -- every other shard's instance of this host
-///     is permanently inert. Same "compute <c>IsArmed</c> once at construction, log and return if not armed"
-///     shape as <see cref="TribeVoteElectionCalendarHost" />, its sibling scheduler on the same designated
-///     legacy content.
-/// </summary>
-/// <remarks>
-///     Réf. C++ : Server/ts25zone/S07_MyGame01.cpp:578-622 -- legacy gates the equivalent on server number 37;
-///     Fenrir shards by map, so "the shard hosting the designated map" is the natural translation.
-/// </remarks>
 public sealed class TribeSymbolBattleSchedulerHost(
     IOptions<GameServerOptions> options,
     ZoneRegistry zoneRegistry,
@@ -50,14 +38,11 @@ public sealed class TribeSymbolBattleSchedulerHost(
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    // A missed tick just delays this cycle's Tribe Symbol Battle advance to the next legacy
-                    // tick -- never worth crashing the GameServer.
                     logger.LogError(ex, "Tribe Symbol Battle scheduler tick failed");
                 }
         }
         catch (OperationCanceledException)
         {
-            // Expected on shutdown.
         }
     }
 }

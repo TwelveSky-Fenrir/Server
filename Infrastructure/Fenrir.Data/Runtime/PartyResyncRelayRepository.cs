@@ -8,14 +8,8 @@ using Fenrir.Data.Abstractions.Runtime;
 
 namespace Fenrir.Data.Runtime;
 
-// Cross-shard fan-out transport for the party-membership resync-on-reconnect flow -- see
-// IPartyResyncRelayRepository for the per-method contract. Fan-out sibling of GuildTribeBroadcastRelayRepository
-// (SourceShardId <> @ShardId poll filter).
 public sealed record PartyResyncRelayRepository(ICaeriusNetDbContext Db) : IPartyResyncRelayRepository
 {
-    // Small, high-frequency round trips against a memory-optimized table that should never itself be slow --
-    // a short timeout fails fast instead of masking a stuck request. Same value as this feature family's
-    // siblings (GuildTribeBroadcastRelayRepository, ChatCrossShardRelayRepository).
     private const int CommandTimeoutSeconds = 5;
 
     public async ValueTask PublishAsync(PartyResyncRelayEntry entry, CancellationToken ct)

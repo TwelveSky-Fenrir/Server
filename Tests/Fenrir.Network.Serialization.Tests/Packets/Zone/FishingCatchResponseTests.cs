@@ -23,7 +23,7 @@ public class ZcFishingRewardRecvTests
             ItemIndex = 9001,
             Page = 0,
             Index = 5,
-            XY = 300 // legacy quirk: carries tPosY, not a packed X/Y pair.
+            XY = 300
         };
 
         var golden = new byte[FishingCatchResponse.PayloadSize];

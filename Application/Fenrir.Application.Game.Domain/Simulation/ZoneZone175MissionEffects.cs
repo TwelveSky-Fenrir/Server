@@ -3,20 +3,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.Simulation;
 
-/// <summary>
-///     The production <see cref="IZone175MissionEffects" />: adapts <see cref="Zone175MissionCore" />'s side
-///     effects onto a live <see cref="Zone" /> (and its per-instance <see cref="Zone175InstanceConfig" />). One
-///     instance per Zone175-type zone, created once by <see cref="Zone175LabyrinthSystem" /> and reused every
-///     tick (no per-tick allocation). Every method runs on that zone's own tick thread.
-/// </summary>
-/// <remarks>
-///     The knowable side effects (presence scan, wave-boss count/removal by cited special type 40-44, reward,
-///     force-disconnect) delegate to the alloc-free helpers in <c>Zone.Zone175Labyrinth.cs</c>. The
-///     genuinely-unrecoverable ones -- summoning concrete wave-boss/trickle monsters (unknown monster ids) --
-///     are flagged no-ops here rather than invented, and the center-directed broadcasts collapse to structured
-///     logs (no receiving center process in Fenrir's two-executable topology, the same collapse
-///     <c>Zone.AnnounceEliteBossDefeated</c> uses).
-/// </remarks>
 public sealed class ZoneZone175MissionEffects(Zone zone, Zone175InstanceConfig config, ILogger logger)
     : IZone175MissionEffects
 {

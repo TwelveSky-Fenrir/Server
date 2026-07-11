@@ -9,13 +9,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Tribes;
 
-/// <summary>
-///     CZ_TRIBE_VOTE_SEND (opcode 83) -- Force Leader election. Whichever future GM-command/scheduled-job
-///     surface opens/closes the candidacy/voting windows and tallies the winner drives
-///     <see cref="TribeVoteElection" /> directly -- this handler only
-///     consumes the phase it finds. Sort 2 (client-side candidacy reset) is compiled out in this build
-///     (MG5ORIGIN).
-/// </summary>
 public sealed class TribeVoteHandler(ITribeVoteService voteService, ILogger<TribeVoteHandler>? logger = null)
     : IAsyncPacketHandler<TribeVoteRequest>
 {

@@ -10,12 +10,12 @@ public class LevelMilestoneBonusTests
     [InlineData(65)]
     [InlineData(85)]
     [InlineData(105)]
-    [InlineData(114)] // LV_M2  -- recovered by the level-milestone-bonus-item-ids pass
-    [InlineData(120)] // LV_M8
-    [InlineData(126)] // LV_M14
-    [InlineData(132)] // LV_M20
-    [InlineData(138)] // LV_M26
-    [InlineData(144)] // LV_M32
+    [InlineData(114)]
+    [InlineData(120)]
+    [InlineData(126)]
+    [InlineData(132)]
+    [InlineData(138)]
+    [InlineData(144)]
     [InlineData(145)]
     public void IsArmableMilestone_TrueForResolvableTiers(int level)
     {
@@ -36,30 +36,28 @@ public class LevelMilestoneBonusTests
     [Fact]
     public void DeferredMilestoneLevels_IsEmpty()
     {
-        // All 11 named legacy milestone levels now have a known claim table (level-milestone-bonus-item-ids
-        // recovered the last six, the M-tier levels) -- nothing is deferred any more.
         Assert.Empty(LevelMilestoneBonus.DeferredMilestoneLevels);
     }
 
     [Theory]
-    [InlineData(44, 45, 45)] // exact single crossing
-    [InlineData(44, 46, 45)] // overshoots one milestone
-    [InlineData(44, 66, 65)] // crosses 45 AND 65 in one jump -> highest wins
-    [InlineData(0, 145, 145)] // crosses every armable milestone -> the top one
+    [InlineData(44, 45, 45)]
+    [InlineData(44, 46, 45)]
+    [InlineData(44, 66, 65)]
+    [InlineData(0, 145, 145)]
     [InlineData(105, 145, 145)]
-    [InlineData(44, 64, 45)] // 65 not yet reached
-    [InlineData(105, 114, 114)] // crosses the first M-tier milestone (LV_M2)
-    [InlineData(105, 144, 144)] // crosses all six M-tier milestones in one jump -> the top one (LV_M32)
+    [InlineData(44, 64, 45)]
+    [InlineData(105, 114, 114)]
+    [InlineData(105, 144, 144)]
     public void ResolveHighestMilestoneCrossed_ReturnsHighestArmableInRange(int previous, int next, int expected)
     {
         Assert.Equal(expected, LevelMilestoneBonus.ResolveHighestMilestoneCrossed(previous, next));
     }
 
     [Theory]
-    [InlineData(45, 45)] // milestone equals previous level -> not "crossed" (strict lower bound)
+    [InlineData(45, 45)]
     [InlineData(145, 145)]
-    [InlineData(46, 64)] // no armable milestone strictly inside the range
-    [InlineData(106, 113)] // next armable (114) not yet reached
+    [InlineData(46, 64)]
+    [InlineData(106, 113)]
     public void ResolveHighestMilestoneCrossed_ZeroWhenNoneCrossed(int previous, int next)
     {
         Assert.Equal(0, LevelMilestoneBonus.ResolveHighestMilestoneCrossed(previous, next));
@@ -69,7 +67,7 @@ public class LevelMilestoneBonusTests
     [InlineData(0)]
     [InlineData(-1)]
     [InlineData(1)]
-    [InlineData(113)] // one below the first M-tier milestone -- still unrecognized
+    [InlineData(113)]
     public void TryResolveClaimDrops_FalseForUnrecognizedStoredLevel(int bonusItemLevel)
     {
         var resolved = LevelMilestoneBonus.TryResolveClaimDrops(bonusItemLevel, 0, out var drops);
@@ -98,9 +96,6 @@ public class LevelMilestoneBonusTests
         Assert.Equal(expected, drops.ToArray());
     }
 
-    // --- M-tier levels (114/120/126/132/138/144), recovered by level-milestone-bonus-item-ids ------------------
-    // S04_MyWork02.cpp:11265-11291: the lower three (M2/M8/M14) grant exactly two drops (main item + item 539
-    // qty 2); the upper three (M20/M26/M32) additionally grant one unit of item 1458 ("EXP Pill(L) cant trade").
 
     [Fact]
     public void TryResolveClaimDrops_Level114_LvM2_GrantsItem847PlusTwoOfItem539()
@@ -175,7 +170,7 @@ public class LevelMilestoneBonusTests
         TribeGroundItemDrop[] expected =
         [
             new(851, 1), new(1022, 10), new(1023, 10), new(1019, 10),
-            new(expectedTribeItemId, 1) // quantity 1 (enchant-20 stamp not expressible in the drop model)
+            new(expectedTribeItemId, 1)
         ];
         Assert.Equal(expected, drops.ToArray());
     }

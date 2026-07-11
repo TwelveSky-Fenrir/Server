@@ -6,9 +6,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Login.Tests.Services;
 
-// op14 CL_CHANGE_MOUSE_PASSWORD_SEND business logic: shares LoginClientSession.PinFailureCount and the
-// account-scoped lockout (Migrations/028_account_pin_lockout.sql) with VerifyMousePinService -- see
-// VerifyMousePinServiceTests for the sibling coverage of the same mechanism through op15.
 public class ChangeMousePinServiceTests
 {
     private const int AccountId = 42;
@@ -39,9 +36,6 @@ public class ChangeMousePinServiceTests
         Assert.Equal(ChangeMousePinOutcome.WrongPassword, result.Outcome);
         Assert.Equal(1, pins.Stored!.FailedAttempts);
 
-        // LogFailedAttemptAsync is called by the handler, not the service, so no event is logged yet here
-        // -- mirrors VerifyMousePinService's own split between VerifyMousePinAsync (DB-only accounting)
-        // and LogFailedAttemptAsync (audit trail, driven by the handler's session-scoped strike count).
         Assert.Empty(eventLog.LoggedEvents);
     }
 
@@ -76,7 +70,7 @@ public class ChangeMousePinServiceTests
         Assert.Equal(0, pins.SetCallCount);
 
         var logged = Assert.Single(eventLog.LoggedEvents);
-        Assert.Equal((short)6, logged.EventCode); // MousePinAttemptRejectedLocked, shared with VerifyMousePinService
+        Assert.Equal((short)6, logged.EventCode);
         Assert.Equal(EventLogCategory.AccountSecurity, logged.Category);
     }
 
@@ -91,9 +85,9 @@ public class ChangeMousePinServiceTests
         await service.LogFailedAttemptAsync(AccountId, 3, true, CancellationToken.None);
 
         Assert.Equal(2, eventLog.LoggedEvents.Count);
-        Assert.Equal((short)4, eventLog.LoggedEvents[0].EventCode); // MousePinChangeMismatch
+        Assert.Equal((short)4, eventLog.LoggedEvents[0].EventCode);
         Assert.Equal((byte)1, eventLog.LoggedEvents[0].Outcome);
-        Assert.Equal((short)5, eventLog.LoggedEvents[1].EventCode); // MousePinChangeLockout
+        Assert.Equal((short)5, eventLog.LoggedEvents[1].EventCode);
         Assert.Equal((byte)3, eventLog.LoggedEvents[1].Outcome);
         Assert.All(eventLog.LoggedEvents, e => Assert.Equal(EventLogCategory.AccountSecurity, e.Category));
     }

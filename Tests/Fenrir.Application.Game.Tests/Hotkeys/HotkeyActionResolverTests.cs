@@ -5,13 +5,6 @@ using Fenrir.Application.Game.Domain.Skills;
 
 namespace Fenrir.Application.Game.Tests.Hotkeys;
 
-/// <summary>
-///     Coverage for <see cref="HotkeyActionResolver" />, the pure policy behind tSort 204 (bind skill/emoticon),
-///     205 (unbind), 211/253 (bind inventory item), 214 (withdraw item to inventory), and 216 (rearrange
-///     hotkey-to-hotkey). Does not depend on any dispatch wiring -- exercises the static policy methods
-///     directly against hand-built <see cref="HotkeySlot" />/<see cref="ItemStack" /> values, same posture as
-///     <c>StoreItemTransferPolicyTests</c>.
-/// </summary>
 public class HotkeyActionResolverTests
 {
     private static ItemStack Stack(int itemId, int quantity)
@@ -19,7 +12,6 @@ public class HotkeyActionResolverTests
         return new ItemStack(itemId, quantity, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     }
 
-    // ---- Bounds helpers ----
 
     [Theory]
     [InlineData(0, true)]
@@ -41,7 +33,6 @@ public class HotkeyActionResolverTests
         Assert.Equal(expected, HotkeyActionResolver.IsValidIndex(index));
     }
 
-    // ---- ResolveBindSkill (tSort 204, skill branch) ----
 
     [Fact]
     public void BindSkill_EmptyDestination_ValidGrade_Succeeds()
@@ -123,7 +114,6 @@ public class HotkeyActionResolverTests
         Assert.Equal(HotkeyActionResolver.BindSkillFailure.DestinationOccupied, result.Failure);
     }
 
-    // ---- ResolveBindEmoticon (tSort 204, emoticon branch) ----
 
     [Fact]
     public void BindEmoticon_ValidCode_Succeeds_AndGradeIsForcedToZero()
@@ -154,7 +144,6 @@ public class HotkeyActionResolverTests
         Assert.Equal(HotkeyActionResolver.BindEmoticonFailure.DestinationOccupied, result.Failure);
     }
 
-    // ---- ResolveUnbind (tSort 205) ----
 
     [Fact]
     public void Unbind_SkillBinding_Succeeds()
@@ -207,7 +196,6 @@ public class HotkeyActionResolverTests
         Assert.Equal(HotkeyActionResolver.UnbindFailure.InvalidPage, result.Failure);
     }
 
-    // ---- ResolveBindItem (tSort 211/253) ----
 
     [Fact]
     public void BindItem_EmptyDestination_ClaimsSlotOutright()
@@ -265,8 +253,6 @@ public class HotkeyActionResolverTests
     public void BindItem_UnconditionalOverwrite_NeverAddsOntoStaleSecondValue(HotkeyBindingKind occupiedKind,
         int staleSecondValue)
     {
-        // Regression guard for the documented quantity-pollution fix: overwriting a Skill/Emoticon-bound slot
-        // must assign the requested quantity outright, never destination.Value2 + requestedQuantity.
         var source = Stack(501, 50);
         var destination = new HotkeySlot(occupiedKind, 1001, staleSecondValue);
 
@@ -353,7 +339,6 @@ public class HotkeyActionResolverTests
         Assert.Equal(HotkeyActionResolver.BindItemFailure.InvalidSourceIndex, result.Failure);
     }
 
-    // ---- ResolveWithdrawItem (tSort 214) ----
 
     [Fact]
     public void WithdrawItem_EmptyDestination_ClaimsOutright()
@@ -443,9 +428,6 @@ public class HotkeyActionResolverTests
     [InlineData(13)]
     public void WithdrawItem_SourcePageOutOfCorrectRange_Fails_DoesNotReproduceLegacyOobWindow(int page)
     {
-        // Legacy accepts pages 3-13 here (bound-checked against MAX_HOT_KEY_NUM=14, not MAX_HOT_KEY_PAGE=3) and
-        // reads/writes adjacent quest-progress memory; this resolver deliberately does not reproduce that --
-        // see ResolveWithdrawItem's own remarks.
         var source = new HotkeySlot(HotkeyBindingKind.Item, 501, 50);
 
         var result = HotkeyActionResolver.ResolveWithdrawItem(source, page, 0, 20, null,
@@ -492,7 +474,6 @@ public class HotkeyActionResolverTests
         Assert.Equal(HotkeyActionResolver.WithdrawItemFailure.InsufficientSourceQuantity, result.Failure);
     }
 
-    // ---- ResolveRearrange (tSort 216) ----
 
     [Fact]
     public void Rearrange_SkillBranch_EmptyDestination_MovesWholeBindingAndClearsSource()

@@ -94,7 +94,7 @@ public class MountStateServiceTests
         var zone = ZoneTestKit.CreateZone(1);
         var (session, pipe, state) = Setup(zone, 10);
         var (_, neighborPipe, _) = Setup(zone, 20, 12f, 12f);
-        ZoneTestKit.DrainOutbound(pipe); // neighbor's own Enter-broadcast join packet, not under test
+        ZoneTestKit.DrainOutbound(pipe);
         state.AnimalIndex = 2;
         state.AnimalTime = 5;
         state.ActionSort = 1;
@@ -226,7 +226,7 @@ public class MountStateServiceTests
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, state) = Setup(zone, 10);
-        state.AnimalIndex = 13; // mounted range -> garage slot 3
+        state.AnimalIndex = 13;
         state.MountRolledAttributes = state.MountRolledAttributes.SetItem(
             MountStateResolver.AttributeIndex(3, 4), 7);
 

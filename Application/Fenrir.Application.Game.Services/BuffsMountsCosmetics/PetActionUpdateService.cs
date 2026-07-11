@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Services.BuffsMountsCosmetics;
 
-/// <inheritdoc cref="IPetActionUpdateService" />
 public sealed class PetActionUpdateService : IPetActionUpdateService
 {
     public void Apply(Zone zone, int characterId, in ActionInfo action)

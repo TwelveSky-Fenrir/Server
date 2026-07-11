@@ -5,19 +5,13 @@ using Fenrir.Application.Game.Tests.GameData;
 
 namespace Fenrir.Application.Game.Tests.World.Npcs;
 
-/// <summary>
-///     Pure-domain coverage of <see cref="WarPointShopPolicy.ResolveBuy" /> -- the WP/CP dual-currency
-///     purchase resolution (<c>USE_WAR_POINT_SYSTEM</c>, <c>Server/ts25zone/S04_MyWork05.cpp:1798-1988</c>). The
-///     War-Point affordability check is NOT modeled here (it is server-authoritative in
-///     <c>usp_Character_BuyWarPointItem</c>); see <c>WarPointShopServiceTests</c> for the insufficient-WP path.
-/// </summary>
 public class WarPointShopPolicyTests
 {
     private const byte StackableSort = 2;
     private const byte NonStackableSort = 9;
-    private const int WpNpc = WarPointShopCatalog.NobleDragonNpcId; // 102, owns a page-2 tribe set
-    private const int OtherWpNpc = WarPointShopCatalog.RoyalSerpentNpcId; // 202
-    private const int NangimNpc = WarPointShopCatalog.NangimNpcId; // 52
+    private const int WpNpc = WarPointShopCatalog.NobleDragonNpcId;
+    private const int OtherWpNpc = WarPointShopCatalog.RoyalSerpentNpcId;
+    private const int NangimNpc = WarPointShopCatalog.NangimNpcId;
     private const int OrdinaryNpc = 1;
 
     private static ItemDefinition Item(int itemId, byte sort)
@@ -69,7 +63,7 @@ public class WarPointShopPolicyTests
     [Fact]
     public void Page2TribeItem_AtWrongNpc_IsHardRejectedBeforeAnyWarPointLogic()
     {
-        var catalog = Catalog(Entry(90200, 500, 0, WpNpc)); // displays only at 102
+        var catalog = Catalog(Entry(90200, 500, 0, WpNpc));
         var result = WarPointShopPolicy.ResolveBuy(catalog, OtherWpNpc, Item(90200, NonStackableSort), 1, null, 0);
 
         Assert.Equal(WarPointShopPolicy.BuyOutcome.WrongNpc, result.Outcome);
@@ -114,7 +108,7 @@ public class WarPointShopPolicyTests
         var result = WarPointShopPolicy.ResolveBuy(catalog, WpNpc, Item(50, StackableSort), 5, null, 0);
 
         Assert.Equal(WarPointShopPolicy.BuyOutcome.Proceed, result.Outcome);
-        Assert.Equal(100, result.WarPointCost); // 20 * 5
+        Assert.Equal(100, result.WarPointCost);
         Assert.Equal(5, result.NewDestinationStack!.Value.Quantity);
     }
 
@@ -128,7 +122,7 @@ public class WarPointShopPolicyTests
             0);
 
         Assert.Equal(WarPointShopPolicy.BuyOutcome.Proceed, result.Outcome);
-        Assert.Equal(20, result.WarPointCost); // priced at quantity 1
+        Assert.Equal(20, result.WarPointCost);
         Assert.Equal(1, result.NewDestinationStack!.Value.Quantity);
     }
 
@@ -139,7 +133,7 @@ public class WarPointShopPolicyTests
         var result = WarPointShopPolicy.ResolveBuy(catalog, WpNpc, Item(50, StackableSort), 5, Stack(50, 10), 0);
 
         Assert.Equal(WarPointShopPolicy.BuyOutcome.Proceed, result.Outcome);
-        Assert.Equal(100, result.WarPointCost); // still 20 * 5 purchased units
+        Assert.Equal(100, result.WarPointCost);
         Assert.Equal(15, result.NewDestinationStack!.Value.Quantity);
     }
 
@@ -191,21 +185,19 @@ public class WarPointShopPolicyTests
 
         var proceeded = WarPointShopPolicy.ResolveBuy(catalog, WpNpc, Item(50, StackableSort), 5, null, 50);
         Assert.Equal(WarPointShopPolicy.BuyOutcome.Proceed, proceeded.Outcome);
-        Assert.Equal(50, proceeded.ContributionPointCost); // 10 * 5
-        Assert.Equal(100, proceeded.WarPointCost); // 20 * 5
+        Assert.Equal(50, proceeded.ContributionPointCost);
+        Assert.Equal(100, proceeded.WarPointCost);
     }
 
     [Fact]
     public void NonStackable_MultiQuantity_ScalesChargedCostButStillDeliversExactlyOneUnit()
     {
-        // Non-stackable purchases always deliver exactly one unit, but legacy still scales the CHARGED cost by
-        // the requested quantity (WarPointSystem.h:207-213, S04_MyWork05.cpp:1971-1978).
         var catalog = Catalog(Entry(90200, 500, 0, WpNpc));
         var result = WarPointShopPolicy.ResolveBuy(catalog, WpNpc, Item(90200, NonStackableSort), 5, null, 0);
 
         Assert.Equal(WarPointShopPolicy.BuyOutcome.Proceed, result.Outcome);
-        Assert.Equal(2500, result.WarPointCost); // 500 * 5
-        Assert.Equal(1, result.NewDestinationStack!.Value.Quantity); // still exactly one unit delivered
+        Assert.Equal(2500, result.WarPointCost);
+        Assert.Equal(1, result.NewDestinationStack!.Value.Quantity);
     }
 
     [Theory]
@@ -213,15 +205,12 @@ public class WarPointShopPolicyTests
     [InlineData(-3)]
     public void NonStackable_QuantityNotPositive_ChargesUnscaledSingleUnitCost(int requestedQuantity)
     {
-        // Unlike the stackable branch (which floors to 1 BEFORE pricing), the non-stackable branch has no such
-        // floor -- a non-positive quantity leaves the unscaled per-unit price in effect instead of zeroing it
-        // out (WarPointSystem.h:207-213).
         var catalog = Catalog(Entry(90200, 500, 0, WpNpc));
         var result = WarPointShopPolicy.ResolveBuy(catalog, WpNpc, Item(90200, NonStackableSort),
             requestedQuantity, null, 0);
 
         Assert.Equal(WarPointShopPolicy.BuyOutcome.Proceed, result.Outcome);
-        Assert.Equal(500, result.WarPointCost); // unscaled single-unit price, not zeroed
+        Assert.Equal(500, result.WarPointCost);
         Assert.Equal(1, result.NewDestinationStack!.Value.Quantity);
     }
 
@@ -235,15 +224,13 @@ public class WarPointShopPolicyTests
 
         var proceeded = WarPointShopPolicy.ResolveBuy(catalog, WpNpc, Item(90200, NonStackableSort), 5, null, 50);
         Assert.Equal(WarPointShopPolicy.BuyOutcome.Proceed, proceeded.Outcome);
-        Assert.Equal(50, proceeded.ContributionPointCost); // 10 * 5
-        Assert.Equal(2500, proceeded.WarPointCost); // 500 * 5
+        Assert.Equal(50, proceeded.ContributionPointCost);
+        Assert.Equal(2500, proceeded.WarPointCost);
     }
 
     [Fact]
     public void FixedStateStampBand_86700To86725_IsFlaggedButGrantedPlain()
     {
-        // The 86700-86725 fixed item-state stamp value is a data gap (not in the contract); the band is flagged
-        // but the item is granted plain -- verifies both that the flag holds and that no stamp is invented.
         Assert.True(WarPointShopPolicy.IsFixedStateStampItem(86700));
         Assert.True(WarPointShopPolicy.IsFixedStateStampItem(86725));
         Assert.False(WarPointShopPolicy.IsFixedStateStampItem(86699));

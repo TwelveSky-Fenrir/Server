@@ -2,7 +2,6 @@ using Fenrir.Application.Game.Domain.Combat;
 
 namespace Fenrir.Application.Game.Tests.Combat;
 
-/// <summary>Pure-logic coverage of the C05 anti-farm gate -- no wall-clock dependency, every instant is synthetic.</summary>
 public class KillCooldownTrackerTests
 {
     private static readonly DateTime Epoch = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
@@ -47,7 +46,6 @@ public class KillCooldownTrackerTests
                                                           TimeSpan.FromSeconds(1));
         Assert.True(afterCooldown);
 
-        // the window re-armed against the SECOND grant, not the first
         var immediatelyAfter = tracker.TryRegisterKill(1, 2,
             Epoch + KillCooldownTracker.DefaultCooldown + TimeSpan.FromSeconds(2));
         Assert.False(immediatelyAfter);
@@ -68,9 +66,8 @@ public class KillCooldownTrackerTests
     public void ReversedPair_IsTrackedIndependently_NotSymmetric()
     {
         var tracker = new KillCooldownTracker();
-        tracker.TryRegisterKill(1, 2, Epoch); // 1 kills 2
+        tracker.TryRegisterKill(1, 2, Epoch);
 
-        // 2 killing 1 back immediately is a different ordered pair -- never blocked by the (1,2) entry above
         var revengeKill = tracker.TryRegisterKill(2, 1, Epoch + TimeSpan.FromSeconds(1));
 
         Assert.True(revengeKill);

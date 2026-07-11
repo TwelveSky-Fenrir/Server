@@ -3,10 +3,6 @@ using Fenrir.Application.Game.Domain.World.Npcs;
 
 namespace Fenrir.Application.Game.Tests.World.Npcs;
 
-/// <summary>
-///     Coverage of <see cref="WarPointShopCatalog" /> -- the boot-frozen War-Point price table + the four
-///     War-Point NPC set + per-entry display gating (<c>Server/Header/WarPointSystem.h:8-9,18-29,39-124</c>).
-/// </summary>
 public class WarPointShopCatalogTests
 {
     [Theory]
@@ -42,8 +38,8 @@ public class WarPointShopCatalogTests
     [Fact]
     public void PageAndSlotDimensions_MatchLegacyConstants()
     {
-        Assert.Equal(3, WarPointShopCatalog.MaxPageCount); // MAX_NPC_SELL_PAGE_NUM
-        Assert.Equal(28, WarPointShopCatalog.MaxSlotPerPage); // MAX_NPC_SELL_SLOT_NUM
+        Assert.Equal(3, WarPointShopCatalog.MaxPageCount);
+        Assert.Equal(28, WarPointShopCatalog.MaxSlotPerPage);
     }
 
     [Fact]
@@ -98,9 +94,6 @@ public class WarPointShopCatalogTests
     [Fact]
     public void ProductionCatalog_Has48Rows_TheVerbatimLiveCatalogueSize()
     {
-        // 10 (page 0) + 24 (page 1, 3x8 tribe sets) + 14 (page 2) = 48 populated rows out of 84 total slots
-        // (WarPointSystem.h:74-140). The other 36 slots stay at their zero-initialized default and are not
-        // represented as catalogue rows at all.
         Assert.Equal(48, WarPointShopCatalog.Production.Count);
     }
 
@@ -142,8 +135,6 @@ public class WarPointShopCatalogTests
     [Fact]
     public void ProductionCatalog_Page2DeadRows_AreNotPresent()
     {
-        // 86725 (20 WP) and the 90786-90794 block are commented-out/dead code (WarPointSystem.h:141,143-156),
-        // never compiled into any build -- they must not appear in the shipped catalogue.
         Assert.False(WarPointShopCatalog.Production.TryGetPrice(86725, out _));
         Assert.False(WarPointShopCatalog.Production.TryGetPrice(90786, out _));
     }
@@ -178,8 +169,6 @@ public class WarPointShopCatalogTests
     [Fact]
     public void ProductionCatalog_NangimNeverDisplaysAnyPage1TribeRow()
     {
-        // Nangin (52) only ever shows page 0 + page 2 (24 distinct items) -- confirmed via the contract's own
-        // "24 distinct items" summary. Spot-check across all three tribe sets.
         foreach (var itemId in new[] { 87077, 87099, 87121 })
         {
             Assert.True(WarPointShopCatalog.Production.TryGetPrice(itemId, out var entry));

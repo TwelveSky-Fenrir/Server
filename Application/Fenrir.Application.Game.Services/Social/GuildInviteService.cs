@@ -14,32 +14,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Services.Social;
 
-/// <inheritdoc cref="IGuildInviteService" />
-/// <remarks>
-///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:9827-9884 (GUILD_ASK_SEND) and
-///     Server/ts25zone/S07_MyGame04.cpp:185-216 (<c>CheckCommunityWork</c>'s seven-flag exclusivity check).
-///     <see cref="AskAsync" /> composes that check from this process's own sibling negotiation registries
-///     (Duel, Trade, Friend, Party, Mentor, plus this family's own <see cref="GuildInviteRegistry" />) and the
-///     stun/death action-state gate (<see cref="PlayerRuntimeState.IsStunned" />/<see cref="PlayerRuntimeState.IsDead" />,
-///     Server/ts25zone/S07_MyGame04.cpp:438-459,1617-1658) -- both applied to the asker before the target is
-///     even resolved, and again to the target once found, matching the legacy check order. The target's own
-///     "currently mid zone-transfer" gate (legacy <c>IsMovingZone()</c>) is now modeled too, via
-///     <see cref="PlayerRuntimeState.IsMovingZone" /> -- re-verified 2026-07-11 (the flag now exists, see that
-///     property's own remarks) and wired into the target-busy check alongside stun/death, matching the pattern
-///     already used at <c>Zone.ValleyWar.cs</c>/<c>Zone.Zone038Occupation.cs</c>. Per legacy's own
-///     <c>IsMovingZone()</c> semantics this gate is target-only, mirroring <c>UnstunResolver</c>'s cure-attempt
-///     check -- it is deliberately NOT added to the asker-busy check above.
-///     <para>
-///         WS1.4 ASK-PUBLISH-ONLY: <see cref="AskAsync" />'s cross-shard fallback publishes an Ask row via
-///         <see cref="ISocialCrossShardRelayQueue" /> and registers the asker-side busy gate
-///         (<see cref="GuildInviteRegistry.TryAskCrossShard" />), but no <c>ISocialCrossShardRelayHandler</c>
-///         is registered for <see cref="SocialCrossShardRelayKind.GuildInvite" /> -- see <c>DuelService</c>'s
-///         own remarks for the shared rationale. <see cref="GuildInviteRegistry.TryCancel" /> still consumes
-///         the outbound entry, so an asker is never left permanently busy even though the invite itself is
-///         never delivered today. A follow-up closing this gap needs a <c>GuildInviteCrossShardRelayHandler</c>
-///         mirroring <c>FriendCrossShardRelayHandler</c>.
-///     </para>
-/// </remarks>
 public sealed class GuildInviteService(
     ZoneRegistry zones,
     GuildInviteRegistry invites,
@@ -53,7 +27,7 @@ public sealed class GuildInviteService(
     IOptions<GameServerOptions> options,
     ILogger<GuildInviteService> logger) : IGuildInviteService
 {
-    public async ValueTask<GuildInviteAskResultKind> AskAsync(Zone zone, PlayerRuntimeState asker,
+    public async ValueTask<GuildInviteAskResultKind> AskAsync(PlayerRuntimeState asker,
         string targetAvatarName, CancellationToken cancellationToken)
     {
         if (asker.GuildId is null || !GuildRoleCodec.IsMasterOrSubMaster(asker.GuildRoleDb))
@@ -73,8 +47,7 @@ public sealed class GuildInviteService(
             return GuildInviteAskResultKind.AskerBusy;
         }
 
-        var target = FindPlayerByName(zone, targetAvatarName);
-        if (target is null)
+        if (!zones.TryGetPlayerByName(targetAvatarName, out var target))
             return await AskCrossShardAsync(asker, targetAvatarName, cancellationToken).ConfigureAwait(false);
 
         if (target.GuildId is not null)
@@ -155,13 +128,7 @@ public sealed class GuildInviteService(
             targetId);
     }
 
-    /// <summary>
-    ///     WS1.4 same-shard-miss, ASK-PUBLISH-ONLY fallback -- see this class's own remarks. The target's
-    ///     guild membership (needed for the already-guilded check) is not carried by the cross-shard
-    ///     directory, so that check is deferred to the eventual target-side handler; only the same-tribe
-    ///     check (against the directory row's own denormalized Tribe) is re-evaluable here.
-    /// </summary>
-    private async ValueTask<GuildInviteAskResultKind> AskCrossShardAsync(PlayerRuntimeState asker,
+        private async ValueTask<GuildInviteAskResultKind> AskCrossShardAsync(PlayerRuntimeState asker,
         string targetAvatarName, CancellationToken cancellationToken)
     {
         var remote = await characterShardLocations.FindByNameAsync(targetAvatarName, cancellationToken)
@@ -210,14 +177,5 @@ public sealed class GuildInviteService(
             "Character {CharacterId} published a guild invite cross-shard to character {TargetCharacterId} on shard {TargetShardId} (never delivered today -- see GuildInviteService's own remarks)",
             asker.CharacterId, remote.CharacterId, remote.ShardId);
         return GuildInviteAskResultKind.SentCrossShard;
-    }
-
-    private static PlayerRuntimeState? FindPlayerByName(Zone zone, string avatarName)
-    {
-        foreach (var candidate in zone.Players)
-            if (string.Equals(candidate.Name, avatarName, StringComparison.OrdinalIgnoreCase))
-                return candidate;
-
-        return null;
     }
 }

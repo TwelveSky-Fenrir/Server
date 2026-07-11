@@ -6,40 +6,13 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.Inventory.UseItems;
 
-/// <summary>
-///     op23 Ivy Hall Ticket pair (world.Items 553 Small/1219 Large) -- adds a fixed per-item amount (180/360)
-///     to the character's shared <see cref="PlayerRuntimeState.IvyHallTicketTime" /> counter, then consumes
-///     exactly one unit. Unlike the Elite Dungeon Ticket/Dungeon Key siblings in this same op23 slice, this
-///     family is NOT listed among the level-gated ids in the originating C9-tickets-tower contract, so no
-///     level precondition is modeled or omitted here -- there is none to model.
-/// </summary>
-/// <remarks>
-///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:6787-6807 (Ivy Hall Ticket branch: the fixed 180/360
-///     amounts, carried forward from the originating contract, not independently re-opened this session).
-///     Every rejection collapses to a clean Result=1 reply rather than a disconnect, same op23 simplification
-///     as this file's sibling handlers.
-///     <para>
-///         CEILING PLACEHOLDER -- the originating contract states this counter is checked against "a distinct,
-///         harder [lower] numeric cap than the generic one" but does not supply the concrete value. This
-///         handler uses <see cref="DungeonAccessTicketResolver" />'s default (the shared 2,000,000,000
-///         ceiling, <see cref="BankedCounterMath.GlobalCeiling" />) as a documented, conservative interim
-///         placeholder rather than an invented tighter number -- this permits banking MORE than legacy's real,
-///         tighter cap would allow, a real (if low-severity, non-currency) parity gap flagged in this
-///         workstream's openQuestions pending a follow-up contract supplying the real cap.
-///     </para>
-/// </remarks>
 public sealed class IvyHallTicketUseItemHandler(
     UseItemInventoryWriter inventoryWriter,
     IEventLogRepository eventLog,
     ILogger<IvyHallTicketUseItemHandler> logger) : IUseItemHandler
 {
-    /// <summary>
-    ///     game.EventLog.EventCode for an Ivy-Hall-Ticket counter grant -- scoped within
-    ///     <see cref="EventLogCategory.ItemUse" />, distinct from
-    ///     <see cref="EliteDungeonTicketUseItemHandler" />'s 30 and <see cref="DungeonKeyUseItemHandler" />'s
-    ///     31 in the same category.
-    /// </summary>
-    private const short IvyHallTicketGrantEventCode = 32;
+
+        private const short IvyHallTicketGrantEventCode = 32;
 
     private const byte SuccessOutcome = 1;
 

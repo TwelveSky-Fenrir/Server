@@ -2,7 +2,6 @@ using CaeriusNet.Attributes.Dto;
 
 namespace Fenrir.Data.Abstractions.World;
 
-// world.usp_Item_GetAll RS0; ctor order must match the SELECT exactly (ordinal mapping).
 [GenerateDto]
 public sealed partial record ItemRowDto(
     int ItemId,
@@ -58,7 +57,6 @@ public sealed partial record ItemRowDto(
     byte CapeInfo2,
     byte CapeInfo3);
 
-/// <summary>world.usp_Item_GetAll RS1 (SlotIndex 0-7); SkillId null when the slot had no skill wired up.</summary>
 [GenerateDto]
 public sealed partial record ItemBonusSkillRowDto(
     int ItemId,

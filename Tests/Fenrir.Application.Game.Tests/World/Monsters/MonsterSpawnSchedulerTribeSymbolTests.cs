@@ -14,13 +14,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.World.Monsters;
 
-/// <summary>
-///     Covers <see cref="MonsterSpawnScheduler.ProcessDeath" />'s "Holy Stone" tribe/monster-symbol report
-///     (A013's <c>mSpecialSortNumber==2</c> branch, <c>S07_MyGame05.cpp:1565-1610</c>): killing one of the
-///     SpecialType-11/12/13/28/14 guardian monsters must resolve the symbol via
-///     <see cref="ZoneEventBroadcaster.AnnounceSymbolResolved" />, using the killer's own tribe (the documented
-///     simplification of legacy's cumulative per-tribe damage tally).
-/// </summary>
 public class MonsterSpawnSchedulerTribeSymbolTests
 {
     private static WorldDataCache CacheWithHolyStone(int monsterId, byte specialType)
@@ -53,8 +46,6 @@ public class MonsterSpawnSchedulerTribeSymbolTests
         var worldState = new WorldStateService(new FakeWorldStateRepository(), NullLogger<WorldStateService>.Instance);
         worldState.InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
 
-        // Decoupled from the zone under test -- AnnounceSymbolResolved only needs *a* ZoneRegistry to iterate
-        // for the broadcast side; the assertions below only care that WorldStateService itself got mutated.
         var options = ZoneTestKit.Options();
         var emptyRegistry = new ZoneRegistry(Options.Create(options), new MovementRules(Options.Create(options)),
             new DirtyTracker<int>(), NullLogger<Zone>.Instance, ZoneTestKit.EmptyWorldData(), []);
@@ -66,7 +57,7 @@ public class MonsterSpawnSchedulerTribeSymbolTests
     }
 
     [Theory]
-    [InlineData(601, (byte)11, (byte)0)] // one tribe's own slot
+    [InlineData(601, (byte)11, (byte)0)]
     [InlineData(603, (byte)13, (byte)2)]
     [InlineData(605, (byte)28, (byte)3)]
     public void KillingATribeSlotGuardian_ResolvesThatTribesOwnSlot_ToTheKillersTribe(int monsterId,
@@ -86,7 +77,7 @@ public class MonsterSpawnSchedulerTribeSymbolTests
 
         zone.TryDamageMonster(1, 10_000, 10, out var died, out _);
         Assert.True(died);
-        zone.Tick(SimulationClock.LegacyTick); // drains the death -> ProcessDeath -> AnnounceSymbolResolved
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.Equal(killerTribe == expectedSymbolIndex, worldState.GetTribe(expectedSymbolIndex).HasSymbol);
     }
@@ -114,8 +105,6 @@ public class MonsterSpawnSchedulerTribeSymbolTests
     [Fact]
     public void KillingAnOrdinaryMonster_NeverResolvesAnySymbol()
     {
-        // SpecialType 1 is the legacy "no special designation" value real ordinary monsters use (e.g.
-        // Migrations/Seed/world/090_monsters.sql's MonsterId=1) -- not one of the 11/12/13/28/14 Holy Stone types.
         var cache = CacheWithHolyStone(700, 1);
         var (worldState, broadcaster) = CreateWorldStateAndBroadcaster();
         var scheduler =
@@ -130,15 +119,12 @@ public class MonsterSpawnSchedulerTribeSymbolTests
         zone.Tick(SimulationClock.LegacyTick);
 
         Assert.Null(worldState.World.MonsterSymbol);
-        Assert.All(worldState.GetAllTribes(), t => Assert.True(t.HasSymbol)); // untouched EnsureInitialized default
+        Assert.All(worldState.GetAllTribes(), t => Assert.True(t.HasSymbol));
     }
 
     [Fact]
     public void NoZoneEventBroadcasterWired_NeverThrows()
     {
-        // The scheduler must remain usable when zoneEventBroadcaster is left null (matches production DI's
-        // "optional dependency, auto-resolved if registered" posture) -- this is the whole point of it being
-        // an optional constructor parameter.
         var cache = CacheWithHolyStone(601, 11);
         var scheduler = new MonsterSpawnScheduler(cache);
         var zone = ZoneTestKit.CreateZone(1, simulationSystems: [scheduler], worldData: cache);
@@ -148,6 +134,6 @@ public class MonsterSpawnSchedulerTribeSymbolTests
         zone.Tick(SimulationClock.LegacyTick);
 
         zone.TryDamageMonster(1, 10_000, 10, out _, out _);
-        zone.Tick(SimulationClock.LegacyTick); // must not throw
+        zone.Tick(SimulationClock.LegacyTick);
     }
 }

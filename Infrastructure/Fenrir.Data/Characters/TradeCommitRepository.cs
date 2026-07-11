@@ -6,10 +6,6 @@ using Fenrir.Data.Abstractions.Characters;
 
 namespace Fenrir.Data.Characters;
 
-// C8 durable, anti-dupe two-character trade commit (game.usp_CharacterTradeCommit_ExecuteIdempotent /
-// game.TradeCommitLedger) -- see ITradeCommitRepository for the per-method contract. A dedicated repository,
-// not added to ICharacterRepository/CharacterRepository, same "hot magnet file" precedent as
-// IRuneRepository/RuneRepository.
 public sealed record TradeCommitRepository(ICaeriusNetDbContext Db) : ITradeCommitRepository
 {
     public async ValueTask ExecuteIdempotentAsync(
@@ -24,8 +20,6 @@ public sealed record TradeCommitRepository(ICaeriusNetDbContext Db) : ITradeComm
         long offeredMoneyA = 0, int offeredBigMoneyA = 0,
         long offeredMoneyB = 0, int offeredBigMoneyB = 0)
     {
-        // Parameter order matches usp_CharacterTradeCommit_ExecuteIdempotent's signature exactly, including
-        // the TVPs interleaved between scalars -- see sql-server-2025-stored-procedure-conventions.
         var builder = new StoredProcedureParametersBuilder("game", "usp_CharacterTradeCommit_ExecuteIdempotent", 0)
             .AddParameter("TradeToken", tradeToken, SqlDbType.UniqueIdentifier)
             .AddParameter("CharacterA", characterA, SqlDbType.Int);
@@ -43,8 +37,6 @@ public sealed record TradeCommitRepository(ICaeriusNetDbContext Db) : ITradeComm
         builder.AddParameter("DeltaMoneyB", deltaMoneyB, SqlDbType.BigInt)
             .AddParameter("DeltaBigMoneyB", deltaBigMoneyB, SqlDbType.Int);
 
-        // Audit-only additions, appended last, matching ICharacterRepository.ExecuteTradeAsync's own
-        // append-only parameter rule.
         if (tradedItemsA is { Count: > 0 }) builder.AddTvpParameter("TradedItemsA", tradedItemsA);
         if (tradedItemsB is { Count: > 0 }) builder.AddTvpParameter("TradedItemsB", tradedItemsB);
 

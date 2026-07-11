@@ -10,19 +10,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.ItemModification;
 
-/// <summary>
-///     Business logic for op89, CZ_DESTROY_ITEM_SEND -- extracted from <see cref="DestroyItemHandler" />, see
-///     that handler's remarks.
-/// </summary>
-/// <remarks>
-///     C1-vault-expiry-enforcement: destroying/salvaging an item is this protocol's closest "discard" analog
-///     for the dated-vault (last inventory page) mechanism, gated identically to the primary
-///     CZ_USE_INVENTORY_ITEM_SEND trigger -- see <see cref="UseInventoryItemService.ResolveAsync" />'s own
-///     remarks for the sibling gate and its citation (Server/ts25zone/S04_MyWork03.cpp:1895-1939). A rejection
-///     here already collapses into the same hard disconnect every other Rejected outcome of this handler uses
-///     (<see cref="DestroyItemHandler" />'s own <c>DisconnectReason.Faulted</c> Abort), matching the legacy's
-///     own force-disconnect-on-expiry posture with no code changes needed at the handler layer.
-/// </remarks>
 public sealed class DestroyItemService(
     ICharacterRepository characters,
     WorldDataCache worldData,
@@ -30,24 +17,10 @@ public sealed class DestroyItemService(
     ILogger<DestroyItemService> logger)
     : IDestroyItemService
 {
-    /// <summary>
-    ///     game.EventLog.EventCode for a successful rare-item destroy-into-stone dissolution -- an app-owned
-    ///     numbering scheme with no central catalog yet (first Application-layer caller of
-    ///     <see cref="IEventLogRepository" /> under <see cref="EventLogCategory.ItemDestroy" />; see
-    ///     game.EventLog.sql's own "EventCode is an app-owned numbering scheme" comment). Picked as an
-    ///     arbitrary small value scoped to this one path; a future central event-code registry should
-    ///     supersede this constant rather than silently reusing its numeric value for something unrelated.
-    /// </summary>
-    private const short DestroyItemEventCode = 1;
 
-    /// <summary>
-    ///     game.EventLog.Outcome for this event code -- caller/EventCode-defined (see
-    ///     game.EventLog.sql's own "Outcome is likewise a caller/EventCode-defined code" comment), not a
-    ///     fixed global enum. 1 marks success, matching <c>UseInventoryItemService</c>'s own
-    ///     GpTicketRedeemedEventCode precedent; only the success path is logged here (a rejected destroy
-    ///     never reaches SQL, so there is nothing durable to audit).
-    /// </summary>
-    private const byte SuccessOutcome = 1;
+        private const short DestroyItemEventCode = 1;
+
+        private const byte SuccessOutcome = 1;
 
     public async ValueTask<DestroyItemResult> DestroyAsync(DestroyItemRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, int accountId, CancellationToken cancellationToken)
@@ -63,7 +36,6 @@ public sealed class DestroyItemService(
             return new DestroyItemResult(DestroyItemOutcome.Rejected, 0, 0, 0, 0);
         }
 
-        // Dated-vault last-page gate (C1-vault-expiry-enforcement) -- see this class's own <remarks>.
         if (page1 == ContainerMatrix.InventoryPage1 && state.InventoryDate < GameDate.Today())
         {
             logger.LogDebug(

@@ -6,8 +6,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Network.Transport;
 
-// Turns accepted TCP connections into (TSession, SocketConnection) pairs; wiring/teardown is onAccepted's job.
-// Generic over the session type so Transport never needs to reference the concrete session hierarchy (Dispatch).
 public sealed class FenrirTcpListener<TSession> : IAsyncDisposable
 {
     private const int Backlog = 512;
@@ -34,7 +32,6 @@ public sealed class FenrirTcpListener<TSession> : IAsyncDisposable
         return ValueTask.CompletedTask;
     }
 
-    // Each acceptance runs as a detached task so a connection's whole lifetime never stalls the next accept.
     public async Task AcceptLoopAsync(
         Func<TSession, SocketConnection, CancellationToken, Task> onAccepted,
         CancellationToken cancellationToken)
@@ -48,14 +45,10 @@ public sealed class FenrirTcpListener<TSession> : IAsyncDisposable
             }
             catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
             {
-                break; // cancelled, or Stop()/DisposeAsync() closed the listen socket
+                break;
             }
             catch (SocketException ex)
             {
-                // A half-open port-scan can surface as a per-accept SocketException with nothing accepted; only
-                // the listen socket being torn down (ObjectDisposedException, above) should stop this loop.
-                // Debug, not Warning -- see TransportLog.AcceptPortScanSwallowed's own remarks for why this is
-                // expected noise, not an anomaly.
                 _logger?.AcceptPortScanSwallowed(ex, _listenSocket.LocalEndPoint);
                 continue;
             }
@@ -71,9 +64,6 @@ public sealed class FenrirTcpListener<TSession> : IAsyncDisposable
             }
             catch (Exception ex)
             {
-                // Must not crash the accept loop or leak the socket; same never-goes-down contract as onAccepted's.
-                // Unlike the SocketException above, this is a genuine anomaly (a successful accept that failed
-                // to become a running session) -- see TransportLog.ConnectionConstructionFailed's own remarks.
                 _logger?.ConnectionConstructionFailed(ex, _listenSocket.LocalEndPoint);
 
                 if (connection is not null)
@@ -96,7 +86,6 @@ public sealed class FenrirTcpListener<TSession> : IAsyncDisposable
         }
         catch (Exception)
         {
-            // Swallowed by design: onAccepted owns this connection's teardown/logging end to end.
         }
     }
 }

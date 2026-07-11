@@ -14,9 +14,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests;
 
-// Cross-shard fan-out for the rvr-siege world-event family (Zone049 sub-codes 1-9 + tribe-symbol/alliance
-// tSort 38/39/40/42/45/46/47) -- same "constructed directly with fakes, no DI container" idiom as
-// SocialCrossShardRelayHostTests/AccountSessionKickPollHostTests.
 public class RvrSiegeEventRelayHostTests
 {
     private const byte ShardId = 3;
@@ -80,8 +77,8 @@ public class RvrSiegeEventRelayHostTests
         var host = CreateHost(relay, ingestor, broadcaster);
 
         var data = new byte[130];
-        BinaryPrimitives.WriteInt32LittleEndian(data, 4); // slot 4
-        relay.NextPoll = [new RvrSiegeEventRelayDto(1, 2, data)]; // sub-code 2 -> state 1
+        BinaryPrimitives.WriteInt32LittleEndian(data, 4);
+        relay.NextPoll = [new RvrSiegeEventRelayDto(1, 2, data)];
 
         await host.PollOnceAsync(CancellationToken.None);
 
@@ -106,13 +103,11 @@ public class RvrSiegeEventRelayHostTests
         var host = CreateHost(relay, ingestor, broadcaster);
 
         var data = new byte[130];
-        BinaryPrimitives.WriteInt32LittleEndian(data, 2); // tribe 2 decided Zone038
+        BinaryPrimitives.WriteInt32LittleEndian(data, 2);
         relay.NextPoll = [new RvrSiegeEventRelayDto(1, 38, data)];
 
         await host.PollOnceAsync(CancellationToken.None);
 
-        // Replayed through ZoneEventBroadcaster.ApplyRelayedEvent -- both the local broadcast AND the
-        // WorldStateService mutation are reproduced immediately (see that method's own remarks for why).
         Assert.Equal((byte?)2, worldState.World.Zone038WinTribe);
         var frame = ZoneTestKit.DrainOutbound(pipe);
         Assert.Equal(38, BinaryPrimitives.ReadInt32LittleEndian(frame.AsSpan(1)));
@@ -148,7 +143,6 @@ public class RvrSiegeEventRelayHostTests
         var relay = new FakeRvrSiegeEventRelayRepository();
         var host = CreateHost(relay, ingestor, broadcaster);
 
-        // A malformed (too-short) payload makes ApplyRelayedEvent throw -- must not take the whole poll cycle down.
         relay.NextPoll = [new RvrSiegeEventRelayDto(1, 2, new byte[4])];
 
         var ex = await Record.ExceptionAsync(() => host.PollOnceAsync(CancellationToken.None).AsTask());

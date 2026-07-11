@@ -3,11 +3,6 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Seeding;
 
-/// <summary>
-///     Generates <c>70_seed/world/071_skill_descriptions.sql</c> from <see cref="SkillReader.ReadAll" />
-///     (005_00003.IMG): one row per non-empty description line (avg ~3.9 of 10 populated per skill), unlike
-///     <c>ITEM_INFO</c>'s fixed 3-line description.
-/// </summary>
 public static class SkillDescriptionSeedGenerator
 {
     private const string DescriptionColumns = "SkillId, LineIndex, Text";

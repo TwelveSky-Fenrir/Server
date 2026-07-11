@@ -5,7 +5,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Social;
 
-/// <summary>A self-targeted kick isn't specially guarded, matching legacy's own lack of a guard.</summary>
 public sealed class PartyKickService(ZoneRegistry zones, PartyRegistry parties, ILogger<PartyKickService> logger)
     : IPartyKickService
 {
@@ -13,8 +12,6 @@ public sealed class PartyKickService(ZoneRegistry zones, PartyRegistry parties, 
     {
         if (!parties.IsLeader(leaderId))
         {
-            // A non-leader (or non-partied) character attempting a leader-only action -- either a stale UI
-            // state or a spoofed/tampered request, worth surfacing by default unlike routine business rejections.
             logger.LogWarning(
                 "Party kick rejected: character {LeaderId} is not the leader of a party, cannot kick {TargetAvatarName}",
                 leaderId, targetAvatarName);
@@ -47,7 +44,6 @@ public sealed class PartyKickService(ZoneRegistry zones, PartyRegistry parties, 
             return new PartyKickResult(PartyKickResultKind.Kicked, targetId, membersBeforeKick, true);
         }
 
-        // Anchor on a surviving member, not leaderId: a self-kick removes leaderId from the roster index too.
         var anchor = membersBeforeKick.FirstOrDefault(id => id != targetId);
         var remaining = parties.GetMembers(anchor);
 

@@ -3,7 +3,6 @@ using Fenrir.Network.Serialization.Wire.Attributes;
 
 namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 
-// Money is the dissolution refund; Value is the emptied slot / compensation stone.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.DestroyItem, ExpectedSize = 33)]
 public readonly partial record struct DestroyItemResponse : IOutgoingPacket
 {

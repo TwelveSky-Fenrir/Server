@@ -10,7 +10,6 @@ public class LcLoginRecvTests
     [Fact]
     public void PayloadSize_MatchesContractConstant()
     {
-        // ExpectedSize=693 (1-byte outbound header) -> 692-byte payload.
         Assert.Equal(692, LoginResponse.PayloadSize);
     }
 
@@ -41,7 +40,6 @@ public class LcLoginRecvTests
 
         Assert.Equal(packet.Result, BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(0, 4)));
 
-        // ApplyUidXor is involutive only if content has no 0x10/0xFE byte; re-applying it recovers plaintext.
         var idBytes = buffer.AsSpan(4, 255).ToArray();
         WireXor.ApplyUidXor(idBytes);
         Assert.Equal(packet.Id, DecodeFixedString(idBytes));

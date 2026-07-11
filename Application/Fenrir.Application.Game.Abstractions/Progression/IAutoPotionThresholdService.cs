@@ -2,10 +2,6 @@ using Fenrir.Application.Game.Domain.World;
 
 namespace Fenrir.Application.Game.Abstractions.Progression;
 
-/// <summary>
-///     Outcome of <see cref="IAutoPotionThresholdService.ApplyAsync" />: <see cref="Aborted" /> means the caller must
-///     disconnect the session.
-/// </summary>
 public readonly record struct AutoPotionThresholdResult(bool Aborted);
 
 public interface IAutoPotionThresholdService

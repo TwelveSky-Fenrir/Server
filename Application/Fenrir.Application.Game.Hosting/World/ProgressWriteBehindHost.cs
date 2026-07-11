@@ -3,87 +3,11 @@ using Fenrir.Data.WriteBehind;
 
 namespace Fenrir.Application.Game.Hosting.World;
 
-/// <summary>
-///     Builds and persists <see cref="CharacterProgressTvp" /> rows for the Vitals/Progression side of a
-///     drained character write-behind batch -- the flush reader that Blocker #1 of the 2026-07-05 audit found
-///     missing (combat HP loss, monster-kill XP, level-ups, quest/CP progress were marked dirty via
-///     <see cref="DirtyFlags.Vitals" />/<see cref="DirtyFlags.Progression" /> but never actually flushed to
-///     <c>game.Characters</c>, which is also the root cause of the tSort 16/17 tribe-scroll CP-duplication
-///     exploit: <c>TribeActionService</c>'s CP debit never survived a relog).
-/// </summary>
-/// <remarks>
-///     <para>
-///         <b>
-///             Why this is not its own independently-timed <see cref="Microsoft.Extensions.Hosting.BackgroundService" />
-///             / <see cref="IWriteBehindFlusher" />, despite that being the more literal reading of "add a new
-///             write-behind
-///             host":
-///         </b>
-///         <see cref="DirtyTracker{TKey}" /> is registered exactly once as a process-wide singleton
-///         (<c>DomainServiceCollectionExtensions.AddGameDomain</c>) and is the SAME instance every Vitals/Progression
-///         call site (combat, death/XP-loss, revive, skill cast, quest/pet/rebirth/CP mirrors) and
-///         <c>Zone.PlayerLifecycle.HandleMove</c>'s Position mark both feed. <see cref="DirtyTracker{TKey}.DrainAll" />
-///         is all-or-nothing with no flag-partitioned variant, so two independently-timed
-///         <see cref="WriteBehindFlusher{TKey}" /> loops draining it would race: whichever fires first empties the
-///         WHOLE dictionary (every character, every flag) and the other finds nothing left to do that round --
-///         not merely delayed, silently dropped, since nothing re-marks the entry. Worse, both
-///         <c>usp_Character_PersistBatch</c> (position) and <c>usp_Character_PersistProgressBatch</c> (this class)
-///         share one per-character <c>FlushSequence</c> guard column; if both procs were ever called with the
-///         identical CURRENT <see cref="PlayerRuntimeState.FlushSequence" /> value in the same real-time window
-///         (e.g. a player who moved AND fought within the same ~5s poll interval), whichever proc call lands
-///         second would fail its own "FlushSequence &gt; stored" idempotence guard and silently no-op --
-///         reproducing a differently-shaped variant of the exact bug this class exists to close. And
-///         <c>GameConnectionHost</c>'s disconnect path holds exactly one <see cref="ICharacterWriteBehindFlusher" />
-///         (itself an <see cref="IWriteBehindFlusher" />): its own correctness guarantee for the disconnecting
-///         player's final state now comes from the synchronous, targeted
-///         <see cref="ICharacterWriteBehindFlusher.FlushCharacterNowAsync" /> it awaits BEFORE posting that
-///         character's Leave command (see <c>GameConnectionHost</c>'s own remarks at its call site for the full
-///         ordering argument), not from <see cref="IWriteBehindFlusher.RequestImmediateFlush" /> -- that call
-///         remains in the disconnect path only as a best-effort nudge for whichever OTHER characters are
-///         already dirty in this same shared tracker, since it is non-blocking and unsynchronized with any
-///         zone tick's own processing. Two independently-timed flushers racing each other on top of either
-///         mechanism would only compound matters, precisely the wrong time for a second race to appear.
-///     </para>
-///     <para>
-///         The safe design is one coordinated drain: <see cref="PositionWriteBehindHost" /> remains the sole
-///         owner of the one <see cref="WriteBehindFlusher{TKey}" /> loop, the one <see cref="IWriteBehindFlusher" />
-///         registration, and the one <see cref="ICharacterWriteBehindFlusher" /> registration, and calls
-///         <see cref="FlushAsync" /> from its own callback on every drained batch, before building position rows.
-///         Within that single batch, this class always "wins" the shared <c>FlushSequence</c> slot for a character
-///         that has Vitals/Progression flags: it persists using the CURRENT value, and <see cref="FlushAsync" />'s
-///         return value tells the caller which character ids must defer (re-mark) their Position row instead of
-///         colliding on that same now-already-advanced value. Position is the safe side to
-///         defer -- it was already documented as best-effort/eventually-consistent (a stale position self-heals on
-///         the player's next move, or is caught by the disconnect flush); Progression is the exploit/durability
-///         -critical side and must never lose its turn.
-///     </para>
-///     <para>
-///         <b>Process-kill residual risk:</b> since this class has no timer of its own and is only ever
-///         drained from inside <c>PositionWriteBehindHost</c>'s single <see cref="WriteBehindFlusher{TKey}" />
-///         callback, its bound on data lost to a true (non-graceful) process kill is identical to
-///         <see cref="PositionWriteBehindHost" />'s own -- see that class's remarks for the exact figure and
-///         why that interval was deliberately left untightened. This is an accepted, bounded tradeoff, not a
-///         silent gap.
-///     </para>
-/// </remarks>
 public sealed class ProgressWriteBehindHost(ZoneRegistry zones, ICharacterRepository characters)
 {
     private const DirtyFlags ProgressFlags = DirtyFlags.Vitals | DirtyFlags.Progression;
 
-    /// <summary>
-    ///     Builds a <see cref="CharacterProgressTvp" /> row (reading CURRENT <see cref="PlayerRuntimeState" />,
-    ///     same "dirty tracker only holds flags, never values" posture as <see cref="PositionWriteBehindHost" />)
-    ///     for every dirty entry carrying <see cref="DirtyFlags.Vitals" /> and/or <see cref="DirtyFlags.Progression" />,
-    ///     persists them in one batch, and returns which character ids it claimed the shared FlushSequence slot
-    ///     for this cycle.
-    /// </summary>
-    /// <remarks>
-    ///     A character absent from every zone (logged out, or mid-handoff) is correctly dropped here, same
-    ///     documented behavior as <see cref="PositionWriteBehindHost" />: for a true disconnect their last state
-    ///     was already flushed synchronously by <see cref="PositionWriteBehindHost.FlushCharacterNowAsync" />
-    ///     BEFORE the zone ever removed them from its live registry, and a handoff re-marks them dirty on arrival.
-    /// </remarks>
-    public async ValueTask<IReadOnlySet<int>> FlushAsync(IReadOnlyDictionary<int, DirtyFlags> dirty,
+        public async ValueTask<IReadOnlySet<int>> FlushAsync(IReadOnlyDictionary<int, DirtyFlags> dirty,
         CancellationToken ct)
     {
         var rows = new List<CharacterProgressTvp>(dirty.Count);
@@ -107,10 +31,6 @@ public sealed class ProgressWriteBehindHost(ZoneRegistry zones, ICharacterReposi
             claimed.Add(characterId);
         }
 
-        // Any failure propagates uncaught: PositionWriteBehindHost's single WriteBehindFlusher callback wraps
-        // both this call and its own position persist in the SAME try, so its shared onFlushError logs once
-        // and re-merges the WHOLE original batch (position + progress flags together) -- never a partial
-        // silent drop, same all-or-nothing retry semantics WriteBehindFlusher already guarantees.
         await characters.PersistProgressAsync(rows, ct).ConfigureAwait(false);
 
         return claimed;

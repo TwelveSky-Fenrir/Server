@@ -8,13 +8,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     Covers <see cref="Zone.RecordEnemyKillForFeed" />/<see cref="Zone.ApplyKillFeedEndOfBattleRewards" />/
-///     <see cref="Zone.ClearKillFeedLeaderboard" /> directly -- the kill-site hook itself is not yet wired
-///     into <c>ApplyCombatCommand</c>/the reflect-kill path (see this mechanic's own wiring manifest), so
-///     these tests call the new public methods straight, mirroring how <c>ZonePvpKillRewardsTests</c> already
-///     exercises <c>Zone</c>'s reward pipeline against directly-constructed player state.
-/// </summary>
 public class ZoneKillFeedTests
 {
     private static int OneFrame => FrameWriter.FrameSizeOf<ZoneEventInfoResponse>();
@@ -32,7 +25,6 @@ public class ZoneKillFeedTests
 
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
-        // Drain the enter-broadcast frames so each test's own assertions only see the kill-feed frame itself.
         ZoneTestKit.DrainOutbound(killerPipe);
         ZoneTestKit.DrainOutbound(victimPipe);
 
@@ -42,7 +34,7 @@ public class ZoneKillFeedTests
     [Fact]
     public void NonWarZone_NoCounterIncrement_NoBroadcast()
     {
-        var (zone, killerPipe, _) = SetUpZone(1); // 1 is not a modeled war-zone type
+        var (zone, killerPipe, _) = SetUpZone(1);
         Assert.True(zone.TryGetPlayer(1, out var killer));
         Assert.True(zone.TryGetPlayer(2, out var victim));
 
@@ -55,7 +47,7 @@ public class ZoneKillFeedTests
     [Fact]
     public void WarZoneActive_IncrementsSessionKillCount_AndBroadcastsWithRealTopThree()
     {
-        var (zone, killerPipe, _) = SetUpZone(49); // Zone049-type
+        var (zone, killerPipe, _) = SetUpZone(49);
         Assert.True(zone.TryGetPlayer(1, out var killer));
         Assert.True(zone.TryGetPlayer(2, out var victim));
 
@@ -74,7 +66,6 @@ public class ZoneKillFeedTests
         var killerName = ReadFixedName(data, 0);
         Assert.Equal("Killer", killerName);
 
-        // Top-1 slot starts at offset 28 within Data -- see KillFeedBroadcastEncoderTests for the layout math.
         var top1Name = ReadFixedName(data, 28);
         var top1Kills = BinaryPrimitives.ReadInt32LittleEndian(data[(28 + 14)..]);
         Assert.Equal("Killer", top1Name);
@@ -180,9 +171,6 @@ public class ZoneKillFeedTests
         zone.Post(ZoneCommand.Leave(1));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
-        // The killer entity object we hold is now detached from the zone's own _players map; the exercise here
-        // is that end-of-battle reward application does not throw for a leaderboard entry whose character has
-        // since left, and the still-present victim (never a leaderboard entry, 0 kills) is left untouched.
         zone.ApplyKillFeedEndOfBattleRewards(isFfaMap: false, isZone267: false);
 
         Assert.Equal(0, victim!.ContributionPoints);
@@ -213,10 +201,8 @@ public class ZoneKillFeedTests
 
         zone.ClearKillFeedLeaderboard();
 
-        // The counter survives the clear (source contract: "does NOT reset any player's session kill counter").
         Assert.Equal(1, killer.SessionKillCount);
 
-        // End-of-battle reward after a clear with no new kills recorded grants nothing (leaderboard is empty).
         zone.ApplyKillFeedEndOfBattleRewards(isFfaMap: false, isZone267: false);
         Assert.Equal(0, killer.ContributionPoints);
     }
@@ -230,14 +216,12 @@ public class ZoneKillFeedTests
         zone.ApplyKillFeedEndOfBattleRewards(isFfaMap: false, isZone267: false);
     }
 
-    // C17 Part B1: four-guild per-kill point accrual, gated to Zone049-type maps only and independent of
-    // warStateActive/leaderboard eligibility (see RecordEnemyKillForFeed's own remarks on this call).
 
     [Fact]
     public void Zone049Type_KillerHasGuild_EnqueuesExactlyOnePointForKillersGuild()
     {
         var queue = new FakeFourGuildKillPointQueue();
-        var (zone, _, _) = SetUpZone(49, queue); // Zone049-type
+        var (zone, _, _) = SetUpZone(49, queue);
         Assert.True(zone.TryGetPlayer(1, out var killer));
         Assert.True(zone.TryGetPlayer(2, out var victim));
         killer!.GuildId = 77;
@@ -265,7 +249,7 @@ public class ZoneKillFeedTests
     public void NonZone049TypeMap_KillerHasGuild_DoesNotEnqueue()
     {
         var queue = new FakeFourGuildKillPointQueue();
-        var (zone, _, _) = SetUpZone(1, queue); // not a Zone049-type map
+        var (zone, _, _) = SetUpZone(1, queue);
         Assert.True(zone.TryGetPlayer(1, out var killer));
         Assert.True(zone.TryGetPlayer(2, out var victim));
         killer!.GuildId = 77;
@@ -279,7 +263,7 @@ public class ZoneKillFeedTests
     public void FfaMap_KillerHasGuild_DoesNotEnqueue()
     {
         var queue = new FakeFourGuildKillPointQueue();
-        var (zone, _, _) = SetUpZone(KillFeedZoneCatalog.FfaMapNumber, queue); // 335, not Zone049-type
+        var (zone, _, _) = SetUpZone(KillFeedZoneCatalog.FfaMapNumber, queue);
         Assert.True(zone.TryGetPlayer(1, out var killer));
         Assert.True(zone.TryGetPlayer(2, out var victim));
         killer!.GuildId = 77;
@@ -306,8 +290,6 @@ public class ZoneKillFeedTests
     [Fact]
     public void Zone049Type_WarStateInactive_StillEnqueues()
     {
-        // The accrual gate is independent of warStateActive (see RecordEnemyKillForFeed's own remarks) --
-        // unlike the leaderboard/session-kill-count increment, which IS gated on it.
         var queue = new FakeFourGuildKillPointQueue();
         var (zone, _, _) = SetUpZone(49, queue);
         Assert.True(zone.TryGetPlayer(1, out var killer));
@@ -322,8 +304,6 @@ public class ZoneKillFeedTests
     [Fact]
     public void Zone049Type_NullQueue_DoesNotThrow()
     {
-        // Most call sites (every other test in this file) construct the zone with no queue at all -- the
-        // real production default before ZoneRegistry/DI wires the singleton relay in.
         var (zone, _, _) = SetUpZone(49);
         Assert.True(zone.TryGetPlayer(1, out var killer));
         Assert.True(zone.TryGetPlayer(2, out var victim));

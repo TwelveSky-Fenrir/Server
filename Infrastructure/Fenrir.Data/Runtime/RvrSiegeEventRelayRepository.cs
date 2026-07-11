@@ -8,13 +8,8 @@ using Fenrir.Data.Abstractions.Runtime;
 
 namespace Fenrir.Data.Runtime;
 
-// Cross-shard fan-out for the Zone049 siege-zone-slot / tribe-symbol / alliance world-event relay -- see
-// IRvrSiegeEventRelayRepository for the per-method contract.
 public sealed record RvrSiegeEventRelayRepository(ICaeriusNetDbContext Db) : IRvrSiegeEventRelayRepository
 {
-    // Small, at-most-a-few-times-per-minute round trips against a memory-optimized table that should never
-    // itself be slow -- same sizing as GuildTribeBroadcastRelayRepository/ProxyShopExpirationRelayRepository's
-    // own CommandTimeoutSeconds.
     private const int CommandTimeoutSeconds = 5;
 
     public async ValueTask PublishAsync(RvrSiegeEventRelayEntry entry, CancellationToken ct)

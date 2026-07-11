@@ -9,7 +9,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Chat;
 
-/// <summary>CZ_TRIBE_CHAT_SEND (opcode 81) -- zone-local only, no inter-zone relay; alliance not modeled.</summary>
 public sealed class TribeChatHandler(ITribeChatService tribeChatService, ILogger<TribeChatHandler>? logger = null)
     : IInlinePacketHandler<TribeChatRequest>
 {

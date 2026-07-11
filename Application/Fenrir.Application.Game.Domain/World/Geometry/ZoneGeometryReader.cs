@@ -4,11 +4,6 @@ using System.Numerics;
 
 namespace Fenrir.Application.Game.Domain.World.Geometry;
 
-/// <summary>
-///     Decodes legacy <c>Z0NN.WM</c> (<c>ts25zone/S09_MyWorld.cpp</c> <c>WORLD_FOR_GXD::LoadWM</c>):
-///     <c>[int32 originalSize][int32 compressedSize][zlib stream]</c>, then triangle records, then quadtree
-///     node records. Node records are variable-length, so must be read sequentially, not by index.
-/// </summary>
 public static class ZoneGeometryReader
 {
     public static ZoneGeometry Load(string wmFilePath)
@@ -36,7 +31,7 @@ public static class ZoneGeometryReader
         for (var i = 0; i < triangleCount; i++) triangles[i] = ReadTriangle(inflated, ref position);
 
         var quadtreeNodeCount = ReadInt32(inflated, ref position);
-        _ = ReadInt32(inflated, ref position); // mMaxQuadtreeNodeLeafNum: allocation hint only, unused here
+        _ = ReadInt32(inflated, ref position);
 
         var quadtree = new QuadtreeNode[quadtreeNodeCount];
         for (var i = 0; i < quadtreeNodeCount; i++) quadtree[i] = ReadQuadtreeNode(inflated, ref position);
@@ -46,19 +41,19 @@ public static class ZoneGeometryReader
 
     private static WorldTriangle ReadTriangle(byte[] data, ref int position)
     {
-        _ = ReadInt32(data, ref position); // mTextureIndex: rendering-only, discarded
+        _ = ReadInt32(data, ref position);
         var vertex0 = ReadVertexPosition(data, ref position);
         var vertex1 = ReadVertexPosition(data, ref position);
         var vertex2 = ReadVertexPosition(data, ref position);
         var planeInfo = ReadVector4(data, ref position);
-        position += 16; // mSphereInfo: rendering-only, discarded
+        position += 16;
         return new WorldTriangle(vertex0, vertex1, vertex2, planeInfo);
     }
 
     private static Vector3 ReadVertexPosition(byte[] data, ref int position)
     {
         var position3D = ReadVector3(data, ref position);
-        position += 12 + 8 + 8; // mN (normal), mT1, mT2 (UVs): rendering-only, discarded
+        position += 12 + 8 + 8;
         return position3D;
     }
 

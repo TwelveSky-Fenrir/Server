@@ -3,7 +3,6 @@ using Fenrir.Network.Serialization.Wire.Attributes;
 
 namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 
-// Result = echo of the request's Sort (1/2/3), or 1 on the reward/timeout path. Also pushed server-side on line timeout.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.FishingProgress,
     ExpectedSize = 21)]
 public readonly partial record struct FishingProgressResponse : IOutgoingPacket

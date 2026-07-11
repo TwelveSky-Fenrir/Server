@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Social;
 
-/// <summary>On accept, both sides may send CZ_TRADE_START_SEND (symmetric).</summary>
 public sealed class TradeAnswerService(TradeRegistry trades, ILogger<TradeAnswerService> logger) : ITradeAnswerService
 {
     public TradeAnswerResult Answer(int targetId, int answer)

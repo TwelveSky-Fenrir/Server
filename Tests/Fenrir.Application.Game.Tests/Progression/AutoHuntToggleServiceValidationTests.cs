@@ -9,11 +9,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Progression;
 
-/// <summary>
-///     Proves the B11 server-side hardening is actually WIRED into <see cref="AutoHuntToggleService" /> (not just
-///     available as a policy): the AUTO_HUNT blob validation and the enable blocked-zone FrozenSet both gate the
-///     store path.
-/// </summary>
 public class AutoHuntToggleServiceValidationTests
 {
     private static AutoHunt ValidBlob()
@@ -25,15 +20,13 @@ public class AutoHuntToggleServiceValidationTests
         };
     }
 
-    /// <summary>A valid blob with a configured attack-skill slot -- so the enable path's attack-setup check passes.</summary>
-    private static AutoHunt ValidBlobWithAttackSkill()
+        private static AutoHunt ValidBlobWithAttackSkill()
     {
         return ValidBlob() with { AttackType = [15, 6, 0, 0] };
     }
 
     private static AutoHunt MalformedBlob()
     {
-        // A negative buff-store skill id can never be legitimate -- the validator rejects it.
         return ValidBlob() with { BuffStore = [-1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] };
     }
 
@@ -76,7 +69,6 @@ public class AutoHuntToggleServiceValidationTests
     [Fact]
     public async Task MalformedBlobOnDisable_IsAlsoRejected()
     {
-        // The blob is copied into stored state on BOTH the enable and disable paths, so validation runs on both.
         var (service, zone, state) = SetUp(1);
         var request = new AutoHuntToggleRequest { Sort = 0, AutoHunt = MalformedBlob() };
 
@@ -88,8 +80,7 @@ public class AutoHuntToggleServiceValidationTests
     [Fact]
     public async Task ValidBlobEnableOnBlockedZone_IsRejectedByTheEnableGate()
     {
-        // Weapon equipped + an attack skill configured, so the ONLY remaining reason to abort is the blocked map.
-        var (service, zone, state) = SetUp(38, equipWeapon: true); // 38 is in AutoHuntEnableGate.BlockedMapNumbers
+        var (service, zone, state) = SetUp(38, equipWeapon: true);
         var request = new AutoHuntToggleRequest { Sort = 1, AutoHunt = ValidBlobWithAttackSkill() };
 
         var result = await service.ToggleAsync(10, zone, state, request, CancellationToken.None);

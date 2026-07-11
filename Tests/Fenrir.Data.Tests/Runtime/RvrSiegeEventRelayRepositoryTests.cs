@@ -7,20 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Runtime;
 
-/// <summary>
-///     runtime.usp_RvrSiegeEventRelay_{Publish,Poll} against real SQL Server 2025, through
-///     <see cref="RvrSiegeEventRelayRepository" /> exactly as <c>RvrSiegeEventRelayHost</c> calls it. Same
-///     broadcast shape as GuildTribeBroadcastRelay/GuildBuffExpiryRelay (every OTHER live shard sees a
-///     published row, never the publishing shard itself) -- see usp_RvrSiegeEventRelay_Poll.sql's own header
-///     for the SourceShardId self-exclusion.
-/// </summary>
-/// <remarks>
-///     Because this is a genuine broadcast, a shard id that has never polled before retroactively sees the
-///     entire un-reaped backlog since RelayId 0 -- including rows left over from an earlier test method
-///     sharing this same table within the run. Every test below primes ("catches up") whichever shard id(s) it
-///     polls via <see cref="DrainAsync" /> before publishing its own row, so each test's assertions only ever
-///     see rows it published itself, independent of test execution order or what ran before it.
-/// </remarks>
 [Collection("SqlServer")]
 public sealed class RvrSiegeEventRelayRepositoryTests : IDisposable
 {
@@ -81,9 +67,6 @@ public sealed class RvrSiegeEventRelayRepositoryTests : IDisposable
         await _repository.PublishAsync(new RvrSiegeEventRelayEntry(sourceShardId, 2, Payload(4)),
             CancellationToken.None);
 
-        // The originating shard already applied and broadcast locally at publish time (in-process, never
-        // through this repository) -- usp_RvrSiegeEventRelay_Poll excludes SourceShardId = @ShardId so it is
-        // never re-delivered to itself via the cross-shard path.
         var ownShardRows =
             await _repository.PollAsync(sourceShardId, 999_999, CancellationToken.None);
         Assert.Empty(ownShardRows);

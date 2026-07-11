@@ -11,12 +11,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.ItemModification;
 
-/// <summary>
-///     Business logic for op29, CZ_MAKE_ITEM_SEND -- extracted from <see cref="CraftItemHandler" />, see that
-///     handler's remarks. On a qualifying recipe success, also stands in for legacy's shared <c>MakeNotice</c>
-///     helper (Server/ts25zone/S04_MyWork02.cpp:309-493) via <see cref="CenterRelayNoticeLog.LogNotableCraft" />
-///     -- see that type's own remarks for why this is a log line, not a client-facing broadcast.
-/// </summary>
 public sealed class CraftItemService(
     ICharacterRepository characters,
     IEventLogRepository eventLog,
@@ -24,21 +18,10 @@ public sealed class CraftItemService(
     ILogger<CraftItemService> logger)
     : ICraftItemService
 {
-    /// <summary>
-    ///     game.EventLog.EventCode for a Jade Upgrade craft (MK_* sort <see cref="CraftRecipeCatalog.JadeUpgradeSort" />)
-    ///     minting a Red Jade -- scoped independently within <see cref="EventLogCategory.ItemCreate" />; EventCode
-    ///     is only ever caller-interpreted alongside its Category (see game.EventLog.sql's own "app-owned
-    ///     numbering scheme" comment), so this does not collide with any other family's numbering, including
-    ///     <see cref="AdvancedElixirEventCode" /> below.
-    /// </summary>
-    private const short JadeUpgradeEventCode = 1;
 
-    /// <summary>
-    ///     game.EventLog.EventCode for an Advanced Elixir craft (MK_* sort
-    ///     <see cref="CraftRecipeCatalog.AdvancedElixirSort" />) minting a random [801,806] item, scoped
-    ///     independently within <see cref="EventLogCategory.ItemCreate" />.
-    /// </summary>
-    private const short AdvancedElixirEventCode = 2;
+        private const short JadeUpgradeEventCode = 1;
+
+        private const short AdvancedElixirEventCode = 2;
 
     private const short StoneMatCombineEventCode = 3;
     private const short MountFusionEventCode = 4;
@@ -111,8 +94,6 @@ public sealed class CraftItemService(
                 ToTvps(projected2), cancellationToken);
         }
 
-        // Logged only once the container replace(s) above have durably committed -- an ItemCreate row must
-        // never assert a mint that the DB write didn't actually persist.
         await eventLog.LogAsync(JadeUpgradeEventCode, EventLogCategory.ItemCreate, accountId, characterId,
             null, null, null, null, null, result.ItemId, result.Quantity, 1, null, cancellationToken);
 
@@ -157,8 +138,6 @@ public sealed class CraftItemService(
             return new AdvancedElixirResult(AdvancedElixirOutcome.Rejected, null, 0, 0, null);
         }
 
-        // Free-slot scan happens before rolling, while the material's own slot is still occupied, so it can
-        // never be picked as its own destination.
         var hasFreeSlot = TryFindEmptySlot(state, out var resultPage, out var resultIndex);
 
         var resolved = CraftResolver.ResolveAdvancedElixir(material, hasFreeSlot, SystemRandomSource.Instance);
@@ -211,8 +190,6 @@ public sealed class CraftItemService(
                 projectedMaterialContainer));
         }
 
-        // Only the roll's success path actually mints a new item -- the 80% failure case still consumes the
-        // material (see CraftResolver's own remarks) but creates nothing, so it gets no ItemCreate row.
         if (resolved.Outcome == CraftResolver.ElixirOutcome.Success)
         {
             var created = newItemStack!.Value;
@@ -241,11 +218,7 @@ public sealed class CraftItemService(
         return new AdvancedElixirResult(outcome, newItemStack, resultPage, resultIndex, resolved.RemainingMaterial);
     }
 
-    /// <summary>
-    ///     MK_MATS_01019 -- 4x item 1019 -&gt; 1 random stone-mat item, see
-    ///     <see cref="CraftResolver.ResolveStoneMatCombine" />.
-    /// </summary>
-    public async ValueTask<CraftFamilyResult> ResolveStoneMatCombineAsync(CraftItemRequest packet, Zone zone,
+        public async ValueTask<CraftFamilyResult> ResolveStoneMatCombineAsync(CraftItemRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, int accountId, CancellationToken cancellationToken)
     {
         if (!IsValidInventorySlot(packet.Page1, packet.Index1) || !IsValidInventorySlot(packet.Page2, packet.Index2) ||
@@ -314,8 +287,7 @@ public sealed class CraftItemService(
             0);
     }
 
-    /// <summary>MK_ANIMAL_NUM_1/2 -- see <see cref="CraftResolver.ResolveMountFusion" />.</summary>
-    public async ValueTask<CraftFamilyResult> ResolveMountFusionAsync(CraftItemRequest packet, Zone zone,
+        public async ValueTask<CraftFamilyResult> ResolveMountFusionAsync(CraftItemRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, int accountId, CancellationToken cancellationToken)
     {
         if (!IsValidInventorySlot(packet.Page1, packet.Index1) || !IsValidInventorySlot(packet.Page2, packet.Index2) ||
@@ -345,8 +317,6 @@ public sealed class CraftItemService(
             return RejectedFamilyResult;
         }
 
-        // Dust consolation is a genuine stack (quantity 3 or 9); the real mount win is always a single fresh
-        // unit (quantity 0) -- :4602-4630.
         var quantity = resolved.Outcome == CraftResolver.MountFusionOutcome.DustConsolation
             ? resolved.ResultQuantity
             : 0;
@@ -388,8 +358,7 @@ public sealed class CraftItemService(
             null, 0, 0);
     }
 
-    /// <summary>MK_WING_0 -- see <see cref="CraftResolver.ResolveWingAssembly" />.</summary>
-    public async ValueTask<CraftFamilyResult> ResolveWingAssemblyAsync(CraftItemRequest packet, Zone zone,
+        public async ValueTask<CraftFamilyResult> ResolveWingAssemblyAsync(CraftItemRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, int accountId, CancellationToken cancellationToken)
     {
         if (!IsValidInventorySlot(packet.Page1, packet.Index1) || !IsValidInventorySlot(packet.Page2, packet.Index2) ||
@@ -423,7 +392,6 @@ public sealed class CraftItemService(
             return RejectedFamilyResult;
         }
 
-        // The 50 CP cost is paid before the roll, win or lose -- :5140.
         var newContributionPoints = state.ContributionPoints - CraftRecipeCatalog.WingAssemblyContributionPointCost;
 
         var working = new Dictionary<byte, ImmutableDictionary<byte, ItemStack>>();
@@ -449,9 +417,6 @@ public sealed class CraftItemService(
         }
         else
         {
-            // Destroyed: only slot1 is cleared -- slots 2-4 (the other 2 feathers + the catalyst gem) are
-            // left completely untouched, an asymmetry directly confirmed at S04_MyWork02.cpp:5188-5199 (the
-            // legacy source itself only calls wClearInv(1) on this branch, not a Fenrir-side simplification).
             working[(byte)packet.Page1] = working[(byte)packet.Page1].Remove((byte)packet.Index1);
             resultItemId = 0;
         }
@@ -482,13 +447,10 @@ public sealed class CraftItemService(
             CenterRelayNoticeLog.LogNotableCraft(logger, worldData, state.Tribe, state.Name, resultItemId,
                 "wing-assembly");
 
-        // material1.Serial is preserved by the `with` expression above in both branches (only ItemId/Quantity
-        // change), matching the legacy's own tValue[5] capture before either branch runs.
         return new CraftFamilyResult(CraftFamilyOutcome.Applied, resultItemId, 0, material1.Serial, null, 0, 0);
     }
 
-    /// <summary>MK_WING_1/MK_WING_3 -- see <see cref="CraftResolver.ResolveFeatherTierUp" />.</summary>
-    public async ValueTask<CraftFamilyResult> ResolveFeatherTierUpAsync(CraftItemRequest packet, Zone zone,
+        public async ValueTask<CraftFamilyResult> ResolveFeatherTierUpAsync(CraftItemRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, int accountId, CancellationToken cancellationToken)
     {
         if (!IsValidInventorySlot(packet.Page1, packet.Index1))
@@ -525,7 +487,6 @@ public sealed class CraftItemService(
 
         if (material.Quantity == CraftRecipeCatalog.FeatherTierUpRequiredQuantity)
         {
-            // Exact quantity: slot1 converts in place into a single fresh unit of the gained feather.
             var resultStack = material with
             {
                 ItemId = resolved.ResultItemId, Quantity = 0, Enchant = 0, Combine = 0, Refine = 0, Socket = 0
@@ -537,8 +498,6 @@ public sealed class CraftItemService(
         }
         else
         {
-            // Over-quantity: slot1 keeps the ORIGINAL feather with 10 units deducted; the gained feather is
-            // granted as a brand-new single-unit stack in a free slot -- :5310-5335.
             if (!TryFindEmptySlot(state, out grantedPage, out grantedIndex))
             {
                 logger.LogInformation(
@@ -587,9 +546,6 @@ public sealed class CraftItemService(
             "Character {CharacterId} craft (feather-tier-up) applied: remaining {ResultItemId} x{ResultQuantity}, granted {GrantedItemId}",
             characterId, resultItemId, resultQuantity, grantedItem?.ItemId);
 
-        // The actually-crafted (gained) feather is grantedItem when the over-quantity branch ran; resultItemId
-        // is the ORIGINAL material's own id in that branch, not the craft's own result -- see this method's
-        // own remarks.
         CenterRelayNoticeLog.LogNotableCraft(logger, worldData, state.Tribe, state.Name,
             grantedItem?.ItemId ?? resultItemId, "feather-tier-up");
 
@@ -597,8 +553,7 @@ public sealed class CraftItemService(
             grantedPage, grantedIndex);
     }
 
-    /// <summary>MK_WING_2 -- see <see cref="CraftResolver.ResolveWingTierReroll" />.</summary>
-    public async ValueTask<CraftFamilyResult> ResolveWingTierRerollAsync(CraftItemRequest packet, Zone zone,
+        public async ValueTask<CraftFamilyResult> ResolveWingTierRerollAsync(CraftItemRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, int accountId, CancellationToken cancellationToken)
     {
         if (!IsValidInventorySlot(packet.Page1, packet.Index1) || !IsValidInventorySlot(packet.Page2, packet.Index2) ||
@@ -647,7 +602,6 @@ public sealed class CraftItemService(
         working[(byte)packet.Page2] = working[(byte)packet.Page2].Remove((byte)packet.Index2);
         working[(byte)packet.Page3] = working[(byte)packet.Page3].Remove((byte)packet.Index3);
 
-        // The catalyst is only partially consumed (1 unit), unlike the other 3 slots -- :5398.
         var remainingCatalystQuantity = catalyst.Quantity - 1;
         working[(byte)packet.Page4] = remainingCatalystQuantity > 0
             ? working[(byte)packet.Page4].SetItem((byte)packet.Index4,
@@ -676,17 +630,7 @@ public sealed class CraftItemService(
             null, 0, 0);
     }
 
-    /// <summary>
-    ///     MK_WING_5/MK_WING_6 -- see <see cref="CraftResolver.ResolveWingFifthTier" />. For sort 46, every
-    ///     material identity/quantity check is skipped by the resolver (legacy validation bypass, see
-    ///     <see cref="CraftRecipeCatalog.WingSixthTierUnvalidatedSort" />'s remarks) -- this method still
-    ///     requires all 4 referenced slots to be occupied (a baseline structural invariant this whole service
-    ///     applies everywhere, not a recipe-specific check), so it does not reproduce the literal legacy
-    ///     behavior of succeeding from 4 completely empty slots, only "any 4 occupied slots regardless of item
-    ///     identity/quantity". Flagged for fenrir-security-hardening-engineer / cpp-security-debt-auditor
-    ///     before deciding whether the full literal behavior should ever be reproduced.
-    /// </summary>
-    public async ValueTask<CraftFamilyResult> ResolveWingFifthTierAsync(CraftItemRequest packet, Zone zone,
+        public async ValueTask<CraftFamilyResult> ResolveWingFifthTierAsync(CraftItemRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, int accountId, CancellationToken cancellationToken)
     {
         if (!IsValidInventorySlot(packet.Page1, packet.Index1) || !IsValidInventorySlot(packet.Page2, packet.Index2) ||
@@ -758,8 +702,7 @@ public sealed class CraftItemService(
             null, 0, 0);
     }
 
-    /// <summary>MK_DUST_WING/CLOAK/ANIMAL/PET1/PET2 -- see <see cref="CraftResolver.ResolveDustRecycle" />.</summary>
-    public async ValueTask<CraftFamilyResult> ResolveDustRecycleAsync(CraftItemRequest packet, Zone zone,
+        public async ValueTask<CraftFamilyResult> ResolveDustRecycleAsync(CraftItemRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, int accountId, CancellationToken cancellationToken)
     {
         if (!IsValidInventorySlot(packet.Page1, packet.Index1))
@@ -855,7 +798,6 @@ public sealed class CraftItemService(
             "Character {CharacterId} craft (dust-recycle) applied: remaining {ResultItemId} x{ResultQuantity}, granted {GrantedItemId}",
             characterId, resultItemId, resultQuantity, grantedItem?.ItemId);
 
-        // Same grantedItem-vs-resultItemId caveat as ResolveFeatherTierUpAsync above.
         CenterRelayNoticeLog.LogNotableCraft(logger, worldData, state.Tribe, state.Name,
             grantedItem?.ItemId ?? resultItemId, "dust-recycle");
 

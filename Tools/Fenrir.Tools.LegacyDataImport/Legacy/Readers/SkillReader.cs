@@ -2,10 +2,6 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
-/// <summary>
-///     Parses <c>005_00003.IMG</c> (<c>SKILL_INFO</c>, STRUCT.h:123-146); no known runtime patches, unlike
-///     <see cref="ItemReader" />.
-/// </summary>
 internal static class SkillReader
 {
     private const string FileName = "005_00003.IMG";
@@ -39,7 +35,7 @@ internal static class SkillReader
         var name = reader.ReadFixedString(25);
         var description = new string[10];
         for (var i = 0; i < 10; i++) description[i] = reader.ReadFixedString(51);
-        reader.Skip(1); // compiler padding before sType (offset 539 -> 540)
+        reader.Skip(1);
 
         var type = reader.ReadInt32();
         var attackType = reader.ReadInt32();

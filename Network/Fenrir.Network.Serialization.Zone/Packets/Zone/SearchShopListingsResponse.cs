@@ -3,7 +3,6 @@ using Fenrir.Network.Serialization.Wire.Attributes;
 
 namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 
-// PshopItemInfo: [0]=itemID [1]=qty [2]=value [3]=serial [4]=price, [5..8]=0 (page/x/y unused in market view).
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.SearchShopListings,
     ExpectedSize = 78)]
 public readonly partial record struct SearchShopListingsResponse : IOutgoingPacket

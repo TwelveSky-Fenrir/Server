@@ -1,6 +1,5 @@
 namespace Fenrir.Network.Abstractions;
 
-/// <summary>Embeddable wire sub-struct with no opcode (e.g. AVATAR_INFO); never travels alone on the wire.</summary>
 public interface IFenrirWireType<TSelf>
     where TSelf : struct, IFenrirWireType<TSelf>
 {

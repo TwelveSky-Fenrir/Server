@@ -2,7 +2,6 @@ using Fenrir.Network.Serialization.Wire.Attributes;
 
 namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 
-// Field order: Price before Quantity (opposite of ProxyShopItem).
 [FenrirWireType(12)]
 public readonly partial record struct BloodItem : IFenrirWireType<BloodItem>
 {

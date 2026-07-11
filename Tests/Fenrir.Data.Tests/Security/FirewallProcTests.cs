@@ -9,11 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Security;
 
-// admin.usp_BlockedIp_*/usp_FirewallRule_*/usp_GmAllowlist_* against real SQL Server 2025, driven through
-// their repositories. FirewallRuleRepository/GmAllowlistRepository cache GetAll for 2s (CaeriusNet's cache is
-// process-wide static storage, not scoped per test -- see GameServerDirectoryRepositoryTests) -- tests that need
-// to observe a just-inserted row wait past that TTL first; BlockedIpRepository hits its natively-compiled proc
-// directly (no cache), so its own test needs no such wait.
 [Collection("SqlServer")]
 public class FirewallProcTests
 {
@@ -62,8 +57,8 @@ public class FirewallProcTests
     }
 
     [Theory]
-    [InlineData((byte)1)] // TCP_BLOCK
-    [InlineData((byte)3)] // ANY_BLOCK
+    [InlineData((byte)1)]
+    [InlineData((byte)3)]
     public async Task FirewallRule_IsBlockedAsync_TrueForBlockRuleTypes(byte blockRuleType)
     {
         var ip = UniqueIp();
@@ -74,10 +69,10 @@ public class FirewallProcTests
     }
 
     [Theory]
-    [InlineData((byte)0)] // TCP_ALLOW
-    [InlineData((byte)2)] // ANY_ALLOW
-    [InlineData((byte)4)] // TCP_ALLOW_CF
-    [InlineData((byte)5)] // TCP_ALLOW_IPRANGE
+    [InlineData((byte)0)]
+    [InlineData((byte)2)]
+    [InlineData((byte)4)]
+    [InlineData((byte)5)]
     public async Task FirewallRule_IsBlockedAsync_FalseForAllowRuleTypes(byte allowRuleType)
     {
         var ip = UniqueIp();
@@ -99,11 +94,7 @@ public class FirewallProcTests
         Assert.True(await _gmAllowlist.IsAllowedAsync(ip, CancellationToken.None));
     }
 
-    /// <summary>
-    ///     A syntactically fake but always-unique value: IpAddress only needs to be a stable key across these
-    ///     tables' UNIQUE constraints, never a parsed/validated address.
-    /// </summary>
-    private static string UniqueIp()
+        private static string UniqueIp()
     {
         return $"203.0.113.{Guid.NewGuid():N}"[..30];
     }

@@ -7,12 +7,6 @@ using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     Covers <c>Zone.ApplyCombatCommand</c>'s mCase 1 dispatch (<c>Zone.Duel.cs</c>'s <c>ApplyDuelAttack</c>)
-///     end to end against real <see cref="Zone" /> instances -- the duel-actual-combat gap: a duel loser must
-///     take real, permanent damage and can genuinely die, but must never reach the enemy-tribe PvP-kill reward
-///     pipeline (<see cref="Zone.ApplyPvpKillRewards" />'s own remarks; see <see cref="DeathCause.Duel" />).
-/// </summary>
 public class ZoneDuelCombatTests
 {
     private static readonly EffectiveStats StrongAttacker =
@@ -43,12 +37,7 @@ public class ZoneDuelCombatTests
         };
     }
 
-    /// <summary>
-    ///     Two players entered, past their zone-entry protect window, with an <see cref="ActiveDuel" /> already
-    ///     established between them via the real <see cref="DuelRegistry" /> ask/accept/start handshake -- the
-    ///     same duel-pairing fact <c>Zone.SharesActiveDuel</c> reads at combat-resolution time.
-    /// </summary>
-    private static Zone TwoDuelingPlayers(DuelRegistry duels, out FakeDuplexPipe attackerPipe,
+        private static Zone TwoDuelingPlayers(DuelRegistry duels, out FakeDuplexPipe attackerPipe,
         out FakeDuplexPipe defenderPipe, byte attackerTribe = 0, byte defenderTribe = 0, short mapId = 1)
     {
         var zone = ZoneTestKit.CreateZone(mapId, randomSource: new ScriptedRandomSource(0, 0), duelRegistry: duels);
@@ -68,18 +57,10 @@ public class ZoneDuelCombatTests
         attacker!.Stats = StrongAttacker;
         defender!.Stats = WeakDefender;
 
-        // PlayerRuntimeState.ActionSort defaults to 0 ("no action yet"), which is itself one of the two
-        // action-states CheckPossibleAttackTarget's avatar-target rule blocks (see
-        // AttackRejectReason.DefenderActionStateBlocksTargeting) -- set it to an ordinary, already-acting pose
-        // here (same convention as ZoneStunCombatTests.EnterTwoPlayers) so the "successful attack" tests below
-        // aren't silently rejected by a fixture default that has nothing to do with what they're testing.
         defender.ActionSort = 2;
 
-        // Same rationale as ZoneAttackTests.TwoPlayerZone -- a raw CombatCommand posted straight after Enter
-        // isn't silently rejected by AttackPacketBudget.TryConsume.
         attacker.AttackSubPacketCeiling = int.MaxValue;
 
-        // past both sides' zone-entry protect window
         zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1));
 
         Assert.Equal(DuelAskOutcome.Sent, duels.TryAsk(1, 2, false));
@@ -116,12 +97,7 @@ public class ZoneDuelCombatTests
         Assert.NotEmpty(ZoneTestKit.DrainOutbound(defenderPipe));
     }
 
-    /// <summary>
-    ///     Duels never evaluate <see cref="CombatResolver.ResolveEnemyTribeAttack" />'s own same-tribe/alliance
-    ///     gate (S07_MyGame02.cpp:935-943 vs. the contrasting :945-958) -- unlike mCase 2
-    ///     (<c>ZoneAttackTests.SameTribe_NoDamageApplied</c>), a same-tribe duel must land.
-    /// </summary>
-    [Fact]
+        [Fact]
     public void DuelAttack_SameTribe_DamageIsApplied()
     {
         var duels = new DuelRegistry();
@@ -138,7 +114,6 @@ public class ZoneDuelCombatTests
     [Fact]
     public void DuelAttack_NotCurrentlyDueling_IsSilentNoOp()
     {
-        // No DuelRegistry handshake performed -- attacker and defender share no active duel.
         var duels = new DuelRegistry();
         var zone = ZoneTestKit.CreateZone(1, randomSource: new ScriptedRandomSource(0, 0), duelRegistry: duels);
         var (attackerSession, _) = ZoneTestKit.CreateSession(1);
@@ -151,7 +126,7 @@ public class ZoneDuelCombatTests
         Assert.True(zone.TryGetPlayer(2, out var defender));
         attacker!.Stats = StrongAttacker;
         defender!.Stats = WeakDefender;
-        defender.ActionSort = 2; // an otherwise-attackable pose -- isolates the duel-pairing gate specifically
+        defender.ActionSort = 2;
         attacker.AttackSubPacketCeiling = int.MaxValue;
         zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1));
 
@@ -162,20 +137,14 @@ public class ZoneDuelCombatTests
         Assert.Equal(lifeBefore, defender.Life);
     }
 
-    /// <summary>
-    ///     Duel-actual-combat finding (Critical): a duel loser must take real, permanent damage and can
-    ///     genuinely die (<c>AVATAR_OBJECT::ProcessForDeath</c>, S07_MyGame04.cpp:1617-1658) -- but, unlike an
-    ///     enemy-tribe kill, must never reach <see cref="Zone.ApplyPvpKillRewards" /> (no CP/mission-kill-counter/
-    ///     hero-points/EXP for either side).
-    /// </summary>
-    [Fact]
+        [Fact]
     public void DuelAttack_LethalHit_KillsDefenderWithDuelCause_GrantsNoPvpKillRewards()
     {
         var duels = new DuelRegistry();
         var zone = TwoDuelingPlayers(duels, out _, out _);
         Assert.True(zone.TryGetPlayer(1, out var attacker));
         Assert.True(zone.TryGetPlayer(2, out var defender));
-        defender!.Life = 1; // one hit will kill regardless of exact damage roll
+        defender!.Life = 1;
 
         var attackerCpBefore = attacker!.ContributionPoints;
         var attackerMissionBefore = attacker.MissionKillOtherTribe;
@@ -185,7 +154,6 @@ public class ZoneDuelCombatTests
 
         Assert.Equal(0, defender.Life);
         Assert.True(defender.IsDead);
-        // The one DeathCause that does NOT arm ReviveHackFlag (Zone.ApplyDeath's own mProtect_ReviveHack gate).
         Assert.False(defender.ReviveHackFlag);
 
         Assert.Equal(attackerCpBefore, attacker.ContributionPoints);
@@ -213,7 +181,7 @@ public class ZoneDuelCombatTests
         var duels = new DuelRegistry();
         var zone = TwoDuelingPlayers(duels, out _, out _);
         Assert.True(zone.TryGetPlayer(2, out var defender));
-        defender!.ActionSort = 12; // death pose -- CheckPossibleAttackTarget's avatar-target rule
+        defender!.ActionSort = 12;
         var lifeBefore = defender.Life;
 
         zone.PostCombatCommand(new CombatCommand { AttackerCharacterId = 1, AttackInfo = DuelRequest(1, 2) });

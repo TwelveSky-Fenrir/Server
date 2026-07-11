@@ -85,8 +85,6 @@ public class DungeonAccessTicketResolverTests
     [Fact]
     public void Resolve_CustomCeiling_UsedInsteadOfGlobalDefault_WithinBounds_Succeeds()
     {
-        // Exercises the optional `ceiling` parameter IvyHallTicketUseItemHandler's own documented placeholder
-        // posture could later pass a tighter value through, once a follow-up contract supplies the real cap.
         var result = DungeonAccessTicketResolver.Resolve(70, 20, slotQuantity: 1, ceiling: 100);
 
         Assert.True(result.Succeeded);

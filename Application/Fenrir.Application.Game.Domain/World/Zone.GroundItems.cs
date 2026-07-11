@@ -13,28 +13,13 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
-    /// <summary>
-    ///     Enqueued by <see cref="TryClaimGroundItem" /> (any thread) so the despawn broadcast (needs
-    ///     <see cref="_grid" />, tick-thread-only) happens from the tick, never the claiming handler's thread.
-    /// </summary>
-    private readonly ConcurrentQueue<GroundItemEntity> _claimedGroundItemDespawns = new();
 
-    /// <summary>
-    ///     Reusable scratch buffer for <see cref="BroadcastGroundItemAction" />'s recipient list -- same
-    ///     non-allocating shape and reuse justification as <c>Zone.PlayerLifecycle</c>'s
-    ///     <c>_rebroadcastNeighborScratch</c> / <c>Zone.Monsters</c>' <c>_monsterBroadcastNeighborScratch</c>:
-    ///     single tick thread, cleared immediately before each call, never read after the immediately-following
-    ///     send loop returns. Replaces a per-call <c>AoiGrid.Neighbors(cell).ToArray()</c> (iterator + LINQ
-    ///     buffer) that used to run once per due ground item -- during a keep-alive burst, once per due item in
-    ///     that SAME tick, not once per zone.
-    /// </summary>
-    private readonly List<int> _groundItemBroadcastNeighborScratch = [];
+        private readonly ConcurrentQueue<GroundItemEntity> _claimedGroundItemDespawns = new();
 
-    /// <summary>Tick-owned only -- see <see cref="_groundItems" />'s remarks.</summary>
-    private readonly Dictionary<int, TimeSpan> _groundItemLastRebroadcast = new();
+        private readonly List<int> _groundItemBroadcastNeighborScratch = [];
 
-    // Populated/expired only by this zone's own tick; claimed (removed) via an atomic compare-and-remove
-    // callable from any thread -- see TryClaimGroundItem's remarks for why pickup is the one exception.
+        private readonly Dictionary<int, TimeSpan> _groundItemLastRebroadcast = new();
+
     private readonly ConcurrentDictionary<int, GroundItemEntity> _groundItems = new();
 
     private int _groundItemServerIndexSeed;
@@ -43,12 +28,7 @@ public sealed partial class Zone
 
     public int GroundItemCount => _groundItems.Count;
 
-    /// <summary>
-    ///     Tick-owned caller only (<see cref="Monsters.MonsterSpawnScheduler" />). <paramref name="instanceId" />
-    ///     is Side effect #3's Zone-241 drop tag (Server/ts25zone/S07_MyGame03.cpp:599) -- null for every
-    ///     ordinary drop.
-    /// </summary>
-    public void SpawnGroundItem(int itemId, int quantity, float posX, float posY, float posZ, string master,
+        public void SpawnGroundItem(int itemId, int quantity, float posX, float posY, float posZ, string master,
         string partyName, int dropSort, int? instanceId = null)
     {
         var index = Interlocked.Increment(ref _groundItemServerIndexSeed);
@@ -60,29 +40,17 @@ public sealed partial class Zone
 
         _groundItems[index] = entity;
 
-        // Staggered, not a plain "= _clock": a single kill can drop several items in the same ProcessDeath
-        // call (public item + boss-tier items + generic-tier items), all reaching this method within the same
-        // Zone.Tick and reading the exact same _clock value -- same thundering-herd root cause as
-        // Zone.SpawnMonster's own stagger, just at a smaller per-kill scale. See
-        // SimulationClock.RebroadcastStaggerOffset's own remarks.
         _groundItemLastRebroadcast[index] =
             _clock - SimulationClock.RebroadcastStaggerOffset(index, SimulationClock.GroundItemRebroadcastInterval);
-        BroadcastGroundItemAction(entity, 1); // action=1 at creation
+        BroadcastGroundItemAction(entity, 1);
     }
 
     private static string TruncateName(string name)
     {
-        return name.Length <= 13 ? name : name[..13]; // MAX_AVATAR_NAME_LENGTH
+        return name.Length <= 13 ? name : name[..13];
     }
 
-    /// <summary>
-    ///     Atomically claims (removes) a ground item for pickup -- callable from any thread. Ownership window
-    ///     and distance are checked against immutable snapshot fields, so only the removal itself needs to be
-    ///     atomic: <see cref="ConcurrentDictionary{TKey,TValue}" />'s compare-and-remove on the snapshot just
-    ///     read gives "first claimant wins" with no custom locking. The despawn broadcast is NOT done here (it
-    ///     needs <see cref="_grid" />, tick-thread-only) -- see <see cref="_claimedGroundItemDespawns" />.
-    /// </summary>
-    public GroundItemClaimOutcome TryClaimGroundItem(int serverIndex, uint expectedUniqueNumber, string claimantName,
+        public GroundItemClaimOutcome TryClaimGroundItem(int serverIndex, uint expectedUniqueNumber, string claimantName,
         string? claimantPartyName, float claimantX, float claimantY, float claimantZ, out GroundItemEntity? item,
         int? claimantInstanceId = null)
     {
@@ -93,9 +61,6 @@ public sealed partial class Zone
             return GroundItemClaimOutcome.NotFound;
         }
 
-        // Side effect #4's pickup gate (Server/ts25zone/S04_MyWork05.cpp:289-297): a mismatch is silently
-        // refused, indistinguishable on the wire from "item no longer there" -- reuses NotFound rather than a
-        // dedicated outcome, matching that documented collapse exactly.
         if (!IsVisibleAcrossDungeonInstance(snapshot.InstanceId, claimantInstanceId))
         {
             item = null;
@@ -108,7 +73,6 @@ public sealed partial class Zone
             return GroundItemClaimOutcome.NotOwned;
         }
 
-        // ITEM_OBJECT::CheckPossibleGetItem (S07_MyGame06.cpp:63): full 3D distance, not XZ-only.
         var dx = snapshot.PosX - claimantX;
         var dy = snapshot.PosY - claimantY;
         var dz = snapshot.PosZ - claimantZ;
@@ -123,7 +87,7 @@ public sealed partial class Zone
                 new KeyValuePair<int, GroundItemEntity>(serverIndex, snapshot)))
         {
             item = null;
-            return GroundItemClaimOutcome.NotFound; // lost the race to a concurrent claimant
+            return GroundItemClaimOutcome.NotFound;
         }
 
         _claimedGroundItemDespawns.Enqueue(snapshot);
@@ -131,8 +95,7 @@ public sealed partial class Zone
         return GroundItemClaimOutcome.Success;
     }
 
-    /// <summary>Keep-alive rebroadcast for ground items, 5 s cadence.</summary>
-    private void RebroadcastGroundItems()
+        private void RebroadcastGroundItems()
     {
         foreach (var (index, item) in _groundItems)
         {
@@ -145,8 +108,7 @@ public sealed partial class Zone
         }
     }
 
-    /// <summary>60 s lifetime sweep -- despawns and broadcasts every expired ground item still present.</summary>
-    private void ExpireGroundItems()
+        private void ExpireGroundItems()
     {
         List<(int Index, GroundItemEntity Item)>? expired = null;
         foreach (var (index, item) in _groundItems)
@@ -173,17 +135,7 @@ public sealed partial class Zone
         }
     }
 
-    /// <summary>
-    ///     Serialize-once broadcast for ground-item replication -- same pattern as <see cref="BroadcastAvatarAction" />,
-    ///     including the same <see cref="IsReviveHackBroadcastSuppressed" /> per-recipient gate (see that method's
-    ///     own remarks for the legacy citations establishing both broadcast families route through the same
-    ///     MyUtil::Broadcast11 primitive).
-    ///     <see cref="AoiGrid.HasAnyNeighbor" /> pre-checks emptiness before paying for
-    ///     <see cref="_groundItemBroadcastNeighborScratch" />'s scan; see that field's own remarks for why this
-    ///     is a reused non-allocating buffer rather than the enumerable-returning, iterator-plus-LINQ-<c>ToArray()</c>
-    ///     overload of <c>AoiGrid.Neighbors</c>.
-    /// </summary>
-    private void BroadcastGroundItemAction(GroundItemEntity item, int checkChangeActionState)
+        private void BroadcastGroundItemAction(GroundItemEntity item, int checkChangeActionState)
     {
         var cell = _grid.CellOf(item.PosX, item.PosZ);
         if (!_grid.HasAnyNeighbor(cell))

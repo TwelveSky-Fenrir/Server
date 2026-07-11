@@ -12,25 +12,10 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.World.Monsters;
 
-/// <summary>
-///     Locks in the monster-action broadcast-on-change fix: a monster that changes its FSM state/target emits an
-///     IMMEDIATE op18 <see cref="MonsterReplicationResponse" /> (<c>checkChangeActionState = 1</c>) with a
-///     correctly-populated target descriptor -- not just an eventual malformed keep-alive.
-/// </summary>
-/// <remarks>
-///     The class this guards: legacy broadcasts every ordinary-monster AI transition immediately via
-///     <c>Send1</c>/<c>Send2</c>/<c>Send3</c> (<c>Server/ts25zone/S07_MyGame05.cpp:1172-1173</c> etc.) and only
-///     re-syncs SPECIAL monsters on the periodic keep-alive; before this fix Fenrir did the inverse (no
-///     change broadcast, plus a malformed keep-alive) which reset real clients' monster renderers. A lone
-///     player in a minimal zone receives only op18 monster frames, so the raw outbound stream parses cleanly
-///     as a sequence of same-size frames.
-/// </remarks>
 public class MonsterActionBroadcastTests
 {
     private static WorldDataCache AggressiveMonsterCache()
     {
-        // radiusInfo2 (detection) huge, radiusInfo1 (melee) tiny so the monster locks a distant target and stays
-        // in Chase rather than snapping straight to AttackWindup; attackType 1 enables proactive aggro.
         var monster = WorldDataTestRows.Monster(600) with
         {
             Life = 1000,
@@ -57,7 +42,7 @@ public class MonsterActionBroadcastTests
     private static Zone CreateAggressiveZone(WorldDataCache cache)
     {
         var scheduler = new MonsterSpawnScheduler(cache, static () => new ZeroScatterRandom());
-        var ai = new MonsterAiSystem(new ScriptedRandomSource(0)); // 0 always wins the 50% aggro coin flip
+        var ai = new MonsterAiSystem(new ScriptedRandomSource(0));
         var options = new GameServerOptions { AoiCellSize = 100_000f };
         return ZoneTestKit.CreateZone(1, options, simulationSystems: [scheduler, ai], worldData: cache);
     }
@@ -67,10 +52,9 @@ public class MonsterActionBroadcastTests
     {
         var zone = CreateAggressiveZone(AggressiveMonsterCache());
         var (session, pipe) = ZoneTestKit.CreateSession(1);
-        // Player characterId 10 at (10,0,0); monster spawns at (0,0,0). UniqueNumber == (uint)CharacterId == 10.
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Target", 10, posZ: 0)));
 
-        zone.Tick(SimulationClock.LegacyTick); // spawn + drain the on-enter catch-up frames below
+        zone.Tick(SimulationClock.LegacyTick);
         ZoneTestKit.DrainOutbound(pipe);
 
         (int ServerIndex, ObjectForMonster Data, int CheckChangeActionState)? acquisition = null;
@@ -78,8 +62,6 @@ public class MonsterActionBroadcastTests
         {
             zone.Tick(SimulationClock.LegacyTick);
             foreach (var frame in ParseMonsterFrames(ZoneTestKit.DrainOutbound(pipe)))
-                // The one definitive change broadcast: a Chase (aSort 4) frame flagged state 1 ("new action"),
-                // never the keep-alive's state 2 -- proves it fired on the transition, not eventually.
                 if (frame.Data.Action.Sort == (int)MonsterAiState.Chase && frame.CheckChangeActionState == 1)
                     acquisition = frame;
         }
@@ -88,10 +70,9 @@ public class MonsterActionBroadcastTests
             "monster never emitted an immediate op18 Chase change-broadcast (checkChangeActionState=1) on aggro");
 
         var action = acquisition!.Value.Data.Action;
-        Assert.Equal(10, action.TargetObjectIndex); // the pursued avatar's own index, not the old hardcoded 0
-        Assert.Equal(10, action.TargetObjectUniqueNumber); // set together with the index, previously always 0
+        Assert.Equal(10, action.TargetObjectIndex);
+        Assert.Equal(10, action.TargetObjectUniqueNumber);
         Assert.Equal(0, action.TargetObjectSort);
-        // TargetLocation tracks the pursued avatar's position, not the monster's own coordinates (the old bug).
         Assert.Equal(10f, action.TargetLocation[0]);
     }
 
@@ -99,8 +80,6 @@ public class MonsterActionBroadcastTests
     public void IdleMonster_OnEnterCatchUpFrame_UsesMinusOneTargetIndex_AndKeepAliveState()
     {
         var zone = ZoneTestKit.CreateZone(1, new GameServerOptions { AoiCellSize = 100_000f });
-        // A plain idle monster (no AI system driving it): stays targetless, so every frame must carry the
-        // legacy no-target descriptor -- index -1, unique number 0 -- never index 0 (a real avatar slot).
         zone.SpawnMonster(MonsterEntity.Create(1, 1u, WorldDataTestRows.Monster(700), 1, 0f, 0f, 0f, 50f));
 
         var (session, pipe) = ZoneTestKit.CreateSession(1);
@@ -111,18 +90,13 @@ public class MonsterActionBroadcastTests
         Assert.NotEmpty(frames);
         foreach (var frame in frames)
         {
-            Assert.Equal(-1, frame.Data.Action.TargetObjectIndex); // never 0 (the old `?? 0` bug)
+            Assert.Equal(-1, frame.Data.Action.TargetObjectIndex);
             Assert.Equal(0, frame.Data.Action.TargetObjectUniqueNumber);
-            Assert.Equal(2, frame.CheckChangeActionState); // re-sync, never the non-legacy 0
+            Assert.Equal(2, frame.CheckChangeActionState);
         }
     }
 
-    /// <summary>
-    ///     Splits the lone player's raw outbound byte stream into decoded op18 monster frames. A lone player in
-    ///     a minimal zone receives nothing but op18, so every frame is exactly one
-    ///     <see cref="MonsterReplicationResponse" />-sized block (1-byte opcode + 124-byte payload).
-    /// </summary>
-    private static List<(int ServerIndex, ObjectForMonster Data, int CheckChangeActionState)> ParseMonsterFrames(
+        private static List<(int ServerIndex, ObjectForMonster Data, int CheckChangeActionState)> ParseMonsterFrames(
         byte[] bytes)
     {
         var frames = new List<(int, ObjectForMonster, int)>();

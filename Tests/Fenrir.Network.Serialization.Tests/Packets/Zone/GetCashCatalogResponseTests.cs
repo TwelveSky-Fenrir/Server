@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Zone;
 
-// CashItemInfo flattens int[4][20][10][4] row-major into 3200 ints (STRUCT.h:1436-1446).
 public class ZcGetCashItemInfoRecvTests
 {
     [Fact]

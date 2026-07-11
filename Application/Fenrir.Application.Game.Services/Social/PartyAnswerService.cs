@@ -7,10 +7,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Services.Social;
 
-/// <summary>
-///     On accept, collapses legacy's separate PARTY_JOIN/PARTY_INFO emissions into one fan-out; a full party
-///     (<see cref="PartyJoinOutcome.PartyWasFull" />) is a silent no-op.
-/// </summary>
 public sealed class PartyAnswerService(
     PartyRegistry parties,
     ZoneRegistry zones,
@@ -30,13 +26,6 @@ public sealed class PartyAnswerService(
 
         var accepted = answer == 0;
 
-        // WS1.4: if this invitee has a cross-shard invite delivered in (via
-        // PartyCrossShardRelayHandler.HandleAskAsync), answer it by publishing an Answer row back to the
-        // original inviter's own shard -- transparent to the caller (PartyAnswerHandler), which is unaware
-        // whether a given pending invite is same-shard or cross-shard. The actual join can only happen on
-        // the inviter's own shard (see PartyRegistry.TryConsumeCrossShardInbound's own remarks), so nothing
-        // party-membership-related is mutated here; InviterId=0/empty Members tells the caller there is no
-        // local join fan-out to perform.
         if (parties.TryConsumeCrossShardInbound(inviteeId, out var inbound))
         {
             var inviteeName = zones.TryGetPlayer(inviteeId, out var inviteeState) ? inviteeState.Name : "";

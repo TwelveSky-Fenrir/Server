@@ -3,32 +3,17 @@ using Fenrir.Application.Game.Domain.World.Pathfinding;
 
 namespace Fenrir.Application.Game.Domain.World.Geometry;
 
-/// <summary>
-///     Collision/height queries for one zone's <c>.WM</c> mesh; port of legacy <c>WORLD_FOR_GXD</c>
-///     (<c>ts25zone/S09_MyWorld.cpp</c>). No epsilon in float comparisons, matching the original --
-///     a tolerance would change which points are walkable at triangle edges.
-/// </summary>
 public sealed class ZoneGeometry(WorldTriangle[] triangles, QuadtreeNode[] quadtree)
 {
-    /// <summary>
-    ///     The triangle-connectivity graph used by A* + funnel monster pathfinding (<see cref="MonsterPathfinder" />),
-    ///     built lazily and once: a zone with geometry but no aggressive, actually-pathing monster never pays the
-    ///     O(triangles) build cost. Thread-safe to first-touch (<see cref="Lazy{T}" />'s default publication mode),
-    ///     though in practice only a zone's own tick thread reads it.
-    /// </summary>
-    private readonly Lazy<TriangleAdjacencyGraph> _navmesh = new(() => TriangleAdjacencyGraph.Build(triangles));
+
+        private readonly Lazy<TriangleAdjacencyGraph> _navmesh = new(() => TriangleAdjacencyGraph.Build(triangles));
 
     public IReadOnlyList<WorldTriangle> Triangles => triangles;
     public IReadOnlyList<QuadtreeNode> Quadtree => quadtree;
 
-    /// <summary>See <see cref="_navmesh" />.</summary>
-    public TriangleAdjacencyGraph Navmesh => _navmesh.Value;
+        public TriangleAdjacencyGraph Navmesh => _navmesh.Value;
 
-    /// <summary>
-    ///     Ground height at (x, z) via quadtree descent (legacy <c>GetYCoord</c>). Among candidates under
-    ///     <paramref name="ceiling" />, the highest wins, so multi-level platforms resolve to the surface underfoot.
-    /// </summary>
-    public bool TryGetGroundHeight(float x, float z, out float y, float? ceiling = null, bool checkTwoSide = false,
+        public bool TryGetGroundHeight(float x, float z, out float y, float? ceiling = null, bool checkTwoSide = false,
         bool firstHitOnly = false)
     {
         y = 0f;
@@ -68,10 +53,7 @@ public sealed class ZoneGeometry(WorldTriangle[] triangles, QuadtreeNode[] quadt
         return found;
     }
 
-    /// <summary>
-    ///     Walkability at (x, z); no Y parameter since legacy <c>CheckPointInWorldWithoutYCoord</c> never reads it either.
-    /// </summary>
-    public bool IsWalkable(float x, float z)
+        public bool IsWalkable(float x, float z)
     {
         if (quadtree.Length == 0 || !TryDescend(x, z, out var nodeIndex))
             return false;
@@ -83,17 +65,7 @@ public sealed class ZoneGeometry(WorldTriangle[] triangles, QuadtreeNode[] quadt
         return false;
     }
 
-    /// <summary>
-    ///     Index of a walkable floor triangle (<see cref="WorldTriangle.PlaneInfo" /><c>.Y &gt; 0</c>) whose XZ
-    ///     footprint contains (x, z), via the same quadtree descent + XZ point-in-triangle test as
-    ///     <see cref="IsWalkable" /> -- the on-mesh entry point A* pathfinding snaps a start/goal position to
-    ///     (see <see cref="MonsterPathfinder" />). Returns the first matching walkable triangle in the resolved
-    ///     leaf; on a multi-level footprint (e.g. a bridge over a floor, coincident in XZ) that first match may be
-    ///     either surface, which is acceptable for grounding a monster's route -- callers needing a specific
-    ///     surface use <see cref="TryGetGroundHeight" />'s height resolution instead. Excludes vertical
-    ///     wall/ceiling triangles, matching the walkable set the adjacency graph is built from.
-    /// </summary>
-    public bool TryFindContainingWalkableTriangle(float x, float z, out int triangleIndex)
+        public bool TryFindContainingWalkableTriangle(float x, float z, out int triangleIndex)
     {
         triangleIndex = -1;
         if (quadtree.Length == 0 || !TryDescend(x, z, out var nodeIndex))
@@ -115,19 +87,7 @@ public sealed class ZoneGeometry(WorldTriangle[] triangles, QuadtreeNode[] quadt
         return false;
     }
 
-    /// <summary>
-    ///     Combined <see cref="IsWalkable" /> + <see cref="TryGetGroundHeight" /> answer for (x, z) at
-    ///     <see cref="TryGetGroundHeight" />'s default parameters (root ceiling, one-sided, best-of-many), descending
-    ///     the quadtree once and scanning the resolved leaf's triangles once instead of the two independent descents
-    ///     a caller needing both answers would otherwise perform. <paramref name="walkable" /> is true only when (x, z)
-    ///     both sits inside some triangle's XZ footprint (matching <see cref="IsWalkable" />) and that footprint also
-    ///     yields a resolvable one-sided ground height (matching <see cref="TryGetGroundHeight" />'s found result) --
-    ///     the same conjunction a caller previously had to check across two separate calls; a footprint with no
-    ///     standable surface underneath it (e.g. the underside of a bridge, with no floor triangle in that same XZ
-    ///     spot) is not walkable under this combined answer even though <see cref="IsWalkable" /> alone would say yes.
-    ///     <paramref name="groundY" /> is only meaningful when <paramref name="walkable" /> is true.
-    /// </summary>
-    public void Resolve(float x, float z, out bool walkable, out float groundY)
+        public void Resolve(float x, float z, out bool walkable, out float groundY)
     {
         walkable = false;
         groundY = 0f;
@@ -190,7 +150,6 @@ public sealed class ZoneGeometry(WorldTriangle[] triangles, QuadtreeNode[] quadt
 
     private static bool TryGetHeightFromPlane(in WorldTriangle triangle, float x, float z, out float y)
     {
-        // B == 0 -> vertical (wall) triangle, no Y to solve for.
         if (triangle.PlaneInfo.Y == 0f)
         {
             y = 0f;
@@ -201,8 +160,7 @@ public sealed class ZoneGeometry(WorldTriangle[] triangles, QuadtreeNode[] quadt
         return true;
     }
 
-    /// <summary>Barycentric inside-triangle test in full 3D (legacy <c>CheckPointInTris</c>).</summary>
-    private static bool IsPointInsideTriangleXyz(in WorldTriangle triangle, float x, float y, float z)
+        private static bool IsPointInsideTriangleXyz(in WorldTriangle triangle, float x, float y, float z)
     {
         var edge0 = triangle.Vertex1 - triangle.Vertex0;
         var edge1 = triangle.Vertex2 - triangle.Vertex0;
@@ -217,8 +175,7 @@ public sealed class ZoneGeometry(WorldTriangle[] triangles, QuadtreeNode[] quadt
         return TryResolveBarycentric(dot00, dot01, dot02, dot11, dot12);
     }
 
-    /// <summary>Barycentric inside-triangle test projected onto XZ (legacy <c>CheckPointInTrisWithoutYCoord</c>).</summary>
-    private static bool IsPointInsideTriangleXz(in WorldTriangle triangle, float x, float z)
+        private static bool IsPointInsideTriangleXz(in WorldTriangle triangle, float x, float z)
     {
         var edge0 = new Vector2(triangle.Vertex1.X - triangle.Vertex0.X, triangle.Vertex1.Z - triangle.Vertex0.Z);
         var edge1 = new Vector2(triangle.Vertex2.X - triangle.Vertex0.X, triangle.Vertex2.Z - triangle.Vertex0.Z);

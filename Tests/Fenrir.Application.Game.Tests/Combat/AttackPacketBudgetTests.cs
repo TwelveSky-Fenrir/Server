@@ -4,11 +4,6 @@ using Fenrir.Application.Game.Tests.TestSupport;
 
 namespace Fenrir.Application.Game.Tests.Combat;
 
-/// <summary>
-///     Covers <see cref="AttackPacketBudget.TryConsume" /> -- the companion check to
-///     <see cref="Fenrir.Application.Game.Domain.Movement.CharacterMotionWhitelist" /> that enforces the
-///     attack sub-packet ceiling and replay guard against a character's session state.
-/// </summary>
 public class AttackPacketBudgetTests
 {
     private static PlayerRuntimeState State(bool enforced, int ceiling, int actionSort, int used = 0)
@@ -38,7 +33,6 @@ public class AttackPacketBudgetTests
         Assert.True(AttackPacketBudget.TryConsume(state, 999));
         Assert.True(AttackPacketBudget.TryConsume(state, 999));
 
-        // Uncapped by explicit original intent (Sort 65/74): the used-so-far counter is never touched.
         Assert.Equal(0, state.AttackSubPacketsUsed);
     }
 
@@ -59,7 +53,6 @@ public class AttackPacketBudgetTests
 
         Assert.True(AttackPacketBudget.TryConsume(state, 42));
         Assert.True(AttackPacketBudget.TryConsume(state, 42));
-        // Third sub-packet exceeds the ceiling of 2.
         Assert.False(AttackPacketBudget.TryConsume(state, 42));
 
         Assert.Equal(3, state.AttackSubPacketsUsed);
@@ -68,8 +61,6 @@ public class AttackPacketBudgetTests
     [Fact]
     public void EnforcementOn_CeilingZero_RejectsTheVeryFirstSubPacket()
     {
-        // Matches the ordinary non-combat animation default: enforcement on, ceiling zero -- a hard zero, not
-        // a soft cap.
         var state = State(true, 0, 0);
 
         Assert.False(AttackPacketBudget.TryConsume(state, 0));
@@ -81,7 +72,6 @@ public class AttackPacketBudgetTests
     {
         var state = State(true, 5, 42);
 
-        // AttackActionValue4 must match the character's currently-recorded action category (ActionSort).
         Assert.False(AttackPacketBudget.TryConsume(state, 99));
     }
 
@@ -100,8 +90,6 @@ public class AttackPacketBudgetTests
     {
         var state = State(true, 0, 42);
 
-        // Ceiling is already exhausted (0), but countAttempt:false mirrors ProcessAttack05's explicit opt-out
-        // of the counter/ceiling comparison -- only the replay guard still applies.
         Assert.True(AttackPacketBudget.TryConsume(state, 42, false));
         Assert.Equal(0, state.AttackSubPacketsUsed);
 

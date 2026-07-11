@@ -13,11 +13,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     <see cref="ProxyShopExpiryFlushHost" /> -- the write-behind twin of <c>Zone.RebroadcastProxyShops</c>'s
-///     expiry branch: persists the durable ShopState=0 write, then best-effort clears the shop's registered
-///     display name (mirroring the legacy account/DB process's own successful-close side effect).
-/// </summary>
 public class ProxyShopExpiryFlushHostTests
 {
     private static ZoneRegistry CreateRegistry(params short[] maps)
@@ -35,8 +30,7 @@ public class ProxyShopExpiryFlushHostTests
         return new ProxyShopBroadcastEntry(characterId, characterId * 2 + 1, "Owner", "Shop", 0f, 0f, 0f, shopDate);
     }
 
-    /// <summary>Drives a real expiry through the zone's own sweep rather than reaching into its private queue.</summary>
-    private static ZoneRegistry RegistryWithOneExpiredShop(int characterId)
+        private static ZoneRegistry RegistryWithOneExpiredShop(int characterId)
     {
         var registry = CreateRegistry(ProxyShopZonePolicy.ZoneNumber);
         var zone = registry[ProxyShopZonePolicy.ZoneNumber];
@@ -78,7 +72,7 @@ public class ProxyShopExpiryFlushHostTests
         var repository = new RecordingOfflineShopRepository { ThrowOnSetProxyShopName = true };
         var host = new ProxyShopExpiryFlushHost(registry, repository, NullLogger<ProxyShopExpiryFlushHost>.Instance);
 
-        await host.FlushOnceAsync(CancellationToken.None); // must not throw
+        await host.FlushOnceAsync(CancellationToken.None);
 
         Assert.Equal([10], repository.ClosedCharacterIds);
         Assert.Empty(repository.NameClears);
@@ -91,18 +85,13 @@ public class ProxyShopExpiryFlushHostTests
         var repository = new RecordingOfflineShopRepository { ThrowOnSetState = true };
         var host = new ProxyShopExpiryFlushHost(registry, repository, NullLogger<ProxyShopExpiryFlushHost>.Instance);
 
-        await host.FlushOnceAsync(CancellationToken.None); // must not throw
+        await host.FlushOnceAsync(CancellationToken.None);
 
         Assert.Empty(repository.ClosedCharacterIds);
         Assert.Empty(repository.NameClears);
     }
 
-    /// <summary>
-    ///     Records calls instead of hitting SQL -- deliberately its own local fake rather than extending the
-    ///     shared <c>FakeOfflineShopRepository</c> (that one only implements the rental-extension surface used
-    ///     by <c>UseInventoryItemServiceTests</c>).
-    /// </summary>
-    private sealed class RecordingOfflineShopRepository : IOfflineShopRepository
+        private sealed class RecordingOfflineShopRepository : IOfflineShopRepository
     {
         public List<int> ClosedCharacterIds { get; } = [];
         public List<(int CharacterId, string ShopName)> NameClears { get; } = [];

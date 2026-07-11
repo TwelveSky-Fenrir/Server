@@ -5,10 +5,6 @@ using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     Covers the in-process map-transfer mechanism (<see cref="ZoneTransfer" />): live state travels inside the
-///     <c>Leave</c>/<c>Enter</c> commands, never observable in two zones at once.
-/// </summary>
 public class ZoneHandoffTests
 {
     [Fact]
@@ -29,7 +25,6 @@ public class ZoneHandoffTests
 
         Assert.False(source.TryGetPlayer(10, out _));
 
-        // Enter was posted to the target but not yet drained -- the state belongs to no zone in between
         Assert.False(target.TryGetPlayer(10, out _));
 
         target.Tick(TimeSpan.FromMilliseconds(50));
@@ -73,15 +68,12 @@ public class ZoneHandoffTests
         Assert.Equal(before.Level, after.Level);
         Assert.Same(session, after.Session);
 
-        // bumped by exactly one so the map change wins usp_Character_PersistBatch's strictly-greater idempotence guard
         Assert.Equal(before.FlushSequence + 1, after.FlushSequence);
     }
 
     [Fact]
     public void Leave_WithHandoffTarget_CarriesTheRememberedCashCatalogVersionThrough()
     {
-        // A client mid cash-catalog-notify window must not silently lose that state on an in-process map
-        // transfer -- see PlayerRuntimeState.KnownCashCatalogVersion's own remarks.
         var dirtyTracker = new DirtyTracker<int>();
         var source = ZoneTestKit.CreateZone(1, dirtyTracker: dirtyTracker);
         var target = ZoneTestKit.CreateZone(2, dirtyTracker: dirtyTracker);
@@ -103,9 +95,6 @@ public class ZoneHandoffTests
     [Fact]
     public void Leave_WithHandoffTarget_CarriesTheLiveHeroRankPointsThrough_NotResetToStalePersistedValue()
     {
-        // A character who earns hero-rank points mid-session must not see the counter reset to whatever
-        // world-entry hydrated on a same-shard zone transfer -- see PlayerRuntimeState.HeroRankPoints's own
-        // remarks and ZoneTransfer.CreateEnterData.
         var dirtyTracker = new DirtyTracker<int>();
         var source = ZoneTestKit.CreateZone(1, dirtyTracker: dirtyTracker);
         var target = ZoneTestKit.CreateZone(2, dirtyTracker: dirtyTracker);
@@ -127,10 +116,6 @@ public class ZoneHandoffTests
     [Fact]
     public void Leave_WithHandoffTarget_CarriesTheLivePetBagDateThrough_NotResetToZero()
     {
-        // C8 pet-bag-entitlement confirmation-pass follow-up: PlayerRuntimeState.PetBagDate must survive a
-        // same-shard zone transfer, not silently reset to 0 (which GenericActionHandler would then read as
-        // an expired pet-bag-upper-half entitlement) -- see that field's own remarks and ZoneTransfer.
-        // CreateEnterData.
         var dirtyTracker = new DirtyTracker<int>();
         var source = ZoneTestKit.CreateZone(1, dirtyTracker: dirtyTracker);
         var target = ZoneTestKit.CreateZone(2, dirtyTracker: dirtyTracker);
@@ -152,9 +137,6 @@ public class ZoneHandoffTests
     [Fact]
     public void Leave_WithHandoffTarget_CarriesTheLiveDropItemTimeThrough_NotResetToZero()
     {
-        // Item-usage-consumables follow-up: the Lucky Drop/"Acquisition" Scroll minutes counter must survive a
-        // same-shard zone transfer, not silently reset to 0 -- see PlayerRuntimeState.DropItemTime's own
-        // remarks and ZoneTransfer.CreateEnterData.
         var dirtyTracker = new DirtyTracker<int>();
         var source = ZoneTestKit.CreateZone(1, dirtyTracker: dirtyTracker);
         var target = ZoneTestKit.CreateZone(2, dirtyTracker: dirtyTracker);
@@ -176,9 +158,6 @@ public class ZoneHandoffTests
     [Fact]
     public void Leave_WithHandoffTarget_CarriesTheLiveWarPointThrough_NotResetToZero()
     {
-        // Migrations/041_characters_warpoint_currency.sql follow-up: the War-Point currency balance must
-        // survive a same-shard zone transfer, not silently reset to 0 -- see PlayerRuntimeState.WarPoint's own
-        // remarks and ZoneTransfer.CreateEnterData.
         var dirtyTracker = new DirtyTracker<int>();
         var source = ZoneTestKit.CreateZone(1, dirtyTracker: dirtyTracker);
         var target = ZoneTestKit.CreateZone(2, dirtyTracker: dirtyTracker);
@@ -200,8 +179,6 @@ public class ZoneHandoffTests
     [Fact]
     public void Leave_WithHandoffTarget_CarriesTheLiveQuestProgressThrough_NotResetToDefault()
     {
-        // A character mid-quest must not lose its step/kill-counter tracking on a same-shard zone transfer --
-        // see ZoneTransfer.CreateEnterData and PlayerEnterData.QuestProgress's own remarks.
         var dirtyTracker = new DirtyTracker<int>();
         var source = ZoneTestKit.CreateZone(1, dirtyTracker: dirtyTracker);
         var target = ZoneTestKit.CreateZone(2, dirtyTracker: dirtyTracker);
@@ -231,8 +208,6 @@ public class ZoneHandoffTests
     [Fact]
     public void Leave_WithHandoffTarget_CarriesTheLiveDailyMissionCountersThrough_NotResetToZero()
     {
-        // Daily-mission progress (join-war, faction-kill, monster-kill, play-time counters) must survive a
-        // same-shard zone transfer -- see ZoneTransfer.CreateEnterData.
         var dirtyTracker = new DirtyTracker<int>();
         var source = ZoneTestKit.CreateZone(1, dirtyTracker: dirtyTracker);
         var target = ZoneTestKit.CreateZone(2, dirtyTracker: dirtyTracker);
@@ -260,8 +235,6 @@ public class ZoneHandoffTests
     [Fact]
     public void Leave_WithHandoffTarget_CarriesTheLiveAutoHuntConfigurationThrough_NotResetToDisabled()
     {
-        // An active auto-hunt session must resume, not silently switch off, on a same-shard zone transfer --
-        // see ZoneTransfer.CreateEnterData.
         var dirtyTracker = new DirtyTracker<int>();
         var source = ZoneTestKit.CreateZone(1, dirtyTracker: dirtyTracker);
         var target = ZoneTestKit.CreateZone(2, dirtyTracker: dirtyTracker);
@@ -302,9 +275,6 @@ public class ZoneHandoffTests
     [Fact]
     public void Leave_WithHandoffTarget_CarriesTheLivePetGrowthAndActivityThrough_NotResetToFreshlyHatched()
     {
-        // A pet's growth/activity feeds MaxLife/MaxMana/AttackPower/DefensePower via the pet-double rule --
-        // resetting it on a same-shard zone transfer would silently understate the character's combat stats
-        // until the next full world entry. See ZoneTransfer.CreateEnterData.
         var dirtyTracker = new DirtyTracker<int>();
         var source = ZoneTestKit.CreateZone(1, dirtyTracker: dirtyTracker);
         var target = ZoneTestKit.CreateZone(2, dirtyTracker: dirtyTracker);
@@ -328,8 +298,6 @@ public class ZoneHandoffTests
     [Fact]
     public void Leave_WithHandoffTarget_CarriesTheLiveRuneSocketsThrough_NotResetToEmpty()
     {
-        // A character's socketed runes must survive a same-shard zone transfer, not silently reset to empty --
-        // see PlayerEnterData.RuneSystem's own remarks and ZoneTransfer.CreateEnterData.
         var dirtyTracker = new DirtyTracker<int>();
         var source = ZoneTestKit.CreateZone(1, dirtyTracker: dirtyTracker);
         var target = ZoneTestKit.CreateZone(2, dirtyTracker: dirtyTracker);
@@ -348,7 +316,6 @@ public class ZoneHandoffTests
         Assert.True(target.TryGetPlayer(10, out var after));
         Assert.Equal(93514, after!.RuneSystem[0]);
         Assert.Equal(12345, after.RuneSystemStat[0]);
-        // The other three sockets stay empty -- proves the whole array traveled, not just a single overwritten slot.
         Assert.Equal(0, after.RuneSystem[1]);
         Assert.Equal(0, after.RuneSystem[2]);
         Assert.Equal(0, after.RuneSystem[3]);
@@ -407,7 +374,6 @@ public class ZoneHandoffTests
     [Fact]
     public void Leave_WithHandoffPosition_LandsAtTheOverriddenPosition_NotWhereverThePlayerWasStanding()
     {
-        // arrival point travels inside the Leave command itself, never by mutating PlayerRuntimeState directly
         var dirtyTracker = new DirtyTracker<int>();
         var source = ZoneTestKit.CreateZone(1, dirtyTracker: dirtyTracker);
         var target = ZoneTestKit.CreateZone(2, dirtyTracker: dirtyTracker);
@@ -463,8 +429,6 @@ public class ZoneHandoffTests
     [Fact]
     public void Leave_WithHandoffTarget_NeverTouchesTheCrossShardLocationDirectory()
     {
-        // ShardId never changes on a same-shard hop -- an in-process handoff must not clean up the directory
-        // row at all, only a true disconnect does.
         var characterShardLocations = new FakeCharacterShardLocationRepository();
         var source = ZoneTestKit.CreateZone(1, characterShardLocations: characterShardLocations);
         var target = ZoneTestKit.CreateZone(2);
@@ -482,8 +446,6 @@ public class ZoneHandoffTests
     [Fact]
     public void Leave_WithoutHandoffTarget_AndNoCharacterShardLocationRepositoryConfigured_NeverThrows()
     {
-        // Matches every other existing test zone in this file: characterShardLocations left null (a Zone
-        // must tolerate not being wired up to the cross-shard directory at all, e.g. in tests).
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _) = ZoneTestKit.CreateSession(1);
 
@@ -491,7 +453,7 @@ public class ZoneHandoffTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         zone.Post(ZoneCommand.Leave(10));
-        zone.Tick(TimeSpan.FromMilliseconds(50)); // must not throw
+        zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.False(zone.TryGetPlayer(10, out _));
     }

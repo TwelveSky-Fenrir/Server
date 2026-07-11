@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Tests.TestSupport;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Shared;
 
-// CZ_GUILD_WORK_SEND tSort 1001.
 public class GuildWorkLogoPayloadTests
 {
     [Fact]

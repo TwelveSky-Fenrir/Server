@@ -10,11 +10,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Inventory.UseItems;
 
-/// <summary>
-///     Drives <see cref="ScrollOfSeekersUseItemHandler" /> (op23 items 1124/1187/7016/8409/8410), now that the
-///     recovered <c>scroll-of-seekers-per-id-split</c> contract supplies the concrete 180-vs-900 per-id amount
-///     table this handler used to reject cleanly for lack of.
-/// </summary>
 public class ScrollOfSeekersUseItemHandlerTests
 {
     private const int AccountId = 1;
@@ -86,7 +81,6 @@ public class ScrollOfSeekersUseItemHandlerTests
             handler.HandleAsync(Context(zone, state, itemId, item), CancellationToken.None), zone);
 
         Assert.Equal(0, response.Result);
-        // Unlike EliteDungeonTicket/DungeonKey/IvyHallTicket, this family never echoes the new counter total.
         Assert.Equal(0, response.Value);
         Assert.Equal(0, response.Value2);
 
@@ -114,8 +108,6 @@ public class ScrollOfSeekersUseItemHandlerTests
     {
         var (zone, state, characters, handler) = SetUp();
         state.ScrollOfSeekersTime = 0;
-        // Five on hand, client asks for a bulk-use of 3 via the wire "Value" field -- both must be ignored:
-        // exactly one unit consumed, exactly the flat per-id amount credited, regardless of either number.
         var item = Scroll(1124, quantity: 5);
 
         var response = await RunToCompletionAsync(

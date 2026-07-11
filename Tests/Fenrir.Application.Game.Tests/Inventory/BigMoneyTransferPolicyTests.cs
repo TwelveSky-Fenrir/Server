@@ -2,11 +2,6 @@ using Fenrir.Application.Game.Domain.Inventory;
 
 namespace Fenrir.Application.Game.Tests.Inventory;
 
-/// <summary>
-///     Coverage for <see cref="BigMoneyTransferPolicy" />, the pure policy behind tSort 241/244
-///     (Inventory &lt;-&gt; Store BigMoney) and 242/245 (Inventory &lt;-&gt; Bank BigMoney). Does not depend on
-///     any dispatch wiring.
-/// </summary>
 public class BigMoneyTransferPolicyTests
 {
     [Theory]

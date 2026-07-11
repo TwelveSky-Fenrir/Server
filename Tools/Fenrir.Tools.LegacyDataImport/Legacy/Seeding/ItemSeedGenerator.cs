@@ -4,11 +4,6 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Seeding;
 
-/// <summary>
-///     Generates <c>70_seed/world/080_items.sql</c> from <see cref="ItemReader.ReadAll" /> (005_00002.IMG,
-///     post-runtime-patch), one row per item where Index != 0 (retired slots 89501-89562/99001 are the
-///     legacy "deleted item" convention). GainSkillNumber's legacy "0 = no skill" sentinel becomes NULL.
-/// </summary>
 public static class ItemSeedGenerator
 {
     private const string ItemColumns =

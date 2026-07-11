@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Zone;
 
-/// <summary>ZC_ADD_USER_INVENTORY_ITEM_RECV (ZONE.h:1326-1338, 48-byte payload).</summary>
 public class ZcAddUserInventoryItemRecvTests
 {
     [Fact]

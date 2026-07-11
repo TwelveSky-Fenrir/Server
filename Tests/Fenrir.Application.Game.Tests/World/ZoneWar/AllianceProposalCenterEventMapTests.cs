@@ -4,12 +4,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Coverage for the A5-alliance-proposal center-side dispatch discriminators 46-49
-///     (<see cref="AllianceProposalCenterEventMap" />), against a fresh <see cref="AllianceProposalCenterState" />
-///     each test -- no <see cref="ZoneCenterBroadcastIngestor" /> wiring exists yet (reported separately), so
-///     this exercises <see cref="AllianceProposalCenterEventMap.Apply" /> directly.
-/// </summary>
 public class AllianceProposalCenterEventMapTests
 {
     private static readonly NullLogger Logger = NullLogger.Instance;
@@ -44,13 +38,13 @@ public class AllianceProposalCenterEventMapTests
     {
         var state = new AllianceProposalCenterState();
         state.SetSlot(0, 2, 3);
-        state.SetSlot(1, 0, 1); // pre-existing, unrelated occupant -- overwritten with no verification
+        state.SetSlot(1, 0, 1);
 
         AllianceProposalCenterEventMap.Apply(AllianceProposalCenterEventMap.FinalizeNewAllianceEventCode,
             Payload(0, 1), state, Logger);
 
-        Assert.Equal(((byte?)2, (byte?)3), state.GetSlot(0)); // untouched
-        Assert.Equal(((byte?)0, (byte?)1), state.GetSlot(1)); // overwritten
+        Assert.Equal(((byte?)2, (byte?)3), state.GetSlot(0));
+        Assert.Equal(((byte?)0, (byte?)1), state.GetSlot(1));
     }
 
     [Fact]
@@ -66,9 +60,9 @@ public class AllianceProposalCenterEventMapTests
     }
 
     [Theory]
-    [InlineData(46)] // FinalizeNewAlliance
-    [InlineData(47)] // BreakAllianceViaRitual
-    [InlineData(49)] // BreakAllianceViaStoneCapture
+    [InlineData(46)]
+    [InlineData(47)]
+    [InlineData(49)]
     public void Apply_OutOfRangeSecondTribe_MutatesNothing(int eventCode)
     {
         var state = new AllianceProposalCenterState();
@@ -84,10 +78,10 @@ public class AllianceProposalCenterEventMapTests
     public void Apply_BreakViaRitual_SlotZeroMatchesPair_SelectsSlotZero_ArmsCooldowns_ClearsSlot()
     {
         var state = new AllianceProposalCenterState();
-        state.SetSlot(0, 1, 2); // the allied pair, order (1,2)
+        state.SetSlot(0, 1, 2);
 
         AllianceProposalCenterEventMap.Apply(AllianceProposalCenterEventMap.BreakAllianceViaRitualEventCode,
-            Payload(2, 1, 20260815, 20260816), // sent in the OPPOSITE order -- must still match
+            Payload(2, 1, 20260815, 20260816),
             state, Logger);
 
         Assert.True(state.SlotIsEmpty(0));
@@ -105,14 +99,14 @@ public class AllianceProposalCenterEventMapTests
     public void Apply_BreakViaRitual_SlotZeroDoesNotMatch_FallsBackToSlotOne_UnconditionallyClearingIt()
     {
         var state = new AllianceProposalCenterState();
-        state.SetSlot(0, 3, 0); // unrelated pair
-        state.SetSlot(1, 1, 2); // the actual pair this break targets
+        state.SetSlot(0, 3, 0);
+        state.SetSlot(1, 1, 2);
 
         AllianceProposalCenterEventMap.Apply(AllianceProposalCenterEventMap.BreakAllianceViaRitualEventCode,
             Payload(1, 2, 20260901, 20260902), state, Logger);
 
-        Assert.Equal(((byte?)3, (byte?)0), state.GetSlot(0)); // untouched
-        Assert.True(state.SlotIsEmpty(1)); // cleared, even though it genuinely held the pair
+        Assert.Equal(((byte?)3, (byte?)0), state.GetSlot(0));
+        Assert.True(state.SlotIsEmpty(1));
     }
 
     [Fact]

@@ -2,7 +2,6 @@ using Fenrir.Application.Game.Domain.World.ZoneWar;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>Covers <see cref="RegularWarRewardCalculator" />'s per-participant grant computation.</summary>
 public class RegularWarRewardCalculatorTests
 {
     private static RegularWarMapConfig OrdinaryMap()
@@ -95,10 +94,10 @@ public class RegularWarRewardCalculatorTests
         Assert.True(winnerGrant.RequestItemDrop);
 
         Assert.False(loserGrant.IsWinningSide);
-        Assert.Equal(5, loserGrant.MoneyAmount); // 11 / 2, integer division -- remainder lost
-        Assert.Equal(3, loserGrant.ExperienceAmount); // 7 / 2
+        Assert.Equal(5, loserGrant.MoneyAmount);
+        Assert.Equal(3, loserGrant.ExperienceAmount);
         Assert.Equal(RegularWarRewardCalculator.LosingOrDrawHeroRankPoints, loserGrant.HeroRankPoints);
-        Assert.True(loserGrant.RequestItemDrop); // non-draw -- both sides get the drop request
+        Assert.True(loserGrant.RequestItemDrop);
     }
 
     [Fact]
@@ -126,7 +125,7 @@ public class RegularWarRewardCalculatorTests
     }
 
     [Theory]
-    [InlineData((short)11, 0, true)] // exactly rebirth tier 11 -- qualifies
+    [InlineData((short)11, 0, true)]
     [InlineData((short)10, 0, false)]
     [InlineData((short)12, 0, false)]
     public void Server120_CpBonus_RestrictedToExactlyRebirthTierEleven(short rebirthTier, int rebirthCount,
@@ -153,7 +152,7 @@ public class RegularWarRewardCalculatorTests
             null, Server164(), [loser], [], new FakeRewardValueProvider(1000, 100));
 
         var grant = Assert.Single(grants);
-        Assert.Equal(shouldQualify ? 50 : 0, grant.CpBonusAmount); // losing-side amount is 50
+        Assert.Equal(shouldQualify ? 50 : 0, grant.CpBonusAmount);
     }
 
     [Fact]
@@ -179,8 +178,8 @@ public class RegularWarRewardCalculatorTests
 
         var loserGrant = grants.Single(g => g.CharacterId == 2);
         Assert.False(loserGrant.IsWinningSide);
-        Assert.Equal(100, loserGrant.LeaderboardCpAmount); // rank 1 leaderboard CP, despite being on the losing side
-        Assert.Equal(500, loserGrant.MoneyAmount); // still the ordinary losing-side halved amount
+        Assert.Equal(100, loserGrant.LeaderboardCpAmount);
+        Assert.Equal(500, loserGrant.MoneyAmount);
     }
 
     [Fact]

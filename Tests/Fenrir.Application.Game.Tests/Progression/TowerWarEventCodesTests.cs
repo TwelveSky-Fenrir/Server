@@ -2,22 +2,17 @@ using Fenrir.Application.Game.Domain.Progression;
 
 namespace Fenrir.Application.Game.Tests.Progression;
 
-/// <summary>
-///     A11 -- the 751-774 tournament/tower-war zone-to-center event-sort band. In the shipped legacy build every
-///     one of these codes is recognized-but-inert on the hub, so this reference table's only job is to let a future
-///     center-side ingestor recognize the whole band without a numeric literal at its call site.
-/// </summary>
 public class TowerWarEventCodesTests
 {
     [Theory]
-    [InlineData(751)] // Proving Grounds new win (band start)
-    [InlineData(752)] // tower state
-    [InlineData(753)] // tower attack state
-    [InlineData(754)] // tower first hit
-    [InlineData(755)] // countdown
-    [InlineData(763)] // zone-319 war band end
-    [InlineData(771)] // Proving Grounds result band start
-    [InlineData(774)] // Proving Grounds result band end
+    [InlineData(751)]
+    [InlineData(752)]
+    [InlineData(753)]
+    [InlineData(754)]
+    [InlineData(755)]
+    [InlineData(763)]
+    [InlineData(771)]
+    [InlineData(774)]
     public void EveryCodeInTheBand_IsRecognizedInert(int code)
     {
         Assert.True(TowerWarEventCodes.IsRecognizedInert(code));
@@ -26,9 +21,9 @@ public class TowerWarEventCodesTests
 
     [Theory]
     [InlineData(0)]
-    [InlineData(750)] // just below the band
-    [InlineData(775)] // just above the band
-    [InlineData(120)] // an unrelated live opcode
+    [InlineData(750)]
+    [InlineData(775)]
+    [InlineData(120)]
     public void CodesOutsideTheBand_AreNotRecognized(int code)
     {
         Assert.False(TowerWarEventCodes.IsRecognizedInert(code));

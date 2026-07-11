@@ -49,8 +49,6 @@ public class PetSlotAmuletBonusTableTests
     [Fact]
     public void GetBaseBonus_WrongSortCode_ReturnsZeroEvenIfIdMatchesTable()
     {
-        // 76005 numerically matches a table entry, but this content classifies it as sort 22 (a growable
-        // pet), not sort 28 (INEW_PET) -- the precondition must still zero it out.
         var items = Items((76005, 22));
 
         var (life, mana) = PetSlotAmuletBonusTable.GetBaseBonus(76005, items);
@@ -71,8 +69,6 @@ public class PetSlotAmuletBonusTableTests
     [Fact]
     public void GetBaseBonus_QualifyingIdWithoutConfirmedMagnitude_ReturnsZero()
     {
-        // 2151 is a confirmed *member* of the 59-id set (QualifyingItemIds) but this table does not yet
-        // carry its exact magnitude -- must not fabricate a nonzero value.
         var items = Items((2151, PetSlotAmuletBonusTable.RequiredSortCode));
 
         Assert.Contains(2151, PetSlotAmuletBonusTable.QualifyingItemIds);

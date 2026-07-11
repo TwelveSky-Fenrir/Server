@@ -1,6 +1,5 @@
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
-/// <summary>Faithful in-memory shape of a legacy <c>ITEM_INFO</c> record (Header/Protocol/STRUCT.h:44-93).</summary>
 internal sealed record ItemRecord(
     int Index,
     string Name,

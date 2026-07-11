@@ -7,8 +7,6 @@ using Fenrir.Network.Serialization.Wire.Attributes;
 
 namespace Fenrir.Application.Game.Tests;
 
-// Closes the gap where a missing handler was only discoverable via ZoneFrameDispatcher's runtime
-// "No handler registered" warning on first packet receipt.
 public class OpcodeHandlerCoverageTests
 {
     private static readonly byte[] LegacyNoOpAllowList = [];

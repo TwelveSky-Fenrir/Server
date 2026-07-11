@@ -11,23 +11,15 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Quests;
 
-/// <summary>
-///     Drives the real <see cref="QuestProgressService" /> Accept (tSort 1) / Complete (tSort 2) through the
-///     NPC-proximity hardening gate (a Fenrir decision, not legacy parity -- see the service's own remarks).
-///     Accept anchors on the accepted (next) step's <c>qStartNPCNumber</c>; Complete anchors on the current
-///     step's <c>qEndNPCNumber</c>; the squared-distance rule and its three fail-open cases live in
-///     <see cref="Fenrir.Application.Game.Domain.World.Npcs.NpcFunctionGate.CheckNpcProximity" />.
-/// </summary>
 public class QuestProgressProximityGateTests
 {
     private const int AccountId = 1;
     private const int CharacterId = 10;
-    private const byte Tribe = 1; // matches ZoneTestKit.EnterData's own default tribe
+    private const byte Tribe = 1;
     private const byte Category = Tribe + 1;
     private const int QuestId = 1;
 
-    /// <summary>The anchor NPC placed at world origin (0,0,0) in zone 1 by <see cref="SetUp" />.</summary>
-    private const int AnchorNpc = 777;
+        private const int AnchorNpc = 777;
 
     private static async Task<QuestActionResult> RunToCompletionAsync(ValueTask<QuestActionResult> pending, Zone zone)
     {
@@ -52,8 +44,6 @@ public class QuestProgressProximityGateTests
             Quests = quests,
             QuestRewards = [],
             QuestSpeeches = [],
-            // A single placement of the anchor NPC at world origin in zone 1. CheckNpcProximity only needs the
-            // placement row (it is keyed on the spawn's NpcId, not on NpcsById), so no Npc row is required.
             ZoneNpcSpawns = [new ZoneNpcSpawnRowDto(1, 0, AnchorNpc, 0f, 0f, 0f, 0f)]
         };
         var (cache, _) = WorldDataCacheBuilder.Build(rows);
@@ -83,8 +73,7 @@ public class QuestProgressProximityGateTests
         state.PosZ = z;
     }
 
-    /// <summary>An in-progress qSort-1 (kill) quest at Step 3, end condition met (KillCounter reaches Solution2 = 1).</summary>
-    private static void MarkKillQuestEndConditionMet(PlayerRuntimeState state, QuestRowDto quest)
+        private static void MarkKillQuestEndConditionMet(PlayerRuntimeState state, QuestRowDto quest)
     {
         state.QuestStepPermanent = quest.Step;
         state.QuestActiveFlag = 1;
@@ -93,8 +82,7 @@ public class QuestProgressProximityGateTests
         state.QuestKillCounter = 1;
     }
 
-    /// <summary>Idle at permanent Step 2, so the next step (3) is acceptable.</summary>
-    private static void MarkIdleAtStep2(PlayerRuntimeState state)
+        private static void MarkIdleAtStep2(PlayerRuntimeState state)
     {
         state.QuestStepPermanent = 2;
         state.QuestActiveFlag = 0;
@@ -112,7 +100,6 @@ public class QuestProgressProximityGateTests
         };
     }
 
-    // --- Complete (tSort 2), anchored on the current step's qEndNPCNumber ---------------------------------
 
     [Fact]
     public async Task Complete_NearEndNpc_Succeeds()
@@ -120,7 +107,7 @@ public class QuestProgressProximityGateTests
         var quest = KillQuestAtStep3(AnchorNpc);
         var (zone, state, characters, _, service) = SetUp(quest);
         MarkKillQuestEndConditionMet(state, quest);
-        PlacePlayer(state, 0, 0, 30); // 30 units from the origin-placed end NPC -> Near
+        PlacePlayer(state, 0, 0, 30);
         var packet = new QuestProgressRequest { Sort = 2, Page1 = -1, Index1 = -1, XPost = 0, YPost = 0 };
 
         var result = await RunToCompletionAsync(
@@ -136,11 +123,10 @@ public class QuestProgressProximityGateTests
         var quest = KillQuestAtStep3(AnchorNpc);
         var (zone, state, characters, eventLog, service) = SetUp(quest);
         MarkKillQuestEndConditionMet(state, quest);
-        PlacePlayer(state, 0, 0, 300); // 300 units from the end NPC -> Far -> gate rejects
+        PlacePlayer(state, 0, 0, 300);
 
         var packet = new QuestProgressRequest { Sort = 2, Page1 = -1, Index1 = -1, XPost = 0, YPost = 0 };
 
-        // The gate rejects synchronously (before any zone-command await), so no ticking is needed.
         var result = await service.CompleteAsync(packet, state, zone, CharacterId, AccountId, CancellationToken.None);
 
         Assert.False(result.Success);
@@ -151,11 +137,10 @@ public class QuestProgressProximityGateTests
     [Fact]
     public async Task Complete_EndNpcNotPlacedOnMap_FailsOpen_Succeeds()
     {
-        // EndNPCNumber 888 is not placed anywhere in the zone (only 777 is) -> NpcNotInZone -> fail-open.
         var quest = KillQuestAtStep3(888);
         var (zone, state, characters, _, service) = SetUp(quest);
         MarkKillQuestEndConditionMet(state, quest);
-        PlacePlayer(state, 0, 0, 300); // deliberately far from everything; the gate still allows it
+        PlacePlayer(state, 0, 0, 300);
 
         var packet = new QuestProgressRequest { Sort = 2, Page1 = -1, Index1 = -1, XPost = 0, YPost = 0 };
 
@@ -169,7 +154,6 @@ public class QuestProgressProximityGateTests
     [Fact]
     public async Task Complete_NoEndNpcConfigured_FailsOpen_Succeeds()
     {
-        // EndNPCNumber 0 == "no anchor NPC" -> the gate cannot apply and allows the action.
         var quest = KillQuestAtStep3(0);
         var (zone, state, characters, _, service) = SetUp(quest);
         MarkKillQuestEndConditionMet(state, quest);
@@ -184,15 +168,14 @@ public class QuestProgressProximityGateTests
         Assert.Single(characters.QuestTransitions);
     }
 
-    // --- Accept (tSort 1), anchored on the accepted (next) step's qStartNPCNumber ------------------------
 
     [Fact]
     public async Task Accept_NearStartNpc_Succeeds()
     {
-        var nextStep = KillQuestAtStep3(AnchorNpc); // StartNPCNumber = AnchorNpc (origin-placed)
+        var nextStep = KillQuestAtStep3(AnchorNpc);
         var (zone, state, characters, _, service) = SetUp(nextStep);
         MarkIdleAtStep2(state);
-        PlacePlayer(state, 30, 0, 0); // 30 units from the origin-placed start NPC -> Near
+        PlacePlayer(state, 30, 0, 0);
         var packet = new QuestProgressRequest { Sort = 1, Page1 = 0, Index1 = 0, XPost = 0, YPost = 0 };
 
         var result = await RunToCompletionAsync(
@@ -208,7 +191,7 @@ public class QuestProgressProximityGateTests
         var nextStep = KillQuestAtStep3(AnchorNpc);
         var (zone, state, characters, _, service) = SetUp(nextStep);
         MarkIdleAtStep2(state);
-        PlacePlayer(state, 300, 0, 0); // 300 units from the start NPC -> Far -> gate rejects
+        PlacePlayer(state, 300, 0, 0);
 
         var packet = new QuestProgressRequest { Sort = 1, Page1 = 0, Index1 = 0, XPost = 0, YPost = 0 };
 

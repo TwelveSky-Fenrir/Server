@@ -8,14 +8,6 @@ using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Tests.Combat;
 
-/// <summary>
-///     Covers the B15 (wave15 contract) PvM tribe-symbol malus term in
-///     <see cref="MonsterCombatResolver.ResolvePvmAttack" /> -- the previously-built, previously-unconsumed
-///     <see cref="TribeSymbolCombatModifiers.GetDamageDownPenalty" /> is now actually applied to damage here,
-///     gated on the attacker's own level strictly exceeding <see cref="MonsterCombatResolver.MalusMinimumAttackerLevel" />,
-///     positioned after the elemental-damage term. This is a pure resolver-level test (no <c>Zone</c>); the
-///     end-to-end wiring through <c>Zone.Combat.cs</c> is covered separately.
-/// </summary>
 public class MonsterCombatResolverTribeSymbolMalusTests
 {
     private const int AttackerAttackPower = 1000;
@@ -35,9 +27,6 @@ public class MonsterCombatResolverTribeSymbolMalusTests
 
     private static CombatantSnapshot Attacker(short level)
     {
-        // MaxLife, MaxMana, AttackPower, DefensePower, AttackSuccess, AttackBlock, Critical, CriticalDefence,
-        // Luck, ElementAttackPower, ElementDefensePower -- Critical=0 so RollCritical never even draws from
-        // the rng (CombatMath.RollCritical short-circuits on a non-positive chance).
         var stats = new EffectiveStats(1000, 0, AttackerAttackPower, 0, 100, 0, 0, 0, 0, 0, 0);
         return new CombatantSnapshot(10, 0, false, 1000, 1000, 0f, 0f, 0f, null, stats, 0, level);
     }
@@ -52,7 +41,7 @@ public class MonsterCombatResolverTribeSymbolMalusTests
             ServerIndex2 = monster.ServerIndex,
             UniqueNumber2 = monster.UniqueNumber,
             SenderLocation = [0, 0, 0],
-            AttackActionValue1 = 1, // melee -- no skill echo sub-check
+            AttackActionValue1 = 1,
             AttackActionValue2 = 0,
             AttackActionValue3 = 0,
             AttackActionValue4 = 0,
@@ -64,9 +53,6 @@ public class MonsterCombatResolverTribeSymbolMalusTests
         };
     }
 
-    // Draw sequence wraps and reduces modulo the requested bound -- a single 0 satisfies both ApplyVariance
-    // draws (add-vs-subtract, then 0% magnitude) with no variance change; Critical=0 above means RollCritical
-    // never draws at all.
     private static ScriptedRandomSource NoVarianceRng()
     {
         return new ScriptedRandomSource(0);
@@ -82,7 +68,6 @@ public class MonsterCombatResolverTribeSymbolMalusTests
             attackerSymbolDamageDownPenalty: TribeSymbolCombatModifiers.OwnSymbolLostDamageDownPenalty);
 
         Assert.True(outcome.Hit);
-        // 1000 base damage - 20% (0.2f) = 800.
         Assert.Equal(800, outcome.DamageApplied);
         Assert.Equal(800, outcome.ViewDamage);
     }
@@ -115,8 +100,6 @@ public class MonsterCombatResolverTribeSymbolMalusTests
     [Fact]
     public void DefaultParameter_OmittedEntirely_BehavesAsUnmalused_ExistingCallersUnaffected()
     {
-        // Every existing positional call site (Zone.Combat.cs before this session, and any test predating this
-        // change) omits the new trailing parameter entirely -- must default to "never malused".
         var monster = Monster();
         var outcome = MonsterCombatResolver.ResolvePvmAttack(Attacker(200), monster, MeleeRequest(monster),
             TimeSpan.Zero, NoVarianceRng(), false, 0, 0);

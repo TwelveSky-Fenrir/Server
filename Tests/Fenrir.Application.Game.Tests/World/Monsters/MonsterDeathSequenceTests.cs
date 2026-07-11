@@ -11,11 +11,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.World.Monsters;
 
-/// <summary>
-///     Covers <see cref="MonsterDeathKnockback" /> (pure knockback-vector formula) and
-///     <see cref="MonsterDeathSequence" /> (the corpse-countdown state transition it feeds) -- behavior contract
-///     <c>wave12/A3-death-sequence.md</c>.
-/// </summary>
 public class MonsterDeathSequenceTests
 {
     private static MonsterEntity CreateEntity(byte damageType = 2, short frameInfo5 = 1)
@@ -24,12 +19,11 @@ public class MonsterDeathSequenceTests
         return MonsterEntity.Create(1, 1u, template, 1, 100f, 0f, 100f, 50f);
     }
 
-    // ---- MonsterDeathKnockback.Compute -------------------------------------------------------------------
 
     [Fact]
     public void Compute_StationaryDamageType_IsAlwaysZero_RegardlessOfDistanceOrCrit()
     {
-        var random = new ScriptedRandomSource(2); // would otherwise land on the 4x-magnitude bucket
+        var random = new ScriptedRandomSource(2);
 
         var nonCritical = MonsterDeathKnockback.Compute(0, 0, 500, 500,
             MonsterDeathKnockback.StationaryDamageType, false, random);
@@ -45,7 +39,6 @@ public class MonsterDeathSequenceTests
     {
         var random = new ScriptedRandomSource(2);
 
-        // Exactly at the threshold and strictly inside it both collapse to zero.
         var atThreshold = MonsterDeathKnockback.Compute(0, 0, MonsterDeathKnockback.PointBlankDistanceThreshold, 0,
             2, false, random);
         var wellInside = MonsterDeathKnockback.Compute(0, 0, 0.1f, 0, 2, false, random);
@@ -57,12 +50,10 @@ public class MonsterDeathSequenceTests
     [Fact]
     public void Compute_Direction_PointsAwayFromKiller_TowardMonster()
     {
-        var random = new ScriptedRandomSource(0); // short magnitude -> easy to check pure direction
+        var random = new ScriptedRandomSource(0);
 
-        // Killer at (0,0), monster at (3,4).
         var knockback = MonsterDeathKnockback.Compute(0, 0, 3, 4, 2, false, random);
 
-        // Unit vector of (3,4) is (0.6, 0.8); short magnitude is 1, so the vector itself IS the unit direction.
         Assert.Equal(0.6f, knockback.X, 3);
         Assert.Equal(0.8f, knockback.Z, 3);
     }
@@ -70,7 +61,7 @@ public class MonsterDeathSequenceTests
     [Fact]
     public void Compute_CriticalHit_IsAlwaysShort_AndConsumesNoRandomDraw()
     {
-        var random = new CountingRandomSource(0); // 0 would map to "short" anyway -- the point is draws == 0
+        var random = new CountingRandomSource(0);
 
         var knockback = MonsterDeathKnockback.Compute(0, 0, 10, 0, 2, true, random);
 
@@ -94,7 +85,6 @@ public class MonsterDeathSequenceTests
         Assert.Equal(0f, knockback.Z, 3);
     }
 
-    // ---- MonsterDeathSequence.BeginCorpseCountdown -------------------------------------------------------
 
     [Fact]
     public void BeginCorpseCountdown_TransitionsToDead_AndResetsStateTicks()
@@ -112,8 +102,6 @@ public class MonsterDeathSequenceTests
     [Fact]
     public void BeginCorpseCountdown_StoresKnockbackVectorIntoRepurposedTargetLocation_YForcedFlat()
     {
-        // Monster spawned at (100, 0, 100); killer at (90, 100) -> away-from-killer direction is +X, magnitude 1
-        // (ScriptedRandomSource(0) lands on the short bucket).
         var monster = CreateEntity();
 
         var knockback = MonsterDeathSequence.BeginCorpseCountdown(monster, 90f, 100f, false,
@@ -121,7 +109,7 @@ public class MonsterDeathSequenceTests
 
         Assert.Equal(knockback.X, monster.TargetLocationX);
         Assert.Equal(knockback.Z, monster.TargetLocationZ);
-        Assert.Equal(0f, monster.TargetLocationY); // vertical explicitly forced flat, never an absolute world point
+        Assert.Equal(0f, monster.TargetLocationY);
         Assert.Equal(1f, monster.TargetLocationX, 3);
         Assert.Equal(0f, monster.TargetLocationZ, 3);
     }
@@ -129,7 +117,7 @@ public class MonsterDeathSequenceTests
     [Fact]
     public void BeginCorpseCountdown_FacesTheCorpseTowardItsKiller()
     {
-        var monster = CreateEntity(); // at (100, _, 100)
+        var monster = CreateEntity();
 
         MonsterDeathSequence.BeginCorpseCountdown(monster, 90f, 100f, false, new ScriptedRandomSource(0));
 
@@ -143,14 +131,13 @@ public class MonsterDeathSequenceTests
         var monster = CreateEntity();
 
         var returned = MonsterDeathSequence.BeginCorpseCountdown(monster, 90f, 100f, false,
-            new ScriptedRandomSource(2)); // long-A bucket
+            new ScriptedRandomSource(2));
 
         Assert.Equal(MonsterDeathKnockback.LongMagnitudeA, returned.X, 3);
         Assert.Equal(returned.X, monster.TargetLocationX);
         Assert.Equal(returned.Z, monster.TargetLocationZ);
     }
 
-    // ---- MonsterDeathSequence.IsCorpseCountdownComplete --------------------------------------------------
 
     [Fact]
     public void IsCorpseCountdownComplete_FalseBeforeThreshold_TrueAtOrAfter()
@@ -173,9 +160,6 @@ public class MonsterDeathSequenceTests
     [Fact]
     public void IsCorpseCountdownComplete_DegenerateThreshold_FloorsToOneTick()
     {
-        // Same Math.Max(1, ...) defensive floor MonsterAiSystem.Update already applies to every other
-        // windup-timed state (FrameInfo1/2/3/4/6) -- a 0-or-negative catalog value resolves in a single tick,
-        // never an infinite/zero-length windup.
         var monster = CreateEntity(frameInfo5: 0);
 
         monster.StateTicks = 0;
@@ -185,15 +169,8 @@ public class MonsterDeathSequenceTests
         Assert.True(MonsterDeathSequence.IsCorpseCountdownComplete(monster));
     }
 
-    // ---- End-to-end production wiring: Zone.ApplyPvmAttack -> MonsterDeathSequence.BeginCorpseCountdown --
 
-    /// <summary>
-    ///     Regression for the <c>Zone.Combat.cs</c> <c>ApplyPvmAttack</c> wiring: a real killing PvM blow must
-    ///     apply the knockback/facing transition to the SAME <see cref="MonsterEntity" /> instance the
-    ///     death-broadcast pipeline later reads, using the killer's own just-received attack-packet position
-    ///     (not a stale/zero one) and the resolved (non-)critical flag.
-    /// </summary>
-    [Fact]
+        [Fact]
     public void ApplyPvmAttack_KillingBlow_AppliesKnockbackAndFacing_UsingTheAttackersOwnSenderLocation()
     {
         var monsterTemplate = WorldDataTestRows.Monster(901) with
@@ -214,28 +191,27 @@ public class MonsterDeathSequenceTests
             LocationX = 100,
             LocationY = 0,
             LocationZ = 100,
-            Radius = 0 // scatter collapses to exactly (100, 0, 100) -- see MonsterSpawnScheduler.Spawn
+            Radius = 0
         };
         var rows = WorldDataTestRows.MinimalRows() with { Monsters = [monsterTemplate], MonsterSpawnRegions = [region] };
         var cache = WorldDataCacheBuilder.Build(rows).Cache;
 
         var scheduler = new MonsterSpawnScheduler(cache);
         var zone = ZoneTestKit.CreateZone(1, simulationSystems: [scheduler], worldData: cache,
-            randomSource: new ScriptedRandomSource(0)); // always-hit, no-crit, short-knockback-bucket
+            randomSource: new ScriptedRandomSource(0));
 
         var (session, _) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Attacker")));
-        zone.Tick(SimulationClock.LegacyTick); // enters + pops the monster
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.True(zone.TryGetMonster(1, out var monster));
-        monster!.AiState = MonsterAiState.Decision; // skip spawn-windup, same convention as ZoneMonsterCombatTests
+        monster!.AiState = MonsterAiState.Decision;
 
         Assert.True(zone.TryGetPlayer(10, out var attacker));
-        attacker!.Stats = new EffectiveStats(1000, 1000, 500, 0, 1000, 0, 0, 0, 0, 0, 0); // Critical = 0 -> never crit
+        attacker!.Stats = new EffectiveStats(1000, 1000, 500, 0, 1000, 0, 0, 0, 0, 0, 0);
         attacker.AttackSubPacketCeiling = int.MaxValue;
-        zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1)); // clear the zone-entry protect window
+        zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1));
 
-        // Killer 10 world units in -X from the monster's (100, 0, 100) spawn point.
         const float killerX = 90f;
         const float killerZ = 100f;
         zone.PostCombatCommand(new CombatCommand
@@ -262,10 +238,8 @@ public class MonsterDeathSequenceTests
         });
         zone.Tick(SimulationClock.LegacyTick);
 
-        Assert.Equal(0, zone.MonsterCount); // the blow was lethal -- monster already removed from the live pool
+        Assert.Equal(0, zone.MonsterCount);
 
-        // Still the SAME MonsterEntity instance (TryDamageMonster removes it from the dictionary, not the
-        // object) -- its fields already carry whatever ApplyPvmAttack applied before the death broadcast fired.
         Assert.Equal(MonsterAiState.Dead, monster.AiState);
         Assert.Equal(0, monster.StateTicks);
 
@@ -279,8 +253,7 @@ public class MonsterDeathSequenceTests
         Assert.Equal(expectedHeading, monster.Heading, 4);
     }
 
-    /// <summary>Counts draws so a caller can assert a critical kill consumes none (contract: "with no randomness involved").</summary>
-    private sealed class CountingRandomSource(int scriptedValue) : IRandomSource
+        private sealed class CountingRandomSource(int scriptedValue) : IRandomSource
     {
         public int DrawCount { get; private set; }
 

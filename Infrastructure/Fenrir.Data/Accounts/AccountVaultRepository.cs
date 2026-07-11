@@ -8,8 +8,6 @@ using Fenrir.Data.Abstractions.Characters;
 
 namespace Fenrir.Data.Accounts;
 
-// game.AccountVault/AccountVaultItems access -- the account-scoped "Save"/bank vault (legacy
-// masterinfo.uSaveMoney/uSaveItem).
 public sealed record AccountVaultRepository(ICaeriusNetDbContext Db) : IAccountVaultRepository
 {
     public async ValueTask<(AccountVaultBalanceDto? Balance, IReadOnlyList<AccountVaultItemSlotDto> Items)>

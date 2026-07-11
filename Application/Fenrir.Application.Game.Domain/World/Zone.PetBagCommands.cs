@@ -4,23 +4,12 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.World;
 
-/// <summary>
-///     Already-validated-and-SQL-durable self-mutation mirror for the CZ_PROCESS_DATA_SEND pet-bag family
-///     (tSort 254 deposit, 255 withdraw, 256 rearrange) -- posted by
-///     <c>Fenrir.Application.Game.Services.Inventory.PetBagActionService</c> after
-///     <c>Fenrir.Application.Game.Domain.Inventory.PetBagItemTransferPolicy</c> decided the move. See
-///     <see cref="PetBagZoneCommand" />'s own remarks for the exact shape.
-/// </summary>
 public sealed partial class Zone
 {
-    /// <summary>
-    ///     Bounded capacity for <see cref="_petBagInbox" /> -- also the basis for
-    ///     <see cref="PetBagInboxDrainCapPerTick" />.
-    /// </summary>
-    private const int PetBagInboxCapacity = 256;
 
-    /// <summary>Per-tick drain cap for <see cref="_petBagInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own remarks.</summary>
-    private const int PetBagInboxDrainCapPerTick = PetBagInboxCapacity / 2;
+        private const int PetBagInboxCapacity = 256;
+
+        private const int PetBagInboxDrainCapPerTick = PetBagInboxCapacity / 2;
 
     private readonly Channel<PetBagZoneCommand> _petBagInbox =
         Channel.CreateBounded<PetBagZoneCommand>(
@@ -32,11 +21,7 @@ public sealed partial class Zone
         return _petBagInbox.Writer.TryWrite(command);
     }
 
-    /// <summary>
-    ///     Same contract as <c>Zone.PostInventoryCommandAndWaitAsync</c> (<c>Zone.EconomyMirrors.cs</c>) --
-    ///     callers must already hold <see cref="PlayerRuntimeState.EconomyActionLock" />.
-    /// </summary>
-    public async Task<bool> PostPetBagCommandAndWaitAsync(PetBagZoneCommand command, CancellationToken ct,
+        public async Task<bool> PostPetBagCommandAndWaitAsync(PetBagZoneCommand command, CancellationToken ct,
         TimeSpan? timeout = null)
     {
         var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -79,8 +64,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_petBagInbox.Reader, "pet-bag", PetBagInboxDrainCapPerTick);
     }
 
-    /// <summary>Same posture as <see cref="ApplyInventoryCommand" />.</summary>
-    private void ApplyPetBagCommand(in PetBagZoneCommand command)
+        private void ApplyPetBagCommand(in PetBagZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;

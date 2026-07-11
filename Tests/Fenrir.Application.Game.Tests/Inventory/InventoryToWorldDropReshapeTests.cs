@@ -3,22 +3,16 @@ using Fenrir.Application.Game.Domain.World.Loot;
 
 namespace Fenrir.Application.Game.Tests.Inventory;
 
-/// <summary>
-///     Coverage for <see cref="InventoryToWorldDropPolicy.ReshapeGroundDrop" />, the C14 port of the shared
-///     <c>MyUtil::ProcessForDropItem</c> per-item-<c>Sort</c> value/quantity reshape (money / stackable /
-///     mounts-pets-wings / equipment IS-IU carry / pat / pass-through / reject). Pure function, no Zone.
-/// </summary>
 public class InventoryToWorldDropReshapeTests
 {
-    private const int MonsterDrop = GroundItemEntity.MonsterKillDropSort; // 1
-    private const int InventoryDrop = GroundItemEntity.ManualGroundDropSort; // 2
-    private const int GmDrop = GroundItemEntity.GmCreateItemDropSort; // 13
+    private const int MonsterDrop = GroundItemEntity.MonsterKillDropSort;
+    private const int InventoryDrop = GroundItemEntity.ManualGroundDropSort;
+    private const int GmDrop = GroundItemEntity.GmCreateItemDropSort;
 
     private const byte MoneySort = 1;
     private const byte StackableSort = 2;
     private const byte MaterialSort999 = 99;
 
-    // ---- Money (sort 1) ----
 
     [Fact]
     public void Money_NonMonsterDrop_DiscardsValue_KeepsQuantity_NoDeposit()
@@ -37,15 +31,14 @@ public class InventoryToWorldDropReshapeTests
         var r = InventoryToWorldDropPolicy.ReshapeGroundDrop(MoneySort, MonsterDrop, 1000, 0);
 
         Assert.True(r.Reshaped);
-        Assert.Equal(850, r.Quantity); // 1000 - 15%
+        Assert.Equal(850, r.Quantity);
         Assert.Equal(0, r.Value);
-        Assert.Equal(850, r.TribeBankDepositAmount); // deposit input = post-15% amount, pre-tower
+        Assert.Equal(850, r.TribeBankDepositAmount);
     }
 
     [Fact]
     public void Money_MonsterDrop_TowerSilverRatio_AddsBackOntoGround_ButNotOntoDeposit()
     {
-        // 1000 -> 850 (reduced) -> deposit 850 -> +10% tower add-back -> ground 935.
         var r = InventoryToWorldDropPolicy.ReshapeGroundDrop(MoneySort, MonsterDrop, 1000, 0, 0.10f);
 
         Assert.True(r.Reshaped);
@@ -80,7 +73,6 @@ public class InventoryToWorldDropReshapeTests
         Assert.Equal(InventoryToWorldDropPolicy.GroundDropReshapeOutcome.RejectedQuantityRange, r.Outcome);
     }
 
-    // ---- Stackable / material (sorts 2 and 99) ----
 
     [Theory]
     [InlineData(StackableSort)]
@@ -107,7 +99,7 @@ public class InventoryToWorldDropReshapeTests
     {
         var r = InventoryToWorldDropPolicy.ReshapeGroundDrop(StackableSort, GmDrop, 0, 0);
 
-        Assert.Equal(GroundItemPickupPolicy.MaxStackQuantity, r.Quantity); // 999
+        Assert.Equal(GroundItemPickupPolicy.MaxStackQuantity, r.Quantity);
     }
 
     [Theory]
@@ -120,7 +112,6 @@ public class InventoryToWorldDropReshapeTests
         Assert.Equal(InventoryToWorldDropPolicy.GroundDropReshapeOutcome.RejectedQuantityRange, r.Outcome);
     }
 
-    // ---- Pets / mounts / wings (sorts 3-6) ----
 
     [Theory]
     [InlineData((byte)3)]
@@ -136,7 +127,6 @@ public class InventoryToWorldDropReshapeTests
         Assert.Equal(0, r.Value);
     }
 
-    // ---- Equipment (sorts 7-21) ----
 
     [Theory]
     [InlineData((byte)7)]
@@ -158,7 +148,6 @@ public class InventoryToWorldDropReshapeTests
         Assert.Equal(2, socket);
     }
 
-    // ---- Companion / pat activity (sort 22) ----
 
     [Fact]
     public void Pat_ValidValue_PassesQuantityAndValueThrough()
@@ -178,7 +167,6 @@ public class InventoryToWorldDropReshapeTests
         Assert.Equal(InventoryToWorldDropPolicy.GroundDropReshapeOutcome.RejectedPackedValueRange, r.Outcome);
     }
 
-    // ---- Pass-through (sorts 23-33) ----
 
     [Theory]
     [InlineData((byte)23)]
@@ -193,7 +181,6 @@ public class InventoryToWorldDropReshapeTests
         Assert.Equal(4242, r.Value);
     }
 
-    // ---- Unhandled sorts ----
 
     [Theory]
     [InlineData((byte)0)]

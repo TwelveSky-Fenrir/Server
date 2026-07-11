@@ -10,14 +10,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Commerce;
 
-/// <summary>
-///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:134-152 (<c>CheckInv0</c>) -- the destination-slot gate
-///     (see <see cref="ResolveAndApplyAsync" />) also disconnects when the destination page is the
-///     account's premium/rental inventory page (<see cref="ContainerMatrix.InventoryPage1" />) and that
-///     page's <c>InventoryDate</c> expiry has already passed, same "hard disconnect, no soft reject"
-///     posture as BuyCashItem's own destination-slot gate
-///     (<see cref="Fenrir.Application.Game.Services.Commerce.BuyCashItemService" />).
-/// </summary>
 public sealed class BuyBloodMarkItemService(
     ICharacterRepository characters,
     WorldDataCache worldData,
@@ -127,7 +119,6 @@ public sealed class BuyBloodMarkItemService(
             }
         }
 
-        // Blood-mark items never carry sockets.
         var finalQuantity = mergesIntoExisting ? destination!.Value.Quantity + entry.Quantity : entry.Quantity;
         var newStack = new ItemStack(entry.ItemId, finalQuantity, 0, 0, 0, 0, 0, 0, 0, 0, 0);
         var projectedContainer = state.Inventory.GetContainer((byte)page).SetItem((byte)slot, newStack);

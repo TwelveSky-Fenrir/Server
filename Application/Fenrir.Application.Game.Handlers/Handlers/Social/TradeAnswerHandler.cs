@@ -7,7 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>CZ_TRADE_ANSWER_SEND (opcode 49) -- on accept, both sides may send CZ_TRADE_START_SEND (symmetric).</summary>
 public sealed class TradeAnswerHandler(
     ZoneRegistry zones,
     ITradeAnswerService tradeAnswerService,

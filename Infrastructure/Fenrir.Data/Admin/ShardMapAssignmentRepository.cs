@@ -6,7 +6,6 @@ using Fenrir.Data.Abstractions.Admin;
 
 namespace Fenrir.Data.Admin;
 
-// DB-backed replacement for the Game:Maps config list; GameServer resolves hosted maps here at boot, before ZoneRegistry.Initialize builds one Zone actor per map id.
 public sealed record ShardMapAssignmentRepository(ICaeriusNetDbContext Db) : IShardMapAssignmentRepository
 {
     public async ValueTask<IReadOnlyList<short>> GetHostedMapsAsync(byte shardId, CancellationToken ct)
@@ -19,8 +18,6 @@ public sealed record ShardMapAssignmentRepository(ICaeriusNetDbContext Db) : ISh
         return rows.Select(row => row.MapId).ToArray();
     }
 
-    // Liveness-independent: no @ShardId parameter, returns every row in the table. See ShardPartitionGuard
-    // for why a boot-time overlap check needs this in addition to the per-shard lookup above.
     public async ValueTask<IReadOnlyList<ShardMapAssignmentDto>> GetAllAssignmentsAsync(CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("admin", "usp_ShardMapAssignment_GetAll").Build();

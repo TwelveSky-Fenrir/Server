@@ -5,9 +5,9 @@ namespace Fenrir.Application.Game.Tests.Social;
 public class GuildRoleCodecTests
 {
     [Theory]
-    [InlineData(0, 2)] // DB member -> wire member
-    [InlineData(1, 1)] // sub-master unchanged
-    [InlineData(2, 0)] // DB master -> wire master
+    [InlineData(0, 2)]
+    [InlineData(1, 1)]
+    [InlineData(2, 0)]
     public void DbRoleToWire_MapsExactly(byte dbRole, int expectedWire)
     {
         Assert.Equal(expectedWire, GuildRoleCodec.DbRoleToWire(dbRole));

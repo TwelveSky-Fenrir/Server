@@ -8,13 +8,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Social;
 
-/// <summary>
-///     Covers <see cref="DuelAskHandler" />'s dispatch on <see cref="DuelAskResultKind" />, in particular the
-///     forced-disconnect edge case for <see cref="DuelAskResultKind.ChallengerAlreadyDueling" /> -- a desynced
-///     is-dueling flag on the requester's own side is not answered as an ordinary "busy" rejection like
-///     <see cref="DuelAskResultKind.ChallengerBusy" />/<see cref="DuelAskResultKind.TargetBusy" />, it tears
-///     down the requester's own session instead (Server/ts25zone/S04_MyWork02.cpp:8259-8263).
-/// </summary>
 public class DuelAskHandlerTests
 {
     private static (DuelAskHandler Handler, ZoneClientSession Session, FakeDuplexPipe Pipe) CreateHandler(
@@ -42,7 +35,7 @@ public class DuelAskHandlerTests
             CancellationToken.None);
 
         Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);
-        Assert.Empty(ZoneTestKit.DrainOutbound(pipe)); // no ZC_DUEL_ANSWER_RECV -- the session is just torn down
+        Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
     }
 
     [Fact]

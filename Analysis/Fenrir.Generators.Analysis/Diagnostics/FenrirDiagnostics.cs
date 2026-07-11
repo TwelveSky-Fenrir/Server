@@ -2,10 +2,8 @@ using Microsoft.CodeAnalysis;
 
 namespace Fenrir.Generators.Analysis.Diagnostics;
 
-// RS2008 requires AnalyzerReleases.Shipped/Unshipped.md tracking; not applicable, this isn't a shipped NuGet analyzer.
 #pragma warning disable RS2008
 
-/// <summary>Catalog of <c>FEN0xx</c> diagnostics for the legacy protocol generator.</summary>
 internal static class FenrirDiagnostics
 {
     private const string Category = "Fenrir.Protocol";

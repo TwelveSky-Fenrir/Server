@@ -15,17 +15,11 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Tribes;
 
-/// <summary>
-///     Drives the real <see cref="TribeMigrationService" /> over a real <see cref="Zone" />; ticks the zone
-///     while the service's own <c>PostTribeProgressCommandAndWaitAsync</c> await is pending, same pattern as
-///     <c>CraftLegendaryPetServiceTests</c>.
-/// </summary>
 public class TribeMigrationServiceTests
 {
     private const int CharacterId = 500;
 
-    /// <summary>Saturday 2024-01-06, 17:00 UTC -- deterministic "always within the conversion window" instant.</summary>
-    private static readonly TimeProvider SaturdayWithinWindow =
+        private static readonly TimeProvider SaturdayWithinWindow =
         new FixedTimeProvider(new DateTimeOffset(2024, 1, 6, 17, 0, 0, TimeSpan.Zero));
 
     private static async Task<T> RunToCompletionAsync<T>(ValueTask<T> pending, Zone zone)
@@ -102,8 +96,6 @@ public class TribeMigrationServiceTests
         state.QuestTargetPhase = 3;
         state.QuestKillCounter = 4;
 
-        // Snapshot of everything this behavior must never touch, per the contract's own "no item/money/stat
-        // point/level/equipment/skill" invariant.
         state.Experience = 12_345;
         state.StatPoints = 9;
         state.Level = 200;
@@ -129,7 +121,6 @@ public class TribeMigrationServiceTests
         Assert.Equal((CharacterId, (byte)3, 0, 0, 0, 0, 0), persisted);
         Assert.Equal(1, quota.ConsumeCallCount);
 
-        // Nothing else moved.
         Assert.Equal(experience, state.Experience);
         Assert.Equal(statPoints, state.StatPoints);
         Assert.Equal(level, state.Level);
@@ -157,7 +148,7 @@ public class TribeMigrationServiceTests
 
         Assert.Equal(TribeMigrationOutcome.Success, outcome);
         Assert.Equal((byte)1, state.Tribe);
-        Assert.Equal(2, state.QuestStepPermanent); // terminal step, not reset to 0
+        Assert.Equal(2, state.QuestStepPermanent);
         Assert.Equal(0, state.QuestActiveFlag);
         Assert.Equal(0, state.TribeFourReturnAllowance);
 
@@ -185,9 +176,6 @@ public class TribeMigrationServiceTests
     [Fact]
     public async Task ConvertAsync_IneligibleCharacter_NeverConsumesTheSharedQuota()
     {
-        // Hardening-order proof: the shared quota must only ever be spent once every character-specific gate
-        // has already passed -- an otherwise-ineligible attempt (level too low here) must leave the quota
-        // completely untouched, unlike the legacy's own quota-first bug.
         var options = new GameServerOptions { TribeFourConversionEnabled = true };
         var (zone, state, worldState) = SetUp(options, WithTribePoints(200, 50, 100, 0), 0, 1);
         var characters = new FakeCharacterRepository();
@@ -220,8 +208,7 @@ public class TribeMigrationServiceTests
         Assert.Empty(characters.TribeFourConversions);
     }
 
-    /// <summary>A deterministic <see cref="TimeProvider" /> whose "local" time is always the supplied UTC instant.</summary>
-    private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
+        private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
     {
         public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
 

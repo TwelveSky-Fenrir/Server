@@ -6,36 +6,15 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.Inventory.UseItems;
 
-/// <summary>
-///     op23 item 1048 (a dungeon-access key, distinct from Taiyan Key/1049) -- adds a fixed 1 to the
-///     character's own <see cref="PlayerRuntimeState.DungeonKeyTime" /> counter, ceiling-checked via
-///     <see cref="DungeonAccessTicketResolver" />, then consumes exactly one unit.
-/// </summary>
-/// <remarks>
-///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3696-3726 (item 1048 branch: the fixed +1 amount, the
-///     before/after log, the single-unit consume). Every rejection collapses to a clean Result=1 reply rather
-///     than a disconnect, same op23 simplification as this file's sibling handlers.
-///     <para>
-///         KNOWN, DELIBERATE GAP -- no level precondition is enforced, for the same reason
-///         <see cref="EliteDungeonTicketUseItemHandler" />'s own remarks document (the originating contract
-///         states a per-item level threshold exists for this id but does not supply its concrete value).
-///         Flagged in this workstream's openQuestions.
-///     </para>
-/// </remarks>
 public sealed class DungeonKeyUseItemHandler(
     UseItemInventoryWriter inventoryWriter,
     IEventLogRepository eventLog,
     ILogger<DungeonKeyUseItemHandler> logger) : IUseItemHandler
 {
-    /// <summary>world.Items 1048.</summary>
-    public const int ItemId = DungeonAccessTicketResolver.DungeonKeyItemId;
 
-    /// <summary>
-    ///     game.EventLog.EventCode for a Dungeon-Key counter grant -- scoped within
-    ///     <see cref="EventLogCategory.ItemUse" />, distinct from
-    ///     <see cref="EliteDungeonTicketUseItemHandler" />'s own 30 in the same category.
-    /// </summary>
-    private const short DungeonKeyGrantEventCode = 31;
+        public const int ItemId = DungeonAccessTicketResolver.DungeonKeyItemId;
+
+        private const short DungeonKeyGrantEventCode = 31;
 
     private const byte SuccessOutcome = 1;
 

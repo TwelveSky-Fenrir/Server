@@ -3,19 +3,15 @@ using Fenrir.Application.Game.Domain.Inventory;
 
 namespace Fenrir.Application.Game.Tests.Inventory;
 
-/// <summary>
-///     Bounds and move-mechanics coverage for <see cref="ContainerMatrix" />, the pure policy consumed by
-///     <c>GenericActionHandler</c>.
-/// </summary>
 public class ContainerMatrixTests
 {
     [Theory]
-    [InlineData(208)] // inventory<->inventory -- implemented
-    [InlineData(210)] // inventory->equipment -- implemented
-    [InlineData(213)] // equipment->inventory -- implemented
-    [InlineData(201)] // pickup -- known, not a container move, not implemented here
-    [InlineData(501)] // GM command -- known, not implemented
-    [InlineData(223)] // inventory<->store -- known container-move family, not implemented yet
+    [InlineData(208)]
+    [InlineData(210)]
+    [InlineData(213)]
+    [InlineData(201)]
+    [InlineData(501)]
+    [InlineData(223)]
     public void IsKnownSort_EveryLegacyFamilyMember_ReturnsTrue(int sort)
     {
         Assert.True(ContainerMatrix.IsKnownSort(sort));
@@ -40,9 +36,9 @@ public class ContainerMatrixTests
     }
 
     [Theory]
-    [InlineData(201)] // known, but not a container move at all
-    [InlineData(223)] // known container move, but Store is out of this pass's scope
-    [InlineData(211)] // known container move, but hotkey-assign is out of this pass's scope
+    [InlineData(201)]
+    [InlineData(223)]
+    [InlineData(211)]
     public void IsImplementedContainerMoveSort_KnownButOutOfScope_ReturnsFalse(int sort)
     {
         Assert.False(ContainerMatrix.IsImplementedContainerMoveSort(sort));
@@ -58,7 +54,7 @@ public class ContainerMatrixTests
     [InlineData(ContainerMatrix.Equipment, 13, false)]
     [InlineData(ContainerMatrix.StorePage0, 27, true)]
     [InlineData(ContainerMatrix.StorePage0, 28, false)]
-    [InlineData((byte)99, 0, false)] // unknown container id
+    [InlineData((byte)99, 0, false)]
     public void IsValidSlot_RespectsPerContainerBounds(byte container, int slot, bool expected)
     {
         Assert.Equal(expected, ContainerMatrix.IsValidSlot(container, slot));
@@ -84,7 +80,6 @@ public class ContainerMatrixTests
     [Fact]
     public void TryResolveContainers_Sort210_IgnoresPage2_AlwaysTargetsEquipment()
     {
-        // page2 arg is a placeholder -- Equipment has no pages
         var ok = ContainerMatrix.TryResolveContainers(210, ContainerMatrix.InventoryPage1, 0, out var from,
             out var to);
 
@@ -96,7 +91,6 @@ public class ContainerMatrixTests
     [Fact]
     public void TryResolveContainers_Sort213_SourceIsAlwaysEquipment()
     {
-        // page1 arg is a placeholder -- Equipment has no pages
         var ok = ContainerMatrix.TryResolveContainers(213, 0, ContainerMatrix.InventoryPage0, out var from,
             out var to);
 
@@ -142,16 +136,6 @@ public class ContainerMatrixTests
     [Fact]
     public void ResolveMove_EmptyDestination_NonStackableSource_IgnoresPartialQuantityRequest_MovesWholeStack()
     {
-        // Defensive guard: Fenrir's current write paths (GroundItemPickupPolicy, NpcShopPolicy, BuyCashItemService,
-        // BuyBloodMarkItemService, UpdateProxyShopService, PshopPurchasePolicy, StoreItemTransferPolicy,
-        // SaveBankItemTransferPolicy, TradeItemPlacementResolver) all gate Quantity > 1 behind IsStackableSort, so
-        // a non-stackable ItemStack should never legitimately carry Quantity > 1 -- but nothing in the domain type
-        // itself (or the game.CharacterItems CK_CharacterItems_Quantity CHECK, which only bounds 1-999 regardless
-        // of Sort) prevents one from existing. If a non-stackable stack ever did carry Quantity > 1, a
-        // client-requested partial quantity must still be ignored and the whole stack moved as one unit --
-        // matching TradeItemPlacementResolver.ResolveNonStackableTransfer (no quantity parameter at all) and
-        // StoreItemTransferPolicy.ResolveOneWayTransfer's own !sourceIsStackable branch. This guards against
-        // a non-stackable item's quantity being split across two live slots from one unit of durable state.
         var source = Stack(999, 5);
 
         var result = ContainerMatrix.ResolveMove(ContainerMatrix.InventoryPage0, 0, 2,
@@ -193,9 +177,6 @@ public class ContainerMatrixTests
     [Fact]
     public void ResolveMove_DifferentItem_OccupiedDestinationIsRejected_NoSwap()
     {
-        // Legacy's ProcessForInventoryToInventory/ProcessForInventoryToEquip/ProcessForEquipToInventory family
-        // rejects an occupied, non-mergeable destination outright for all 3 directions -- there is no
-        // swap-with-occupant concept anywhere in that family (Server/ts25zone/S04_MyWork05.cpp:875-880).
         var source = Stack(10);
         var destination = Stack(20);
 
@@ -211,12 +192,6 @@ public class ContainerMatrixTests
     [Fact]
     public void ResolveMove_SameItemIdButNotStackable_OccupiedDestinationIsRejected_NoSwap()
     {
-        // sourceIsStackable=false: two enchanted items sharing an ItemId aren't one mergeable pile, so this
-        // must reject exactly like any other occupied-destination case -- not merge, and (the historical bug
-        // this test now guards against) not swap either. Server/ts25zone/S04_MyWork05.cpp:1589-1594 confirms
-        // the equip->inventory (unequip) direction rejects identically; using Equipment as the source
-        // container here is deliberately the same shape as the unequip (tSort 213) direction, where a swap
-        // would otherwise write an arbitrary, unvalidated item straight into the vacated Equipment slot.
         var source = Stack(999, 1, 5);
         var destination = Stack(999, 1, 12);
 

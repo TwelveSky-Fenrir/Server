@@ -8,7 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Admin;
 
-/// <summary>admin.usp_ShardMapAssignment_GetForShard against real SQL Server 2025.</summary>
 [Collection("SqlServer")]
 public class ShardMapAssignmentProcTests
 {
@@ -54,9 +53,6 @@ public class ShardMapAssignmentProcTests
         Assert.Equal([305, 310], maps);
     }
 
-    // gameserver-directory-heartbeat-liveness: GetAllAssignmentsAsync is the liveness-independent read
-    // ShardPartitionGuard needs so a boot-time overlap check does not depend on runtime.GameServerDirectory
-    // heartbeat timing -- see ShardPartitionGuardTests for the guard-level cold-boot scenario this backs.
     [Fact]
     public async Task GetAllAssignments_IncludesEveryShardRegardlessOfLiveness()
     {

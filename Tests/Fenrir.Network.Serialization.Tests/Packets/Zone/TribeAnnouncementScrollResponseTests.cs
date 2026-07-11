@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Zone;
 
-// TribeRole actually carries the sender's tribe NUMBER, not a role.
 public class ZcTribeNotifyRecvTests
 {
     [Fact]

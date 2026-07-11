@@ -14,14 +14,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Covers the forced-resummon wiring <see cref="ZoneEventBroadcaster" /> adds on top of
-///     <see cref="TribeGuardSpawner" />/<see cref="TribeSymbolSpawner" /> (the HSB broadcast relay cases
-///     39/40 and the zone038-conclusion call, see that class's own remarks) -- proves the production entry
-///     points actually reach the spawners, not just the spawners' own direct API. Every test burns through
-///     <see cref="TribeGuardSpawner" />'s own boot-time forced pass first, so the later assertions can only be
-///     explained by the broadcaster's own forced-resummon call, never by boot alone.
-/// </summary>
 public class ZoneEventBroadcasterGuardSymbolTests
 {
     private const byte MainType = 5;
@@ -68,12 +60,11 @@ public class ZoneEventBroadcasterGuardSymbolTests
         var broadcaster = new ZoneEventBroadcaster(worldState, registry, NullLogger<ZoneEventBroadcaster>.Instance,
             guardSpawner);
 
-        // Burn the boot pass first -- no winner recorded yet, so the zone038-winner pool stays a no-op.
         guardSpawner.Simulate(zone, 1);
         Assert.Equal(0, zone.MonsterCount);
 
         broadcaster.AnnounceZone038Winner(1);
-        guardSpawner.Simulate(zone, 1); // consumes the forced flag AnnounceZone038Winner just set
+        guardSpawner.Simulate(zone, 1);
 
         Assert.Equal(1, zone.MonsterCount);
     }
@@ -95,22 +86,20 @@ public class ZoneEventBroadcasterGuardSymbolTests
         var broadcaster = new ZoneEventBroadcaster(worldState, registry, NullLogger<ZoneEventBroadcaster>.Instance,
             guardSpawner);
 
-        // Boot pass unconditionally pops this post (no gate on it) -- kill the guard back off so the later
-        // resummon is the only thing that can bring the count back to 1.
         guardSpawner.Simulate(zone, 1);
         Assert.Equal(1, zone.MonsterCount);
         var serverIndex = zone.MonstersSnapshot.Single().ServerIndex;
         zone.TryDamageMonster(serverIndex, 10_000, null, out _, out _);
         Assert.Equal(0, zone.MonsterCount);
         ZoneTestKit.DrainOutbound(
-            pipe); // discard the kill/death broadcast so the frame below is only the sort-39 announce
+            pipe);
 
         broadcaster.AnnounceTribeSymbolBattleCountdown();
 
         var frame = ZoneTestKit.DrainOutbound(pipe);
         Assert.Equal(39, BinaryPrimitives.ReadInt32LittleEndian(frame.AsSpan(1)));
 
-        guardSpawner.Simulate(zone, 1); // consumes the forced flag -- bypasses the (still cooling) respawn timer
+        guardSpawner.Simulate(zone, 1);
         Assert.Equal(1, zone.MonsterCount);
     }
 
@@ -135,7 +124,6 @@ public class ZoneEventBroadcasterGuardSymbolTests
         var broadcaster = new ZoneEventBroadcaster(worldState, registry, NullLogger<ZoneEventBroadcaster>.Instance,
             guardSpawner, symbolSpawner);
 
-        // Burn the guard's own boot pass and kill it back off, isolating the resummon this test cares about.
         guardSpawner.Simulate(zone, 1);
         var serverIndex = zone.MonstersSnapshot.Single().ServerIndex;
         zone.TryDamageMonster(serverIndex, 10_000, null, out _, out _);
@@ -143,10 +131,9 @@ public class ZoneEventBroadcasterGuardSymbolTests
 
         broadcaster.AnnounceTribeSymbolBattleStarted();
 
-        // The symbol evaluation runs synchronously inside the call itself.
         Assert.Equal(1, zone.MonsterCount);
 
-        guardSpawner.Simulate(zone, 1); // consumes the forced ordinary-pool flag the same call also set
-        Assert.Equal(2, zone.MonsterCount); // the symbol above, plus the now-resummoned guard
+        guardSpawner.Simulate(zone, 1);
+        Assert.Equal(2, zone.MonsterCount);
     }
 }

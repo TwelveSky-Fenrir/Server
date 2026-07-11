@@ -4,10 +4,6 @@ using Fenrir.Application.Game.Tests.TestSupport;
 
 namespace Fenrir.Application.Game.Tests.Simulation;
 
-/// <summary>
-///     Covers <see cref="BuffExpirySystem" />: buff durations count down one per legacy tick, and a slot reaching
-///     zero is fully cleared.
-/// </summary>
 public class BuffExpirySystemTests
 {
     [Fact]
@@ -19,8 +15,8 @@ public class BuffExpirySystemTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.True(zone.TryGetPlayer(10, out var state));
-        state!.Buffs.Buff[0] = 25; // slot 0 value
-        state.Buffs.Buff[1] = 3; // slot 0 duration = 3 legacy ticks
+        state!.Buffs.Buff[0] = 25;
+        state.Buffs.Buff[1] = 3;
 
         zone.Tick(SimulationClock.LegacyTick);
 
@@ -37,8 +33,8 @@ public class BuffExpirySystemTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.True(zone.TryGetPlayer(10, out var state));
-        state!.Buffs.Buff[10 * 2] = 40; // Critical buff slot
-        state.Buffs.Buff[10 * 2 + 1] = 1; // 1 legacy tick left
+        state!.Buffs.Buff[10 * 2] = 40;
+        state.Buffs.Buff[10 * 2 + 1] = 1;
 
         zone.Tick(SimulationClock.LegacyTick);
 
@@ -73,7 +69,6 @@ public class BuffExpirySystemTests
         state!.Buffs.Buff[0] = 10;
         state.Buffs.Buff[1] = 10;
 
-        // 3 whole legacy ticks (1.5s) arrive in a single stalled-host frame.
         zone.Tick(TimeSpan.FromMilliseconds(1500));
 
         Assert.Equal(7, state.Buffs.Buff[1]);

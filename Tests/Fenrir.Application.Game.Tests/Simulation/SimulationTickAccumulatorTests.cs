@@ -2,10 +2,6 @@ using Fenrir.Application.Game.Domain.Simulation;
 
 namespace Fenrir.Application.Game.Tests.Simulation;
 
-/// <summary>
-///     Covers the 20 Hz network frame -> 2 Hz legacy tick bridge: the remainder must survive across calls with zero
-///     drift.
-/// </summary>
 public class SimulationTickAccumulatorTests
 {
     [Fact]
@@ -27,7 +23,6 @@ public class SimulationTickAccumulatorTests
     [Fact]
     public void Advance_SeveralLegacyTicksInOneFrame_ReturnsAllOfThemAtOnce()
     {
-        // A stalled host (GC pause, debugger) must deliver the missed ticks as one burst, not one per call.
         var accumulator = new SimulationTickAccumulator();
 
         Assert.Equal(3, accumulator.Advance(TimeSpan.FromMilliseconds(1500)));
@@ -38,7 +33,6 @@ public class SimulationTickAccumulatorTests
     {
         var accumulator = new SimulationTickAccumulator();
 
-        // 10 frames of 50 ms must add up to exactly 1 legacy tick on the 10th, never earlier
         for (var frame = 1; frame < 10; frame++)
             Assert.Equal(0, accumulator.Advance(TimeSpan.FromMilliseconds(50)));
 
@@ -72,7 +66,6 @@ public class SimulationTickAccumulatorTests
 
         Assert.Equal(0, accumulator.Advance(TimeSpan.FromMilliseconds(400)));
 
-        // a zero/negative-elapsed hiccup must not discard or rewind the 400 ms already banked
         Assert.Equal(0, accumulator.Advance(TimeSpan.Zero));
         Assert.Equal(0, accumulator.Advance(TimeSpan.FromMilliseconds(-100)));
 

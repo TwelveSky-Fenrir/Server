@@ -11,21 +11,19 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Inventory;
 
-/// <inheritdoc cref="IPetBagActionService" />
 public sealed class PetBagActionService(
     IPetBagRepository petBag,
     WorldDataCache worldData,
     ILogger<PetBagActionService> logger)
     : IPetBagActionService
 {
-    /// <summary>Sentinel container/slot byte forced when a raw wire value falls outside the safe 0-1/0-19 range.</summary>
-    private const byte InvalidByte = 0xFF;
+
+        private const byte InvalidByte = 0xFF;
 
     public async ValueTask<GenericActionResult> DepositAsync(Zone zone, PlayerRuntimeState state, int characterId,
         DefaultPData move, bool petBagUpperHalfEntitlementActive, bool secondInventoryPageEntitlementActive,
         CancellationToken cancellationToken)
     {
-        // Case 254 field re-map: Page1/Index1 = source inventory page/slot, Page2 = destination pet-bag slot.
         var sourcePage = move.Page1;
         var sourceIndex = move.Index1;
         var petBagSlot = move.Page2;
@@ -83,8 +81,6 @@ public sealed class PetBagActionService(
         DefaultPData move, bool petBagUpperHalfEntitlementActive, bool secondInventoryPageEntitlementActive,
         CancellationToken cancellationToken)
     {
-        // Case 255 field re-map: Index1 = source pet-bag slot, Quantity1 = destination inventory page, Page2 =
-        // destination inventory slot, Index2 = destination cell X, XPost2 = destination cell Y.
         var sourceBagSlot = move.Index1;
         var destinationPage = move.Quantity1;
         var destinationIndex = move.Page2;
@@ -103,9 +99,6 @@ public sealed class PetBagActionService(
 
         var petEquipped = IsPetEquipped(state);
 
-        // No confirmed non-zero rarity-tier serial formula is modeled here yet -- see
-        // PetBagItemTransferPolicy.ResolveWithdrawToInventory's own remarks; 0 is correct for the genuine
-        // pet-category items this direction actually handles.
         var resolved = PetBagItemTransferPolicy.ResolveWithdrawToInventory(sourceBagSlot, sourceBagItemId,
             destinationContainer, destinationIndex, destinationX, destinationY, destination, 0, petEquipped,
             petBagUpperHalfEntitlementActive, secondInventoryPageEntitlementActive);
@@ -143,14 +136,9 @@ public sealed class PetBagActionService(
     public async ValueTask<GenericActionResult> RearrangeAsync(Zone zone, PlayerRuntimeState state, int characterId,
         DefaultPData move, bool petBagUpperHalfEntitlementActive, CancellationToken cancellationToken)
     {
-        // Case 256 field re-map: Index1 = source pet-bag slot, Page2 = destination pet-bag slot.
         var sourceBagSlot = move.Index1;
         var destinationBagSlot = move.Page2;
 
-        // Source-equals-destination: PetBagItemTransferPolicy.ResolveRearrangeWithinPetBag already returns a
-        // no-mutation Success for this case, bypassing every other guard (pet-equipped, entitlement, catalog
-        // lookups) per the C8 contract's own Edge cases section -- short-circuited here BEFORE any lookup so a
-        // genuinely bare request never touches the database or the zone tick.
         if (sourceBagSlot == destinationBagSlot && PetBagItemTransferPolicy.IsValidBagSlot(sourceBagSlot))
         {
             logger.LogDebug(
@@ -204,12 +192,7 @@ public sealed class PetBagActionService(
         return GenericActionResult.Succeeded;
     }
 
-    /// <summary>
-    ///     C8 contract's own gate: "the pet equipment slot, equip index 8, holds an id of at least 1" -- the
-    ///     real pet-validity check is dead code in legacy (only this floor test actually runs), per
-    ///     <see cref="PetBagItemTransferPolicy" />'s own remarks.
-    /// </summary>
-    private static bool IsPetEquipped(PlayerRuntimeState state)
+        private static bool IsPetEquipped(PlayerRuntimeState state)
     {
         var petStack = state.Inventory.GetSlot(ContainerMatrix.Equipment, PetSlots.EquipmentSlot);
         return petStack is { ItemId: >= 1 };

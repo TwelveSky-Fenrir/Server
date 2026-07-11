@@ -7,7 +7,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
-// op25 CL_GIFT_INFO_SEND -- the 10-page gift list, backed by the real game.Gifts pending queue.
 public class ClGiftInfoSendHandlerTests
 {
     private const int AccountId = 42;

@@ -47,7 +47,6 @@ public class ShardMapPartitionValidatorTests
         var conflicts = ShardMapPartitionValidator.FindConflicts(claims);
 
         var conflict = Assert.Single(conflicts);
-        // Lower shard id always reported first, regardless of input order.
         Assert.Equal((byte)3, conflict.ShardIdA);
         Assert.Equal((byte)5, conflict.ShardIdB);
         Assert.Equal(new short[] { 11, 12 }, conflict.MapIds);
@@ -56,7 +55,6 @@ public class ShardMapPartitionValidatorTests
     [Fact]
     public void SameShardListedTwice_IsNotReportedAsAConflictWithItself()
     {
-        // e.g. a duplicate/self directory row observed at the boundary of a fast restart.
         ShardMapPartitionValidator.ShardMapClaim[] claims =
         [
             new(1, new short[] { 1, 2 }),

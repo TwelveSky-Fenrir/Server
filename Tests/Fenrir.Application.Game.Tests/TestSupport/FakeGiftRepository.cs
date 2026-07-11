@@ -3,13 +3,6 @@ using Fenrir.Data.Abstractions.Accounts;
 
 namespace Fenrir.Application.Game.Tests.TestSupport;
 
-/// <summary>
-///     In-memory stand-in for IGiftRepository, scoped to the EnqueueAsync ("mint one gift") surface that
-///     this test project exercises. GetPendingByAccountAsync/ClaimIntoVaultAsync are not driven by any
-///     Game-side production code yet -- deciding the actual purchase-reward/GM-command trigger is out of
-///     scope for the EnqueueAsync contract itself (see IGiftRepository.EnqueueAsync's remarks) -- so they
-///     are minimal, order-preserving pass-throughs here rather than fully modeled.
-/// </summary>
 internal sealed class FakeGiftRepository : IGiftRepository
 {
     private readonly List<PendingGiftDto> _pending = [];

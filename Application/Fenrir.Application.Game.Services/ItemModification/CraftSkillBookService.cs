@@ -10,12 +10,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.ItemModification;
 
-/// <summary>
-///     Business logic for op30, CZ_MAKE_SKILL_SEND -- extracted from <see cref="CraftSkillBookHandler" />, see
-///     that handler's remarks. Recipe 3 (War God) additionally stands in for legacy's <c>MakeNotice</c> call
-///     (Server/ts25zone/S04_MyWork02.cpp:6011) via <see cref="CenterRelayNoticeLog.LogNotableCraft" /> -- see
-///     that type's own remarks for why this is a log line, not a client-facing broadcast.
-/// </summary>
 public sealed class CraftSkillBookService(
     ICharacterRepository characters,
     WorldDataCache worldData,
@@ -94,8 +88,6 @@ public sealed class CraftSkillBookService(
             "Character {CharacterId} craft-skill-book applied: result item {ResultItemId}", characterId,
             resolved.ResultItemId);
 
-        // Recipe 3 (War God) is the only one of the four that calls MakeNotice -- Server/ts25zone/
-        // S04_MyWork02.cpp:6011. Recipes 0-2 never call it, so they get no log here.
         if (packet.Sort == SkillBookCraftCatalog.WarGodSort)
             CenterRelayNoticeLog.LogNotableCraft(logger, worldData, state.Tribe, state.Name, resolved.ResultItemId,
                 "craft-skill-book (War God)");

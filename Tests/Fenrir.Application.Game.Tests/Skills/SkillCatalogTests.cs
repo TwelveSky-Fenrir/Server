@@ -5,10 +5,6 @@ using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Game.Tests.Skills;
 
-/// <summary>
-///     Covers <see cref="SkillCatalog.ReturnSkillValue" /> against <c>SKILLSYSTEM::ReturnSkillValue</c> (
-///     <c>GameSystem_03_Skill.cpp</c>).
-/// </summary>
 public class SkillCatalogTests
 {
     private static SkillDefinition Skill(byte maxUpgradePoint, short manaUseMin, short manaUseMax,
@@ -34,8 +30,7 @@ public class SkillCatalogTests
     [Fact]
     public void HalfwayGradePoints_InterpolatesLinearly()
     {
-        var skill = Skill(10, 10, 100); // min=10, max=100, maxUpgrade=10
-        // value = 10 + (100-10)*5/10 = 10 + 45 = 55
+        var skill = Skill(10, 10, 100);
         Assert.Equal(55f, SkillCatalog.ReturnSkillValue(skill, 5, SkillValueKind.ManaUse));
     }
 
@@ -49,7 +44,7 @@ public class SkillCatalogTests
     [Fact]
     public void ValueBetweenZeroAndOne_ClampsUpToOne()
     {
-        var skill = Skill(10, 0, 1); // at gradePoints=1: 0 + (1-0)*1/10 = 0.1 -> clamped to 1
+        var skill = Skill(10, 0, 1);
         Assert.Equal(1f, SkillCatalog.ReturnSkillValue(skill, 1, SkillValueKind.ManaUse));
     }
 
@@ -64,7 +59,6 @@ public class SkillCatalogTests
     public void DifferentKind_ReadsItsOwnColumn()
     {
         var skill = Skill(10, 10, 100, 50, 500);
-        // AttackPowerRatio (kind 7 -> AttackInfo1): min=50, max=500, at gradePoints=10 -> 500.
         Assert.Equal(500f, SkillCatalog.ReturnSkillValue(skill, 10, SkillValueKind.AttackPowerRatio));
     }
 

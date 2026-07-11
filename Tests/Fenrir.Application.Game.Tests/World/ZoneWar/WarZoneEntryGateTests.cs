@@ -2,12 +2,6 @@ using Fenrir.Application.Game.Domain.World.ZoneWar;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Covers <see cref="WarZoneEntryGate" /> in isolation -- the pure decision rule, no session/repository
-///     dependencies. Wiring into <c>EnterWorldService</c>/<c>ZoneMoveService</c> (call-site placement and the
-///     hard-disconnect it triggers) is covered separately once those services are wired (see this slice's own
-///     wiringManifest).
-/// </summary>
 public class WarZoneEntryGateTests
 {
     [Theory]

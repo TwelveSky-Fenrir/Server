@@ -8,13 +8,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Chat;
 
-/// <summary>
-///     CZ_GENERAL_CHAT_SEND (opcode 38). A muted sender is silently dropped, not disconnected. GM
-///     inline-command interception (where/ygdrop/lab/boss/kill200/?clear) is routed through
-///     <see cref="ILocalChatService" /> -- see that interface's and
-///     <see cref="Fenrir.Application.Game.Services.Chat.LocalChatService" />'s own remarks for which of the six
-///     commands are actually implemented versus a tier-gated, logged no-op pending their own subsystem.
-/// </summary>
 public sealed class LocalChatHandler(ILocalChatService localChatService) : IInlinePacketHandler<LocalChatRequest>
 {
     public void Handle(in LocalChatRequest packet, IPacketSession session)

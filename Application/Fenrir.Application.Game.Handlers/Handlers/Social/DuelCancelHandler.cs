@@ -6,7 +6,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>CZ_DUEL_CANCEL_SEND (opcode 44) -- the challenger withdraws their own still-pending ask.</summary>
 public sealed class DuelCancelHandler(IDuelService duelService, ILogger<DuelCancelHandler>? logger = null)
     : IInlinePacketHandler<DuelCancelRequest>
 {

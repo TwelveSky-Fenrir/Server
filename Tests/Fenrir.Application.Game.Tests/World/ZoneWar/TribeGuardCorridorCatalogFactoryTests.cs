@@ -2,11 +2,6 @@ using Fenrir.Application.Game.Domain.World.ZoneWar;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Covers <see cref="TribeGuardCorridorCatalogFactory" /> -- the real sixteen-corridor-zone / shared-hub
-///     table (A8-corridor-respawn contract), as opposed to <see cref="TribeGuardCorridorCatalogTests" />'s own
-///     synthetic two-tribe fixture.
-/// </summary>
 public class TribeGuardCorridorCatalogFactoryTests
 {
     [Fact]
@@ -18,22 +13,18 @@ public class TribeGuardCorridorCatalogFactoryTests
     }
 
     [Theory]
-    // Tribe 0: town 1, corridor 2/3/4, innermost-first segment order [4, 3, 2, 1].
     [InlineData((short)4, (byte)0, (byte)0)]
     [InlineData((short)3, (byte)0, (byte)1)]
     [InlineData((short)2, (byte)0, (byte)2)]
     [InlineData((short)1, (byte)0, (byte)3)]
-    // Tribe 1: town 6, corridor 7/8/9.
     [InlineData((short)9, (byte)1, (byte)0)]
     [InlineData((short)8, (byte)1, (byte)1)]
     [InlineData((short)7, (byte)1, (byte)2)]
     [InlineData((short)6, (byte)1, (byte)3)]
-    // Tribe 2: town 11, corridor 12/13/14.
     [InlineData((short)14, (byte)2, (byte)0)]
     [InlineData((short)13, (byte)2, (byte)1)]
     [InlineData((short)12, (byte)2, (byte)2)]
     [InlineData((short)11, (byte)2, (byte)3)]
-    // Tribe 3: town 140, corridor 141/142/143.
     [InlineData((short)143, (byte)3, (byte)0)]
     [InlineData((short)142, (byte)3, (byte)1)]
     [InlineData((short)141, (byte)3, (byte)2)]
@@ -61,8 +52,6 @@ public class TribeGuardCorridorCatalogFactoryTests
     {
         var catalog = TribeGuardCorridorCatalogFactory.BuildLive();
 
-        // Contract edge case: "destination not in the table" -- zones 5, 10, 37, 38 are explicitly called out
-        // as always permitted since they are never named in the corridor switch.
         Assert.False(catalog.TryGetSegmentForDestinationZone(5, out _, out _));
         Assert.False(catalog.TryGetSegmentForDestinationZone(10, out _, out _));
         Assert.False(catalog.TryGetSegmentForDestinationZone(37, out _, out _));
@@ -83,9 +72,9 @@ public class TribeGuardCorridorCatalogFactoryTests
     }
 
     [Theory]
-    [InlineData((short)4, (byte)0, (byte)1)] // tribe 0's innermost corridor zone owns the next (segment 1) stone
+    [InlineData((short)4, (byte)0, (byte)1)]
     [InlineData((short)3, (byte)0, (byte)2)]
-    [InlineData((short)2, (byte)0, (byte)3)] // outermost corridor zone owns the stone gating the town
+    [InlineData((short)2, (byte)0, (byte)3)]
     public void BuildLive_ACorridorZoneOwnsOnlyTheNextSegmentOfItsOwnTribe(short zoneId, byte expectedTribe,
         byte expectedSegment)
     {
@@ -98,10 +87,10 @@ public class TribeGuardCorridorCatalogFactoryTests
     }
 
     [Theory]
-    [InlineData((short)1)] // tribe 0's town
-    [InlineData((short)6)] // tribe 1's town
-    [InlineData((short)11)] // tribe 2's town
-    [InlineData((short)140)] // tribe 3's town
+    [InlineData((short)1)]
+    [InlineData((short)6)]
+    [InlineData((short)11)]
+    [InlineData((short)140)]
     public void BuildLive_TownZonesOwnNoStoneAtAll(short townZoneId)
     {
         var catalog = TribeGuardCorridorCatalogFactory.BuildLive();
@@ -120,9 +109,6 @@ public class TribeGuardCorridorCatalogFactoryTests
     [Fact]
     public void BuildLive_ComposedWithTheGate_EnemyAdvanceIntoTownIsGatedByGuardState()
     {
-        // End-to-end sanity check combining the real catalog with the real gate: an enemy of tribe 0 (tribe 1)
-        // trying to step from zone 2 (segment 3's own adjacent zone) into the town (zone 1) is blocked while
-        // segment 3 is closed (the default boot state) and allowed once it opens.
         var catalog = TribeGuardCorridorCatalogFactory.BuildLive();
         var state = new TribeGuardCorridorState();
 
@@ -140,9 +126,6 @@ public class TribeGuardCorridorCatalogFactoryTests
     [Fact]
     public void BuildLive_ComposedWithTheGate_EnemyRetreatingTowardTheHubIsAlwaysAllowed()
     {
-        // Contract: "The outward direction (town toward center) is freely permitted once inside." Moving from
-        // tribe 0's town (zone 1) back to zone 2 (one step toward the hub) must be unconditional, even with
-        // every segment closed.
         var catalog = TribeGuardCorridorCatalogFactory.BuildLive();
         var state = new TribeGuardCorridorState();
 
@@ -155,10 +138,9 @@ public class TribeGuardCorridorCatalogFactoryTests
     [Fact]
     public void BuildLive_ComposedWithTheGate_SkippingAZoneIsRejectedRegardlessOfGuardState()
     {
-        // Jumping from the hub straight into tribe 0's zone 3 (segment 1), skipping zone 4 (segment 0) entirely.
         var catalog = TribeGuardCorridorCatalogFactory.BuildLive();
         var state = new TribeGuardCorridorState();
-        state.TrySetOpen(0, 1, true); // even with the target segment open, adjacency still fails
+        state.TrySetOpen(0, 1, true);
 
         var outcome = TribeGuardCorridorGate.Evaluate(catalog, state, requesterTribe: 1, originZoneId: 38,
             destinationZoneId: 3, requesterIsGmOrAdminRank: false);
@@ -170,7 +152,7 @@ public class TribeGuardCorridorCatalogFactoryTests
     public void BuildLive_ComposedWithTheGate_TheOwningTribeItselfIsNeverGated()
     {
         var catalog = TribeGuardCorridorCatalogFactory.BuildLive();
-        var state = new TribeGuardCorridorState(); // every segment closed
+        var state = new TribeGuardCorridorState();
 
         var outcome = TribeGuardCorridorGate.Evaluate(catalog, state, requesterTribe: 0, originZoneId: 9999,
             destinationZoneId: 1, requesterIsGmOrAdminRank: false);

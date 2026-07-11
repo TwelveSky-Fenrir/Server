@@ -6,12 +6,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Login.Services.ZoneTransfer;
 
-/// <summary>
-///     Real <see cref="IShardReachabilityProbe" />: a bare TCP connect attempt, torn down immediately
-///     whether it succeeds or fails. This never speaks the wire protocol (no handshake, no bytes
-///     exchanged) -- <see cref="ZoneTransferService" /> only needs a liveness signal before minting a
-///     ticket, not a protocol-level health check.
-/// </summary>
 public sealed class TcpShardReachabilityProbe(
     IOptions<LoginServerOptions> options,
     ILogger<TcpShardReachabilityProbe> logger) : IShardReachabilityProbe
@@ -31,14 +25,11 @@ public sealed class TcpShardReachabilityProbe(
         }
         catch (SocketException ex)
         {
-            // Refused, unreachable, DNS failure, etc. -- the shard is not accepting connections right now.
             logger.LogDebug(ex, "Shard reachability probe: TCP connect to {Host}:{Port} failed", host, port);
             return false;
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            // Our own probe timeout fired (linkedCts), not the caller's cancellation -- a non-responding
-            // socket is treated exactly like a refused one: unreachable, not an error.
             logger.LogDebug(
                 "Shard reachability probe: TCP connect to {Host}:{Port} timed out after {TimeoutMs}ms", host,
                 port, options.Value.ShardReachabilityProbeTimeoutMilliseconds);

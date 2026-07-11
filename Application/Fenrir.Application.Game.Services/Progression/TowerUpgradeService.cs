@@ -8,12 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Progression;
 
-/// <summary>
-///     Business logic extracted from <c>TowerUpgradeHandler</c> (CZ_CHUGSOUNG_WAR_UP_SEND, opcode 120).
-///     Material consumption only arms the upgrade (<see cref="TowerWarState.BeginUpgrade" />); the actual
-///     level change, guardian-monster respawn, and the later siege/destruction cycle all run off that
-///     tower's own zone tick -- see <see cref="TowerGuardianSystem" />.
-/// </summary>
 public sealed class TowerUpgradeService(
     TowerWarState towerWar,
     ICharacterRepository characters,
@@ -22,20 +16,11 @@ public sealed class TowerUpgradeService(
     private const int HerbItemId = 666;
     private const int BarItemId = 1073;
 
-    /// <summary>
-    ///     A11 -- world.Items id of the from-scratch "construct tower" item (contract trigger 1,
-    ///     S04_MyWork03.cpp:7283-7284).
-    /// </summary>
-    private const int TowerConstructItemId = 665;
+        private const int TowerConstructItemId = 665;
 
-    /// <summary>A11 -- world.Items id of the "heal tower guardian" item (contract trigger 2, S04_MyWork03.cpp:7506-7511).</summary>
-    private const int TowerHealItemId = 667;
+        private const int TowerHealItemId = 667;
 
-    /// <summary>
-    ///     A11 -- max heal reach: within 200.0 world units of the tower's fixed location (contract,
-    ///     S04_MyWork03.cpp:7532), stored squared.
-    /// </summary>
-    private const float HealRangeSquared = 200f * 200f;
+        private const float HealRangeSquared = 200f * 200f;
 
     public async ValueTask<TowerUpgradeResult> UpgradeAsync(int characterId, Zone zone, PlayerRuntimeState state,
         TowerUpgradeRequest packet, CancellationToken cancellationToken)
@@ -109,26 +94,7 @@ public sealed class TowerUpgradeService(
         return new TowerUpgradeResult(TowerUpgradeOutcome.Success, packedPage, packedIndex);
     }
 
-    /// <summary>
-    ///     A11 -- item-665 from-scratch tower construction (contract trigger 1, S04_MyWork03.cpp:7283-7502).
-    ///     Validates the leadership role, construct kind, own-tribe tower zone, idle-tower, max-of-a-kind and
-    ///     tribe-group-adjacency gates, then atomically arms the construction and consumes one unit of the item;
-    ///     the level-1 guardian is summoned and the 5-minute post-create cooldown driven by
-    ///     <see cref="TowerLifecycleSystem" /> on the tower's own tick. Reached via
-    ///     <c>UseInventoryItemService.ResolveAsync</c>'s own item-id dispatch branch (a direct if-cascade check,
-    ///     not the C9 <c>UseItemHandlerRegistry</c> -- that registry is a distinct, synchronous dispatch for a
-    ///     disjoint family of items; see this feature's wiring manifest).
-    ///     <para>
-    ///         The legacy disconnects the session on the "illegitimate input" gates (wrong role, out-of-range
-    ///         kind, non-idle, wrong-tribe zone, group-adjacency) and only soft-fails the max-of-a-kind gate. This
-    ///         use-inventory-item path has no way to signal "disconnect" in its response shape, so -- matching the
-    ///         documented simplification every other family in <c>UseInventoryItemService</c> already uses -- every
-    ///         rejection collapses to a clean Result=1 with the item retained. The item is consumed only on the
-    ///         success path. <paramref name="constructType" /> is the use-inventory-item request's numeric value
-    ///         field; flagged for confirmation that it carries tValue01 on the item-665 path.
-    ///     </para>
-    /// </summary>
-    public async ValueTask<UseInventoryItemResponse> ConstructAsync(int characterId, Zone zone,
+        public async ValueTask<UseInventoryItemResponse> ConstructAsync(int characterId, Zone zone,
         PlayerRuntimeState state, byte page, byte index, ItemStack item, int constructType,
         CancellationToken cancellationToken)
     {
@@ -156,8 +122,6 @@ public sealed class TowerUpgradeService(
         if (towerWar.IsKindPresentInTribeGroup(towerIndex, constructType))
             return Fail(characterId, page, index, "kind already present in tribe group");
 
-        // Atomic idle-claim, BEFORE consuming the item, so a lost race (a second concurrent item-665 on the same
-        // tower) leaves the item retained rather than spent.
         if (!towerWar.BeginConstruction(towerIndex, constructType, state.Tribe))
             return Fail(characterId, page, index, "tower construction already claimed");
 
@@ -190,21 +154,7 @@ public sealed class TowerUpgradeService(
         return new UseInventoryItemResponse { Result = 0, Page = page, Index = index, Value = 0, Value2 = 0 };
     }
 
-    /// <summary>
-    ///     A11 -- item-667 tower-guardian heal (contract trigger 2, S04_MyWork03.cpp:7506-7565). Validates the
-    ///     own-tribe tower zone, a live guardian, being within 200 world units of the tower, and the guardian not
-    ///     already at full life, then consumes one unit of the item and arms the actual +10%-of-max-life heal for
-    ///     tick-side application via <see cref="TowerWarState.RequestGuardianHeal" />.
-    ///     <para>
-    ///         The heal's life mutation and repair-info broadcast are tick-owned (a <c>MonsterEntity</c> life
-    ///         write) and handed off -- see the wiring manifest's heal-drain entry. The full-life and
-    ///         guardian-exists checks here read <c>MonsterEntity.Life</c>/<c>MaxLife</c>, both explicitly safe from
-    ///         any thread, so they are done up front (item retained on a full-life or no-tower tower). Every
-    ///         rejection collapses to Result=1 (the legacy's distinct "restricted area" vs "cannot be used"
-    ///         signals both map to the single use-inventory-item result code here), item retained.
-    ///     </para>
-    /// </summary>
-    public async ValueTask<UseInventoryItemResponse> HealAsync(int characterId, Zone zone, PlayerRuntimeState state,
+        public async ValueTask<UseInventoryItemResponse> HealAsync(int characterId, Zone zone, PlayerRuntimeState state,
         byte page, byte index, ItemStack item, CancellationToken cancellationToken)
     {
         var towerIndex = TowerZoneIndexTable.GetTowerIndex(zone.MapId);
@@ -237,7 +187,6 @@ public sealed class TowerUpgradeService(
             return Fail(characterId, page, index, "item consumption failed");
         }
 
-        // Item is spent -- arm the tick-side +10%-of-max-life heal (see this method's remarks + the wiring manifest).
         towerWar.RequestGuardianHeal(towerIndex);
 
         var containers = ImmutableArray.Create(new InventoryContainerSnapshot(page, projected));

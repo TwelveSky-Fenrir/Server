@@ -10,15 +10,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Inventory.UseItems;
 
-/// <summary>
-///     Drives <see cref="CpTicketUseItemHandler" /> (op23 CP Ticket family, 691-694/1444/1447-1449/1499/
-///     8431-8434) directly -- not through <see cref="UseItemHandlerRegistry" />, since wiring the handler into
-///     that registry's constructor is a verbatim edit to an existing file reported separately (see this
-///     workstream's wiringManifest). Uses only the pre-existing
-///     <see cref="PlayerRuntimeState.ContributionPoints" />/<c>TribeProgressZoneCommand.ContributionPoints</c>
-///     fields, so -- unlike the sibling Elite-Dungeon/Dungeon-Key/Ivy-Hall handlers in this same workstream --
-///     this one is fully wireable and testable end-to-end today.
-/// </summary>
 public class CpTicketUseItemHandlerTests
 {
     private const int AccountId = 1;
@@ -101,18 +92,18 @@ public class CpTicketUseItemHandlerTests
     {
         var (zone, state, characters, _, handler) = SetUp();
         state.ContributionPoints = 0;
-        var item = Ticket(1499, quantity: 3); // 5000 per unit
+        var item = Ticket(1499, quantity: 3);
 
         var response = await RunToCompletionAsync(
             handler.HandleAsync(Context(zone, state, 1499, item, value: 999), CancellationToken.None), zone);
 
         Assert.Equal(0, response.Result);
-        Assert.Equal(15000, response.Value); // 3 * 5000
+        Assert.Equal(15000, response.Value);
         Assert.Equal(3, response.Value2);
 
         Assert.True(zone.TryGetPlayer(CharacterId, out var after));
         Assert.Equal(15000, after!.ContributionPoints);
-        Assert.Null(after.Inventory.GetSlot(ContainerMatrix.InventoryPage0, 0)); // whole stack consumed
+        Assert.Null(after.Inventory.GetSlot(ContainerMatrix.InventoryPage0, 0));
     }
 
     [Fact]

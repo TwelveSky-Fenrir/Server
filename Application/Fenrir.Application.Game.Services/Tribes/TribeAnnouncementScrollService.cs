@@ -9,14 +9,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Services.Tribes;
 
-/// <summary>
-///     See <see cref="ITribeAnnouncementScrollService" />. Same-shard delivery is synchronous, via
-///     <see cref="ZoneRegistry" />, exactly as before. Cross-shard delivery (a tribe member connected to a map
-///     hosted by a DIFFERENT live shard) is handed off to <see cref="IGuildTribeBroadcastRelayQueue" /> -- see
-///     that interface and <c>GuildTribeBroadcastRelayHost</c>'s own remarks for the full cluster-wide fan-out
-///     design (Fenrir's SQL-mediated stand-in for legacy's <c>ts25zone</c>&lt;-&gt;<c>ts25center</c> relay
-///     uplink).
-/// </summary>
 public sealed class TribeAnnouncementScrollService(
     ZoneRegistry zones,
     IGuildTribeBroadcastRelayQueue relay,
@@ -55,9 +47,6 @@ public sealed class TribeAnnouncementScrollService(
             options.Value.ShardId,
             null,
             sender.Tribe,
-            // Wire-field quirk: this opcode's "role" field position actually carries the sender's raw tribe
-            // number, not a role (see TribeAnnouncementScrollResponse's own docstring) -- mirrored exactly
-            // here so GuildTribeBroadcastRelayHost's delivery loop needs no opcode-specific special case.
             sender.Tribe,
             sender.Name,
             content,

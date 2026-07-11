@@ -2,12 +2,6 @@ using Fenrir.Application.Game.Domain.Inventory;
 
 namespace Fenrir.Application.Game.Domain.Forge;
 
-/// <summary>
-///     Pure resolver for CZ_DESTROY_ITEM_SEND (S04_MyWork02.cpp:12511). Only the LNW33 (EU33) branch is
-///     reproduced: the IELITE dissolution path (POE bag rewards) is dead code in this build -- an unconditional
-///     `if (iType != IRARE) Quit()` right after the shared checks kills it regardless of the earlier
-///     type-specific branch, matching the legacy exactly. No I/O, no Zone dependency.
-/// </summary>
 public static class DestroyResolver
 {
     public enum DestroyOutcome

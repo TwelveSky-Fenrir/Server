@@ -31,7 +31,6 @@ public class TribePointLevelRecomputeTests
     [Fact]
     public void CharacterAtExactlyTheLevelThreshold_Qualifies()
     {
-        // (145 - 112) + 0*3 + 0*3 = 33
         var roster = new[] { new TribeRosterCharacterSnapshot(0, 145, 0, 0) };
 
         var totals = TribePointLevelRecompute.ComputeTotals(roster);
@@ -42,7 +41,6 @@ public class TribePointLevelRecomputeTests
     [Fact]
     public void QualifyingCharacter_SumsAllThreeTerms()
     {
-        // (200 - 112) + 50*3 + 4*3 = 88 + 150 + 12 = 250
         var roster = new[] { new TribeRosterCharacterSnapshot(1, 200, 50, 4) };
 
         var totals = TribePointLevelRecompute.ComputeTotals(roster);
@@ -56,8 +54,8 @@ public class TribePointLevelRecomputeTests
     {
         var roster = new[]
         {
-            new TribeRosterCharacterSnapshot(2, 145, 0, 0), // +33
-            new TribeRosterCharacterSnapshot(2, 150, 10, 2) // (150-112)+30+6 = 38+30+6=74
+            new TribeRosterCharacterSnapshot(2, 145, 0, 0),
+            new TribeRosterCharacterSnapshot(2, 150, 10, 2)
         };
 
         var totals = TribePointLevelRecompute.ComputeTotals(roster);
@@ -68,7 +66,7 @@ public class TribePointLevelRecomputeTests
     [Fact]
     public void Tribe3AloneReceivesTheFlatBonus_OnTopOfItsOwnRosterContribution()
     {
-        var roster = new[] { new TribeRosterCharacterSnapshot(3, 145, 0, 0) }; // +33
+        var roster = new[] { new TribeRosterCharacterSnapshot(3, 145, 0, 0) };
 
         var totals = TribePointLevelRecompute.ComputeTotals(roster);
 
@@ -83,9 +81,9 @@ public class TribePointLevelRecomputeTests
     {
         var roster = new[]
         {
-            new TribeRosterCharacterSnapshot(0, 200, 0, 0), // (200-112)=88
-            new TribeRosterCharacterSnapshot(1, 145, 0, 0), // 33
-            new TribeRosterCharacterSnapshot(2, 300, 0, 0) // (300-112)=188
+            new TribeRosterCharacterSnapshot(0, 200, 0, 0),
+            new TribeRosterCharacterSnapshot(1, 145, 0, 0),
+            new TribeRosterCharacterSnapshot(2, 300, 0, 0)
         };
 
         var totals = TribePointLevelRecompute.ComputeTotals(roster);
@@ -112,8 +110,6 @@ public class TribePointLevelRecomputeTests
     [Fact]
     public void IsAlwaysAFullRecompute_NeverConditionalOnPriorRosterState()
     {
-        // Calling twice with different rosters must never carry state between calls -- each call is a pure
-        // function of its own input only.
         var first = TribePointLevelRecompute.ComputeTotals([new TribeRosterCharacterSnapshot(0, 500, 0, 0)]);
         var second = TribePointLevelRecompute.ComputeTotals([]);
 

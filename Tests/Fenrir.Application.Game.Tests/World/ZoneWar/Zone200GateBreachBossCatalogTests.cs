@@ -5,13 +5,6 @@ using Fenrir.Application.Game.Tests.GameData;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Boss-756 (Zone200 gate-breach/kill-race) summon and mechanic data -- see
-///     <see cref="Zone200GateBreachBossCatalog" />'s own remarks: the kill-drop side effect is already fully
-///     implemented elsewhere (<see cref="BossDropCatalog" />/<see cref="BossEventDropResolver" />), verified
-///     directly against this catalog's own citation range in <see cref="KillDrop_AlreadyImplemented_MatchesContractOrder" />
-///     below rather than duplicated. Everything else here is data-only, not yet wired into any state machine.
-/// </summary>
 public class Zone200GateBreachBossCatalogTests
 {
     [Fact]
@@ -49,17 +42,12 @@ public class Zone200GateBreachBossCatalogTests
     [Fact]
     public void BattleWinBonusFixedItemIds_HasSevenOfEightKnownItems_EighthSlotDeliberatelyOmitted()
     {
-        // The 8th slot (a server-computed random "animal" item) is never invented -- see the field's own
-        // remarks. Only the 7 concretely-cited ids are present, in the source's own order.
         Assert.Equal([1072, 1103, 1449, 1422, 1145, 2249, 602], Zone200GateBreachBossCatalog.BattleWinBonusFixedItemIds);
     }
 
     [Fact]
     public void KillDrop_AlreadyImplemented_MatchesContractOrder()
     {
-        // Regression cross-check: the A4-missing-bosses contract's Boss-756 kill-drop (item 1073, then 1447,
-        // then 723) is already fully implemented by the C4 boss-drop workstream -- this test confirms that
-        // remains true rather than re-implementing it in this catalog.
         var worldData = WorldDataCacheBuilder.Build(WorldDataTestRows.MinimalRows()).Cache;
 
         var outcome = BossEventDropResolver.Resolve(

@@ -12,11 +12,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.GenericAction;
 
-// CZ_PROCESS_DATA_SEND tSort 206, ProcessForStatPlus -- GenericActionService.AllocateStatPointAsync's own
-// orchestration (resolver gate -> attribute credit + stat-point debit -> derived-stat recompute -> mirror onto
-// PlayerRuntimeState). GenericActionHandler's dispatch switch now wires this tSort up too (reads the raw
-// STAT_PLUS_RECV two-int payload and calls this same service method) -- these tests still call the service
-// method directly, independent of that wiring, to keep this orchestration coverage a pure in-memory unit test.
 public class StatAllocationServiceTests
 {
     private const int CharacterId = 10;

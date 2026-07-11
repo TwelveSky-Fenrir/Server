@@ -56,7 +56,6 @@ public class ZcGuildWorkRecvTests
     [Fact]
     public void Write_ZeroFillsGuildInfo_OnFailureResponse()
     {
-        // Legacy: mRecv_GuildInfo held stack garbage on failure/tSort 1001; Fenrir zero-fills instead.
         var zeroGuildInfo = new GuildInfo
         {
             Name = string.Empty,

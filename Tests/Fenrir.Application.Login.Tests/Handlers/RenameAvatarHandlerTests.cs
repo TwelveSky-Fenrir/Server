@@ -10,10 +10,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
-// op19 CL_CHANGE_AVATAR_NAME_SEND -- item-1133 gate, five relationship refusals (Result=3, collapsed),
-// legacy result codes (0/2/101/102) forwarded verbatim from game.usp_Character_Rename, and the
-// structural/charset preconditions that Quit() outright. A successful rename (Result=0) is also recorded
-// as a game.EventLog AccountSecurity row; every other path writes nothing.
 public class ClChangeAvatarNameSendHandlerTests
 {
     private const int AccountId = 42;
@@ -88,8 +84,8 @@ public class ClChangeAvatarNameSendHandlerTests
     }
 
     [Theory]
-    [InlineData(2)] // name taken / unchanged
-    [InlineData(102)] // slot vanished
+    [InlineData(2)]
+    [InlineData(102)]
     public async Task HandleAsync_ProcReturnsLegacyFailureCode_ForwardsItVerbatim(int code)
     {
         var characters = CharactersWithRenameScroll();
@@ -121,9 +117,6 @@ public class ClChangeAvatarNameSendHandlerTests
         Assert.Empty(eventLog.LoggedEvents);
     }
 
-    // Server/ts25login/S04_MyWork02.cpp:1325-1329: the identical-name short circuit runs first, before the
-    // item-1133 gate -- a same-name request with no rename scroll present still gets a graceful Result=2
-    // response instead of the silent disconnect an item mismatch would otherwise trigger.
     [Fact]
     public async Task HandleAsync_NameUnchangedAndNoScrollPresent_RepliesResultTwoWithoutDisconnecting()
     {
@@ -154,11 +147,9 @@ public class ClChangeAvatarNameSendHandlerTests
         Assert.Null(session.DisconnectReason);
     }
 
-    // Server/ts25login/S04_MyWork02.cpp:1340-1344: the claimed (Page, Index) slot must hold exactly item
-    // 1133. Any other value -- including an empty slot -- disconnects with no response at all.
     [Theory]
-    [InlineData(null)] // empty slot
-    [InlineData(4321)] // some other item
+    [InlineData(null)]
+    [InlineData(4321)]
     public async Task HandleAsync_ItemAtSlotIsNotRenameScroll_AbortsWithoutReplying(int? itemIdAtSlot)
     {
         var characters = FakeCharacterRepository.WithSummaries(Summary);
@@ -175,9 +166,6 @@ public class ClChangeAvatarNameSendHandlerTests
         PacketAssert.AssertNothingSent(pipe);
     }
 
-    // Server/ts25login/S04_MyWork02.cpp:1358-1385: all five relationship refusals collapse to the same
-    // Result=3 response, indistinguishable to the client. One representative case (guild membership) is
-    // exercised at the handler level; RenameAvatarServiceTests covers all five plus their fixed ordering.
     [Fact]
     public async Task HandleAsync_GuildMember_RepliesResultThreeWithoutRenaming()
     {
@@ -196,11 +184,11 @@ public class ClChangeAvatarNameSendHandlerTests
     }
 
     [Theory]
-    [InlineData(-1, "Name", 0, 0)] // AvatarPost out of range
-    [InlineData(3, "Name", 0, 0)] // AvatarPost out of range (> MAX_USER_AVATAR_NUM-1)
-    [InlineData(0, "", 0, 0)] // empty name
-    [InlineData(0, "Name", 2, 0)] // page out of range (MAX_INVENTORY_PAGE_NUM=2)
-    [InlineData(0, "Name", 0, 64)] // index out of range (MAX_INVENTORY_SLOT_NUM=64)
+    [InlineData(-1, "Name", 0, 0)]
+    [InlineData(3, "Name", 0, 0)]
+    [InlineData(0, "", 0, 0)]
+    [InlineData(0, "Name", 2, 0)]
+    [InlineData(0, "Name", 0, 64)]
     public async Task HandleAsync_StructuralViolation_AbortsWithoutCallingRepository(int avatarPost, string name,
         int page, int index)
     {
@@ -216,14 +204,11 @@ public class ClChangeAvatarNameSendHandlerTests
         PacketAssert.AssertNothingSent(pipe);
     }
 
-    // CheckNameString (Server/Header/safestring.h:43-81): unlike creation, a whitelist violation here
-    // disconnects with no response -- the same treatment as the structural checks above (S04_MyWork02.cpp
-    // l.1345).
     [Theory]
-    [InlineData("New Name")] // space
-    [InlineData("New_Name")] // underscore
-    [InlineData("New-Name")] // hyphen
-    [InlineData("Nômme")] // accented Latin byte
+    [InlineData("New Name")]
+    [InlineData("New_Name")]
+    [InlineData("New-Name")]
+    [InlineData("Nômme")]
     public async Task HandleAsync_NewNameWithDisallowedCharacters_AbortsWithoutCallingRepository(string name)
     {
         var characters = CharactersWithRenameScroll();

@@ -11,10 +11,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.ItemModification;
 
-/// <summary>
-///     Business logic for op93, CZ_SKY_UP_ITEM_SEND -- extracted from <see cref="SkyUpgradeItemHandler" />, see
-///     that handler's remarks.
-/// </summary>
 public sealed class SkyUpgradeItemService(
     ICharacterRepository characters,
     WorldDataCache worldData,
@@ -22,15 +18,10 @@ public sealed class SkyUpgradeItemService(
     ILogger<SkyUpgradeItemService> logger)
     : ISkyUpgradeItemService
 {
-    /// <summary>
-    ///     game.EventLog.EventCode for a sky-upgrade attempt -- the wire opcode (op93) itself, same
-    ///     "app-owned numbering scheme, caller-interpreted alongside Category" posture as every other
-    ///     EventCode in this codebase.
-    /// </summary>
-    private const short SkyUpgradeItemEventCode = 93;
 
-    /// <summary>game.EventLog.Outcome for this EventCode: 0 success, 1 failed.</summary>
-    private const byte SuccessOutcome = 0;
+        private const short SkyUpgradeItemEventCode = 93;
+
+        private const byte SuccessOutcome = 0;
 
     private const byte FailedOutcome = 1;
 

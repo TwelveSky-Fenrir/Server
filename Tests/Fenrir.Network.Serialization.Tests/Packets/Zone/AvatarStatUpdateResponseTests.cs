@@ -9,7 +9,6 @@ public class ZcAvatarChangeInfo2Tests
     [Fact]
     public void PayloadSize_MatchesContract()
     {
-        // USE_PREMIUM_LONGTIME is ON in EU33: Value2 is present -> 12 bytes (not 8).
         Assert.Equal(12, AvatarStatUpdateResponse.PayloadSize);
         Assert.Equal(Opcodes.Zone.Outgoing.AvatarStatUpdate, AvatarStatUpdateResponse.Opcode);
     }

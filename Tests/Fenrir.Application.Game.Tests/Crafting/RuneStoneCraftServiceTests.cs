@@ -9,13 +9,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Crafting;
 
-/// <summary>
-///     Drives the real <see cref="RuneStoneCraftService" /> over a real <see cref="Zone" />, same pattern as
-///     <c>RuneSocketServiceTests</c>. Exercises the orchestration this task owns (bounds/whitelist delegation
-///     to <see cref="RuneStoneCraftResolver" />, source-item consumption/persistence, event logging, zone
-///     mirror) without depending on <c>GenericActionHandler</c>'s dispatch switch, which does not call this
-///     service yet.
-/// </summary>
 public class RuneStoneCraftServiceTests
 {
     private const int AddStatItemId = RuneStoneCraftCatalog.AddStatItemId;
@@ -50,11 +43,6 @@ public class RuneStoneCraftServiceTests
         return (session, zone, state!, new FakeCharacterRepository(), new FakeEventLogQueue());
     }
 
-    // Merges into whatever the container already holds (via PlayerRuntimeState, not a fresh Empty dictionary),
-    // because InventoryState.ReplaceContainer is a whole-container replace (mirroring
-    // usp_CharacterItems_ReplaceContainer's own semantics -- see InventoryState.cs). Seeding 2 slots in the
-    // SAME container across 2 separate calls with a fresh ImmutableDictionary.Empty base would silently wipe
-    // the first slot when the second call's snapshot replaces the whole container.
     private static void SeedInventorySlot(Zone zone, PlayerRuntimeState state, byte container, byte slot,
         ItemStack stack)
     {
@@ -133,7 +121,6 @@ public class RuneStoneCraftServiceTests
     public async Task Refused_DoesNotConsumeSourceOrLog()
     {
         var (session, zone, state, repo, eventLog) = SetUp();
-        // All 4 sub-stats already filled -> 92296 refuses (result code 10), nothing consumed/logged.
         var packed = RuneStoneStatCodec.Encode(1, 1, 1, 1);
         SeedInventorySlot(zone, state, ContainerMatrix.InventoryPage0, 5, Stack(AddStatItemId, 1));
         SeedInventorySlot(zone, state, ContainerMatrix.InventoryPage0, 6, Stack(RuneCoreItemId, 1));

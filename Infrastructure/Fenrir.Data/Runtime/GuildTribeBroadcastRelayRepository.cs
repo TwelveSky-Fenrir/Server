@@ -8,14 +8,9 @@ using Fenrir.Data.Abstractions.Runtime;
 
 namespace Fenrir.Data.Runtime;
 
-// Cross-shard fan-out for GuildAnnouncement/GuildChat/TribeAnnouncement/TribeAnnouncementScroll -- see
-// IGuildTribeBroadcastRelayRepository for the per-method contract.
 public sealed record GuildTribeBroadcastRelayRepository(ICaeriusNetDbContext Db)
     : IGuildTribeBroadcastRelayRepository
 {
-    // Small, high-frequency (GuildChat has no rate limiting per the legacy contract) round trips against a
-    // memory-optimized table that should never itself be slow -- a short timeout fails fast instead of
-    // masking a stuck request.
     private const int CommandTimeoutSeconds = 5;
 
     public async ValueTask PublishAsync(GuildTribeBroadcastRelayEntry entry, CancellationToken ct)

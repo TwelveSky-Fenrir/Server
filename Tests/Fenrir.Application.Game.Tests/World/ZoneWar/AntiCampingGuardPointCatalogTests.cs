@@ -78,8 +78,6 @@ public class AntiCampingGuardPointCatalogTests
     [Fact]
     public void IsGuardedMap_IgnoresWhateverIsConfigured_OnlyTheFixedListMatters()
     {
-        // A hypothetical caller mistakenly configures points for a map outside the fixed guarded set --
-        // IsGuardedMap must still say no, since the guarded-map set itself is not caller-configurable data.
         var configured = new AntiCampingMapGuardPoints([new AntiCampingGuardPoint(0, 0, 0)], null);
         var catalog = new AntiCampingGuardPointCatalog(
             new Dictionary<short, AntiCampingMapGuardPoints> { [999] = configured });
@@ -88,12 +86,6 @@ public class AntiCampingGuardPointCatalogTests
     }
 }
 
-/// <summary>
-///     Pins every recovered per-map Holy Stone Symbol Point / Tower Point coordinate in
-///     <see cref="AntiCampingGuardPointCatalog.Default" /> to the anti-camping-guard-point-coordinates behavior
-///     contract's table (transcribed from <c>Server/ts25zone/S07_MyGame01.cpp:2079-2368</c> for the Symbol
-///     Points and :1341-1352 for the Tower Points). Pure data assertions -- no zone/tick needed.
-/// </summary>
 public class AntiCampingGuardPointCatalogDefaultTests
 {
     private static AntiCampingMapGuardPoints Points(short mapId)
@@ -204,9 +196,6 @@ public class AntiCampingGuardPointCatalogDefaultTests
     [InlineData((short)143)]
     public void EveryGuardedMap_TowerPoint_MatchesTowerGuardianCatalog_NoDrift(short mapId)
     {
-        // Default reuses TowerGuardianCatalog.TryGetGuardianLocation for the Tower Point rather than a second
-        // hardcoded copy of the same S07_MyGame01.cpp:1341-1352 table -- assert the two never silently drift
-        // apart.
         var found = TowerGuardianCatalog.TryGetGuardianLocation(mapId, out var x, out var y, out var z);
 
         Assert.True(found);

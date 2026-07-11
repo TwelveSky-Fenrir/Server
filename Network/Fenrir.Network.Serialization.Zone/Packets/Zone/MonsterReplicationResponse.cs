@@ -12,6 +12,5 @@ public readonly partial record struct MonsterReplicationResponse : IOutgoingPack
     public required uint UniqueNumber { get; init; }
     public required ObjectForMonster Data { get; init; }
 
-    /// <summary>0/1/2: forces animation re-sync client-side.</summary>
-    public required int CheckChangeActionState { get; init; }
+        public required int CheckChangeActionState { get; init; }
 }

@@ -2,12 +2,6 @@ using Fenrir.Application.Game.Domain.World.ZoneWar;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Covers <see cref="TribeSymbolBattleZoneLockout" /> (<c>S04_MyWork02.cpp:2125-2141</c>) in isolation --
-///     no prior test file exercised this pure decision rule directly. Wiring into
-///     <see cref="Fenrir.Application.Game.Services.ZoneLifecycle.ZoneMoveService" /> (ordering relative to the
-///     other zone-move gates) is covered separately in <c>ZoneMoveServiceTests</c>.
-/// </summary>
 public class TribeSymbolBattleZoneLockoutTests
 {
     [Theory]

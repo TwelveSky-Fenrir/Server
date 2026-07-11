@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Zone;
 
-// Distinct C++ struct from ZC 29/30/31 despite the identical 32-byte layout.
 public class ZcSkyUpItemRecvTests
 {
     [Fact]

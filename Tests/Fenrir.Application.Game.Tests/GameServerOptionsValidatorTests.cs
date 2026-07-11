@@ -6,7 +6,6 @@ public class GameServerOptionsValidatorTests
 {
     private static readonly GameServerOptionsValidator Validator = new();
 
-    // GameServerOptions is a plain sealed class, not a record -- no "with", so build a fresh instance per call
     private static GameServerOptions Options(
         int port = 1100,
         byte shardId = 1,

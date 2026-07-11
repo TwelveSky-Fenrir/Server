@@ -6,21 +6,14 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     Covers <see cref="Zone.PostHolyStoneBattleRankReset" />/<c>Zone.ApplyHolyStoneBattleRankReset</c> --
-///     the C15-hsb-reset behavior contract's per-zone, per-player half of the code-40 HSB cluster-wide rank
-///     reset (Server/ts25zone/S07_MyGame08.cpp:223-271).
-/// </summary>
 public class ZoneHolyStoneBattleRankResetTests
 {
-    /// <summary>Legacy sub-command 66 -- rank-point cleared.</summary>
-    private const int RankPointClearedStatSort = 66;
 
-    /// <summary>Legacy sub-command 67 -- rank-point-date reset.</summary>
-    private const int RankPointDateResetStatSort = 67;
+        private const int RankPointClearedStatSort = 66;
 
-    /// <summary>Legacy sub-command 68 -- rank-buff cleared.</summary>
-    private const int RankBuffClearedStatSort = 68;
+        private const int RankPointDateResetStatSort = 67;
+
+        private const int RankBuffClearedStatSort = 68;
 
     private static byte[] ExpectedFrames(params ReadOnlySpan<AvatarStatUpdateResponse> packets)
     {
@@ -37,7 +30,7 @@ public class ZoneHolyStoneBattleRankResetTests
         var (session, pipe) = ZoneTestKit.CreateSession(characterId);
         zone.Post(ZoneCommand.Enter(characterId, ZoneTestKit.EnterData(session, 1)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
-        ZoneTestKit.DrainOutbound(pipe); // discard the world-entry handshake's own traffic
+        ZoneTestKit.DrainOutbound(pipe);
 
         Assert.True(zone.TryGetPlayer(characterId, out var state));
         return (zone, state!, pipe);
@@ -67,7 +60,7 @@ public class ZoneHolyStoneBattleRankResetTests
     public void MainBranch_RankPointAboveZero_SendsClearNotificationBeforeDateNotification_AndZeroesIt()
     {
         var (zone, state, pipe) = SetUp();
-        state.RankPoint = 250; // only reachable in production via the DEAD USE_RANK_POINT accumulator
+        state.RankPoint = 250;
 
         Assert.True(zone.PostHolyStoneBattleRankReset());
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -100,9 +93,6 @@ public class ZoneHolyStoneBattleRankResetTests
             new AvatarStatUpdateResponse { Sort = RankBuffClearedStatSort, Value = 0, Value2 = 0 });
 
         var sent = ZoneTestKit.DrainOutbound(pipe);
-        // The rank-buff clear also triggers RecomputeStatsAndBroadcastBuffs, which appends its own
-        // AvatarEffectStateResponse frame after the two AvatarStatUpdateResponse notifications below -- only
-        // the deterministic notification prefix is asserted byte-for-byte here.
         Assert.True(sent.Length > expectedPrefix.Length);
         Assert.Equal(expectedPrefix, sent[..expectedPrefix.Length]);
     }
@@ -114,7 +104,7 @@ public class ZoneHolyStoneBattleRankResetTests
         state.IsMovingZone = true;
         state.RankPoint = 100;
         state.RankBuffType = 4;
-        state.RankPointDate = 0; // never reset -- not today
+        state.RankPointDate = 0;
 
         Assert.True(zone.PostHolyStoneBattleRankReset());
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -132,7 +122,7 @@ public class ZoneHolyStoneBattleRankResetTests
         var (zone, state, pipe) = SetUp();
         var today = GameDate.Today();
         state.IsMovingZone = true;
-        state.RankPointDate = today; // already reset earlier today
+        state.RankPointDate = today;
         state.RankPoint = 77;
         state.RankBuffType = 2;
 
@@ -140,8 +130,8 @@ public class ZoneHolyStoneBattleRankResetTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.Equal(today, state.RankPointDate);
-        Assert.Equal(77, state.RankPoint); // untouched, not re-zeroed
-        Assert.Equal(2, state.RankBuffType); // untouched, not re-zeroed
+        Assert.Equal(77, state.RankPoint);
+        Assert.Equal(2, state.RankBuffType);
         Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
     }
 

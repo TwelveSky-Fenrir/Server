@@ -5,14 +5,6 @@ using Fenrir.Data.Abstractions.Characters;
 
 namespace Fenrir.Application.Game.Tests.Avatars;
 
-/// <summary>
-///     Migrations/041_characters_warpoint_currency.sql follow-up: that migration's own header flagged
-///     <c>usp_Character_GetForWorldEntry</c> not yet projecting <c>game.Characters.WarPoint</c> as the still-open
-///     follow-up. Covers the wire-projection half of closing it -- <see cref="AvatarInfoFactory" /> must reflect
-///     the real persisted/in-memory value instead of leaving <c>AvatarInfo.WarPoint</c> at
-///     <see cref="Fenrir.Network.Serialization.Shared.Packets.Shared.AvatarInfoTemplates.Zeroed" />'s bare 0 --
-///     see <see cref="PlayerRuntimeState.WarPoint" />'s own remarks.
-/// </summary>
 public class AvatarInfoFactoryTests
 {
     [Fact]

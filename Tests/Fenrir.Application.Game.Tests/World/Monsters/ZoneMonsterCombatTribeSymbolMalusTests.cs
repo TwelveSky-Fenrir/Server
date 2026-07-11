@@ -13,15 +13,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.World.Monsters;
 
-/// <summary>
-///     Covers the end-to-end wiring of the B15 (wave15 contract) PvM tribe-symbol malus through
-///     <c>Zone.Combat.cs</c>'s <c>ResolvePvmAttack</c> call site: <see cref="Zone" />'s own
-///     <c>tribeSymbolCombatModifiers</c> collaborator, populated by a real
-///     <see cref="TribeSymbolDamageModifierSystem" /> tick, actually reaches
-///     <see cref="MonsterCombatResolver.ResolvePvmAttack" /> and reduces the applied damage. Complements
-///     <c>MonsterCombatResolverTribeSymbolMalusTests</c> (the same term's pure resolver-level coverage) and
-///     <c>ZoneMonsterCombatTests</c> (this suite's own general-purpose PvM coverage, left untouched).
-/// </summary>
 public class ZoneMonsterCombatTribeSymbolMalusTests
 {
     private static readonly EffectiveStats StrongAttacker = new(1000, 1000, 1000, 0, 1000, 0, 0, 0, 0, 0, 0);
@@ -66,8 +57,6 @@ public class ZoneMonsterCombatTribeSymbolMalusTests
             randomSource: new ScriptedRandomSource(0), tribeSymbolCombatModifiers: modifiers);
 
         var (session, pipe) = ZoneTestKit.CreateSession(1);
-        // EnterData's own default tribe is 1 -- relied on here rather than overridden, so the malus below
-        // targets this exact attacker's own tribe.
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Attacker")));
         zone.Tick(SimulationClock.LegacyTick);
 
@@ -80,13 +69,8 @@ public class ZoneMonsterCombatTribeSymbolMalusTests
         attacker.AttackSubPacketCeiling = int.MaxValue;
 
         if (malusTribe1)
-            worldState.ResolveTribeSymbol(1, 2); // tribe 1 (this attacker's own tribe) loses its own slot
+            worldState.ResolveTribeSymbol(1, 2);
 
-        // Populate Zone's own tribeSymbolCombatModifiers exactly the way the real per-tick simulation system
-        // would, using the SAME WorldStateService the malus is derived from -- not a direct internal-setter
-        // poke (TribeSymbolCombatModifiers.SetDamageDownPenalty is internal to Fenrir.Application.Game.Domain
-        // and deliberately not exercised directly from this test assembly, matching
-        // TribeSymbolCombatModifiersTests's own documented convention).
         new TribeSymbolDamageModifierSystem(worldState, modifiers).Simulate(zone, 1);
 
         zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1));
@@ -129,7 +113,6 @@ public class ZoneMonsterCombatTribeSymbolMalusTests
         zone.Tick(SimulationClock.LegacyTick);
 
         Assert.True(zone.TryGetMonster(1, out var damaged));
-        // 1000 base attack power - 20% malus = 800 applied damage.
         Assert.Equal(startingLife - 800, damaged!.Life);
     }
 
@@ -148,7 +131,7 @@ public class ZoneMonsterCombatTribeSymbolMalusTests
         zone.Tick(SimulationClock.LegacyTick);
 
         Assert.True(zone.TryGetMonster(1, out var damaged));
-        Assert.Equal(startingLife - 1000, damaged!.Life); // full, un-malused damage
+        Assert.Equal(startingLife - 1000, damaged!.Life);
     }
 
     [Fact]

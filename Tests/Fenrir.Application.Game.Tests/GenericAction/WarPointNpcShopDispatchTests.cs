@@ -20,27 +20,15 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.GenericAction;
 
-/// <summary>
-///     Covers the C13 dual-path dispatch <see cref="GenericActionService.BuyFromNpcShopAsync" /> now performs:
-///     a War-Point-priced item is offered to <see cref="IWarPointShopService.TryBuyAsync" /> BEFORE
-///     <see cref="NpcShopPolicy.ResolveBuy" />, and only a <see cref="WarPointBuyStatus.NotHandled" /> result falls
-///     through to the ordinary money-price path. Neither <see cref="WarPointShopPolicy" />'s own outcome mapping
-///     (see <c>WarPointShopServiceTests</c>) nor <see cref="NpcShopPolicy" />'s own outcome mapping (see
-///     <c>NpcShopTradeServiceTests</c>) is re-covered here -- this file asserts only the routing decision itself:
-///     which path actually runs, and that a short-circuited War-Point outcome never also touches the ordinary
-///     money/container path.
-/// </summary>
 public class WarPointNpcShopDispatchTests
 {
     private const int AccountId = 1;
     private const int CharacterId = 10;
-    private const short ZoneNumber = 1; // NpcShopPolicy.TownZoneNumbers
+    private const short ZoneNumber = 1;
 
-    /// <summary>The War-Point NPC that both satisfies the NpcShop proximity gate and owns the WP catalogue row.</summary>
-    private const int ShopNpcId = WarPointShopCatalog.NobleDragonNpcId; // 102
+        private const int ShopNpcId = WarPointShopCatalog.NobleDragonNpcId;
 
-    /// <summary>A second War-Point NPC, present in the world but NOT the owner of <see cref="WpItemId" />.</summary>
-    private const int OtherWpNpcId = WarPointShopCatalog.RoyalSerpentNpcId; // 202
+        private const int OtherWpNpcId = WarPointShopCatalog.RoyalSerpentNpcId;
 
     private const int WpItemId = 90200;
     private const int WpItemWarPointPrice = 500;
@@ -63,15 +51,7 @@ public class WarPointNpcShopDispatchTests
         return await task;
     }
 
-    /// <summary>
-    ///     One town zone, one NPC (<see cref="ShopNpcId" />) offering <see cref="NpcFunctionGate.NpcShop" /> and
-    ///     stocking <see cref="OrdinaryItemId" /> in its ordinary shop catalogue, plus a second NPC
-    ///     (<see cref="OtherWpNpcId" />) present in the world (but not spawned/offering anything) purely so a
-    ///     "wrong War-Point NPC" request still resolves to a real NPC row. <see cref="WpItemId" /> is
-    ///     deliberately NOT in <see cref="ShopNpcId" />'s ordinary <c>ShopItems</c> -- a War-Point item bypasses
-    ///     shop-membership entirely, so it must never be reachable through <see cref="NpcShopPolicy" /> at all.
-    /// </summary>
-    private static WorldDataCache BuildWorldData()
+        private static WorldDataCache BuildWorldData()
     {
         var wpItem = WorldDataTestRows.Item(WpItemId) with { Sort = NonStackableSort };
         var ordinaryItem = WorldDataTestRows.Item(OrdinaryItemId) with
@@ -173,15 +153,12 @@ public class WarPointNpcShopDispatchTests
         Assert.Equal(1, warPoints.CallCount);
         Assert.Equal(WpItemWarPointPrice, warPoints.LastCall!.WarPointCost);
 
-        // The ordinary money/container path must never have run for a War-Point purchase.
         Assert.Null(characters.LastAdjustMoneyAndReplaceContainer);
 
         var mirrored = state.Inventory.GetSlot(ContainerMatrix.InventoryPage0, 0);
         Assert.NotNull(mirrored);
         Assert.Equal(WpItemId, mirrored!.Value.ItemId);
 
-        // EventCode=3 is WarPointShopService's own WarPointShopBuyEventCode, distinct from the ordinary path's
-        // NpcShopBuyEventCode=2 -- proves the audit row came from the War-Point branch, not a fallthrough.
         var logged = Assert.Single(eventLog.LoggedEvents);
         Assert.Equal(3, logged.EventCode);
     }
@@ -195,8 +172,6 @@ public class WarPointNpcShopDispatchTests
         var warPointShop = CreateWarPointShop(worldData, warPoints, eventLog);
         var service = CreateService(worldData, characters, eventLog, warPointShop);
 
-        // OrdinaryItemId is absent from the War-Point price table, even though ShopNpcId IS a War-Point NPC --
-        // TryBuyAsync must answer NotHandled, and BuyFromNpcShopAsync must still complete the ordinary purchase.
         var result = await RunToCompletionAsync(
             service.BuyFromNpcShopAsync(zone, state, AccountId, CharacterId, BuyMove(ShopNpcId, OrdinaryItemId, 0),
                 CancellationToken.None), zone);
@@ -207,7 +182,7 @@ public class WarPointNpcShopDispatchTests
         Assert.Equal(-OrdinaryItemBuyCost, characters.LastAdjustMoneyAndReplaceContainer!.Value.DeltaMoney);
 
         var logged = Assert.Single(eventLog.LoggedEvents);
-        Assert.Equal(2, logged.EventCode); // ordinary NpcShopBuyEventCode
+        Assert.Equal(2, logged.EventCode);
     }
 
     [Fact]
@@ -238,7 +213,6 @@ public class WarPointNpcShopDispatchTests
         var warPointShop = CreateWarPointShop(worldData, warPoints, eventLog);
         var service = CreateService(worldData, characters, eventLog, warPointShop);
 
-        // OtherWpNpcId is itself a War-Point NPC, but WpItemId's catalogue row only displays at ShopNpcId.
         var result = await service.BuyFromNpcShopAsync(zone, state, AccountId, CharacterId,
             BuyMove(OtherWpNpcId, WpItemId, 1), CancellationToken.None);
 
@@ -255,9 +229,6 @@ public class WarPointNpcShopDispatchTests
         var (zone, state, characters, eventLog) = SetUp(worldData);
         var service = CreateService(worldData, characters, eventLog, warPointShop: null);
 
-        // WpItemId is not in ShopNpcId's ordinary ShopItems catalogue, so with War-Point routing disabled
-        // (the optional constructor parameter's default-null test seam) the request must fall straight into
-        // NpcShopPolicy.ResolveBuy and be rejected there (NotInCatalog) -- never reaching any War-Point logic.
         var result = await service.BuyFromNpcShopAsync(zone, state, AccountId, CharacterId,
             BuyMove(ShopNpcId, WpItemId, 1), CancellationToken.None);
 

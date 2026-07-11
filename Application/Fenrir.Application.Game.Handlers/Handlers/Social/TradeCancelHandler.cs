@@ -7,7 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>CZ_TRADE_CANCEL_SEND (opcode 48) -- the asker withdraws their own still-pending ask.</summary>
 public sealed class TradeCancelHandler(
     ZoneRegistry zones,
     ITradeCancelService tradeCancelService,

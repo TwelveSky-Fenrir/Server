@@ -7,7 +7,6 @@ public class TokenBucketTests
     [Fact]
     public void TryConsume_ExactlyCapacityTimes_AllSucceedThenNextFails()
     {
-        // TokensPerSecond = 0 removes refill entirely, so the (capacity+1)-th call fails deterministically.
         var bucket = new TokenBucket(5, 0d);
 
         for (var i = 0; i < 5; i++)
@@ -19,7 +18,6 @@ public class TokenBucketTests
     [Fact]
     public void TryConsume_AfterRealDelay_RefillsAtLeastOneToken()
     {
-        // A high TokensPerSecond means even a short sleep refills the small capacity, avoiding a flaky long sleep.
         var bucket = new TokenBucket(1, 1_000d);
 
         Assert.True(bucket.TryConsume());
@@ -33,7 +31,6 @@ public class TokenBucketTests
     [Fact]
     public void TryConsume_RefillNeverExceedsCapacity()
     {
-        // Refill is clamped to Capacity -- an idle bucket must not accumulate unbounded burst credit.
         var bucket = new TokenBucket(2, 1_000d);
 
         Thread.Sleep(50);

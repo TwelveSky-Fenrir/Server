@@ -4,10 +4,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Zone;
 
-/// <summary>
-///     ZC_MAKE_ITEM2_RECV (ZONE.h:1357, 29-byte payload) — same typedef as <see cref="UpgradeCapeResponse" />,
-///     including the dead trailing <see cref="UpgradeCapeResponse.Padding" /> byte.
-/// </summary>
 public class ZcMakeItem2RecvTests
 {
     [Fact]

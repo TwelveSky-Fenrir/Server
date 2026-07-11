@@ -7,13 +7,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Commerce;
 
-/// <summary>
-///     Covers <see cref="GetCashCatalogService" />: it always answers with the live
-///     <see cref="CommerceCatalogCache" /> contents/version, and records
-///     <see cref="PlayerRuntimeState.KnownCashCatalogVersion" /> for the resolving session so
-///     <see cref="Fenrir.Application.Game.Domain.Simulation.CashCatalogStaleNotifySystem" />'s own bookkeeping
-///     stays correct.
-/// </summary>
 public class GetCashCatalogServiceTests
 {
     private static async Task<CommerceCatalogCache> CacheAtVersionAsync(int version)
@@ -50,7 +43,7 @@ public class GetCashCatalogServiceTests
         service.GetCatalog(state);
 
         Assert.Equal(9, state.KnownCashCatalogVersion);
-        _ = zone; // keep the zone alive for the state's own Session reference
+        _ = zone;
     }
 
     [Fact]

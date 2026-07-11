@@ -11,9 +11,6 @@ public class AvatarInfoFactoryTests
     {
         var avatar = AvatarInfoFactory.Zeroed;
 
-        // Write()/TryRead() alone only catch an oversized array (IndexOutOfRangeException); an undersized one
-        // round-trips fine since Zeroed is all zeros anyway and would never throw, so these explicit length
-        // assertions are what actually proves all arrays are sized correctly.
         Assert.Equal(52, avatar.Equip.Length);
         Assert.Equal(768, avatar.Inventory.Length);
         Assert.Equal(32, avatar.Trade.Length);
@@ -53,7 +50,6 @@ public class AvatarInfoFactoryTests
         Assert.Equal(16, avatar.AutoHunt.BuffStore.Length);
         Assert.Equal(4, avatar.AutoHunt.AttackType.Length);
 
-        // No entry may be null: WriteFixedStringRows indexes every slot of the array unconditionally.
         Assert.All(avatar.Friend, Assert.NotNull);
         Assert.All(avatar.PartyName, Assert.NotNull);
 
@@ -100,25 +96,20 @@ public class AvatarInfoFactoryTests
         Assert.Equal(12, avatar.Level1);
         Assert.Equal(new[] { 101, 1500, -200, 30, 850, 320 }, avatar.LogoutInfo);
 
-        // A field not covered by CreateForCharacter must stay at Zeroed's value.
         Assert.Equal(0, avatar.Money);
     }
 
-    // FEQUIP_TYPE (Server/Header/Protocol/STRUCT.h:1662-1676) has exactly 13 slots (0-12), each packed as 4
-    // wire ints -- previously only exercised indirectly through CreateAvatarHandlerTests' full-AvatarInfo
-    // equality assertions; this pins the exact packing (ItemId/ExpireDate/Enchant-Combine-Refine-Socket) and
-    // the slot-13-and-above skip directly.
     [Fact]
     public void BuildEquipArray_PacksItemIdExpireDateAndEnchantEncoding_AndSkipsSlotsAtOrAbove13()
     {
         var equipment = new List<CharacterItemSlotTvp>
         {
             new(0, 84671, 1, 45, 6, 1, 2,
-                0, 0, 0, 12345, 0), // Amulet
+                0, 0, 0, 12345, 0),
             new(7, 84527, 1, 45, 6, 0, 0,
-                0, 0, 0, 0, 0), // Weapon
+                0, 0, 0, 0, 0),
             new(13, 999999, 1, 0, 0, 0, 0,
-                0, 0, 0, 0, 0) // out of FEQUIP_TYPE's range
+                0, 0, 0, 0, 0)
         };
 
         var equip = AvatarInfoFactory.BuildEquipArray(equipment);
@@ -128,13 +119,12 @@ public class AvatarInfoFactoryTests
         Assert.Equal(84671, equip[0]);
         Assert.Equal(12345, equip[1]);
         Assert.Equal(45 | (6 << 8) | (1 << 16) | (2 << 24), equip[2]);
-        Assert.Equal(0, equip[3]); // 4th wire int per slot is unmapped, always wire-zero
+        Assert.Equal(0, equip[3]);
 
-        Assert.Equal(84527, equip[28]); // slot 7 -> baseIndex 7*4
+        Assert.Equal(84527, equip[28]);
         Assert.Equal(0, equip[29]);
         Assert.Equal(45 | (6 << 8), equip[30]);
 
-        // Slot 13 would index past the 52-length array (13*4 == 52) -- silently dropped, not packed/thrown.
         Assert.DoesNotContain(999999, equip);
     }
 }

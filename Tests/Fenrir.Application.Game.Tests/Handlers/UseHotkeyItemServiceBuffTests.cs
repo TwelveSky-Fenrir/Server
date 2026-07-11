@@ -11,13 +11,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 
-/// <summary>
-///     End-to-end coverage (resolver -&gt; service -&gt; posted <c>HotkeySlotMirrorZoneCommand</c> -&gt; drained
-///     onto the tick-owned <see cref="Zone" />/<see cref="PlayerRuntimeState" />) for the four fixed-value
-///     self-buff scrolls/books added to potion types 12-15: Assassin Scroll (world.Items 1364), Departed
-///     Spirit Scroll (1156), Attack Increase Book (1471), Dodge Increase Book (1472). See
-///     <c>HotkeyItemConsumptionResolverTests</c> for the pure-resolver-level coverage of the same four items.
-/// </summary>
 public class UseHotkeyItemServiceBuffTests
 {
     private const int AssassinScrollItemId = 1364;
@@ -63,13 +56,13 @@ public class UseHotkeyItemServiceBuffTests
 
         Assert.Equal(UseHotkeyItemOutcome.Success, outcome);
         Assert.Equal(3, state.Buffs.Buff[15 * 2]);
-        Assert.Equal(80, state.Buffs.Buff[15 * 2 + 1]); // 40s @ 500ms legacy tick
+        Assert.Equal(80, state.Buffs.Buff[15 * 2 + 1]);
 
         var upsert = Assert.NotNull(characters.LastUpsertHotkeySlot);
         Assert.Equal(10, upsert.CharacterId);
-        Assert.Equal(AssassinScrollItemId, upsert.Sort); // bound id, still 1 unit left
-        Assert.Equal(1, upsert.Value1); // remaining quantity
-        Assert.Equal((int)HotkeyBindingKind.Item, upsert.Value2); // kind discriminator
+        Assert.Equal(AssassinScrollItemId, upsert.Sort);
+        Assert.Equal(1, upsert.Value1);
+        Assert.Equal((int)HotkeyBindingKind.Item, upsert.Value2);
     }
 
     [Fact]
@@ -82,9 +75,8 @@ public class UseHotkeyItemServiceBuffTests
 
         Assert.Equal(UseHotkeyItemOutcome.Success, outcome);
         Assert.Equal(3, state.Buffs.Buff[15 * 2]);
-        Assert.Equal(120, state.Buffs.Buff[15 * 2 + 1]); // 60s @ 500ms legacy tick
+        Assert.Equal(120, state.Buffs.Buff[15 * 2 + 1]);
 
-        // Last unit consumed -> the hotkey slot is cleared outright, not written as a zeroed-but-bound row.
         var upsert = Assert.NotNull(characters.LastUpsertHotkeySlot);
         Assert.Equal(0, upsert.Sort);
         Assert.Equal(0, upsert.Value1);

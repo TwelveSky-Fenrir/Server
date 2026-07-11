@@ -9,7 +9,6 @@ public class LcDemandZoneServerInfoRecvTests
     [Fact]
     public void PayloadSize_MatchesContractConstant()
     {
-        // ExpectedSize=29 (1-byte outbound header) -> 28-byte payload (4 + char[16] + 4 + 4).
         Assert.Equal(28, ZoneTransferResponse.PayloadSize);
     }
 

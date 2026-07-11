@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Guilds;
 
-/// <inheritdoc cref="IGuildActionService" />
 public sealed class GuildActionService(
     ZoneRegistry zones,
     IGuildRepository guilds,
@@ -31,17 +30,10 @@ public sealed class GuildActionService(
         int guildId;
         try
         {
-            // Guild creation, the creation-cost debit, and a guild-money audit-log row (game.EventLog,
-            // Category=GuildMoney) all commit atomically in usp_Guild_CreateAndDebitMoney -- no app-level
-            // compensation needed (Fenrir has no cached Money field to pre-check against, so an
-            // insufficient-balance failure is only discovered inside this same round trip).
             guildId = await guilds.CreateAndDebitMoneyAsync(name, characterId, -CreateGuildMoneyCost, 0, ct);
         }
         catch (Exception ex)
         {
-            // Economy gate (insufficient funds) or a name-uniqueness constraint enforced inside the stored
-            // procedure -- Warning, not Information: this is the exact "rejected due to an economy gate"
-            // class an operator should see by default, not routine chatter.
             logger.LogWarning(ex, "Character {CharacterId} guild create failed for name {GuildName}",
                 characterId, name);
             return GuildActionResult.Success(1, GuildInfoProjection.Empty(), 1);
@@ -167,8 +159,6 @@ public sealed class GuildActionService(
             return GuildActionResult.Success(6, GuildInfoProjection.Empty(), 2);
         }
 
-        // Deletes the guild/members/notices and writes a guild-money audit-log row (game.EventLog,
-        // Category=GuildMoney, DeltaMoney=0) atomically -- see usp_Guild_Disband's own doc comment.
         await guilds.DisbandAsync(guildId, characterId, ct);
 
         await zone.PostGuildCommandAndWaitAsync(new GuildMembershipZoneCommand(characterId, null, "", 0, ""), ct);
@@ -206,14 +196,10 @@ public sealed class GuildActionService(
 
         try
         {
-            // Grade increment, the upgrade-cost debit, and a guild-money audit-log row (game.EventLog,
-            // Category=GuildMoney) all commit atomically in usp_Guild_UpgradeAndDebitMoney -- no app-level
-            // compensation needed.
             await guilds.UpgradeAndDebitMoneyAsync(guildId, guild.Grade + 1, characterId, -cost, 0, ct);
         }
         catch (Exception ex)
         {
-            // Economy gate (insufficient funds) -- Warning, matching CreateGuildAsync's own treatment.
             logger.LogWarning(ex, "Character {CharacterId} guild upgrade failed for guild {GuildId}",
                 characterId, guildId);
             return GuildActionResult.Success(7, GuildInfoProjection.Empty(), 1);
@@ -391,10 +377,6 @@ public sealed class GuildActionService(
 
         try
         {
-            // Legacy's UpdateGuildBuffType (Server/ts25extra/S08_MyDB.cpp:1188-1191) writes only gBuffType/
-            // gBuffState -- gBuffTime/gBuffTimeForDiff are never touched by this action, whether this is a
-            // fresh activation or an ordinary type switch while already active. Carry the existing checkpoint
-            // through unchanged rather than stamping "now" here; GuildBuffDecayHost owns that field exclusively.
             await guilds.SetBuffAsync(guildId, payload.GuildBuffType, 1, guild.BuffTime, guild.BuffTimeForDiff, ct);
         }
         catch (Exception ex)
@@ -480,8 +462,6 @@ public sealed class GuildActionService(
         }
         catch (Exception ex)
         {
-            // Swallowed by design (see this method's own doc remarks): the response is always reported as
-            // Success(1001) either way, so a failure here is only ever observable through this log line.
             logger.LogWarning(ex, "Guild {GuildId} logo update failed", guildId);
         }
 

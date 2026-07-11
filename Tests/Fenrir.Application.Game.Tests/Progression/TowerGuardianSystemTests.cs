@@ -9,11 +9,10 @@ namespace Fenrir.Application.Game.Tests.Progression;
 
 public class TowerGuardianSystemTests
 {
-    // Zone 2 -> TowerZoneIndexTable towerIndex 0; guardian for level 2/type 1 is world.Monsters#589 (Silver Tower[L1]).
     private const short TowerZoneNumber = 2;
     private const int TowerIndex = 0;
     private const int GuardianMonsterId = 589;
-    private const int UpgradedGuardianMonsterId = 590; // level 4/type 1
+    private const int UpgradedGuardianMonsterId = 590;
 
     private static WorldDataCache CacheWithGuardians()
     {
@@ -50,7 +49,7 @@ public class TowerGuardianSystemTests
         zone.Tick(SimulationClock.LegacyTick);
 
         Assert.Equal(0, zone.MonsterCount);
-        Assert.Equal(TowerSiegePhase.Building, towerWar.GetPhase(0)); // untouched -- not this zone's tower
+        Assert.Equal(TowerSiegePhase.Building, towerWar.GetPhase(0));
     }
 
     [Fact]
@@ -79,12 +78,12 @@ public class TowerGuardianSystemTests
     {
         var (zone, towerWar) = CreateZone();
         towerWar.BeginUpgrade(TowerIndex, 201, 1);
-        zone.Tick(SimulationClock.LegacyTick); // level 2 guardian spawns
-
-        towerWar.BeginUpgrade(TowerIndex, 401, 1); // level-up to 4
         zone.Tick(SimulationClock.LegacyTick);
 
-        Assert.Equal(1, zone.MonsterCount); // old guardian freed, not stacked
+        towerWar.BeginUpgrade(TowerIndex, 401, 1);
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.Equal(1, zone.MonsterCount);
         Assert.True(zone.TryGetMonster(TowerWarState.GuardianServerIndex(TowerIndex), out var guardian));
         Assert.Equal(UpgradedGuardianMonsterId, guardian!.Template.MonsterId);
         Assert.Equal(401, towerWar.GetPackedState(TowerIndex));
@@ -118,7 +117,7 @@ public class TowerGuardianSystemTests
         Assert.Equal(TowerSiegePhase.Sieged, towerWar.GetPhase(TowerIndex));
         Assert.False(towerWar.IsValid(TowerIndex));
         Assert.Equal(201,
-            towerWar.GetPackedState(TowerIndex)); // last known level still shown until the destroy cooldown elapses
+            towerWar.GetPackedState(TowerIndex));
     }
 
     [Fact]

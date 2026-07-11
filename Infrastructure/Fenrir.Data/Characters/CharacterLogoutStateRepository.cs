@@ -8,9 +8,6 @@ using Fenrir.Data.Abstractions.Characters;
 
 namespace Fenrir.Data.Characters;
 
-// Durable per-character logout-info snapshot (game.CharacterLogoutState) -- see
-// ICharacterLogoutStateRepository for the per-method contract. A distinct, capture-time snapshot store, never
-// a second authority for the live world spawn.
 public sealed record CharacterLogoutStateRepository(ICaeriusNetDbContext Db) : ICharacterLogoutStateRepository
 {
     public async ValueTask UpsertAsync(int characterId, int lastZone, int posX, int posY, int posZ, int life,
@@ -32,7 +29,6 @@ public sealed record CharacterLogoutStateRepository(ICaeriusNetDbContext Db) : I
     public async ValueTask<ImmutableArray<CharacterLogoutStateDto>> GetByAccountAsync(int accountId,
         CancellationToken ct)
     {
-        // MAX_USER_AVATAR_NUM = 3 occupied slots at most, one row each -- a small, bounded result.
         var sp = new StoredProcedureParametersBuilder("game", "usp_CharacterLogoutState_GetByAccount", 3)
             .AddParameter("AccountId", accountId, SqlDbType.Int)
             .Build();

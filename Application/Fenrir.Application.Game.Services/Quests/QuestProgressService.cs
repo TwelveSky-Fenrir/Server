@@ -10,35 +10,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Quests;
 
-/// <remarks>
-///     NPC-proximity gate on Accept/Complete is a deliberate <b>Fenrir hardening decision, NOT legacy parity</b>.
-///     The legacy <c>PROCESS_QUEST_SEND</c> handler (Server/ts25zone/S04_MyWork02.cpp:7307-7559) gates neither
-///     accept nor complete on distance -- it never resolves the step's anchor NPC number nor reads the player's
-///     position, so a client can accept/complete from arbitrarily far from the quest NPC as long as the
-///     quest-STATE guard passes. Fenrir closes that exploit here by reusing the same squared-distance rule legacy
-///     already applies to the comparable NPC skill-learn/shop functions (<c>CheckNPCFunction</c>, radius
-///     <see cref="NpcFunctionGate.ProximityRadius" />, Server/ts25zone/S07_MyGame07.cpp:230-257 +
-///     Server/Header/mapcheck.h:17-20) via <see cref="NpcFunctionGate.CheckNpcProximity" />, keyed on the step's
-///     concrete anchor NPC number rather than a menu-function.
-///     <para>
-///         The anchor-per-action mapping IS legacy-grounded: <c>ReturnQuestNextNPCNumber</c>
-///         (Server/ts25zone/S07_MyGame04.cpp:1937-1975) resolves an in-progress step to its <c>qStartNPCNumber</c>
-///         and a completed step to its <c>qEndNPCNumber</c> -- so Accept anchors on the accepted (next) step's
-///         Start NPC and Complete anchors on the current step's End NPC.
-///     </para>
-///     <para>
-///         The gate is intentionally <b>fail-open</b> in three cases, so it never disconnects a legitimate player
-///         on a data gap: (1) the step declares no anchor NPC (number &lt;= 0); (2) the current map has no loaded
-///         placement data; (3) the anchor NPC is not placed on the current map at all
-///         (<see cref="NpcProximity.NpcNotInZone" />). Only case (3)'s residual -- accept/complete while on a map
-///         the anchor NPC isn't on -- is left un-gated; tightening it to also require the correct map is an open
-///         product decision (see this workstream's openQuestions). A proximity failure surfaces as a failed
-///         <see cref="QuestActionResult" />, which <c>QuestProgressHandler</c> turns into a session disconnect --
-///         the same outward signal legacy uses at every live <c>CheckNPCFunction</c> failure
-///         (Server/ts25zone/S04_MyWork04.cpp:382-386). Receive/Exchange/Abandon are NOT gated: the contract does
-///         not establish their anchors, and legacy gates none of them.
-///     </para>
-/// </remarks>
 public sealed class QuestProgressService(
     ICharacterRepository characters,
     IEventLogRepository eventLog,
@@ -47,17 +18,8 @@ public sealed class QuestProgressService(
     ILogger<QuestProgressService> logger)
     : IQuestProgressService
 {
-    /// <summary>
-    ///     game.EventLog.EventCode for a quest-completion reward grant (tSort 2, "mission completed" -- see
-    ///     <see cref="CompleteAsync" />), scoped independently within <see cref="EventLogCategory.ItemCreate" />;
-    ///     EventCode is only ever caller-interpreted alongside its Category (see game.EventLog.sql's own
-    ///     "app-owned numbering scheme" comment). Fires whenever completion actually grants something -- an
-    ///     item deposit, and/or any nonzero money/experience/contribution-point/teacher-point reward -- not
-    ///     only when an item was granted. Money has its own DeltaMoney column; experience, contribution
-    ///     points, and teacher points have no dedicated EventLog column, so those three are packed into
-    ///     Payload when any of them is nonzero.
-    /// </summary>
-    private const short QuestRewardEventCode = 1;
+
+        private const short QuestRewardEventCode = 1;
 
     public async ValueTask<QuestActionResult> AcceptAsync(QuestProgressRequest packet, PlayerRuntimeState state,
         Zone zone, int characterId, CancellationToken ct)
@@ -76,8 +38,6 @@ public sealed class QuestProgressService(
         if (!result.Success)
             return new QuestActionResult(false);
 
-        // NPC-proximity hardening gate (Fenrir decision, not legacy parity -- see class remarks). Accept anchors
-        // on the ACCEPTED (next) step's quest-giver, qStartNPCNumber.
         if (!IsNearQuestAnchorNpc(zone, state, progress.StepPermanent + 1, false))
         {
             logger.LogInformation(
@@ -125,8 +85,6 @@ public sealed class QuestProgressService(
         if (!result.Success)
             return new QuestActionResult(false);
 
-        // NPC-proximity hardening gate (Fenrir decision, not legacy parity -- see class remarks). Complete anchors
-        // on the CURRENT step's turn-in NPC, qEndNPCNumber.
         if (!IsNearQuestAnchorNpc(zone, state, progress.StepPermanent, true))
         {
             logger.LogInformation(
@@ -143,8 +101,6 @@ public sealed class QuestProgressService(
                     out var container, out var slot))
                 return new QuestActionResult(false);
 
-            // Skip the deposit when no reward item is configured: an ItemId of 0 would be misread as an
-            // empty slot by Fenrir's presence-keyed container model.
             if (result.RewardItemId > 0)
             {
                 edits.Deposit(container, slot,
@@ -162,10 +118,6 @@ public sealed class QuestProgressService(
         var hasNumericReward = result.MoneyReward != 0 || result.ExperienceReward != 0 ||
                                result.ContributionPointsReward != 0 || result.TeacherPointReward != 0;
 
-        // Logged only once the quest-transition/container write above has durably committed, and only when
-        // completion actually granted something -- an item deposit and/or a nonzero money/XP/CP/teacher-point
-        // reward. A completion that grants literally nothing (all reward fields zero/absent) mints nothing to
-        // audit here.
         if (itemRewardGranted || hasNumericReward)
             await eventLog.LogAsync(QuestRewardEventCode, EventLogCategory.ItemCreate, accountId, characterId,
                 null, null, null,
@@ -242,11 +194,6 @@ public sealed class QuestProgressService(
         if (!result.Success)
             return new QuestActionResult(false);
 
-        // Legacy quirk (ChangeQuestItem, Server/ts25zone/S07_MyGame04.cpp:2223-2244): the inventory
-        // scan-and-swap's found/not-found signal is discarded by the caller. If the avatar no longer holds
-        // the "before" item anywhere (already exchanged, traded away, or otherwise missing), no item is
-        // physically changed, but quest-progress state still advances to "after exchange" exactly as if the
-        // swap had succeeded -- there is no failure path tied to the swap itself.
         edits.TryReplaceFirstMatch(result.FromItemId, _ =>
             new ItemStack(result.ToItemId, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
 
@@ -293,11 +240,7 @@ public sealed class QuestProgressService(
         return new QuestActionResult(true);
     }
 
-    /// <summary>
-    ///     Shared tail for Accept/Complete/Exchange: persist (quest-state + optional money + up to 2 containers) in ONE
-    ///     transaction, then mirror onto the live PlayerRuntimeState.
-    /// </summary>
-    private async ValueTask PersistAndMirrorAsync(Zone zone, int characterId, QuestProgress newProgress,
+        private async ValueTask PersistAndMirrorAsync(Zone zone, int characterId, QuestProgress newProgress,
         long deltaMoney, int experienceDelta, int contributionPointsDelta, int teacherPointDelta,
         ContainerEdits edits, CancellationToken ct)
     {
@@ -321,15 +264,7 @@ public sealed class QuestProgressService(
             state.QuestTargetPhase, state.QuestKillCounter);
     }
 
-    /// <summary>
-    ///     True when the player is within <see cref="NpcFunctionGate.ProximityRadius" /> of the anchor NPC for
-    ///     <paramref name="anchorStep" /> (its <c>qEndNPCNumber</c> when <paramref name="useEndNpc" />, else its
-    ///     <c>qStartNPCNumber</c>), OR when the gate is fail-open for a data gap. See the class remarks for the
-    ///     three fail-open cases and why this is a Fenrir hardening decision rather than legacy parity. Rejects
-    ///     (returns false) only when the anchor NPC IS placed on the current map but every placement is beyond
-    ///     radius -- exactly the "accept/complete from anywhere on the same map" exploit the contract cites.
-    /// </summary>
-    private bool IsNearQuestAnchorNpc(Zone zone, PlayerRuntimeState state, int anchorStep, bool useEndNpc)
+        private bool IsNearQuestAnchorNpc(Zone zone, PlayerRuntimeState state, int anchorStep, bool useEndNpc)
     {
         var quest = questCatalog.TryGet(state.Tribe, anchorStep);
         if (quest is null)
@@ -346,8 +281,7 @@ public sealed class QuestProgressService(
             state.PosZ) != NpcProximity.Far;
     }
 
-    /// <summary>Bounds/occupancy validation shared by Accept/Complete/Receive.</summary>
-    private static bool TryValidateDepositSlot(int page, int index, int xPost, int yPost, ContainerEdits edits,
+        private static bool TryValidateDepositSlot(int page, int index, int xPost, int yPost, ContainerEdits edits,
         out byte container, out byte slot)
     {
         container = 0;
@@ -371,11 +305,7 @@ public sealed class QuestProgressService(
         return list;
     }
 
-    /// <summary>
-    ///     Accumulates projected container edits over the live inventory snapshot, so a delete-then-deposit
-    ///     sequence on the same container merges into one final projection instead of racing itself.
-    /// </summary>
-    private sealed class ContainerEdits(PlayerRuntimeState state)
+        private sealed class ContainerEdits(PlayerRuntimeState state)
     {
         private static readonly byte[] InventoryContainers =
             [ContainerMatrix.InventoryPage0, ContainerMatrix.InventoryPage1];
@@ -392,8 +322,7 @@ public sealed class QuestProgressService(
             _edits[container] = Get(container).SetItem(slot, stack);
         }
 
-        /// <summary>Scans page 0 then page 1, wipes the first matching slot; a no-op if not found anywhere.</summary>
-        public void DeleteFirstMatch(int itemId)
+                public void DeleteFirstMatch(int itemId)
         {
             foreach (var container in InventoryContainers)
             {
@@ -407,8 +336,7 @@ public sealed class QuestProgressService(
             }
         }
 
-        /// <summary>Scans page 0 then page 1, replaces the first matching slot via <paramref name="transform" />.</summary>
-        public bool TryReplaceFirstMatch(int itemId, Func<ItemStack, ItemStack> transform)
+                public bool TryReplaceFirstMatch(int itemId, Func<ItemStack, ItemStack> transform)
         {
             foreach (var container in InventoryContainers)
             {
@@ -435,8 +363,7 @@ public sealed class QuestProgressService(
             return builder.ToImmutable();
         }
 
-        /// <summary>Splits the (at most 2) touched containers into parameter pairs; null container = "not touched".</summary>
-        public (byte? Container1, List<CharacterItemSlotTvp> Items1, byte? Container2, List<CharacterItemSlotTvp> Items2
+                public (byte? Container1, List<CharacterItemSlotTvp> Items1, byte? Container2, List<CharacterItemSlotTvp> Items2
             )
             ToTvpPairs()
         {

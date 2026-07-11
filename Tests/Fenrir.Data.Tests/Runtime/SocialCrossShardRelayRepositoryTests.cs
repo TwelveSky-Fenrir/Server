@@ -7,12 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Runtime;
 
-/// <summary>
-///     runtime.usp_SocialCrossShardRelay_{Publish,Poll} against real SQL Server 2025, through
-///     <see cref="SocialCrossShardRelayRepository" /> exactly as the (future) <c>SocialCrossShardRelayHost</c>
-///     calls it. Unlike <see cref="CharacterShardLocationRepositoryTests" />, no
-///     <c>runtime.GameServerDirectory</c> heartbeat is required first -- neither proc joins against it.
-/// </summary>
 [Collection("SqlServer")]
 public sealed class SocialCrossShardRelayRepositoryTests : IDisposable
 {
@@ -85,7 +79,6 @@ public sealed class SocialCrossShardRelayRepositoryTests : IDisposable
         var askRow = Assert.Single(
             await _repository.PollAsync(targetShardId, 999_999, CancellationToken.None));
 
-        // Answer is addressed back the other way: Answer.TargetShardId is the original asker's shard.
         var answer = MakeAnswer(targetShardId, 100, "Target",
             7, 200, false, 5, askRow.RelayId);
         await _repository.PublishAsync(answer, CancellationToken.None);
@@ -114,8 +107,6 @@ public sealed class SocialCrossShardRelayRepositoryTests : IDisposable
                 targetShardId, 100),
             CancellationToken.None);
 
-        // Unlike GuildTribeBroadcastRelay's fan-out (every OTHER shard sees it), a shard not named as the
-        // target never sees this row at all -- not even once.
         var unrelatedShardRows =
             await _repository.PollAsync(unrelatedShardId, 999_999, CancellationToken.None);
         Assert.Empty(unrelatedShardRows);
@@ -137,8 +128,6 @@ public sealed class SocialCrossShardRelayRepositoryTests : IDisposable
         var firstPoll = await _repository.PollAsync(targetShardId, 999_999, CancellationToken.None);
         Assert.Single(firstPoll);
 
-        // Cursor already advanced past the first row -- an immediate re-poll with nothing new published sees
-        // nothing, it is never re-delivered.
         var secondPollNoNewRows =
             await _repository.PollAsync(targetShardId, 999_999, CancellationToken.None);
         Assert.Empty(secondPollNoNewRows);
@@ -167,15 +156,10 @@ public sealed class SocialCrossShardRelayRepositoryTests : IDisposable
                 otherTargetShardId, 101),
             CancellationToken.None);
 
-        // The SELECT happens before the reap DELETE, so this call still returns its own row even though
-        // @RetentionSeconds = 0 makes every already-inserted row (any target shard) immediately reap-eligible.
         var pollingShardRows =
             await _repository.PollAsync(pollingShardId, 0, CancellationToken.None);
         Assert.Single(pollingShardRows);
 
-        // The row addressed to otherTargetShardId was reaped as a side effect of the call above, even though
-        // that shard never polled with a small retention itself -- reap is purely time-based, not scoped to
-        // the polling shard's own TargetShardId filter.
         var otherShardRows =
             await _repository.PollAsync(otherTargetShardId, 999_999, CancellationToken.None);
         Assert.Empty(otherShardRows);

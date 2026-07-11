@@ -7,13 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Progression;
 
-/// <summary>
-///     CZ_HERORANK_INFO_SEND (opcode 118). The legacy gates each reply on whether the server-wide ranking
-///     snapshot (refreshed by a periodic DB-poll job) has advanced by more than 2.5s beyond what this
-///     connection last saw, independently for the Previous and Current periods
-///     (S04_MyWork02.cpp:14159-14176). Fenrir has no separate ranking-refresh job, so this reproduces the
-///     same observable cadence as a flat per-connection 2.5s throttle instead, always querying live.
-/// </summary>
 public sealed class HeroRankingHandler(IHeroRankingService heroRankingService, ILogger<HeroRankingHandler> logger)
     : IAsyncPacketHandler<HeroRankingRequest>
 {

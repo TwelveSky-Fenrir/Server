@@ -2,7 +2,6 @@ using Fenrir.Data.WriteBehind;
 
 namespace Fenrir.Data.Tests.WriteBehind;
 
-// Pure in-memory unit tests for WriteBehindFlusher<TKey>: the flush callback is faked, no database needed.
 public sealed class WriteBehindFlusherTests
 {
     private static readonly TimeSpan BoundedWait = TimeSpan.FromSeconds(5);
@@ -24,7 +23,7 @@ public sealed class WriteBehindFlusherTests
                 return ValueTask.CompletedTask;
             },
             TimeSpan.FromMilliseconds(100),
-            1_000); // large enough that only the interval can trigger this flush
+            1_000);
 
         using var cts = new CancellationTokenSource();
         var runTask = flusher.RunAsync(cts.Token);
@@ -32,7 +31,7 @@ public sealed class WriteBehindFlusherTests
         var batch = await flushed.Task.WaitAsync(BoundedWait);
 
         Assert.Equal(DirtyFlags.Position, Assert.Single(batch).Value);
-        Assert.Equal(0, tracker.Count); // the flusher drains before invoking the callback
+        Assert.Equal(0, tracker.Count);
 
         cts.Cancel();
         await runTask.WaitAsync(BoundedWait);
@@ -54,7 +53,7 @@ public sealed class WriteBehindFlusherTests
                 flushed.TrySetResult(batch);
                 return ValueTask.CompletedTask;
             },
-            TimeSpan.FromSeconds(30), // long enough that only RequestImmediateFlush can explain a fast flush
+            TimeSpan.FromSeconds(30),
             1_000);
 
         using var cts = new CancellationTokenSource();
@@ -92,7 +91,7 @@ public sealed class WriteBehindFlusherTests
 
         tracker.MarkDirty(1, DirtyFlags.Position);
         tracker.MarkDirty(2, DirtyFlags.Position);
-        tracker.MarkDirty(3, DirtyFlags.Position); // crosses entityThreshold = 3
+        tracker.MarkDirty(3, DirtyFlags.Position);
 
         var batch = await flushed.Task.WaitAsync(BoundedWait);
         Assert.Equal(3, batch.Count);
@@ -134,7 +133,6 @@ public sealed class WriteBehindFlusherTests
         var observedFailure = await firstAttemptFailed.Task.WaitAsync(BoundedWait);
         Assert.IsType<InvalidOperationException>(observedFailure);
 
-        // Re-merge happens before onFlushError fires, so this read isn't racing FlushBatchAsync's catch block.
         Assert.Equal(1, tracker.Count);
 
         flusher.RequestImmediateFlush();
@@ -150,9 +148,6 @@ public sealed class WriteBehindFlusherTests
     [Fact]
     public async Task RunAsync_OnCancellation_PerformsAFinalDrainOfWhateverIsStillDirty()
     {
-        // Parity fix for Server/ts25playuser/S07_MyGame01.cpp:317-372's force-save-then-poll-until-drained
-        // shutdown sequence: RunAsync must attempt one more drain-and-flush of whatever DirtyTracker still
-        // holds the instant cancellation is observed, instead of abandoning it.
         var tracker = new DirtyTracker<int>();
         tracker.MarkDirty(99, DirtyFlags.Position | DirtyFlags.Vitals);
 
@@ -167,8 +162,8 @@ public sealed class WriteBehindFlusherTests
                 finalBatch = batch;
                 return ValueTask.CompletedTask;
             },
-            TimeSpan.FromSeconds(30), // long enough that only the final drain (never the interval) explains this
-            1_000); // large enough that only the final drain (never the threshold) explains this
+            TimeSpan.FromSeconds(30),
+            1_000);
 
         using var cts = new CancellationTokenSource();
         var runTask = flusher.RunAsync(cts.Token);
@@ -193,10 +188,9 @@ public sealed class WriteBehindFlusherTests
             TimeSpan.FromMilliseconds(20),
             1_000);
 
-        // Token is never cancelled -- only DisposeAsync's internal shutdown signal can stop the loop.
         var runTask = flusher.RunAsync(CancellationToken.None);
 
-        await Task.Delay(TimeSpan.FromMilliseconds(100)); // let a few loop iterations actually happen first
+        await Task.Delay(TimeSpan.FromMilliseconds(100));
 
         await flusher.DisposeAsync().AsTask().WaitAsync(BoundedWait);
 

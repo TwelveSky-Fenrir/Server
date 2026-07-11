@@ -3,17 +3,6 @@ using System.Text;
 
 namespace Fenrir.Network.Serialization.Wire;
 
-/// <summary>
-///     (De)serialization primitives shared by code emitted by Fenrir.Generators.Protocol. Strings use
-///     <see cref="System.Text.Encoding.Latin1" /> (wire contract §7.6); scalars are little-endian (via
-///     <see cref="System.Buffers.Binary.BinaryPrimitives" />).
-/// </summary>
-/// <remarks>
-///     Hand-written, not generator-emitted: this content used to be regenerated verbatim into every project the
-///     Protocol generator was attached to via <c>RuntimeHelpersEmitter</c>/<c>RegisterPostInitializationOutput</c>.
-///     A single checked-in copy is simpler to read/diff and is exactly as available to <see cref="MessageReader" />/
-///     <see cref="MessageWriter" /> and every generated packet's <c>TryRead</c>/<c>Write</c>.
-/// </remarks>
 public static class LegacyWireCodec
 {
     public static string ReadFixedString(ReadOnlySpan<byte> source)

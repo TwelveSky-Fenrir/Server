@@ -9,7 +9,6 @@ public class ClChangeAvatarNameSendTests
     [Fact]
     public void PayloadSize_MatchesContractConstant()
     {
-        // ExpectedSize=34 (9-byte inbound header) -> 25-byte payload (int + char[13] + int + int).
         Assert.Equal(25, RenameAvatarRequest.PayloadSize);
     }
 

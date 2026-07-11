@@ -8,7 +8,6 @@ public class LcRecommandWorld2RecvTests
     [Fact]
     public void PayloadSize_MatchesContractConstant()
     {
-        // ExpectedSize=13 (1-byte outbound header) -> 12-byte payload (3 int), same struct as op 24 in LOGIN.h.
         Assert.Equal(12, WorldRecommendationFinalResponse.PayloadSize);
     }
 

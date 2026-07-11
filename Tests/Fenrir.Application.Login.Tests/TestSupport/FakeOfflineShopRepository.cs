@@ -4,18 +4,12 @@ using Fenrir.Data.Abstractions.Commerce;
 
 namespace Fenrir.Application.Login.Tests.TestSupport;
 
-/// <summary>
-///     In-memory stand-in for IOfflineShopRepository, used only for DeleteAvatarService's proxy-shop refusal
-///     check -- every member besides <see cref="GetByCharacterAsync" /> throws, since nothing else on this path
-///     calls them.
-/// </summary>
 internal sealed class FakeOfflineShopRepository : IOfflineShopRepository
 {
     private readonly Dictionary<int, (OfflineShopRowDto? Shop, IReadOnlyList<OfflineShopItemRowDto> Items)>
         _byCharacterId = new();
 
-    /// <summary>Every characterId GetByCharacterAsync was called with, in call order -- proves ordering/short-circuit.</summary>
-    public List<int> QueriedCharacterIds { get; } = [];
+        public List<int> QueriedCharacterIds { get; } = [];
 
     public ValueTask<(OfflineShopRowDto? Shop, IReadOnlyList<OfflineShopItemRowDto> Items)> GetByCharacterAsync(
         int characterId, CancellationToken ct)
@@ -82,8 +76,7 @@ internal sealed class FakeOfflineShopRepository : IOfflineShopRepository
         throw new NotSupportedException();
     }
 
-    /// <summary>No character has ever opened a shop.</summary>
-    public static FakeOfflineShopRepository Empty()
+        public static FakeOfflineShopRepository Empty()
     {
         return new FakeOfflineShopRepository();
     }

@@ -5,11 +5,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Tribes;
 
-/// <summary>
-///     See <see cref="ITribeVoteService" />. Sort 1 (candidacy, TRIBE_VOTE_V2 branch, S04_MyWork02.cpp:11610+)
-///     requires <see cref="TribeVoteElection.Phase" /> to be <see cref="TribeVotePhase.Candidacy" />; sort 3
-///     (vote, same file's case 3) requires <see cref="TribeVotePhase.Voting" />.
-/// </summary>
 public sealed class TribeVoteService(TribeVoteElection election, ILogger<TribeVoteService> logger)
     : ITribeVoteService
 {

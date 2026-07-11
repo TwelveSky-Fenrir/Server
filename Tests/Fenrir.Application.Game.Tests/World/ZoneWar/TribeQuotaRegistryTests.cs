@@ -22,7 +22,6 @@ public class TribeQuotaRegistryTests
 
         registry.Release(sessionA.SessionId);
 
-        // Recomputed, not decremented from a cached counter: releasing one of the two now shows exactly one.
         Assert.Equal(1, registry.CountForTribe(1));
     }
 
@@ -32,8 +31,6 @@ public class TribeQuotaRegistryTests
         var registry = new TribeQuotaRegistry();
         var (session, _) = ZoneTestKit.CreateSession(1);
 
-        // Simulates the "declared tribe used only for the threshold check, upstream-resolved tribe recorded"
-        // edge case: caller passes the resolved tribe (2), not whatever was declared on the wire.
         registry.Record(session, 2, 10, 100, DateTimeOffset.UtcNow);
 
         Assert.Equal(1, registry.CountForTribe(2));
@@ -58,7 +55,7 @@ public class TribeQuotaRegistryTests
 
         Assert.True(registry.Release(session.SessionId));
         Assert.Equal(0, registry.Count);
-        Assert.False(registry.Release(session.SessionId)); // second release is a harmless no-op
+        Assert.False(registry.Release(session.SessionId));
     }
 
     [Fact]
@@ -98,7 +95,7 @@ public class TribeQuotaRegistryTests
     {
         var registry = new TribeQuotaRegistry();
         var (session, _) = ZoneTestKit.CreateSession(1);
-        session.MarkTicketConsumed(10, 100); // TicketConsumed -- never reached Registering/InWorld
+        session.MarkTicketConsumed(10, 100);
 
         var registeredAt = DateTimeOffset.UtcNow - TempRegistrationIdleSweep.IdleTimeout;
         registry.Record(session, 2, 10, 100, registeredAt);

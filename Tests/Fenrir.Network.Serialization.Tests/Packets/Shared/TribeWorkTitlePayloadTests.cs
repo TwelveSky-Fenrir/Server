@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Tests.TestSupport;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Shared;
 
-// CZ_TRIBE_WORK_SEND tSort 6.
 public class TribeWorkTitlePayloadTests
 {
     [Fact]

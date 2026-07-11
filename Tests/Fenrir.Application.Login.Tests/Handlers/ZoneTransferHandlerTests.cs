@@ -12,10 +12,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
-// op22 CL_DEMAND_ZONE_SERVER_INFO_SEND -- previously audited bug (ADR-0012 point 4): FirstOrDefault() over the
-// shard directory ignored which shard actually hosts the character's MapId, silently mis-routing instead of
-// failing explicitly. Fixed in ZoneTransferService.ResolveShardForMapAsync; see the two "no shard hosts the
-// map" tests below for the current, explicit-failure behavior.
 public class ClDemandZoneServerInfoSendHandlerTests
 {
     private const short HostedMapId = 42;
@@ -58,8 +54,6 @@ public class ClDemandZoneServerInfoSendHandlerTests
         });
     }
 
-    // GM-BLOCK precondition: the Login-side account-grade fact (legacy uUserSort) must ride the same
-    // handover ticket as the character/shard, never re-queried by the Zone session.
     [Fact]
     public async Task HandleAsync_GmAccount_CarriesAccountGradeIntoTheMintedTicket()
     {

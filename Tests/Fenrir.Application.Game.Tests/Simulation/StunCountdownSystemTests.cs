@@ -4,10 +4,6 @@ using Fenrir.Application.Game.Tests.TestSupport;
 
 namespace Fenrir.Application.Game.Tests.Simulation;
 
-/// <summary>
-///     Covers <see cref="StunCountdownSystem" />: the ~1 s (2 legacy tick) stun-duration countdown and its
-///     natural-expiry hand-off to <c>Zone.ClearStun</c> (<c>S07_MyGame04.cpp:438-459</c>).
-/// </summary>
 public class StunCountdownSystemTests
 {
     private static (Zone Zone, PlayerRuntimeState State) EnterStunnedPlayer(int durationSeconds)
@@ -46,7 +42,7 @@ public class StunCountdownSystemTests
     {
         var (zone, state) = EnterStunnedPlayer(5);
 
-        zone.Tick(SimulationClock.LegacyTick); // only 1 of the required 2 legacy ticks
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.True(state.IsStunned);
         Assert.Equal(5, state.StunDurationSeconds);
@@ -68,7 +64,6 @@ public class StunCountdownSystemTests
     {
         var (zone, state) = EnterStunnedPlayer(20);
 
-        // 6 whole "1-second" units (12 legacy ticks) arrive in a single stalled-host frame.
         zone.Tick(SimulationClock.ToTimeSpan(12));
 
         Assert.True(state.IsStunned);

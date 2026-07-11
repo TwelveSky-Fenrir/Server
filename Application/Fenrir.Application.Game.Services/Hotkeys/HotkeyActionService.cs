@@ -10,27 +10,16 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Hotkeys;
 
-/// <inheritdoc cref="IHotkeyActionService" />
 public sealed class HotkeyActionService(
     ICharacterRepository characters,
     WorldDataCache worldData,
     ILogger<HotkeyActionService> logger)
     : IHotkeyActionService
 {
-    /// <summary>
-    ///     The one item-catalog sort code cases 211/253/214 accept -- C8 contract's own Edge cases section
-    ///     ("accept only stackable-consumable items (item sort 2)"), narrower than
-    ///     <see cref="ContainerMatrix.IsStackableSort" />'s broader sort-2-or-99 definition used elsewhere.
-    /// </summary>
-    private const byte HotkeyBindableItemSort = 2;
 
-    /// <summary>
-    ///     The two <c>iPotionType[0]</c> (world.Items.PotionType1) values cases 211/253 (bind INTO a hotkey
-    ///     slot) refuse -- C8 contract's own Edge cases section: "A stackable-consumable whose first
-    ///     potion-type byte equals 7 or 8 is barred from being hotkey-bound and disconnects." Case 214
-    ///     (withdraw) applies no such exclusion.
-    /// </summary>
-    private const int ExcludedPotionType1A = 7;
+        private const byte HotkeyBindableItemSort = 2;
+
+        private const int ExcludedPotionType1A = 7;
 
     private const int ExcludedPotionType1B = 8;
 
@@ -232,9 +221,6 @@ public sealed class HotkeyActionService(
         var destinationPage = move.Page2;
         var destinationIndex = move.Index2;
 
-        // Source-equals-destination: HotkeyActionResolver.ResolveRearrange already returns a Success carrying
-        // both fields unchanged for this case (see that method's own remarks) -- short-circuited here BEFORE
-        // even resolving, so a genuinely bare no-mutation request never touches the database or the zone tick.
         if (sourcePage == destinationPage && sourceIndex == destinationIndex &&
             HotkeyActionResolver.IsValidPage(sourcePage) && HotkeyActionResolver.IsValidIndex(sourceIndex))
         {
@@ -282,8 +268,7 @@ public sealed class HotkeyActionService(
         return GenericActionResult.Succeeded;
     }
 
-    /// <summary>Shared persistence+mirror tail for the 3 single-slot-write sub-commands (204 skill/emoticon, 205).</summary>
-    private async ValueTask PersistAndMirrorSingleSlotAsync(Zone zone, int characterId, byte page, byte index,
+        private async ValueTask PersistAndMirrorSingleSlotAsync(Zone zone, int characterId, byte page, byte index,
         HotkeySlot newSlot, CancellationToken cancellationToken)
     {
         await characters.UpsertHotkeySlotAsync(characterId, page, index, newSlot.Value1, newSlot.Value2,
@@ -305,11 +290,7 @@ public sealed class HotkeyActionService(
             : HotkeySlot.Empty;
     }
 
-    /// <summary>
-    ///     Bounds-checked before any byte cast, same posture as <c>GenericActionService.MoveContainerAsync</c>:
-    ///     an out-of-range slot must never be truncated into a byte that could accidentally alias a real slot.
-    /// </summary>
-    private static ItemStack? ResolveInventorySlotOrNull(PlayerRuntimeState state, int page, int index)
+        private static ItemStack? ResolveInventorySlotOrNull(PlayerRuntimeState state, int page, int index)
     {
         return page is ContainerMatrix.InventoryPage0 or ContainerMatrix.InventoryPage1 &&
                ContainerMatrix.IsValidSlot((byte)page, index)

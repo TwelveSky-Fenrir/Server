@@ -4,27 +4,6 @@ using Fenrir.Application.Game.GameData;
 
 namespace Fenrir.Application.Game.Domain.Forge;
 
-/// <summary>
-///     Pure resolver for CZ_HIGH_ITEM_SEND (S04_MyWork02.cpp:3992, upgrade) and CZ_LOW_ITEM_SEND
-///     (S04_MyWork02.cpp:4136, downgrade). No I/O, no Zone dependency.
-/// </summary>
-/// <remarks>
-///     <c>USE_ULTIMATE_UPGRADE_STONE</c> (material 984) is CONFIRMED dead in the shipped ReleaseEU33 build: it
-///     is defined only in the never-compiled <c>#else</c> of <c>#ifdef M33</c> (Server/Header/Protocol/DEFINE.h:40),
-///     so the material check accepts only 1024/1025, the +10 probability bonus never applies, and the
-///     "IS -4 / IU -1" success formula always holds -- reproduced exactly, with material 984 simply rejected.
-///     The <c>__REBIRTH__</c> Warlord reroll (only reachable at the absolute top tier, encoded level 157, 3/4 of
-///     successes) has its cited DECISION modeled -- see <see cref="RankChangeResult.WarlordRerollEligible" /> --
-///     but its replacement DRAW is deferred: it needs <c>ReturnWarlordForUpgrade</c>/a per-tribe Warlord item
-///     catalog Fenrir doesn't have, and the contract flags a cross-call bonus flag whose reset is unconfirmed
-///     (S07_MyGame03.cpp:5425-5433). It degrades gracefully: the plain (non-Warlord) result item is granted.
-///     <c>aHighItemValue</c> (the "lucky upgrade" charge)
-///     has no acquisition path yet, same open issue as <see cref="CombineResolver" />'s <c>luckyComboCharges</c>.
-///     Unlike <c>luckyComboCharges</c>, the lucky-upgrade charge does NOT add a probability bonus in the source
-///     (S04_MyWork02.cpp:4051-4078, 4202-4230) -- it is consumed and reported unconditionally, but the roll
-///     probability itself is untouched. <see cref="RankChangeResult.ConsumesLuckyCharge" /> still reflects
-///     consumption for once an acquisition path exists.
-/// </remarks>
 public static class RankChangeResolver
 {
     public enum RankChangeOutcome
@@ -40,15 +19,9 @@ public static class RankChangeResolver
     private const int MaxBaseLevel = 145;
     private const int MaxMartialLevel = 12;
 
-    /// <summary>
-    ///     The absolute top forged tier, encoded as base-level 145 + martial 12 = 157. A successful upgrade that
-    ///     lands here is the only one that can trigger the <c>__REBIRTH__</c> Warlord reroll -- see
-    ///     <see cref="RankChangeResult.WarlordRerollEligible" />.
-    /// </summary>
-    private const int WarlordRerollEncodedLevel = MaxBaseLevel + MaxMartialLevel;
+        private const int WarlordRerollEncodedLevel = MaxBaseLevel + MaxMartialLevel;
 
-    /// <summary>Cape slot-type (ICape). A cape is excluded from the Warlord reroll.</summary>
-    private const byte CapeSort = 8;
+        private const byte CapeSort = 8;
 
     private const int RareUp145P1024 = 10;
     private const int RareUp145POther = 20;
@@ -141,13 +114,6 @@ public static class RankChangeResolver
             return new RankChangeResult(RankChangeOutcome.Failed, cost, 0, targetStack.Enchant, targetStack.Combine,
                 luckyChargeConsumed);
 
-        // __REBIRTH__ Warlord reroll DECISION (Server/ts25zone/S04_MyWork02.cpp:4082-4102): only when the drawn
-        // result is at the absolute top tier (encoded 157) and is not a cape does a 75% chance (a modulo-4 draw
-        // being non-zero) elect to reroll into the previous-tribe Warlord set. This resolver models only that
-        // cited, unambiguous DECISION -- the Warlord replacement DRAW itself (ReturnWarlordForUpgrade + a
-        // per-tribe Warlord catalog Fenrir has no equivalent for, plus a contract-flagged cross-call bonus flag
-        // whose reset is unconfirmed) is deferred, so the plain result item is still granted. The rand%4 draw is
-        // taken ONLY in this exact top-tier/non-cape condition, so it never perturbs any other path's draw order.
         var warlordEligible = false;
         if (encodedLevel == WarlordRerollEncodedLevel && target.Sort != CapeSort)
             warlordEligible = random.NextInt32(4) != 0;
@@ -239,13 +205,7 @@ public static class RankChangeResolver
         return (144 + target.MartialLevel, materialItemId == 1024 ? p1024Rest : pOtherRest);
     }
 
-    /// <summary>
-    ///     Verified against every literal case in GetHighMoney/GetLowMoney (function.h:917-1295): a flat
-    ///     increment per tier index (100,000 Rare / 1,000,000 Elite), keyed by the target's OWN current level
-    ///     (not the destination), with a level-145 martial extension of <paramref name="maxMartialInclusive" />
-    ///     entries (11 for High, 12 for Low -- Downgrade can start from any martial tier including the max).
-    /// </summary>
-    private static int GetTieredMoney(short[] baseLevels, int increment, int maxMartialInclusive, short level,
+        private static int GetTieredMoney(short[] baseLevels, int increment, int maxMartialInclusive, short level,
         byte martialLevel)
     {
         var index = Array.IndexOf(baseLevels, level);
@@ -258,13 +218,7 @@ public static class RankChangeResolver
         return increment * (index + 1);
     }
 
-    /// <summary>
-    ///     Reproduces ReturnForHighItem/ReturnForLowItem (GameSystem_02_Item.cpp:664/733) as a full-catalog scan
-    ///     instead of the legacy's boot-time (level,type,sort) bucket index -- same candidate set, same uniform
-    ///     random pick, no precomputed index needed. Even a single-candidate match still draws from
-    ///     <paramref name="random" /> (matching the legacy's own unconditional <c>rand_mir() % 1</c>).
-    /// </summary>
-    private static ItemDefinition? FindReplacement(
+        private static ItemDefinition? FindReplacement(
         ItemDefinition target, int encodedLevel, bool isUpgrade,
         IEnumerable<ItemDefinition> catalog, IRandomSource random)
     {
@@ -334,15 +288,7 @@ public static class RankChangeResolver
         return 0;
     }
 
-    /// <summary>
-    ///     <see cref="WarlordRerollEligible" /> is set true only on a successful top-tier (encoded 157),
-    ///     non-cape upgrade that also passed the 75% rand%4 draw -- the cited signal that the legacy would, at
-    ///     this point, attempt a previous-tribe Warlord-set replacement. Fenrir has no Warlord catalog yet, so
-    ///     the flag currently drives nothing (the plain <see cref="ResultItemId" /> is granted regardless); it
-    ///     exists so a future catalog-backed layer can hook the reroll without re-deriving the decision, and so
-    ///     the decision itself is testable today. Always false on the downgrade (LOW) path, which has no reroll.
-    /// </summary>
-    public readonly record struct RankChangeResult(
+        public readonly record struct RankChangeResult(
         RankChangeOutcome Outcome,
         int Cost,
         int ResultItemId,

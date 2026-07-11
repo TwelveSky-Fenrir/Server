@@ -2,8 +2,6 @@ using Fenrir.Network.Serialization.Wire.Attributes;
 
 namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 
-// Reused as-is by CZ_PROCESS_ATTACK_SEND (client proposal) and ZC_PROCESS_ATTACK_RECV (server echo);
-// same shape, different fill semantics for the result fields. GXCW tail member not compiled in EU33.
 [FenrirWireType(68)]
 public readonly partial record struct AttackForProtocol : IFenrirWireType<AttackForProtocol>
 {

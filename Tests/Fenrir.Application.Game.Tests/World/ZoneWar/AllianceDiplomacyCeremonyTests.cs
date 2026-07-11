@@ -12,9 +12,6 @@ namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
 public class AllianceDiplomacyCeremonyTests
 {
-    // Arbitrary small test values -- the legacy's own negotiation-duration constant was not part of the
-    // translated contract (see AllianceDiplomacyCeremony's GAP 2 remarks); these exist only to exercise the
-    // countdown mechanics, not to represent real game-balance tuning.
     private const int NewAllianceDuration = 4;
     private const int AlreadyAlliedDuration = 6;
 
@@ -95,7 +92,7 @@ public class AllianceDiplomacyCeremonyTests
     public void Idle_DisqualifiedBySingleBiggestTribe_SendsRejectedToBoth()
     {
         var (ceremony, worldState, _) = CreateCeremony();
-        worldState.SetTribePoints(0, 500); // unique biggest
+        worldState.SetTribePoints(0, 500);
         worldState.SetTribePoints(1, 200);
         worldState.SetTribePoints(2, 150);
         worldState.SetTribePoints(3, 100);
@@ -115,7 +112,7 @@ public class AllianceDiplomacyCeremonyTests
     {
         var (ceremony, worldState, _) = CreateCeremony();
         worldState.SetTribePoints(0, 200);
-        worldState.SetTribePoints(1, 200); // tied with 0 -- no single biggest tribe
+        worldState.SetTribePoints(1, 200);
         worldState.SetTribePoints(2, 100);
         worldState.SetTribePoints(3, 100);
         var one = new AllianceCeremonyCandidate(1, 0);
@@ -135,8 +132,8 @@ public class AllianceDiplomacyCeremonyTests
         worldState.SetTribePoints(1, 150);
         worldState.SetTribePoints(2, 150);
         worldState.SetTribePoints(3, 150);
-        worldState.SetAllianceOffer(2, 3, true); // tribes 2 and 3 are already each other's ally
-        var one = new AllianceCeremonyCandidate(1, 2); // tribe 2 already has an ally
+        worldState.SetAllianceOffer(2, 3, true);
+        var one = new AllianceCeremonyCandidate(1, 2);
         var two = new AllianceCeremonyCandidate(2, 0);
 
         var result = ceremony.Tick(one, two, Today);
@@ -150,7 +147,7 @@ public class AllianceDiplomacyCeremonyTests
     {
         var (ceremony, worldState, _) = CreateCeremony();
         worldState.SetTribePoints(0, 50);
-        worldState.SetTribePoints(1, 50); // tied -- no single biggest tribe, but both below the 100 floor
+        worldState.SetTribePoints(1, 50);
         var one = new AllianceCeremonyCandidate(1, 0);
         var two = new AllianceCeremonyCandidate(2, 1);
 
@@ -178,10 +175,10 @@ public class AllianceDiplomacyCeremonyTests
     public void Idle_AlreadyAllied_BypassesEveryDisqualifier_EntersAlreadyAlliedNegotiation()
     {
         var (ceremony, worldState, cooldowns) = CreateCeremony();
-        worldState.SetTribePoints(0, 100_000); // would otherwise be the single biggest tribe
-        worldState.SetTribePoints(1, 0); // would otherwise fail the points floor
+        worldState.SetTribePoints(0, 100_000);
+        worldState.SetTribePoints(1, 0);
         worldState.SetAllianceOffer(0, 1, true);
-        cooldowns.SetCooldownUntil(0, Today.AddDays(30)); // would otherwise fail the cooldown check
+        cooldowns.SetCooldownUntil(0, Today.AddDays(30));
         var one = new AllianceCeremonyCandidate(1, 0);
         var two = new AllianceCeremonyCandidate(2, 1);
 
@@ -198,7 +195,7 @@ public class AllianceDiplomacyCeremonyTests
         worldState.SetTribePoints(0, 500);
         var one = new AllianceCeremonyCandidate(1, 0);
         var two = new AllianceCeremonyCandidate(2, 1);
-        ceremony.Tick(one, two, Today); // rejected -> RejectionMessage, raw tick 1
+        ceremony.Tick(one, two, Today);
 
         for (var i = 0; i < AllianceDiplomacyCeremony.RejectionMessageDurationRawTicks - 1; i++)
         {
@@ -206,7 +203,7 @@ public class AllianceDiplomacyCeremonyTests
             Assert.Equal(AllianceCeremonyPhase.RejectionMessage, ceremony.Phase);
         }
 
-        ceremony.Tick(null, null, Today); // the 120th raw tick since entry
+        ceremony.Tick(null, null, Today);
         Assert.Equal(AllianceCeremonyPhase.Idle, ceremony.Phase);
     }
 
@@ -218,13 +215,13 @@ public class AllianceDiplomacyCeremonyTests
         worldState.SetTribePoints(1, 500);
         var one = new AllianceCeremonyCandidate(1, 0);
         var two = new AllianceCeremonyCandidate(2, 1);
-        ceremony.Tick(one, two, Today); // raw tick 1: enters NewAllianceNegotiation, countdown = 4
+        ceremony.Tick(one, two, Today);
 
-        var tick2 = ceremony.Tick(one, two, Today); // raw tick 2 (even) -- validated, countdown -> 3
+        var tick2 = ceremony.Tick(one, two, Today);
         Assert.Equal(AllianceCeremonyNotice.NewAllianceProgress, tick2.Notice);
         Assert.Equal(3, tick2.RemainingCountdown);
 
-        var tick3 = ceremony.Tick(one, two, Today); // raw tick 3 (odd) -- skipped
+        var tick3 = ceremony.Tick(one, two, Today);
         Assert.Equal(AllianceCeremonyNotice.None, tick3.Notice);
         Assert.Equal(AllianceCeremonyPhase.NewAllianceNegotiation, ceremony.Phase);
     }
@@ -237,9 +234,8 @@ public class AllianceDiplomacyCeremonyTests
         worldState.SetTribePoints(1, 500);
         var one = new AllianceCeremonyCandidate(1, 0);
         var two = new AllianceCeremonyCandidate(2, 1);
-        ceremony.Tick(one, two, Today); // raw tick 1: enters negotiation
+        ceremony.Tick(one, two, Today);
 
-        // Raw tick 2 (even/validated): post two's leader is gone.
         var result = ceremony.Tick(one, null, Today);
 
         Assert.Equal(AllianceCeremonyNotice.NewAllianceAborted, result.Notice);
@@ -256,10 +252,9 @@ public class AllianceDiplomacyCeremonyTests
         worldState.SetTribePoints(1, 500);
         var one = new AllianceCeremonyCandidate(1, 0);
         var two = new AllianceCeremonyCandidate(2, 1);
-        ceremony.Tick(one, two, Today); // raw tick 1
-        ceremony.Tick(one, two, Today); // raw tick 2 (even, validated, countdown -> 9)
+        ceremony.Tick(one, two, Today);
+        ceremony.Tick(one, two, Today);
 
-        // Raw tick 3 (odd): leader two vanished, but parity means this is not checked yet.
         var result = ceremony.Tick(one, null, Today);
 
         Assert.Equal(AllianceCeremonyNotice.None, result.Notice);
@@ -274,15 +269,15 @@ public class AllianceDiplomacyCeremonyTests
         worldState.SetTribePoints(1, 500);
         var one = new AllianceCeremonyCandidate(1, 0);
         var two = new AllianceCeremonyCandidate(2, 1);
-        ceremony.Tick(one, two, Today); // raw tick 1: enters negotiation, countdown = 2
-        ceremony.Tick(one, two, Today); // raw tick 2 (even): countdown -> 1
-        var completion = ceremony.Tick(one, two, Today); // raw tick 3 (odd): skipped
+        ceremony.Tick(one, two, Today);
+        ceremony.Tick(one, two, Today);
+        var completion = ceremony.Tick(one, two, Today);
         Assert.Equal(AllianceCeremonyPhase.NewAllianceNegotiation, ceremony.Phase);
-        completion = ceremony.Tick(one, two, Today); // raw tick 4 (even): countdown -> 0, completes
+        completion = ceremony.Tick(one, two, Today);
 
         Assert.Equal(AllianceCeremonyNotice.None, completion.Notice);
         Assert.Equal(AllianceCeremonyPhase.PostNegotiationCooldown, ceremony.Phase);
-        Assert.Null(worldState.GetAllyOf(0)); // no alliance was ever created
+        Assert.Null(worldState.GetAllyOf(0));
         Assert.Null(worldState.GetAllyOf(1));
     }
 
@@ -293,10 +288,10 @@ public class AllianceDiplomacyCeremonyTests
         worldState.SetAllianceOffer(0, 1, true);
         var one = new AllianceCeremonyCandidate(1, 0);
         var two = new AllianceCeremonyCandidate(2, 1);
-        ceremony.Tick(one, two, Today); // raw tick 1: already allied -> enters AlreadyAlliedNegotiation, countdown = 2
-        ceremony.Tick(one, two, Today); // raw tick 2 (even): countdown -> 1
-        ceremony.Tick(one, two, Today); // raw tick 3 (odd): skipped
-        var completion = ceremony.Tick(one, two, Today); // raw tick 4 (even): countdown -> 0, completes
+        ceremony.Tick(one, two, Today);
+        ceremony.Tick(one, two, Today);
+        ceremony.Tick(one, two, Today);
+        var completion = ceremony.Tick(one, two, Today);
 
         Assert.Equal(AllianceCeremonyPhase.PostNegotiationCooldown, ceremony.Phase);
         Assert.Null(worldState.GetAllyOf(0));
@@ -317,7 +312,7 @@ public class AllianceDiplomacyCeremonyTests
         ceremony.Tick(one, two, Today);
         ceremony.Tick(one, two, Today);
         ceremony.Tick(one, two, Today);
-        ceremony.Tick(one, two, Today); // completes -> PostNegotiationCooldown
+        ceremony.Tick(one, two, Today);
         Assert.Equal(AllianceCeremonyPhase.PostNegotiationCooldown, ceremony.Phase);
 
         for (var i = 0; i < AllianceDiplomacyCeremony.PostNegotiationCooldownDurationRawTicks - 1; i++)

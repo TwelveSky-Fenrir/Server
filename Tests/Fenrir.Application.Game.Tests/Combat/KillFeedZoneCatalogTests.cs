@@ -7,8 +7,6 @@ public class KillFeedZoneCatalogTests
     [Fact]
     public void HasLeaderboardStore_Zone049TypeMap_True()
     {
-        // 49 is the representative Zone049-type map; RegularWarMapCatalog also lists 146 as another member
-        // of the same family.
         Assert.True(KillFeedZoneCatalog.HasLeaderboardStore(49));
         Assert.True(KillFeedZoneCatalog.HasLeaderboardStore(146));
     }

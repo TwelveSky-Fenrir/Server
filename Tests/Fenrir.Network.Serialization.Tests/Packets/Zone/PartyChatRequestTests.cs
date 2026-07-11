@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Zone;
 
-// Link rides the wire but is dead server-side; still decoded faithfully here.
 public class CzPartyChatSendTests
 {
     [Fact]

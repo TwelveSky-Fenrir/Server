@@ -6,11 +6,6 @@ using Fenrir.Application.Game.Tests.TestSupport;
 
 namespace Fenrir.Application.Game.Tests.Enchant;
 
-/// <summary>
-///     The special "no-change" material 8101 (Server/ts25zone/S04_MyWork02.cpp:3315-3318,3370-3378): destroy
-///     chance forced to 0, and a failed success roll leaves the enchant untouched (ZC result 8) instead of
-///     downgrading or destroying.
-/// </summary>
 public class EnchantResolverNoChangeTests
 {
     private const int NoChangeMaterialId = 8101;
@@ -35,7 +30,6 @@ public class EnchantResolverNoChangeTests
     [Fact]
     public void NoChangeMaterial_SuccessRoll_BehavesAsAnOrdinaryPlusOne()
     {
-        // current=10, +1 => new=11, p1 = 103 - 33 = 70; roll 0 succeeds.
         var result = EnchantResolver.Resolve(Equip(1), Target(10), Material(NoChangeMaterialId), 0, 0,
             0, new ScriptedRandomSource(0));
 
@@ -47,8 +41,6 @@ public class EnchantResolverNoChangeTests
     [Fact]
     public void NoChangeMaterial_FailureBelowSafeValue_LeavesEnchantUntouched()
     {
-        // current=10, +1 => new=11 (<= safe 20); roll 99 fails the success roll. An ordinary stone would
-        // downgrade to 9 -- 8101 leaves it at 10.
         var result = EnchantResolver.Resolve(Equip(1), Target(10), Material(NoChangeMaterialId), 0, 0,
             0, new ScriptedRandomSource(99));
 
@@ -60,8 +52,6 @@ public class EnchantResolverNoChangeTests
     [Fact]
     public void NoChangeMaterial_FailureAboveSafeValue_NeverDestroys_LeavesEnchantUntouched()
     {
-        // current=25, +1 => new=26 (> safe 20): an ordinary stone would roll for destruction. 8101 short-
-        // circuits before the destroy block, so a single failing roll yields NoChange, never Destroyed.
         var result = EnchantResolver.Resolve(Equip(1), Target(25), Material(NoChangeMaterialId), 0, 0,
             0, new ScriptedRandomSource(99));
 

@@ -3,7 +3,6 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Data.SqlClient;
 
-// Refuses to re-apply a journaled script whose hash changed -- history is never rewritten, only corrected forward.
 
 var connectionString =
     Environment.GetEnvironmentVariable("ConnectionStrings__FenrirDb") ??
@@ -31,10 +30,6 @@ var scriptPaths = (await File.ReadAllLinesAsync(manifestPath))
     .Where(line => line.Length > 0 && !line.StartsWith('#'))
     .ToArray();
 
-// No Aspire health-check gate upstream (see AppHost.cs) -- the container may still be
-// finishing its first boot when this process starts, so retry instead of failing immediately.
-// Aspire's own "create the database" step is gated by that same broken health check and never
-// runs either, so this migrator owns database creation instead of assuming it already exists.
 const int maxAttempts = 10;
 
 var targetBuilder = new SqlConnectionStringBuilder(connectionString);
@@ -93,7 +88,6 @@ var applied = journalReady
     ? await LoadAppliedScriptsAsync(connection)
     : new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
 
-// admin.SchemaVersions can't journal scripts that run before it exists; buffer those and flush once it does.
 var pendingJournal = new List<(string RelativePath, byte[] Hash)>();
 
 foreach (var relativePath in scriptPaths)
@@ -199,7 +193,6 @@ static async Task JournalAsync(SqlConnection connection, string scriptName, byte
     await command.ExecuteNonQueryAsync();
 }
 
-// SQL Server requires some statements (CREATE SCHEMA, CREATE/ALTER PROCEDURE...) to be alone in their batch.
 static IEnumerable<string> SplitBatches(string script)
 {
     var batch = new StringBuilder();

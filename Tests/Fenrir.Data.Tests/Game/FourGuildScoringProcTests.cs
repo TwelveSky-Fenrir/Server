@@ -8,9 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Game;
 
-// game.usp_Guild_AddFourGuildPoints + game.usp_Guild_GetTopFourGuild against real SQL Server 2025 -- the
-// four-guild live-scoring accrual (silent on unknown guild) and the top-N-positive leaderboard read (C17
-// Part B). Points are game.Guilds.Points (legacy gPoint).
 [Collection("SqlServer")]
 public class FourGuildScoringProcTests
 {
@@ -43,8 +40,6 @@ public class FourGuildScoringProcTests
     [Fact]
     public async Task AddPoints_UnknownGuild_IsSilent_NoThrow()
     {
-        // Contract: a guild not present in the table simply matches no row and the point is silently lost --
-        // distinct from usp_Guild_AdjustPoints, which would THROW 50234 here.
         var exception = await Record.ExceptionAsync(() =>
             _scoring.AddPointsAsync(-999_999, 1, CancellationToken.None).AsTask());
 
@@ -56,7 +51,7 @@ public class FourGuildScoringProcTests
     {
         await ZeroAllGuildPointsAsync();
         var high = await CreateGuildAsync(10);
-        await CreateGuildAsync(0); // excluded -- not strictly positive
+        await CreateGuildAsync(0);
         var mid = await CreateGuildAsync(5);
 
         var board = await _scoring.GetLeaderboardAsync(10, CancellationToken.None);
@@ -92,8 +87,6 @@ public class FourGuildScoringProcTests
 
     private async Task ZeroAllGuildPointsAsync()
     {
-        // Deterministic leaderboard: zero every existing guild's points so only this test's positive guilds
-        // can appear. Safe within the serialized [Collection("SqlServer")] -- tests set up their own state.
         await using var connection = new SqlConnection(_connectionString);
         await connection.OpenAsync();
         await using var command = new SqlCommand("UPDATE game.Guilds SET Points = 0;", connection);

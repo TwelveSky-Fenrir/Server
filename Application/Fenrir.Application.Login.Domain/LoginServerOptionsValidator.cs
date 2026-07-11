@@ -2,7 +2,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Login.Domain;
 
-/// <summary>Validates <see cref="LoginServerOptions" /> at startup (ValidateOnStart) before any connection is accepted.</summary>
 public sealed class LoginServerOptionsValidator : IValidateOptions<LoginServerOptions>
 {
     public ValidateOptionsResult Validate(string? name, LoginServerOptions options)

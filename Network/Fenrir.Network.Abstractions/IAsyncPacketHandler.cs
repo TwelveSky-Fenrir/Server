@@ -1,6 +1,5 @@
 ﻿namespace Fenrir.Network.Abstractions;
 
-/// <summary>Asynchronous handler awaited by the session loop (auth, character selection, ticket consumption).</summary>
 public interface IAsyncPacketHandler<in TPacket>
     where TPacket : struct, IIncomingPacket<TPacket>
 {

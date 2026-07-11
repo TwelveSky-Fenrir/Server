@@ -12,12 +12,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Inventory;
 
-/// <summary>
-///     End-to-end coverage (policy -&gt; service -&gt; posted <see cref="PetBagZoneCommand" /> -&gt; drained onto
-///     the tick-owned <see cref="Zone" />/<see cref="PlayerRuntimeState" />) for the CZ_PROCESS_DATA_SEND
-///     pet-bag family (tSort 254/255/256) -- see <c>PetBagItemTransferPolicyTests</c> for the
-///     pure-policy-level coverage this builds on.
-/// </summary>
 public class PetBagActionServiceTests
 {
     private const int PetEligibleItemId = 91001;
@@ -93,7 +87,6 @@ public class PetBagActionServiceTests
         var (zone, state, repo, service) = SetUp();
         state.SetPetBagSlot(2, PetEligibleItemId);
 
-        // Case 255 field re-map: Index1=source bag slot, Quantity1=dest page, Page2=dest slot, Index2=dest X, XPost2=dest Y.
         var move = new DefaultPData { Page1 = 0, Index1 = 2, Quantity1 = 0, Page2 = 7, Index2 = 1, XPost2 = 1, YPost2 = 0 };
         var outcome = await service.WithdrawAsync(zone, state, 10, move, false, true, CancellationToken.None);
         zone.Tick(TimeSpan.FromMilliseconds(50));

@@ -5,7 +5,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Login.Tests.Services;
 
-// op13 CL_CREATE_MOUSE_PASSWORD_SEND business logic.
 public class CreateMousePinServiceTests
 {
     private const int AccountId = 42;
@@ -34,10 +33,6 @@ public class CreateMousePinServiceTests
         Assert.Equal(0, pins.SetCallCount);
     }
 
-    // Regression test for the pincode-second-password audit's Minor finding: existence must be checked
-    // before format, matching the cited legacy guard order exactly (Server/ts25login/S04_MyWork02.cpp:461
-    // before :468). Before the fix, a malformed PIN submitted against an account that already has a PIN
-    // configured was misreported as InvalidFormat instead of AlreadyExists.
     [Fact]
     public async Task CreateMousePinAsync_PinAlreadyExistsAndSubmittedFormatAlsoMalformed_ReportsAlreadyExists()
     {

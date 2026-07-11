@@ -5,8 +5,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Login.Tests;
 
-// Server/ts25login/S07_MyGame01.cpp:4-29 (MyGame::Init, one-time startup read) and :37-85 (MyGame::Logic, the
-// recurring tick).
 public class ServerQuotaRefreshHostTests
 {
     [Fact]
@@ -51,8 +49,6 @@ public class ServerQuotaRefreshHostTests
     [Fact]
     public async Task RefreshOnceAsync_MaxPlayersIsZero_SkipsTheCurrentCountRefreshEntirely()
     {
-        // S07_MyGame01.cpp:80-84: the present-count broker round trip is skipped for the whole duration of
-        // maintenance mode, not just rejected downstream.
         var state = new LoginCapacityState();
         var quota = new FakeServerQuotaRepository { MaxPlayers = 0 };
         var accountSessions = new FakeAccountSessionRepository { ActiveSessionCount = 42 };
@@ -77,8 +73,6 @@ public class ServerQuotaRefreshHostTests
         await host.RefreshOnceAsync(CancellationToken.None);
 
         Assert.Equal(750, state.MaxPlayers);
-        // Still attempted using the stale-but-still-nonzero cached max (S07_MyGame01.cpp:79-84's own
-        // "if (mMaxPlayerNum > 0)" reads whatever value is currently held, stale or fresh).
         Assert.Equal(1, accountSessions.ActiveSessionCountCallCount);
         Assert.Equal(42, state.CurrentPlayers);
     }

@@ -27,6 +27,6 @@ public class PasswordHasherTests
         var (hash2, salt2) = PasswordHasher.Hash("same password");
 
         Assert.False(salt1.AsSpan().SequenceEqual(salt2));
-        Assert.False(hash1.AsSpan().SequenceEqual(hash2)); // different salt -> different hash for the same password
+        Assert.False(hash1.AsSpan().SequenceEqual(hash2));
     }
 }

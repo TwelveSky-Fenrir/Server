@@ -2,7 +2,6 @@ using Fenrir.Network.Serialization.Wire.Attributes;
 
 namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 
-// Flat index = tribe*10 + rank (MAX_TRIBE_NUM=4 x MAX_HERO_RANK_AVATAR_NUM=10).
 [FenrirWireType(680)]
 public readonly partial record struct HeroRank : IFenrirWireType<HeroRank>
 {

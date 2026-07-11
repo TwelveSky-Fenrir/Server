@@ -2,12 +2,6 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
-/// <summary>
-///     Parses <c>005_00004.IMG</c> (<c>MONSTER_INFO</c>, STRUCT.h:156-204) and replays
-///     <c>MyShm::Load_Monster</c>'s single runtime patch (S15_MyShare.cpp:603-604): the unconditional
-///     Thunder Giant <c>AttackType</c> override, unlike <see cref="ItemReader" />'s several patches, this is
-///     just the one.
-/// </summary>
 internal static class MonsterReader
 {
     private const string FileName = "005_00004.IMG";
@@ -16,17 +10,9 @@ internal static class MonsterReader
     private const int RecordCount = 10000;
     private const int RecordSize = 940;
 
-    /// <summary>
-    ///     Zero-based physical slot patched by <c>Load_Monster</c> (S15_MyShare.cpp:604:
-    ///     <c>shmMONSTER-&gt;mDATA[81 - 1].mAttackType = 1;</c>) -- an array-position write, not a lookup by
-    ///     the record's own <c>Index</c> field. In the current data file this slot's record self-reports
-    ///     Index 81 and is named "Thunder Giant", so the two descriptions coincide, but a re-ordered source
-    ///     file would break that coincidence; re-verify with cpp-ts25-explorer if the file layout ever changes.
-    /// </summary>
-    private const int ThunderGiantSlot = 80;
+        private const int ThunderGiantSlot = 80;
 
-    /// <summary>Raw parse, no patches -- matches a raw <c>ts25ztool export monster</c> CSV dump.</summary>
-    public static IReadOnlyList<MonsterRecord> ReadAllRaw(string dataDirectory)
+        public static IReadOnlyList<MonsterRecord> ReadAllRaw(string dataDirectory)
     {
         var recordBytes = ImgUnpacker.UnpackRecordArray(
             Path.Combine(dataDirectory, FileName), XorKey, RecordArrayOffset, RecordCount, RecordSize);
@@ -38,8 +24,7 @@ internal static class MonsterReader
         return monsters;
     }
 
-    /// <summary>Patched records -- what monster data looks like at runtime; seed this into SQL Server.</summary>
-    public static IReadOnlyList<MonsterRecord> ReadAll(string dataDirectory)
+        public static IReadOnlyList<MonsterRecord> ReadAll(string dataDirectory)
     {
         return ApplyRuntimePatches(ReadAllRaw(dataDirectory));
     }
@@ -58,7 +43,7 @@ internal static class MonsterReader
         var index = reader.ReadInt32();
         var name = reader.ReadFixedString(25);
         var chatInfo = new[] { reader.ReadFixedString(101), reader.ReadFixedString(101) };
-        reader.Skip(1); // compiler padding before mType (offset 231 -> 232)
+        reader.Skip(1);
 
         var type = reader.ReadInt32();
         var specialType = reader.ReadInt32();

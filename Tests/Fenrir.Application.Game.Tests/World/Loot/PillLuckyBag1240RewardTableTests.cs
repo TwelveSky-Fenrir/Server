@@ -2,11 +2,6 @@ using Fenrir.Application.Game.Domain.World.Loot;
 
 namespace Fenrir.Application.Game.Tests.World.Loot;
 
-/// <summary>
-///     Guards the item-1240 "Pill Lucky Bag" reward table (workstream C10-remaining-box-pools) --
-///     <see cref="PillLuckyBag1240RewardTable" />. The simplest box of this workstream: no tribe dependence, no
-///     pity, a flat uniform 5-id pool.
-/// </summary>
 public class PillLuckyBag1240RewardTableTests
 {
     private static readonly BoxRewardSpec Spec = PillLuckyBag1240RewardTable.Spec;
@@ -38,8 +33,7 @@ public class PillLuckyBag1240RewardTableTests
         Assert.Equal(expectedRewardId, Spec.RollRewardId(new ScriptedRandom(drawIndex)));
     }
 
-    /// <summary>Returns queued draws in request order; throws if the code draws more than were scripted.</summary>
-    private sealed class ScriptedRandom(params int[] values) : Random
+        private sealed class ScriptedRandom(params int[] values) : Random
     {
         private int _index;
 

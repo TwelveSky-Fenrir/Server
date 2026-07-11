@@ -3,18 +3,12 @@ using CaeriusNet.Attributes.Dto;
 
 namespace Fenrir.Data.Abstractions.Characters;
 
-/// <summary>One-row result of usp_Character_GetIdByName -- resolves an avatar name to its CharacterId.</summary>
 [GenerateDto]
 public sealed partial record CharacterIdDto(int CharacterId);
 
-/// <summary>
-///     One-row result of usp_CharacterItem_GetIdAtSlot -- the ItemId currently occupying one (Container, Slot)
-///     pair. Row-absent (mapped to a null return by the repository) means the slot is empty.
-/// </summary>
 [GenerateDto]
 public sealed partial record CharacterItemIdDto(int ItemId);
 
-// game.usp_Character_GetByAccount; ordinal-mapped, ctor order must match the SELECT.
 [GenerateDto]
 public sealed partial record CharacterSummaryDto(
     int CharacterId,
@@ -26,12 +20,6 @@ public sealed partial record CharacterSummaryDto(
     byte FaceType,
     short Level);
 
-// game.usp_Character_GetAccountRoster RS0; ordinal-mapped, ctor order must match the SELECT. Richer sibling of
-// CharacterSummaryDto for the CL_LOGIN_SEND avatar-roster response (LC_USER_AVATAR_RECV2) -- see the
-// "Account-login avatar roster population" legacy-behavior-translator contract and the procedure's own header
-// for exactly which fields are (and, just as deliberately, are NOT) carried here. MapId/PosX/PosY/PosZ/Life/Mana
-// are the raw LogoutInfo[0..5] source values -- the contract's logout-position tribe-consistency correction and
-// forced-flag overwrite are call-site transforms, not applied by this read.
 [GenerateDto]
 public sealed partial record CharacterRosterDto(
     int CharacterId,
@@ -62,14 +50,6 @@ public sealed partial record CharacterRosterDto(
     int Life,
     int Mana);
 
-/// <summary>
-///     RS1 of usp_Character_GetAccountRoster -- every occupied CharacterItems row for every character on one
-///     account in one round trip, tagged with CharacterId (unlike CharacterItemSlotDto, which covers exactly
-///     one character since usp_Character_GetForWorldEntry is always called per-character). Same per-slot shape
-///     as CharacterItemSlotDto otherwise; project onto AvatarRosterResponse's Equip/Inventory/StoreItem arrays
-///     the same way AvatarInfoFactory.BuildEquipArrayFromRows/BuildInventoryArrayFromRows/
-///     BuildStoreItemArrayFromRows already do for CharacterItemSlotDto.
-/// </summary>
 [GenerateDto]
 public sealed partial record CharacterRosterItemDto(
     int CharacterId,
@@ -87,22 +67,10 @@ public sealed partial record CharacterRosterItemDto(
     int ExpireDate,
     int Serial);
 
-/// <summary>
-///     Both result sets of usp_Character_GetAccountRoster, stitched -- not a [GenerateDto] since it spans result
-///     sets. Unlike CharacterWorldEntryBundle, an empty Characters collection is NOT collapsed to null: a
-///     brand-new account with zero characters yet is a legitimate, common state for this read (straight after
-///     account creation, before CL_CREATE_AVATAR_SEND2), not a "not found" error.
-/// </summary>
 public sealed record CharacterAccountRosterBundle(
     ReadOnlyCollection<CharacterRosterDto> Characters,
     ReadOnlyCollection<CharacterRosterItemDto> Items);
 
-// game.usp_Character_GetForWorldEntry; drives ZC_REGISTER_AVATAR_RECV/AVATAR_INFO. Mirrors game.Characters minus audit timestamps.
-// Deliberately does NOT carry PreviousTribe/Mount* (added to CharacterWorldSnapshotDto by
-// Migrations/018_character_previous_tribe_and_mount_readpath.sql): this type's only current consumers
-// (CreateAvatarService's create-response overlay, ZoneTransferService's shard routing/vitals clamp) don't
-// need either, and both new fields are appended past this record's read range in RS0 for exactly that
-// reason -- extend this record too, in the same append-only fashion, the day a consumer actually needs it.
 [GenerateDto]
 public sealed partial record CharacterWorldEntryDto(
     int CharacterId,
@@ -125,7 +93,6 @@ public sealed partial record CharacterWorldEntryDto(
     int MaxMana,
     long FlushSequence);
 
-// RS0 of usp_Character_GetForWorldEntry: CharacterWorldEntryDto's exact prefix (kept stable for existing callers) plus appended progression + quest state (legacy inline avatar state, hence same result set not a 6th).
 [GenerateDto]
 public sealed partial record CharacterWorldSnapshotDto(
     int CharacterId,
@@ -185,79 +152,27 @@ public sealed partial record CharacterWorldSnapshotDto(
     int MissionKillMonster,
     int MissionPlayTime,
     bool AutoHuntEnabled,
-    // Bare byte[] (not byte[]?): [GenerateDto] only recognizes bare byte[] for varbinary mapping; NULL still maps fine at runtime.
     byte[] AutoHuntConfig,
     byte AutoLifeRatio,
     byte AutoManaRatio,
     int PetGrowth,
     byte PetActivity,
-    // wAvatar.aTeacherPoint; appended last to match the proc's column order.
     int TeacherPoint,
-    // aAutoBuffTime/aPremium, both appended after TeacherPoint for the same reason. AutoBuffTime is still not
-    // read into PlayerRuntimeState (same "durably stored, runtime wiring pending" posture DoubleExpTime1/2
-    // have above); PremiumExpireUtc IS read into PlayerRuntimeState.PremiumExpireUtc at world entry
-    // (EnterWorldService.HandleAsync) and threaded through the premium-account drop-rate bonus
-    // (World.Loot.MonsterDropRoller.Roll's killerPremiumActive parameter) -- see that field's own remarks.
     int AutoBuffTime,
     long PremiumExpireUtc,
-    // wAvatar.aExp2; appended last for the same reason AutoBuffTime/PremiumExpireUtc were -- see TribeActionHandler.HandleRebirthAsync for the one live consumer.
     int Exp2,
-    // Migrations/018_character_previous_tribe_and_mount_readpath.sql: appended after Exp2, not inserted next
-    // to Tribe, so CharacterWorldEntryDto's ordinal-mapped prefix (this record's own first 19 fields) never
-    // shifts. PreviousTribe is the Noble Dragon/Royal Serpent/Grand Tiger starter-kit template (0-2) --
-    // genuinely independent of Tribe, see Server/ts25zone/S04_MyWork02.cpp:880-901's self-consistency check.
     byte PreviousTribe,
-    // The 5 columns Migrations/015_starter_kit_elite_grant.sql granted at creation
-    // (Server/ts25login/S04_MyWork02.cpp:1174-1179) but no procedure/DTO projected until now -- see this
-    // migration's own header for the full "inert data" citation.
     int MountItemId,
     int MountExpActivity,
     int MountPower,
     int MountSlotIndex,
     int MountTime,
-    // Migrations/027_character_autotime2_grant.sql: aAutoTime2, the free auto-hunt minute allowance
-    // (Server/ts25login/S04_MyWork02.cpp:888 grants the literal 1440 == 24h of minutes at creation;
-    // Server/ts25zone/S07_MyGame04.cpp:787-823 decrements it by 1 per elapsed real minute while auto-hunt is
-    // enabled). Appended last, defaulted to 0 (same "pre-existing N-arg test construction keeps compiling"
-    // posture as AccountDtos.AuthenticateAccountDto.AccountGrade), not inserted next to MountTime, so this
-    // record's field order for every prior column is unchanged.
     int AutoTime2 = 0,
-    // Migrations/041_character_rebirth_zone241_time.sql: aZone241Time, wire-exposed via
-    // AvatarInfo.Zone241Time (still always sent as the bare literal 0 from AvatarInfoFactory until a caller
-    // wires this persisted value through -- see that migration's own header). First durable consumer is the
-    // legacy-behavior-translator Rebirth-advancement contract's Path B ("Max Rebirth" aZone241Time += 10).
-    // Appended last, defaulted to 0, same "pre-existing N-arg test construction keeps compiling" posture as
-    // AutoTime2 immediately above.
     int Zone241Time = 0,
-    // Migrations/047_characters_petbagdate_column.sql: aPetBagDate, the pet-bag upper-half (slots 10-19)
-    // rental entitlement expiry (YYYYMMDD), wire-exposed via AvatarInfo.PetBagDate (previously always sent as
-    // the bare literal 0 from AvatarInfoFactory, per that field's own remarks) and consumed by
-    // GenericActionHandler's petBagUpperHalfEntitlementActive gate (PlayerRuntimeState.PetBagDate >=
-    // GameDate.Today(), same posture as the sibling InventoryDate/StoreDate gates above). DEFAULT 0 matches
-    // legacy's own confirmed behavior -- ServerDocs/11_ts25login/01_Flux_Authentification_Redirection.md:
-    // 381-383 confirms the live creation path never sets this field, so a never-granted character reads as
-    // permanently expired both here and in legacy. Appended last, defaulted to 0, same "pre-existing N-arg
-    // test construction keeps compiling" posture as AutoTime2/Zone241Time immediately above.
     int PetBagDate = 0,
-    // Migrations/041_characters_warpoint_currency.sql: aWarPoint, the War-Point currency balance. That
-    // migration's own header flagged this exact projection as the still-open follow-up (usp_Character_
-    // GetForWorldEntry did not yet select it) -- closed here. Wire-exposed via AvatarInfo.WarPoint
-    // (previously always sent as the bare literal 0 from AvatarInfoFactory -- see
-    // PlayerRuntimeState.WarPoint's own remarks). Appended last, defaulted to 0, same "pre-existing N-arg
-    // test construction keeps compiling" posture as AutoTime2/Zone241Time/PetBagDate immediately above. The
-    // GrantWarPoints credit path remains write-behind-excluded and unpersisted, same posture as Money/
-    // BloodCoin/BigMoney -- this projection only closes the READ side.
     int WarPoint = 0,
-    // Migrations/048_characters_m15petluckybox_pity_column.sql (confirmation-pass follow-up): the M15 Pet
-    // Lucky Box (world.Items 8111) pity counter, previously session-scoped only -- see
-    // PlayerRuntimeState.M15PetLuckyBoxPity's own remarks. Appended last, defaulted to 0, same "pre-existing
-    // N-arg test construction keeps compiling" posture as AutoTime2/Zone241Time/PetBagDate/WarPoint above.
     int M15PetLuckyBoxPity = 0);
 
-/// <summary>
-///     RS1 of usp_Character_GetForWorldEntry. ExpireDate: legacy YYYYMMDD int, 0 = not a rental. Container: 0/1
-///     inventory pages, 2 equipment, 3 store.
-/// </summary>
 [GenerateDto]
 public sealed partial record CharacterItemSlotDto(
     byte Container,
@@ -274,14 +189,12 @@ public sealed partial record CharacterItemSlotDto(
     int ExpireDate,
     int Serial);
 
-/// <summary>RS2 of usp_Character_GetForWorldEntry -- legacy aSkill[slot][0..1].</summary>
 [GenerateDto]
 public sealed partial record CharacterSkillDto(
     byte SlotIndex,
     int SkillId,
     int Grade);
 
-/// <summary>RS3 -- legacy aHotKey[page][key][0..2] stored verbatim; per-sort semantics live in the hotkey logic, not here.</summary>
 [GenerateDto]
 public sealed partial record CharacterHotkeyDto(
     byte Page,
@@ -290,17 +203,12 @@ public sealed partial record CharacterHotkeyDto(
     int Value1,
     int Value2);
 
-/// <summary>RS4; RemainingLegacyTicks is 500ms legacy ticks, persisted verbatim (no ms conversion at this boundary).</summary>
 [GenerateDto]
 public sealed partial record CharacterBuffDto(
     byte SlotIndex,
     int Value,
     int RemainingLegacyTicks);
 
-/// <summary>
-///     All five result sets of usp_Character_GetForWorldEntry, stitched -- not a [GenerateDto] since it spans result
-///     sets.
-/// </summary>
 public sealed record CharacterWorldEntryBundle(
     CharacterWorldSnapshotDto Character,
     ReadOnlyCollection<CharacterItemSlotDto> Items,

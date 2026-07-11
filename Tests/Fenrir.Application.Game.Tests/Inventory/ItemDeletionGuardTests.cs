@@ -2,10 +2,6 @@ using Fenrir.Application.Game.Domain.Inventory;
 
 namespace Fenrir.Application.Game.Tests.Inventory;
 
-/// <summary>
-///     Covers <see cref="ItemDeletionGuard.IsDeletionAllowed" />'s 15-id always-protected set (legacy
-///     <c>CheckDeleteItem</c>, Server/Header/function.h:2454-2517) and its 0-99999 valid-range guard.
-/// </summary>
 public class ItemDeletionGuardTests
 {
     [Theory]
@@ -68,18 +64,12 @@ public class ItemDeletionGuardTests
     [InlineData(int.MaxValue)]
     public void IsDeletionAllowed_OutOfRangeItemId_ReturnsFalse(int itemTypeId)
     {
-        // Out-of-range is treated identically to "protected" -- refused, never "unchecked"/"allowed by default".
         Assert.False(ItemDeletionGuard.IsDeletionAllowed(itemTypeId));
     }
 
     [Fact]
     public void ProtectedItemTypeIds_DoesNotGrowBeyondTheFifteenDocumentedIds()
     {
-        // The contract explicitly documents ~30 further ids that were once protected in the legacy switch and
-        // now survive only as commented-out case labels (no longer enforced in any real build) -- their exact
-        // values are not itemized by the contract, so this guard deliberately does not attempt to enumerate or
-        // reject them. This test only pins the SIZE of the always-protected set so a future edit cannot
-        // silently grow it back in without a fresh, cited contract update.
         Assert.Equal(15, ItemDeletionGuard.ProtectedItemTypeIds.Count);
     }
 }

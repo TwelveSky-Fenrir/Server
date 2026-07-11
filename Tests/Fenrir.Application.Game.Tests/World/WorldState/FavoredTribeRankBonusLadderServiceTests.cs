@@ -34,15 +34,14 @@ public class FavoredTribeRankBonusLadderServiceTests
         return registry;
     }
 
-    /// <summary>One connected player in map 1, so a broadcast (if any fires) is directly observable on its pipe.</summary>
-    private static (FavoredTribeRankBonusLadderService Service, FakeDuplexPipe Pipe)
+        private static (FavoredTribeRankBonusLadderService Service, FakeDuplexPipe Pipe)
         CreateServiceWithOneConnectedZone(WorldStateService worldState)
     {
         var registry = CreateRegistry(1);
         var (session, pipe) = ZoneTestKit.CreateSession(1);
         registry[1].Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
         registry[1].Tick(TimeSpan.FromMilliseconds(50));
-        ZoneTestKit.DrainOutbound(pipe); // discard whatever the enter itself queued
+        ZoneTestKit.DrainOutbound(pipe);
 
         var broadcaster = new ZoneEventBroadcaster(worldState, registry, NullLogger<ZoneEventBroadcaster>.Instance);
         var service = new FavoredTribeRankBonusLadderService(worldState, broadcaster,
@@ -58,7 +57,6 @@ public class FavoredTribeRankBonusLadderServiceTests
 
         await service.TickIfPendingAsync(CancellationToken.None);
 
-        // No-op: FakeWorldStateRepository's own default seed (0) is left completely untouched.
         Assert.Equal(0, worldState.World.UpdateTribePoint);
         Assert.Equal(0, worldState.GetTribe(0).Points);
         Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
@@ -83,13 +81,11 @@ public class FavoredTribeRankBonusLadderServiceTests
     {
         var (worldState, _) = CreateInitializedWorldState();
         worldState.SetUpdateTribePointFlag(FavoredTribeRankBonusLadderService.PendingFlagValue);
-        // HighTribe left null -- Fenrir's own schema does not seed a default favored tribe (see class remarks).
         var (service, pipe) = CreateServiceWithOneConnectedZone(worldState);
 
         await service.TickIfPendingAsync(CancellationToken.None);
 
         Assert.Equal(FavoredTribeRankBonusLadderService.ConsumedFlagValue, worldState.World.UpdateTribePoint);
-        // The ladder never ran (no favored tribe) -- every tribe is left at the untouched seed value.
         Assert.Equal(0, worldState.GetTribe(0).Points);
         Assert.Equal(0, worldState.GetTribe(1).Points);
         Assert.Equal(0, worldState.GetTribe(2).Points);
@@ -113,7 +109,6 @@ public class FavoredTribeRankBonusLadderServiceTests
         Assert.Equal(1000 + 4000, worldState.GetTribe(2).Points);
         Assert.Equal(1000 + 100, worldState.GetTribe(3).Points);
 
-        // Immediately persisted -- not deferred to the write-behind flush.
         Assert.Contains(repository.TribeUpdateCalls, c => c.TribeId == 0 && c.Points == 1000 + 200);
         Assert.Contains(repository.TribeUpdateCalls, c => c.TribeId == 1 && c.Points == 1000 + 300);
         Assert.Contains(repository.TribeUpdateCalls, c => c.TribeId == 2 && c.Points == 1000 + 4000);
@@ -141,8 +136,6 @@ public class FavoredTribeRankBonusLadderServiceTests
         Assert.Equal(1000 + 4000, worldState.GetTribe(0).Points);
         ZoneTestKit.DrainOutbound(pipe);
 
-        // Simulate an unrelated concurrent overwrite between the two calls -- a second TickIfPendingAsync must
-        // not re-apply the ladder since the flag is no longer pending.
         worldState.SetTribePoints(0, 42);
         await service.TickIfPendingAsync(CancellationToken.None);
 
@@ -154,7 +147,7 @@ public class FavoredTribeRankBonusLadderServiceTests
     public async Task EachApplication_IsAFullOverwrite_ResettingEveryTribeToTheBaselineFirst()
     {
         var (worldState, _) = CreateInitializedWorldState();
-        worldState.SetTribePoints(1, 99999); // stale standing from an unrelated prior mechanism
+        worldState.SetTribePoints(1, 99999);
         worldState.SetHighTribe(3);
         worldState.SetUpdateTribePointFlag(FavoredTribeRankBonusLadderService.PendingFlagValue);
         var (service, _) = CreateServiceWithOneConnectedZone(worldState);
@@ -175,12 +168,10 @@ public class FavoredTribeRankBonusLadderServiceTests
 
         await service.TickIfPendingAsync(CancellationToken.None);
 
-        // Flag write failed -- left exactly as it was (still pending), no totals touched, no broadcast.
         Assert.Equal(FavoredTribeRankBonusLadderService.PendingFlagValue, worldState.World.UpdateTribePoint);
         Assert.Equal(0, worldState.GetTribe(0).Points);
         Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
 
-        // Next poll retries the whole sequence from scratch, now that the transient failure is gone.
         repository.ThrowOnUpdate = false;
         await service.TickIfPendingAsync(CancellationToken.None);
 
@@ -195,16 +186,13 @@ public class FavoredTribeRankBonusLadderServiceTests
         var (worldState, repository) = CreateInitializedWorldState();
         worldState.SetHighTribe(1);
         worldState.SetUpdateTribePointFlag(FavoredTribeRankBonusLadderService.PendingFlagValue);
-        repository.ThrowOnUpdateTribeForIds.Add(2); // one tribe's persist fails -> the whole step is a failure
+        repository.ThrowOnUpdateTribeForIds.Add(2);
         var (service, pipe) = CreateServiceWithOneConnectedZone(worldState);
 
         await service.TickIfPendingAsync(CancellationToken.None);
 
-        // Flag already advanced (step 1 succeeded) -- this request is now permanently lost, never retried.
         Assert.Equal(FavoredTribeRankBonusLadderService.ConsumedFlagValue, worldState.World.UpdateTribePoint);
 
-        // In-memory mirror already reflects every new total, including tribe 2's, even though its own DB
-        // write failed -- the mirror is never rolled back.
         Assert.Equal(1000 + 300, worldState.GetTribe(0).Points);
         Assert.Equal(1000 + 4000, worldState.GetTribe(1).Points);
         Assert.Equal(1000 + 100, worldState.GetTribe(2).Points);
@@ -212,10 +200,8 @@ public class FavoredTribeRankBonusLadderServiceTests
         Assert.DoesNotContain(repository.TribeUpdateCalls, c => c.TribeId == 2);
         Assert.Contains(repository.TribeUpdateCalls, c => c.TribeId == 0);
 
-        // No broadcast -- the persist-and-recompute step reported failure.
         Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
 
-        // A later, independent poll never retries this specific lost request (flag stays consumed forever).
         await service.TickIfPendingAsync(CancellationToken.None);
         Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
     }

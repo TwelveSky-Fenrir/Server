@@ -63,7 +63,6 @@ public class ZcDeputyPshopActionRecvTests
         BinaryPrimitives.WriteInt32LittleEndian(golden.AsSpan(4), 42);
         var proxyWritten = WireTestKit.EncodeProxyStateInfo(golden.AsSpan(8, ProxyStateInfo.WireSize), proxy);
         Assert.Equal(ProxyStateInfo.WireSize, proxyWritten);
-        // 2 bytes of queue padding (offsets 58-59) are left zero by default.
         BinaryPrimitives.WriteInt32LittleEndian(golden.AsSpan(8 + ProxyStateInfo.WireSize + 2), 0);
 
         Span<byte> buffer = new byte[ProxyShopStallStateResponse.PayloadSize];

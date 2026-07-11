@@ -65,7 +65,7 @@ public class MonsterEntityTests
         var secondHit = monster.TakeDamage(10, out var remaining);
 
         Assert.True(firstKill);
-        Assert.False(secondHit); // must never re-trigger death-processing for the same monster
+        Assert.False(secondHit);
         Assert.Equal(0, remaining);
     }
 
@@ -82,7 +82,6 @@ public class MonsterEntityTests
     [Fact]
     public void TakeDamage_ConcurrentAttackers_ExactlyOneClaimsTheKill()
     {
-        // Simulates two attackers racing to deliver the killing blow -- only one may ever get died=true.
         var monster = CreateEntity();
 
         var results = new bool[50];

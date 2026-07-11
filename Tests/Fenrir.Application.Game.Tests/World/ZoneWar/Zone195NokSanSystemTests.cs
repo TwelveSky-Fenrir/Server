@@ -11,22 +11,14 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Covers <see cref="Zone195NokSanSystem" />: the per-zone-tick Zone195 "Nok-San" solo point-capture
-///     state machine (idle-and-searching -> settle -> countdown -> commit,
-///     Server/ts25zone/S07_MyGame01.cpp:8385-8602) -- the challenger lock, the settle/countdown broadcasts,
-///     cancellation on the capturer becoming ineligible, the atomic stone flip, and the window/level-gated
-///     time-bonus CP/hero-point reward.
-/// </summary>
 public class Zone195NokSanSystemTests
 {
-    private const short RewardMapId = 196; // slot 0 -> the reward-window ("server 196") shard
-    private const short PlainMapId = 199; // slot 2 -> a non-reward stone shard
-    private const short WitnessMapId = 1; // not a Nok-San map at all -- the cluster-wide-reach witness
+    private const short RewardMapId = 196;
+    private const short PlainMapId = 199;
+    private const short WitnessMapId = 1;
     private const float PostX = 100f;
     private const float PostZ = 100f;
 
-    // Full capture = settle (12) + five one-game-minute countdown intervals (5,4,3,2,1 -> commit).
     private const int FullCaptureBurstTicks =
         Zone195NokSanSystem.SettleLegacyTicks + 5 * Zone195NokSanSystem.CountdownIntervalLegacyTicks;
 
@@ -65,13 +57,11 @@ public class Zone195NokSanSystemTests
         return state!;
     }
 
-    // A guaranteed non-reward instant (not Sunday) so the LNW33 window never fires unexpectedly.
     private static DateTime MondayNoon()
     {
         return SundayAt(20).AddDays(1);
     }
 
-    // A guaranteed instant inside the reward window (Sunday, hour 20).
     private static DateTime SundayInWindow()
     {
         return SundayAt(20);
@@ -118,7 +108,7 @@ public class Zone195NokSanSystemTests
         var appeared = Assert.Single(broadcaster.ChallengerAppeared);
         Assert.Equal((byte)1, appeared.Tribe);
         Assert.Equal("Challenger", appeared.Name);
-        Assert.Empty(broadcaster.Countdowns); // locked only; the settle countdown has not fired yet
+        Assert.Empty(broadcaster.Countdowns);
     }
 
     [Fact]
@@ -132,10 +122,9 @@ public class Zone195NokSanSystemTests
         var state = new Zone195NokSanState();
         var system = CreateSystem(broadcaster, state, new Zone195NokSanSiteCatalog([PlainSite()]));
 
-        system.Simulate(zone, 1); // lock
-        system.Simulate(zone, FullCaptureBurstTicks); // settle + countdown + commit, all in one burst
+        system.Simulate(zone, 1);
+        system.Simulate(zone, FullCaptureBurstTicks);
 
-        // Countdown broadcasts: 5 (from settle), then 4,3,2,1 (countdown intervals).
         Assert.Equal(new[] { 5, 4, 3, 2, 1 }, broadcaster.Countdowns.ConvertAll(c => c.Remaining));
         Assert.All(broadcaster.Countdowns, c => Assert.Equal((short)99, c.Server));
 
@@ -146,7 +135,6 @@ public class Zone195NokSanSystemTests
         var stateBroadcast = Assert.Single(broadcaster.NokSanState);
         Assert.Equal((byte)1, stateBroadcast.OwningTribe);
 
-        // Stone flipped to tribe 1 in slot 2.
         Assert.Equal((byte)1, state.GetOwningTribe(2));
         Assert.Equal(1, state.GetStonesHeld(1));
         Assert.Empty(broadcaster.CaptureCancelled);
@@ -160,14 +148,14 @@ public class Zone195NokSanSystemTests
         var (zone, _, _) = EnterPlayer(registry, PlainMapId, 1, 1);
 
         var state = new Zone195NokSanState();
-        state.CommitCapture(2, 1); // tribe 1 already owns slot 2
+        state.CommitCapture(2, 1);
 
         var broadcaster = new RecordingBroadcaster();
         var system = CreateSystem(broadcaster, state, new Zone195NokSanSiteCatalog([PlainSite()]));
 
         system.Simulate(zone, 1);
 
-        Assert.Empty(broadcaster.ChallengerAppeared); // the owning tribe's member is skipped
+        Assert.Empty(broadcaster.ChallengerAppeared);
     }
 
     [Fact]
@@ -175,7 +163,6 @@ public class Zone195NokSanSystemTests
     {
         var registry = ZoneTestKit.CreateRegistry();
         registry.Initialize([PlainMapId]);
-        // Far outside the 12.5-unit capture spot (but the map itself is a configured stone shard).
         var (zone, _, _) = EnterPlayer(registry, PlainMapId, 1, 1, posX: 500, posZ: 500);
 
         var broadcaster = new RecordingBroadcaster();
@@ -188,9 +175,9 @@ public class Zone195NokSanSystemTests
     }
 
     [Theory]
-    [InlineData(true, false, 0)] // dead
-    [InlineData(false, true, 0)] // zoning
-    [InlineData(false, false, Zone195NokSanSystem.DisqualifyingActionSort)] // action-sort 33
+    [InlineData(true, false, 0)]
+    [InlineData(false, true, 0)]
+    [InlineData(false, false, Zone195NokSanSystem.DisqualifyingActionSort)]
     public void IneligibleCandidate_IsNotLocked(bool dead, bool zoning, int actionSort)
     {
         var registry = ZoneTestKit.CreateRegistry();
@@ -222,13 +209,13 @@ public class Zone195NokSanSystemTests
         var state = new Zone195NokSanState();
         var system = CreateSystem(broadcaster, state, new Zone195NokSanSiteCatalog([PlainSite()]));
 
-        system.Simulate(zone, 1); // lock
-        PlayerState(zone, 1).IsDead = true; // capturer dies during settle
+        system.Simulate(zone, 1);
+        PlayerState(zone, 1).IsDead = true;
         system.Simulate(zone, Zone195NokSanSystem.SettleLegacyTicks);
 
         Assert.Single(broadcaster.CaptureCancelled);
         Assert.Empty(broadcaster.CaptureSucceeded);
-        Assert.Null(state.GetOwningTribe(2)); // stone never flipped
+        Assert.Null(state.GetOwningTribe(2));
     }
 
     [Fact]
@@ -242,11 +229,11 @@ public class Zone195NokSanSystemTests
         var state = new Zone195NokSanState();
         var system = CreateSystem(broadcaster, state, new Zone195NokSanSiteCatalog([PlainSite()]));
 
-        system.Simulate(zone, 1); // lock
-        system.Simulate(zone, Zone195NokSanSystem.SettleLegacyTicks); // -> countdown (broadcast 5)
+        system.Simulate(zone, 1);
+        system.Simulate(zone, Zone195NokSanSystem.SettleLegacyTicks);
         Assert.Single(broadcaster.Countdowns);
 
-        PlayerState(zone, 1).PosX = 9000; // step off the capture spot
+        PlayerState(zone, 1).PosX = 9000;
         system.Simulate(zone, Zone195NokSanSystem.CountdownIntervalLegacyTicks);
 
         Assert.Single(broadcaster.CaptureCancelled);
@@ -259,12 +246,12 @@ public class Zone195NokSanSystemTests
     {
         var registry = ZoneTestKit.CreateRegistry();
         registry.Initialize([RewardMapId]);
-        var (zone, _, _) = EnterPlayer(registry, RewardMapId, 1, 1); // capturer at the post
-        EnterPlayer(registry, RewardMapId, 2, 1, posX: 150, posZ: 150); // same-tribe ally, inside 1000, outside 12.5
+        var (zone, _, _) = EnterPlayer(registry, RewardMapId, 1, 1);
+        EnterPlayer(registry, RewardMapId, 2, 1, posX: 150, posZ: 150);
 
         var capturer = PlayerState(zone, 1);
         var ally = PlayerState(zone, 2);
-        capturer.Level = 130; // combined level >= 113
+        capturer.Level = 130;
         ally.Level = 130;
         var capCpBefore = capturer.ContributionPoints;
         var capHeroBefore = capturer.HeroRankPoints;
@@ -292,7 +279,7 @@ public class Zone195NokSanSystemTests
         var (zone, _, _) = EnterPlayer(registry, RewardMapId, 1, 1);
 
         var capturer = PlayerState(zone, 1);
-        capturer.Level = 42; // combined level < 113
+        capturer.Level = 42;
         var capCpBefore = capturer.ContributionPoints;
         var capHeroBefore = capturer.HeroRankPoints;
 
@@ -304,7 +291,7 @@ public class Zone195NokSanSystemTests
         system.Simulate(zone, FullCaptureBurstTicks);
 
         Assert.Equal(capCpBefore + Zone195NokSanSystem.CapturerContributionPoints, capturer.ContributionPoints);
-        Assert.Equal(capHeroBefore, capturer.HeroRankPoints); // hero-rank half withheld below LV_M1
+        Assert.Equal(capHeroBefore, capturer.HeroRankPoints);
     }
 
     [Fact]
@@ -321,14 +308,13 @@ public class Zone195NokSanSystemTests
 
         var broadcaster = new RecordingBroadcaster();
         var state = new Zone195NokSanState();
-        // MondayNoon (default) is outside the Sunday 20:00-21:59 window.
         var system = CreateSystem(broadcaster, state, new Zone195NokSanSiteCatalog([RewardSite()]));
 
         system.Simulate(zone, 1);
         system.Simulate(zone, FullCaptureBurstTicks);
 
-        Assert.Equal((byte)1, state.GetOwningTribe(0)); // still flips the stone
-        Assert.Equal(capCpBefore, capturer.ContributionPoints); // but no reward
+        Assert.Equal((byte)1, state.GetOwningTribe(0));
+        Assert.Equal(capCpBefore, capturer.ContributionPoints);
         Assert.Equal(capHeroBefore, capturer.HeroRankPoints);
     }
 
@@ -346,7 +332,6 @@ public class Zone195NokSanSystemTests
 
         var broadcaster = new RecordingBroadcaster();
         var state = new Zone195NokSanState();
-        // Slot 2 (server 99) is never a reward shard, even on Sunday inside the hour window.
         var system = CreateSystem(broadcaster, state, new Zone195NokSanSiteCatalog([PlainSite()]),
             utcNow: SundayInWindow);
 
@@ -371,9 +356,8 @@ public class Zone195NokSanSystemTests
             new Lazy<IZone195NokSanBroadcaster>(() => realBroadcaster), new HeroRankPointAccumulator(),
             NullLogger<Zone195NokSanSystem>.Instance, MondayNoon);
 
-        system.Simulate(nokSanZone, 1); // lock -> tSort 771 challenger-appeared, cluster-wide
+        system.Simulate(nokSanZone, 1);
 
-        // The witness player -- on a map that is not even a Nok-San shard -- still receives the op94 notice.
         AssertZoneEventInfo(ZoneTestKit.DrainOutbound(witnessPipe), 771, 1);
     }
 

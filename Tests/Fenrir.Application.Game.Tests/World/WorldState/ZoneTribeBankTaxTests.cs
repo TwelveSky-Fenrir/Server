@@ -11,7 +11,7 @@ public class ZoneTribeBankTaxTests
     {
         var zone = ZoneTestKit.CreateZone(1);
 
-        zone.CreditMonsterKillTribeTax(0, 1000); // 9% of 1000 = 90
+        zone.CreditMonsterKillTribeTax(0, 1000);
 
         Assert.Equal(90, zone.GetTribeBankTaxTotal(0));
         Assert.Equal(0, zone.GetTribeBankTaxTotal(1));
@@ -22,7 +22,7 @@ public class ZoneTribeBankTaxTests
     {
         var zone = ZoneTestKit.CreateZone(1);
 
-        zone.CreditNpcServiceTribeTax(2, 1000); // 1% of 1000 = 10
+        zone.CreditNpcServiceTribeTax(2, 1000);
 
         Assert.Equal(10, zone.GetTribeBankTaxTotal(2));
     }
@@ -47,15 +47,15 @@ public class ZoneTribeBankTaxTests
         zone.Tick(TimeSpan.FromMinutes(9));
 
         Assert.Empty(zone.DrainPendingTribeBankTaxSweeps());
-        Assert.Equal(10, zone.GetTribeBankTaxTotal(0)); // still accumulating, not yet swept
+        Assert.Equal(10, zone.GetTribeBankTaxTotal(0));
     }
 
     [Fact]
     public void Tick_AtTenMinutesOfZoneUptime_QueuesASweep_AndResetsTheZoneLocalTotalsImmediately()
     {
         var zone = ZoneTestKit.CreateZone(1);
-        zone.CreditNpcServiceTribeTax(0, 1000); // 10
-        zone.CreditMonsterKillTribeTax(1, 1000); // 90
+        zone.CreditNpcServiceTribeTax(0, 1000);
+        zone.CreditMonsterKillTribeTax(1, 1000);
 
         zone.Tick(TimeSpan.FromMinutes(10));
 
@@ -66,7 +66,6 @@ public class ZoneTribeBankTaxTests
         Assert.Equal(0, sweep.Tribe2);
         Assert.Equal(0, sweep.Tribe3);
 
-        // Reset already happened -- unconditionally, whether or not anything ever drains the queued payload.
         for (byte tribe = 0; tribe < 4; tribe++)
             Assert.Equal(0, zone.GetTribeBankTaxTotal(tribe));
     }

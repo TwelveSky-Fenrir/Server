@@ -11,6 +11,5 @@ public readonly partial record struct PartyChatRequest : IIncomingPacket<PartyCh
 {
     [FixedString(61)] public required string Content { get; init; }
 
-    // Dead server-side: the relay never transports it, so decode but do not propagate downstream.
     public required ItemLinkInfo Link { get; init; }
 }

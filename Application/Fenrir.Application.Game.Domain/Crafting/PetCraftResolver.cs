@@ -4,13 +4,6 @@ using Fenrir.Application.Game.Domain.World.Loot;
 
 namespace Fenrir.Application.Game.Domain.Crafting;
 
-/// <summary>
-///     Pure resolver for the 6 CZ_MAKE_PET_SEND (op88) recipes -- S04_MyWork02.cpp:12125-12501, LNW33+__GOD__
-///     build. No I/O, no Zone dependency. Every recipe writes the produced pet back into material1's own slot
-///     (cosmetic X/Y at wire indices 1/2 always 0, matching the established "no Fenrir-side backing" precedent
-///     from <see cref="Fenrir.Application.Game.Handlers.CraftItemHandler" />; Serial is inherited from
-///     material1 via the caller's own <c>with</c>).
-/// </summary>
 public static class PetCraftResolver
 {
     public enum Outcome
@@ -63,13 +56,7 @@ public static class PetCraftResolver
         return Success(resultItemId, 0, 0);
     }
 
-    /// <summary>
-    ///     The roll here is genuinely dead code in this build (S04_MyWork02.cpp:12403-12408): <c>tValue[0]</c> is
-    ///     unconditionally overwritten to 1012 immediately after being rolled, so the outcome never varies. Not
-    ///     drawing from an <see cref="IRandomSource" /> here has no observable effect -- this recipe never makes
-    ///     another draw afterward, and each request gets its own independent random source.
-    /// </summary>
-    public static Result ResolveRecipe3(ItemStack material1, ItemStack material2, ItemStack material3,
+        public static Result ResolveRecipe3(ItemStack material1, ItemStack material2, ItemStack material3,
         ItemStack catalyst)
     {
         if (material1.ItemId != PetCraftRecipeCatalog.Recipe3Material1ItemId ||

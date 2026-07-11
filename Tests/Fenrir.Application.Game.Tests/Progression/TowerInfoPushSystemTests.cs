@@ -4,12 +4,6 @@ using Fenrir.Application.Game.Tests.TestSupport;
 
 namespace Fenrir.Application.Game.Tests.Progression;
 
-/// <summary>
-///     A11 -- the periodic per-player tower-war info push (legacy per-player 60-tick "30-second" cadence). Driven
-///     through the public <see cref="TowerInfoPushSystem.Simulate" /> so the accrual counter is fed exact legacy-tick
-///     counts and nothing else in the zone can write to the pipe -- the push's own frame is then the only possible
-///     outbound. Zone 2 hosts tower index 0.
-/// </summary>
 public class TowerInfoPushSystemTests
 {
     private const short TowerZoneNumber = 2;
@@ -22,7 +16,7 @@ public class TowerInfoPushSystemTests
         var (session, pipe) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, mapId, "Watcher", tribe: 0)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
-        ZoneTestKit.DrainOutbound(pipe); // discard the enter/replication noise
+        ZoneTestKit.DrainOutbound(pipe);
         return (zone, pipe);
     }
 
@@ -33,10 +27,10 @@ public class TowerInfoPushSystemTests
         var system = new TowerInfoPushSystem();
 
         system.Simulate(zone, 59);
-        Assert.Empty(ZoneTestKit.DrainOutbound(pipe)); // 59 < 60 -- nothing pushed yet
+        Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
 
         system.Simulate(zone, 1);
-        Assert.NotEmpty(ZoneTestKit.DrainOutbound(pipe)); // the 12-tower snapshot reached the watcher
+        Assert.NotEmpty(ZoneTestKit.DrainOutbound(pipe));
     }
 
     [Fact]
@@ -45,17 +39,17 @@ public class TowerInfoPushSystemTests
         var (zone, pipe) = TowerZoneWithWatcher();
         var system = new TowerInfoPushSystem();
 
-        system.Simulate(zone, 200); // a stalled host's catch-up burst
-        Assert.NotEmpty(ZoneTestKit.DrainOutbound(pipe)); // pushed once, not 200/60 times
+        system.Simulate(zone, 200);
+        Assert.NotEmpty(ZoneTestKit.DrainOutbound(pipe));
 
         system.Simulate(zone, 1);
-        Assert.Empty(ZoneTestKit.DrainOutbound(pipe)); // counter reset to 0 (not decremented) -- fresh 60 needed
+        Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
     }
 
     [Fact]
     public void Simulate_OnANonTowerZone_NeverPushes()
     {
-        var (zone, pipe) = TowerZoneWithWatcher(999); // zone 999 hosts no tower slot
+        var (zone, pipe) = TowerZoneWithWatcher(999);
         var system = new TowerInfoPushSystem();
 
         system.Simulate(zone, 120);

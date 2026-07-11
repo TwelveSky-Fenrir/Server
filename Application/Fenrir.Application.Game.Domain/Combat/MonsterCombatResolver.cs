@@ -3,104 +3,20 @@ using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Domain.Combat;
 
-/// <summary>
-///     PvM/MvP attack resolution -- monster-entity twin of <see cref="CombatResolver" />'s PvP path
-///     (ProcessAttack03/04).
-/// </summary>
-/// <remarks>
-///     Verified divergence, not a bug: neither direction applies PvP's ÷5 division nor
-///     <see cref="CombatResolver.MinimumDamageAgainstAvatar" />'s floor.
-/// </remarks>
 public static class MonsterCombatResolver
 {
-    /// <summary>
-    ///     The sole LNW33-build owner-name-lock exemption (<c>Server/ts25zone/S07_MyGame02.cpp:1890</c>): this
-    ///     one monster template skips the name-match requirement entirely, subject instead to
-    ///     <see cref="OwnerNameLockExemptionCooldown" />.
-    /// </summary>
-    private const int OwnerNameLockExemptMonsterId = 9002;
 
-    /// <summary>
-    ///     Catapult flat attack-power bonus (<c>Server/ts25zone/S07_MyGame02.cpp:3273-3287</c>, live under
-    ///     <c>__REBIRTH__</c>): a monster of one of the four "catapult" special-types adds this to its own attack
-    ///     power BEFORE the defender's defense is subtracted, in the monster-attacks-avatar damage path.
-    /// </summary>
-    public const int CatapultAttackPowerBonus = 15000;
+        private const int OwnerNameLockExemptMonsterId = 9002;
 
-    /// <summary>
-    ///     <c>GetMinuteFromTick(1.0f)</c> (<c>Server/ts25zone/S07_MyGame02.cpp:1893</c>) -- the elapsed-time gate
-    ///     for <see cref="OwnerNameLockExemptMonsterId" />'s owner-name-lock exemption, measured against
-    ///     <see cref="World.Monsters.MonsterEntity.OwnerNameLockExemptionArmedAt" />.
-    /// </summary>
-    public static readonly TimeSpan OwnerNameLockExemptionCooldown = TimeSpan.FromMinutes(1);
+        public const int CatapultAttackPowerBonus = 15000;
 
-    /// <summary>
-    ///     B15 (wave15 contract, Preconditions/Side effects §2b) -- the attacking avatar's own level must
-    ///     STRICTLY exceed this for the PvM tribe-symbol malus to apply at all; a level of exactly 112 or below
-    ///     never carries the malus regardless of the attacking tribe's own cached penalty.
-    /// </summary>
-    public const short MalusMinimumAttackerLevel = 112;
+        public static readonly TimeSpan OwnerNameLockExemptionCooldown = TimeSpan.FromMinutes(1);
 
-    /// <summary>
-    ///     <c>tribesymbol-damage-magnitude</c> contract (<c>S07_MyGame02.cpp:2314-2318</c>, collapsing
-    ///     <c>500 * (tTribeSymbolDamageUp * 10)</c> once <c>tTribeSymbolDamageUp</c>'s own 0.1-per-increment
-    ///     build-up -- <c>S07_MyGame01.cpp:3155,3160,3165,3170,3178,3186</c>, repeated per tribe across
-    ///     <c>:3144-3338</c> -- is substituted in): the flat amount added to the running PvM attack-damage total
-    ///     per damage-up increment (<see cref="World.ZoneWar.TribeSymbolCombatModifiers.GetDamageUpBonusIncrementCount" />),
-    ///     up to <see cref="World.ZoneWar.TribeSymbolCombatModifiers.MaxDamageUpBonusIncrementCount" /> increments
-    ///     (four -- own-slot control, up to three other-tribe slots, the monster symbol, or the small-tribe
-    ///     fallback). Every increment is worth the identical flat amount regardless of which gate produced it.
-    /// </summary>
-    public const int DamageUpBonusFlatPerIncrement = 500;
+        public const short MalusMinimumAttackerLevel = 112;
 
-    /// <param name="request">
-    ///     <c>AttackActionValue1</c> (attack-mode selector, 1=melee/2=skill -- any other value is an
-    ///     unconditional silent reject) and, only when it selects the skill branch,
-    ///     <c>AttackActionValue2</c>/<c>AttackActionValue3</c> (skill number / combined skill-grade points),
-    ///     consulted against <paramref name="attackerActionSkillNumber" />/
-    ///     <paramref name="attackerActionSkillGradePoints" /> below (<c>S07_MyGame02.cpp:2171-2189</c>).
-    /// </param>
-    /// <param name="attackerAttackBudgetEnforced">
-    ///     <see cref="World.PlayerRuntimeState.AttackBudgetEnforced" /> (legacy <c>mCheckMaxAttackPacketNum</c>)
-    ///     -- gates the skill-number/skill-grade echo check below. Deliberately NOT
-    ///     <see cref="World.PlayerRuntimeState.VerifyEchoedActionState" />: that is a separate, narrower toggle
-    ///     that only gates <see cref="StunResolver" />/<see cref="UnstunResolver" />'s own echo re-check
-    ///     (<c>S07_MyGame02.cpp:3593-3600</c>/<c>:3783-3798</c>); ProcessAttack03's echo check is gated by
-    ///     <c>mCheckMaxAttackPacketNum</c> instead (confirmed directly at <c>:2177</c>), the same flag
-    ///     <see cref="AttackPacketBudget" /> already reproduces for this same attacker earlier in the same
-    ///     packet's resolution.
-    /// </param>
-    /// <param name="attackerActionSkillNumber"><see cref="World.PlayerRuntimeState.ActionSkillNumber" />.</param>
-    /// <param name="attackerActionSkillGradePoints">
-    ///     <see cref="World.PlayerRuntimeState.ActionSkillGradeNum1" /> +
-    ///     <see cref="World.PlayerRuntimeState.ActionSkillGradeNum2" /> -- already the combined grade, not
-    ///     summed here.
-    /// </param>
-    /// <param name="attackerSymbolDamageDownPenalty">
-    ///     B15 (wave15 contract) -- the attacking tribe's current PvM tribe-symbol malus, from
-    ///     <see cref="World.ZoneWar.TribeSymbolCombatModifiers.GetDamageDownPenalty" /> (0 = not currently
-    ///     malused). Applied only when <paramref name="attacker" />'s own <see cref="CombatantSnapshot.Level" />
-    ///     (aLevel1, the same base-level field this resolver's owner-name-lock/newbie-protection-style gates
-    ///     already read directly -- the contract's own citation does not disambiguate base vs. combined level,
-    ///     so this reuses the one field this file's sibling gates already establish as the convention rather
-    ///     than inventing a second one) exceeds <see cref="MalusMinimumAttackerLevel" />, applied AFTER the
-    ///     elemental-damage term AND the damage-up bonus below, BEFORE the view-damage capture, compounding on
-    ///     the already-modified damage (not the pre-bonus base) -- see this method's own body for the exact
-    ///     insertion point. Defaults to 0 so every existing positional caller (tests) keeps compiling with no
-    ///     behavior change.
-    /// </param>
-    /// <param name="attackerSymbolDamageUpBonusIncrementCount">
-    ///     <c>tribesymbol-damage-magnitude</c> contract -- the attacking tribe's current PvM tribe-symbol
-    ///     damage-up bonus increment count (0-4), from
-    ///     <see cref="World.ZoneWar.TribeSymbolCombatModifiers.GetDamageUpBonusIncrementCount" />. Each
-    ///     increment adds a flat <see cref="DamageUpBonusFlatPerIncrement" /> to the running damage total,
-    ///     applied immediately AFTER the elemental-damage term and BEFORE
-    ///     <paramref name="attackerSymbolDamageDownPenalty" />'s reduction (which compounds on top of this
-    ///     addition, matching the contract's own ordering). A count of exactly 0 contributes nothing -- the
-    ///     addition is skipped entirely, not a zero-valued add. Defaults to 0 so every existing positional
-    ///     caller (tests) keeps compiling with no behavior change.
-    /// </param>
-    public static AttackOutcome ResolvePvmAttack(
+        public const int DamageUpBonusFlatPerIncrement = 500;
+
+        public static AttackOutcome ResolvePvmAttack(
         CombatantSnapshot attacker,
         MonsterEntity monster,
         AttackForProtocol request,
@@ -116,15 +32,10 @@ public static class MonsterCombatResolver
             return AttackOutcome.Reject(AttackRejectReason.AttackerDead);
         if (monster.Life < 1)
             return AttackOutcome.Reject(AttackRejectReason.DefenderDead);
-        // Only the attacker's protect-tick applies -- monsters have no protect-tick of their own.
         if (attacker.ZoneEntryAtZoneClock is { } attackerZoneEntry &&
             zoneClock - attackerZoneEntry < CombatResolver.ProtectDuration)
             return AttackOutcome.Reject(AttackRejectReason.AttackerProtected);
 
-        // Owner-name lock (S07_MyGame02.cpp:1885-1896): runs before the distance check, matching legacy's own
-        // gate order. Unreachable in production today -- no Fenrir spawn path sets MonsterEntity.OwnerName --
-        // but kept wired so a future summon-monster mechanic gets correct enforcement for free instead of
-        // silently under-enforcing ownership the moment it lands.
         if (!string.IsNullOrEmpty(monster.OwnerName) &&
             !string.Equals(monster.OwnerName, attacker.Name, StringComparison.Ordinal))
         {
@@ -139,10 +50,6 @@ public static class MonsterCombatResolver
                 monster.PosZ, CombatResolver.MaxAttackDistance))
             return AttackOutcome.Reject(AttackRejectReason.OutOfRange);
 
-        // Attack-mode selector switch (S07_MyGame02.cpp:2171-2189): both recognized cases fall through to the
-        // identical GetAttackSuccess() read immediately below (reproduced as the shared attackSuccess line
-        // that follows this switch); only the skill case (2) carries the extra echo sub-check, and only while
-        // the attacker's own rate-check flag is on.
         switch (request.AttackActionValue1)
         {
             case 1:
@@ -181,7 +88,7 @@ public static class MonsterCombatResolver
         if (damage < 1) damage = 1;
 
         var critical = false;
-        if (CombatMath.RollCritical(attacker.Stats.Critical, rng)) // monsters have no CriticalDefence stat
+        if (CombatMath.RollCritical(attacker.Stats.Critical, rng))
         {
             damage *= 2;
             critical = true;
@@ -192,22 +99,12 @@ public static class MonsterCombatResolver
             elementDamage = attacker.Stats.ElementAttackPower - monster.Template.ElementDefensePower;
         damage += elementDamage;
 
-        // tribesymbol-damage-magnitude contract (S07_MyGame02.cpp:2314-2318): flat DamageUpBonusFlatPerIncrement
-        // (500) per increment, immediately after the elemental term above and before the malus below. A count
-        // of exactly 0 skips the addition entirely rather than adding zero, matching the cited `> 0.0f` gate.
         if (attackerSymbolDamageUpBonusIncrementCount > 0)
             damage += DamageUpBonusFlatPerIncrement * attackerSymbolDamageUpBonusIncrementCount;
 
-        // B15 (wave15 contract, Side effects §2b): PvM tribe-symbol malus -- a genuine percentage reduction
-        // that compounds AFTER the elemental term AND the damage-up bonus above (on the already-modified
-        // damage), gated on the attacker's own level strictly exceeding MalusMinimumAttackerLevel. Runs before
-        // the view-damage capture below, matching the contract's own ordering ("this is a genuine percentage
-        // reduction, and it compounds after the flat bonus... it does not apply to the pre-bonus base damage").
         if (attackerSymbolDamageDownPenalty > 0f && attacker.Level > MalusMinimumAttackerLevel)
             damage -= (int)(damage * attackerSymbolDamageDownPenalty);
 
-        // "View" damage (S07_MyGame02.cpp:2371) is captured BEFORE the life-cap clamp (:2372-2375); "real"
-        // damage (:2376) is the clamped value -- same view-before-clamp / real-after-clamp split as PvP.
         var viewDamage = damage;
         if (damage > monster.Life)
             damage = monster.Life;
@@ -216,11 +113,7 @@ public static class MonsterCombatResolver
             chargeConsumed);
     }
 
-    /// <summary>
-    ///     AI-initiated -- intended caller is <see cref="Monsters.MonsterAiSystem" />'s attack-windup state, not
-    ///     <c>Zone.ApplyCombatCommand</c>.
-    /// </summary>
-    public static AttackOutcome ResolveMvpAttack(
+        public static AttackOutcome ResolveMvpAttack(
         MonsterEntity monster,
         CombatantSnapshot defender,
         TimeSpan zoneClock,
@@ -234,7 +127,6 @@ public static class MonsterCombatResolver
             zoneClock - defenderZoneEntry < CombatResolver.ProtectDuration)
             return AttackOutcome.Reject(AttackRejectReason.DefenderProtected);
 
-        // MvP's range check is XZ-only, bounded by the monster's own radius -- not the shared 3D 185.0f check.
         var dx = monster.PosX - defender.PosX;
         var dz = monster.PosZ - defender.PosZ;
         var attackRadius = (float)monster.Template.RadiusInfo2;
@@ -253,15 +145,6 @@ public static class MonsterCombatResolver
                 return AttackOutcome.Miss();
         }
 
-        // Catapult flat +15000 (E.1, S07_MyGame02.cpp:3273-3287, __REBIRTH__, live): added to the monster's
-        // attack power BEFORE the defender's defense is subtracted. GAP: the contract grounds the +15000
-        // magnitude and the "before defense subtraction" ordering, but NOT the four catapult mSpecialType
-        // values that gate it -- so this reads the nearest existing accessor, the car-thrower/catapult
-        // archetype selector (MonsterSpecialSort.CarThrower). That selector's own (Type, SpecialType) -> sort 6
-        // derivation is itself still ungrounded (MonsterSpecialSort's remarks), so no production spawn resolves
-        // to CarThrower yet and this bonus is inert in production today -- it becomes live for free once the
-        // derivation is grounded. TODO(legacy): reopen the four catapult mSpecialType values and gate on them
-        // directly if they do not all map to the CarThrower archetype.
         var monsterAttackPower = monster.Template.AttackPower;
         if (monster.SpecialSort == MonsterSpecialSort.CarThrower)
             monsterAttackPower += CatapultAttackPowerBonus;
@@ -272,7 +155,6 @@ public static class MonsterCombatResolver
         damage = CombatMath.ApplyVariance(damage, rng);
         if (damage < 1) damage = 1;
 
-        // Flat 1% crit chance even when Critical does not exceed CriticalDefence (verified asymmetry vs PvP/PvM).
         var criticalChance = monster.Template.Critical - defender.Stats.CriticalDefence;
         var critical = criticalChance > 0
             ? CombatMath.RollCritical(criticalChance, rng)
@@ -285,8 +167,6 @@ public static class MonsterCombatResolver
             elementDamage = monster.Template.ElementAttackPower - defender.Stats.ElementDefensePower;
         damage += elementDamage;
 
-        // "View" damage (S07_MyGame02.cpp:3428) is captured BEFORE the life-cap clamp (:3429-3432); "real"
-        // damage (:3433) is the clamped value -- same view-before-clamp / real-after-clamp split as PvP/PvM.
         var viewDamage = damage;
         if (damage > defender.Life)
             damage = defender.Life;

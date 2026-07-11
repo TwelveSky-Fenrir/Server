@@ -10,7 +10,6 @@ public class ClLoginSendTests
     [Fact]
     public void PayloadSize_MatchesContractConstant()
     {
-        // ExpectedSize=457 (9-byte inbound header) -> 448-byte payload (255+33+4+156).
         Assert.Equal(448, LoginRequest.PayloadSize);
     }
 
@@ -50,9 +49,6 @@ public class ClLoginSendTests
         Assert.False(LoginRequest.TryRead(buffer, out _));
     }
 
-    // Finding 4 (ServerDocs/11_ts25login/03_Plaintext_Passwords_Secrets.md): this wire type still carries the
-    // password in clear text for legacy-client compatibility, so its ToString() must never echo it back --
-    // guards against a future "{Packet}"-style structured log or debugger watch leaking the raw credential.
     [Fact]
     public void ToString_NeverIncludesThePlaintextPassword()
     {

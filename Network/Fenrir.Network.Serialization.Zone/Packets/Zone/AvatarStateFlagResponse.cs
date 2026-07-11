@@ -3,7 +3,6 @@ using Fenrir.Network.Serialization.Wire.Attributes;
 
 namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 
-// Semantics live in Sort (e.g. 7=duel, 10=pet), not the wire shape; distinct from the self-state packet (different layout).
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.AvatarStateFlag, ExpectedSize = 25)]
 public readonly partial record struct AvatarStateFlagResponse : IOutgoingPacket
 {

@@ -11,14 +11,10 @@ namespace Fenrir.Data.Characters;
 
 public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRepository
 {
-    /// <summary>
-    ///     Sentinel for ApplyQuestTransitionAsync/ApplyDailyMissionClaimAsync's @ContainerN; no valid container id is
-    ///     255.
-    /// </summary>
-    public const byte NoContainer = 255;
 
-    /// <summary>Character-select list for the account. Capacity 3 = MAX_USER_AVATAR_NUM, the legacy 3-slot cap.</summary>
-    public async ValueTask<ReadOnlyCollection<CharacterSummaryDto>> GetByAccountAsync(int accountId,
+        public const byte NoContainer = 255;
+
+        public async ValueTask<ReadOnlyCollection<CharacterSummaryDto>> GetByAccountAsync(int accountId,
         CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetByAccount", 3)
@@ -28,13 +24,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return await Db.QueryAsReadOnlyCollectionAsync<CharacterSummaryDto>(sp, ct);
     }
 
-    /// <summary>
-    ///     Richer companion to <see cref="GetByAccountAsync" /> -- see
-    ///     <see cref="ICharacterRepository.GetAccountRosterAsync" />'s
-    ///     own doc for scope. Capacity 3 (like <see cref="GetByAccountAsync" />) sizes RS0; RS1 (items) has no
-    ///     fixed cap since it spans up to 3 characters' full containers.
-    /// </summary>
-    public async ValueTask<CharacterAccountRosterBundle> GetAccountRosterAsync(int accountId, CancellationToken ct)
+        public async ValueTask<CharacterAccountRosterBundle> GetAccountRosterAsync(int accountId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetAccountRoster", 3)
             .AddParameter("AccountId", accountId, SqlDbType.Int)
@@ -46,8 +36,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return new CharacterAccountRosterBundle(characters, items);
     }
 
-    /// <summary>Creates a character in the given slot; returns the new CharacterId (usp_Character_Create's scalar result).</summary>
-    public async ValueTask<int> CreateAsync(
+        public async ValueTask<int> CreateAsync(
         int accountId,
         byte slot,
         string name,
@@ -86,11 +75,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return await Db.ExecuteScalarAsync<int>(sp, ct);
     }
 
-    /// <summary>
-    ///     Op17's full creation path -- usp_Character_CreateWithStarterKit's scalar CharacterId result. Empty-TVP
-    ///     omission follows the same rule as <see cref="ReplaceContainerAsync" />.
-    /// </summary>
-    public async ValueTask<int> CreateWithStarterKitAsync(
+        public async ValueTask<int> CreateWithStarterKitAsync(
         int accountId,
         byte slot,
         string name,
@@ -146,21 +131,12 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         if (hotkeys.Count > 0)
             builder.AddTvpParameter("Hotkeys", hotkeys);
 
-        // Appended last (never inserted among the existing scalars/TVPs above) to match
-        // Migrations/018_character_previous_tribe_and_mount_readpath.sql's own append-only parameter rule.
         builder.AddParameter("PreviousTribe", previousTribe, SqlDbType.TinyInt);
 
         return await Db.ExecuteScalarAsync<int>(builder.Build(), ct);
     }
 
-    /// <summary>
-    ///     Deletes the character occupying (AccountId, Slot) -- CL_DELETE_AVATAR_SEND's target. Idempotent on
-    ///     an already-empty slot (no-op, no error). The procedure itself also deletes every normalized child
-    ///     row (items/skills/hotkeys/buffs/quest state/friends, plus the HeroRankings/OfflineShops rows that
-    ///     mirror legacy's unconditional HeroRankCur/ProxyInfo cleanup) so the delete never fails with an FK
-    ///     violation -- see usp_Character_Delete.sql's own header for the full rationale.
-    /// </summary>
-    public async ValueTask DeleteAsync(int accountId, byte slot, CancellationToken ct)
+        public async ValueTask DeleteAsync(int accountId, byte slot, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_Delete", 0)
             .AddParameter("AccountId", accountId, SqlDbType.Int)
@@ -170,8 +146,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>Full world-entry snapshot for ZC_REGISTER_AVATAR_RECV/AVATAR_INFO; null if the character vanished mid-flight.</summary>
-    public async ValueTask<CharacterWorldEntryDto?> GetForWorldEntryAsync(int characterId, CancellationToken ct)
+        public async ValueTask<CharacterWorldEntryDto?> GetForWorldEntryAsync(int characterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetForWorldEntry", 1)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
@@ -180,14 +155,10 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return await Db.FirstQueryAsync<CharacterWorldEntryDto>(sp, ct);
     }
 
-    /// <summary>
-    ///     Write-behind position flush; usp_Character_PersistBatch is idempotent on FlushSequence, so a retry never
-    ///     regresses a position.
-    /// </summary>
-    public async ValueTask PersistPositionsAsync(IReadOnlyList<CharacterPositionTvp> rows, CancellationToken ct)
+        public async ValueTask PersistPositionsAsync(IReadOnlyList<CharacterPositionTvp> rows, CancellationToken ct)
     {
         if (rows.Count == 0)
-            return; // SQL Server rejects an empty TVP outright -- never build the call for nothing to flush
+            return;
 
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_PersistBatch", 0)
             .AddTvpParameter("Positions", rows)
@@ -196,11 +167,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>
-    ///     Narrow Life/Mana floor-clamp write; see <see cref="ICharacterRepository.ClampVitalsFloorAsync" />'s own
-    ///     doc for why this is a two-column update rather than a route through <see cref="PersistProgressAsync" />.
-    /// </summary>
-    public async ValueTask ClampVitalsFloorAsync(int characterId, long flushSequence, int life, int mana,
+        public async ValueTask ClampVitalsFloorAsync(int characterId, long flushSequence, int life, int mana,
         CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_ClampVitalsFloor", 0)
@@ -213,11 +180,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>
-    ///     All 5 result sets of usp_Character_GetForWorldEntry in one round trip; null if the character vanished
-    ///     mid-flight. <see cref="GetForWorldEntryAsync" /> stays the cheap prefix read -- this is the full snapshot.
-    /// </summary>
-    public async ValueTask<CharacterWorldEntryBundle?> GetWorldEntryBundleAsync(int characterId, CancellationToken ct)
+        public async ValueTask<CharacterWorldEntryBundle?> GetWorldEntryBundleAsync(int characterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetForWorldEntry", 64)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
@@ -232,11 +195,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
             : new CharacterWorldEntryBundle(characters[0], items, skills, hotkeys, buffs);
     }
 
-    /// <summary>
-    ///     Transactional DELETE+INSERT replace of one container (not write-behind). Empty list = deliberate clear -- the
-    ///     TVP param is omitted since ADO.NET rejects a zero-row TVP.
-    /// </summary>
-    public async ValueTask ReplaceContainerAsync(int characterId, byte container,
+        public async ValueTask ReplaceContainerAsync(int characterId, byte container,
         IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
     {
         var builder = new StoredProcedureParametersBuilder("game", "usp_CharacterItems_ReplaceContainer", 0)
@@ -249,12 +208,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-    /// <summary>
-    ///     Replaces TWO containers in one transaction -- e.g. equip (inventory -&gt; equipment). Calling
-    ///     <see cref="ReplaceContainerAsync" /> twice could durably remove an item from one container without adding it to the
-    ///     other; this closes that window.
-    /// </summary>
-    public async ValueTask ReplaceTwoContainersAsync(int characterId, byte containerA,
+        public async ValueTask ReplaceTwoContainersAsync(int characterId, byte containerA,
         IReadOnlyList<CharacterItemSlotTvp> itemsA, byte containerB, IReadOnlyList<CharacterItemSlotTvp> itemsB,
         CancellationToken ct)
     {
@@ -273,14 +227,10 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-    /// <summary>
-    ///     Write-behind progression flush, idempotent on the same per-character FlushSequence as
-    ///     <see cref="PersistPositionsAsync" /> -- replays never regress state.
-    /// </summary>
-    public async ValueTask PersistProgressAsync(IReadOnlyList<CharacterProgressTvp> rows, CancellationToken ct)
+        public async ValueTask PersistProgressAsync(IReadOnlyList<CharacterProgressTvp> rows, CancellationToken ct)
     {
         if (rows.Count == 0)
-            return; // SQL Server rejects an empty TVP outright -- never build the call for nothing to flush
+            return;
 
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_PersistProgressBatch", 0)
             .AddTvpParameter("Progress", rows)
@@ -289,8 +239,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>Atomic money adjustment; throws SQL 50222 instead of clamping when either pool would go negative.</summary>
-    public async ValueTask AdjustMoneyAsync(int characterId, long deltaMoney, int deltaBigMoney, CancellationToken ct)
+        public async ValueTask AdjustMoneyAsync(int characterId, long deltaMoney, int deltaBigMoney, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_AdjustMoney", 0)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
@@ -301,11 +250,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>
-    ///     Atomic wallet/Store-money transfer; throws SQL 50337 instead of clamping when either pool would go
-    ///     negative/over cap.
-    /// </summary>
-    public async ValueTask AdjustStoreMoneyAsync(int characterId, long deltaMoney, long deltaStoreMoney,
+        public async ValueTask AdjustStoreMoneyAsync(int characterId, long deltaMoney, long deltaStoreMoney,
         CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_AdjustStoreMoney", 0)
@@ -317,12 +262,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>
-    ///     Atomic money adjustment + one container replace, e.g. NPC-shop buy/sell -- a mid-sequence failure must never
-    ///     pay without granting the item (or vice versa). Same empty-TVP-omission rule as <see cref="ReplaceContainerAsync" />
-    ///     .
-    /// </summary>
-    public async ValueTask AdjustMoneyAndReplaceContainerAsync(int characterId, long deltaMoney, int deltaBigMoney,
+        public async ValueTask AdjustMoneyAndReplaceContainerAsync(int characterId, long deltaMoney, int deltaBigMoney,
         byte container, IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
     {
         var builder = new StoredProcedureParametersBuilder("game", "usp_Character_AdjustMoneyAndReplaceContainer", 0)
@@ -337,11 +277,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-    /// <summary>
-    ///     Atomic money adjustment + two container replaces -- e.g. an enchant whose target and material slots land on
-    ///     different inventory pages.
-    /// </summary>
-    public async ValueTask AdjustMoneyAndReplaceTwoContainersAsync(int characterId, long deltaMoney,
+        public async ValueTask AdjustMoneyAndReplaceTwoContainersAsync(int characterId, long deltaMoney,
         int deltaBigMoney, byte containerA, IReadOnlyList<CharacterItemSlotTvp> itemsA, byte containerB,
         IReadOnlyList<CharacterItemSlotTvp> itemsB, CancellationToken ct)
     {
@@ -363,11 +299,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-    /// <summary>
-    ///     Durable single-slot write to game.CharacterSkills; SkillPoints itself is deliberately not touched here. Covers
-    ///     both learn (tSort 202/233) and upgrade (tSort 203) -- both are just this slot's final (SkillId, Grade).
-    /// </summary>
-    public async ValueTask UpsertSkillSlotAsync(int characterId, byte slotIndex, int skillId, int grade,
+        public async ValueTask UpsertSkillSlotAsync(int characterId, byte slotIndex, int skillId, int grade,
         CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_CharacterSkills_UpsertSlot", 0)
@@ -380,12 +312,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>
-    ///     Durable single-slot write to game.CharacterHotkeys (op22 CZ_USE_HOTKEY_ITEM_SEND's post-consumption
-    ///     decrement/clear) -- see <see cref="ICharacterRepository.UpsertHotkeySlotAsync" />'s own remarks for
-    ///     the column-order caveat.
-    /// </summary>
-    public async ValueTask UpsertHotkeySlotAsync(int characterId, byte page, byte keyIndex, int sort, int value1,
+        public async ValueTask UpsertHotkeySlotAsync(int characterId, byte page, byte keyIndex, int sort, int value1,
         int value2, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_CharacterHotkeys_UpsertSlot", 0)
@@ -400,16 +327,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>
-    ///     Atomic two-character trade commit -- both sides' final inventory contents and money deltas commit in one
-    ///     transaction or none do. TradeSession has already computed every value; this is the durable commit, not the
-    ///     negotiation. Since Migrations/037_trade_event_log.sql, the same transaction also writes the
-    ///     game.EventLog audit rows for the trade (legacy GL_615_TRADE_ITEM/GL_615_TRADE_ITEM2/GL_616_TRADE_MONEY)
-    ///     when <paramref name="tradedItemsA" />/<paramref name="tradedItemsB" />/<paramref name="offeredMoneyA" />/
-    ///     <paramref name="offeredMoneyB" /> are supplied -- see ICharacterRepository's own doc comment for why
-    ///     these are distinct from the whole-container/net-delta parameters already here.
-    /// </summary>
-    public async ValueTask ExecuteTradeAsync(
+        public async ValueTask ExecuteTradeAsync(
         int characterA, IReadOnlyList<CharacterItemSlotTvp> itemsA0, IReadOnlyList<CharacterItemSlotTvp> itemsA1,
         long deltaMoneyA, int deltaBigMoneyA,
         int characterB, IReadOnlyList<CharacterItemSlotTvp> itemsB0, IReadOnlyList<CharacterItemSlotTvp> itemsB1,
@@ -436,8 +354,6 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         builder.AddParameter("DeltaMoneyB", deltaMoneyB, SqlDbType.BigInt)
             .AddParameter("DeltaBigMoneyB", deltaBigMoneyB, SqlDbType.Int);
 
-        // Audit-only additions (Migrations/037_trade_event_log.sql) -- appended last, never inserted among the
-        // existing scalars/TVPs above, matching the append-only parameter rule.
         if (tradedItemsA is { Count: > 0 }) builder.AddTvpParameter("TradedItemsA", tradedItemsA);
         if (tradedItemsB is { Count: > 0 }) builder.AddTvpParameter("TradedItemsB", tradedItemsB);
 
@@ -449,12 +365,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-    /// <summary>
-    ///     Atomically upserts quest state plus optional money credit and up to two container replaces, in one
-    ///     transaction. Unlike every other money proc here, a money-cap breach is silently skipped, not thrown. A (container,
-    ///     items) pair is ignored unless container is non-null; passing the same container twice is a caller error.
-    /// </summary>
-    public async ValueTask ApplyQuestTransitionAsync(int characterId, int stepPermanent, int activeQuestId,
+        public async ValueTask ApplyQuestTransitionAsync(int characterId, int stepPermanent, int activeQuestId,
         int qSort, int targetPhase, int killCounter, long deltaMoney,
         byte? container1, IReadOnlyList<CharacterItemSlotTvp> items1,
         byte? container2, IReadOnlyList<CharacterItemSlotTvp> items2,
@@ -481,11 +392,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-    /// <summary>
-    ///     Atomically writes the 4 daily-mission counters (after deduction) plus an optional one-container reward
-    ///     deposit.
-    /// </summary>
-    public async ValueTask ApplyDailyMissionClaimAsync(int characterId, int joinWar, int killOtherTribe,
+        public async ValueTask ApplyDailyMissionClaimAsync(int characterId, int joinWar, int killOtherTribe,
         int killMonster, int playTime, byte? container, IReadOnlyList<CharacterItemSlotTvp> items,
         CancellationToken ct)
     {
@@ -503,8 +410,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-    /// <summary>Persists CZ_CHANGE_AUTO_INFO's two auto-potion thresholds.</summary>
-    public async ValueTask SetAutoPotionThresholdAsync(int characterId, byte autoLifeRatio, byte autoManaRatio,
+        public async ValueTask SetAutoPotionThresholdAsync(int characterId, byte autoLifeRatio, byte autoManaRatio,
         CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_SetAutoPotionThreshold", 0)
@@ -516,11 +422,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>
-    ///     Persists the auto-hunt flag and the raw 112-byte AUTO_HUNT blob verbatim, no validation -- matches the legacy
-    ///     CopyMemory.
-    /// </summary>
-    public async ValueTask SetAutoHuntAsync(int characterId, bool enabled, byte[] config, CancellationToken ct)
+        public async ValueTask SetAutoHuntAsync(int characterId, bool enabled, byte[] config, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_SetAutoHunt", 0)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
@@ -531,8 +433,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>Persists the active pet's growth/activity counters.</summary>
-    public async ValueTask SetPetGrowthAsync(int characterId, int petGrowth, byte petActivity, CancellationToken ct)
+        public async ValueTask SetPetGrowthAsync(int characterId, int petGrowth, byte petActivity, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_SetPetGrowth", 0)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
@@ -543,11 +444,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>
-    ///     Resolves an avatar name to its CharacterId regardless of online state -- used to view another (possibly
-    ///     offline) character's shop stall.
-    /// </summary>
-    public async ValueTask<int?> GetIdByNameAsync(string name, CancellationToken ct)
+        public async ValueTask<int?> GetIdByNameAsync(string name, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetIdByName", 1)
             .AddParameter("Name", name, SqlDbType.NVarChar)
@@ -557,8 +454,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return row?.CharacterId;
     }
 
-    /// <summary>Targeted single-slot read (game.usp_CharacterItem_GetIdAtSlot); null if the slot is empty.</summary>
-    public async ValueTask<int?> GetItemIdAtSlotAsync(int characterId, byte container, byte slot, CancellationToken ct)
+        public async ValueTask<int?> GetItemIdAtSlotAsync(int characterId, byte container, byte slot, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_CharacterItem_GetIdAtSlot", 1)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
@@ -570,11 +466,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return row?.ItemId;
     }
 
-    /// <summary>
-    ///     CZ_GET_REWARD_ITEM_SEND's read; null only if the character doesn't exist. todayDate (app-clock YYYYMMDD)
-    ///     drives the proc's lazy weekly reset of RewardClaimDay.
-    /// </summary>
-    public async ValueTask<RewardClaimStateDto?> GetRewardClaimStateAsync(int characterId, int todayDate,
+        public async ValueTask<RewardClaimStateDto?> GetRewardClaimStateAsync(int characterId, int todayDate,
         CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetRewardClaimState", 1)
@@ -585,11 +477,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return await Db.FirstQueryAsync<RewardClaimStateDto>(sp, ct);
     }
 
-    /// <summary>
-    ///     Atomically advances the 7-day login-reward cursor and grants the day's item. Throws SQL 50270 if already
-    ///     claimed today, fully claimed, or unknown character.
-    /// </summary>
-    public async ValueTask ClaimDailyRewardAsync(int characterId, int todayDate, byte container,
+        public async ValueTask ClaimDailyRewardAsync(int characterId, int todayDate, byte container,
         IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
     {
         var builder = new StoredProcedureParametersBuilder("game", "usp_Character_ClaimDailyReward", 0)
@@ -603,11 +491,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-    /// <summary>
-    ///     Atomic BloodCoin spend + one container replace (CZ_BUY_BLOOD_MARK_SEND). Returns the post-debit balance.
-    ///     Throws SQL 50271 on insufficient balance.
-    /// </summary>
-    public async ValueTask<int> SpendBloodCoinAndReplaceContainerAsync(int characterId, int deltaBloodCoin,
+        public async ValueTask<int> SpendBloodCoinAndReplaceContainerAsync(int characterId, int deltaBloodCoin,
         byte container, IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
     {
         var builder = new StoredProcedureParametersBuilder("game", "usp_Character_SpendBloodCoinAndReplaceContainer", 1)
@@ -621,11 +505,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return await Db.ExecuteScalarAsync<int>(builder.Build(), ct);
     }
 
-    /// <summary>
-    ///     Atomic two-character live personal-shop-stall purchase (CZ_BUY_PSHOP_SEND). No item-slot CAS guard needed --
-    ///     caller already re-validated under both participants' EconomyActionLock.
-    /// </summary>
-    public async ValueTask ExecutePshopPurchaseAsync(int sellerCharacterId, byte sellerContainer,
+        public async ValueTask ExecutePshopPurchaseAsync(int sellerCharacterId, byte sellerContainer,
         IReadOnlyList<CharacterItemSlotTvp> sellerItems, int buyerCharacterId, byte buyerContainer,
         IReadOnlyList<CharacterItemSlotTvp> buyerItems, int price, CancellationToken ct)
     {
@@ -645,12 +525,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-    /// <summary>
-    ///     game.Characters.TribeTransferPermitCount adjustment (Faction Transfer Scroll, world.Items 8153/8154).
-    ///     Returns the post-adjustment balance. Throws SQL 50312 on unknown character or an adjustment that
-    ///     would take the balance negative.
-    /// </summary>
-    public async ValueTask<int> GrantTribeTransferPermitAsync(int characterId, int delta, CancellationToken ct)
+        public async ValueTask<int> GrantTribeTransferPermitAsync(int characterId, int delta, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GrantTribeTransferPermit", 1)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
@@ -660,11 +535,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return await Db.ExecuteScalarAsync<int>(sp, ct);
     }
 
-    /// <summary>
-    ///     game.Characters.ProtectForDeath adjustment/consumption. Returns the post-adjustment balance.
-    ///     Throws SQL 50332 on unknown character or an adjustment that would take the balance negative.
-    /// </summary>
-    public async ValueTask<int> AdjustDeathProtectionAsync(int characterId, int delta, CancellationToken ct)
+        public async ValueTask<int> AdjustDeathProtectionAsync(int characterId, int delta, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_AdjustDeathProtection", 1)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
@@ -674,11 +545,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return await Db.ExecuteScalarAsync<int>(sp, ct);
     }
 
-    /// <summary>
-    ///     game.Characters.Zone241Time adjustment. Returns the post-adjustment balance. Throws SQL 50336 on
-    ///     unknown character or an adjustment that would take the balance negative.
-    /// </summary>
-    public async ValueTask<int> AdjustZone241TimeAsync(int characterId, int delta, CancellationToken ct)
+        public async ValueTask<int> AdjustZone241TimeAsync(int characterId, int delta, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_AdjustZone241Time", 1)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
@@ -688,13 +555,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return await Db.ExecuteScalarAsync<int>(sp, ct);
     }
 
-    /// <summary>
-    ///     Book of Noble Dragon/Royal Serpent/Grand Tiger V2 tribe-conversion mechanic (world.Items
-    ///     99014/99015/99016); see usp_Character_ApplyTribeConversion.sql's own header for the full
-    ///     precondition list and THROW codes (50313-50320). Empty-TVP-omission rule same as
-    ///     <see cref="ReplaceContainerAsync" />.
-    /// </summary>
-    public async ValueTask ApplyTribeConversionAsync(int characterId, int itemId, byte container,
+        public async ValueTask ApplyTribeConversionAsync(int characterId, int itemId, byte container,
         IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
     {
         var builder = new StoredProcedureParametersBuilder("game", "usp_Character_ApplyTribeConversion", 0)
@@ -708,12 +569,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-    /// <summary>
-    ///     Fourth-tribe (Fujin) conversion/return (CZ_CHANGE_TO_TRIBE4_SEND, op37) -- see
-    ///     usp_Character_ApplyTribeFourConversion.sql's own header. Distinct from, and never conflated with,
-    ///     <see cref="ApplyTribeConversionAsync" /> -- see that method's own remarks.
-    /// </summary>
-    public async ValueTask ApplyTribeFourConversionAsync(int characterId, byte newTribe, int stepPermanent,
+        public async ValueTask ApplyTribeFourConversionAsync(int characterId, byte newTribe, int stepPermanent,
         int activeQuestId, int qSort, int targetPhase, int killCounter, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_ApplyTribeFourConversion", 0)

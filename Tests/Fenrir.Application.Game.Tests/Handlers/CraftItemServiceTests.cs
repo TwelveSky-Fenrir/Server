@@ -12,13 +12,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 
-/// <summary>
-///     Drives the real <see cref="CraftItemService" /> (op29, CZ_MAKE_ITEM_SEND) over a real <see cref="Zone" />;
-///     ticks the zone while the service's own <c>PostInventoryCommandAndWaitAsync</c> await is pending, same
-///     pattern as <c>UseInventoryItemServiceTests</c>. Covers the game.EventLog (Category=ItemCreate) wiring
-///     added on top of the pre-existing Jade-upgrade/Advanced-elixir craft resolution -- see
-///     <c>CraftResolverTests</c> for the pure-domain outcome coverage this does not duplicate.
-/// </summary>
 public class CraftItemServiceTests
 {
     private const int AccountId = 1;
@@ -155,12 +148,6 @@ public class CraftItemServiceTests
     [Fact]
     public async Task AdvancedElixir_SuccessOutcome_LogsItemCreate_FailureOutcome_LogsNothing()
     {
-        // CraftItemService rolls the elixir via SystemRandomSource.Instance -- no DI seam, the same posture as
-        // SkyUpgradeItemService/EnchantItemService (see SkyUpgradeItemServiceTests' own remarks), so this
-        // repeats many independent trials rather than forcing a specific roll. At the fixed 20% success rate
-        // (CraftRecipeCatalog.AdvancedElixirSuccessRatePercent), the odds that 60 independent trials produce
-        // zero successes (0.8^60) or zero failures (0.2^60) are both negligible, so asserting both branches
-        // were observed is not flaky in practice.
         var sawSuccess = false;
         var sawFailure = false;
 

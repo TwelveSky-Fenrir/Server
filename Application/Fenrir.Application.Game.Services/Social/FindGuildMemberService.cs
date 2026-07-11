@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Social;
 
-/// <inheritdoc cref="IFindGuildMemberService" />
 public sealed class FindGuildMemberService(
     ZoneRegistry zones,
     ICharacterShardLocationRepository characterShardLocations,
@@ -28,8 +27,6 @@ public sealed class FindGuildMemberService(
             return new FindGuildMemberResult(true, found.MapId);
         }
 
-        // Same-shard miss -- fall back to the cross-shard directory before reporting "not found". A
-        // deliberate, low-frequency player action (a guild-find ping), not a per-tick path.
         var remote = await characterShardLocations.FindByNameAsync(avatarName, cancellationToken)
             .ConfigureAwait(false);
 

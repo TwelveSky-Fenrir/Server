@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Social;
 
-/// <summary>Abandons an in-progress trade; nothing was ever committed, so no rollback is needed.</summary>
 public sealed class TradeEndService(TradeRegistry trades, ILogger<TradeEndService> logger) : ITradeEndService
 {
     public TradeEndResult End(int characterId)

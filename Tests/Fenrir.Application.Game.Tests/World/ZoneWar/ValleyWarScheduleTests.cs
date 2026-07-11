@@ -2,14 +2,6 @@ using Fenrir.Application.Game.Domain.World.ZoneWar;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Covers <see cref="ValleyWarSchedule" />: the Idle/GateCountdown/GateOpen/DoorPending/KillRace/
-///     ScrollPending/BossWindow/PostWinCooldown/PreReset phase machine for Valley of the Deceased (Zone
-///     200/297/298/299) -- a DISTINCT state machine from <see cref="RegularWarSchedule" />'s own Zone049
-///     family (see <see cref="RegularWarScheduleTests" />, which this task leaves entirely unchanged). Every
-///     tick count below is derived directly from the class's own public tick constants so a future constant
-///     change fails these tests loudly instead of silently drifting.
-/// </summary>
 public class ValleyWarScheduleTests
 {
     private static ValleyWarEnvironmentSnapshot Present(bool eligible = true, bool bossSlotOccupied = false)
@@ -38,7 +30,6 @@ public class ValleyWarScheduleTests
     private static ValleyWarSchedule AdvanceToGateOpenStart()
     {
         var schedule = AdvanceToGateCountdownStart();
-        // 5 countdown announcements (5,4,3,2,1) then 1 more interval to actually open the gate.
         TickMany(schedule,
             (ValleyWarSchedule.GateCountdownStartValue + 1) * ValleyWarSchedule.GateCountdownIntervalTicks);
         Assert.Equal(ValleyWarPhase.GateOpen, schedule.Phase);
@@ -61,11 +52,7 @@ public class ValleyWarScheduleTests
         return schedule;
     }
 
-    /// <summary>
-    ///     Tribe 0 wins the kill race (via <see cref="ValleyWarSchedule.ForceZeroTribeQuota" />), then
-    ///     waits out the scroll-delete delay, landing exactly at the first tick of <see cref="ValleyWarPhase.BossWindow" />.
-    /// </summary>
-    private static ValleyWarSchedule AdvanceToBossWindowStart()
+        private static ValleyWarSchedule AdvanceToBossWindowStart()
     {
         var schedule = AdvanceToKillRaceStart();
         schedule.ForceZeroTribeQuota(0);
@@ -81,8 +68,6 @@ public class ValleyWarScheduleTests
     private static ValleyWarSchedule AdvanceToPostWinCooldownStart()
     {
         var schedule = AdvanceToBossWindowStart();
-        // BossSlotOccupied defaults to false -- the boss is never actually summoned in this cluster (see
-        // ValleyWarSystem's own remarks), so the very first BossWindow tick always resolves as a win.
         var result = schedule.Tick(Present());
         Assert.True(result.BossWin);
         Assert.Equal(ValleyWarPhase.PostWinCooldown, schedule.Phase);
@@ -104,7 +89,7 @@ public class ValleyWarScheduleTests
         TickMany(schedule, ValleyWarSchedule.IdleWaitTicks - 1);
         Assert.Equal(ValleyWarPhase.Idle, schedule.Phase);
 
-        var result = schedule.Tick(ValleyWarEnvironmentSnapshot.Empty); // the exact IdleWaitTicks-th tick
+        var result = schedule.Tick(ValleyWarEnvironmentSnapshot.Empty);
         Assert.Equal(ValleyWarPhase.GateCountdown, result.Phase);
         Assert.Equal(ValleyWarPhase.Idle, result.PreviousPhase);
     }
@@ -123,7 +108,7 @@ public class ValleyWarScheduleTests
         }
 
         Assert.Equal([5, 4, 3, 2, 1], announced);
-        Assert.Equal(ValleyWarPhase.GateCountdown, schedule.Phase); // not yet opened
+        Assert.Equal(ValleyWarPhase.GateCountdown, schedule.Phase);
 
         var openResult = TickMany(schedule, ValleyWarSchedule.GateCountdownIntervalTicks);
         Assert.True(openResult.GateOpened);
@@ -158,7 +143,7 @@ public class ValleyWarScheduleTests
         }
 
         Assert.Equal([10, 9, 8, 7, 6, 5, 4, 3, 2, 1], countdowns);
-        Assert.True(last.DoorOpened); // the 10th (last) countdown tick and the door-open tick coincide
+        Assert.True(last.DoorOpened);
         Assert.Equal(ValleyWarPhase.KillRace, last.Phase);
 
         for (byte t = 0; t < ValleyWarSchedule.TribeCount; t++)
@@ -232,10 +217,10 @@ public class ValleyWarScheduleTests
         var schedule = AdvanceToKillRaceStart();
         Assert.Equal(170, schedule.GetKillQuota(1));
 
-        schedule.Tick(Present(false)); // empty map -> PreReset (quota is NOT cleared until PreReset resolves)
+        schedule.Tick(Present(false));
         Assert.Equal(ValleyWarPhase.PreReset, schedule.Phase);
 
-        schedule.RegisterMonsterKill(1); // no-op: Phase != KillRace
+        schedule.RegisterMonsterKill(1);
         Assert.Equal(170, schedule.GetKillQuota(1));
     }
 
@@ -255,7 +240,7 @@ public class ValleyWarScheduleTests
     {
         var schedule = AdvanceToKillRaceStart();
 
-        schedule.RegisterMonsterKill(ValleyWarSchedule.TribeCount); // one past the valid range
+        schedule.RegisterMonsterKill(ValleyWarSchedule.TribeCount);
         schedule.RegisterMonsterKill(255);
 
         for (byte t = 0; t < ValleyWarSchedule.TribeCount; t++)
@@ -269,7 +254,7 @@ public class ValleyWarScheduleTests
 
         schedule.ForceZeroTribeQuota(0);
         Assert.Equal(0, schedule.GetKillQuota(0));
-        Assert.Equal(170, schedule.GetKillQuota(1)); // untouched
+        Assert.Equal(170, schedule.GetKillQuota(1));
 
         var result = schedule.Tick(Present());
         Assert.True(result.TribeWin);
@@ -279,15 +264,15 @@ public class ValleyWarScheduleTests
     [Fact]
     public void ForceZeroTribeQuota_OutsideKillRace_IsANoOp()
     {
-        var schedule = new ValleyWarSchedule(); // Idle
+        var schedule = new ValleyWarSchedule();
         schedule.ForceZeroTribeQuota(0);
-        Assert.Equal(ValleyWarPhase.Idle, schedule.Phase); // unaffected, still Idle
+        Assert.Equal(ValleyWarPhase.Idle, schedule.Phase);
     }
 
     [Fact]
     public void GetKillQuota_OutOfRangeTribeId_ReturnsZero()
     {
-        var schedule = AdvanceToKillRaceStart(); // every real tribe seeded to 170
+        var schedule = AdvanceToKillRaceStart();
         Assert.Equal(0, schedule.GetKillQuota(ValleyWarSchedule.TribeCount));
         Assert.Equal(0, schedule.GetKillQuota(255));
     }
@@ -348,7 +333,7 @@ public class ValleyWarScheduleTests
     public void PreReset_WaitsOneMinute_ThenForceDisconnectsAndFullyResetsToIdle()
     {
         var schedule = AdvanceToKillRaceStart();
-        var toPreReset = schedule.Tick(Present(false)); // empty-map end -> PreReset
+        var toPreReset = schedule.Tick(Present(false));
         Assert.Equal(ValleyWarPhase.PreReset, toPreReset.Phase);
 
         TickMany(schedule, ValleyWarSchedule.PreResetTicks - 1, Present(false));

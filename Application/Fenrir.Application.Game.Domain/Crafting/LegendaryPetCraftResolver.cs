@@ -2,10 +2,6 @@ using Fenrir.Application.Game.Domain.Combat;
 
 namespace Fenrir.Application.Game.Domain.Crafting;
 
-/// <summary>
-///     Pure resolver for CZ_MAKE_ITEM2_SEND tSort==2 (S04_MyWork02.cpp:15074-15141) -- re-rolls an
-///     already-Legendary pet into a further-evolved Legendary/Guardian pet for 10,000 CP + 2 catalyst stones.
-/// </summary>
 public static class LegendaryPetCraftResolver
 {
     public enum Outcome
@@ -16,10 +12,7 @@ public static class LegendaryPetCraftResolver
 
     private static readonly Result Rejected = new(Outcome.Rejected, 0);
 
-    /// <param name="material1Sort">world.Items.Sort of the page1/index1 pet being upgraded; must be 31 or 32.</param>
-    /// <param name="material2ItemId">page2/index2 -- catalyst stone (1878 or 2150).</param>
-    /// <param name="material3ItemId">page3/index3 -- catalyst stone (1878 or 2150).</param>
-    public static Result Resolve(byte material1Sort, int material2ItemId, int material3ItemId,
+        public static Result Resolve(byte material1Sort, int material2ItemId, int material3ItemId,
         int contributionPoints, IRandomSource random)
     {
         if ((material1Sort != LegendaryPetCraftCatalog.Material1RequiredSort1 &&

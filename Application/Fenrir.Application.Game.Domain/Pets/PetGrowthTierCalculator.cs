@@ -2,21 +2,6 @@ using System.Collections.Frozen;
 
 namespace Fenrir.Application.Game.Domain.Pets;
 
-/// <summary>
-///     Port of <c>PETSYSTEM::ReturnGrowStep</c> (GameSystem_07_Pet.cpp:335-435) -- the tier boundary the
-///     ability-recalculation broadcast fires on, checked once before and once after a credited amount is
-///     applied (<c>PETSYSTEM::ProcessForExperience</c>, GameSystem_07_Pet.cpp:1961-1968).
-/// </summary>
-/// <remarks>
-///     Deliberately a SEPARATE item-id -&gt; category table from <see cref="PetExperienceCreditCalculator" />'s:
-///     the legacy source itself uses two disagreeing tables reading the same <see cref="PetGrowthCaps" />
-///     array. Every item id this table places in category 0-3 that <see cref="PetExperienceCreditCalculator" />
-///     instead places in the corresponding higher category (index+4) is evaluated here against exactly half
-///     its real growth cap -- a genuine legacy inconsistency, reproduced faithfully rather than "fixed."
-///     <c>ReturnGrowPercent</c> (:437 onward, a sibling routine in the same file) is out of this contract's
-///     scope -- only the tier-crossing comparison via <c>ReturnGrowStep</c> feeds the broadcast decision at
-///     the cited call site.
-/// </remarks>
 public static class PetGrowthTierCalculator
 {
     private static readonly FrozenDictionary<int, int> CategoryByItemId = new Dictionary<int, int>
@@ -29,12 +14,7 @@ public static class PetGrowthTierCalculator
         [17055] = 3, [17056] = 3, [17057] = 3
     }.ToFrozenDictionary();
 
-    /// <summary>
-    ///     0-3 for a growth percentage in [0,25)/[25,50)/[50,75)/[75,100) of its category cap, 4 at/above the
-    ///     cap ("100%+"), or 0 for an unrecognized item id or a growth counter below 1 -- matching
-    ///     <c>ReturnGrowStep</c>'s own <c>pGrowUpValue &lt; 1</c> guard and <c>default: return 0.0f;</c>.
-    /// </summary>
-    public static int ComputeTier(int petItemId, int growth)
+        public static int ComputeTier(int petItemId, int growth)
     {
         if (growth < 1)
             return 0;
@@ -56,8 +36,7 @@ public static class PetGrowthTierCalculator
         };
     }
 
-    /// <summary>Whether crediting moved the tier strictly upward -- the broadcast gate at :1963.</summary>
-    public static bool HasTierIncreased(int petItemId, int growthBeforeCredit, int growthAfterCredit)
+        public static bool HasTierIncreased(int petItemId, int growthBeforeCredit, int growthAfterCredit)
     {
         return ComputeTier(petItemId, growthAfterCredit) > ComputeTier(petItemId, growthBeforeCredit);
     }

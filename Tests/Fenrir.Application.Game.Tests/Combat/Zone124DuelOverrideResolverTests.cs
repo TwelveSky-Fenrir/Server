@@ -2,24 +2,19 @@ using Fenrir.Application.Game.Domain.Combat;
 
 namespace Fenrir.Application.Game.Tests.Combat;
 
-/// <summary>
-///     Covers <see cref="Zone124DuelOverrideResolver" /> -- branch C of the B10 contract: the map-124
-///     final-countdown x3-damage / forced-crit duel override
-///     (<c>Server/ts25zone/S07_MyGame02.cpp:1146-1150</c>).
-/// </summary>
 public class Zone124DuelOverrideResolverTests
 {
     [Theory]
     [InlineData(0)]
     [InlineData(1)]
-    [InlineData(9)] // strictly below ten
+    [InlineData(9)]
     public void IsActive_OnMap124_BelowTen_IsActive(int countdown)
     {
         Assert.True(Zone124DuelOverrideResolver.IsActive(isMap124Process: true, countdown));
     }
 
     [Theory]
-    [InlineData(10)] // exactly ten is NOT below ten
+    [InlineData(10)]
     [InlineData(11)]
     [InlineData(60)]
     public void IsActive_OnMap124_AtOrAboveTen_IsInactive(int countdown)
@@ -39,8 +34,6 @@ public class Zone124DuelOverrideResolverTests
     [Fact]
     public void Apply_Active_TriplesDamage_AndForcesCrit()
     {
-        // The 200 here is already the ordinary-crit-doubled value; the override triples it to 600 (the divide
-        // -by-five happens later, at the call site) -- the contract's own 100 -> 200 -> 600 -> 120 illustration.
         var outcome = Zone124DuelOverrideResolver.Apply(damage: 200, critExists: true, isMap124Process: true,
             countdownRemaining: 9);
 
@@ -51,7 +44,6 @@ public class Zone124DuelOverrideResolverTests
     [Fact]
     public void Apply_Active_ForcesCrit_EvenWhenOrdinaryCritDidNotFire()
     {
-        // A non-crit base hit still gets the forced crit flag and the triple.
         var outcome = Zone124DuelOverrideResolver.Apply(damage: 100, critExists: false, isMap124Process: true,
             countdownRemaining: 3);
 

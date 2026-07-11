@@ -5,9 +5,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Services.Commerce;
 
-/// <summary>
-///     world.RewardBundles has exactly 1 row in this build, hardcoded here rather than resolved dynamically.
-/// </summary>
 public sealed class GetDailyRewardCatalogService(ICharacterRepository characters, WorldDataCache worldData)
     : IGetDailyRewardCatalogService
 {

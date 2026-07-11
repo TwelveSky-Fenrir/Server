@@ -9,10 +9,10 @@ public class FavoredTribeRankBonusLadderTests
     {
         var totals = FavoredTribeRankBonusLadder.ComputeTotals(0);
 
-        Assert.Equal(1000 + 4000, totals[0]); // distance 0 + flat bonus
-        Assert.Equal(1000 + 100, totals[1]); // distance 1
-        Assert.Equal(1000 + 200, totals[2]); // distance 2
-        Assert.Equal(1000 + 300, totals[3]); // distance 3
+        Assert.Equal(1000 + 4000, totals[0]);
+        Assert.Equal(1000 + 100, totals[1]);
+        Assert.Equal(1000 + 200, totals[2]);
+        Assert.Equal(1000 + 300, totals[3]);
     }
 
     [Fact]
@@ -20,10 +20,10 @@ public class FavoredTribeRankBonusLadderTests
     {
         var totals = FavoredTribeRankBonusLadder.ComputeTotals(1);
 
-        Assert.Equal(1000 + 300, totals[0]); // distance 3 (wraps backward)
-        Assert.Equal(1000 + 4000, totals[1]); // distance 0 + flat bonus
-        Assert.Equal(1000 + 100, totals[2]); // distance 1
-        Assert.Equal(1000 + 200, totals[3]); // distance 2
+        Assert.Equal(1000 + 300, totals[0]);
+        Assert.Equal(1000 + 4000, totals[1]);
+        Assert.Equal(1000 + 100, totals[2]);
+        Assert.Equal(1000 + 200, totals[3]);
     }
 
     [Fact]

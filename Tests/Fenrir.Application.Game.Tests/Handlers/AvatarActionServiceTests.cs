@@ -8,11 +8,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 
-/// <summary>
-///     Covers <see cref="AvatarActionService" />'s <c>mProtect_ReviveHack</c> companion check
-///     (S04_MyWork02.cpp:1313-1320): a stand-up-from-death action request (action-sort 30) while still
-///     flagged from an unresolved death kicks the session outright instead of being silently denied/forwarded.
-/// </summary>
 public class AvatarActionServiceTests
 {
     private const int CharacterId = 10;
@@ -89,7 +84,7 @@ public class AvatarActionServiceTests
         var (zone, session) = SetUp(true);
         var service = new AvatarActionService(NullLogger<AvatarActionService>.Instance);
 
-        var action = Action(0); // ordinary movement, not the stand-up sort
+        var action = Action(0);
         service.PostAction(zone, CharacterId, in action);
 
         Assert.Null(session.DisconnectReason);

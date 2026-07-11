@@ -9,7 +9,6 @@ public class ClCreateAvatarSend2Tests
     [Fact]
     public void PayloadSize_MatchesContractConstant()
     {
-        // ExpectedSize=50 (9-byte inbound header) -> 41-byte payload (7 int + char[13]).
         Assert.Equal(41, CreateAvatarRequest.PayloadSize);
     }
 

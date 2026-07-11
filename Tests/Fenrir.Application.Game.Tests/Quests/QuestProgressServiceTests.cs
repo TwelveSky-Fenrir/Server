@@ -13,20 +13,11 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Quests;
 
-/// <summary>
-///     Drives the real <see cref="QuestProgressService" /> (opcode 36, CZ_PROCESS_QUEST_SEND, tSort 2
-///     "mission completed") over a real <see cref="Zone" />; ticks the zone while the service's own
-///     <c>PostQuestCommandAndWaitAsync</c> await is pending, same pattern as
-///     <c>UseInventoryItemServiceTests</c>. Covers only the game.EventLog (Category=ItemCreate) wiring added
-///     for the quest-completion reward grant -- item deposit and/or nonzero money/experience/
-///     contribution-point/teacher-point reward -- every other CompleteAsync/QuestStateMachine rule is
-///     covered by <c>QuestStateMachineTests</c> and is not duplicated here.
-/// </summary>
 public class QuestProgressServiceTests
 {
     private const int AccountId = 1;
     private const int CharacterId = 10;
-    private const byte Tribe = 1; // matches ZoneTestKit.EnterData's own default tribe
+    private const byte Tribe = 1;
     private const byte Category = Tribe + 1;
     private const int RewardItemId = 9500;
     private const int QuestId = 1;
@@ -47,8 +38,7 @@ public class QuestProgressServiceTests
         return await task;
     }
 
-    /// <summary>A qSort-1 (kill monster) quest at Step 3 -- Solution2 (1) is the required kill count.</summary>
-    private static QuestRowDto KillQuestAtStep3()
+        private static QuestRowDto KillQuestAtStep3()
     {
         return WorldDataTestRows.Quest(QuestId) with
         {
@@ -113,10 +103,10 @@ public class QuestProgressServiceTests
         Assert.Null(logged.TargetAccountId);
         Assert.Null(logged.TargetCharacterId);
         Assert.Equal(RewardItemId, logged.ItemId);
-        Assert.Equal(1, logged.Quantity); // Sort=1 (non-equipment) -> quantity 1, see QuestStateMachine.Complete
+        Assert.Equal(1, logged.Quantity);
         Assert.Equal((byte)1, logged.Outcome);
         Assert.Null(logged.DeltaMoney);
-        Assert.Null(logged.Payload); // no nonzero money/XP/CP/teacher-point reward configured alongside the item
+        Assert.Null(logged.Payload);
     }
 
     [Fact]
@@ -147,9 +137,9 @@ public class QuestProgressServiceTests
     {
         var rewards = new[]
         {
-            new QuestRewardRowDto(QuestId, 0, 4, null, 200), // RewardType 4 = experience
-            new QuestRewardRowDto(QuestId, 1, 3, null, 50), // RewardType 3 = contribution points
-            new QuestRewardRowDto(QuestId, 2, 5, null, 5) // RewardType 5 = teacher points
+            new QuestRewardRowDto(QuestId, 0, 4, null, 200),
+            new QuestRewardRowDto(QuestId, 1, 3, null, 50),
+            new QuestRewardRowDto(QuestId, 2, 5, null, 5)
         };
         var (_, zone, state, _, eventLog, service) = SetUp(KillQuestAtStep3(), rewards, 1);
         var packet = new QuestProgressRequest { Sort = 2, Page1 = 0, Index1 = 0, XPost = 0, YPost = 0 };
@@ -194,8 +184,6 @@ public class QuestProgressServiceTests
     [Fact]
     public async Task Complete_RewardItemConfigured_ButNoDepositSlotOffered_SkipsTheDeposit_AndLogsNothing()
     {
-        // Page1 == -1 signals "no deposit slot" -- CompleteAsync skips the item grant entirely even though a
-        // reward item is configured, so no item is ever created and nothing is logged.
         var reward = new QuestRewardRowDto(QuestId, 0, 6, RewardItemId, null);
         var (_, zone, state, _, eventLog, service) = SetUp(KillQuestAtStep3(), [reward], 1);
         var packet = new QuestProgressRequest { Sort = 2, Page1 = -1, Index1 = -1, XPost = 0, YPost = 0 };
@@ -211,7 +199,6 @@ public class QuestProgressServiceTests
     public async Task Complete_EndConditionNotMet_Fails_AndLogsNothing()
     {
         var reward = new QuestRewardRowDto(QuestId, 0, 6, RewardItemId, null);
-        // killCounter (0) below Solution2 (1) -> end condition not met
         var (_, zone, state, characters, eventLog, service) = SetUp(KillQuestAtStep3(), [reward], 0);
         var packet = new QuestProgressRequest { Sort = 2, Page1 = 0, Index1 = 0, XPost = 0, YPost = 0 };
 

@@ -4,19 +4,6 @@ using Fenrir.Data.Accounts;
 using Fenrir.Data.Security;
 using Microsoft.Extensions.DependencyInjection;
 
-// The legacy client (BuildEU33) has no sign-up screen, so this CLI is the only way to provision an account.
-// "grant-gm" exists because, until it was added, there was no path anywhere in this repo (no seed script,
-// no other tool, nothing documented) to set AccountGrade (legacy uUserSort) above 0 -- making the GM
-// command tier work (Application/Fenrir.Application.Game.Services/Gm/*) unreachable/untestable end-to-end.
-//
-// "allow-gm-ip" exists for the same reason, one layer down: LoginService.LoginAsync's "# GM Enable Login IP #"
-// gate (Server/ts25login/S04_MyWork02.cpp:192-201) additionally requires any AccountGrade>=1 account to log in
-// from an IP listed in admin.GmAllowlist -- deliberately left unseeded (see admin.GmAllowlist.sql's own remarks:
-// the legacy dump's only row, 127.0.0.1, was NOT ported as seed data). Without this command, granting GM on an
-// account whose IP isn't already allowlisted silently locks that account out of login entirely (LoginService
-// logs "GM-tier account ... attempted login from non-allowlisted IP" at Warning, but nothing surfaces that to
-// whoever just ran grant-gm) -- run this right after grant-gm for any account/IP you intend to actually log in
-// with, not just to unlock GM commands once already in-world.
 
 var command = args.Length > 0 ? args[0] : null;
 
@@ -44,7 +31,6 @@ async Task<int> RunCreateAsync(string loginName, string password)
         return 1;
     }
 
-    // LoginRequest.Password is [FixedString(33)] on the wire (null-terminated Latin1 char[33]): 32 usable characters max.
     const int maxPasswordLength = 32;
     if (password.Length > maxPasswordLength)
     {
@@ -67,7 +53,6 @@ async Task<int> RunCreateAsync(string loginName, string password)
     }
     catch (Exception ex)
     {
-        // usp_Account_Create raises THROW 50101 on duplicate LoginName.
         Console.Error.WriteLine($"Could not create account '{loginName}': {ex.Message}");
         return 1;
     }
@@ -97,7 +82,6 @@ async Task<int> RunGrantGmAsync(string loginName, string gradeText)
     }
     catch (Exception ex)
     {
-        // usp_Account_SetGrade raises THROW 50102 if LoginName does not exist.
         Console.Error.WriteLine($"Could not set AccountGrade for '{loginName}': {ex.Message}");
         return 1;
     }
@@ -117,7 +101,6 @@ async Task<int> RunAllowGmIpAsync(string ipAddress)
     }
     catch (Exception ex)
     {
-        // usp_GmAllowlist_Add raises THROW 50304 if the IP is already allowlisted.
         Console.Error.WriteLine($"Could not add IP '{ipAddress}' to the GM allowlist: {ex.Message}");
         return 1;
     }

@@ -8,7 +8,6 @@ public class ClCreateMousePasswordSendTests
     [Fact]
     public void PayloadSize_MatchesContractConstant()
     {
-        // ExpectedSize=14 (9-byte inbound header) -> 5-byte payload (char[5], MAX_MOUSE_PASSWORD_LENGTH).
         Assert.Equal(5, CreateMousePinRequest.PayloadSize);
     }
 

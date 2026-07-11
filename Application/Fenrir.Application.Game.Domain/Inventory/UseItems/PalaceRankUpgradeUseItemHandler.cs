@@ -7,56 +7,18 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.Inventory.UseItems;
 
-/// <summary>
-///     op23 item 2193 — the Palace Rank +1 ticket. Raises the character's halo/palace-rank by one, capped at
-///     96: the rank cannot be pushed past that ceiling. On success it increments the rank, recomputes
-///     equipment stats + HP/MP, consumes the item, refreshes the rank/halo view, and rebroadcasts the avatar
-///     to surrounding players; reaching 96 exactly additionally fires a server-wide milestone announcement.
-/// </summary>
-/// <remarks>
-///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:6912-7008 (the item-2193 case: rank&lt;96 gate, rank+1,
-///     equipment/HP-MP recompute, rank/halo UI refresh, the milestone-96 center-server announcement, the
-///     consume rule, the plain success result, and the surrounding-player rebroadcast). "Halo/palace rank" is
-///     modeled as <see cref="PlayerRuntimeState.Halo" /> itself — the same field StatCalculator reads as aHalo,
-///     and the same one <c>UseInventoryItemService</c>'s CP-Prot-Charm branch already treats as the rank value.
-///     Two deliberate divergences: (1) the milestone-96 announcement is flagged (logged) and left unsent, not
-///     invented — and, as of a follow-up 2026-07-11 legacy-behavior-translator pass, CLOSED rather than
-///     pending. An earlier same-day confirmation pass had only gotten as far as "the exact legacy notice text
-///     is not cited anywhere in this codebase, only the bare line range"; the follow-up pass went past that
-///     and confirmed there is no text to find, ever. The send site itself (S04_MyWork03.cpp:6946-6952, the
-///     actual relay-sort-672 call inside the :6912-7008 case) ships only a tribe id and an avatar name — no
-///     string/format field of any kind. Both possible receivers are permanently-empty stub cases with no
-///     <c>default:</c> fallback in either switch to catch it instead: <c>ts25center</c>'s
-///     <c>S04_MyWork02.cpp:1079-1080</c> and <c>ts25zone</c>'s <c>S07_MyGame08.cpp:1158-1159</c>.
-///     This handler's own plain <c>logger.LogInformation</c> call below follows the same log-only-stand-in
-///     precedent as <c>CenterRelayNoticeLog</c> (no receiving ts25center-equivalent process in Fenrir), and
-///     while <c>IWorldNoticeService</c>'s <c>Broadcast(string)</c> IS a real client-visible send path
-///     elsewhere (e.g. <c>UpgradeCapeService</c>'s RANKUP notice), wiring it here would still mean
-///     fabricating wording the legacy server itself never shipped — this is not the same class of blocker as
-///     an uncited magnitude waiting on future archaeology, it is a confirmed terminal dead end; the rank
-///     itself is still raised and persisted regardless. (2) The item
-///     is consumed BEFORE the rank grant is mirrored, so a dropped mirror can only lose the ticket, never
-///     grant a free rank — the same security ordering the Rebirth-Pill branch uses, and materially important
-///     here since (unlike the single-step title ticket) the rank gate re-opens after each successful use.
-/// </remarks>
 public sealed class PalaceRankUpgradeUseItemHandler(
     WorldDataCache worldData,
     UseItemInventoryWriter inventoryWriter,
     IEventLogRepository eventLog,
     ILogger<PalaceRankUpgradeUseItemHandler> logger) : IUseItemHandler
 {
-    /// <summary>world.Items 2193 — the Palace Rank +1 ticket.</summary>
-    public const int ItemId = 2193;
 
-    /// <summary>The rank ceiling: the ticket cannot raise the rank at or above this value.</summary>
-    private const int RankCeiling = 96;
+        public const int ItemId = 2193;
 
-    /// <summary>
-    ///     game.EventLog.EventCode for a palace-rank grant — an app-owned value scoped within
-    ///     <see cref="EventLogCategory.CashItemUse" />, distinct from that category's proxy-shop (2) and
-    ///     pet-EXP-boost (3) EventCodes. A future central event-code registry should reconcile this constant.
-    /// </summary>
-    private const short PalaceRankGrantEventCode = 5;
+        private const int RankCeiling = 96;
+
+        private const short PalaceRankGrantEventCode = 5;
 
     private const byte SuccessOutcome = 1;
 
@@ -80,7 +42,6 @@ public sealed class PalaceRankUpgradeUseItemHandler(
             context.CharacterId, null, null, null, null, null, context.Item.ItemId, context.Item.Quantity,
             SuccessOutcome, $"Rank={state.Halo}->{newRank}", cancellationToken);
 
-        // Consume the ticket first (durable) so a dropped mirror can only lose it, never grant a free rank.
         var remaining = CashItemStackConsumption.RemainingQuantity(context.Item.ItemId, context.Item.Quantity);
         await inventoryWriter.ConsumeAndMirrorAsync(context.Zone, state, context.CharacterId, context.Page,
             context.Index, context.Item, remaining, null, cancellationToken);
@@ -93,14 +54,6 @@ public sealed class PalaceRankUpgradeUseItemHandler(
                 context.Zone.MapId, context.CharacterId);
 
         if (newRank == RankCeiling)
-            // CLOSED 2026-07-11 (was TODO(C9)): the legacy send site for this milestone
-            // (S04_MyWork03.cpp:6946-6952, relay sort 672) ships only a tribe id + avatar name -- no
-            // string/format field -- and both possible receivers (ts25center S04_MyWork02.cpp:1079-1080,
-            // ts25zone S07_MyGame08.cpp:1158-1159) are permanently-empty stub cases with no default: fallback
-            // in either switch. IWorldNoticeService.Broadcast(string) IS a real send path elsewhere (e.g.
-            // UpgradeCapeService's RANKUP notice), but there is no legacy wording to translate here, ever --
-            // this is a confirmed dead end, not a pending citation, so it stays log-only permanently. The
-            // rank itself is still raised and persisted regardless.
             logger.LogInformation(
                 "Character {CharacterId} reached palace rank {RankCeiling}: milestone announcement not modeled (confirmed dead end in legacy -- no notice text/send path exists to translate)",
                 context.CharacterId, RankCeiling);

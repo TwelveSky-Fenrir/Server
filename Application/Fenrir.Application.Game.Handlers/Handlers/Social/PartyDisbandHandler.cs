@@ -7,10 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>
-///     CZ_PARTY_BREAK_SEND (opcode 71) -- leader-only, unconditional full disband. USE_PARTY_V3 is off in
-///     this build, so <c>Sort</c> is always 1 and <c>AvatarName</c> always blank.
-/// </summary>
 public sealed class PartyDisbandHandler(
     ZoneRegistry zones,
     IPartyDisbandService partyDisbandService,

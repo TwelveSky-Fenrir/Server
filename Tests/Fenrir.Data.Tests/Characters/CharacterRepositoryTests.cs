@@ -12,8 +12,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Characters;
 
-// game.usp_Character_* against real SQL Server 2025: every [GenerateDto] column is checked since the result
-// set is the contract. Each test creates its own auth.Accounts row so tests never depend on each other.
 [Collection("SqlServer")]
 public class CharacterRepositoryTests
 {
@@ -56,7 +54,7 @@ public class CharacterRepositoryTests
         Assert.Equal(0, row.Gender);
         Assert.Equal(1, row.HeadType);
         Assert.Equal(1, row.FaceType);
-        Assert.Equal(1, row.Level); // DF_Characters_Level default -- usp_Character_Create never sets it
+        Assert.Equal(1, row.Level);
     }
 
     [Fact]
@@ -69,7 +67,6 @@ public class CharacterRepositoryTests
 
         Assert.NotNull(ex);
 
-        // usp_Character_Create raises THROW 50201 for an occupied slot; CaeriusNet may wrap the SqlException.
         var sqlException = ex as SqlException ?? ex!.InnerException as SqlException;
         if (sqlException is not null)
             Assert.Equal(50201, sqlException.Number);
@@ -91,7 +88,6 @@ public class CharacterRepositoryTests
 
         Assert.NotNull(ex);
 
-        // usp_Character_Create raises THROW 50202 for a duplicate Name; CaeriusNet may wrap the SqlException.
         var sqlException = ex as SqlException ?? ex!.InnerException as SqlException;
         if (sqlException is not null)
             Assert.Equal(50202, sqlException.Number);
@@ -108,17 +104,11 @@ public class CharacterRepositoryTests
         var roster = await _characters.GetByAccountAsync(accountId, CancellationToken.None);
         Assert.Empty(roster);
 
-        // Slot 0 is now empty -- a second delete must be a silent no-op, never an exception.
         var ex = await Record.ExceptionAsync(() =>
             _characters.DeleteAsync(accountId, 0, CancellationToken.None).AsTask());
         Assert.Null(ex);
     }
 
-    // Regression test: usp_Character_Delete used to be a bare `DELETE FROM game.Characters`, which threw an
-    // FK-violation error for any character owning even one item/skill/hotkey row -- i.e. virtually every real
-    // character -- instead of ever completing. This seeds every normalized child table (including the two
-    // legacy ranking-adjacent tables, HeroRankCur/ProxyInfo analogues, and a mentor bond another character
-    // still holds pointing at this one) and asserts the delete both succeeds and leaves nothing orphaned.
     [Fact]
     public async Task DeleteAsync_WithEveryNormalizedChildRowPopulated_CleansUpAllOfThem_WithoutAnFkViolation()
     {
@@ -139,8 +129,6 @@ public class CharacterRepositoryTests
             [new CharacterHotkeySlotTvp(0, 0, 1, 1, 1)],
             CancellationToken.None);
 
-        // CharacterBuffs/CharacterQuests/CharacterFriends/HeroRankings/OfflineShops have no dedicated
-        // repository seed path exercised elsewhere that fits this test's needs -- seed them directly.
         await ExecAsync($"""
                          INSERT INTO game.CharacterBuffs (CharacterId, SlotIndex, Value, RemainingLegacyTicks)
                          VALUES ({characterId}, 0, 5, 100);
@@ -162,8 +150,6 @@ public class CharacterRepositoryTests
                          VALUES ({characterId}, NULL, 0, 0, 0);
                          """);
 
-        // Another character's TeacherCharacterId now points at this one -- FK_Characters_TeacherCharacter
-        // would otherwise block the delete outright.
         await _mentors.BondAsync(characterId, studentId, CancellationToken.None);
 
         var deleteEx = await Record.ExceptionAsync(() =>
@@ -191,8 +177,6 @@ public class CharacterRepositoryTests
         Assert.Equal(0,
             await ScalarAsync<int>($"SELECT COUNT(*) FROM game.OfflineShopItems WHERE CharacterId = {characterId};"));
 
-        // The surviving student's own TeacherCharacterId pointer, which pointed at the now-deleted
-        // character, must have been severed rather than left dangling or blocking the delete.
         var studentTeacherId = await ScalarAsync<object>(
             $"SELECT TeacherCharacterId FROM game.Characters WHERE CharacterId = {studentId};");
         Assert.Equal(DBNull.Value, studentTeacherId);
@@ -222,17 +206,17 @@ public class CharacterRepositoryTests
         Assert.Equal(1, entry.Gender);
         Assert.Equal(2, entry.HeadType);
         Assert.Equal(4, entry.FaceType);
-        Assert.Equal(1, entry.Level); // DF_Characters_Level default
+        Assert.Equal(1, entry.Level);
         Assert.Equal(7, entry.MapId);
         Assert.Equal(11.5f, entry.PosX);
         Assert.Equal(22.5f, entry.PosY);
         Assert.Equal(33.5f, entry.PosZ);
-        Assert.Equal(0f, entry.Heading); // DF_Characters_Heading default
+        Assert.Equal(0f, entry.Heading);
         Assert.Equal(250, entry.Life);
         Assert.Equal(300, entry.MaxLife);
         Assert.Equal(40, entry.Mana);
         Assert.Equal(60, entry.MaxMana);
-        Assert.Equal(0L, entry.FlushSequence); // DF_Characters_FlushSequence default
+        Assert.Equal(0L, entry.FlushSequence);
 
         var missing = await _characters.GetForWorldEntryAsync(-1, CancellationToken.None);
         Assert.Null(missing);
@@ -244,7 +228,6 @@ public class CharacterRepositoryTests
         var accountId = await CreateTestAccountAsync();
         var characterId = await CreateCharacterAsync(accountId, 0);
 
-        // FlushSequence starts at 0; 5 is strictly greater, so this first flush must be applied.
         await _characters.PersistPositionsAsync(
             [new CharacterPositionTvp(characterId, 5, 9, 111f, 222f, 333f, 1.5f)],
             CancellationToken.None);
@@ -258,8 +241,6 @@ public class CharacterRepositoryTests
         Assert.Equal(333f, afterFirstFlush.PosZ);
         Assert.Equal(1.5f, afterFirstFlush.Heading);
 
-        // Replay the same FlushSequence with different coordinates (a network retry) -- the
-        // "FlushSequence > current" guard must discard it silently: nothing below may change.
         await _characters.PersistPositionsAsync(
             [new CharacterPositionTvp(characterId, 5, 99, 999f, 999f, 999f, 9f)],
             CancellationToken.None);
@@ -273,7 +254,6 @@ public class CharacterRepositoryTests
         Assert.Equal(333f, afterReplay.PosZ);
         Assert.Equal(1.5f, afterReplay.Heading);
 
-        // Short-circuits on an empty list -- SQL Server would otherwise reject an empty TVP outright.
         var ex = await Record.ExceptionAsync(() =>
             _characters.PersistPositionsAsync(Array.Empty<CharacterPositionTvp>(), CancellationToken.None).AsTask());
         Assert.Null(ex);
@@ -294,9 +274,6 @@ public class CharacterRepositoryTests
         var afterSpend = await _characters.GrantTribeTransferPermitAsync(characterId, -2, CancellationToken.None);
         Assert.Equal(0, afterSpend);
 
-        // CharacterRepository goes through CaeriusNet (unlike GuildProcTests' raw ADO.NET calls), which wraps
-        // the driver's SqlException in its own CaeriusNetSqlException -- assert on the wrapped exception's
-        // inner SqlException.Number, same posture as CommerceProcTests' BloodCoin overdraft check.
         var overspend = await Record.ExceptionAsync(() =>
             _characters.GrantTribeTransferPermitAsync(characterId, -1, CancellationToken.None).AsTask());
         Assert.Equal(50312, Assert.IsType<SqlException>(overspend!.InnerException).Number);
@@ -310,21 +287,17 @@ public class CharacterRepositoryTests
     public async Task AdjustDeathProtectionAsync_DecrementsShieldCharges_AndRejectsGoingNegative()
     {
         var accountId = await CreateTestAccountAsync();
-        // usp_Character_Create (plain, not the starter-kit path) never grants the starting 5 -- ProtectForDeath
-        // starts at the column's own DEFAULT of 0, exactly like TribeTransferPermitCount above.
         var characterId = await CreateCharacterAsync(accountId, 0);
 
         var afterGrant = await _characters.AdjustDeathProtectionAsync(characterId, 5, CancellationToken.None);
         Assert.Equal(5, afterGrant);
 
-        // A qualifying death consumes exactly one charge (delta = -1).
         var afterFirstConsume = await _characters.AdjustDeathProtectionAsync(characterId, -1, CancellationToken.None);
         Assert.Equal(4, afterFirstConsume);
 
         var afterDraining = await _characters.AdjustDeathProtectionAsync(characterId, -4, CancellationToken.None);
         Assert.Equal(0, afterDraining);
 
-        // Same wrapped-CaeriusNetSqlException posture as GrantTribeTransferPermitAsync's own overspend check.
         var overspend = await Record.ExceptionAsync(() =>
             _characters.AdjustDeathProtectionAsync(characterId, -1, CancellationToken.None).AsTask());
         Assert.Equal(50332, Assert.IsType<SqlException>(overspend!.InnerException).Number);
@@ -334,14 +307,6 @@ public class CharacterRepositoryTests
         Assert.Equal(50332, Assert.IsType<SqlException>(unknownCharacter!.InnerException).Number);
     }
 
-    // Database-layer backstop for the "inventory-capacity-stacking-rules" finding: CK_CharacterItems_Quantity
-    // (Migrations/034_character_items_quantity_upper_bound.sql) is the schema-level last resort for the missing
-    // 999-stack cap in ContainerMatrix.ResolveMove's merge branch (an Application/ fix tracked separately, out
-    // of this repository's charter). Legacy's own merge-cap comparison is strict ">" against
-    // MAX_ITEM_DUPLICATION_NUM (999), so exactly 999 must persist cleanly through the normal
-    // ReplaceContainerAsync call path, while 1000 must be rejected -- surfacing as a raw constraint violation
-    // (native error 547), not a catalogued admin.ErrorCatalog THROW, since this is a backstop, not the primary
-    // fix.
     [Fact]
     public async Task ReplaceContainerAsync_AcceptsQuantityExactlyAtThe999Cap_ButTheCheckConstraintRejectsOverCap()
     {
@@ -363,23 +328,14 @@ public class CharacterRepositoryTests
         Assert.Equal(547, Assert.IsType<SqlException>(overCap!.InnerException).Number);
     }
 
-    // Confirmed root-cause regression test (user's exact reported scenario, DB layer): the character-select
-    // roster used to always show a returning character's equipped items/stats as zero because
-    // usp_Character_GetByAccount (GetByAccountAsync/CharacterSummaryDto, exercised in the narrow-read
-    // assertion below) never selected them -- confirmed still true and unchanged by this fix. This creates a
-    // character carrying the real weapon+torso starter kit (CreateAvatarService.WeaponEquipSlot=7/
-    // ArmorEquipSlot=2) against real SQL Server, then re-reads via GetAccountRosterAsync (usp_Character_
-    // GetAccountRoster) -- the richer read a second CL_LOGIN_SEND now uses instead of GetByAccountAsync, NOT
-    // GetForWorldEntryAsync/usp_Character_GetForWorldEntry, the world-entry path this bug never affected --
-    // and asserts the real equipped items/progression scalars come back instead of zeros.
     [Fact]
     public async Task GetAccountRosterAsync_AfterCreateWithStarterKit_ReturnsTheRealEquippedWeaponAndTorsoArmor()
     {
         var accountId = await CreateTestAccountAsync();
         var name = NewCharacterName();
 
-        const int weaponItemId = 84527; // Blade of the Moon (Noble Dragon starter-kit weapon alternative)
-        const int torsoItemId = 84575; // Kahn Guardian Armor (Noble Dragon starter-kit torso/armor)
+        const int weaponItemId = 84527;
+        const int torsoItemId = 84575;
 
         var characterId = await _characters.CreateWithStarterKitAsync(
             accountId, 0, name, 0, 1, 2, 1,
@@ -395,14 +351,9 @@ public class CharacterRepositoryTests
             [],
             CancellationToken.None);
 
-        // The pre-existing narrow read (still used by CreateAvatarService's slot-occupancy check and
-        // DeleteAvatarService's slot resolution) is untouched by this fix and never carried equipment at
-        // all -- confirms this test isn't accidentally exercising a read that was already correct.
         var narrowRoster = await _characters.GetByAccountAsync(accountId, CancellationToken.None);
         Assert.Single(narrowRoster);
 
-        // Simulates the disconnect/relogin: a fresh call to the new richer read, exactly what LoginService
-        // now calls on every CL_LOGIN_SEND instead of GetByAccountAsync.
         var roster = await _characters.GetAccountRosterAsync(accountId, CancellationToken.None);
 
         var character = Assert.Single(roster.Characters);
@@ -413,24 +364,19 @@ public class CharacterRepositoryTests
         Assert.Equal((byte)1, character.Gender);
         Assert.Equal((byte)2, character.HeadType);
         Assert.Equal((byte)1, character.FaceType);
-        Assert.Equal(1, character.Level); // DF_Characters_Level default -- genuine Level 1 character
+        Assert.Equal(1, character.Level);
 
-        // The real fix: the weapon and torso armor actually persisted now come back, tagged with the right
-        // CharacterId/Container, instead of the roster response having nothing to draw equipment from at all.
         Assert.Equal(2, roster.Items.Count);
         var weaponRow = Assert.Single(roster.Items, i => i.Slot == 7);
         var torsoRow = Assert.Single(roster.Items, i => i.Slot == 2);
         Assert.Equal(characterId, weaponRow.CharacterId);
-        Assert.Equal((byte)2, weaponRow.Container); // Equipment container (AvatarInfoFactory.ContainerEquipment)
+        Assert.Equal((byte)2, weaponRow.Container);
         Assert.Equal(weaponItemId, weaponRow.ItemId);
         Assert.Equal(characterId, torsoRow.CharacterId);
         Assert.Equal((byte)2, torsoRow.Container);
         Assert.Equal(torsoItemId, torsoRow.ItemId);
     }
 
-    // A brand-new account with zero characters yet (straight after CL_LOGIN_SEND, before
-    // CL_CREATE_AVATAR_SEND2) is a legitimate state, not an error -- both result sets come back empty rather
-    // than the bundle collapsing to null (see CharacterAccountRosterBundle's own remarks).
     [Fact]
     public async Task GetAccountRosterAsync_AccountWithNoCharactersYet_ReturnsEmptyCharactersAndItems()
     {
@@ -459,7 +405,6 @@ public class CharacterRepositoryTests
             CancellationToken.None).AsTask();
     }
 
-    // Name is NVARCHAR(13) and globally unique (UQ_Characters_Name); an 8-char guid slice fits and won't collide.
     private static string NewCharacterName()
     {
         return $"T{Guid.NewGuid():N}"[..8];

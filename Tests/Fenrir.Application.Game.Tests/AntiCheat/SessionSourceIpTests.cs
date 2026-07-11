@@ -3,10 +3,6 @@ using Fenrir.Application.Game.Domain.AntiCheat;
 
 namespace Fenrir.Application.Game.Tests.AntiCheat;
 
-/// <summary>
-///     Covers <see cref="SessionSourceIp" /> — the per-session source-IP normalizer/accessor feeding the PvP
-///     same-origin kill guard.
-/// </summary>
 public class SessionSourceIpTests
 {
     [Fact]
@@ -26,7 +22,6 @@ public class SessionSourceIpTests
     [Fact]
     public void Normalize_Ipv4MappedIpv6_IsUnwrappedToPlainIpv4()
     {
-        // ::ffff:203.0.113.7 must compare equal to the plain IPv4 spelling of the same host.
         var mapped = IPAddress.Parse("203.0.113.7").MapToIPv6();
         Assert.True(mapped.IsIPv4MappedToIPv6);
 
@@ -37,7 +32,6 @@ public class SessionSourceIpTests
     [Fact]
     public void AreSameHost_TwoUnknowns_IsFalse()
     {
-        // An absent source IP must never falsely prove a shared origin (fail open, distinct hosts).
         Assert.False(SessionSourceIp.AreSameHost(null, null));
         Assert.False(SessionSourceIp.AreSameHost("", ""));
         Assert.False(SessionSourceIp.AreSameHost("203.0.113.7", null));

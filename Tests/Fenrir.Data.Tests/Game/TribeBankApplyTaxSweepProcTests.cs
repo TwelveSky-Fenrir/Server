@@ -8,9 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Game;
 
-// game.usp_TribeBank_ApplyTaxSweep against real SQL Server 2025 -- the durable 10-minute tribe-bank income-tax
-// sweep merge (C17 side effect A3): scan-for-first-slot-that-can-absorb, saturating clamp fallback, and
-// silent drop when the whole grid is at the 2,000,000,000 ceiling.
 [Collection("SqlServer")]
 public class TribeBankApplyTaxSweepProcTests
 {
@@ -44,12 +41,12 @@ public class TribeBankApplyTaxSweepProcTests
     public async Task FirstSlotFull_ScansToTheNextSlotWithRoom()
     {
         await ClearTribeAsync(0);
-        await SeedSlotAsync(0, 0, (int)Ceiling); // slot 0 already at the ceiling
+        await SeedSlotAsync(0, 0, (int)Ceiling);
 
         await _sweeps.ApplyTaxSweepAsync(1_000, 0, 0, 0, CancellationToken.None);
 
-        Assert.Equal((int)Ceiling, await SlotAsync(0, 0)); // untouched -- could not absorb
-        Assert.Equal(1_000, await SlotAsync(0, 1)); // whole amount landed in the next slot
+        Assert.Equal((int)Ceiling, await SlotAsync(0, 0));
+        Assert.Equal(1_000, await SlotAsync(0, 1));
     }
 
     [Fact]
@@ -67,15 +64,13 @@ public class TribeBankApplyTaxSweepProcTests
     public async Task NoSlotCanAbsorbButSomeAreBelowCeiling_ClampsTheFirstBelowCeilingSlotToTheCeiling()
     {
         await ClearTribeAsync(0);
-        // Every one of the 50 slots is one short of the ceiling: incoming 100 overflows each, so no slot can
-        // absorb the whole amount -- the saturating fallback force-sets the first sub-ceiling slot to ceiling.
         for (byte slot = 0; slot < 50; slot++)
             await SeedSlotAsync(0, slot, 1_999_999_999);
 
         await _sweeps.ApplyTaxSweepAsync(100, 0, 0, 0, CancellationToken.None);
 
-        Assert.Equal((int)Ceiling, await SlotAsync(0, 0)); // clamped up to the ceiling
-        Assert.Equal(1_999_999_999, await SlotAsync(0, 1)); // every later slot left untouched
+        Assert.Equal((int)Ceiling, await SlotAsync(0, 0));
+        Assert.Equal(1_999_999_999, await SlotAsync(0, 1));
     }
 
     [Fact]
@@ -87,7 +82,7 @@ public class TribeBankApplyTaxSweepProcTests
 
         await _sweeps.ApplyTaxSweepAsync(100, 0, 0, 0, CancellationToken.None);
 
-        Assert.Equal((int)Ceiling, await SlotAsync(0, 0)); // nothing placed, no error thrown
+        Assert.Equal((int)Ceiling, await SlotAsync(0, 0));
     }
 
     [Fact]
@@ -100,7 +95,7 @@ public class TribeBankApplyTaxSweepProcTests
 
         Assert.Equal(100, await SlotAsync(0, 0));
         Assert.Equal(200, await SlotAsync(2, 0));
-        Assert.Equal(0, await CountRowsAsync(1)); // zero-amount tribe never materialized a row
+        Assert.Equal(0, await CountRowsAsync(1));
         Assert.Equal(0, await CountRowsAsync(3));
     }
 

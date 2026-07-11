@@ -1,13 +1,6 @@
 using Fenrir.Tools.LegacyDataImport.Legacy.Seeding;
 using Fenrir.Tools.LegacyDataImport.Legacy.Validation;
 
-// One-off migration/verification tool: decodes every legacy BuildEU33 static-data source and cross-validates
-// each against legacy CSV exports, as ground truth before the SQL Server schema/seed phase.
-// Usage: dotnet run --project Tools/Fenrir.Tools.LegacyDataImport -- <path-to-BuildEU33-DATA-dir>
-//
-// Seed regeneration (writes Database/Migrations/Seed/world/080_items.sql and 090_monsters.sql from the
-// current reader/patch logic -- run this after changing ItemReader/MonsterReader's ApplyRuntimePatches):
-// Usage: dotnet run --project Tools/Fenrir.Tools.LegacyDataImport -- <path-to-BuildEU33-DATA-dir> --regenerate-seed <path-to-Database/Migrations/Seed/world>
 
 if (args.Length < 1)
 {

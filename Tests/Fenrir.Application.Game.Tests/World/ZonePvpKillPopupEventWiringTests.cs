@@ -7,15 +7,6 @@ using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     Covers the C16 wiring gap this workstream closes: <c>Zone.ApplyPvpKillRewards</c> forwarding to
-///     <see cref="PopupEventRewardSystem.NotifyPvpKill" /> -- previously never called from anywhere, leaving the
-///     popup system entirely inert on the PvP side. <c>PopupEventRewardSystemTests</c> already covers
-///     <see cref="PopupEventRewardSystem" />'s own counting/threshold/reset logic exhaustively via direct
-///     <c>NotifyPvpKill</c> calls; this suite instead proves the call site exists and is placed correctly
-///     relative to the C05 anti-farm cooldown, by driving real kills through the full HP-death combat path
-///     (reusing <c>ZonePvpKillRewardsTests</c>' own <c>SetUpZone</c>/<c>KillDefender</c> shape).
-/// </summary>
 public class ZonePvpKillPopupEventWiringTests
 {
     private static readonly EffectiveStats StrongAttacker =
@@ -71,21 +62,14 @@ public class ZonePvpKillPopupEventWiringTests
         attacker!.Stats = StrongAttacker;
         Assert.True(zone.TryGetPlayer(2, out var defender));
         defender!.Stats = WeakDefender;
-        defender.ActionSort = 1; // legal, already-acting pose -- see ZoneAttackTests' own TwoPlayerZone remarks
-        attacker.AttackSubPacketCeiling = int.MaxValue; // see ZonePvpKillRewardsTests' own remarks
+        defender.ActionSort = 1;
+        attacker.AttackSubPacketCeiling = int.MaxValue;
 
-        zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1)); // past the zone-entry protect window
+        zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1));
         return (zone, popupSystem);
     }
 
-    /// <summary>
-    ///     Kills (or re-kills) the defender: Life is force-set to 1 so one hit always finishes it off, and
-    ///     IsDead is force-cleared first so a SECOND/THIRD/... call in the same test can re-kill the same pair
-    ///     without driving the full death-gate/eligibility revive state machine -- this suite only needs "the
-    ///     defender is alive and killable again", not a faithful revive sequence (that is
-    ///     <c>ZoneDeathTests</c>' own job).
-    /// </summary>
-    private static void KillDefender(Zone zone)
+        private static void KillDefender(Zone zone)
     {
         Assert.True(zone.TryGetPlayer(2, out var defender));
         defender!.IsDead = false;
@@ -100,33 +84,25 @@ public class ZonePvpKillPopupEventWiringTests
     [Fact]
     public void PopupCounter_AdvancesOnEveryKill_EvenWhileTheCpRewardIsGatedByTheAntiFarmCooldown()
     {
-        // Invasion popup (map 1, PopupEventZoneCatalog's InvasionMaps): threshold 5, cheap to drive to
-        // completion in one test, unlike the war/monster counters' 10/400 thresholds.
         var (zone, _) = SetUpZone(1, PopupEventType.InvasionPvp);
 
         KillDefender(zone);
         Assert.True(zone.TryGetPlayer(1, out var attacker));
         var cpAfterFirstKill = attacker!.ContributionPoints;
-        Assert.True(cpAfterFirstKill > 0); // ordinary formula-based CP grant on the FIRST kill of this pair
+        Assert.True(cpAfterFirstKill > 0);
 
-        // Kills 2-5 of the SAME pair, all within the C05 10-minute anti-farm cooldown -- the CP/EXP/hero-point
-        // reward path is gated shut for every one of these, but the popup counter must still advance on each,
-        // since NotifyPopupEventPvpKill is placed BEFORE the cooldown gate in Zone.ApplyPvpKillRewards.
         for (var i = 0; i < 4; i++)
             KillDefender(zone);
 
-        Assert.Equal(cpAfterFirstKill, attacker.ContributionPoints); // cooldown blocked every repeat CP grant
+        Assert.Equal(cpAfterFirstKill, attacker.ContributionPoints);
 
-        zone.Tick(TimeSpan.FromMilliseconds(500)); // one legacy tick -> PopupEventRewardSystem.Simulate delivers
-        Assert.Equal(1, attacker.WarPoint); // 5th kill crossed the Invasion threshold
+        zone.Tick(TimeSpan.FromMilliseconds(500));
+        Assert.Equal(1, attacker.WarPoint);
     }
 
     [Fact]
     public void NoPopupSystemRegistered_KillStillGrantsOrdinaryRewards_AndDoesNotThrow()
     {
-        // Default ZoneTestKit.CreateZone has an empty simulationSystems list, so Zone's own
-        // _popupEventRewardSystem resolves to null -- NotifyPopupEventPvpKill must degrade to a silent no-op
-        // rather than throwing a NullReferenceException from inside the HP-death path.
         var zone = ZoneTestKit.CreateZone(1, randomSource: new ScriptedRandomSource(0, 0));
 
         var (attackerSession, _) = ZoneTestKit.CreateSession(1);
@@ -143,8 +119,8 @@ public class ZonePvpKillPopupEventWiringTests
         attacker.AttackSubPacketCeiling = int.MaxValue;
         zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1));
 
-        KillDefender(zone); // must not throw
+        KillDefender(zone);
 
-        Assert.True(attacker.ContributionPoints > 0); // ordinary reward path is unaffected
+        Assert.True(attacker.ContributionPoints > 0);
     }
 }

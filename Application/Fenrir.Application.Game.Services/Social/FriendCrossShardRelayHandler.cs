@@ -13,19 +13,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Services.Social;
 
-/// <summary>
-///     WS1.4 target-shard delivery and asker-shard completion for cross-shard CZ_FRIEND_ASK_SEND/
-///     CZ_FRIEND_ANSWER_SEND negotiations that <see cref="FriendService" /> itself could not complete locally
-///     (same-shard <c>ZoneRegistry</c> miss, resolved via <see cref="ICharacterShardLocationRepository" /> --
-///     see <see cref="FriendService.AskAsync" />'s own remarks). Registered as
-///     <see cref="ISocialCrossShardRelayHandler" /> for <see cref="SocialCrossShardRelayKind.Friend" />;
-///     <c>SocialCrossShardRelayHost</c> routes every delivered Ask/Answer row for that Kind here. The reason
-///     codes this handler publishes on decline reuse the exact same numeric wire values
-///     <c>FriendAskHandler</c> already sends for a same-shard rejection (3 = asker/target busy, 4 = target
-///     not found) so the eventual <see cref="FriendAnswerResponse" /> the asker receives looks identical
-///     whether the rejection happened synchronously (same-shard) or asynchronously (cross-shard, via this
-///     handler).
-/// </summary>
 public sealed class FriendCrossShardRelayHandler(
     ZoneRegistry zones,
     FriendRegistry friends,
@@ -40,8 +27,7 @@ public sealed class FriendCrossShardRelayHandler(
 {
     public SocialCrossShardRelayKind Kind => SocialCrossShardRelayKind.Friend;
 
-    /// <summary>Runs on the TARGET's own shard.</summary>
-    public ValueTask HandleAskAsync(SocialCrossShardRelayDto ask, CancellationToken ct)
+        public ValueTask HandleAskAsync(SocialCrossShardRelayDto ask, CancellationToken ct)
     {
         if (!zones.TryGetPlayer(ask.TargetCharacterId, out var target))
         {
@@ -59,9 +45,6 @@ public sealed class FriendCrossShardRelayHandler(
                 new CrossShardInboundAsk(ask.RelayId, ask.SourceShardId, ask.SourceCharacterId,
                     ask.SourceAvatarName)))
         {
-            // Lost a narrow race against a same-shard ask that landed on the target in between the
-            // IsNegotiating check above and this registration -- same "busy" reply as if it had been caught
-            // synchronously.
             PublishDecline(ask, 5);
             return ValueTask.CompletedTask;
         }
@@ -73,8 +56,7 @@ public sealed class FriendCrossShardRelayHandler(
         return ValueTask.CompletedTask;
     }
 
-    /// <summary>Runs on the original ASKER's own shard.</summary>
-    public ValueTask HandleAnswerAsync(SocialCrossShardRelayDto answer, CancellationToken ct)
+        public ValueTask HandleAnswerAsync(SocialCrossShardRelayDto answer, CancellationToken ct)
     {
         if (!friends.TryConsumeCrossShardOutbound(answer.TargetCharacterId, out _))
         {
@@ -114,13 +96,7 @@ public sealed class FriendCrossShardRelayHandler(
             ask.RelayId));
     }
 
-    /// <summary>
-    ///     Duplicated from <see cref="FriendService" />'s own private method of the same name (Services
-    ///     cannot share a private helper across classes without a new public surface neither needs elsewhere)
-    ///     -- <c>CheckCommunityWork()</c>'s six OTHER exclusivity flags, re-run here against the TARGET's own
-    ///     live state since the asker's shard could not evaluate it.
-    /// </summary>
-    private bool IsExcludedByCommunityWork(PlayerRuntimeState player)
+        private bool IsExcludedByCommunityWork(PlayerRuntimeState player)
     {
         return player.PshopOpen
                || duels.IsNegotiating(player.CharacterId)

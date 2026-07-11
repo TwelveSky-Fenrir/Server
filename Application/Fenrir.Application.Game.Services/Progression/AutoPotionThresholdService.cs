@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Progression;
 
-/// <summary>Business logic extracted from <c>AutoPotionThresholdHandler</c> (CZ_CHANGE_AUTO_INFO, opcode 86).</summary>
 public sealed class AutoPotionThresholdService(
     ICharacterRepository characters,
     ILogger<AutoPotionThresholdService> logger)
@@ -21,7 +20,6 @@ public sealed class AutoPotionThresholdService(
 
         await characters.SetAutoPotionThresholdAsync(characterId, lifeRatio, manaRatio, cancellationToken);
 
-        // Written directly, not EconomyActionLock-guarded: own-character scalar, no item/money involved.
         state.AutoLifeRatio = lifeRatio;
         state.AutoManaRatio = manaRatio;
 

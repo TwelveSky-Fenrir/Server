@@ -8,15 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>
-///     CZ_FRIEND_MAKE_SEND (opcode 56) -- one-directional: only the caller's own list gains an entry; the
-///     other side must separately send its own CZ_FRIEND_MAKE_SEND.
-/// </summary>
-/// <remarks>
-///     <see cref="PlayerRuntimeState.Friends" /> is mutated directly (not via ZoneCommand): safe since
-///     self-directed, but must stay a <see cref="System.Collections.Concurrent.ConcurrentDictionary{TKey,TValue}" />
-///     since <c>Zone.HandleEnter</c> enumerates it concurrently during zone transfer.
-/// </remarks>
 public sealed class FriendAddHandler(IFriendService friendService, ILogger<FriendAddHandler> logger)
     : IAsyncPacketHandler<FriendAddRequest>
 {

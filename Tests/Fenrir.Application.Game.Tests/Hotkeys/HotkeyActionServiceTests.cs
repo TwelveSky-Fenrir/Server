@@ -13,12 +13,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Hotkeys;
 
-/// <summary>
-///     End-to-end coverage (resolver -&gt; service -&gt; posted <see cref="HotkeyMoveZoneCommand" /> -&gt;
-///     drained onto the tick-owned <see cref="Zone" />/<see cref="PlayerRuntimeState" />) for the
-///     CZ_PROCESS_DATA_SEND hotkey-bind family (tSort 204/205/211/253/214/216) -- see
-///     <c>HotkeyActionResolverTests</c> for the pure-resolver-level coverage this builds on.
-/// </summary>
 public class HotkeyActionServiceTests
 {
     private const int StackableConsumableItemId = 90001;
@@ -232,7 +226,6 @@ public class HotkeyActionServiceTests
         Assert.Equal(555, bound.Value1);
         Assert.Equal(2, bound.Value2);
 
-        // Copy, not a move: the source skill slot itself is never consumed by this codepath.
         Assert.Equal(3, state.LearnedSkills[0].Grade);
         Assert.NotNull(characters.LastUpsertHotkeySlot);
     }

@@ -2,8 +2,6 @@ using Fenrir.Application.Login.Domain.Avatars;
 
 namespace Fenrir.Application.Login.Tests.Avatars;
 
-// op17's fourth-faction (Tribe value 3) creation exclusion -- LNW33-gated in legacy, always active in the
-// sole production-shipped build (ReleaseEU33). Réf. C++ : Server/ts25login/S04_MyWork02.cpp:635-646.
 public class FourthFactionGateTests
 {
     [Theory]
@@ -33,8 +31,6 @@ public class FourthFactionGateTests
     [Fact]
     public void FourthFactionTribe_IsDerivedFromTheSharedTribeSlotCount_NotASecondIndependentLiteral()
     {
-        // Guards against the two gates drifting out of lockstep -- both ultimately come from the same
-        // Server/Header/Protocol/DEFINE.h:309 four-tribe-slot constant.
         Assert.Equal(TribeDominanceGate.TribeSlotCount - 1, FourthFactionGate.FourthFactionTribe);
         Assert.Equal(3, FourthFactionGate.FourthFactionTribe);
     }

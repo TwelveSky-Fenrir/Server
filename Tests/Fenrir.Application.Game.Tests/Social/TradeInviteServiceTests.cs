@@ -15,11 +15,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Social;
 
-/// <summary>
-///     Covers <see cref="TradeInviteService.InviteAsync" />'s response-code-order: the asker's own busy state
-///     must be checked before the target avatar is resolved by name
-///     (Server/ts25zone/S04_MyWork02.cpp:8259-8277,8459-8471,9088-9101,9311-9324 pre-check family).
-/// </summary>
 public class TradeInviteServiceTests
 {
     private static (TradeInviteService Service, ZoneRegistry Zones, TradeRegistry Trades) CreateService(short mapId,
@@ -55,7 +50,7 @@ public class TradeInviteServiceTests
         var asker = Enter(zones, 1, 1, "Asker");
         Enter(zones, 1, 2, "PendingTarget");
 
-        Assert.Equal(TradeAskOutcome.Sent, trades.TryAsk(1, 2)); // still pending, never answered
+        Assert.Equal(TradeAskOutcome.Sent, trades.TryAsk(1, 2));
 
         var result = await service.InviteAsync(zones[1], asker, "NoSuchAvatar", CancellationToken.None);
 
@@ -73,11 +68,7 @@ public class TradeInviteServiceTests
         Assert.Equal(TradeInviteResultKind.TargetNotFound, result.Kind);
     }
 
-    /// <summary>
-    ///     Covers the trade-ask displayed-level combined-level extension: the outward Level value must be
-    ///     <see cref="PlayerRuntimeState.CombinedLevel" /> (aLevel1+aLevel2), sent verbatim with no offset.
-    /// </summary>
-    [Fact]
+        [Fact]
     public async Task Invite_Success_SendsAskersCombinedLevel_NotOrdinaryLevelAlone()
     {
         var (service, zones, _) = CreateService(1);
@@ -92,8 +83,7 @@ public class TradeInviteServiceTests
         Assert.Equal(37, result.AskerLevel);
     }
 
-    /// <summary>WS1.4 ASK-PUBLISH-ONLY: a same-shard miss that resolves cross-shard publishes an Ask.</summary>
-    [Fact]
+        [Fact]
     public async Task Invite_SameShardMiss_ResolvesCrossShard_PublishesAskAndReturnsSentCrossShard()
     {
         var directory = new FakeCharacterShardLocationRepository();

@@ -63,7 +63,6 @@ public class TribeAnnouncementScrollServiceTests
         var statFrameSize = FrameWriter.FrameSizeOf<AvatarStatUpdateResponse>();
         var scrollFrameSize = FrameWriter.FrameSizeOf<TribeAnnouncementScrollResponse>();
 
-        // sender: self stat update first, then its own broadcast copy (same-tribe fan-out includes self)
         var senderBytes = ZoneTestKit.DrainOutbound(senderPipe);
         Assert.Equal(statFrameSize + scrollFrameSize, senderBytes.Length);
 
@@ -77,11 +76,9 @@ public class TribeAnnouncementScrollServiceTests
         Assert.Equal("Odin", ReadFixedString(scrollPayload.Slice(4, 13)));
         Assert.Equal("Scroll used!", ReadFixedString(scrollPayload[17..]));
 
-        // same-tribe recipient in a different zone: just the broadcast copy
         var sameTribeBytes = ZoneTestKit.DrainOutbound(sameTribePipe);
         Assert.Equal(scrollFrameSize, sameTribeBytes.Length);
 
-        // different-tribe recipient: nothing at all
         Assert.Empty(ZoneTestKit.DrainOutbound(otherTribePipe));
 
         registry[1].Tick(TimeSpan.FromMilliseconds(50));
@@ -115,8 +112,6 @@ public class TribeAnnouncementScrollServiceTests
     [Fact]
     public void Handle_WithEmptyContent_Aborts()
     {
-        // The empty-content gate lives on the handler itself, ahead of the service call -- exercise the real
-        // handler here rather than the service, which never sees an empty Content at all.
         var registry = CreateRegistry(1);
         var (senderSession, _) = ZoneTestKit.CreateSession(1);
 

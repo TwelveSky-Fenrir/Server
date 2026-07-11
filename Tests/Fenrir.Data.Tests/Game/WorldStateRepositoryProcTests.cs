@@ -12,17 +12,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Game;
 
-/// <summary>
-///     game.usp_WorldState_{EnsureInitialized,Get,Update}/usp_WorldStateTribe_Update/
-///     usp_WorldStateAllianceOffer_Set/usp_TribeVote_GetByTribe against real SQL Server 2025, through
-///     <see cref="WorldStateRepository" /> exactly as <c>WorldStateService</c> calls it.
-/// </summary>
-/// <remarks>
-///     game.WorldState/WorldStateTribes are true singletons (1 + 4 fixed rows) shared by every test in the
-///     "SqlServer" collection for the whole assembly run, in no guaranteed order -- every assertion below
-///     reads back only what THIS test itself just wrote, never an assumed pristine/default value, so it stays
-///     correct regardless of what any other test in the suite already did to the same rows.
-/// </remarks>
 [Collection("SqlServer")]
 public class WorldStateRepositoryProcTests
 {
@@ -43,11 +32,7 @@ public class WorldStateRepositoryProcTests
         _characters = new CharacterRepository(db);
     }
 
-    /// <summary>
-    ///     game.TribeVotes.CandidateCharacterId is a real FK into game.Characters -- every Register test needs
-    ///     an actual row to point at, not a throwaway int.
-    /// </summary>
-    private async Task<int> CreateCharacterAsync()
+        private async Task<int> CreateCharacterAsync()
     {
         var accountId = await _accounts.CreateAsync($"tribevotetest-{Guid.NewGuid():N}",
             RandomNumberGenerator.GetBytes(32), RandomNumberGenerator.GetBytes(16), CancellationToken.None);
@@ -70,31 +55,24 @@ public class WorldStateRepositoryProcTests
         await _repository.UpdateTribeAsync(0, null, false, 999, true,
             CancellationToken.None);
 
-        await _repository.EnsureInitializedAsync(CancellationToken.None); // must stay a no-op from here on
+        await _repository.EnsureInitializedAsync(CancellationToken.None);
 
         var (row, tribes, _) = await _repository.GetAsync(CancellationToken.None);
 
         Assert.NotNull(row);
         Assert.Equal((byte?)1, row.Zone038WinTribe);
         Assert.Equal(101, row.Zone038WinTribeTime);
-        Assert.Equal(4, tribes.Count); // fixed domain: still exactly 4 tribe rows, never duplicated
+        Assert.Equal(4, tribes.Count);
         Assert.Contains(tribes, t => t is { TribeId: 0, Points: 999, IsClosed: true, HasSymbol: false });
     }
 
-    /// <summary>
-    ///     Reproduces the sharded-boot race that used to throw a PK_WorldState violation: every
-    ///     <c>game-shard-NN</c> process calls <c>EnsureInitializedAsync</c> once at startup with no external
-    ///     serialization between them, so several callers can hit the procedure at the same instant. The
-    ///     sp_getapplock guard added by 039_worldstate_ensureinitialized_concurrency_fix.sql must serialize
-    ///     them instead of letting two concurrent "NOT EXISTS" checks both pass.
-    /// </summary>
-    [Fact]
+        [Fact]
     public async Task EnsureInitializedAsync_CalledConcurrently_NeverThrowsAndSeedsExactlyOnce()
     {
         var callers = Enumerable.Range(0, 8)
             .Select(_ => _repository.EnsureInitializedAsync(CancellationToken.None).AsTask());
 
-        await Task.WhenAll(callers); // must not throw PK_WorldState/PK_Tribes/etc.
+        await Task.WhenAll(callers);
 
         var (row, tribes, _) = await _repository.GetAsync(CancellationToken.None);
 
@@ -142,7 +120,6 @@ public class WorldStateRepositoryProcTests
         Assert.Equal(77, updated.Points);
         Assert.True(updated.IsClosed);
 
-        // Every other tribe's row is byte-for-byte whatever it already was -- untouched by this call.
         foreach (var tribe in after.Where(t => t.TribeId != 2))
             Assert.Equal(othersBefore[tribe.TribeId], tribe);
     }
@@ -164,7 +141,6 @@ public class WorldStateRepositoryProcTests
         Assert.Equal(symbolDate, updated.SymbolDate);
         Assert.False(updated.HasSymbol);
         Assert.True(updated.IsClosed);
-        // Points is deliberately excluded from this proc -- untouched by this call, unlike UpdateTribeAsync.
         Assert.Equal(pointsBefore, updated.Points);
     }
 
@@ -185,7 +161,6 @@ public class WorldStateRepositoryProcTests
         var updated = Assert.Single(after, t => t.TribeId == 1);
 
         Assert.Equal(pointsBefore + 15 - 3, updated.Points);
-        // Symbol-state fields untouched by this proc, unlike UpdateTribeAsync's whole-row overwrite.
         Assert.Equal(symbolDate, updated.SymbolDate);
         Assert.True(updated.HasSymbol);
         Assert.False(updated.IsClosed);
@@ -211,8 +186,6 @@ public class WorldStateRepositoryProcTests
     {
         await _repository.EnsureInitializedAsync(CancellationToken.None);
 
-        // Tribe 3's candidate slots are never touched by any other test in this suite, so this stays
-        // reliably empty regardless of run order.
         var votes = await _repository.GetTribeVotesAsync(3, CancellationToken.None);
 
         Assert.Empty(votes);
@@ -256,7 +229,7 @@ public class WorldStateRepositoryProcTests
         var slot4 = Assert.Single(votes, v => v.SlotIndex == 4);
         Assert.Equal(secondCandidate, slot4.CandidateCharacterId);
         Assert.Equal(3000, slot4.KillOtherTribeCount);
-        Assert.Equal(0, slot4.VotePoint); // displacing a candidate resets the tally for that slot
+        Assert.Equal(0, slot4.VotePoint);
     }
 
     [Fact]

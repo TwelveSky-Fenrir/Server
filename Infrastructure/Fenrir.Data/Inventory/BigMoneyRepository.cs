@@ -6,7 +6,6 @@ using Fenrir.Data.Abstractions.Inventory;
 
 namespace Fenrir.Data.Inventory;
 
-/// <inheritdoc cref="IBigMoneyRepository" />
 public sealed record BigMoneyRepository(ICaeriusNetDbContext Db) : IBigMoneyRepository
 {
     public async ValueTask AdjustInventoryStoreAsync(int characterId, int deltaInventoryBigMoney,

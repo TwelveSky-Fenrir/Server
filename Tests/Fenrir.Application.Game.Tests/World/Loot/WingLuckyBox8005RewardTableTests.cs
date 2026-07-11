@@ -2,12 +2,6 @@ using Fenrir.Application.Game.Domain.World.Loot;
 
 namespace Fenrir.Application.Game.Tests.World.Loot;
 
-/// <summary>
-///     Covers the C10-remaining-box-pools reward-table DATA and roll primitive for item 8005 (Wing Lucky Box,
-///     mirroring the legacy shared helper <c>RandomWingBox</c>) -- <see cref="WingLuckyBox8005RewardTable" />.
-///     Three of its five branches are tribe-keyed and do not fit any existing <see cref="BoxRewardSpec" /> shape,
-///     so this file exercises <see cref="WingLuckyBox8005RewardTable.Roll" /> directly.
-/// </summary>
 public class WingLuckyBox8005RewardTableTests
 {
     [Theory]
@@ -171,8 +165,7 @@ public class WingLuckyBox8005RewardTableTests
         Assert.Equal(1237, result.RewardItemId);
     }
 
-    /// <summary>Returns queued draws in request order; throws if the code draws more than were scripted.</summary>
-    private sealed class ScriptedRandom(params int[] values) : Random
+        private sealed class ScriptedRandom(params int[] values) : Random
     {
         private int _index;
 

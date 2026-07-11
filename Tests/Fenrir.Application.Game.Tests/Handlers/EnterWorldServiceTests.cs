@@ -35,11 +35,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 
-// op12 ZC_REGISTER_AVATAR_RECV -- cluster C02: a GM-banned character (admin.Bans) and a firewalled IP must both
-// abort world-entry before any other repository is ever touched. Both fixtures below reuse the plain
-// FakeCharacterRepository, whose GetWorldEntryBundleAsync throws NotSupportedException by its own documented
-// scope -- if either new check failed to short-circuit, the service would blow up with that exception instead
-// of aborting cleanly, so a clean Faulted abort is itself proof the character bundle was never fetched.
 public class EnterWorldServiceTests
 {
     private const int AccountId = 1;
@@ -66,19 +61,10 @@ public class EnterWorldServiceTests
         Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);
     }
 
-    // Covers the bridge-enterworld-spawn/bridge-stats-equipment contracts' EnterWorldService gaps: BuffInfo/
-    // EffectValueForView must reflect a returning character's persisted buffs (not the all-zero template),
-    // WorldInfo must reflect the live WorldStateService RvR snapshot (not the all-zero template), and the
-    // self-spawn ObjectForAvatar's PreviousTribe/top-level PetLocation must reflect the persisted character
-    // (not a flat 0/zeroed array).
     [Fact]
     public async Task HandleAsync_ReturningCharacter_PopulatesBuffsWorldStateAndPreviousTribe_InsteadOfZeros()
     {
         const short MapId = 7;
-        // Tribe 3 (fourth faction) with PreviousTribe 2 is the one legitimate case the two fields differ
-        // (Server/ts25zone/S04_MyWork02.cpp:880-901) -- deliberately chosen so this fixture both stays
-        // internally consistent under EnterWorldService's own Tribe/PreviousTribe gate and still proves
-        // PreviousTribe isn't synthesized as Tribe.
         const byte Tribe = 3;
         const byte PreviousTribe = 2;
         const float PosX = 111f, PosY = 5f, PosZ = 222f;
@@ -134,7 +120,6 @@ public class EnterWorldServiceTests
 
         Assert.Null(session.DisconnectReason);
 
-        // 1) EnterWorldResponse: BuffInfo must reflect the persisted buffs, not the all-zero template.
         var expectedEnterWorld = new EnterWorldResponse
         {
             AvatarInfo = AvatarInfoFactory.CreateForCharacter(bundle.Character, bundle.Items,
@@ -143,7 +128,6 @@ public class EnterWorldServiceTests
         };
         var expectedEnterWorldBytes = FrameWriter.WriteCompressedFrame(in expectedEnterWorld);
 
-        // 2) WorldSnapshotResponse: WorldInfo must reflect the live WorldStateService snapshot, not zeros.
         var expectedWorldSnapshot = new WorldSnapshotResponse
         {
             WorldInfo = ZoneCenterSiegeProjection.Apply(
@@ -154,11 +138,6 @@ public class EnterWorldServiceTests
         };
         var expectedWorldSnapshotBytes = FrameWriter.WriteCompressedFrame(in expectedWorldSnapshot);
 
-        // 3) TowerStatusResponse: the 12-tower ownership/status snapshot must now be sent unconditionally,
-        // immediately after WorldSnapshotResponse -- see EnterWorldService's own remarks on this send.
-        // TowerStatusResponse isn't Compressed, so (unlike the two ZoneMessageFactory.Encode-built messages
-        // above) it goes out via the plain Send<T> frame shape, built by hand here the same way the
-        // self-spawn AvatarActionResponse already is below.
         var expectedTowerStatus = towerWar.BuildStatusSnapshot();
         var towerStatusFrameSize = FrameWriter.FrameSizeOf<TowerStatusResponse>();
         var expectedTowerStatusBytes = new byte[towerStatusFrameSize];
@@ -166,12 +145,6 @@ public class EnterWorldServiceTests
 
         var selfSpawnFrameSize = FrameWriter.FrameSizeOf<AvatarActionResponse>();
 
-        // HandleAsync sends all four messages back-to-back with no `await` between them, so by the time
-        // control returns here every byte is already sitting in the pipe -- a single ReadAsync() call can
-        // therefore non-deterministically return anywhere from one message to all four concatenated,
-        // depending on how System.IO.Pipelines happens to have segmented the buffer. Reading exactly the
-        // combined expected length up front (looping if a single read doesn't yet cover it) and slicing
-        // locally avoids relying on a 1:1 read-call-to-message correspondence that isn't actually guaranteed.
         var allSent = await ReadExactlyAsync(pipe,
             expectedEnterWorldBytes.Length + expectedWorldSnapshotBytes.Length + towerStatusFrameSize +
             selfSpawnFrameSize);
@@ -188,10 +161,6 @@ public class EnterWorldServiceTests
             .ToArray();
         Assert.Equal(expectedTowerStatusBytes, towerStatusActual);
 
-        // 4) Self-spawn AvatarActionResponse: PreviousTribe/EffectValueForView/top-level PetLocation must
-        // reflect the persisted character -- decoded via ObjectForAvatar's own TryRead rather than
-        // reproducing all ~50 sibling fields by hand (Data starts 8 bytes into the 1-byte-opcode-prefixed,
-        // uncompressed payload: ServerIndex(int) + UniqueNumber(uint) precede it).
         var selfSpawnActual = allSent
             .AsSpan(
                 expectedEnterWorldBytes.Length + expectedWorldSnapshotBytes.Length + towerStatusFrameSize,
@@ -205,9 +174,6 @@ public class EnterWorldServiceTests
         Assert.Equal(ExpectedEffectValueForView(buffs), selfSpawnData.EffectValueForView);
     }
 
-    // hero-rank-points-world-entry-hydration (Major): a returning character's already-persisted Current-period
-    // hero-rank point total must seed PlayerRuntimeState.HeroRankPoints at world entry, not merely start at 0
-    // -- see that field's own remarks (legacy MyDB::GetHeroPoint) and Migrations/030.
     [Fact]
     public async Task HandleAsync_ReturningCharacterWithPersistedHeroRankPoints_SeedsThePlayerRuntimeStateMirror()
     {
@@ -220,8 +186,6 @@ public class EnterWorldServiceTests
         var zones = ZoneTestKit.CreateRegistry(worldData: worldData);
         zones.Initialize([MapId]);
 
-        // PeriodKind 0 = Current -- the only period hero points are ever earned into (see
-        // HeroRankPointAccumulator.CurrentPeriodKind's own remarks).
         var heroRankings = new FakeHeroRankingRepository();
         heroRankings.Points[(CharacterId, 0)] = PersistedHeroRankPoints;
 
@@ -262,9 +226,6 @@ public class EnterWorldServiceTests
         Assert.Equal(PersistedHeroRankPoints, state!.HeroRankPoints);
     }
 
-    // C8 pet-bag-entitlement confirmation-pass follow-up: a returning character's already-persisted
-    // game.Characters.PetBagDate must seed PlayerRuntimeState.PetBagDate at world entry, not merely start at
-    // 0 -- see that field's own remarks and Migrations/047_characters_petbagdate_column.sql.
     [Fact]
     public async Task HandleAsync_ReturningCharacterWithPersistedPetBagDate_SeedsThePlayerRuntimeStateMirror()
     {
@@ -314,9 +275,6 @@ public class EnterWorldServiceTests
         Assert.Equal(PersistedPetBagDate, state!.PetBagDate);
     }
 
-    // item-usage-consumables follow-up: a returning character's already-persisted game.Characters.DropItemTime
-    // (Lucky Drop/"Acquisition" Scroll minutes counter) must seed PlayerRuntimeState.DropItemTime at world
-    // entry, not merely start at 0 -- see that field's own remarks.
     [Fact]
     public async Task HandleAsync_ReturningCharacterWithPersistedDropItemTime_SeedsThePlayerRuntimeStateMirror()
     {
@@ -366,9 +324,6 @@ public class EnterWorldServiceTests
         Assert.Equal(PersistedDropItemTime, state!.DropItemTime);
     }
 
-    // Migrations/041_characters_warpoint_currency.sql follow-up: a returning character's already-persisted
-    // game.Characters.WarPoint must seed PlayerRuntimeState.WarPoint at world entry, not merely start at 0 --
-    // see that field's own remarks.
     [Fact]
     public async Task HandleAsync_ReturningCharacterWithPersistedWarPoint_SeedsThePlayerRuntimeStateMirror()
     {
@@ -418,10 +373,6 @@ public class EnterWorldServiceTests
         Assert.Equal(PersistedWarPoint, state!.WarPoint);
     }
 
-    // B5 rune-socket world-entry hydration: a returning character's already-persisted game.CharacterRunes rows
-    // must seed PlayerRuntimeState.RuneSystem/RuneSystemStat by SocketIndex, not merely start at [0,0,0,0] --
-    // see PlayerRuntimeState.RuneSystem's own remarks and IRuneRepository.GetRunesAsync's own contract
-    // (occupied sockets only; an absent socket hydrates to 0).
     [Fact]
     public async Task HandleAsync_ReturningCharacterWithPersistedRunes_SeedsThePlayerRuntimeStateRuneArrays()
     {
@@ -433,8 +384,6 @@ public class EnterWorldServiceTests
         var zones = ZoneTestKit.CreateRegistry(worldData: worldData);
         zones.Initialize([MapId]);
 
-        // Sockets 0 and 2 occupied; 1 and 3 stay unset -- proves an absent socket hydrates to 0 rather than
-        // leaking a stale/adjacent value.
         var runes = new FakeRuneRepository
         {
             RowsToReturn =
@@ -488,17 +437,13 @@ public class EnterWorldServiceTests
         Assert.Equal(0, state.RuneSystemStat[3]);
     }
 
-    // Covers the bridge-tribe-validation contract's Behavior C (Server/ts25zone/S04_MyWork02.cpp:880-901): the
-    // just-loaded character record's own Tribe/PreviousTribe must be internally consistent, or the session
-    // ends outright with no response -- this validates the server's own data against itself, never anything
-    // the client claims.
     [Theory]
-    [InlineData((byte)0, (byte)1)] // main-faction Tribe, PreviousTribe != Tribe
+    [InlineData((byte)0, (byte)1)]
     [InlineData((byte)1, (byte)0)]
     [InlineData((byte)2, (byte)0)]
-    [InlineData((byte)3, (byte)3)] // fourth faction, PreviousTribe outside {0,1,2}
+    [InlineData((byte)3, (byte)3)]
     [InlineData((byte)3, (byte)5)]
-    [InlineData((byte)4, (byte)0)] // Tribe itself outside 0-3
+    [InlineData((byte)4, (byte)0)]
     [InlineData((byte)200, (byte)0)]
     public async Task HandleAsync_TribeAndPreviousTribeInternallyInconsistent_AbortsSession(byte tribe,
         byte previousTribe)
@@ -512,10 +457,10 @@ public class EnterWorldServiceTests
     }
 
     [Theory]
-    [InlineData((byte)0, (byte)0)] // main-faction Tribe, PreviousTribe == Tribe
+    [InlineData((byte)0, (byte)0)]
     [InlineData((byte)1, (byte)1)]
     [InlineData((byte)2, (byte)2)]
-    [InlineData((byte)3, (byte)0)] // fourth faction, PreviousTribe one of the three original tribes
+    [InlineData((byte)3, (byte)0)]
     [InlineData((byte)3, (byte)1)]
     [InlineData((byte)3, (byte)2)]
     public async Task HandleAsync_TribeAndPreviousTribeInternallyConsistent_DoesNotAbort(byte tribe,
@@ -529,12 +474,7 @@ public class EnterWorldServiceTests
         Assert.Null(session.DisconnectReason);
     }
 
-    /// <summary>
-    ///     Loops <see cref="PipeReader.ReadAsync" />/<see cref="PipeReader.AdvanceTo(System.SequencePosition)" />
-    ///     until exactly <paramref name="totalLength" /> bytes have been collected -- see the call site's own
-    ///     remarks for why a single read can't be assumed to align with one message.
-    /// </summary>
-    private static async Task<byte[]> ReadExactlyAsync(FakeDuplexPipe pipe, int totalLength)
+        private static async Task<byte[]> ReadExactlyAsync(FakeDuplexPipe pipe, int totalLength)
     {
         var collected = new byte[totalLength];
         var offset = 0;
@@ -579,8 +519,7 @@ public class EnterWorldServiceTests
             new ReadOnlyCollection<CharacterBuffDto>([..buffs]));
     }
 
-    /// <summary>Mirrors EnterWorldService's own BuildBuffInfo (private) for this test's own small, hand-picked fixture.</summary>
-    private static BuffInfo ExpectedBuffInfo(IReadOnlyList<CharacterBuffDto> buffs)
+        private static BuffInfo ExpectedBuffInfo(IReadOnlyList<CharacterBuffDto> buffs)
     {
         var buff = new int[70];
         foreach (var row in buffs)
@@ -592,8 +531,7 @@ public class EnterWorldServiceTests
         return WorldStateTemplates.ZeroedBuffInfo with { Buff = buff };
     }
 
-    /// <summary>Mirrors EnterWorldService's own BuildEffectValueForView (private) for this test's own fixture.</summary>
-    private static int[] ExpectedEffectValueForView(IReadOnlyList<CharacterBuffDto> buffs)
+        private static int[] ExpectedEffectValueForView(IReadOnlyList<CharacterBuffDto> buffs)
     {
         var view = new int[35];
         foreach (var row in buffs)
@@ -644,12 +582,7 @@ public class EnterWorldServiceTests
             NullLogger<EnterWorldService>.Instance);
     }
 
-    /// <summary>
-    ///     Unlike <see cref="CreateService" /> (whose Throwing* fakes exist specifically to prove an abort
-    ///     happens before those repositories are ever touched), this builds a fully working service so a
-    ///     Tribe/PreviousTribe-consistent request can run to completion without an unrelated fake throwing.
-    /// </summary>
-    private static (EnterWorldService Service, ZoneClientSession Session) CreateWorkingService(
+        private static (EnterWorldService Service, ZoneClientSession Session) CreateWorkingService(
         CharacterWorldEntryBundle bundle)
     {
         var characters = new FakeCharacterRepository { WorldEntryBundleToReturn = bundle };
@@ -686,8 +619,7 @@ public class EnterWorldServiceTests
         return (service, session);
     }
 
-    /// <summary>Mirrors ObfuscatedUidCodec.TryDecodeAccountId's encoding half: Latin1("MG"+id), then USE_XOR_UID.</summary>
-    private static string EncodeObfuscatedAccountId(int accountId)
+        private static string EncodeObfuscatedAccountId(int accountId)
     {
         var bytes = Encoding.Latin1.GetBytes("MG" + accountId);
         WireXor.ApplyUidXor(bytes);
@@ -698,8 +630,6 @@ public class EnterWorldServiceTests
     {
         return new EnterWorldRequest
         {
-            // Never decoded by the two abort tests below: both abort before ObfuscatedUidCodec ever looks at
-            // this field. A happy-path test that reaches that check must pass a real encoded id instead.
             Id = id ?? "irrelevant",
             AvatarName = "Hero",
             Action = new ActionInfo
@@ -1007,11 +937,7 @@ public class EnterWorldServiceTests
         }
     }
 
-    /// <summary>
-    ///     Only <see cref="GetRoleForCharacterAsync" /> is exercised by EnterWorldService; every other member is out of
-    ///     scope.
-    /// </summary>
-    private sealed class RoleOnlyTribeRepository(byte role) : ITribeRepository
+        private sealed class RoleOnlyTribeRepository(byte role) : ITribeRepository
     {
         public ValueTask<byte> GetRoleForCharacterAsync(int characterId, CancellationToken ct)
         {

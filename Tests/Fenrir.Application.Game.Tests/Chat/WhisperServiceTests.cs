@@ -7,11 +7,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Chat;
 
-/// <summary>
-///     <see cref="WhisperService.ResolveAsync" />'s same-shard-first, cross-shard-directory-fallback shape.
-///     Same-zone/same-shard behavior is covered by the pre-existing <see cref="ZoneRegistry" /> lookup tests;
-///     this focuses on the NEW cross-shard-miss fallback and its distinct outcomes.
-/// </summary>
 public class WhisperServiceTests
 {
     private static PlayerRuntimeState MakePlayer(int characterId, string name, byte tribe = 0)
@@ -64,8 +59,6 @@ public class WhisperServiceTests
 
         Assert.Equal(WhisperOutcome.Delivered, resolution.Outcome);
         Assert.Equal("Target", resolution.Target!.Name);
-        // Fast path never touches the directory -- FindByNameAsync would have populated no calls to check
-        // against, but this at least proves no exception was needed to reach Delivered.
     }
 
     [Fact]

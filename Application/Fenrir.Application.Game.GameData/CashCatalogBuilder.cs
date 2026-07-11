@@ -2,10 +2,6 @@ using System.Collections.Immutable;
 
 namespace Fenrir.Application.Game.GameData;
 
-/// <summary>
-///     Builds the cash shop's two views: an 800-slot cost-info table (a purchase resolves price/item from this, never
-///     client-submitted values) and the 4x20x10x4 display grid.
-/// </summary>
 public static class CashCatalogBuilder
 {
     public const int MaxCashType = 4;
@@ -15,15 +11,12 @@ public static class CashCatalogBuilder
 
     public const int MaxCashNum = MaxCashType * MaxCashItemPerPage * MaxCashPage;
 
-    /// <summary>Only ProductType 1..4 participate; 5 is the version-sentinel row (see <see cref="ResolveVersion" />).</summary>
-    public static CashCatalog Build(IEnumerable<ItemMallProductRowDto> products)
+        public static CashCatalog Build(IEnumerable<ItemMallProductRowDto> products)
     {
         var costInfo = new CostInfoEntry[MaxCashNum];
         var grid = new int[MaxCashType * MaxCashPage * MaxCashItemPerPage * MaxCashItemDetail];
         Array.Fill(grid, -1);
 
-        // rowCount advances for every row regardless of ItemID validity; pageCount/itemCount only advance
-        // past the range check, so an out-of-range row consumes a costInfoIndex slot but leaves no display gap.
         var rowCount = new int[MaxCashType];
         var pageCount = new int[MaxCashType];
         var itemCount = new int[MaxCashType];
@@ -39,7 +32,7 @@ public static class CashCatalogBuilder
             rowCount[typeIndex]++;
 
             if (costInfoIndex >= MaxCashNum)
-                continue; // overflow guard -- never hit by real seed data (159 rows across 4 types, cap 200/type)
+                continue;
 
             costInfo[costInfoIndex] = new CostInfoEntry(product.Cost, product.ItemId!.Value, product.Quantity,
                 product.ProductType, product.ItemMallProductId);
@@ -69,11 +62,7 @@ public static class CashCatalogBuilder
         return new CashCatalog { CostInfoByIndex = [.. costInfo], DisplayGrid = grid };
     }
 
-    /// <summary>
-    ///     Version is the ItemId of the ProductType=5/ItemMallProductId=100000 sentinel row (repurposed column, not a
-    ///     real item); 0 if absent.
-    /// </summary>
-    public static int ResolveVersion(IEnumerable<ItemMallProductRowDto> products)
+        public static int ResolveVersion(IEnumerable<ItemMallProductRowDto> products)
     {
         foreach (var product in products)
             if (product.ItemMallProductId == 100000 && product.ProductType == 5)
@@ -82,17 +71,7 @@ public static class CashCatalogBuilder
         return 0;
     }
 
-    /// <summary>
-    ///     Fenrir-chosen CRC sentinel slot (ItemMallProductId=100001/ProductType=5), mirroring
-    ///     <see cref="ResolveVersion" />'s existing 100000/5 convention. The behavior contract this ports
-    ///     (cash/blood catalog hot-reload) only describes "a second, separate reserved row, same type" for the
-    ///     client CRC without giving its literal row number, so this specific slot number is a Fenrir-side
-    ///     design choice, not a verified legacy literal -- and no seed row reserves it yet in
-    ///     world.ItemMallProducts, so this always resolves to 0 today until a seed row is added. That is
-    ///     harmless: see <see cref="Fenrir.Application.Game.Domain.Commerce.CommerceCatalogCache" />'s own
-    ///     remarks for why nothing downstream currently consumes this value.
-    /// </summary>
-    public static int ResolveCrc(IEnumerable<ItemMallProductRowDto> products)
+        public static int ResolveCrc(IEnumerable<ItemMallProductRowDto> products)
     {
         foreach (var product in products)
             if (product.ItemMallProductId == 100001 && product.ProductType == 5)
@@ -101,20 +80,7 @@ public static class CashCatalogBuilder
         return 0;
     }
 
-    /// <summary>
-    ///     Fenrir-chosen "cash shop administratively open" sentinel slot (ItemMallProductId=100002/ProductType=5),
-    ///     mirroring <see cref="ResolveVersion" />/<see cref="ResolveCrc" />'s existing 100000/100001 convention.
-    ///     Mirrors legacy's <c>CASH_INFO.mIsSellCash</c> flag (Server/Header/Protocol/STRUCT.h:1435-1446), read
-    ///     by <c>ts25zone</c> at purchase time but only ever written by the separate <c>ts25extra</c> process in
-    ///     legacy; Fenrir has no second writer process, so this table row is the closest equivalent live,
-    ///     administratively-settable source. The behavior contract this ports gives no literal row number for
-    ///     this flag (deriving/maintaining the live value is explicitly out of that contract's scope), so this
-    ///     specific slot is a Fenrir-side design choice, not a verified legacy literal. No seed row reserves
-    ///     this slot yet in world.ItemMallProducts, so this always resolves to <c>true</c> (shop open) today --
-    ///     a deliberately backward-compatible default matching Fenrir's pre-existing always-open behavior, not
-    ///     a parity regression a client could observe.
-    /// </summary>
-    public static bool ResolveSellEnabled(IEnumerable<ItemMallProductRowDto> products)
+        public static bool ResolveSellEnabled(IEnumerable<ItemMallProductRowDto> products)
     {
         foreach (var product in products)
             if (product.ItemMallProductId == 100002 && product.ProductType == 5)
@@ -123,24 +89,16 @@ public static class CashCatalogBuilder
         return true;
     }
 
-    /// <summary>
-    ///     <see cref="ItemMallProductId" /> is a Fenrir-only addition for game.CashLog's audit trail -- never sent on the
-    ///     wire.
-    /// </summary>
-    public readonly record struct CostInfoEntry(int Cost, int ItemId, int Quantity, int Type, int ItemMallProductId)
+        public readonly record struct CostInfoEntry(int Cost, int ItemId, int Quantity, int Type, int ItemMallProductId)
     {
         public bool IsAssigned => ItemId >= 1;
     }
 
     public sealed class CashCatalog
     {
-        /// <summary>Flat 800-entry master table, index == the wire's CostInfoIndex.</summary>
-        public required ImmutableArray<CostInfoEntry> CostInfoByIndex { get; init; }
 
-        /// <summary>
-        ///     -1 marks an unfilled/inactive slot. Built once at boot, never mutated -- safe to share without a defensive
-        ///     copy.
-        /// </summary>
-        public required int[] DisplayGrid { get; init; }
+                public required ImmutableArray<CostInfoEntry> CostInfoByIndex { get; init; }
+
+                public required int[] DisplayGrid { get; init; }
     }
 }

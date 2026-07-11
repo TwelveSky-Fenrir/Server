@@ -2,10 +2,6 @@ using Fenrir.Application.Game.Domain.Inventory;
 
 namespace Fenrir.Application.Game.Domain.Pets;
 
-/// <summary>
-///     The pet/Phoenix-amulet equipment slot (FEQUIP_TYPE::EPET). Same slot StatCalculator's Phoenix-amulet
-///     contribution reads, so a growable pet and a Phoenix amulet are mutually exclusive, never double-counted.
-/// </summary>
 public static class PetSlots
 {
     public const byte EquipmentSlot = 8;

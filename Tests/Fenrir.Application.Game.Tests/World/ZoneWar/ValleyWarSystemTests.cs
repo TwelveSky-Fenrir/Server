@@ -10,20 +10,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Covers <see cref="ValleyWarSystem" />: the client-notifying, per-zone-tick driver for
-///     <see cref="ValleyWarSchedule" /> (Zone 200/297/298/299, "Valley of the Deceased") -- a DISTINCT
-///     feature from <see cref="RegularWarSchedulerHost" />'s own Zone049 family (see
-///     <see cref="RegularWarSchedulerHostTests" />, left entirely unchanged by this task). Every test here
-///     verifies which broadcast reaches which zone's players: op94 events (<see cref="ZoneEventInfoResponse" />,
-///     tSort 659-669) are cluster/shard-wide, reaching every zone this registry hosts, while the door/kill-race/
-///     boss-window countdowns (opcodes 116/118) and the forced end-of-cycle disconnect are strictly zone-local
-///     to the Valley map itself.
-/// </summary>
 public class ValleyWarSystemTests
 {
-    private const short ValleyMapId = 200; // one of ValleyWarMapCatalog's 4 configured maps
-    private const short OtherMapId = 1; // NOT a configured Valley map -- the cluster-wide-reach witness
+    private const short ValleyMapId = 200;
+    private const short OtherMapId = 1;
 
     private static (ValleyWarSystem System, ValleyWarKillRegistry KillRegistry) CreateSystem(ZoneRegistry registry)
     {
@@ -55,11 +45,7 @@ public class ValleyWarSystemTests
         return (registry[mapId], session, pipe);
     }
 
-    /// <summary>
-    ///     Ticks Idle -> GateCountdown(5 announcements + open) -> GateOpen -> DoorPending, landing exactly
-    ///     on the tick the door opens and <see cref="ValleyWarPhase.KillRace" /> begins.
-    /// </summary>
-    private static void AdvanceToKillRaceStart(ValleyWarSystem system, ValleyWarKillRegistry killRegistry,
+        private static void AdvanceToKillRaceStart(ValleyWarSystem system, ValleyWarKillRegistry killRegistry,
         Zone valleyZone)
     {
         system.Simulate(valleyZone,
@@ -101,22 +87,19 @@ public class ValleyWarSystemTests
 
         var (system, _) = CreateSystem(registry);
 
-        // First gate-countdown announcement (tSort 659, payload 5) -- reaches BOTH zones' players, including
-        // the witness zone, which never hosts a Valley of the Deceased map at all.
         system.Simulate(valleyZone, ValleyWarSchedule.IdleWaitTicks + ValleyWarSchedule.GateCountdownIntervalTicks);
         AssertZoneEventInfo(ZoneTestKit.DrainOutbound(valleyPipe), 659, 5);
         AssertZoneEventInfo(ZoneTestKit.DrainOutbound(witnessPipe), 659, 5);
 
-        // Skip the remaining 4,3,2,1 announcements (covered by ValleyWarScheduleTests) straight to gate-open.
         system.Simulate(valleyZone, 4 * ValleyWarSchedule.GateCountdownIntervalTicks);
         ZoneTestKit.DrainOutbound(valleyPipe);
         ZoneTestKit.DrainOutbound(witnessPipe);
 
-        system.Simulate(valleyZone, ValleyWarSchedule.GateCountdownIntervalTicks); // -> GateOpen (tSort 660)
+        system.Simulate(valleyZone, ValleyWarSchedule.GateCountdownIntervalTicks);
         AssertZoneEventInfo(ZoneTestKit.DrainOutbound(valleyPipe), 660);
         AssertZoneEventInfo(ZoneTestKit.DrainOutbound(witnessPipe), 660);
 
-        system.Simulate(valleyZone, ValleyWarSchedule.GateOpenTicks); // -> DoorPending (tSort 662, gate closed)
+        system.Simulate(valleyZone, ValleyWarSchedule.GateOpenTicks);
         AssertZoneEventInfo(ZoneTestKit.DrainOutbound(valleyPipe), 662);
         AssertZoneEventInfo(ZoneTestKit.DrainOutbound(witnessPipe), 662);
     }
@@ -131,8 +114,6 @@ public class ValleyWarSystemTests
 
         var (system, killRegistry) = CreateSystem(registry);
 
-        // Advance to the start of DoorPending (Idle + full GateCountdown + GateOpen), draining the cluster-wide
-        // events already covered by the test above.
         system.Simulate(valleyZone,
             ValleyWarSchedule.IdleWaitTicks +
             (ValleyWarSchedule.GateCountdownStartValue + 1) * ValleyWarSchedule.GateCountdownIntervalTicks +
@@ -140,15 +121,11 @@ public class ValleyWarSystemTests
         ZoneTestKit.DrainOutbound(valleyPipe);
         ZoneTestKit.DrainOutbound(witnessPipe);
 
-        // The first 9 (of 10) door countdown sends -- opcode 116, zone-local only, one per elapsed real second.
-        // The door hasn't opened yet, so no cluster-wide event is in flight either.
         system.Simulate(valleyZone, ValleyWarSchedule.DoorPendingTicks - 1);
         var earlyDoorFrames = ZoneTestKit.DrainOutbound(valleyPipe);
         Assert.Equal(9 * FrameWriter.FrameSizeOf<ZoneWar297StatusResponse>(), earlyDoorFrames.Length);
         Assert.Empty(ZoneTestKit.DrainOutbound(witnessPipe));
 
-        // The 20th (last) tick: the 10th local door countdown AND the door-open transition land on the SAME
-        // tick -- the former is zone-local only, the latter (tSort 663) is cluster-wide.
         system.Simulate(valleyZone, 1);
         Assert.Equal(ValleyWarPhase.KillRace, killRegistry.GetOrCreate(ValleyMapId).Phase);
 
@@ -156,9 +133,9 @@ public class ValleyWarSystemTests
         Assert.Equal(
             FrameWriter.FrameSizeOf<ZoneWar297StatusResponse>() + FrameWriter.FrameSizeOf<ZoneEventInfoResponse>(),
             finalValleyFrames.Length);
-        AssertZoneEventInfo(ZoneTestKit.DrainOutbound(witnessPipe), 663); // door-open reaches the other zone too
+        AssertZoneEventInfo(ZoneTestKit.DrainOutbound(witnessPipe), 663);
 
-        system.Simulate(valleyZone, 2); // 2 ticks -> first kill-race quota broadcast (opcode 118, every 2 ticks)
+        system.Simulate(valleyZone, 2);
         var quotaFrame = ZoneTestKit.DrainOutbound(valleyPipe);
         Assert.Equal(FrameWriter.FrameSizeOf<ZoneWar297MonsterCountResponse>(), quotaFrame.Length);
         Assert.Empty(ZoneTestKit.DrainOutbound(witnessPipe));
@@ -177,8 +154,6 @@ public class ValleyWarSystemTests
         ZoneTestKit.DrainOutbound(valleyPipe);
         ZoneTestKit.DrainOutbound(witnessPipe);
 
-        // The sole Valley-zone character is mid zone-transfer -- the "not mid-transfer" eligibility criterion
-        // fails, so the map reads as empty on the very first KillRace tick.
         Assert.True(valleyZone.TryGetPlayer(1, out var solePlayer));
         solePlayer!.IsMovingZone = true;
 
@@ -187,7 +162,7 @@ public class ValleyWarSystemTests
         Assert.Equal(ValleyWarPhase.PreReset, killRegistry.GetOrCreate(ValleyMapId).Phase);
         AssertZoneEventInfo(ZoneTestKit.DrainOutbound(witnessPipe), 669);
         Assert.Null(valleySession
-            .DisconnectReason); // not disconnected yet -- PreReset's own 1-minute wait hasn't elapsed
+            .DisconnectReason);
     }
 
     [Fact]
@@ -205,18 +180,16 @@ public class ValleyWarSystemTests
 
         killRegistry.GetOrCreate(ValleyMapId).ForceZeroTribeQuota(2);
 
-        system.Simulate(valleyZone, 1); // -> ScrollPending: tSort 666, payload = winning tribe (2)
+        system.Simulate(valleyZone, 1);
         AssertZoneEventInfo(ZoneTestKit.DrainOutbound(witnessPipe), 666, 2);
 
-        system.Simulate(valleyZone, ValleyWarSchedule.ScrollDeleteDelayTicks); // -> BossWindow: tSort 667
+        system.Simulate(valleyZone, ValleyWarSchedule.ScrollDeleteDelayTicks);
         AssertZoneEventInfo(ZoneTestKit.DrainOutbound(witnessPipe), 667);
 
-        // Boss (monster id 756) is never actually summoned in this cluster (documented gap, see ValleyWarSystem's
-        // own remarks) -- the very first BossWindow tick always resolves as "already defeated": tSort 668.
-        system.Simulate(valleyZone, 1); // -> PostWinCooldown
+        system.Simulate(valleyZone, 1);
         AssertZoneEventInfo(ZoneTestKit.DrainOutbound(witnessPipe), 668);
 
-        system.Simulate(valleyZone, ValleyWarSchedule.PostWinCooldownTicks); // -> PreReset: tSort 669
+        system.Simulate(valleyZone, ValleyWarSchedule.PostWinCooldownTicks);
         AssertZoneEventInfo(ZoneTestKit.DrainOutbound(witnessPipe), 669);
 
         Assert.Equal(ValleyWarPhase.PreReset, killRegistry.GetOrCreate(ValleyMapId).Phase);
@@ -230,11 +203,11 @@ public class ValleyWarSystemTests
         var registry = ZoneTestKit.CreateRegistry();
         registry.Initialize([ValleyMapId, OtherMapId]);
 
-        var (valleyZone, _, _) = EnterPlayer(registry, ValleyMapId, 1, winningTribe); // on the war map itself
-        var (otherZone, _, _) = EnterPlayer(registry, OtherMapId, 2, winningTribe); // elsewhere, eligible
-        EnterPlayer(registry, OtherMapId, 3, winningTribe); // dead -> ineligible
-        EnterPlayer(registry, OtherMapId, 4, winningTribe); // mid zone-transfer -> ineligible
-        EnterPlayer(registry, OtherMapId, 5, 0); // wrong tribe -> ineligible
+        var (valleyZone, _, _) = EnterPlayer(registry, ValleyMapId, 1, winningTribe);
+        var (otherZone, _, _) = EnterPlayer(registry, OtherMapId, 2, winningTribe);
+        EnterPlayer(registry, OtherMapId, 3, winningTribe);
+        EnterPlayer(registry, OtherMapId, 4, winningTribe);
+        EnterPlayer(registry, OtherMapId, 5, 0);
 
         Assert.True(otherZone.TryGetPlayer(3, out var deadPlayer));
         deadPlayer!.IsDead = true;
@@ -245,15 +218,15 @@ public class ValleyWarSystemTests
         AdvanceToKillRaceStart(system, killRegistry, valleyZone);
 
         killRegistry.GetOrCreate(ValleyMapId).ForceZeroTribeQuota(winningTribe);
-        system.Simulate(valleyZone, 1); // -> ScrollPending
-        system.Simulate(valleyZone, ValleyWarSchedule.ScrollDeleteDelayTicks); // -> BossWindow
-        system.Simulate(valleyZone, 1); // -> boss defeated: posts GrantValleyWarRewardDrop to every eligible zone
+        system.Simulate(valleyZone, 1);
+        system.Simulate(valleyZone, ValleyWarSchedule.ScrollDeleteDelayTicks);
+        system.Simulate(valleyZone, 1);
 
-        valleyZone.Tick(TimeSpan.FromMilliseconds(50)); // drain the war map's own posted command
-        otherZone.Tick(TimeSpan.FromMilliseconds(50)); // drain the cross-zone posted commands
+        valleyZone.Tick(TimeSpan.FromMilliseconds(50));
+        otherZone.Tick(TimeSpan.FromMilliseconds(50));
 
-        Assert.Equal(7, valleyZone.GroundItemCount); // character 1: eligible, on the war map itself
-        Assert.Equal(7, otherZone.GroundItemCount); // ONLY character 2's grant landed -- 3/4/5 excluded
+        Assert.Equal(7, valleyZone.GroundItemCount);
+        Assert.Equal(7, otherZone.GroundItemCount);
     }
 
     [Fact]
@@ -267,26 +240,19 @@ public class ValleyWarSystemTests
         var (system, killRegistry) = CreateSystem(registry);
         AdvanceToKillRaceStart(system, killRegistry, valleyZone);
 
-        // Empty-map path straight to PreReset (see KillRace_MapReadsEmpty_... above).
         Assert.True(valleyZone.TryGetPlayer(1, out var solePlayer));
         solePlayer!.IsMovingZone = true;
-        system.Simulate(valleyZone, 1); // -> PreReset
+        system.Simulate(valleyZone, 1);
         Assert.Equal(ValleyWarPhase.PreReset, killRegistry.GetOrCreate(ValleyMapId).Phase);
 
-        system.Simulate(valleyZone, ValleyWarSchedule.PreResetTicks); // -> forced disconnect, reset to Idle
+        system.Simulate(valleyZone, ValleyWarSchedule.PreResetTicks);
 
         Assert.Equal(DisconnectReason.ValleyWarForcedReset, valleySession.DisconnectReason);
         Assert.Null(otherSession.DisconnectReason);
         Assert.Equal(ValleyWarPhase.Idle, killRegistry.GetOrCreate(ValleyMapId).Phase);
     }
 
-    /// <summary>
-    ///     <see cref="Monsters.MonsterSpawnScheduler" />'s own per-kill credit path reaches
-    ///     <see cref="ValleyWarSchedule" /> through <see cref="ValleyWarKillRegistry.RegisterMonsterKill" />, not
-    ///     the schedule directly -- this proves that wrapper decrements the SAME schedule instance
-    ///     <see cref="ValleyWarSystem" /> is ticking for that map, not an independent one.
-    /// </summary>
-    [Fact]
+        [Fact]
     public void KillRegistry_RegisterMonsterKill_DecrementsTheSameScheduleInstanceTheSystemTicks()
     {
         var registry = ZoneTestKit.CreateRegistry();

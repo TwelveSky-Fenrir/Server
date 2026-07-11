@@ -17,17 +17,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 
-/// <summary>
-///     A11 (wave15 dispatch-wiring fix) -- covers the previously-confirmed gap: <c>UseInventoryItemService.cs</c>
-///     had zero references to catalog items 665/667, so a tower-construct/heal request fell through to the
-///     generic Result=1 "unhandled item" failure instead of reaching <see cref="ITowerUpgradeService" />.
-///     Complements <c>TowerConstructAndHealServiceTests</c> (which drives <see cref="TowerUpgradeService" />'s own
-///     <c>ConstructAsync</c>/<c>HealAsync</c> directly and exhaustively covers every validation gate) by proving
-///     only the DISPATCH itself: that <see cref="UseInventoryItemService.ResolveAsync" /> now routes item 665/667
-///     requests to that service -- via the item resolved from the addressed inventory slot, not a
-///     directly-supplied <see cref="ItemStack" /> -- rather than silently falling through, and that the request's
-///     own <c>value</c> field is threaded through unmodified as item 665's constructType.
-/// </summary>
 public class UseInventoryItemTowerServiceTests
 {
     private const short TowerZoneNumber = 2;
@@ -55,7 +44,7 @@ public class UseInventoryItemTowerServiceTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(pipe);
         Assert.True(zone.TryGetPlayer(CharacterId, out var state));
-        state!.TribeRole = 1; // Force Leader -- one of the two accepted tower-build leadership roles
+        state!.TribeRole = 1;
 
         var characters = new FakeCharacterRepository();
         var itemsById = new Dictionary<int, ItemDefinition>
@@ -90,7 +79,7 @@ public class UseInventoryItemTowerServiceTests
         var template = WorldDataTestRows.Monster(Level1GuardianMonsterId) with { Life = 5000 };
         var guardian = MonsterEntity.Create(guardianIndex, 500u, template, guardianIndex, -1276f, -5f, 1826f, 300f);
         if (damaged)
-            guardian.TakeDamage(1000, out _); // 5000 -> 4000, so it is below MaxLife
+            guardian.TakeDamage(1000, out _);
 
         zone.SpawnMonster(guardian);
         return guardian;
@@ -119,19 +108,10 @@ public class UseInventoryItemTowerServiceTests
         return await task;
     }
 
-    /// <summary>
-    ///     Regression guard for the fix itself: before this session, item 665 addressed via op23 had no
-    ///     dispatch branch in <see cref="UseInventoryItemService.ResolveAsync" /> at all, so this request would
-    ///     have fallen through to the generic Result=1 <c>Fail</c> with the tower war state never touched. It now
-    ///     routes to <see cref="ITowerUpgradeService.ConstructAsync" />, and the request's own <c>value</c> field
-    ///     (1=Silver/2=CP/3=EXP) is threaded through unmodified as the constructType -- confirmed against all
-    ///     three legal values, matching <c>CZ_USE_INVENTORY_ITEM_SEND</c>'s single <c>tValue</c> field
-    ///     (Server/Header/Protocol/CLIENT.h:243-248; no separate tValue01/tValue1 exists on this packet).
-    /// </summary>
-    [Theory]
-    [InlineData(1)] // Silver Tower
-    [InlineData(2)] // CP Tower
-    [InlineData(3)] // EXP Tower
+        [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
     public async Task ConstructItem_RoutesToTowerUpgradeService_UsesRequestValueAsConstructTypeUnmodified(int value)
     {
         var (session, _, zone, state, characters, towerWar, service) = SetUp();
@@ -142,21 +122,13 @@ public class UseInventoryItemTowerServiceTests
             zone);
 
         Assert.Null(session.DisconnectReason);
-        Assert.Equal(0, response.Result); // success -- was previously an unreachable code path for this item id
+        Assert.Equal(0, response.Result);
         Assert.Equal(value, towerWar.GetPendingConstructKind(TowerIndex));
         Assert.NotNull(characters.LastReplacedContainer);
         Assert.DoesNotContain(characters.LastReplacedContainer!.Value.Items, i => i.ItemId == ConstructItemId);
     }
 
-    /// <summary>
-    ///     Same regression guard as above, for item 667: routes to <see cref="ITowerUpgradeService.HealAsync" />
-    ///     and arms the tick-side heal, rather than falling through to the generic failure. The request's
-    ///     <c>value</c> field is deliberately passed as an arbitrary, meaningless number here (999) -- item 667's
-    ///     heal has no per-request parameter and <see cref="ITowerUpgradeService.HealAsync" />'s own signature has
-    ///     no <c>value</c>/constructType parameter to (mis)route it through, so this also structurally confirms
-    ///     the wiring never conflates the two items' request-value semantics.
-    /// </summary>
-    [Fact]
+        [Fact]
     public async Task HealItem_RoutesToTowerUpgradeService_ConsumesItemAndArmsTheTickSideHeal()
     {
         var (session, _, zone, state, characters, towerWar, service) = SetUp();
@@ -175,13 +147,7 @@ public class UseInventoryItemTowerServiceTests
         Assert.DoesNotContain(characters.LastReplacedContainer!.Value.Items, i => i.ItemId == HealItemId);
     }
 
-    /// <summary>
-    ///     Sanity/regression guard the other way: adding the two new item-665/667 dispatch branches must not
-    ///     widen matching to any other item id -- an unrelated item (registered in the catalog, Sort=3 like the
-    ///     two tower items, but neither id) still falls through to the generic Result=1 failure with the tower
-    ///     war state completely untouched.
-    /// </summary>
-    [Fact]
+        [Fact]
     public async Task UnrelatedItemId_StillFallsThroughToGenericFailure_TowerStateNeverTouched()
     {
         var (_, _, zone, state, characters, towerWar, service) = SetUp();

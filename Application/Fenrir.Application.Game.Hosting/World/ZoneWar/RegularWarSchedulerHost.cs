@@ -7,39 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Hosting.World.ZoneWar;
 
-/// <summary>
-///     Drives one <see cref="RegularWarSchedule" /> per configured Regular War (Zone049) map that this shard
-///     actually hosts, at the legacy 2 Hz tick cadence -- the Hosting-level "scheduler" half of this cluster;
-///     <see cref="RegularWarSchedule" /> itself is pure and knows nothing about <see cref="Zone" /> or timers.
-/// </summary>
-/// <remarks>
-///     <para>
-///         Gathers each map's per-tick <see cref="RegularWarEnvironmentSnapshot" /> from live
-///         <see cref="PlayerRuntimeState" /> reads (tribe/present-count only) -- the exact same
-///         read-only-cross-thread posture <c>ZoneWarTickService.ComputeLiveTribeHeadcount</c> already uses for
-///         this same map family, not a new pattern. <see cref="RegularWarEnvironmentSnapshot.BossMonsterAlive" />
-///         is always reported <see langword="false" /> (see the constructor remarks) -- Fenrir has no monster
-///         catalog entry identified yet for the boss-war (server 295) post-war spawn, so the boss-war post-war
-///         poll in <see cref="RegularWarSchedule" /> degrades to a flat
-///         <see cref="RegularWarSchedule.BossConfirmedAbsenceTicks" /> wait instead of genuinely polling
-///         liveness; documented gap, not a silent one.
-///     </para>
-///     <para>
-///         Every actual mutation (reward grants, disconnects, monster spawn/despawn) is delegated to
-///         <see cref="IRegularWarEventSink" />, defaulting to <see cref="LoggingRegularWarEventSink" /> -- see
-///         that class's own remarks for why this host is safe to run continuously in production today even
-///         though no map has ever been observed to reach <see cref="RegularWarPhase.ForcedReset" /> against a
-///         real player yet.
-///     </para>
-///     <para>
-///         Also reports each hosted map's freshly-ticked <see cref="RegularWarSchedule.Phase" /> to
-///         <see cref="RegularWarActiveMapTracker" /> every tick -- the Domain-owned, Hosting-updated shared
-///         state <see cref="Fenrir.Application.Game.Domain.World.Zone" />'s PvP kill-reward pipeline reads back
-///         to gate the Regular-War-host flat CP/War Point/Blood Point override. That tracker's own remarks
-///         explain why a small Domain-owned class, rather than this Hosting class directly, is the bridge
-///         Zone (Domain) can share without inverting the Domain -&gt; Hosting dependency direction.
-///     </para>
-/// </remarks>
 public sealed class RegularWarSchedulerHost(
     ZoneRegistry zones,
     WorldStateService worldState,
@@ -55,12 +22,7 @@ public sealed class RegularWarSchedulerHost(
 
     private readonly Dictionary<short, RegularWarSchedule> _schedules = new();
 
-    /// <summary>
-    ///     Advances every hosted configured map's schedule by <paramref name="elapsed" /> real time -- pure and
-    ///     timer-free so tests can drive it directly, same convention as
-    ///     <see cref="Fenrir.Application.Game.Hosting.World.ZoneWar.ZoneWarTickService.Tick" />.
-    /// </summary>
-    public void Tick(TimeSpan elapsed)
+        public void Tick(TimeSpan elapsed)
     {
         var wholeTicks = _accumulator.Advance(elapsed);
         for (var i = 0; i < wholeTicks; i++)
@@ -80,14 +42,11 @@ public sealed class RegularWarSchedulerHost(
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    // A missed tick just delays this cycle's Regular War advance to the next legacy tick --
-                    // never worth crashing the GameServer.
                     logger.LogError(ex, "Regular War scheduler tick failed");
                 }
         }
         catch (OperationCanceledException)
         {
-            // Expected on shutdown.
         }
     }
 
@@ -96,7 +55,7 @@ public sealed class RegularWarSchedulerHost(
         foreach (var mapConfig in RegularWarMapCatalog.ConfiguredMaps)
         {
             if (!zones.TryGet(mapConfig.MapId, out var zone))
-                continue; // not hosted by this shard
+                continue;
 
             var schedule = GetOrCreateSchedule(mapConfig);
             var snapshot = BuildSnapshot(zone);
@@ -146,27 +105,7 @@ public sealed class RegularWarSchedulerHost(
         sink.OnWarConcluded(mapConfig.MapId, outcome, winningTribe, rewards, bossMonstersShouldSpawn);
     }
 
-    /// <summary>
-    ///     Daily-mission "join war" credit and archetype-8 waterfall-quest step credit -- this cluster's own
-    ///     behavior contract ("War Conclusion -- Daily-Mission 'Join War' Credit and Waterfall-Quest Step
-    ///     Credit"), Réf. C++ : Server/ts25zone/S07_MyGame01.cpp:5293-5314. Applies to every character this
-    ///     host still finds tracked in <paramref name="zone" /> at conclusion time, excluding only
-    ///     <see cref="PlayerRuntimeState.IsMovingZone" /> ("non-zone-transferring" per the contract) --
-    ///     deliberately NOT restricted to <see cref="BuildParticipants" />'s own list (which
-    ///     <see cref="RegularWarRewardCalculator" /> turns into money/XP/CP grants): the contract states this
-    ///     credit "is unrelated to a given player's own participation beyond having that specific quest
-    ///     active," so every present, ready, non-transferring character qualifies, not only ones who fought.
-    /// </summary>
-    /// <remarks>
-    ///     Posts one <see cref="ZoneCommand.CreditRegularWarConclusion" /> per qualifying character rather than
-    ///     mutating <see cref="PlayerRuntimeState" /> directly from this host's own background-timer thread --
-    ///     preserving the single-writer-per-zone invariant, same precedent as
-    ///     <c>MuteRefreshPollHost.PollOnceAsync</c>'s own <see cref="ZoneCommand.SetMuted" /> posting loop. A
-    ///     dropped post (full inbox, or the character already left between this snapshot and the command
-    ///     draining) just means this specific credit is missed for that character this cycle -- same
-    ///     never-blocks-never-retries posture as every other <see cref="Zone.Post" /> caller in this codebase.
-    /// </remarks>
-    private static void CreditDailyMissionAndWaterfallQuest(Zone zone)
+        private static void CreditDailyMissionAndWaterfallQuest(Zone zone)
     {
         foreach (var player in zone.Players)
         {

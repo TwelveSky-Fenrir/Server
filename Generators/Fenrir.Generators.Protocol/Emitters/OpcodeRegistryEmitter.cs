@@ -5,23 +5,6 @@ using Fenrir.Generators.Analysis.Support;
 
 namespace Fenrir.Generators.Protocol.Emitters;
 
-/// <summary>
-///     Emits <c>Fenrir.Network.Serialization.Wire.{Login,Zone}OpcodeRegistry</c> from all discovered
-///     <c>[FenrirPacket]</c> in this compilation.
-/// </summary>
-/// <remarks>
-///     Named per-server -- <c>LoginOpcodeRegistry</c>/<c>ZoneOpcodeRegistry</c>, never a bare
-///     <c>OpcodeRegistry</c> -- because <c>Fenrir.Network.Serialization.Login</c> and <c>.Zone</c> each emit
-///     their own into the SAME namespace (same precedent as the generated <c>MessageDispatcher</c> across
-///     <c>*.Handlers</c> projects). That precedent is safe there because no single project ever references
-///     both Login and Game Handlers together; it is NOT safe here, since cross-server test/bot code
-///     (<c>Fenrir.Network.Tests</c>, <c>Fenrir.IntegrationTests</c>'s wire-bot clients) legitimately references
-///     both <c>.Login</c> and <c>.Zone</c> in the same file -- a bare <c>OpcodeRegistry</c> name would collide
-///     (CS0433) the moment both assemblies are in scope together. Since every compilation this generator runs
-///     against now contains exactly one server's <c>[FenrirPacket]</c>s (post packet-project split), there is
-///     also no longer any need for the two side-by-side <c>LoginProvider</c>/<c>ZoneProvider</c> members this
-///     class used to carry -- one <c>Provider</c> per (now server-specific) class is enough.
-/// </remarks>
 internal static class OpcodeRegistryEmitter
 {
     public const string HintName = "OpcodeRegistry.g.cs";
@@ -34,8 +17,6 @@ internal static class OpcodeRegistryEmitter
             .ThenBy(p => p.Opcode)
             .ToImmutableArray();
 
-        // Safe: ProtocolIncrementalGenerator.EmitAggregates already returns early when packets is empty, and
-        // every remaining compilation contains exactly one server's [FenrirPacket]s post packet-project split.
         var className = ordered[0].Server == FenrirServer.Login ? "LoginOpcodeRegistry" : "ZoneOpcodeRegistry";
 
         var writer = new IndentedWriter();
@@ -49,10 +30,6 @@ internal static class OpcodeRegistryEmitter
         writer.Line($"public static class {className}");
         writer.OpenBrace();
 
-        // FrameSizeOf/NameOf stay (server, direction, opcode)-keyed and throwing, matching their pre-split
-        // shape, for the one existing external caller (the wire-bot test clients) that still passes an
-        // explicit FenrirServer -- even though within this class it is always the one server className
-        // already names.
         writer.Line(
             "public static int FrameSizeOf(global::Fenrir.Network.Abstractions.FenrirServer server, FenrirDirection direction, byte opcode) => (server, direction, opcode) switch");
         writer.OpenBrace();
@@ -88,9 +65,6 @@ internal static class OpcodeRegistryEmitter
         return writer.ToString();
     }
 
-    // Adapts this server's Incoming opcode set to global::Fenrir.Network.Abstractions.IOpcodeFrameSizeProvider
-    // (never Outgoing: FrameReader is the only consumer, and it only ever sizes an inbound frame -- an
-    // outgoing packet's size always comes straight from TPacket.PayloadSize).
     private static void EmitProvider(IndentedWriter writer, ImmutableArray<TypeModel> ordered)
     {
         var entries = ordered

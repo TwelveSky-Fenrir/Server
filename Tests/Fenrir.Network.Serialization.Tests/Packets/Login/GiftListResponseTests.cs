@@ -8,14 +8,12 @@ public class LcDemandGiftRecvTests
     [Fact]
     public void PayloadSize_MatchesContractConstant()
     {
-        // ExpectedSize=85 (1-byte outbound header) -> 84-byte payload (int result + int[10][2] flattened).
         Assert.Equal(84, GiftListResponse.PayloadSize);
     }
 
     [Fact]
     public void RoundTrip_PreservesAllFields()
     {
-        // V1 shape: [page*2+0]=itemId, [page*2+1]=0 (GIFT_V2 disabled in EU33).
         var giftItem = new int[20];
         for (var page = 0; page < 10; page++)
             giftItem[page * 2] = 1000 + page;

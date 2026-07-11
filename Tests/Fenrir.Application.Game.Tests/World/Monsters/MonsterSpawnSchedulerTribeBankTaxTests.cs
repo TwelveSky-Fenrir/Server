@@ -8,15 +8,6 @@ using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Game.Tests.World.Monsters;
 
-/// <summary>
-///     Covers the (deliberate) absence of any tribe-bank 9% monster-kill-currency tax credit from
-///     <see cref="MonsterSpawnScheduler.ProcessDeath" />'s money-grant path -- see <c>Zone.TribeBankTax.cs</c>
-///     and <c>TribeBankTaxAccumulator.CreditMonsterKillCurrencyTax</c>'s own remarks for why this wiring was
-///     removed: in production <c>ts25zone</c>, the live <c>DROP_MONEY</c> block never reaches
-///     <c>AddTribeBankInfo3</c> (its one call site is <c>ProcessForDropItem</c>'s <c>DP_MN_TO_WD</c>/currency
-///     branch, which the monster-kill money grant never invokes -- the connecting call is commented out at
-///     <c>Server/ts25zone/S07_MyGame05.cpp:2689</c>).
-/// </summary>
 public class MonsterSpawnSchedulerTribeBankTaxTests
 {
     private static WorldDataCache CacheWithMoneyDrop(MonsterDropMoneyRowDto dropMoney)
@@ -58,8 +49,6 @@ public class MonsterSpawnSchedulerTribeBankTaxTests
     [Fact]
     public void MonsterKill_WithMoneyDrop_GrantsTheKillerButCreditsNoTribeBankTax()
     {
-        // DropRate 500 -> always drops (RollMoney gates on RandomNumber <= (DropRate + luck) * itemDropRatio),
-        // fixed MinAmount == MaxAmount so the resulting money grant is deterministic.
         var cache = CacheWithMoneyDrop(new MonsterDropMoneyRowDto(500, 1_000_000, 100, 100));
         var zone = CreateZone(cache);
         var (session, _) = ZoneTestKit.CreateSession(1);
@@ -75,8 +64,6 @@ public class MonsterSpawnSchedulerTribeBankTaxTests
         Assert.Equal(10, grant.CharacterId);
         Assert.True(grant.Amount > 0);
 
-        // Legacy-parity: the monster-kill money grant never reaches AddTribeBankInfo3, so no tribe -- not
-        // even the killer's own -- is ever credited from this path.
         for (byte tribe = 0; tribe < 4; tribe++)
             Assert.Equal(0, zone.GetTribeBankTaxTotal(tribe));
     }
@@ -84,7 +71,7 @@ public class MonsterSpawnSchedulerTribeBankTaxTests
     [Fact]
     public void MonsterKill_WithNoMoneyDrop_CreditsNoTribeBankTax()
     {
-        var cache = CacheWithMoneyDrop(new MonsterDropMoneyRowDto(0, 0, 0, 0)); // DropRate 0 -> RollMoney is null
+        var cache = CacheWithMoneyDrop(new MonsterDropMoneyRowDto(0, 0, 0, 0));
         var zone = CreateZone(cache);
         var (session, _) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Killer", level: 1, tribe: 1)));
@@ -106,9 +93,9 @@ public class MonsterSpawnSchedulerTribeBankTaxTests
         zone.Tick(SimulationClock.LegacyTick);
         Assert.Equal(1, zone.MonsterCount);
 
-        zone.TryDamageMonster(1, 10_000, 999, out _, out _); // 999 resolves to no player in this zone
+        zone.TryDamageMonster(1, 10_000, 999, out _, out _);
 
-        zone.Tick(SimulationClock.LegacyTick); // must not throw
+        zone.Tick(SimulationClock.LegacyTick);
 
         for (byte tribe = 0; tribe < 4; tribe++)
             Assert.Equal(0, zone.GetTribeBankTaxTotal(tribe));

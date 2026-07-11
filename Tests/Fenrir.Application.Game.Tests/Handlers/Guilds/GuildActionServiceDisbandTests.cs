@@ -8,15 +8,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Guilds;
 
-// Guild-money-movement event logging (GUILD_WORK tSort 6, not legacy parity -- see the behavior contract's
-// citations at Server/ts25zone/S04_MyWork02.cpp:10237-10302 and
-// Server/ts25zone/UpperCom/S06_MyUpperCom05.cpp:492-496). usp_Guild_Disband now writes a guild-money audit
-// row (game.EventLog, Category=GuildMoney, DeltaMoney=0 -- see
-// Database/Migrations/014_guild_money_event_log.sql) atomically with the disband itself, which required
-// threading the acting (sole remaining) master's characterId through IGuildRepository.DisbandAsync so the
-// procedure can attribute the row. These tests exercise that call-site wiring at the GuildActionService
-// level (the actual EventLog row / SQL-side behavior is covered by Fenrir.Data.Tests.Game.GuildProcTests
-// against a real SQL Server instance).
 public class GuildActionServiceDisbandTests
 {
     private const int CharacterId = 1;

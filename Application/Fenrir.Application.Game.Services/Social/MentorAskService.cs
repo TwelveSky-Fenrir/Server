@@ -13,16 +13,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Services.Social;
 
-/// <remarks>
-///     WS1.4 ASK-PUBLISH-ONLY: <see cref="AskAsync" />'s cross-shard fallback publishes an Ask row via
-///     <see cref="ISocialCrossShardRelayQueue" /> and registers the master-side busy gate
-///     (<see cref="MentorRegistry.TryAskCrossShard" />), but no <c>ISocialCrossShardRelayHandler</c> is
-///     registered for <see cref="SocialCrossShardRelayKind.Mentor" /> -- see <c>DuelService</c>'s own remarks
-///     for the shared rationale. <see cref="MentorRegistry.TryCancel" /> still consumes the outbound entry,
-///     so a master is never left permanently busy even though the ask itself is never delivered today. A
-///     follow-up closing this gap needs a <c>MentorCrossShardRelayHandler</c> mirroring
-///     <c>FriendCrossShardRelayHandler</c>, including the target's own level-gate re-check.
-/// </remarks>
 public sealed class MentorAskService(
     MentorRegistry mentors,
     DuelRegistry duels,
@@ -37,37 +27,12 @@ public sealed class MentorAskService(
 {
     private const int MinimumMasterLevel = 113;
 
-    /// <remarks>
-    ///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:8259-8277,8459-8471,9088-9101,9311-9324 (the shared
-    ///     CZ_DUEL_ASK_SEND/CZ_FRIEND_ASK_SEND/CZ_PARTY_ASK_SEND/CZ_TEACHER_ASK_SEND/CZ_TRADE_ASK_SEND
-    ///     pre-check family) -- legacy checks the requester's OWN busy/pose state before it ever resolves
-    ///     the target avatar by name. The level/existing-teacher/existing-student disconnect gate already
-    ///     ran before target resolution here; the still-negotiating soft-busy check
-    ///     (<see cref="MentorRegistry.IsNegotiating" />,
-    ///     <see cref="Fenrir.Application.Game.Domain.Social.CommunityWorkGate.IsBusy" />) did not, and
-    ///     is moved up to join it so a busy master naming a nonexistent/offline student gets the busy reply,
-    ///     not "target not found". The same <see cref="MentorRegistry.IsNegotiating" /> check inside
-    ///     <see cref="MentorRegistry.TryAsk" /> stays in place for the actual registration.
-    ///     <para>
-    ///         Server/ts25zone/S07_MyGame04.cpp:185-216 (<c>CheckCommunityWork</c>'s shared seven-flag busy
-    ///         check) is also re-applied to the resolved target below (
-    ///         <see cref="Fenrir.Application.Game.Domain.Social.CommunityWorkGate.IsBusy" />),
-    ///         mirroring <c>GuildInviteService.IsExcludedByCommunityWorkOrStunDeath</c>/
-    ///         <c>TradeInviteService.IsExcludedByCommunityWorkOrStunDeath</c> -- this closes a gap where only
-    ///         this family's own <see cref="MentorRegistry" /> state was previously consulted for either side.
-    ///         The stun/post-death gate those two siblings additionally apply is deliberately NOT included here:
-    ///         no contract citation confirms it applies to this opcode pair, so it is left unmodeled rather than
-    ///         guessed at.
-    ///     </para>
-    /// </remarks>
-    public async ValueTask<MentorAskResult> AskAsync(Zone zone, PlayerRuntimeState master, string targetAvatarName,
+        public async ValueTask<MentorAskResult> AskAsync(Zone zone, PlayerRuntimeState master, string targetAvatarName,
         CancellationToken cancellationToken)
     {
         if (master.Level < MinimumMasterLevel || master.TeacherCharacterId is not null ||
             master.StudentCharacterId is not null)
         {
-            // Client-visible as a session disconnect (MentorAskHandler aborts on this outcome) -- a legitimate
-            // client never lets an ineligible character open a teacher negotiation.
             logger.LogWarning(
                 "Mentor ask rejected: character {MasterId} (level {Level}) is not eligible to be a master -- session will be disconnected",
                 master.CharacterId, master.Level);
@@ -94,7 +59,6 @@ public sealed class MentorAskService(
 
         if (student.Tribe != master.Tribe || student.Level >= master.Level)
         {
-            // Client-visible as a session disconnect (MentorAskHandler aborts on this outcome).
             logger.LogWarning(
                 "Mentor ask rejected: character {MasterId} (level {MasterLevel}, tribe {MasterTribe}) targeted ineligible character {TargetCharacterId} (level {TargetLevel}, tribe {TargetTribe}) -- session will be disconnected",
                 master.CharacterId, master.Level, master.Tribe, student.CharacterId, student.Level, student.Tribe);
@@ -136,14 +100,7 @@ public sealed class MentorAskService(
         }
     }
 
-    /// <summary>
-    ///     WS1.4 same-shard-miss, ASK-PUBLISH-ONLY fallback -- see this class's own remarks. The student's
-    ///     level (needed for the level-gate check) is not carried by the cross-shard directory, so that check
-    ///     -- along with already-has-teacher/already-has-student -- is deferred to the eventual target-side
-    ///     handler; only the same-tribe check (against the directory row's own denormalized Tribe) is
-    ///     re-evaluable here.
-    /// </summary>
-    private async ValueTask<MentorAskResult> AskCrossShardAsync(PlayerRuntimeState master, string targetAvatarName,
+        private async ValueTask<MentorAskResult> AskCrossShardAsync(PlayerRuntimeState master, string targetAvatarName,
         CancellationToken cancellationToken)
     {
         var remote = await characterShardLocations.FindByNameAsync(targetAvatarName, cancellationToken)

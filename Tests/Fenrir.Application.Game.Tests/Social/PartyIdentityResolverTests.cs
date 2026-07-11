@@ -41,9 +41,6 @@ public class PartyIdentityResolverTests
     [Fact]
     public void RequesterIsNonLeaderMember_FallsBackToOwnName_WhenLeaderIsNotLocallyResolvable()
     {
-        // Same posture as MonsterSpawnScheduler.ResolvePartyDrop's cross-zone fallback: still non-empty
-        // (still marks the requester as partied for comparison purposes), just not byte-identical to the
-        // true leader name in this rare edge case.
         var result = PartyIdentityResolver.ResolveCurrentPartyName([10, 11], 11, "Mate", static _ => null);
 
         Assert.Equal("Mate", result);

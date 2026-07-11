@@ -3,9 +3,6 @@ using Fenrir.Data.Abstractions.Runtime;
 
 namespace Fenrir.LoginServer.Tests.TestSupport;
 
-// In-memory stand-in for IAccountSessionRepository: never exercised by BuildGreetingPacket itself, only
-// needed to satisfy LoginConnectionHost's constructor (LoginCapacityState -- not this repository -- is what
-// GreetingCapacityPacketTests actually drives).
 internal sealed class FakeAccountSessionRepository : IAccountSessionRepository
 {
     public ValueTask<AccountSessionClaimDto> ClaimOrSignalKickAsync(int accountId, Guid newSessionToken,

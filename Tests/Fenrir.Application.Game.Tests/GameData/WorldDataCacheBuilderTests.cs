@@ -4,7 +4,6 @@ using static Fenrir.Application.Game.Tests.GameData.WorldDataTestRows;
 
 namespace Fenrir.Application.Game.Tests.GameData;
 
-/// <summary>Index construction and orphan filtering of <see cref="WorldDataCacheBuilder" /> on in-memory rows.</summary>
 public class WorldDataCacheBuilderTests
 {
     [Fact]
@@ -40,7 +39,7 @@ public class WorldDataCacheBuilderTests
                 SpawnRegion(11, null, 100),
                 SpawnRegion(12, 1, null),
                 SpawnRegion(13, 2, 200),
-                SpawnRegion(14, null, null) // zone check runs first, so a null-zone+null-monster row counts only once
+                SpawnRegion(14, null, null)
             ]);
 
         Assert.Equal(2, stats.SpawnRegionsWithoutZone);
@@ -70,7 +69,6 @@ public class WorldDataCacheBuilderTests
     [Fact]
     public void BuildZones_KeepsAllSpawnPoints_AndFindsLandingByFromZone()
     {
-        // unlike portals/regions, a null FromZoneNumber isn't an orphan here -- the row is never discarded
         var (zones, stats) = WorldDataCacheBuilder.BuildZones(
             [Zone(1), Zone(2)],
             [],
@@ -958,8 +956,8 @@ public class WorldDataCacheBuilderTests
     }
 
     [Theory]
-    [InlineData(99, 0, 999_999, 999_999)] // Value02 = 0 bypasses every band rule, even an otherwise-invalid Type
-    [InlineData(0, 999, 999_999, 999_999)] // Type = 0 bypasses every band rule too, even an otherwise-invalid Value02
+    [InlineData(99, 0, 999_999, 999_999)]
+    [InlineData(0, 999, 999_999, 999_999)]
     public void Build_Accepts_GemSocketZeroBypassCombinations(int type, int value02, int value03, int value04)
     {
         var rows = MinimalRows() with
@@ -989,10 +987,10 @@ public class WorldDataCacheBuilderTests
     }
 
     [Theory]
-    [InlineData(-1, 100, 100)] // Value02 below the Type=1 band's 1-33 range (0 itself would be the zero-bypass)
-    [InlineData(34, 100, 100)] // Value02 above the Type=1 band's 1-33 range
-    [InlineData(1, 401, 100)] // Value03 above the Type=1 band's 0-400 range
-    [InlineData(1, 100, 401)] // Value04 above the Type=1 band's 0-400 range
+    [InlineData(-1, 100, 100)]
+    [InlineData(34, 100, 100)]
+    [InlineData(1, 401, 100)]
+    [InlineData(1, 100, 401)]
     public void Build_Throws_WhenGemSocketType1BandIsViolated(int value02, int value03, int value04)
     {
         var rows = MinimalRows() with
@@ -1022,10 +1020,10 @@ public class WorldDataCacheBuilderTests
     }
 
     [Theory]
-    [InlineData(-1, 500, 500)] // Value02 below the Type 2-29 band's 1-100 range
-    [InlineData(101, 500, 500)] // Value02 above the Type 2-29 band's 1-100 range
-    [InlineData(50, 1001, 500)] // Value03 above the Type 2-29 band's 0-1000 range
-    [InlineData(50, 500, 1001)] // Value04 above the Type 2-29 band's 0-1000 range
+    [InlineData(-1, 500, 500)]
+    [InlineData(101, 500, 500)]
+    [InlineData(50, 1001, 500)]
+    [InlineData(50, 500, 1001)]
     public void Build_Throws_WhenGemSocketMidBandTypeIsViolated(int value02, int value03, int value04)
     {
         var rows = MinimalRows() with
@@ -1057,8 +1055,6 @@ public class WorldDataCacheBuilderTests
     [Fact]
     public void Build_Accepts_GemSocketDeadBandType30To38Unconstrained()
     {
-        // Type 30-38 is confirmed dead code in the legacy source (its own guard can never fire) -- every
-        // record here falls through unconstrained, so even wildly out-of-range values are accepted.
         var rows = MinimalRows() with
         {
             GemSockets = [new GemSocketRowDto(1, 34, 0, 999_999, 999_999, 999_999)]
@@ -1070,10 +1066,10 @@ public class WorldDataCacheBuilderTests
     }
 
     [Theory]
-    [InlineData(-1, 5, 0)] // Value02 below the Type 39-42 band's 1-10 range
-    [InlineData(11, 5, 0)] // Value02 above the Type 39-42 band's 1-10 range
-    [InlineData(5, 0, 0)] // Value03 below the Type 39-42 band's >= 1 floor
-    [InlineData(5, 5, 1)] // Value04 must be exactly 0 in the Type 39-42 band
+    [InlineData(-1, 5, 0)]
+    [InlineData(11, 5, 0)]
+    [InlineData(5, 0, 0)]
+    [InlineData(5, 5, 1)]
     public void Build_Throws_WhenGemSocketLowReqBandTypeIsViolated(int value02, int value03, int value04)
     {
         var rows = MinimalRows() with
@@ -1103,10 +1099,10 @@ public class WorldDataCacheBuilderTests
     }
 
     [Theory]
-    [InlineData(-1, 10, 0)] // Value02 below the Type 43-46 band's 1-10 range
-    [InlineData(11, 10, 0)] // Value02 above the Type 43-46 band's 1-10 range
-    [InlineData(5, 5, 0)] // Value03 below the Type 43-46 band's >= 6 floor
-    [InlineData(5, 10, 1)] // Value04 must be exactly 0 in the Type 43-46 band
+    [InlineData(-1, 10, 0)]
+    [InlineData(11, 10, 0)]
+    [InlineData(5, 5, 0)]
+    [InlineData(5, 10, 1)]
     public void Build_Throws_WhenGemSocketHighReqBandTypeIsViolated(int value02, int value03, int value04)
     {
         var rows = MinimalRows() with
@@ -1138,9 +1134,6 @@ public class WorldDataCacheBuilderTests
     [Fact]
     public void Build_PopulatesGemSocketsById_WithAllFieldValues_KeyedByGemSocketId()
     {
-        // Value01 is carried through untouched by every validation rule (see ValidateGemSockets's remarks on
-        // the dead Value01 check), so this is the only place confirming it -- and every other field --
-        // actually round-trips into the cache rather than merely not throwing.
         var rows = MinimalRows() with
         {
             GemSockets = [new GemSocketRowDto(7, 40, 3, 5, 10, 0)]

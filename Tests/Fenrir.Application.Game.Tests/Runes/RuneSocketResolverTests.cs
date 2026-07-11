@@ -44,8 +44,6 @@ public class RuneSocketResolverTests
     [Fact]
     public void ResolveInsert_NaturalSlotAlreadyOccupied_RejectedEvenIfTargetSlotDiffers()
     {
-        // Item 93514's natural slot (0) is already occupied; inserting at a different client-supplied
-        // slot (2) must still be rejected -- mirrors the legacy's own redundant per-item-id safety check.
         var runeSystem = Empty.SetItem(0, 93514);
 
         var result = RuneSocketResolver.ResolveInsert(2, 93514, runeSystem);
@@ -75,7 +73,6 @@ public class RuneSocketResolverTests
     [Fact]
     public void ResolveRemove_MismatchedOccupant_Rejected()
     {
-        // Slot 1 should only ever hold 93515 -- a mismatched occupant (defensive/UB-adjacent state) is rejected.
         var runeSystem = Empty.SetItem(1, 93514);
 
         var result = RuneSocketResolver.ResolveRemove(1, runeSystem, true);

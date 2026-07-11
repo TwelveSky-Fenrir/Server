@@ -3,7 +3,6 @@ using Fenrir.Network.Compression;
 
 namespace Fenrir.Application.Game.Domain;
 
-/// <summary>Decodes the USE_XOR_UID-obfuscated tID the legacy client relays ("MG"+decimal(AccountId), XORed).</summary>
 public static class ObfuscatedUidCodec
 {
     public static bool TryDecodeAccountId(string obfuscatedId, out int accountId)

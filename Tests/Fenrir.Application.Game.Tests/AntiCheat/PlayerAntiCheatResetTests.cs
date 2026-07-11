@@ -4,11 +4,6 @@ using Fenrir.Application.Game.Tests.TestSupport;
 
 namespace Fenrir.Application.Game.Tests.AntiCheat;
 
-/// <summary>
-///     Covers <see cref="PlayerRuntimeState.ResetVolatileAntiCheatCountersOnEntry" /> — side effect #1 of the D2
-///     contract: every volatile anti-cheat counter re-baselined to its clean-slate value at avatar registration
-///     (Server/ts25zone/S04_MyWork02.cpp:818-878), so nothing carries stale cross-session state.
-/// </summary>
 public class PlayerAntiCheatResetTests
 {
     private static PlayerRuntimeState NewState(string? sourceIp = null)
@@ -32,7 +27,6 @@ public class PlayerAntiCheatResetTests
     {
         var state = NewState();
 
-        // Dirty every counter, as if a prior session left state behind (models legacy object reuse).
         state.DarkAttackUseTick = 11;
         state.DarkAttackActiveTick = 12;
         state.DarkAttackKind = 13;
@@ -71,7 +65,6 @@ public class PlayerAntiCheatResetTests
         Assert.Equal(0, state.BottleTick);
         Assert.False(state.AntiAhsHackFlag);
         Assert.Equal(0, state.AutoCheckState);
-        // Deliberate hardening: legacy leaves these three OUT of the reset block; Fenrir clears them anyway.
         Assert.Equal(0, state.AutoCheckAnswer1);
         Assert.Equal(0, state.AutoCheckAnswer2);
         Assert.Equal(0, state.AutoCheckTime);

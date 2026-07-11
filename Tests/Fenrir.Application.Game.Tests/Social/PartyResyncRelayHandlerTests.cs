@@ -9,12 +9,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Social;
 
-/// <summary>
-///     <see cref="PartyResyncRelayHandler" /> -- the <c>*.Services</c> party-reconciliation authority
-///     <c>PartyResyncRelayHost</c> routes every delivered cross-shard party-resync row to. Exercises exactly
-///     one shard's own <see cref="ZoneRegistry" />/<see cref="PartyRegistry" /> at a time, mirroring how the
-///     real feature runs as independent processes (same posture as <c>PartyCrossShardRelayHandlerTests</c>).
-/// </summary>
 public class PartyResyncRelayHandlerTests
 {
     private const byte OwnShardId = 3;
@@ -33,11 +27,7 @@ public class PartyResyncRelayHandlerTests
         return (handler, zones, parties, relay);
     }
 
-    /// <summary>
-    ///     Enters a character into map 1 -- the caller's own <see cref="ZoneRegistry" /> must already be
-    ///     initialized (once) by <see cref="CreateHandler" />; this never re-initializes it.
-    /// </summary>
-    private static PlayerRuntimeState Enter(ZoneRegistry zones, short mapId, int characterId, string name)
+        private static PlayerRuntimeState Enter(ZoneRegistry zones, short mapId, int characterId, string name)
     {
         zones.TryGet(mapId, out var zone);
         var (session, _) = ZoneTestKit.CreateSession(characterId);
@@ -106,8 +96,6 @@ public class PartyResyncRelayHandlerTests
             parties.TryInvite(leader.CharacterId, 1, leader.Tribe, follower.CharacterId, 1, leader.Tribe));
         Assert.True(parties.TryAnswer(follower.CharacterId, true, out _, out _));
 
-        // "Follower" is a live, partied character but not the leader -- PartyName only ever anchors to the
-        // leader's own name (PartyIdentityResolver's own remarks), so this must not be treated as hosted.
         await handler.HandleAsync(MakeRequest("Follower"), CancellationToken.None);
 
         Assert.Empty(relay.Enqueued);

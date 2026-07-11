@@ -8,12 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Tribes;
 
-/// <summary>
-///     CZ_TRIBE_WORK_SEND (opcode 79) -- the generic tribe sub-command channel. Sub-commands 12-15 always
-///     abort; unrecognized sorts also abort. Unlike GUILD_WORK, every mutation here is either this
-///     character's own progression state (write-behind) or a synchronous money debit.
-/// </summary>
-/// <remarks>ZC_TRIBE_WORK_RECV always echoes the client's raw tData back verbatim, never server-computed content.</remarks>
 public sealed class TribeActionHandler(
     ITribeActionService tribeActionService,
     ILogger<TribeActionHandler>? logger = null) : IAsyncPacketHandler<TribeActionRequest>
@@ -97,8 +91,6 @@ public sealed class TribeActionHandler(
             case 13:
             case 14:
             case 15:
-                // Dead sub-commands: an unmodified legacy client never sends these (see class remarks) --
-                // Debug, not Warning, since they aren't themselves proof of a modified client.
                 logger?.LogDebug(
                     "Character {CharacterId} sent CZ_TRIBE_WORK_SEND sort {Sort} (dead sub-command) -- aborting session {SessionId}",
                     characterId, packet.Sort, session.SessionId);

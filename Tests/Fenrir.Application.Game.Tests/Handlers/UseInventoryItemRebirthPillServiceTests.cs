@@ -16,18 +16,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 
-/// <summary>
-///     Covers the Rebirth Pill (world.Items 632/1241/2462) -- Path A of the G1-G12 rebirth-advancement
-///     mechanism, the only path that reaches generations 7-12. Kept in its own file, separate from
-///     <c>UseInventoryItemConsumablesServiceTests</c>/<c>UseInventoryItemServiceTests</c>, for the same
-///     "avoid two concurrently-evolving suites touching shared setup" reason those two already give.
-///     <para>
-///         The per-tick anti-flood throttle (<see cref="PlayerRuntimeState.LastItemUseUtc" />) is enforced by
-///         <c>UseInventoryItemHandler</c> before any item-specific dispatch, one layer above
-///         <see cref="UseInventoryItemService.ResolveAsync" /> -- out of scope for this file, which drives the
-///         service directly.
-///     </para>
-/// </summary>
 public class UseInventoryItemRebirthPillServiceTests
 {
     private const byte SpecialUseSort = 3;
@@ -37,7 +25,6 @@ public class UseInventoryItemRebirthPillServiceTests
     private const int RebirthPillItemIdB = 1241;
     private const int RebirthPillItemIdC = 2462;
 
-    // The threshold ReturnHighExpValue(12) resolves to -- see RebirthProgression.HighLevelExpTable's own remarks.
     private const int MaxHighLevelExp = 1_481_117_817;
 
     private static async Task<UseInventoryItemResponse> RunToCompletionAsync(
@@ -125,7 +112,6 @@ public class UseInventoryItemRebirthPillServiceTests
         Assert.True(zone.TryGetPlayer(CharacterId, out var after));
         Assert.Equal(4, after!.RebirthCount);
         Assert.Equal(0, after.Exp2);
-        // Path A never touches ContributionPoints/Zone241Time/HP/MP -- unlike Path B (TribeActionService.RebirthAsync).
         Assert.Equal(0, after.ContributionPoints);
         Assert.Equal(0, after.Zone241Time);
     }
@@ -230,11 +216,7 @@ public class UseInventoryItemRebirthPillServiceTests
         Assert.Equal(RebirthProgression.MaxRebirthGeneration, state.RebirthCount);
     }
 
-    /// <summary>
-    ///     Reaches generation 12 -- unlike Path B (TribeActionService.RebirthAsync, hard-capped at 6), Path A
-    ///     is the only route past generation 6.
-    /// </summary>
-    [Fact]
+        [Fact]
     public async Task RebirthPill_FromGeneration11_ReachesTheAbsoluteCapOf12()
     {
         var (session, _, zone, state, characters) =
@@ -252,12 +234,7 @@ public class UseInventoryItemRebirthPillServiceTests
         Assert.Equal(RebirthProgression.MaxRebirthGeneration, after!.RebirthCount);
     }
 
-    /// <summary>
-    ///     Proves rebirth cannot be repeated without consuming the required item each time: a second attempt
-    ///     against the now-emptied slot fails the generic item-lookup precondition, the same "no double-spend"
-    ///     guarantee every other family in this file relies on (DecreaseQunatity clears the whole slot at zero).
-    /// </summary>
-    [Fact]
+        [Fact]
     public async Task RebirthPill_SecondAttemptAgainstTheSameNowEmptySlot_FailsCleanly_NoDoubleSpend()
     {
         var (session, _, zone, state, characters) = SetUp(rebirthCount: 0);
@@ -272,8 +249,6 @@ public class UseInventoryItemRebirthPillServiceTests
         Assert.Equal(1, afterFirst!.RebirthCount);
         Assert.Null(afterFirst.Inventory.GetSlot(ContainerMatrix.InventoryPage0, 0));
 
-        // Exp2 was reset to 0 by the first success too, but the item-lookup precondition is checked first, so
-        // this fails there rather than on the Exp2 threshold -- the slot genuinely holds nothing to consume.
         var second = await RunToCompletionAsync(
             service.ResolveAsync(zone, afterFirst, CharacterId, AccountId, ContainerMatrix.InventoryPage0, 0, 0,
                 CancellationToken.None), zone);
@@ -281,6 +256,6 @@ public class UseInventoryItemRebirthPillServiceTests
         Assert.Null(session.DisconnectReason);
         Assert.Equal(1, second.Result);
         Assert.True(zone.TryGetPlayer(CharacterId, out var afterSecond));
-        Assert.Equal(1, afterSecond!.RebirthCount); // unchanged by the rejected second attempt
+        Assert.Equal(1, afterSecond!.RebirthCount);
     }
 }

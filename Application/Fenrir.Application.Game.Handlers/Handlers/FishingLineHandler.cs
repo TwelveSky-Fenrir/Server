@@ -8,11 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
-/// <summary>
-///     CZ_FISHING_STATE_SEND (opcode 103) -- zone 52 only (S04_MyWork01.cpp:115-122): any other zone would
-///     never have registered this opcode in the legacy, so it disconnects here too. Sort 1=cast (gated by a
-///     mesh check under the caster's own position), 2=reel; anything else disconnects.
-/// </summary>
 public sealed class FishingLineHandler(IFishingLineService fishingLineService, ILogger<FishingLineHandler> logger)
     : IInlinePacketHandler<FishingLineRequest>
 {

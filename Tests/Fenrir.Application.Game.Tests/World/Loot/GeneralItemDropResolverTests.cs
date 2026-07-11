@@ -9,7 +9,7 @@ public class GeneralItemDropResolverTests
 {
     private const int Common = 1;
     private const int Armor = 9;
-    private const int Sword = 13; // tribe 0's own weapon sort
+    private const int Sword = 13;
 
     private static WorldDataCache CacheWith(params ItemRowDto[] items)
     {
@@ -36,7 +36,6 @@ public class GeneralItemDropResolverTests
     {
         var item = EligibleItem(9001, 10, Common, Armor);
         var cache = CacheWith(item);
-        // sortPool[1] == Armor -- see class remarks on the pool's fixed order.
         var random = new ScriptedRandom(1);
 
         var result = GeneralItemDropResolver.Resolve(cache, random, 0, Common, 10,
@@ -61,10 +60,8 @@ public class GeneralItemDropResolverTests
     [Fact]
     public void Resolve_TribeRestrictedItem_RejectedForTheWrongTribe()
     {
-        // EquipInfo1 == 3 means "tribe 1 only" (EquipInfo1 - 2 == tribe).
         var item = EligibleItem(9003, 10, Common, Sword, 3);
         var cache = CacheWith(item);
-        // sortPool[5] is tribe 0's own weapon sort (Sword) -- picked, but the item itself is tribe-1-restricted.
         var random = new ScriptedRandom(5);
 
         var result = GeneralItemDropResolver.Resolve(cache, random, 0, Common, 10,
@@ -76,7 +73,6 @@ public class GeneralItemDropResolverTests
     [Fact]
     public void Resolve_TribeRestrictedItem_AcceptedForTheRightTribe()
     {
-        // EquipInfo1 == 2 means "tribe 0 only" (EquipInfo1 - 2 == tribe), matching sortPool[5] == Sword for tribe 0.
         var item = EligibleItem(9004, 10, Common, Sword, 2);
         var cache = CacheWith(item);
         var random = new ScriptedRandom(5);
@@ -90,8 +86,6 @@ public class GeneralItemDropResolverTests
     [Fact]
     public void Resolve_NoCandidateAtAll_ReturnsNullWithinAttemptBudget()
     {
-        // A non-empty catalog (WorldDataCacheBuilder.Build requires world.Items non-empty) whose one item
-        // simply never matches the (level,type,sort) triple being resolved for.
         var cache = CacheWith(EligibleItem(9099, 99, Common, Armor));
         var random = new ScriptedRandom(0);
 
@@ -114,7 +108,6 @@ public class GeneralItemDropResolverTests
         Assert.Null(result);
     }
 
-    // ---- includeCape / includeSkillBook (workstream lucky-ticket-handler-thresholds) --------------------
 
     private const int Cape = 8;
     private const int SkillBook = 5;
@@ -122,7 +115,6 @@ public class GeneralItemDropResolverTests
     [Fact]
     public void Resolve_IncludeCapeDefaultTrue_CapeSlotIsReachable()
     {
-        // Default pool (10 slots: 8 fixed + Cape + Skill Book) -- index 8 is Cape.
         var item = EligibleItem(9006, 10, Common, Cape);
         var cache = CacheWith(item);
         var random = new ScriptedRandom(8);
@@ -135,8 +127,6 @@ public class GeneralItemDropResolverTests
     [Fact]
     public void Resolve_IncludeCapeFalse_CapeSlotIsNeverReachable_EvenIfThatIndexWouldOtherwiseHitIt()
     {
-        // With includeCape:false the pool shrinks to 8 slots (indices 0-7): random.Next(8) can never
-        // address a 9th (Cape) slot that simply is not appended to the pool at all.
         var item = EligibleItem(9007, 10, Common, Cape);
         var cache = CacheWith(item);
         var random = new ScriptedRandom(0, 1, 2, 3, 4, 5, 6, 7);
@@ -150,10 +140,6 @@ public class GeneralItemDropResolverTests
     [Fact]
     public void Resolve_IncludeSkillBookFalse_SkillBookSlotIsNeverReachable()
     {
-        // Skill Book only ever occupies the LAST slot appended (after Cape, when both are included). With
-        // includeCape:true/includeSkillBook:false the pool is 9 slots (0-8); Skill Book (a would-be 10th
-        // slot) is never appended, so it can never be drawn regardless of which of the 9 reachable indices
-        // is picked.
         var item = EligibleItem(9008, 10, Common, SkillBook);
         var cache = CacheWith(item);
         var random = new ScriptedRandom(0, 1, 2, 3, 4, 5, 6, 7, 8);
@@ -169,7 +155,6 @@ public class GeneralItemDropResolverTests
     {
         var item = EligibleItem(9009, 10, Common, Armor);
         var cache = CacheWith(item);
-        // Index 1 (Armor) is still reachable in the shrunk 8-slot pool.
         var random = new ScriptedRandom(1);
 
         var result = GeneralItemDropResolver.Resolve(cache, random, 0, Common, 10, 10,

@@ -6,10 +6,6 @@ using Fenrir.Network.Dispatch.Zone.Sessions;
 
 namespace Fenrir.Application.Game.Tests.Simulation;
 
-/// <summary>
-///     Covers <see cref="PersonalShopRegionEnforcementSystem" />: per-tick personal-shop region re-validation
-///     (behavior contract C21§E).
-/// </summary>
 public class PersonalShopRegionEnforcementSystemTests
 {
     private static Zone SetUp(short mapId)
@@ -44,13 +40,13 @@ public class PersonalShopRegionEnforcementSystemTests
     public void ShopOpen_InsidePermittedRegion_NeverDisconnected()
     {
         var zone = SetUp(37);
-        var (session, state) = EnterPlayer(zone, 1, 0, 1f, 0f, -1478f); // zone-37 market-district center
+        var (session, state) = EnterPlayer(zone, 1, 0, 1f, 0f, -1478f);
         state.PshopOpen = true;
 
         zone.Tick(TimeSpan.FromMilliseconds(500));
 
         Assert.Null(session.DisconnectReason);
-        Assert.True(state.PshopOpen); // no "graceful close" state change from this check
+        Assert.True(state.PshopOpen);
     }
 
     [Fact]
@@ -60,7 +56,6 @@ public class PersonalShopRegionEnforcementSystemTests
         var (session, state) = EnterPlayer(zone, 1, 0, 1f, 0f, -1478f);
         state.PshopOpen = true;
 
-        // Drift far outside the zone-37 market district after opening.
         state.PosX = 999_999f;
 
         zone.Tick(TimeSpan.FromMilliseconds(500));
@@ -87,7 +82,7 @@ public class PersonalShopRegionEnforcementSystemTests
         var (session, state) = EnterPlayer(zone, 1, 0, 1f, 0f, -1478f);
         state.PshopOpen = true;
         state.IsMovingZone = true;
-        state.PosX = 999_999f; // would otherwise fail
+        state.PosX = 999_999f;
 
         zone.Tick(TimeSpan.FromMilliseconds(500));
 

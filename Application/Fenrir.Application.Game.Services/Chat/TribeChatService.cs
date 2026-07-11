@@ -12,8 +12,6 @@ public sealed class TribeChatService(ILogger<TribeChatService> logger) : ITribeC
     {
         if (sender.IsMuted)
         {
-            // A moderation action (mute) actively being enforced -- worth surfacing by default, mirroring
-            // GuildChatService's own muted-drop treatment.
             logger.LogInformation("Character {CharacterId} tribe chat dropped: caller is muted", sender.CharacterId);
             return false;
         }

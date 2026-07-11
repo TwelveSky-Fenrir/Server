@@ -3,7 +3,6 @@ using Fenrir.Data.Abstractions.Inventory;
 
 namespace Fenrir.Application.Game.Tests.TestSupport;
 
-/// <summary>In-memory stand-in for the new (wave7/C8) <see cref="IPetBagRepository" /> -- records the last call only.</summary>
 internal sealed class FakePetBagRepository : IPetBagRepository
 {
     public (int CharacterId, byte InventoryContainer, IReadOnlyList<CharacterItemSlotTvp> InventoryItems,

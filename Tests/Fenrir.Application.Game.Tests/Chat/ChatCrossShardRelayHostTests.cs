@@ -10,9 +10,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Chat;
 
-// WS-C3 cross-shard whisper (op39 / SECRET_CHAT) relay poll loop -- point-to-point sibling of
-// SocialCrossShardRelayHost, minus its Ask/Answer negotiation (a whisper is fire-and-forget). Delivery is done
-// by the host itself (like GuildTribeBroadcastRelayHost), not routed to a per-Kind handler.
 public class ChatCrossShardRelayHostTests
 {
     private const byte ShardId = 3;
@@ -46,7 +43,7 @@ public class ChatCrossShardRelayHostTests
         var (session, pipe) = ZoneTestKit.CreateSession(200);
         zone!.Post(ZoneCommand.Enter(200, ZoneTestKit.EnterData(session, MapId, "Target")));
         zone.Tick(TimeSpan.FromMilliseconds(50));
-        ZoneTestKit.DrainOutbound(pipe); // clear the enter broadcast before asserting the whisper
+        ZoneTestKit.DrainOutbound(pipe);
 
         relay.NextPoll =
         [
@@ -79,7 +76,6 @@ public class ChatCrossShardRelayHostTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(pipe);
 
-        // Addressed to a character id that is not present on this shard -- the since-departed-target parity case.
         relay.NextPoll =
         [
             new ChatCrossShardWhisperDto(1, 5, 100, "Asker", ShardId, 999, "Ghost", "hello there", 0)
@@ -105,7 +101,7 @@ public class ChatCrossShardRelayHostTests
         ZoneTestKit.DrainOutbound(pipe);
 
         Assert.True(zone.TryGetPlayer(200, out var target));
-        target!.IsMovingZone = true; // flagged mid-transfer -- skipped by the same guard even if still registered
+        target!.IsMovingZone = true;
 
         relay.NextPoll =
         [

@@ -3,10 +3,6 @@ using Fenrir.Data.Abstractions.Progression;
 
 namespace Fenrir.Application.Game.Tests.Progression;
 
-/// <summary>
-///     In-memory stand-in for <see cref="ITowerRepository" />, seeded like a fresh usp_TowerState_EnsureInitialized
-///     boot (12 uncontrolled rows).
-/// </summary>
 internal sealed class FakeTowerRepository : ITowerRepository
 {
     public List<TowerStateRowDto> Rows { get; set; } =

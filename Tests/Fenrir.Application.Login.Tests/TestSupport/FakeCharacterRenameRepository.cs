@@ -2,8 +2,6 @@ using Fenrir.Data.Abstractions.Characters;
 
 namespace Fenrir.Application.Login.Tests.TestSupport;
 
-// In-memory stand-in for ICharacterRenameRepository: drives every game.usp_Character_Rename outcome
-// (0/2/102/-1, plus a simulated engine error) without a SQL container.
 internal sealed class FakeCharacterRenameRepository : ICharacterRenameRepository
 {
     private readonly Exception? _fault;

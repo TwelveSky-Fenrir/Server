@@ -67,7 +67,6 @@ public class SkyUpgradeResolverTests
     {
         var item = WarlordItem();
 
-        // Tier 501: 40% probability -- roll 0 always succeeds.
         var result = SkyUpgradeResolver.Resolve(item, 30, 501, new ScriptedRandomSource(0));
 
         Assert.True(result.Succeeded);
@@ -80,7 +79,6 @@ public class SkyUpgradeResolverTests
     {
         var item = WarlordItem();
 
-        // Tier 501: 40% probability -- roll 40 (>= 40) fails.
         var result = SkyUpgradeResolver.Resolve(item, 30, 501, new ScriptedRandomSource(40));
 
         Assert.Equal(SkyUpgradeResolver.Outcome.Failed, result.Outcome);
@@ -91,7 +89,6 @@ public class SkyUpgradeResolverTests
     {
         var item = WarlordItem();
 
-        // Tier 504: 10% probability -- roll 0 always succeeds, no decrease.
         var result = SkyUpgradeResolver.Resolve(item, 35, 504, new ScriptedRandomSource(0));
 
         Assert.True(result.Succeeded);

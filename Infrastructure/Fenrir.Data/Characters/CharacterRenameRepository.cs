@@ -6,7 +6,6 @@ using Fenrir.Data.Abstractions.Characters;
 
 namespace Fenrir.Data.Characters;
 
-/// <summary>Singleton facade over game.usp_Character_Rename -- procs only, no SqlDbType leaks past this type.</summary>
 public sealed record CharacterRenameRepository(ICaeriusNetDbContext Db) : ICharacterRenameRepository
 {
     private const int RenameScrollItemId = 1133;

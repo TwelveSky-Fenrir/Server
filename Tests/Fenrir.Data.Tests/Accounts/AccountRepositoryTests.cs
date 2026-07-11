@@ -9,8 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Accounts;
 
-// Exercises auth.usp_Account_* against the real containerized SQL Server (no mocks). Each test mints its own
-// GUID-suffixed LoginName to stay independent from the seeded devtest account and from each other.
 [Collection("SqlServer")]
 public sealed class AccountRepositoryTests
 {
@@ -29,7 +27,6 @@ public sealed class AccountRepositoryTests
         _repository = new AccountRepository(db);
     }
 
-    // LoginName is NVARCHAR(64); a full CallerMemberName-based suffix would overflow it.
     private static string NewLoginName()
     {
         return $"acct_{Guid.NewGuid():N}";
@@ -83,7 +80,6 @@ public sealed class AccountRepositoryTests
 
         Assert.NotNull(ex);
 
-        // usp_Account_Create raises THROW 50101 for a duplicate LoginName; CaeriusNet may wrap the SqlException.
         var sqlException = ex as SqlException ?? ex!.InnerException as SqlException;
         if (sqlException is not null)
             Assert.Equal(50101, sqlException.Number);
@@ -96,7 +92,6 @@ public sealed class AccountRepositoryTests
         var (hash, salt) = PasswordHasher.Hash(SamplePassword);
         var accountId = await _repository.CreateAsync(loginName, hash, salt, CancellationToken.None);
 
-        // usp_Account_RecordLoginAttempt escalates to a 1-minute lockout once FailedLoginCount reaches 5.
         for (var i = 0; i < 5; i++)
             await _repository.RecordLoginAttemptAsync(accountId, false, CancellationToken.None);
 

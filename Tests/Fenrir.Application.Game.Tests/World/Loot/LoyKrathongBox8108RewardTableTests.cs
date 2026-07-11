@@ -2,17 +2,6 @@ using Fenrir.Application.Game.Domain.World.Loot;
 
 namespace Fenrir.Application.Game.Tests.World.Loot;
 
-/// <summary>
-///     Covers the C10-remaining-box-pools reward-table DATA and roll primitive for item 8108 (Loy Krathong Box)
-///     -- <see cref="LoyKrathongBox8108RewardTable" />. <b>Security-focused</b>: the legacy single-open code
-///     path for this item contains a confirmed arbitrary-item-grant exploit (see that type's own SECURITY
-///     remarks) that Fenrir does not reproduce -- <see cref="Roll_NeverAcceptsAnyClientSuppliedValue_SignatureHasNoSuchParameter" />
-///     and <see cref="Roll_AcrossManyRealRandomDraws_EveryRewardIsAlwaysWithinTheKnownTable" /> below are the
-///     direct proof of that hardening for this table; the
-///     <c>LoyKrathongBox8108_SECURITY_ClientSuppliedExtremeValue_NeverInfluencesGrantedReward_OnlyClampsBulkCount</c>
-///     test in <c>Fenrir.Application.Game.Tests.Inventory.UseItems.Boxes.LootBoxUseItemHandlerTribeKeyedDispatchTests</c>
-///     proves the same property end-to-end through the handler.
-/// </summary>
 public class LoyKrathongBox8108RewardTableTests
 {
     private static readonly HashSet<int> AllKnownRewardIds =
@@ -40,10 +29,6 @@ public class LoyKrathongBox8108RewardTableTests
     [InlineData(6, 1404)]
     public void Roll_SeventhsBand_FourVersusThreeSplit_MapsSubRollToAssumedId(int subRoll, int expectedRewardId)
     {
-        // Roll 6 or 7 enters this band; sub-roll of sevenths decides 1403 (4-in-7) vs 1404 (3-in-7). The
-        // direction (which id gets the 4-in-7 share) is this table's own flagged, non-citation-confirmed
-        // assumption -- see LoyKrathongBox8108RewardTable's own remarks. This test locks in that assumption so
-        // any accidental flip is caught, not so it can never be revisited once a fresh citation resolves it.
         var result = LoyKrathongBox8108RewardTable.Roll(0, new ScriptedRandom(6, subRoll));
 
         Assert.True(result.Success);
@@ -98,8 +83,6 @@ public class LoyKrathongBox8108RewardTableTests
     [InlineData(5, 619)]
     public void Roll_SixthsBand_TwoVersusFourSplit_MapsSubRollToExpectedId(int subRoll, int expectedRewardId)
     {
-        // Roll 10 or 11 enters this band; the contract IS explicit about direction here (826 on a third,
-        // 619 on two-thirds), unlike the sevenths band above.
         var result = LoyKrathongBox8108RewardTable.Roll(0, new ScriptedRandom(10, subRoll));
 
         Assert.True(result.Success);
@@ -142,13 +125,7 @@ public class LoyKrathongBox8108RewardTableTests
         Assert.Equal([90793, 90792, 90794], LoyKrathongBox8108RewardTable.EpicIdsByPreviousTribe[2].ToArray());
     }
 
-    /// <summary>
-    ///     SECURITY: <see cref="LoyKrathongBox8108RewardTable.Roll" /> has exactly two parameters --
-    ///     <c>previousTribe</c> and <c>random</c> -- and no way whatsoever to receive a client-supplied reward
-    ///     id or item value. This is the structural guarantee that closes the legacy single-open exploit at the
-    ///     API surface itself, not merely by convention.
-    /// </summary>
-    [Fact]
+        [Fact]
     public void Roll_NeverAcceptsAnyClientSuppliedValue_SignatureHasNoSuchParameter()
     {
         var method = typeof(LoyKrathongBox8108RewardTable).GetMethod(nameof(LoyKrathongBox8108RewardTable.Roll));
@@ -160,13 +137,7 @@ public class LoyKrathongBox8108RewardTableTests
         Assert.Equal(typeof(Random), parameters[1].ParameterType);
     }
 
-    /// <summary>
-    ///     SECURITY: across many real (non-scripted) random draws and every recognized tribe, every reward this
-    ///     table ever produces is a member of its own known, bounded id set -- never an arbitrary value. This is
-    ///     the data-level counterpart to the legacy single-open exploit's own defect (an unbounded id reachable
-    ///     32% of the time) -- here that surface simply cannot exist.
-    /// </summary>
-    [Fact]
+        [Fact]
     public void Roll_AcrossManyRealRandomDraws_EveryRewardIsAlwaysWithinTheKnownTable()
     {
         var random = new Random(20260711);
@@ -181,8 +152,7 @@ public class LoyKrathongBox8108RewardTableTests
             }
     }
 
-    /// <summary>Returns queued draws in request order; throws if the code draws more than were scripted.</summary>
-    private sealed class ScriptedRandom(params int[] values) : Random
+        private sealed class ScriptedRandom(params int[] values) : Random
     {
         private int _index;
 

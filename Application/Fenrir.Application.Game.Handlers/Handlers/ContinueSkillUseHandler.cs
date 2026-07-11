@@ -9,12 +9,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
-/// <summary>
-///     CZ_CONTINUE_SKILL_USE_SEND (op95). Sort=1 starts auto-buff channeling (mana-gated, broadcasts the
-///     resulting avatar action); Sort=2 is the per-tick buff-apply pulse -- a documented, wire-faithful no-op
-///     here (the legacy itself never replies or disconnects for Sort=2 either; see
-///     <see cref="AutoBuffActivationResolver" />'s remarks for what's out of scope). Any other Sort disconnects.
-/// </summary>
 public sealed class ContinueSkillUseHandler(IContinueSkillUseService service, ILogger<ContinueSkillUseHandler> logger)
     : IInlinePacketHandler<ContinueSkillUseRequest>
 {
@@ -28,9 +22,6 @@ public sealed class ContinueSkillUseHandler(IContinueSkillUseService service, IL
         if (!zone.TryGetPlayer(characterId, out var state) || state is null)
             return;
 
-        // Sort=2 is the per-tick auto-buff pulse (see this class's own remarks) -- fires on every tick while
-        // channeling, so the entry log must not format/box unconditionally like the other handlers in this
-        // area; gate behind IsEnabled exactly like SessionLoop.ProcessBufferAsync's own debugEnabled local.
         if (logger.IsEnabled(LogLevel.Debug))
             logger.LogDebug(
                 "Session {SessionId}: ContinueSkillUseRequest (op95) received for character {CharacterId}, sort {Sort}",

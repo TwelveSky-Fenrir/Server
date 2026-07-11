@@ -14,7 +14,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Services.Social;
 
-/// <inheritdoc cref="IFriendService" />
 public sealed class FriendService(
     ZoneRegistry zones,
     FriendRegistry friends,
@@ -32,36 +31,7 @@ public sealed class FriendService(
 {
     private const int MaxFriends = 10;
 
-    /// <remarks>
-    ///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:8259-8277,8459-8471,9088-9101,9311-9324 (the shared
-    ///     CZ_DUEL_ASK_SEND/CZ_FRIEND_ASK_SEND/CZ_PARTY_ASK_SEND/CZ_TEACHER_ASK_SEND/CZ_TRADE_ASK_SEND
-    ///     pre-check family) -- legacy checks the requester's OWN busy/pose state before it ever resolves
-    ///     the target avatar by name, so a busy asker naming a nonexistent/offline target gets the busy
-    ///     reply, not "target not found". <see cref="FriendRegistry.IsNegotiating" /> and
-    ///     <see cref="Fenrir.Application.Game.Domain.Social.CommunityWorkGate.IsBusy" /> are therefore both checked ahead of
-    ///     <see cref="FindPlayerByName" />; the same <see cref="FriendRegistry.IsNegotiating" /> check inside
-    ///     <see cref="FriendRegistry.TryAsk" /> stays in place for the actual registration.
-    ///     <para>
-    ///         Server/ts25zone/S07_MyGame04.cpp:185-216 (<c>CheckCommunityWork</c>'s shared seven-flag busy
-    ///         check) is also re-applied to the resolved target below (
-    ///         <see cref="Fenrir.Application.Game.Domain.Social.CommunityWorkGate.IsBusy" />),
-    ///         mirroring <c>GuildInviteService.IsExcludedByCommunityWorkOrStunDeath</c>/
-    ///         <c>TradeInviteService.IsExcludedByCommunityWorkOrStunDeath</c> -- this closes a gap where only
-    ///         this family's own <see cref="FriendRegistry" /> state was previously consulted for either side.
-    ///         The stun/post-death gate those two siblings additionally apply is deliberately NOT included here:
-    ///         no contract citation confirms it applies to this opcode pair, so it is left unmodeled rather than
-    ///         guessed at.
-    ///     </para>
-    ///     <para>
-    ///         WS1.4: on a same-shard <see cref="FindPlayerByName" /> miss, falls back to
-    ///         <see cref="ICharacterShardLocationRepository.FindByNameAsync" /> before reporting
-    ///         <see cref="FriendAskResultKind.TargetNotFound" /> -- see <see cref="FriendAskResultKind.SentCrossShard" />'s
-    ///         own remarks. The already-friend-or-full check reuses <paramref name="asker" />'s own local
-    ///         <see cref="PlayerRuntimeState.Friends" /> list either way (no second query needed); the
-    ///         same-tribe check re-runs against the resolved row's own denormalized Tribe column.
-    ///     </para>
-    /// </remarks>
-    public async ValueTask<FriendAskResultKind> AskAsync(Zone zone, PlayerRuntimeState asker, string targetAvatarName,
+        public async ValueTask<FriendAskResultKind> AskAsync(Zone zone, PlayerRuntimeState asker, string targetAvatarName,
         CancellationToken cancellationToken)
     {
         if (zone.MapId == 124)
@@ -92,8 +62,6 @@ public sealed class FriendService(
 
         if (asker.Tribe != target.Tribe)
         {
-            // Client-visible as a session disconnect (FriendAskHandler aborts on this outcome) -- a legitimate
-            // client never lets a player target a different-tribe avatar for a friend request.
             logger.LogWarning(
                 "Friend ask rejected: character {AskerId} (tribe {AskerTribe}) targeted character {TargetCharacterId} (tribe {TargetTribe}) -- session will be disconnected",
                 asker.CharacterId, asker.Tribe, target.CharacterId, target.Tribe);
@@ -129,14 +97,7 @@ public sealed class FriendService(
         }
     }
 
-    /// <summary>
-    ///     WS1.4: if <paramref name="targetId" /> has a cross-shard ask delivered in (via
-    ///     <see cref="FriendCrossShardRelayHandler.HandleAskAsync" />), answers it by publishing an Answer row
-    ///     back to the original asker's own shard instead of the same-shard <see cref="FriendRegistry.TryAnswer" />
-    ///     path -- transparent to the caller (<see cref="FriendAskHandler" />/<c>FriendAnswerHandler</c>), which
-    ///     is unaware whether a given pending ask is same-shard or cross-shard.
-    /// </summary>
-    public void Answer(int targetId, int answerCode)
+        public void Answer(int targetId, int answerCode)
     {
         if (friends.TryConsumeCrossShardInbound(targetId, out var inbound))
         {
@@ -204,7 +165,6 @@ public sealed class FriendService(
 
         if (!asker.Friends.TryGetValue((byte)index, out var friendId))
         {
-            // Client-visible as a session disconnect (FriendLocateHandler aborts on this outcome).
             logger.LogWarning(
                 "Friend locate rejected: character {AskerId} slot {Index} is empty -- session will be disconnected",
                 asker.CharacterId, index);
@@ -220,9 +180,6 @@ public sealed class FriendService(
             return new FriendLocateResult(FriendLocateResultKind.Found, sameShardZone);
         }
 
-        // Same-shard miss -- fall back to the cross-shard directory, re-applying the same same-tribe gate
-        // against the row's own denormalized Tribe column (no second query needed). A deliberate,
-        // low-frequency player action (a friend-locate ping), not a per-tick path.
         var remote = await characterShardLocations.FindByCharacterIdAsync(friendId, cancellationToken)
             .ConfigureAwait(false);
 
@@ -238,7 +195,6 @@ public sealed class FriendService(
     {
         if (index is < 0 or >= MaxFriends || state.Friends.ContainsKey((byte)index))
         {
-            // Client-visible as a session disconnect (FriendAddHandler aborts on this outcome).
             logger.LogWarning(
                 "Friend add rejected: character {CharacterId} slot {Index} is out of range or already occupied -- session will be disconnected",
                 state.CharacterId, index);
@@ -275,7 +231,6 @@ public sealed class FriendService(
 
         if (!state.Friends.ContainsKey((byte)index))
         {
-            // Client-visible as a session disconnect (FriendRemoveHandler aborts on this outcome).
             logger.LogWarning(
                 "Friend remove rejected: character {CharacterId} slot {Index} is already empty -- session will be disconnected",
                 state.CharacterId, index);
@@ -291,17 +246,7 @@ public sealed class FriendService(
         return FriendRemoveResultKind.Removed;
     }
 
-    /// <summary>
-    ///     WS1.4 same-shard-miss fallback: resolves <paramref name="targetAvatarName" /> via the cross-shard
-    ///     character-location directory, re-runs the two pre-checks that are still evaluable from local data
-    ///     (already-friend-or-full against <paramref name="asker" />'s own list; same-tribe against the
-    ///     directory row's own denormalized Tribe), then publishes an Ask row via
-    ///     <see cref="ISocialCrossShardRelayQueue" /> and registers the asker-side busy gate
-    ///     (<see cref="FriendRegistry.TryAskCrossShard" />). The remaining target-side pre-check
-    ///     (<c>IsExcludedByCommunityWork</c>, which needs the target's own live state) is re-run on the
-    ///     target's own shard by <see cref="FriendCrossShardRelayHandler.HandleAskAsync" /> once delivered.
-    /// </summary>
-    private async ValueTask<FriendAskResultKind> AskCrossShardAsync(PlayerRuntimeState asker,
+        private async ValueTask<FriendAskResultKind> AskCrossShardAsync(PlayerRuntimeState asker,
         string targetAvatarName, CancellationToken cancellationToken)
     {
         var remote = await characterShardLocations.FindByNameAsync(targetAvatarName, cancellationToken)

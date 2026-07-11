@@ -2,7 +2,6 @@ using Fenrir.Application.Game.Domain.World;
 
 namespace Fenrir.Application.Game.Abstractions.Tribes;
 
-/// <summary>Whether a <see cref="TribeActionHandler" /> sub-command should abort the session or echo a result code back.</summary>
 public readonly record struct TribeActionOutcome(bool Aborted, int Result)
 {
     public static readonly TribeActionOutcome Abort = new(true, 0);
@@ -13,10 +12,6 @@ public readonly record struct TribeActionOutcome(bool Aborted, int Result)
     }
 }
 
-/// <summary>
-///     Business logic behind every CZ_TRIBE_WORK_SEND (opcode 79) sub-command, extracted out of
-///     <see cref="TribeActionHandler" />.
-/// </summary>
 public interface ITribeActionService
 {
     public ValueTask<TribeActionOutcome> ResetStatsAsync(Zone zone, PlayerRuntimeState state, int characterId,

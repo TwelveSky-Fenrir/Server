@@ -13,8 +13,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Game;
 
-// game.usp_Tribe_SetMaster against real SQL Server 2025 -- TRIBE_WORK tSort 55's tally write, the first
-// caller of this previously-uncalled proc (see ITribeRepository.SetMasterAsync).
 [Collection("SqlServer")]
 public class TribeSetMasterProcTests
 {
@@ -67,7 +65,7 @@ public class TribeSetMasterProcTests
     [Fact]
     public async Task SetMasterAsync_UnknownTribe_Throws50330()
     {
-        const byte unknownTribeId = 200; // outside the real 0-3 domain, guaranteed absent
+        const byte unknownTribeId = 200;
 
         await AssertSqlErrorAsync(50330,
             () => _tribes.SetMasterAsync(unknownTribeId, null, CancellationToken.None).AsTask());
@@ -86,7 +84,6 @@ public class TribeSetMasterProcTests
 
     private async Task<byte> CreateTribeAsync()
     {
-        // TribeId is a fixed 0-3 domain value (CK_Tribes_TribeId); no throwaway ids are possible here.
         const byte tribeId = 2;
         await EnsureTribeExistsAsync(tribeId);
         return tribeId;
@@ -123,8 +120,6 @@ public class TribeSetMasterProcTests
             CancellationToken.None);
     }
 
-    // CaeriusNet wraps the driver's SqlException in its own CaeriusNetSqlException; unwrap by walking
-    // InnerException rather than depending on that wrapper type directly.
     private static async Task AssertSqlErrorAsync(int expectedNumber, Func<Task> action)
     {
         var thrown = await Record.ExceptionAsync(action);

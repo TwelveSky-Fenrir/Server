@@ -8,8 +8,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Login.Tests;
 
-// Cross-process duplicate-login kick/refusal, Login-side liveness half: keeps runtime.AccountSessions'
-// LastRefreshedUtc warm for every account this process holds a live Login session for.
 public class AccountSessionLivenessHostTests
 {
     [Fact]

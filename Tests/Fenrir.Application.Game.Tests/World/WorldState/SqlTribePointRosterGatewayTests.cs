@@ -5,9 +5,6 @@ using Fenrir.Data.Abstractions.Tribes;
 
 namespace Fenrir.Application.Game.Tests.World.WorldState;
 
-// SqlTribePointRosterGateway maps the game.usp_TribeRoster_GetForTribePoint rows into the domain snapshots the
-// pure TribePointLevelRecompute formula consumes. Verifies the field mapping and that the mapped roster drives
-// the formula to the same totals TribePointLevelRecomputeServiceTests already covers directly.
 public class SqlTribePointRosterGatewayTests
 {
     [Fact]
@@ -34,8 +31,6 @@ public class SqlTribePointRosterGatewayTests
     [Fact]
     public async Task EmptyRoster_ReturnsEmptyList_NotNull()
     {
-        // Distinct from the LoggingOnly placeholder (which returns null "unavailable"): a real empty read is a
-        // success, and the domain still produces every tribe's 1000 baseline from it.
         var gateway = new SqlTribePointRosterGateway(new FakeTribeRosterRepository { Rows = [] });
 
         var roster = await gateway.GetRosterAsync(CancellationToken.None);
@@ -51,8 +46,8 @@ public class SqlTribePointRosterGatewayTests
         {
             Rows =
             [
-                new TribeRosterCharacterDto(0, 200, 0, 0), // (200-112) = +88
-                new TribeRosterCharacterDto(3, 145, 2, 1) // (145-112) + 3*2 + 3*1 = 33+6+3 = +42, plus tribe-3 +800
+                new TribeRosterCharacterDto(0, 200, 0, 0),
+                new TribeRosterCharacterDto(3, 145, 2, 1)
             ]
         };
         var gateway = new SqlTribePointRosterGateway(repository);

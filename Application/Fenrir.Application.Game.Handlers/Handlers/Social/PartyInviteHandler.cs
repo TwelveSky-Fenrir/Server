@@ -8,10 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>
-///     CZ_PARTY_ASK_SEND (opcode 65) -- level-gap check delegates to <c>PartyInviteService.Invite</c>, which
-///     uses <see cref="PlayerRuntimeState.CombinedLevel" /> (aLevel1+aLevel2) on both sides.
-/// </summary>
 public sealed class PartyInviteHandler(IPartyInviteService partyInviteService, ILogger<PartyInviteHandler> logger)
     : IAsyncPacketHandler<PartyInviteRequest>
 {
@@ -56,9 +52,6 @@ public sealed class PartyInviteHandler(IPartyInviteService partyInviteService, I
                 target!.Session.Send(new PartyInviteResponse { AvatarName = result.InviterName! });
                 return;
             case PartyInviteResultKind.SentCrossShard:
-                // Nothing to send yet -- the target (on another shard) is notified asynchronously once
-                // SocialCrossShardRelayHost delivers the Ask; see PartyInviteResultKind.SentCrossShard's own
-                // remarks.
                 return;
         }
     }

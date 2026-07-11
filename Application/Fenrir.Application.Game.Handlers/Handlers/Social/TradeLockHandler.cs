@@ -7,17 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>
-///     CZ_TRADE_MENU_SEND (opcode 51) -- 2-notch confirm: first call locks (menu 0→1), second confirms
-///     (1→2). At menu==2 on both sides, commits atomically and idempotently
-///     (<see cref="Fenrir.Data.Abstractions.Characters.ITradeCommitRepository.ExecuteIdempotentAsync" />) and
-///     mirrors each side's new
-///     container back to their own zone. An overflow aborts the whole commit -- no partial state.
-/// </summary>
-/// <remarks>
-///     Both players' <see cref="PlayerRuntimeState.EconomyActionLock" /> are acquired in a fixed order
-///     (smaller CharacterId first) to rule out lock-ordering deadlock.
-/// </remarks>
 public sealed class TradeLockHandler(
     ZoneRegistry zones,
     ITradeLockService tradeLockService,

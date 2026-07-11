@@ -8,13 +8,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Chat;
 
-/// <summary>
-///     WS-C3: <see cref="WhisperService.ResolveAsync" />'s NEW cross-shard-miss branch -- enqueue onto the
-///     whisper relay outbox and report <see cref="WhisperOutcome.QueuedCrossShard" /> (accepted, target located)
-///     rather than the old "no relay exists yet" degrade. The self-whisper / same-shard / genuinely-offline
-///     branches are covered by the pre-existing <c>WhisperServiceTests</c>; this focuses on the enqueue and its
-///     entry fields.
-/// </summary>
 public class WhisperServiceCrossShardTests
 {
     private const byte ThisShardId = 1;
@@ -102,8 +95,6 @@ public class WhisperServiceCrossShardTests
     [Fact]
     public async Task ResolveAsync_OutboxFull_StillReturnsQueuedCrossShard()
     {
-        // A full outbox is a silent best-effort drop of the cross-shard leg -- the sender is still told the
-        // target was located (Result=0), matching the op39 contract's result-0-before-relay posture.
         var directory = new FakeCharacterShardLocationRepository();
         directory.Seed(new CharacterShardLocationDto(99, 3, 42, "Remote", 0, DateTime.UtcNow));
         var relay = new FakeChatCrossShardRelayQueue { EnqueueResult = false };

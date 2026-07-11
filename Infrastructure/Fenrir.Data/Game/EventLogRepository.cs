@@ -46,7 +46,7 @@ public sealed record EventLogRepository(ICaeriusNetDbContext Db) : IEventLogRepo
     public async ValueTask BatchLogAsync(IReadOnlyList<EventLogEntryTvp> rows, CancellationToken ct)
     {
         if (rows.Count == 0)
-            return; // SQL Server rejects an empty TVP outright -- never build the call for nothing to flush
+            return;
 
         var sp = new StoredProcedureParametersBuilder("game", "usp_EventLog_InsertBatch", 0)
             .AddTvpParameter("Entries", rows)

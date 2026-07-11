@@ -9,63 +9,32 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Hosting.World.ZoneWar;
 
-/// <summary>
-///     Which legacy zone-siege wire family <see cref="ZoneWarTickService" /> is currently reporting on. Each
-///     legacy variant is its own map/expansion era (Server/ts25zone/S07_MyGame01.cpp's <c>mZone049Type...</c>/
-///     <c>mZone051Type...</c>/etc. state machines) and only one is ever live in a given deployment, so one
-///     shared engine parametrized by this enum stands in for all 7.
-/// </summary>
 public enum ZoneWarKind : byte
 {
-    /// <summary>ZC 049_TYPE_BATTLE_INFO (op95) -- TribeUserNum[4] headcount + RemainTime.</summary>
-    Zone049 = 0,
 
-    /// <summary>ZC 051_TYPE_BATTLE_INFO (op96) -- ExistStone[4] + RemainTime.</summary>
-    Zone051 = 1,
+        Zone049 = 0,
 
-    /// <summary>
-    ///     ZC 194_TYPE_BATTLE_INFO/COUNTDOWN (op100/101) -- BattleInfo[4] + RemainTime, plus its own lighter countdown
-    ///     frame.
-    /// </summary>
-    Zone194 = 2,
+        Zone051 = 1,
 
-    /// <summary>ZC 241_TYPE_BATTLE_INFO (op104) -- RemainTime only.</summary>
-    Zone241 = 3,
+        Zone194 = 2,
 
-    /// <summary>ZC 267_TYPE_BATTLE_INFO (op103) -- BattleInfo[4] + RemainTime.</summary>
-    Zone267 = 4,
+        Zone241 = 3,
 
-    /// <summary>ZC 297_TYPE_REMAIN_INFO/MONSTER_INFO (op116/118) -- a 3-value status frame plus MonsterNum[4].</summary>
-    Zone297 = 5,
+        Zone267 = 4,
 
-    /// <summary>ZC FFA_TYPE_BATTLE_INFO (op200) -- RemainTime only; the twin ZC 198 countdown is dead code.</summary>
-    Zone335 = 6
+        Zone297 = 5,
+
+        Zone335 = 6
 }
 
-/// <summary>
-///     Periodic producer for the ZoneWar049/051/194/241/267/297/335 status wire family -- the legacy zone
-///     tick's own `% 10 == 0` broadcast cadence (S07_MyGame01.cpp:5159-5177 et al: decrement, and every 10th
-///     legacy tick tell the whole server), reproduced here as one engine shared across every variant instead
-///     of duplicating that loop 7 times.
-///     <para>
-///         Nothing yet flips a zone into a siege (no boss/stone/monster-count gameplay exists in Fenrir), so
-///         <see cref="ActiveKind" /> starts, and stays, null until something calls <see cref="StartWar" /> --
-///         same "real API, not yet called by anything" posture as <see cref="TowerWarState" />.
-///         The one exception is <see cref="ZoneWarKind.Zone049" />'s TribeUserNum, which this class always
-///         computes live from every connected player's <see cref="PlayerRuntimeState.Tribe" /> rather than
-///         waiting on a caller to report it, since that figure needs no gameplay system to be real.
-///     </para>
-/// </summary>
 public sealed class ZoneWarTickService(ZoneRegistry zones, ILogger<ZoneWarTickService> logger) : BackgroundService
 {
-    /// <summary>4 tribes -- every per-tribe status array this wire family carries is this wide.</summary>
-    public const int TribeCount = WorldStateService.TribeCount;
 
-    /// <summary>Every 10 legacy ticks (5 s) -- S07_MyGame01.cpp:5169's own `% 10 == 0` gate.</summary>
-    private const int BroadcastCadenceLegacyTicks = 10;
+        public const int TribeCount = WorldStateService.TribeCount;
 
-    /// <summary>RemainTime counts real seconds (2 legacy ticks each), not raw legacy ticks.</summary>
-    private const int LegacyTicksPerRemainTimeUnit = 2;
+        private const int BroadcastCadenceLegacyTicks = 10;
+
+        private const int LegacyTicksPerRemainTimeUnit = 2;
 
     private readonly SimulationTickAccumulator _accumulator = new();
     private readonly Lock _lock = new();
@@ -111,8 +80,7 @@ public sealed class ZoneWarTickService(ZoneRegistry zones, ILogger<ZoneWarTickSe
         }
     }
 
-    /// <summary>Arms a fresh window -- every reported standing/monster-count/extra value resets to zero.</summary>
-    public void StartWar(ZoneWarKind kind, int remainTimeSeconds)
+        public void StartWar(ZoneWarKind kind, int remainTimeSeconds)
     {
         lock (_lock)
         {
@@ -126,8 +94,7 @@ public sealed class ZoneWarTickService(ZoneRegistry zones, ILogger<ZoneWarTickSe
         }
     }
 
-    /// <summary>Ends the window immediately, with no final broadcast (an admin abort, not a natural expiry).</summary>
-    public void EndWar()
+        public void EndWar()
     {
         lock (_lock)
         {
@@ -135,11 +102,7 @@ public sealed class ZoneWarTickService(ZoneRegistry zones, ILogger<ZoneWarTickSe
         }
     }
 
-    /// <summary>
-    ///     Feeds Zone051/194/267's per-tribe standings array (ExistStone/BattleInfo) -- Zone049 ignores this, see
-    ///     remarks.
-    /// </summary>
-    public void ReportStanding(byte tribeId, int value)
+        public void ReportStanding(byte tribeId, int value)
     {
         ValidateTribeId(tribeId);
         lock (_lock)
@@ -148,8 +111,7 @@ public sealed class ZoneWarTickService(ZoneRegistry zones, ILogger<ZoneWarTickSe
         }
     }
 
-    /// <summary>Feeds Zone297's MonsterNum[4].</summary>
-    public void ReportMonsterCount(byte tribeId, int value)
+        public void ReportMonsterCount(byte tribeId, int value)
     {
         ValidateTribeId(tribeId);
         lock (_lock)
@@ -158,8 +120,7 @@ public sealed class ZoneWarTickService(ZoneRegistry zones, ILogger<ZoneWarTickSe
         }
     }
 
-    /// <summary>Feeds Zone297's Value01/Value02 (Value00 is always the current RemainTime).</summary>
-    public void ReportExtraStatus(int value1, int value2)
+        public void ReportExtraStatus(int value1, int value2)
     {
         lock (_lock)
         {
@@ -168,12 +129,7 @@ public sealed class ZoneWarTickService(ZoneRegistry zones, ILogger<ZoneWarTickSe
         }
     }
 
-    /// <summary>
-    ///     Advances the window by <paramref name="elapsed" /> real time, broadcasting on tick 1 and every
-    ///     <see cref="BroadcastCadenceLegacyTicks" />th legacy tick after -- pure and timer-free so tests can
-    ///     drive it directly, same convention as <see cref="Zone.Tick" />.
-    /// </summary>
-    public void Tick(TimeSpan elapsed)
+        public void Tick(TimeSpan elapsed)
     {
         var wholeTicks = _accumulator.Advance(elapsed);
         for (var i = 0; i < wholeTicks; i++)
@@ -193,14 +149,11 @@ public sealed class ZoneWarTickService(ZoneRegistry zones, ILogger<ZoneWarTickSe
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    // A missed tick just delays this cycle's ZoneWar status broadcast to the next legacy tick --
-                    // never worth crashing the GameServer.
                     logger.LogError(ex, "ZoneWar tick failed");
                 }
         }
         catch (OperationCanceledException)
         {
-            // Expected on shutdown.
         }
     }
 

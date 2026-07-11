@@ -7,7 +7,6 @@ public class ClGiftInfoSendTests
     [Fact]
     public void PayloadSize_MatchesContractConstant()
     {
-        // ExpectedSize=9 (header only) -> 0-byte payload: empty struct (CLIENT.h).
         Assert.Equal(0, GiftListRequest.PayloadSize);
     }
 

@@ -4,12 +4,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.World.WorldState;
 
-/// <summary>
-///     Covers <see cref="WorldStateProjection" />: WorldInfo's Zone038/tribe-symbol-battle/monster-symbol/
-///     per-tribe symbol-ownership/points fields must reflect the live <see cref="WorldStateService" /> snapshot,
-///     while every other WorldInfo field (no backing state modeled here) must pass through the template
-///     unchanged.
-/// </summary>
 public class WorldStateProjectionTests
 {
     private static WorldStateService CreateInitialized(FakeWorldStateRepository? repository = null)
@@ -32,12 +26,9 @@ public class WorldStateProjectionTests
         Assert.Equal(0, result.TribeSymbolBattle);
         Assert.Equal(0, result.MonsterSymbol);
         Assert.Equal(0, result.MonsterSymbolEndTime);
-        // Fresh boot: every tribe starts owning its own numbered symbol slot, so each slot's wire value is
-        // that tribe's own id (0-3) -- never a boolean flag (Server/Header/Protocol/STRUCT.h:594-598).
         Assert.Equal([0, 1, 2, 3], result.TribeSymbol);
         Assert.Equal([0, 0, 0, 0], result.TribePoint);
 
-        // Untouched fields must still be the template's own zeroed defaults, not silently overwritten.
         Assert.Equal(WorldStateTemplates.ZeroedWorldInfo.TribeCloseInfo, result.TribeCloseInfo);
         Assert.Equal(WorldStateTemplates.ZeroedWorldInfo.PossibleAllianceInfo, result.PossibleAllianceInfo);
         Assert.Equal(WorldStateTemplates.ZeroedWorldInfo.GuildName1, result.GuildName1);
@@ -71,12 +62,6 @@ public class WorldStateProjectionTests
     {
         var worldState = CreateInitialized();
 
-        // Slot 1 is contested and lost to tribe 3 -- every other slot stays owned by its own tribe id
-        // (0, 2, 3). The legacy-correct value for the lost slot itself would be the winning tribe's id
-        // (3), but today's schema only records HasSymbol as a bool on the slot's own row -- it cannot
-        // recover which tribe the slot was lost TO, only that it lost it (see
-        // WorldStateService.ResolveTribeSymbol's own remarks on this schema gap). 0 is the documented
-        // placeholder for that unresolved case, not a claim that tribe 0 actually won this slot.
         worldState.ResolveTribeSymbol(1, 3);
 
         var result = WorldStateProjection.Apply(WorldStateTemplates.ZeroedWorldInfo, worldState);
@@ -111,8 +96,6 @@ public class WorldStateProjectionTests
     [Fact]
     public void Apply_PassesGuildRankingProjectionFieldsThrough_WhenComposedTogether()
     {
-        // WorldStateProjection.Apply and GuildRankingProjection.Apply overlay disjoint field sets onto the
-        // same template -- composing them (as EnterWorldService does) must not clobber either's own overlay.
         var worldState = CreateInitialized();
         worldState.AddTribePoints(1, 42);
 

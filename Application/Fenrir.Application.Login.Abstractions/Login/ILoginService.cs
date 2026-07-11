@@ -7,44 +7,14 @@ namespace Fenrir.Application.Login.Abstractions.Login;
 
 public enum LoginOutcome
 {
-    /// <summary>Silent drop, no reply/abort: a legitimate NAT-shared client that burst its IP budget just retries later.</summary>
-    RateLimited,
+
+        RateLimited,
     Failure,
     Success,
 
-    /// <summary>
-    ///     Silent drop, no reply/abort: this account already held a live session on this same LoginServer process
-    ///     (runtime.AccountSessions ConflictLogin) -- the stale local session was just evicted
-    ///     (<see cref="Fenrir.Network.Dispatch.Sessions.DisconnectReason.Evicted" />) and this login attempt is
-    ///     dropped too, mirroring legacy tResult=8's "the player must retry afterward" rather than the new
-    ///     attempt winning outright. See <c>LoginService</c>'s remarks for the ServerDocs citation.
-    /// </summary>
-    DuplicateSessionEvicted
+        DuplicateSessionEvicted
 }
 
-/// <summary>
-///     <paramref name="ReArmVersionOk" /> mirrors the legacy quirk where only a full authentication attempt
-///     (account lookup + password verify) re-arms VersionOk so the client can retry on the same connection --
-///     the earlier gates (IP block/version/MAC ban) never re-arm it.
-/// </summary>
-/// <param name="SessionToken">
-///     Populated only on <see cref="LoginOutcome.Success" /> -- the token
-///     <c>usp_AccountSession_ClaimOrSignalKick</c> minted for this login epoch (runtime.AccountSessions), carried
-///     into the zone-transfer ticket so the game-side handshake can prove it's completing the same login.
-/// </param>
-/// <param name="AccountGrade">
-///     Populated only on <see cref="LoginOutcome.Success" /> -- the account-grade fact read straight off
-///     <c>AuthenticateAccountDto</c> (legacy <c>uUserSort</c>), carried into <c>LoginClientSession.AccountGrade</c>
-///     and from there into the zone-transfer ticket, so the Zone session never has to re-query auth.Accounts for it.
-/// </param>
-/// <param name="Characters">
-///     Populated only on <see cref="LoginOutcome.Success" /> -- one <see cref="AvatarRosterEntry" /> per
-///     occupied roster slot, each already carrying its own equipment/inventory/store items and live
-///     guild/friend/teacher/student lookups (resolved by <c>LoginService</c> via
-///     <c>ICharacterRepository.GetAccountRosterAsync</c> plus <c>IGuildRepository</c>/<c>IFriendRepository</c>/
-///     <c>IMentorRepository</c>). Feeds <c>LoginTrain.BuildAvatarSlots</c> directly; see that method's own
-///     remarks for the full citation.
-/// </param>
 public sealed record LoginResult(
     LoginOutcome Outcome,
     int ResultCode,
@@ -60,8 +30,7 @@ public sealed record LoginResult(
     public static LoginResult RateLimitedResult { get; } =
         new(LoginOutcome.RateLimited, 0, "", false, 0, false, "", []);
 
-    /// <summary>Identical wire shape to <see cref="RateLimitedResult" /> -- both are a silent, no-reply drop.</summary>
-    public static LoginResult SilentDropResult { get; } =
+        public static LoginResult SilentDropResult { get; } =
         new(LoginOutcome.DuplicateSessionEvicted, 0, "", false, 0, false, "", []);
 }
 

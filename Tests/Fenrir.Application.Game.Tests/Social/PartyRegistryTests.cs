@@ -67,12 +67,10 @@ public class PartyRegistryTests
     [Fact]
     public void TryInvite_TargetAlreadyPartiedAndTribeMismatch_PrefersTargetAlreadyPartied()
     {
-        // PARTY_ASK_SEND (S04_MyWork02.cpp): target-already-partied is checked before the tribe-mismatch Quit()
         var registry = new PartyRegistry();
         registry.TryInvite(1, 10, 0, 2, 10, 0);
         registry.TryAnswer(2, true, out _, out _);
 
-        // character 3 (different tribe) invites character 2 (already partied) -- both conditions hold at once
         var outcome = registry.TryInvite(3, 10, 1, 2, 10, 0);
 
         Assert.Equal(PartyInviteOutcome.TargetAlreadyPartied, outcome);

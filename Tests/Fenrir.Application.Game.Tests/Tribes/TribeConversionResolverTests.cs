@@ -5,11 +5,6 @@ namespace Fenrir.Application.Game.Tests.Tribes;
 
 public class TribeConversionResolverTests
 {
-    // Synthetic 3-column equivalence catalog mirroring the real world.Tribe*Equivalences shape:
-    //   skill group 0:  tribe0=1000  tribe1=1001  tribe2=1002
-    //   item  group 0:  tribe0=2000  tribe1=2001  tribe2=2002
-    //   item  group 1:  tribe0=87050 tribe1=87051 tribe2=87052  (base 87000..87128 band, for the +129 V2 test)
-    //   cost  group 0:  tribe0=3000  tribe1=3001  tribe2=3002
     private static TribeConversionResolver BuildResolver()
     {
         var skills = new[]
@@ -55,9 +50,9 @@ public class TribeConversionResolverTests
     }
 
     [Theory]
-    [InlineData(0, 1, 87179, 87180)] // 87050+129 -> group1; target tribe1 87051+129
-    [InlineData(0, 2, 87179, 87181)] // ... target tribe2 87052+129
-    [InlineData(2, 0, 87181, 87179)] // reverse: 87052+129 -> tribe0 87050+129
+    [InlineData(0, 1, 87179, 87180)]
+    [InlineData(0, 2, 87179, 87181)]
+    [InlineData(2, 0, 87181, 87179)]
     public void TryRemapItem_AppliesV2BandOffsetTransparently(byte from, byte to, int itemId, int expected)
     {
         var resolver = BuildResolver();
@@ -76,7 +71,7 @@ public class TribeConversionResolverTests
         var ok = resolver.TryRemapItem(0, 1, 9999, out var newItemId);
 
         Assert.False(ok);
-        Assert.Equal(9999, newItemId); // best-effort callers write this back as-is
+        Assert.Equal(9999, newItemId);
     }
 
     [Fact]
@@ -84,7 +79,6 @@ public class TribeConversionResolverTests
     {
         var resolver = BuildResolver();
 
-        // 2000 is tribe0's id; asking to remap it AS a tribe1 item finds nothing (tribe1's own id is 2001).
         var ok = resolver.TryRemapItem(1, 2, 2000, out _);
 
         Assert.False(ok);
@@ -143,9 +137,9 @@ public class TribeConversionResolverTests
     }
 
     [Theory]
-    [InlineData(99013)] // just below the book range
-    [InlineData(99017)] // just above the book range
-    [InlineData(8153)] // a scroll id, never a book
+    [InlineData(99013)]
+    [InlineData(99017)]
+    [InlineData(8153)]
     [InlineData(0)]
     public void TryGetBookTargetTribe_NonBookItem_ReturnsFalse(int itemId)
     {
@@ -160,7 +154,7 @@ public class TribeConversionResolverTests
     [InlineData((byte)0, true)]
     [InlineData((byte)1, true)]
     [InlineData((byte)2, true)]
-    [InlineData((byte)3, false)] // neutral pool -- no equivalence column, never a conversion target
+    [InlineData((byte)3, false)]
     [InlineData((byte)255, false)]
     public void IsPlayableTribe_OnlyAcceptsTheThreePlayableTribes(byte tribe, bool expected)
     {
@@ -172,7 +166,6 @@ public class TribeConversionResolverTests
     {
         var resolver = BuildResolver();
 
-        // Both a plain item and a V2-band item, all with equivalents in the 0->1 direction.
         var ok = resolver.AreAllItemsMappable(0, 1, new[] { 2000, 87179 });
 
         Assert.True(ok);
@@ -183,7 +176,6 @@ public class TribeConversionResolverTests
     {
         var resolver = BuildResolver();
 
-        // The book path aborts the WHOLE conversion when any single slot cannot be mapped.
         var ok = resolver.AreAllItemsMappable(0, 1, new[] { 2000, 9999 });
 
         Assert.False(ok);

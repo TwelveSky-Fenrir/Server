@@ -3,11 +3,6 @@ using Fenrir.Application.Game.Domain.Simulation;
 
 namespace Fenrir.Application.Game.Tests.Commerce;
 
-/// <summary>
-///     Pure-logic coverage for <see cref="ProxyShopRentalExtensionResolver" /> -- the proxy-shop
-///     rental-extension consumables (world.Items 567/592/8422/8423) handled by
-///     <c>UseInventoryItemService</c>'s dispatch.
-/// </summary>
 public class ProxyShopRentalExtensionResolverTests
 {
     [Theory]
@@ -38,7 +33,6 @@ public class ProxyShopRentalExtensionResolverTests
     [Fact]
     public void Resolve_NoExistingExpiration_ExtendsFromToday()
     {
-        // No game.OfflineShops row yet -- caller passes 0 for "never set".
         var result = ProxyShopRentalExtensionResolver.Resolve(567, 20260706, 0);
 
         Assert.Equal(ProxyShopRentalExtensionResolver.Outcome.Success, result.Outcome);
@@ -66,7 +60,6 @@ public class ProxyShopRentalExtensionResolverTests
     [Fact]
     public void Resolve_ExistingExpirationInTheFuture_CompoundsOntoTheRemainingTime()
     {
-        // Existing expiration is 10 days out; a 7-day extension should land 7 days past THAT date, not today.
         var result = ProxyShopRentalExtensionResolver.Resolve(592, 20260706, 20260716);
 
         Assert.Equal(ProxyShopRentalExtensionResolver.Outcome.Success, result.Outcome);
@@ -85,7 +78,6 @@ public class ProxyShopRentalExtensionResolverTests
     [Fact]
     public void Resolve_ExtremeExistingExpiration_ReturnsInvalidDateSentinel()
     {
-        // The maximum representable calendar date -- projecting one more day forward overflows.
         var result = ProxyShopRentalExtensionResolver.Resolve(567, 20260706, 99991231);
 
         Assert.Equal(ProxyShopRentalExtensionResolver.Outcome.InvalidDate, result.Outcome);

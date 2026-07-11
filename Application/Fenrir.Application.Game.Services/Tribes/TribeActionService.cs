@@ -9,12 +9,12 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Stats;
+using Fenrir.Application.Game.Stats.Context;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Tribes;
 
-/// <summary>See <see cref="ITribeActionService" />; one method per CZ_TRIBE_WORK_SEND sub-command (tSort).</summary>
 public sealed class TribeActionService(
     ZoneRegistry zones,
     ITribeRepository tribes,
@@ -31,23 +31,9 @@ public sealed class TribeActionService(
     private const int AlertCharmCpCost = 10;
     private const int RebirthCpCost = 10_000;
 
-    /// <summary>
-    ///     Path B ("Max Rebirth")'s own path-specific cap -- confirmed by the Rebirth-advancement behavior
-    ///     contract as a genuine, distinct rule from <see cref="RebirthProgression.MaxRebirthGeneration" />
-    ///     (the absolute 12 cap): once <c>aRebirthNum</c> reaches 6, a further Path B request does not
-    ///     disconnect (unlike every other Path B precondition failure) -- it is answered with a graceful
-    ///     in-band failure instead, and neither the counter nor the CP cost is touched. Generations 7-12 are
-    ///     reachable only via Path A, the Rebirth-Pill item-consumption path
-    ///     (<c>UseInventoryItemService</c>'s own Rebirth-Pill branch), which checks against the true absolute
-    ///     cap instead of this one.
-    /// </summary>
-    private const int MaxRebirth = 6;
+        private const int MaxRebirth = 6;
 
-    /// <summary>
-    ///     tSort 1 -- reset spent base stats back into unspent points. Requires level &lt;=39 and a valid tribe-capital
-    ///     zone.
-    /// </summary>
-    public async ValueTask<TribeActionOutcome> ResetStatsAsync(Zone zone, PlayerRuntimeState state, int characterId,
+        public async ValueTask<TribeActionOutcome> ResetStatsAsync(Zone zone, PlayerRuntimeState state, int characterId,
         CancellationToken ct)
     {
         if (state.Level > 39 || !IsValidTown(state.Tribe, zone.MapId))
@@ -60,7 +46,7 @@ public sealed class TribeActionService(
             state.Title, state.Halo, state.RebirthCount, state.Level2);
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
         var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
-            pet: ComputePetContribution(state, equipmentContainer));
+            pet: ComputePetContribution(state, equipmentContainer), runtimeState: state);
 
         await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
             StatVit: 1, StatStr: 1, StatInt: 1, StatDex: 1, StatPoints: newStatPoints,
@@ -72,8 +58,7 @@ public sealed class TribeActionService(
         return TribeActionOutcome.Ok();
     }
 
-    /// <summary>tSort 2 -- appoint a sub-master, Force Leader only. Target must be in the actor's own zone.</summary>
-    public async ValueTask<TribeActionOutcome> AppointSubMasterAsync(Zone zone, PlayerRuntimeState state, byte[] data,
+        public async ValueTask<TribeActionOutcome> AppointSubMasterAsync(Zone zone, PlayerRuntimeState state, byte[] data,
         CancellationToken ct)
     {
         if (state.TribeRole != 1 || !IsSubMasterCapitalZone(state.Tribe, zone.MapId) ||
@@ -84,8 +69,6 @@ public sealed class TribeActionService(
         if (targetName.Length == 0)
             return TribeActionOutcome.Abort;
 
-        // "Already a sub-master" is resolved by name->id (independent of online state), since most
-        // sub-masters won't be online in this zone.
         var targetIdByName = await characters.GetIdByNameAsync(targetName, ct);
         var subMasters = await tribes.GetSubMastersAsync(state.Tribe, ct);
         if (targetIdByName is { } knownId && subMasters.Any(s => s.CharacterId == knownId))
@@ -151,8 +134,7 @@ public sealed class TribeActionService(
         return TribeActionOutcome.Ok();
     }
 
-    /// <summary>tSort 3 -- remove a sub-master, Force Leader only. Target need not be online.</summary>
-    public async ValueTask<TribeActionOutcome> RemoveSubMasterAsync(Zone zone, PlayerRuntimeState state, byte[] data,
+        public async ValueTask<TribeActionOutcome> RemoveSubMasterAsync(Zone zone, PlayerRuntimeState state, byte[] data,
         CancellationToken ct)
     {
         if (state.TribeRole != 1 || !IsSubMasterCapitalZone(state.Tribe, zone.MapId) ||
@@ -177,11 +159,7 @@ public sealed class TribeActionService(
         return TribeActionOutcome.Ok();
     }
 
-    /// <summary>
-    ///     tSort 4 -- tribe weapon, Force Leader/sub-master. Money debited but never notified to the client (matches
-    ///     legacy).
-    /// </summary>
-    public async ValueTask<TribeActionOutcome> UseTribeWeaponAsync(Zone zone, PlayerRuntimeState state,
+        public async ValueTask<TribeActionOutcome> UseTribeWeaponAsync(Zone zone, PlayerRuntimeState state,
         int characterId, CancellationToken ct)
     {
         if (state.TribeRole is not (1 or 2) || !IsValidTown(state.Tribe, zone.MapId))
@@ -195,7 +173,6 @@ public sealed class TribeActionService(
         }
         catch (Exception ex)
         {
-            // Economy gate (insufficient funds) -- Warning, not Information.
             logger.LogWarning(ex, "Character {CharacterId} tribe-weapon money debit failed (insufficient funds)",
                 characterId);
             return TribeActionOutcome.Abort;
@@ -210,28 +187,7 @@ public sealed class TribeActionService(
         return TribeActionOutcome.Ok();
     }
 
-    /// <summary>
-    ///     tSort 5 -- tribe Formation-ability declaration (B10 branch A), Force Leader only. Declares this
-    ///     character's own tribe's world-scope Formation ability code via
-    ///     <see cref="WorldStateService.SetTribeFormationAbility" /> -- see
-    ///     <see cref="FormationCombatResolver" /> for what a live code does to enemy-class combat math.
-    /// </summary>
-    /// <remarks>
-    ///     All five eligibility gates <see cref="WorldStateService.SetTribeFormationAbility" />'s own remarks
-    ///     name are now enforced here, in order: (1) Force Leader role (<c>state.TribeRole == 1</c>) and
-    ///     payload shape/range (<see cref="TribeWorkSkillPayload.TribeSkillSort" />, 0-4) below; then gates
-    ///     (a)-(c) via <see cref="TribeFormationAbilityEligibility" /> -- all four tribes' points above the
-    ///     floor (<see cref="TribeFormationAbilityEligibility.AllTribesAboveFloor" />), the requester's tribe
-    ///     being the strict single lowest by index on a tie
-    ///     (<see cref="TribeFormationAbilityEligibility.FindLowestPointTribe" />), and that tribe's share of
-    ///     the combined total under twenty percent (<see cref="TribeFormationAbilityEligibility.IsUnderShareThreshold" />,
-    ///     evaluated only once gate (a) has already passed, so the combined-points divisor can never be zero);
-    ///     then gate (d), a direct read of <see cref="WorldStateService.World" />'s
-    ///     <see cref="WorldRvrState.TribeSymbolBattle" /> flag -- Tribe Symbol Battle must currently be active.
-    ///     Every gate failure is answered identically to the pre-existing Force-Leader-role/payload-range
-    ///     gates: <see cref="TribeActionOutcome.Abort" />, no further state touched.
-    /// </remarks>
-    public TribeActionOutcome ValidateTribeSkill(PlayerRuntimeState state, byte[] data)
+        public TribeActionOutcome ValidateTribeSkill(PlayerRuntimeState state, byte[] data)
     {
         if (state.TribeRole != 1)
             return TribeActionOutcome.Abort;
@@ -241,23 +197,17 @@ public sealed class TribeActionService(
 
         var tribes = worldState.GetAllTribes();
 
-        // Gate (a): four-tribe RvR point floor -- a global floor across all four tribes, not scoped to the
-        // requester's own tribe.
         if (!TribeFormationAbilityEligibility.AllTribesAboveFloor(tribes))
             return TribeActionOutcome.Abort;
 
-        // Gate (b): the requester's own tribe must be the single strict-lowest-point tribe.
         var lowestPointTribe = TribeFormationAbilityEligibility.FindLowestPointTribe(tribes);
         if (state.Tribe != lowestPointTribe)
             return TribeActionOutcome.Abort;
 
-        // Gate (c): that tribe's share of the four-tribe combined total must be under twenty percent. Safe to
-        // evaluate now -- gate (a) already guarantees the combined total (the divisor) can never be zero.
         var combinedPoints = TribeFormationAbilityEligibility.CombinedPoints(tribes);
         if (!TribeFormationAbilityEligibility.IsUnderShareThreshold(tribes[state.Tribe].Points, combinedPoints))
             return TribeActionOutcome.Abort;
 
-        // Gate (d): the Tribe Symbol Battle world event must currently be active.
         if (!worldState.World.TribeSymbolBattle)
             return TribeActionOutcome.Abort;
 
@@ -271,8 +221,7 @@ public sealed class TribeActionService(
         return TribeActionOutcome.Ok();
     }
 
-    /// <summary>tSort 6 -- title tier purchase, no role gate at all; any tribe member may buy, CP-gated only.</summary>
-    public async ValueTask<TribeActionOutcome> PurchaseTitleAsync(Zone zone, PlayerRuntimeState state,
+        public async ValueTask<TribeActionOutcome> PurchaseTitleAsync(Zone zone, PlayerRuntimeState state,
         int characterId, byte[] data, CancellationToken ct)
     {
         if (!TribeWorkTitlePayload.TryRead(data, out var payload))
@@ -293,9 +242,8 @@ public sealed class TribeActionService(
             state.Level2);
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
         var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
-            pet: ComputePetContribution(state, equipmentContainer));
+            pet: ComputePetContribution(state, equipmentContainer), runtimeState: state);
 
-        // Unconditional full heal to the new max, not a clamp (legacy SetIntegerUp idiom).
         await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
             state.ContributionPoints - cost, Title: newTitle,
             Life: updatedStats.MaxLife, Mana: updatedStats.MaxMana, UpdatedStats: updatedStats), ct);
@@ -307,24 +255,9 @@ public sealed class TribeActionService(
         return TribeActionOutcome.Ok();
     }
 
-    /// <summary>
-    ///     tSort 7 -- halo enchant, no role gate at all.
-    /// </summary>
-    /// <remarks>
-    ///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:11128-11136 (<c>mTickCountCPRFC == mGAME.mTickCount</c>
-    ///     same-tick reentry guard, checked first, and its <c>Quit()</c>) ; :11137-11150 (the CP/money/level
-    ///     checks this guard precedes -- <see cref="PlayerRuntimeState.LastHaloEnchantAttemptUtc" /> is stamped
-    ///     unconditionally the instant the guard passes, before any of those checks run, so a same-tick retry
-    ///     is rejected even if this first attempt later fails one of them) ; Server/ts25zone/H07_MyGame.h:836
-    ///     (field declaration, "#Protect CP RFC Time").
-    /// </remarks>
-    public async ValueTask<TribeActionOutcome> HaloEnchantAsync(Zone zone, PlayerRuntimeState state, int characterId,
+        public async ValueTask<TribeActionOutcome> HaloEnchantAsync(Zone zone, PlayerRuntimeState state, int characterId,
         CancellationToken ct)
     {
-        // Same-tick reentry guard (mTickCountCPRFC) -- see this method's own <remarks>. A hostile-client
-        // signal (a real client can never submit twice within the same server tick), so it disconnects
-        // outright via TribeActionOutcome.Abort rather than a soft in-band failure -- the same posture the
-        // CP-insufficiency check immediately below also uses.
         var now = DateTime.UtcNow;
         if (now - state.LastHaloEnchantAttemptUtc < SimulationClock.LegacyTick)
         {
@@ -344,7 +277,6 @@ public sealed class TribeActionService(
         }
         catch (Exception ex)
         {
-            // Economy gate (insufficient funds) -- Warning, not Information.
             logger.LogWarning(ex, "Character {CharacterId} halo-enchant money debit failed (insufficient funds)",
                 characterId);
             return TribeActionOutcome.Abort;
@@ -367,7 +299,7 @@ public sealed class TribeActionService(
                 state.Level2);
             var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
             var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
-                pet: ComputePetContribution(state, equipmentContainer));
+                pet: ComputePetContribution(state, equipmentContainer), runtimeState: state);
 
             await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
                 state.ContributionPoints - HaloEnchantCpCost, Halo: newHalo,
@@ -385,24 +317,12 @@ public sealed class TribeActionService(
         return TribeActionOutcome.Ok(result);
     }
 
-    /// <summary>
-    ///     tSort 8 -- level-milestone bonus claim. <see cref="PlayerRuntimeState.BonusItemLevel" /> is armed by
-    ///     <c>Zone.ApplyCharacterExperienceGain</c>'s own level-milestone step (<see cref="LevelMilestoneBonus" />)
-    ///     the moment a level-up crosses one of <see cref="LevelMilestoneBonus.ArmableMilestoneLevels" />;
-    ///     before that field is ever populated this aborts, matching the legacy's own behavior for the same
-    ///     zero case. Session-scoped only -- an armed-but-unclaimed milestone does not survive logout/zone
-    ///     transfer today (see <see cref="PlayerRuntimeState.BonusItemLevel" />'s own remarks).
-    /// </summary>
-    public async ValueTask<TribeActionOutcome> ClaimLevelBonusAsync(Zone zone, PlayerRuntimeState state,
+        public async ValueTask<TribeActionOutcome> ClaimLevelBonusAsync(Zone zone, PlayerRuntimeState state,
         int characterId, CancellationToken ct)
     {
         if (!LevelMilestoneBonus.TryResolveClaimDrops(state.BonusItemLevel, state.PreviousTribe, out var drops))
             return TribeActionOutcome.Abort;
 
-        // Captured before the await below: PostTribeProgressCommandAndWaitAsync's own BonusItemLevel: 0 zeroes
-        // this field in place on the tick thread before the await completes, so reading state.BonusItemLevel
-        // afterward for the log line below would always report tier 0 (a pre-existing bug this fixes in
-        // passing while this method is already being touched for the LevelMilestoneBonus wiring).
         var claimedTier = state.BonusItemLevel;
 
         await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
@@ -415,18 +335,24 @@ public sealed class TribeActionService(
         return TribeActionOutcome.Ok();
     }
 
-    /// <summary>tSort 9/10 -- ornament on/off, no gate at all.</summary>
-    public async ValueTask<TribeActionOutcome> SetOrnamentAsync(Zone zone, PlayerRuntimeState state, int characterId,
+        public async ValueTask<TribeActionOutcome> SetOrnamentAsync(Zone zone, PlayerRuntimeState state, int characterId,
         bool on, CancellationToken ct)
     {
         var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
             state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo, state.RebirthCount,
             state.Level2);
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
-        var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
-            pet: ComputePetContribution(state, equipmentContainer));
 
-        // tSort 10 (OFF) additionally full-heals to the new max; tSort 9 (ON) does not touch Life/Mana.
+        // The ornament flag this call is itself toggling is only durably written to state.UseOrnament once the
+        // TribeProgressZoneCommand posted below is drained by this zone's own tick -- runtimeState still
+        // carries the PRE-toggle value at this exact instant. Override ZoneContext.OrnamentInUse with the new
+        // value directly so this recompute (not a later, unrelated one) is the first to reflect it.
+        var zoneOverride = new ZoneContext(state.MapId, OrnamentInUse: on, RankBuffType: state.RankBuffType,
+            TribeRole: state.TribeRole, GuildBuffActive: state.GuildBuffActive, GuildId: state.GuildId ?? 0);
+
+        var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
+            pet: ComputePetContribution(state, equipmentContainer), runtimeState: state, zoneOverride: zoneOverride);
+
         var command = on
             ? new TribeProgressZoneCommand(characterId, UseOrnament: true, UpdatedStats: updatedStats)
             : new TribeProgressZoneCommand(characterId, UseOrnament: false, Life: updatedStats.MaxLife,
@@ -434,33 +360,12 @@ public sealed class TribeActionService(
 
         await zone.PostTribeProgressCommandAndWaitAsync(command, ct);
 
-        // Routine, purely cosmetic per-request toggle -- Debug, not Information.
         logger.LogDebug("Character {CharacterId} set tribe ornament to {OnOff}", characterId, on ? "on" : "off");
 
         return TribeActionOutcome.Ok();
     }
 
-    /// <summary>
-    ///     tSort 11 -- Max Rebirth, Path B of the G1-G12 rebirth-advancement mechanism (S04_MyWork02.cpp:
-    ///     10800,11342-11390, <c>__REBIRTH__</c>). Requires Level1 AND Level2 both already at their own caps
-    ///     (equivalently, their combined sum at <see cref="RebirthProgression.CombinedLevelCap" />), Exp2 at
-    ///     100% of Level2's threshold, a 10,000 CP toll, and the absolute rebirth cap
-    ///     (<see cref="RebirthProgression.MaxRebirthGeneration" />) not yet reached; on success resets Exp2,
-    ///     increments RebirthCount, debits the CP, banks <c>aZone241Time += 10</c>, fully heals, and recomputes
-    ///     stats (RebirthCount feeds StatCalculator's critical-defence and critical-wrapper bonuses).
-    /// </summary>
-    /// <remarks>
-    ///     Hardened against a legacy quirk the originating behavior contract explicitly calls out as a data-
-    ///     loss bug, not a designed rule: the legacy unconditionally resets Exp2 and bumps aZone241Time the
-    ///     instant the four preconditions above pass, BEFORE checking whether <see cref="MaxRebirth" /> (the
-    ///     path-specific cap of 6, distinct from the absolute 12 above) has already been reached -- so a
-    ///     character sitting at generation 6+ who re-grew Exp2 to 100% and retries Path B loses that bar for
-    ///     zero reward. This method checks <see cref="MaxRebirth" /> before mutating anything, so no state is
-    ///     ever touched on that path; see <see cref="MaxRebirth" />'s own remarks for why that check is
-    ///     answered as a graceful in-band failure rather than the disconnect every other precondition above
-    ///     uses.
-    /// </remarks>
-    public async ValueTask<TribeActionOutcome> RebirthAsync(Zone zone, PlayerRuntimeState state, int characterId,
+        public async ValueTask<TribeActionOutcome> RebirthAsync(Zone zone, PlayerRuntimeState state, int characterId,
         CancellationToken ct)
     {
         if (state.RebirthCount >= RebirthProgression.MaxRebirthGeneration ||
@@ -469,8 +374,6 @@ public sealed class TribeActionService(
             state.ContributionPoints < RebirthCpCost)
             return TribeActionOutcome.Abort;
 
-        // Path-specific cap, checked only once every other precondition already passed -- see this method's
-        // own <remarks> for why nothing above this line may ever mutate state.
         if (state.RebirthCount >= MaxRebirth)
         {
             logger.LogDebug(
@@ -503,15 +406,7 @@ public sealed class TribeActionService(
             Life: updatedStats.MaxLife, Mana: updatedStats.MaxMana, UpdatedStats: updatedStats,
             RebirthBroadcast: true, Zone241Time: newZone241Time), ct);
 
-        // Milestone-reward pass (generation 6/12 tribe-specific ground-item drop, plus a generation-12
-        // server-wide notice naming the character) -- S04_MyWork05.cpp:4828-4865's MyWork::MaxRebirth, run
-        // unconditionally after every successful transition on both rebirth paths. Deliberately NOT wired
-        // here: no citation available to this pass establishes the actual tribe-keyed item ids or the notice
-        // wording, and this project's policy against reproducing/guessing legacy-parity content from memory
-        // means fabricating either is worse than leaving this an explicit, documented gap. Flagged for a
-        // dedicated legacy-behavior-translator follow-up before this pass is wired in for either path.
 
-        // A major, infrequent progression milestone -- Information regardless of how routine other tSorts are.
         logger.LogInformation(
             "Character {CharacterId} completed Max Rebirth (Path B): generation {OldGeneration} -> {NewGeneration}",
             characterId, state.RebirthCount, newRebirthCount);
@@ -519,25 +414,19 @@ public sealed class TribeActionService(
         return TribeActionOutcome.Ok();
     }
 
-    /// <summary>tSort 16 -- map/clan scroll, item 591, 1 CP, Force Leader/sub-master.</summary>
-    public ValueTask<TribeActionOutcome> RedeemMapScrollAsync(Zone zone, PlayerRuntimeState state, int characterId,
+        public ValueTask<TribeActionOutcome> RedeemMapScrollAsync(Zone zone, PlayerRuntimeState state, int characterId,
         CancellationToken ct)
     {
         return RedeemScrollAsync(zone, state, characterId, 591, MapScrollCpCost, ct);
     }
 
-    /// <summary>tSort 17 -- alert charm, item 590, 10 CP, Force Leader/sub-master.</summary>
-    public ValueTask<TribeActionOutcome> RedeemAlertCharmAsync(Zone zone, PlayerRuntimeState state, int characterId,
+        public ValueTask<TribeActionOutcome> RedeemAlertCharmAsync(Zone zone, PlayerRuntimeState state, int characterId,
         CancellationToken ct)
     {
         return RedeemScrollAsync(zone, state, characterId, 590, AlertCharmCpCost, ct);
     }
 
-    /// <summary>
-    ///     tSort 18 -- tower construction scroll, Force Leader/sub-master. Money debited but never notified (same as
-    ///     tSort 4).
-    /// </summary>
-    public async ValueTask<TribeActionOutcome> UseTowerScrollAsync(Zone zone, PlayerRuntimeState state,
+        public async ValueTask<TribeActionOutcome> UseTowerScrollAsync(Zone zone, PlayerRuntimeState state,
         int characterId, CancellationToken ct)
     {
         if (state.TribeRole is not (1 or 2))
@@ -549,7 +438,6 @@ public sealed class TribeActionService(
         }
         catch (Exception ex)
         {
-            // Economy gate (insufficient funds) -- Warning, not Information.
             logger.LogWarning(ex, "Character {CharacterId} tower-scroll money debit failed (insufficient funds)",
                 characterId);
             return TribeActionOutcome.Abort;
@@ -564,8 +452,7 @@ public sealed class TribeActionService(
         return TribeActionOutcome.Ok();
     }
 
-    /// <summary>tSort 16 (map/clan scroll) / tSort 17 (alert charm) shared body -- Force Leader/sub-master.</summary>
-    private async ValueTask<TribeActionOutcome> RedeemScrollAsync(Zone zone, PlayerRuntimeState state,
+        private async ValueTask<TribeActionOutcome> RedeemScrollAsync(Zone zone, PlayerRuntimeState state,
         int characterId, int itemId, int cpCost, CancellationToken ct)
     {
         if (state.TribeRole is not (1 or 2) || state.ContributionPoints < cpCost)
@@ -581,8 +468,7 @@ public sealed class TribeActionService(
         return TribeActionOutcome.Ok();
     }
 
-    /// <summary>Tribe 0-2 map to zones 1/6/11, tribe 3 to zone 140.</summary>
-    private static bool IsValidTown(byte tribe, short mapId)
+        private static bool IsValidTown(byte tribe, short mapId)
     {
         return tribe switch
         {
@@ -594,12 +480,7 @@ public sealed class TribeActionService(
         };
     }
 
-    /// <summary>
-    ///     tSort 2/3's own zone-number gate: 71+tribe for tribes 0-2, 140 for tribe 3 -- a different mapping
-    ///     than <see cref="IsValidTown" /> (used by tSort 1/4). A genuine, verified legacy inconsistency,
-    ///     reproduced exactly as found.
-    /// </summary>
-    private static bool IsSubMasterCapitalZone(byte tribe, short mapId)
+        private static bool IsSubMasterCapitalZone(byte tribe, short mapId)
     {
         return tribe switch
         {

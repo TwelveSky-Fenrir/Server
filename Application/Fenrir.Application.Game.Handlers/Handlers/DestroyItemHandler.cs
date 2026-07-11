@@ -8,11 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
-/// <summary>
-///     op89, CZ_DESTROY_ITEM_SEND -- dissolves an enchanted Rare equip item into money plus a compensation
-///     stone (delegated to <see cref="IDestroyItemService" />). Only the LNW33 (EU33) branch is reproduced
-///     (Elite items are always rejected in this build, see <c>DestroyResolver</c>'s remarks).
-/// </summary>
 public sealed class DestroyItemHandler(IDestroyItemService destroyItemService, ILogger<DestroyItemHandler> logger)
     : IAsyncPacketHandler<DestroyItemRequest>
 {

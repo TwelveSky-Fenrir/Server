@@ -3,17 +3,11 @@ using Fenrir.Data.Abstractions.Tribes;
 
 namespace Fenrir.Application.Login.Tests.TestSupport;
 
-/// <summary>
-///     In-memory stand-in for ITribeRepository, used only for CreateAvatarService's dominant-tribe creation
-///     gate -- every member besides <see cref="GetAllAsync" /> throws, since nothing else on this path calls
-///     them.
-/// </summary>
 internal sealed class FakeTribeRepository : ITribeRepository
 {
     public List<TribeSummaryDto> Standings { get; init; } = [];
 
-    /// <summary>0 (regular member) unless overridden per character id -- used by DeleteAvatarService tests.</summary>
-    public Dictionary<int, byte> RolesByCharacterId { get; init; } = new();
+        public Dictionary<int, byte> RolesByCharacterId { get; init; } = new();
 
     public ValueTask<ReadOnlyCollection<TribeSummaryDto>> GetAllAsync(CancellationToken ct)
     {
@@ -60,8 +54,7 @@ internal sealed class FakeTribeRepository : ITribeRepository
         throw new NotSupportedException();
     }
 
-    /// <summary>No standings seeded at all -- the "before any WorldState bootstrap" edge case.</summary>
-    public static FakeTribeRepository Empty()
+        public static FakeTribeRepository Empty()
     {
         return new FakeTribeRepository();
     }
@@ -74,8 +67,7 @@ internal sealed class FakeTribeRepository : ITribeRepository
         };
     }
 
-    /// <summary>Seeds a single character's ReturnTribeRole encoding (0=none, 1=master, 2=sub-master).</summary>
-    public static FakeTribeRepository WithRole(int characterId, byte role)
+        public static FakeTribeRepository WithRole(int characterId, byte role)
     {
         return new FakeTribeRepository { RolesByCharacterId = { [characterId] = role } };
     }

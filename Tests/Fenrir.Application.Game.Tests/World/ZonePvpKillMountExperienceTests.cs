@@ -7,13 +7,6 @@ using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     Covers the B16 wiring gap this workstream closes: <c>Zone.ApplyPvpKillMountExperience</c>, called from
-///     <c>Zone.ApplyPvpKillExperience</c> alongside the pre-existing pet-growth grant -- previously nothing ever
-///     invoked <see cref="MountKillExperienceCalculator.ComputeGain" />, so
-///     <see cref="PlayerRuntimeState.MountAccumulatedExp" /> stayed frozen at 0 for every character regardless of
-///     kill count. Reuses <c>ZonePvpKillRewardsTests</c>' own <c>SetUpZone</c>/<c>KillDefender</c> shape.
-/// </summary>
 public class ZonePvpKillMountExperienceTests
 {
     private static readonly EffectiveStats StrongAttacker =
@@ -60,17 +53,17 @@ public class ZonePvpKillMountExperienceTests
         attacker!.Stats = StrongAttacker;
         Assert.True(zone.TryGetPlayer(2, out var defender));
         defender!.Stats = WeakDefender;
-        defender.ActionSort = 1; // legal, already-acting pose -- see ZoneAttackTests' own TwoPlayerZone remarks
-        attacker.AttackSubPacketCeiling = int.MaxValue; // see ZonePvpKillRewardsTests' own remarks
+        defender.ActionSort = 1;
+        attacker.AttackSubPacketCeiling = int.MaxValue;
 
-        zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1)); // past the zone-entry protect window
+        zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1));
         return zone;
     }
 
     private static void KillDefender(Zone zone)
     {
         Assert.True(zone.TryGetPlayer(2, out var defender));
-        defender!.Life = 1; // one hit will kill regardless of exact damage roll
+        defender!.Life = 1;
 
         zone.PostCombatCommand(new CombatCommand { AttackerCharacterId = 1, AttackInfo = MeleeRequest(1, 2) });
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -83,8 +76,8 @@ public class ZonePvpKillMountExperienceTests
     {
         var zone = SetUpZone();
         Assert.True(zone.TryGetPlayer(1, out var attacker));
-        attacker!.AnimalIndex = 10; // slot 0, actively mounted (10-19 offset band)
-        attacker.MountActivity = attacker.MountActivity.SetItem(0, 50); // fed, > 0
+        attacker!.AnimalIndex = 10;
+        attacker.MountActivity = attacker.MountActivity.SetItem(0, 50);
         attacker.MountAccumulatedExp = attacker.MountAccumulatedExp.SetItem(0, 0);
 
         KillDefender(zone);
@@ -97,7 +90,7 @@ public class ZonePvpKillMountExperienceTests
     {
         var zone = SetUpZone();
         Assert.True(zone.TryGetPlayer(1, out var attacker));
-        attacker!.AnimalIndex = 10; // actively mounted, but activity is still 0 (never fed)
+        attacker!.AnimalIndex = 10;
         Assert.Equal(0, attacker.MountActivity[0]);
 
         KillDefender(zone);
@@ -110,7 +103,7 @@ public class ZonePvpKillMountExperienceTests
     {
         var zone = SetUpZone();
         Assert.True(zone.TryGetPlayer(1, out var attacker));
-        attacker!.AnimalIndex = 3; // garage slot SELECTED (0-9 band), not actively ridden
+        attacker!.AnimalIndex = 3;
         attacker.MountActivity = attacker.MountActivity.SetItem(3, 50);
 
         KillDefender(zone);
@@ -123,9 +116,9 @@ public class ZonePvpKillMountExperienceTests
     {
         var zone = SetUpZone();
         Assert.True(zone.TryGetPlayer(1, out var attacker));
-        Assert.Equal(-1, attacker!.AnimalIndex); // default: no mount selected at all
+        Assert.Equal(-1, attacker!.AnimalIndex);
 
-        KillDefender(zone); // must not throw (regression guard against indexing with AnimalIndex == -1)
+        KillDefender(zone);
 
         Assert.All(attacker.MountAccumulatedExp, exp => Assert.Equal(0, exp));
     }
@@ -137,7 +130,7 @@ public class ZonePvpKillMountExperienceTests
         Assert.True(zone.TryGetPlayer(1, out var attacker));
         attacker!.AnimalIndex = 10;
         attacker.MountActivity = attacker.MountActivity.SetItem(0, 50);
-        attacker.AnimalDoubleExp = 5; // running
+        attacker.AnimalDoubleExp = 5;
         attacker.MountExpUp = true;
 
         KillDefender(zone);
@@ -162,9 +155,6 @@ public class ZonePvpKillMountExperienceTests
     [Fact]
     public void AlreadyAtMaxMountExperience_GainsNoFurther_AndComputeGainItselfReturnsZero()
     {
-        // MountKillExperienceCalculator.ComputeGain's own >= MaxExp gate means the grant is a no-op once a slot
-        // is already fully capped -- distinct from GainIsClampedAtMaxMountExperience's "would overflow past the
-        // cap" case, which still grants a (clamped) nonzero amount.
         var zone = SetUpZone();
         Assert.True(zone.TryGetPlayer(1, out var attacker));
         attacker!.AnimalIndex = 10;

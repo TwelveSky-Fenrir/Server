@@ -10,13 +10,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Social;
 
-/// <summary>
-///     WS1.4 <see cref="PartyCrossShardRelayHandler" /> -- target-shard delivery and inviter-shard join
-///     completion for the cross-shard half of CZ_PARTY_ASK_SEND/CZ_PARTY_ANSWER_SEND. The actual join can
-///     only ever be committed on the inviter's own shard (see that type's own remarks); these tests exercise
-///     exactly one shard's own <see cref="PartyRegistry" /> at a time, mirroring how the real feature runs as
-///     two independent processes.
-/// </summary>
 public class PartyCrossShardRelayHandlerTests
 {
     private const byte OwnShardId = 3;
@@ -35,11 +28,7 @@ public class PartyCrossShardRelayHandlerTests
         return (handler, zones, parties, relay);
     }
 
-    /// <summary>
-    ///     Enters a character into map 1 -- the caller's own <see cref="ZoneRegistry" /> must already be
-    ///     initialized (once) by <see cref="CreateHandler" />; this never re-initializes it.
-    /// </summary>
-    private static (PlayerRuntimeState State, FakeDuplexPipe Pipe) Enter(ZoneRegistry zones, short mapId,
+        private static (PlayerRuntimeState State, FakeDuplexPipe Pipe) Enter(ZoneRegistry zones, short mapId,
         int characterId, string name)
     {
         zones.TryGet(mapId, out var zone);
@@ -80,7 +69,7 @@ public class PartyCrossShardRelayHandlerTests
 
         Assert.Empty(relay.Enqueued);
         Assert.True(parties.IsNegotiating(invitee.CharacterId));
-        Assert.NotEmpty(ZoneTestKit.DrainOutbound(pipe)); // PartyInviteResponse prompt
+        Assert.NotEmpty(ZoneTestKit.DrainOutbound(pipe));
     }
 
     [Fact]
@@ -89,7 +78,6 @@ public class PartyCrossShardRelayHandlerTests
         var (handler, zones, parties, relay) = CreateHandler();
         var (invitee, _) = Enter(zones, 1, 100, "Invitee");
 
-        // Give the invitee an existing party membership via the same-shard path so IsInParty is true.
         Enter(zones, 1, 501, "Leader");
         Assert.Equal(PartyInviteOutcome.Sent, parties.TryInvite(501, 1, invitee.Tribe, 100, 1, invitee.Tribe));
         Assert.True(parties.TryAnswer(100, true, out _, out _));
@@ -128,7 +116,7 @@ public class PartyCrossShardRelayHandlerTests
 
         await handler.HandleAnswerAsync(answer, CancellationToken.None);
 
-        Assert.NotEmpty(ZoneTestKit.DrainOutbound(pipe)); // PartyAnswerResponse + join notice + roster
+        Assert.NotEmpty(ZoneTestKit.DrainOutbound(pipe));
         Assert.True(parties.IsLeader(inviter.CharacterId));
         var members = parties.GetMembers(inviter.CharacterId);
         Assert.Equal([100, 200], members);

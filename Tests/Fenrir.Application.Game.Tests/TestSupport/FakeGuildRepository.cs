@@ -3,10 +3,6 @@ using Fenrir.Data.Abstractions.Guilds;
 
 namespace Fenrir.Application.Game.Tests.TestSupport;
 
-/// <summary>
-///     In-memory stand-in for IGuildRepository: only the single-guild lookup/buff-write surface used by the
-///     handler test suites is exercised here; every other member is out of scope.
-/// </summary>
 internal sealed class FakeGuildRepository : IGuildRepository
 {
     private readonly Dictionary<int, GuildSummaryDto> _guilds = new();
@@ -31,12 +27,7 @@ internal sealed class FakeGuildRepository : IGuildRepository
         private set;
     }
 
-    /// <summary>
-    ///     GuildId/CharacterId DisbandAsync was last called with -- proves GuildActionService.DisbandGuildAsync
-    ///     threads the acting master's characterId through (usp_Guild_Disband needs it to attribute the
-    ///     guild-money audit row it now writes; see IGuildRepository.DisbandAsync's own doc comment).
-    /// </summary>
-    public (int GuildId, int CharacterId)? LastDisband { get; private set; }
+        public (int GuildId, int CharacterId)? LastDisband { get; private set; }
 
     public (int GuildId, int BuffType, int BuffState, int BuffTime, long BuffTimeForDiff)? LastSetBuff
     {
@@ -44,8 +35,7 @@ internal sealed class FakeGuildRepository : IGuildRepository
         private set;
     }
 
-    /// <summary>Scripted return for <see cref="GetByCharacterAsync" /> -- null (the default) means "no guild".</summary>
-    public CharacterGuildMembershipDto? MembershipToReturn { get; set; }
+        public CharacterGuildMembershipDto? MembershipToReturn { get; set; }
 
     public ValueTask<GuildSummaryDto?> GetByIdAsync(int guildId, CancellationToken ct)
     {

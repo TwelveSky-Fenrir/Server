@@ -5,14 +5,6 @@ using Microsoft.Data.SqlClient;
 
 namespace Fenrir.Application.Game.Tests.Commerce;
 
-/// <summary>
-///     C21a -- <see cref="ProxyShopDeputyFailureClassifier" /> coverage. Builds real
-///     <see cref="SqlException" /> instances via reflection into SqlClient's own internal
-///     <c>SqlError</c>/<c>SqlErrorCollection</c>/<c>SqlException.CreateException</c> plumbing (mirroring
-///     <c>Fenrir.Application.Login.Tests.TestSupport.SqlExceptionTestFactory</c>'s established approach in the
-///     sibling Login test project) since <see cref="SqlException" /> has no public constructor and is only
-///     ever created by SqlClient itself from a real server round trip.
-/// </summary>
 [UnconditionalSuppressMessage("Trimming", "IL2026",
     Justification = "Test-only helper, never published/trimmed -- reflects into SqlClient's own internal " +
                     "SqlError/SqlErrorCollection/SqlException.CreateException plumbing to build a real SqlException.")]
@@ -27,9 +19,6 @@ public class ProxyShopDeputyFailureClassifierTests
     [Fact]
     public void StaleListingSqlErrorNumber_MatchesEstablishedProxyListingStaleErrorNumber()
     {
-        // BuyShopItemService.ProxyListingStaleErrorNumber (private) is 50272 for the identical stored
-        // procedure -- pinned here as a literal so a future divergence between the two constants is caught
-        // by this test rather than silently drifting.
         Assert.Equal(50272, ProxyShopDeputyFailureClassifier.StaleListingSqlErrorNumber);
     }
 
@@ -44,8 +33,6 @@ public class ProxyShopDeputyFailureClassifierTests
     [Fact]
     public void IsStaleListingFailure_DifferentSqlErrorNumber_ReturnsFalse()
     {
-        // 50273 is the sibling ProxyBigMoneyCapExceededErrorNumber from the same stored-procedure family --
-        // a different, non-stale condition that must NOT be misclassified as stale.
         var ex = BuildSqlException(50273);
 
         Assert.False(ProxyShopDeputyFailureClassifier.IsStaleListingFailure(ex));

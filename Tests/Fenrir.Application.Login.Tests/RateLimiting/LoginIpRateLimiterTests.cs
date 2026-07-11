@@ -5,7 +5,6 @@ namespace Fenrir.Application.Login.Tests.RateLimiting;
 
 public class LoginIpRateLimiterTests
 {
-    // Must track LoginIpRateLimiter's private Capacity (5), which the class does not expose.
     private const int ExpectedCapacity = 5;
 
     [Fact]
@@ -24,7 +23,6 @@ public class LoginIpRateLimiterTests
     [Fact]
     public void TryConsume_SameIpDifferentPort_SharesTheSameBudget()
     {
-        // Port must NOT be part of the key, or a bruteforcer reconnecting each time would never be caught.
         var limiter = new LoginIpRateLimiter();
         var address = IPAddress.Parse("203.0.113.10");
 
@@ -51,7 +49,6 @@ public class LoginIpRateLimiterTests
     [Fact]
     public void TryConsume_NullEndPoint_AlwaysSucceeds()
     {
-        // No IP to throttle on (e.g. an in-memory transport) must fail open, not block the caller.
         var limiter = new LoginIpRateLimiter();
 
         for (var i = 0; i < ExpectedCapacity + 5; i++)

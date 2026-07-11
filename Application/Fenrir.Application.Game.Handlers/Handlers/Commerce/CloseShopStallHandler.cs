@@ -8,11 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Commerce;
 
-/// <summary>
-///     CZ_END_PSHOP_SEND (opcode 32). <c>Sort</c> 1 closes the live personal shop, replying only if one was
-///     actually open. <c>Sort</c> 2 closes the offline/deputy shop (ShopState only, items/money stay
-///     attached) and sends no unicast reply, matching the legacy.
-/// </summary>
 public sealed class CloseShopStallHandler(ICloseShopStallService service, ILogger<CloseShopStallHandler> logger)
     : IAsyncPacketHandler<CloseShopStallRequest>
 {

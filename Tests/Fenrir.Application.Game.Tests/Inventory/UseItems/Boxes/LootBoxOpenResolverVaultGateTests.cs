@@ -6,12 +6,6 @@ using Fenrir.Application.Game.Domain.World.Loot;
 
 namespace Fenrir.Application.Game.Tests.Inventory.UseItems.Boxes;
 
-/// <summary>
-///     C1-vault-expiry-enforcement, trigger 2: covers <see cref="LootBoxOpenResolver" />'s new
-///     <c>secondPageAccessible</c> parameter (threaded through to <see cref="BoxRewardPlacementResolver.Resolve" />).
-///     Companion to <see cref="LootBoxOpenResolverTests" />, which only exercises the always-accessible
-///     (default) shape.
-/// </summary>
 public class LootBoxOpenResolverVaultGateTests
 {
     private const int Today = 20260710;
@@ -42,7 +36,7 @@ public class LootBoxOpenResolverVaultGateTests
     public void OpenSingle_SecondPageInaccessible_Page0Full_ReportsInventoryFull_EvenThoughPage1HasRoom()
     {
         var page0 = FullPageExceptBoxSlot();
-        var page1 = ImmutableDictionary<byte, ItemStack>.Empty; // fully empty -- would normally absorb the reward
+        var page1 = ImmutableDictionary<byte, ItemStack>.Empty;
 
         var plan = LootBoxOpenResolver.OpenSingle(MountBox, 0, 0, Box(601, 3), page0, page1, Sorts((635, 4)),
             new ScriptedRandom(49), Today, secondPageAccessible: false);
@@ -67,9 +61,6 @@ public class LootBoxOpenResolverVaultGateTests
     [Fact]
     public void OpenBulk_SecondPageInaccessible_NeverSpillsOntoPage1_EvenAcrossMultipleAttemptedOpens()
     {
-        // Every slot on page0 is occupied (slot 0 by the box itself, 1-63 by Filler) -- with page1 excluded,
-        // there is no valid placement target for any of the requested opens, and no-progress must halt
-        // immediately rather than looping.
         var page0 = FullPageExceptBoxSlot();
         var page1 = ImmutableDictionary<byte, ItemStack>.Empty;
 
@@ -80,8 +71,7 @@ public class LootBoxOpenResolverVaultGateTests
         Assert.True(plan.ProjectedPage1.IsEmpty);
     }
 
-    /// <summary>Returns queued draws in request order; throws if the code draws more than were scripted.</summary>
-    private sealed class ScriptedRandom(params int[] values) : Random
+        private sealed class ScriptedRandom(params int[] values) : Random
     {
         private int _index;
 

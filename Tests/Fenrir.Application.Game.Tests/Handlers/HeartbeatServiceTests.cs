@@ -47,8 +47,6 @@ public class HeartbeatServiceTests
     [Fact]
     public void FirstHeartbeatCarryingZero_IsNotMistakenForReplay()
     {
-        // Unlike legacy's truthy-zero mPrevSent sentinel, PrevSentHeartbeat is null (not 0) until the first
-        // heartbeat -- a legitimate first LastSend of 0 must still be accepted.
         var zone = ZoneTestKit.CreateZone(1);
         var (_, _, state) = Setup(zone, 10);
         var service = new HeartbeatService();
@@ -83,7 +81,6 @@ public class HeartbeatServiceTests
         var first = service.Process(state, 42u);
         Assert.Equal(HeartbeatOutcome.Accepted, first);
 
-        // Same LastSend counter sent twice in a row -- a captured-and-replayed frame.
         var second = service.Process(state, 42u);
 
         Assert.Equal(HeartbeatOutcome.Replayed, second);
@@ -107,8 +104,6 @@ public class HeartbeatServiceTests
     [Fact]
     public void PlayerNotInZone_NoOpDoesNotThrow()
     {
-        // No PlayerRuntimeState exists yet to hand the service -- this guard is handler-owned plumbing, not
-        // service business logic, so exercise the real handler here.
         var (session, _) = ZoneTestKit.CreateSession(10);
         session.MarkTicketConsumed(1, 10);
         session.MarkRegistering();

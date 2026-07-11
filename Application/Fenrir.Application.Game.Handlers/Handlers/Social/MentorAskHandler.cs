@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>CZ_TEACHER_ASK_SEND (opcode 59) -- sender becomes master (MG5ORIGIN branch, active in this build).</summary>
 public sealed class MentorAskHandler(IMentorAskService mentorAskService, ILogger<MentorAskHandler> logger)
     : IAsyncPacketHandler<MentorRequest>
 {
@@ -56,8 +55,6 @@ public sealed class MentorAskHandler(IMentorAskService mentorAskService, ILogger
                 student!.Session.Send(new MentorResponse { AvatarName = result.AskerName! });
                 return;
             case MentorAskResultKind.SentCrossShard:
-                // Ask-publish-only today -- see MentorAskResultKind.SentCrossShard's own remarks; nothing to
-                // send (no target-side delivery exists yet to ever produce a reply).
                 return;
         }
     }

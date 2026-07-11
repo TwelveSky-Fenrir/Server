@@ -5,17 +5,10 @@ using Fenrir.Application.Game.Tests.GameData;
 
 namespace Fenrir.Application.Game.Tests.World.Npcs;
 
-/// <summary>
-///     Coverage of the NPC-sell WarPoint-adjacent exemption added to <see cref="NpcShopPolicy.ResolveSell" />:
-///     the live <c>99703</c>-<c>99756</c> range (<c>#elif defined LNW33</c>,
-///     <c>Server/ts25zone/S04_MyWork05.cpp:1496-1522</c>) skips the rare/costume sell-block and sells for the
-///     sell price. The dead <c>74200</c>-<c>74223</c> (<c>#ifdef USE_CUSTOME_CREATE</c>) range is deliberately
-///     not carried. Complements <c>NpcShopPolicyTests</c>, which covers the non-exempt sell/buy resolution.
-/// </summary>
 public class NpcShopPolicySellExemptTests
 {
     private const byte NonStackableSort = 9;
-    private const byte RareType = 3; // IRARE (STRUCT.h:1657)
+    private const byte RareType = 3;
 
     private static ItemDefinition Item(int itemId, byte type = 0, int sellCost = 500, byte checkNpcSell = 0)
     {
@@ -28,7 +21,7 @@ public class NpcShopPolicySellExemptTests
 
     private static ItemStack Enchanted(int itemId)
     {
-        return new ItemStack(itemId, 1, 5, 0, 0, 0, 0, 0, 0, 0, 0); // Enchant != 0 -> normally rare-blocked
+        return new ItemStack(itemId, 1, 5, 0, 0, 0, 0, 0, 0, 0, 0);
     }
 
     [Theory]
@@ -42,7 +35,7 @@ public class NpcShopPolicySellExemptTests
     [Theory]
     [InlineData(99702)]
     [InlineData(99757)]
-    [InlineData(74200)] // dead USE_CUSTOME_CREATE range -- must NOT be treated as exempt
+    [InlineData(74200)]
     [InlineData(74223)]
     public void IsSellExempt_FalseOutsideTheLiveRange(int itemId)
     {
@@ -62,7 +55,6 @@ public class NpcShopPolicySellExemptTests
     [Fact]
     public void NonExemptRareEnchantedItem_IsStillRejected()
     {
-        // Control: the same rare/enchanted item just outside the exempt range is blocked as before.
         var result = NpcShopPolicy.ResolveSell(Item(99702, RareType), Enchanted(99702), 0);
 
         Assert.False(result.Succeeded);
@@ -81,7 +73,6 @@ public class NpcShopPolicySellExemptTests
     [Fact]
     public void ExemptItem_DoesNotOverrideCheckNpcSellBlock()
     {
-        // The exemption is scoped to the rare/costume blocks; the earlier CheckNpcSell==1 gate still rejects.
         var result = NpcShopPolicy.ResolveSell(Item(99720, RareType, checkNpcSell: 1), Enchanted(99720), 0);
 
         Assert.False(result.Succeeded);

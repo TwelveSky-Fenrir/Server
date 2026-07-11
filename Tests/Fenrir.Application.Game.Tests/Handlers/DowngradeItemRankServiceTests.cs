@@ -16,12 +16,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 
-/// <summary>
-///     Drives the real <see cref="DowngradeItemRankService" /> (opcode 28) over a real <see cref="Zone" />;
-///     ticks the zone while the service's own <c>PostInventoryCommandAndWaitAsync</c> await is pending, same
-///     pattern as <c>UpgradeCapeServiceTests</c>. Primarily exercises the game.EventLog write-behind wiring --
-///     roll-math fidelity is covered deterministically by <c>RankChangeResolverTests</c>.
-/// </summary>
 public class DowngradeItemRankServiceTests
 {
     private const int TargetItemId = 1;
@@ -67,8 +61,7 @@ public class DowngradeItemRankServiceTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
     }
 
-    /// <summary>Level 55 Rare, Sort 9 -- matches RankChangeResolverTests' own downgrade fixtures (RareDownTiers[0]).</summary>
-    private static ItemRowDto TargetRow()
+        private static ItemRowDto TargetRow()
     {
         return WorldDataTestRows.Item(TargetItemId) with
         {
@@ -76,8 +69,7 @@ public class DowngradeItemRankServiceTests
         };
     }
 
-    /// <summary>Level 45 Rare, Sort 9 -- the only catalog entry that can satisfy FindReplacement for TargetRow.</summary>
-    private static ItemRowDto CandidateRow()
+        private static ItemRowDto CandidateRow()
     {
         return WorldDataTestRows.Item(CandidateItemId) with
         {
@@ -103,10 +95,6 @@ public class DowngradeItemRankServiceTests
     [Fact]
     public async Task ValidPreconditions_AlwaysDeductsMoneyAndLogsAttempt_RegardlessOfRandomOutcome()
     {
-        // DowngradeItemRankService rolls via SystemRandomSource.Instance (no DI seam) -- success/failure branch
-        // fidelity is covered deterministically by RankChangeResolverTests. This asserts only what's true on
-        // BOTH outcomes: money is always deducted, material is always consumed, and exactly one EventLog row
-        // is queued either way.
         var (session, _, zone, state, repo, eventLog) = SetUp();
         SeedInventory(zone, new ItemStack(TargetItemId, 1, 7, 3, 0, 0, 0, 0, 0, 0, 777),
             new ItemStack(MaterialItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
@@ -140,7 +128,6 @@ public class DowngradeItemRankServiceTests
 
         var itemsById = new Dictionary<int, ItemDefinition>
         {
-            // Level 45 is the Rare floor -- RankChangeResolver rejects downgrading at or below it.
             [TargetItemId] = new(WorldDataTestRows.Item(TargetItemId) with
             {
                 Type = RankChangeResolver.RareItemType, Sort = 9, Level = 45, CheckLowItem = 2

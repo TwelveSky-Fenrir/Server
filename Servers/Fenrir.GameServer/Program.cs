@@ -1,18 +1,3 @@
-// SECURITY GUARDRAIL -- read before adding any HTTP/gRPC surface to this executable.
-// Legacy ts25center bound an unauthenticated cpp-httplib dashboard on 127.0.0.1:2499 with zero
-// authentication anywhere in its routing (no set_pre_routing_handler check) and a side-effecting
-// GET /Shutdown that armed a cluster-wide kill switch (Server/ts25center/S02_MyServer.cpp:56-82,215-253;
-// ServerDocs/10_ts25center/03_HTTP_Dashboard_NonAuth_CRITIQUE.md; ServerDocs/04_SECURITE_ET_DETTE_TECHNIQUE.md
-// finding #2). This is the single worst legacy anti-pattern this project's security audits have found.
-// Fenrir.GameServer is deliberately a Microsoft.NET.Sdk.Worker project with no ASP.NET Core reference at
-// all (Host.CreateApplicationBuilder, never WebApplication -- see Orchestration/Fenrir.ServiceDefaults'
-// own "TCP-socket-only servers" comments), and Tests/Fenrir.IntegrationTests/NoUnauthenticatedHttpSurfaceTests.cs
-// regression-tests that this stays true. The day anyone proposes an HTTP/gRPC admin, metrics, shard-control,
-// or GM surface on this process: it must get its own explicit authentication and authorization from line
-// one, must never be assumed to inherit ClientSession/game-session auth, must never expose a state-mutating
-// action behind an unauthenticated GET (or any verb without a real credential check), and must bind to a
-// scope no broader than the ts25 loopback-only precedent unless there is an explicit, reviewed reason to
-// widen it.
 
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Commerce;
@@ -59,77 +44,45 @@ builder.Services.AddSingleton<ISessionRateLimiter, SessionRateLimiter>();
 
 var host = builder.Build();
 
-// Must run before ZoneConnectionHost starts accepting connections: MessageDispatcher resolves handlers through this provider.
 PacketHandlerHub.Initialize(host.Services);
 
 var bootLogger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Fenrir.GameServer.Boot");
 
-// Everything below is sequential, one-shot boot-time initialization -- unlike a BackgroundService's own tick
-// loop, a failure here must still crash the process (fail fast, never serve on a half-populated cache), but
-// until this wrapper existed, a failure here (e.g. the WorldStateService.InitializeAsync PK-violation-race
-// production incident this was added for) produced ONLY a raw unhandled-exception dump to stderr, with no
-// application-level trace of which step was in flight. bootStep is updated immediately before each await so
-// the single catch below can name the failing step in one LogCritical line before rethrowing -- the process
-// still exits non-zero exactly as before, this only makes the failure diagnosable from logs alone.
 var bootStep = "(unknown)";
 byte shardId;
 IReadOnlyList<short> hostedMaps;
 
-// Bounds every sequential boot step below against a silent, indefinite hang (e.g. a stuck DB/network call
-// that never throws) -- without this, a hang here has no exception for the catch block to report, so the
-// process sits forever with no diagnostic at all, unlike every OTHER failure mode this wrapper already
-// covers. 60s is generous relative to every step's own real-world cost (WorldDataLoader alone was ~1.2s in
-// practice); a step that is still running past that is not "slow," it is hung, and should fail loudly with
-// the same "which step" diagnostic every other boot failure already gets.
 using var bootCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
 try
 {
-    // Hosted services only start inside host.Run(), so awaiting this here guarantees the world.* reference-data
-    // cache is populated before the first connection -- a SQL failure aborts startup instead of serving an empty world.
     bootStep = "WorldDataLoader.InitializeAsync";
     await host.Services.GetRequiredService<WorldDataLoader>().InitializeAsync(bootCts.Token);
 
-    // C11 faction-transfer scroll: same rationale as WorldDataLoader just above -- TribeConversionResolver
-    // (world.usp_TribeConversionCatalog_GetAll's equivalence data) must be built before the first op23
-    // faction-transfer-scroll use, or TribeConversionCatalogLoader.Resolver throws.
     bootStep = "TribeConversionCatalogLoader.InitializeAsync";
     await host.Services.GetRequiredService<TribeConversionCatalogLoader>()
         .InitializeAsync(host.Services.GetRequiredService<IWorldDataRepository>(), bootCts.Token);
 
-    // Same rationale again: mirrors legacy MyGame::Init's own one-shot synchronous InitItemMall/InitBloodShop
-    // pass -- without this, the first CZ_GET_CASH_ITEM_INFO_SEND/CZ_DEMAND_BLOOD_MARK_SEND of the shard's life
-    // would see an empty catalog until CommerceCatalogRefreshHost's first periodic pass caught up.
     bootStep = "CommerceCatalogCache.RefreshAllAsync";
     await host.Services.GetRequiredService<CommerceCatalogCache>()
         .RefreshAllAsync(host.Services.GetRequiredService<IWorldDataRepository>(), bootCts.Token);
 
-    // Same rationale: RvR world state (tribe symbols/points/gate/alliance offers) must be loaded before any
-    // zone actor or handler can read/mutate it.
     bootStep = "WorldStateService.InitializeAsync";
     await host.Services.GetRequiredService<WorldStateService>().InitializeAsync(bootCts.Token);
 
-    // Same rationale again: without this, the first players in would broadcast an empty guild ranking board
-    // until GuildRankingRefreshHost's first periodic pass caught up.
     bootStep = "GuildRankingCache.RefreshAsync";
     await host.Services.GetRequiredService<GuildRankingCache>()
         .RefreshAsync(host.Services.GetRequiredService<IGuildRepository>(), bootCts.Token);
 
-    // Same rationale again: a tower's guardian-monster lifecycle must resume from game.TowerState before
-    // TowerGuardianSystem's first tick, instead of starting every tower at Dormant every restart.
     bootStep = "TowerWarState.InitializeAsync";
     await host.Services.GetRequiredService<TowerWarState>()
         .InitializeAsync(host.Services.GetRequiredService<ITowerRepository>(), bootCts.Token);
 
-    // Same rationale again: the persisted "Yanggok" named-boss respawn deadlines (monsters 564-568) must be in
-    // memory before MonsterSpawnScheduler's first tick for any zone, or a freshly booted server would pop them
-    // back in immediately regardless of how recently they were killed.
     bootStep = "MonsterBossRespawnTracker.InitializeAsync";
     await host.Services.GetRequiredService<MonsterBossRespawnTracker>()
         .InitializeAsync(host.Services.GetRequiredService<IMonsterBossRespawnTimerRepository>(),
             bootCts.Token);
 
-    // Must run before ZoneTickHost/ZoneConnectionHost start accepting ticks or connections.
     bootStep = "IShardMapAssignmentRepository.GetHostedMapsAsync";
     shardId = host.Services.GetRequiredService<IOptions<GameServerOptions>>().Value.ShardId;
     hostedMaps = await host.Services.GetRequiredService<IShardMapAssignmentRepository>()
@@ -139,12 +92,6 @@ try
         throw new InvalidOperationException(
             $"No maps assigned to shard {shardId} in admin.ShardMapAssignments -- a GameServer hosting no world is always a configuration mistake.");
 
-    // ADR-0012 rule 1: a shard is a disjoint map partition, never a replica. Must run before ZoneRegistry.Initialize
-    // so a colliding shard fails fast at boot instead of silently duplicating a Zone another shard already hosts --
-    // "another shard" here means either a currently-live one (cross-checked via runtime.GameServerDirectory) or one
-    // merely configured in admin.ShardMapAssignments but not yet live, which matters because this shard's own
-    // heartbeat (below, inside host.RunAsync()) has not started yet either: on a whole fleet cold-booting together,
-    // no shard would otherwise be visible to any other shard's check at this exact moment.
     bootStep = "ShardPartitionGuard.EnsureNoOverlapAsync";
     await ShardPartitionGuard.EnsureNoOverlapAsync(shardId, hostedMaps,
         host.Services.GetRequiredService<IGameServerDirectoryRepository>(),
@@ -168,9 +115,6 @@ catch (Exception ex)
     throw;
 }
 
-// Complements the guard above: not "do two shards collide" (impossible to reach this line if so) but
-// "is any live shard actually hosting the map each singleton RvR scheduler is configured to run on".
-// Service-degradation risk (an inert scheduler), not data-corruption -- logged, never fatal.
 var gameOptions = host.Services.GetRequiredService<IOptions<GameServerOptions>>().Value;
 var unclaimedDesignatedMaps = await SingletonRvrSchedulerGuard.FindUnclaimedDesignatedMapsAsync(
     [
@@ -196,13 +140,6 @@ foreach (var gap in unclaimedDesignatedMaps)
 var zoneRegistry = host.Services.GetRequiredService<ZoneRegistry>();
 zoneRegistry.Initialize(hostedMaps);
 
-// Aggregates the per-zone LogWarning (missing file)/LogError (parse failure) Zone.TryLoadGeometry already
-// emitted once per Zone above, inside ZoneRegistry.Initialize, into one glanceable rollup -- same "collect,
-// then log one summary via the Boot logger" shape as unclaimedDesignatedMaps above. Pure observability: does
-// not change Zone's own degrade-to-speed-only-validation behavior (see GameServerOptionsValidator's remarks
-// for why a missing/unparseable .WM is deliberately not startup-blocking), it only makes "which of this
-// shard's hosted maps are currently running with degraded (speed-only, unconstrained-pathing) anti-cheat"
-// visible at a glance instead of requiring an operator to scroll back through N individual per-zone log lines.
 var mapsMissingGeometry = new List<short>();
 foreach (var zone in zoneRegistry.Zones)
     if (zone.Geometry is null)

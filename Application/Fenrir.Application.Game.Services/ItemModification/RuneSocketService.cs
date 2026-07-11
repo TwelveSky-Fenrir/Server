@@ -9,31 +9,16 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.ItemModification;
 
-/// <summary>
-///     Business logic for CZ_RUNE_SYSTEM_SEND (op157) -- extracted from <see cref="RuneSocketHandler" />, see
-///     that handler's remarks.
-/// </summary>
 public sealed class RuneSocketService(
     IRuneRepository runes,
     IEventLogQueue eventLogQueue,
     ILogger<RuneSocketService> logger)
     : IRuneSocketService
 {
-    /// <summary>
-    ///     game.EventLog.EventCode for a rune-insert attempt -- the wire opcode (op157) itself. See
-    ///     <see cref="RuneRemoveEventCode" /> for why remove gets its own, distinct code within the same
-    ///     opcode/Category pair.
-    /// </summary>
-    private const short RuneInsertEventCode = 157;
 
-    /// <summary>
-    ///     game.EventLog.EventCode for a rune-remove attempt -- op157's sort=1 sub-action. Insert and remove
-    ///     are opposite, independently interesting operations for audit purposes, so each gets its own
-    ///     EventCode rather than sharing op157's number and relying on Outcome/Payload alone to disambiguate --
-    ///     same "app-owned numbering scheme, caller-interpreted alongside Category" posture as every other
-    ///     EventCode in this codebase.
-    /// </summary>
-    private const short RuneRemoveEventCode = 158;
+        private const short RuneInsertEventCode = 157;
+
+        private const short RuneRemoveEventCode = 158;
 
     public async ValueTask<RuneInsertResult> InsertAsync(RuneSocketRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
@@ -54,11 +39,6 @@ public sealed class RuneSocketService(
             sourceStack.Socket);
         var projectedContainer = state.Inventory.GetContainer((byte)packet.Page).Remove((byte)packet.Index);
 
-        // B5: the whole 4-socket rune array AND the paired inventory container commit atomically+durably in ONE
-        // proc (usp_Character_PersistRunes), replacing the inventory-only ReplaceContainerAsync so the rune item
-        // can never dupe/lose across the socket<->inventory boundary. Post-mutation rune state == the current
-        // sockets with socket[RuneIndex] claimed to the client-supplied ItemIndex at packedStat -- the same value
-        // the zone mirror below writes into RuneSystem (the legacy client-id-verbatim quirk, see RuneSocketResolver).
         var projectedRunes = state.RuneSystem.SetItem(packet.RuneIndex, packet.ItemIndex);
         var projectedRuneStats = state.RuneSystemStat.SetItem(packet.RuneIndex, packedStat);
 
@@ -111,9 +91,6 @@ public sealed class RuneSocketService(
         var newStack = new ItemStack(resolved.ItemId, 0, enchant, combine, refine, socket, 0, 0, 0, 0, 0);
         var projectedContainer = state.Inventory.GetContainer(container).SetItem(slot, newStack);
 
-        // B5: rune array + paired inventory container commit atomically in one proc (usp_Character_PersistRunes).
-        // Post-mutation rune state == the current sockets with socket[RuneIndex] cleared; when this was the last
-        // rune, ToRuneTvps yields an empty list the repository omits and the proc's unconditional DELETE clears the table.
         var projectedRunes = state.RuneSystem.SetItem(packet.RuneIndex, 0);
         var projectedRuneStats = state.RuneSystemStat.SetItem(packet.RuneIndex, 0);
 
@@ -164,9 +141,6 @@ public sealed class RuneSocketService(
         return list;
     }
 
-    // Occupied sockets only: RuneItemId == 0 IS the empty-socket encoding (row absence in game.CharacterRunes), so
-    // a fully-empty rune array yields an empty list the repository omits as a TVP (SQL Server rejects a zero-row
-    // TVP; the proc's own DELETE clears the table in that case).
     private static List<CharacterRuneSocketTvp> ToRuneTvps(ImmutableArray<int> runeSystem,
         ImmutableArray<int> runeSystemStat)
     {

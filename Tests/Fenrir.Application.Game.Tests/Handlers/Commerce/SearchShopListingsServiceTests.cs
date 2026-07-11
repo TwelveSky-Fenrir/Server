@@ -55,11 +55,7 @@ public class SearchShopListingsServiceTests
     {
         var itemsById = new Dictionary<int, ItemDefinition>
         {
-            // Sort 11 -> EPSORT_RING (category 6).
             [500] = new(WorldDataTestRows.Item(500) with { Sort = 11 }, []),
-            // Sort 50 isn't mapped by SortToCategory's ~10 named sorts at all -- a known/cataloged item the
-            // legacy's own default-inclusion rule (S04_MyWork02.cpp:6681-6909) still surfaces under an
-            // unfiltered "show all" query.
             [600] = new(WorldDataTestRows.Item(600) with { Sort = 50 }, [])
         }.ToFrozenDictionary();
 
@@ -107,7 +103,6 @@ public class SearchShopListingsServiceTests
 
         Assert.True(zone.TryGetPlayer(20, out var seller));
         seller!.PshopListing = WithSlot(40, 1, 2, 500, 3, 0, 7, 999);
-        // PshopOpen deliberately left false.
 
         var service = CreateService();
         var results = await service.SearchAsync(new SearchShopListingsRequest { Sort1 = 0, Sort2 = 0 }, zone,
@@ -125,9 +120,6 @@ public class SearchShopListingsServiceTests
 
         Assert.True(zone.TryGetPlayer(20, out var seller));
         seller!.PshopOpen = true;
-        // Item 999 isn't in the handler's item catalog at all -- unlike a cataloged item with an
-        // uncategorized sort (see CatalogedItemWithUncategorizedSort_* below), there is nothing here for
-        // even the legacy default-inclusion rule to classify.
         seller.PshopListing = WithSlot(40, 0, 0, 999, 1, 0, 1, 100);
 
         var service = CreateService();
@@ -146,10 +138,6 @@ public class SearchShopListingsServiceTests
 
         Assert.True(zone.TryGetPlayer(20, out var seller));
         seller!.PshopOpen = true;
-        // Item 600 IS cataloged but its sort (50) isn't one of SortToCategory's ~10 mapped sorts --
-        // S04_MyWork02.cpp:6681-6909's own default-inclusion rule still surfaces it under an unfiltered
-        // "show all" (type=ALL, category=ALL) query; only an explicit non-ALL category filter genuinely
-        // excludes it (see the next test).
         seller.PshopListing = WithSlot(40, 0, 0, 600, 1, 0, 1, 100);
 
         var service = CreateService();
@@ -171,8 +159,6 @@ public class SearchShopListingsServiceTests
         seller.PshopListing = WithSlot(40, 0, 0, 600, 1, 0, 1, 100);
 
         var service = CreateService();
-        // Sort1=ALL, Sort2=6 (Ring) -- an explicit, non-ALL category filter genuinely excludes an item
-        // neither classification pass can resolve.
         var results = await service.SearchAsync(new SearchShopListingsRequest { Sort1 = 0, Sort2 = 6 }, zone,
             CancellationToken.None);
 
@@ -188,10 +174,9 @@ public class SearchShopListingsServiceTests
 
         Assert.True(zone.TryGetPlayer(20, out var seller));
         seller!.PshopOpen = true;
-        seller.PshopListing = WithSlot(40, 0, 0, 500, 1, 0, 1, 100); // category 6 (Ring)
+        seller.PshopListing = WithSlot(40, 0, 0, 500, 1, 0, 1, 100);
 
         var service = CreateService();
-        // Sort1=ALL, Sort2=1 (Skill) -- doesn't match the ring's category (6).
         var results = await service.SearchAsync(new SearchShopListingsRequest { Sort1 = 0, Sort2 = 1 }, zone,
             CancellationToken.None);
 
@@ -207,7 +192,7 @@ public class SearchShopListingsServiceTests
 
         Assert.True(zone.TryGetPlayer(20, out var seller));
         seller!.PshopOpen = true;
-        seller.PshopListing = WithSlot(40, 0, 0, 500, 1, 0, 1, 100); // category 6 (Ring)
+        seller.PshopListing = WithSlot(40, 0, 0, 500, 1, 0, 1, 100);
 
         var service = CreateService();
         var results = await service.SearchAsync(new SearchShopListingsRequest { Sort1 = 0, Sort2 = 6 }, zone,
@@ -223,7 +208,6 @@ public class SearchShopListingsServiceTests
         Setup(zone, 10);
 
         var offlineShops = new FakeOfflineShopRepository();
-        // SlotIndex 7 = page 1, slot 2 (5 slots/page) -- category 6 (Ring, item 500).
         offlineShops.SeedOpenListings(new OfflineShopOpenListingRowDto(99, "Deputy", 7, 500, 2, 0, 5, 250, null));
 
         var service = CreateService(offlineShops);
@@ -271,10 +255,9 @@ public class SearchShopListingsServiceTests
 
         var offlineShops = new FakeOfflineShopRepository();
         offlineShops.SeedOpenListings(
-            new OfflineShopOpenListingRowDto(99, "Deputy", 0, 500, 1, 0, 1, 100, null)); // category 6 (Ring)
+            new OfflineShopOpenListingRowDto(99, "Deputy", 0, 500, 1, 0, 1, 100, null));
 
         var service = CreateService(offlineShops);
-        // Sort1=ALL, Sort2=1 (Skill) -- doesn't match the ring's category (6).
         var results = await service.SearchAsync(new SearchShopListingsRequest { Sort1 = 0, Sort2 = 1 }, zone,
             CancellationToken.None);
 

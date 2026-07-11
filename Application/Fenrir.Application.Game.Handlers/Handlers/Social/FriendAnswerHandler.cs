@@ -6,10 +6,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>
-///     CZ_FRIEND_ANSWER_SEND (opcode 55) -- on accept, both sides become eligible to call their own
-///     CZ_FRIEND_MAKE_SEND; neither is added automatically.
-/// </summary>
 public sealed class FriendAnswerHandler(IFriendService friendService, ILogger<FriendAnswerHandler> logger)
     : IInlinePacketHandler<FriendAnswerRequest>
 {

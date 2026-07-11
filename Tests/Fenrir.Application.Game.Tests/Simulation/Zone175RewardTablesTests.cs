@@ -48,10 +48,10 @@ public sealed class Zone175RewardTablesTests
     }
 
     [Theory]
-    [InlineData(1, 1, true)] // wave 1 cleared, index2 1 -> may enter wave 2
-    [InlineData(1, 0, false)] // wave 1 cleared, index2 0 -> stop
-    [InlineData(2, 1, false)] // wave 2 cleared needs index2 >= 2
-    [InlineData(4, 4, true)] // wave 4 cleared, index2 4 -> may enter wave 5
+    [InlineData(1, 1, true)]
+    [InlineData(1, 0, false)]
+    [InlineData(2, 1, false)]
+    [InlineData(4, 4, true)]
     [InlineData(4, 3, false)]
     public void CanAdvanceToNextWave_RequiresIndex2AtLeastTheClearedWaveNumber(int clearedWave, int index2,
         bool expected)
@@ -60,13 +60,12 @@ public sealed class Zone175RewardTablesTests
     }
 
     [Theory]
-    [InlineData(0)] // rebirth tier 0 -> zero (the table only has entries for tiers 1-12)
+    [InlineData(0)]
     [InlineData(1)]
     [InlineData(12)]
-    [InlineData(13)] // out of range
+    [InlineData(13)]
     public void WaveClearExperience_IsZeroToday_TierTableIsAnUnrecoveredGap(int rebirthTier)
     {
-        // GAP: the per-tier base amounts are not recovered; every tier currently yields 0. Tier 0 is genuinely 0.
         Assert.Equal(0, Zone175RewardTables.WaveClearExperience(rebirthTier, 1f));
         Assert.Equal(0, Zone175RewardTables.WaveClearExperience(rebirthTier, 5f));
     }

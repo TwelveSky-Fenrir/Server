@@ -41,7 +41,7 @@ public class CostumeVisibilityServiceTests
         var zone = ZoneTestKit.CreateZone(1);
         var (session, pipe, _) = Setup(zone, 10);
         var (_, neighborPipe, _) = Setup(zone, 20, 12f, 12f);
-        ZoneTestKit.DrainOutbound(pipe); // neighbor's own Enter-broadcast join packet, not under test
+        ZoneTestKit.DrainOutbound(pipe);
         var service = new CostumeVisibilityService();
 
         service.Apply(zone, 10, sort);
@@ -58,8 +58,6 @@ public class CostumeVisibilityServiceTests
     [Fact]
     public void InvalidSort_Aborts()
     {
-        // Sort validation (0/1 only) lives on the handler itself, ahead of the service call -- exercise the
-        // real handler here rather than the service, which never sees an out-of-range sort at all.
         var zone = ZoneTestKit.CreateZone(1);
         var (session, pipe, _) = Setup(zone, 10);
         var handler = new CostumeVisibilityHandler(new CostumeVisibilityService(),

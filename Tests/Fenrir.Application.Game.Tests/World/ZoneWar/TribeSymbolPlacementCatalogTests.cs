@@ -2,11 +2,6 @@ using Fenrir.Application.Game.Domain.World.ZoneWar;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Pins every per-owner-state coordinate in <see cref="TribeSymbolPlacementCatalog" /> to the exact value the
-///     A4-symbol behavior contract transcribes from <c>MySummon::SummonTribeSymbol</c>
-///     (<c>S10_MySummon.cpp:1873-2034</c>). Pure data assertions -- no zone/tick needed.
-/// </summary>
 public class TribeSymbolPlacementCatalogTests
 {
     private static readonly TribeSymbolCatalog Catalog = TribeSymbolPlacementCatalog.Default;
@@ -57,7 +52,6 @@ public class TribeSymbolPlacementCatalogTests
     [Fact]
     public void MonsterSymbol_NeutralAndCaptors_MatchContractTable()
     {
-        // Owner -1 (neutral / unclaimed) -> the sentinel key -> neutral home zone 74.
         Assert.Equal(new TribeSymbolPlacement(74, -2f, 0f, 2626f),
             Get(4, TribeSymbolCatalog.NeutralUnclaimedOwnerState));
         Assert.Equal(new TribeSymbolPlacement(4, 7839f, 461f, 6520f), Get(4, 0));
@@ -69,9 +63,6 @@ public class TribeSymbolPlacementCatalogTests
     [Fact]
     public void EveryTribeSymbolHasAllFourCaptorRows_ReadyForCapturedRelocation()
     {
-        // The captor placements (owner != slot tribe) are populated for all four tribe symbols even though
-        // upstream owner resolution can only reach them for the neutral symbol today -- the data is complete so
-        // no re-transcription is needed once a captor identity is recorded for tribe symbols 0-3.
         for (byte symbolIndex = 0; symbolIndex < 4; symbolIndex++)
         for (byte owner = 0; owner < 4; owner++)
             Assert.True(Catalog.TryGetPlacement(symbolIndex, owner, out _),
@@ -81,9 +72,8 @@ public class TribeSymbolPlacementCatalogTests
     [Fact]
     public void UnconfiguredOwnerState_ReturnsFalse_NoGuessing()
     {
-        // A tribe symbol has no key 255 (the neutral sentinel is only meaningful for symbol 4), and no owner 5.
         Assert.False(Catalog.TryGetPlacement(0, TribeSymbolCatalog.NeutralUnclaimedOwnerState, out _));
         Assert.False(Catalog.TryGetPlacement(2, 5, out _));
-        Assert.False(Catalog.TryGetPlacement(9, 0, out _)); // no such symbol index
+        Assert.False(Catalog.TryGetPlacement(9, 0, out _));
     }
 }

@@ -5,12 +5,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Guilds;
 
-// C17 Part B1 wiring: FourGuildKillPointRelayHost is the non-blocking Domain-facing producer half
-// (Enqueue -- what Zone.KillFeed.cs's RecordEnemyKillForFeed calls through IFourGuildKillPointQueue) plus the
-// BackgroundService drain loop that forwards each entry into FourGuildScoringService.AccrueKillPointAsync.
-// Zone (Domain) never sees this concrete host or FourGuildScoringService directly -- only the narrow
-// IFourGuildKillPointQueue surface -- so these tests exercise the host end-to-end (Enqueue -> drain ->
-// repository call) rather than mocking the drain loop away.
 public sealed class FourGuildKillPointRelayHostTests
 {
     private static readonly TimeSpan BoundedWait = TimeSpan.FromSeconds(5);
@@ -73,8 +67,6 @@ public sealed class FourGuildKillPointRelayHostTests
         var scoring = new FourGuildScoringService(repository, NullLogger<FourGuildScoringService>.Instance);
         var host = new FourGuildKillPointRelayHost(scoring, NullLogger<FourGuildKillPointRelayHost>.Instance);
 
-        // Enqueue is a plain bounded-channel TryWrite -- safe and non-blocking even before ExecuteAsync ever
-        // runs (matching Zone's own tick thread, which must never wait on a hosted service's own startup).
         Assert.True(host.Enqueue(7));
     }
 

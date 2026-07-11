@@ -7,13 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Tribes;
 
-/// <summary>
-///     CZ_GET_ZONE_CONNECT_USER_SEND (opcode 92). Already customized in this fork: ignores the request's
-///     <see cref="TribePopulationRequest.ZoneNumber" /> and always replies with 4 packets, one per tribe
-///     (0-3), each carrying that tribe's live connected-player count on the requester's own zone/map only --
-///     matching the legacy one-process-per-map semantics (see the TribePopulation behavior contract), not a
-///     shard-wide or cluster-wide figure.
-/// </summary>
 public sealed class TribePopulationHandler(
     ITribePopulationService populationService,
     ILogger<TribePopulationHandler>? logger = null) : IInlinePacketHandler<TribePopulationRequest>

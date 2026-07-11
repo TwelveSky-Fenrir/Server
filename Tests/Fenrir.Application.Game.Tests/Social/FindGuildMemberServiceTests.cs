@@ -6,11 +6,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Social;
 
-/// <summary>
-///     <see cref="FindGuildMemberService.FindZoneAsync" />'s same-shard-first, cross-shard-directory-fallback
-///     shape. Unlike whisper/friend-locate, this opcode only needs a ZoneNumber -- the directory's MapId
-///     answers it directly, no live delivery required.
-/// </summary>
 public class FindGuildMemberServiceTests
 {
     private static PlayerRuntimeState MakePlayer(int characterId, string name, int? guildId)

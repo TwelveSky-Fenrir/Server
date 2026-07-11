@@ -15,8 +15,8 @@ public class TradeCommitPlannerTests
     public void BuildFinalContainers_RemovesOwnOfferedItem_AndAddsReceivedItemToFreeSlot()
     {
         var page0 = ImmutableDictionary<byte, ItemStack>.Empty
-            .Add(0, Stack(100)) // offered away
-            .Add(1, Stack(200)); // kept
+            .Add(0, Stack(100))
+            .Add(1, Stack(200));
 
         var page1 = ImmutableDictionary<byte, ItemStack>.Empty;
 
@@ -26,14 +26,14 @@ public class TradeCommitPlannerTests
         };
         var received = new (byte, byte, ItemStack)?[]
         {
-            (ContainerMatrix.InventoryPage0, 5, Stack(999)) // source container/slot irrelevant on the receiving side
+            (ContainerMatrix.InventoryPage0, 5, Stack(999))
         };
 
         var plan = TradeCommitPlanner.BuildFinalContainers(page0, page1, ownOffered, received);
 
         Assert.False(plan.Overflowed);
-        Assert.Equal(200, plan.Page0[1].ItemId); // untouched
-        Assert.Equal(999, plan.Page0[0].ItemId); // slot 0 vacated by the offered item, then reused for the received one
+        Assert.Equal(200, plan.Page0[1].ItemId);
+        Assert.Equal(999, plan.Page0[0].ItemId);
     }
 
     [Fact]

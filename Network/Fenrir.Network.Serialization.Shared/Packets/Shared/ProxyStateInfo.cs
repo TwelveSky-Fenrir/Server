@@ -2,8 +2,6 @@ using Fenrir.Network.Serialization.Wire.Attributes;
 
 namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 
-// C++ sizeof is 52 bytes; the trailing 2-byte pad can't be expressed here ([Reserved] only covers
-// leading padding) and is instead carried by the parent packet's next field.
 [FenrirWireType(50)]
 public readonly partial record struct ProxyStateInfo : IFenrirWireType<ProxyStateInfo>
 {

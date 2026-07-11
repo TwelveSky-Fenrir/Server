@@ -8,7 +8,6 @@ public class ClWantGiftSendTests
     [Fact]
     public void PayloadSize_MatchesContractConstant()
     {
-        // ExpectedSize=17 (9-byte inbound header) -> 8-byte payload (2 int).
         Assert.Equal(8, ClaimGiftRequest.PayloadSize);
     }
 

@@ -3,18 +3,14 @@ using Fenrir.Application.Game.Tests.TestSupport;
 
 namespace Fenrir.Application.Game.Tests.Combat;
 
-/// <summary>
-///     Covers <see cref="CombatMath" />'s primitives against the C++ formulas in
-///     <c>Server/ts25zone/S07_MyGame02.cpp</c>, with hand-computed expected values.
-/// </summary>
 public class CombatMathTests
 {
     [Theory]
-    [InlineData(100, 100, 70)] // equal stats -> exactly base 70%
-    [InlineData(200, 100, 95)] // 70 + (2-1)*25 = 95
-    [InlineData(1000, 100, 99)] // clamps at 99
-    [InlineData(100, 200, 45)] // 70 - (2-1)*25 = 45
-    [InlineData(100, 1000, 1)] // clamps at 1
+    [InlineData(100, 100, 70)]
+    [InlineData(200, 100, 95)]
+    [InlineData(1000, 100, 99)]
+    [InlineData(100, 200, 45)]
+    [InlineData(100, 1000, 1)]
     public void ComputeHitChancePercent_MatchesTheVerifiedFormula(int attackSuccess, int attackBlock, int expected)
     {
         Assert.Equal(expected, CombatMath.ComputeHitChancePercent(attackSuccess, attackBlock));
@@ -37,7 +33,6 @@ public class CombatMathTests
     [Fact]
     public void RollCritical_ZeroOrNegativeChance_NeverRolls()
     {
-        // non-positive chance must short-circuit without consuming a random draw
         var rng = new ScriptedRandomSource(0);
         Assert.False(CombatMath.RollCritical(0, rng));
         Assert.False(CombatMath.RollCritical(-5, rng));
@@ -53,7 +48,6 @@ public class CombatMathTests
     [Fact]
     public void ApplyVariance_EvenDraw_Adds()
     {
-        // First draw (%2) = 0 -> add branch; second draw (%11) = 10 -> +10%.
         var rng = new ScriptedRandomSource(0, 10);
         var result = CombatMath.ApplyVariance(1000, rng);
         Assert.Equal(1100, result);
@@ -77,7 +71,6 @@ public class CombatMathTests
     [Fact]
     public void ApplySkillPowerRatio_MatchesCalDamage()
     {
-        // CalDamage(1000, 50.0f) = (int)(1000 * 150.0f * 0.01f) = 1500
         Assert.Equal(1500, CombatMath.ApplySkillPowerRatio(1000, 50.0f));
         Assert.Equal(1000, CombatMath.ApplySkillPowerRatio(1000, 0f));
     }

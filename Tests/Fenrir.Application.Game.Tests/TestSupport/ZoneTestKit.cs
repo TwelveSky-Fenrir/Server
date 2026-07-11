@@ -22,10 +22,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.TestSupport;
 
-/// <summary>
-///     Real <see cref="Zone" /> instances over in-memory pipes; time driven exclusively through
-///     <see cref="Zone.Tick" /> -- no <c>RunAsync</c>, timers, or sleeps.
-/// </summary>
 internal static class ZoneTestKit
 {
     public static GameServerOptions Options()
@@ -63,13 +59,7 @@ internal static class ZoneTestKit
         return (new ZoneClientSession(sessionId, pipe), pipe);
     }
 
-    /// <summary>
-    ///     A ready-to-use (already <see cref="WorldStateService.InitializeAsync" />'d) <see cref="WorldStateService" />
-    ///     over an in-memory repository -- no alliance offers by default. Needed by anything exercising
-    ///     <see cref="Simulation.DeathGateTickSystem" /> or the zone-transfer/stand-up companion checks, since
-    ///     <see cref="WorldStateService" /> throws until initialized.
-    /// </summary>
-    public static WorldStateService CreateWorldState(FakeWorldStateRepository? repository = null)
+        public static WorldStateService CreateWorldState(FakeWorldStateRepository? repository = null)
     {
         var service = new WorldStateService(repository ?? new FakeWorldStateRepository(),
             NullLogger<WorldStateService>.Instance);
@@ -77,12 +67,7 @@ internal static class ZoneTestKit
         return service;
     }
 
-    /// <summary>
-    ///     A real <see cref="ZoneRegistry" /> (not just a lone <see cref="Zone" />) -- needed by anything that
-    ///     exercises a process-wide lookup (<see cref="ZoneRegistry.TryGetPlayerAndZoneByName" /> and siblings),
-    ///     which a single <see cref="Zone" /> instance from <see cref="CreateZone" /> can't stand in for.
-    /// </summary>
-    public static ZoneRegistry CreateRegistry(GameServerOptions? options = null, WorldDataCache? worldData = null)
+        public static ZoneRegistry CreateRegistry(GameServerOptions? options = null, WorldDataCache? worldData = null)
     {
         var opts = options ?? Options();
         var optionsWrapper = Microsoft.Extensions.Options.Options.Create(opts);
@@ -115,8 +100,7 @@ internal static class ZoneTestKit
             SourceIp: sourceIp);
     }
 
-    /// <summary>Drains every byte the session has written so far (empty array when nothing is pending).</summary>
-    public static byte[] DrainOutbound(FakeDuplexPipe pipe)
+        public static byte[] DrainOutbound(FakeDuplexPipe pipe)
     {
         if (!pipe.SessionToPeer.TryRead(out var result))
             return [];
@@ -126,8 +110,7 @@ internal static class ZoneTestKit
         return bytes;
     }
 
-    /// <summary>A structurally valid but empty <see cref="WorldDataCache" /> -- every catalog lookup misses.</summary>
-    public static WorldDataCache EmptyWorldData(
+        public static WorldDataCache EmptyWorldData(
         FrozenDictionary<int, ItemDefinition>? itemsById = null,
         FrozenDictionary<int, SkillDefinition>? skillsById = null,
         FrozenDictionary<short, LevelRowDto>? levelsByLevel = null,
@@ -160,10 +143,6 @@ internal static class ZoneTestKit
     }
 }
 
-/// <summary>
-///     Deterministic <see cref="IRandomSource" />: returns a fixed sequence (wrapping when exhausted), reduced modulo
-///     each call's own requested bound.
-/// </summary>
 internal sealed class ScriptedRandomSource(params int[] sequence) : IRandomSource
 {
     private int _index;

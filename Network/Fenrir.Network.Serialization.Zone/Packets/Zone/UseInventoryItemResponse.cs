@@ -3,10 +3,6 @@ using Fenrir.Network.Serialization.Wire.Attributes;
 
 namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 
-/// <summary>
-///     Value2 exists because USE_PREMIUM_LONGTIME is active in this build; without it wire size would be 17 bytes,
-///     not 21.
-/// </summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.UseInventoryItem,
     ExpectedSize = 21)]
 public readonly partial record struct UseInventoryItemResponse : IOutgoingPacket

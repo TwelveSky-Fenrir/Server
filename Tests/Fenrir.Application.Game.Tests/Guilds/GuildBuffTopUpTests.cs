@@ -3,12 +3,6 @@ using Fenrir.Data.Abstractions.Guilds;
 
 namespace Fenrir.Application.Game.Tests.Guilds;
 
-/// <summary>
-///     C6-center-audit: legacy parity for <c>MyDB::UpdateGuildBuffTime</c>
-///     (Server/ts25extra/S08_MyDB.cpp:1151-1186), the missing producer half of the guild-buff mechanism --
-///     see <see cref="GuildBuffTopUp" />'s own remarks for the full cited behavior and its companion
-///     <see cref="GuildBuffDecay" /> decay-side half.
-/// </summary>
 public class GuildBuffTopUpTests
 {
     private static readonly DateTime Now = new(2026, 7, 10, 12, 0, 0, DateTimeKind.Utc);
@@ -16,8 +10,6 @@ public class GuildBuffTopUpTests
     [Fact]
     public void Apply_BaselineAtSchemaDefaultZero_RestartsFromNow()
     {
-        // game.Guilds.BuffTimeForDiff defaults to 0 (DF_Guilds_BuffTimeForDiff) -- a guild that has never
-        // been topped up before must start counting from now, not from year-1 epoch zero.
         var guild = Guild(2, 0, 0, 0L);
 
         var result = GuildBuffTopUp.Apply(guild, 30, Now);

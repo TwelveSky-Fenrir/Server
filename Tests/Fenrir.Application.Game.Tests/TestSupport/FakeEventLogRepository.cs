@@ -2,11 +2,6 @@ using Fenrir.Data.Abstractions.Game;
 
 namespace Fenrir.Application.Game.Tests.TestSupport;
 
-/// <summary>
-///     In-memory stand-in for IEventLogRepository: records every single-row LogAsync call (append-only) so
-///     handler test suites can assert an audit row was (or was not) written, without a real SQL Server 2025
-///     instance.
-/// </summary>
 internal sealed class FakeEventLogRepository : IEventLogRepository
 {
     public List<LoggedEvent> LoggedEvents { get; } = [];

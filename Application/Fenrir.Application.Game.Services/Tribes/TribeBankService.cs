@@ -5,31 +5,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Tribes;
 
-/// <summary>
-///     See <see cref="ITribeBankService" />. Sort 1 (view) requires either any tribe role at all, or the
-///     caller's session meeting <see cref="GmCommandTier.Basic" /> -- legacy's <c>uUserSort &lt; 1</c> gate
-///     (Server/ts25zone/S04_MyWork02.cpp:11560-11607) bypasses the <c>ReturnTribeRole != 0</c> check entirely
-///     for a staff/GM-tier caller, letting such an account view any tribe's bank scoped to whatever tribe id
-///     is recorded on their own avatar (Server/ts25zone/H07_MyGame.h:796, tier field declaration ;
-///     Server/ts25zone/S04_MyWork02.cpp:806, tier populated from the player-session-tracking process's own
-///     per-account tier at login) -- the same <c>uUserSort</c>/<see cref="GmCommandTier" /> concept
-///     <see cref="Chat.GlobalAnnouncementService" /> and <see cref="Gm.GmBlockAvatarService" /> already gate
-///     on.
-///     <para>
-///         <b>Correction:</b> a fresh, definitive full read of
-///         Server/ts25zone/S04_MyWork02.cpp:11560-11607 and Server/ts25playuser/S04_MyWork02.cpp:269-377
-///         resolved a 3-way contradiction between this file, <see cref="ITribeBankService" />, and
-///         <c>TribeBankWithdrawService</c>: CZ_TRIBE_BANK_SEND sort 2 is exclusively a WITHDRAW (bank slot
-///         -&gt; player money, now wired via <c>TribeBankWithdrawService.WithdrawAsync</c> in
-///         <see cref="Handlers.Tribes.TribeBankHandler" />), not a deposit. Legacy has no client-invocable
-///         deposit path anywhere on this opcode, or anywhere else -- deposits only happen via the automatic
-///         10-minute server-internal tax-skim sweep (<c>TribeBankTaxSweepFlushHost</c>), never a packet. The
-///         <see cref="DepositAsync" /> method below (player money -&gt; bank slot, Force Leader role only,
-///         same 3-sub-master-quorum and slot-range gates as the withdraw) is consequently no longer reachable
-///         from any opcode -- it is kept, not deleted, pending a decision on whether it should be removed
-///         outright, since it turns out to have no legacy basis as a client-invoked action at all.
-///     </para>
-/// </summary>
 public sealed class TribeBankService(ITribeRepository tribes, ILogger<TribeBankService> logger) : ITribeBankService
 {
     private const int SlotCount = 50;
@@ -38,9 +13,6 @@ public sealed class TribeBankService(ITribeRepository tribes, ILogger<TribeBankS
     public async ValueTask<TribeBankResult> ViewAsync(ZoneClientSession zoneSession, PlayerRuntimeState state,
         CancellationToken ct)
     {
-        // uUserSort < 1 GM bypass (Server/ts25zone/S04_MyWork02.cpp:11560-11607): a staff/GM-tier caller
-        // skips the tribe-role gate entirely and may view any tribe's bank, scoped to whatever tribe id is
-        // recorded on their own avatar (state.Tribe) -- not a tribe of their choosing.
         if (state.TribeRole == 0 && !zoneSession.MeetsGmTier(GmCommandTier.Basic))
         {
             logger.LogDebug("Character {CharacterId} tribe-bank view rejected: caller holds no tribe role",
@@ -52,13 +24,7 @@ public sealed class TribeBankService(ITribeRepository tribes, ILogger<TribeBankS
         return new TribeBankResult(true, 1, BuildBankArray(slots), 0);
     }
 
-    /// <summary>
-    ///     Player money -&gt; tribe-bank slot. No longer reachable from any opcode -- see this class's own
-    ///     summary for the corrected finding that legacy has no client-invocable deposit path at all. Kept
-    ///     for now rather than deleted; not deleting is an explicit instruction from the correction that
-    ///     surfaced this, pending a separate decision on removing it outright.
-    /// </summary>
-    public async ValueTask<TribeBankResult> DepositAsync(int slotValue, PlayerRuntimeState state, int characterId,
+        public async ValueTask<TribeBankResult> DepositAsync(int slotValue, PlayerRuntimeState state, int characterId,
         CancellationToken ct)
     {
         if (slotValue < 0 || slotValue >= SlotCount || state.TribeRole != 1)

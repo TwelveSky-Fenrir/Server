@@ -8,20 +8,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Hosting.World.ZoneWar;
 
-/// <summary>
-///     Per-tick driver for <see cref="TribeVoteElectionCalendar" />: reads the real calendar day/hour every
-///     zone-tick and applies whichever of <see cref="TribeVoteElection" />'s transitions the calendar decides,
-///     but only on whichever live shard currently hosts <see cref="GameServerOptions.VoteTribeMapId" /> with
-///     <c>VoteTribe</c> enabled -- every other shard's instance of this host is permanently inert.
-/// </summary>
-/// <remarks>
-///     Réf. C++ : Server/ts25zone/S07_MyGame01.cpp:612-616 -- legacy gates the equivalent on the single
-///     physical instance running server number 37; Fenrir shards by map, not by a numbered
-///     server-instance-per-process, so "the shard hosting the designated map" (read once at construction and
-///     cached, see <see cref="_armed" />/<see cref="_testMode" />) is the natural translation. See
-///     <see cref="TribeVoteElectionCalendar" />'s own remarks for why, in production, this host only ever
-///     calls <see cref="TribeVoteElection.OpenCandidacyWindowAsync" />.
-/// </remarks>
 public sealed class TribeVoteElectionCalendarHost(
     IOptions<GameServerOptions> options,
     ZoneRegistry zoneRegistry,
@@ -33,16 +19,9 @@ public sealed class TribeVoteElectionCalendarHost(
 
     private readonly bool _testMode = options.Value.VoteTribeTestMode;
 
-    /// <summary>True once at construction if this shard is both server number 37 and has VoteTribe enabled.</summary>
-    public bool IsArmed => _armed;
+        public bool IsArmed => _armed;
 
-    /// <summary>
-    ///     Evaluates and, if due, applies one calendar transition -- pure enough to drive directly from a test
-    ///     without a real timer, same convention as
-    ///     <see cref="Fenrir.Application.Game.Domain.World.ZoneWar.ZoneEventBroadcaster" />'s
-    ///     sibling <c>ZoneWarTickService.Tick</c>. A no-op entirely if this instance is not armed.
-    /// </summary>
-    public async ValueTask TickAsync(DateTime utcNow, CancellationToken ct)
+        public async ValueTask TickAsync(DateTime utcNow, CancellationToken ct)
     {
         if (!_armed)
             return;
@@ -93,14 +72,11 @@ public sealed class TribeVoteElectionCalendarHost(
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    // A missed tick just delays this cycle's Tribe Vote calendar transition to the next
-                    // legacy tick -- never worth crashing the GameServer.
                     logger.LogError(ex, "Tribe Vote election calendar tick failed");
                 }
         }
         catch (OperationCanceledException)
         {
-            // Expected on shutdown.
         }
     }
 }

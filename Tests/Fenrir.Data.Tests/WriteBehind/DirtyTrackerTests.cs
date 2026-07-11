@@ -3,7 +3,6 @@ using Fenrir.Data.WriteBehind;
 
 namespace Fenrir.Data.Tests.WriteBehind;
 
-// Pure in-memory unit tests for DirtyTracker<TKey> -- no database needed.
 public sealed class DirtyTrackerTests
 {
     [Fact]
@@ -76,8 +75,6 @@ public sealed class DirtyTrackerTests
     [Fact]
     public void DrainAll_ThenMarkDirtyAgain_CountTracksTheNewCycleCorrectly()
     {
-        // Guards Count staying exact if it were ever Interlocked-maintained instead of forwarding to
-        // ConcurrentDictionary.Count.
         var tracker = new DirtyTracker<int>();
         tracker.MarkDirty(1, DirtyFlags.Position);
         tracker.DrainAll();
@@ -91,7 +88,6 @@ public sealed class DirtyTrackerTests
     [Fact]
     public async Task MarkDirty_And_DrainAll_UnderConcurrency_NeverLosesAKey_AndCountNeverGoesNegative()
     {
-        // Invariant: a MarkDirty racing a DrainAll must never be silently dropped or drained twice.
         const int keyCount = 32;
         const int writerTaskCount = 8;
         const int markCallsPerWriter = 4_000;
@@ -111,7 +107,6 @@ public sealed class DirtyTrackerTests
                 await Task.Yield();
             }
 
-            // Final sweep: anything marked after the last in-loop drain must still be counted.
             foreach (var key in tracker.DrainAll().Keys)
                 everDrained[key] = 0;
         });

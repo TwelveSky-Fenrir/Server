@@ -8,10 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Commerce;
 
-/// <summary>
-///     CZ_GET_DEPUTY_PSHOP_SEND (opcode 108) -- fetch a deputy (offline/proxy) shop's contents. Gated to
-///     zone 37.
-/// </summary>
 public sealed class GetProxyShopHandler(IGetProxyShopService service, ILogger<GetProxyShopHandler> logger)
     : IAsyncPacketHandler<GetProxyShopRequest>
 {

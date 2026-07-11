@@ -9,7 +9,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 
-/// <summary>Drives the real <see cref="ContinueSkillUseService" /> (opcode 95) over a real <see cref="Zone" />.</summary>
 public class ContinueSkillUseServiceTests
 {
     private static readonly int ActionFrame = FrameWriter.FrameSizeOf<AvatarActionResponse>();

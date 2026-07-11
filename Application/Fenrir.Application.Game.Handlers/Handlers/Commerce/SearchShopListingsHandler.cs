@@ -7,12 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Commerce;
 
-/// <summary>
-///     CZ_PSHOP_ITEM_INFO_SEND (opcode 34) -- market-wide search: every currently open proxy/deputy shop
-///     cluster-wide, unioned with every live personal-shop stall currently open in this zone only, gated
-///     to zone 37 like <see cref="ViewShopStallHandler" />. One <see cref="SearchShopListingsResponse" />
-///     per matching listing (a burst, not a single reply). Async -- the proxy-shop half is a database read.
-/// </summary>
 public sealed class SearchShopListingsHandler(
     ISearchShopListingsService service,
     ILogger<SearchShopListingsHandler> logger) : IAsyncPacketHandler<SearchShopListingsRequest>

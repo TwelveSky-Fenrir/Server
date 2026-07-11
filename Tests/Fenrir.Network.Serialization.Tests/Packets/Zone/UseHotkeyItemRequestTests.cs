@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Zone;
 
-/// <summary>CZ_USE_HOTKEY_ITEM_SEND (CLIENT.h:227-231, 8-byte payload): Page1/Index1, no padding.</summary>
 public class CzUseHotkeyItemSendTests
 {
     [Fact]

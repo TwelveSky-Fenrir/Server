@@ -2,13 +2,8 @@ using Fenrir.Application.Game.Domain.Inventory;
 
 namespace Fenrir.Application.Game.Tests.Inventory;
 
-/// <summary>
-///     Coverage for <see cref="BigMoneyUnitConversionPolicy" />, the pure policy behind tSort 246
-///     (money -&gt; BigMoney) and 247 (BigMoney -&gt; money). Does not depend on any dispatch wiring.
-/// </summary>
 public class BigMoneyUnitConversionPolicyTests
 {
-    // ---- tSort 246 -- ResolveMoneyToBigMoney ----
 
     [Fact]
     public void ResolveMoneyToBigMoney_QuantityBelowOneBillion_IsQuantityBelowMinimum()
@@ -83,7 +78,6 @@ public class BigMoneyUnitConversionPolicyTests
     [Fact]
     public void ResolveMoneyToBigMoney_QuantityAboveOneBillion_DebitsFullQuantityButGrantsOnlyOneUnit()
     {
-        // A client that overpays loses the excess: no partial refund, no extra units granted.
         var result = BigMoneyUnitConversionPolicy.ResolveMoneyToBigMoney(
             1_500_000_000, 2_000_000_000, 5);
 
@@ -92,7 +86,6 @@ public class BigMoneyUnitConversionPolicyTests
         Assert.Equal(6, result.NewInventoryBigMoney);
     }
 
-    // ---- tSort 247 -- ResolveBigMoneyToMoney ----
 
     [Fact]
     public void ResolveBigMoneyToMoney_ZeroQuantity_IsQuantityBelowMinimum()
@@ -158,8 +151,6 @@ public class BigMoneyUnitConversionPolicyTests
     [Fact]
     public void ResolveBigMoneyToMoney_QuantityAboveOne_OnlyRaisesEligibilityBar_MutationStaysFixed()
     {
-        // Over-supplying the quantity only requires a correspondingly larger BigMoney balance; it has no
-        // additional effect on the amounts actually moved.
         var result = BigMoneyUnitConversionPolicy.ResolveBigMoneyToMoney(
             5, 5, 0);
 

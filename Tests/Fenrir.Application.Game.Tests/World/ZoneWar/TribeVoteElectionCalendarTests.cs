@@ -21,8 +21,6 @@ public class TribeVoteElectionCalendarTests
     [InlineData(31, 23)]
     public void RealCalendarDay_FromVotingClosedOrResultsAnnounced_StillOpensRegistration(int dayOfMonth, int hourOfDay)
     {
-        // Every valid DateTime.Day is >= 1, so the day >= 1 branch is always taken regardless of which phase
-        // the cycle happens to be in -- only "already Candidacy" is guarded against.
         Assert.Equal(TribeVoteCalendarTransition.OpenRegistration,
             TribeVoteElectionCalendar.Evaluate(TribeVotePhase.VotingClosed, dayOfMonth, hourOfDay, false));
         Assert.Equal(TribeVoteCalendarTransition.OpenRegistration,
@@ -54,12 +52,6 @@ public class TribeVoteElectionCalendarTests
     [Fact]
     public void HypotheticalNonCalendarDay_BelowOne_StructurallyReachesTheOtherwiseBranches()
     {
-        // Documents the legacy's own day<=2 cascade structure -- unreachable with a real DateTime.Day (always
-        // 1-31), included only to prove the branch precedence is faithfully modeled. The day<=3 branch and the
-        // final fallback below it are NOT exercised here (unlike this pair): per Evaluate's own remarks, they
-        // require day>=1 to be false (to fall past the first branch) AND day>2 (to fall past day<=2) at the
-        // same time, which is self-contradictory -- there is no int value, real calendar day or otherwise,
-        // that can ever reach them.
         Assert.Equal(TribeVoteCalendarTransition.OpenVoting,
             TribeVoteElectionCalendar.Evaluate(TribeVotePhase.Closed, 0, 0, false));
         Assert.Equal(TribeVoteCalendarTransition.OpenVoting,

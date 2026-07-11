@@ -7,10 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>
-///     CZ_PARTY_EXILE_SEND (opcode 70) -- a self-targeted kick isn't specially guarded, matching legacy's
-///     own lack of a guard.
-/// </summary>
 public sealed class PartyKickHandler(
     ZoneRegistry zones,
     IPartyKickService partyKickService,

@@ -13,21 +13,13 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.WarPoint;
 
-/// <summary>
-///     Orchestration coverage of <see cref="WarPointShopService" />: the NotHandled/Aborted/SoftRejected/Succeeded
-///     mapping, the atomic-purchase repository call, the item mirror, and the audit row. The server-authoritative
-///     War-Point affordability check lives in the SQL procedure (fielded here by
-///     <see cref="FakeWarPointRepository" />). The S905/S003 balance-update packets reuse the same
-///     <c>AvatarStatUpdateResponse</c> carrier <c>Zone.GrantWarPoints</c> already emits (see the service's own
-///     remarks) and are not re-asserted at the byte level here.
-/// </summary>
 public class WarPointShopServiceTests
 {
     private const int AccountId = 1;
     private const int CharacterId = 10;
     private const short ZoneNumber = 1;
-    private const int WpNpc = WarPointShopCatalog.NobleDragonNpcId; // 102
-    private const int OtherWpNpc = WarPointShopCatalog.RoyalSerpentNpcId; // 202
+    private const int WpNpc = WarPointShopCatalog.NobleDragonNpcId;
+    private const int OtherWpNpc = WarPointShopCatalog.RoyalSerpentNpcId;
     private const int OrdinaryNpc = 1;
     private const int WpItemId = 90200;
     private const byte NonStackableSort = 9;
@@ -104,7 +96,6 @@ public class WarPointShopServiceTests
         Assert.Single(warPoints.LastCall!.Items);
         Assert.Equal(WpItemId, warPoints.LastCall!.Items[0].ItemId);
 
-        // Item mirrored into PlayerRuntimeState by the zone tick.
         var mirrored = state.Inventory.GetSlot(DestinationPage, DestinationSlot);
         Assert.NotNull(mirrored);
         Assert.Equal(WpItemId, mirrored!.Value.ItemId);
@@ -187,7 +178,7 @@ public class WarPointShopServiceTests
                 DestinationSlot, CancellationToken.None), zone);
 
         Assert.Equal(WarPointBuyStatus.SoftRejected, result.Status);
-        Assert.Equal(1, warPoints.CallCount); // the atomic proc IS the authoritative WP check
+        Assert.Equal(1, warPoints.CallCount);
         Assert.Empty(eventLog.LoggedEvents);
         Assert.Null(state.Inventory.GetSlot(DestinationPage, DestinationSlot));
     }
@@ -197,7 +188,6 @@ public class WarPointShopServiceTests
     {
         var worldData = WorldData();
         var (zone, state) = SetUp(worldData);
-        // Player enters with 0 Contribution Points; a CP-priced item cannot be afforded.
         var warPoints = new FakeWarPointRepository();
         var eventLog = new FakeEventLogRepository();
         var service = CreateService(worldData, Catalog(contributionPointPrice: 100), warPoints, eventLog);
@@ -207,7 +197,7 @@ public class WarPointShopServiceTests
                 DestinationSlot, CancellationToken.None), zone);
 
         Assert.Equal(WarPointBuyStatus.SoftRejected, result.Status);
-        Assert.Equal(0, warPoints.CallCount); // CP checked in-memory, before any DB write
+        Assert.Equal(0, warPoints.CallCount);
         Assert.Empty(eventLog.LoggedEvents);
     }
 

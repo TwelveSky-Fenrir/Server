@@ -8,29 +8,12 @@ using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     Covers the world-state/config wiring closed by the PvP-kill reward follow-up pass on top of
-///     <see cref="ZonePvpKillRewardsTests" />: <see cref="Zone" /> now threads live
-///     <see cref="WorldStateService.World" />.<c>TribeSymbolBattle</c> into both
-///     <see cref="PvpKillExtendedRewardZones" />' zone-eligibility gate and
-///     <see cref="PvpKillContributionPointBonuses.ComputeConditionalBonuses" />' own symbol-battle CP bonus
-///     (previously both were hardcoded <see langword="false" />), and <see cref="GameServerOptions.CrossTribeCpAddValue" />/
-///     <see cref="GameServerOptions.CrossTribeXpRatio" /> now feed the CP/EXP formulas instead of the hardcoded
-///     shipped literals (3/2) they replace -- the defaults are unchanged, only the source of the value moved.
-/// </summary>
 public class ZonePvpKillWorldStateWiringTests
 {
-    /// <summary>
-    ///     One of the twelve tribe-symbol-battle secondary zones
-    ///     (<c>PvpKillExtendedRewardZones.SymbolBattleZoneIds</c>: 2, 3, 4, 7, 8, 9, 12, 13, 14, 141, 142, 143) --
-    ///     grants the full CP/EXP/drop/daily-mission set only while <see cref="WorldStateService.World" />'s
-    ///     <c>TribeSymbolBattle</c> flag is active, nothing at all while it is inactive.
-    /// </summary>
-    private const short SymbolBattleZoneId = 2;
 
-    /// <summary>Map 38 ("DTM"): CP is force-enabled regardless of the symbol-battle flag, but the flag still gates
-    /// the <see cref="PvpKillContributionPointBonuses.SymbolBattleBaseLevelBonus" /> (+10) additive CP term.</summary>
-    private const short SymbolBattleCpBonusServerId = PvpKillContributionPointBonuses.SymbolBattleServerId;
+        private const short SymbolBattleZoneId = 2;
+
+        private const short SymbolBattleCpBonusServerId = PvpKillContributionPointBonuses.SymbolBattleServerId;
 
     private static readonly EffectiveStats StrongAttacker =
         new(1000, 1000, 1000, 0, 100, 0, 0, 0, 0, 0, 0);
@@ -84,14 +67,14 @@ public class ZonePvpKillWorldStateWiringTests
 
         attacker.AttackSubPacketCeiling = int.MaxValue;
 
-        zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1)); // past the zone-entry protect window
+        zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1));
         return zone;
     }
 
     private static void KillDefender(Zone zone)
     {
         Assert.True(zone.TryGetPlayer(2, out var defender));
-        defender!.Life = 1; // one hit will kill regardless of exact damage roll
+        defender!.Life = 1;
 
         zone.PostCombatCommand(new CombatCommand { AttackerCharacterId = 1, AttackInfo = MeleeRequest(1, 2) });
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -102,7 +85,7 @@ public class ZonePvpKillWorldStateWiringTests
     [Fact]
     public void SymbolBattleZone_GrantsNothing_WhileWorldStateTribeSymbolBattleInactive()
     {
-        var worldState = ZoneTestKit.CreateWorldState(); // TribeSymbolBattle false by default
+        var worldState = ZoneTestKit.CreateWorldState();
         var zone = SetUpZone(SymbolBattleZoneId, worldState: worldState);
         Assert.True(zone.TryGetPlayer(1, out var attackerBefore));
         var experienceBefore = attackerBefore!.Experience;
@@ -135,10 +118,6 @@ public class ZonePvpKillWorldStateWiringTests
     [Fact]
     public void SymbolBattleCpBonus_AppliesOnlyWhileWorldStateTribeSymbolBattleActive()
     {
-        // Map 38 force-enables CP regardless of the symbol-battle flag (it's the DTM zone), so this isolates the
-        // ComputeConditionalBonuses wiring specifically -- both attacker and defender sit at the
-        // SymbolBattleMinimumBaseLevel (135) with a zero combined-level gap so the outer 13-level anti-gank gate
-        // never interferes.
         const short level = PvpKillContributionPointBonuses.SymbolBattleMinimumBaseLevel;
 
         var inactiveWorldState = ZoneTestKit.CreateWorldState();
@@ -185,8 +164,6 @@ public class ZonePvpKillWorldStateWiringTests
         KillDefender(zone);
 
         Assert.True(zone.TryGetPlayer(1, out var attacker));
-        // Same combined level (42) on both sides, so Scale is a no-op and map 1 isn't a regular-war server, so
-        // ResolveZoneMultiplier returns the configured ratio verbatim.
         var scaledBase = PvpKillExperienceScaling.Scale(PvpKillExperienceBaseTable.Lookup(42), 42, 42);
         var zoneMultiplier = PvpKillExperienceScaling.ResolveZoneMultiplier(false, options.CrossTribeXpRatio);
         var expectedGain = PvpKillExperienceCalculator.ComputeGain(scaledBase, 42, 42, false, false, zoneMultiplier);
@@ -201,10 +178,6 @@ public class ZonePvpKillWorldStateWiringTests
     [Fact]
     public void Map195_StillGrantsNothing_RegardlessOfWorldState()
     {
-        // Zone195TimeEventGate.IsOpen is permanently false (no live legacy trigger ever flips isZone195TimeEvent)
-        // -- confirms wiring it through PvpKillRewardZoneRuntimeState.Map195TimeEventActive (replacing the
-        // previously-hardcoded false) is not a behavior change: a symbol-battle world-state flip must NOT open
-        // this unrelated gate.
         var worldState = ZoneTestKit.CreateWorldState();
         worldState.StartTribeSymbolBattle();
         var zone = SetUpZone(195, worldState: worldState);

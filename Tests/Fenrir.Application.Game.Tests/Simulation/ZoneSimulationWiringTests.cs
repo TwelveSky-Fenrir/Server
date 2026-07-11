@@ -4,10 +4,6 @@ using Fenrir.Application.Game.Tests.TestSupport;
 
 namespace Fenrir.Application.Game.Tests.Simulation;
 
-/// <summary>
-///     Covers <see cref="Zone" />'s ordered <see cref="ISimulationSystem" /> list: whole-legacy-tick gating, declared
-///     order, and per-system fault containment.
-/// </summary>
 public class ZoneSimulationWiringTests
 {
     [Fact]
@@ -42,7 +38,6 @@ public class ZoneSimulationWiringTests
         var system = new RecordingSystem(log, "only");
         var zone = ZoneTestKit.CreateZone(1, simulationSystems: [system]);
 
-        // A stalled host: 3 whole legacy ticks (1.5 s) arrive in a single frame.
         zone.Tick(TimeSpan.FromMilliseconds(1500));
 
         Assert.Equal(1, system.CallCount);
@@ -86,13 +81,11 @@ public class ZoneSimulationWiringTests
         var system = new RecordingSystem(log, "only");
         var zone = ZoneTestKit.CreateZone(1, simulationSystems: [system]);
 
-        // 9 frames of 50 ms (450 ms total) must not be enough for a single legacy tick yet.
         for (var i = 0; i < 9; i++)
             zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.Equal(0, system.CallCount);
 
-        // The 10th frame crosses the 500 ms boundary.
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.Equal(1, system.CallCount);

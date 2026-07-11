@@ -5,10 +5,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Guilds;
 
-// C17 Part B2: FourGuildScoringRecomputeHost is the periodic driver for
-// FourGuildScoringService.RecomputeAsync -- FourGuildScoringService itself already covers the
-// silent-on-fault/leaves-previous-standings-in-place semantics (FourGuildScoringServiceTests), so these
-// tests only exercise the host's own RunOnceAsync forwarding and its "never throws" tick-loop posture.
 public sealed class FourGuildScoringRecomputeHostTests
 {
     [Fact]

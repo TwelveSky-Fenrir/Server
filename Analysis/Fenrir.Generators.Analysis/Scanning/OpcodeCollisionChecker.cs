@@ -6,7 +6,6 @@ using Microsoft.CodeAnalysis;
 
 namespace Fenrir.Generators.Analysis.Scanning;
 
-/// <summary>FEN004: two <c>[FenrirPacket]</c>s cannot share (Server, Direction, Opcode).</summary>
 internal static class OpcodeCollisionChecker
 {
     public static (ImmutableArray<TypeModel> Deduplicated, ImmutableArray<Diagnostic> Diagnostics) Check(

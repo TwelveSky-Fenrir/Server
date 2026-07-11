@@ -13,17 +13,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.World.Monsters;
 
-/// <summary>
-///     <c>Zone.ApplyPvmAttack</c>'s tower-guardian sub-branch (legacy <c>mSpecialSortNumber</c> == 10) --
-///     <see cref="TowerFriendlyFireGate" />'s authorization gate wired against a real <see cref="Zone" />
-///     tick, plus its allowed-hit side effects (siege-flag clear, first-hit bookkeeping, the
-///     <see cref="TowerStatusResponse" /> rebroadcast).
-/// </summary>
 public class ZoneTowerGuardianCombatTests
 {
     private const int TowerIndex = 0;
 
-    // TowerZoneIndexTable.GetTowerIndex(2) == 0 -> TowerZoneIndexTable.GetOwningTribe(2) == tribe 0.
     private const short TowerZoneNumber = 2;
 
     private static readonly EffectiveStats StrongAttacker = new(1000, 1000, 500, 0, 1000, 0, 0, 0, 0, 0, 0);
@@ -35,11 +28,6 @@ public class ZoneTowerGuardianCombatTests
         var guardianIndex = TowerWarState.GuardianServerIndex(towerIndex);
         var guardian = MonsterEntity.Create(guardianIndex, 777u, template, guardianIndex, 100, 0, 100, 300f);
 
-        // This suite never wires MonsterAiSystem into the zone (it only needs the friendly-fire gate), so a
-        // freshly created guardian would otherwise sit in MonsterAiState.Spawning forever -- Zone.ApplyCombatCommand's
-        // CheckPossibleAttackTarget gate (Zone.Combat.cs) now silently rejects an attack against a monster
-        // mid-spawn-windup. Force straight to Decision: a tower guardian is conceptually always "up," not
-        // mid-spawn-animation, for this suite's purposes.
         guardian.AiState = MonsterAiState.Decision;
         return guardian;
     }
@@ -48,7 +36,7 @@ public class ZoneTowerGuardianCombatTests
         WorldStateService? worldState = null, int towerIndex = TowerIndex)
     {
         var towerWar = new TowerWarState();
-        towerWar.SetTowerState(towerIndex, 201, true); // level 2 type 1, valid => TowerSiegePhase.Active
+        towerWar.SetTowerState(towerIndex, 201, true);
 
         var zone = ZoneTestKit.CreateZone(TowerZoneNumber, randomSource: new ScriptedAlwaysHitRandomSource(),
             towerWar: towerWar, worldState: worldState);
@@ -58,25 +46,19 @@ public class ZoneTowerGuardianCombatTests
         var (session, _) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(10,
             ZoneTestKit.EnterData(session, TowerZoneNumber, "Attacker", tribe: attackerTribe)));
-        zone.Tick(SimulationClock.LegacyTick); // enters + pops the guardian into _players/_monsters
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.True(zone.TryGetPlayer(10, out var attacker));
         attacker!.Stats = StrongAttacker;
 
-        // This suite exercises the tower-guardian friendly-fire gate, not the attack sub-packet budget/replay
-        // guard (that's AttackPacketBudgetTests' own job) -- a real client always sends a legal avatar-action
-        // packet first to establish a non-zero ceiling, which this fixture skips. Uncapped here so a raw
-        // CombatCommand posted straight after Enter isn't silently rejected by AttackPacketBudget.TryConsume.
         attacker.AttackSubPacketCeiling = int.MaxValue;
 
-        // ResolvePvmAttack checks the attacker's own zone-entry protect window, even against a monster.
         zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1));
 
         return (zone, towerWar);
     }
 
-    /// <summary>Synchronous-init helper -- kept out of any <c>[Fact]</c> body so xUnit1031 never fires here.</summary>
-    private static WorldStateService CreateInitializedWorldState()
+        private static WorldStateService CreateInitializedWorldState()
     {
         var service = new WorldStateService(new FakeWorldStateRepository(), NullLogger<WorldStateService>.Instance);
         service.InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
@@ -122,7 +104,7 @@ public class ZoneTowerGuardianCombatTests
     [Fact]
     public void AttackFromOwningTribe_IsRejected_SelfTribeProtection()
     {
-        var (zone, _) = CreateZoneWithActiveGuardian(0); // owner of zone 2's tower is tribe 0
+        var (zone, _) = CreateZoneWithActiveGuardian(0);
         Assert.True(zone.TryGetMonster(TowerWarState.GuardianServerIndex(TowerIndex), out var guardian));
         var startingLife = guardian!.Life;
 
@@ -137,7 +119,7 @@ public class ZoneTowerGuardianCombatTests
     public void AttackFromTribeAlliedWithTheOwner_IsRejected_TheFriendlyFireFix()
     {
         var worldState = CreateInitializedWorldState();
-        worldState.SetAllianceOffer(0, 2, true); // tribe 0 (this tower's owner) allied with tribe 2
+        worldState.SetAllianceOffer(0, 2, true);
 
         var (zone, _) = CreateZoneWithActiveGuardian(2, worldState);
         Assert.True(zone.TryGetMonster(TowerWarState.GuardianServerIndex(TowerIndex), out var guardian));
@@ -153,7 +135,7 @@ public class ZoneTowerGuardianCombatTests
     [Fact]
     public void TowerNotActivelyBuilt_AttackIsRejected_EvenFromAnUnrelatedTribe()
     {
-        var towerWar = new TowerWarState(); // fresh: Dormant, never built
+        var towerWar = new TowerWarState();
         var zone = ZoneTestKit.CreateZone(TowerZoneNumber, randomSource: new ScriptedAlwaysHitRandomSource(),
             towerWar: towerWar);
         var guardian = CreateGuardian();
@@ -164,7 +146,7 @@ public class ZoneTowerGuardianCombatTests
         zone.Tick(SimulationClock.LegacyTick);
         Assert.True(zone.TryGetPlayer(10, out var attacker));
         attacker!.Stats = StrongAttacker;
-        attacker.AttackSubPacketCeiling = int.MaxValue; // see CreateZoneWithActiveGuardian's own remarks
+        attacker.AttackSubPacketCeiling = int.MaxValue;
         zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1));
 
         zone.PostCombatCommand(new CombatCommand { AttackerCharacterId = 10, AttackInfo = MeleeAgainst(guardian) });
@@ -177,14 +159,12 @@ public class ZoneTowerGuardianCombatTests
     [Fact]
     public void NonTowerZone_MonsterAtTheGuardianReservedIndex_IsUnaffectedByTheGate()
     {
-        // Zone 39 has no recognized tower slot at all (GetTowerIndex returns -1), so isTowerGuardian must be
-        // false regardless of the monster's own ServerIndex -- the friendly-fire gate must never engage here.
         var towerWar = new TowerWarState();
         var zone = ZoneTestKit.CreateZone(39, randomSource: new ScriptedAlwaysHitRandomSource(), towerWar: towerWar);
         var guardianIndex = TowerWarState.GuardianServerIndex(TowerIndex);
         var monster = MonsterEntity.Create(guardianIndex, 1u, WorldDataTestRows.Monster(9001) with { Life = 1000 },
             guardianIndex, 100, 0, 100, 300f);
-        monster.AiState = MonsterAiState.Decision; // see CreateGuardian's own remarks on the spawn-windup gate
+        monster.AiState = MonsterAiState.Decision;
         zone.SpawnMonster(monster);
 
         var (session, _) = ZoneTestKit.CreateSession(1);
@@ -192,14 +172,14 @@ public class ZoneTowerGuardianCombatTests
         zone.Tick(SimulationClock.LegacyTick);
         Assert.True(zone.TryGetPlayer(10, out var attacker));
         attacker!.Stats = StrongAttacker;
-        attacker.AttackSubPacketCeiling = int.MaxValue; // see CreateZoneWithActiveGuardian's own remarks
+        attacker.AttackSubPacketCeiling = int.MaxValue;
         zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1));
 
         zone.PostCombatCommand(new CombatCommand { AttackerCharacterId = 10, AttackInfo = MeleeAgainst(monster) });
         zone.Tick(SimulationClock.LegacyTick);
 
         Assert.True(zone.TryGetMonster(TowerWarState.GuardianServerIndex(TowerIndex), out var damaged));
-        Assert.True(damaged!.Life < 1000); // attack went through -- the gate never engages outside a tower zone
+        Assert.True(damaged!.Life < 1000);
     }
 
     [Fact]
@@ -225,14 +205,14 @@ public class ZoneTowerGuardianCombatTests
         zone.Post(ZoneCommand.Enter(20, ZoneTestKit.EnterData(bystanderSession, TowerZoneNumber, "Bystander",
             500, 0, 500, tribe: 3)));
         zone.Tick(SimulationClock.LegacyTick);
-        ZoneTestKit.DrainOutbound(bystanderPipe); // discard the enter/replication noise before asserting
+        ZoneTestKit.DrainOutbound(bystanderPipe);
 
         zone.PostCombatCommand(new CombatCommand { AttackerCharacterId = 10, AttackInfo = MeleeAgainst(guardian!) });
         zone.Tick(SimulationClock.LegacyTick);
 
         Assert.NotNull(towerWar.GetFirstAttackAtUtc(TowerIndex));
         var bytes = ZoneTestKit.DrainOutbound(bystanderPipe);
-        Assert.NotEmpty(bytes); // the full tower-state rebroadcast reached a bystander who never attacked
+        Assert.NotEmpty(bytes);
     }
 
     [Fact]
@@ -254,8 +234,7 @@ public class ZoneTowerGuardianCombatTests
         Assert.Equal(firstAttackAt, towerWar.GetFirstAttackAtUtc(TowerIndex));
     }
 
-    /// <summary>Always rolls a hit/no-crit -- removes RNG as a source of test flakiness for the hit-chance/variance rolls.</summary>
-    private sealed class ScriptedAlwaysHitRandomSource : IRandomSource
+        private sealed class ScriptedAlwaysHitRandomSource : IRandomSource
     {
         public int NextInt32(int exclusiveUpperBound)
         {

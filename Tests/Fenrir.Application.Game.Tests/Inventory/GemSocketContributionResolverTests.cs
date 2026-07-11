@@ -4,8 +4,8 @@ namespace Fenrir.Application.Game.Tests.Inventory;
 
 public class GemSocketContributionResolverTests
 {
-    /// <summary>Packs SOCKET_GEM_V2's 12 bytes (unused, num, t1,g1..t5,g5) into 3 little-endian ints.</summary>
-    private static (int P1, int P2, int P3) Pack(byte num, params (byte Type, byte Tier)[] sockets)
+
+        private static (int P1, int P2, int P3) Pack(byte num, params (byte Type, byte Tier)[] sockets)
     {
         Span<byte> bytes = stackalloc byte[12];
         bytes[1] = num;
@@ -47,7 +47,6 @@ public class GemSocketContributionResolverTests
     [Fact]
     public void UnpackActiveSockets_OnlyConsultsLeadingActiveCountEntries()
     {
-        // 5 socket slots populated, but active count says only 2 -- trailing 3 must never surface.
         var (p1, p2, p3) = Pack(2, (10, 1), (20, 2), (99, 9), (98, 8), (97, 7));
 
         var result = GemSocketContributionResolver.UnpackActiveSockets(p1, p2, p3);

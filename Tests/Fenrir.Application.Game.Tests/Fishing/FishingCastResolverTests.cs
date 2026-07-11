@@ -4,7 +4,6 @@ using Fenrir.Application.Game.Domain.World.Geometry;
 
 namespace Fenrir.Application.Game.Tests.Fishing;
 
-/// <summary>Mirrors <c>MovementRulesTests</c>' hand-built flat-square geometry fixture.</summary>
 public class FishingCastResolverTests
 {
     private static ZoneGeometry FlatSquareGeometry()

@@ -34,7 +34,6 @@ public class BankedCounterMathTests
     [Fact]
     public void AddWideSafe_LargeBulkAmount_NeverOverflowsBeforeTheCeilingCompare()
     {
-        // A 32-bit-unsafe add would wrap here; the wide-safe path must not.
         var result = BankedCounterMath.AddWideSafe(int.MaxValue - 10, 999);
 
         Assert.Equal(BankedCounterMath.AddOutcome.WouldExceedCeiling, result.Outcome);
@@ -69,7 +68,6 @@ public class BankedCounterMathTests
     [Fact]
     public void CoerceBulkToHeadroom_RequestOvershootsCap_IsSilentlyReducedToWhatFits()
     {
-        // current=190, cap=200, perUnitAmount=10 -> only 1 unit fits, not the requested 5.
         var count = BankedCounterMath.CoerceBulkToHeadroom(190, 200, 10, 5);
 
         Assert.Equal(1, count);

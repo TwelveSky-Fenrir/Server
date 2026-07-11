@@ -63,14 +63,6 @@ public enum CraftFamilyOutcome
     Applied
 }
 
-/// <summary>
-///     Shared result shape for the sort 0/2/3/40/41/42/43/45/46/80-84 recipe family (stone-mat combine, mount
-///     fusion, wing assembly/tier-up/reroll, wing-dust recycling): slot1 (the "base" material slot) always
-///     ends up holding <see cref="ResultItemId" />/<see cref="ResultQuantity" /> (preserving its original
-///     Serial via the <c>material1 with { ... }</c> idiom); <see cref="GrantedItem" /> is set only when the
-///     recipe additionally grants a brand-new stack into a different free slot because the consumed material
-///     only partially depletes (feather tier-up over-quantity, dust-recycle over-threshold).
-/// </summary>
 public readonly record struct CraftFamilyResult(
     CraftFamilyOutcome Outcome,
     int ResultItemId,

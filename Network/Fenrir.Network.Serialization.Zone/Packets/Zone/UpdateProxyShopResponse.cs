@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Wire.Attributes;
 
 namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 
-/// <summary>Value1 packs 6 item values + 3 sockets (9 ints), in that order.</summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.UpdateProxyShop,
     ExpectedSize = 877)]
 public readonly partial record struct UpdateProxyShopResponse : IOutgoingPacket

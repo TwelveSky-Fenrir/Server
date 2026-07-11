@@ -12,13 +12,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Inventory.UseItems;
 
-/// <summary>
-///     Drives <see cref="ForcedNeutralTribeResetUseItemHandler" /> (op23 item 8100) directly -- not through
-///     <see cref="UseItemHandlerRegistry" />, since wiring the handler into that registry's constructor is a
-///     verbatim edit to an existing file reported separately (see this workstream's wiringManifest), not
-///     something a new-files-only pass can apply itself. Every precondition, the tribe flip, the item
-///     consumption, and the neutral-home-zone reachability resolution are exercised here regardless.
-/// </summary>
 public class ForcedNeutralTribeResetUseItemHandlerTests
 {
     private const int AccountId = 1;
@@ -110,11 +103,8 @@ public class ForcedNeutralTribeResetUseItemHandlerTests
         Assert.True(zone.TryGetPlayer(CharacterId, out var after));
         Assert.Equal(3, after!.Tribe);
 
-        // The item was consumed.
         Assert.NotNull(characters.LastReplacedContainer);
 
-        // Durable write reused the existing atomic Tribe+quest-state procedure, with the character's own
-        // current quest-progress fields written back UNCHANGED (never touched by this action).
         Assert.Single(characters.TribeFourConversions);
         var (writtenCharacterId, newTribe, stepPermanent, activeQuestId, qSort, targetPhase, killCounter) =
             characters.TribeFourConversions[0];
@@ -216,9 +206,6 @@ public class ForcedNeutralTribeResetUseItemHandlerTests
     [Fact]
     public async Task UnconfiguredHomeMapId_DefaultsToPermanentlyOffline_FailsCleanly()
     {
-        // ForcedNeutralResetHomeMapId <= 0 (the shipped default) must short-circuit to "offline" without even
-        // consulting the directory -- see ForcedNeutralTribeResetUseItemHandler.IsNeutralHomeZoneOnlineAsync's
-        // own remarks on why this stays fail-safe until an operator confirms + configures the real map id.
         var (zone, state, characters, handler) = SetUp(configuredHomeMapId: 0);
         state.Tribe = 0;
         state.Level = 120;
@@ -243,7 +230,6 @@ public class ForcedNeutralTribeResetUseItemHandlerTests
         Assert.Equal(0, response.Result);
         Assert.True(zone.TryGetPlayer(CharacterId, out var after));
         Assert.Equal(3, after!.Tribe);
-        // Previous tribe (race/starter-kit template) is a pure faction flip -- never remapped by this action.
         Assert.Equal(1, after.PreviousTribe);
     }
 }

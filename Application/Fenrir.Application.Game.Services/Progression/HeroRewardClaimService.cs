@@ -6,11 +6,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Progression;
 
-/// <summary>
-///     Business logic extracted from <c>HeroRewardClaimHandler</c> (CZ_HEROREWARD_SEND, opcode 119). The real
-///     reward is CP -- ZC_HEROREWARD_RECV's item-drop fields are dead code in this build and always sent as 0
-///     by the handler.
-/// </summary>
 public sealed class HeroRewardClaimService(IHeroRankingRepository heroRankings, ILogger<HeroRewardClaimService> logger)
     : IHeroRewardClaimService
 {

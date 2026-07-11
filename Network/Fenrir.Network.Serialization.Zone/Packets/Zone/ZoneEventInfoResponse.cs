@@ -3,7 +3,6 @@ using Fenrir.Network.Serialization.Wire.Attributes;
 
 namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 
-/// <summary>Data's meaning depends on Sort; opaque payload here.</summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.ZoneEventInfo,
     ExpectedSize = 135)]
 public readonly partial record struct ZoneEventInfoResponse : IOutgoingPacket

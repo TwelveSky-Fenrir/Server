@@ -2,12 +2,6 @@ using Fenrir.Application.Game.Domain.World.Loot;
 
 namespace Fenrir.Application.Game.Tests.World.Loot;
 
-/// <summary>
-///     Pins the item-id data <see cref="BossDropCatalog" /> materializes (C4) against the boss-drop behavior
-///     contract's own per-block id lists (<c>Server/ts25zone/S07_MyGame05.cpp:2333-2662</c>). Order is
-///     load-bearing -- the legacy blocks drop guaranteed lists in source order -- so these assert sequences, not
-///     just membership.
-/// </summary>
 public class BossDropCatalogTests
 {
     private static readonly BossDropCatalog Catalog = BossDropCatalog.Default;
@@ -100,8 +94,6 @@ public class BossDropCatalogTests
     [Fact]
     public void FifteenMinuteBossHighTierPool_MatchesContract()
     {
-        // Explicit int[] so Assert.Equal binds its element-wise IEnumerable overload, not ImmutableArray<int>'s
-        // own (reference-based) struct equality -- the latter reports "differ" on identical-looking contents.
         int[] expected = [695, 696, 698];
 
         Assert.Equal(expected, Catalog.FifteenMinuteBossHighTierPool);

@@ -3,10 +3,6 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
 namespace Fenrir.Tools.LegacyDataImport.Tests;
 
-/// <summary>
-///     Parses <c>005_00004.IMG</c> exactly once (raw and patched) for the whole
-///     <see cref="MonsterReaderPatchTests" /> class, mirroring <see cref="ItemReaderFixture" />.
-/// </summary>
 public sealed class MonsterReaderFixture
 {
     public MonsterReaderFixture()

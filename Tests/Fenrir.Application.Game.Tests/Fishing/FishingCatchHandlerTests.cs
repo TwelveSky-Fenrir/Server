@@ -13,12 +13,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Fishing;
 
-/// <summary>
-///     Drives the real <see cref="FishingCatchHandler" /> (opcode 105) over a real <see cref="Zone" />.
-///     <see cref="RunToCompletionAsync" /> ticks the zone while the handler's own
-///     <c>PostFishingCommandAndWaitAsync</c>/<c>PostInventoryCommandAndWaitAsync</c> awaits are pending --
-///     there is no background <c>Zone.RunAsync</c> loop in a unit test to drain those channels otherwise.
-/// </summary>
 public class FishingCatchHandlerTests
 {
     private static readonly int CatchFrame = FrameWriter.FrameSizeOf<FishingCatchResponse>();

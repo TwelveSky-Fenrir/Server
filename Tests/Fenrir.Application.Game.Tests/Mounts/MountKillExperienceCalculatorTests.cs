@@ -45,7 +45,6 @@ public class MountKillExperienceCalculatorTests
     [Fact]
     public void ComputeGain_UnfedMount_IsZero()
     {
-        // activity 0 -> the "unfed mount never gains kill experience" gate.
         Assert.Equal(0, MountKillExperienceCalculator.ComputeGain(
             true, mountActivity: 0, mountExperience: 0, hasDoubleExp: false, hasSessionExpUp: false));
     }

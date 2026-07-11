@@ -4,12 +4,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Commerce;
 
-/// <summary>
-///     Covers <see cref="GetCashBalanceService" />: legacy CZ_GET_CASH_SIZE_SEND / GET_CASH_SIZE_SEND never
-///     fails the request on a DB/IPC error -- it substitutes a 0 balance rather than dropping the
-///     connection. Because <c>SessionLoop</c>'s dispatch-level catch treats any uncaught handler exception as
-///     fatal (<c>DisconnectReason.Faulted</c>), that substitution must happen inside the service itself.
-/// </summary>
 public class GetCashBalanceServiceTests
 {
     [Fact]

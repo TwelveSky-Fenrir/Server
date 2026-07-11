@@ -11,11 +11,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Covers <see cref="TribeGuardSpawner" /> (<c>MySummon::SummonGuard</c>) against synthetic catalogs --
-///     the real per-map/tribe coordinate table is not reproduced anywhere in this codebase yet (see that
-///     class's own remarks), so these tests exercise the rule engine itself, independent of that data.
-/// </summary>
 public class TribeGuardSpawnerTests
 {
     private const byte MainType = 5;
@@ -75,7 +70,6 @@ public class TribeGuardSpawnerTests
     public void MapNotInTheHardcodedEligibleSet_NeverSpawnsAnything()
     {
         var cache = CacheWithGuardTemplate();
-        // 99 is not one of the 13 hardcoded server numbers -- the whole call must be a no-op.
         var catalog = new GuardPostCatalog([Post(99, 0, 3)], []);
         var spawner = new TribeGuardSpawner(cache, catalog);
         var zone = CreateZone(99, cache, spawner);
@@ -88,7 +82,7 @@ public class TribeGuardSpawnerTests
     [Fact]
     public void NoMatchingMonsterTemplate_SkipsTheWholePost()
     {
-        var cache = WorldDataCacheBuilder.Build(WorldDataTestRows.MinimalRows()).Cache; // no MainType/SpecialType match
+        var cache = WorldDataCacheBuilder.Build(WorldDataTestRows.MinimalRows()).Cache;
         var catalog = new GuardPostCatalog([Post(2, 0, 3)], []);
         var spawner = new TribeGuardSpawner(cache, catalog);
         var zone = CreateZone(2, cache, spawner);
@@ -109,7 +103,7 @@ public class TribeGuardSpawnerTests
 
         zone.Tick(SimulationClock.LegacyTick);
 
-        Assert.Equal(2, zone.MonsterCount); // only tribe 0's post, tribe 3's 2 slots skipped
+        Assert.Equal(2, zone.MonsterCount);
     }
 
     [Fact]
@@ -118,7 +112,7 @@ public class TribeGuardSpawnerTests
         var cache = CacheWithGuardTemplate();
         var catalog = new GuardPostCatalog([Post(2, 1, 2, 1)], []);
         var worldState = CreateWorldState();
-        worldState.ResolveTribeSymbol(1, 2); // tribe 1 loses its own slot to tribe 2
+        worldState.ResolveTribeSymbol(1, 2);
         var spawner = new TribeGuardSpawner(cache, catalog, worldState);
         var zone = CreateZone(2, cache, spawner);
 
@@ -132,7 +126,7 @@ public class TribeGuardSpawnerTests
     {
         var cache = CacheWithGuardTemplate();
         var catalog = new GuardPostCatalog([Post(2, 1, 2, 1)], []);
-        var worldState = CreateWorldState(); // fresh boot -- every tribe starts owning its own symbol
+        var worldState = CreateWorldState();
         var spawner = new TribeGuardSpawner(cache, catalog, worldState);
         var zone = CreateZone(2, cache, spawner);
 
@@ -149,15 +143,13 @@ public class TribeGuardSpawnerTests
         var spawner = new TribeGuardSpawner(cache, catalog);
         var zone = CreateZone(2, cache, spawner);
 
-        zone.Tick(SimulationClock.LegacyTick); // boot -- spawns
+        zone.Tick(SimulationClock.LegacyTick);
         Assert.Equal(1, zone.MonsterCount);
         var before = zone.MonstersSnapshot.Single().UniqueNumber;
 
         spawner.ForceOrdinaryResummon(zone);
         zone.Tick(SimulationClock.LegacyTick);
 
-        // Side effect §1: a force-reset (tCheckFirst) wipes and re-plants the region, so the live guard is
-        // replaced with a fresh one (new unique number), not left untouched.
         Assert.Equal(1, zone.MonsterCount);
         Assert.NotEqual(before, zone.MonstersSnapshot.Single().UniqueNumber);
     }
@@ -165,12 +157,12 @@ public class TribeGuardSpawnerTests
     [Fact]
     public void KilledGuard_DoesNotRespawnBeforeItsTimerElapses_ThenRespawnsAfterEnoughEvaluations()
     {
-        var cache = CacheWithGuardTemplate(summonTimeSeconds: 1); // 1s == 2 legacy ticks
+        var cache = CacheWithGuardTemplate(summonTimeSeconds: 1);
         var catalog = new GuardPostCatalog([Post(2, 0, 1)], []);
         var spawner = new TribeGuardSpawner(cache, catalog);
         var zone = CreateZone(2, cache, spawner);
 
-        zone.Tick(SimulationClock.LegacyTick); // tick 1: boot -- spawns
+        zone.Tick(SimulationClock.LegacyTick);
         Assert.Equal(1, zone.MonsterCount);
 
         var serverIndex = zone.MonstersSnapshot.Single().ServerIndex;
@@ -178,14 +170,12 @@ public class TribeGuardSpawnerTests
         Assert.True(died);
         Assert.Equal(0, zone.MonsterCount);
 
-        // One full 20-tick evaluation cycle -- notices the slot empty and arms the cooldown, too soon to spawn.
         for (var i = 0; i < 19; i++)
-            zone.Tick(SimulationClock.LegacyTick); // ticks 2..20
+            zone.Tick(SimulationClock.LegacyTick);
         Assert.Equal(0, zone.MonsterCount);
 
-        // A second full cycle -- the (tiny) timer has long since elapsed by the next scheduled evaluation.
         for (var i = 0; i < 20; i++)
-            zone.Tick(SimulationClock.LegacyTick); // ticks 21..40
+            zone.Tick(SimulationClock.LegacyTick);
         Assert.Equal(1, zone.MonsterCount);
     }
 
@@ -194,7 +184,7 @@ public class TribeGuardSpawnerTests
     {
         var cache = CacheWithGuardTemplate();
         var catalog = new GuardPostCatalog([], [Post(TribeGuardSpawner.Zone038MapId, 0, 2)]);
-        var worldState = CreateWorldState(); // Zone038WinTribe still null (sentinel)
+        var worldState = CreateWorldState();
         var spawner = new TribeGuardSpawner(cache, catalog, worldState);
         var zone = CreateZone(TribeGuardSpawner.Zone038MapId, cache, spawner);
 
@@ -216,7 +206,7 @@ public class TribeGuardSpawnerTests
 
         zone.Tick(SimulationClock.LegacyTick);
 
-        Assert.Equal(2, zone.MonsterCount); // only tribe 1's 2 slots, not tribe 0's
+        Assert.Equal(2, zone.MonsterCount);
     }
 
     [Fact]
@@ -228,7 +218,6 @@ public class TribeGuardSpawnerTests
         var spawner = new TribeGuardSpawner(cache, catalog, worldState);
         var zone = CreateZone(TribeGuardSpawner.Zone038MapId, cache, spawner);
 
-        // First tick -- boot pass runs, but there is still no winner, so nothing spawns yet.
         zone.Tick(SimulationClock.LegacyTick);
         Assert.Equal(0, zone.MonsterCount);
 

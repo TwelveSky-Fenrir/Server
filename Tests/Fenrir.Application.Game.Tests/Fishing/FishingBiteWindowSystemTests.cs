@@ -8,12 +8,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.Fishing;
 
-/// <summary>
-///     Drives the real <see cref="FishingBiteWindowSystem" /> (CZ_FISHING_RESULT_SEND's server-driven,
-///     non-client-initiated step 2-&gt;3 trigger) over a real <see cref="Zone" />. This is what makes
-///     <c>FishingProgressService.PollBite</c> (sub-action 1) reachable through normal play -- without it,
-///     nothing ever sets <c>FishingStep</c> to 3 outside of the client's own unvalidated sub-action 3.
-/// </summary>
 public class FishingBiteWindowSystemTests
 {
     private static int ReadResult(byte[] frame)
@@ -39,13 +33,7 @@ public class FishingBiteWindowSystemTests
         return (zone, pipe, state!);
     }
 
-    /// <summary>
-    ///     Casts (mirrored the same way <c>FishingLineService.Cast</c>'s success path does -- state=1, step=2,
-    ///     cast timestamp stamped), then simulated real-world time is pushed past the 1-minute window entirely
-    ///     by backdating the cast timestamp (no sleep needed), then ticks the zone with no client-sent
-    ///     FishingProgress request anywhere in this test -- the step-3 push must still arrive.
-    /// </summary>
-    [Fact]
+        [Fact]
     public void Simulate_Step2CastOverAMinuteAgo_AdvancesToStep3AndPushesUnsolicited()
     {
         var (zone, pipe, state) = SetUp(FishingLineHandler.FishingZoneNumber);

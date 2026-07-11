@@ -42,9 +42,9 @@ public class KillFeedLeaderboardTests
         var top3 = board.GetTopThree();
 
         Assert.Equal(3, top3.Length);
-        Assert.Equal(2, top3[0].CharacterId); // Bob, 7 kills
-        Assert.Equal(3, top3[1].CharacterId); // Carol, 5 kills
-        Assert.Equal(1, top3[2].CharacterId); // Alice, 3 kills
+        Assert.Equal(2, top3[0].CharacterId);
+        Assert.Equal(3, top3[1].CharacterId);
+        Assert.Equal(1, top3[2].CharacterId);
     }
 
     [Fact]
@@ -90,7 +90,6 @@ public class KillFeedLeaderboardTests
 
         Assert.Equal(KillFeedLeaderboard.Capacity, board.Count);
 
-        // The 1001st distinct killer is silently untracked -- no exception, no state change.
         Assert.False(board.RecordKill(KillFeedLeaderboard.Capacity, "Overflow", 0, 999));
         Assert.Equal(KillFeedLeaderboard.Capacity, board.Count);
     }

@@ -8,11 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
-/// <summary>
-///     op25, CZ_ADD_ITEM_SEND -- the "combine" (IUValue) mechanic via <see cref="Combat.SystemRandomSource" /> and
-///     <see cref="Forge.CombineResolver" /> (delegated to <see cref="ICombineItemService" />). A normal
-///     (non-scroll) material survives a failed attempt; only scrolls (2001/2002/2003) are always consumed.
-/// </summary>
 public sealed class CombineItemHandler(ICombineItemService combineItemService, ILogger<CombineItemHandler> logger)
     : IAsyncPacketHandler<CombineItemRequest>
 {

@@ -7,7 +7,6 @@ using Fenrir.Data.Abstractions.Accounts;
 
 namespace Fenrir.Data.Accounts;
 
-// Facade over auth.usp_Account_*. AccountId is the legacy uUserIdx; usp_Account_Create returns the new IDENTITY value, callers never mint ids.
 public sealed record AccountRepository(ICaeriusNetDbContext Db) : IAccountRepository
 {
     public async ValueTask<AuthenticateAccountDto?> AuthenticateAsync(string loginName, CancellationToken ct)

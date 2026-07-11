@@ -5,9 +5,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Guilds;
 
-// FourGuildScoringService owns the accrual (+1 per enemy-tribe kill, silent) and the top-3-positive
-// leaderboard recompute (published to CurrentStandings). Both are best-effort by contract -- an
-// infrastructure fault must never break the kill pipeline or clear a previously-published leaderboard.
 public class FourGuildScoringServiceTests
 {
     private static FourGuildScoringService Create(IFourGuildScoringRepository repository)
@@ -36,7 +33,6 @@ public class FourGuildScoringServiceTests
         };
         var service = Create(repository);
 
-        // Must not throw -- a failed increment is silent by contract (kill reward unaffected).
         var exception = await Record.ExceptionAsync(() => service.AccrueKillPointAsync(77, CancellationToken.None));
 
         Assert.Null(exception);
@@ -85,7 +81,7 @@ public class FourGuildScoringServiceTests
         await service.RecomputeAsync(CancellationToken.None);
 
         repository.LeaderboardThrow = new InvalidOperationException("simulated leaderboard read failure");
-        await service.RecomputeAsync(CancellationToken.None); // must not throw, must not clear
+        await service.RecomputeAsync(CancellationToken.None);
 
         Assert.Collection(service.CurrentStandings,
             s => Assert.Equal(new FourGuildStanding(3, "Alpha", 40), s));

@@ -3,9 +3,6 @@ using Fenrir.Data.Abstractions.Runtime;
 
 namespace Fenrir.Application.Game.Tests.TestSupport;
 
-// In-memory stand-in for IAccountSessionRepository: defaults to TransitionToGameAsync succeeding (the path
-// every pre-existing ZoneHandshake flow exercises) and RefreshAndGetKickedAsync returning a scripted set of
-// kicked accounts for AccountSessionKickPollHostTests to assert against.
 internal sealed class FakeAccountSessionRepository : IAccountSessionRepository
 {
     public bool TransitionResult { get; set; } = true;

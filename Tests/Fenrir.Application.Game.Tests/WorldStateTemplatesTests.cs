@@ -9,7 +9,6 @@ public class WorldStateTemplatesTests
     {
         var worldInfo = WorldStateTemplates.ZeroedWorldInfo;
 
-        // Write()/TryRead() alone can't catch an undersized array (it'd round-trip zero-for-zero without throwing), so length is asserted explicitly.
         Assert.Equal(4, worldInfo.TribeSymbol.Length);
         Assert.Equal(4, worldInfo.TribePoint.Length);
         Assert.Equal(2, worldInfo.TribeCloseInfo.Length);

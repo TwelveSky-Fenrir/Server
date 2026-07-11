@@ -2,64 +2,33 @@ using System.Collections.Immutable;
 
 namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
-/// <summary>
-///     The shared world-state value for one Valley of the Deceased (Zone 200/297/298/299) "Regular War" map
-///     instance -- a DISTINCT legacy state machine from the Zone049 family already modeled by
-///     <see cref="RegularWarSchedule" /> (different function, different maps, different tSort numbers; see this
-///     class's own remarks). Numeric values match the legacy shared world-state values 0-8 verbatim, for easy
-///     cross-reference against the source contract.
-/// </summary>
 public enum ValleyWarPhase : byte
 {
-    /// <summary>6-hour idle wait since the last full cycle reset.</summary>
-    Idle = 0,
 
-    /// <summary>Counting down the gate-open value (5,4,3,2,1), one send per elapsed real minute.</summary>
-    GateCountdown = 1,
+        Idle = 0,
 
-    /// <summary>Gate open, closing in one more real minute.</summary>
-    GateOpen = 2,
+        GateCountdown = 1,
 
-    /// <summary>Gate closed; a ~10 real-second, zone-local-only countdown before the door opens.</summary>
-    DoorPending = 3,
+        GateOpen = 2,
 
-    /// <summary>The kill-race window: per-tribe kill quotas count down from 170.</summary>
-    KillRace = 4,
+        DoorPending = 3,
 
-    /// <summary>A tribe has emptied its kill quota; waiting a fixed 3 real seconds to delete the battle scroll.</summary>
-    ScrollPending = 5,
+        KillRace = 4,
 
-    /// <summary>The boss-kill window.</summary>
-    BossWindow = 6,
+        ScrollPending = 5,
 
-    /// <summary>Boss confirmed dead; a fixed 1 real-minute cooldown before the return-to-town notice.</summary>
-    PostWinCooldown = 7,
+        BossWindow = 6,
 
-    /// <summary>A fixed 1 real-minute wait before every session on the map is force-disconnected and the cycle resets.</summary>
-    PreReset = 8
+        PostWinCooldown = 7,
+
+        PreReset = 8
 }
 
-/// <summary>Per-tick ambient inputs <see cref="ValleyWarSchedule.Tick" /> reads.</summary>
-/// <param name="EligiblePlayerPresent">
-///     Whether at least one ready, non-mid-transfer avatar is present on the map instance right now. The
-///     contract's own third eligibility criterion ("not hiding") has no Fenrir stealth/hide state to check yet --
-///     a documented gap, not a silent one (same posture <see cref="World.Monsters.MonsterAiSystem" />'s own
-///     hidden-recheck gap already documents).
-/// </param>
-/// <param name="BossSlotOccupied">
-///     Whether the reserved special-monster-object slot range the contract's §8b poll checks is still occupied.
-///     Always <see langword="false" /> from every real caller in this cluster: the boss (monster id 756) is never
-///     actually summoned here (see <see cref="ValleyWarSystem" />'s own remarks for the missing fixed-coordinate
-///     citation), so the boss-kill window resolves as "already defeated" as soon as it is entered -- a documented
-///     gap, not a silent one, same posture as <see cref="RegularWarEnvironmentSnapshot.BossMonsterAlive" />'s own
-///     remarks for the sibling Zone049 boss-war map.
-/// </param>
 public readonly record struct ValleyWarEnvironmentSnapshot(bool EligiblePlayerPresent, bool BossSlotOccupied = false)
 {
     public static ValleyWarEnvironmentSnapshot Empty { get; } = new(false);
 }
 
-/// <summary>Everything a caller needs to react to after one <see cref="ValleyWarSchedule.Tick" /> call.</summary>
 public readonly record struct ValleyWarTickResult(
     ValleyWarPhase Phase,
     ValleyWarPhase PreviousPhase,
@@ -81,86 +50,38 @@ public readonly record struct ValleyWarTickResult(
     bool MonstersShouldDespawn = false,
     bool AllSessionsShouldDisconnect = false);
 
-/// <summary>
-///     One map instance's Valley of the Deceased (Zone 200/297/298/299) "Regular War" gate/door/kill-race/
-///     boss-window/conclusion schedule. Pure and I/O-free -- driven entirely by <see cref="Tick" /> (one legacy
-///     tick, ~500 ms, per call) and <see cref="RegisterMonsterKill" />; never touches a
-///     <see cref="Zone" />/<see cref="PlayerRuntimeState" />/socket itself.
-/// </summary>
-/// <remarks>
-///     <para>
-///         <b>Distinct from <see cref="RegularWarSchedule" />.</b> Despite the superficial naming overlap ("Regular
-///         War" is the legacy's own umbrella term for several unrelated periodic RvR state machines), this class
-///         ports <c>Process_Zone_200</c> (<c>Server/ts25zone/S07_MyGame01.cpp:11149-11572</c>), gated to server
-///         numbers 200/297/298/299 only (<c>:1116-1137</c>, <c>Server/ts25zone/H07_MyGame.h:36</c>) -- a completely
-///         separate function, tSort family (659-669), and map set from <see cref="RegularWarSchedule" />'s own
-///         <c>Process_Zone_049_TYPE</c> (<c>:4920-5521</c>, maps 49/146/149/154/157/160/120/121/122/295/164). Do
-///         not route Zone049 events through this class or vice versa.
-///     </para>
-///     <para>
-///         Réf. C++ (shared trigger/tick-unit context) : <c>Server/ts25zone/S07_MyGame01.cpp:2989-2994</c> (tick
-///         call site) ; <c>:1116-1137</c> (eligibility flag) ; <c>:11149</c> (function definition) ;
-///         <c>Server/ts25zone/H07_MyGame.h:36</c> (guarding macro is live) ; <c>Server/Header/function.h:1643-1652</c>
-///         (120 ticks = 1 real minute, 7200 ticks = 1 real hour).
-///     </para>
-///     <para>
-///         <b>Not modeled by this class</b> (left to the caller -- see <see cref="ValleyWarSystem" />'s own
-///         remarks for the exact gaps and their citations): the client-facing broadcast/send itself, the general
-///         kill-race monster summon population (no concrete monster id/count/coordinate data available in the
-///         source contract), the boss (monster id 756) summon coordinate, the "animal5" randomized reward item,
-///         and every ground-item/session-disconnect mutation.
-///     </para>
-/// </remarks>
 public sealed class ValleyWarSchedule
 {
-    /// <summary>4 tribes -- same width as every other RvR system in this cluster.</summary>
-    public const int TribeCount = 4;
 
-    /// <summary>6 hours (Server/ts25zone/S07_MyGame01.cpp:11149-11572 preconditions, this cluster's own contract §2).</summary>
-    public const int IdleWaitTicks = 43200;
+        public const int TribeCount = 4;
 
-    /// <summary>Seeded value for the gate-open countdown -- 5 sends, one per elapsed real minute (contract §2).</summary>
-    public const int GateCountdownStartValue = 5;
+        public const int IdleWaitTicks = 43200;
 
-    /// <summary>1 real minute per countdown step, and per the final gate-open transition tick (contract §2/§3).</summary>
-    public const int GateCountdownIntervalTicks = 120;
+        public const int GateCountdownStartValue = 5;
 
-    /// <summary>1 more real minute in the "gate open" phase before it closes (contract §4).</summary>
-    public const int GateOpenTicks = 120;
+        public const int GateCountdownIntervalTicks = 120;
 
-    /// <summary>~10 real seconds (20 legacy ticks) before the door opens (contract §5).</summary>
-    public const int DoorPendingTicks = 20;
+        public const int GateOpenTicks = 120;
 
-    /// <summary>2 legacy ticks per real second -- the zone-local door countdown's own cadence (contract §11).</summary>
-    public const int LegacyTicksPerRealSecond = 2;
+        public const int DoorPendingTicks = 20;
 
-    /// <summary>The zone-local door countdown steps 10 down to 1 (contract §11).</summary>
-    public const int DoorCountdownStartValue = 10;
+        public const int LegacyTicksPerRealSecond = 2;
 
-    /// <summary>30 real minutes (3600 legacy ticks) -- both the kill-race and boss-window timers (contract §5).</summary>
-    public const int KillRaceDurationTicks = 3600;
+        public const int DoorCountdownStartValue = 10;
 
-    /// <summary>30 real minutes (3600 legacy ticks), armed alongside the kill-race timer but consumed later (contract §5).</summary>
-    public const int BossWindowDurationTicks = 3600;
+        public const int KillRaceDurationTicks = 3600;
 
-    /// <summary>Each tribe's kill quota at door-open (contract §5).</summary>
-    public const int KillQuotaPerTribeStart = 170;
+        public const int BossWindowDurationTicks = 3600;
 
-    /// <summary>3 real seconds (6 legacy ticks) before the battle scroll is deleted (contract §7).</summary>
-    public const int ScrollDeleteDelayTicks = 6;
+        public const int KillQuotaPerTribeStart = 170;
 
-    /// <summary>1 real minute (120 legacy ticks) post-win cooldown before the return-to-town notice (contract §9).</summary>
-    public const int PostWinCooldownTicks = 120;
+        public const int ScrollDeleteDelayTicks = 6;
 
-    /// <summary>1 real minute (120 legacy ticks) before the forced disconnect + full reset (contract §10).</summary>
-    public const int PreResetTicks = 120;
+        public const int PostWinCooldownTicks = 120;
 
-    /// <summary>
-    ///     Legacy monster id for the boss summoned on a tribe kill-race win (contract §6b) -- retained here purely
-    ///     for citation fidelity; this class never spawns it (no fixed-coordinate data available, see
-    ///     <see cref="ValleyWarSystem" />'s own remarks).
-    /// </summary>
-    public const int BossMonsterId = 756;
+        public const int PreResetTicks = 120;
+
+        public const int BossMonsterId = 756;
 
     private readonly int[] _killRaceQuota = new int[TribeCount];
 
@@ -181,11 +102,9 @@ public sealed class ValleyWarSchedule
 
     public ValleyWarPhase Phase { get; private set; } = ValleyWarPhase.Idle;
 
-    /// <summary>Non-null from the moment a kill-race win is determined (contract §6b) until the next full reset.</summary>
-    public byte? WinningTribe { get; private set; }
+        public byte? WinningTribe { get; private set; }
 
-    /// <summary>Advances by exactly one legacy tick (~500 ms).</summary>
-    public ValleyWarTickResult Tick(ValleyWarEnvironmentSnapshot snapshot)
+        public ValleyWarTickResult Tick(ValleyWarEnvironmentSnapshot snapshot)
     {
         var previousPhase = Phase;
 
@@ -268,12 +187,7 @@ public sealed class ValleyWarSchedule
             allSessionsShouldDisconnect);
     }
 
-    /// <summary>
-    ///     One qualifying monster killing blow decrements <paramref name="tribeId" />'s kill quota by one,
-    ///     floor-clamped at zero -- no-op outside <see cref="ValleyWarPhase.KillRace" />.
-    /// </summary>
-    /// <remarks>Réf. C++ : Server/ts25zone/S07_MyGame02.cpp:3162-3170.</remarks>
-    public void RegisterMonsterKill(byte tribeId)
+        public void RegisterMonsterKill(byte tribeId)
     {
         if (Phase != ValleyWarPhase.KillRace || tribeId >= TribeCount)
             return;
@@ -282,18 +196,7 @@ public sealed class ValleyWarSchedule
             _killRaceQuota[tribeId]--;
     }
 
-    /// <summary>
-    ///     Immediately zeroes <paramref name="tribeId" />'s kill quota -- the effect of the legacy's unguarded,
-    ///     unauthenticated "kill200" chat command (contract §6 Inputs). Exposed for completeness only: no caller
-    ///     in this cluster wires an actual command to it -- porting a live, unauthenticated exploit surface needs
-    ///     its own explicit decision, not a side effect of implementing this broadcast lifecycle. No-op outside
-    ///     <see cref="ValleyWarPhase.KillRace" />.
-    /// </summary>
-    /// <remarks>
-    ///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:7933-7939 (the unguarded command), contrasted with
-    ///     :7905-7912 (the guarded sibling "boss"-spawn GM command's rank check).
-    /// </remarks>
-    public void ForceZeroTribeQuota(byte tribeId)
+        public void ForceZeroTribeQuota(byte tribeId)
     {
         if (Phase != ValleyWarPhase.KillRace || tribeId >= TribeCount)
             return;

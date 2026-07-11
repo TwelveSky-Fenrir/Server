@@ -6,94 +6,26 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Domain.World;
 
-/// <summary>
-///     Duel combat (<c>mCase</c> 1, <see cref="ApplyDuelAttack" />, dispatched from <see cref="ApplyCombatCommand" />
-///     in Zone.Combat.cs) and the per-participant half of ending an active duel -- called by
-///     <see cref="Simulation.DuelMaintenanceSystem" /> once it has resolved which end condition fired; the
-///     registry-side half (removing both participants' <see cref="Social.Duel.DuelRegistry" /> entries) is that
-///     system's own responsibility via <see cref="Social.Duel.DuelRegistry.TryEndActiveDuel" />.
-/// </summary>
 public sealed partial class Zone
 {
-    /// <summary>
-    ///     Reusable scratch buffer for <see cref="EndActiveDuel" />'s neighbor-broadcast recipient list -- same
-    ///     non-allocating shape and reuse justification as <c>Zone.PlayerLifecycle.cs</c>'s own
-    ///     <c>_moveNeighborScratch</c>: single tick thread, cleared before use, consumed entirely by the
-    ///     immediately-following broadcast call before <see cref="EndActiveDuel" /> returns.
-    /// </summary>
-    private readonly List<int> _duelEndNeighborScratch = [];
 
-    /// <summary>
-    ///     B10 branch C: this zone's own zone124 final-countdown mass-duel state (see
-    ///     <see cref="Zone124DuelOverrideResolver" />/<see cref="Zone124MassDuelState" />). Constructed
-    ///     unconditionally for every zone -- harmless, and avoids any dependency on partial-class
-    ///     field-initializer ordering across <c>Zone.*.cs</c> files for a value keyed on <see cref="Zone.MapId" />
-    ///     -- but only ever meaningful on the single map-124 process, since
-    ///     <see cref="Zone124DuelOverrideResolver.IsActive" /> already gates on
-    ///     <c>MapId == Zone124DuelOverrideResolver.Zone124MapId</c> before ever consulting
-    ///     <see cref="Zone124MassDuelState.RemainingUnits" />. The event lifecycle itself (start/end/out
-    ///     sub-commands 601/602/603, enrollment, and the per-tick <see cref="Zone124MassDuelState.Advance" />
-    ///     hook) is NOT wired here -- see the B10 workstream's own open questions for why (unrecoverable
-    ///     enrollment literals, tick-cadence ownership belongs to the realtime-simulation owner). Until that
-    ///     lands, this state can never actually be started, so <see cref="Zone124MassDuelState.RemainingUnits" />
-    ///     stays permanently 0 and <see cref="ApplyDuelAttack" />'s override check stays inert.
-    /// </summary>
-    private readonly Zone124MassDuelState _zone124MassDuel = new();
+        private readonly List<int> _duelEndNeighborScratch = [];
 
-    /// <summary>
-    ///     ProcessAttack01 -- an avatar attacks its matched duel opponent. Shares <c>AttackPlayer</c>'s core
-    ///     damage resolution with <c>mCase</c> 2 (<see cref="CombatResolver.ResolveDuelAttack" />), but gated by
-    ///     the duel-specific authorization check (<see cref="SharesActiveDuel" />, already used identically for
-    ///     the stun-duel-exception gate in Zone.Stun.cs) instead of the zone-wide open-PvP/same-tribe gate
-    ///     <c>mCase</c> 2 uses -- plus the defender's shop-open/attackable-action-state preconditions
-    ///     (<see cref="CombatResolver.ResolveDuelAttack" />'s own <c>defenderPshopOpen</c>/<c>defenderActionSort</c>
-    ///     parameters), part of <c>AttackPlayer</c>'s shared precondition block (S07_MyGame02.cpp:901-933) that
-    ///     <c>mCase</c> 2 (<see cref="ApplyCombatCommand" />) also reproduces, via
-    ///     <see cref="CombatResolver.ResolveEnemyTribeAttack" />'s identically-named parameters.
-    ///     A qualifying kill routes to <see cref="ApplyDeath" /> with
-    ///     <see cref="DeathCause.Duel" /> (armed for exactly this purpose -- see that enum's own remarks) rather
-    ///     than <see cref="ApplyPvpKillRewards" />: whether the legacy's shared kill-reward pipeline (CP/EXP/
-    ///     hero-points/mission-kill-counter) fires identically for a duel kill was not independently re-verified
-    ///     by this behavior's own source contract, so Fenrir does not award any of it for a duel kill until that
-    ///     is settled. <see cref="Simulation.DuelMaintenanceSystem" /> already watches every participant's
-    ///     <see cref="PlayerRuntimeState.IsDead" /> flag every tick and ends the duel (win/loss) the moment it
-    ///     flips -- this method only needs to get the defender to that state; it does not itself decide the
-    ///     duel's outcome.
-    /// </summary>
-    /// <remarks>
-    ///     The zone124 unconditional x3-damage/forced-crit override in the final 10s of a duel countdown
-    ///     (S07_MyGame02.cpp:1146-1150) is now computed below via <see cref="Zone124DuelOverrideResolver.IsActive" />
-    ///     against this zone's own <see cref="_zone124MassDuel" /> and threaded into
-    ///     <see cref="CombatResolver.ResolveDuelAttack" />'s <c>zone124OverrideActive</c> parameter. It remains
-    ///     structurally unreachable in production today: map 124 duels are already refused outright at
-    ///     CZ_DUEL_ASK_SEND (<see cref="Simulation.DuelMaintenanceSystem" />'s own
-    ///     <c>ScriptedDuelArenaMapId</c> guard), so no <see cref="Social.Duel.ActiveDuel" /> can ever exist there
-    ///     today and <see cref="SharesActiveDuel" /> always rejects first -- and the zone124 mass-duel event's
-    ///     own lifecycle (start/end/out sub-commands 601/602/603, enrollment, per-tick countdown) is not wired
-    ///     yet either, so <see cref="_zone124MassDuel" /> can never actually be started (see the B10 workstream's
-    ///     open questions for the unrecoverable enrollment literals and tick-cadence ownership this still needs).
-    /// </remarks>
-    private void ApplyDuelAttack(in CombatCommand command)
+        private readonly Zone124MassDuelState _zone124MassDuel = new();
+
+        private void ApplyDuelAttack(in CombatCommand command)
     {
         if (!_players.TryGetValue(command.AttackerCharacterId, out var attackerState))
             return;
 
-        // Recorded onto the attacker's tracked location unconditionally, before any other check runs -- see
-        // ApplySenderLocation's own remarks (Zone.Combat.cs). Must happen before this same packet's own
-        // distance check, which CombatResolver.ResolveDuelAttack runs against attackerSnapshot below.
         ApplySenderLocation(attackerState, command.AttackInfo);
 
         if (!_players.TryGetValue(command.AttackInfo.ServerIndex2, out var defenderState))
             return;
 
-        // CheckAttackPacket (S07_MyGame02.cpp:1718-1761), counting enabled -- shared verbatim by ProcessAttack01
-        // and ProcessAttack02 (AttackPacketBudget's own remarks list ProcessAttack01 as a counting-enabled
-        // caller). Silent reject, matching every other rejection path in this method.
         if (!AttackPacketBudget.TryConsume(attackerState, command.AttackInfo.AttackActionValue4))
             return;
 
-        // Duel-specific authorization gate (S07_MyGame02.cpp:935-943) -- duel attacks never evaluate the
-        // zone-wide open-PvP/same-tribe gate mCase 2 uses instead.
         var sharesActiveDuel = SharesActiveDuel(attackerState.CharacterId, defenderState.CharacterId);
 
         var attackerSnapshot = ToCombatantSnapshot(attackerState);
@@ -105,8 +37,6 @@ public sealed partial class Zone
             ? skillDef
             : null;
 
-        // B10 branch C (zone124 duel override) -- see this method's own remarks for why this is still
-        // structurally unreachable in production even though the resolver-side wiring is now live.
         var zone124OverrideActive = Zone124DuelOverrideResolver.IsActive(
             MapId == Zone124DuelOverrideResolver.Zone124MapId, _zone124MassDuel.RemainingUnits);
 
@@ -119,11 +49,8 @@ public sealed partial class Zone
 
         if (outcome.ChargeConsumed)
             attackerState.Buffs.Buff[8 * 2] =
-                0; // charge buff slot 8, value half -- single-use, same convention as mCase 2
+                0;
 
-        // B15 cross-avatar depth terms -- shared verbatim with mCase 2 (Zone.Combat.DamagePipeline.cs), differing
-        // only in the reflect-kill crediting (a duel reflect-kill routes to ApplyDeath with DeathCause.Duel and
-        // no reward pipeline, matching every other duel kill).
         var viewDamage = outcome.ViewDamage;
         var realDamage = outcome.DamageApplied;
         var reflectFired = false;
@@ -141,7 +68,6 @@ public sealed partial class Zone
             }
         }
 
-        // "1 + attacker's weapon ItemId" on a hit (client picks the swing animation/effect from this), 0 on a miss.
         var attackerWeaponItemId = attackerState.Inventory.GetSlot(ContainerMatrix.Equipment, 7)?.ItemId ?? 0;
         var response = new AttackResponse
         {
@@ -150,8 +76,6 @@ public sealed partial class Zone
                 AttackResultValue = outcome.Hit ? 1 + attackerWeaponItemId : 0,
                 AttackCriticalExist = outcome.Critical ? 1 : 0,
                 AttackElementDamage = reflectFired ? 0 : outcome.ElementDamage,
-                // View = full (pre-life-cap) hit size the client displays; Real = the life-capped amount
-                // actually applied -- duel shares AttackPlayer's split (S07_MyGame02.cpp:1361-1366).
                 AttackViewDamageValue = viewDamage,
                 AttackRealDamageValue = realDamage
             }
@@ -170,19 +94,11 @@ public sealed partial class Zone
             ApplyDeath(defenderState.CharacterId, DeathCause.Duel);
     }
 
-    /// <summary>
-    ///     RESET_DUEL (Server/ts25zone/S07_MyGame04.cpp:606-611): unconditionally lifts <paramref name="state" />'s
-    ///     potion restriction, sends ZC_DUEL_END_RECV with the resolved <paramref name="reason" />, and
-    ///     refreshes this avatar's state to nearby observers only -- unlike <see cref="GrantReviveEligibility" />,
-    ///     this never self-echoes to <paramref name="state" />'s own session, since ZC_DUEL_END_RECV is already
-    ///     that participant's own "this happened to you" signal.
-    /// </summary>
-    public void EndActiveDuel(PlayerRuntimeState state, DuelEndReason reason)
+        public void EndActiveDuel(PlayerRuntimeState state, DuelEndReason reason)
     {
         state.CanUseConsumables = true;
         state.Session.Send(new DuelEndResponse { Result = (int)reason });
 
-        // Uses _duelEndNeighborScratch instead of AoiGrid.Neighbors(...).Where(...).ToArray().
         _duelEndNeighborScratch.Clear();
         _grid.NeighborsExcludingSelf(_duelEndNeighborScratch, state.CurrentCell, state.CharacterId, state.PosX,
             state.PosY, state.PosZ);

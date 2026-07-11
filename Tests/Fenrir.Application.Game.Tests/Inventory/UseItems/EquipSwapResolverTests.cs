@@ -5,11 +5,6 @@ using Fenrir.Application.Game.Tests.GameData;
 
 namespace Fenrir.Application.Game.Tests.Inventory.UseItems;
 
-/// <summary>
-///     Pure coverage of the op23 double-click-to-equip decision (<see cref="EquipSwapResolver" />): the
-///     item-tag-to-equip-slot derivation, the registry routing predicate, and the idle/eligibility/slot gate
-///     chain plus the swap projection (occupied vs. empty equip slot). No Zone/I/O.
-/// </summary>
 public class EquipSwapResolverTests
 {
     private const int IdleActionSort = 1;
@@ -41,7 +36,7 @@ public class EquipSwapResolverTests
     }
 
     [Theory]
-    [InlineData(0)] // pet-slot sentinel + the default EquipInfo2 of every non-equip item -- deliberately excluded
+    [InlineData(0)]
     [InlineData(1)]
     [InlineData(8)]
     [InlineData(15)]
@@ -58,10 +53,10 @@ public class EquipSwapResolverTests
     }
 
     [Theory]
-    [InlineData(26, 0)] // Bottle sort, no equip tag -- must NOT be stolen from the Bottle family
-    [InlineData(5, 2)] // Skill-grimoire sort (< 6), even with a real tag
-    [InlineData(6, 0)] // Equip sort but EquipInfo2==0 (default) -- must not be claimed
-    [InlineData(34, 2)] // Above the final-category ceiling
+    [InlineData(26, 0)]
+    [InlineData(5, 2)]
+    [InlineData(6, 0)]
+    [InlineData(34, 2)]
     public void ClaimsItem_NonEquipShapes_AreNotClaimed(byte sort, byte equipInfo2)
     {
         var item = WorldDataTestRows.Item(1000) with { Sort = sort, EquipInfo2 = equipInfo2 };
@@ -111,7 +106,6 @@ public class EquipSwapResolverTests
     [Fact]
     public void Resolve_ItemFailsEligibilityGate_IsNotEquippable()
     {
-        // LevelLimit far above the character's combined level fails the gate's level check.
         var result = EquipSwapResolver.Resolve(Stack(1000), Candidate(equipPartTag: 2, levelLimit: 999),
             ImmutableDictionary<byte, ItemStack>.Empty, IdleActionSort, characterTribe: 1, CombinedLevel,
             rebirthCount: 0);
@@ -129,11 +123,10 @@ public class EquipSwapResolverTests
     }
 
     [Theory]
-    [InlineData(0)] // tag maps to no slot
-    [InlineData(8)] // tag not in the slot table
+    [InlineData(0)]
+    [InlineData(8)]
     public void Resolve_EligibleButTagMapsToNoSlot_IsInvalidTargetSlot(int equipPartTag)
     {
-        // Passes tribe/level/rebirth/final-category (Sort 6), but the tag derives no real equip slot.
         var result = EquipSwapResolver.Resolve(Stack(1000), Candidate(equipPartTag),
             ImmutableDictionary<byte, ItemStack>.Empty, IdleActionSort, characterTribe: 1, CombinedLevel,
             rebirthCount: 0);

@@ -8,21 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Guilds;
 
-/// <summary>
-///     CZ_GUILD_WORK_SEND (opcode 75) -- the generic guild sub-command channel. Dead sub-commands reproduce
-///     their exact legacy shape: 11 always aborts; 12/13 are a silent no-op (the legacy's own abort call is
-///     commented out); anything else falls to the default abort.
-/// </summary>
-/// <remarks>
-///     Membership changes (join/leave/kick/promote/transfer) still only mirror onto the specific character(s)
-///     whose own <c>PlayerRuntimeState</c> changed, via <c>GuildMembershipZoneCommand</c> -- a guild-wide
-///     GUILD_INFO push for those would still leave every other member's roster view stale on its own next query,
-///     but membership rows are looked up fresh every time regardless. Notice/AGM/title/buff, by contrast, mutate
-///     something every member's already-cached GUILD_INFO should reflect immediately, so those four additionally
-///     broadcast the refreshed GUILD_INFO to every currently connected member (see
-///     <see cref="IGuildActionService" />'s implementation), not just the actor (who already gets it
-///     through this handler's own response send).
-/// </remarks>
 public sealed class GuildActionHandler(IGuildActionService service, ILogger<GuildActionHandler>? logger = null)
     : IAsyncPacketHandler<GuildActionRequest>
 {
@@ -41,7 +26,6 @@ public sealed class GuildActionHandler(IGuildActionService service, ILogger<Guil
         if (!zone.TryGetPlayer(characterId, out var state) || state is null)
             return;
 
-        // Every tSort here shares the same per-character economy-adjacent state (guild membership, money).
         await state.EconomyActionLock.WaitAsync(cancellationToken);
         try
         {
@@ -98,9 +82,6 @@ public sealed class GuildActionHandler(IGuildActionService service, ILogger<Guil
                     await service.SetMemberTitleAsync(packet, state, ct));
                 return;
             case 11:
-                // Dead sub-command: the legacy's own abort call for this sort is unconditional (see class
-                // remarks) -- Debug, not Warning, since an unmodified legacy client can send this too, it is
-                // not itself a sign of a misbehaving/modified client.
                 logger?.LogDebug(
                     "Character {CharacterId} sent CZ_GUILD_WORK_SEND sort 11 (dead sub-command) -- aborting session {SessionId}",
                     characterId, session.SessionId);
@@ -122,8 +103,6 @@ public sealed class GuildActionHandler(IGuildActionService service, ILogger<Guil
                     await service.SetGuildLogoAsync(packet, state, ct));
                 return;
             default:
-                // Unrecognized tSort -- an unmodified legacy client never sends one, so this is worth a
-                // higher-visibility trace than the known-dead sort 11 case above.
                 logger?.LogWarning(
                     "Character {CharacterId} sent CZ_GUILD_WORK_SEND with unrecognized sort {Sort} -- aborting session {SessionId}",
                     characterId, packet.Sort, session.SessionId);

@@ -2,14 +2,10 @@ using Fenrir.Application.Game.Domain.Movement;
 
 namespace Fenrir.Application.Game.Tests.Movement;
 
-/// <summary>
-///     Covers <see cref="CharacterMotionWhitelist.TryEvaluate" /> -- the full (Sort, Type) legality table and
-///     its four resolved outputs, one representative pair per legal Sort plus the illegal-input edge cases.
-/// </summary>
 public class CharacterMotionWhitelistTests
 {
-    /// <summary>One row per legal Sort: a legal Type for it, and the exact four outputs the table specifies.</summary>
-    [Theory]
+
+        [Theory]
     [InlineData(0, 0, 0, true, 0, 0)]
     [InlineData(1, 0, 0, true, 0, 0)]
     [InlineData(1, 7, 0, true, 0, 0)]
@@ -52,7 +48,7 @@ public class CharacterMotionWhitelistTests
     [InlineData(52, 5, 2, true, 3, 3)]
     [InlineData(54, 7, 2, true, 4, 1)]
     [InlineData(55, 7, 2, true, 4, 3)]
-    [InlineData(56, 7, 2, true, 3, 5)] // irregular: tag 3, not 4, verbatim per the behavior contract's table
+    [InlineData(56, 7, 2, true, 3, 5)]
     [InlineData(57, 7, 2, true, 4, 1)]
     [InlineData(58, 7, 2, true, 4, 3)]
     [InlineData(60, 3, 2, true, 0, 0)]
@@ -60,7 +56,7 @@ public class CharacterMotionWhitelistTests
     [InlineData(62, 7, 2, true, 0, 0)]
     [InlineData(63, 0, 2, true, 0, 0)]
     [InlineData(64, 0, 0, true, 0, 0)]
-    [InlineData(65, 0, 0, false, 5, 0)] // enforcement explicitly OFF
+    [InlineData(65, 0, 0, false, 5, 1)]
     [InlineData(66, 0, 2, true, 0, 0)]
     [InlineData(67, 0, 2, true, 0, 0)]
     [InlineData(68, 0, 2, true, 0, 0)]
@@ -69,7 +65,7 @@ public class CharacterMotionWhitelistTests
     [InlineData(71, 5, 2, true, 3, 1)]
     [InlineData(72, 5, 2, true, 3, 3)]
     [InlineData(73, 7, 2, true, 4, 3)]
-    [InlineData(74, 7, 2, false, 0, 0)] // enforcement explicitly OFF
+    [InlineData(74, 7, 2, false, 0, 0)]
     [InlineData(75, 0, 2, true, 0, 0)]
     [InlineData(76, 0, 2, true, 0, 0)]
     [InlineData(81, 3, 2, true, 3, 5)]
@@ -96,8 +92,7 @@ public class CharacterMotionWhitelistTests
         Assert.Equal(expectedCeiling, evaluation.AttackSubPacketCeiling);
     }
 
-    /// <summary>Every Type 0-7 is legal for a Sort whose row legalizes "all Types" (e.g. Sort 1/2/10/32).</summary>
-    [Theory]
+        [Theory]
     [InlineData(1)]
     [InlineData(2)]
     [InlineData(10)]
@@ -109,8 +104,7 @@ public class CharacterMotionWhitelistTests
             Assert.True(CharacterMotionWhitelist.TryEvaluate(sort, type, out _));
     }
 
-    /// <summary>Sort 3 legalizes only the even Types (0, 2, 4, 6); the odd ones must be rejected.</summary>
-    [Theory]
+        [Theory]
     [InlineData(0, true)]
     [InlineData(1, false)]
     [InlineData(2, true)]
@@ -124,8 +118,7 @@ public class CharacterMotionWhitelistTests
         Assert.Equal(expectedLegal, CharacterMotionWhitelist.TryEvaluate(3, type, out _));
     }
 
-    /// <summary>Sort 4 legalizes only the odd Types (1, 3, 5, 7); the even ones must be rejected.</summary>
-    [Theory]
+        [Theory]
     [InlineData(0, false)]
     [InlineData(1, true)]
     [InlineData(2, false)]
@@ -139,8 +132,7 @@ public class CharacterMotionWhitelistTests
         Assert.Equal(expectedLegal, CharacterMotionWhitelist.TryEvaluate(4, type, out _));
     }
 
-    /// <summary>Sort 42 legalizes only Type 3 -- every other Type in 0-7 must be rejected.</summary>
-    [Theory]
+        [Theory]
     [InlineData(0)]
     [InlineData(1)]
     [InlineData(2)]
@@ -180,11 +172,7 @@ public class CharacterMotionWhitelistTests
         Assert.Equal(default, evaluation);
     }
 
-    /// <summary>
-    ///     Sort 31 is an identically-bodied sibling of Sort 30 reachable only under a build flag never turned on
-    ///     in any shipped configuration -- dead code, not a legal category, unlike Sort 30 itself.
-    /// </summary>
-    [Fact]
+        [Fact]
     public void Sort31_DeadMobileOnlySibling_IsIllegal()
     {
         Assert.False(CharacterMotionWhitelist.TryEvaluate(31, 0, out _));
@@ -211,5 +199,15 @@ public class CharacterMotionWhitelistTests
 
         Assert.True(CharacterMotionWhitelist.TryEvaluate(74, 7, out var sort74));
         Assert.False(sort74.AttackBudgetEnforced);
+    }
+
+        [Fact]
+    public void Sort65_CeilingIsOne_Sort74_CeilingIsZero_DespiteBothDisablingEnforcement()
+    {
+        Assert.True(CharacterMotionWhitelist.TryEvaluate(65, 0, out var sort65));
+        Assert.Equal(1, sort65.AttackSubPacketCeiling);
+
+        Assert.True(CharacterMotionWhitelist.TryEvaluate(74, 7, out var sort74));
+        Assert.Equal(0, sort74.AttackSubPacketCeiling);
     }
 }

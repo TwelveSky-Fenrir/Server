@@ -8,13 +8,9 @@ using Fenrir.Data.Abstractions.Runtime;
 
 namespace Fenrir.Data.Runtime;
 
-// Cross-shard fan-out for the proxy-shop rental-extension live-registry mirror update -- see
-// IProxyShopExpirationRelayRepository for the per-method contract.
 public sealed record ProxyShopExpirationRelayRepository(ICaeriusNetDbContext Db)
     : IProxyShopExpirationRelayRepository
 {
-    // Small, at-most-human-click-speed round trips against a memory-optimized table that should never itself
-    // be slow -- same sizing as GuildTribeBroadcastRelayRepository's own CommandTimeoutSeconds.
     private const int CommandTimeoutSeconds = 5;
 
     public async ValueTask PublishAsync(ProxyShopExpirationRelayEntry entry, CancellationToken ct)

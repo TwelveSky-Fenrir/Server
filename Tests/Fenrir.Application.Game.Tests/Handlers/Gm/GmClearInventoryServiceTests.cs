@@ -9,11 +9,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Gm;
 
-// GM_CLEAR_INVENTORY (legacy PROCESS_DATA_SEND, opcode 19, tSort 701 --
-// Server/ts25zone/S04_MyWork04.cpp:2084-2111). Operates exclusively on the invoking GM's own inventory. Once
-// the Basic-tier permission gate passes, this command cannot fail: every page-selector value (in range or out
-// of range) results in the shared success ack. Reuses GmBasicTestSupport's CreateWorld/Enter/RunToCompletionAsync
-// helpers, same layout convention as the sibling GmBasicCallServiceTests fixture in this same file group.
 public class GmClearInventoryServiceTests
 {
     private const int CallerId = 10;
@@ -43,7 +38,6 @@ public class GmClearInventoryServiceTests
         PacketAssert.AssertNothingSent(pipe);
         Assert.Null(characters.LastReplacedContainer);
         Assert.Empty(eventLog.LoggedEvents);
-        // Untouched -- the gate failure short-circuits before any wipe logic runs.
         Assert.Single(state.Inventory.GetContainer(ContainerMatrix.InventoryPage0));
     }
 
@@ -66,7 +60,7 @@ public class GmClearInventoryServiceTests
                 CancellationToken.None), zone);
 
         Assert.Empty(state.Inventory.GetContainer(ContainerMatrix.InventoryPage0));
-        Assert.Single(state.Inventory.GetContainer(ContainerMatrix.InventoryPage1)); // untouched
+        Assert.Single(state.Inventory.GetContainer(ContainerMatrix.InventoryPage1));
 
         Assert.NotNull(characters.LastReplacedContainer);
         Assert.Equal(ContainerMatrix.InventoryPage0, characters.LastReplacedContainer!.Value.Container);
@@ -76,7 +70,7 @@ public class GmClearInventoryServiceTests
             new GenericActionResponse { Result = 0, Sort = Sort, Data = data, RuneValue = 0 });
 
         var logged = Assert.Single(eventLog.LoggedEvents);
-        Assert.Equal((short)13, logged.EventCode); // GmDuelAndInventoryActionEventCodes.ClearInventory (internal, not visible here)
+        Assert.Equal((short)13, logged.EventCode);
         Assert.Equal(EventLogCategory.GmAction, logged.Category);
         Assert.Equal(GmBasicTestSupport.AccountId, logged.ActorAccountId);
         Assert.Equal(CallerId, logged.ActorCharacterId);
@@ -102,7 +96,7 @@ public class GmClearInventoryServiceTests
             service.HandleAsync(new GmClearInventoryPayload { PageSelector = 1 }, data, session, state, zone,
                 CancellationToken.None), zone);
 
-        Assert.Single(state.Inventory.GetContainer(ContainerMatrix.InventoryPage0)); // untouched
+        Assert.Single(state.Inventory.GetContainer(ContainerMatrix.InventoryPage0));
         Assert.Empty(state.Inventory.GetContainer(ContainerMatrix.InventoryPage1));
 
         Assert.NotNull(characters.LastReplacedContainer);

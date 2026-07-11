@@ -2,7 +2,6 @@ using System.Text;
 
 namespace Fenrir.Generators.Analysis.Support;
 
-/// <summary>Indented text-source assembler (4 spaces/level).</summary>
 internal sealed class IndentedWriter
 {
     private readonly StringBuilder _builder = new();

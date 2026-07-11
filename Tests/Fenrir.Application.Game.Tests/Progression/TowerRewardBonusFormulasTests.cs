@@ -56,8 +56,7 @@ public class TowerRewardBonusFormulasTests
         Assert.Equal(0f, TowerRewardBonusFormulas.XpBonusRatio(builtLevel));
     }
 
-    /// <summary>A level-4 CP tower is the verified non-monotonic case: +2 PvM and +2 PvP simultaneously, not +2 total.</summary>
-    [Fact]
+        [Fact]
     public void LevelFourCpTower_YieldsBothPvmAndPvpBonusesSimultaneously()
     {
         Assert.Equal(2, TowerRewardBonusFormulas.CpForPvmBonus(4));
@@ -85,7 +84,7 @@ public class TowerRewardBonusTableTests
     public void SingleSilverTowerAtLevelTwo_OnlySetsThatTribesSilverRatio()
     {
         var towers = EmptyTowers();
-        towers[0] = 4 * 100 + 1; // tribe 0, slot-local 0: built level 2 (raw digit 4), type 1 (Silver)
+        towers[0] = 4 * 100 + 1;
 
         var bonuses = TowerRewardBonusTable.Recompute(towers);
 
@@ -102,7 +101,7 @@ public class TowerRewardBonusTableTests
     public void CpTowerAtLevelFour_SetsBothPvmAndPvpFieldsForItsTribe()
     {
         var towers = EmptyTowers();
-        towers[3] = 8 * 100 + 2; // tribe 1, slot-local 0 (tower index 3): built level 4 (raw digit 8), type 2 (CP)
+        towers[3] = 8 * 100 + 2;
 
         var bonuses = TowerRewardBonusTable.Recompute(towers);
 
@@ -116,7 +115,7 @@ public class TowerRewardBonusTableTests
     public void XpTowerAtLevelThree_SetsOnlyXpRatioForItsTribe()
     {
         var towers = EmptyTowers();
-        towers[9] = 6 * 100 + 3; // tribe 3, slot-local 0 (tower index 9): built level 3 (raw digit 6), type 3 (XP)
+        towers[9] = 6 * 100 + 3;
 
         var bonuses = TowerRewardBonusTable.Recompute(towers);
 
@@ -125,16 +124,12 @@ public class TowerRewardBonusTableTests
         Assert.Equal(0, bonuses[3].CpForPvpBonus);
     }
 
-    /// <summary>
-    ///     Overwrite, not additive/max: two Silver towers in the same tribe's own group -- the higher slot-local
-    ///     index (processed last) wins.
-    /// </summary>
-    [Fact]
+        [Fact]
     public void TwoSameTypeTowersInOneTribesGroup_HighestSlotLocalIndexWins()
     {
         var towers = EmptyTowers();
-        towers[0] = 2 * 100 + 1; // tribe 0 slot-local 0: level 1 Silver
-        towers[2] = 8 * 100 + 1; // tribe 0 slot-local 2: level 4 Silver -- processed last, must win
+        towers[0] = 2 * 100 + 1;
+        towers[2] = 8 * 100 + 1;
 
         var bonuses = TowerRewardBonusTable.Recompute(towers);
 
@@ -145,8 +140,8 @@ public class TowerRewardBonusTableTests
     public void TwoSameTypeTowers_LowerIndexProcessedLastAmongThem_StillLosesToHigherLocalIndex()
     {
         var towers = EmptyTowers();
-        towers[1] = 8 * 100 + 1; // slot-local 1: level 4 Silver
-        towers[2] = 2 * 100 + 1; // slot-local 2: level 1 Silver -- processed last, must win despite being weaker
+        towers[1] = 8 * 100 + 1;
+        towers[2] = 2 * 100 + 1;
 
         var bonuses = TowerRewardBonusTable.Recompute(towers);
 
@@ -157,7 +152,7 @@ public class TowerRewardBonusTableTests
     public void UnbuiltStateCode1_CountsAsLevelZero_NoBonus()
     {
         var towers = EmptyTowers();
-        towers[0] = 1 * 100 + 1; // raw state 1 ("creating, still cooling down") -- must NOT count as built
+        towers[0] = 1 * 100 + 1;
 
         var bonuses = TowerRewardBonusTable.Recompute(towers);
 
@@ -168,10 +163,10 @@ public class TowerRewardBonusTableTests
     public void AllFourTribesBuiltSimultaneously_EachGetsItsOwnIndependentBonus()
     {
         var towers = EmptyTowers();
-        towers[0] = 2 * 100 + 1; // tribe 0: Silver L1
-        towers[3] = 4 * 100 + 2; // tribe 1: CP L2
-        towers[6] = 6 * 100 + 3; // tribe 2: XP L3
-        towers[9] = 8 * 100 + 1; // tribe 3: Silver L4
+        towers[0] = 2 * 100 + 1;
+        towers[3] = 4 * 100 + 2;
+        towers[6] = 6 * 100 + 3;
+        towers[9] = 8 * 100 + 1;
 
         var bonuses = TowerRewardBonusTable.Recompute(towers);
 

@@ -67,7 +67,6 @@ public class MonsterBossRespawnTrackerTests
         Assert.Equal(3, call.MonsterSpawnRegionId);
         Assert.Equal(deadline, call.NextSpawnUtc);
 
-        // Nothing dirty anymore -- a second flush must not re-persist the same region.
         await tracker.FlushDirtyAsync(repository, CancellationToken.None);
         Assert.Single(repository.SetCalls);
     }
@@ -81,11 +80,11 @@ public class MonsterBossRespawnTrackerTests
 
         tracker.SetNextSpawnUtc(5, DateTime.UtcNow.AddMinutes(10));
 
-        await tracker.FlushDirtyAsync(repository, CancellationToken.None); // swallows the simulated failure
+        await tracker.FlushDirtyAsync(repository, CancellationToken.None);
         Assert.Empty(repository.SetCalls);
 
         repository.ThrowOnSet = false;
-        await tracker.FlushDirtyAsync(repository, CancellationToken.None); // retried on the next interval
+        await tracker.FlushDirtyAsync(repository, CancellationToken.None);
 
         Assert.Single(repository.SetCalls);
     }

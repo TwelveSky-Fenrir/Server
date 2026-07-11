@@ -123,7 +123,7 @@ public class HolyStoneWarCycleTests
     public void Contest_SkipsCharacterAlreadyMatchingHolderTribe()
     {
         var worldState = CreateWorldState();
-        worldState.SetZone038Winner(1); // tribe 1 already holds the Stone
+        worldState.SetZone038Winner(1);
         var registry = CreateRegistry(StoneMapId);
         var (session, _) = ZoneTestKit.CreateSession(1);
         registry[StoneMapId].Post(ZoneCommand.Enter(10,
@@ -175,7 +175,7 @@ public class HolyStoneWarCycleTests
         var cycle = CreateCycle(worldState, registry, gateway);
         cycle.Tick(HolyStoneWarCycle.NormalCooldown);
         AdvanceThroughOpeningCountdown(cycle);
-        cycle.Tick(TimeSpan.Zero); // finds the candidate
+        cycle.Tick(TimeSpan.Zero);
         Assert.Equal(HolyStoneWarPhase.ChallengePending, cycle.Phase);
 
         for (var i = 0; i < HolyStoneWarCycle.ChallengeCountdownMinutes; i++)
@@ -274,8 +274,6 @@ public class HolyStoneWarCycleTests
         registry[StoneMapId].Post(ZoneCommand.Enter(10,
             ZoneTestKit.EnterData(capturerSession, StoneMapId, tribe: 1, posX: Site.StoneX, posZ: Site.StoneZ)));
 
-        // 11/12 sit just outside the small capture radius (so scan order among 10/11/12 can never make either
-        // of them the contest candidate instead of 10) but well inside the much larger participation radius.
         var (rebornSession, _) = ZoneTestKit.CreateSession(2);
         registry[StoneMapId].Post(ZoneCommand.Enter(11,
             ZoneTestKit.EnterData(rebornSession, StoneMapId, tribe: 1, posX: Site.StoneX + 50, posZ: Site.StoneZ)));
@@ -300,16 +298,16 @@ public class HolyStoneWarCycleTests
         var cycle = CreateCycle(worldState, registry, gateway);
         cycle.Tick(HolyStoneWarCycle.NormalCooldown);
         AdvanceThroughOpeningCountdown(cycle);
-        cycle.Tick(TimeSpan.Zero); // 10 is the only character within the capture radius
+        cycle.Tick(TimeSpan.Zero);
         Assert.Equal(10, cycle.PendingCandidateCharacterId);
 
         for (var i = 0; i < HolyStoneWarCycle.ChallengeCountdownMinutes; i++)
             cycle.Tick(TimeSpan.FromMinutes(1));
 
-        Assert.DoesNotContain(10, gateway.ParticipationRewardedCharacterIds); // capturer excluded
-        Assert.Contains(11, gateway.ParticipationRewardedCharacterIds); // reborn + in range
-        Assert.DoesNotContain(12, gateway.ParticipationRewardedCharacterIds); // never reborn
-        Assert.DoesNotContain(13, gateway.ParticipationRewardedCharacterIds); // out of participation radius
+        Assert.DoesNotContain(10, gateway.ParticipationRewardedCharacterIds);
+        Assert.Contains(11, gateway.ParticipationRewardedCharacterIds);
+        Assert.DoesNotContain(12, gateway.ParticipationRewardedCharacterIds);
+        Assert.DoesNotContain(13, gateway.ParticipationRewardedCharacterIds);
     }
 
     [Fact]
@@ -322,11 +320,9 @@ public class HolyStoneWarCycleTests
         registry[StoneMapId].Post(ZoneCommand.Enter(10,
             ZoneTestKit.EnterData(capturerSession, StoneMapId, tribe: 1, posX: Site.StoneX, posZ: Site.StoneZ)));
 
-        // Tribemate on an entirely different map, nowhere near the Stone -- still eligible per contract step 8.
         var (elsewhereSession, _) = ZoneTestKit.CreateSession(2);
         registry[99].Post(ZoneCommand.Enter(20, ZoneTestKit.EnterData(elsewhereSession, 99, tribe: 1)));
 
-        // A different tribe entirely -- must never be advanced.
         var (otherTribeSession, _) = ZoneTestKit.CreateSession(3);
         registry[99].Post(ZoneCommand.Enter(21, ZoneTestKit.EnterData(otherTribeSession, 99, tribe: 2)));
 

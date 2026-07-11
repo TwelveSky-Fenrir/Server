@@ -13,13 +13,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Game;
 
-// game.usp_HeroRanking_Rollover against real SQL Server 2025. game.HeroRankingRolloverState is a true
-// singleton (like game.WorldState), shared by every test in the "SqlServer" collection for the whole
-// assembly run -- every path that writes LastRolloverAtUtc (row creation, a successful flip) sets it to
-// "now", so a bare RolloverIfDueAsync call is always a deterministic no-op regardless of what any other
-// test already did to it; only backdating it ourselves, inside a single test method, can ever make a flip
-// due. No other test file in this suite touches game.HeroRankings, so the top-10-per-tribe cap assertions
-// below only ever see rows this test itself inserted.
 [Collection("SqlServer")]
 public sealed class HeroRankingRolloverProcTests
 {
@@ -45,9 +38,6 @@ public sealed class HeroRankingRolloverProcTests
     [Fact]
     public async Task RolloverIfDueAsync_SentinelFresh_NeverFlips()
     {
-        // Whether this is the very first call in the whole suite (creates the row with LastRolloverAtUtc =
-        // now) or a later one (every prior writer also always left it at "now"), the 7-day gate can never be
-        // satisfied here.
         var rolledOver = await _heroRankings.RolloverIfDueAsync(CancellationToken.None);
 
         Assert.False(rolledOver);
@@ -58,8 +48,6 @@ public sealed class HeroRankingRolloverProcTests
     {
         var tribeId = await EnsureTribeAsync();
 
-        // 11 ranked characters for the same tribe: the cap must keep exactly the top 10 by Points and drop
-        // the 11th (lowest-points) one, exactly like the legacy's own "ORDER BY hPoint DESC LIMIT 10".
         var ranked = new List<int>();
         for (var i = 0; i < 11; i++)
         {
@@ -69,22 +57,18 @@ public sealed class HeroRankingRolloverProcTests
                 10, CancellationToken.None);
         }
 
-        // Must never be promoted: zero points ("if (hPoint < 1) continue" in the legacy) ...
         var zeroPointsCharacterId = await CreateCharacterAsync();
         await _heroRankings.MarkRewardClaimedAsync(zeroPointsCharacterId, 0, 0, tribeId,
             1, CancellationToken.None);
 
-        // ... and no live tribe (unreachable via HeroRankBuilder/HeroRewardResolver anyway).
         var noTribeCharacterId = await CreateCharacterAsync();
         await _heroRankings.MarkRewardClaimedAsync(noTribeCharacterId, 0, 500, null,
             1, CancellationToken.None);
 
-        // A leftover Previous-period row from the last cycle: the rollover must replace it wholesale, not merge.
         var staleCharacterId = await CreateCharacterAsync();
         await _heroRankings.MarkRewardClaimedAsync(staleCharacterId, 1, 42, tribeId, 1,
             CancellationToken.None);
 
-        // Ensure the sentinel row exists, then force it stale enough for the 7-day gate to trip.
         await _heroRankings.RolloverIfDueAsync(CancellationToken.None);
         await BackdateSentinelAsync(TimeSpan.FromDays(8));
 
@@ -95,8 +79,8 @@ public sealed class HeroRankingRolloverProcTests
         var promoted = previous.Where(r => ranked.Contains(r.CharacterId)).ToList();
 
         Assert.Equal(10, promoted.Count);
-        Assert.DoesNotContain(promoted, r => r.CharacterId == ranked[^1]); // the 11th, lowest-points entrant
-        Assert.All(promoted, r => Assert.False(r.RewardClaimed == true)); // fresh period, nothing claimed yet
+        Assert.DoesNotContain(promoted, r => r.CharacterId == ranked[^1]);
+        Assert.All(promoted, r => Assert.False(r.RewardClaimed == true));
         Assert.DoesNotContain(previous, r => r.CharacterId == zeroPointsCharacterId);
         Assert.DoesNotContain(previous, r => r.CharacterId == noTribeCharacterId);
         Assert.DoesNotContain(previous, r => r.CharacterId == staleCharacterId);
@@ -106,7 +90,6 @@ public sealed class HeroRankingRolloverProcTests
         Assert.DoesNotContain(current, r => r.CharacterId == zeroPointsCharacterId);
         Assert.DoesNotContain(current, r => r.CharacterId == noTribeCharacterId);
 
-        // Idempotent: immediately calling again must not roll a second time.
         var secondCall = await _heroRankings.RolloverIfDueAsync(CancellationToken.None);
         Assert.False(secondCall);
     }
@@ -124,8 +107,6 @@ public sealed class HeroRankingRolloverProcTests
 
     private async Task<byte> EnsureTribeAsync()
     {
-        // TribeId is a fixed 0-3 domain value (CK_Tribes_TribeId); idempotent so it doesn't matter whether
-        // another test class already created it.
         const byte tribeId = 0;
 
         await using var connection = new SqlConnection(_connectionString);

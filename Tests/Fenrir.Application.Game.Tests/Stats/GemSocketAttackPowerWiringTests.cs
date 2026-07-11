@@ -5,16 +5,6 @@ using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Game.Tests.Stats;
 
-/// <summary>
-///     Workstream B13-socket-prerequisites -- the end-to-end wiring of the gem-socket AttackPower contribution
-///     into <see cref="StatCalculator.ComputeBaseStats" />/<see cref="StatCalculator.ComputeEffectiveStats" />,
-///     now that <see cref="EquippedItemSlot" /> carries the packed <c>SOCKET_GEM_V2</c> blob
-///     (<see cref="EquippedItemSlot.SocketGem1" />/<see cref="EquippedItemSlot.SocketGem2" />/
-///     <see cref="EquippedItemSlot.SocketGem3" />) and a (Type,Value02)-keyed effect table can be supplied. The
-///     routing/decode/aggregation math itself is pinned separately in <c>GemSocketContributionTests</c>; these
-///     tests only pin the call-site wiring (which slots get folded, and that omitting the table reproduces the
-///     pre-wiring, gem-socket-free result).
-/// </summary>
 public class GemSocketAttackPowerWiringTests
 {
     private static readonly EquippedItemSlot[] NoEquipment = [];
@@ -51,8 +41,6 @@ public class GemSocketAttackPowerWiringTests
             0, 0, 0, 0, 0);
     }
 
-    // Packs SOCKET_GEM_V2 as 3 little-endian ints: [0] unused, [1] count, then up to 5 (type,value) byte pairs --
-    // same shape GemSocketContributionTests.Pack pins in isolation.
     private static (int P1, int P2, int P3) Pack(byte count, params (byte Type, byte Value)[] pairs)
     {
         Span<byte> bytes = stackalloc byte[12];
@@ -80,7 +68,7 @@ public class GemSocketAttackPowerWiringTests
     {
         var attributes = Attributes(strength: 100, level: 1);
         var levels = Levels(LevelRow(1));
-        var (p1, p2, p3) = Pack(1, (2, 50)); // would resolve to a real contribution if a table were supplied
+        var (p1, p2, p3) = Pack(1, (2, 50));
         var equipment = new[] { new EquippedItemSlot(0, Item(1), 0, 0, 0, 0, p1, p2, p3) };
 
         var withoutTable = StatCalculator.ComputeBaseStats(attributes, equipment, levels);
@@ -133,7 +121,7 @@ public class GemSocketAttackPowerWiringTests
     {
         var attributes = Attributes(strength: 100, level: 1);
         var levels = Levels(LevelRow(1));
-        var (p1, p2, p3) = Pack(1, (2, 99)); // no (2,99) row in the table below
+        var (p1, p2, p3) = Pack(1, (2, 99));
         var equipment = new[] { new EquippedItemSlot(0, Item(1), 0, 0, 0, 0, p1, p2, p3) };
         var table = EffectTable(new GemSocketRowDto(1, 2, 0, 50, 77, 0));
 

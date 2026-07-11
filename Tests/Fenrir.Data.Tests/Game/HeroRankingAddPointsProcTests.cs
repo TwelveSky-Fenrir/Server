@@ -12,9 +12,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Game;
 
-// game.usp_HeroRanking_AddPoints against real SQL Server 2025 -- the atomic-accumulate variant the PvP-kill
-// reward pipeline's hero-point grant needs, distinct from usp_HeroRanking_Upsert's whole-row overwrite (only
-// safe for HeroRewardClaimService's claim-time write).
 [Collection("SqlServer")]
 public sealed class HeroRankingAddPointsProcTests
 {

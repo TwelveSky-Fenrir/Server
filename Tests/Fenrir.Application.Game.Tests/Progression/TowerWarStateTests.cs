@@ -70,7 +70,7 @@ public class TowerWarStateTests
         state.BeginUpgrade(3, 401, 2);
 
         Assert.False(state.IsValid(3));
-        Assert.Equal(201, state.GetPackedState(3)); // unchanged -- guardian hasn't (re)spawned yet
+        Assert.Equal(201, state.GetPackedState(3));
         Assert.Equal(TowerSiegePhase.Building, state.GetPhase(3));
         Assert.Equal(401, state.GetPendingPackedStateForBuilding(3));
     }
@@ -192,8 +192,8 @@ public class TowerWarStateTests
         var isFirstHit = state.RecordGuardianHit(3, second);
 
         Assert.False(isFirstHit);
-        Assert.Equal(first, state.GetFirstAttackAtUtc(3)); // one-shot -- never overwritten again
-        Assert.Equal(second, state.GetLastAttackAtUtc(3)); // refreshed on every landed hit
+        Assert.Equal(first, state.GetFirstAttackAtUtc(3));
+        Assert.Equal(second, state.GetLastAttackAtUtc(3));
     }
 
     [Fact]
@@ -222,7 +222,6 @@ public class TowerWarStateTests
         Assert.Null(state.GetLastAttackAtUtc(3));
         Assert.False(state.IsUnderAttack(3));
 
-        // The new guardian instance's own first hit is "first" again.
         Assert.True(state.RecordGuardianHit(3, DateTime.UtcNow));
     }
 
@@ -244,12 +243,9 @@ public class TowerWarStateTests
 
         Assert.Equal(1, repository.EnsureInitializedCallCount);
 
-        // Untouched tower: stays Dormant.
         Assert.Equal(TowerSiegePhase.Dormant, state.GetPhase(0));
         Assert.Equal(0, state.GetPackedState(0));
 
-        // Previously-built tower: resumes into Building (its guardian MonsterEntity never survived the
-        // restart) with the persisted level/type queued as the pending target.
         Assert.Equal(TowerSiegePhase.Building, state.GetPhase(1));
         Assert.Equal(402, state.GetPendingPackedStateForBuilding(1));
         Assert.Equal((byte?)1, state.GetControllingTribe(1));
@@ -262,7 +258,7 @@ public class TowerWarStateTests
         var state = new TowerWarState();
         state.SetTowerState(3, 201, true);
         state.BeginUpgrade(3, 401, 2);
-        state.CompleteUpgrade(3); // only this one is marked dirty
+        state.CompleteUpgrade(3);
 
         await state.FlushDirtyAsync(repository, CancellationToken.None);
 
@@ -293,9 +289,9 @@ public class TowerWarStateTests
         state.BeginUpgrade(3, 401, 2);
         state.CompleteUpgrade(3);
 
-        await state.FlushDirtyAsync(repository, CancellationToken.None); // must not throw
+        await state.FlushDirtyAsync(repository, CancellationToken.None);
         repository.ThrowOnSetProgress = false;
-        await state.FlushDirtyAsync(repository, CancellationToken.None); // retried and now succeeds
+        await state.FlushDirtyAsync(repository, CancellationToken.None);
 
         Assert.Single(repository.SetProgressCalls);
     }
@@ -324,15 +320,11 @@ public class TowerWarStateTests
     public void RecomputeTribeBonuses_ReadsPackedStateDirectly_RegardlessOfSiegePhase()
     {
         var state = new TowerWarState();
-        // Tribe 0, level 4 XP-less Silver tower (type 1): raw packed level digit is always 2/4/6/8 for
-        // built levels 1-4 respectively (DecodeLevel's own remarks, MyGame::GetTowerState) -- 801, not 401.
         state.SetTowerState(0, 801, true);
-        state.BeginSiege(0, DateTime.UtcNow); // guardian just died -- packedState is untouched by this
+        state.BeginSiege(0, DateTime.UtcNow);
 
         state.RecomputeTribeBonuses();
 
-        // Still reports the full level-4 Silver bonus during the destroy cooldown -- packedState (Fenrir's
-        // mirror of the legacy shared mTowerInfo->mState1Tower[]) isn't zeroed until CompleteDestruction.
         Assert.Equal(0.20f, state.GetTribeBonus(0).SilverRatio);
     }
 
@@ -340,7 +332,7 @@ public class TowerWarStateTests
     public void RecomputeTribeBonuses_CalledAgainAfterCompleteDestruction_DropsBackToZero()
     {
         var state = new TowerWarState();
-        state.SetTowerState(0, 801, true); // level 4 (raw digit 8, see DecodeLevel's 2/4/6/8 remarks)
+        state.SetTowerState(0, 801, true);
         state.RecomputeTribeBonuses();
         Assert.Equal(0.20f, state.GetTribeBonus(0).SilverRatio);
 

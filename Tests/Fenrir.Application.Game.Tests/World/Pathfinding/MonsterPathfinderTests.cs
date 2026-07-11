@@ -5,17 +5,6 @@ using Fenrir.Application.Game.Tests.TestSupport;
 
 namespace Fenrir.Application.Game.Tests.World.Pathfinding;
 
-/// <summary>
-///     Covers <see cref="MonsterPathfinder" /> A* + funnel routing over hand-built navmeshes: a direct funnel on
-///     open ground, an obstacle-avoiding detour around a gap, same-triangle/off-mesh edge cases, the per-tick
-///     budget, and allocation-freedom of the search hot path.
-/// </summary>
-/// <remarks>
-///     Joins the serialized <see cref="AllocationRegressionCollection" /> because
-///     <see cref="TryFindPath_ReusingBuffers_DoesNotAllocateOnTheHotPath" /> reads a per-thread
-///     <see cref="GC.GetAllocatedBytesForCurrentThread" /> delta that concurrent test execution perturbs (JIT and
-///     thread-pool bookkeeping landing on the measuring thread) -- see that collection's own remarks.
-/// </remarks>
 [Collection(AllocationRegressionCollection.Name)]
 public class MonsterPathfinderTests
 {
@@ -23,13 +12,7 @@ public class MonsterPathfinderTests
     private const float GroundY = 10f;
     private static readonly Vector4 FloorPlane = new(0f, 1f, 0f, GroundY);
 
-    /// <summary>
-    ///     Builds a navmesh from a set of present grid cells: each cell <c>(col, row)</c> spans
-    ///     <c>[col*10,(col+1)*10] x [row*10,(row+1)*10]</c> at <see cref="GroundY" />, split into two floor
-    ///     triangles along the cell diagonal so orthogonally-adjacent present cells share exact triangle edges.
-    ///     A single-leaf quadtree over the whole bounding box backs the (x, z) containment lookups.
-    /// </summary>
-    private static ZoneGeometry GridGeometry(params (int Col, int Row)[] cells)
+        private static ZoneGeometry GridGeometry(params (int Col, int Row)[] cells)
     {
         var triangles = new List<WorldTriangle>(cells.Length * 2);
         float minX = float.MaxValue, minZ = float.MaxValue, maxX = float.MinValue, maxZ = float.MinValue;
@@ -65,8 +48,7 @@ public class MonsterPathfinderTests
         return new ZoneGeometry(triangles.ToArray(), [root]);
     }
 
-    /// <summary>Single 3x3-cell open square, so any start/goal within it is trivially connected.</summary>
-    private static ZoneGeometry OpenGround()
+        private static ZoneGeometry OpenGround()
     {
         return GridGeometry(
             (0, 0), (1, 0), (2, 0),
@@ -74,12 +56,7 @@ public class MonsterPathfinderTests
             (0, 2), (1, 2), (2, 2));
     }
 
-    /// <summary>
-    ///     Two vertical columns joined only by a top connector; the two-cell-tall gap
-    ///     (<c>(1,0)</c>/<c>(1,1)</c>) blocks any straight line between the columns' bottoms, forcing an
-    ///     up-and-over detour.
-    /// </summary>
-    private static ZoneGeometry GapWithTopDetour()
+        private static ZoneGeometry GapWithTopDetour()
     {
         return GridGeometry(
             (0, 0), (0, 1), (0, 2),
@@ -109,7 +86,6 @@ public class MonsterPathfinderTests
         var found = pathfinder.TryFindPath(new Vector3(5, GroundY, 5), new Vector3(25, GroundY, 25), waypoints);
 
         Assert.True(found);
-        // A clear line across open ground collapses to the single goal waypoint (the funnel emits no corners).
         Assert.Single(waypoints);
         Assert.Equal(25f, waypoints[0].X, 3);
         Assert.Equal(25f, waypoints[0].Y, 3);
@@ -121,7 +97,6 @@ public class MonsterPathfinderTests
         var pathfinder = new MonsterPathfinder(OpenGround(), 24);
         var waypoints = new List<Vector2>();
 
-        // Both points sit below the diagonal of cell (0,0) -- the same triangle.
         var found = pathfinder.TryFindPath(new Vector3(7, GroundY, 3), new Vector3(8, GroundY, 4), waypoints);
 
         Assert.True(found);
@@ -136,24 +111,20 @@ public class MonsterPathfinderTests
         var pathfinder = new MonsterPathfinder(GapWithTopDetour(), 24);
         var waypoints = new List<Vector2>();
 
-        var from = new Vector3(7, GroundY, 3); // cell (0,0), below its diagonal
-        var to = new Vector3(27, GroundY, 3); // cell (2,0), below its diagonal
+        var from = new Vector3(7, GroundY, 3);
+        var to = new Vector3(27, GroundY, 3);
         var found = pathfinder.TryFindPath(from, to, waypoints);
 
         Assert.True(found);
 
-        // Not a direct path: it has to turn to get around the gap.
         Assert.True(waypoints.Count >= 2, $"expected a detour with corners, got {waypoints.Count} waypoint(s)");
 
-        // It routes UP and over the gap -- some corner is well above both endpoints' z (=3).
         Assert.Contains(waypoints, w => w.Y >= 15f);
 
-        // The routed length is far longer than the (blocked) straight-line distance of 20 units.
         var straightLine = Vector2.Distance(new Vector2(from.X, from.Z), new Vector2(to.X, to.Z));
         Assert.True(PathLength(new Vector2(from.X, from.Z), waypoints) > straightLine + 15f,
             "routed path should be substantially longer than the blocked straight line");
 
-        // Ends at the goal.
         Assert.Equal(27f, waypoints[^1].X, 2);
         Assert.Equal(3f, waypoints[^1].Y, 2);
     }
@@ -162,7 +133,7 @@ public class MonsterPathfinderTests
     public void OffMeshStart_ReturnsFalse_AndClearsOutput()
     {
         var pathfinder = new MonsterPathfinder(OpenGround(), 24);
-        var waypoints = new List<Vector2> { new(1f, 2f) }; // pre-populated to prove it is cleared
+        var waypoints = new List<Vector2> { new(1f, 2f) };
 
         var found = pathfinder.TryFindPath(new Vector3(5000, GroundY, 5000), new Vector3(5, GroundY, 5), waypoints);
 
@@ -185,7 +156,6 @@ public class MonsterPathfinderTests
     [Fact]
     public void DisconnectedIslands_ReturnFalse()
     {
-        // Two present cells with no shared edge and a gap between them: reachable containment, unreachable route.
         var geometry = GridGeometry((0, 0), (5, 5));
         var pathfinder = new MonsterPathfinder(geometry, 24);
         var waypoints = new List<Vector2>();
@@ -226,9 +196,6 @@ public class MonsterPathfinderTests
         var from = new Vector3(7, GroundY, 3);
         var to = new Vector3(27, GroundY, 3);
 
-        // Warm up well past tiered-compilation's tier-1 promotion (~30 calls) so no re-JIT lands inside the
-        // measured window, and so every reused A*/funnel scratch buffer (and the lazy navmesh adjacency) has
-        // already grown to its steady-state capacity before the first measured call.
         for (var i = 0; i < 64; i++)
             Assert.True(pathfinder.TryFindPath(from, to, waypoints));
 
@@ -238,10 +205,6 @@ public class MonsterPathfinderTests
             pathfinder.TryFindPath(from, to, waypoints);
         var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
 
-        // Scratch is fully reused once warmed, so the search allocates nothing per call. The threshold is an
-        // average of under 8 bytes/call -- a real per-call allocation (a List/PriorityQueue grow or a fresh
-        // result object) is dozens of bytes or more, so this still catches any regression, while leaving headroom
-        // for the occasional stray byte of runtime bookkeeping the per-thread counter attributes to this thread.
         Assert.True(allocated < iterations * 8,
             $"expected ~0 allocation on the pathfinding hot path, got {allocated} bytes over {iterations} calls");
     }

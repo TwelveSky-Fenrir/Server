@@ -11,11 +11,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Characters;
 
-// game.usp_CharacterTradeCommit_ExecuteIdempotent against real SQL Server 2025 -- the C8 anti-dupe variant of
-// usp_CharacterTrade_Execute (exercised by CharacterRepositoryTests' sibling coverage of the plain proc
-// indirectly via ExecuteTradeAsync elsewhere). The one behavior this proc adds over the plain one -- a retry
-// carrying the same TradeToken must never re-apply the additive money legs -- is this file's whole reason to
-// exist as a separate suite.
 [Collection("SqlServer")]
 public class TradeCommitRepositoryTests
 {
@@ -72,8 +67,6 @@ public class TradeCommitRepositoryTests
             $"SELECT COUNT(*) FROM game.TradeCommitLedger WHERE TradeToken = '{token}' AND CharacterA = {characterA} AND CharacterB = {characterB};"));
     }
 
-    // The core anti-dupe guarantee: a retry carrying the SAME token must be a complete no-op, even though the
-    // money legs are additive (Money = Money + @Delta) and would otherwise double-apply on a naive replay.
     [Fact]
     public async Task ExecuteIdempotentAsync_RetryWithSameToken_DoesNotReapplyMoney()
     {
@@ -89,7 +82,6 @@ public class TradeCommitRepositoryTests
             1000, 1,
             CancellationToken.None);
 
-        // Retry: same token, same (or any) deltas -- must short-circuit before touching game.Characters at all.
         await _tradeCommits.ExecuteIdempotentAsync(
             token,
             characterA, [], [],
@@ -99,20 +91,17 @@ public class TradeCommitRepositoryTests
             CancellationToken.None);
 
         var (moneyA, bigMoneyA) = await GetMoneyAsync(characterA);
-        Assert.Equal(4000L, moneyA); // NOT 3000 -- the second call must not have re-debited A.
+        Assert.Equal(4000L, moneyA);
         Assert.Equal(2, bigMoneyA);
 
         var (moneyB, bigMoneyB) = await GetMoneyAsync(characterB);
-        Assert.Equal(1000L, moneyB); // NOT 2000 -- the second call must not have re-credited B.
+        Assert.Equal(1000L, moneyB);
         Assert.Equal(1, bigMoneyB);
 
-        // Exactly one ledger row for this token, never two.
         Assert.Equal(1,
             await ScalarAsync<int>($"SELECT COUNT(*) FROM game.TradeCommitLedger WHERE TradeToken = '{token}';"));
     }
 
-    // A genuinely different trade (a fresh token) between the same two characters must NOT be blocked by the
-    // first trade's ledger row -- dedupe is per-token, not a global once-ever-between-these-two-characters gate.
     [Fact]
     public async Task ExecuteIdempotentAsync_DifferentTokenBetweenSameCharacters_CommitsIndependently()
     {
@@ -148,13 +137,11 @@ public class TradeCommitRepositoryTests
 
         Assert.Equal(50268, Assert.IsType<SqlException>(ex!.InnerException).Number);
 
-        // The failed attempt's ledger INSERT must have rolled back with the rest of the transaction -- a
-        // legitimate retry of this exact token (e.g. after the player tops up) must still be possible.
         Assert.Equal(0,
             await ScalarAsync<int>($"SELECT COUNT(*) FROM game.TradeCommitLedger WHERE TradeToken = '{token}';"));
 
         var (moneyA, _) = await GetMoneyAsync(characterA);
-        Assert.Equal(100L, moneyA); // untouched
+        Assert.Equal(100L, moneyA);
     }
 
     [Fact]
@@ -170,7 +157,6 @@ public class TradeCommitRepositoryTests
 
         Assert.Equal(50269, Assert.IsType<SqlException>(ex!.InnerException).Number);
 
-        // XACT_ABORT unwinds the whole transaction, including Character A's already-applied debit.
         var (moneyA, _) = await GetMoneyAsync(characterA);
         Assert.Equal(5000L, moneyA);
 
@@ -201,7 +187,6 @@ public class TradeCommitRepositoryTests
             RandomNumberGenerator.GetBytes(16), CancellationToken.None);
     }
 
-    // Name is NVARCHAR(13) and globally unique (UQ_Characters_Name); an 8-char guid slice fits and won't collide.
     private static string NewCharacterName()
     {
         return $"T{Guid.NewGuid():N}"[..8];

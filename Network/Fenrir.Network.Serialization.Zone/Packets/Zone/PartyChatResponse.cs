@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Wire.Attributes;
 
 namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 
-// Link is zeroed when no item is linked.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.PartyChat, ExpectedSize = 99)]
 public readonly partial record struct PartyChatResponse : IOutgoingPacket
 {

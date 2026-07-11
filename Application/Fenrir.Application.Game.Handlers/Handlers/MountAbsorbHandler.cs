@@ -8,11 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
-/// <summary>
-///     CZ_ANIMAL_ABSORB_SEND (op113). No dedicated reply -- state changes broadcast via AVATAR_CHANGE_INFO_1
-///     (AOI) + AVATAR_CHANGE_INFO_2 (self) instead, mirrored onto the tick through
-///     <see cref="MountZoneCommand" />.
-/// </summary>
 public sealed class MountAbsorbHandler(IMountAbsorbService service, ILogger<MountAbsorbHandler> logger)
     : IInlinePacketHandler<MountAbsorbRequest>
 {

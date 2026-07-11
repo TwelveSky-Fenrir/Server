@@ -8,11 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
-/// <summary>
-///     op28, CZ_LOW_ITEM_SEND -- downgrades a Rare/Elite item to the previous tier (delegated to
-///     <see cref="IDowngradeItemRankService" />). Unlike <see cref="UpgradeItemRankHandler" />, a successful
-///     downgrade only swaps the item id -- Enchant/Combine/Refine/Socket are all left exactly as they were.
-/// </summary>
 public sealed class DowngradeItemRankHandler(
     IDowngradeItemRankService downgradeItemRankService,
     ILogger<DowngradeItemRankHandler> logger)

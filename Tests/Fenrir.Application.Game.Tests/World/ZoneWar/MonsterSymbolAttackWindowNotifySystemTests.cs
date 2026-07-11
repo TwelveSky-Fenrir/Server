@@ -14,15 +14,11 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Covers <see cref="MonsterSymbolAttackWindowNotifySystem" />: the per-tick gate on the current
-///     monster-symbol holder, the holder-tribe-to-mapped-instance filter, and the one-shot sort-401 broadcast.
-/// </summary>
 public class MonsterSymbolAttackWindowNotifySystemTests
 {
-    private const short HolderMapId = 4; // mapped to holder tribe 0 in every test's options
-    private const short OtherMapId = 9; // mapped to holder tribe 1, never the current holder below
-    private const int LegacyTicksPerMinute = 120; // Server/Header/function.h:1643-1652
+    private const short HolderMapId = 4;
+    private const short OtherMapId = 9;
+    private const int LegacyTicksPerMinute = 120;
 
     private static ZoneRegistry CreateRegistry(params short[] maps)
     {
@@ -90,7 +86,7 @@ public class MonsterSymbolAttackWindowNotifySystemTests
         var registry = CreateRegistry(HolderMapId);
         var (zone, pipe) = EnterOnePlayer(registry, HolderMapId, 10);
 
-        var worldState = CreateWorldState(); // MonsterSymbol never resolved -- null
+        var worldState = CreateWorldState();
         var tracker = new MonsterSymbolAttackWindowTracker();
         var broadcaster = new ZoneEventBroadcaster(worldState, registry, NullLogger<ZoneEventBroadcaster>.Instance);
         var system = new MonsterSymbolAttackWindowNotifySystem(worldState, tracker, LazyBroadcaster(broadcaster),
@@ -109,7 +105,7 @@ public class MonsterSymbolAttackWindowNotifySystemTests
         var (otherZone, otherPipe) = EnterOnePlayer(registry, OtherMapId, 20);
 
         var worldState = CreateWorldState();
-        worldState.ResolveMonsterSymbol(0); // holder tribe 0 -> mapped to HolderMapId, not OtherMapId
+        worldState.ResolveMonsterSymbol(0);
         var tracker = new MonsterSymbolAttackWindowTracker();
         var broadcaster = new ZoneEventBroadcaster(worldState, registry, NullLogger<ZoneEventBroadcaster>.Instance);
         var system = new MonsterSymbolAttackWindowNotifySystem(worldState, tracker, LazyBroadcaster(broadcaster),
@@ -128,7 +124,7 @@ public class MonsterSymbolAttackWindowNotifySystemTests
         var (zone, pipe) = EnterOnePlayer(registry, HolderMapId, 10);
 
         var worldState = CreateWorldState();
-        worldState.ResolveMonsterSymbol(2); // tribe 2 has no configured mapping in BuildGameOptions (only 0/1)
+        worldState.ResolveMonsterSymbol(2);
         var tracker = new MonsterSymbolAttackWindowTracker();
         var broadcaster = new ZoneEventBroadcaster(worldState, registry, NullLogger<ZoneEventBroadcaster>.Instance);
         var system = new MonsterSymbolAttackWindowNotifySystem(worldState, tracker, LazyBroadcaster(broadcaster),
@@ -152,14 +148,13 @@ public class MonsterSymbolAttackWindowNotifySystemTests
         var system = new MonsterSymbolAttackWindowNotifySystem(worldState, tracker, LazyBroadcaster(broadcaster),
             Options.Create(BuildGameOptions(delayMinutes: 1)));
 
-        system.Simulate(zone, LegacyTicksPerMinute - 1); // one tick short of the 1-minute delay
+        system.Simulate(zone, LegacyTicksPerMinute - 1);
         Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
 
-        system.Simulate(zone, 1); // crosses the delay on this exact tick
+        system.Simulate(zone, 1);
         var frame = ZoneTestKit.DrainOutbound(pipe);
         Assert.Equal(FrameWriter.FrameSizeOf<ZoneEventInfoResponse>(), frame.Length);
         Assert.Equal(401, BinaryPrimitives.ReadInt32LittleEndian(frame.AsSpan(1)));
-        // No payload beyond the sort itself -- the rest of the 130-byte data block stays zero.
         Assert.Equal(0, BinaryPrimitives.ReadInt32LittleEndian(frame.AsSpan(5)));
     }
 
@@ -191,21 +186,21 @@ public class MonsterSymbolAttackWindowNotifySystemTests
         var (otherZone, otherPipe) = EnterOnePlayer(registry, OtherMapId, 20);
 
         var worldState = CreateWorldState();
-        worldState.ResolveMonsterSymbol(0); // tribe 0 -> HolderMapId
+        worldState.ResolveMonsterSymbol(0);
         var tracker = new MonsterSymbolAttackWindowTracker();
         var broadcaster = new ZoneEventBroadcaster(worldState, registry, NullLogger<ZoneEventBroadcaster>.Instance);
         var system = new MonsterSymbolAttackWindowNotifySystem(worldState, tracker, LazyBroadcaster(broadcaster),
             Options.Create(BuildGameOptions(delayMinutes: 1)));
 
         system.Simulate(holderZone, LegacyTicksPerMinute);
-        system.Simulate(otherZone, LegacyTicksPerMinute); // never matches -- no-op every call
+        system.Simulate(otherZone, LegacyTicksPerMinute);
         Assert.NotEmpty(ZoneTestKit.DrainOutbound(holderPipe));
 
-        worldState.ResolveMonsterSymbol(1); // tribe 1 -> OtherMapId
-        system.Simulate(holderZone, LegacyTicksPerMinute); // no longer the holder's map -- no broadcast
+        worldState.ResolveMonsterSymbol(1);
+        system.Simulate(holderZone, LegacyTicksPerMinute);
         Assert.Empty(ZoneTestKit.DrainOutbound(holderPipe));
 
-        system.Simulate(otherZone, LegacyTicksPerMinute); // now matches -- fresh holding period, notifies again
+        system.Simulate(otherZone, LegacyTicksPerMinute);
         Assert.NotEmpty(ZoneTestKit.DrainOutbound(otherPipe));
     }
 }

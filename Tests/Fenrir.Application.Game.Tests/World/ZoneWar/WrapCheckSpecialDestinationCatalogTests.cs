@@ -2,7 +2,6 @@ using Fenrir.Application.Game.Domain.World.ZoneWar;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-// Server/ts25zone/S07_MyGame03.cpp:5840-5941 -- the three non-tribe-corridor WrapCheck destination groups.
 public class WrapCheckSpecialDestinationCatalogTests
 {
     [Theory]
@@ -17,7 +16,7 @@ public class WrapCheckSpecialDestinationCatalogTests
     }
 
     [Theory]
-    [InlineData((short)38)] // the hub itself is not a member of this group
+    [InlineData((short)38)]
     [InlineData((short)1)]
     [InlineData((short)241)]
     public void IsWinZone038Destination_FalseForEverythingElse(short zoneId)

@@ -5,7 +5,6 @@ using Fenrir.Data.Abstractions.Admin;
 
 namespace Fenrir.Data.Admin;
 
-/// <summary>See <see cref="ITribeFourQuotaRepository" />.</summary>
 public sealed record TribeFourQuotaRepository(ICaeriusNetDbContext Db) : ITribeFourQuotaRepository
 {
     public async ValueTask<bool> TryConsumeAsync(CancellationToken ct)

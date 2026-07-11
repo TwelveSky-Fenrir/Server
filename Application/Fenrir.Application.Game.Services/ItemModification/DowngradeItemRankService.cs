@@ -11,10 +11,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.ItemModification;
 
-/// <summary>
-///     Business logic for op28, CZ_LOW_ITEM_SEND -- extracted from <see cref="DowngradeItemRankHandler" />, see
-///     that handler's remarks.
-/// </summary>
 public sealed class DowngradeItemRankService(
     ICharacterRepository characters,
     WorldDataCache worldData,
@@ -22,15 +18,10 @@ public sealed class DowngradeItemRankService(
     ILogger<DowngradeItemRankService> logger)
     : IDowngradeItemRankService
 {
-    /// <summary>
-    ///     game.EventLog.EventCode for a downgrade-rank attempt -- the wire opcode (op28) itself, same
-    ///     "app-owned numbering scheme, caller-interpreted alongside Category" posture as every other
-    ///     EventCode in this codebase.
-    /// </summary>
-    private const short DowngradeItemRankEventCode = 28;
 
-    /// <summary>game.EventLog.Outcome for this EventCode: 0 success, 1 failed.</summary>
-    private const byte SuccessOutcome = 0;
+        private const short DowngradeItemRankEventCode = 28;
+
+        private const byte SuccessOutcome = 0;
 
     private const byte FailedOutcome = 1;
 
@@ -127,9 +118,6 @@ public sealed class DowngradeItemRankService(
             return new DowngradeItemRankResult(DowngradeItemRankOutcome.Rejected, false, 0, [0, 0, 0, 0, 0, 0]);
         }
 
-        // Server/ts25zone/S04_MyWork02.cpp:4228-4229 -- same AddTribeBankInfo2 credit as UpgradeItemRank's
-        // (see that service's own remark), mirrored for the downgrade path; also never reached on the
-        // NoCandidate/result-2 path above.
         zone.CreditNpcServiceTribeTax(state.Tribe, resolved.Cost);
 
         if (!eventLogQueue.Enqueue(new EventLogEntryTvp(DowngradeItemRankEventCode, (byte)EventLogCategory.Enchant,

@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Zone;
 
-/// <summary>ZC_IMPROVE_ITEM_RECV (ZONE.h:513-518, 12-byte payload): Result/Cost/Value (source: <c>iValue</c>).</summary>
 public class ZcImproveItemRecvTests
 {
     [Fact]

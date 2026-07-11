@@ -10,21 +10,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Inventory;
 
-/// <inheritdoc cref="IInventoryToWorldDropService" />
-/// <remarks>
-///     Réf. C++ : Server/ts25zone/S04_MyWork05.cpp:1129-1233 (<c>ProcessForInventoryToWorld</c>) --
-///     orchestration only; see <see cref="InventoryToWorldDropPolicy" /> for the actual ported rules and its
-///     own remarks for the two deliberately-unresolved handoffs (the <c>CheckAvatarDrop</c> encoding, and the
-///     shared spawn routine's item-type/packed-value gate) this service's own call sites below reproduce.
-///     <para>
-///         Does NOT call any <see cref="Zone" /> ground-item-spawn method -- <see cref="Zone.SpawnGroundItem" />
-///         is documented tick-thread-only and, even if it weren't, has no parameter for Value/SerialNumber/
-///         gem-socket data, so calling it here would either require an unsafe cross-thread call or silently
-///         drop this operation's own unique-item socket carry-over requirement. The returned
-///         <see cref="GroundItemSpawnPlan" /> is the hand-off point for whichever follow-up gives
-///         <see cref="Zone" /> a capacity/value/socket-aware spawn entry point safely callable from here.
-///     </para>
-/// </remarks>
 public sealed class InventoryToWorldDropService(
     ICharacterRepository characters,
     WorldDataCache worldData,
@@ -33,22 +18,12 @@ public sealed class InventoryToWorldDropService(
     ILogger<InventoryToWorldDropService> logger)
     : IInventoryToWorldDropService
 {
-    /// <summary>
-    ///     game.EventLog.EventCode for a manual unique-item ground drop -- an app-owned numbering scheme (see
-    ///     <c>DestroyItemService.DestroyItemEventCode</c>'s own identical remark); picked as an arbitrary small
-    ///     value scoped to this one path.
-    /// </summary>
-    private const short ManualDropItemEventCode = 1;
+
+        private const short ManualDropItemEventCode = 1;
 
     private const byte SuccessOutcome = 1;
 
-    /// <summary>
-    ///     <c>ItemRowDto.CheckAvatarDrop</c>'s "disallow player drop" encoding -- see
-    ///     <see cref="InventoryToWorldDropPolicy" />'s own remarks (handoff 1) for why this specific value is a
-    ///     documented, NOT independently re-confirmed, analogy to the sibling <c>CheckAvatarTrade == 1</c>
-    ///     convention rather than a re-derived citation of its own.
-    /// </summary>
-    private const byte NonDroppableFlagValue = 1;
+        private const byte NonDroppableFlagValue = 1;
 
     public async ValueTask<InventoryToWorldDropResult> DropToWorldAsync(Zone zone, PlayerRuntimeState state,
         int characterId, int accountId, DefaultPData move, bool premiumPageAccessAllowed,
@@ -92,8 +67,6 @@ public sealed class InventoryToWorldDropService(
 
         await characters.ReplaceContainerAsync(characterId, container, ToTvps(projected), cancellationToken);
 
-        // Unique-item-only audit row -- the stackable path records no equivalent entry (see this operation's
-        // own behavior contract's Edge cases, and InventoryToWorldDropPolicy's class remarks).
         if (source is { } droppedStack && !ContainerMatrix.IsStackableSort(itemDefinition!.Item.Sort))
             await eventLog.LogAsync(ManualDropItemEventCode, EventLogCategory.ItemDrop, accountId, characterId,
                 null, null, null, null, null, droppedStack.ItemId, droppedStack.Quantity, SuccessOutcome,

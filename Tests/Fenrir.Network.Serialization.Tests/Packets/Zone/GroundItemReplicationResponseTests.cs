@@ -74,7 +74,6 @@ public class ZcItemActionRecvTests
         BinaryPrimitives.WriteInt32LittleEndian(golden.AsSpan(8 + ObjectForItem.WireSize), 2);
 
         Assert.Equal(ObjectForItem.WireSize, dataWritten);
-        // Padding bytes (payload offsets 62-63, after PartyName) must be zeroed, not left uninitialized.
         Assert.Equal(0, golden[8 + 54]);
         Assert.Equal(0, golden[8 + 55]);
 

@@ -6,10 +6,6 @@ using Fenrir.Network.Tests.Sessions;
 
 namespace Fenrir.Network.Tests.FloodProtection;
 
-// Unit coverage of IpFloodGuard in isolation -- SessionLoopTests covers Trigger B's actual production wiring
-// through SessionLoop's ProtocolViolationException handling; LoginConnectionHost/GameConnectionHost wire
-// Trigger A, out of this test project's scope (Hosting layer), so its accept-time ordering isn't re-tested
-// here beyond the guard's own return-value contract.
 public sealed class IpFloodGuardTests
 {
     private const string Ip = "203.0.113.10";
@@ -26,8 +22,6 @@ public sealed class IpFloodGuardTests
         Assert.Empty(blockCalls);
     }
 
-    // Trigger A boundary (contract): strict greater-than, so the block trips on the (threshold+1)th
-    // concurrent connection, not the threshold'th itself.
     [Fact]
     public async Task TryAcquireConnectionAsync_ExceedsThreshold_ReturnsFalseAndBlocksExactlyOnce()
     {
@@ -42,9 +36,6 @@ public sealed class IpFloodGuardTests
         Assert.Equal([Ip], blockCalls);
     }
 
-    // Deliberate fix over legacy's own bare self-referential Quit() bug (contract Side effects §2): every
-    // session sharing the blocked IP is kicked, not just the newly-arriving one, and sessions on a different
-    // IP are left alone.
     [Fact]
     public async Task TryAcquireConnectionAsync_OverThreshold_KicksEverySessionSharingThatIpButNotOthers()
     {
@@ -100,7 +91,6 @@ public sealed class IpFloodGuardTests
         Assert.True(await guard.TryAcquireConnectionAsync("203.0.113.2", CancellationToken.None));
     }
 
-    // Contract's Error/failure semantics: persisting the block must never fault the accept path.
     [Fact]
     public async Task TryAcquireConnectionAsync_BlockDelegateThrows_StillReturnsFalseAndNeverThrows()
     {
@@ -125,8 +115,6 @@ public sealed class IpFloodGuardTests
         Assert.Empty(blockCalls);
     }
 
-    // Trigger B boundary (contract): greater-than-or-equal, so the block trips exactly on the threshold'th
-    // tallied violation, unlike Trigger A's strict greater-than.
     [Fact]
     public async Task RecordProtocolViolationAsync_ReachesThreshold_BlocksOnTheExactCountingViolation()
     {
@@ -151,15 +139,10 @@ public sealed class IpFloodGuardTests
         await guard.RecordProtocolViolationAsync("203.0.113.1", CancellationToken.None);
         Assert.Equal(["203.0.113.1"], blockCalls);
 
-        // A second, different IP's very first violation must independently trip its own threshold too -- not
-        // be silently absorbed the way legacy's shared/global "last hour" variable would (contract Edge Cases).
         await guard.RecordProtocolViolationAsync("203.0.113.2", CancellationToken.None);
         Assert.Equal(["203.0.113.1", "203.0.113.2"], blockCalls);
     }
 
-    // Deliberately NOT reproducing legacy's two known bugs in the dead MyUserPacketError function (contract
-    // Edge Cases): a single process-wide "last hour" sentinel that (a) free-passes the first violation after
-    // every hour boundary and (b) resets every OTHER ip's tally too. This is a clean per-IP tumbling window.
     [Fact]
     public async Task RecordProtocolViolationAsync_HourRollover_ResetsOnlyThatIpsOwnCounterAsACleanWindow()
     {
@@ -171,13 +154,12 @@ public sealed class IpFloodGuardTests
 
         await guard.RecordProtocolViolationAsync(Ip, CancellationToken.None);
         await guard.RecordProtocolViolationAsync(Ip, CancellationToken.None);
-        Assert.Empty(blockCalls); // 2 of 3 in hour one -- not yet tripped
+        Assert.Empty(blockCalls);
 
-        currentTime = hourOne.AddHours(1); // roll over to a new wall-clock hour
+        currentTime = hourOne.AddHours(1);
 
         await guard.RecordProtocolViolationAsync(Ip, CancellationToken.None);
 
-        // The 3rd lifetime violation is only the 1st of the new hour -- must NOT trip a threshold of 3.
         Assert.Empty(blockCalls);
 
         await guard.RecordProtocolViolationAsync(Ip, CancellationToken.None);

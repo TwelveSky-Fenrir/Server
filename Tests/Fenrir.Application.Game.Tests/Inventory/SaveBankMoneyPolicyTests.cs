@@ -2,10 +2,6 @@ using Fenrir.Application.Game.Domain.Inventory;
 
 namespace Fenrir.Application.Game.Tests.Inventory;
 
-/// <summary>
-///     Coverage for <see cref="SaveBankMoneyPolicy" />, the pure policy behind tSort 231 (deposit money) and 232
-///     (withdraw money). Does not depend on any dispatch wiring.
-/// </summary>
 public class SaveBankMoneyPolicyTests
 {
     [Fact]
@@ -79,7 +75,6 @@ public class SaveBankMoneyPolicyTests
     [Fact]
     public void Resolve_NoFixedPerRequestCapBeyondOverflowGuard()
     {
-        // Unlike the 999 stackable-item cap, money has no fixed per-request ceiling besides the overflow guard.
         var result = SaveBankMoneyPolicy.ResolveDeposit(1_500_000_000,
             1_500_000_000, 0);
 

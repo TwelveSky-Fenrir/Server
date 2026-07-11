@@ -25,10 +25,10 @@ public sealed class Zone175MissionCoreTests
         var sunday2100 = NextSunday2100();
 
         Assert.True(Zone175MissionCore.IsOpenMoment(sunday2100));
-        Assert.False(Zone175MissionCore.IsOpenMoment(sunday2100.AddMinutes(1))); // 21:01
-        Assert.False(Zone175MissionCore.IsOpenMoment(sunday2100.AddHours(1))); // 22:00
-        Assert.False(Zone175MissionCore.IsOpenMoment(sunday2100.AddDays(1))); // Monday 21:00
-        Assert.False(Zone175MissionCore.IsOpenMoment(sunday2100.AddHours(-1))); // 20:00
+        Assert.False(Zone175MissionCore.IsOpenMoment(sunday2100.AddMinutes(1)));
+        Assert.False(Zone175MissionCore.IsOpenMoment(sunday2100.AddHours(1)));
+        Assert.False(Zone175MissionCore.IsOpenMoment(sunday2100.AddDays(1)));
+        Assert.False(Zone175MissionCore.IsOpenMoment(sunday2100.AddHours(-1)));
     }
 
     [Fact]
@@ -87,8 +87,6 @@ public sealed class Zone175MissionCoreTests
         Zone175MissionCore.Advance(state, in config, effects, sunday2100, 1);
         Assert.Equal(Zone175MissionPhase.PreOpen, state.Phase);
 
-        // Simulate the machine having returned to Idle later that same Sunday (e.g. a short prior cycle): the
-        // once-per-day guard must refuse to reopen at the same 21:00 minute.
         state.Phase = Zone175MissionPhase.Idle;
         effects.Events.Clear();
 
@@ -106,17 +104,15 @@ public sealed class Zone175MissionCoreTests
         var effects = new RecordingZone175MissionEffects();
         var now = NextSunday2100();
 
-        Zone175MissionCore.Advance(state, in config, effects, now, 1); // open
+        Zone175MissionCore.Advance(state, in config, effects, now, 1);
         effects.Events.Clear();
 
-        // One minute -> one decrement (10 -> 9).
         Zone175MissionCore.Advance(state, in config, effects, now, OneMinute);
         var first = Assert.Single(effects.Events);
         Assert.Equal(Zone175MissionEvent.PreOpenCountdown, first.Event);
         Assert.Equal(9, first.Remaining);
         Assert.Equal(Zone175MissionPhase.PreOpen, state.Phase);
 
-        // The remaining nine minutes' worth in one batch -> nine more decrements down to 0 -> begin wave 1.
         Zone175MissionCore.Advance(state, in config, effects, now, 9 * OneMinute);
 
         Assert.Equal(Zone175MissionPhase.WaveBossSummon, state.Phase);
@@ -142,12 +138,10 @@ public sealed class Zone175MissionCoreTests
     {
         var (state, config, effects) = OpenAndReachWaveOneCombat(livingBosses: 1);
 
-        // 20 sub-ticks -> exactly one trickle summon; boss still alive so no clear.
         Zone175MissionCore.Advance(state, in config, effects, NextSunday2100(), 20);
         Assert.Equal(Zone175MissionPhase.WaveCombat, state.Phase);
         Assert.Single(effects.TrickleSummons);
 
-        // 45 more -> two further trickles (45/20), remainder carried.
         Zone175MissionCore.Advance(state, in config, effects, NextSunday2100(), 45);
         Assert.Equal(3, effects.TrickleSummons.Count);
         Assert.All(effects.TrickleSummons, stage => Assert.Equal(1, stage));
@@ -163,7 +157,6 @@ public sealed class Zone175MissionCoreTests
         Assert.Equal(1, effects.RemoveMissionMonstersCount);
         Assert.Equal(new[] { 1 }, effects.Rewards);
         Assert.Contains(effects.Events, e => e.Event == Zone175MissionEvent.WaveCleared && e.Wave == 1);
-        // index2 = 4 allows advancing to wave 2.
         Assert.Equal(Zone175MissionPhase.WaveBossSummon, state.Phase);
         Assert.Equal(2, state.CurrentWave);
     }
@@ -186,12 +179,11 @@ public sealed class Zone175MissionCoreTests
     {
         var (state, config, effects) = OpenAndReachWaveOneCombat(livingBosses: 0, index2: 4);
 
-        // Clear all five waves in sequence.
         for (var wave = 1; wave <= Zone175RewardTables.WaveCount; wave++)
         {
             if (state.Phase == Zone175MissionPhase.WaveBossSummon)
-                Zone175MissionCore.Advance(state, in config, effects, NextSunday2100(), 1); // -> combat
-            Zone175MissionCore.Advance(state, in config, effects, NextSunday2100(), 1); // clear
+                Zone175MissionCore.Advance(state, in config, effects, NextSunday2100(), 1);
+            Zone175MissionCore.Advance(state, in config, effects, NextSunday2100(), 1);
         }
 
         Assert.Equal(new[] { 1, 2, 3, 4, 5 }, effects.Rewards);
@@ -231,16 +223,14 @@ public sealed class Zone175MissionCoreTests
     {
         var (state, config, effects) = OpenAndReachWaveOneCombat(livingBosses: 1);
         effects.PlayerPresent = false;
-        Zone175MissionCore.Advance(state, in config, effects, NextSunday2100(), 1); // -> Terminal
+        Zone175MissionCore.Advance(state, in config, effects, NextSunday2100(), 1);
         Assert.Equal(Zone175MissionPhase.Terminal, state.Phase);
 
-        // Not yet elapsed: still holding.
         Zone175MissionCore.Advance(state, in config, effects, NextSunday2100(),
             Zone175RewardTables.TerminalHoldLegacyTicks - 1);
         Assert.Equal(Zone175MissionPhase.Terminal, state.Phase);
         Assert.Equal(0, effects.ForceDisconnectAllCount);
 
-        // Cross the 60-minute hold.
         Zone175MissionCore.Advance(state, in config, effects, NextSunday2100(), 1);
 
         Assert.Equal(1, effects.ForceDisconnectAllCount);
@@ -257,8 +247,8 @@ public sealed class Zone175MissionCoreTests
         var effects = new RecordingZone175MissionEffects();
         var now = NextSunday2100();
 
-        Zone175MissionCore.Advance(state, in config, effects, now, 1); // open
-        Zone175MissionCore.Advance(state, in config, effects, now, 10 * OneMinute); // countdown -> wave 1 summon
+        Zone175MissionCore.Advance(state, in config, effects, now, 1);
+        Zone175MissionCore.Advance(state, in config, effects, now, 10 * OneMinute);
         effects.Events.Clear();
         return (state, config, effects);
     }
@@ -268,14 +258,13 @@ public sealed class Zone175MissionCoreTests
     {
         var (state, config, effects) = OpenAndReachWaveOneSummon(index2);
         effects.LivingBosses = livingBosses;
-        Zone175MissionCore.Advance(state, in config, effects, NextSunday2100(), 1); // summon -> combat
+        Zone175MissionCore.Advance(state, in config, effects, NextSunday2100(), 1);
         effects.Events.Clear();
         effects.SummonedBosses.Clear();
         return (state, config, effects);
     }
 }
 
-/// <summary>Records every <see cref="IZone175MissionEffects" /> call and answers queries from settable fields.</summary>
 internal sealed class RecordingZone175MissionEffects : IZone175MissionEffects
 {
     public bool PlayerPresent { get; set; } = true;

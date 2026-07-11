@@ -3,21 +3,10 @@ using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Tests.World.WorldState;
 
-/// <summary>
-///     Covers <see cref="WorldInfoBootReset" />: exactly the six requested field groups (votes/close-vote/
-///     alliance-possibility/DTM/Nok-San/popup) must be zeroed by <see cref="WorldInfoBootReset.Apply" />, every
-///     other <see cref="WorldInfo" /> field must survive completely untouched (the "curated reset, never a
-///     whole-region clear" invariant), and <c>AllianceState</c> must never be silently guessed at.
-/// </summary>
 public class WorldInfoBootResetTests
 {
-    /// <summary>
-    ///     A <see cref="WorldInfo" /> with every one of the six targeted field groups poisoned with a
-    ///     distinctive non-zero sentinel (7), plus several UNRELATED fields poisoned with their own distinctive
-    ///     values -- so a passing assertion proves <see cref="WorldInfoBootReset.Apply" /> actually reset the
-    ///     targeted fields (not that they merely started zero already) while leaving everything else alone.
-    /// </summary>
-    private static WorldInfo Poisoned()
+
+        private static WorldInfo Poisoned()
     {
         return WorldStateTemplates.ZeroedWorldInfo with
         {
@@ -32,7 +21,6 @@ public class WorldInfoBootResetTests
             PopUpKillAvt = [7, 7, 7, 7, 7],
             PopUpKillMonster = [7, 7, 7, 7, 7],
 
-            // Unrelated fields -- must survive Apply() byte-for-byte.
             GuildBattle = 99,
             TribeSymbol = [1, 2, 3, 4],
             Zone049TypeState = [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
@@ -100,8 +88,6 @@ public class WorldInfoBootResetTests
     {
         var result = WorldInfoBootReset.Apply(Poisoned());
 
-        // Sentinel unknown/uncited -- Apply() must never guess it. Passing the poisoned value straight through
-        // (not silently zeroing it, which would itself be an unverified guess) is the only safe default.
         Assert.Equal([7, 7, 7, 7], result.AllianceState);
     }
 

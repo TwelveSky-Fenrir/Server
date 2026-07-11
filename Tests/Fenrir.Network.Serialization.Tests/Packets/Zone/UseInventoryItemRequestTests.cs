@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Zone;
 
-/// <summary>CZ_USE_INVENTORY_ITEM_SEND (CLIENT.h:243-248, 12-byte payload): Page/Index/Value.</summary>
 public class CzUseInventoryItemSendTests
 {
     [Fact]

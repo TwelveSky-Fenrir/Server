@@ -103,8 +103,6 @@ public class ObjectForAvatarTests
         StructuralAssert.DeepEqual(data, roundTripped);
     }
 
-    // Name (offset 48, char[13]) is followed by a 3-byte compiler pad before Tribe at offset 64;
-    // Action is a nested ACTION_INFO at offset 216.
     [Fact]
     public void TryRead_DecodesGoldenBytes()
     {

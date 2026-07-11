@@ -6,10 +6,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     Covers <see cref="Zone" />'s Move command path: position update, <c>MovementRules</c> plausibility gate, AOI
-///     tracking, and broadcast/resync split.
-/// </summary>
 public class ZoneMoveTests
 {
     private static readonly int OneFrame = FrameWriter.FrameSizeOf<AvatarActionResponse>();
@@ -19,11 +15,6 @@ public class ZoneMoveTests
         return new ActionInfo
         {
             Type = 0,
-            // Sort 2 ("plain movement"), NOT 0 -- Sort 0 is RestActionSort, and an accepted Sort-0 action now
-            // legitimately triggers Zone.PlayerLifecycle.cs's ApplyRestActionProtectionAndHeal (legacy-parity
-            // "rest"/stand-up side effect: an unconditional HP heal + a self-only AvatarStatUpdateResponse),
-            // which would make this suite's "self excluded from a plain move" assertions fail for the wrong
-            // reason. Sort 2 is legal for every Type (CharacterMotionWhitelist) and carries no such side effect.
             Sort = 2,
             Frame = 0,
             Location = [x, 0f, z],
@@ -57,7 +48,6 @@ public class ZoneMoveTests
         ZoneTestKit.DrainOutbound(moverPipe);
         ZoneTestKit.DrainOutbound(neighborPipe);
 
-        // MovementRules measures DateTime.UtcNow, not the zone's simulated clock -- SlackUnits=1 covers this tiny step regardless
         zone.Post(ZoneCommand.Move(10, MoveTo(10.5f, 10f)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
@@ -65,11 +55,6 @@ public class ZoneMoveTests
         Assert.Equal(10.5f, mover10!.PosX);
         Assert.Equal(10f, mover10.PosZ);
 
-        // op15 (CZ_AVATAR_ACTION_SEND, isResumeAction: false) accepted-action tail echoes the just-accepted
-        // action back to the mover itself, in addition to the neighbor broadcast -- Server/ts25zone/
-        // S04_MyWork02.cpp:1770-1777's unconditional self-send, previously missing here (see
-        // MoveResume_Plausible_BroadcastsToNeighbors_NoSelfEcho below for the op16 contrast, which has no
-        // self-send at all).
         var moverInbox = ZoneTestKit.DrainOutbound(moverPipe);
         Assert.Equal(OneFrame, moverInbox.Length);
 
@@ -90,12 +75,6 @@ public class ZoneMoveTests
         ZoneTestKit.DrainOutbound(moverPipe);
         ZoneTestKit.DrainOutbound(neighborPipe);
 
-        // op16 (CZ_UPDATE_AVATAR_ACTION, isResumeAction: true) has no broadcast call anywhere in its legacy
-        // body (Server/ts25zone/S04_MyWork02.cpp:1789-1922 -- verified directly: the handler only calls
-        // SetSpaceIndex()/UPDATE_LOGOUT_INFO, never mTRANSFER.B_AVATAR_ACTION_RECV) -- neither the acting
-        // client nor its neighbors ever see this update over the wire; the state change is applied
-        // server-side only, matching legacy's documented server-knows/clients-don't-know staleness gap for
-        // this opcode.
         zone.Post(ZoneCommand.Move(10, MoveTo(10.5f, 10f), true));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
@@ -124,7 +103,6 @@ public class ZoneMoveTests
         Assert.Equal(10f, mover10!.PosX);
         Assert.Equal(10f, mover10.PosZ);
 
-        // only the mover gets a direct resync frame with its last-known-good position
         var moverInbox = ZoneTestKit.DrainOutbound(moverPipe);
         Assert.Equal(OneFrame, moverInbox.Length);
     }

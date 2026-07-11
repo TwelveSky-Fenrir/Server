@@ -4,12 +4,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Exercises <see cref="Zone051Zone053BroadcastResolver" /> directly (not through
-///     <see cref="ZoneCenterBroadcastIngestor" />, which this slice deliberately does not edit -- see the
-///     originating wave-13 A5-zone051-053-states wiring manifest for the exact <c>case</c> arms a later
-///     integration pass adds to that class's own <c>ApplyStateEffect</c> switch).
-/// </summary>
 public class Zone051Zone053BroadcastResolverTests
 {
     private static byte[] SlotPayload(int slot)
@@ -22,11 +16,11 @@ public class Zone051Zone053BroadcastResolverTests
     [Theory]
     [InlineData(11, 1)]
     [InlineData(14, 5)]
-    [InlineData(18, 0)] // reset -- a real write, distinct from selector 10's no-op
+    [InlineData(18, 0)]
     public void ApplyZone051_WritesTheMappedState_NotTheRawSelector(int selector, int expectedState)
     {
         var state = new Zone051Zone053SiegeState();
-        state.SetZone051(2, 9); // seed so a reset-to-0 write is observable
+        state.SetZone051(2, 9);
 
         Zone051Zone053BroadcastResolver.ApplyZone051(state, selector, SlotPayload(2), NullLogger.Instance);
 
@@ -59,11 +53,11 @@ public class Zone051Zone053BroadcastResolverTests
     [Theory]
     [InlineData(20, 1)]
     [InlineData(23, 5)]
-    [InlineData(30, 0)] // reset -- a real write, distinct from the no-op selectors below
+    [InlineData(30, 0)]
     public void ApplyZone053_WritesTheMappedState_NotTheRawSelector(int selector, int expectedState)
     {
         var state = new Zone051Zone053SiegeState();
-        state.SetZone053(5, 9); // seed so a reset-to-0 write is observable
+        state.SetZone053(5, 9);
 
         Zone051Zone053BroadcastResolver.ApplyZone053(state, selector, SlotPayload(5), NullLogger.Instance);
 

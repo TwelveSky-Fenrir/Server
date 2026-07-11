@@ -2,17 +2,6 @@ using Fenrir.Application.Game.Domain.Combat;
 
 namespace Fenrir.Application.Game.Domain.Enchant;
 
-/// <summary>
-///     Pure resolver for CZ_SKY_UP_ITEM_SEND (op93, S04_MyWork02.cpp:12862, <c>__REBIRTH__</c> build --
-///     confirmed active). Warlord-item-only upgrade: consumes a protection-stone tier item, on success bumps
-///     the target item id by +129 and reduces its enchant value by the tier's decrease. No I/O, no Zone
-///     dependency.
-/// </summary>
-/// <remarks>
-///     Unlike the sibling CZ_UP_LEVEL_ITEM_SEND (op127, <see cref="CapeUpgradeResolver" />), this opcode's
-///     probability formula has no <c>aHighItemValue</c>/premium-discount inputs at all -- it is exactly the
-///     per-tier stone probability, nothing else.
-/// </remarks>
 public static class SkyUpgradeResolver
 {
     public enum Outcome

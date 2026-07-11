@@ -5,10 +5,6 @@ using Fenrir.Application.Game.Tests.TestSupport;
 
 namespace Fenrir.Application.Game.Tests.Combat;
 
-/// <summary>
-///     Covers <see cref="StunResolver.Resolve" /> (mCase 5, <c>ProcessAttack05</c>) against
-///     <c>Server/ts25zone/S07_MyGame02.cpp:3491-3735</c>.
-/// </summary>
 public class StunResolverTests
 {
     private static CombatantSnapshot Combatant(int characterId, byte tribe, bool isDead = false,
@@ -17,8 +13,7 @@ public class StunResolverTests
         return new CombatantSnapshot(characterId, tribe, isDead, 1000, 1000, 0, 0, 0, zoneEntryAt, default, 0);
     }
 
-    /// <summary>A flat (grade0 == grade1) skill -- gradePoints only needs to be &gt;= 1 to hit these values.</summary>
-    private static SkillDefinition FlatSkill(int skillId, int stunAttack = 0, int stunDefense = 0, int runTime = 0)
+        private static SkillDefinition FlatSkill(int skillId, int stunAttack = 0, int stunDefense = 0, int runTime = 0)
     {
         var skill = WorldDataTestRows.Skill(skillId) with { MaxUpgradePoint = 20 };
         var grade0 = WorldDataTestRows.SkillGrade(skillId, 0) with
@@ -202,7 +197,6 @@ public class StunResolverTests
     {
         var attacker = Combatant(1, 0);
         var defender = Combatant(2, 1);
-        // block = 0 (no resist skill configured), margin = 50, roll range 500 -> roll 10 succeeds.
         var outcome = StunResolver.Resolve(Request(attacker, defender, FlatSkill(7, 50, runTime: 8)), TimeSpan.Zero,
             new ScriptedRandomSource(10));
         Assert.False(outcome.Rejected);
@@ -241,8 +235,6 @@ public class StunResolverTests
         var attacker = Combatant(1, 0);
         var defender = Combatant(2, 1);
         var skill = FlatSkill(StunResolver.TeamStunSkillId, 10, runTime: 5);
-        // A roll of 60 would still be < margin(10) if the range were mistakenly 500-scaled, but must fail on
-        // the real 100-scaled roll used for skill 80 -- this pins the roll range, not just the outcome.
         var outcome = StunResolver.Resolve(
             Request(attacker, defender, skill, StunResolver.TeamStunSkillId),
             TimeSpan.Zero, new ScriptedRandomSource(60));
@@ -255,10 +247,10 @@ public class StunResolverTests
         var attacker = Combatant(1, 0);
         var defender = Combatant(2, 1);
         var skill = FlatSkill(StunResolver.TeamStunSkillId, 10, runTime: 5);
-        var resist = FlatSkill(5, stunDefense: 999); // would normally guarantee a miss
+        var resist = FlatSkill(5, stunDefense: 999);
         var outcome = StunResolver.Resolve(
             Request(attacker, defender, skill, StunResolver.TeamStunSkillId, resistSkill: resist,
-                resistGradePoints: 10), TimeSpan.Zero, new ScriptedRandomSource(5)); // 5 < margin(10) on range 100
+                resistGradePoints: 10), TimeSpan.Zero, new ScriptedRandomSource(5));
         Assert.True(outcome.Success);
         Assert.True(outcome.IsTeamStunSkill);
     }
@@ -280,9 +272,6 @@ public class StunResolverTests
     {
         var attacker = Combatant(1, 0);
         var defender = Combatant(2, 1);
-        // Buff slot 13 ("Stun Defense") replaces the block value with the literal 100 (S07_MyGame02.cpp:3645-
-        // 3653), not int.MaxValue -- margin = 50 - 100 = negative, still fails, but as a beatable mitigation,
-        // not unconditional immunity (see the next test).
         var outcome = StunResolver.Resolve(
             Request(attacker, defender, FlatSkill(7, 50, runTime: 5), defenderHasImmunityBuff: true),
             TimeSpan.Zero, new ScriptedRandomSource(0));
@@ -295,10 +284,6 @@ public class StunResolverTests
     {
         var attacker = Combatant(1, 0);
         var defender = Combatant(2, 1);
-        // A sufficiently high stun-attack success value (scales with the attacker's used-skill grade) can
-        // still exceed the flat 100 block and land the stun despite the buff being active: margin = 500 - 100
-        // = 400. This is the exact real-PvP divergence the flat-100 fix closes -- the buff mitigates, it does
-        // not guarantee immunity, unlike the previous int.MaxValue substitution.
         var outcome = StunResolver.Resolve(
             Request(attacker, defender, FlatSkill(7, 500, runTime: 5), defenderHasImmunityBuff: true),
             TimeSpan.Zero, new ScriptedRandomSource(0));
@@ -311,10 +296,7 @@ public class StunResolverTests
     {
         var attacker = Combatant(1, 0);
         var defender = Combatant(2, 1);
-        var resist = FlatSkill(5, stunDefense: 999); // would normally guarantee a miss on its own
-        // The buff-13 override is a replacement, not an addition/combination: block becomes 100, not 999 and
-        // not 999+100. margin = 150 - 100 = 50 -> succeeds; had the resist-skill value been used instead, or
-        // added to 100, this would fail.
+        var resist = FlatSkill(5, stunDefense: 999);
         var outcome = StunResolver.Resolve(
             Request(attacker, defender, FlatSkill(7, 150, runTime: 5), resistSkill: resist, resistGradePoints: 10,
                 defenderHasImmunityBuff: true),

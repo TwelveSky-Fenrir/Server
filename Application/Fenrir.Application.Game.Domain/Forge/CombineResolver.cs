@@ -3,23 +3,6 @@ using Fenrir.Application.Game.Domain.Inventory;
 
 namespace Fenrir.Application.Game.Domain.Forge;
 
-/// <summary>
-///     Pure resolver for CZ_ADD_ITEM_SEND (S04_MyWork02.cpp:3453), the "combine" (IUValue) mechanic. No I/O, no
-///     Zone dependency.
-/// </summary>
-/// <remarks>
-///     The material-vs-target `iSort != iSort` check (S04_MyWork02.cpp:3512) compares a value to itself and is
-///     therefore always false in the legacy -- verified dead code, not reproduced here. <c>aAddItemValue</c>
-///     (the "lucky combine" +5% charge) has no acquisition path yet, so <see cref="Resolve" /> is always called
-///     with 0 charges, same open issue as <see cref="Enchant.EnchantResolver" />'s <c>protectForDestroyCharges</c>.
-///     <c>AddTribeBankInfo2</c>'s 1% cost skim into the tribe bank is deliberately NOT computed here: this
-///     resolver stays Zone-free by design (see the type summary), and the tribe-symbol indirection
-///     (<c>mWorldInfo-&gt;mTribeSymbol</c>) it ultimately targets is modeled one layer up, in
-///     <see cref="World.WorldState.TribeBankTaxAccumulator" />'s own optional beneficiary-resolver seam.
-///     <c>CombineItemService</c> credits it via <c>Zone.CreditNpcServiceTribeTax</c> once this resolver's
-///     <see cref="CombineResult.Cost" /> has actually been debited -- same posture as
-///     <c>RerollResolver</c>/<c>RankChangeResolver</c>, whose own services do the same.
-/// </remarks>
 public static class CombineResolver
 {
     public const byte RareItemType = 3;
@@ -110,13 +93,7 @@ public static class CombineResolver
         return table[combine];
     }
 
-    /// <summary>
-    ///     eq.Level -&gt; required mat.Level for the Elite (IELITE) combine family. Level 145's own
-    ///     martial-&gt;martial branch (S04_MyWork02.cpp:3661) compares a value to itself and is always true --
-    ///     verified dead code, reproduced here as an unconditional pass. Any eq.Level not in this table has no
-    ///     `case` in the legacy switch (no `default:`), so it silently passes too.
-    /// </summary>
-    private static bool MatchesEliteTier(short eqLevel, short matLevel, byte matMartialLevel)
+        private static bool MatchesEliteTier(short eqLevel, short matLevel, byte matMartialLevel)
     {
         return eqLevel switch
         {

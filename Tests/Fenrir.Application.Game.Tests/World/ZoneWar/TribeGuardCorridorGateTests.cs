@@ -3,18 +3,12 @@ using Fenrir.Application.Game.Domain.World.ZoneWar;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Covers <see cref="TribeGuardCorridorGate" /> (<c>MyUtil::WrapCheck</c>) against a synthetic two-tribe
-///     corridor -- the real sixteen-zone/hub table is not reproduced anywhere in this codebase yet (see
-///     <see cref="TribeGuardCorridorCatalog" />'s own remarks).
-/// </summary>
 public class TribeGuardCorridorGateTests
 {
     private const short HubZoneId = 100;
     private const byte OwnerTribe = 0;
     private const byte OtherTribe = 1;
 
-    // Owner tribe 0's own chain: 1 (seg0) -> 2 (seg1) -> 3 (seg2) -> 4 (seg3, home).
     private static readonly ImmutableArray<short> Tribe0Chain = [1, 2, 3, 4];
 
     private static TribeGuardCorridorCatalog CreateCatalog(short? segment0Override = null)
@@ -42,7 +36,7 @@ public class TribeGuardCorridorGateTests
     public void NonCorridorDestination_IsAlwaysAllowed_RegardlessOfEverythingElse()
     {
         var catalog = CreateCatalog();
-        var state = new TribeGuardCorridorState(); // every segment closed
+        var state = new TribeGuardCorridorState();
 
         var outcome = Evaluate(catalog, state, OtherTribe, 9999, 8888);
 
@@ -64,9 +58,8 @@ public class TribeGuardCorridorGateTests
     public void GmOrAdminRank_BypassesEverything_EvenAClosedSegmentAndBadAdjacency()
     {
         var catalog = CreateCatalog();
-        var state = new TribeGuardCorridorState(); // segment 2 closed
+        var state = new TribeGuardCorridorState();
 
-        // origin 9999 is not even a valid adjacent zone -- would fail adjacency too, if evaluated.
         var outcome = Evaluate(catalog, state, OtherTribe, 9999, 3, true);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.Allowed, outcome);
@@ -87,7 +80,7 @@ public class TribeGuardCorridorGateTests
     public void DeclaredAllyOfTheOwningTribe_BypassesEverything()
     {
         var catalog = CreateCatalog();
-        var state = new TribeGuardCorridorState(); // closed
+        var state = new TribeGuardCorridorState();
 
         var outcome = Evaluate(catalog, state, OtherTribe, 1, 2,
             resolveAlly: owner => owner == OwnerTribe ? OtherTribe : null);
@@ -102,10 +95,6 @@ public class TribeGuardCorridorGateTests
         var state = new TribeGuardCorridorState();
         byte? queriedWith = null;
 
-        // This delegate only recognizes an alliance when queried with the OWNING tribe (0); if the gate ever
-        // queried with the requester's own tribe instead, this would return null and the bypass would (wrongly)
-        // not fire, matching the legacy bug class TowerFriendlyFireGate/HolyStoneTribeMatch already guard
-        // against for their own analogous checks.
         byte? ResolveAlly(byte tribeId)
         {
             queriedWith = tribeId;
@@ -124,7 +113,7 @@ public class TribeGuardCorridorGateTests
     {
         var catalog = CreateCatalog();
         var state = new TribeGuardCorridorState();
-        state.TrySetOpen(OwnerTribe, 1, true); // segment gating entry into zone 2 (chain[1])
+        state.TrySetOpen(OwnerTribe, 1, true);
 
         var outcome = Evaluate(catalog, state, OtherTribe, 1, 2);
 
@@ -135,7 +124,7 @@ public class TribeGuardCorridorGateTests
     public void ValidSingleStepAdvance_ClosedSegment_IsRejectedSoft()
     {
         var catalog = CreateCatalog();
-        var state = new TribeGuardCorridorState(); // closed by default
+        var state = new TribeGuardCorridorState();
 
         var outcome = Evaluate(catalog, state, OtherTribe, 1, 2);
 
@@ -158,9 +147,8 @@ public class TribeGuardCorridorGateTests
     public void RetreatTowardTheHub_IsAlwaysAllowed_EvenWhenTheShallowerSegmentIsClosed()
     {
         var catalog = CreateCatalog();
-        var state = new TribeGuardCorridorState(); // segment 0 (gating zone 1) closed
+        var state = new TribeGuardCorridorState();
 
-        // Moving from zone 2 (segment-1 depth) back to zone 1 (segment-0 depth) -- retreating toward the hub.
         var outcome = Evaluate(catalog, state, OtherTribe, 2, 1);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.Allowed, outcome);
@@ -182,11 +170,8 @@ public class TribeGuardCorridorGateTests
     {
         var catalog = CreateCatalog();
         var state = new TribeGuardCorridorState();
-        // Segment 2 (gating entry into zone 3, the actual destination below) is OPEN -- guards defeated -- yet
-        // the move must still be rejected, because adjacency is checked independently of guard state.
         state.TrySetOpen(OwnerTribe, 2, true);
 
-        // Jumping from the hub straight into zone 3 (segment 2), skipping zone 1/2 entirely.
         var outcome = Evaluate(catalog, state, OtherTribe, HubZoneId, 3);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.RejectedSoft, outcome);
@@ -208,7 +193,7 @@ public class TribeGuardCorridorGateTests
     public void RejectionInvolvingZone37AsOrigin_IsAHardDisconnect()
     {
         var catalog = CreateCatalog();
-        var state = new TribeGuardCorridorState(); // closed
+        var state = new TribeGuardCorridorState();
 
         var outcome = Evaluate(catalog, state, OtherTribe, 37, 1);
 
@@ -220,7 +205,7 @@ public class TribeGuardCorridorGateTests
     {
         var catalog = CreateCatalog();
         var state = new TribeGuardCorridorState();
-        state.TrySetOpen(OwnerTribe, 2, true); // even with guards defeated, adjacency still fails
+        state.TrySetOpen(OwnerTribe, 2, true);
 
         var outcome = Evaluate(catalog, state, OtherTribe, 37, 3);
 
@@ -230,8 +215,8 @@ public class TribeGuardCorridorGateTests
     [Fact]
     public void RejectionInvolvingZone37AsDestination_IsAHardDisconnect()
     {
-        var catalog = CreateCatalog(37); // segment 0's own destination zone is (contrived) 37
-        var state = new TribeGuardCorridorState(); // closed
+        var catalog = CreateCatalog(37);
+        var state = new TribeGuardCorridorState();
 
         var outcome = Evaluate(catalog, state, OtherTribe, HubZoneId, 37);
 
@@ -244,8 +229,6 @@ public class TribeGuardCorridorGateTests
         var catalog = CreateCatalog(37);
         var state = new TribeGuardCorridorState();
 
-        // Owning tribe's own move into its own segment-0 zone (which happens to be numbered 37) -- unconditional
-        // bypass, never even reaches the hard-disconnect check.
         var outcome = Evaluate(catalog, state, OwnerTribe, HubZoneId, 37);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.Allowed, outcome);

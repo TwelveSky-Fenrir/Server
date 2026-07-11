@@ -2,11 +2,6 @@ using Fenrir.Application.Game.Domain.World.Loot;
 
 namespace Fenrir.Application.Game.Tests.World.Loot;
 
-/// <summary>
-///     Guards the item-8114 reward + pity table (workstream C10-remaining-box-pools) --
-///     <see cref="CloakVariantBox8114RewardTable" />. Single-open only (no bulk counterpart in the legacy
-///     source); pity reward is deterministic (id 1403, zero draws), unlike box 8111/8115's coin-flip guarantee.
-/// </summary>
 public class CloakVariantBox8114RewardTableTests
 {
     [Fact]
@@ -50,8 +45,6 @@ public class CloakVariantBox8114RewardTableTests
     [Fact]
     public void Roll_PityCounterAt199_Triggers_ConsumesZeroDraws_AndResetsToZero()
     {
-        // No scripted values at all: ScriptedRandom throws if Next is ever called, proving the deterministic
-        // pity branch never touches random (unlike box 8111/8115's coin-flip guarantee).
         var result = CloakVariantBox8114RewardTable.Roll(199, new ScriptedRandom());
 
         Assert.Equal(1403, result.RewardItemId);
@@ -91,8 +84,6 @@ public class CloakVariantBox8114RewardTableTests
     [Fact]
     public void Roll_NaturalHitOnItem1403_IsAGenuinelyIndependentOutcome_NotThePityBranch()
     {
-        // Pool-select draw 0 lands in pool 1 (item 1403) even though pity has NOT triggered -- confirming the
-        // "reachable naturally too" claim from this type's own remarks.
         var result = CloakVariantBox8114RewardTable.Roll(0, new ScriptedRandom(0, 0));
 
         Assert.Equal(1403, result.RewardItemId);
@@ -100,8 +91,7 @@ public class CloakVariantBox8114RewardTableTests
         Assert.Equal(1, result.NewPityCounter);
     }
 
-    /// <summary>Returns queued draws in request order; throws if the code draws more than were scripted.</summary>
-    private sealed class ScriptedRandom(params int[] values) : Random
+        private sealed class ScriptedRandom(params int[] values) : Random
     {
         private int _index;
 

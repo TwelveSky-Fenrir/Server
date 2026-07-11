@@ -15,12 +15,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 
-/// <summary>
-///     C1-vault-expiry-enforcement: op89 (CZ_DESTROY_ITEM_SEND) is this protocol's closest "discard" analog
-///     to a literal drop/move request, and the originating contract's own Edge cases confirm it is gated
-///     identically to the primary CZ_USE_INVENTORY_ITEM_SEND trigger. Companion to
-///     <see cref="DestroyItemServiceTests" />, which does not cover this gate at all.
-/// </summary>
 public class DestroyItemServiceVaultExpiryTests
 {
     private const int RareItemId = 87000;
@@ -85,7 +79,7 @@ public class DestroyItemServiceVaultExpiryTests
     public async Task LastPageExpired_RejectsAndWritesNoEventLogRow()
     {
         var (session, zone, state, characters, eventLog) = SetUp();
-        state.InventoryDate = 20200101; // long past
+        state.InventoryDate = 20200101;
         SeedInventory(zone, ContainerMatrix.InventoryPage1, 0,
             new ItemStack(RareItemId, 1, 10, 0, 0, 0, 0, 0, 0, 0, 777));
         var service = CreateService(characters, eventLog);
@@ -102,7 +96,7 @@ public class DestroyItemServiceVaultExpiryTests
     public async Task LastPageStillValid_DoesNotBlockAnOtherwiseSuccessfulDestroy()
     {
         var (session, zone, state, characters, eventLog) = SetUp();
-        state.InventoryDate = 99991231; // far future -- still valid
+        state.InventoryDate = 99991231;
         SeedInventory(zone, ContainerMatrix.InventoryPage1, 0,
             new ItemStack(RareItemId, 1, 10, 0, 0, 0, 0, 0, 0, 0, 777));
         var service = CreateService(characters, eventLog);
@@ -120,7 +114,7 @@ public class DestroyItemServiceVaultExpiryTests
     public async Task FirstPageAlwaysAccessible_EvenWhenInventoryDateIsExpired()
     {
         var (session, zone, state, characters, eventLog) = SetUp();
-        state.InventoryDate = 20200101; // expired -- irrelevant, this destroy targets page0
+        state.InventoryDate = 20200101;
         SeedInventory(zone, ContainerMatrix.InventoryPage0, 0,
             new ItemStack(RareItemId, 1, 10, 0, 0, 0, 0, 0, 0, 0, 777));
         var service = CreateService(characters, eventLog);

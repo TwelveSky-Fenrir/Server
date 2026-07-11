@@ -3,10 +3,6 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Seeding;
 
-/// <summary>
-///     Generates one idempotent <c>70_seed/world/Monsters.sql</c> covering <c>world.Monsters</c> and its 6
-///     child tables from <see cref="MonsterReader.ReadAll" /> (005_00004.IMG), guarded by a single check.
-/// </summary>
 public static class MonsterSeedGenerator
 {
     private const string MonsterColumns =
@@ -29,11 +25,8 @@ public static class MonsterSeedGenerator
 
     public static void Generate(string dataDir, string outputPath)
     {
-        // Index == 0 marks an unused slot (1139 of 10000 populated: dense 1..~1139 plus sparse "event boss" ids up to 9002).
         var monsters = MonsterReader.ReadAll(dataDir).Where(m => m.Index != 0).OrderBy(m => m.Index).ToList();
 
-        // 17 of 13,686 DropExtraItemInfo slots reference a deleted (Index==0) item id -- no FK integrity in
-        // the legacy engine, so these phantom ids are treated as NULL, same as "0 means absent".
         var realItemIds = ItemReader.ReadAll(dataDir).Where(i => i.Index != 0).Select(i => i.Index).ToHashSet();
 
         var monsterRows = monsters.Select(m => string.Join(", ", new[]
@@ -74,13 +67,10 @@ public static class MonsterSeedGenerator
             SqlSeedWriter.Number(m.BulletInfo[1])
         })).ToList();
 
-        // Dense, not sparse: one row per monster even when all-zero (644/1139 never drop money).
         var moneyRows = monsters.Select(m => string.Join(", ",
             SqlSeedWriter.Number(m.Index), SqlSeedWriter.Number(m.DropMoneyInfo[0]),
             SqlSeedWriter.Number(m.DropMoneyInfo[1]), SqlSeedWriter.Number(m.DropMoneyInfo[2]))).ToList();
 
-        // Each slot is fully zero or fully non-zero (0 partial cases) -- PotionItemId never legitimately 0,
-        // but still resolved through realItemIds for phantom ids.
         var potionRows = new List<string>();
         foreach (var m in monsters)
             for (var slot = 0; slot < m.DropPotionInfo.Length; slot++)
@@ -91,8 +81,6 @@ public static class MonsterSeedGenerator
                     SqlSeedWriter.Number(pair[0]), SqlSeedWriter.Number(ResolveItemId(pair[1], realItemIds))));
             }
 
-        // Unlike potions, extra-item slots have partial-zero pairs; "populated" means not-both-zero, and
-        // ItemId 0 or a phantom (never-real) item id both resolve to NULL.
         var extraRows = new List<string>();
         foreach (var m in monsters)
             for (var slot = 0; slot < m.DropExtraItemInfo.Length; slot++)
@@ -103,7 +91,6 @@ public static class MonsterSeedGenerator
                     SqlSeedWriter.Number(pair[0]), SqlSeedWriter.Number(ResolveItemId(pair[1], realItemIds))));
             }
 
-        // mDropItemInfo[12]: category/rate slots, exact roll semantics unconfirmed; only non-zero slots seeded.
         var categoryRows = new List<string>();
         foreach (var m in monsters)
             for (var slot = 0; slot < m.DropItemInfo.Length; slot++)
@@ -114,7 +101,6 @@ public static class MonsterSeedGenerator
                     SqlSeedWriter.Number(value)));
             }
 
-        // mDropQuestItemInfo[2] is a single [rate, itemId] pair -- at most one row per monster, not an array table.
         var questRows = monsters
             .Where(m => m.DropQuestItemInfo[0] != 0 || m.DropQuestItemInfo[1] != 0)
             .Select(m => string.Join(", ", SqlSeedWriter.Number(m.Index),

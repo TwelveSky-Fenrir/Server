@@ -7,7 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>CZ_TEACHER_CANCEL_SEND (opcode 60) -- the master withdraws their own still-pending ask.</summary>
 public sealed class MentorCancelHandler(
     ZoneRegistry zones,
     IMentorCancelService mentorCancelService,

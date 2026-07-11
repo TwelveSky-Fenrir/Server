@@ -8,13 +8,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     Blocker #1 (2026-07-05 audit) regression coverage: Vitals/Progression were marked dirty throughout combat/
-///     quest/guild/pet code but never actually flushed to game.Characters -- the same gap that let
-///     TribeActionService's scroll-redemption ContributionPoints debit revert on relog (tSort 16/17 dupe). These
-///     tests exercise <see cref="ProgressWriteBehindHost.FlushAsync" /> directly (pure in-memory, fakes only,
-///     same posture as <see cref="Fenrir.Data.Tests.WriteBehind.WriteBehindFlusherTests" />).
-/// </summary>
 public sealed class ProgressWriteBehindHostTests
 {
     private static (ZoneRegistry Registry, DirtyTracker<int> DirtyTracker) CreateRegistryWithOnePlayer(
@@ -75,10 +68,6 @@ public sealed class ProgressWriteBehindHostTests
         Assert.Equal(7, row.StatPoints);
     }
 
-    // Item-usage-consumables follow-up: the Lucky Drop/"Acquisition" Scroll minutes counter must be flushed
-    // back to game.Characters.DropItemTime alongside every other Vitals/Progression field, or a live in-memory
-    // increment (Zone.EconomyMirrors' ApplyTribeProgressCommand) would silently revert to its last-persisted
-    // value on the next flush cycle -- see PlayerRuntimeState.DropItemTime's own remarks.
     [Fact]
     public async Task FlushAsync_DirtyDropItemTimeCounter_PersistsRowWithTheCurrentValue()
     {
@@ -107,13 +96,11 @@ public sealed class ProgressWriteBehindHostTests
         var characters = new FakeCharacterRepository();
         var progress = new ProgressWriteBehindHost(registry, characters);
 
-        // First combat hit: no movement anywhere in this test.
         state.Life -= 50;
         state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
         var firstBatch = dirtyTracker.DrainAll();
         await progress.FlushAsync(firstBatch, CancellationToken.None);
 
-        // Second combat hit, still zero movement in between.
         state.Life -= 30;
         state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
         var secondBatch = dirtyTracker.DrainAll();
@@ -123,14 +110,10 @@ public sealed class ProgressWriteBehindHostTests
         var firstRow = characters.PersistedProgressRows[0];
         var secondRow = characters.PersistedProgressRows[1];
 
-        // The critical guard: usp_Character_PersistProgressBatch only accepts a STRICTLY greater FlushSequence.
-        // Without PlayerRuntimeState.MarkProgressDirty bumping FlushSequence on every call (not just HandleMove's
-        // move-only cadence), both rows would carry an identical value and the second flush would silently no-op
-        // against the real stored procedure's guard.
         Assert.True(secondRow.FlushSequence > firstRow.FlushSequence,
             $"expected second flush's FlushSequence ({secondRow.FlushSequence}) to strictly exceed the first's ({firstRow.FlushSequence})");
-        Assert.Equal(750, firstRow.Life); // ZoneTestKit.EnterData's default Life (800) minus the first hit (50)
-        Assert.Equal(720, secondRow.Life); // minus the second hit (30) too
+        Assert.Equal(750, firstRow.Life);
+        Assert.Equal(720, secondRow.Life);
     }
 
     [Fact]
@@ -140,7 +123,6 @@ public sealed class ProgressWriteBehindHostTests
         var (registry, dirtyTracker) = CreateRegistryWithOnePlayer(1, characterId, out var state);
         state.ContributionPoints = 10_000;
 
-        // Simulate TribeActionService.RedeemScrollAsync's in-memory CP debit for a paid tSort 16/17 redemption.
         state.ContributionPoints -= 2_000;
         state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
 
@@ -151,7 +133,7 @@ public sealed class ProgressWriteBehindHostTests
         await progress.FlushAsync(dirty, CancellationToken.None);
 
         var row = Assert.Single(characters.PersistedProgressRows);
-        Assert.Equal(8_000, row.ContributionPoints); // debit reached the DB -- a relog can no longer revert it for free
+        Assert.Equal(8_000, row.ContributionPoints);
     }
 
     [Fact]
@@ -162,7 +144,6 @@ public sealed class ProgressWriteBehindHostTests
         state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
         var dirty = dirtyTracker.DrainAll();
 
-        // The character logged out (or is mid-handoff) between being marked dirty and this flush cycle running.
         Assert.True(registry.TryGet(1, out var zone));
         zone!.Post(ZoneCommand.Leave(characterId));
         zone.Tick(TimeSpan.FromMilliseconds(50));

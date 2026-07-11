@@ -14,8 +14,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Game;
 
-// Commerce and cash procs against real SQL Server 2025. Each test creates its own account/character(s) so
-// tests never depend on execution order.
 [Collection("SqlServer")]
 public class CommerceProcTests
 {
@@ -70,7 +68,6 @@ public class CommerceProcTests
 
         Assert.NotNull(ex);
         Assert.Equal(40, await _cash.GetBalanceAsync(accountId, CancellationToken.None));
-        // Failed debit must not have granted the second item either.
         Assert.Single(await GetItemsAsync(characterId, 0));
     }
 
@@ -124,9 +121,6 @@ public class CommerceProcTests
     [Fact]
     public async Task Character_ClaimDailyReward_FullyClaimedWeek_ResetsOnTheFollowingMonday()
     {
-        // Legacy resets RewardClaimDay to 0 every Monday (Server/ts25center/S07_MyGame01.cpp:218-238).
-        // 2024-01-01 is a Monday, so day 7 (Sun 01-07) is fully claimed and 01-08 (next Monday) must
-        // succeed with a reset instead of being rejected as "fully claimed".
         var accountId = await CreateAccountAsync();
         var characterId = await CreateCharacterAsync(accountId);
         var itemId = await MinItemIdAsync();
@@ -138,7 +132,6 @@ public class CommerceProcTests
         var fullyClaimed = await _characters.GetRewardClaimStateAsync(characterId, 20240107, CancellationToken.None);
         Assert.Equal((byte)7, fullyClaimed!.RewardClaimDay);
 
-        // Merely reading the state on the new week already reports the reset, before any claim runs.
         var readOnNewWeek = await _characters.GetRewardClaimStateAsync(characterId, 20240108, CancellationToken.None);
         Assert.Equal((byte)0, readOnNewWeek!.RewardClaimDay);
 
@@ -218,10 +211,6 @@ public class CommerceProcTests
     [Fact]
     public async Task Gift_Enqueue_CopiesQuantityAndValueThroughUnvalidated_AndAllowsANullProductId()
     {
-        // Matches the "mint one gift" contract this is modeled on: no positivity/upper-bound check is
-        // observed anywhere in the legacy shape it was designed after (Server/ts25playuser/S08_MyDB.cpp:331-381,
-        // itself dead code -- see IGiftRepository.EnqueueAsync's remarks), and usp_Gift_Enqueue enforces none
-        // either.
         var accountId = await CreateAccountAsync();
 
         var giftId = await _gifts.EnqueueAsync(accountId, null, -5, 0, CancellationToken.None);
@@ -253,7 +242,6 @@ public class CommerceProcTests
         Assert.Single(items);
         Assert.Empty(await GetItemsAsync(sellerId, 0));
 
-        // Re-opening while the shop still holds unclaimed value is refused.
         var reopenEx = await Record.ExceptionAsync(() => _offlineShops.OpenAndReplaceContainersAsync(sellerId, 37,
             20260710, "MyShop", 1, 1, 1, [new OfflineShopItemSlotTvp(0, itemId, 1, 0, 0, 500, null)], [], [],
             CancellationToken.None).AsTask());
@@ -268,7 +256,6 @@ public class CommerceProcTests
         Assert.Equal(500, shopAfterSale!.Money);
         Assert.Empty(itemsAfterSale);
 
-        // Buying the same now-gone slot again fails cleanly (CAS).
         var staleEx = await Record.ExceptionAsync(() => _offlineShops.ExecutePurchaseAsync(sellerId, 0, itemId, 1, 0,
             500, buyerId, 0, [], CancellationToken.None).AsTask());
         Assert.NotNull(staleEx);
@@ -285,11 +272,6 @@ public class CommerceProcTests
     public async Task
         OfflineShop_ExecutePurchase_SellingTheLastListedItem_AutoClosesTheShop_AndUnblocksWithdrawalWithoutAnExplicitClose()
     {
-        // Regression test for the Major proxy-shop-listing-pricing finding: legacy auto-closes a proxy shop
-        // the instant a purchase empties its whole 25-slot listing (Server/ts25zone/S07_MyGame09.cpp:860-880),
-        // which usp_OfflineShop_ExecutePurchase previously never did -- a sold-out shop stayed ShopState=1
-        // (open) indefinitely, blocking usp_OfflineShop_WithdrawMoney's `ShopState = 0` gate until the owner
-        // manually closed it. Fixed by Database/Migrations/040_offline_shop_auto_close_on_sellout.sql.
         var sellerAccount = await CreateAccountAsync();
         var sellerId = await CreateCharacterAsync(sellerAccount);
         var buyerAccount = await CreateAccountAsync();
@@ -304,7 +286,6 @@ public class CommerceProcTests
             new OfflineShopItemSlotTvp(1, itemId, 1, 0, 0, 100, null)
         ], [], [], CancellationToken.None);
 
-        // First purchase (slot 0) still leaves slot 1 listed -- the shop must stay open.
         await _offlineShops.ExecutePurchaseAsync(sellerId, 0, itemId, 1, 0, 100, buyerId, 0,
             [new CharacterItemSlotTvp(0, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1)], CancellationToken.None);
 
@@ -312,12 +293,10 @@ public class CommerceProcTests
         Assert.Equal((byte)1, afterFirst!.ShopState);
         Assert.Single(itemsAfterFirst);
 
-        // Withdrawal is still refused while the shop remains open (ShopState = 0 gate).
         var earlyWithdrawEx = await Record.ExceptionAsync(() =>
             _offlineShops.WithdrawMoneyAsync(sellerId, 100, 0, 20260101, CancellationToken.None).AsTask());
         Assert.NotNull(earlyWithdrawEx);
 
-        // Second purchase (slot 1) sells the last listed item -- the shop must auto-close.
         await _offlineShops.ExecutePurchaseAsync(sellerId, 1, itemId, 1, 0, 100, buyerId, 1,
             [new CharacterItemSlotTvp(0, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2)], CancellationToken.None);
 
@@ -327,7 +306,6 @@ public class CommerceProcTests
         Assert.Empty(itemsAfterSecond);
         Assert.Equal(200, afterSecond.Money);
 
-        // Withdrawal now succeeds immediately -- no explicit SetStateAsync close was ever called.
         await _offlineShops.WithdrawMoneyAsync(sellerId, 200, 0, 20260101, CancellationToken.None);
         Assert.Equal(200L, await ScalarAsync<long>($"SELECT Money FROM game.Characters WHERE CharacterId={sellerId};"));
     }
@@ -335,11 +313,6 @@ public class CommerceProcTests
     [Fact]
     public async Task OfflineShop_WithdrawMoney_ZeroPendingBalance_ThrowsDistinctNothingToWithdrawError()
     {
-        // Regression test for the shop-and-proxyshop legacy-parity audit finding: the contract requires a
-        // withdrawal of a zero pending balance on both components to fail with its own distinct error
-        // (mapped to client Result=4, "nothing to withdraw"), separate from the generic
-        // stale/not-closed/expired error (50276, mapped to Result=3). Both used to share SQL error 50276,
-        // making the distinction unreachable.
         var sellerAccount = await CreateAccountAsync();
         var sellerId = await CreateCharacterAsync(sellerAccount);
 
@@ -355,10 +328,6 @@ public class CommerceProcTests
     [Fact]
     public async Task OfflineShop_WithdrawMoney_ExpiredShop_IsRefused_EvenWhenClosedAndAmountsMatch()
     {
-        // Regression test for the shop-and-proxyshop legacy-parity audit finding: the contract requires the
-        // shop be "closed and not expired" before a withdrawal is allowed, but the guarded UPDATE
-        // previously only checked ShopState = 0 and never consulted ShopDate at all -- an expired-but-closed
-        // shop's earnings could be withdrawn indefinitely.
         var sellerAccount = await CreateAccountAsync();
         var sellerId = await CreateCharacterAsync(sellerAccount);
         var itemId = await MinItemIdAsync();
@@ -386,9 +355,6 @@ public class CommerceProcTests
     public async Task
         OfflineShop_GetAllOpen_ReturnsOnlyCurrentlyOpenShops_WithAvatarNameJoined_AndExcludesClosedShops()
     {
-        // Regression coverage for the Major market-wide-proxy-shop-search finding: usp_OfflineShop_GetAllOpen
-        // backs SearchShopListingsService's proxy-shop half, so it must be cluster-wide (no zone filter),
-        // ShopState=1-only, and carry the seller's own character name (not persisted on OfflineShops itself).
         var openSellerAccount = await CreateAccountAsync();
         var openSellerId = await CreateCharacterAsync(openSellerAccount);
         var closedSellerAccount = await CreateAccountAsync();
@@ -419,15 +385,6 @@ public class CommerceProcTests
     public async Task
         OfflineShop_ExecutePurchase_SellerEarningsNearRolloverCeiling_WidensToBigIntInsteadOfOverflowing()
     {
-        // Regression test for the Critical proxy-shop-listing-pricing finding: game.OfflineShops.Money and
-        // @Price are both 32-bit INT, so `Money + @Price` must be widened to BIGINT before any of the
-        // BigMoney-rollover CASE WHEN branches are chosen (fixed by
-        // Database/Migrations/033_offline_shop_execute_purchase_bigint_overflow_fix.sql) -- otherwise a
-        // maximum-priced sale (999,999,999, PshopPurchasePolicy.MaxSellPrice) against a shop already sitting
-        // at the legacy MAX_NUMBER_SIZE ceiling (2,000,000,000, a value the rollover CASE's own strict
-        // "> 2000000000" threshold implies is legal to sit at) sums to ~2.999999999e9 -- past Int32.MaxValue
-        // -- and previously raised a raw SQL 8115 arithmetic-overflow error instead of legacy's intended
-        // "+2 BigMoney, wrap the remainder" rollover.
         var sellerAccount = await CreateAccountAsync();
         var sellerId = await CreateCharacterAsync(sellerAccount);
         var buyerAccount = await CreateAccountAsync();
@@ -443,15 +400,12 @@ public class CommerceProcTests
             [new OfflineShopItemSlotTvp(0, itemId, 1, 0, 0, maxPrice, null)],
             [], [], CancellationToken.None);
 
-        // Simulate a shop that already banked exactly the legacy rollover ceiling from prior, not-yet-
-        // withdrawn sales.
         await ExecAsync($"UPDATE game.OfflineShops SET Money = {rolloverCeiling} WHERE CharacterId = {sellerId};");
 
         await _offlineShops.ExecutePurchaseAsync(sellerId, 0, itemId, 1, 0, maxPrice, buyerId, 0,
             [new CharacterItemSlotTvp(0, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1)], CancellationToken.None);
 
         var (shop, _) = await _offlineShops.GetByCharacterAsync(sellerId, CancellationToken.None);
-        // (2,000,000,000 + 999,999,999) rolls over once: +2 BigMoney, remainder stored back as Money.
         Assert.Equal(maxPrice, shop!.Money);
         Assert.Equal(2, shop.BigMoney);
         Assert.Equal(1L, await ScalarAsync<long>($"SELECT Money FROM game.Characters WHERE CharacterId={buyerId};"));

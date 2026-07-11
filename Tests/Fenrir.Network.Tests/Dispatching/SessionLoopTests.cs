@@ -12,8 +12,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Network.Tests.Dispatching;
 
-// Integration-level coverage of SessionLoop: the full read -> decode -> state-gate -> rate-limit -> dispatch
-// pipeline against a real Pipe pair, not just FrameDecoder in isolation.
 public sealed class SessionLoopTests
 {
     private static readonly TimeSpan LoopTimeout = TimeSpan.FromSeconds(5);
@@ -55,7 +53,6 @@ public sealed class SessionLoopTests
 
         for (var i = 0; i < frame.Length; i++)
         {
-            // WriteAsync flushes -> one real, separate segment per byte.
             await pipe.PeerToSession.WriteAsync(frame.AsMemory(i, 1));
 
             if (i < frame.Length - 1)
@@ -78,12 +75,11 @@ public sealed class SessionLoopTests
     public async Task RunAsync_OpcodeIllegalInCurrentState_AbortsWithStateViolationAndNeverDispatches()
     {
         var pipe = new FakeDuplexPipe();
-        var session = new ZoneClientSession(3, pipe); // Connected, not TicketConsumed
+        var session = new ZoneClientSession(3, pipe);
         var dispatcher = new RecordingFrameDispatcher();
         var loopTask = SessionLoop.RunAsync(session, dispatcher, ZoneOpcodeRegistry.Provider, null, null,
             CancellationToken.None);
 
-        // EnterWorld is only allowed once TicketConsumed -> illegal here.
         var frame = BuildClientFrame(EnterWorldRequest.Opcode, EnterWorldRequest.PayloadSize);
         await pipe.PeerToSession.WriteAsync(frame);
 
@@ -102,7 +98,6 @@ public sealed class SessionLoopTests
         var loopTask = SessionLoop.RunAsync(session, dispatcher, ZoneOpcodeRegistry.Provider, null, null,
             CancellationToken.None);
 
-        // Opcode 250 is unregistered -> FrameDecoder's ProtocolViolationException must be swallowed here.
         var header = new byte[WireHeaderSizes.ClientPacketSize];
         header[8] = 250;
         await pipe.PeerToSession.WriteAsync(header);
@@ -113,8 +108,6 @@ public sealed class SessionLoopTests
         Assert.Equal(DisconnectReason.UnknownOpcode, session.DisconnectReason);
     }
 
-    // Trigger B integration (contract): SessionLoop's own ProtocolViolationException handling is the sole
-    // production call site of IpFloodGuard.RecordProtocolViolationAsync.
     [Fact]
     public async Task RunAsync_UnknownOpcode_FloodGuardBelowThreshold_StillAbortsWithUnknownOpcodeAndDoesNotBlock()
     {
@@ -153,7 +146,6 @@ public sealed class SessionLoopTests
         var registry = new SessionRegistry();
         registry.Register(session);
         var blockedIps = new List<string>();
-        // Threshold 1: a single violation must already trip it (Trigger B's >= boundary).
         var floodGuard = new IpFloodGuard(40, 1, (ip, _) =>
         {
             blockedIps.Add(ip);
@@ -170,8 +162,6 @@ public sealed class SessionLoopTests
         await AwaitLoopAsync(loopTask);
 
         Assert.Empty(dispatcher.Records);
-        // The flood block (which aborts every session sharing the IP, this one included) beats SessionLoop's
-        // own subsequent Abort(UnknownOpcode) to the punch -- Abort is idempotent, so IpBlocked sticks.
         Assert.Equal(DisconnectReason.IpBlocked, session.DisconnectReason);
         Assert.Equal(["10.0.0.8"], blockedIps);
     }
@@ -180,7 +170,7 @@ public sealed class SessionLoopTests
     public async Task RunAsync_UnknownOpcode_NoRemoteEndPoint_FloodGuardNeverCalled()
     {
         var pipe = new FakeDuplexPipe();
-        var session = new ZoneClientSession(9, pipe); // no RemoteEndPoint, e.g. a non-socket-backed transport
+        var session = new ZoneClientSession(9, pipe);
         var registry = new SessionRegistry();
         var blockedIps = new List<string>();
         var floodGuard = new IpFloodGuard(40, 1, (ip, _) =>
@@ -221,10 +211,6 @@ public sealed class SessionLoopTests
         Assert.Equal(DisconnectReason.RateLimited, session.DisconnectReason);
     }
 
-    // Contract: a handler exception must not propagate out of RunAsync uncaught -- it is recorded as
-    // DisconnectReason.Faulted and the loop ends cleanly, the same posture as the other violation paths
-    // above (unknown opcode/state violation/rate limit), instead of surfacing only as an unplanned
-    // exception at the connection host with no disconnect-reason bookkeeping at all.
     [Fact]
     public async Task RunAsync_HandlerThrows_AbortsWithFaultedAndLoopEndsCleanlyWithoutPropagating()
     {
@@ -259,12 +245,6 @@ public sealed class SessionLoopTests
         Assert.Equal(DisconnectReason.ClientClosed, session.DisconnectReason);
     }
 
-    // Packet-level observability (Fenrir.Network.Dispatch.Logging.PacketLog): every successfully decoded
-    // frame must emit exactly one Debug-level "packet received" entry, carrying session id/opcode/byte size,
-    // when Debug is enabled -- before this feature existed there was only an ad-hoc LogDebug call here. A
-    // successfully dispatched frame (RecordingFrameDispatcher never throws) must additionally emit exactly
-    // one "packet dispatched" entry, distinct from "packet received" -- it fires after dispatch completes,
-    // not before dispatch resolution like PacketReceived.
     [Fact]
     public async Task RunAsync_DebugLoggingEnabled_LogsPacketReceivedWithOpcodeAndSize()
     {
@@ -293,10 +273,6 @@ public sealed class SessionLoopTests
         Assert.Contains(HeartbeatRequest.Opcode.ToString(), dispatched.Message);
     }
 
-    // Mirrors the generated method's own IsEnabled(LogLevel.Debug) short-circuit -- SessionLoop itself must
-    // never even capture a Stopwatch timestamp when Debug is disabled, let alone log anything at Debug. The
-    // terminal "connection loop ended" entry is still expected at Information (the client's own graceful
-    // close, DisconnectReason.ClientClosed) since that log is independent of Debug-level packet chatter.
     [Fact]
     public async Task RunAsync_DebugLoggingDisabled_NeverLogsPacketReceived()
     {
@@ -327,7 +303,6 @@ public sealed class SessionLoopTests
         return session;
     }
 
-    // Raw CLIENT_PACKET frame (9-byte header, opcode at offset 8); content is never parsed by SessionLoop.
     private static byte[] BuildClientFrame(byte opcode, int payloadSize, byte payloadSeed = 1)
     {
         var frame = new byte[WireHeaderSizes.ClientPacketSize + payloadSize];

@@ -8,12 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
-/// <summary>
-///     CZ_CONTINUE_SKILL_STAT_SEND (op94) -- registers up to 8 auto-buff (skillId, grade) slots, clamping each
-///     requested grade to the character's own currently-learned grade for that skill (see
-///     <see cref="AutoBuffSkillResolver" />'s remarks). Always replies Result=0, even when every slot clamps to
-///     an unlearned skill's -1.
-/// </summary>
 public sealed class ContinueSkillStatHandler(
     IContinueSkillStatService service,
     ILogger<ContinueSkillStatHandler> logger)

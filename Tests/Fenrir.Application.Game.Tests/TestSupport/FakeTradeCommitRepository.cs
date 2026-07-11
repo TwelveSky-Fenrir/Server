@@ -2,18 +2,11 @@ using Fenrir.Data.Abstractions.Characters;
 
 namespace Fenrir.Application.Game.Tests.TestSupport;
 
-/// <summary>
-///     In-memory stand-in for <see cref="ITradeCommitRepository" /> -- records every call verbatim (including
-///     the idempotency token) so C8-trade-finalize tests can assert <c>TradeLockService.CommitAsync</c> commits
-///     through the anti-dupe repository (never the plain <c>ICharacterRepository.ExecuteTradeAsync</c>) and that
-///     a fresh <see cref="Guid" /> token is supplied on every distinct commit attempt.
-/// </summary>
 internal sealed class FakeTradeCommitRepository : ITradeCommitRepository
 {
     public List<TradeCommitCall> Calls { get; } = [];
 
-    /// <summary>Set to make the next (and only the next) call throw, simulating a SQL 50268/50269 rejection.</summary>
-    public Exception? ThrowOnNextExecute { get; set; }
+        public Exception? ThrowOnNextExecute { get; set; }
 
     public ValueTask ExecuteIdempotentAsync(
         Guid tradeToken,

@@ -17,12 +17,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Covers rvr-siege's cross-shard relay leg on <see cref="ZoneEventBroadcaster" />: the seven producer
-///     methods (tSort 38/39/40/42/45/46/47) enqueueing onto <see cref="IRvrSiegeEventRelayQueue" /> after their
-///     own unchanged same-shard work, and <see cref="ZoneEventBroadcaster.ApplyRelayedEvent" /> reproducing the
-///     local broadcast plus reactive guard/symbol resummon for a row this shard did NOT originate.
-/// </summary>
 public class ZoneEventBroadcasterRelayTests
 {
     private const byte MainType = 5;
@@ -138,24 +132,20 @@ public class ZoneEventBroadcasterRelayTests
         var broadcaster = new ZoneEventBroadcaster(worldState, registry, NullLogger<ZoneEventBroadcaster>.Instance,
             guardSpawner);
 
-        guardSpawner.Simulate(zone, 1); // burn the boot pass, still a no-op (no winner recorded)
+        guardSpawner.Simulate(zone, 1);
         Assert.Equal(0, zone.MonsterCount);
 
         var data = new byte[130];
         BinaryPrimitives.WriteInt32LittleEndian(data, 1);
         broadcaster.ApplyRelayedEvent(38, data);
 
-        // The relay replay must reproduce the WorldStateService mutation immediately (not wait on
-        // WorldStateService's own separate DB reconcile poll) -- ForceZone038WinnerResummon's own effect
-        // depends on reading Zone038WinTribe back out on this very call, so a skipped/lagged mutation here
-        // would silently leave the guard resummon a no-op.
         Assert.Equal((byte?)1, worldState.World.Zone038WinTribe);
 
         var frame = ZoneTestKit.DrainOutbound(pipe);
         Assert.Equal(OneFrame, frame.Length);
         Assert.Equal(38, BinaryPrimitives.ReadInt32LittleEndian(frame.AsSpan(1)));
 
-        guardSpawner.Simulate(zone, 1); // consumes the forced flag ApplyRelayedEvent just set
+        guardSpawner.Simulate(zone, 1);
         Assert.Equal(1, zone.MonsterCount);
     }
 
@@ -176,7 +166,6 @@ public class ZoneEventBroadcasterRelayTests
         BinaryPrimitives.WriteInt32LittleEndian(data.AsSpan(4), 1);
         broadcaster.ApplyRelayedEvent(42, data);
 
-        // Slot 2 contested, tribe 1 wins it -- slot 2 loses its own symbol.
         Assert.False(worldState.GetTribe(2).HasSymbol);
 
         var frame = ZoneTestKit.DrainOutbound(pipe);

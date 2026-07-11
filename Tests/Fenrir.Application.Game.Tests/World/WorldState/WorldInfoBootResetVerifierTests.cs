@@ -6,13 +6,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Tests.World.WorldState;
 
-/// <summary>
-///     Covers <see cref="WorldInfoBootResetVerifier" />: a fresh (never-mutated) set of
-///     <see cref="ZoneCenterSiegeState" />/<see cref="Zone195NokSanState" />/<see cref="PopupEventState" />/
-///     <see cref="AllianceProposalCenterState" /> singletons must verify clean and log no violation, while a
-///     singleton that some other code path already mutated before <see cref="WorldInfoBootResetVerifier.Verify" />
-///     ran must surface a loud, per-field violation instead of passing silently.
-/// </summary>
 public class WorldInfoBootResetVerifierTests
 {
     private static WorldInfoBootResetVerifier CreateVerifier(CapturingLogger<WorldInfoBootResetVerifier> logger,
@@ -63,7 +56,6 @@ public class WorldInfoBootResetVerifierTests
         verifier.Verify();
 
         var errors = logger.Entries.FindAll(e => e.Level == LogLevel.Error);
-        // One violation for the per-slot owner, one for the per-tribe stones-held count.
         Assert.Equal(2, errors.Count);
         Assert.Contains(errors, e => e.Message.Contains("stone slot"));
         Assert.Contains(errors, e => e.Message.Contains("stones-held"));

@@ -4,13 +4,6 @@ using Fenrir.Application.Game.Tests.TestSupport;
 
 namespace Fenrir.Application.Game.Tests.Simulation;
 
-/// <summary>
-///     Covers <see cref="PopupEventRewardSystem" />: the three per-character popup counters, per-type gating
-///     (map identity + on/off flag + level gates), threshold-crossing reward (the concrete War Point +1 grant,
-///     deferred to the owning zone's <see cref="PopupEventRewardSystem.Simulate" /> pass), and counter reset.
-///     The item-reward draws are intentionally deferred (unrecoverable item ids -- see the system's own
-///     remarks), so reward firing is asserted through <see cref="PlayerRuntimeState.WarPoint" />.
-/// </summary>
 public class PopupEventRewardSystemTests
 {
     private static (Zone Zone, PopupEventRewardSystem System) SetUp(short mapId, params PopupEventType[] enabled)
@@ -36,7 +29,7 @@ public class PopupEventRewardSystemTests
 
     private static void Tick(Zone zone)
     {
-        zone.Tick(TimeSpan.FromMilliseconds(500)); // exactly one legacy tick -> Simulate runs
+        zone.Tick(TimeSpan.FromMilliseconds(500));
     }
 
     [Fact]
@@ -49,13 +42,12 @@ public class PopupEventRewardSystemTests
         for (var i = 0; i < 9; i++)
             system.NotifyPvpKill(zone, killer, victim);
         Tick(zone);
-        Assert.Equal(0, killer.WarPoint); // 9 < 10 -- not yet
+        Assert.Equal(0, killer.WarPoint);
 
-        system.NotifyPvpKill(zone, killer, victim); // 10th crosses the threshold
+        system.NotifyPvpKill(zone, killer, victim);
         Tick(zone);
         Assert.Equal(1, killer.WarPoint);
 
-        // Counter reset to 0: another full run fires exactly once more.
         for (var i = 0; i < 10; i++)
             system.NotifyPvpKill(zone, killer, victim);
         Tick(zone);
@@ -72,7 +64,7 @@ public class PopupEventRewardSystemTests
         for (var i = 0; i < 10; i++)
             system.NotifyPvpKill(zone, killer, victim);
 
-        Assert.Equal(0, killer.WarPoint); // threshold crossed, but reward not delivered until Simulate
+        Assert.Equal(0, killer.WarPoint);
         Tick(zone);
         Assert.Equal(1, killer.WarPoint);
     }
@@ -80,7 +72,7 @@ public class PopupEventRewardSystemTests
     [Fact]
     public void RegularWar_FlagOff_NeverCountsOrRewards()
     {
-        var (zone, system) = SetUp(146); // RegularWar flag NOT enabled
+        var (zone, system) = SetUp(146);
         var killer = Enter(zone, 1, level: 145);
         var victim = Enter(zone, 2, level: 145);
 
@@ -94,7 +86,7 @@ public class PopupEventRewardSystemTests
     [Fact]
     public void MapOutsideEveryPopupSet_NeverRewards()
     {
-        var (zone, system) = SetUp(999, PopupEventType.RegularWar); // flag on, but 999 is in no set
+        var (zone, system) = SetUp(999, PopupEventType.RegularWar);
         var killer = Enter(zone, 1, level: 145);
         var victim = Enter(zone, 2, level: 145);
 
@@ -123,7 +115,7 @@ public class PopupEventRewardSystemTests
     {
         var (zone, system) = SetUp(146, PopupEventType.RegularWar);
         var killer = Enter(zone, 1, level: 145);
-        var victim = Enter(zone, 2, level: 130); // gap 15 > 13
+        var victim = Enter(zone, 2, level: 130);
 
         for (var i = 0; i < 20; i++)
             system.NotifyPvpKill(zone, killer, victim);
@@ -135,10 +127,9 @@ public class PopupEventRewardSystemTests
     [Fact]
     public void Pvp_AttackerBelowVictim_IsNotGated()
     {
-        // The level gate is one-directional -- an attacker below the victim is never blocked by it.
         var (zone, system) = SetUp(146, PopupEventType.RegularWar);
         var killer = Enter(zone, 1, level: 100);
-        var victim = Enter(zone, 2, level: 145); // attacker 45 levels below
+        var victim = Enter(zone, 2, level: 145);
 
         for (var i = 0; i < 10; i++)
             system.NotifyPvpKill(zone, killer, victim);
@@ -152,7 +143,7 @@ public class PopupEventRewardSystemTests
     {
         var (zone, system) = SetUp(38, PopupEventType.YanggokPvp);
         var killer = Enter(zone, 1, level: 145);
-        var victim = Enter(zone, 2, level: 144); // one short of the 145 cap
+        var victim = Enter(zone, 2, level: 144);
 
         for (var i = 0; i < 20; i++)
             system.NotifyPvpKill(zone, killer, victim);
@@ -173,7 +164,7 @@ public class PopupEventRewardSystemTests
         Tick(zone);
         Assert.Equal(0, killer.WarPoint);
 
-        system.NotifyPvpKill(zone, killer, victim); // 10th
+        system.NotifyPvpKill(zone, killer, victim);
         Tick(zone);
         Assert.Equal(1, killer.WarPoint);
     }
@@ -190,7 +181,7 @@ public class PopupEventRewardSystemTests
         Tick(zone);
         Assert.Equal(0, killer.WarPoint);
 
-        system.NotifyPvpKill(zone, killer, victim); // 5th -- Invasion threshold is 5, not 10
+        system.NotifyPvpKill(zone, killer, victim);
         Tick(zone);
         Assert.Equal(1, killer.WarPoint);
     }
@@ -217,13 +208,12 @@ public class PopupEventRewardSystemTests
         for (var i = 0; i < 399; i++)
             system.NotifyMonsterKill(zone, killer, dropEligible: true);
         Tick(zone);
-        Assert.Equal(0, killer.WarPoint); // capped at 399 < 400, no reward yet
+        Assert.Equal(0, killer.WarPoint);
 
-        system.NotifyMonsterKill(zone, killer, dropEligible: true); // 400th
+        system.NotifyMonsterKill(zone, killer, dropEligible: true);
         Tick(zone);
         Assert.Equal(1, killer.WarPoint);
 
-        // Reset: a fresh run of 400 fires again.
         for (var i = 0; i < 400; i++)
             system.NotifyMonsterKill(zone, killer, dropEligible: true);
         Tick(zone);
@@ -233,7 +223,7 @@ public class PopupEventRewardSystemTests
     [Fact]
     public void Monster_FlagOff_NeverCounts()
     {
-        var (zone, system) = SetUp(145); // MonsterPve flag not enabled
+        var (zone, system) = SetUp(145);
         var killer = Enter(zone, 1);
 
         for (var i = 0; i < 400; i++)
@@ -251,14 +241,13 @@ public class PopupEventRewardSystemTests
         var victim = Enter(zone, 2, level: 145);
 
         for (var i = 0; i < 10; i++)
-            system.NotifyPvpKill(zone, killer, victim); // threshold crossed, reward-due queued
+            system.NotifyPvpKill(zone, killer, victim);
 
-        // Killer leaves before the reward-delivering Simulate runs.
         zone.Post(ZoneCommand.Leave(1));
-        Tick(zone); // drains the Leave, then Simulate finds the killer gone and skips -- must not throw
+        Tick(zone);
 
         Assert.False(zone.TryGetPlayer(1, out _));
-        Assert.Equal(0, killer.WarPoint); // never granted
+        Assert.Equal(0, killer.WarPoint);
     }
 
     [Fact]
@@ -269,7 +258,6 @@ public class PopupEventRewardSystemTests
         var killerB = Enter(zone, 2, level: 145);
         var victim = Enter(zone, 3, level: 145);
 
-        // A gets 10 kills (fires), B gets only 5 (no fire).
         for (var i = 0; i < 10; i++)
             system.NotifyPvpKill(zone, killerA, victim);
         for (var i = 0; i < 5; i++)

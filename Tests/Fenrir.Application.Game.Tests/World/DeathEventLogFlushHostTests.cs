@@ -7,12 +7,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     Covers <see cref="DeathEventLogFlushHost" />'s drain/persist loop end-to-end against a real
-///     <see cref="Zone" />/<see cref="ZoneRegistry" /> pair and a <see cref="FakeEventLogRepository" /> --
-///     the write-behind twin of <see cref="ZoneDeathEventLogTests" />, which covers only the in-memory
-///     queueing side (<see cref="Zone.PendingDeathEventLog" />) without a repository.
-/// </summary>
 public class DeathEventLogFlushHostTests
 {
     [Fact]
@@ -41,7 +35,6 @@ public class DeathEventLogFlushHostTests
         Assert.NotNull(logged.Payload);
         Assert.Contains("Cause=PlayerKill", logged.Payload);
 
-        // Drained -- a second flush with nothing new queued must not log again.
         await host.FlushAllZonesAsync(CancellationToken.None);
         Assert.Single(fakeRepo.LoggedEvents);
     }

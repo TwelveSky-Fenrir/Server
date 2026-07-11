@@ -2,10 +2,6 @@ using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Domain.Commerce;
 
-/// <summary>
-///     Shared PROXY_SHOP_USER_INFO builder for <see cref="GetProxyShopHandler" />/
-///     <see cref="UpdateProxyShopHandler" /> -- maps offline-shop rows onto the 25-slot wire shape.
-/// </summary>
 public static class ProxyShopWireMapper
 {
     public const int MaxSlots = 25;

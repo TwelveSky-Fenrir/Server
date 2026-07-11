@@ -23,26 +23,15 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
-// op11 CL_LOGIN_SEND -- cluster C02: application firewall (IP block/GM-allowlist bypass), MAC-restriction
-// ("banned PC"), and the admin.Bans ban-log check layered on top of the pre-existing account.IsBanned flag.
 public class LoginHandlerTests
 {
-    private const int ClientVersion = 90354; // LoginServerOptions.ExpectedClientVersion default
+    private const int ClientVersion = 90354;
 
-    // Realistic, non-placeholder default adapter name: a real client always declares a non-empty adapter
-    // name/GUID, so the empty-adapter-name gate (cluster: Server/ts25login/S08_MyDB.cpp:421-425) never trips
-    // unless a test deliberately asks for the empty-string edge case it covers below -- same rationale as
-    // DefaultPhysicalAddress above.
     private const string DefaultAdapterName = "{real-adapter-guid}";
     private static readonly IPEndPoint RemoteEndPoint = new(IPAddress.Parse("203.0.113.50"), 40000);
 
-    // Realistic, non-placeholder default device tuple: a real client always has a non-zero-length MAC, so
-    // the anti-spoofing gate (cluster C09, DeviceSpoofingGuard) never trips unless a test deliberately
-    // asks for the zero-length-MAC or placeholder-literal edge cases it covers below.
     private static readonly byte[] DefaultPhysicalAddress = ParseMac("11-22-33-44-55-66");
 
-    // Login-time maintenance lockdown / server-full quota (Server/ts25login/S04_MyWork02.cpp:149-160): the two
-    // earliest gates in the handler, evaluated before the firewall/version/MAC/auth checks below.
     [Fact]
     public async Task HandleAsync_MaintenanceMode_SendsMaintenanceResult_AndNeverAuthenticates()
     {
@@ -60,7 +49,6 @@ public class LoginHandlerTests
     [Fact]
     public async Task HandleAsync_MaintenanceMode_TakesPrecedenceOverAnUnrelatedBlockedIp()
     {
-        // Proves ordering: maintenance is checked before the firewall, not just before version/MAC/auth.
         var accounts = FakeAccountRepository.WithNoAccount();
         var capacity = new LoginCapacityState();
         capacity.SetMaxPlayers(0);
@@ -125,7 +113,6 @@ public class LoginHandlerTests
         await handler.HandleAsync(ValidLoginRequest(), session, CancellationToken.None);
 
         Assert.Equal(1, accounts.AuthenticateCallCount);
-        // ResultUnknownAccount (6) proves it reached authentication instead of being turned away as IP-blocked.
         await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(6, "someuser", 0, LoginTrain.FailurePinMask));
     }
 
@@ -168,16 +155,11 @@ public class LoginHandlerTests
 
         await handler.HandleAsync(ValidLoginRequest(password: "correct-password"), session, CancellationToken.None);
 
-        // RequireSecondPassword defaults to true (secondLoginSort=1); no stored PIN yet (pinMask="").
         await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(0, "MG7", 1, ""));
         Assert.NotNull(session.AccountSessionToken);
-        // GM-BLOCK precondition: a non-elevated account must leave the session at grade 0.
         Assert.Equal((short)0, session.AccountGrade);
     }
 
-    // Cross-process duplicate-login kick/refusal: runtime.AccountSessions flags a live Login-side row for this
-    // same account (ServerDocs/11_ts25login/01_Flux_Authentification_Redirection.md:145 "case 4" -- kick the
-    // stale local session directly). The new attempt is dropped too, silently, exactly like RateLimited.
     [Fact]
     public async Task
         HandleAsync_ConflictLogin_WithALiveLocalSession_EvictsTheOldSession_AndDropsTheNewAttemptSilently()
@@ -234,11 +216,6 @@ public class LoginHandlerTests
         await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(8, "someuser", 0, LoginTrain.FailurePinMask));
     }
 
-    // ts25playuser's RegisterUserForLogin_01 capacity-full/DB-persistence-failure exits (_failed2/_failed3,
-    // S07_MyGame01.cpp:915-923) collapse in ts25login onto tResult=5 (S04_MyWork02.cpp:285-292), always an
-    // explicit reply, never a silent drop. The claim write exhausting its own bounded retry budget (or
-    // hitting an unrelated SqlException) is the closest present-day analog -- this must translate into the
-    // same explicit LC_LOGIN_RECV{Result=5} reply rather than propagating uncaught out of LoginService.
     [Fact]
     public async Task HandleAsync_AccountSessionClaimThrowsSqlException_SendsSessionRegistrationFailedResult()
     {
@@ -252,17 +229,9 @@ public class LoginHandlerTests
 
         await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(5, "someuser", 0, LoginTrain.FailurePinMask));
         Assert.Null(session.AccountId);
-        // ReArmVersionOk=true (like every other post-auth-success failure): the client can retry on this
-        // same connection without a reconnect.
         Assert.Equal(LoginSessionState.VersionOk, session.State);
     }
 
-    // "# GM Enable Login IP #" gate: the primary check lives inside MyDB::Login itself
-    // (Server/ts25login/S08_MyDB.cpp:339-356), strictly before the password comparison at :357-370 -- so a
-    // GM-tier account connecting from a non-allowlisted IP is refused immediately once its account row is
-    // located, whether or not its credentials would have matched. ReArmVersionOk=true even though this now
-    // trips ahead of the password check: it still happens after the account lookup (unlike the pre-auth
-    // IpIsBlocked/MAC-ban cases above), so the client can retry on this same connection.
     [Fact]
     public async Task HandleAsync_GmAccount_NonAllowlistedIp_SendsIpBlockedResult_AndNeverCompletesLogin()
     {
@@ -278,12 +247,6 @@ public class LoginHandlerTests
         Assert.Equal(LoginSessionState.VersionOk, session.State);
     }
 
-    // Regression for the confirmed audit finding: legacy evaluates the GM-IP-allowlist gate strictly before
-    // the password comparison (S08_MyDB.cpp:339-356 precedes :357-370 inside MyDB::Login), so a *wrong*
-    // password against a GM-tier account from a non-allowlisted IP still returns tResult=2 ("IP blocked"),
-    // never tResult=7 ("wrong password") -- proving the gate no longer requires a successful password check
-    // to trip, unlike before this fix. Also proves the password comparison itself never actually ran
-    // (LastRecordedAttempt stays null), even though a same-cost dummy Argon2id verify was performed.
     [Fact]
     public async Task
         HandleAsync_GmAccount_WrongPassword_NonAllowlistedIp_SendsIpBlockedResult_NotWrongPasswordResult()
@@ -302,8 +265,6 @@ public class LoginHandlerTests
         Assert.Equal(LoginSessionState.VersionOk, session.State);
     }
 
-    // Symmetric positive case: a GM-tier account from an allow-listed IP proceeds normally, proving the gate
-    // is a real check (not an always-reject) and doesn't interfere with a legitimate GM login.
     [Fact]
     public async Task HandleAsync_GmAccount_AllowlistedIp_Succeeds()
     {
@@ -318,8 +279,6 @@ public class LoginHandlerTests
         Assert.Equal((short)1, session.AccountGrade);
     }
 
-    // A non-GM account is entirely unaffected by the GM-IP gate regardless of allowlist state -- the
-    // condition is gated on AccountGrade, not evaluated unconditionally for every login.
     [Fact]
     public async Task HandleAsync_NonGmAccount_NonAllowlistedIp_StillSucceeds()
     {
@@ -333,9 +292,6 @@ public class LoginHandlerTests
         await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(0, "MG7", 1, ""));
     }
 
-    // Legacy "Only Admin can login" operator lockdown (Server/ts25login/S04_MyWork02.cpp:202-208): when
-    // enabled, a non-GM-tier account is refused with the fixed application message, even with fully valid
-    // credentials and no other restriction in play.
     [Fact]
     public async Task HandleAsync_OnlyAdminLockdownEnabled_NonGmAccount_SendsCustomMessageResult()
     {
@@ -351,7 +307,6 @@ public class LoginHandlerTests
         Assert.Null(session.AccountId);
     }
 
-    // A GM-tier account is exempt from the lockdown -- the flag only turns away non-elevated accounts.
     [Fact]
     public async Task HandleAsync_OnlyAdminLockdownEnabled_GmAccount_Succeeds()
     {
@@ -366,10 +321,6 @@ public class LoginHandlerTests
         await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(0, "MG7", 1, ""));
     }
 
-    // Regression for the confirmed audit finding: legacy has an unconditional gate rejecting any login (GM or
-    // non-GM) whose declared adapter name/GUID is empty (Server/ts25login/S08_MyDB.cpp:421-425:
-    // "if (IsEmptyString(adapter->AdapterName)) { resString = "IP address not specified. Please update to the
-    // latest client."; return 10000; }"), which had no equivalent anywhere in LoginService before this fix.
     [Fact]
     public async Task HandleAsync_NonGmAccount_EmptyAdapterName_SendsCustomMessageResult()
     {
@@ -387,9 +338,6 @@ public class LoginHandlerTests
         Assert.Null(session.AccountId);
     }
 
-    // The gate is unconditional on account grade, unlike the mac-limit and "Protect Spoofed" gates right
-    // below it in legacy (both scoped to uUserSort &lt; 1) -- a GM-tier account with an empty adapter name is
-    // refused too, even though it would otherwise be exempt from every other device-related gate.
     [Fact]
     public async Task HandleAsync_GmAccount_EmptyAdapterName_SendsCustomMessageResult()
     {
@@ -407,9 +355,6 @@ public class LoginHandlerTests
         Assert.Null(session.AccountId);
     }
 
-    // "Protect Spoofed" anti-spoofing gate (Server/ts25login/S08_MyDB.cpp:497-507): a non-GM account whose
-    // declared MAC is zero-length never gets its device values populated with real data at all, so the gate
-    // always trips regardless of whatever GUID/IP the client happened to declare.
     [Fact]
     public async Task HandleAsync_NonGmAccount_ZeroLengthMac_SendsInvalidDevicesResult()
     {
@@ -427,17 +372,12 @@ public class LoginHandlerTests
         Assert.Null(session.AccountId);
     }
 
-    // GM-tier accounts (grade one or above) are exempt from the gate entirely, even with an all-placeholder
-    // device tuple -- the same account row was just overwritten with those placeholders as a side effect
-    // (Server/ts25login/S08_MyDB.cpp:487-494), but that write never gates this check.
     [Fact]
     public async Task HandleAsync_GmAccount_ZeroLengthMac_StillSucceeds()
     {
         var (hash, salt) = PasswordHasher.Hash("correct-password");
         var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false, 1);
         var accounts = FakeAccountRepository.WithAccount(account);
-        // gmAllowlisted:true -- this test targets the anti-spoofing gate's GM exemption, not the separate
-        // GM-IP allowlist gate (covered on its own below); an allowlisted IP keeps that gate out of the way.
         var handler = CreateHandler(out var session, out var pipe, accounts, gmAllowlisted: true);
 
         await handler.HandleAsync(ValidLoginRequest(password: "correct-password", physicalAddress: []), session,
@@ -445,12 +385,9 @@ public class LoginHandlerTests
 
         await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(0, "MG7", 1, ""));
         Assert.NotNull(session.AccountSessionToken);
-        // GM-BLOCK precondition: the account-grade fact must land on the session itself, not be re-derived later.
         Assert.Equal((short)1, session.AccountGrade);
     }
 
-    // A non-zero-length MAC that is nonetheless the exact placeholder literal text still trips the gate --
-    // the comparison is exact-text equality, not a byte-level "was this zero-length" test.
     [Fact]
     public async Task HandleAsync_NonGmAccount_MacEqualsPlaceholderLiteral_SendsInvalidDevicesResult()
     {
@@ -467,8 +404,6 @@ public class LoginHandlerTests
             LoginTrain.BuildLoginRecv(10000, "someuser", 0, LoginTrain.FailurePinMask, "Invalid devices!"));
     }
 
-    // Placeholder adapter-name/GUID literal alone is sufficient -- the three conditions are "any one",
-    // not "all three together".
     [Fact]
     public async Task HandleAsync_NonGmAccount_AdapterGuidEqualsPlaceholderLiteral_SendsInvalidDevicesResult()
     {
@@ -485,8 +420,6 @@ public class LoginHandlerTests
             LoginTrain.BuildLoginRecv(10000, "someuser", 0, LoginTrain.FailurePinMask, "Invalid devices!"));
     }
 
-    // A genuinely loopback connection trips the gate too, even with real MAC/GUID values -- a real boundary
-    // condition the legacy check accepts (same-host non-GM connections are indistinguishable from spoofing).
     [Fact]
     public async Task HandleAsync_NonGmAccount_LoopbackRemoteIp_SendsInvalidDevicesResult()
     {
@@ -502,8 +435,6 @@ public class LoginHandlerTests
             LoginTrain.BuildLoginRecv(10000, "someuser", 0, LoginTrain.FailurePinMask, "Invalid devices!"));
     }
 
-    // Baseline: a non-GM account with a real, non-placeholder device tuple passes the gate silently and
-    // proceeds exactly like HandleAsync_NoRestrictionsAndValidCredentials_Succeeds.
     [Fact]
     public async Task HandleAsync_NonGmAccount_RealDeviceTuple_Succeeds()
     {
@@ -520,10 +451,6 @@ public class LoginHandlerTests
         Assert.NotNull(session.AccountSessionToken);
     }
 
-    // Major audit gap (ts25extra-scope-confirmation cluster): the character-select roster used to always send
-    // GuildName="" regardless of actual guild membership. LoginService now resolves each roster character's live
-    // guild membership (IGuildRepository.GetByCharacterAsync) and LoginTrain.BuildAvatarSlots wires it onto the
-    // wire GuildName field -- see LoginTrain.BuildAvatarSlots' own remarks for the full legacy citation.
     [Fact]
     public async Task HandleAsync_Success_PopulatesGuildNameForGuildedCharacter_AndLeavesGuildlessCharacterEmpty()
     {
@@ -567,13 +494,6 @@ public class LoginHandlerTests
         Assert.Equal("", expectedSlots[1].GuildName);
     }
 
-    // Fixes the confirmed gap this session's root-cause read found: the roster response used to always show
-    // zeroed equipment/inventory/stats for a returning character regardless of what was actually persisted.
-    // LoginService now reads usp_Character_GetAccountRoster (ICharacterRepository.GetAccountRosterAsync) and
-    // LoginTrain.BuildAvatarSlots overlays the real equipped-item/progression-scalar data onto the wire
-    // response -- see that method's own remarks for the full legacy citation and the fields deliberately left
-    // at their wire-zero/-1 template (LogoutInfo correction, blacklist pruning, VisibleState/SpecialState/
-    // CostumeIndex/PetBag/Costume).
     [Fact]
     public async Task HandleAsync_Success_PopulatesEquipmentAndProgressionScalarsFromTheAccountRosterRead()
     {
@@ -613,9 +533,6 @@ public class LoginHandlerTests
 
         Assert.Equal(expectedSlot0Frame, actual.AsSpan(loginRecvSize, avatarSlotSize).ToArray());
 
-        // Sanity-check the actual values, not just a byte-for-byte match against a second call to the same
-        // production code -- proves the weapon really landed in equip slot 7 and the progression scalars
-        // really came from CharacterRosterDto, not from a coincidentally-matching zero default.
         Assert.Equal(9001, expectedSlots[0].Equip[7 * 4]);
         Assert.Equal(5, expectedSlots[0].Halo);
         Assert.Equal(2, expectedSlots[0].RebirthNum);
@@ -636,9 +553,6 @@ public class LoginHandlerTests
         pipe = new FakeDuplexPipe();
         session = new LoginClientSession(1, pipe, remoteEndPoint ?? RemoteEndPoint);
 
-        // Same fake instance backs both the generic block-list bypass (ApplicationFirewall) and the
-        // GM-tier-specific post-authentication gate (LoginService) -- legacy checks the identical `gmip`
-        // table for both (S04_MyWork02.cpp:195, S08_MyDB.cpp:339-356), so one allowlist fake is correct here.
         var gmAllowlistRepository = new FakeGmAllowlistRepository(gmAllowlisted);
         var firewall = new ApplicationFirewall(
             new FakeBlockedIpRepository(blockedIp),
@@ -668,11 +582,7 @@ public class LoginHandlerTests
             NullLogger<LoginHandler>.Instance);
     }
 
-    /// <summary>
-    ///     Comfortably large cap, never maintenance/full -- the default for every test that isn't
-    ///     specifically exercising the capacity gates themselves.
-    /// </summary>
-    private static LoginCapacityState AllowedCapacity()
+        private static LoginCapacityState AllowedCapacity()
     {
         var state = new LoginCapacityState();
         state.SetMaxPlayers(10_000);
@@ -711,14 +621,7 @@ public class LoginHandlerTests
         return mac.Split('-').Select(b => Convert.ToByte(b, 16)).ToArray();
     }
 
-    /// <summary>
-    ///     Mirrors FakeCharacterRepository's own private ToRosterDto -- the auto-derivation
-    ///     <see cref="FakeCharacterRepository.GetAccountRosterAsync" /> falls back to for a character seeded only
-    ///     via <see cref="FakeCharacterRepository.WithSummaries" />, every field beyond CharacterSummaryDto's own
-    ///     8 defaulted to 0. Duplicated here (not shared) so this expected-value construction doesn't reach into
-    ///     the fake's private implementation detail.
-    /// </summary>
-    private static CharacterRosterDto ToRosterDto(CharacterSummaryDto summary)
+        private static CharacterRosterDto ToRosterDto(CharacterSummaryDto summary)
     {
         return new CharacterRosterDto(
             summary.CharacterId,
@@ -750,26 +653,12 @@ public class LoginHandlerTests
             0);
     }
 
-    /// <summary>
-    ///     SqlException has no accessible public constructor -- it's only ever created by
-    ///     Microsoft.Data.SqlClient itself from a real server round trip. Bypassing every constructor is the
-    ///     only way to get an instance of the exact type LoginService's catch clause discriminates on; the
-    ///     fake's Message/Number are irrelevant here since only the type, not the content, drives the branch
-    ///     under test.
-    /// </summary>
-    private static SqlException CreateFakeSqlException()
+        private static SqlException CreateFakeSqlException()
     {
         return (SqlException)RuntimeHelpers.GetUninitializedObject(typeof(SqlException));
     }
 
-    /// <summary>
-    ///     Every outcome here sends the full 6-packet SEND_LOGIN train (LoginTrain.Send/SendFailure), so a plain
-    ///     <see cref="PacketAssert.AssertSentAsync{TPacket}" /> (built for a single-packet reply) sees trailing
-    ///     bytes from the later packets and fails on length alone. Only LC_LOGIN_RECV -- the sole packet whose
-    ///     content actually depends on this cluster's new checks -- is asserted here; the rest of the train is
-    ///     already covered by LoginTrainTests.
-    /// </summary>
-    private static async Task AssertFirstResponseAsync(FakeDuplexPipe pipe, LoginResponse expected)
+        private static async Task AssertFirstResponseAsync(FakeDuplexPipe pipe, LoginResponse expected)
     {
         var actual = await PacketAssert.ReadSentBytesAsync(pipe);
         var expectedFrame = new byte[FrameWriter.FrameSizeOf<LoginResponse>()];

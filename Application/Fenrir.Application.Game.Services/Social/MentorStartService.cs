@@ -5,16 +5,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Social;
 
-/// <summary>
-///     Master/student may be hosted by different zones/tick threads: only the master-side field is mutated
-///     directly here; the student's side is mirrored via a zone command.
-/// </summary>
-/// <remarks>
-///     <see cref="TryConsumeStart" /> delegates to <see cref="MentorRegistry.TryConsumeStart" />, whose own
-///     remarks carry an open <c>LEGACY-PARITY RISK</c> note: whether MentorStart is legacy-accurately
-///     restricted to the original asker ("master") or may be sent by either mutually-accepted party has not
-///     been confirmed. This service intentionally does not attempt to resolve that ambiguity by inference.
-/// </remarks>
 public sealed class MentorStartService(
     MentorRegistry mentors,
     IMentorRepository repository,

@@ -8,13 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
-/// <summary>
-///     CZ_FISHING_RESULT_SEND (opcode 104) -- same zone-52 gating as <see cref="FishingLineHandler" />. Sort
-///     1=poll bite (silent no-op unless step==3 and &gt;=1 minute elapsed since cast -- no reply at all on
-///     gate failure, matching the legacy exactly), 2=recast, 3=client-forced step (0..5, else disconnect).
-///     Reaching step 4/5 here always broadcasts action Sort=93 to self + AOI neighbors (mirrors <c>Broadcast22</c>
-///     + explicit self <c>USEND</c>).
-/// </summary>
 public sealed class FishingProgressHandler(
     IFishingProgressService fishingProgressService,
     ILogger<FishingProgressHandler> logger)
@@ -29,9 +22,6 @@ public sealed class FishingProgressHandler(
             state is null)
             return;
 
-        // Sort=1 (poll bite) is a client-driven poll while waiting for a bite, so this entry log must not
-        // format/box unconditionally on every poll -- gate behind IsEnabled like ContinueSkillUseHandler's
-        // own per-tick pulse.
         if (logger.IsEnabled(LogLevel.Debug))
             logger.LogDebug(
                 "Session {SessionId}: FishingProgressRequest (op104) received for character {CharacterId}, sort {Sort}",

@@ -2,10 +2,6 @@ using Fenrir.Application.Game.Domain.World;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     Zone-241 "LOD" personal-dungeon boss tables (Catalog A/D/E) -- see <see cref="PersonalDungeonBossTables" />'s
-///     own remarks for the confirmed three-way summon race these tables feed.
-/// </summary>
 public class PersonalDungeonBossTablesTests
 {
     [Theory]
@@ -22,7 +18,7 @@ public class PersonalDungeonBossTablesTests
     [InlineData(10, 748)]
     [InlineData(11, 749)]
     [InlineData(12, 750)]
-    [InlineData(13, 750)] // out-of-range falls through to the tier-12 fallback
+    [InlineData(13, 750)]
     [InlineData(-1, 750)]
     public void ResolveCatalogA_MatchesZoneEnterHandlerTable(int rebirthTier, int expectedBossId)
     {
@@ -57,7 +53,7 @@ public class PersonalDungeonBossTablesTests
     [InlineData(328, 728)]
     [InlineData(329, 729)]
     [InlineData(330, 730)]
-    [InlineData(0, 725)] // unreachable-in-practice fallback
+    [InlineData(0, 725)]
     public void ResolveCatalogD_MatchesServerNumberTable(int serverNumber, int expectedBossId)
     {
         Assert.Equal(expectedBossId, PersonalDungeonBossTables.ResolveCatalogD(serverNumber));

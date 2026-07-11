@@ -8,10 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Combat;
 
-// Movement/combat entry logging (Fenrir.Application.Game.Handlers.Logging.MovementCombatLog.AttackReceived):
-// AttackHandler must log every CZ_PROCESS_ATTACK_SEND (op18) it receives, with the real session id, character
-// id, mCase, and target server-index carried by the packet -- not a bare "handler called" marker -- before the
-// anti-fuzzing case-range check even runs.
 public class AttackHandlerLoggingTests
 {
     private static AttackForProtocol Attack(int mCase, int targetServerIndex)
@@ -49,19 +45,15 @@ public class AttackHandlerLoggingTests
         handler.Handle(new AttackRequest { AttackInfo = Attack(3, 42) }, session);
 
         var entry = Assert.Single(logger.Entries, e => e.Level == LogLevel.Debug);
-        Assert.Contains("55", entry.Message); // session id
-        Assert.Contains("7", entry.Message); // attacking character id
-        Assert.Contains("case 3", entry.Message); // real mCase value, not a placeholder
-        Assert.Contains("target server-index 42", entry.Message); // real target, not a placeholder
+        Assert.Contains("55", entry.Message);
+        Assert.Contains("7", entry.Message);
+        Assert.Contains("case 3", entry.Message);
+        Assert.Contains("target server-index 42", entry.Message);
     }
 
     [Fact]
     public void Handle_CaseOutOfRange_StillLogsAttackReceived_BeforeRejecting()
     {
-        // The entry log fires unconditionally before the anti-fuzzing case-range gate, so even a rejected
-        // attack (case outside 1-6) must still have produced the "attack received" line -- logging must never
-        // silently skip the malformed/malicious path, which is exactly the traffic an operator most wants
-        // visible.
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _) = ZoneTestKit.CreateSession(56);
         session.MarkTicketConsumed(1, 8);

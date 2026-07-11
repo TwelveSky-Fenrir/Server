@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Tests.TestSupport;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Shared;
 
-// Golden encoder (incl. nested ActionInfo) is hand-built from the C++ OBJECT_FOR_MONSTER layout, independent of the generated Write.
 public class ObjectForMonsterTests
 {
     [Fact]

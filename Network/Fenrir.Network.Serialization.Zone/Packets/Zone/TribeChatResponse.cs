@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Wire.Attributes;
 
 namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 
-/// <summary>Local to the zone only, no inter-zone relay; recipients are same/allied tribe members.</summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.TribeChat, ExpectedSize = 99)]
 public readonly partial record struct TribeChatResponse : IOutgoingPacket
 {

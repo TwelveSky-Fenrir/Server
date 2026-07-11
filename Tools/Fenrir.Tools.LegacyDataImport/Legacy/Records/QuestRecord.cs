@@ -1,9 +1,5 @@
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
-/// <summary>
-///     Legacy <c>QUEST_INFO</c> (STRUCT.h:237-274): tail is 10 speech blocks (lines[15][51] + 3-byte pad +
-///     colors[15]) in declaration order.
-/// </summary>
 internal sealed record QuestRecord(
     int Index,
     string Subject,

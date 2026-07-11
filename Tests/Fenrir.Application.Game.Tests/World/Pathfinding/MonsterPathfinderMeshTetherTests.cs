@@ -5,19 +5,6 @@ using Fenrir.Application.Game.Tests.TestSupport;
 
 namespace Fenrir.Application.Game.Tests.World.Pathfinding;
 
-/// <summary>
-///     Covers the two <see cref="MonsterPathfinder" /> additions from behavior contract <c>A2-mesh-tether</c>:
-///     <see cref="MonsterPathfinder.TryFindPathClamped" /> (wander/patrol off-mesh-destination clamp) and
-///     <see cref="MonsterPathfinder.TryFindPursuitPath" /> (pursuit-tether early-stop). Separate file from
-///     <c>MonsterPathfinderTests</c> so a concurrent sibling working on the pre-existing A* + funnel coverage in
-///     that file never collides with this one.
-/// </summary>
-/// <remarks>
-///     Joins the serialized <see cref="AllocationRegressionCollection" /> for the same reason
-///     <c>MonsterPathfinderTests</c> does -- <see cref="TryFindPursuitPath_ReusingBuffers_DoesNotAllocateOnTheHotPath" />
-///     reads a per-thread <see cref="GC.GetAllocatedBytesForCurrentThread" /> delta that concurrent test execution
-///     perturbs.
-/// </remarks>
 [Collection(AllocationRegressionCollection.Name)]
 public class MonsterPathfinderMeshTetherTests
 {
@@ -25,8 +12,7 @@ public class MonsterPathfinderMeshTetherTests
     private const float GroundY = 10f;
     private static readonly Vector4 FloorPlane = new(0f, 1f, 0f, GroundY);
 
-    /// <summary>Same grid-mesh builder shape as <c>MonsterPathfinderTests.GridGeometry</c> (kept file-local -- no shared test navmesh helper exists yet).</summary>
-    private static ZoneGeometry GridGeometry(params (int Col, int Row)[] cells)
+        private static ZoneGeometry GridGeometry(params (int Col, int Row)[] cells)
     {
         var triangles = new List<WorldTriangle>(cells.Length * 2);
         float minX = float.MaxValue, minZ = float.MaxValue, maxX = float.MinValue, maxZ = float.MinValue;
@@ -62,8 +48,7 @@ public class MonsterPathfinderMeshTetherTests
         return new ZoneGeometry(triangles.ToArray(), [root]);
     }
 
-    /// <summary>Single 3x3-cell open square spanning [0,30]x[0,30].</summary>
-    private static ZoneGeometry OpenGround()
+        private static ZoneGeometry OpenGround()
     {
         return GridGeometry(
             (0, 0), (1, 0), (2, 0),
@@ -71,8 +56,7 @@ public class MonsterPathfinderMeshTetherTests
             (0, 2), (1, 2), (2, 2));
     }
 
-    /// <summary>Two vertical columns joined only by a top connector, forcing an up-and-over detour.</summary>
-    private static ZoneGeometry GapWithTopDetour()
+        private static ZoneGeometry GapWithTopDetour()
     {
         return GridGeometry(
             (0, 0), (0, 1), (0, 2),
@@ -80,7 +64,6 @@ public class MonsterPathfinderMeshTetherTests
             (1, 2));
     }
 
-    // ---- TryFindPathClamped ------------------------------------------------------------------------------
 
     [Fact]
     public void Clamped_DestinationAlreadyOnMesh_BehavesLikeOrdinaryPath()
@@ -105,7 +88,7 @@ public class MonsterPathfinderMeshTetherTests
         var waypoints = new List<Vector2>();
 
         var from = new Vector3(5, GroundY, 5);
-        var to = new Vector3(50, GroundY, 50); // far outside the [0,30]x[0,30] mesh
+        var to = new Vector3(50, GroundY, 50);
 
         var found = pathfinder.TryFindPathClamped(from, to, waypoints);
 
@@ -114,12 +97,9 @@ public class MonsterPathfinderMeshTetherTests
 
         var resolved = waypoints[^1];
 
-        // Clamped well short of the original off-mesh destination, but still materially past the start --
-        // the boundary bisection should land near the grid's far edge (x=z=30 along this 45-degree approach).
         Assert.True(resolved.X < 45f, $"expected a point well short of the off-mesh goal, got {resolved.X}");
         Assert.True(resolved.X > 20f, $"expected meaningful progress toward the goal, got {resolved.X}");
 
-        // The resolved point must itself be walkable -- the whole point of the clamp.
         var geometry = OpenGround();
         Assert.True(geometry.TryFindContainingWalkableTriangle(resolved.X, resolved.Y, out _));
     }
@@ -152,16 +132,15 @@ public class MonsterPathfinderMeshTetherTests
         Assert.Equal(25f, waypoints[0].Y, 3);
     }
 
-    // ---- TryFindPursuitPath -------------------------------------------------------------------------------
 
     [Fact]
     public void Pursuit_StartAlreadyWithinTether_ReturnsTrueWithNoWaypoints()
     {
         var pathfinder = new MonsterPathfinder(OpenGround(), 24);
-        var waypoints = new List<Vector2> { new(9f, 9f) }; // pre-populated to prove it is cleared
+        var waypoints = new List<Vector2> { new(9f, 9f) };
 
         var from = new Vector3(5, GroundY, 5);
-        var anchor = new Vector2(6f, 6f); // distance ~1.41 from `from`
+        var anchor = new Vector2(6f, 6f);
         var found = pathfinder.TryFindPursuitPath(from, new Vector3(25, GroundY, 25), anchor, 5f, waypoints);
 
         Assert.True(found);
@@ -176,7 +155,7 @@ public class MonsterPathfinderMeshTetherTests
 
         var from = new Vector3(5, GroundY, 5);
         var to = new Vector3(25, GroundY, 25);
-        var anchor = new Vector2(25f, 25f); // the chased avatar sits at the destination itself
+        var anchor = new Vector2(25f, 25f);
         const float tetherRadius = 10f;
 
         var found = pathfinder.TryFindPursuitPath(from, to, anchor, tetherRadius, waypoints);
@@ -188,7 +167,6 @@ public class MonsterPathfinderMeshTetherTests
         var distanceToAnchor = Vector2.Distance(resolved, anchor);
         Assert.Equal(tetherRadius, distanceToAnchor, 2);
 
-        // The clipped point must still lie strictly between the start and the raw destination, not overshoot it.
         var totalDistance = Vector2.Distance(new Vector2(from.X, from.Z), anchor);
         var resolvedDistanceFromStart = Vector2.Distance(new Vector2(from.X, from.Z), resolved);
         Assert.True(resolvedDistanceFromStart < totalDistance);
@@ -200,9 +178,9 @@ public class MonsterPathfinderMeshTetherTests
         var pathfinder = new MonsterPathfinder(GapWithTopDetour(), 24);
         var waypoints = new List<Vector2>();
 
-        var from = new Vector3(7, GroundY, 3); // cell (0,0)
-        var to = new Vector3(27, GroundY, 3); // cell (2,0) -- reachable only via the top detour
-        var anchor = new Vector2(27f, 3f); // sits at the goal
+        var from = new Vector3(7, GroundY, 3);
+        var to = new Vector3(27, GroundY, 3);
+        var anchor = new Vector2(27f, 3f);
         const float tetherRadius = 5f;
 
         var full = new List<Vector2>();
@@ -214,8 +192,6 @@ public class MonsterPathfinderMeshTetherTests
         Assert.True(found);
         Assert.NotEmpty(waypoints);
 
-        // Every corner strictly before the final one is untouched (none of them sit within the small tether
-        // radius of the far-away anchor), and only the last, clipped point is new.
         for (var i = 0; i < waypoints.Count - 1; i++)
             Assert.Equal(full[i], waypoints[i]);
 
@@ -230,7 +206,7 @@ public class MonsterPathfinderMeshTetherTests
         var waypoints = new List<Vector2> { new(1f, 2f) };
 
         var from = new Vector3(5, GroundY, 5);
-        var to = new Vector3(-5000, GroundY, -5000); // off-mesh
+        var to = new Vector3(-5000, GroundY, -5000);
         var anchor = new Vector2(0f, 0f);
 
         var found = pathfinder.TryFindPursuitPath(from, to, anchor, 5f, waypoints);
@@ -248,7 +224,7 @@ public class MonsterPathfinderMeshTetherTests
 
         var from = new Vector3(5, GroundY, 5);
         var to = new Vector3(25, GroundY, 25);
-        var anchor = new Vector2(1000f, 1000f); // nowhere near the route
+        var anchor = new Vector2(1000f, 1000f);
 
         Assert.True(pathfinder.TryFindPath(from, to, ordinary));
         var found = pathfinder.TryFindPursuitPath(from, to, anchor, 1f, waypoints);

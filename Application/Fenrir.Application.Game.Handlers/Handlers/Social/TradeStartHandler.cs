@@ -8,10 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>
-///     CZ_TRADE_START_SEND (opcode 50) -- callable by either accepted side; ZC_TRADE_START_RECV is crossed
-///     (each player receives the OTHER's offer).
-/// </summary>
 public sealed class TradeStartHandler(
     ZoneRegistry zones,
     ITradeStartService tradeStartService,
@@ -33,9 +29,6 @@ public sealed class TradeStartHandler(
         if (!zones.TryGetPlayer(trade.PlayerAId, out var playerA) ||
             !zones.TryGetPlayer(trade.PlayerBId, out var playerB))
         {
-            // Partner re-validation failed after TradeRegistry.TryStart already committed both sides to
-            // trade-process-state 4 -- roll the CALLER's own state back to idle only; the partner's side
-            // (if any) is deliberately left untouched, matching legacy's asymmetric partial-effect behavior.
             tradeStartService.AbortStart(callerId);
             return;
         }

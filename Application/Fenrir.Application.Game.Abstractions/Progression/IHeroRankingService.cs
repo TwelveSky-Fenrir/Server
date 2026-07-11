@@ -3,7 +3,6 @@ using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Abstractions.Progression;
 
-/// <summary><see langword="null" /> per period means that period's throttle has not elapsed yet -- no reply for it.</summary>
 public readonly record struct HeroRankingQueryResult(HeroRank? Previous, HeroRank? Current);
 
 public interface IHeroRankingService

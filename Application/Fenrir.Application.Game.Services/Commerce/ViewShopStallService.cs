@@ -8,8 +8,6 @@ namespace Fenrir.Application.Game.Services.Commerce;
 
 public sealed class ViewShopStallService(ILogger<ViewShopStallService> logger) : IViewShopStallService
 {
-    // Placeholder for "requester never opened a stall" -- must not be default(PshopInfo): its null
-    // Name/arrays can't serialize on the wire.
     private static readonly PshopInfo EmptyPshopInfo = new()
         { UniqueNumber = 0, Name = string.Empty, ItemInfo = new int[225], SocketInfo = new int[75] };
 
@@ -23,7 +21,6 @@ public sealed class ViewShopStallService(ILogger<ViewShopStallService> logger) :
                 break;
             }
 
-        // Legacy trap: on either error path the PshopInfo carries the REQUESTER's own stall, not the target's.
         var ownListing = requester.PshopListing ?? EmptyPshopInfo;
 
         if (target is null)

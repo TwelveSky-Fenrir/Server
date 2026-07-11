@@ -12,7 +12,7 @@ public class Zone051Zone053StateMapTests
     [InlineData(15, 5)]
     [InlineData(16, 4)]
     [InlineData(17, 5)]
-    [InlineData(18, 0)] // reset -- a real write, distinct from the no-op below
+    [InlineData(18, 0)]
     public void Zone051_Selectors11Through18_MapToTheExactState(int selector, int expected)
     {
         Assert.True(Zone051Zone053StateMap.TryMapZone051(selector, out var state));
@@ -52,7 +52,7 @@ public class Zone051Zone053StateMapTests
     [InlineData(24, 5)]
     [InlineData(28, 4)]
     [InlineData(29, 5)]
-    [InlineData(30, 0)] // reset -- a real write, distinct from the no-ops below
+    [InlineData(30, 0)]
     public void Zone053_Selectors20Through30_MapToTheExactState(int selector, int expected)
     {
         Assert.True(Zone051Zone053StateMap.TryMapZone053(selector, out var state));
@@ -62,9 +62,6 @@ public class Zone051Zone053StateMapTests
     [Fact]
     public void Zone053_Selector19_IsDeadCodeInEveryShippedBuild_DoesNotMap()
     {
-        // The intended write (100) is compiled out under a permanently-true __GOD__ guard -- observed live
-        // behavior is "no write," never the source's dead intent. See Zone051Zone053StateMap.TryMapZone053's
-        // own remarks for the guard-chain citation.
         Assert.False(Zone051Zone053StateMap.TryMapZone053(19, out _));
     }
 

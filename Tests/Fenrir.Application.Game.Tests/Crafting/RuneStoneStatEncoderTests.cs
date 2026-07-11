@@ -2,11 +2,6 @@ using Fenrir.Application.Game.Domain.Crafting;
 
 namespace Fenrir.Application.Game.Tests.Crafting;
 
-/// <summary>
-///     wave13/B5-rune-encoders: the four *ValueRune overwrite encoders (Server/Header/function.h:3348-3386)
-///     consumed by the rune-stone-crafting write path -- each proven equivalent to
-///     <see cref="RuneStoneCraftResolver" />'s own inline decode-all/replace-one/encode-all computation.
-/// </summary>
 public class RuneStoneStatEncoderTests
 {
     [Fact]
@@ -68,9 +63,6 @@ public class RuneStoneStatEncoderTests
     [Fact]
     public void EachEncoder_OverwritesOutright_IgnoringWhateverThePriorValueWas_EvenNegative()
     {
-        // The 92298 (single-slot-reroll) branch's own emptiness test allows overwriting a slot whose prior
-        // decoded value was already positive (single-slot reroll requires exactly 0, but the encoder itself
-        // has no such restriction -- that gating lives in RuneStoneCraftResolver, not here).
         var packed = RuneStoneStatCodec.Encode(-5, -6, -7, -8);
 
         Assert.Equal(1, RuneStoneStatCodec.Decode(RuneStoneStatEncoder.ChangeStrValueRune(packed, 1)).Str);
@@ -79,7 +71,6 @@ public class RuneStoneStatEncoderTests
         Assert.Equal(4, RuneStoneStatCodec.Decode(RuneStoneStatEncoder.ChangeIntValueRune(packed, 4)).Int);
     }
 
-    // ---- Equivalence with RuneStoneCraftResolver's own inline decode-all/replace-one/encode-all shape ----
 
     [Theory]
     [InlineData(0, 0, 0, 0)]
@@ -92,7 +83,6 @@ public class RuneStoneStatEncoderTests
         var packed = RuneStoneStatCodec.Encode(str, dex, vit, intel);
         const sbyte roll = 17;
 
-        // The shape RuneStoneCraftResolver itself uses inline (decode all four, re-encode with one replaced).
         var (rStr, rDex, rVit, rInt) = RuneStoneStatCodec.Decode(packed);
         var resolverStyleStr = RuneStoneStatCodec.Encode(roll, rDex, rVit, rInt);
         var resolverStyleDex = RuneStoneStatCodec.Encode(rStr, roll, rVit, rInt);

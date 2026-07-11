@@ -3,7 +3,6 @@ using Fenrir.Data.Abstractions.Characters;
 
 namespace Fenrir.Application.Game.Tests.TestSupport;
 
-/// <summary>In-memory stand-in for IAccountVaultRepository -- a single account's vault, no real persistence.</summary>
 internal sealed class FakeAccountVaultRepository : IAccountVaultRepository
 {
     private readonly Dictionary<int, (long Money, long Money2, Dictionary<short, AccountVaultItemSlotDto> Items)>
@@ -79,8 +78,7 @@ internal sealed class FakeAccountVaultRepository : IAccountVaultRepository
         return ValueTask.CompletedTask;
     }
 
-    /// <summary>Seeds a vault balance/items for a test to assert against, bypassing the transfer methods.</summary>
-    public void Seed(int accountId, long money, long money2,
+        public void Seed(int accountId, long money, long money2,
         params (short SlotIndex, AccountVaultItemSlotDto Row)[] items)
     {
         var slots = items.ToDictionary(i => i.SlotIndex, i => i.Row);

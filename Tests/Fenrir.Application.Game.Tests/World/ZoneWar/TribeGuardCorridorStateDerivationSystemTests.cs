@@ -8,11 +8,6 @@ using Fenrir.Application.Game.Tests.TestSupport;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
-/// <summary>
-///     Covers <see cref="TribeGuardCorridorStateDerivationSystem" /> (<c>MyGame::ProcessForGuardState</c>)
-///     against a synthetic two-tribe corridor -- the real sixteen-zone/hub table is not reproduced anywhere in
-///     this codebase yet (see <see cref="TribeGuardCorridorCatalog" />'s own remarks).
-/// </summary>
 public class TribeGuardCorridorStateDerivationSystemTests
 {
     private const short HubZoneId = 100;
@@ -75,19 +70,19 @@ public class TribeGuardCorridorStateDerivationSystemTests
     public void CorridorZone_BootTick_ForcesOpenOnlyItsOwnOwnedSegment()
     {
         var catalog = CreateCatalog();
-        var (zone, state) = CreateZoneWithSystem(1, catalog); // tribe 0's chain[0] -- owns segment 1
+        var (zone, state) = CreateZoneWithSystem(1, catalog);
 
         zone.Tick(SimulationClock.LegacyTick);
 
         Assert.True(state.IsOpen(0, 1));
-        Assert.False(state.IsOpen(0, 2)); // not this zone's own segment to own
+        Assert.False(state.IsOpen(0, 2));
     }
 
     [Fact]
     public void HomeZone_OwnsNoSegment_BootTickIsANoOp()
     {
         var catalog = CreateCatalog();
-        var (zone, state) = CreateZoneWithSystem(4, catalog); // tribe 0's home zone (chain[3])
+        var (zone, state) = CreateZoneWithSystem(4, catalog);
 
         zone.Tick(SimulationClock.LegacyTick);
 
@@ -100,13 +95,13 @@ public class TribeGuardCorridorStateDerivationSystemTests
         var slots = ImmutableDictionary<(byte, byte), ImmutableArray<int>>.Empty
             .Add((0, 1), ImmutableArray.Create(10, 11, 12, 13, 14));
         var catalog = CreateCatalog(guardPostSlots: slots);
-        var (zone, state) = CreateZoneWithSystem(1, catalog); // owns segment (0,1)
+        var (zone, state) = CreateZoneWithSystem(1, catalog);
 
-        zone.Tick(SimulationClock.LegacyTick); // tick 1 -- boot pass, forced open
+        zone.Tick(SimulationClock.LegacyTick);
         Assert.True(state.IsOpen(0, 1));
 
-        SpawnGuard(zone, 12); // one of the five configured guard-post slots
-        zone.Tick(SimulationClock.LegacyTick); // tick 2 -- live scan notices the guard alive
+        SpawnGuard(zone, 12);
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.False(state.IsOpen(0, 1));
     }
@@ -119,8 +114,8 @@ public class TribeGuardCorridorStateDerivationSystemTests
         var catalog = CreateCatalog(guardPostSlots: slots);
         var (zone, state) = CreateZoneWithSystem(1, catalog);
 
-        zone.Tick(SimulationClock.LegacyTick); // boot -- forced open
-        zone.Tick(SimulationClock.LegacyTick); // live scan -- nobody alive, stays open
+        zone.Tick(SimulationClock.LegacyTick);
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.True(state.IsOpen(0, 1));
     }
@@ -133,14 +128,14 @@ public class TribeGuardCorridorStateDerivationSystemTests
         var catalog = CreateCatalog(guardPostSlots: slots);
         var (zone, state) = CreateZoneWithSystem(1, catalog);
 
-        zone.Tick(SimulationClock.LegacyTick); // tick 1 -- boot, forced open
+        zone.Tick(SimulationClock.LegacyTick);
         SpawnGuard(zone, 12);
-        zone.Tick(SimulationClock.LegacyTick); // tick 2 -- guard alive, closes
+        zone.Tick(SimulationClock.LegacyTick);
         Assert.False(state.IsOpen(0, 1));
 
         zone.TryDamageMonster(12, 10_000, null, out var died, out _);
         Assert.True(died);
-        zone.Tick(SimulationClock.LegacyTick); // tick 3 -- no guards alive anymore, reopens
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.True(state.IsOpen(0, 1));
     }
@@ -148,15 +143,12 @@ public class TribeGuardCorridorStateDerivationSystemTests
     [Fact]
     public void UnconfiguredGuardPostSlots_OwnedSegment_StaysAtWhateverBootLeftIt()
     {
-        // Segment is owned by this zone (so the boot pass forces it open), but no guard-post slots are
-        // configured for it yet -- EvaluateSegment must skip the scan (documented catalog gap), leaving the
-        // boot-forced state alone rather than guessing.
-        var catalog = CreateCatalog(); // no guardPostSlots at all
+        var catalog = CreateCatalog();
         var (zone, state) = CreateZoneWithSystem(1, catalog);
 
-        zone.Tick(SimulationClock.LegacyTick); // boot -- forced open
-        SpawnGuard(zone, 999); // would-be guard at an arbitrary, unconfigured index
-        zone.Tick(SimulationClock.LegacyTick); // live scan -- no configured slots, no-op
+        zone.Tick(SimulationClock.LegacyTick);
+        SpawnGuard(zone, 999);
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.True(state.IsOpen(0, 1));
     }

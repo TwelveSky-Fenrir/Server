@@ -7,7 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Admin;
 
-/// <summary>admin.usp_GameSettings_Get against real SQL Server 2025 -- covers the seeded singleton row.</summary>
 [Collection("SqlServer")]
 public class GameSettingsProcTests
 {

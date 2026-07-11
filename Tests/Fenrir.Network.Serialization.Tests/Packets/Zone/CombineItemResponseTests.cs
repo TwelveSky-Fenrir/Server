@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Zone;
 
-/// <summary>ZC_ADD_ITEM_RECV (ZONE.h:520-524, 8-byte payload) — only forge response with no trailing <c>tValue[6]</c>.</summary>
 public class ZcAddItemRecvTests
 {
     [Fact]

@@ -5,62 +5,28 @@ using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Domain.World;
 
-/// <summary>
-///     <c>mCase</c> 5 (Stun, <see cref="ApplyStunAttack" />) and 6 (UnStun, <see cref="ApplyUnstunAttack" />)
-///     resolution, plus the shared stun-pose broadcast/clear helpers <see cref="Simulation.StunCountdownSystem" />
-///     also uses for natural expiry. Dispatched from <see cref="ApplyCombatCommand" /> (Zone.Combat.cs) --
-///     everything else (kill hooks, PvP/PvM resolution) stays in that file; this one is stun's own home.
-/// </summary>
 public sealed partial class Zone
 {
-    /// <summary>"Stun" avatar-action pose (<c>mDATA.aAction.aSort==11</c>).</summary>
-    private const int StunActionSort = 11;
 
-    /// <summary>
-    ///     Post-cure/expiry idle pose (<c>mDATA.aAction.aSort=1</c>, S07_MyGame04.cpp:449) -- NOT the same as the default
-    ///     0 used elsewhere.
-    /// </summary>
-    private const int IdleActionSort = 1;
+        private const int StunActionSort = 11;
 
-    /// <summary>
-    ///     Buff slot 13 ("Stun Defense") -- replaces a stun attempt's computed block value with the flat
-    ///     literal 100 (a finite, beatable mitigation, not unconditional immunity; see <see cref="StunResolver" />).
-    /// </summary>
-    private const int StunDefenseBuffSlot = 13;
+        private const int IdleActionSort = 1;
 
-    /// <summary>Buff slot 10 ("Critical") -- both sides of the team-stun kill-credit grant must hold this active.</summary>
-    private const int CriticalBuffSlot = 10;
+        private const int StunDefenseBuffSlot = 13;
 
-    /// <summary>Repeated-stun count at which the team-stun sub-mechanic force-kills the victim (S07_MyGame02.cpp:3727-3731).</summary>
-    private const int TeamStunLockDeathThreshold = 10;
+        private const int CriticalBuffSlot = 10;
 
-    /// <summary>
-    ///     Reusable scratch buffer for <see cref="BroadcastIdleActionState" />'s neighbor-broadcast recipient
-    ///     list -- see <see cref="_stunNeighborScratch" />'s own remarks for the reuse justification.
-    /// </summary>
-    private readonly List<int> _idleNeighborScratch = [];
+        private const int TeamStunLockDeathThreshold = 10;
 
-    /// <summary>
-    ///     Reusable scratch buffer for <see cref="BroadcastStunActionState" />'s neighbor-broadcast recipient
-    ///     list -- same non-allocating shape and reuse justification as <c>Zone.PlayerLifecycle.cs</c>'s own
-    ///     <c>_moveNeighborScratch</c>: single tick thread, cleared before use, consumed entirely by the
-    ///     immediately-following broadcast call before <see cref="BroadcastStunActionState" /> returns. Kept
-    ///     distinct from <see cref="_idleNeighborScratch" /> even though the two poses are mutually exclusive,
-    ///     matching the rest of this codebase's one-scratch-field-per-call-site convention.
-    /// </summary>
-    private readonly List<int> _stunNeighborScratch = [];
+        private readonly List<int> _idleNeighborScratch = [];
 
-    /// <summary>
-    ///     ProcessAttack05 -- an avatar attempts to stun another avatar. Every failure path is a silent no-op;
-    ///     see <see cref="StunResolver" />'s own remarks for what isn't modeled and why.
-    /// </summary>
-    private void ApplyStunAttack(in CombatCommand command)
+        private readonly List<int> _stunNeighborScratch = [];
+
+        private void ApplyStunAttack(in CombatCommand command)
     {
         if (!_players.TryGetValue(command.AttackerCharacterId, out var attackerState))
             return;
 
-        // Recorded onto the attacker's tracked location unconditionally, before any other check runs -- not
-        // otherwise validated against the server-known position for this request (matches ATK_VAR2::create()).
         ApplySenderLocation(attackerState, command.AttackInfo);
 
         if (!_players.TryGetValue(command.AttackInfo.ServerIndex2, out var defenderState))
@@ -108,12 +74,7 @@ public sealed partial class Zone
             ApplyTeamStunSubMechanic(attackerState, defenderState);
     }
 
-    /// <summary>
-    ///     ProcessAttack06 -- an avatar attempts to cure/remove stun from another avatar. Every failure path is
-    ///     a silent no-op; see <see cref="UnstunResolver" />'s own remarks for the two cited asymmetries versus
-    ///     <see cref="ApplyStunAttack" />.
-    /// </summary>
-    private void ApplyUnstunAttack(in CombatCommand command)
+        private void ApplyUnstunAttack(in CombatCommand command)
     {
         if (!_players.TryGetValue(command.AttackerCharacterId, out var curerState))
             return;
@@ -125,8 +86,6 @@ public sealed partial class Zone
         if (targetState.UniqueNumber != command.AttackInfo.UniqueNumber2)
             return;
 
-        // CheckAttackPacket (S07_MyGame02.cpp:1718-1761), counting enabled -- see AttackPacketBudget's own
-        // remarks. Silent reject, same as every other ProcessAttack06 rejection path.
         if (!AttackPacketBudget.TryConsume(curerState, command.AttackInfo.AttackActionValue4))
             return;
 
@@ -153,12 +112,7 @@ public sealed partial class Zone
         ClearStun(targetState);
     }
 
-    /// <summary>
-    ///     Ends a stun early (a successful cure) or naturally (<see cref="Simulation.StunCountdownSystem" />'s
-    ///     own expiry) -- both broadcast the same return-to-idle pose and reset the repeated-stun counter
-    ///     (<c>S07_MyGame04.cpp:2593-2612</c>). A no-op if the character isn't currently stunned.
-    /// </summary>
-    public void ClearStun(PlayerRuntimeState state)
+        public void ClearStun(PlayerRuntimeState state)
     {
         if (!state.IsStunned)
             return;
@@ -172,13 +126,7 @@ public sealed partial class Zone
         BroadcastIdleActionState(state);
     }
 
-    /// <summary>
-    ///     Team-stun sub-mechanic (used skill id 80, <c>S07_MyGame02.cpp:3708-3725</c>): only runs when the
-    ///     attacker's party has exactly <see cref="Social.Party.PartyRegistry.MaxMembers" /> members present and
-    ///     connected in this zone instance -- a party short of five, or no party at all, aborts with no further
-    ///     effect.
-    /// </summary>
-    private void ApplyTeamStunSubMechanic(PlayerRuntimeState attackerState, PlayerRuntimeState defenderState)
+        private void ApplyTeamStunSubMechanic(PlayerRuntimeState attackerState, PlayerRuntimeState defenderState)
     {
         var members = _partyRegistry.GetMembers(attackerState.CharacterId);
         if (members.Count != PartyRegistry.MaxMembers)
@@ -190,11 +138,10 @@ public sealed partial class Zone
                 (present ??= []).Add(member);
 
         if (present is not { Count: 5 })
-            return; // a member of the full 5-name roster isn't actually connected in this zone
+            return;
 
         defenderState.RepeatedStunCount++;
 
-        // Only the very first time the counter reaches 1 since its last reset attempts the kill-credit grant.
         if (defenderState.RepeatedStunCount == 1)
         {
             var defenderHasCriticalBuff = defenderState.Buffs.Buff[CriticalBuffSlot * 2 + 1] > 0;
@@ -205,23 +152,11 @@ public sealed partial class Zone
                     if (!memberHasCriticalBuff)
                         continue;
 
-                    // S07_MyGame02.cpp:3714/3721 calls MyUtil::ProcessForKillOtherTribe(tPartyUser[index01],
-                    // atk.defenser, mSERVER_INFO.mServerNumber, KILL_CP_TYPE::STUN) verbatim per present party
-                    // member -- the exact same per-zone-gated CP/EXP/hero-point/daily-mission pipeline the
-                    // ordinary HP-death kill path runs (ApplyPvpKillRewards), not a narrower, zone-blind reward
-                    // channel of its own. Routing through it here (instead of unconditionally bumping
-                    // MissionKillOtherTribe) picks up the anti-farm cooldown, the combined-level-gap cap, AND
-                    // PvpKillRewardZoneCatalog's per-zone gating -- e.g. a stun-trigger kill in a "city" zone
-                    // (1/6/11/140) still grants EXP/drop/daily-mission progress but withholds CP, while a
-                    // stun-trigger kill in an unlisted zone withholds every reward channel outright
-                    // (S07_MyGame03.cpp default case, :3031-3040).
                     ApplyPvpKillRewards(member, defenderState, true);
                 }
         }
 
         if (defenderState.RepeatedStunCount >= TeamStunLockDeathThreshold)
-            // Distinct death entry point from ordinary HP-based death: no XP/loot/additional kill credit is
-            // granted here (that all lives in the ordinary damage-based death path this bypasses entirely).
             ApplyDeath(defenderState.CharacterId, DeathCause.StunLock);
     }
 
@@ -231,11 +166,7 @@ public sealed partial class Zone
                duel.OpponentOf(attackerId) == defenderId;
     }
 
-    /// <summary>
-    ///     Slot-order scan of a character's learned skills for the first id in <paramref name="candidateIds" />;
-    ///     0/default when none match.
-    /// </summary>
-    private static int FindFirstLearnedSkill(PlayerRuntimeState state,
+        private static int FindFirstLearnedSkill(PlayerRuntimeState state,
         ImmutableArray<int> candidateIds, out int grade)
     {
         foreach (var slot in state.LearnedSkills.Keys.Order())
@@ -262,7 +193,6 @@ public sealed partial class Zone
         var action = BuildActionForPose(state, StunActionSort, durationSeconds);
         state.Session.Send(BuildAvatarActionRecv(state, action));
 
-        // Uses _stunNeighborScratch instead of AoiGrid.Neighbors(...).Where(...).ToArray().
         _stunNeighborScratch.Clear();
         _grid.NeighborsExcludingSelf(_stunNeighborScratch, state.CurrentCell, state.CharacterId, state.PosX,
             state.PosY, state.PosZ);
@@ -276,7 +206,6 @@ public sealed partial class Zone
         var action = BuildActionForPose(state, IdleActionSort, 0);
         state.Session.Send(BuildAvatarActionRecv(state, action));
 
-        // Uses _idleNeighborScratch instead of AoiGrid.Neighbors(...).Where(...).ToArray().
         _idleNeighborScratch.Clear();
         _grid.NeighborsExcludingSelf(_idleNeighborScratch, state.CurrentCell, state.CharacterId, state.PosX,
             state.PosY, state.PosZ);

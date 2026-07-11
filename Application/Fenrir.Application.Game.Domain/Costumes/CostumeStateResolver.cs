@@ -2,37 +2,25 @@ using System.Collections.Immutable;
 
 namespace Fenrir.Application.Game.Domain.Costumes;
 
-/// <summary>Pure resolver for CZ_COSTUME_STATE_SEND (op90) Sort 1-5. No I/O, no Zone dependency.</summary>
-/// <remarks>
-///     <see cref="CostumeStateContext.Wardrobe" /> occupancy is simplified to "non-zero" rather than the
-///     legacy's ~300-entry <c>IsValidCostume</c> item-id whitelist (Server/Header/function.h) -- see
-///     <c>PlayerRuntimeState.CostumeWardrobe</c>'s own remarks. Since nothing grants a costume yet, every slot
-///     is always 0 today, so Select/Equip/Remove/ReturnToInventorySuccess never actually fire outside a test
-///     that seeds the wardrobe directly.
-/// </remarks>
 public static class CostumeStateResolver
 {
     public enum ResultKind
     {
-        /// <summary>Legacy silently returns with no reply and no state change.</summary>
-        NoReply,
 
-        /// <summary>A real Quit() condition -- the caller must disconnect.</summary>
-        Disconnect,
+                NoReply,
+
+                Disconnect,
         Select,
         Equip,
         Remove,
 
-        /// <summary>ZC result 1 -- CostumeIndex/Value mismatch or out of range. Self-reply, no disconnect.</summary>
-        ReturnToInventoryMismatch,
+                ReturnToInventoryMismatch,
         ReturnToInventorySuccess
     }
 
-    /// <summary>MAX_AVATAR_COSTUME_NUM.</summary>
-    public const int SlotCount = 10;
+        public const int SlotCount = 10;
 
-    /// <summary>MAX_AVATAR_COSTUME_NUM2 -- the highest CostumeIndex value considered "worn."</summary>
-    public const int WornMax = 19;
+        public const int WornMax = 19;
 
     public static Result Resolve(int sort, int value, in Context ctx)
     {

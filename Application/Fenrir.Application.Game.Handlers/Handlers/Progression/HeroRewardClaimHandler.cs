@@ -7,13 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Progression;
 
-/// <summary>
-///     CZ_HEROREWARD_SEND (opcode 119). Unranked -&gt; no reply at all (the legacy's own search loop just
-///     falls through without ever calling USEND). Already claimed -&gt; Result=3, every other field 0.
-///     Otherwise credits <see cref="HeroRewardResolver.PointsByRank" /> as CP and marks the row claimed;
-///     the real reward is CP -- ZC_HEROREWARD_RECV's item-drop fields are dead code in this build
-///     (S04_MyWork02.cpp:14225-14243 is commented out) and are always sent as 0.
-/// </summary>
 public sealed class HeroRewardClaimHandler(
     IHeroRewardClaimService heroRewardClaimService,
     ILogger<HeroRewardClaimHandler> logger)

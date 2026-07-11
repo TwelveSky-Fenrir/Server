@@ -14,17 +14,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Gm;
 
-// Elevated-tier "moncall" summon-monster GM command (legacy PROCESS_DATA_SEND, opcode 19, tSort 506 --
-// there is no dedicated legacy wire opcode for this command; GenericActionHandler decodes
-// GmSummonMonsterPayload out of GenericActionRequest.Data before calling into this service --
-// Server/ts25zone/S04_MyWork04.cpp:1133-1145). GmSummonMonsterService performs no validation of its own
-// (matching legacy's own SummonMonsterForSpecial call, which is also unchecked) and unconditionally reports
-// success once the tier gate passes; the actual spawn -- or silent no-op for an unknown template id -- is
-// applied by Zone.Monsters.cs's SpawnGmSummonedMonster on the zone's own tick thread via
-// Zone.PostTribeProgressCommandAndWaitAsync. Covers: the Elevated-tier privilege gate, a known-template-id
-// spawn (MonsterCount increments), an unknown-template-id no-op (MonsterCount unchanged, still an accepted
-// ack -- legacy performs no id validation either), and the game.EventLog (Category=GmAction) audit row
-// written on every accepted invocation regardless of whether the spawn actually happened.
 public class GmSummonMonsterServiceTests
 {
     private const int AccountId = 1;
@@ -33,7 +22,7 @@ public class GmSummonMonsterServiceTests
     private const int Sort = 506;
     private const int GenericActionDataLength = 130;
     private const int KnownMonsterId = 900;
-    private const int UnknownMonsterId = 901; // absent from the test catalog.
+    private const int UnknownMonsterId = 901;
 
     private static async Task RunToCompletionAsync(ValueTask pending, Zone zone)
     {
@@ -80,14 +69,7 @@ public class GmSummonMonsterServiceTests
         return data;
     }
 
-    /// <summary>
-    ///     Tolerates the BroadcastMonsterAction creation announcement Zone.SpawnMonster sends to every AOI
-    ///     neighbor -- always including the summoning GM's own client here, since a "moncall" monster spawns
-    ///     exactly at the caller's own position -- landing on this same pipe BEFORE this service's own ack,
-    ///     same "tail of whatever is currently buffered" posture GmCreateItemServiceTests documents for its
-    ///     own ground-item AOI creation broadcast.
-    /// </summary>
-    private static async Task AssertResponseSentAsync(FakeDuplexPipe pipe, GenericActionResponse expected)
+        private static async Task AssertResponseSentAsync(FakeDuplexPipe pipe, GenericActionResponse expected)
     {
         var actual = await PacketAssert.ReadSentBytesAsync(pipe);
         var frame = new byte[FrameWriter.FrameSizeOf<GenericActionResponse>()];
@@ -131,7 +113,7 @@ public class GmSummonMonsterServiceTests
             new GenericActionResponse { Result = 0, Sort = Sort, Data = data, RuneValue = 0 });
 
         var logged = Assert.Single(eventLog.LoggedEvents);
-        Assert.Equal((short)6, logged.EventCode); // GmActionEventCodes.SummonMonster (internal, not visible here).
+        Assert.Equal((short)6, logged.EventCode);
         Assert.Equal(EventLogCategory.GmAction, logged.Category);
         Assert.Equal(AccountId, logged.ActorAccountId);
         Assert.Equal(CharacterId, logged.ActorCharacterId);
@@ -154,12 +136,11 @@ public class GmSummonMonsterServiceTests
 
         Assert.Null(session.DisconnectReason);
         Assert.Equal(0, zone.MonsterCount);
-        // No spawn -> no BroadcastMonsterAction noise -- the ack is the only frame on the wire this time.
         await PacketAssert.AssertSentAsync(pipe,
             new GenericActionResponse { Result = 0, Sort = Sort, Data = data, RuneValue = 0 });
 
         var logged = Assert.Single(eventLog.LoggedEvents);
-        Assert.Equal((byte)1, logged.Outcome); // Unconditional success -- legacy validates nothing either.
+        Assert.Equal((byte)1, logged.Outcome);
         Assert.Equal($"MonsterId={UnknownMonsterId};MapId={MapId}", logged.Payload);
     }
 }

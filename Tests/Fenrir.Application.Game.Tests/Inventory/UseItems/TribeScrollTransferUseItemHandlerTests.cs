@@ -19,12 +19,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Inventory.UseItems;
 
-/// <summary>
-///     Drives <see cref="TribeScrollTransferUseItemHandler" /> (op23 items 8153/8154) directly, over a real
-///     <see cref="Zone" /> so its <c>PostTribeProgressCommandAndWaitAsync</c>/<c>PostInventoryCommandAndWaitAsync</c>
-///     mirrors actually apply. Covers all 13 gates in <see cref="TribeScrollTransferGate" />, the two genuine
-///     disconnects, the atomic conversion call, and the best-effort equip/skill remap.
-/// </summary>
 public class TribeScrollTransferUseItemHandlerTests
 {
     private const int AccountId = 1;
@@ -33,8 +27,6 @@ public class TribeScrollTransferUseItemHandlerTests
     private const byte HomeShardId = 1;
     private const short EligibleLevel = 145;
 
-    // Synthetic equivalence catalog: item group 0 (tribe0=2000, tribe1=2001, tribe2=2002), skill group 0
-    // (tribe0=1000, tribe1=1001, tribe2=1002) -- same shape as TribeConversionResolverTests' own fixture.
     private static TribeConversionResolver BuildResolver()
     {
         var skills = new[]
@@ -145,7 +137,6 @@ public class TribeScrollTransferUseItemHandlerTests
         Assert.Equal(0, response.Result);
         Assert.Null(session.DisconnectReason);
 
-        // Atomic conversion call reached the repository with the projected (scroll-removed) container.
         Assert.NotNull(tribeConversion.LastCall);
         var call = tribeConversion.LastCall!.Value;
         Assert.Equal(CharacterId, call.CharacterId);
@@ -158,17 +149,14 @@ public class TribeScrollTransferUseItemHandlerTests
         Assert.Equal(1, after!.Tribe);
         Assert.Equal(1, after.PreviousTribe);
 
-        // Scroll consumed from live state.
         Assert.Null(after.Inventory.GetSlot(ContainerMatrix.InventoryPage0, 0));
 
-        // Equipment remapped 2000 (tribe0) -> 2001 (tribe1), enchant/combine preserved.
         var equip = after.Inventory.GetSlot(ContainerMatrix.Equipment, 2);
         Assert.NotNull(equip);
         Assert.Equal(2001, equip!.Value.ItemId);
         Assert.Equal(5, equip.Value.Enchant);
         Assert.Equal(3, equip.Value.Combine);
 
-        // Skill remapped 1000 (tribe0) -> 1001 (tribe1).
         Assert.Equal(1001, after.LearnedSkills[0].SkillId);
         Assert.Equal(7, after.LearnedSkills[0].Grade);
     }
@@ -257,7 +245,6 @@ public class TribeScrollTransferUseItemHandlerTests
     [Fact]
     public async Task NotStandingInOwnTribesCapital_FailsCleanly()
     {
-        // Zone 1 is tribe 0's own capital (IsValidTown); zone 6 is tribe 1's -- standing in the WRONG one.
         var (zone, _, state, tribeConversion, _, handler) = SetUp(zoneMapId: 6);
 
         var response = await handler.HandleAsync(Context(zone, state, ContainerMatrix.InventoryPage0, 0, 1),

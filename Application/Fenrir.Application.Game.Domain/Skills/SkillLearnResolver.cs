@@ -3,14 +3,6 @@ using Fenrir.Application.Game.GameData;
 
 namespace Fenrir.Application.Game.Domain.Skills;
 
-/// <summary>
-///     Pure resolver for CZ_PROCESS_DATA_SEND tSort 202/233 (learn a skill from an NPC's offer) and 203 (skill
-///     upgrade). No I/O, no Zone dependency.
-/// </summary>
-/// <remarks>
-///     Every failure branch in the legacy is a Quit(), never a graceful reply -- callers must Abort on any
-///     non-success result.
-/// </remarks>
 public static class SkillLearnResolver
 {
     public enum LearnFailure
@@ -33,14 +25,11 @@ public static class SkillLearnResolver
         AlreadyMaxed
     }
 
-    /// <summary>MAX_SKILL_SLOT_NUM (aSkill[40]).</summary>
-    public const int MaxSlots = 40;
+        public const int MaxSlots = 40;
 
-    /// <summary>NpcSkillOfferRowDto.ArrayKind -- tSort 202, nSkillInfo1.</summary>
-    public const byte SkillTree1 = 1;
+        public const byte SkillTree1 = 1;
 
-    /// <summary>NpcSkillOfferRowDto.ArrayKind -- tSort 233, nSkillInfo2.</summary>
-    public const byte SkillTree2 = 2;
+        public const byte SkillTree2 = 2;
 
     public static LearnResult ResolveLearn(
         ImmutableArray<NpcSkillOfferRowDto> npcSkillOffers,
@@ -97,13 +86,7 @@ public static class SkillLearnResolver
         return new UpgradeResult(true, UpgradeFailure.None, learned.Grade + 1);
     }
 
-    /// <summary>
-    ///     Per-sType slot ranges: 1 -> [0,10), 2 -> [20,30), 3/4 -> try [10,20) then [30,40). Internal (not
-    ///     private) so <see cref="SkillGrimoireLearnResolver" /> can reuse the identical table rather than
-    ///     duplicating it -- both resolvers share the same underlying legacy slot-range logic, just reached
-    ///     from different triggers (NPC skill-tree offer vs. item consumption).
-    /// </summary>
-    internal static bool TryFindFreeSlotForType(byte skillType, IReadOnlyDictionary<byte, LearnedSkill> learnedSkills,
+        internal static bool TryFindFreeSlotForType(byte skillType, IReadOnlyDictionary<byte, LearnedSkill> learnedSkills,
         out byte slot)
     {
         switch (skillType)

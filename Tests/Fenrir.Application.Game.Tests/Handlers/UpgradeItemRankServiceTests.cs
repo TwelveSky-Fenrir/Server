@@ -18,12 +18,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 
-/// <summary>
-///     Drives the real <see cref="UpgradeItemRankService" /> (opcode 27) over a real <see cref="Zone" />; ticks
-///     the zone while the service's own <c>PostInventoryCommandAndWaitAsync</c> await is pending, same pattern as
-///     <c>UpgradeCapeServiceTests</c>. Primarily exercises the game.EventLog write-behind wiring -- roll-math
-///     fidelity is covered deterministically by <c>RankChangeResolverTests</c>.
-/// </summary>
 public class UpgradeItemRankServiceTests
 {
     private const int TargetItemId = 1;
@@ -69,8 +63,7 @@ public class UpgradeItemRankServiceTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
     }
 
-    /// <summary>Level 45 Rare, Sort 9 -- matches RankChangeResolverTests' own upgrade fixtures (RareUpTiers[0]).</summary>
-    private static ItemRowDto TargetRow()
+        private static ItemRowDto TargetRow()
     {
         return WorldDataTestRows.Item(TargetItemId) with
         {
@@ -78,8 +71,7 @@ public class UpgradeItemRankServiceTests
         };
     }
 
-    /// <summary>Level 55 Rare, Sort 9 -- the only catalog entry that can satisfy FindReplacement for TargetRow.</summary>
-    private static ItemRowDto CandidateRow()
+        private static ItemRowDto CandidateRow()
     {
         return WorldDataTestRows.Item(CandidateItemId) with
         {
@@ -105,10 +97,6 @@ public class UpgradeItemRankServiceTests
     [Fact]
     public async Task ValidPreconditions_AlwaysDeductsMoneyAndLogsAttempt_RegardlessOfRandomOutcome()
     {
-        // UpgradeItemRankService rolls via SystemRandomSource.Instance (no DI seam) -- success/failure branch
-        // fidelity is covered deterministically by RankChangeResolverTests. This asserts only what's true on
-        // BOTH outcomes: money is always deducted, material is always consumed, and exactly one EventLog row
-        // is queued either way.
         var (session, _, zone, state, repo, eventLog) = SetUp();
         SeedInventory(zone, new ItemStack(TargetItemId, 1, 6, 2, 0, 0, 0, 0, 0, 0, 777),
             new ItemStack(MaterialItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
@@ -142,7 +130,6 @@ public class UpgradeItemRankServiceTests
 
         var itemsById = new Dictionary<int, ItemDefinition>
         {
-            // Type left at the default (not Rare/Elite) -- fails RankChangeResolver's own type gate.
             [TargetItemId] = new(WorldDataTestRows.Item(TargetItemId) with { Sort = 9, CheckHighItem = 2 }, []),
             [MaterialItemId] = new(WorldDataTestRows.Item(MaterialItemId), [])
         }.ToFrozenDictionary();
@@ -196,16 +183,8 @@ public class UpgradeItemRankServiceTests
     [Fact]
     public async Task WarlordRerollEligible_EliteSwap_LogsWarlordSwapNotice()
     {
-        // Contract side effect B.4 (see UpgradeItemRankService's own remarks at the warlord-swap call site): an
-        // accepted top-tier (encoded level 157) Elite Warlord swap must fire CenterRelayNoticeLog.LogWarlordSwap.
-        // UpgradeItemRankService rolls via SystemRandomSource.Instance with no DI seam (same posture as
-        // ValidPreconditions_AlwaysDeductsMoneyAndLogsAttempt_RegardlessOfRandomOutcome above) -- an extreme
-        // Luck stat forces RankChangeResolver's own success roll unconditionally (probability += luck/300 >=
-        // 1000), isolating the only remaining random gate to RankChangeResolver's internal 75% "warlordEligible"
-        // die. This retries across independent attempts (guarded) rather than asserting a single deterministic
-        // call; each attempt uses a fresh WarlordPityLockState so the pity lock never carries across attempts.
         const byte eliteItemType = RankChangeResolver.EliteItemType;
-        const byte amuletSort = 7; // WarlordRerollBonusTable's private IAmulet -- mapped in both bonus tables.
+        const byte amuletSort = 7;
 
         var itemsById = new Dictionary<int, ItemDefinition>
         {
@@ -229,7 +208,6 @@ public class UpgradeItemRankServiceTests
             var (_, _, zone, state, repo, eventLog) = SetUp();
             SeedInventory(zone, new ItemStack(TargetItemId, 1, 6, 2, 0, 0, 0, 0, 0, 0, 777),
                 new ItemStack(MaterialItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
-            // Forces the success roll unconditionally regardless of the raw (2/1000 or 4/1000) base probability.
             state.Stats = new EffectiveStats(0, 0, 0, 0, 0, 0, 0, 0, 300_000, 0, 0);
 
             var logger = new CapturingLogger<UpgradeItemRankService>();
@@ -246,13 +224,11 @@ public class UpgradeItemRankServiceTests
 
             var noticeEntries = logger.Entries.Where(e => e.Message.Contains("Warlord-swap notice")).ToList();
             if (noticeEntries.Count == 0)
-                continue; // The 25%-chance warlordEligible die missed this attempt -- retry.
+                continue;
 
             Assert.Equal(LogLevel.Information, noticeEntries[0].Level);
             Assert.Contains("tribe 1", noticeEntries[0].Message);
             Assert.Contains("Hero", noticeEntries[0].Message);
-            // Ties the logged id back to the actual applied replacement item rather than hardcoding
-            // whichever of the Top/Base draw this attempt happened to land on.
             Assert.Contains(result.Value[0].ToString(), noticeEntries[0].Message);
             return;
         }

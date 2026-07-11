@@ -4,7 +4,6 @@ using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Zone;
 
-/// <summary>CZ_UP_LEVEL_ITEM_SEND (CLIENT.h:271, 16-byte payload) — same typedef as <see cref="SkyUpgradeItemRequest" />.</summary>
 public class CzUpLevelItemSendTests
 {
     [Fact]

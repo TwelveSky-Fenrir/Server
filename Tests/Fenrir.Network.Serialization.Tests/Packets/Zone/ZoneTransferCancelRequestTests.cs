@@ -8,7 +8,6 @@ public class CzFailMoveZone2SendTests
     [Fact]
     public void PayloadSize_MatchesContractConstant()
     {
-        // ExpectedSize=9 (inbound header only) -> 0-byte payload: empty struct (CLIENT.h:155-161).
         Assert.Equal(0, ZoneTransferCancelRequest.PayloadSize);
         Assert.Equal(Opcodes.Zone.Incoming.ZoneTransferCancel, ZoneTransferCancelRequest.Opcode);
     }

@@ -2,8 +2,6 @@ using Fenrir.Application.Game.Domain.Stats;
 
 namespace Fenrir.Application.Game.Tests.Stats;
 
-// tSort 206, ProcessForStatPlus (S04_MyWork05.cpp:705-791) -- three affordability regimes over category codes
-// 1-12, mapped Strength/Dexterity/Vitality/Intelligence in that order for every regime.
 public class StatAllocationResolverTests
 {
     [Theory]
@@ -34,8 +32,7 @@ public class StatAllocationResolverTests
         Assert.Equal(StatAllocationResolver.Outcome.Disconnect, result.Outcome);
     }
 
-    /// <summary>tAddValue is present on the wire for categories 1-4 but must have zero effect on the outcome.</summary>
-    [Fact]
+        [Fact]
     public void SmallFixedCategory_AddValueIgnored()
     {
         var withZero = StatAllocationResolver.Resolve(1, 0, 10);
@@ -75,8 +72,6 @@ public class StatAllocationResolverTests
     [Fact]
     public void LargeFixedCategory_NoPartialGrant_WhenUnaffordable()
     {
-        // The server never grants "as many as the character can afford" -- confirms the whole request rejects,
-        // not a reduced-amount success.
         var result = StatAllocationResolver.Resolve(8, 0, 4);
 
         Assert.False(result.Succeeded);

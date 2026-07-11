@@ -139,12 +139,27 @@ public static class HostingServiceCollectionExtensions
             sp.GetRequiredService<SocialCrossShardRelayHost>());
         services.AddHostedService(sp => sp.GetRequiredService<SocialCrossShardRelayHost>());
 
-        // D1 party-resync fan-out, one-instance-three-registrations like SocialCrossShardRelayHost. A future
-        // *.Services party authority registers its own IPartyResyncRelayHandler; until then a delivered row is
-        // logged+dropped (same-shard party membership unaffected).
+        // D1 party-resync fan-out, one-instance-three-registrations like SocialCrossShardRelayHost. The
+        // *.Services party authority (PartyResyncRelayHandler, Fenrir.Application.Game.Services'
+        // AddSocialServices) registers itself as IPartyResyncRelayHandler; a row is only ever logged+dropped
+        // here if that registration is absent from a given composition (e.g. a narrower test host) --
+        // same-shard party membership is unaffected either way.
         services.AddSingleton<PartyResyncRelayHost>();
         services.AddSingleton<IPartyResyncRelayQueue>(sp => sp.GetRequiredService<PartyResyncRelayHost>());
         services.AddHostedService(sp => sp.GetRequiredService<PartyResyncRelayHost>());
+
+        // Same factory-opacity reasoning as the other Lazy<T> registrations in this file (e.g.
+        // Lazy<ZoneEventBroadcaster> below): PartyResyncRelayHandler needs IPartyResyncRelayQueue back (to
+        // republish a confirmed reconciliation result), but that interface's own factory just above resolves
+        // PartyResyncRelayHost, whose constructor resolves IEnumerable<IPartyResyncRelayHandler> -- a direct
+        // constructor dependency on IPartyResyncRelayQueue from the handler deadlocks the container's singleton
+        // realization lock (PartyResyncRelayHost's own construction, still in flight, re-entered via the
+        // handler it is itself constructing) instead of throwing a clean circular-dependency error, since a
+        // factory lambda's own GetRequiredService call is opaque to the static cycle detector. The factory
+        // closure only captures the container; it does not resolve IPartyResyncRelayQueue until something
+        // actually calls .Value, by which point PartyResyncRelayHost is already constructed and cached.
+        services.AddSingleton(sp =>
+            new Lazy<IPartyResyncRelayQueue>(sp.GetRequiredService<IPartyResyncRelayQueue>));
 
         // WS-C3 cross-shard whisper (op39 / SECRET_CHAT) relay -- point-to-point sibling of
         // SocialCrossShardRelayHost above, same "one instance, three registrations" pattern. WhisperService

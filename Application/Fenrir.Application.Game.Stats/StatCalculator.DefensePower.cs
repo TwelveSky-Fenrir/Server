@@ -35,6 +35,12 @@ public static partial class StatCalculator
         {
             def -= petAmulet.Item.DefensePower; // Phoenix replaces the item's own DefensePower stat
             def += PhoenixFlatBonus(petAmulet.Item.ItemId, 5000, 7500, 12500);
+
+            // WORKSTREAM B8: flat amulet defense table (8290, 76000-76004) -- excludes 76005-76007, which
+            // already double-count via the two PhoenixFlatBonus passes below (see PetAmuletDefenseBonus
+            // remarks / PetAmuletPhoenixOverlapIds).
+            if (!PetAmuletPhoenixOverlapIds.Contains(petAmulet.Item.ItemId))
+                def += PetAmuletDefenseBonus(petAmulet.Item.ItemId, petAmulet.Item.Sort);
         }
 
         def += SetBonusTables.GetBaseFlatDefensePowerBonus(setNumber); // NXT +1000/2000/3000

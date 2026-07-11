@@ -37,7 +37,7 @@ builder.AddProject<Fenrir_LoginServer>("login-server")
     .WithEnvironment("Login__Port", loginPort.ToString());
 
 const int gameBasePort = 1100;
-byte[] shardIds = [1, 2];
+byte[] shardIds = [1];
 
 foreach (var shardId in shardIds)
 {

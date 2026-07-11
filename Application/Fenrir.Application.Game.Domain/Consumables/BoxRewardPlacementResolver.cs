@@ -147,14 +147,24 @@ public static class BoxRewardPlacementResolver
 
     private static ItemStack BuildStack(ResolvedReward reward)
     {
+        // A stackable reward is always stripped of any caller-supplied serial (S04_MyWork05.cpp:5271-5321's
+        // own stackable-safety step -- the same step that strips value/socket/expiry) -- only a non-stackable
+        // reward can carry one through, e.g. the Lucky Ticket family's fixed per-ticket constant tag
+        // (Server/ts25zone/S04_MyWork03.cpp:3478). Every pre-C9-tickets caller passes Serial 0 either way, so
+        // this changes nothing for them.
+        var serial = reward.IsStackable ? 0 : reward.Serial;
         return new ItemStack(reward.ItemId, reward.Quantity, reward.Enchant, reward.Combine, reward.Refine,
-            reward.Socket, 0, 0, 0, reward.ExpireDate, 0);
+            reward.Socket, 0, 0, 0, reward.ExpireDate, serial);
     }
 
     /// <summary>Output of <see cref="ResolveQuantity" />: the clamped slot quantity and whether the reward stacks.</summary>
     public readonly record struct QuantityResult(int Quantity, bool IsStackable);
 
-    /// <summary>Already-resolved shape of the reward the caller rolled -- see this type's own remarks.</summary>
+    /// <summary>
+    ///     Already-resolved shape of the reward the caller rolled -- see this type's own remarks.
+    ///     <paramref name="Serial" /> defaults to 0 (every pre-C9-tickets caller's prior behavior); a
+    ///     non-default value is only ever honored for a non-stackable reward -- see <see cref="BuildStack" />.
+    /// </summary>
     public readonly record struct ResolvedReward(
         int ItemId,
         int Quantity,
@@ -163,7 +173,8 @@ public static class BoxRewardPlacementResolver
         byte Combine,
         byte Refine,
         byte Socket,
-        int ExpireDate);
+        int ExpireDate,
+        int Serial = 0);
 
     /// <summary>NewStack is null only for <see cref="Outcome.InventoryFull" />.</summary>
     public readonly record struct Result(Outcome Outcome, byte Container, byte Slot, ItemStack? NewStack)

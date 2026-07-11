@@ -123,5 +123,16 @@ public enum DisconnectReason
     ///     disconnect).
     /// </summary>
     /// <remarks>Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:2503-2514 (costume), :2542-2553 (stellar core).</remarks>
-    WardrobeFull
+    WardrobeFull,
+
+    /// <summary>
+    ///     Torn down by the Zone175 "Labyrinth" 5-wave PvE mission's own terminal-state kick: every session still
+    ///     on the map is force-disconnected once the mission concludes (wave 5 cleared, or an empty-zone abort)
+    ///     and its post-conclusion hold elapses -- see
+    ///     <c>Fenrir.Application.Game.Domain.World.Zone.ForceDisconnectAllForZone175</c> for the one caller.
+    ///     Distinct from <see cref="TimedZoneExpired" />, which is the unrelated Hoisundo rebirth-event zones'
+    ///     own per-player forced-departure countdown, not this mission's all-sessions terminal kick.
+    /// </summary>
+    /// <remarks>Réf. C++ : Server/ts25zone/S07_MyGame01.cpp:8609-9311.</remarks>
+    LabyrinthMissionEnded
 }

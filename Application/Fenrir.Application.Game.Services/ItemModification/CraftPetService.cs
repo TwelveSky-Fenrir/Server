@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Crafting;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.GameData;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Microsoft.Extensions.Logging;
 
@@ -11,11 +12,17 @@ namespace Fenrir.Application.Game.Services.ItemModification;
 
 /// <summary>
 ///     Business logic for op88, CZ_MAKE_PET_SEND -- extracted from <see cref="CraftPetHandler" />, see that
-///     handler's remarks.
+///     handler's remarks. On a qualifying recipe success, also stands in for legacy's shared <c>MakeNotice</c>
+///     helper (Server/ts25zone/S04_MyWork02.cpp:309-493, this feature's own call site at :12276) via
+///     <see cref="CenterRelayNoticeLog.LogNotableCraft" /> -- see that type's own remarks for why this is a log
+///     line, not a client-facing broadcast, and for the 2026-07-11 confirmation that no such broadcast is
+///     recoverable (the Center-side relay case for this notice family is a permanently-empty stub with no
+///     default fallback).
 /// </summary>
 public sealed class CraftPetService(
     ICharacterRepository characters,
     IEventLogRepository eventLog,
+    WorldDataCache worldData,
     ILogger<CraftPetService> logger)
     : ICraftPetService
 {
@@ -80,8 +87,8 @@ public sealed class CraftPetService(
                 .SetItem((byte)packet.Index4, cat with { Quantity = remainingCatalystQuantity })
             : working[(byte)packet.Page4].Remove((byte)packet.Index4);
 
-        return await PersistAndBuildResultAsync(zone, characterId, accountId, FourSlotRecipeEventCode, working,
-            resolved, newPet, 10000, cancellationToken);
+        return await PersistAndBuildResultAsync(zone, state, characterId, accountId, FourSlotRecipeEventCode,
+            working, resolved, newPet, 10000, RecipeLabel(packet.Sort), cancellationToken);
     }
 
     /// <summary>Recipes 4-6: exactly 2 materials (page1/page2), page2 always fully consumed (never decremented).</summary>
@@ -120,13 +127,21 @@ public sealed class CraftPetService(
         working[(byte)packet.Page1] = working[(byte)packet.Page1].SetItem((byte)packet.Index1, newPet);
         working[(byte)packet.Page2] = working[(byte)packet.Page2].Remove((byte)packet.Index2);
 
-        return await PersistAndBuildResultAsync(zone, characterId, accountId, TwoSlotRecipeEventCode, working,
-            resolved, newPet, 0, cancellationToken);
+        return await PersistAndBuildResultAsync(zone, state, characterId, accountId, TwoSlotRecipeEventCode, working,
+            resolved, newPet, 0, RecipeLabel(packet.Sort), cancellationToken);
     }
 
-    private async ValueTask<CraftPetResult> PersistAndBuildResultAsync(Zone zone, int characterId, int accountId,
-        short eventCode, Dictionary<byte, ImmutableDictionary<byte, ItemStack>> working,
-        PetCraftResolver.Result resolved, ItemStack newPet, int wireResult, CancellationToken cancellationToken)
+    /// <summary>Human-readable recipe tag for <see cref="CenterRelayNoticeLog.LogNotableCraft" />'s log line only -- no legacy equivalent, purely for log correlation.</summary>
+    private static string RecipeLabel(int sort)
+    {
+        return $"pet-recipe-{sort + 1}";
+    }
+
+    private async ValueTask<CraftPetResult> PersistAndBuildResultAsync(Zone zone, PlayerRuntimeState state,
+        int characterId, int accountId, short eventCode,
+        Dictionary<byte, ImmutableDictionary<byte, ItemStack>> working,
+        PetCraftResolver.Result resolved, ItemStack newPet, int wireResult, string recipeLabel,
+        CancellationToken cancellationToken)
     {
         var pages = working.Keys.ToArray();
         if (pages.Length == 1)
@@ -152,6 +167,9 @@ public sealed class CraftPetService(
             logger.LogError(
                 "Zone {MapId} inventory inbox full: dropped craft-pet mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
+
+        CenterRelayNoticeLog.LogNotableCraft(logger, worldData, state.Tribe, state.Name, resolved.ResultItemId,
+            recipeLabel);
 
         return new CraftPetResult(CraftPetOutcome.Applied, wireResult, resolved.ResultItemId,
             resolved.ResultQuantity, newPet.Serial);

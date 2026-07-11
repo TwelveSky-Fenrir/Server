@@ -23,7 +23,7 @@ public class ZoneCenterRegularWarEventSinkTests
     private static (ZoneCenterRegularWarEventSink Sink, ZoneCenterSiegeState State) CreateSink()
     {
         var registry = ZoneTestKit.CreateRegistry();
-        registry.Initialize(1);
+        registry.Initialize([1]);
         var state = new ZoneCenterSiegeState();
         var ingestor = new ZoneCenterBroadcastIngestor(state, registry,
             NullLogger<ZoneCenterBroadcastIngestor>.Instance);
@@ -118,7 +118,7 @@ public class ZoneCenterRegularWarEventSinkTests
     public void Events_EnqueueForOtherShards_WithTheZone049SubCodeAndSlot()
     {
         var registry = ZoneTestKit.CreateRegistry();
-        registry.Initialize(1);
+        registry.Initialize([1]);
         var state = new ZoneCenterSiegeState();
         var relayQueue = new FakeRvrSiegeEventRelayQueue();
         var ingestor = new ZoneCenterBroadcastIngestor(state, registry,

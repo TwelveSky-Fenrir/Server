@@ -66,10 +66,10 @@ public static class DomainServiceCollectionExtensions
         // FIX_HSB_POS_BUG's anti-camping forced-return check -- registered first (ahead of every other
         // per-avatar system, including BuffExpirySystem below) for the same tick-order-fidelity reason
         // DeathGateTickSystem is registered last: the legacy check runs before any other per-avatar tick work
-        // in the same pass (S07_MyGame01.cpp:2031-2038's outer loop). AntiCampingGuardPointCatalog.Empty
-        // makes every map a documented no-op until the real per-map coordinate table is supplied -- see that
-        // class's own GAP remarks.
-        services.AddSingleton(AntiCampingGuardPointCatalog.Empty);
+        // in the same pass (S07_MyGame01.cpp:2031-2038's outer loop). AntiCampingGuardPointCatalog.Default
+        // carries the recovered per-map Holy Stone Symbol/Tower coordinate table -- see that class's own
+        // remarks.
+        services.AddSingleton(AntiCampingGuardPointCatalog.Default);
         services.AddSingleton<ISimulationSystem, AntiCampingForcedReturnSystem>();
 
         services.AddSingleton<ISimulationSystem, BuffExpirySystem>();
@@ -299,8 +299,11 @@ public static class DomainServiceCollectionExtensions
         // precondition chain and a best-effort equip/skill remap. Supersedes the old permit-banking stub
         // previously inlined in UseInventoryItemService.ResolveTribeTransferScrollAsync (removed).
         services.AddSingleton<TribeScrollTransferUseItemHandler>();
-        // C9-tickets-tower: CP Ticket / Elite Dungeon Ticket / Dungeon Key / Ivy Hall Ticket / Lucky Ticket
-        // (stub) / Scroll of Seekers (stub) families.
+        // C9-tickets-tower: CP Ticket / Elite Dungeon Ticket / Dungeon Key / Ivy Hall Ticket / Lucky Ticket /
+        // Scroll of Seekers families. Lucky Ticket's draw thresholds/tier cascade/family serial are now
+        // resolved by the recovered lucky-ticket-handler-thresholds contract, and Scroll of Seekers' 180-vs-900
+        // per-id split is resolved by the recovered scroll-of-seekers-per-id-split contract -- neither is a
+        // stub anymore.
         services.AddSingleton<CpTicketUseItemHandler>();
         services.AddSingleton<EliteDungeonTicketUseItemHandler>();
         services.AddSingleton<DungeonKeyUseItemHandler>();

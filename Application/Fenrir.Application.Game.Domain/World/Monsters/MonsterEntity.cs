@@ -508,6 +508,22 @@ public sealed class MonsterEntity
     }
 
     /// <summary>
+    ///     True if at least one attacker is currently tracked. A cheap <c>Count</c> check under the same lock
+    ///     <see cref="SnapshotAttackDamage" /> takes, deliberately avoiding that method's own full-array-copy
+    ///     allocation merely to test for emptiness -- behavior contract <c>A3-aggro-pruning</c>'s own Trigger
+    ///     gate (<see cref="MonsterAiSystem" />'s standard-recipe decision tick only re-attempts its proximity
+    ///     scan when this is false, matching legacy's own "scan only when the table starts this tick empty"
+    ///     rule) is evaluated on every idle Standard-recipe monster's decision tick, so this must not allocate.
+    /// </summary>
+    internal bool HasTrackedAttackers()
+    {
+        lock (_attackDamageLock)
+        {
+            return _attackDamage.Count > 0;
+        }
+    }
+
+    /// <summary>
     ///     Write-back half of <see cref="MonsterAggroListPruner.Prune" /> (behavior contract A3-aggro-pruning,
     ///     legacy AdjustValidAttackTarget, Server/ts25zone/S07_MyGame05.cpp:336-447): replaces the live
     ///     attacker table with the pruned/compacted survivor set, in the order supplied. Prune itself is a pure

@@ -19,10 +19,19 @@ public static partial class StatCalculator
     //   * The grow STEP (ReturnGrowStep) tier-crossing test: Domain PetGrowthTierCalculator.
     //   * The eight tier maxima: Domain PetGrowthCaps.
     //   * The amulet LIFE/MANA flat tables (sort 28, ReturnAmuletLifeValue/ReturnAmuletManaValue):
-    //     Domain PetSlotAmuletBonusTable -- built there but deliberately UNWIRED pending the "Custom
-    //     Phoenix Amulet" double-count contradiction (see that class's remarks). This file adds the
-    //     ATTACK/DEFENSE siblings of those tables, which inherit the SAME wiring blocker (see
-    //     PetAmuletAttackBonus/PetAmuletDefenseBonus remarks) -- so they are built, not yet wired.
+    //     Domain PetSlotAmuletBonusTable -- the general 59-id table stays UNWIRED (only 9 of 59 ids have a
+    //     confirmed magnitude; see that class's remarks). The narrower question of whether the Phoenix
+    //     triple's base-table value stacks with the separate "Custom Phoenix Amulet" correction IS resolved
+    //     (workstream pet-amulet-bonus-table-mapping, 2026-07-11): both apply unconditionally, and
+    //     ComputeMaxLife/ComputeMaxMana now apply the matching two-pass PhoenixFlatBonus (5000/7500/12500
+    //     then 2000/4500/9500) -- see StatCalculator.Life.cs. This file adds the ATTACK/DEFENSE siblings of
+    //     those tables. Confirmation pass (2026-07-11): the 6 non-overlapping rows (8290, 76000-76004) ARE
+    //     wired into ComputeAttackPower/ComputeDefensePower below; the 3 Phoenix-overlapping rows
+    //     (76005-76007, see PetAmuletAttackBonus/PetAmuletDefenseBonus remarks and PetAmuletPhoenixOverlapIds)
+    //     remain deliberately excluded at the call site -- that is a DIFFERENT, still-open contradiction
+    //     (whether ReturnAmuletAttackValue/ReturnAmuletDefenseValue's own table entry is a third stacking term
+    //     or a restatement of an existing one) that the pet-amulet-bonus-table-mapping contract does NOT
+    //     address (it covers only the Life/Mana base-vs-correction question above).
     //
     // MISSING RUNTIME INPUT (blocks wiring the graded IS/IU/IM/growth-value contributions):
     //   Fenrir models the pet equip slot's sub-field 2 only as PlayerRuntimeState.PetGrowth, an int GROWTH
@@ -118,6 +127,25 @@ public static partial class StatCalculator
         [76006] = 7500,
         [76007] = 12500
     }.ToFrozenDictionary();
+
+    /// <summary>
+    ///     Ids whose <see cref="PetAmuletAttackTable" />/<see cref="PetAmuletDefenseTable" /> entry restates a
+    ///     magnitude already summed elsewhere via <see cref="PhoenixFlatBonus" /> in ComputeAttackPower/
+    ///     ComputeDefensePower (identical figures: attack 3000/4000/5000, defense 5000/7500/12500 -- the
+    ///     defense side is applied twice more on top, 2000/4500/9500). Excluded from the ComputeAttackPower/
+    ///     ComputeDefensePower getter wiring ONLY -- <see cref="PetAmuletAttackBonus" />/
+    ///     <see cref="PetAmuletDefenseBonus" /> themselves still return the table's transcribed value for these
+    ///     ids so the confirmed-magnitude tests keep exercising the raw table. Resolving which total is legacy-
+    ///     correct requires re-reading <c>ReturnAmuletAttackValue</c>/<c>ReturnAmuletDefenseValue</c>
+    ///     (GameSystem_07_Pet.cpp:856-910) against both Phoenix passes in MyFactor.cpp end-to-end -- this is the
+    ///     Attack/Defense-side analogue of the Life/Mana base-vs-correction question, which the
+    ///     pet-amulet-bonus-table-mapping workstream (2026-07-11) already resolved for Life/Mana (base and
+    ///     correction stack, see <c>Domain PetSlotAmuletBonusTable</c>'s remarks and <c>StatCalculator.Life.cs</c>)
+    ///     -- but that pass did not re-read the Attack/Defense functions, so do not assume the same "stack, don't
+    ///     replace" answer here by analogy. Do not remove this exclusion (i.e. do not fold these 3 ids into the
+    ///     getters) until that separate research pass lands.
+    /// </summary>
+    private static readonly FrozenSet<int> PetAmuletPhoenixOverlapIds = new[] { 76005, 76006, 76007 }.ToFrozenSet();
 
     // ---- packed-value signed-byte decoders (Server/Header/function.h:317-343) ----
     // The sub-field-2 int reinterpreted as four independent SIGNED bytes: byte 0 = IS, byte 1 = IU,
@@ -238,10 +266,14 @@ public static partial class StatCalculator
     }
 
     /// <summary>
-    ///     Amulet flat attack bonus (event-gated at the call site, MyFactor.cpp:4069-4071). WIRING BLOCKED:
-    ///     the 76005/76006/76007 rows overlap the existing "Custom Phoenix Amulet" attack terms
-    ///     (<see cref="PhoenixFlatBonus" /> in ComputeAttackPower), so wiring this alongside them would
-    ///     double-count -- resolve the same contradiction Domain PetSlotAmuletBonusTable flags first.
+    ///     Amulet flat attack bonus (event-gated at the call site, MyFactor.cpp:4069-4071). Wired into
+    ///     ComputeAttackPower for the 6 non-overlapping ids (8290, 76000-76004). The 76005/76006/76007 rows
+    ///     overlap the existing "Custom Phoenix Amulet" attack terms (<see cref="PhoenixFlatBonus" /> in
+    ///     ComputeAttackPower) -- calling this method still returns their table value (exact-magnitude tests
+    ///     rely on that), but the call site excludes them via <see cref="PetAmuletPhoenixOverlapIds" /> to avoid
+    ///     double-counting; a DIFFERENT, still-open question than the now-resolved Life/Mana base-vs-correction
+    ///     contradiction (see <c>Domain PetSlotAmuletBonusTable</c>'s remarks) -- resolving this Attack-side one
+    ///     requires its own pass over <c>ReturnAmuletAttackValue</c> (GameSystem_07_Pet.cpp:856-910) end-to-end.
     /// </summary>
     public static int PetAmuletAttackBonus(int petItemId, int petSort)
     {
@@ -249,10 +281,16 @@ public static partial class StatCalculator
     }
 
     /// <summary>
-    ///     Amulet flat defense bonus (event-gated at the call site, MyFactor.cpp:4140-4144). WIRING BLOCKED:
-    ///     the 76005/76006/76007 rows (5000/7500/12500) exactly equal the existing
-    ///     <see cref="PhoenixFlatBonus" /> defense term (5000/7500/12500) in ComputeDefensePower, so this is
-    ///     very likely the SAME contribution differently attributed -- do not wire until that is resolved.
+    ///     Amulet flat defense bonus (event-gated at the call site, MyFactor.cpp:4140-4144). Wired into
+    ///     ComputeDefensePower for the 6 non-overlapping ids (8290, 76000-76004). The 76005/76006/76007 rows
+    ///     (5000/7500/12500) exactly equal the existing <see cref="PhoenixFlatBonus" /> defense term
+    ///     (5000/7500/12500) in ComputeDefensePower, so this is very likely the SAME contribution differently
+    ///     attributed -- calling this method still returns their table value (exact-magnitude tests rely on
+    ///     that), but the call site excludes them via <see cref="PetAmuletPhoenixOverlapIds" /> until resolved.
+    ///     Note this is the Defense-side analogue of the Life/Mana question the pet-amulet-bonus-table-mapping
+    ///     workstream resolved (base and correction stack, see <c>StatCalculator.Life.cs</c>) -- but
+    ///     <c>ReturnAmuletDefenseValue</c> itself was not re-read by that pass, so treat the Defense/Attack
+    ///     overlap exclusion here as still open, not settled by analogy alone.
     /// </summary>
     public static int PetAmuletDefenseBonus(int petItemId, int petSort)
     {

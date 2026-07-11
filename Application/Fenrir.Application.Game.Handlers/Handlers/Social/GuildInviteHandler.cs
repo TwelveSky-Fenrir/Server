@@ -14,17 +14,14 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 ///     <see cref="GuildRoleCodec.IsMasterOrSubMaster" />).
 /// </summary>
 /// <remarks>
-///     <see cref="Fenrir.Application.Game.Services.Social.GuildInviteService.Ask" /> enforces the legacy
+///     <see cref="Fenrir.Application.Game.Services.Social.GuildInviteService.AskAsync" /> enforces the legacy
 ///     CheckCommunityWork()/stunned-dead exclusivity gate (asker checked before target resolution, target
 ///     checked again once found) via the sibling Duel/Trade/Friend/Party/Mentor/Guild negotiation registries
-///     and <see cref="PlayerRuntimeState.IsStunned" />/<see cref="PlayerRuntimeState.IsDead" />.
-///     OPEN ISSUE (still not modeled here): the target's own "currently mid zone-transfer" gate (legacy
-///     <c>IsMovingZone()</c>). Since the zone-transfer-in-progress-gate behavior contract (2026-07 round),
-///     <see cref="PlayerRuntimeState.IsMovingZone" /> now exists and is observably true for a target mid a
-///     CROSS-shard transfer, but this specific guild-invite consuming site is one of the ~28 social sites
-///     (<c>S04_MyWork02.cpp:8292-9950</c>) that contract explicitly left un-re-verified line-by-line --
-///     wiring a guess at the exact failure-vs-silent-drop semantics/reply code here would risk a wrong wire
-///     contract, so this remains open and tracked, not guessed at.
+///     and <see cref="PlayerRuntimeState.IsStunned" />/<see cref="PlayerRuntimeState.IsDead" />, plus the
+///     target's own "currently mid zone-transfer" gate (legacy <c>IsMovingZone()</c>,
+///     <see cref="PlayerRuntimeState.IsMovingZone" />) -- re-verified 2026-07-11 and wired into the same
+///     target-busy check, falling through to the existing <see cref="GuildInviteAskResultKind.TargetBusy" />
+///     branch below (reply code 5) with no new wire contract needed.
 /// </remarks>
 public sealed class GuildInviteHandler(
     IGuildInviteService guildInviteService,

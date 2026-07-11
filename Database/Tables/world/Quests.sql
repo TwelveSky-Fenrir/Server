@@ -42,5 +42,10 @@ CREATE TABLE world.Quests
     CONSTRAINT FK_Quests_NextQuest FOREIGN KEY (NextIndex) REFERENCES world.Quests (QuestId),
     CONSTRAINT CK_Quests_Category CHECK (Category BETWEEN 1 AND 4),
     CONSTRAINT CK_Quests_Type CHECK (Type BETWEEN 1 AND 2),
-    CONSTRAINT CK_Quests_Sort CHECK (Sort BETWEEN 1 AND 8)
+    CONSTRAINT CK_Quests_Sort CHECK (Sort BETWEEN 1 AND 8),
+    -- Legacy never lets an out-of-range Step reach the shared-memory quest table at all
+    -- (Quest_CheckValidElement, Server/Header/S15_MyShare.cpp:2003-2007) -- rejects the whole 1000-slot
+    -- Load_Quest call on the first offending record, fatal to ts25sharemem's boot sequence. Step ranges
+    -- 1-207 across all 688 seeded quests (Migrations/Seed/world/050_quests.sql), comfortably inside this bound.
+    CONSTRAINT CK_Quests_Step CHECK (Step BETWEEN 1 AND 1000)
 );

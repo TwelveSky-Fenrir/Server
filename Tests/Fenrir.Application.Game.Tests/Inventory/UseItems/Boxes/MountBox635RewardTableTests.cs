@@ -28,7 +28,7 @@ public class MountBox635RewardTableTests
     [Fact]
     public void RewardItemIds_ExcludesPuma3_1331()
     {
-        Assert.False(MountBox635RewardTable.RewardItemIds.Contains(1331));
+        Assert.DoesNotContain(1331, MountBox635RewardTable.RewardItemIds);
     }
 
     [Fact]
@@ -108,7 +108,7 @@ public class MountBox635RewardTableTests
         // reached, and its own case in the bulk-eligibility switch is source-commented out in legacy -- reproduced
         // here by this box id being absent from the whitelist, so LootBoxUseItemHandler always takes the
         // single-open path for 635 regardless of the client's requested open count.
-        Assert.False(LootBoxCatalog.BulkOpenWhitelist.Contains(MountBox635RewardTable.BoxItemId));
+        Assert.DoesNotContain(MountBox635RewardTable.BoxItemId, LootBoxCatalog.BulkOpenWhitelist);
     }
 
     private static ItemStack Box(int id, int quantity)

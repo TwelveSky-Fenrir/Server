@@ -30,18 +30,26 @@ namespace Fenrir.Application.Game.Domain.Progression;
 ///     definition at :5135-5158 are both dead in the shipped ReleaseEU33 build).
 ///     Server/Header/Protocol/DEFINE.h:452-483 (<c>LV_M2</c>=114 .. <c>LV_M33</c>=145).
 ///     Server/ts25zone/S04_MyWork02.cpp:11233-11326 (the tribe-work sort-8 deferred-claim item drops + the M33
-///     previous-tribe-specific item stamped with enchant value 20).
-///     Only levels 45/105/145's item ids are directly cited by this system's C19 behavior contract; 65/85's ids
-///     (99701/99702) are inherited verbatim from the already-shipped Fenrir implementation
-///     (<c>TribeActionService.ClaimLevelBonusAsync</c>) and are NOT re-invented here. The M-tier levels
-///     114/120/126/132/138/144 (<see cref="DeferredMilestoneLevels" />) are deliberately NOT armable: their claim
-///     item ids are unrecoverable from the contract ("Several M-tier cases additionally grant one of item 1458",
-///     no per-level table), and arming a level whose claim can't be honored would strand the player.
+///     previous-tribe-specific item stamped with enchant value 20; the six M-tier cases -- LV_M2/M8/M14/M20/M26/M32,
+///     i.e. levels 114/120/126/132/138/144 -- at :11265-11291, recovered by a later verification pass, see below).
+///     Only levels 45/105/145's item ids are directly cited by this system's original C19 behavior contract; 65/85's
+///     ids (99701/99702) are inherited verbatim from the already-shipped Fenrir implementation
+///     (<c>TribeActionService.ClaimLevelBonusAsync</c>) and are NOT re-invented here.
+///     The six M-tier levels 114/120/126/132/138/144 were originally left deliberately unarmed (their claim item
+///     ids were believed unrecoverable), but a follow-up legacy-behavior-translator contract (workstream
+///     <c>level-milestone-bonus-item-ids</c>) recovered the full per-level drop table by directly re-reading
+///     S04_MyWork02.cpp:11265-11291: 114 (LV_M2) grants item 847 qty 1 + item 539 qty 2; 120 (LV_M8) grants item
+///     846 qty 1 + item 539 qty 2; 126 (LV_M14) grants item 848 qty 1 + item 539 qty 2; 132 (LV_M20) grants item
+///     850 qty 1 + item 539 qty 2 + item 1458 qty 1; 138 (LV_M26) grants item 99699 qty 1 + item 539 qty 2 + item
+///     1458 qty 1; 144 (LV_M32) grants item 99698 qty 1 + item 539 qty 2 + item 1458 qty 1 (item 1458 is "EXP
+///     Pill(L), cant trade" per its own source comment at S04_MyWork03.cpp:3601-3612). All six are therefore now
+///     armable and claimable, closing the gap -- <see cref="DeferredMilestoneLevels" /> is empty today because
+///     every one of the 11 named legacy milestone levels now has a known claim table.
 /// </remarks>
 public static class LevelMilestoneBonus
 {
     // Named M-tier milestone levels (DEFINE.h:452-483). All 11 legacy milestone levels are declared for
-    // reference; only the ones with a known claim table below are actually armable (see ArmableMilestoneLevels).
+    // reference; every one of them now has a known claim table (see ArmableMilestoneLevels).
     public const int LvM2 = 114;
     public const int LvM8 = 120;
     public const int LvM14 = 126;
@@ -55,18 +63,20 @@ public static class LevelMilestoneBonus
     ///     <see cref="TryResolveClaimDrops" /> resolves, so arm and claim never disagree.
     /// </summary>
     public static readonly FrozenSet<int> ArmableMilestoneLevels =
-        new[] { 45, 65, 85, 105, LvM33 }.ToFrozenSet();
+        new[] { 45, 65, 85, 105, LvM2, LvM8, LvM14, LvM20, LvM26, LvM32, LvM33 }.ToFrozenSet();
 
     /// <summary>
-    ///     Legacy milestone levels whose claim item set is not recoverable from the C19 contract and are
-    ///     therefore intentionally NOT armed today (arming them would produce a claim that disconnects the
-    ///     player). Declared for discoverability; wire these in once a legacy finding supplies their item ids.
+    ///     Legacy milestone levels whose claim item set is not recoverable from any behavior contract yet and
+    ///     are therefore intentionally NOT armed today (arming one would produce a claim that disconnects the
+    ///     player). Empty as of the <c>level-milestone-bonus-item-ids</c> recovery pass, which supplied the
+    ///     last six missing entries (the M-tier levels) -- kept declared, rather than removed, for
+    ///     discoverability if a future legacy milestone level is ever discovered undocumented.
     /// </summary>
-    public static readonly FrozenSet<int> DeferredMilestoneLevels =
-        new[] { LvM2, LvM8, LvM14, LvM20, LvM26, LvM32 }.ToFrozenSet();
+    public static readonly FrozenSet<int> DeferredMilestoneLevels = FrozenSet<int>.Empty;
 
     // Ascending, for ResolveHighestMilestoneCrossed's allocation-free scan. Mirrors ArmableMilestoneLevels.
-    private static readonly int[] ArmableMilestoneLevelsAscending = [45, 65, 85, 105, LvM33];
+    private static readonly int[] ArmableMilestoneLevelsAscending =
+        [45, 65, 85, 105, LvM2, LvM8, LvM14, LvM20, LvM26, LvM32, LvM33];
 
     /// <summary>True when reaching <paramref name="level" /> arms a claimable milestone bonus.</summary>
     public static bool IsArmableMilestone(int level)
@@ -119,6 +129,42 @@ public static class LevelMilestoneBonus
                 return true;
             case 105:
                 drops = [new TribeGroundItemDrop(845, 1), new TribeGroundItemDrop(539, 2)];
+                return true;
+            case LvM2:
+                // S04_MyWork02.cpp:11265-11268.
+                drops = [new TribeGroundItemDrop(847, 1), new TribeGroundItemDrop(539, 2)];
+                return true;
+            case LvM8:
+                // S04_MyWork02.cpp:11269-11272.
+                drops = [new TribeGroundItemDrop(846, 1), new TribeGroundItemDrop(539, 2)];
+                return true;
+            case LvM14:
+                // S04_MyWork02.cpp:11273-11276.
+                drops = [new TribeGroundItemDrop(848, 1), new TribeGroundItemDrop(539, 2)];
+                return true;
+            case LvM20:
+                // S04_MyWork02.cpp:11277-11281. Item 1458 = "EXP Pill(L) cant trade" (S04_MyWork03.cpp:3601-3612).
+                drops =
+                [
+                    new TribeGroundItemDrop(850, 1), new TribeGroundItemDrop(539, 2),
+                    new TribeGroundItemDrop(1458, 1)
+                ];
+                return true;
+            case LvM26:
+                // S04_MyWork02.cpp:11282-11286.
+                drops =
+                [
+                    new TribeGroundItemDrop(99699, 1), new TribeGroundItemDrop(539, 2),
+                    new TribeGroundItemDrop(1458, 1)
+                ];
+                return true;
+            case LvM32:
+                // S04_MyWork02.cpp:11287-11291.
+                drops =
+                [
+                    new TribeGroundItemDrop(99698, 1), new TribeGroundItemDrop(539, 2),
+                    new TribeGroundItemDrop(1458, 1)
+                ];
                 return true;
             case LvM33:
                 drops = BuildM33ClaimDrops(previousTribe);

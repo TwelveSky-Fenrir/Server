@@ -41,32 +41,33 @@ namespace Fenrir.Application.Game.Domain.Skills;
 ///         not an invention -- see each term's own remarks below for exactly which contribution this composes.
 ///     </para>
 ///     <para>
-///         <b>Three of the six terms are NOT modeled here and always contribute zero</b> -- see the per-term
-///         remarks on <see cref="GetBonusSkillValue" /> and this project's own instruction to never invent an
-///         id/magnitude the source contract does not transcribe:
+///         <b>
+///             Terms 3 and 6 were originally left as documented no-ops pending missing citations; both were
+///             closed by the <c>skillgrade-authority-magnitudes</c> supplemental contract</b>
+///         (a follow-up, narrowly-scoped `legacy-behavior-translator` pass that reopened and independently
+///         re-confirmed the two previously-uncited magnitudes below) and are now fully modeled:
 ///     </para>
 ///     <list type="number">
 ///         <item>
 ///             <description>
-///                 <b>Term 3 (cape-slot flat +2)</b>: the D2 contract states "one specific hardcoded item
-///                 identifier" grants a flat +2 to every skill query when equipped in the cape slot, but does not
-///                 transcribe that item id anywhere in its Outputs or Citations sections. Left as a documented
-///                 no-op. NOTE for whoever resolves this:
-///                 <c>Fenrir.Application.Game.Domain.Enchant.CapeUpgradeResolver.EmperorCapeItemId</c>
-///                 (94100) is an UNCONFIRMED lead only -- it comes from a completely different mechanic (the cape
-///                 upgrade RNG target table) cited to a different <c>Server/</c> range than this term's
-///                 <c>MyFactor.cpp:4519-4578</c>, and must not be assumed to be the same item without an
-///                 independent citation.
+///                 <b>Term 3 (cape-slot flat +2)</b>: the hardcoded item identifier is <see cref="GodOfWarriorCapeItemId" />
+///                 (1404, "Cape/Cloak « God of Warrior »") -- confirmed by <c>MyFactor.cpp:4543-4546</c> (an
+///                 exact-match check against the equipped cape-slot item id) and independently corroborated by
+///                 <c>ServerDocs/19_Header_Lib/02_Protocol_MyFactor.md:313</c>. The earlier
+///                 <c>Fenrir.Application.Game.Domain.Enchant.CapeUpgradeResolver.EmperorCapeItemId</c> (94100)
+///                 lead is now confirmed a red herring -- a different item from a wholly unrelated mechanic (the
+///                 cape upgrade RNG target table) -- and must not be conflated with this term's item id.
 ///             </description>
 ///         </item>
 ///         <item>
 ///             <description>
-///                 <b>Term 6 (guild-buff type-3 flat +1)</b>: the numeric gate itself is fully specified (guild
-///                 buff active, numeric type selector == 3, flat +1 -- see <see cref="GuildBuffFlatBonusType" />/
-///                 <see cref="GuildBuffFlatBonusAmount" />), but the D2 contract's own "buff-category skill in the
-///                 shared skill-definition table" predicate has no field name or threshold transcribed (only its
-///                 citation, <c>GameSystem_03_Skill.cpp:22-33</c>, a "NULL-safe skill-definition lookup"). Left as
-///                 a documented no-op via <see cref="IsBuffCategorySkill" /> pending that predicate.
+///                 <b>Term 6 (guild-buff type-3 flat +1)</b>: the previously-missing "buff-category skill" predicate
+///                 is now resolved as the queried skill's own catalog row resolving at all (a null
+///                 <paramref name="skillDefinition" /> is the modeled "skill not found" case
+///                 <c>GameSystem_03_Skill.cpp:22-33</c>'s <c>SKILLSYSTEM::Search</c> can return) AND that row's
+///                 <see cref="SkillRowDto.Type" /> field (<c>SKILL_INFO.sType</c>, <c>STRUCT.h:136</c>) equaling
+///                 exactly <see cref="BuffCategorySkillType" /> (2) -- confirmed by <c>MyFactor.cpp:4573-4575</c>.
+///                 See <see cref="IsBuffCategorySkill" /> for the implementation.
 ///             </description>
 ///         </item>
 ///         <item>
@@ -95,6 +96,17 @@ public static class SkillGradeAuthority
     public const int CapeSlotIndex = 1;
 
     /// <summary>
+    ///     Server/Header/Protocol/MyFactor.cpp:4543-4546 -- the single hardcoded item identifier that grants
+    ///     term 3's flat +2 when equipped in <see cref="CapeSlotIndex" />, unconditionally regardless of which
+    ///     skill is being queried. "Cape/Cloak « God of Warrior »" per
+    ///     <c>ServerDocs/19_Header_Lib/02_Protocol_MyFactor.md:313</c>, which also cites this exact line range.
+    ///     Confirmed by the <c>skillgrade-authority-magnitudes</c> supplemental contract as unrelated to (and
+    ///     not a duplicate of) <c>CapeUpgradeResolver.EmperorCapeItemId</c> (94100) -- a different item from a
+    ///     wholly separate mechanic (the cape upgrade RNG target table).
+    /// </summary>
+    public const int GodOfWarriorCapeItemId = 1404;
+
+    /// <summary>
     ///     Server/Header/Protocol/STRUCT.h:1662-1676 -- the pet/amulet equip-slot index (terms 4/5's slot).
     ///     Matches the already-established <see cref="PetSlots.EquipmentSlot" /> constant (same slot, already
     ///     cited by a different contract) rather than re-deriving a second literal 8.
@@ -116,8 +128,16 @@ public static class SkillGradeAuthority
     /// </summary>
     private const int GuildBuffFlatBonusType = 3;
 
-    /// <summary>Term 6's flat contribution once the (unresolved) buff-category predicate is satisfied.</summary>
+    /// <summary>Term 6's flat contribution once the buff-category predicate is satisfied.</summary>
     private const int GuildBuffFlatBonusAmount = 1;
+
+    /// <summary>
+    ///     Server/Header/Protocol/MyFactor.cpp:4573-4575, Server/Header/Protocol/STRUCT.h:136 -- the
+    ///     <c>SKILL_INFO.sType</c> value (<see cref="SkillRowDto.Type" />) a queried skill's own catalog row
+    ///     must equal for term 6's buff-category predicate to hold. Resolved by the
+    ///     <c>skillgrade-authority-magnitudes</c> supplemental contract; see <see cref="IsBuffCategorySkill" />.
+    /// </summary>
+    private const int BuffCategorySkillType = 2;
 
     /// <summary>
     ///     <c>MyUtil::GetMaxSkillGradeNum</c> (Server/ts25zone/S07_MyGame03.cpp:8945-8956) -- NOT a
@@ -141,9 +161,9 @@ public static class SkillGradeAuthority
     ///     <c>MyFactor::GetBonusSkillValue</c> (Server/Header/Protocol/MyFactor.cpp:4519-4578) -- the sum of
     ///     six independently-gated contributions for <paramref name="skillId" />, evaluated against the
     ///     querying character's OWN equipment and guild-buff state (never an arbitrary target's, and never
-    ///     read from the client). Terms 3 and 6 are documented no-ops pending missing citations (see class
-    ///     remarks); terms 4/5 are wired but currently inert pending a confirmed <paramref name="petPackedValue" />
-    ///     source (also class remarks). Terms 1 and 2 are fully modeled.
+    ///     read from the client). Terms 4/5 are wired but currently inert pending a confirmed
+    ///     <paramref name="petPackedValue" /> source (see class remarks). Terms 1, 2, 3, and 6 are fully
+    ///     modeled.
     /// </summary>
     /// <param name="skillId">The skill being queried.</param>
     /// <param name="equipSlotItems">
@@ -159,9 +179,8 @@ public static class SkillGradeAuthority
     ///     0 contribution from both terms, never a false mismatch.
     /// </param>
     /// <param name="skillDefinition">
-    ///     The queried skill's own catalog row, needed only for term 6's (currently unresolved) buff-category
-    ///     predicate. Accepted now so this method's signature does not need to change once that predicate is
-    ///     resolved.
+    ///     The queried skill's own catalog row, needed only for term 6's buff-category predicate (null means
+    ///     "skill not found," which never satisfies it -- see <see cref="IsBuffCategorySkill" />).
     /// </param>
     /// <param name="guildBuffType">The character's live guild-buff numeric "type" selector (one of 1/2/3/4).</param>
     /// <param name="guildBuffActive">The character's live guild-buff on/off gate.</param>
@@ -195,8 +214,10 @@ public static class SkillGradeAuthority
             // decision (D2 contract Edge cases).
             total += equipped.Item.CapeInfo3;
 
-            // Term 3 (cape-slot-specific flat +2 for one hardcoded item id): deliberately NOT modeled -- see
-            // class remarks. `if (slotIndex == CapeSlotIndex && equipped.Item.ItemId == /* unresolved */) total += 2;`
+            // Term 3: cape-slot-specific flat +2 for one hardcoded item id (MyFactor.cpp:4543-4546) --
+            // unconditional regardless of which skill is being queried, and independent of every other term.
+            if (slotIndex == CapeSlotIndex && equipped.Item.ItemId == GodOfWarriorCapeItemId)
+                total += 2;
         }
 
         // Terms 4 + 5: pet slot only.
@@ -223,9 +244,9 @@ public static class SkillGradeAuthority
                 total += StatCalculator.PetGrowthValueBonusSkillGrade(petPackedValue);
         }
 
-        // Term 6 (guild-buff type-3 flat +1 for a buff-category skill): the type/active gate is fully
-        // modeled; IsBuffCategorySkill always returns false today -- see class remarks and that method's own
-        // TODO.
+        // Term 6: guild-buff type-3 flat +1 for a buff-category skill -- all four conditions (skill resolves,
+        // its sType == 2, guild buff active, guild buff type == 3) must hold simultaneously; partial matches
+        // grant nothing (MyFactor.cpp:4573-4575).
         if (guildBuffActive && guildBuffType == GuildBuffFlatBonusType && IsBuffCategorySkill(skillDefinition))
             total += GuildBuffFlatBonusAmount;
 
@@ -233,20 +254,16 @@ public static class SkillGradeAuthority
     }
 
     /// <summary>
-    ///     TODO(D2-skillcast-helpers open question): the buff-category predicate itself (which
-    ///     <see cref="SkillRowDto" /> field, and what value/range counts as "buff category") is not
-    ///     transcribed anywhere in the D2 contract's Outputs/Edge-cases text -- only its citation
-    ///     (Server/ts25zone/GameSystem/GameSystem_03_Skill.cpp:22-33, a NULL-safe skill-definition lookup) is
-    ///     given, with no field name or threshold. Per this project's never-invent-a-magnitude rule, this
-    ///     always returns false (so term 6 never contributes) until a follow-up contract or a
-    ///     <c>legacy-behavior-translator</c>/<c>fenrir-gameplay-domain-engineer</c> pass supplies the actual
-    ///     predicate. <paramref name="skillDefinition" /> is accepted (and referenced, so the parameter is not
-    ///     flagged unused) so <see cref="GetBonusSkillValue" />'s public signature does not need to change
-    ///     once this is resolved.
+    ///     Server/Header/Protocol/MyFactor.cpp:4573-4575 -- term 6's "buff-category skill" predicate: the
+    ///     queried skill must resolve to an existing catalog row at all (a null <paramref name="skillDefinition" />
+    ///     models <c>SKILLSYSTEM::Search</c>'s NULL return for an out-of-range/zeroed skill id,
+    ///     <c>GameSystem_03_Skill.cpp:22-33</c>) AND that row's <c>sType</c> field
+    ///     (<see cref="SkillRowDto.Type" />, <c>STRUCT.h:136</c>) must equal exactly
+    ///     <see cref="BuffCategorySkillType" /> (2). Resolved by the <c>skillgrade-authority-magnitudes</c>
+    ///     supplemental contract -- previously an unconditional documented no-op pending this predicate.
     /// </summary>
     private static bool IsBuffCategorySkill(SkillDefinition? skillDefinition)
     {
-        _ = skillDefinition;
-        return false;
+        return skillDefinition is not null && skillDefinition.Skill.Type == BuffCategorySkillType;
     }
 }

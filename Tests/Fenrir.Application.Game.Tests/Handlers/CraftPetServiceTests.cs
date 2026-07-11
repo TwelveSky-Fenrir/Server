@@ -1,13 +1,17 @@
+using System.Collections.Frozen;
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.ItemModification;
 using Fenrir.Application.Game.Domain.Crafting;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Services.ItemModification;
+using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.Abstractions.Game;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
@@ -67,9 +71,11 @@ public class CraftPetServiceTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
     }
 
-    private static CraftPetService CreateService(FakeCharacterRepository characters, FakeEventLogRepository eventLog)
+    private static CraftPetService CreateService(FakeCharacterRepository characters, FakeEventLogRepository eventLog,
+        WorldDataCache? worldData = null, ILogger<CraftPetService>? logger = null)
     {
-        return new CraftPetService(characters, eventLog, NullLogger<CraftPetService>.Instance);
+        return new CraftPetService(characters, eventLog, worldData ?? ZoneTestKit.EmptyWorldData(),
+            logger ?? NullLogger<CraftPetService>.Instance);
     }
 
     private static ItemStack Item(int itemId, int serial)
@@ -191,5 +197,75 @@ public class CraftPetServiceTests
         Assert.Equal(CraftPetOutcome.Rejected, result.Outcome);
         Assert.Null(characters.LastReplacedContainer);
         Assert.Empty(eventLog.LoggedEvents);
+    }
+
+    // The two tests below cover the 2026-07-11-recovered "milestone-notice-text-family" finding's Site 3
+    // (CraftPetHandler/CraftPetService's own MakeNotice stand-in): CenterRelayNoticeLog.LogNotableCraft is now
+    // wired into CraftPetService on every applied recipe, matching the precedent already established by
+    // CraftItemService/CraftSkillBookService -- see CraftPetService's own remarks for why this is a log line,
+    // never a client-facing broadcast (the legacy Center-side relay case is a confirmed-dead permanently-empty
+    // stub, not a pending citation).
+
+    [Fact]
+    public async Task FourSlotRecipe_Recipe3_Success_NotableResultItem_LogsNotableCraftNotice()
+    {
+        var (_, _, zone, state, characters, eventLog) = SetUp();
+        SeedInventory(zone,
+            (0, Item(PetCraftRecipeCatalog.Recipe3Material1ItemId, 901)),
+            (1, Item(PetCraftRecipeCatalog.Recipe3Material2ItemId, 902)),
+            (2, Item(PetCraftRecipeCatalog.Recipe3Material3ItemId, 903)),
+            (3, Item(PetCraftRecipeCatalog.Recipe3CatalystItemId, 904)));
+
+        // MakeNotice's own default-case fallback rule only notifies for iType >= 4 (NotableItemTypeThreshold,
+        // see CenterRelayNoticeLog's own remarks) -- Type 4 here is a stand-in "notable" (Elite-tier) result.
+        var itemsById = new Dictionary<int, ItemDefinition>
+        {
+            [PetCraftRecipeCatalog.Recipe3ResultItemId] = new(
+                WorldDataTestRows.Item(PetCraftRecipeCatalog.Recipe3ResultItemId) with { Type = 4 }, [])
+        }.ToFrozenDictionary();
+
+        var logger = new CapturingLogger<CraftPetService>();
+        var service = CreateService(characters, eventLog, ZoneTestKit.EmptyWorldData(itemsById), logger);
+
+        var result = await RunToCompletionAsync(
+            service.ResolveFourSlotRecipeAsync(Recipe3Packet(), zone, state, CharacterId, AccountId,
+                CancellationToken.None), zone);
+
+        Assert.Equal(CraftPetOutcome.Applied, result.Outcome);
+
+        var noticeEntries = logger.Entries.Where(e => e.Message.Contains("Notable-craft notice")).ToList();
+        var entry = Assert.Single(noticeEntries);
+        Assert.Equal(LogLevel.Information, entry.Level);
+        Assert.Contains("tribe 1", entry.Message);
+        Assert.Contains("Hero", entry.Message);
+        Assert.Contains(PetCraftRecipeCatalog.Recipe3ResultItemId.ToString(), entry.Message);
+        Assert.Contains("pet-recipe-3", entry.Message);
+    }
+
+    [Fact]
+    public async Task TwoSlotRecipe_Recipe4_Success_LowTierResultItem_DoesNotLogNotableCraftNotice()
+    {
+        var (_, _, zone, state, characters, eventLog) = SetUp();
+        SeedInventory(zone,
+            (0, Item(PetCraftRecipeCatalog.Recipe4MaterialItemId, 901)),
+            (1, Item(PetCraftRecipeCatalog.Recipe4MaterialItemId, 902)));
+
+        // Default WorldDataTestRows.Item Type is 0, below NotableItemTypeThreshold (4) -- MakeNotice's own
+        // documented default-case fallback means this recipe's result is never notable enough to notify on.
+        var itemsById = new Dictionary<int, ItemDefinition>
+        {
+            [PetCraftRecipeCatalog.Recipe4ResultItemId] =
+                new(WorldDataTestRows.Item(PetCraftRecipeCatalog.Recipe4ResultItemId), [])
+        }.ToFrozenDictionary();
+
+        var logger = new CapturingLogger<CraftPetService>();
+        var service = CreateService(characters, eventLog, ZoneTestKit.EmptyWorldData(itemsById), logger);
+
+        var result = await RunToCompletionAsync(
+            service.ResolveTwoSlotRecipeAsync(Recipe4Packet(), zone, state, CharacterId, AccountId,
+                CancellationToken.None), zone);
+
+        Assert.Equal(CraftPetOutcome.Applied, result.Outcome);
+        Assert.DoesNotContain(logger.Entries, e => e.Message.Contains("Notable-craft notice"));
     }
 }

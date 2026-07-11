@@ -86,6 +86,35 @@ public class LootBoxOpenResolverTests
     }
 
     [Fact]
+    public void OpenSingle_ResolveRewardSerial_StampsTheOverrideSerial_OnANonStackableReward()
+    {
+        // Workstream lucky-ticket-handler-thresholds: resolveRewardSerial lets a caller stamp a fixed serial
+        // (e.g. the Lucky Ticket family's per-ticket constant) instead of the default 0 -- every pre-existing
+        // box (like this same MountBox spec used elsewhere in this file) keeps Serial 0 unless it opts in.
+        var page0 = ImmutableDictionary<byte, ItemStack>.Empty.SetItem(0, Box(601, 1));
+
+        var plan = LootBoxOpenResolver.OpenSingle(MountBox, 0, 0, Box(601, 1), page0,
+            ImmutableDictionary<byte, ItemStack>.Empty, Sorts((635, 4)), new ScriptedRandom(49), Today,
+            resolveRewardSerial: _ => 100000001);
+
+        Assert.Equal(LootBoxOpenResolver.Outcome.Success, plan.Outcome);
+        Assert.Equal(635, plan.RewardItemId);
+        Assert.Equal(100000001, plan.RewardStack.Serial);
+        Assert.Equal(100000001, plan.ProjectedPage0[1].Serial);
+    }
+
+    [Fact]
+    public void OpenSingle_NoResolveRewardSerial_DefaultsToZero()
+    {
+        var page0 = ImmutableDictionary<byte, ItemStack>.Empty.SetItem(0, Box(601, 3));
+
+        var plan = LootBoxOpenResolver.OpenSingle(MountBox, 0, 0, Box(601, 3), page0,
+            ImmutableDictionary<byte, ItemStack>.Empty, Sorts((635, 4)), new ScriptedRandom(49), Today);
+
+        Assert.Equal(0, plan.RewardStack.Serial);
+    }
+
+    [Fact]
     public void OpenSingle_InventoryFull_ReportsFull_AndDoesNotConsumeTheBox()
     {
         var builder = ImmutableDictionary.CreateBuilder<byte, ItemStack>();

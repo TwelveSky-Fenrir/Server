@@ -1,15 +1,26 @@
+using System.Collections.Frozen;
 using Fenrir.Application.Game.Stats;
+using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Game.Tests.Stats;
 
 /// <summary>
 ///     Workstream B8 (pet stat contributions) -- the AMULET-pet graded/flat bonuses, the stepped attack
 ///     bonus, and the grow-percent, ported from PETSYSTEM (Server/ts25zone/GameSystem/GameSystem_07_Pet.cpp).
-///     Every method is a pure computation, so these are exact reference vectors. The methods are exercised
-///     directly (not through <see cref="StatCalculator.ComputeBaseStats" />) because the getter/skill-pipeline
-///     call sites are landed by a separate serial integration pass (see the workstream's wiringManifest), and
-///     several are wiring-blocked (no runtime packed-graded-value field yet; Phoenix double-count contradiction
-///     for the flat amulet tables) -- until then a full ComputeBaseStats run would report 0.
+///     Every method is a pure computation, so these are exact reference vectors. Most of the methods are
+///     exercised directly (not through <see cref="StatCalculator.ComputeBaseStats" />) because the
+///     getter/skill-pipeline call sites are landed by a separate serial integration pass (see the workstream's
+///     wiringManifest), and several remain wiring-blocked (no runtime packed-graded-value field yet). The flat
+///     amulet attack/defense tables are the exception: a 2026-07-11 confirmation pass wired the 6
+///     non-overlapping ids (8290, 76000-76004) into <see cref="StatCalculator.ComputeBaseStats" />'s
+///     AttackPower/DefensePower getters -- see the end-to-end tests below -- while the 3 Phoenix-overlapping
+///     ids (76005-76007) stay deliberately excluded at the call site (<c>PetAmuletPhoenixOverlapIds</c>)
+///     pending a still-open Attack/Defense-side double-count question (whether <c>ReturnAmuletAttackValue</c>/
+///     <c>ReturnAmuletDefenseValue</c>'s own table entry is a third stacking term or a restatement of an
+///     existing one). This is a DIFFERENT, narrower question than the Life/Mana base-vs-correction
+///     contradiction <c>Domain PetSlotAmuletBonusTable</c> used to flag -- that one is now RESOLVED (workstream
+///     pet-amulet-bonus-table-mapping, 2026-07-11: base and correction stack, see <c>StatCalculator.Life.cs</c>
+///     and <see cref="B12GetterFixTests" />'s two-pass Life/Mana regression tests).
 /// </summary>
 public class PetStatContributionTests
 {
@@ -292,5 +303,74 @@ public class PetStatContributionTests
     public void BonusSkillStatType_MapsSkillIndexToType(int skillIndex, int expected)
     {
         Assert.Equal(expected, StatCalculator.PetBonusSkillStatType(skillIndex));
+    }
+
+    // ---- end-to-end wiring guard (2026-07-11 confirmation pass: flat amulet attack/defense tables now wired
+    // into ComputeBaseStats for the 6 non-overlapping ids; the 3 Phoenix-overlapping ids stay excluded) ----
+
+    private static readonly CharacterBaseAttributes NeutralAttributes = new(
+        Vitality: 0, Strength: 0, Intelligence: 0, Dexterity: 0,
+        Level: 1, Tribe: 0, PreviousTribe: 0, Title: 0, Halo: 0, RebirthCount: 0);
+
+    private static readonly FrozenDictionary<short, LevelRowDto> NeutralLevels =
+        new Dictionary<short, LevelRowDto> { [1] = new LevelRowDto(1, 0, 100, 0, 0, 0, 0, 0, 0, 0, 0) }
+            .ToFrozenDictionary();
+
+    // Minimal amulet ItemRowDto: only ItemId/Sort matter for the flat tables/Phoenix switch, and AttackPower/
+    // DefensePower are pinned to 0 so the slot's own "subtract the item's stat" term stays a no-op, isolating
+    // the getter contribution under test.
+    private static ItemRowDto AmuletItem(int itemId)
+    {
+        return new ItemRowDto(
+            itemId, $"Amulet{itemId}", null, null, null,
+            0, AmuletSort, 0, 0, 0,
+            0, 0, 0, 0,
+            0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0,
+            0, 0, 0,
+            0, 0, 0, 0, 0,
+            0, 0, 0, 0,
+            0, 0, 0,
+            0, 0, null,
+            0, 0, 0, 0, 0);
+    }
+
+    private static EquippedItemSlot[] AmuletEquipment(int itemId)
+    {
+        return [new EquippedItemSlot(8, AmuletItem(itemId), 0, 0, 0, 0)];
+    }
+
+    [Theory]
+    // 8290 and the 76000-76004 rows have no overlap with any Phoenix term -- the full table value must land.
+    [InlineData(8290, 275, 550)]
+    [InlineData(76000, 3000, 3000)]
+    [InlineData(76004, 3000, 3000)]
+    public void AmuletFlatBonus_NonOverlappingIds_WiredIntoComputeBaseStats(int itemId, int expectedAttackDelta,
+        int expectedDefenseDelta)
+    {
+        var baseline = StatCalculator.ComputeBaseStats(NeutralAttributes, [], NeutralLevels);
+        var withAmulet = StatCalculator.ComputeBaseStats(NeutralAttributes, AmuletEquipment(itemId), NeutralLevels);
+
+        Assert.Equal(baseline.AttackPower + expectedAttackDelta, withAmulet.AttackPower);
+        Assert.Equal(baseline.DefensePower + expectedDefenseDelta, withAmulet.DefensePower);
+    }
+
+    [Theory]
+    // 76005/76006/76007: the flat table's own entry must NOT be added on top of the two existing PhoenixFlatBonus
+    // passes already summed in ComputeAttackPower/ComputeDefensePower -- only the Phoenix total should show up.
+    // Attack Phoenix total = first pass (3000/4000/5000) + PhoenixDamageSecondPassBonus (0/1000/2000) = 3000/5000/7000.
+    // Defense Phoenix total = first pass (5000/7500/12500) + final pass (2000/4500/9500) = 7000/12000/22000.
+    [InlineData(76005, 3000, 7000)]
+    [InlineData(76006, 5000, 12000)]
+    [InlineData(76007, 7000, 22000)]
+    public void AmuletFlatBonus_PhoenixOverlapIds_NotDoubleCountedInComputeBaseStats(int itemId,
+        int expectedAttackDelta, int expectedDefenseDelta)
+    {
+        var baseline = StatCalculator.ComputeBaseStats(NeutralAttributes, [], NeutralLevels);
+        var withAmulet = StatCalculator.ComputeBaseStats(NeutralAttributes, AmuletEquipment(itemId), NeutralLevels);
+
+        Assert.Equal(baseline.AttackPower + expectedAttackDelta, withAmulet.AttackPower);
+        Assert.Equal(baseline.DefensePower + expectedDefenseDelta, withAmulet.DefensePower);
     }
 }

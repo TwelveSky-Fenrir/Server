@@ -9,8 +9,8 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 ///     small-tribe-advantage fallback. Recomputed every tick by <see cref="TribeSymbolDamageModifierSystem" />;
 ///     read later by whichever combat-damage calculation wires it in
 ///     (<c>ServerDocs/12_ts25zone/10_MyGame02_Combat_ProcessAttack.md</c>) -- see
-///     <see cref="Combat.MonsterCombatResolver.ResolvePvmAttack" />'s own remarks for which half is actually
-///     applied to damage today.
+///     <see cref="Combat.MonsterCombatResolver.ResolvePvmAttack" />'s own remarks for how both halves are
+///     applied to damage.
 /// </summary>
 /// <remarks>
 ///     Réf. C++ : Server/ts25zone/S07_MyGame01.cpp:3144-3157 (function signature and the first per-tribe
@@ -27,16 +27,16 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 ///         ceiling, the ten-point small-tribe floor), not an invented one.
 ///     </para>
 ///     <para>
-///         <b>STILL NOT modeled -- genuinely unrecoverable, not guessed:</b> the actual FLAT DAMAGE magnitude
-///         each increment contributes at the point of application. The B15 contract's own Side-effects text
-///         describes it only in non-numeric prose ("the very first increment already worth a meaningfully large
-///         flat addition, roughly the size of the increment itself times several hundred, and each further
-///         increment worth the same amount again") -- not a citation-backed number. Per this project's
-///         never-invent-a-magnitude rule, <see cref="GetDamageUpBonusIncrementCount" />'s result is therefore
-///         NOT yet multiplied into any damage calculation anywhere in this codebase; it is computed and
-///         available for the day a fresh citation grounds the actual per-increment amount. Flag for
-///         <c>cpp-security-debt-auditor</c>/<c>cpp-zone-gameplay-analyst</c> re-check if that magnitude is ever
-///         needed.
+///         <b>RESOLVED this session (<c>tribesymbol-damage-magnitude</c> contract):</b> the actual FLAT DAMAGE
+///         magnitude each increment contributes is now grounded, not guessed --
+///         <c>Server/ts25zone/S07_MyGame02.cpp:2314-2318</c> collapses to a flat
+///         <see cref="Combat.MonsterCombatResolver.DamageUpBonusFlatPerIncrement" /> (500) per increment, once
+///         <c>tTribeSymbolDamageUp</c>'s own 0.1-per-increment build-up
+///         (<c>S07_MyGame01.cpp:3155,3160,3165,3170,3178,3186</c>, repeated per tribe across <c>:3144-3338</c>)
+///         is substituted into the formula. <see cref="GetDamageUpBonusIncrementCount" />'s result is now
+///         multiplied by that flat amount inside <see cref="Combat.MonsterCombatResolver.ResolvePvmAttack" />,
+///         applied immediately after the elemental-damage term and before the damage-down malus above (which
+///         compounds on top of it) -- see that method's own remarks for the exact insertion point.
 ///     </para>
 /// </remarks>
 public sealed class TribeSymbolCombatModifiers

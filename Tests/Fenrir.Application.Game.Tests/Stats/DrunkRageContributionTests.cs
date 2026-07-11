@@ -19,14 +19,14 @@ public class DrunkRageContributionTests
     public void DrunkPotionIds_AreExactlyTheFiveRecognisedPotions()
     {
         Assert.Equal(5, StatCalculator.DrunkPotionIds.Count);
-        Assert.True(StatCalculator.DrunkPotionIds.Contains(878));
-        Assert.True(StatCalculator.DrunkPotionIds.Contains(879));
-        Assert.True(StatCalculator.DrunkPotionIds.Contains(880));
-        Assert.True(StatCalculator.DrunkPotionIds.Contains(881));
-        Assert.True(StatCalculator.DrunkPotionIds.Contains(882));
-        Assert.False(StatCalculator.DrunkPotionIds.Contains(0));
-        Assert.False(StatCalculator.DrunkPotionIds.Contains(877));
-        Assert.False(StatCalculator.DrunkPotionIds.Contains(883));
+        Assert.Contains(878, StatCalculator.DrunkPotionIds);
+        Assert.Contains(879, StatCalculator.DrunkPotionIds);
+        Assert.Contains(880, StatCalculator.DrunkPotionIds);
+        Assert.Contains(881, StatCalculator.DrunkPotionIds);
+        Assert.Contains(882, StatCalculator.DrunkPotionIds);
+        Assert.DoesNotContain(0, StatCalculator.DrunkPotionIds);
+        Assert.DoesNotContain(877, StatCalculator.DrunkPotionIds);
+        Assert.DoesNotContain(883, StatCalculator.DrunkPotionIds);
     }
 
     [Fact]

@@ -42,7 +42,7 @@ public class ItemDeletionGuardTests
 
         Assert.Equal(15, ItemDeletionGuard.ProtectedItemTypeIds.Count);
         foreach (var id in expected)
-            Assert.True(ItemDeletionGuard.ProtectedItemTypeIds.Contains(id));
+            Assert.Contains(id, ItemDeletionGuard.ProtectedItemTypeIds);
     }
 
     [Theory]

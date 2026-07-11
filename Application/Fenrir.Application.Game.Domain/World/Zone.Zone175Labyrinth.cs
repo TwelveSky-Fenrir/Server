@@ -17,13 +17,8 @@ namespace Fenrir.Application.Game.Domain.World;
 /// </remarks>
 public sealed partial class Zone
 {
-    /// <summary>
-    ///     Interim terminal-kick disconnect reason. TODO(wire): add a dedicated <c>LabyrinthMissionEnded</c>
-    ///     value to <see cref="DisconnectReason" /> (Network) so the disconnect-reason metric distinguishes this
-    ///     from an unrelated timed-zone expiry -- see the workstream report. <see cref="DisconnectReason.TimedZoneExpired" />
-    ///     (a timed zone instance ending for its occupants) is the least-wrong existing value in the meantime.
-    /// </summary>
-    private const DisconnectReason Zone175TerminalDisconnectReason = DisconnectReason.TimedZoneExpired;
+    /// <summary>The mission's own terminal-kick disconnect reason.</summary>
+    private const DisconnectReason Zone175TerminalDisconnectReason = DisconnectReason.LabyrinthMissionEnded;
 
     /// <summary>
     ///     Whether any player is present per the mission's presence rule (ready, not mid-zone-transition, not

@@ -209,9 +209,14 @@ public static class WarlordRerollBonusTable
     ///     discards any item whose stored tier value is below elite tier -- and rare-tier top-range items are
     ///     stored at exactly the "rare" tier value, one below elite (sampling-tier confidence per this
     ///     workstream's own contract). Net effect: only an elite-tier top-tier swap notice ever reaches
-    ///     anyone. Exposed here as pure data for whichever broadcast-wiring pass hooks this resolver's output
-    ///     into the notice-broadcast path (<c>ZoneEventBroadcaster</c>, out of this workstream's scope) --
-    ///     this resolver does not attempt the broadcast itself.
+    ///     anyone. Exposed here as pure data for the caller that hooks this resolver's output into the
+    ///     notice-broadcast path -- this resolver does not attempt the broadcast itself. Consumed by
+    ///     <c>Fenrir.Application.Game.Services.ItemModification.UpgradeItemRankService</c> to gate its own call
+    ///     into <c>CenterRelayNoticeLog.LogWarlordSwap</c> (the log-only stand-in for this notice family; the
+    ///     true receiving-side packet was never resolved, same posture as every other <c>CenterRelayNoticeLog</c>
+    ///     call site -- see that type's own remarks. Not <c>ZoneEventBroadcaster</c>: none of that type's
+    ///     RvR/siege/tower/FFA-specific <c>Announce*</c> methods fit this notice's generic "name an item to
+    ///     everyone" shape).
     /// </summary>
     public static bool NoticeReachesRecipients(byte itemType)
     {

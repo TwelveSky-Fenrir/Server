@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.Stats;
@@ -325,6 +326,19 @@ public sealed record PlayerEnterData(
     int EatStrPotion = 0,
     int EatDexPotion = 0,
     int EatElePotion = 0,
+    // Lucky Drop/"Acquisition" Scroll minutes counter (PlayerRuntimeState.DropItemTime) -- must travel here
+    // too, or it silently resets to 0 on every world entry and in-process zone transfer, same "must travel or
+    // it resets" posture as the Eat*Potion block above. game.Characters.DropItemTime already exists as a
+    // persisted column; this was the missing runtime-hydration link (follow-up to the item-usage-consumables
+    // finding). See PlayerRuntimeState.DropItemTime's own remarks.
+    int DropItemTime = 0,
+    // War Point currency balance (PlayerRuntimeState.WarPoint) -- must travel here too, or it silently resets
+    // to 0 on every world entry and in-process zone transfer, same "must travel or it resets" posture as
+    // every block above. game.Characters.WarPoint already exists as a persisted column
+    // (Migrations/041_characters_warpoint_currency.sql); this was the missing runtime-hydration link (grant/
+    // persist-back for GrantWarPoints remains a separate, still-open follow-up -- see that field's own
+    // remarks).
+    int WarPoint = 0,
     // mSupportSkillTimeUpRatio's two source fields (behavior contract "buff-application-stacking-decay") --
     // must travel here too, same "must travel or it resets" posture as every block above: without this, a
     // premium account's buff-duration multiplier would silently reset to 1x on every in-process zone
@@ -372,10 +386,39 @@ public sealed record PlayerEnterData(
     long StoreMoney = 0,
     int InventoryDate = 0,
     int StoreDate = 0,
+    // aPetBagDate -- must travel here too, or PlayerRuntimeState.PetBagDate would silently reset to 0 on
+    // every world entry and in-process zone transfer, same "must travel or it resets" posture as
+    // StoreMoney/InventoryDate/StoreDate above. game.Characters already persists it
+    // (Migrations/047_characters_petbagdate_column.sql); this is the runtime-hydration link. See
+    // PlayerRuntimeState.PetBagDate's own remarks -- 0 (the default here) reads as expired, matching every
+    // creation path today (no known grant mechanism yet).
+    int PetBagDate = 0,
     // D2 hook 2 (PvP same-origin kill-credit guard input): the accepted socket's canonical remote-IP string
     // (AntiCheat.SessionSourceIp.Normalize), null for a transport with no accepted socket (test transports).
     // Must travel through an in-process zone transfer too, or PlayerRuntimeState.SourceIp would silently reset
     // to null on every map hop, re-opening the PvP same-origin guard as a no-op after the character's first
     // hop. See PlayerRuntimeState.SourceIp's own remarks and AntiCheat.PvpKillCreditGuard.IsSameOrigin, the
     // guard this field feeds.
-    string? SourceIp = null);
+    string? SourceIp = null,
+    // aRuneSystem[4]/aRuneSystemStat[4] world-entry hydration (B5 wiring: IRuneRepository.GetRunesAsync,
+    // EnterWorldService) -- must travel here too, or a returning character's socketed runes would silently
+    // reset to empty on every world entry AND every in-process zone transfer, same "must travel or it resets"
+    // posture as every block above. Null only means "this caller left it unset" -- both live call sites
+    // (EnterWorldService, ZoneTransfer.CreateEnterData) always pass a real, already-computed length-4 array;
+    // PlayerRuntimeState.RuneSystem/RuneSystemStat's own [0,0,0,0] default already covers a never-socketed
+    // character, so Zone.HandleEnter only overwrites it when non-null (same pattern as Items/Stats/Skills
+    // above). See PlayerRuntimeState.RuneSystem's own remarks and Stats.RuneStatDecoder, the live consumer this
+    // hydration finally feeds (StatCalculator.PrimaryAttributes' rune contribution, already live for any
+    // RecomputeStats call that passes runtimeState -- Zone.ApplyRuneSocketCommand is the one production call
+    // site that does). The one still-open half -- folding a rune contribution into the very FIRST RecomputeStats
+    // call in EnterWorldService, before this PlayerRuntimeState even exists to pass as runtimeState -- is a
+    // structural gap unique to that one call site, not something this hydration can close; see
+    // EquipmentService.RecomputeStats's own remarks.
+    ImmutableArray<int>? RuneSystem = null,
+    ImmutableArray<int>? RuneSystemStat = null,
+    // The M15 Pet Lucky Box (world.Items 8111) pity counter -- must travel here too, or
+    // PlayerRuntimeState.M15PetLuckyBoxPity would silently reset to 0 on every world entry and in-process
+    // zone transfer, same "must travel or it resets" posture as every block above. game.Characters already
+    // persists it (Migrations/048_characters_m15petluckybox_pity_column.sql, confirmation-pass follow-up);
+    // this is the missing runtime-hydration link. See PlayerRuntimeState.M15PetLuckyBoxPity's own remarks.
+    int M15PetLuckyBoxPity = 0);

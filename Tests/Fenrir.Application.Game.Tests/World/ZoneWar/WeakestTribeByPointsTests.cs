@@ -49,10 +49,10 @@ public class WeakestTribeByPointsTests
     }
 
     [Fact]
-    public void WorldStateOverload_ReadsCachedPointsInTribeIdOrder()
+    public async Task WorldStateOverload_ReadsCachedPointsInTribeIdOrder()
     {
         var worldState = new WorldStateService(new FakeWorldStateRepository(), NullLogger<WorldStateService>.Instance);
-        worldState.InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
+        await worldState.InitializeAsync(CancellationToken.None);
 
         worldState.SetTribePoints(0, 900);
         worldState.SetTribePoints(1, 250);
@@ -63,10 +63,10 @@ public class WeakestTribeByPointsTests
     }
 
     [Fact]
-    public void WorldStateOverload_FreshBoot_AllZero_ReturnsTribeZero()
+    public async Task WorldStateOverload_FreshBoot_AllZero_ReturnsTribeZero()
     {
         var worldState = new WorldStateService(new FakeWorldStateRepository(), NullLogger<WorldStateService>.Instance);
-        worldState.InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
+        await worldState.InitializeAsync(CancellationToken.None);
 
         Assert.Equal(0, WeakestTribeByPoints.Resolve(worldState));
     }

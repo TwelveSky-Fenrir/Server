@@ -90,7 +90,7 @@ public class LootBoxCatalogTests
         Assert.Equal(5, spec.Pools.Length);
         Assert.Equal(10, spec.Pools[0].ThresholdCeilingInclusive);
         Assert.Equal(200, spec.Pools[^1].ThresholdCeilingInclusive);
-        Assert.True(spec.Pools[1].Ids.Contains(1301));
+        Assert.Contains(1301, spec.Pools[1].Ids);
     }
 
     [Fact]
@@ -139,11 +139,11 @@ public class LootBoxCatalogTests
 
         Assert.NotNull(spec);
         Assert.Equal(BoxRewardKind.Weighted, spec!.Kind);
-        Assert.Equal(3, spec.Weighted.Length);
-        Assert.Equal(696, spec.Weighted[0].ItemId);
-        Assert.Equal(73, spec.Weighted[0].Weight);
-        Assert.Equal(2397, spec.Weighted[2].ItemId);
-        Assert.Equal(7, spec.Weighted[2].Weight);
+        Assert.Equal(3, spec.WeightedRewards.Length);
+        Assert.Equal(696, spec.WeightedRewards[0].ItemId);
+        Assert.Equal(73, spec.WeightedRewards[0].Weight);
+        Assert.Equal(2397, spec.WeightedRewards[2].ItemId);
+        Assert.Equal(7, spec.WeightedRewards[2].Weight);
     }
 
     [Fact]
@@ -153,11 +153,11 @@ public class LootBoxCatalogTests
 
         Assert.NotNull(spec);
         Assert.Equal(BoxRewardKind.Weighted, spec!.Kind);
-        Assert.Equal(7, spec.Weighted.Length);
-        Assert.Equal(93500, spec.Weighted[0].ItemId);
-        Assert.Equal(350, spec.Weighted[0].Weight);
-        Assert.Equal(93506, spec.Weighted[6].ItemId);
-        Assert.Equal(30, spec.Weighted[6].Weight);
+        Assert.Equal(7, spec.WeightedRewards.Length);
+        Assert.Equal(93500, spec.WeightedRewards[0].ItemId);
+        Assert.Equal(350, spec.WeightedRewards[0].Weight);
+        Assert.Equal(93506, spec.WeightedRewards[6].ItemId);
+        Assert.Equal(30, spec.WeightedRewards[6].Weight);
     }
 
     [Fact]
@@ -214,19 +214,19 @@ public class LootBoxCatalogTests
             Assert.True(LootBoxCatalog.BulkOpenWhitelist.Contains(id), $"expected {id} in bulk whitelist");
 
         // 635 is explicitly commented out of the whitelist; 76542 is single-open only.
-        Assert.False(LootBoxCatalog.BulkOpenWhitelist.Contains(635));
-        Assert.False(LootBoxCatalog.BulkOpenWhitelist.Contains(76542));
+        Assert.DoesNotContain(635, LootBoxCatalog.BulkOpenWhitelist);
+        Assert.DoesNotContain(76542, LootBoxCatalog.BulkOpenWhitelist);
     }
 
     [Fact]
     public void NoticeRewardWhitelist_HasThePetBoxSpecialTierIds_AndEliteOnlyBoxesAreTheThreeCitedIds()
     {
-        Assert.True(LootBoxCatalog.NoticeRewardWhitelist.Contains(1012));
-        Assert.True(LootBoxCatalog.NoticeRewardWhitelist.Contains(1016));
+        Assert.Contains(1012, LootBoxCatalog.NoticeRewardWhitelist);
+        Assert.Contains(1016, LootBoxCatalog.NoticeRewardWhitelist);
         Assert.Equal(2, LootBoxCatalog.NoticeRewardWhitelist.Count);
 
-        Assert.True(LootBoxCatalog.EliteOnlyNoticeBoxIds.Contains(1035));
-        Assert.True(LootBoxCatalog.EliteOnlyNoticeBoxIds.Contains(1036));
-        Assert.True(LootBoxCatalog.EliteOnlyNoticeBoxIds.Contains(1037));
+        Assert.Contains(1035, LootBoxCatalog.EliteOnlyNoticeBoxIds);
+        Assert.Contains(1036, LootBoxCatalog.EliteOnlyNoticeBoxIds);
+        Assert.Contains(1037, LootBoxCatalog.EliteOnlyNoticeBoxIds);
     }
 }

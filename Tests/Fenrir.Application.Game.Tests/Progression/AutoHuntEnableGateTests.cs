@@ -57,6 +57,6 @@ public class AutoHuntEnableGateTests
 
         Assert.Equal(expected.Length, AutoHuntEnableGate.BlockedMapNumbers.Count);
         foreach (var mapId in expected)
-            Assert.True(AutoHuntEnableGate.BlockedMapNumbers.Contains(mapId));
+            Assert.Contains(mapId, AutoHuntEnableGate.BlockedMapNumbers);
     }
 }

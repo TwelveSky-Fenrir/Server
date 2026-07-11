@@ -15,10 +15,11 @@ namespace Fenrir.Application.Game.Services.ItemModification;
 
 /// <summary>
 ///     Business logic for op24, CZ_IMPROVE_ITEM_SEND -- extracted from <see cref="EnchantItemHandler" />, see
-///     that handler's remarks. Both the Protection Charm (<see cref="PlayerRuntimeState.ProtectForDestroy" />)
-///     and the "sweet potato" Lucky Enchant Scroll (<see cref="PlayerRuntimeState.ImproveItemValue" />) are
-///     read from live character state and threaded into <see cref="EnchantResolver.Resolve" /> -- see that
-///     type's own remarks for what is and is not yet modeled about the sweet-potato bonus.
+///     that handler's remarks. The Protection Charm (<see cref="PlayerRuntimeState.ProtectForDestroy" />),
+///     the Absolute Craft Ticket (<see cref="PlayerRuntimeState.ProtectForDestroy2" />), and the "sweet
+///     potato" Lucky Enchant Scroll (<see cref="PlayerRuntimeState.ImproveItemValue" />) are all read from
+///     live character state and threaded into <see cref="EnchantResolver.Resolve" /> -- see that type's own
+///     remarks for what is and is not yet modeled about the sweet-potato bonus and the Absolute Craft Ticket.
 /// </summary>
 public sealed class EnchantItemService(
     ICharacterRepository characters,
@@ -98,11 +99,12 @@ public sealed class EnchantItemService(
 
         var luck = state.Stats?.Luck ?? 0;
 
-        // ProtectForDestroy (Protection Charm) and ImproveItemValue ("sweet potato", Lucky Enchant Scroll)
-        // both already have real acquisition paths via UseInventoryItemService (op23) -- see
-        // EnchantResolver's own remarks for why neither is a guess.
+        // ProtectForDestroy (Protection Charm), ImproveItemValue ("sweet potato", Lucky Enchant Scroll), and
+        // ProtectForDestroy2 (Absolute Craft Ticket) all already have real acquisition paths via
+        // UseInventoryItemService (op23) -- see EnchantResolver's own remarks for why none of these is a guess.
         var resolved = EnchantResolver.Resolve(targetDefinition, target, materialDefinition, luck,
-            state.ProtectForDestroy, state.ImproveItemValue, SystemRandomSource.Instance);
+            state.ProtectForDestroy, state.ImproveItemValue, SystemRandomSource.Instance,
+            state.ProtectForDestroy2);
 
         if (resolved.Outcome == EnchantResolver.EnchantOutcome.Rejected)
         {
@@ -185,6 +187,7 @@ public sealed class EnchantItemService(
         // columns -- see EnchantResolver's own remarks for why the sweet-potato probability bonus itself is
         // not yet applied even though the charge is genuinely consumed and persisted here.
         int? newProtectForDestroy = resolved.ConsumesProtectCharge ? state.ProtectForDestroy - 1 : null;
+        int? newProtectForDestroy2 = resolved.ConsumesProtectCharge2 ? state.ProtectForDestroy2 - 1 : null;
         int? newImproveItemValue = resolved.ConsumesImproveCharge ? state.ImproveItemValue - 1 : null;
 
         if (resolved.IsWing)
@@ -196,7 +199,8 @@ public sealed class EnchantItemService(
             var newContributionPoints = state.ContributionPoints - resolved.Cost;
             if (!await zone.PostTribeProgressCommandAndWaitAsync(
                     new TribeProgressZoneCommand(characterId, newContributionPoints,
-                        ProtectForDestroy: newProtectForDestroy, ImproveItemValue: newImproveItemValue),
+                        ProtectForDestroy: newProtectForDestroy, ProtectForDestroy2: newProtectForDestroy2,
+                        ImproveItemValue: newImproveItemValue),
                     cancellationToken))
                 logger.LogError(
                     "Zone {MapId} tribe-progress inbox full: dropped CP/charge mirror for character {CharacterId} after wing enchant -- SQL write-behind will retry on next dirty flush",
@@ -212,16 +216,17 @@ public sealed class EnchantItemService(
             // remarks.
             zone.CreditNpcServiceTribeTax(state.Tribe, resolved.Cost);
 
-            if (newProtectForDestroy is not null || newImproveItemValue is not null)
+            if (newProtectForDestroy is not null || newProtectForDestroy2 is not null || newImproveItemValue is not null)
                 if (!await zone.PostTribeProgressCommandAndWaitAsync(
                         new TribeProgressZoneCommand(characterId, ProtectForDestroy: newProtectForDestroy,
-                            ImproveItemValue: newImproveItemValue), cancellationToken))
+                            ProtectForDestroy2: newProtectForDestroy2, ImproveItemValue: newImproveItemValue),
+                        cancellationToken))
                     logger.LogError(
                         "Zone {MapId} tribe-progress inbox full: dropped protect/sweet-potato charge mirror for character {CharacterId}",
                         zone.MapId, characterId);
         }
 
-        var resultCode = MapResultCode(resolved.Outcome);
+        var resultCode = MapResultCode(resolved.Outcome, resolved.IsWing);
 
         // Server/ts25zone/S04_MyWork02.cpp:3244-3247 (wing) / :3350-3357 (non-wing) -- reaching the enchant
         // cap fires a realm-wide notice via a DIFFERENT relay mechanism than UpgradeCape's own RANKUP notice
@@ -270,8 +275,16 @@ public sealed class EnchantItemService(
         return new EnchantItemResult(EnchantItemOutcome.Applied, resultCode, resolved.Cost, resolved.NewEnchant);
     }
 
-    /// <summary>ZC_IMPROVE_ITEM_RECV codes: 0 success, 1 fail, 2 destroyed, 3 reset-to-+40, 4 protected.</summary>
-    private static int MapResultCode(EnchantResolver.EnchantOutcome outcome)
+    /// <summary>
+    ///     ZC_IMPROVE_ITEM_RECV codes: 0 success, 1 fail, 2 destroyed, 3 reset-to-+40, 4 protected, 8/9 no-change
+    ///     (material consumed, enchant untouched -- 8 for a non-wing target's item 8101, 9 for a wing target's
+    ///     item 8106/695, per <see cref="EnchantResolver.EnchantOutcome.NoChange" />'s own remarks: "the caller
+    ///     maps the result code by <see cref="EnchantResolver.EnchantResult.IsWing" />"). Fixed a pre-existing
+    ///     bug (predates the wing-8106 finding that surfaced it): NoChange previously fell through to the `_`
+    ///     default (1, ordinary failure), silently misreporting a "material consumed, enchant safe" outcome as
+    ///     an ordinary failed roll for material 8101 -- never actually wired to a distinct code at all.
+    /// </summary>
+    private static int MapResultCode(EnchantResolver.EnchantOutcome outcome, bool isWing)
     {
         return outcome switch
         {
@@ -281,6 +294,7 @@ public sealed class EnchantItemService(
             EnchantResolver.EnchantOutcome.Destroyed => 2,
             EnchantResolver.EnchantOutcome.ResetToForty => 3,
             EnchantResolver.EnchantOutcome.Protected => 4,
+            EnchantResolver.EnchantOutcome.NoChange => isWing ? 9 : 8,
             _ => 1
         };
     }

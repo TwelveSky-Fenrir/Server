@@ -139,45 +139,108 @@ public static class EventLogEmitters
     public const short PetInventoryFromPetEventCode = 2;
 
     // ================================================================================================
-    // (F) Big-money ("1B" unit) ledger conversion -- legacy GL_990-GL_997 (Server/ts25zone/S04_MyWork05.cpp:
-    // 3512-3804, UpperCom/S06_MyUpperCom05.cpp:1028-1074), all eight siblings unconditional, one distinct
-    // legacy identifier per conversion pair/direction. Category: EventLogCategory.BigMoneyConversion (new
-    // member, wiring manifest). Only the FIRST of the eight is individually named/cited in the C20 contract
-    // (ProcessForInventoryMoneyTo1BInventoryMoney = GL_990, EventCode 1 below) -- the remaining seven
-    // (GL_991-GL_997) are not individually distinguished by name in the cited source range, so EventCode
-    // 2-8 are reserved as a generic ordered mapping (GL_991=2 ... GL_997=8) for whoever wires the actual
-    // tSort 240-247 dispatch to assign per the real function order, rather than guessed at here.
+    // (F) Big-money ("1B" unit) ledger conversion -- legacy GL_990-GL_997. Category:
+    // EventLogCategory.BigMoneyConversion. The full eight-way tSort/GL/direction mapping below is now
+    // CONFIRMED (re-read pass, all eight ProcessFor... bodies independently cross-checked against both
+    // their own mGAMELOG.GL_99x_...(...) call (S04_MyWork05.cpp) and their own literal mLogSort = 99N
+    // assignment (UpperCom/S06_MyUpperCom05.cpp:1028-1074) -- no discrepancy found between the two):
+    //
+    //   tSort | direction                                          | legacy id          | EventCode
+    //   ------|----------------------------------------------------|--------------------|----------
+    //   246   | Inventory Money -> Inventory BigMoney (fixed +1)    | GL_990_INVENTORY_MONEY | 1
+    //   247   | Inventory BigMoney -> Inventory Money (1 = 1e9)     | GL_991_INVENTORY_MONEY | 2
+    //   240   | Inventory BigMoney -> Trade BigMoney                | GL_992_TRADE_MONEY     | 3
+    //   243   | Trade BigMoney -> Inventory BigMoney                | GL_993_TRADE_MONEY     | 4
+    //   241   | Inventory BigMoney -> Store BigMoney (deposit)      | GL_994_STORE_MONEY     | 5
+    //   244   | Store BigMoney -> Inventory BigMoney (withdraw)     | GL_995_STORE_MONEY     | 6
+    //   242   | Inventory BigMoney -> Save/vault BigMoney (deposit) | GL_996_SAVE_MONEY      | 7
+    //   245   | Save/vault BigMoney -> Inventory BigMoney (withdraw)| GL_997_SAVE_MONEY      | 8
+    //
+    // Réf. C++ (all reopened, not recopied from a prior pass): Server/ts25zone/S04_MyWork04.cpp:726-773
+    // (the tSort 240-247 switch, one case per function above) ; S04_MyWork05.cpp:3512-3804 (the eight
+    // ProcessFor... bodies, each ending in its own GL_99x call -- see each constant below for its own
+    // line range) ; H06_MyUpperCom.h:362-369 (the eight GL_990-GL_997 declarations) ;
+    // UpperCom/S06_MyUpperCom05.cpp:1028-1074 (each body's own mLogSort = 99N assignment, an independent
+    // second confirmation of every GL number) ; H04_MyWork.h:170-177 (the eight ProcessFor... declarations).
+    //
+    // Dispatch status as of this pass (identifier mapping is now fully resolved regardless of dispatch):
+    // tSort 241/244 (Store) and 242/245 (Save/vault) ARE dispatched --
+    // Application/Fenrir.Application.Game.Services/Inventory/BigMoneyTransferService.cs (called from
+    // GenericActionHandler.cs's BigMoney branch), which now calls LogBigMoneyConversionAsync below for all
+    // four. tSort 240/243 (Inventory<->Trade-offer BigMoney) and 246/247 (Money<->BigMoney unit conversion,
+    // BigMoneyUnitConversionPolicy) still have NO dispatch of any kind anywhere in this codebase (their only
+    // callers remain their own unit tests) -- EventCode1-4 above are therefore still unused by any
+    // production call site. This is an open TODO (missing dispatch), not an unresolved identifier mapping;
+    // do not invent a call site for them here.
     // ================================================================================================
 
     /// <summary>
-    ///     GL_990 (ProcessForInventoryMoneyTo1BInventoryMoney): inventory Money -&gt; inventory BigMoney.
+    ///     GL_990_INVENTORY_MONEY (tSort 246, <c>ProcessForInventoryMoneyTo1BInventoryMoney</c>,
+    ///     Server/ts25zone/S04_MyWork05.cpp:3512-3545): inventory Money -&gt; inventory BigMoney.
     ///     Non-proportionate by design -- always converts exactly +1 BigMoney unit regardless of the
     ///     requested transfer amount, while debiting the FULL requested amount from Money
-    ///     (<c>wAvatar.aBigMoney += 1; wMoney -= tQuantity1;</c>, Server/ts25zone/S04_MyWork05.cpp:3540-3541).
+    ///     (<c>wAvatar.aBigMoney += 1; wMoney -= tQuantity1;</c>, :3540-3541).
     ///     <see cref="LogBigMoneyConversionAsync" />'s <c>fromLedgerDelta</c>/<c>toLedgerDelta</c> must carry
-    ///     that true, non-proportionate pair verbatim -- do not "correct" it to look proportionate.
+    ///     that true, non-proportionate pair verbatim -- do not "correct" it to look proportionate. Still
+    ///     unused by any production call site -- tSort 246 has no dispatch yet (see this class's remarks).
     /// </summary>
     public const short BigMoneyConversionEventCode1 = 1;
 
-    /// <summary>GL_991 -- see this class's remarks: exact function mapping to be assigned by the dispatch implementer.</summary>
+    /// <summary>
+    ///     GL_991_INVENTORY_MONEY (tSort 247, <c>ProcessFor1BInventoryMoneyToInventoryMoney</c>,
+    ///     Server/ts25zone/S04_MyWork05.cpp:3547-3580): inventory BigMoney -&gt; inventory Money, the exact
+    ///     inverse of <see cref="BigMoneyConversionEventCode1" /> -- always -1 BigMoney unit / +
+    ///     <c>MAX_NUMBER_SIZE1</c> (1,000,000,000, Server/Header/Protocol/DEFINE.h:366) Money. Still unused
+    ///     by any production call site -- tSort 247 has no dispatch yet.
+    /// </summary>
     public const short BigMoneyConversionEventCode2 = 2;
 
-    /// <summary>GL_992 -- see <see cref="BigMoneyConversionEventCode2" />'s remarks.</summary>
+    /// <summary>
+    ///     GL_992_TRADE_MONEY (tSort 240, <c>ProcessFor1BInventoryMoneyTo1BTradeMoney</c>,
+    ///     Server/ts25zone/S04_MyWork05.cpp:3582-3622): inventory BigMoney -&gt; trade-window BigMoney. Still
+    ///     unused by any production call site -- tSort 240 has no dispatch yet (the broader trade-money-
+    ///     placement subsystem has zero live callers in this codebase).
+    /// </summary>
     public const short BigMoneyConversionEventCode3 = 3;
 
-    /// <summary>GL_993 -- see <see cref="BigMoneyConversionEventCode2" />'s remarks.</summary>
+    /// <summary>
+    ///     GL_993_TRADE_MONEY (tSort 243, <c>ProcessFor1BTradeMoneyTo1BInventoryMoney</c>,
+    ///     Server/ts25zone/S04_MyWork05.cpp:3624-3664): trade-window BigMoney -&gt; inventory BigMoney, the
+    ///     reverse of <see cref="BigMoneyConversionEventCode3" />. Still unused -- tSort 243 has no dispatch
+    ///     yet.
+    /// </summary>
     public const short BigMoneyConversionEventCode4 = 4;
 
-    /// <summary>GL_994 -- see <see cref="BigMoneyConversionEventCode2" />'s remarks.</summary>
+    /// <summary>
+    ///     GL_994_STORE_MONEY (tSort 241, <c>ProcessFor1BInventoryMoneyTo1BStoreMoney</c>,
+    ///     Server/ts25zone/S04_MyWork05.cpp:3666-3699): inventory BigMoney -&gt; Store BigMoney (deposit).
+    ///     Wired via <c>BigMoneyTransferService.TransferStoreAsync</c>'s <c>isDeposit</c> (<c>sort == 241</c>)
+    ///     branch.
+    /// </summary>
     public const short BigMoneyConversionEventCode5 = 5;
 
-    /// <summary>GL_995 -- see <see cref="BigMoneyConversionEventCode2" />'s remarks.</summary>
+    /// <summary>
+    ///     GL_995_STORE_MONEY (tSort 244, <c>ProcessFor1BStoreMoneyTo1BInventoryMoney</c>,
+    ///     Server/ts25zone/S04_MyWork05.cpp:3701-3734): Store BigMoney -&gt; inventory BigMoney (withdraw),
+    ///     the reverse of <see cref="BigMoneyConversionEventCode5" />. Wired via
+    ///     <c>BigMoneyTransferService.TransferStoreAsync</c>'s withdraw (<c>sort == 244</c>) branch.
+    /// </summary>
     public const short BigMoneyConversionEventCode6 = 6;
 
-    /// <summary>GL_996 -- see <see cref="BigMoneyConversionEventCode2" />'s remarks.</summary>
+    /// <summary>
+    ///     GL_996_SAVE_MONEY (tSort 242, <c>ProcessFor1BInventoryMoneyTo1BSaveMoney</c>,
+    ///     Server/ts25zone/S04_MyWork05.cpp:3736-3769): inventory BigMoney -&gt; Save/vault BigMoney
+    ///     (deposit). Wired via <c>BigMoneyTransferService.TransferSaveAsync</c>'s <c>isDeposit</c>
+    ///     (<c>sort == 242</c>) branch.
+    /// </summary>
     public const short BigMoneyConversionEventCode7 = 7;
 
-    /// <summary>GL_997 -- see <see cref="BigMoneyConversionEventCode2" />'s remarks.</summary>
+    /// <summary>
+    ///     GL_997_SAVE_MONEY (tSort 245, <c>ProcessFor1BSaveMoneyToInventoryMoney</c>,
+    ///     Server/ts25zone/S04_MyWork05.cpp:3771-3804): Save/vault BigMoney -&gt; inventory BigMoney
+    ///     (withdraw), the reverse of <see cref="BigMoneyConversionEventCode7" />. Wired via
+    ///     <c>BigMoneyTransferService.TransferSaveAsync</c>'s withdraw (<c>sort == 245</c>) branch.
+    /// </summary>
     public const short BigMoneyConversionEventCode8 = 8;
 
     /// <summary>
@@ -258,13 +321,18 @@ public static class EventLogEmitters
     /// <summary>
     ///     Writes one big-money conversion audit record. <paramref name="conversionEventCode" /> must be one
     ///     of the eight <c>BigMoneyConversionEventCodeN</c> constants above (not validated here -- the
-    ///     dispatch implementer picks the right one per direction). <paramref name="fromLedgerDelta" />/
-    ///     <paramref name="toLedgerDelta" /> are the raw signed deltas actually applied to the debited/
-    ///     credited ledgers -- see <see cref="BigMoneyConversionEventCode1" />'s remarks for why these must
-    ///     never be normalized to look proportionate.
+    ///     caller picks the right one per direction/tSort, per this class's own remarks table).
+    ///     <paramref name="accountId" /> is nullable because not every wired call site currently threads an
+    ///     account id through to this point (e.g. <c>BigMoneyTransferService.TransferStoreAsync</c> only
+    ///     receives a character id) -- pass <see langword="null" /> rather than guessing one.
+    ///     <paramref name="fromLedgerDelta" />/<paramref name="toLedgerDelta" /> are the raw signed deltas
+    ///     actually applied to the debited/credited ledgers (by convention, the debited/source ledger's
+    ///     delta first, the credited/destination ledger's delta second) -- see
+    ///     <see cref="BigMoneyConversionEventCode1" />'s remarks for why these must never be normalized to
+    ///     look proportionate.
     /// </summary>
     public static ValueTask LogBigMoneyConversionAsync(this IEventLogRepository eventLog, short conversionEventCode,
-        int accountId, int characterId, long fromLedgerDelta, long toLedgerDelta, CancellationToken ct)
+        int? accountId, int characterId, long fromLedgerDelta, long toLedgerDelta, CancellationToken ct)
     {
         return eventLog.LogAsync(conversionEventCode, EventLogCategory.BigMoneyConversion, accountId,
             characterId, null, null, null, fromLedgerDelta, toLedgerDelta, null, null, SuccessOutcome, null, ct);

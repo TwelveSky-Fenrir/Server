@@ -2,7 +2,9 @@ using System.Buffers;
 using System.Collections.Immutable;
 using System.Threading.Channels;
 using Fenrir.Application.Game.Domain.Hotkeys;
+using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Mounts;
+using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Social.Pshop;
 using Fenrir.Application.Game.Stats;
@@ -1208,8 +1210,23 @@ public sealed partial class Zone
     ///     this slot" (both sort 0 insert and sort 1 remove always write the full new value for
     ///     <see cref="RuneSocketZoneCommand.RuneIndex" />, never "leave untouched"). The paired inventory-slot
     ///     mirror rides the existing <see cref="_inventoryInbox" /> separately, same as every other
-    ///     economy-adjacent handler. <see cref="RuneSocketZoneCommand.UpdatedStats" /> is always null today --
-    ///     see <c>RuneSocketHandler</c>'s remarks for why recomputing would be a pure no-op.
+    ///     economy-adjacent handler.
+    ///     <para>
+    ///         B5/B6 made the rune arrays a live <see cref="Inventory.EquipmentService.RecomputeStats" /> input
+    ///         (via <c>AssembleStatContexts</c> -&gt; <c>CosmeticContext</c>), so <see cref="PlayerRuntimeState.Stats" />
+    ///         is recomputed unconditionally, right here, after every socket mutation -- same "recompute on the
+    ///         tick thread, at apply time" posture as <see cref="RecomputeStatsAndBroadcastBuffs" />, minus that
+    ///         method's buff-slot broadcast (a rune change has no changed-buff-slots payload to push). Passing
+    ///         <c>runtimeState: state</c> is the critical bit: it is what makes
+    ///         <c>EquipmentService.AssembleStatContexts</c> read the just-mutated <see cref="PlayerRuntimeState.RuneSystem" />/
+    ///         <see cref="PlayerRuntimeState.RuneSystemStat" /> (plus every other live cosmetic/zone/consumable/mount
+    ///         context) instead of silently defaulting all four to neutral.
+    ///     </para>
+    ///     <para>
+    ///         <see cref="RuneSocketZoneCommand.UpdatedStats" /> is always null from every real caller today (see
+    ///         <c>RuneSocketService</c>'s remarks) -- when a future caller does supply one, it still wins last over
+    ///         this recompute, same precedence <see cref="ApplyAvatarBuffCommand" /> gives its own <c>UpdatedStats</c>.
+    ///     </para>
     /// </summary>
     private void ApplyRuneSocketCommand(in RuneSocketZoneCommand command)
     {
@@ -1219,11 +1236,19 @@ public sealed partial class Zone
         state.RuneSystem = state.RuneSystem.SetItem(command.RuneIndex, command.RuneItemId ?? 0);
         state.RuneSystemStat = state.RuneSystemStat.SetItem(command.RuneIndex, command.RuneStat ?? 0);
 
-        // TODO(wiring B5): recompute-trigger deferred to fenrir-gameplay-domain-engineer (real gameplay change,
-        // out of this wiring pass's scope). Per the B5 manifest, rune arrays now feed EquipmentService.RecomputeStats
-        // (via AssembleStatContexts -> CosmeticContext), so recomputing is no longer the pure no-op this method's
-        // doc above describes: either compute UpdatedStats on the posting thread and pass it via
-        // RuneSocketZoneCommand.UpdatedStats, or recompute here on the tick thread -- before the op199 response.
+        var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
+            state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo, state.RebirthCount,
+            state.Level2);
+        var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
+        var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
+            ? petStack.ItemId
+            : 0;
+        var petContribution = PetGrowthCalculator.Compute(petItemId, state.PetGrowth, state.PetActivity,
+            worldData.ItemsById);
+
+        state.Stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
+            petContribution, runtimeState: state);
+
         if (command.UpdatedStats is { } stats)
             state.Stats = stats;
     }

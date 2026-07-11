@@ -369,6 +369,11 @@ public sealed partial class Zone
             EatStrPotion = data.EatStrPotion,
             EatDexPotion = data.EatDexPotion,
             EatElePotion = data.EatElePotion,
+            // Lucky Drop/"Acquisition" Scroll minutes counter -- see PlayerRuntimeState.DropItemTime's own
+            // remarks.
+            DropItemTime = data.DropItemTime,
+            // War Point currency balance -- see PlayerRuntimeState.WarPoint's own remarks.
+            WarPoint = data.WarPoint,
             // mSupportSkillTimeUpRatio's two source fields -- see PlayerRuntimeState.PremiumExpireUtc/
             // BuffX2Time's own remarks. SupportSkillTimeUpRatio itself is recomputed from these just below,
             // not copied from any prior in-memory value (zone-enter/character-load is itself one of the
@@ -381,6 +386,13 @@ public sealed partial class Zone
             StoreMoney = data.StoreMoney,
             InventoryDate = data.InventoryDate,
             StoreDate = data.StoreDate,
+            // aPetBagDate -- see PlayerRuntimeState.PetBagDate's own remarks and PlayerEnterData.PetBagDate's
+            // own remarks for why this must travel through both world entry and an in-process zone transfer.
+            PetBagDate = data.PetBagDate,
+            // The M15 Pet Lucky Box (8111) pity counter -- see PlayerRuntimeState.M15PetLuckyBoxPity's own
+            // remarks and PlayerEnterData.M15PetLuckyBoxPity's own remarks for why this must travel through
+            // both world entry and an in-process zone transfer.
+            M15PetLuckyBoxPity = data.M15PetLuckyBoxPity,
             // D2 hook 2: canonical source-IP for the PvP same-origin kill-credit guard -- must be set here,
             // in the object initializer, since PlayerRuntimeState.SourceIp is init-only. Populated end-to-end
             // by EnterWorldService (fresh login) and ZoneTransfer.CreateEnterData (in-process handoff) -- see
@@ -467,6 +479,15 @@ public sealed partial class Zone
         state.LastSeenPetItemId = data.Items is { } petScanItems
             ? PetSlots.ResolveEquippedPetItemId(petScanItems)
             : 0;
+
+        // aRuneSystem[4]/aRuneSystemStat[4] -- world-entry hydration (EnterWorldService) or, for an in-process
+        // handoff, the live arrays carried through by ZoneTransfer.CreateEnterData. Null (neither live call
+        // site ever leaves it so) would leave PlayerRuntimeState's own [0,0,0,0] "never socketed" default in
+        // place, same null-means-leave-default posture as Items/Stats/Skills above.
+        if (data.RuneSystem is { } runeSystem)
+            state.RuneSystem = runeSystem;
+        if (data.RuneSystemStat is { } runeSystemStat)
+            state.RuneSystemStat = runeSystemStat;
 
         var cell = _grid.CellOf(state.PosX, state.PosZ);
         state.CurrentCell = cell;
@@ -1287,9 +1308,14 @@ public sealed partial class Zone
         }
 
         // petPackedValue: 0 (SkillGradeAuthority's own documented safe default -- no confirmed live source
-        // yet, see that class's remarks). guildBuffType/guildBuffActive: term 6 is a documented no-op today
-        // (SkillGradeAuthority.IsBuffCategorySkill always returns false), so state.GuildBuffActive is passed
-        // for completeness but cannot change the result either way.
+        // yet, see that class's remarks). guildBuffType/guildBuffActive: term 6 itself is now fully modeled
+        // (skillgrade-authority-magnitudes contract -- SkillGradeAuthority.IsBuffCategorySkill no longer
+        // always returns false), but THIS call site still hardcodes guildBuffType to 0 because
+        // PlayerRuntimeState has no live numeric guild-buff "type" selector field yet (only
+        // GuildBuffActive/GuildBuffActiveMirror on/off flags) -- a separate, pre-existing state-modeling gap,
+        // not something this contract closes. Since term 6 requires guildBuffType == 3, hardcoding 0 keeps
+        // this call site's result unchanged (0) until that field exists; state.GuildBuffActive is passed for
+        // completeness but cannot change the result on its own either.
         var serverBonusGrade = SkillGradeAuthority.GetBonusSkillValue(action.SkillNumber, equipSlotItems, 0,
             skillDef, 0, state.GuildBuffActive);
         var serverMaxGrade = SkillGradeAuthority.GetMaxSkillGradeNum(action.SkillNumber, state.LearnedSkills);
@@ -1499,13 +1525,15 @@ public sealed partial class Zone
     ///         (<see cref="HasFullPartyPresent" />, checked via <see cref="SkillCastResolver.Result.RequiresFullParty" />)
     ///         -- short of a full 5 (including solo), no buff is written even to the caster, matching
     ///         <c>AVATAR_OBJECT::ProcessForCreateEffectValue</c>'s own all-or-nothing gate
-    ///         (S07_MyGame04.cpp:1348-1374). Not modeled here: the two-step <c>mParty_Buff_Act</c> CAST/DONE
-    ///         cast-lifecycle marker the legacy also requires (S04_MyWork02.cpp:1684-1699) -- this method's own
-    ///         skill/grade staleness check above already enforces the same "a cast must have started before
-    ///         this confirm applies" ordering, so it stands in as the structural equivalent; and the
-    ///         independent grade-bound recheck the legacy performs for every other skill number
-    ///         (S07_MyGame04.cpp:1376-1381) -- neither established by the behavior contract this satisfies
-    ///         (flagged there as further-tracing items, not guessed at here).
+    ///         (S07_MyGame04.cpp:1348-1374). <b>Wiring B14, hook 3 (resolved, AND-combine):</b> the broadcast
+    ///         is additionally gated on <see cref="PlayerRuntimeState.PartyBuffAct" /> having already reached
+    ///         <see cref="PartyBuffAction.Done" /> (the two-step <c>mParty_Buff_Act</c> CAST/DONE
+    ///         cast-lifecycle marker the legacy also requires, S04_MyWork02.cpp:1684-1699) -- stricter than
+    ///         either gate alone, an explicit project-owner adjudication of a three-times-flagged open
+    ///         question (original B14 pass -&gt; wave9 reconciliation -&gt; wave17 fresh confirmation pass).
+    ///         Not modeled here: the independent grade-bound recheck the legacy performs for every other
+    ///         skill number (S07_MyGame04.cpp:1376-1381) -- not established by the behavior contract this
+    ///         satisfies (flagged there as a further-tracing item, not guessed at here).
     ///     </para>
     ///     <para>
     ///         Skill 82 ("Holy Shield") additionally carries its own <c>mLastHSTick</c> real-time
@@ -1552,19 +1580,19 @@ public sealed partial class Zone
         // state, S07_MyGame03.cpp:9600/9607/9614/9621) is applied below, once the buff has actually been
         // written, not here.
         //
-        // TODO(wiring B14): hook 3 (gate the formation buff broadcast on PartyBuffAct == Done) is STILL
-        // DEFERRED as a genuine design decision for this partial's owner -- this reconciliation fixes WHICH
-        // Sort/opcode advances and consumes the marker, not whether buff creation should additionally be
-        // gated on it. The B14 contract wants the party-buff CAST/DONE marker to be the broadcast gate; but
-        // this method's own remarks state the existing op15/op16 skill/grade staleness check already "stands
-        // in as the structural equivalent". Adding `if (result.RequiresFullParty && state.PartyBuffAct !=
-        // PartyBuffAction.Done) return;` here would change the existing HasFullPartyPresent-gated behavior, so
-        // it is intentionally NOT applied without adjudication -- see the B14 openQuestions.
+        // Wiring B14, hook 3 -- resolved (AND-combine): the formation buff broadcast is gated on BOTH the
+        // existing HasFullPartyPresent check AND state.PartyBuffAct == PartyBuffAction.Done, stricter than
+        // either the pre-existing C# behavior (HasFullPartyPresent alone) or the cited legacy behavior
+        // (PartyBuffAct == Done alone, S07_MyGame04.cpp:1348-1351) individually. This was a three-times-flagged
+        // open design decision (original B14 pass -> wave9 reconciliation -> a wave17 fresh confirmation pass,
+        // see PartyBuffMarkerDispatchRules' own remarks) explicitly adjudicated by the project owner rather
+        // than silently picked.
 
         // Formation skills 76/77/79/81 only (SkillEffectCatalog.RequiresFullParty) -- see this method's own
         // remarks and the "Formation Party-Buff Exact-Five-Member Gate" behavior contract. Every other skill
         // number leaves RequiresFullParty false and this check is a no-op for it.
-        if (result.RequiresFullParty && !HasFullPartyPresent(state.CharacterId))
+        if (result.RequiresFullParty &&
+            (!HasFullPartyPresent(state.CharacterId) || state.PartyBuffAct != PartyBuffAction.Done))
             return;
 
         switch (result.Kind)

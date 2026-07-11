@@ -41,12 +41,32 @@ public class MonsterAiSystemRecipesTests
     [InlineData((byte)13)]
     [InlineData((byte)28)]
     [InlineData((byte)14)]
+    [InlineData((byte)15)] // recovered 2026-07-11: a sixth Tribe-Symbol-Stone code, a genuine no-op one level
+    // deeper inside the recipe body itself, but still resolves to this archetype at the selector level.
     public void SpecialSort_TribeSymbolSpecialTypes_DeriveToTribeSymbolStone(byte specialType)
     {
         // The one non-default mapping with an independent Fenrir anchor (MonsterSpawnScheduler's own
-        // 11/12/13/28/14 Holy-Stone symbol map). Type is unused for this branch.
+        // 11/12/13/28/14 Holy-Stone symbol map, plus the recovered 15). Type is unused for this branch --
+        // Type 2 stands in for "any Type outside the Tribe-Guard set {6,7,8,9}" (Type 9 would no longer prove
+        // the same point: recovered 2026-07-11, Type 9 unconditionally derives TribeGuard regardless of
+        // SpecialType -- see SpecialSort_TribeGuardTypes_DeriveToTribeGuard_RegardlessOfSpecialType below).
         Assert.Equal(MonsterSpecialSort.TribeSymbolStone, MonsterSpecialSort.Derive(1, specialType));
-        Assert.Equal(MonsterSpecialSort.TribeSymbolStone, MonsterSpecialSort.Derive(9, specialType));
+        Assert.Equal(MonsterSpecialSort.TribeSymbolStone, MonsterSpecialSort.Derive(2, specialType));
+    }
+
+    [Theory]
+    [InlineData((byte)6)]
+    [InlineData((byte)7)]
+    [InlineData((byte)8)]
+    [InlineData((byte)9)]
+    public void SpecialSort_TribeGuardTypes_DeriveToTribeGuard_RegardlessOfSpecialType(byte type)
+    {
+        // Recovered 2026-07-11: Type 6/7/8/9 -> Tribe Guard unconditionally, closing MonsterAiSystem's own
+        // previously-documented "Derive has no discriminator entry mapping a guard's (Type, SpecialType) to
+        // TribeGuard" gap. SpecialType is not inspected at all once Type matches -- proven here by using 11,
+        // a value that WOULD otherwise resolve to TribeSymbolStone under Type==1, to show Type dominates.
+        Assert.Equal(MonsterSpecialSort.TribeGuard, MonsterSpecialSort.Derive(type, 11));
+        Assert.Equal(MonsterSpecialSort.TribeGuard, MonsterSpecialSort.Derive(type, 0));
     }
 
     [Fact]

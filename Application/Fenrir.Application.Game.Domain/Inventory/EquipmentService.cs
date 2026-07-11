@@ -35,10 +35,21 @@ public static class EquipmentService
     ///     When supplied, the cosmetic/zone/consumable/mount stat contexts are assembled from this player's
     ///     runtime state (rune/costume/stellar, ornament/rank-buff/tribe-role/zone, the five potion counters,
     ///     mount) and threaded into <see cref="StatCalculator.ComputeEffectiveStats" />. Introduced by
-    ///     workstream B1 as the assembly point the cited finding names; today this is a pure signature
-    ///     extension -- <see cref="StatCalculator" /> accepts those contexts but no formula reads them, so
-    ///     passing a runtime state yields the same numeric result as omitting it, until a later workstream
-    ///     wires the bonus math. Null (every current caller) leaves all four contexts at their neutral default.
+    ///     workstream B1 as the assembly point the cited finding names, this is no longer a pure signature
+    ///     extension: workstreams B2/B4-B8 wired real <see cref="StatCalculator" /> formulas onto most of what
+    ///     <see cref="AssembleStatContexts" /> assembles (rune -- <c>StatCalculator.PrimaryAttributes.cs</c>'s
+    ///     Rune{Vitality,Strength,Ki,Wisdom}Bonus getters, see <see cref="Fenrir.Application.Game.Domain.World.PlayerRuntimeState.RuneSystem" />'s
+    ///     own remarks; costume enchant; the five Eat*Potion elixir counters; mount rolled attributes; rank-buff/
+    ///     tribe-role/guild-buff), so passing a real runtime state DOES change the numeric result for those
+    ///     inputs today -- see each context's own remarks in <see cref="AssembleStatContexts" /> below for which
+    ///     specific fields still stay neutral pending their own follow-up. Null (still every call site except
+    ///     <c>Zone.ApplyRuneSocketCommand</c>, the one production caller that supplies the live
+    ///     <see cref="Fenrir.Application.Game.Domain.World.PlayerRuntimeState" /> -- see that method's own
+    ///     remarks) leaves all four contexts at their neutral default; the very first post-login stat snapshot
+    ///     built by <c>Application.Game.Services.ZoneLifecycle.EnterWorldService</c> is a structural instance of
+    ///     this, not an oversight -- it runs before <c>Zone.HandleEnter</c> ever constructs this character's
+    ///     <see cref="Fenrir.Application.Game.Domain.World.PlayerRuntimeState" />, so there is no runtime state
+    ///     to pass yet at that specific call site.
     /// </param>
     public static EffectiveStats RecomputeStats(
         CharacterBaseAttributes attributes,

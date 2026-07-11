@@ -8,5 +8,7 @@ CREATE TABLE world.NpcGambleCosts
     CONSTRAINT PK_NpcGambleCosts PRIMARY KEY CLUSTERED (NpcId, GambleTier, CostIndex),
     CONSTRAINT CK_NpcGambleCosts_GambleTier CHECK (GambleTier BETWEEN 0 AND 144),
     CONSTRAINT CK_NpcGambleCosts_CostIndex CHECK (CostIndex BETWEEN 0 AND 14),
-    CONSTRAINT FK_NpcGambleCosts_Npcs FOREIGN KEY (NpcId) REFERENCES world.Npcs (NpcId)
+    CONSTRAINT FK_NpcGambleCosts_Npcs FOREIGN KEY (NpcId) REFERENCES world.Npcs (NpcId),
+    -- Value mirrors legacy's own load-time bound (Npc_CheckValidElement, Server/Header/S15_MyShare.cpp:1953-1962).
+    CONSTRAINT CK_NpcGambleCosts_Value CHECK (Value BETWEEN 0 AND 100000000)
 );

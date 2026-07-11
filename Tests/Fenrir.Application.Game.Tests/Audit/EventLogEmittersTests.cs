@@ -181,6 +181,22 @@ public class EventLogEmittersTests
     }
 
     [Fact]
+    public async Task LogBigMoneyConversionAsync_NullAccountId_WritesNullActorAccountId()
+    {
+        var fake = new FakeEventLogRepository();
+
+        // BigMoneyTransferService.TransferStoreAsync (tSort 241/244) has no account id in scope -- the
+        // wrapper must allow accountId: null rather than forcing a guessed value.
+        await fake.LogBigMoneyConversionAsync(EventLogEmitters.BigMoneyConversionEventCode5, accountId: null,
+            characterId: 10, fromLedgerDelta: -5, toLedgerDelta: 5, CancellationToken.None);
+
+        var e = Assert.Single(fake.LoggedEvents);
+        Assert.Equal(EventLogEmitters.BigMoneyConversionEventCode5, e.EventCode);
+        Assert.Null(e.ActorAccountId);
+        Assert.Equal(10, e.ActorCharacterId);
+    }
+
+    [Fact]
     public void BigMoneyConversionEventCodes_AreEightDistinctValues()
     {
         short[] codes =

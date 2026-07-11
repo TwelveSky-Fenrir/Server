@@ -263,4 +263,65 @@ public class EnchantItemServiceTests
         Assert.Equal(EnchantItemOutcome.Applied, result.Outcome);
         Assert.Equal(0, state.ImproveItemValue);
     }
+
+    /// <summary>
+    ///     Regression test for the <c>MapResultCode</c> fix: a "no-change" material (item 8101 -- see
+    ///     <see cref="EnchantMaterialCatalog.StandardMaterials" />'s <c>NoChangeOnFailure</c> entry) failing its
+    ///     success roll against a NON-wing target must report ZC_IMPROVE_ITEM_RECV result code 8 and leave the
+    ///     target's enchant value completely untouched -- no downgrade, no destroy. Before the fix,
+    ///     <c>EnchantOutcome.NoChange</c> had no case in <c>MapResultCode</c> and silently fell through to the
+    ///     <c>_ =&gt; 1</c> default (ordinary failure), misreporting this outcome.
+    ///     <para>
+    ///         <see cref="EnchantItemService" /> rolls via <c>SystemRandomSource.Instance</c> with no injectable
+    ///         <c>IRandomSource</c>/<c>Random</c> seam (same posture as
+    ///         <c>UpgradeItemRankServiceTests.WarlordRerollEligible_EliteSwap_LogsWarlordSwapNotice</c>), so this
+    ///         forces a genuine failed roll rather than injecting a scripted one: a <c>currentImprove</c> of 32
+    ///         (-&gt; <c>newImprove</c> 33) with Luck 0 drives <c>EnchantResolver.ResolveStandard</c>'s
+    ///         <c>p1 = Math.Max(5, 103 - newImprove*3 + luck/100)</c> formula down to its floor of 5 -- a
+    ///         95%-per-attempt chance the roll fails and <c>NoChange</c> is returned. This retries across
+    ///         independent attempts (guarded, bounded, `Assert.Fail`s if never hit) rather than asserting a
+    ///         single non-deterministic call, matching the established idiom for a real end-to-end test that has
+    ///         no deterministic-random seam to reach for instead.
+    ///     </para>
+    /// </summary>
+    [Fact]
+    public async Task NoChangeMaterialFailedRoll_NonWingTarget_ReportsResultCodeEight_EnchantUnchanged()
+    {
+        const int noChangeMaterialId = 8101;
+        const byte currentImprove = 32; // newImprove = 33 -> p1 = Math.Max(5, 103 - 99 + 0) = 5 (the floor).
+
+        var itemsById = new Dictionary<int, ItemDefinition>
+        {
+            [TargetItemId] = new(WorldDataTestRows.Item(TargetItemId) with { Sort = 7, CheckImprove = 2 }, []),
+            [noChangeMaterialId] = new(WorldDataTestRows.Item(noChangeMaterialId), [])
+        }.ToFrozenDictionary();
+
+        for (var attempt = 0; attempt < 40; attempt++)
+        {
+            var (session, _, zone, state, repo, eventLog) = SetUp();
+            state.LastEnchantAttemptUtc = DateTime.UtcNow - SimulationClock.LegacyTick - TimeSpan.FromMilliseconds(1);
+            SeedInventory(zone, new ItemStack(TargetItemId, 1, currentImprove, 0, 0, 0, 0, 0, 0, 0, 777),
+                new ItemStack(noChangeMaterialId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+            var service = new EnchantItemService(repo, ZoneTestKit.EmptyWorldData(itemsById), eventLog,
+                NullLogger<EnchantItemService>.Instance);
+
+            var result = await RunToCompletionAsync(
+                service.EnchantAsync(
+                    new EnchantItemRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1, Luck = 0 }, zone, state,
+                    10, CancellationToken.None), zone);
+
+            Assert.Null(session.DisconnectReason);
+            Assert.Equal(EnchantItemOutcome.Applied, result.Outcome);
+
+            if (result.NewEnchant != currentImprove)
+                continue; // The 5%-chance success roll landed this attempt instead -- retry for NoChange.
+
+            Assert.Equal(8, result.ResultCode);
+            Assert.Equal(currentImprove, state.Inventory.GetSlot(0, 0)!.Value.Enchant);
+            return;
+        }
+
+        Assert.Fail(
+            "Failed (NoChange) roll never landed across 40 attempts (5% success chance per attempt, each independent).");
+    }
 }

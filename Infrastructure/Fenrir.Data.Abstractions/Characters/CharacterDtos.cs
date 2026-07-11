@@ -228,7 +228,31 @@ public sealed partial record CharacterWorldSnapshotDto(
     // legacy-behavior-translator Rebirth-advancement contract's Path B ("Max Rebirth" aZone241Time += 10).
     // Appended last, defaulted to 0, same "pre-existing N-arg test construction keeps compiling" posture as
     // AutoTime2 immediately above.
-    int Zone241Time = 0);
+    int Zone241Time = 0,
+    // Migrations/047_characters_petbagdate_column.sql: aPetBagDate, the pet-bag upper-half (slots 10-19)
+    // rental entitlement expiry (YYYYMMDD), wire-exposed via AvatarInfo.PetBagDate (previously always sent as
+    // the bare literal 0 from AvatarInfoFactory, per that field's own remarks) and consumed by
+    // GenericActionHandler's petBagUpperHalfEntitlementActive gate (PlayerRuntimeState.PetBagDate >=
+    // GameDate.Today(), same posture as the sibling InventoryDate/StoreDate gates above). DEFAULT 0 matches
+    // legacy's own confirmed behavior -- ServerDocs/11_ts25login/01_Flux_Authentification_Redirection.md:
+    // 381-383 confirms the live creation path never sets this field, so a never-granted character reads as
+    // permanently expired both here and in legacy. Appended last, defaulted to 0, same "pre-existing N-arg
+    // test construction keeps compiling" posture as AutoTime2/Zone241Time immediately above.
+    int PetBagDate = 0,
+    // Migrations/041_characters_warpoint_currency.sql: aWarPoint, the War-Point currency balance. That
+    // migration's own header flagged this exact projection as the still-open follow-up (usp_Character_
+    // GetForWorldEntry did not yet select it) -- closed here. Wire-exposed via AvatarInfo.WarPoint
+    // (previously always sent as the bare literal 0 from AvatarInfoFactory -- see
+    // PlayerRuntimeState.WarPoint's own remarks). Appended last, defaulted to 0, same "pre-existing N-arg
+    // test construction keeps compiling" posture as AutoTime2/Zone241Time/PetBagDate immediately above. The
+    // GrantWarPoints credit path remains write-behind-excluded and unpersisted, same posture as Money/
+    // BloodCoin/BigMoney -- this projection only closes the READ side.
+    int WarPoint = 0,
+    // Migrations/048_characters_m15petluckybox_pity_column.sql (confirmation-pass follow-up): the M15 Pet
+    // Lucky Box (world.Items 8111) pity counter, previously session-scoped only -- see
+    // PlayerRuntimeState.M15PetLuckyBoxPity's own remarks. Appended last, defaulted to 0, same "pre-existing
+    // N-arg test construction keeps compiling" posture as AutoTime2/Zone241Time/PetBagDate/WarPoint above.
+    int M15PetLuckyBoxPity = 0);
 
 /// <summary>
 ///     RS1 of usp_Character_GetForWorldEntry. ExpireDate: legacy YYYYMMDD int, 0 = not a rental. Container: 0/1

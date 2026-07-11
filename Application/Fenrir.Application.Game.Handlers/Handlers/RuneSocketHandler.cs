@@ -19,8 +19,12 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 ///     full (removal only) -- <c>B_RUNE_SYSTEM_RECV(0, ...)</c> terminates the Sort=0 branch and
 ///     <c>B_RUNE_SYSTEM_RECV(1, ...)</c> terminates the Sort=1 branch in S04_MyWork03.cpp:8162, the reverse of
 ///     <see cref="RuneSocketResponse" />'s original doc comment. Stat recompute (SetBasicAbilityFromEquip +
-///     SetHPMP) is skipped: <c>aRuneSystemStat</c> has no consumer anywhere in Fenrir's stat pipeline yet, so
-///     recomputing today would be a pure no-op (same posture as <c>DrinkBottleHandler</c>'s own remarks).
+///     SetHPMP) happens tick-side, not here: <c>aRuneSystemStat</c> now feeds
+///     <c>EquipmentService.RecomputeStats</c> (via <c>AssembleStatContexts</c> -&gt; <c>CosmeticContext</c>,
+///     workstreams B5/B6), so <c>Zone.ApplyRuneSocketCommand</c> recomputes
+///     <c>PlayerRuntimeState.Stats</c> unconditionally on every socket mutation -- this handler stays a thin
+///     validate-persist-mirror layer and never computes stats itself, same posture as every other
+///     economy-adjacent handler.
 ///     A successful Sort=1 withdrawal sends <b>two</b> packets, not one: an <see cref="AddInventoryItemResponse" />
 ///     (ZC_ADD_USER_INVENTORY_ITEM_RECV) confirming the rune's resulting inventory position, immediately
 ///     followed by the <see cref="RuneSocketResponse" /> confirming the rune-slot withdrawal itself -- same

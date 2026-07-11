@@ -6,7 +6,8 @@ namespace Fenrir.Application.Game.Stats;
 public static partial class StatCalculator
 {
     // ================================================================================================
-    // Mount / animal grade stat contributions (WORKSTREAM B8-mount, deepened by wave11's B8-myanimal-table)
+    // Mount / animal grade stat contributions (WORKSTREAM B8-mount, deepened by wave11's B8-myanimal-table,
+    // and by workstream mount-grade-contribution-table which recovered the base table's own row VALUES)
     //
     // Legacy MyFactor folds a mounted avatar's mount state into its derived-stat recompute. In Fenrir terms
     // that is the BASE cache layer (the SetAvatar / factor rebuild that ComputeBaseStats models), NOT the
@@ -17,28 +18,38 @@ public static partial class StatCalculator
     //
     // The contract describes four tiers, applied in this order inside each stat's function:
     //   Tier 0  -- mount decode (once, before the stat blocks; MyAnimal.cpp:190-227). Two independent halves:
-    //              (a) the base-table row lookup by item id (per-stat tier columns 5/10/15/20, absorb, model,
-    //              ability-effect) -- still UNRECOVERABLE, the 74-row table's own VALUES are not transcribed
-    //              by either the original B8 contract or wave11's B8-myanimal-table follow-up, only its
-    //              mechanism and row count; (b) the per-digit power decode -- NOW modeled below as
-    //              DecodeMountPowerDigits/ComputeMountFlatBonuses, which the wave11 contract newly pinned:
-    //              the fixed digit-place -> stat mapping (previously ambiguous, see this workstream's own
-    //              memory) and the "activity strictly positive" gate on the decode itself, not just on each
-    //              flat-bonus call site. Sourcing the raw (power, activity) pair from PlayerRuntimeState into
-    //              a call site is still unwired -- see openQuestions.
+    //              (a) the base-table row lookup by item id (per-stat tier columns 0/5/10/15/20, absorb,
+    //              model, ability-effect) -- NOW modeled below as MountBaseRow/MountBaseDataByItemId/
+    //              TryGetMountBaseRow: the full 94-row mANIMAL_DATA catalogue (not the earlier-reported 74
+    //              rows), recovered in full by workstream mount-grade-contribution-table. Wiring the
+    //              resolved row's columns into the per-stat GetBase* call sites (ComputeMaxLife et al.) is a
+    //              separate integration step, not done here -- see each getter's own "mount grade ...
+    //              blocked" remark and this workstream's openQuestions; (b) the per-digit power decode --
+    //              NOW modeled below as DecodeMountPowerDigits/ComputeMountFlatBonuses, which the wave11
+    //              contract newly pinned: the fixed digit-place -> stat mapping (previously ambiguous, see
+    //              this workstream's own memory) and the "activity strictly positive" gate on the decode
+    //              itself, not just on each flat-bonus call site. Sourcing the raw (power, activity) pair
+    //              from PlayerRuntimeState into a call site is still unwired -- see openQuestions.
     //   Tier 1  -- grade percentage multiplier (per derived stat): a base-table column value of 5/10/15/20
     //              multiplies the running stat total by 1.05/1.10/1.15/1.20, single float multiply then
-    //              truncate toward zero. Below: ApplyMountGradeMultiplier{FourTier,ThreeTier}. Re-verified
-    //              against the wave11 contract: the three-tier stats (hit/dodge/critical/elem-atk/elem-def)
-    //              never see column 20 anywhere in the table's own data (not a code gap), exactly as already
-    //              implemented here.
+    //              truncate toward zero. Below: ApplyMountGradeMultiplier{FourTier,ThreeTier}. Confirmed
+    //              directly against the now-recovered 94-row table: the three-tier stats hit/dodge/
+    //              element-attack/element-defense never see column 20 anywhere in the table's own data (not
+    //              a code gap); critical's own column, however, is NOT uniformly zero -- it is nonzero
+    //              (5/10/15) for 18 of the 94 rows (the whole Deer and Wolf families, plus the two Christmas
+    //              event ids 510/511), so ApplyMountGradeMultiplierThreeTier is genuinely exercised for
+    //              critical too, correcting an earlier pass's "critical never populated" assumption for this
+    //              column specifically (Tier 2 still has no separate flat critical additive -- that part is
+    //              unaffected, see MountFlatBonusPerPointByStat).
     //   Tier 2  -- flat per-point additive (per derived stat): a fixed multiple of the decoded grade digit,
     //              added AFTER the Tier-1 multiplier so it is never scaled by the percentage. Below:
     //              MountFlat*Bonus (primitives) / DecodeMountPowerDigits+ComputeMountFlatBonuses (the decode
     //              + one-call composition wave11 added). Per-point magnitudes re-verified unchanged.
     //   Tier 2b -- absorb -> each of the 4 primary stats (Vit/Ki/Str/Wis) when the mount is set and the
-    //              absorb-state flag holds. Below: MountAbsorbPrimaryBonus. Still 0 in practice -- AbsorbValue
-    //              is a base-table column, same unrecoverable-table blockage as Tier 1.
+    //              absorb-state flag holds. Below: MountAbsorbPrimaryBonus. The magnitude is now resolvable
+    //              via TryGetMountBaseRow(...).AbsorbValue -- MountContext.AbsorbValue itself still needs an
+    //              assembler wired to that lookup before this stops contributing 0 in practice; the rule is
+    //              nonetheless faithfully in place and unchanged by this data recovery.
     //   Tier 3  -- "set-30" exp-scaled bonus: DEFERRED. Its qualifying mount ids are item-table-data-driven
     //              (item sort field == 30, S07_MyGame03.cpp:7467-7475) and unrecoverable from the contract;
     //              its two packed-decimal helpers (ReturnNewPower / ReturnNewAnimalAbsorbBuff) and the
@@ -48,15 +59,236 @@ public static partial class StatCalculator
     //
     // Réf. C++ : Server/Header/Protocol/DEFINE.h:80 (USE_ANIMAL defined unconditionally -- live in the
     // production ReleaseEU33 build, not a single-variant branch), :185-188 (the four grade-tier percentage
-    // constants ANIMAL_RATE_5/10/15/20_GRADE); Server/Header/Protocol/MyAnimal.cpp:16-168 (the 74-row base
-    // table -- its row VALUES are NOT provided by either B8 contract, so the mount-id -> per-stat-column
-    // mapping is NOT transcribed here; the Tier-1/Tier-2b magnitudes it feeds stay unresolved, see
-    // openQuestions), :170 (row count), :190-227 (the per-character decode: active-index range check, the
-    // activity-gated per-digit power decode in the exact order element-defense/element-attack/dodge/hit/
-    // mana/health/defense/damage, and the trailing base-table-row lookup); Server/Header/function.h:2420-2423
-    // (slot index = active index modulo 10), :2425-2433 (activity/experience = packed counter div/mod
+    // constants ANIMAL_RATE_ONE_GRADE/TWO_GRADE/THREE_GRADE/FOUR_GRADE = 1.05f/1.10f/1.15f/1.20f -- corrected
+    // from an earlier pass's mistaken "_5/10/15/20_GRADE" naming); Server/Header/Protocol/MyAnimal.cpp:16-168
+    // (the 94-row mANIMAL_DATA base table, row count independently hand-recounted at 94, correcting an
+    // earlier "74" figure -- every row's VALUES are now transcribed in full below, see
+    // MountBaseDataByItemId), :17 (column order: hp, mp, dmg, def, hit, dodge, cri, ele_dmg, ele_def, absorb,
+    // 3d, abEffect), :176-188 (ANIMALSYSTEM::GetAnimalBaseData, the linear-scan-by-id lookup itself, first
+    // match wins, silent fall-through on no match -- modeled by TryGetMountBaseRow), :190-227 (the
+    // per-character decode: active-index range check, the activity-gated per-digit power decode in the exact
+    // order element-defense/element-attack/dodge/hit/mana/health/defense/damage, and the trailing
+    // base-table-row lookup); Server/Header/Protocol/STRUCT.h:1929-1943 (the ANIMAL_BASE struct definition,
+    // confirming the column-order comment matches the compiled field order); Server/Header/function.h:2420-
+    // 2423 (slot index = active index modulo 10), :2425-2433 (activity/experience = packed counter div/mod
     // 1,000,000); the per-stat MyFactor blocks are cited on each member below.
     // ================================================================================================
+
+    // ---- Tier 0(a): mount base-table row lookup (mANIMAL_DATA) ----
+
+    /// <summary>
+    ///     One row of the legacy <c>mANIMAL_DATA</c> table (Server/Header/Protocol/MyAnimal.cpp:16-168),
+    ///     keyed by mount/animal item id. Each of the nine stat columns is itself a Tier-1 grade-percentage
+    ///     <em>column selector</em> to feed straight into <see cref="ApplyMountGradeMultiplierFourTier" />/
+    ///     <see cref="ApplyMountGradeMultiplierThreeTier" /> (0, or one of 5/10/15/20) -- it is NOT a flat
+    ///     point amount; that is Tier 2's own, separate, per-digit mechanism
+    ///     (<see cref="ComputeMountFlatBonuses" />). Field order matches the column-order comment at the head
+    ///     of the source table (MyAnimal.cpp:17) and the compiled <c>ANIMAL_BASE</c> struct
+    ///     (STRUCT.h:1929-1943).
+    /// </summary>
+    /// <param name="AbsorbValue">
+    ///     Tier-2b's own input (<see cref="MountAbsorbPrimaryBonus" />) -- added to each of the four primary
+    ///     stats while the mount's absorb-state flag holds. Not itself a grade column.
+    /// </param>
+    /// <param name="ModelId">Cosmetic 3D model id -- rendering only, not a combat stat, not consumed here.</param>
+    /// <param name="AbilityEffectId">
+    ///     Index into a separate ability/skill-effect table; -1 means "no special ability effect". Not a
+    ///     combat stat and not consumed by the stat-contribution pipeline -- out of scope here. Every row
+    ///     whose <see cref="AbsorbValue" /> is overridden to 0 against its own family's tier also carries
+    ///     -1 here (no row has -1 with a nonzero absorb, and no row with a real ability-effect id has its
+    ///     absorb zeroed out beyond what its own tier already calls for).
+    /// </param>
+    public readonly record struct MountBaseRow(
+        int MaxLifeColumn,
+        int MaxManaColumn,
+        int AttackColumn,
+        int DefenseColumn,
+        int HitColumn,
+        int DodgeColumn,
+        int CriticalColumn,
+        int ElementAttackColumn,
+        int ElementDefenseColumn,
+        int AbsorbValue,
+        int ModelId,
+        int AbilityEffectId);
+
+    /// <summary>
+    ///     The full 94-row <c>mANIMAL_DATA</c> catalogue (Server/Header/Protocol/MyAnimal.cpp:18-167), keyed
+    ///     by mount/animal item id (the "index" field -- <see cref="MountContext.AnimalNumber" /> once an
+    ///     assembler wires it through). Recovered in full by workstream mount-grade-contribution-table --
+    ///     previously only the lookup's mechanism and row count were known, and the row count itself was
+    ///     mis-reported as 74; the true count, independently hand-recounted from every literal row in the
+    ///     source, is 94. An id absent from this table means "no contribution from any of the nine columns,
+    ///     absorb, model, or ability-effect" -- exactly the legacy linear-scan lookup's own silent
+    ///     fall-through on no match (<see cref="TryGetMountBaseRow" />, MyAnimal.cpp:176-188).
+    /// </summary>
+    private static readonly FrozenDictionary<int, MountBaseRow> MountBaseDataByItemId =
+        new Dictionary<int, MountBaseRow>
+        {
+            // Tiger, tier 1
+            [1301] = new MountBaseRow(0, 5, 5, 0, 0, 0, 0, 5, 0, 30, 0, 24),
+            [8301] = new MountBaseRow(0, 5, 5, 0, 0, 0, 0, 5, 0, 30, 0, 24),
+            [7001] = new MountBaseRow(0, 5, 5, 0, 0, 0, 0, 5, 0, 30, 0, 24),
+
+            // Pig, tier 1
+            [1302] = new MountBaseRow(5, 5, 0, 0, 0, 0, 0, 0, 5, 30, 1, 27),
+            [8302] = new MountBaseRow(5, 5, 0, 0, 0, 0, 0, 0, 5, 30, 1, 27),
+
+            // Deer, tier 1 (nonzero critical column -- see the Tier-1 remarks above)
+            [1303] = new MountBaseRow(0, 5, 0, 0, 0, 0, 5, 5, 0, 30, 2, 30),
+            [8303] = new MountBaseRow(0, 5, 0, 0, 0, 0, 5, 5, 0, 30, 2, 30),
+
+            // Tiger, tier 2
+            [1304] = new MountBaseRow(0, 10, 10, 0, 0, 0, 0, 10, 0, 20, 3, 25),
+            [8304] = new MountBaseRow(0, 10, 10, 0, 0, 0, 0, 10, 0, 20, 3, 25),
+            [559] = new MountBaseRow(0, 10, 10, 0, 0, 0, 0, 10, 0, 20, 3, 25),
+            [17044] = new MountBaseRow(0, 10, 10, 0, 0, 0, 0, 10, 0, 20, 3, 25),
+
+            // Pig, tier 2
+            [1305] = new MountBaseRow(10, 10, 0, 0, 0, 0, 0, 0, 10, 20, 4, 28),
+            [8305] = new MountBaseRow(10, 10, 0, 0, 0, 0, 0, 0, 10, 20, 4, 28),
+            [17045] = new MountBaseRow(10, 10, 0, 0, 0, 0, 0, 0, 10, 20, 4, 28),
+
+            // Deer, tier 2 (nonzero critical column)
+            [1306] = new MountBaseRow(0, 10, 0, 0, 0, 0, 10, 10, 0, 20, 5, 31),
+            [8306] = new MountBaseRow(0, 10, 0, 0, 0, 0, 10, 10, 0, 20, 5, 31),
+            [17046] = new MountBaseRow(0, 10, 0, 0, 0, 0, 10, 10, 0, 20, 5, 31),
+
+            // Tiger, tier 3 (685 is the absorb/ability-effect exception -- absorb 0, ability-effect -1)
+            [1307] = new MountBaseRow(0, 15, 15, 0, 0, 0, 0, 15, 0, 10, 6, 26),
+            [8307] = new MountBaseRow(0, 15, 15, 0, 0, 0, 0, 15, 0, 10, 6, 26),
+            [685] = new MountBaseRow(0, 15, 15, 0, 0, 0, 0, 15, 0, 0, 6, -1),
+            [814] = new MountBaseRow(0, 15, 15, 0, 0, 0, 0, 15, 0, 10, 6, 26),
+
+            // Pig, tier 3 (683 is the absorb/ability-effect exception)
+            [1308] = new MountBaseRow(15, 15, 0, 0, 0, 0, 0, 0, 15, 10, 7, 29),
+            [8308] = new MountBaseRow(15, 15, 0, 0, 0, 0, 0, 0, 15, 10, 7, 29),
+            [683] = new MountBaseRow(15, 15, 0, 0, 0, 0, 0, 0, 15, 0, 7, -1),
+            [819] = new MountBaseRow(15, 15, 0, 0, 0, 0, 0, 0, 15, 10, 7, 29),
+
+            // Deer, tier 3 (nonzero critical column)
+            [1309] = new MountBaseRow(0, 15, 0, 0, 0, 0, 15, 15, 0, 10, 8, 32),
+            [8309] = new MountBaseRow(0, 15, 0, 0, 0, 0, 15, 15, 0, 10, 8, 32),
+            [817] = new MountBaseRow(0, 15, 0, 0, 0, 0, 15, 15, 0, 10, 8, 32),
+
+            // Bear, tier 1 (1451 is the absorb/ability-effect exception)
+            [1313] = new MountBaseRow(0, 5, 5, 0, 5, 0, 0, 0, 0, 30, 9, 33),
+            [8313] = new MountBaseRow(0, 5, 5, 0, 5, 0, 0, 0, 0, 30, 9, 33),
+            [1451] = new MountBaseRow(0, 5, 5, 0, 5, 0, 0, 0, 0, 0, 9, -1),
+
+            // Bear, tier 2
+            [1314] = new MountBaseRow(0, 10, 10, 0, 10, 0, 0, 0, 0, 20, 10, 34),
+            [8314] = new MountBaseRow(0, 10, 10, 0, 10, 0, 0, 0, 0, 20, 10, 34),
+            [17047] = new MountBaseRow(0, 10, 10, 0, 10, 0, 0, 0, 0, 20, 10, 34),
+
+            // Bear, tier 3
+            [1315] = new MountBaseRow(0, 15, 15, 0, 15, 0, 0, 0, 0, 10, 11, 35),
+            [8315] = new MountBaseRow(0, 15, 15, 0, 15, 0, 0, 0, 0, 10, 11, 35),
+            [820] = new MountBaseRow(0, 15, 15, 0, 15, 0, 0, 0, 0, 10, 11, 35),
+
+            // Christmas baseline / event ids (all ability-effect -1; 510/511 also carry a nonzero critical column)
+            [1316] = new MountBaseRow(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, -1),
+            [8316] = new MountBaseRow(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, -1),
+            [510] = new MountBaseRow(0, 0, 10, 0, 10, 0, 15, 0, 0, 0, 12, -1),
+            [511] = new MountBaseRow(0, 0, 15, 0, 15, 0, 15, 0, 0, 0, 12, -1),
+
+            // Cat, tier 1
+            [1317] = new MountBaseRow(0, 5, 5, 0, 0, 0, 0, 0, 5, 30, 13, 36),
+            [8317] = new MountBaseRow(0, 5, 5, 0, 0, 0, 0, 0, 5, 30, 13, 36),
+
+            // Cat, tier 2
+            [1318] = new MountBaseRow(0, 10, 10, 0, 0, 0, 0, 0, 10, 20, 14, 37),
+            [8318] = new MountBaseRow(0, 10, 10, 0, 0, 0, 0, 0, 10, 20, 14, 37),
+            [17048] = new MountBaseRow(0, 10, 10, 0, 0, 0, 0, 0, 10, 20, 14, 37),
+
+            // Cat, tier 3
+            [1319] = new MountBaseRow(0, 15, 15, 0, 0, 0, 0, 0, 15, 10, 15, 38),
+            [8319] = new MountBaseRow(0, 15, 15, 0, 0, 0, 0, 0, 15, 10, 15, 38),
+            [818] = new MountBaseRow(0, 15, 15, 0, 0, 0, 0, 0, 15, 10, 15, 38),
+
+            // Bull, tier 1
+            [1320] = new MountBaseRow(5, 5, 0, 0, 0, 0, 0, 5, 0, 30, 16, 42),
+            [8320] = new MountBaseRow(5, 5, 0, 0, 0, 0, 0, 5, 0, 30, 16, 42),
+
+            // Bull, tier 2
+            [1321] = new MountBaseRow(10, 10, 0, 0, 0, 0, 0, 10, 0, 20, 17, 43),
+            [8321] = new MountBaseRow(10, 10, 0, 0, 0, 0, 0, 10, 0, 20, 17, 43),
+            [17049] = new MountBaseRow(10, 10, 0, 0, 0, 0, 0, 10, 0, 20, 17, 43),
+
+            // Bull, tier 3 (684 is the absorb/ability-effect exception)
+            [1322] = new MountBaseRow(15, 15, 0, 0, 0, 0, 0, 15, 0, 10, 18, 44),
+            [8322] = new MountBaseRow(15, 15, 0, 0, 0, 0, 0, 15, 0, 10, 18, 44),
+            [684] = new MountBaseRow(15, 15, 0, 0, 0, 0, 0, 15, 0, 0, 18, -1),
+            [821] = new MountBaseRow(15, 15, 0, 0, 0, 0, 0, 15, 0, 10, 18, 44),
+            [17058] = new MountBaseRow(15, 15, 0, 0, 0, 0, 0, 15, 0, 10, 18, 44),
+
+            // Wolf, tier 1 (nonzero critical column)
+            [1323] = new MountBaseRow(0, 5, 0, 0, 0, 5, 5, 0, 0, 30, 19, 39),
+            [8323] = new MountBaseRow(0, 5, 0, 0, 0, 5, 5, 0, 0, 30, 19, 39),
+
+            // Wolf, tier 2 (nonzero critical column)
+            [1324] = new MountBaseRow(0, 10, 0, 0, 0, 10, 10, 0, 0, 20, 20, 40),
+            [8324] = new MountBaseRow(0, 10, 0, 0, 0, 10, 10, 0, 0, 20, 20, 40),
+            [17050] = new MountBaseRow(0, 10, 0, 0, 0, 10, 10, 0, 0, 20, 20, 40),
+
+            // Wolf, tier 3 (nonzero critical column)
+            [1325] = new MountBaseRow(0, 15, 0, 0, 0, 15, 15, 0, 0, 10, 21, 41),
+            [8325] = new MountBaseRow(0, 15, 0, 0, 0, 15, 15, 0, 0, 10, 21, 41),
+            [815] = new MountBaseRow(0, 15, 0, 0, 0, 15, 15, 0, 0, 10, 21, 41),
+
+            // Lion, tier 1
+            [1326] = new MountBaseRow(0, 5, 0, 5, 0, 5, 0, 0, 0, 30, 22, 45),
+            [8326] = new MountBaseRow(0, 5, 0, 5, 0, 5, 0, 0, 0, 30, 22, 45),
+
+            // Lion, tier 2
+            [1327] = new MountBaseRow(0, 10, 0, 10, 0, 10, 0, 0, 0, 20, 23, 46),
+            [8327] = new MountBaseRow(0, 10, 0, 10, 0, 10, 0, 0, 0, 20, 23, 46),
+            [17051] = new MountBaseRow(0, 10, 0, 10, 0, 10, 0, 0, 0, 20, 23, 46),
+
+            // Lion, tier 3
+            [1328] = new MountBaseRow(0, 15, 0, 15, 0, 15, 0, 0, 0, 10, 24, 47),
+            [8328] = new MountBaseRow(0, 15, 0, 15, 0, 15, 0, 0, 0, 10, 24, 47),
+            [816] = new MountBaseRow(0, 15, 0, 15, 0, 15, 0, 0, 0, 10, 24, 47),
+
+            // Puma, tier 1
+            [1329] = new MountBaseRow(15, 20, 15, 0, 0, 0, 0, 0, 0, 5, 25, 50),
+            [8329] = new MountBaseRow(15, 20, 15, 0, 0, 0, 0, 0, 0, 5, 25, 50),
+            [17059] = new MountBaseRow(15, 20, 15, 0, 0, 0, 0, 0, 0, 5, 25, 50),
+
+            // Puma, tier 2
+            [1330] = new MountBaseRow(0, 20, 20, 0, 0, 0, 0, 0, 0, 5, 26, 49),
+            [8330] = new MountBaseRow(0, 20, 20, 0, 0, 0, 0, 0, 0, 5, 26, 49),
+            [17060] = new MountBaseRow(0, 20, 20, 0, 0, 0, 0, 0, 0, 5, 26, 49),
+
+            // Puma, tier 3
+            [1331] = new MountBaseRow(20, 20, 0, 0, 0, 0, 0, 0, 0, 5, 27, 48),
+            [8331] = new MountBaseRow(20, 20, 0, 0, 0, 0, 0, 0, 0, 5, 27, 48),
+            [17061] = new MountBaseRow(20, 20, 0, 0, 0, 0, 0, 0, 0, 5, 27, 48),
+
+            // Puma, tier 3 recolors (stat columns identical to 1331/8331/17061; only the model id varies)
+            [1332] = new MountBaseRow(20, 20, 0, 0, 0, 0, 0, 0, 0, 5, 48, 48),
+            [1333] = new MountBaseRow(20, 20, 0, 0, 0, 0, 0, 0, 0, 5, 49, 48),
+            [1334] = new MountBaseRow(20, 20, 0, 0, 0, 0, 0, 0, 0, 5, 50, 48),
+            [1335] = new MountBaseRow(20, 20, 0, 0, 0, 0, 0, 0, 0, 5, 51, 48),
+            [1336] = new MountBaseRow(20, 20, 0, 0, 0, 0, 0, 0, 0, 5, 52, 48),
+            [1337] = new MountBaseRow(20, 20, 0, 0, 0, 0, 0, 0, 0, 5, 53, 48),
+            [1338] = new MountBaseRow(20, 20, 0, 0, 0, 0, 0, 0, 0, 5, 54, 48),
+            [1339] = new MountBaseRow(20, 20, 0, 0, 0, 0, 0, 0, 0, 5, 55, 48),
+            [1340] = new MountBaseRow(20, 20, 0, 0, 0, 0, 0, 0, 0, 5, 56, 48),
+            [1341] = new MountBaseRow(20, 20, 0, 0, 0, 0, 0, 0, 0, 5, 57, 48)
+        }.ToFrozenDictionary();
+
+    /// <summary>
+    ///     Tier 0(a): the base-table row for a mount/animal item id, or <c>false</c> if the id matches none
+    ///     of the 94 catalogued rows -- reproducing <c>ANIMALSYSTEM::GetAnimalBaseData</c>'s own linear-scan,
+    ///     first-match-wins lookup with silent fall-through on no match (MyAnimal.cpp:176-188). A caller that
+    ///     gets <c>false</c> back must leave every stat's contribution at its existing value, not zero it out
+    ///     or otherwise treat it as an error -- exactly like any other non-matching id.
+    /// </summary>
+    public static bool TryGetMountBaseRow(int mountItemId, out MountBaseRow row)
+    {
+        return MountBaseDataByItemId.TryGetValue(mountItemId, out row);
+    }
 
     // ---- Tier 1: grade percentage multiplier ----
 
@@ -64,8 +296,10 @@ public static partial class StatCalculator
     ///     Tier-1 grade-percentage multipliers keyed on a base-table column value. The column value is itself
     ///     both the selector and the percent (a 5 means +5%). Only the exact values 5/10/15/20 are recognized;
     ///     any other nonzero column falls through to no multiply, reproducing MyFactor's discrete case match.
-    ///     The four float constants are <c>ANIMAL_RATE_5/10/15/20_GRADE</c>
-    ///     (Server/Header/Protocol/DEFINE.h:185-188).
+    ///     The four float constants are <c>ANIMAL_RATE_ONE_GRADE</c>/<c>TWO_GRADE</c>/<c>THREE_GRADE</c>/
+    ///     <c>FOUR_GRADE</c> = 1.05f/1.10f/1.15f/1.20f (Server/Header/Protocol/DEFINE.h:185-188) -- corrected
+    ///     from an earlier pass's mistaken "_5/10/15/20_GRADE" naming; the *values* 5/10/15/20 are the column
+    ///     selectors transcribed into <see cref="MountBaseDataByItemId" />, not part of the constant names.
     /// </summary>
     private static readonly FrozenDictionary<int, float> MountGradeMultiplierByColumn =
         new Dictionary<int, float>
@@ -78,10 +312,16 @@ public static partial class StatCalculator
 
     /// <summary>
     ///     The stats whose grade switch carries only the 5/10/15 tiers (hit/dodge/critical/element-attack/
-    ///     element-defense): a column of 20 is NOT a case for these and falls through to no multiply. In the
-    ///     shipped base table those five columns never actually hold 20 (only HP/MP/attack/defense reach the
-    ///     top tier, on the "Puma"/high-tier rows, MyAnimal.cpp:143-167), so the missing 20-case is a benign
-    ///     match to the data, not a bug.
+    ///     element-defense): a column of 20 is NOT a case for these and falls through to no multiply.
+    ///     Confirmed directly against the now-recovered 94-row <see cref="MountBaseDataByItemId" /> table:
+    ///     none of these five columns ever holds 20 in any row (only HP/MP/attack/defense reach the top
+    ///     tier, on the "Puma"/high-tier rows, MyAnimal.cpp:143-167), so the missing 20-case is a benign
+    ///     match to the data, not a bug. Critical's own column is NOT uniformly zero, though: it is nonzero
+    ///     (5/10/15, mirroring the mount's own tier) for 18 of the 94 rows -- the whole Deer and Wolf
+    ///     families, plus the two Christmas event ids 510/511 -- so this multiplier is genuinely exercised
+    ///     for critical, not merely a theoretical case. There is still no separate flat per-digit critical
+    ///     additive (Tier 2 has none for critical, see <see cref="MountFlatBonusPerPointByStat" />) -- only
+    ///     this Tier-1 percentage multiply ever touches critical.
     /// </summary>
     private static readonly FrozenSet<int> MountGradeThreeTierColumns = new[] { 5, 10, 15 }.ToFrozenSet();
 
@@ -260,9 +500,12 @@ public static partial class StatCalculator
     ///     (Vitality, Ki, Strength, Wisdom) while the mount is set and the mount absorb-state flag holds
     ///     (MyFactor.cpp:1705-1708 for Vitality; :1765-1766 / :1824-1825 / :1883-1884 for Ki/Strength/Wisdom).
     ///     Consumed in the BASE layer -- added to each primary attribute inside ComputeBaseStats, so it
-    ///     propagates into every derived stat. The magnitude is <see cref="MountContext.AbsorbValue" />, which
-    ///     the runtime assembler leaves at 0 until the (currently unrecoverable) MyAnimal base table is loaded,
-    ///     so this contributes 0 in practice today; the rule is nonetheless faithfully in place.
+    ///     propagates into every derived stat. The magnitude is <see cref="MountContext.AbsorbValue" />, now
+    ///     resolvable in full via <see cref="TryGetMountBaseRow" />'s recovered <c>AbsorbValue</c> column (30
+    ///     for tier-1 mounts down to 5 for Puma, with four family-specific 0-overrides -- see
+    ///     <see cref="MountBaseDataByItemId" />). No assembler wires that lookup into
+    ///     <see cref="MountContext" /> yet, so this still contributes 0 in practice today; the rule itself is
+    ///     nonetheless faithfully in place and unaffected by that still-pending wiring step.
     ///     <para>
     ///         Gate note: <see cref="MountContext.AbsorbActive" /> is the assembler-cooked
     ///         <c>aAnimalAbsorbState != 0</c>, while the legacy line checks <c>== 1</c> (MyFactor.cpp:1706) --
@@ -298,13 +541,12 @@ public static partial class StatCalculator
     // ordering is legacy-consistent: attribute-index 1 = MountPowerCodec place 7 = ten-millions = attack,
     // ... index 8 = place 0 = ones = element-defense -- the exact reverse-LSD order this contract states).
     //
-    // This is still the general MECHANISM only, not the 74-row MyAnimal base table itself: the
-    // B8-myanimal-table contract's own citations (MyAnimal.cpp:16-168) describe but do NOT transcribe the
-    // concrete item-id -> per-stat tier-column data, so Tier-1's grade columns and Tier-2b's AbsorbValue
-    // stay unrecoverable exactly as the prior B8-mount pass already found -- see this workstream's
-    // openQuestions. The per-digit power value itself is likewise not yet threaded from
-    // PlayerRuntimeState/MountContext into a call site (no Power/Activity channel exists on MountContext
-    // today) -- also an openQuestions item, not guessed here.
+    // This decode is the per-digit MECHANISM only -- the separate 94-row MyAnimal base table itself (Tier-1's
+    // grade columns and Tier-2b's AbsorbValue) is now fully transcribed above as MountBaseRow/
+    // MountBaseDataByItemId/TryGetMountBaseRow (workstream mount-grade-contribution-table), closing the gap
+    // the prior B8-mount pass had left open. The per-digit power value itself is likewise not yet threaded
+    // from PlayerRuntimeState/MountContext into a call site (no Power/Activity channel exists on MountContext
+    // today) -- still an openQuestions item, not guessed here.
 
     /// <summary>
     ///     The eight per-stat point-investment digits <see cref="DecodeMountPowerDigits" /> decodes from the

@@ -14,36 +14,50 @@ namespace Fenrir.Application.Game.Domain.World.Monsters;
 ///     <see cref="AllianceStone" /> (4), <see cref="TribeGuard" /> (5), <see cref="CarThrower" /> (6), and
 ///     <see cref="Tower" /> (10). Any value outside that set is the recipe switch's inert default.
 ///     <para>
-///         <b>Grounding / open question.</b> The contract describes each recipe's behavior in full but does
-///         NOT contain the concrete <c>(Type, SpecialType) -&gt; sort</c> discriminator table itself: the
-///         cited <c>ReturnSpecialSortNumber</c> body (<c>S10_MySummon.cpp:612-647</c>) sits in the contract's
-///         "carried forward, not independently reopened this session" citation set. So only the mappings that
-///         are independently grounded elsewhere are asserted here:
+///         <b>UPDATE (2026-07-11, recovered <c>monster-ai-recipe-bodies</c> behavior contract).</b> This
+///         session independently re-opened <c>S10_MySummon.cpp:612-647</c> (the complete
+///         <c>ReturnSpecialSortNumber</c> body) rather than carrying forward the prior "not reopened"
+///         citation, and recovered the FULL Type-based half of the discriminator that was previously missing:
 ///         <list type="bullet">
 ///             <item>
-///                 <b>Tribe-symbol stones -&gt; <see cref="TribeSymbolStone" /> (2).</b> The five
-///                 <see cref="MonsterRowDto.SpecialType" /> values 11/12/13/28/14 are the "Holy Stone"
-///                 guardians Fenrir already recognises by exactly these values in
-///                 <see cref="MonsterSpawnScheduler" />'s own symbol-index map (its <c>TribeSymbolIndexOf</c>),
-///                 and the contract's tribe-symbol recipe maps "five distinct special-type values ... to
-///                 indices 0 through 4" -- the same five. This is the one non-default mapping with an
-///                 independent Fenrir-side anchor, so it is reproduced; the resulting monsters are still a
-///                 no-op in the dispatch until workstream A4 supplies their spawn objects.
+///                 <b><see cref="MonsterRowDto.Type" /> 6, 7, 8, or 9 -&gt; <see cref="TribeGuard" /> (5),
+///                 unconditionally.</b> These four Type values resolve to Tribe Guard regardless of
+///                 <see cref="MonsterRowDto.SpecialType" /> -- SpecialType is not inspected at all once Type
+///                 matches one of them (checked FIRST in <see cref="Derive" />, ahead of the Type==1
+///                 sub-switch, since the two conditions are mutually exclusive by construction). This closes
+///                 <see cref="MonsterAiSystem" />'s own previously-documented gap ("<c>Derive</c> has no
+///                 discriminator entry mapping a guard's (Type, SpecialType) to <see cref="TribeGuard" />") --
+///                 a monster spawned by <see cref="World.ZoneWar.TribeGuardSpawner" /> with one of these Type
+///                 values now really derives <see cref="TribeGuard" /> at spawn, so
+///                 <see cref="MonsterAiSystem" />'s guard-recipe dispatch case is reachable in production, not
+///                 test-override-only.
 ///             </item>
 ///             <item>
-///                 <b>Everything else -&gt; <see cref="Standard" /> (1).</b> The guard/tower/alliance/thrower
-///                 discriminators (which <c>Type</c>/<c>SpecialType</c> values map to 5/10/4/6) are NOT
-///                 available from this contract, so those monsters fall to the standard-mob default here rather
-///                 than being guessed at -- flagged for a <c>legacy-behavior-translator</c> /
-///                 <c>
-///                     cpp-zone-
-///                     gameplay-analyst
-///                 </c>
-///                 follow-up (reopen <c>ReturnSpecialSortNumber</c> and hand back the
-///                 concrete table). Until then, the <see cref="CarThrower" />/<see cref="TribeGuard" />/etc.
-///                 recipes in <see cref="MonsterAiSystem" /> are reachable only by an explicit
-///                 <see cref="MonsterEntity.Create" /> <c>specialSort</c> override (tests), never by live
-///                 derivation.
+///                 <b>Type == 1, SpecialType 11/12/13/28/14/15 -&gt; <see cref="TribeSymbolStone" /> (2).</b>
+///                 The recovered contract confirms six SpecialType codes map to this archetype under Type 1,
+///                 not five: the five already-grounded via <see cref="MonsterSpawnScheduler" />'s own
+///                 <c>TribeSymbolIndexOf</c> symbol-index map (11/12/13/28/14), PLUS a sixth code, 15, newly
+///                 recovered this session. Code 15 still resolves to <see cref="TribeSymbolStone" /> at THIS
+///                 selector level even though it is a genuine no-op one level deeper, inside the recipe body
+///                 itself (the "Yaoguai"-adjacent sixth sub-type has no arm gate and no arm logic at all,
+///                 per the companion Tribe-Symbol-Stone contract) -- the selector does not special-case 15
+///                 away, the no-op lives inside the recipe, not the discriminator.
+///             </item>
+///             <item>
+///                 <b>Type == 1, everything else, and every other Type outside {1,6,7,8,9} -&gt;
+///                 <see cref="Standard" /> (1).</b> The recovered contract gives only the CARDINALITY of the
+///                 remaining Type==1 SpecialType sets (one code -&gt; Tower, four -&gt; Inert, four -&gt;
+///                 Alliance Stone, five -&gt; Car Thrower), never their concrete numeric values -- still NOT
+///                 recoverable, so those monsters keep falling to the Standard default here rather than being
+///                 guessed at. Flagged for a further <c>legacy-behavior-translator</c> /
+///                 <c>cpp-zone-gameplay-analyst</c> follow-up (reopen <c>ReturnSpecialSortNumber</c>'s own
+///                 SpecialType literals) -- not this session's to invent. Until then, the
+///                 <see cref="Tower" />/<see cref="Inert" />/<see cref="AllianceStone" /> recipes in
+///                 <see cref="MonsterAiSystem" /> remain reachable only via an explicit
+///                 <see cref="MonsterEntity.Create" /> <c>specialSort</c> override (tests), never live
+///                 derivation; <see cref="CarThrower" /> is the sole exception among the five remaining values, in
+///                 that its recipe body is already fully implemented -- only its own live derivation is still
+///                 blocked on these same unrecovered SpecialType literals.
 ///             </item>
 ///         </list>
 ///     </para>
@@ -80,18 +94,31 @@ public static class MonsterSpecialSort
     /// <summary>
     ///     Derives the archetype selector from a monster's template <paramref name="type" /> and
     ///     <paramref name="specialType" />. See the class remarks for exactly which mappings are grounded and
-    ///     which fall to the <see cref="Standard" /> default pending the reopened <c>ReturnSpecialSortNumber</c>
-    ///     table.
+    ///     which fall to the <see cref="Standard" /> default pending a further reopening of
+    ///     <c>ReturnSpecialSortNumber</c>'s own remaining SpecialType literals.
     /// </summary>
     public static byte Derive(byte type, byte specialType)
     {
-        // Tribe-symbol "Holy Stone" guardians -- the one non-default mapping with an independent Fenrir anchor
-        // (MonsterSpawnScheduler's own 11/12/13/28/14 -> 0..4 symbol map). Keyed on SpecialType only, matching
-        // that same map's shape; Type is unused for this branch.
-        _ = type;
+        // Tribe-Guard Type codes (S10_MySummon.cpp:612-647, recovered 2026-07-11): four fixed Type values ->
+        // Tribe Guard, unconditionally -- SpecialType is not inspected at all once Type matches one of these,
+        // so this check runs FIRST, ahead of the Type==1 sub-switch below (the two are mutually exclusive by
+        // construction: a monster's Type is exactly one value).
+        if (type is 6 or 7 or 8 or 9)
+            return TribeGuard;
+
+        if (type != 1)
+            return Standard; // every Type outside {1,6,7,8,9} -> Standard default, SpecialType never inspected
+
+        // Type == 1: SpecialType-keyed sub-switch. Only the tribe-symbol "Holy Stone" set is grounded -- the
+        // five special types MonsterSpawnScheduler's own 11/12/13/28/14 -> 0..4 symbol map already anchors,
+        // PLUS a sixth code (15) recovered this session (still resolves to this archetype at the SELECTOR
+        // level even though it is a genuine no-op one level deeper, inside the recipe body itself). The
+        // Tower/Inert/Alliance-Stone/Car-Thrower SpecialType sets remain unrecovered (only their cardinality
+        // is known, not their concrete values) -- flagged, not guessed; every unmatched SpecialType falls to
+        // the shared Standard default below.
         return specialType switch
         {
-            11 or 12 or 13 or 28 or 14 => TribeSymbolStone,
+            11 or 12 or 13 or 28 or 14 or 15 => TribeSymbolStone,
             _ => Standard
         };
     }

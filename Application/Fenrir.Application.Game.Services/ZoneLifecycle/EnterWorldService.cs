@@ -38,6 +38,7 @@ public sealed class EnterWorldService(
     IFriendRepository friends,
     IMentorRepository mentors,
     IHeroRankingRepository heroRankings,
+    IRuneRepository runes,
     ICharacterShardLocationRepository characterShardLocations,
     ICharacterLogoutStateRepository logoutState,
     WorldStateService worldState,
@@ -211,9 +212,15 @@ public sealed class EnterWorldService(
             var shardLocationUpsertTask = characterShardLocations.UpsertAsync(characterId, options.Value.ShardId,
                 character.MapId, character.Name, character.Tribe, cancellationToken);
 
+            // B5: world-entry rune-socket hydration (usp_Character_GetRunes) -- a returning character's
+            // already-persisted game.CharacterRunes rows must seed PlayerRuntimeState.RuneSystem/RuneSystemStat,
+            // not leave them at their all-zero "never socketed" default. Deliberately a separate read from
+            // GetWorldEntryBundleAsync -- see IRuneRepository.GetRunesAsync's own remarks.
+            var runeRowsTask = runes.GetRunesAsync(characterId, cancellationToken);
+
             await Task.WhenAll(isMutedTask.AsTask(), guildTask.AsTask(), tribeRoleTask.AsTask(),
                 friendsTask.AsTask(), mentorTask.AsTask(), heroRankPointsTask.AsTask(),
-                shardLocationUpsertTask.AsTask());
+                shardLocationUpsertTask.AsTask(), runeRowsTask.AsTask());
 
             var isMuted = isMutedTask.Result;
             var guildMembership = guildTask.Result;
@@ -221,6 +228,7 @@ public sealed class EnterWorldService(
             var friendRows = friendsTask.Result;
             var mentorBond = mentorTask.Result;
             var heroRankPoints = heroRankPointsTask.Result ?? 0;
+            var (runeSystem, runeSystemStat) = BuildRuneArrays(runeRowsTask.Result);
 
             var guildRoleWire = guildMembership is { } gm ? GuildRoleCodec.DbRoleToWire(gm.Role) : 0;
             var friendNameBySlot = friendRows.ToDictionary(f => f.Slot, f => f.FriendName);
@@ -400,11 +408,18 @@ public sealed class EnterWorldService(
                 CheckChangeActionState = 0
             });
 
-            // TODO(wiring B5): rune world-entry hydration deferred to fenrir-gameplay-domain-engineer (new app
-            // caller, out of this wiring pass's scope). Inject IRuneRepository, call GetRunesAsync(characterId), and
-            // seed PlayerRuntimeState.RuneSystem/RuneSystemStat by SocketIndex (absent sockets stay 0) so the rune
-            // contribution is live in the first RecomputeStats. The exact seeding mechanism (a new PlayerEnterData
-            // field consumed by Zone.HandleEnter vs. a post-enter mirror command) is a design decision left to that pass.
+            // B5 wiring closed: PlayerRuntimeState.RuneSystem/RuneSystemStat are now seeded from the character's
+            // already-persisted game.CharacterRunes rows (runeSystem/runeSystemStat above), via the new
+            // PlayerEnterData.RuneSystem/RuneSystemStat fields Zone.HandleEnter copies onto the freshly-created
+            // state -- so RuneStatDecoder's contribution is live the moment this character's next rune-socket
+            // mutation runs (Zone.ApplyRuneSocketCommand, the one production RecomputeStats call site that
+            // already passes runtimeState: state -- see that method's own remarks). Still open, and
+            // deliberately NOT guessed at here: EquipmentService.RecomputeStats's runtimeState parameter (the
+            // call just above, line ~183) has no PlayerRuntimeState to pass yet at THIS specific call site --
+            // HandleEnter hasn't run -- so the very FIRST post-login stat snapshot still excludes the rune (and
+            // every other cosmetic/zone/consumable/mount context) contribution, a structural gap unique to this
+            // one call site, not a data gap this pass can close. See EquipmentService.RecomputeStats's own
+            // remarks for the full, corrected picture of which call sites do/don't pass runtimeState today.
             var entered = zone.Post(ZoneCommand.Enter(characterId, new PlayerEnterData(
                 zoneSession,
                 character.Name,
@@ -474,6 +489,14 @@ public sealed class EnterWorldService(
                 EatStrPotion: character.EatStrPotion,
                 EatDexPotion: character.EatDexPotion,
                 EatElePotion: character.EatElePotion,
+                // Lucky Drop/"Acquisition" Scroll minutes counter -- game.Characters.DropItemTime already
+                // persisted this, but nothing read it back into PlayerRuntimeState until now. See
+                // PlayerRuntimeState.DropItemTime's own remarks.
+                DropItemTime: character.DropItemTime,
+                // War Point currency balance -- game.Characters.WarPoint already persisted this
+                // (Migrations/041_characters_warpoint_currency.sql), but nothing read it back into
+                // PlayerRuntimeState until now. See PlayerRuntimeState.WarPoint's own remarks.
+                WarPoint: character.WarPoint,
                 // mSupportSkillTimeUpRatio's Premium source field (behavior contract
                 // "buff-application-stacking-decay") -- the character's real persisted
                 // game.Characters.PremiumExpireUtc, not the PlayerEnterData default of 0. BuffX2Time stays at
@@ -495,10 +518,25 @@ public sealed class EnterWorldService(
                 // StoreDate is a sibling field this contract does not cover -- deliberately left un-normalized.
                 InventoryDate: VaultDateNormalization.NormalizeIfExpired(character.InventoryDate, GameDate.Today()),
                 StoreDate: character.StoreDate,
+                // aPetBagDate -- game.Characters already persists this (Migrations/047_characters_petbagdate_
+                // column.sql), but nothing read it back into PlayerRuntimeState until now. See
+                // PlayerRuntimeState.PetBagDate's own remarks. Deliberately NOT run through
+                // VaultDateNormalization -- that contract is scoped to InventoryDate only (see StoreDate's own
+                // un-normalized treatment immediately above), and no equivalent contract covers this field.
+                PetBagDate: character.PetBagDate,
+                // The M15 Pet Lucky Box (8111) pity counter -- game.Characters already persists this
+                // (Migrations/048_characters_m15petluckybox_pity_column.sql, confirmation-pass follow-up), but
+                // nothing read it back into PlayerRuntimeState until now. See
+                // PlayerRuntimeState.M15PetLuckyBoxPity's own remarks.
+                M15PetLuckyBoxPity: character.M15PetLuckyBoxPity,
                 // D2 hook 2: canonical source-IP for the PvP same-origin kill-credit guard
                 // (AntiCheat.PvpKillCreditGuard.IsSameOrigin) -- captured from this session's own accepted
                 // socket at world entry. See PlayerRuntimeState.SourceIp's own remarks.
-                SourceIp: SessionSourceIp.Normalize(zoneSession.RemoteEndPoint))));
+                SourceIp: SessionSourceIp.Normalize(zoneSession.RemoteEndPoint),
+                // B5: world-entry rune-socket hydration (usp_Character_GetRunes, folded above) -- see
+                // PlayerEnterData.RuneSystem's own remarks.
+                RuneSystem: runeSystem,
+                RuneSystemStat: runeSystemStat)));
 
             // A dropped Enter is never replayed -- the character would stay permanently invisible despite the two
             // packets above already telling the client registration succeeded, so treat it as fatal.
@@ -630,5 +668,29 @@ public sealed class EnterWorldService(
                 effectValueForView[row.SlotIndex] = row.Value;
 
         return effectValueForView;
+    }
+
+    /// <summary>
+    ///     Folds game.CharacterRunes rows (occupied sockets only, <see cref="IRuneRepository.GetRunesAsync" />'s
+    ///     own contract) into two length-<see cref="RuneStatDecoder.SocketCount" /> arrays keyed by SocketIndex --
+    ///     an absent socket stays 0 in both, matching PlayerRuntimeState.RuneSystem/RuneSystemStat's own all-zero
+    ///     "never socketed" default (B5 wiring: world-entry rune hydration). An out-of-range SocketIndex is
+    ///     silently skipped, same defensive posture as <see cref="BuildBuffInfo" />/<see cref="BuildEffectValueForView" />
+    ///     above.
+    /// </summary>
+    private static (ImmutableArray<int> RuneSystem, ImmutableArray<int> RuneSystemStat) BuildRuneArrays(
+        IReadOnlyCollection<CharacterRuneSocketDto> rows)
+    {
+        var runeSystem = new int[RuneStatDecoder.SocketCount];
+        var runeSystemStat = new int[RuneStatDecoder.SocketCount];
+
+        foreach (var row in rows)
+            if (row.SocketIndex < RuneStatDecoder.SocketCount)
+            {
+                runeSystem[row.SocketIndex] = row.RuneItemId;
+                runeSystemStat[row.SocketIndex] = row.RuneStat;
+            }
+
+        return (runeSystem.ToImmutableArray(), runeSystemStat.ToImmutableArray());
     }
 }

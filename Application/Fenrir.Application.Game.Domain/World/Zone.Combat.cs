@@ -494,12 +494,13 @@ public sealed partial class Zone
 
         // B9: the four extended zone families (symbol-battle, DTM/38, regular-war-drop, 195/196) now resolve
         // through PvpKillExtendedRewardZones first; every other zone (FFA-335, the four city zones, 194/267-269,
-        // and the catch-all default) still falls through to PvpKillRewardZoneCatalog exactly as before. The
-        // runtime world/event toggles below are not yet sourced from live world state -- see this method's own
-        // remarks for the follow-up.
+        // and the catch-all default) still falls through to PvpKillRewardZoneCatalog exactly as before.
+        // SymbolBattleActive/Map195TimeEventActive are now sourced from live state (WorldStateService.World and
+        // Zone195TimeEventGate respectively); the map-38 battle-post branch below still isn't -- see this
+        // method's own remarks for that follow-up.
         var zoneRuntime = new PvpKillRewardZoneRuntimeState(
-            false, // TODO(world-state): mWorldInfo->mTribeSymbolBattle for MapId
-            false, // TODO(world-state): mGAME.isZone195TimeEvent
+            worldState?.World.TribeSymbolBattle ?? false, // mWorldInfo->mTribeSymbolBattle for MapId
+            Zone195TimeEventGate.IsOpen, // mGAME.isZone195TimeEvent -- permanently false, see that gate's own remarks
             false, // TODO(world-state): map-38 battle-post-distance/state branch
             false); // TODO(world-state): same map-38 branch
         var profile = PvpKillExtendedRewardZones.TryResolve(MapId, isStunTrigger, zoneRuntime)
@@ -590,22 +591,20 @@ public sealed partial class Zone
         // B9: the game-wide cross-tribe add value (doubled by the always-active rebirth build macro) and the
         // three server/tribe/level-conditional bonuses now feed the base amount too. Premium status/warrior-
         // scroll buff are still not modeled in Fenrir yet -- always false until a buff slot for each is
-        // identified. CrossTribeCpAddValue is the same "hardcode the cited shipped literal, pending a
-        // GameServerOptions knob" treatment as the XP ratio above.
+        // identified. CrossTribeCpAddValue now comes from GameServerOptions (shipped BuildEU33 default 3,
+        // =>6 after the rebirth x2 doubling below) instead of a hardcoded literal.
         var baseAmount = PvpKillContributionPointCalculator.ComputeBaseAmount(
             false,
             false,
             PvpKillContributionPointBonuses.ComputePerUserAddValue(false), // TODO: time-effect code 300
             0, // TODO(world-state): mTribeKillOtherTribeAddValueInfo[tribe]
             0, // KEEP 0 -- tower CP already granted separately by ApplyTowerCpForPvpBonus (do NOT double-count)
-            PvpKillContributionPointBonuses
-                .ComputeGameWideAddValue(
-                    3)); // TODO(config): GameServerOptions CrossTribeCpAddValue, shipped BuildEU33 = 3 (=>6 after rebirth x2)
+            PvpKillContributionPointBonuses.ComputeGameWideAddValue(options.CrossTribeCpAddValue));
         baseAmount += PvpKillContributionPointBonuses.ComputeConditionalBonuses(
             MapId, attackerState.Tribe,
             -1, // TODO(world-state): mTribeAddCP runtime tribe
             attackerState.Level, // BASE level only (Level, not Level+Level2)
-            false, // TODO(world-state)
+            worldState?.World.TribeSymbolBattle ?? false, // gates the server-38 symbol-battle +10 bonus
             -1); // UNRECOVERABLE per-server home-tribe map -- withholds minority-capital +10
 
         var grantedAmount = PvpKillContributionPointCalculator.ClampGrant(attackerState.ContributionPoints,
@@ -709,15 +708,16 @@ public sealed partial class Zone
             // attacker/victim level-gap scaling (PvpKillExperienceScaling.Scale) replace the flat placeholder;
             // the zone multiplier is the regular-war x150 (the 11-map SERVER set, RegularWarMapCatalog -- NOT
             // the broader 26-map drop-eligibility family PvpKillExtendedRewardZones uses) vs. the deployment-
-            // configured cross-tribe ratio. Warrior-scroll/double-EXP-charge buffs are still not modeled in
-            // Fenrir yet -- see PvpKillExperienceCalculator's own remarks.
+            // configured cross-tribe ratio (now GameServerOptions.CrossTribeXpRatio, shipped BuildEU33 default
+            // 2, instead of a hardcoded literal). Warrior-scroll/double-EXP-charge buffs are still not modeled
+            // in Fenrir yet -- see PvpKillExperienceCalculator's own remarks.
             var scaledBase = PvpKillExperienceScaling.Scale(
                 PvpKillExperienceBaseTable.Lookup(defenderCombinedLevel),
                 attackerCombinedLevel,
                 defenderCombinedLevel);
             var zoneMultiplier = PvpKillExperienceScaling.ResolveZoneMultiplier(
                 RegularWarMapCatalog.TryGet(MapId, out _),
-                2); // TODO(config): GameServerOptions CrossTribeXpRatio, shipped BuildEU33 = 2
+                options.CrossTribeXpRatio);
             var gain = PvpKillExperienceCalculator.ComputeGain(
                 scaledBase,
                 attackerCombinedLevel,
@@ -891,10 +891,13 @@ public sealed partial class Zone
         // B15 (wave15 contract): PvM tribe-symbol malus -- see MonsterCombatResolver.ResolvePvmAttack's own
         // attackerSymbolDamageDownPenalty remarks for the level gate/ordering, and Zone's own
         // tribeSymbolCombatModifiers remarks for why this degrades to "never malused" (0f) when null.
+        // tribesymbol-damage-magnitude contract: the companion damage-up bonus increment count, same
+        // null-degrades-to-zero convention (never bonused when tribeSymbolCombatModifiers is null).
         var outcome = MonsterCombatResolver.ResolvePvmAttack(attackerSnapshot, monster, command.AttackInfo, _clock,
             _random, attackerState.AttackBudgetEnforced, attackerState.ActionSkillNumber,
             attackerState.ActionSkillGradeNum1 + attackerState.ActionSkillGradeNum2,
-            tribeSymbolCombatModifiers?.GetDamageDownPenalty(attackerSnapshot.Tribe) ?? 0f);
+            tribeSymbolCombatModifiers?.GetDamageDownPenalty(attackerSnapshot.Tribe) ?? 0f,
+            tribeSymbolCombatModifiers?.GetDamageUpBonusIncrementCount(attackerSnapshot.Tribe) ?? 0);
 
         if (outcome.Rejected)
             return;

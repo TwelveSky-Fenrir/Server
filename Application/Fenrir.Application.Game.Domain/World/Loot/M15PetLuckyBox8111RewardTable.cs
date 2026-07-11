@@ -68,9 +68,13 @@ namespace Fenrir.Application.Game.Domain.World.Loot;
 ///         must write the returned counter BEFORE the placement step runs, exactly as box 2249 already does.
 ///     </para>
 ///     <para>
-///         Persistence: <see cref="World.PlayerRuntimeState.M15PetLuckyBoxPity" /> remains session-scoped only
-///         (no game.Characters column, hydration, or write-behind flush yet), same gap already flagged on that
-///         field and on box 2249's <c>CloakLuckyBoxPity</c> -- unchanged by this workstream.
+///         Persistence (confirmation-pass follow-up, gap CLOSED): <see cref="World.PlayerRuntimeState.M15PetLuckyBoxPity" />
+///         is now durably persisted -- game.Characters.M15PetLuckyBoxPity (Migrations/048), world-entry
+///         hydration, in-process zone-transfer carry, and write-behind flush-back are all wired, and
+///         <c>LootBoxUseItemHandler</c> posts a <c>TribeProgressZoneCommand</c> mirror after every open so the
+///         write-behind flush actually picks up the change -- see that field's own remarks for the full
+///         citation trail. Box 2249's <c>CloakLuckyBoxPity</c> (and 8114/8115's own pity counters) remain the
+///         pre-existing session-scoped-only gap, deliberately untouched by this pass.
 ///     </para>
 /// </remarks>
 public static class M15PetLuckyBox8111RewardTable

@@ -21,7 +21,7 @@ public class TowerWarEventCodesTests
     public void EveryCodeInTheBand_IsRecognizedInert(int code)
     {
         Assert.True(TowerWarEventCodes.IsRecognizedInert(code));
-        Assert.True(TowerWarEventCodes.RecognizedInertCodes.Contains(code));
+        Assert.Contains(code, TowerWarEventCodes.RecognizedInertCodes);
     }
 
     [Theory]

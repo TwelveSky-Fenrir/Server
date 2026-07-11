@@ -212,15 +212,64 @@ public static partial class StatCalculator
     }
 
     /// <summary>
-    ///     Base Critical gains a costume-enchant amount driven by <c>cs</c> (MyFactor.cpp:3410-3413): a
-    ///     magnitude of exactly 96 gives a flat +10 (a sentinel whose rationale is unrecoverable, OPEN
-    ///     QUESTION); any other positive magnitude gives magnitude/10 as integer division (remainder dropped);
-    ///     a magnitude of zero or below gives nothing.
+    ///     Base Critical gains a costume-enchant amount driven by <c>cs</c> (MyFactor.cpp:3409-3414): a
+    ///     magnitude of exactly 96 gives a flat +10; any other positive magnitude gives magnitude/10 as
+    ///     integer division (remainder dropped); a magnitude of zero or below gives nothing.
     /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <b>96-sentinel rationale (recovered finding, workstream costume-contribution-magnitude96 --
+    ///         supersedes the prior "unrecoverable, OPEN QUESTION" framing).</b> 96 is the confirmed hard
+    ///         ceiling of this costume-enchant progression stat, not an arbitrary threshold that happens to
+    ///         divide evenly by 10: the enchant-attempt handler rejects outright (disconnects the session)
+    ///         any attempt while the current magnitude already reads &gt;= 96, before any cost is charged
+    ///         (<c>Server/ts25zone/S04_MyWork02.cpp:2616-2623</c> -- modelled in C# by
+    ///         <c>Fenrir.Application.Game.Domain.Enchant.CostumeImproveResolver.MaxCostumeImprove</c>), and
+    ///         reaching exactly 96 after a successful enchant fires its own dedicated server-wide broadcast
+    ///         (opcode 2101), distinct from the ordinary per-attempt success signal
+    ///         (<c>S04_MyWork02.cpp:2665-2676</c> -- surfaced as
+    ///         <c>CostumeImproveResolver.CostumeEnchantResult.ReachedCap</c>).
+    ///         Truncating integer division by 10 collapses every magnitude from 90 through 95 to the same
+    ///         result a genuinely-maxed value would otherwise produce one unit higher (90/10 == 95/10 == 9);
+    ///         special-casing the true ceiling to grant a flat +10 -- instead of the truncated +9 that plain
+    ///         division would give at 96 -- is how the legacy code keeps a fully-maxed enchant numerically
+    ///         distinguishable from a merely-near-max one.
+    ///     </para>
+    ///     <para>
+    ///         The identical cap-plus-sentinel idiom is independently duplicated on a sibling progression
+    ///         field, <c>aHalo</c> ("Palace Rank"): value == 96 grants a flat +10 to Critical Defense, any
+    ///         other positive value divides by 10 (<c>MyFactor.cpp:3581-3586</c>; field declared at
+    ///         <c>STRUCT.h:407</c>) -- confirming this 0-96-plus-sentinel shape is a repeated two-field
+    ///         design pattern, not a one-off constant chosen for the Critical formula alone. Both
+    ///         progressions further share one rate function, <c>GetHaloCostumeEnchantRate</c>
+    ///         (<c>function.h:2165</c>), called from both the costume-enchant path
+    ///         (<c>S04_MyWork02.cpp:2650</c>) and the halo-upgrade path (<c>S04_MyWork02.cpp:11183</c>).
+    ///     </para>
+    ///     <para>
+    ///         One corroborating citation from the initial research pass is dead code, not live evidence: a
+    ///         ticket-item path that also caps <c>aHalo</c> at 96 and fires its own broadcast
+    ///         (<c>S04_MyWork03.cpp:6888-6910</c>) is gated by <c>WUSE_ITEM_867</c>, which is only ever
+    ///         commented out (<c>use_inventory.h:85</c>) and never live-defined anywhere under
+    ///         <c>Server/</c> -- independently corroborated dead by
+    ///         <c>ServerDocs/12_ts25zone/23_Fichiers_Morts_ts25zone.md:130-132</c>. It is retained here only
+    ///         as secondary design-intent corroboration for the <c>aHalo</c> idiom, never as evidence of a
+    ///         currently-running production path.
+    ///     </para>
+    ///     <para>
+    ///         No source comment stating the rationale in these words was found in any reopened file -- this
+    ///         is a corroborated inference from the cap-enforcement, matching-idiom, and shared-rate-function
+    ///         evidence above, not a verbatim-cited developer statement. No logic change results from this
+    ///         finding; the formula below is unchanged from before the finding was recovered.
+    ///     </para>
+    /// </remarks>
     public static int CostumeCriticalContribution(int cs)
     {
-        // OPEN QUESTION (contract edge case 8): the specific value 96 as a Critical sentinel is not
-        // recoverable from the source; preserved exactly, NOT smoothed into the ordinary divide-by-ten rule.
+        // 96 is the confirmed hard ceiling of the costume-enchant magnitude (see remarks): the legacy
+        // enchant handler rejects any attempt once the stored value already reads >= 96
+        // (Server/ts25zone/S04_MyWork02.cpp:2616-2623), so the flat +10 here -- rather than the truncated
+        // +9 that int division by 10 would give across the whole 90-95 range -- is how a fully-maxed
+        // enchant stays numerically distinguishable from a merely-near-max one. Preserved exactly, not an
+        // arbitrary constant (MyFactor.cpp:3409-3414).
         return cs == 96 ? 10 : cs > 0 ? cs / 10 : 0;
     }
 

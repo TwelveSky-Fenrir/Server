@@ -65,9 +65,10 @@ public class UseItemHandlerRegistryTests
             NullLogger<DungeonKeyUseItemHandler>.Instance);
         var ivyHallTicket = new IvyHallTicketUseItemHandler(writer, eventLog,
             NullLogger<IvyHallTicketUseItemHandler>.Instance);
-        var luckyTicket = new LuckyTicketUseItemHandler(NullLogger<LuckyTicketUseItemHandler>.Instance);
+        var luckyTicket = new LuckyTicketUseItemHandler(worldData, writer,
+            NullLogger<LuckyTicketUseItemHandler>.Instance);
         var scrollOfSeekers =
-            new ScrollOfSeekersUseItemHandler(NullLogger<ScrollOfSeekersUseItemHandler>.Instance);
+            new ScrollOfSeekersUseItemHandler(writer, eventLog, NullLogger<ScrollOfSeekersUseItemHandler>.Instance);
         var costumeStellarCore = new CostumeStellarCoreUseItemHandler(writer, eventLog,
             NullLogger<CostumeStellarCoreUseItemHandler>.Instance);
 

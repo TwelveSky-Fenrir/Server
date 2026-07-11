@@ -35,7 +35,7 @@ public class CpTicketResolverTests
     {
         var ids = CpTicketResolver.HandledItemIds.ToHashSet();
         foreach (var expected in new[] { 691, 692, 693, 694, 1444, 1447, 8433, 1448, 8432, 1449, 8431, 1499, 8434 })
-            Assert.True(ids.Contains(expected));
+            Assert.Contains(expected, ids);
         Assert.Equal(13, ids.Count);
     }
 

@@ -7,5 +7,8 @@ CREATE TABLE world.NpcMenuOptions
     OptionId  INT      NOT NULL,
     CONSTRAINT PK_NpcMenuOptions PRIMARY KEY CLUSTERED (NpcId, SlotIndex),
     CONSTRAINT CK_NpcMenuOptions_SlotIndex CHECK (SlotIndex BETWEEN 0 AND 99),
-    CONSTRAINT FK_NpcMenuOptions_Npcs FOREIGN KEY (NpcId) REFERENCES world.Npcs (NpcId)
+    CONSTRAINT FK_NpcMenuOptions_Npcs FOREIGN KEY (NpcId) REFERENCES world.Npcs (NpcId),
+    -- OptionId is exactly 1 or 2 per legacy's own load-time validation (Npc_CheckValidElement,
+    -- Server/Header/S15_MyShare.cpp:1910-1916); 0 is explicitly invalid there.
+    CONSTRAINT CK_NpcMenuOptions_OptionId CHECK (OptionId IN (1, 2))
 );

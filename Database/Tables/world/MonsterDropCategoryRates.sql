@@ -6,5 +6,8 @@ CREATE TABLE world.MonsterDropCategoryRates
     Value         INT     NOT NULL,
     CONSTRAINT PK_MonsterDropCategoryRates PRIMARY KEY CLUSTERED (MonsterId, CategoryIndex),
     CONSTRAINT FK_MonsterDropCategoryRates_Monster FOREIGN KEY (MonsterId) REFERENCES world.Monsters (MonsterId),
-    CONSTRAINT CK_MonsterDropCategoryRates_CategoryIndex CHECK (CategoryIndex BETWEEN 0 AND 11)
+    CONSTRAINT CK_MonsterDropCategoryRates_CategoryIndex CHECK (CategoryIndex BETWEEN 0 AND 11),
+    -- Value-range bound mirrors legacy's load-time field validation (Monster_CheckValidElement,
+    -- Server/Header/S15_MyShare.cpp:1801-1808).
+    CONSTRAINT CK_MonsterDropCategoryRates_Value CHECK (Value BETWEEN 0 AND 1000000)
 );

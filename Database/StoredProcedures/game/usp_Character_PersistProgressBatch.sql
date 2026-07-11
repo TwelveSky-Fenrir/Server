@@ -30,6 +30,8 @@ BEGIN
         c.EatStrPotion       = s.EatStrPotion,
         c.EatDexPotion       = s.EatDexPotion,
         c.EatElePotion       = s.EatElePotion,
+        c.DropItemTime       = s.DropItemTime,
+        c.M15PetLuckyBoxPity = s.M15PetLuckyBoxPity,
         c.FlushSequence      = s.FlushSequence,
         c.UpdatedAtUtc       = SYSUTCDATETIME()
     FROM game.Characters AS c

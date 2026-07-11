@@ -9,5 +9,10 @@ CREATE TABLE world.MonsterDropExtraItems
     CONSTRAINT FK_MonsterDropExtraItems_Monster FOREIGN KEY (MonsterId) REFERENCES world.Monsters (MonsterId),
     CONSTRAINT FK_MonsterDropExtraItems_Item FOREIGN KEY (ItemId) REFERENCES world.Items (ItemId),
     CONSTRAINT CK_MonsterDropExtraItems_SlotIndex CHECK (SlotIndex BETWEEN 0 AND 49),
+    -- Value-range bounds mirror legacy's load-time field validation (Monster_CheckValidElement,
+    -- Server/Header/S15_MyShare.cpp:1819-1830). ItemId stays nullable-aware (rate-only slots are real seeded
+    -- data -- see the table's own header comment).
+    CONSTRAINT CK_MonsterDropExtraItems_DropRate CHECK (DropRate BETWEEN 0 AND 1000000), -- :1819-1825
+    CONSTRAINT CK_MonsterDropExtraItems_ItemId CHECK (ItemId IS NULL OR ItemId BETWEEN 0 AND 99999), -- :1826-1830
     INDEX IX_MonsterDropExtraItems_ItemId NONCLUSTERED (ItemId)
 );

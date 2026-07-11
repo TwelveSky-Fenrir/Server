@@ -276,31 +276,38 @@ public class SkillGradeAuthorityTests
         Assert.Equal(0, result);
     }
 
-    // ================= GetBonusSkillValue: terms 3/6 documented no-ops =================
+    // ================= GetBonusSkillValue: term 3 (cape-slot hardcoded item id 1404) =================
+    // Resolved by the skillgrade-authority-magnitudes supplemental contract (MyFactor.cpp:4543-4546).
 
     [Fact]
-    public void GetBonusSkillValue_Term6_GuildBuffTypeThreeActive_StillContributesZero_UntilBuffCategoryPredicateResolved()
+    public void GetBonusSkillValue_Term3_GodOfWarriorCapeInCapeSlot_AddsFlatTwo()
     {
-        // Documents today's deliberate no-op (class remarks / openQuestions): the numeric gate alone (type 3,
-        // active) is NOT sufficient to add the flat +1, because the buff-category predicate the D2 contract
-        // never transcribes is unresolved.
-        var result = SkillGradeAuthority.GetBonusSkillValue(82, [], 0, null, guildBuffType: 3, guildBuffActive: true);
+        var capeItem = ItemWith(SkillGradeAuthority.GodOfWarriorCapeItemId);
+        var slots = new ItemDefinition?[SkillGradeAuthority.EquipSlotCount];
+        slots[SkillGradeAuthority.CapeSlotIndex] = capeItem;
 
-        Assert.Equal(0, result);
+        var result = SkillGradeAuthority.GetBonusSkillValue(41, slots, 0, null, 0, false);
+
+        Assert.Equal(2, result);
     }
 
     [Fact]
-    public void GetBonusSkillValue_Term6_InactiveOrWrongType_AlsoContributesZero()
+    public void GetBonusSkillValue_Term3_AppliesRegardlessOfWhichSkillIsQueried()
     {
-        Assert.Equal(0, SkillGradeAuthority.GetBonusSkillValue(82, [], 0, null, 3, false));
-        Assert.Equal(0, SkillGradeAuthority.GetBonusSkillValue(82, [], 0, null, 1, true));
+        var capeItem = ItemWith(SkillGradeAuthority.GodOfWarriorCapeItemId);
+        var slots = new ItemDefinition?[SkillGradeAuthority.EquipSlotCount];
+        slots[SkillGradeAuthority.CapeSlotIndex] = capeItem;
+
+        var result = SkillGradeAuthority.GetBonusSkillValue(999, slots, 0, null, 0, false);
+
+        Assert.Equal(2, result);
     }
 
     [Fact]
-    public void GetBonusSkillValue_Term3_NoHardcodedCapeItemGrantsFlatTwo_DocumentedNoOp()
+    public void GetBonusSkillValue_Term3_OtherCapeItemId_ContributesZero()
     {
-        // No item id can trigger term 3 today (deliberately unmodeled -- class remarks). A cape-slot item,
-        // however implausible its id, contributes only via terms 1/2 (both zero here), never an extra +2.
+        // No item id besides 1404 can trigger term 3 -- any other cape-slot item contributes only via
+        // terms 1/2 (both zero here), never the extra +2.
         var capeItem = ItemWith(99999);
         var slots = new ItemDefinition?[SkillGradeAuthority.EquipSlotCount];
         slots[SkillGradeAuthority.CapeSlotIndex] = capeItem;
@@ -308,5 +315,97 @@ public class SkillGradeAuthorityTests
         var result = SkillGradeAuthority.GetBonusSkillValue(41, slots, 0, null, 0, false);
 
         Assert.Equal(0, result);
+    }
+
+    [Fact]
+    public void GetBonusSkillValue_Term3_MatchingItemIdOutsideCapeSlot_ContributesZero()
+    {
+        // Item id 1404 equipped in any slot OTHER than the cape slot must not trigger term 3.
+        var itemInWrongSlot = ItemWith(SkillGradeAuthority.GodOfWarriorCapeItemId);
+        ReadOnlySpan<ItemDefinition?> equip = [itemInWrongSlot]; // slot 0, not CapeSlotIndex (1)
+
+        var result = SkillGradeAuthority.GetBonusSkillValue(41, equip, 0, null, 0, false);
+
+        Assert.Equal(0, result);
+    }
+
+    [Fact]
+    public void GetBonusSkillValue_Term3_StacksWithTerms1And2()
+    {
+        var capeItem = ItemWith(SkillGradeAuthority.GodOfWarriorCapeItemId, capeInfo3: 3,
+            bonusSkills: [new ItemBonusSkillRowDto(SkillGradeAuthority.GodOfWarriorCapeItemId, 0, 41, 5)]);
+        var slots = new ItemDefinition?[SkillGradeAuthority.EquipSlotCount];
+        slots[SkillGradeAuthority.CapeSlotIndex] = capeItem;
+
+        var result = SkillGradeAuthority.GetBonusSkillValue(41, slots, 0, null, 0, false);
+
+        // term 1: 5, term 2: 3, term 3: 2 -- total 10.
+        Assert.Equal(10, result);
+    }
+
+    // ================= GetBonusSkillValue: term 6 (guild-buff type-3, sType==2 skill, flat +1) =================
+    // Resolved by the skillgrade-authority-magnitudes supplemental contract (MyFactor.cpp:4573-4575,
+    // STRUCT.h:136).
+
+    private static SkillDefinition SkillDefinitionWithType(int skillId, byte type)
+    {
+        var row = WorldDataTestRows.Skill(skillId) with { Type = type };
+        return new SkillDefinition(row, ImmutableArray<SkillDescriptionRowDto>.Empty,
+            ImmutableArray<SkillGradeRowDto>.Empty);
+    }
+
+    [Fact]
+    public void GetBonusSkillValue_Term6_AllFourConditionsHold_AddsFlatOne()
+    {
+        var buffCategorySkill = SkillDefinitionWithType(82, type: 2);
+
+        var result = SkillGradeAuthority.GetBonusSkillValue(82, [], 0, buffCategorySkill,
+            guildBuffType: 3, guildBuffActive: true);
+
+        Assert.Equal(1, result);
+    }
+
+    [Fact]
+    public void GetBonusSkillValue_Term6_SkillDefinitionNull_ContributesZero()
+    {
+        // A null skill definition models SKILLSYSTEM::Search's NULL return for an out-of-range/zeroed skill
+        // id -- never satisfies the predicate even with the guild-buff gate fully open.
+        var result = SkillGradeAuthority.GetBonusSkillValue(82, [], 0, null, guildBuffType: 3, guildBuffActive: true);
+
+        Assert.Equal(0, result);
+    }
+
+    [Fact]
+    public void GetBonusSkillValue_Term6_SkillTypeNotTwo_ContributesZero()
+    {
+        var notBuffCategorySkill = SkillDefinitionWithType(82, type: 1);
+
+        var result = SkillGradeAuthority.GetBonusSkillValue(82, [], 0, notBuffCategorySkill,
+            guildBuffType: 3, guildBuffActive: true);
+
+        Assert.Equal(0, result);
+    }
+
+    [Fact]
+    public void GetBonusSkillValue_Term6_GuildBuffInactiveOrWrongType_ContributesZero()
+    {
+        var buffCategorySkill = SkillDefinitionWithType(82, type: 2);
+
+        Assert.Equal(0, SkillGradeAuthority.GetBonusSkillValue(82, [], 0, buffCategorySkill, 3, false));
+        Assert.Equal(0, SkillGradeAuthority.GetBonusSkillValue(82, [], 0, buffCategorySkill, 1, true));
+    }
+
+    [Fact]
+    public void GetBonusSkillValue_Terms3And6_BothApply_StackAdditively()
+    {
+        var capeItem = ItemWith(SkillGradeAuthority.GodOfWarriorCapeItemId);
+        var slots = new ItemDefinition?[SkillGradeAuthority.EquipSlotCount];
+        slots[SkillGradeAuthority.CapeSlotIndex] = capeItem;
+        var buffCategorySkill = SkillDefinitionWithType(82, type: 2);
+
+        var result = SkillGradeAuthority.GetBonusSkillValue(82, slots, 0, buffCategorySkill,
+            guildBuffType: 3, guildBuffActive: true);
+
+        Assert.Equal(3, result); // term 3 (+2) + term 6 (+1)
     }
 }

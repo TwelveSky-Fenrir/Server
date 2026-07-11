@@ -41,6 +41,18 @@ public static class MonsterCombatResolver
     /// </summary>
     public const short MalusMinimumAttackerLevel = 112;
 
+    /// <summary>
+    ///     <c>tribesymbol-damage-magnitude</c> contract (<c>S07_MyGame02.cpp:2314-2318</c>, collapsing
+    ///     <c>500 * (tTribeSymbolDamageUp * 10)</c> once <c>tTribeSymbolDamageUp</c>'s own 0.1-per-increment
+    ///     build-up -- <c>S07_MyGame01.cpp:3155,3160,3165,3170,3178,3186</c>, repeated per tribe across
+    ///     <c>:3144-3338</c> -- is substituted in): the flat amount added to the running PvM attack-damage total
+    ///     per damage-up increment (<see cref="World.ZoneWar.TribeSymbolCombatModifiers.GetDamageUpBonusIncrementCount" />),
+    ///     up to <see cref="World.ZoneWar.TribeSymbolCombatModifiers.MaxDamageUpBonusIncrementCount" /> increments
+    ///     (four -- own-slot control, up to three other-tribe slots, the monster symbol, or the small-tribe
+    ///     fallback). Every increment is worth the identical flat amount regardless of which gate produced it.
+    /// </summary>
+    public const int DamageUpBonusFlatPerIncrement = 500;
+
     /// <param name="request">
     ///     <c>AttackActionValue1</c> (attack-mode selector, 1=melee/2=skill -- any other value is an
     ///     unconditional silent reject) and, only when it selects the skill branch,
@@ -72,11 +84,21 @@ public static class MonsterCombatResolver
     ///     already read directly -- the contract's own citation does not disambiguate base vs. combined level,
     ///     so this reuses the one field this file's sibling gates already establish as the convention rather
     ///     than inventing a second one) exceeds <see cref="MalusMinimumAttackerLevel" />, applied AFTER the
-    ///     elemental-damage term and BEFORE the view-damage capture, compounding on the already-modified damage
-    ///     (not the pre-bonus base) -- see this method's own body for the exact insertion point and
-    ///     <see cref="World.ZoneWar.TribeSymbolCombatModifiers" />'s own remarks for why the companion damage-UP
-    ///     bonus is NOT applied here (its per-increment magnitude is not recoverable from the contract).
-    ///     Defaults to 0 so every existing positional caller (tests) keeps compiling with no behavior change.
+    ///     elemental-damage term AND the damage-up bonus below, BEFORE the view-damage capture, compounding on
+    ///     the already-modified damage (not the pre-bonus base) -- see this method's own body for the exact
+    ///     insertion point. Defaults to 0 so every existing positional caller (tests) keeps compiling with no
+    ///     behavior change.
+    /// </param>
+    /// <param name="attackerSymbolDamageUpBonusIncrementCount">
+    ///     <c>tribesymbol-damage-magnitude</c> contract -- the attacking tribe's current PvM tribe-symbol
+    ///     damage-up bonus increment count (0-4), from
+    ///     <see cref="World.ZoneWar.TribeSymbolCombatModifiers.GetDamageUpBonusIncrementCount" />. Each
+    ///     increment adds a flat <see cref="DamageUpBonusFlatPerIncrement" /> to the running damage total,
+    ///     applied immediately AFTER the elemental-damage term and BEFORE
+    ///     <paramref name="attackerSymbolDamageDownPenalty" />'s reduction (which compounds on top of this
+    ///     addition, matching the contract's own ordering). A count of exactly 0 contributes nothing -- the
+    ///     addition is skipped entirely, not a zero-valued add. Defaults to 0 so every existing positional
+    ///     caller (tests) keeps compiling with no behavior change.
     /// </param>
     public static AttackOutcome ResolvePvmAttack(
         CombatantSnapshot attacker,
@@ -87,7 +109,8 @@ public static class MonsterCombatResolver
         bool attackerAttackBudgetEnforced,
         int attackerActionSkillNumber,
         int attackerActionSkillGradePoints,
-        float attackerSymbolDamageDownPenalty = 0f)
+        float attackerSymbolDamageDownPenalty = 0f,
+        int attackerSymbolDamageUpBonusIncrementCount = 0)
     {
         if (attacker.IsDead)
             return AttackOutcome.Reject(AttackRejectReason.AttackerDead);
@@ -169,14 +192,17 @@ public static class MonsterCombatResolver
             elementDamage = attacker.Stats.ElementAttackPower - monster.Template.ElementDefensePower;
         damage += elementDamage;
 
+        // tribesymbol-damage-magnitude contract (S07_MyGame02.cpp:2314-2318): flat DamageUpBonusFlatPerIncrement
+        // (500) per increment, immediately after the elemental term above and before the malus below. A count
+        // of exactly 0 skips the addition entirely rather than adding zero, matching the cited `> 0.0f` gate.
+        if (attackerSymbolDamageUpBonusIncrementCount > 0)
+            damage += DamageUpBonusFlatPerIncrement * attackerSymbolDamageUpBonusIncrementCount;
+
         // B15 (wave15 contract, Side effects §2b): PvM tribe-symbol malus -- a genuine percentage reduction
-        // that compounds AFTER the elemental term above (on the already-modified damage), gated on the
-        // attacker's own level strictly exceeding MalusMinimumAttackerLevel. Runs before the view-damage
-        // capture below, matching the contract's own ordering ("this is a genuine percentage reduction, and it
-        // compounds after the flat bonus... it does not apply to the pre-bonus base damage" -- the companion
-        // damage-UP bonus is not applied anywhere in this codebase yet, so there is currently nothing for this
-        // reduction to compound after besides the elemental term; see attackerSymbolDamageDownPenalty's own
-        // remarks for why).
+        // that compounds AFTER the elemental term AND the damage-up bonus above (on the already-modified
+        // damage), gated on the attacker's own level strictly exceeding MalusMinimumAttackerLevel. Runs before
+        // the view-damage capture below, matching the contract's own ordering ("this is a genuine percentage
+        // reduction, and it compounds after the flat bonus... it does not apply to the pre-bonus base damage").
         if (attackerSymbolDamageDownPenalty > 0f && attacker.Level > MalusMinimumAttackerLevel)
             damage -= (int)(damage * attackerSymbolDamageDownPenalty);
 

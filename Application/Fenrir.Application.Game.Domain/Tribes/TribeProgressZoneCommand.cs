@@ -73,6 +73,10 @@ namespace Fenrir.Application.Game.Domain.Tribes;
 ///     Ivy Hall Ticket pair (553/1219) -- see
 ///     <see cref="PlayerRuntimeState.IvyHallTicketTime" />.
 /// </param>
+/// <param name="ScrollOfSeekersTime">
+///     Scroll of Seekers family (1124/1187/7016/8409/8410) -- see
+///     <see cref="PlayerRuntimeState.ScrollOfSeekersTime" />.
+/// </param>
 /// <param name="TeacherPoint">
 ///     tSort 237 (TimeExchange) -- the character's new total after granting 694 points per accrued
 ///     play-time-event minute. See <see cref="PlayerRuntimeState.TeacherPoint" />.
@@ -198,6 +202,14 @@ namespace Fenrir.Application.Game.Domain.Tribes;
 /// </param>
 /// <param name="Level2">Companion to <see cref="Level" /> -- see <see cref="PlayerRuntimeState.Level2" />.</param>
 /// <param name="Experience">Companion to <see cref="Level" /> -- see <see cref="PlayerRuntimeState.Experience" />.</param>
+/// <param name="M15PetLuckyBoxPity">
+///     The M15 Pet Lucky Box (world.Items 8111) pity counter -- <c>LootBoxUseItemHandler</c> posts this after
+///     every box-8111 open (the reward-id-override closure has already written the same value directly onto
+///     <see cref="PlayerRuntimeState.M15PetLuckyBoxPity" /> synchronously; this mirror exists purely so
+///     applying it here marks <see cref="DirtyFlags" />.Progression dirty, since that tracker is Zone-internal
+///     state a handler cannot reach directly). See <see cref="PlayerRuntimeState.M15PetLuckyBoxPity" />'s own
+///     remarks for the confirmation-pass persistence gap this closes.
+/// </param>
 /// <param name="Applied">
 ///     Completed once actually mirrored -- see InventoryZoneCommand.Applied for why this matters while
 ///     EconomyActionLock is held.
@@ -241,6 +253,7 @@ public readonly record struct TribeProgressZoneCommand(
     int? EliteDungeonTime = null,
     int? DungeonKeyTime = null,
     int? IvyHallTicketTime = null,
+    int? ScrollOfSeekersTime = null,
     int? TeacherPoint = null,
     int? PetGrowth = null,
     byte? PetActivity = null,
@@ -266,6 +279,7 @@ public readonly record struct TribeProgressZoneCommand(
     short? Level = null,
     short? Level2 = null,
     long? Experience = null,
+    int? M15PetLuckyBoxPity = null,
     TaskCompletionSource? Applied = null);
 
 /// <summary>

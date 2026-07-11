@@ -9,6 +9,7 @@
     <ProjectReference Include="..\Fenrir.Application.Game.Domain\Fenrir.Application.Game.Domain.csproj"/>
     <ProjectReference Include="..\Fenrir.Application.Game.GameData\Fenrir.Application.Game.GameData.csproj"/>
     <ProjectReference Include="..\Fenrir.Application.Game.Stats\Fenrir.Application.Game.Stats.csproj"/>
+    <ProjectReference Include="..\Fenrir.Application.Game.Services\Fenrir.Application.Game.Services.csproj"/>
     <ProjectReference Include="..\..\Network\Fenrir.Network.Abstractions\Fenrir.Network.Abstractions.csproj"/>
     <ProjectReference Include="..\..\Network\Fenrir.Network.Serialization.Wire\Fenrir.Network.Serialization.Wire.csproj"/>
     <ProjectReference Include="..\..\Network\Fenrir.Network.Serialization.Shared\Fenrir.Network.Serialization.Shared.csproj"/>

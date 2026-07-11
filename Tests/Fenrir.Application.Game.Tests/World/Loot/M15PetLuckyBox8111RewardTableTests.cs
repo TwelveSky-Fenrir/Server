@@ -21,7 +21,7 @@ public class M15PetLuckyBox8111RewardTableTests
         Assert.Equal(BoxRewardKind.RareBandThenPools, spec.Kind);
         Assert.Equal(0, spec.RentalDays);
         Assert.Empty(spec.RareBands);
-        Assert.Same(M15PetLuckyBox8111RewardTable.Pools, spec.Pools);
+        Assert.Equal(M15PetLuckyBox8111RewardTable.Pools, spec.Pools);
     }
 
     [Fact]

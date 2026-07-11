@@ -35,11 +35,30 @@ namespace Fenrir.Application.Game.Domain.Enchant;
 ///         .
 ///         The +0..+40/+41..+50 regime split, the destroy-probability formula, and
 ///         <see cref="EnchantResolver.SafeImproveValue" />=20 remain correctly shared between wings and
-///         every other equipment slot -- only the legal-MATERIAL set differs. This type is data only; wiring
-///         <see cref="EnchantResolver" />/<see cref="EnchantMaterialCatalog" /> to actually branch on
-///         <see cref="EnchantResolver.EnchantResult.IsWing" /> and consult THIS whitelist instead of the
-///         shared tables is deferred to a later pass (both files are outside this workstream's edit
-///         permission) -- see this workstream's wiring manifest.
+///         every other equipment slot -- only the legal-MATERIAL set differs. Wiring
+///         <see cref="EnchantResolver" />/<see cref="EnchantMaterialCatalog" /> to fully branch on
+///         <see cref="EnchantResolver.EnchantResult.IsWing" /> and consult THIS whitelist for every material
+///         instead of the shared tables remains a later pass for the still-unresolved ids (696/698/826/
+///         2387/2392/2397) -- but the "enchant-resolver-wing-8106-ticket" follow-up contract below supplied
+///         <see cref="ProtectedMaterialItemId" />'s (8106) own missing magnitude, and
+///         <see cref="EnchantResolver" /> now wires that one material's full behavior (see that type's own
+///         remarks and its <c>ResolveWingProtectedMaterial</c>).
+///     </para>
+///     <para>
+///         <b>2026-07-11 supplemental finding (enchant-resolver-wing-8106-ticket)</b>, independently
+///         re-verified: Server/ts25zone/S04_MyWork02.cpp:3051-3056 -- the per-attempt enchant VALUE for
+///         material 8106 (gated on the always-live <c>LNW33</c>, per the citations above) and its sibling
+///         695 (compiled unconditionally, same case label, NOT <c>LNW33</c>-gated) is the same flat +1
+///         (<see cref="ProtectedMaterialEnchantValue" />). :3084-3091 confirms the Wing-category cost is
+///         keyed by the EQUIPPED ITEM'S category, not by material -- contrasted against the material-priced
+///         default path at :3092-3099 -- and :3222-3237 shows that flat cost (<see cref="WingEnchantCpCost" />
+///         = 50, contribution points, not money) is debited unconditionally before the success roll is drawn,
+///         win or lose. 695's own FAILURE path is a DIFFERENT code block than 8106's (the one cited at
+///         :3259-3267 names 8106 specifically) and was not observed in the cited range of that finding --
+///         do NOT assume it shares 8106's NoChange/immune-to-loss shape; <see cref="EnchantResolver" />
+///         therefore only wires 8106, not 695, leaving 695 in <see cref="ClassWhitelist" /> (Gate 1 passes)
+///         but out of any modeled success/failure path (Rejected until a follow-up contract resolves its
+///         failure semantics).
 ///     </para>
 /// </remarks>
 public static class WingEnchantMaterialWhitelist
@@ -57,10 +76,10 @@ public static class WingEnchantMaterialWhitelist
     ///     destroy occurs -- immune to loss on failure, the wing analogue of the non-wing 8101 material's own
     ///     <see cref="EnchantMaterialCatalog.StandardMaterial.NoChangeOnFailure" /> shape, but with its own
     ///     distinct wire result code since the caller distinguishes wing vs. non-wing targets
-    ///     (S04_MyWork02.cpp:3264). Its own Gate-2 SUCCESS increment amount is not cited by this workstream's
-    ///     contract -- do not invent one; see <see cref="WhitelistedAmountNotCited" />'s own remarks for the
-    ///     same posture (8106 is intentionally NOT included in that set only because its FAILURE behavior,
-    ///     unlike 695/696/698/2397, IS fully specified -- only its success amount is open).
+    ///     (S04_MyWork02.cpp:3264). Its per-attempt SUCCESS increment amount and cost are now resolved --
+    ///     see <see cref="ProtectedMaterialEnchantValue" />/<see cref="WingEnchantCpCost" /> and this type's
+    ///     own 2026-07-11 supplemental-finding remarks -- and fully wired by
+    ///     <see cref="EnchantResolver" />'s <c>ResolveWingProtectedMaterial</c>.
     /// </summary>
     public const int ProtectedMaterialItemId = 8106;
 
@@ -70,6 +89,39 @@ public static class WingEnchantMaterialWhitelist
     ///     since the caller maps the "no-change" result differently for wing vs. non-wing targets.
     /// </summary>
     public const int ProtectedMaterialFailureResultCode = 9;
+
+    /// <summary>
+    ///     The flat per-attempt enchant increment shared by material 8106 and its sibling 695
+    ///     (Server/ts25zone/S04_MyWork02.cpp:3051-3056, same case label) -- see this type's own 2026-07-11
+    ///     supplemental-finding remarks. <see cref="EnchantResolver" /> only wires this for 8106 itself
+    ///     (695's failure path is unresolved -- see <see cref="SiblingWithSharedEnchantValueItemId" />).
+    /// </summary>
+    public const int ProtectedMaterialEnchantValue = 1;
+
+    /// <summary>
+    ///     Item 695: shares material 8106's exact +1 enchant-value assignment (same case label, but compiled
+    ///     unconditionally -- NOT <c>LNW33</c>-gated) per Server/ts25zone/S04_MyWork02.cpp:3051-3056. Its own
+    ///     FAILURE path is a genuinely different code block than 8106's (the dedicated early-exit cited at
+    ///     :3259-3267 names 8106 specifically) and was never observed by the finding that recovered the
+    ///     shared +1 value -- do NOT assume it shares 8106's NoChange/immune-to-loss shape; it may instead
+    ///     fall through to the ordinary destroy-risk path that follows that block. Flagged for a
+    ///     <c>cpp-zone-gameplay-analyst</c> re-check before modeling 695 at all;
+    ///     <see cref="EnchantResolver" /> deliberately leaves 695 unmodeled (Rejected) pending that follow-up.
+    /// </summary>
+    public const int SiblingWithSharedEnchantValueItemId = 695;
+
+    /// <summary>
+    ///     The flat Wing-CATEGORY enchant cost (contribution points, never money) debited unconditionally
+    ///     before the success roll is drawn, win or lose -- keyed by the EQUIPPED item's category, not by
+    ///     material (Server/ts25zone/S04_MyWork02.cpp:3084-3091, contrasted against the material-priced
+    ///     default path at :3092-3099; the debit itself at :3222-3237). Conceptually applies to every wing
+    ///     material, but <see cref="EnchantResolver" /> currently only wires it for the fully-specified 8106
+    ///     case (see this type's own 2026-07-11 supplemental-finding remarks) -- the caller
+    ///     (<c>EnchantItemService</c>) routes <see cref="EnchantResolver.EnchantResult.Cost" /> to CP instead
+    ///     of money via <see cref="EnchantResolver.EnchantResult.IsWing" />, so this constant slots into that
+    ///     same field unchanged.
+    /// </summary>
+    public const int WingEnchantCpCost = 50;
 
     /// <summary>
     ///     Gate 1 (the class whitelist). 99409 is textually present in source but gated behind
@@ -92,7 +144,10 @@ public static class WingEnchantMaterialWhitelist
     ///     2387/2392 as Gate-2-absent, not these) to have a matching case, but this workstream's own contract
     ///     did not cite the specific per-material increment amount for any of these three. Do NOT invent a
     ///     magnitude here -- flag for a follow-up legacy-behavior-translator pass citing
-    ///     S04_MyWork02.cpp:3036-3079's individual case values for these ids specifically.
+    ///     S04_MyWork02.cpp:3036-3079's individual case values for these ids specifically. 695 is deliberately
+    ///     NOT in this set any more: the 2026-07-11 supplemental finding cited its enchant-VALUE assignment
+    ///     (<see cref="SiblingWithSharedEnchantValueItemId" />'s own remarks) -- what remains open for 695 is
+    ///     its failure-path behavior, a different concern than "amount not cited".
     /// </summary>
-    public static readonly FrozenSet<int> WhitelistedAmountNotCited = new[] { 695, 696, 698, 2397 }.ToFrozenSet();
+    public static readonly FrozenSet<int> WhitelistedAmountNotCited = new[] { 696, 698, 2397 }.ToFrozenSet();
 }

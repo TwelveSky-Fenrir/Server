@@ -24,7 +24,7 @@ public class MonsterSpawnSchedulerPopupEventWiringTests
     /// <summary>145 -- one of <c>PopupEventZoneCatalog.MonsterMaps</c>.</summary>
     private const short MonsterPopupMap = 145;
 
-    private static WorldDataCache CacheWithOneRegion(int martialItemLevel = 0)
+    private static WorldDataCache CacheWithOneRegion(short martialItemLevel = 0)
     {
         var monster = WorldDataTestRows.Monster(500) with
         {

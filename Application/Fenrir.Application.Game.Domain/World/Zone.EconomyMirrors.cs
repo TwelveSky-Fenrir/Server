@@ -764,6 +764,12 @@ public sealed partial class Zone
             changed = true;
         }
 
+        if (command.ScrollOfSeekersTime is { } scrollOfSeekersTime)
+        {
+            state.ScrollOfSeekersTime = scrollOfSeekersTime;
+            changed = true;
+        }
+
         if (command.TeacherPoint is { } teacherPoint)
         {
             state.TeacherPoint = teacherPoint;
@@ -894,6 +900,18 @@ public sealed partial class Zone
         if (command.Experience is { } newExperience)
         {
             state.Experience = newExperience;
+            changed = true;
+        }
+
+        // M15 Pet Lucky Box (8111) pity-counter persistence mirror (confirmation-pass follow-up) --
+        // LootBoxUseItemHandler's reward-id-override closure has already written the same value directly onto
+        // PlayerRuntimeState.M15PetLuckyBoxPity synchronously; applying it again here is a no-op mutation-wise
+        // (self-assignment), but marking `changed`/DirtyFlags.Progression is the actual payload, since
+        // DirtyTracker is Zone-internal state a handler cannot reach directly. See
+        // TribeProgressZoneCommand.M15PetLuckyBoxPity's own remarks.
+        if (command.M15PetLuckyBoxPity is { } m15PetLuckyBoxPity)
+        {
+            state.M15PetLuckyBoxPity = m15PetLuckyBoxPity;
             changed = true;
         }
 

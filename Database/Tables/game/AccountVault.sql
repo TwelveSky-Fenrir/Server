@@ -7,6 +7,9 @@ CREATE TABLE game.AccountVault
         CONSTRAINT DF_AccountVault_Money DEFAULT 0,
     Money2       BIGINT       NOT NULL
         CONSTRAINT DF_AccountVault_Money2 DEFAULT 0,
+    BigMoney     INT          NOT NULL
+        CONSTRAINT DF_AccountVault_BigMoney DEFAULT 0
+        CONSTRAINT CK_AccountVault_BigMoney CHECK (BigMoney >= 0), -- account-scoped Save/vault BigMoney pool backing the Inventory<->Save BigMoney transfer (CZ_PROCESS_DATA_SEND tSort 242/245), see usp_AccountVault_TransferBigMoneyWithCharacter
     UpdatedAtUtc DATETIME2(3) NOT NULL
         CONSTRAINT DF_AccountVault_UpdatedAtUtc DEFAULT SYSUTCDATETIME(),
     CONSTRAINT PK_AccountVault PRIMARY KEY CLUSTERED (AccountId),

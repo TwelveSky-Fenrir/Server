@@ -82,12 +82,15 @@ public partial class PlayerRuntimeState
     ///         flagged avatar from monster target acquisition, mirroring <see cref="IsDead" />'s own
     ///         exclusion), <c>Combat.UnstunResolver.Resolve</c> (via
     ///         <see cref="Combat.CombatantSnapshot.IsMovingZone" /> on the cure attempt's target only, never
-    ///         the curer -- matching legacy exactly), and <c>Buffs.RankBuffResolver.Resolve</c> (the ACTING
+    ///         the curer -- matching legacy exactly), <c>Buffs.RankBuffResolver.Resolve</c> (the ACTING
     ///         player's own state, unlike the two consumers above -- CZ_RANK_BUFF_SEND's legacy
     ///         <c>IsMovingZone()</c> gate checks the requester, not a target; see that resolver's own
-    ///         remarks). The remaining combat/social sites the contract's own citation range covers
-    ///         (<c>S04_MyWork02.cpp:8292-9950</c>, minus the sites already re-verified there) are deliberately
-    ///         left unwired here -- an open, tracked follow-up, not guessed at.
+    ///         remarks), and <c>Social.GuildInviteService.AskAsync</c> (the target's own state, alongside
+    ///         <see cref="IsStunned" />/<see cref="IsDead" />, target-only -- matching
+    ///         <c>UnstunResolver</c>'s pattern, re-verified 2026-07-11). The remaining combat/social sites the
+    ///         contract's own citation range covers (<c>S04_MyWork02.cpp:8292-9950</c>, minus the sites
+    ///         already re-verified there) are deliberately left unwired here -- an open, tracked follow-up,
+    ///         not guessed at.
     ///     </para>
     /// </summary>
     public bool IsMovingZone { get; set; }

@@ -18,10 +18,12 @@ namespace Fenrir.Application.Game.Domain.World.Monsters;
 /// </summary>
 /// <remarks>
 ///     Split across two files by concern: this file holds the FSM core (the per-tick <see cref="Update" />
-///     dispatch, spawn-wait, idle/decision dispatch, chase, movement/pathfinding, and the shared candidate
-///     gauntlet). <c>MonsterAiSystem.Recipes.cs</c> holds the <c>mSpecialSortNumber</c> archetype recipes
-///     (<see cref="MonsterSpecialSort" />): the car-thrower/ranged annulus recipe and the Zone175-type boss
-///     multi-candidate acquisition + far/near decision (behavior contract <c>A3-ai-recipes</c>).
+///     dispatch, spawn-wait, idle/decision dispatch, chase, movement/pathfinding, the shared candidate
+///     gauntlet, and the Standard recipe's own post-prune engagement selection). <c>MonsterAiSystem.Recipes.cs</c>
+///     holds the remaining <c>mSpecialSortNumber</c> archetype recipes (<see cref="MonsterSpecialSort" />): the
+///     car-thrower/ranged annulus recipe, the Zone175-type boss multi-candidate acquisition + far/near
+///     decision (behavior contract <c>A3-ai-recipes</c>), and the Tribe Guard direct-melee acquisition recipe
+///     (behavior contract <c>monster-ai-recipe-bodies</c>, recovered 2026-07-11).
 /// </remarks>
 /// <remarks>
 ///     Deliberately not ported:
@@ -50,19 +52,49 @@ namespace Fenrir.Application.Game.Domain.World.Monsters;
 ///             <see cref="RunDecision" />. Implemented: the standard mob (<see cref="MonsterSpecialSort.Standard" />),
 ///             the car-thrower/ranged annulus recipe (<see cref="MonsterSpecialSort.CarThrower" />), and the
 ///             Zone175-type boss multi-candidate acquisition + far/near decision (both in
-///             <c>MonsterAiSystem.Recipes.cs</c>). The RvR recipes that act only on objects workstream A4
-///             spawns -- tribe-symbol stone (2), alliance stone (4), tribe guard (5), tower (10) -- are
-///             dispatched but a safe no-op with a <c>TODO(A4)</c> marker (they cannot run until A4 creates
-///             those objects). Recipe 3 is a genuine inert no-op. NOT yet grounded (flagged for a
-///             <c>legacy-behavior-translator</c> follow-up, see <see cref="MonsterSpecialSort" />): the concrete
-///             <c>ReturnSpecialSortNumber</c> <c>(Type, SpecialType) -&gt; sort</c> discriminator table (only
-///             standard-default + tribe-symbol are grounded), the guard/thrower monster-type/special-type -&gt;
-///             tribe maps (the contract's tribe/allied-tribe exclusion, so the thrower recipe currently applies
-///             no such exclusion), and any <c>BulletInfo1/2</c> server-side projectile hit-test (the contract
-///             states the ranged attack is client-echoed, not server-resolved -- so
+///             <c>MonsterAiSystem.Recipes.cs</c>). The RvR recipes -- tribe-symbol stone (2), alliance stone
+///             (4), tribe guard (5), tower (10) -- were, as of this UPDATE item, ALL dispatched as a safe no-op
+///             with a <c>TODO(A4)</c> marker; tribe guard's own status has since moved on -- see the next
+///             UPDATE item below for its current, corrected state (a real recipe body, reachable in
+///             production). Recipe 3 is a genuine inert no-op. NOT yet grounded (flagged for a
+///             <c>legacy-behavior-translator</c> follow-up, see <see cref="MonsterSpecialSort" />): the
+///             guard/thrower monster-type/special-type -&gt; tribe maps (the contract's tribe/allied-tribe
+///             exclusion, so the thrower recipe currently applies no such exclusion), the remaining two RvR
+///             recipe bodies (tribe-symbol/alliance one-hour idle guard, tower periodic hub action), and any
+///             <c>BulletInfo1/2</c> server-side projectile hit-test (the contract states the ranged attack is
+///             client-echoed, not server-resolved -- so
 ///             <see cref="MonsterAiState.RangedAttackWindup" />
 ///             stays pure-timed and only the melee <see cref="MonsterAiState.AttackWindup" /> resolves damage
 ///             through <see cref="Zone.ResolveMonsterAttack" />).
+///         </item>
+///         <item>
+///             UPDATE (2026-07-11, recovered <c>monster-ai-recipe-bodies</c> behavior contract, three
+///             sub-gaps): (1) the Standard recipe's own post-prune engagement selection is now wired --
+///             <see cref="MonsterAggroListPruner.Prune" /> (previously implemented but never called from
+///             anywhere in this system) is invoked from a new <c>RunPrunedAttackerEngagement</c> in
+///             <see cref="RunStandardDecision" />, which now only re-attempts its proximity scan
+///             (<see cref="TryAcquireTarget" />) when <see cref="MonsterEntity.HasTrackedAttackers" /> is
+///             false, then always falls through to the prune+select step once the table has anything in it --
+///             a freshly-acquired candidate already within melee range now engages IMMEDIATELY (skipping
+///             <see cref="MonsterAiState.Chase" /> entirely), a deliberate, cited behavioral correction versus
+///             this class's own prior simplification (<see cref="TryAcquireTarget" /> used to force
+///             <see cref="MonsterAiState.Chase" /> unconditionally on every successful scan). (2)
+///             <see cref="MonsterSpecialSort.Derive" /> now maps <c>Type</c> 6/7/8/9 to
+///             <see cref="MonsterSpecialSort.TribeGuard" /> unconditionally (closing the gap this remarks
+///             block used to describe) and a sixth Tribe-Symbol-Stone <c>SpecialType</c> code (15) -- see that
+///             type's own remarks for the full citation trail. (3) the Tribe Guard recipe body
+///             (<c>RunGuardDecision</c>, <c>MonsterAiSystem.Recipes.cs</c>) is now implemented: melee-range-
+///             only direct acquisition, no chase/pathing step, no anti-clump cap (confirmed by its absence in
+///             the guard's own function) -- with three specific sub-checks still NOT modeled and explicitly
+///             flagged rather than guessed at (the tribe/allied-tribe exclusion, since the guard's own
+///             Type -&gt; tribe-id mapping isn't recoverable; the two-specific-action-state exclusion, whose
+///             exact codes aren't cited; and the coarse world-sector-box exclusion, whose underlying grid
+///             cell size remains the same unrecovered figure <see cref="MonsterAggroListPruner" />'s own
+///             coarse-3D-grid gap already flags). The Tribe-Symbol-Stone recipe body itself (case (2) of the
+///             <c>TODO(A4)</c> switch in <see cref="RunDecision" />) remains a documented no-op -- its arm
+///             event fires from the combat-damage path, outside this AI system, and needs concrete gating
+///             data this recovery pass could not obtain; see that switch case's own remarks for the full
+///             reasoning.
 ///         </item>
 ///         <item>
 ///             UPDATE (2026-07, A3-mid-chase-retarget behavior contract): <see cref="TryShortRangeRetarget" />
@@ -336,16 +368,37 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
                 RunThrowerDecision(zone, monster);
                 break;
 
+            case MonsterSpecialSort.TribeGuard:
+                // UPDATE (2026-07-11, recovered monster-ai-recipe-bodies contract): both remaining blockers are
+                // now resolved -- TribeGuardSpawner already spawns real guards, and MonsterSpecialSort.Derive now
+                // maps Type 6/7/8/9 to this archetype -- so this case is reachable in production and has a real
+                // recipe body (RunGuardDecision, MonsterAiSystem.Recipes.cs).
+                RunGuardDecision(zone, monster, legacyTicksElapsed);
+                break;
+
             case MonsterSpecialSort.TribeSymbolStone:
             case MonsterSpecialSort.AllianceStone:
-            case MonsterSpecialSort.TribeGuard:
             case MonsterSpecialSort.Tower:
-                // TODO(A4): these RvR recipes act only on objects workstream A4 spawns (tribe-symbol/alliance
-                // stones, tribe guards, towers), each gated on a first-attack flag / one-hour or 30-second
-                // hub-action window / territory-ownership state that has no Fenrir spawn source yet. Dispatched
-                // here so the switch is exhaustive and the recipe activates the moment A4 supplies the objects
-                // (and MonsterSpecialSort.Derive gets the reopened discriminator table) -- a safe no-op until
-                // then, never a standard-aggro fall-through.
+                // TODO(A4): each of these RvR recipes is gated on a first-attack flag / one-hour or 30-second
+                // hub-action window / territory-ownership state with no behavior-contract body yet -- re-confirmed
+                // 2026-07-11, still a safe no-op, never a standard-aggro fall-through, for a different reason per
+                // recipe. TribeSymbolStone's spawn object (World.ZoneWar.TribeSymbolSpawner) AND its
+                // MonsterSpecialSort.Derive mapping both exist (this case IS reachable in production); a
+                // monster-ai-recipe-bodies contract pass this session recovered its idle-reset SHAPE in full
+                // (per-sub-type arm gating, one-hour idle auto-reset/Center-notify/damage-tally-zero/full-heal
+                // sequence, and a confirmed genuine no-op for one specific sub-type code) but deliberately still
+                // does NOT ground it here: the arm EVENT itself fires from the combat-damage-application path
+                // (Zone.Combat.cs, outside this AI system entirely, so out of this pass's own scope), and even
+                // there its exact gating needs concrete data this recovery pass could not obtain -- which of four
+                // named physical server numbers excludes which hardcoded tribe, the Yaoguai sub-type's own
+                // separate global attack-permission-flag wiring, and (flagged as a still-fully-open question by
+                // the recovery itself) the majority-damage-tribe ownership-transfer path's interaction with the
+                // idle auto-reset. Implementing only the idle-reset half with no arm path ever able to set it
+                // true would be permanently-dead code masquerading as a finished feature, so this stays a
+                // documented no-op rather than a half-wired guess -- next step is a legacy-behavior-translator
+                // pass resolving those specifics, not an AI-system-only change. AllianceStone and Tower have no
+                // spawn source anywhere in the codebase yet. Dispatched here so the switch stays exhaustive and
+                // each recipe activates the moment its own remaining blocker is resolved.
                 break;
 
             case MonsterSpecialSort.Inert:
@@ -357,19 +410,43 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
 
     /// <summary>
     ///     Standard-mob idle/decision recipe (<see cref="MonsterSpecialSort.Standard" />,
-    ///     <c>S07_MyGame05.cpp:1003-1057</c>): every idle tick first re-attempts the same wide-radius proximity
-    ///     scan used for original aggro -- including the very first idle tick after this monster just gave up a
-    ///     chase target (<see cref="RunChase" />'s give-up branches all land here, not in
-    ///     <see cref="MonsterAiState.ReturnToSpawn" />). Only once 60 continuous idle ticks pass with zero
-    ///     re-engagement does the monster even consider heading home; until then it falls into a 40-second
-    ///     random-wander cadence instead, still loitering wherever it currently is.
+    ///     <c>S07_MyGame05.cpp:1003-1057</c>): the tick's proximity re-scan for a new attacker is only ever
+    ///     attempted when the monster's own tracked-attacker table (<see cref="MonsterEntity.HasTrackedAttackers" />)
+    ///     starts this tick empty (behavior contract <c>A3-aggro-pruning</c>'s own Trigger, recovered
+    ///     2026-07-11) -- including the very first idle tick after this monster just gave up a chase target
+    ///     (<see cref="RunChase" />'s give-up branches all land here, not in <see cref="MonsterAiState.ReturnToSpawn" />,
+    ///     and give-up ALSO doesn't clear this table, only <see cref="MonsterEntity.TargetCharacterId" />). A
+    ///     table that's already non-empty at the start of this tick skips the scan entirely and falls straight
+    ///     through to the recovered post-prune engagement step (<see cref="RunPrunedAttackerEngagement" />); an
+    ///     empty table that the scan just seeds falls through to that SAME step immediately afterward, in this
+    ///     same tick; an empty table whose scan also fails to find anyone never reaches that step at all this
+    ///     tick -- only then does the 60-second return-home grace period / 40-second random-wander fallback
+    ///     below even run.
     /// </summary>
     private void RunStandardDecision(Zone zone, MonsterEntity monster, int legacyTicksElapsed,
         IEnumerable<MonsterEntity> allMonsters)
     {
-        if (TryAcquireTarget(zone, monster, legacyTicksElapsed, allMonsters))
-            return;
+        if (!monster.HasTrackedAttackers())
+        {
+            if (!TryAcquireTarget(zone, monster, legacyTicksElapsed, allMonsters, transitionToChaseOnAcquire: false))
+            {
+                RunIdleWanderOrReturnHome(zone, monster, legacyTicksElapsed);
+                return;
+            }
 
+            // Scan just seeded exactly one new entry -- the engagement step below runs immediately, same tick
+            // (contract's own "this step still runs immediately afterward" Trigger bullet).
+        }
+
+        RunPrunedAttackerEngagement(zone, monster, allMonsters);
+    }
+
+    /// <summary>
+    ///     The 60-second return-home grace period / 40-second random-wander fallback (<see cref="RunStandardDecision" />'s
+    ///     own tail when the recovered post-prune engagement step above did not itself run this tick).
+    /// </summary>
+    private void RunIdleWanderOrReturnHome(Zone zone, MonsterEntity monster, int legacyTicksElapsed)
+    {
         // 60-second in-place re-detection grace period (mCheckFirstLocationTime, S07_MyGame05.cpp:1012-1031):
         // only after this many continuous idle ticks with no re-acquired target does the monster even consider
         // heading home -- and even then only if it isn't already there. Crossing this threshold always resets
@@ -427,6 +504,174 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
     }
 
     /// <summary>
+    ///     Recovered post-prune engagement selection for the Standard recipe (behavior contract
+    ///     <c>A3-aggro-pruning</c>, recovered 2026-07-11, <c>S07_MyGame05.cpp:1070-1174</c>): prunes the
+    ///     monster's own tracked-attacker table (<see cref="MonsterAggroListPruner.Prune" />) and writes the
+    ///     survivors back (<see cref="MonsterEntity.ReplaceAttackDamage" />) unconditionally once reached, then
+    ///     decides this SAME tick's action from the survivor set -- an immediate melee engagement, a chase
+    ///     toward a computed arc-shaped approach point, a walk-home transition, or no transition at all. See
+    ///     <see cref="RunStandardDecision" /> for the Trigger gate that reaches this step.
+    /// </summary>
+    private void RunPrunedAttackerEngagement(Zone zone, MonsterEntity monster, IEnumerable<MonsterEntity> allMonsters)
+    {
+        var pruneResult = MonsterAggroListPruner.Prune(zone, monster, allMonsters);
+        monster.ReplaceAttackDamage(pruneResult.Survivors);
+
+        if (!pruneResult.HasValidAttackers)
+            return; // empty after prune -- no transition of any kind this tick (contract side effect 2)
+
+        var survivors = pruneResult.Survivors;
+
+        // Guaranteed positive here: MonsterAggroListPruner.Prune itself wipes the whole table unconditionally
+        // whenever the monster's own melee OR leash radius is non-positive, so a non-empty result already
+        // implies both passed -- this step never needs to re-check that itself (contract's own Inputs note).
+        var meleeRadius = monster.Template.RadiusInfo1;
+        var meleeRadiusSq = (float)meleeRadius * meleeRadius;
+
+        // Per-entry melee-range coin flip, first success wins (contract side effect 3): only a survivor
+        // within melee range ever gets this roll at all; a beyond-range entry is skipped outright, never
+        // rolled against.
+        MonsterAggroListPruner.Survivor? chosen = null;
+        foreach (var survivor in survivors)
+        {
+            if (survivor.DistanceSquared > meleeRadiusSq)
+                continue;
+
+            if (_random.NextInt32(2) == 0)
+            {
+                chosen = survivor;
+                break;
+            }
+        }
+
+        // Uniform fallback across the WHOLE surviving table when no melee-range entry's flip succeeded
+        // (contract side effect 4) -- a melee-range entry whose own flip just failed remains eligible here.
+        chosen ??= survivors[_random.NextInt32(survivors.Count)];
+
+        var pick = chosen.Value;
+
+        // Defensive: the picked entry's own live player must still resolve to the exact reference Prune just
+        // validated it against -- an invariant that always holds given the single-writer tick (nothing
+        // mutates the table between Prune and here), kept only as a guard against a future change silently
+        // breaking that invariant, never expected to actually trip.
+        if (!zone.TryGetPlayer(pick.CharacterId, out var target) || target is null ||
+            !ReferenceEquals(target, pick.SessionToken))
+            return;
+
+        if (pick.DistanceSquared <= meleeRadiusSq)
+        {
+            // Immediate melee engagement (contract side effect 5). NOT modeled here (out of scope per the
+            // contract itself): the per-attack-attempt tracking hook and the attack-type-conditioned
+            // "expecting an attack-confirmation packet" flag/timestamp -- both explicitly flagged as feeding a
+            // separate, not-yet-specified anti-cheat mechanic.
+            monster.AssignTarget(pick.CharacterId, target.UniqueNumber, target.PosX, target.PosY, target.PosZ);
+            monster.AiState = MonsterAiState.AttackWindup;
+            monster.StateTicks = 0;
+            zone.BroadcastMonsterActionChange(monster);
+            return;
+        }
+
+        // Beyond melee range -- only reachable via the uniform fallback above (a melee-range pick always
+        // satisfies the branch above). No transition of any kind when the monster's own chase speed is
+        // non-positive (contract's own edge case; melee radius is already known positive here, per this
+        // method's own opening remark).
+        var chaseSpeed = monster.Template.RunSpeed;
+        if (chaseSpeed <= 0)
+            return;
+
+        // Arc-shaped approach point (contract side effect 6): same distance from the monster as the target,
+        // rotated by an angle whose lateral displacement is drawn uniformly from [0, meleeRadius].
+        ComputeArcApproachPoint(monster, target.PosX, target.PosZ, meleeRadius, out var approachX,
+            out var approachZ);
+
+        if (CanReachPoint(zone, monster, approachX, approachZ))
+        {
+            // Chase toward the computed approach point (contract side effect 7) -- RunChase (once entered)
+            // re-derives the broadcast target location toward the pursued avatar's own LIVE position every
+            // tick regardless (see that method's own remarks), so this arc point only ever governs the
+            // reachability probe above and this transition's own initial broadcast frame, never the ongoing
+            // per-tick movement target itself.
+            monster.AssignTarget(pick.CharacterId, target.UniqueNumber, approachX, monster.PosY, approachZ);
+            monster.AiState = MonsterAiState.Chase;
+            monster.StateTicks = 0;
+            zone.BroadcastMonsterActionChange(monster);
+        }
+        else
+        {
+            // No walkable path found -- walk-home transition instead (contract side effect 8). ReturnToSpawn's
+            // own tick handler already clears the target descriptor once the return completes (Update's
+            // ReturnToSpawn case), so nothing needs releasing here.
+            monster.AiState = MonsterAiState.ReturnToSpawn;
+            monster.StateTicks = 0;
+            zone.BroadcastMonsterActionChange(monster);
+        }
+    }
+
+    /// <summary>
+    ///     Arc-shaped approach point (behavior contract <c>A3-aggro-pruning</c>, side effect 6): a point at the
+    ///     exact same distance from <paramref name="monster" /> as (<paramref name="targetX" />,
+    ///     <paramref name="targetZ" />), rotated around the monster by an angle whose lateral (perpendicular)
+    ///     displacement magnitude is drawn uniformly from <c>[0, meleeRadius]</c>, with an independent coin
+    ///     flip choosing the rotation's left/right sign -- an arc-shaped approach vector, not a straight line at
+    ///     the target's exact position. Rotation preserves vector length, so the result is always exactly as
+    ///     far from the monster as the original target, by construction.
+    /// </summary>
+    private void ComputeArcApproachPoint(MonsterEntity monster, float targetX, float targetZ, int meleeRadius,
+        out float approachX, out float approachZ)
+    {
+        var dx = targetX - monster.PosX;
+        var dz = targetZ - monster.PosZ;
+        var distance = MathF.Sqrt(dx * dx + dz * dz);
+
+        if (distance <= 0.0001f)
+        {
+            // Degenerate (monster and target already coincide) -- unreachable in practice, since this method
+            // is only ever called once the chosen survivor is confirmed beyond melee range, so distance is
+            // always well above zero here. No rotation possible with a zero-length vector; fall back to the
+            // target's own position.
+            approachX = targetX;
+            approachZ = targetZ;
+            return;
+        }
+
+        var lateral = _random.NextInt32(meleeRadius + 1); // uniform [0, meleeRadius]
+        var sign = _random.NextInt32(2) == 0 ? -1f : 1f;
+        var ratio = Math.Clamp(lateral / distance, -1f, 1f);
+        var theta = sign * MathF.Asin(ratio);
+
+        var cos = MathF.Cos(theta);
+        var sin = MathF.Sin(theta);
+
+        // Rotate (dx, dz) by theta in the XZ plane.
+        approachX = monster.PosX + (dx * cos - dz * sin);
+        approachZ = monster.PosZ + (dx * sin + dz * cos);
+    }
+
+    /// <summary>
+    ///     A one-off reachability PROBE for <see cref="RunPrunedAttackerEngagement" />'s own decision-time
+    ///     Chase-vs-walk-home branch -- deliberately NOT the same thing as the continuous, budget-gated route
+    ///     <see cref="MoveToward" /> recomputes every movement tick (a fresh, small scratch list is used here
+    ///     rather than <paramref name="monster" />'s own cached <see cref="MonsterEntity.PathWaypoints" />, and
+    ///     this probe is never budget-gated via <see cref="Pathfinding.MonsterPathfinder.TryConsumeBudget" />,
+    ///     since it is a single decision-time query rather than the per-tick route <see cref="MoveAlongPath" />
+    ///     recomputes under budget). Matches <see cref="MoveToward" />'s own no-geometry/no-pathfinder fallback
+    ///     postures for the cases where no real A* search is possible at all.
+    /// </summary>
+    private static bool CanReachPoint(Zone zone, MonsterEntity monster, float destX, float destZ)
+    {
+        if (zone.Geometry is not { } geometry)
+            return true; // no navmesh loaded: unconstrained straight-line movement, always reachable
+
+        if (zone.Pathfinder is { } pathfinder)
+            return pathfinder.TryFindPath(new Vector3(monster.PosX, monster.PosY, monster.PosZ),
+                new Vector3(destX, monster.PosY, destZ), []);
+
+        // Geometry present but pathfinding disabled (budget option 0): a point-walkability check is the
+        // closest available reachability signal, same fallback posture MoveToward itself uses.
+        return geometry.IsWalkable(destX, destZ);
+    }
+
+    /// <summary>
     ///     Random wander destination (S07_MyGame05.cpp:1039-1053): a normalized random 2D direction scaled by a
     ///     radius uniformly drawn from [50,100], measured from the monster's CURRENT position -- not home.
     ///     Legacy resolves the raw random point through <c>mWORLD.Path</c> (navmesh-aware, can slide the
@@ -472,8 +717,18 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
     ///     <see cref="RunChase" /> uses for the attack-windup transition -- do not swap these two), gated to at
     ///     least 1, a per-candidate anti-clump pursuer cap, and a 50% coin flip.
     /// </summary>
+    /// <param name="transitionToChaseOnAcquire">
+    ///     UPDATE (2026-07-11, recovered <c>monster-ai-recipe-bodies</c> behavior contract): a successful scan
+    ///     no longer always means "start chasing immediately" -- the Standard recipe's own post-prune
+    ///     engagement selection (<see cref="RunPrunedAttackerEngagement" />) now makes that decision instead,
+    ///     since a freshly-seeded candidate already within melee range engages immediately without ever
+    ///     entering <see cref="MonsterAiState.Chase" /> at all. Defaults to <c>true</c> so <see cref="Update" />'s
+    ///     own Patrol re-check call site (A004, not covered by the recovered contract) keeps its prior direct-
+    ///     transition behavior unchanged; <see cref="RunStandardDecision" /> is the one caller that passes
+    ///     <c>false</c> and runs the recovered engagement step immediately afterward instead.
+    /// </param>
     private bool TryAcquireTarget(Zone zone, MonsterEntity monster, int legacyTicksElapsed,
-        IEnumerable<MonsterEntity> allMonsters)
+        IEnumerable<MonsterEntity> allMonsters, bool transitionToChaseOnAcquire = true)
     {
         if (monster.Template.AttackType is not (1 or 3 or 6))
             return false;
@@ -532,13 +787,20 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
             // proximity-only list -- see MonsterEntity.RegisterAcquisition's own remarks for why this is a
             // distinct call into a shared table rather than a merge of the two algorithms.
             monster.RegisterAcquisition(characterId, player);
-            monster.AiState = MonsterAiState.Chase;
-            monster.StateTicks = 0;
 
-            // Legacy broadcasts the aggro transition (aSort 4) immediately via B_MONSTER_ACTION_RECV(...,1)+
-            // Send1 (S07_MyGame05.cpp:1164-1173) -- this is the frame a real client needs to start rendering
-            // the chase toward a correctly-identified target, instead of only finding out via the keep-alive.
-            zone.BroadcastMonsterActionChange(monster);
+            if (transitionToChaseOnAcquire)
+            {
+                monster.AiState = MonsterAiState.Chase;
+                monster.StateTicks = 0;
+
+                // Legacy broadcasts the aggro transition (aSort 4) immediately via B_MONSTER_ACTION_RECV(...,1)+
+                // Send1 (S07_MyGame05.cpp:1164-1173) -- this is the frame a real client needs to start rendering
+                // the chase toward a correctly-identified target, instead of only finding out via the keep-alive.
+                zone.BroadcastMonsterActionChange(monster);
+            }
+
+            // else: the caller (RunStandardDecision) runs the recovered post-prune engagement step immediately
+            // afterward instead -- see transitionToChaseOnAcquire's own remarks.
             return true;
         }
 

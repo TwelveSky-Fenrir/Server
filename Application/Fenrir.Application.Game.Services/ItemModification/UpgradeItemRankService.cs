@@ -106,9 +106,15 @@ public sealed class UpgradeItemRankService(
                 resultItemId = warlordDraw.ReplacementItemId;
                 resultCombine = 1;
 
-                // TODO (deferred, out of this workstream's scope -- ZoneEventBroadcaster is off-limits):
-                // if (WarlordRerollBonusTable.NoticeReachesRecipients(targetDefinition.Item.Type))
-                //     /* broadcast a server-wide notice naming resultItemId, per contract side effect B.4 */;
+                // Contract side effect B.4: the unconditional legacy notice-broadcast ATTEMPT on an accepted
+                // swap (S04_MyWork02.cpp:4092-4095) -- CenterRelayNoticeLog.LogWarlordSwap is this codebase's
+                // established log-only stand-in for that same MakeNotice mechanism (see EnchantItemService's
+                // LogEnchantCap / CraftItemService's LogNotableCraft call sites for the identical pattern),
+                // since the true receiving-side packet for this legacy family was never resolved (see
+                // CenterRelayNoticeLog's own remarks). NoticeReachesRecipients already encodes that this only
+                // ever actually reaches anyone for an elite-tier swap.
+                if (WarlordRerollBonusTable.NoticeReachesRecipients(targetDefinition.Item.Type))
+                    CenterRelayNoticeLog.LogWarlordSwap(logger, state.Tribe, state.Name, warlordDraw.ReplacementItemId);
             }
         }
 

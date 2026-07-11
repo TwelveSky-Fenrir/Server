@@ -37,8 +37,10 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 ///         whose own combined (self + ally) points are at least
 ///         <see cref="TribeSymbolCombatModifiers.SmallTribeAdvantagePointFloor" /> -- ties, or this tribe itself
 ///         being under the floor, both yield no fallback increment. Only the increment COUNT is computed here;
-///         see <see cref="TribeSymbolCombatModifiers" />'s own remarks for why the per-increment damage
-///         magnitude is deliberately left unmodeled.
+///         the per-increment flat damage magnitude itself (grounded by the <c>tribesymbol-damage-magnitude</c>
+///         contract as <see cref="Combat.MonsterCombatResolver.DamageUpBonusFlatPerIncrement" />) is applied
+///         downstream, inside <see cref="Combat.MonsterCombatResolver.ResolvePvmAttack" /> -- see
+///         <see cref="TribeSymbolCombatModifiers" />'s own remarks for the full history.
 ///     </para>
 /// </remarks>
 public sealed class TribeSymbolDamageModifierSystem(

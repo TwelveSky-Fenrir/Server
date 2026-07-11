@@ -56,6 +56,25 @@ public sealed class Zone195NokSanState
     /// </summary>
     public const float DefaultCaptureRadius = 12.5f;
 
+    /// <summary>
+    ///     Fixed world-space X coordinate of the Nok-San capture post, written unconditionally at Zone195
+    ///     boot-time state initialization before the per-server-number switch that assigns the stone-slot
+    ///     index -- one shared value across all three live shards (servers 99/100/196), not a per-slot
+    ///     configuration (Server/ts25zone/S07_MyGame01.cpp:1148). Axis order (index 0 = X) independently
+    ///     confirmed against two other minimap-plotting consumers of the same 3-float array convention
+    ///     (Server/Header/S19_MyZoneMoveInfo.cpp:1448-1450,1488-1490). Used as the
+    ///     <see cref="Zone195NokSanSite" /> default.
+    /// </summary>
+    public const float DefaultPostX = -20.0f;
+
+    /// <summary>
+    ///     Fixed world-space Z coordinate of the Nok-San capture post -- same boot-time literal, same
+    ///     shared-across-all-three-shards posture, and same independently-confirmed axis order (index 2 = Z)
+    ///     as <see cref="DefaultPostX" /> (Server/ts25zone/S07_MyGame01.cpp:1150). Used as the
+    ///     <see cref="Zone195NokSanSite" /> default.
+    /// </summary>
+    public const float DefaultPostZ = 2510.0f;
+
     /// <summary>Number of tribes -- <c>MAX_TRIBE_NUM</c> (Server/Header/Protocol/DEFINE.h:309).</summary>
     public static readonly int TribeCount = WorldStateService.TribeCount;
 

@@ -28,14 +28,42 @@ namespace Fenrir.Application.Game.Domain.Pets;
 ///         remaining 50 ids can be added here.
 ///     </para>
 ///     <para>
-///         <b>Open contradiction, deliberately not resolved here.</b> Item ids 76005/76006/76007 also receive a
-///         second, separate "Custom Phoenix Amulet final HP/MP correction" addition (+2000/+4500/+9500) inside
-///         <c>GetBaseMaxLife</c>/<c>GetBaseMaxMana</c> themselves (already modeled as
-///         <c>StatCalculator.PhoenixFlatBonus</c>) -- whether the true legacy total for these 3 ids is this
-///         table's base value alone, the correction alone, or their sum (base 5000/7500/12500 + correction
-///         2000/4500/9500 = 7000/12000/22000) is flagged by the originating contract as an unresolved
-///         contradiction requiring a cpp-protocol-header-analyst pass reading both functions end-to-end. Do not
-///         wire this table into <c>StatCalculator</c> alongside the existing correction until that is resolved.
+///         <b>RESOLVED -- base and correction STACK additively (workstream pet-amulet-bonus-table-mapping,
+///         2026-07-11).</b> Item ids 76005/76006/76007 receive TWO separate, unconditional additions inside
+///         <c>GetBaseMaxLife</c>/<c>GetBaseMaxMana</c>: this table's own base amount (this class,
+///         5000/7500/12500) PLUS a second, wholly independent "Custom Phoenix Amulet final HP/MP correction"
+///         addition (+2000/+4500/+9500, already modeled as <c>StatCalculator.PhoenixFlatBonus</c>). A
+///         contiguous re-read of <c>GetBaseMaxLife</c>/<c>GetBaseMaxMana</c> end-to-end
+///         (MyFactor.cpp:2120-2224/2280-2357) confirms no early return or conditional branch sits between the
+///         base-table call and the correction switch -- they are genuinely sequential and both apply, giving a
+///         combined legacy total of 7000/12000/22000 for 76005/76006/76007 respectively, never the base alone,
+///         the correction alone, or a replacement of one by the other. The stale "old 3000 -&gt; target N"
+///         comments beside the correction switch describe a superseded prior revision of THIS table (which
+///         used to return a flat 3000 for these ids before being updated to 5000/7500/12500) and are not
+///         evidence of any conditional/exclusivity relationship between the two additions.
+///         <c>StatCalculator.ComputeMaxLife</c>/<c>ComputeMaxMana</c> (StatCalculator.Life.cs) now apply the
+///         matching two-pass <c>PhoenixFlatBonus(5000, 7500, 12500)</c> then <c>PhoenixFlatBonus(2000, 4500,
+///         9500)</c> for the Pet slot, mirroring the shape <c>ComputeDefensePower</c> already used for the
+///         identical base magnitudes.
+///     </para>
+///     <para>
+///         <b>Asymmetry, flagged not resolved.</b> This table's own precondition (item resolves AND
+///         <c>Sort == </c><see cref="RequiredSortCode" />) has no counterpart in the correction switch, which
+///         reads the equipped Pet-slot item id directly with no lookup or sort check at all. An id of
+///         76005/76006/76007 that somehow failed this table's own sort==28 gate would still receive the
+///         correction addition on its own, decoupled from the base amount -- an observed code asymmetry in the
+///         legacy source, not a claim that this state is reachable through normal item granting.
+///     </para>
+///     <para>
+///         Additional citations for the resolution above: Server/ts25zone/GameSystem/GameSystem_07_Pet.cpp:
+///         768-770 (base Life values) and :848-850 (base Mana values, identical to Life); Server/Header/
+///         Protocol/MyFactor.cpp:1899-1902 (<c>GetBaseMaxLife</c> is not itself macro-gated -- it begins
+///         immediately after the enclosing <c>#ifdef __REBIRTH__</c> block's <c>#endif</c>, so it and both
+///         additions inside it compile unconditionally in every build variant); :2140 / :2202-2214 (Life
+///         base-amount call site and correction switch); :2317 / :2335-2347 (the Mana equivalents);
+///         Server/Header/Protocol/STRUCT.h:1662-1676 (<c>FEQUIP_TYPE</c> enum -- confirms <c>EPET</c> is index
+///         8, the slot both the base table and the correction switch read via <c>aEquip[8][0]</c>/
+///         <c>aEquip[EPET][0]</c>).
 ///     </para>
 /// </remarks>
 public static class PetSlotAmuletBonusTable

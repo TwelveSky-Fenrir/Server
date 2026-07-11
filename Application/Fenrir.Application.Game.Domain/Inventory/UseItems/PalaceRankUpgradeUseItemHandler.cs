@@ -19,12 +19,25 @@ namespace Fenrir.Application.Game.Domain.Inventory.UseItems;
 ///     consume rule, the plain success result, and the surrounding-player rebroadcast). "Halo/palace rank" is
 ///     modeled as <see cref="PlayerRuntimeState.Halo" /> itself — the same field StatCalculator reads as aHalo,
 ///     and the same one <c>UseInventoryItemService</c>'s CP-Prot-Charm branch already treats as the rank value.
-///     Two deliberate divergences: (1) the milestone-96 center-server announcement has no Fenrir cross-process
-///     broadcast seam in this workstream's scope — it is flagged (logged) and left for a follow-up, not
-///     invented; the rank itself is still raised and persisted. (2) The item is consumed BEFORE the rank grant
-///     is mirrored, so a dropped mirror can only lose the ticket, never grant a free rank — the same security
-///     ordering the Rebirth-Pill branch uses, and materially important here since (unlike the single-step
-///     title ticket) the rank gate re-opens after each successful use.
+///     Two deliberate divergences: (1) the milestone-96 announcement is flagged (logged) and left unsent, not
+///     invented — and, as of a follow-up 2026-07-11 legacy-behavior-translator pass, CLOSED rather than
+///     pending. An earlier same-day confirmation pass had only gotten as far as "the exact legacy notice text
+///     is not cited anywhere in this codebase, only the bare line range"; the follow-up pass went past that
+///     and confirmed there is no text to find, ever. The send site itself (S04_MyWork03.cpp:6946-6952, the
+///     actual relay-sort-672 call inside the :6912-7008 case) ships only a tribe id and an avatar name — no
+///     string/format field of any kind. Both possible receivers are permanently-empty stub cases with no
+///     <c>default:</c> fallback in either switch to catch it instead: <c>ts25center</c>'s
+///     <c>S04_MyWork02.cpp:1079-1080</c> and <c>ts25zone</c>'s <c>S07_MyGame08.cpp:1158-1159</c>.
+///     This handler's own plain <c>logger.LogInformation</c> call below follows the same log-only-stand-in
+///     precedent as <c>CenterRelayNoticeLog</c> (no receiving ts25center-equivalent process in Fenrir), and
+///     while <c>IWorldNoticeService</c>'s <c>Broadcast(string)</c> IS a real client-visible send path
+///     elsewhere (e.g. <c>UpgradeCapeService</c>'s RANKUP notice), wiring it here would still mean
+///     fabricating wording the legacy server itself never shipped — this is not the same class of blocker as
+///     an uncited magnitude waiting on future archaeology, it is a confirmed terminal dead end; the rank
+///     itself is still raised and persisted regardless. (2) The item
+///     is consumed BEFORE the rank grant is mirrored, so a dropped mirror can only lose the ticket, never
+///     grant a free rank — the same security ordering the Rebirth-Pill branch uses, and materially important
+///     here since (unlike the single-step title ticket) the rank gate re-opens after each successful use.
 /// </remarks>
 public sealed class PalaceRankUpgradeUseItemHandler(
     WorldDataCache worldData,
@@ -80,11 +93,16 @@ public sealed class PalaceRankUpgradeUseItemHandler(
                 context.Zone.MapId, context.CharacterId);
 
         if (newRank == RankCeiling)
-            // TODO(C9): the legacy fires a server-wide milestone announcement to the center server when the
-            // rank reaches 96 (S04_MyWork03.cpp:6912-7008). No Fenrir cross-process center-broadcast seam is in
-            // this workstream's scope; the rank is still raised and persisted. Flagged for a follow-up finding.
+            // CLOSED 2026-07-11 (was TODO(C9)): the legacy send site for this milestone
+            // (S04_MyWork03.cpp:6946-6952, relay sort 672) ships only a tribe id + avatar name -- no
+            // string/format field -- and both possible receivers (ts25center S04_MyWork02.cpp:1079-1080,
+            // ts25zone S07_MyGame08.cpp:1158-1159) are permanently-empty stub cases with no default: fallback
+            // in either switch. IWorldNoticeService.Broadcast(string) IS a real send path elsewhere (e.g.
+            // UpgradeCapeService's RANKUP notice), but there is no legacy wording to translate here, ever --
+            // this is a confirmed dead end, not a pending citation, so it stays log-only permanently. The
+            // rank itself is still raised and persisted regardless.
             logger.LogInformation(
-                "Character {CharacterId} reached palace rank {RankCeiling}: center-server milestone announcement not modeled (deferred)",
+                "Character {CharacterId} reached palace rank {RankCeiling}: milestone announcement not modeled (confirmed dead end in legacy -- no notice text/send path exists to translate)",
                 context.CharacterId, RankCeiling);
 
         logger.LogInformation("Character {CharacterId} op23 palace-rank (2193) applied: rank {OldRank}->{NewRank}",

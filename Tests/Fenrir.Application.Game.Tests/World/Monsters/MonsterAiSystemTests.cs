@@ -146,8 +146,11 @@ public class MonsterAiSystemTests
         zone.Tick(SimulationClock.LegacyTick); // spawn (FrameInfo1=1 -> Decision already this same tick's next pass)
         zone.Tick(SimulationClock
             .LegacyTick); // Decision: 1-second detection throttle blocks the very first check (mCheckDetectEnemyTime, S07_MyGame05.cpp:127-131) -- stays Decision
-        zone.Tick(SimulationClock.LegacyTick); // Decision: throttle window elapsed -> detects -> Chase
-        zone.Tick(SimulationClock.LegacyTick); // Chase: already in range -> AttackWindup, StateTicks=0
+        // Decision: throttle window elapsed -> detects a target already within melee range (RadiusInfo1 ==
+        // RadiusInfo2 == 1000 here) -> the recovered post-prune engagement step (A3-aggro-pruning) engages
+        // IMMEDIATELY, straight to AttackWindup, in this SAME tick -- no separate Chase tick in between, since
+        // that step only ever routes through Chase for a survivor confirmed BEYOND melee range.
+        zone.Tick(SimulationClock.LegacyTick);
         Assert.True(zone.TryGetMonster(1, out var monster));
         Assert.Equal(MonsterAiState.AttackWindup, monster!.AiState);
 

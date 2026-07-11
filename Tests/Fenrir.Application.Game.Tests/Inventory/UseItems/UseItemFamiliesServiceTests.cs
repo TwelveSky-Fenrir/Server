@@ -110,8 +110,8 @@ public class UseItemFamiliesServiceTests
                 NullLogger<EliteDungeonTicketUseItemHandler>.Instance),
             new DungeonKeyUseItemHandler(writer, eventLog, NullLogger<DungeonKeyUseItemHandler>.Instance),
             new IvyHallTicketUseItemHandler(writer, eventLog, NullLogger<IvyHallTicketUseItemHandler>.Instance),
-            new LuckyTicketUseItemHandler(NullLogger<LuckyTicketUseItemHandler>.Instance),
-            new ScrollOfSeekersUseItemHandler(NullLogger<ScrollOfSeekersUseItemHandler>.Instance),
+            new LuckyTicketUseItemHandler(worldData, writer, NullLogger<LuckyTicketUseItemHandler>.Instance),
+            new ScrollOfSeekersUseItemHandler(writer, eventLog, NullLogger<ScrollOfSeekersUseItemHandler>.Instance),
             new CostumeStellarCoreUseItemHandler(writer, eventLog,
                 NullLogger<CostumeStellarCoreUseItemHandler>.Instance));
 

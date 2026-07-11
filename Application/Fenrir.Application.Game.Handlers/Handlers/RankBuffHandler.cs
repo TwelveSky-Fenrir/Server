@@ -23,8 +23,12 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 ///     world-wide tribe-symbol-battle silent no-op -- are now closed via <see cref="RankBuffResolver.Resolve" />;
 ///     see that type's remarks for the full citation trail, including why the world-battle flag is no longer
 ///     "always 0 in Fenrir" as this file previously claimed. <c>MyFactor.cpp</c>'s per-<c>aRankBuffType</c> stat
-///     bonuses (7 separate formula sites) are still not modeled -- only the wire mechanic, the state mirror, and
-///     the HP/MP heal are implemented.
+///     bonuses (7 separate formula sites) are modeled in
+///     <see cref="Fenrir.Application.Game.Stats.StatCalculator" />'s <c>RankBuffContribution</c> partial (see its
+///     remarks for the full tier-&gt;stat-&gt;magnitude table and citations) -- this handler only owns the wire
+///     mechanic, the state mirror (<see cref="PlayerRuntimeState.RankBuffType" />), and the HP/MP heal; the stat
+///     bonuses are read live off that same field by <c>ZoneContext.RankBuffType</c> wherever effective stats are
+///     computed.
 /// </remarks>
 public sealed class RankBuffHandler(IRankBuffService service, ILogger<RankBuffHandler> logger)
     : IInlinePacketHandler<RankBuffRequest>

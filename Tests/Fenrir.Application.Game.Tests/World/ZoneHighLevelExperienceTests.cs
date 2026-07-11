@@ -10,9 +10,10 @@ namespace Fenrir.Application.Game.Tests.World;
 /// <summary>
 ///     Covers <see cref="Zone.ApplyHighLevelExperienceGain" /> -- the B17-rebirth-hook orchestration method
 ///     that resolves a post-general-level-cap award via <see cref="HighLevelExperienceResolver" /> and applies
-///     it. This is NOT yet reachable from <see cref="Zone.GrantMonsterKillExperience" /> or the PvP-kill award
-///     path (that one-line fork is this workstream's own wiringManifest entry, not applied) -- every test here
-///     calls the new method directly. <c>HighLevelExperienceInputFactoryTests</c>/
+///     it. Most tests here call the method directly to isolate its own branches; see
+///     <see cref="ZoneHighLevelExperienceWiringTests" /> for coverage of the actual fork inside
+///     <c>Zone.Combat.cs</c>'s <c>ApplyCharacterExperienceGain</c> that routes <see cref="Zone.GrantMonsterKillExperience" />/
+///     PvP-kill awards here once a recipient is at the general-level cap. <c>HighLevelExperienceInputFactoryTests</c>/
 ///     <c>HighLevelExperienceOutcomeApplierTests</c> (under <c>Tests.Progression</c>) cover the two adapter
 ///     halves in isolation; this covers the zone-scoped tail (stat recompute, heal, dirty-mark, broadcast).
 /// </summary>

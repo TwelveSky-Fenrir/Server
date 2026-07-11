@@ -19,7 +19,7 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 ///     are processed ; this check sits before the position-broadcast throttle (:2432), hide-state handling
 ///     (:2437), and death-state handling (:2447) later in the same loop body) ; :2074-2371 (guarded-map
 ///     switch -- see <see cref="AntiCampingGuardPointCatalog" /> for the full citation of the coordinate
-///     table's shape and its own documented data gap) ; :2373-2406 (Tower proximity addendum, evaluated only
+///     table's shape and its recovered per-map data) ; :2373-2406 (Tower proximity addendum, evaluated only
 ///     when no Holy Stone symbol check already flagged the avatar this tick, then the forced-return call once
 ///     the counter reaches 20) ; Server/ts25zone/H07_MyGame.h:57-59 (<c>FIX_HSB_POS_BUG</c> unconditionally
 ///     defined under <c>LNW33</c>, always active in the shipped <c>ReleaseEU33</c> build -- live production
@@ -39,19 +39,22 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 ///         before any other per-avatar tick work in the same pass.
 ///     </para>
 ///     <para>
-///         GAP -- not modeled, deliberately not guessed: (1) the real per-map coordinate data -- see
-///         <see cref="AntiCampingGuardPointCatalog" />'s own remarks; (2) the separate, unrelated AFK-kick
-///         mechanic whose own forced-return/disconnect decision (if it already fired earlier in the same
-///         tick's per-avatar pass) is supposed to skip this check entirely for that avatar -- no such
-///         mechanic exists yet anywhere in Fenrir, so nothing skips this check today; whoever implements it
-///         must register their own <see cref="ISimulationSystem" /> ahead of this one and give this class a
-///         way to observe "already handled this tick" for a given avatar; (3) once the forced-return
-///         notification is sent, the legacy skips the remainder of that avatar's own tick processing
-///         (position-broadcast throttle, hide-state, death-state) for that tick only -- reproducing that
-///         precisely would require every other simulation system and <c>Zone.PlayerLifecycle.RebroadcastAvatars</c>
-///         to observe the same "already handled" signal, which spans well beyond this cluster's World/RvR
-///         scope; the notification itself (the behaviorally significant, observable part of this mechanism)
-///         is still sent correctly and repeatedly every tick regardless.
+///         The real per-map coordinate data (both Holy Stone Symbol Points and Tower Points) is recovered and
+///         populated in <see cref="AntiCampingGuardPointCatalog.Default" /> -- see that class's own remarks.
+///     </para>
+///     <para>
+///         GAP -- not modeled, deliberately not guessed: (1) the separate, unrelated AFK-kick mechanic whose
+///         own forced-return/disconnect decision (if it already fired earlier in the same tick's per-avatar
+///         pass) is supposed to skip this check entirely for that avatar -- no such mechanic exists yet
+///         anywhere in Fenrir, so nothing skips this check today; whoever implements it must register their
+///         own <see cref="ISimulationSystem" /> ahead of this one and give this class a way to observe
+///         "already handled this tick" for a given avatar; (2) once the forced-return notification is sent,
+///         the legacy skips the remainder of that avatar's own tick processing (position-broadcast throttle,
+///         hide-state, death-state) for that tick only -- reproducing that precisely would require every
+///         other simulation system and <c>Zone.PlayerLifecycle.RebroadcastAvatars</c> to observe the same
+///         "already handled" signal, which spans well beyond this cluster's World/RvR scope; the notification
+///         itself (the behaviorally significant, observable part of this mechanism) is still sent correctly
+///         and repeatedly every tick regardless.
 ///     </para>
 /// </remarks>
 public sealed class AntiCampingForcedReturnSystem(AntiCampingGuardPointCatalog catalog) : ISimulationSystem

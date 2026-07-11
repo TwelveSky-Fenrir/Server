@@ -1,6 +1,6 @@
 using System.Collections.Frozen;
 
-namespace Fenrir.Application.Game.Domain.World.Geometry;
+namespace Fenrir.Application.Game.GameData;
 
 /// <summary>
 ///     The canonical spawn-region zone id and <c>_FIX</c>-suffix flag for one physical zone number, per
@@ -17,31 +17,37 @@ public readonly record struct SpawnRegionCanonicalZone(short CanonicalZoneId, bo
 /// <remarks>
 ///     <para>
 ///         Behavior contract: <c>wave11/A1-canonical-wm-remap.md</c>. This is a STRUCTURALLY SEPARATE
-///         mechanism from <see cref="ZoneCanonicalGeometryMap" />'s <c>.WM</c> navmesh remap, even though both
-///         are keyed by the same physical zone number and both run once at <c>ts25zone</c> boot (navmesh
-///         first, then spawn regions -- <c>Server/ts25zone/S07_MyGame01.cpp:1441</c> before <c>:1658</c>). The
-///         two canonical targets diverge for some ids: the concrete example the contract calls out is physical
-///         zones 39/144/145/313, which fold into navmesh canonical 126 (<see cref="ZoneCanonicalGeometryMap" />
-///         's <c>LNW33</c> branch, <c>S09_MyWorld.cpp:305-313</c>) but keep their OWN zone number for spawn
-///         purposes, gaining only the <c>_FIX</c> filename suffix (<c>S10_MySummon.cpp:91-99</c>). Never infer
-///         one table's grouping from the other's.
+///         mechanism from <c>Fenrir.Application.Game.Domain.World.Geometry.ZoneCanonicalGeometryMap</c>'s
+///         <c>.WM</c> navmesh remap, even though both are keyed by the same physical zone number and both run
+///         once at <c>ts25zone</c> boot (navmesh first, then spawn regions --
+///         <c>Server/ts25zone/S07_MyGame01.cpp:1441</c> before <c>:1658</c>). The two canonical targets diverge
+///         for some ids: the concrete example the contract calls out is physical zones 39/144/145/313, which
+///         fold into navmesh canonical 126 (<c>ZoneCanonicalGeometryMap</c>'s <c>LNW33</c> branch,
+///         <c>S09_MyWorld.cpp:305-313</c>) but keep their OWN zone number for spawn purposes, gaining only the
+///         <c>_FIX</c> filename suffix (<c>S10_MySummon.cpp:91-99</c>). Never infer one table's grouping from
+///         the other's.
 ///     </para>
 ///     <para>
-///         WHY THIS MATTERS for Fenrir specifically (established this session by reading the DB import
-///         pipeline, not stated by the contract itself): the on-disk <c>*.WREGION.csv</c> file set has exactly
-///         one file per canonical <c>mSameSummon</c> value (filename construction at
-///         <c>S10_MySummon.cpp:364,368</c>), and Fenrir's importer
-///         (<c>Tools/Fenrir.Tools.LegacyDataImport/Legacy/Readers/MonsterSpawnRegionReader.cs</c>,
+///         WHY THIS MATTERS for Fenrir specifically (established by reading the DB import pipeline, not
+///         stated by the contract itself): the on-disk <c>*.WREGION.csv</c> file set has exactly one file per
+///         canonical <c>mSameSummon</c> value (filename construction at <c>S10_MySummon.cpp:364,368</c>), and
+///         Fenrir's importer (<c>Tools/Fenrir.Tools.LegacyDataImport/Legacy/Readers/MonsterSpawnRegionReader.cs</c>,
 ///         <c>ZoneNumberPattern</c> = <c>^Z(\d+)_</c>) parses each row's
 ///         <c>world.MonsterSpawnRegions.ZoneNumber</c> straight from that file's own leading "Z0NN_" segment
 ///         -- i.e. from the CANONICAL zone number, not from every physical zone that shares it.
-///         <c>Fenrir.Application.Game.GameData.WorldDataCacheBuilder.BuildZones</c> currently looks spawn
-///         regions up by each <c>ZoneDefinition</c>'s OWN physical <c>ZoneNumber</c> with no remap step at
-///         all, so today every physical zone that is not its own canonical spawn zone (e.g. 102, which shares
-///         canonical 101 with 103/167) resolves to an EMPTY <c>MonsterSpawnRegions</c> list even though seed
-///         data for it exists under zone 101's rows. This type exists to close that gap; see this slice's own
-///         wiringManifest for the exact (not-yet-applied) call-site fix -- left unapplied here per this pass's
-///         "do not edit shared GameData boot files directly" instruction.
+///         <see cref="Fenrir.Application.Game.GameData.WorldDataCacheBuilder.BuildZones" /> uses
+///         <see cref="ResolveCanonicalSpawnZoneId" /> to remap each <c>ZoneDefinition</c>'s own physical
+///         <c>ZoneNumber</c> before the spawn-region lookup, so a physical zone that is not its own canonical
+///         spawn zone (e.g. 102, which shares canonical 101 with 103/167) still resolves to the seeded spawn
+///         regions filed under zone 101's rows instead of an empty list.
+///     </para>
+///     <para>
+///         <b>Layering note:</b> this type lives in <c>Fenrir.Application.Game.GameData</c>, not
+///         <c>Fenrir.Application.Game.Domain</c> (unlike its sibling <c>ZoneCanonicalGeometryMap</c>), because
+///         its only real consumer, <see cref="Fenrir.Application.Game.GameData.WorldDataCacheBuilder" />, lives
+///         in this lower layer -- <c>Fenrir.Application.Game.Domain</c> references
+///         <c>Fenrir.Application.Game.GameData</c>, never the reverse, so a Domain-layer type can never be
+///         called from here.
 ///     </para>
 ///     <para>
 ///         The <c>_FIX</c> suffix, by contrast, is INERT for that exact DB-lookup concern: it is appended
@@ -62,8 +68,8 @@ public readonly record struct SpawnRegionCanonicalZone(short CanonicalZoneId, bo
 ///         this session). The
 ///         following canonical anchors are therefore NOT implemented below, pending a follow-up
 ///         <c>cpp-zone-gameplay-analyst</c> extraction confirming exact membership -- do not guess at them by
-///         analogy with <see cref="ZoneCanonicalGeometryMap" />'s grouping, since the two tables are documented
-///         to diverge:
+///         analogy with <c>ZoneCanonicalGeometryMap</c>'s grouping, since the two tables are documented to
+///         diverge:
 ///         <list type="bullet">
 ///             <item>40, 43, 46, 56, 59, 62, 63, 64 (three-zone ND/RS/GT triples -- <c>:119-165</c>)</item>
 ///             <item>104, 105, 110, 111, 251, 252, 259, 260 (four-zone groups -- <c>:174-228</c>)</item>

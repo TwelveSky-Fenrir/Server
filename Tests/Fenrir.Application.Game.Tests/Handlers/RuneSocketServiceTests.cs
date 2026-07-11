@@ -36,7 +36,7 @@ public class RuneSocketServiceTests
     }
 
     private static (ZoneClientSession Session, FakeDuplexPipe Pipe, Zone Zone, PlayerRuntimeState State,
-        FakeCharacterRepository Repository, FakeEventLogQueue EventLog) SetUp()
+        FakeRuneRepository Repository, FakeEventLogQueue EventLog) SetUp()
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, pipe) = ZoneTestKit.CreateSession(1);
@@ -46,7 +46,7 @@ public class RuneSocketServiceTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(pipe);
         Assert.True(zone.TryGetPlayer(10, out var state));
-        return (session, pipe, zone, state!, new FakeCharacterRepository(), new FakeEventLogQueue());
+        return (session, pipe, zone, state!, new FakeRuneRepository(), new FakeEventLogQueue());
     }
 
     private static void SeedInventorySlot(Zone zone, byte container, byte slot, ItemStack stack)
@@ -75,9 +75,9 @@ public class RuneSocketServiceTests
         Assert.Equal(93514, state.RuneSystem[0]);
         Assert.Equal(ItemValueCodec.Encode(12, 3, 0, 0), state.RuneSystemStat[0]);
 
-        Assert.NotNull(repo.LastReplacedContainer);
-        Assert.Equal(ContainerMatrix.InventoryPage0, repo.LastReplacedContainer!.Value.Container);
-        Assert.Empty(repo.LastReplacedContainer.Value.Items);
+        Assert.NotNull(repo.LastPersistedContainer);
+        Assert.Equal(ContainerMatrix.InventoryPage0, repo.LastPersistedContainer!.Value);
+        Assert.Empty(repo.LastPersistedItems!);
 
         var logged = Assert.Single(eventLog.Enqueued);
         Assert.Equal(157, logged.EventCode);
@@ -133,8 +133,8 @@ public class RuneSocketServiceTests
         Assert.Equal(0, state.RuneSystem[1]);
         Assert.Equal(0, state.RuneSystemStat[1]);
 
-        Assert.NotNull(repo.LastReplacedContainer);
-        var granted = Assert.Single(repo.LastReplacedContainer!.Value.Items);
+        Assert.NotNull(repo.LastPersistedContainer);
+        var granted = Assert.Single(repo.LastPersistedItems!);
         Assert.Equal(93515, granted.ItemId);
         Assert.Equal(20, granted.Enchant);
         Assert.Equal(1, granted.Combine);

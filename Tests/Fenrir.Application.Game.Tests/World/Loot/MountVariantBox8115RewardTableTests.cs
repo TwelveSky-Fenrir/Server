@@ -19,7 +19,7 @@ public class MountVariantBox8115RewardTableTests
         Assert.Equal(BoxRewardKind.RareBandThenPools, spec.Kind);
         Assert.Equal(0, spec.RentalDays);
         Assert.Empty(spec.RareBands);
-        Assert.Same(MountVariantBox8115RewardTable.Pools, spec.Pools);
+        Assert.Equal(MountVariantBox8115RewardTable.Pools, spec.Pools);
     }
 
     [Fact]

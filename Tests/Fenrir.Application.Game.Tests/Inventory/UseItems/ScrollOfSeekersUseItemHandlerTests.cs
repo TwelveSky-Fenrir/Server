@@ -1,25 +1,43 @@
+using Fenrir.Application.Game.Domain.Consumables;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Inventory.UseItems;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
+using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Inventory.UseItems;
 
 /// <summary>
-///     <see cref="ScrollOfSeekersUseItemHandler" /> is a clearly-marked stub (the 180-vs-900 per-id amount
-///     split is not recoverable from this workstream's behavior contract) -- every use must fail cleanly
-///     without ever consuming the scroll, the same "never a silent success" posture other stub handlers in
-///     this workstream already established.
+///     Drives <see cref="ScrollOfSeekersUseItemHandler" /> (op23 items 1124/1187/7016/8409/8410), now that the
+///     recovered <c>scroll-of-seekers-per-id-split</c> contract supplies the concrete 180-vs-900 per-id amount
+///     table this handler used to reject cleanly for lack of.
 /// </summary>
 public class ScrollOfSeekersUseItemHandlerTests
 {
     private const int AccountId = 1;
     private const int CharacterId = 10;
 
-    private static (Zone Zone, PlayerRuntimeState State) SetUp()
+    private static async Task<UseInventoryItemResponse> RunToCompletionAsync(
+        ValueTask<UseInventoryItemResponse> pending, Zone zone)
+    {
+        var task = pending.AsTask();
+        var guard = 0;
+        while (!task.IsCompleted)
+        {
+            zone.Tick(TimeSpan.FromMilliseconds(50));
+            await Task.Yield();
+            if (++guard > 100_000)
+                throw new TimeoutException("ScrollOfSeekersUseItemHandler task never completed.");
+        }
+
+        return await task;
+    }
+
+    private static (Zone Zone, PlayerRuntimeState State, FakeCharacterRepository Characters,
+        ScrollOfSeekersUseItemHandler Handler) SetUp()
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, pipe) = ZoneTestKit.CreateSession(CharacterId);
@@ -29,26 +47,89 @@ public class ScrollOfSeekersUseItemHandlerTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(pipe);
         Assert.True(zone.TryGetPlayer(CharacterId, out var state));
-        return (zone, state!);
+
+        var characters = new FakeCharacterRepository();
+        var eventLog = new FakeEventLogRepository();
+        var writer = new UseItemInventoryWriter(characters, NullLogger<UseItemInventoryWriter>.Instance);
+        var handler = new ScrollOfSeekersUseItemHandler(writer, eventLog,
+            NullLogger<ScrollOfSeekersUseItemHandler>.Instance);
+
+        return (zone, state!, characters, handler);
+    }
+
+    private static ItemStack Scroll(int itemId, int quantity = 1)
+    {
+        return new ItemStack(itemId, quantity, 0, 0, 0, 0, 0, 0, 0, 0, 1);
+    }
+
+    private static UseItemContext Context(Zone zone, PlayerRuntimeState state, int itemId, ItemStack item,
+        int value = 0)
+    {
+        return new UseItemContext(zone, state, CharacterId, AccountId, 0, 0, item,
+            new ItemDefinition(WorldDataTestRows.Item(itemId), []), value);
     }
 
     [Theory]
-    [InlineData(1124)]
-    [InlineData(1187)]
-    [InlineData(7016)]
-    [InlineData(8409)]
-    [InlineData(8410)]
-    public async Task Use_AlwaysFailsCleanly_NeverConsumesTheScroll(int itemId)
+    [InlineData(1124, 180)]
+    [InlineData(8409, 180)]
+    [InlineData(1187, 900)]
+    [InlineData(7016, 900)]
+    [InlineData(8410, 900)]
+    public async Task Use_AddsTheDocumentedAmount_ConsumesOneUnit_NeverEchoesTheNewTotal(int itemId,
+        int expectedAmount)
     {
-        var (zone, state) = SetUp();
-        var handler = new ScrollOfSeekersUseItemHandler(NullLogger<ScrollOfSeekersUseItemHandler>.Instance);
-        var item = new ItemStack(itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1);
-        var context = new UseItemContext(zone, state, CharacterId, AccountId, 0, 0, item,
-            new ItemDefinition(WorldDataTestRows.Item(itemId), []), 0);
+        var (zone, state, characters, handler) = SetUp();
+        state.ScrollOfSeekersTime = 10;
+        var item = Scroll(itemId);
 
-        var response = await handler.HandleAsync(context, CancellationToken.None);
+        var response = await RunToCompletionAsync(
+            handler.HandleAsync(Context(zone, state, itemId, item), CancellationToken.None), zone);
+
+        Assert.Equal(0, response.Result);
+        // Unlike EliteDungeonTicket/DungeonKey/IvyHallTicket, this family never echoes the new counter total.
+        Assert.Equal(0, response.Value);
+        Assert.Equal(0, response.Value2);
+
+        Assert.True(zone.TryGetPlayer(CharacterId, out var after));
+        Assert.Equal(10 + expectedAmount, after!.ScrollOfSeekersTime);
+        Assert.NotNull(characters.LastReplacedContainer);
+    }
+
+    [Fact]
+    public async Task WouldExceedCeiling_FailsCleanly_NoConsumption()
+    {
+        var (zone, state, characters, handler) = SetUp();
+        state.ScrollOfSeekersTime = BankedCounterMath.GlobalCeiling;
+        var item = Scroll(1124);
+
+        var response = await handler.HandleAsync(Context(zone, state, 1124, item), CancellationToken.None);
 
         Assert.Equal(1, response.Result);
+        Assert.Equal(BankedCounterMath.GlobalCeiling, state.ScrollOfSeekersTime);
+        Assert.Null(characters.LastReplacedContainer);
+    }
+
+    [Fact]
+    public async Task BulkStackAndClientSuppliedValue_AreIgnored_OnlyOneUnitConsumed_FlatAmountCredited()
+    {
+        var (zone, state, characters, handler) = SetUp();
+        state.ScrollOfSeekersTime = 0;
+        // Five on hand, client asks for a bulk-use of 3 via the wire "Value" field -- both must be ignored:
+        // exactly one unit consumed, exactly the flat per-id amount credited, regardless of either number.
+        var item = Scroll(1124, quantity: 5);
+
+        var response = await RunToCompletionAsync(
+            handler.HandleAsync(Context(zone, state, 1124, item, value: 3), CancellationToken.None), zone);
+
+        Assert.Equal(0, response.Result);
+        Assert.True(zone.TryGetPlayer(CharacterId, out var after));
+        Assert.Equal(180, after!.ScrollOfSeekersTime);
+
+        var replaced = characters.LastReplacedContainer;
+        Assert.NotNull(replaced);
+        var remainingSlot = replaced!.Value.Items.SingleOrDefault(i => i.ItemId == 1124);
+        Assert.NotNull(remainingSlot);
+        Assert.Equal(4, remainingSlot!.Quantity);
     }
 
     [Fact]
@@ -58,6 +139,6 @@ public class ScrollOfSeekersUseItemHandlerTests
 
         Assert.Equal(5, ids.Count);
         foreach (var expected in new[] { 1124, 1187, 7016, 8409, 8410 })
-            Assert.True(ids.Contains(expected));
+            Assert.Contains(expected, ids);
     }
 }

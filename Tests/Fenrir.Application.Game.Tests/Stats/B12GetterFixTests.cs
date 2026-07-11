@@ -18,8 +18,9 @@ namespace Fenrir.Application.Game.Tests.Stats;
 ///         <item>
 ///             <b>Regression tests</b> drive <see cref="StatCalculator.ComputeBaseStats" /> end-to-end to lock
 ///             the halves of the contract Fenrir already implements correctly (Phoenix defense two-pass with
-///             withdrawal, Phoenix single-additive max-life/max-mana, the set-20 chained life bonus, and the
-///             Ki=Intelligence / Wisdom=Dexterity name swap) so a later edit can't regress them.
+///             withdrawal, Phoenix max-life/max-mana two-pass stacking with no withdrawal, the set-20 chained
+///             life bonus, and the Ki=Intelligence / Wisdom=Dexterity name swap) so a later edit can't regress
+///             them.
 ///         </item>
 ///     </list>
 ///     Hand-computed reference vectors, not the implementation's echo. Inputs use comfortable fractional parts
@@ -190,13 +191,17 @@ public class B12GetterFixTests
         Assert.Equal(expectedDefense, stats.DefensePower);
     }
 
-    // ---- Regression: Phoenix max-life / max-mana single additive pass, NO withdrawal (2000/4500/9500) ----
+    // ---- Regression: Phoenix max-life / max-mana two-pass stacking, NO withdrawal (workstream
+    // pet-amulet-bonus-table-mapping, 2026-07-11: the base amulet table (5000/7500/12500) and the separate
+    // "Custom Phoenix Amulet" correction (2000/4500/9500) are CONFIRMED to stack unconditionally -- net
+    // 7000/12000/22000, mirroring the already-correct ComputeDefensePower two-pass shape. Superseded the prior
+    // single-pass (2000/4500/9500-only) expectation, which was missing the base-table first pass.) ----
 
     [Theory]
-    [InlineData(76005, 2000)]
-    [InlineData(76006, 4500)]
-    [InlineData(76007, 9500)]
-    public void PhoenixMaxLife_SingleAdditivePass_NoWithdrawal(int phoenixId, int expectedLife)
+    [InlineData(76005, 7000)]
+    [InlineData(76006, 12000)]
+    [InlineData(76007, 22000)]
+    public void PhoenixMaxLife_TwoPassGivesCombinedTotal_NoWithdrawal(int phoenixId, int expectedLife)
     {
         var attributes = Attributes(); // vitality=0 so base life is 0
         var levels = Levels(LevelRow(1));
@@ -208,10 +213,10 @@ public class B12GetterFixTests
     }
 
     [Theory]
-    [InlineData(76005, 2000)]
-    [InlineData(76006, 4500)]
-    [InlineData(76007, 9500)]
-    public void PhoenixMaxMana_SingleAdditivePass_NoWithdrawal(int phoenixId, int expectedMana)
+    [InlineData(76005, 7000)]
+    [InlineData(76006, 12000)]
+    [InlineData(76007, 22000)]
+    public void PhoenixMaxMana_TwoPassGivesCombinedTotal_NoWithdrawal(int phoenixId, int expectedMana)
     {
         var attributes = Attributes(); // ki(int)=0 so base mana is 0
         var levels = Levels(LevelRow(1));

@@ -63,6 +63,12 @@ public static partial class StatCalculator
             // (MyFactor.cpp:2699-2711); safe inside this guard since it returns 0 for non-Phoenix ids.
             // Net damage delta becomes +3000/+5000/+7000 (was +3000/+4000/+5000).
             atk += PhoenixDamageSecondPassBonus(petAmulet.Item.ItemId);
+
+            // WORKSTREAM B8: flat amulet attack table (8290, 76000-76004) -- excludes 76005-76007, which
+            // already double-count via PhoenixFlatBonus above (see PetAmuletAttackBonus remarks /
+            // PetAmuletPhoenixOverlapIds).
+            if (!PetAmuletPhoenixOverlapIds.Contains(petAmulet.Item.ItemId))
+                atk += PetAmuletAttackBonus(petAmulet.Item.ItemId, petAmulet.Item.Sort);
         }
 
         atk += SetBonusTables.GetBaseFlatAttackPowerBonus(setNumber); // NXT +500/1000/1500

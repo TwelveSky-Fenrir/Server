@@ -5,12 +5,14 @@ using Fenrir.Application.Game.Tests.TestSupport;
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
 /// <summary>
-///     Covers <see cref="TribeSymbolDamageModifierSystem" />'s new (B15, wave15 contract) damage-up bonus
+///     Covers <see cref="TribeSymbolDamageModifierSystem" />'s (B15, wave15 contract) damage-up bonus
 ///     INCREMENT COUNT half -- <see cref="TribeSymbolCombatModifiers.GetDamageUpBonusIncrementCount" />. Every
 ///     gate/threshold exercised here is a literal number the wave15 contract's own prose states (the four-
-///     increment ceiling, the ten-point small-tribe floor); the per-increment FLAT DAMAGE magnitude itself is
-///     deliberately not modeled anywhere in this codebase yet -- see <see cref="TribeSymbolCombatModifiers" />'s
-///     own remarks for why -- so this class only asserts on the COUNT, never on damage.
+///     increment ceiling, the ten-point small-tribe floor). This class asserts only on the COUNT, never on
+///     damage -- the per-increment FLAT DAMAGE magnitude (now grounded by the <c>tribesymbol-damage-magnitude</c>
+///     contract, see <see cref="TribeSymbolCombatModifiers" />'s own remarks) is covered separately by
+///     <c>MonsterCombatResolverTribeSymbolDamageUpBonusTests</c>, which exercises the resolver-level
+///     count-to-damage multiplication this class deliberately does not.
 /// </summary>
 public class TribeSymbolDamageUpBonusTests
 {

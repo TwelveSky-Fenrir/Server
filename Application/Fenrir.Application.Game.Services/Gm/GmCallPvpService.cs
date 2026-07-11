@@ -16,35 +16,47 @@ namespace Fenrir.Application.Game.Services.Gm;
 ///     validation, the immediate acknowledgment send that precedes the relocation work, the fixed coordinate
 ///     pair, the full connected-character iteration and its three filter conditions, the per-match position
 ///     overwrite/notification/broadcast, and the exit that bypasses the dispatcher's shared closing steps) ;
-///     Server/ts25zone/S04_MyWork04.cpp:1825-1834 (the duel-ready command immediately following, cited only to
-///     confirm ITS OWN explicit same-server-number guard that this command's body conspicuously lacks) ;
+///     Server/ts25zone/S04_MyWork04.cpp:1785-1790 (the two literal coordinate-triple assignments for duel slot
+///     1 and slot 2, -232/36/2 and 232/36/2 respectively) ; Server/ts25zone/S04_MyWork04.cpp:1801-1819
+///     (tDuleNo-to-slot selection: 1 routes to the first triple, 2 to the second) ;
+///     Server/ts25zone/S04_MyWork04.cpp:1825-1844 (the duel-ready command immediately following, case 600:
+///     cited both to confirm ITS OWN explicit same-server-number guard that this command's body conspicuously
+///     lacks, and because its own :1839-1844 independently re-declares the identical pair of coordinate
+///     literals -- cross-confirmation of the same two values, not a second, different coordinate set) ;
 ///     Server/ts25zone/H07_MyGame.h:892 (the per-session cooldown-tracking field this command resets on every
 ///     relocated character) ; Server/ts25zone/S07_MyGame03.cpp:9388-9397 (that field's only other read/write
-///     site: an unidentified skill/buff-cast branch's ten-second reuse cooldown) ;
-///     Server/Header/Protocol/STRUCT.h:1290-1294 (payload shape).
+///     site: an unidentified skill/buff-cast branch's ten-second reuse cooldown -- confirmed a second time, by
+///     an exhaustive repo-wide search for any SKILL_INFO name field/aSkillName/szSkillName field/skill-data
+///     file, to be permanently unrecoverable from Server/ alone; skill names live in a client-side resource
+///     table outside this repository) ; Server/Header/Protocol/STRUCT.h:1285-1294 (GM_SETPVPPOINT and
+///     GM_CALLPVP struct shapes -- confirms tDuleNo is the field selecting between the two slots).
 /// </summary>
 /// <remarks>
 ///     <b>
-///         Two magnitudes this pass does NOT invent, per the "A14-gm-remaining" behavior contract's own explicit
-///         framing:
+///         One magnitude recovered, one confirmed permanently unrecoverable -- per the "gm-call-pvp-magnitudes"
+///         legacy-research re-verification pass's own explicit framing:
 ///     </b>
 ///     <list type="bullet">
 ///         <item>
-///             <see cref="DuelSlot1Coordinate" />/<see cref="DuelSlot2Coordinate" /> are documented, INERT
-///             placeholders (0,0,0), not a guessed real value -- the contract's own text describes that two
-///             fixed coordinate triples exist (one per duel slot, slot 2 "mirroring" slot 1) but never supplies
-///             their actual numbers; those were never extracted from
-///             Server/ts25zone/S04_MyWork04.cpp:1770-1823 by the upstream legacy-behavior-translator pass. Do
-///             NOT wire this command into <c>GenericActionHandler</c>'s live dispatch table (or otherwise reach
-///             a real player) until <c>cpp-zone-gameplay-analyst</c> supplies the real triples and this remark
-///             is updated -- see this pass's own reported open question.
+///             <see cref="DuelSlot1Coordinate" />/<see cref="DuelSlot2Coordinate" /> are now the REAL legacy
+///             values -- (-232, 36, 2) and (232, 36, 2) respectively -- byte-for-byte transcribed from
+///             Server/ts25zone/S04_MyWork04.cpp:1785-1790 (case 599) and independently cross-confirmed by the
+///             sibling case 600 re-declaration at :1839-1844 (the two host commands do not share a single named
+///             constant; each independently re-declares the identical pair of literal triples, treated as
+///             cross-confirmation, not evidence of two different coordinate sets). This command is safe to wire
+///             into <c>GenericActionHandler</c>'s live dispatch table -- the earlier "documented INERT
+///             placeholder, do not enable" caveat no longer applies.
 ///         </item>
 ///         <item>
-///             The H07_MyGame.h:892 per-character cooldown-tracking field reset is NOT implemented here at all:
-///             no <see cref="PlayerRuntimeState" /> field models it yet, and the specific skill/buff it
-///             incidentally gates could not be identified from the source contract. Implementing a guessed field
-///             or a guessed skill identity would violate this project's "never invent an id/magnitude" rule more
-///             than simply omitting the effect -- flagged as an open question, not silently dropped.
+///             The H07_MyGame.h:892 per-character cooldown-tracking field reset is still NOT implemented here:
+///             no <see cref="PlayerRuntimeState" /> field models it, and the specific skill/buff it incidentally
+///             gates could not be identified even after a second, exhaustive re-search under Server/ (no
+///             SKILL_INFO name field, no aSkillName/szSkillName field, and no skill-data file of any kind exists
+///             anywhere in this repository -- skill names live in a client-side resource table this repository
+///             does not contain; ServerDocs/12_ts25zone/11_MyGame03_PartieA.md §5.9 likewise never resolves
+///             skill numbers to names). This is now a permanently-closed gap, not an open question pending a
+///             future re-check -- implementing a guessed field or a guessed skill identity would violate this
+///             project's "never invent an id/magnitude" rule more than simply omitting the effect.
 ///         </item>
 ///     </list>
 ///     <b>"Already engaged in another duel-related state" filter:</b> mapped onto this project's own
@@ -80,9 +92,11 @@ public sealed class GmCallPvpService(
     private const int AcceptedResult = 0;
     private const int RejectedResult = 1; // legacy tResult's own default-initialized/rejected value
 
-    // TODO(open question, see this type's own remarks): documented INERT placeholders, not real coordinates.
-    private static readonly (float X, float Y, float Z) DuelSlot1Coordinate = (0f, 0f, 0f);
-    private static readonly (float X, float Y, float Z) DuelSlot2Coordinate = (0f, 0f, 0f);
+    // Server/ts25zone/S04_MyWork04.cpp:1785-1790 (case 599) / :1839-1844 (case 600, identical re-declaration,
+    // cross-confirming these are the real recovered values, not a placeholder). Slot 2 mirrors slot 1 by
+    // negating only the first component; components 1 and 2 (36, 2) are shared between both slots.
+    private static readonly (float X, float Y, float Z) DuelSlot1Coordinate = (-232f, 36f, 2f);
+    private static readonly (float X, float Y, float Z) DuelSlot2Coordinate = (232f, 36f, 2f);
 
     public async ValueTask HandleAsync(GmCallPvpPayload packet, byte[] data, ZoneClientSession zoneSession,
         CancellationToken cancellationToken)
@@ -148,7 +162,8 @@ public sealed class GmCallPvpService(
                     zone.MapId, candidate.CharacterId);
 
             // The H07_MyGame.h:892 cooldown-tracking field reset is deliberately NOT implemented -- see this
-            // type's own remarks for why (unidentified field/skill, never invented).
+            // type's own remarks for why (unidentified field/skill, confirmed permanently unrecoverable after
+            // a second exhaustive re-search, never invented).
 
             await eventLog.LogAsync(GmDuelAndInventoryActionEventCodes.CallPvpRelocate, EventLogCategory.GmAction,
                 callerAccountId, callerCharacterId, ((ZoneClientSession)candidate.Session).AccountId,

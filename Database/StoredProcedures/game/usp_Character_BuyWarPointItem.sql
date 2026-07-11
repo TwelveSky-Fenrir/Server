@@ -1,4 +1,3 @@
--- Migrations/042_character_buy_warpoint_item.sql
 -- Atomic War-Point NPC-shop purchase (USE_WAR_POINT_SYSTEM branch of ProcessForNPCShopToInventory,
 -- Server/ts25zone/S04_MyWork05.cpp:1863-1895,1948-1987). Debits @WarPointCost War-Points and whole-replaces
 -- the destination inventory container in ONE transaction (all-or-nothing). War-Point sufficiency is enforced
@@ -8,14 +7,10 @@
 -- must disambiguate from a real DB error. Contribution-Point cost is NOT handled here: it is a write-behind
 -- field mirrored through the tribe-progress channel (same split the ordinary NPC-buy path uses), and every live
 -- catalogue row charges 0 CP anyway (WarPointSystem.h:79-140).
---
--- Created as a migration (not a StoredProcedures/ script) specifically so it is applied AFTER Migrations/041
--- adds game.Characters.WarPoint -- StoredProcedures/ scripts run before migrations, and this procedure
--- references that migration-added column. Precedent: Migrations/029 also creates a procedure.
-CREATE OR ALTER PROCEDURE game.usp_Character_BuyWarPointItem @CharacterId INT,
-                                                             @WarPointCost INT,
-                                                             @Container TINYINT,
-                                                             @Items game.tvp_CharacterItemSlot READONLY
+CREATE PROCEDURE game.usp_Character_BuyWarPointItem @CharacterId INT,
+                                                     @WarPointCost INT,
+                                                     @Container TINYINT,
+                                                     @Items game.tvp_CharacterItemSlot READONLY
 AS
 BEGIN
     SET NOCOUNT ON;

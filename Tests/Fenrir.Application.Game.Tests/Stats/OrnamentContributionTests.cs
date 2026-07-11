@@ -85,11 +85,11 @@ public class OrnamentContributionTests
     {
         Assert.Equal(4, StatCalculator.OrnamentDecorationSlots.Count);
         foreach (var expected in (int[])[9, 10, 11, 12])
-            Assert.True(StatCalculator.OrnamentDecorationSlots.Contains(expected));
+            Assert.Contains(expected, StatCalculator.OrnamentDecorationSlots);
 
         // The amulet slot (0) and pet slot (8) are deliberately NOT part of the gate.
-        Assert.False(StatCalculator.OrnamentDecorationSlots.Contains(0));
-        Assert.False(StatCalculator.OrnamentDecorationSlots.Contains(8));
+        Assert.DoesNotContain(0, StatCalculator.OrnamentDecorationSlots);
+        Assert.DoesNotContain(8, StatCalculator.OrnamentDecorationSlots);
     }
 
     [Theory]

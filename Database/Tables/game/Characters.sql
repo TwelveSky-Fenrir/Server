@@ -170,6 +170,14 @@ CREATE TABLE game.Characters
     Zone241Time              INT                NOT NULL
         CONSTRAINT DF_Characters_Zone241Time DEFAULT 0
         CONSTRAINT CK_Characters_Zone241Time CHECK (Zone241Time >= 0),                           -- aZone241Time (Server/Header/Protocol/STRUCT.h:751-757's persisted avatar snapshot field, always wired as literal 0 today). First durable consumer: Rebirth-advancement Path B ("Max Rebirth", CZ_TRIBE_WORK_SEND tSort 11) unconditionally += 10 on precondition pass (Server/ts25zone/S04_MyWork02.cpp:11342-11390); see usp_Character_AdjustZone241Time for the write-path primitive.
+    WarPoint                 INT                NOT NULL
+        CONSTRAINT DF_Characters_WarPoint DEFAULT 0
+        CONSTRAINT CK_Characters_WarPoint CHECK (WarPoint >= 0),                                 -- aWarPoint (USE_WAR_POINT_SYSTEM, Server/Header/Protocol/STRUCT.h:554): spendable War-Point balance, deliberately kept OUT of usp_Character_PersistProgressBatch (same posture as Money/BloodCoin) -- it only moves through the dedicated atomic usp_Character_BuyWarPointItem so a last-write-wins flush can never clobber it.
+    PetBagDate               INT                NOT NULL
+        CONSTRAINT DF_Characters_PetBagDate DEFAULT 0,                                           -- aPetBagDate (Server/Header/Protocol/STRUCT.h:520-521): pet-bag upper-half (slots 10-19) rental-entitlement expiry date, same shape as InventoryDate/StoreDate above. DEFAULT 0 matches legacy's own confirmed baseline (ServerDocs/11_ts25login/01_Flux_Authentification_Redirection.md:381-383: creation never sets aPetBagDate) -- unlike InventoryDate/StoreDate, usp_Character_CreateWithStarterKit does NOT grant this at creation; no citation establishes what, if anything, ever grants it a non-zero value.
+    M15PetLuckyBoxPity       INT                NOT NULL
+        CONSTRAINT DF_Characters_M15PetLuckyBoxPity DEFAULT 0
+        CONSTRAINT CK_Characters_M15PetLuckyBoxPity CHECK (M15PetLuckyBoxPity BETWEEN 0 AND 200), -- M15 Pet Lucky Box (world.Items 8111) pity counter (legacy gBox8111, Server/Header/Protocol/STRUCT.h:568-571); ceiling 200 matches M15PetLuckyBox8111RewardTable.PityCeiling (Server/ts25zone/S04_MyWork03.cpp:1615-1621,7729-7735).
     FlushSequence            BIGINT             NOT NULL
         CONSTRAINT DF_Characters_FlushSequence DEFAULT 0,                                        -- idempotent write-behind
     CreatedAtUtc             DATETIME2(3)       NOT NULL
@@ -185,5 +193,12 @@ CREATE TABLE game.Characters
     CONSTRAINT FK_Characters_StudentCharacter FOREIGN KEY (StudentCharacterId) REFERENCES game.Characters (CharacterId),
     CONSTRAINT CK_Characters_TeacherNotSelf CHECK (TeacherCharacterId IS NULL OR TeacherCharacterId <> CharacterId),
     CONSTRAINT CK_Characters_StudentNotSelf CHECK (StudentCharacterId IS NULL OR StudentCharacterId <> CharacterId),
-    INDEX IX_Characters_Account NONCLUSTERED (AccountId) INCLUDE (Slot, Name, Tribe, Level)
+    INDEX IX_Characters_Account NONCLUSTERED (AccountId) INCLUDE (Slot, Name, Tribe, Level),
+    -- Filtered covering index for game.usp_TribeRoster_GetForTribePoint (C17 Part C tribe-point recompute,
+    -- runs on a ~6s cadence): WHERE Level >= 145 keeps the index to the tiny max-level subset, and
+    -- INCLUDE (Level2, RebirthCount) covers every column that procedure projects (Tribe, Level, Level2,
+    -- RebirthCount) with no key lookup. Maintenance cost is negligible -- these columns only change on rare
+    -- progression/rebirth/tribe-conversion events for characters already at the level cap, not on the
+    -- per-tick position/progress write-behind hot path.
+    INDEX IX_Characters_MaxLevel_TribePoint NONCLUSTERED (Tribe, Level) INCLUDE (Level2, RebirthCount) WHERE (Level >= 145)
 );

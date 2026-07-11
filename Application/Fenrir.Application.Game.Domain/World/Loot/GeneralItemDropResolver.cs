@@ -49,42 +49,66 @@ public static class GeneralItemDropResolver
     ///     history, so the character's current tribe is used instead, exact unless the character has
     ///     transferred factions.
     /// </summary>
+    /// <param name="includeCape">
+    ///     Whether the pool includes the Cape sort at all (<c>ReturnDropRareItem</c>'s <c>iAddSort</c>
+    ///     parameter) -- the general monster-item-drop call site (<c>S07_MyGame05.cpp:2794</c>) passes this
+    ///     unconditionally true; the Lucky Ticket call site (<c>S04_MyWork03.cpp:3461-3467</c>) passes it only
+    ///     when the resolved tier is IRARE. Defaults to <see langword="true" /> so every pre-existing caller
+    ///     keeps its prior behavior unchanged.
+    /// </param>
+    /// <param name="includeSkillBook">
+    ///     Whether the pool includes the Skill Book sort at all (<c>ReturnDropRareItem</c>'s <c>iAddSort2</c>
+    ///     parameter) -- the general monster-item-drop call site passes this unconditionally true; the Lucky
+    ///     Ticket call site never sets it (always 0/false). Defaults to <see langword="true" /> for the same
+    ///     back-compat reason as <paramref name="includeCape" />.
+    /// </param>
     public static int? Resolve(WorldDataCache worldData, Random random, byte killerTribe, int itemType,
-        int levelLow, int levelHigh)
+        int levelLow, int levelHigh, bool includeCape = true, bool includeSkillBook = true)
     {
-        Span<int> sortPool =
-        [
-            Amulet, Armor, Glove, Ring, Boots,
-            killerTribe switch
-            {
-                0 => Sword,
-                1 => Katana,
-                2 => LongBlade,
-                _ => -1
-            },
-            killerTribe switch
-            {
-                0 => Blade,
-                1 => DoubleBlade,
-                2 => Spear,
-                _ => -1
-            },
-            killerTribe switch
-            {
-                0 => Marble,
-                1 => Lute,
-                2 => Scepter,
-                _ => -1
-            },
-            Cape,
-            SkillBook
-        ];
+        var weapon1 = killerTribe switch
+        {
+            0 => Sword,
+            1 => Katana,
+            2 => LongBlade,
+            _ => -1
+        };
 
-        if (sortPool[5] < 0)
-            return
-                null; // unknown tribe -- legacy returns null for tPreviousTribe outside 0..2
+        if (weapon1 < 0)
+            return null; // unknown tribe -- legacy returns null for tPreviousTribe outside 0..2
 
-        var chosenSort = sortPool[random.Next(sortPool.Length)];
+        var weapon2 = killerTribe switch
+        {
+            0 => Blade,
+            1 => DoubleBlade,
+            2 => Spear,
+            _ => -1
+        };
+
+        var weapon3 = killerTribe switch
+        {
+            0 => Marble,
+            1 => Lute,
+            2 => Scepter,
+            _ => -1
+        };
+
+        // tSortSearch in the legacy source: 8 fixed slots, +1 for a live iAddSort, +1 for a live iAddSort2.
+        Span<int> pool = stackalloc int[10];
+        var poolSize = 0;
+        pool[poolSize++] = Amulet;
+        pool[poolSize++] = Armor;
+        pool[poolSize++] = Glove;
+        pool[poolSize++] = Ring;
+        pool[poolSize++] = Boots;
+        pool[poolSize++] = weapon1;
+        pool[poolSize++] = weapon2;
+        pool[poolSize++] = weapon3;
+        if (includeCape)
+            pool[poolSize++] = Cape;
+        if (includeSkillBook)
+            pool[poolSize++] = SkillBook;
+
+        var chosenSort = pool[random.Next(poolSize)];
 
         for (var attempt = 0; attempt < MaxAttempts; attempt++)
         {

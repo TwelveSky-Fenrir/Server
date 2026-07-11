@@ -114,6 +114,70 @@ public class GeneralItemDropResolverTests
         Assert.Null(result);
     }
 
+    // ---- includeCape / includeSkillBook (workstream lucky-ticket-handler-thresholds) --------------------
+
+    private const int Cape = 8;
+    private const int SkillBook = 5;
+
+    [Fact]
+    public void Resolve_IncludeCapeDefaultTrue_CapeSlotIsReachable()
+    {
+        // Default pool (10 slots: 8 fixed + Cape + Skill Book) -- index 8 is Cape.
+        var item = EligibleItem(9006, 10, Common, Cape);
+        var cache = CacheWith(item);
+        var random = new ScriptedRandom(8);
+
+        var result = GeneralItemDropResolver.Resolve(cache, random, 0, Common, 10, 10);
+
+        Assert.Equal(9006, result);
+    }
+
+    [Fact]
+    public void Resolve_IncludeCapeFalse_CapeSlotIsNeverReachable_EvenIfThatIndexWouldOtherwiseHitIt()
+    {
+        // With includeCape:false the pool shrinks to 8 slots (indices 0-7): random.Next(8) can never
+        // address a 9th (Cape) slot that simply is not appended to the pool at all.
+        var item = EligibleItem(9007, 10, Common, Cape);
+        var cache = CacheWith(item);
+        var random = new ScriptedRandom(0, 1, 2, 3, 4, 5, 6, 7);
+
+        var result = GeneralItemDropResolver.Resolve(cache, random, 0, Common, 10, 10,
+            includeCape: false, includeSkillBook: false);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void Resolve_IncludeSkillBookFalse_SkillBookSlotIsNeverReachable()
+    {
+        // Skill Book only ever occupies the LAST slot appended (after Cape, when both are included). With
+        // includeCape:true/includeSkillBook:false the pool is 9 slots (0-8); Skill Book (a would-be 10th
+        // slot) is never appended, so it can never be drawn regardless of which of the 9 reachable indices
+        // is picked.
+        var item = EligibleItem(9008, 10, Common, SkillBook);
+        var cache = CacheWith(item);
+        var random = new ScriptedRandom(0, 1, 2, 3, 4, 5, 6, 7, 8);
+
+        var result = GeneralItemDropResolver.Resolve(cache, random, 0, Common, 10, 10,
+            includeCape: true, includeSkillBook: false);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void Resolve_IncludeCapeAndSkillBookBothFalse_PoolIsExactlyTheEightFixedSlots()
+    {
+        var item = EligibleItem(9009, 10, Common, Armor);
+        var cache = CacheWith(item);
+        // Index 1 (Armor) is still reachable in the shrunk 8-slot pool.
+        var random = new ScriptedRandom(1);
+
+        var result = GeneralItemDropResolver.Resolve(cache, random, 0, Common, 10, 10,
+            includeCape: false, includeSkillBook: false);
+
+        Assert.Equal(9009, result);
+    }
+
     private sealed class ScriptedRandom(params int[] sequence) : Random
     {
         private int _index;

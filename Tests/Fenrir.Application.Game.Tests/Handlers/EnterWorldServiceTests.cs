@@ -117,6 +117,7 @@ public class EnterWorldServiceTests
             new EmptyFriendRepository(),
             new NoMentorRepository(),
             new FakeHeroRankingRepository(),
+            new FakeRuneRepository(),
             new FakeCharacterShardLocationRepository(),
             new FakeCharacterLogoutStateRepository(),
             worldState,
@@ -238,6 +239,7 @@ public class EnterWorldServiceTests
             new EmptyFriendRepository(),
             new NoMentorRepository(),
             heroRankings,
+            new FakeRuneRepository(),
             new FakeCharacterShardLocationRepository(),
             new FakeCharacterLogoutStateRepository(),
             ZoneTestKit.CreateWorldState(),
@@ -258,6 +260,232 @@ public class EnterWorldServiceTests
 
         Assert.True(zone.TryGetPlayer(CharacterId, out var state));
         Assert.Equal(PersistedHeroRankPoints, state!.HeroRankPoints);
+    }
+
+    // C8 pet-bag-entitlement confirmation-pass follow-up: a returning character's already-persisted
+    // game.Characters.PetBagDate must seed PlayerRuntimeState.PetBagDate at world entry, not merely start at
+    // 0 -- see that field's own remarks and Migrations/047_characters_petbagdate_column.sql.
+    [Fact]
+    public async Task HandleAsync_ReturningCharacterWithPersistedPetBagDate_SeedsThePlayerRuntimeStateMirror()
+    {
+        const short MapId = 13;
+        const int PersistedPetBagDate = 20991231;
+
+        var bundle = HappyPathBundle(MapId, 1, 1, 0f, 0f, 0f, [], petBagDate: PersistedPetBagDate);
+        var characters = new FakeCharacterRepository { WorldEntryBundleToReturn = bundle };
+        var worldData = ZoneTestKit.EmptyWorldData();
+        var zones = ZoneTestKit.CreateRegistry(worldData: worldData);
+        zones.Initialize([MapId]);
+
+        var service = new EnterWorldService(
+            characters,
+            worldData,
+            zones,
+            new NoOpMuteRepository(),
+            new FakeBanRepository(),
+            new ApplicationFirewall(new FakeBlockedIpRepository(), new FakeFirewallRuleRepository(),
+                new FakeGmAllowlistRepository()),
+            new FakeGuildRepository(),
+            new GuildRankingCache(),
+            new RoleOnlyTribeRepository(0),
+            new EmptyFriendRepository(),
+            new NoMentorRepository(),
+            new FakeHeroRankingRepository(),
+            new FakeRuneRepository(),
+            new FakeCharacterShardLocationRepository(),
+            new FakeCharacterLogoutStateRepository(),
+            ZoneTestKit.CreateWorldState(),
+            new TowerWarState(),
+            new ZoneCenterSiegeState(),
+            new TribeGuardCorridorState(),
+            Options.Create(ZoneTestKit.Options()),
+            NullLogger<EnterWorldService>.Instance);
+
+        var (session, _) = ZoneTestKit.CreateSession(1);
+        session.MarkTicketConsumed(AccountId, CharacterId);
+
+        await service.HandleAsync(ValidRequest(EncodeObfuscatedAccountId(AccountId)), session, CancellationToken.None);
+
+        Assert.Null(session.DisconnectReason);
+        Assert.True(zones.TryGet(MapId, out var zone));
+        zone!.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(CharacterId, out var state));
+        Assert.Equal(PersistedPetBagDate, state!.PetBagDate);
+    }
+
+    // item-usage-consumables follow-up: a returning character's already-persisted game.Characters.DropItemTime
+    // (Lucky Drop/"Acquisition" Scroll minutes counter) must seed PlayerRuntimeState.DropItemTime at world
+    // entry, not merely start at 0 -- see that field's own remarks.
+    [Fact]
+    public async Task HandleAsync_ReturningCharacterWithPersistedDropItemTime_SeedsThePlayerRuntimeStateMirror()
+    {
+        const short MapId = 15;
+        const int PersistedDropItemTime = 42;
+
+        var bundle = HappyPathBundle(MapId, 1, 1, 0f, 0f, 0f, [], dropItemTime: PersistedDropItemTime);
+        var characters = new FakeCharacterRepository { WorldEntryBundleToReturn = bundle };
+        var worldData = ZoneTestKit.EmptyWorldData();
+        var zones = ZoneTestKit.CreateRegistry(worldData: worldData);
+        zones.Initialize([MapId]);
+
+        var service = new EnterWorldService(
+            characters,
+            worldData,
+            zones,
+            new NoOpMuteRepository(),
+            new FakeBanRepository(),
+            new ApplicationFirewall(new FakeBlockedIpRepository(), new FakeFirewallRuleRepository(),
+                new FakeGmAllowlistRepository()),
+            new FakeGuildRepository(),
+            new GuildRankingCache(),
+            new RoleOnlyTribeRepository(0),
+            new EmptyFriendRepository(),
+            new NoMentorRepository(),
+            new FakeHeroRankingRepository(),
+            new FakeRuneRepository(),
+            new FakeCharacterShardLocationRepository(),
+            new FakeCharacterLogoutStateRepository(),
+            ZoneTestKit.CreateWorldState(),
+            new TowerWarState(),
+            new ZoneCenterSiegeState(),
+            new TribeGuardCorridorState(),
+            Options.Create(ZoneTestKit.Options()),
+            NullLogger<EnterWorldService>.Instance);
+
+        var (session, _) = ZoneTestKit.CreateSession(1);
+        session.MarkTicketConsumed(AccountId, CharacterId);
+
+        await service.HandleAsync(ValidRequest(EncodeObfuscatedAccountId(AccountId)), session, CancellationToken.None);
+
+        Assert.Null(session.DisconnectReason);
+        Assert.True(zones.TryGet(MapId, out var zone));
+        zone!.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(CharacterId, out var state));
+        Assert.Equal(PersistedDropItemTime, state!.DropItemTime);
+    }
+
+    // Migrations/041_characters_warpoint_currency.sql follow-up: a returning character's already-persisted
+    // game.Characters.WarPoint must seed PlayerRuntimeState.WarPoint at world entry, not merely start at 0 --
+    // see that field's own remarks.
+    [Fact]
+    public async Task HandleAsync_ReturningCharacterWithPersistedWarPoint_SeedsThePlayerRuntimeStateMirror()
+    {
+        const short MapId = 17;
+        const int PersistedWarPoint = 1234;
+
+        var bundle = HappyPathBundle(MapId, 1, 1, 0f, 0f, 0f, [], warPoint: PersistedWarPoint);
+        var characters = new FakeCharacterRepository { WorldEntryBundleToReturn = bundle };
+        var worldData = ZoneTestKit.EmptyWorldData();
+        var zones = ZoneTestKit.CreateRegistry(worldData: worldData);
+        zones.Initialize([MapId]);
+
+        var service = new EnterWorldService(
+            characters,
+            worldData,
+            zones,
+            new NoOpMuteRepository(),
+            new FakeBanRepository(),
+            new ApplicationFirewall(new FakeBlockedIpRepository(), new FakeFirewallRuleRepository(),
+                new FakeGmAllowlistRepository()),
+            new FakeGuildRepository(),
+            new GuildRankingCache(),
+            new RoleOnlyTribeRepository(0),
+            new EmptyFriendRepository(),
+            new NoMentorRepository(),
+            new FakeHeroRankingRepository(),
+            new FakeRuneRepository(),
+            new FakeCharacterShardLocationRepository(),
+            new FakeCharacterLogoutStateRepository(),
+            ZoneTestKit.CreateWorldState(),
+            new TowerWarState(),
+            new ZoneCenterSiegeState(),
+            new TribeGuardCorridorState(),
+            Options.Create(ZoneTestKit.Options()),
+            NullLogger<EnterWorldService>.Instance);
+
+        var (session, _) = ZoneTestKit.CreateSession(1);
+        session.MarkTicketConsumed(AccountId, CharacterId);
+
+        await service.HandleAsync(ValidRequest(EncodeObfuscatedAccountId(AccountId)), session, CancellationToken.None);
+
+        Assert.Null(session.DisconnectReason);
+        Assert.True(zones.TryGet(MapId, out var zone));
+        zone!.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(CharacterId, out var state));
+        Assert.Equal(PersistedWarPoint, state!.WarPoint);
+    }
+
+    // B5 rune-socket world-entry hydration: a returning character's already-persisted game.CharacterRunes rows
+    // must seed PlayerRuntimeState.RuneSystem/RuneSystemStat by SocketIndex, not merely start at [0,0,0,0] --
+    // see PlayerRuntimeState.RuneSystem's own remarks and IRuneRepository.GetRunesAsync's own contract
+    // (occupied sockets only; an absent socket hydrates to 0).
+    [Fact]
+    public async Task HandleAsync_ReturningCharacterWithPersistedRunes_SeedsThePlayerRuntimeStateRuneArrays()
+    {
+        const short MapId = 11;
+
+        var bundle = HappyPathBundle(MapId, 1, 1, 0f, 0f, 0f, []);
+        var characters = new FakeCharacterRepository { WorldEntryBundleToReturn = bundle };
+        var worldData = ZoneTestKit.EmptyWorldData();
+        var zones = ZoneTestKit.CreateRegistry(worldData: worldData);
+        zones.Initialize([MapId]);
+
+        // Sockets 0 and 2 occupied; 1 and 3 stay unset -- proves an absent socket hydrates to 0 rather than
+        // leaking a stale/adjacent value.
+        var runes = new FakeRuneRepository
+        {
+            RowsToReturn =
+            [
+                new CharacterRuneSocketDto(0, 93514, 12345),
+                new CharacterRuneSocketDto(2, 93516, 67890)
+            ]
+        };
+
+        var service = new EnterWorldService(
+            characters,
+            worldData,
+            zones,
+            new NoOpMuteRepository(),
+            new FakeBanRepository(),
+            new ApplicationFirewall(new FakeBlockedIpRepository(), new FakeFirewallRuleRepository(),
+                new FakeGmAllowlistRepository()),
+            new FakeGuildRepository(),
+            new GuildRankingCache(),
+            new RoleOnlyTribeRepository(0),
+            new EmptyFriendRepository(),
+            new NoMentorRepository(),
+            new FakeHeroRankingRepository(),
+            runes,
+            new FakeCharacterShardLocationRepository(),
+            new FakeCharacterLogoutStateRepository(),
+            ZoneTestKit.CreateWorldState(),
+            new TowerWarState(),
+            new ZoneCenterSiegeState(),
+            new TribeGuardCorridorState(),
+            Options.Create(ZoneTestKit.Options()),
+            NullLogger<EnterWorldService>.Instance);
+
+        var (session, _) = ZoneTestKit.CreateSession(1);
+        session.MarkTicketConsumed(AccountId, CharacterId);
+
+        await service.HandleAsync(ValidRequest(EncodeObfuscatedAccountId(AccountId)), session, CancellationToken.None);
+
+        Assert.Null(session.DisconnectReason);
+        Assert.True(zones.TryGet(MapId, out var zone));
+        zone!.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(CharacterId, out var state));
+        Assert.Equal(93514, state!.RuneSystem[0]);
+        Assert.Equal(12345, state.RuneSystemStat[0]);
+        Assert.Equal(0, state.RuneSystem[1]);
+        Assert.Equal(0, state.RuneSystemStat[1]);
+        Assert.Equal(93516, state.RuneSystem[2]);
+        Assert.Equal(67890, state.RuneSystemStat[2]);
+        Assert.Equal(0, state.RuneSystem[3]);
+        Assert.Equal(0, state.RuneSystemStat[3]);
     }
 
     // Covers the bridge-tribe-validation contract's Behavior C (Server/ts25zone/S04_MyWork02.cpp:880-901): the
@@ -325,7 +553,8 @@ public class EnterWorldServiceTests
     }
 
     private static CharacterWorldEntryBundle HappyPathBundle(short mapId, byte tribe, byte previousTribe,
-        float posX, float posY, float posZ, IReadOnlyList<CharacterBuffDto> buffs)
+        float posX, float posY, float posZ, IReadOnlyList<CharacterBuffDto> buffs, int petBagDate = 0,
+        int dropItemTime = 0, int warPoint = 0)
     {
         var character = new CharacterWorldSnapshotDto(
             CharacterId, AccountId, 0, "Hero", tribe, 0,
@@ -334,13 +563,13 @@ public class EnterWorldServiceTests
             1, 1, 1, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0,
+            0, 0, 0, dropItemTime, 0,
             0, 0, 0, 0, 0,
             0, 0, 0, 0, 0,
             false, [], 0, 0, 0,
             0, 0, 0, 0, 0,
             previousTribe, 0, 0, 0, 0,
-            0);
+            0, PetBagDate: petBagDate, WarPoint: warPoint);
 
         return new CharacterWorldEntryBundle(
             character,
@@ -404,6 +633,7 @@ public class EnterWorldServiceTests
             new ThrowingFriendRepository(),
             new ThrowingMentorRepository(),
             new ThrowingHeroRankingRepository(),
+            new ThrowingRuneRepository(),
             new ThrowingCharacterShardLocationRepository(),
             new FakeCharacterLogoutStateRepository(),
             ZoneTestKit.CreateWorldState(),
@@ -441,6 +671,7 @@ public class EnterWorldServiceTests
             new EmptyFriendRepository(),
             new NoMentorRepository(),
             new FakeHeroRankingRepository(),
+            new FakeRuneRepository(),
             new FakeCharacterShardLocationRepository(),
             new FakeCharacterLogoutStateRepository(),
             ZoneTestKit.CreateWorldState(),
@@ -681,6 +912,21 @@ public class EnterWorldServiceTests
         }
 
         public ValueTask<bool> RolloverIfDueAsync(CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+    }
+
+    private sealed class ThrowingRuneRepository : IRuneRepository
+    {
+        public ValueTask<ReadOnlyCollection<CharacterRuneSocketDto>> GetRunesAsync(int characterId,
+            CancellationToken ct)
+        {
+            throw new InvalidOperationException("Must not be reached once world-entry is already rejected.");
+        }
+
+        public ValueTask PersistRunesAsync(int characterId, IReadOnlyList<CharacterRuneSocketTvp> runes,
+            byte? container, IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
         {
             throw new NotSupportedException();
         }

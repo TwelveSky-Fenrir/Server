@@ -5,10 +5,16 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 /// <summary>
 ///     Fixed per-map identity/geometry for one Zone195 "Nok-San" stone shard -- which stone slot this map
 ///     represents, the legacy server number that identifies it in the client-facing broadcasts, and the fixed
-///     capture-post location plus its <see cref="Zone195NokSanState.DefaultCaptureRadius" /> radius. None of
-///     the concrete post coordinates are recoverable from the translated behavior contract (only that a "fixed
-///     point" and a 12.5-unit radius exist, Server/ts25zone/S07_MyGame01.cpp:1148-1151), so -- exactly like
-///     <see cref="HolyStoneWarSite" /> -- these must be supplied by operator configuration rather than guessed.
+///     capture-post location plus its <see cref="Zone195NokSanState.DefaultCaptureRadius" /> radius. The
+///     capture-post X/Z coordinates are RECOVERED, fixed legacy world constants -- one shared literal pair
+///     written unconditionally at Zone195 boot-time state initialization, before the per-server-number switch
+///     that assigns the stone-slot index, so the same point applies identically to all three live shards
+///     (Server/ts25zone/S07_MyGame01.cpp:1148-1151; axis order independently re-derived, not assumed -- see
+///     <see cref="Zone195NokSanState.DefaultPostX" />/<see cref="Zone195NokSanState.DefaultPostZ" />). Only
+///     <see cref="MapId" /> (which of an operator's own hosted maps runs this shard) and the resulting
+///     <see cref="StoneSlotIndex" />/<see cref="LegacyServerNumber" /> pairing remain operator-supplied --
+///     exactly like <see cref="HolyStoneWarSite" />'s own per-deployment map assignment -- since Fenrir has no
+///     fixed map-id-to-shard convention of its own to hardcode.
 /// </summary>
 /// <param name="MapId">The hosted map id this Nok-San instance runs on.</param>
 /// <param name="StoneSlotIndex">
@@ -22,8 +28,14 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 ///     <see cref="IZone195NokSanBroadcaster" />. Purely a broadcast-payload value; no gameplay logic branches
 ///     on it (the reward window keys on <see cref="IsRewardWindowShard" /> instead).
 /// </param>
-/// <param name="PostX">Fixed capture-post X (operator-configured; unrecoverable from the contract).</param>
-/// <param name="PostZ">Fixed capture-post Z (operator-configured; unrecoverable from the contract).</param>
+/// <param name="PostX">
+///     Fixed capture-post world-space X, -20.0 (Server/ts25zone/S07_MyGame01.cpp:1148); identical across all
+///     three live shards. Defaults to <see cref="Zone195NokSanState.DefaultPostX" />.
+/// </param>
+/// <param name="PostZ">
+///     Fixed capture-post world-space Z, 2510.0 (Server/ts25zone/S07_MyGame01.cpp:1150); identical across all
+///     three live shards. Defaults to <see cref="Zone195NokSanState.DefaultPostZ" />.
+/// </param>
 /// <param name="CaptureRadius">
 ///     The capture-spot radius; defaults to <see cref="Zone195NokSanState.DefaultCaptureRadius" />
 ///     (12.5).
@@ -32,8 +44,8 @@ public sealed record Zone195NokSanSite(
     short MapId,
     int StoneSlotIndex,
     short LegacyServerNumber,
-    float PostX,
-    float PostZ,
+    float PostX = Zone195NokSanState.DefaultPostX,
+    float PostZ = Zone195NokSanState.DefaultPostZ,
     float CaptureRadius = Zone195NokSanState.DefaultCaptureRadius)
 {
     /// <summary>
@@ -50,9 +62,10 @@ public sealed record Zone195NokSanSite(
 ///     after -- a <see cref="FrozenDictionary{TKey,TValue}" /> keyed by map id, read from any zone's tick
 ///     thread with no lock (same immutable-after-boot posture as <see cref="ZoneRegistry" />). Empty by
 ///     default (<see cref="Empty" />), matching every other operator-configured map-id set in this cluster
-///     (<c>GameServerOptions.Zone195MapIds</c>, <see cref="AntiCampingGuardPointCatalog.Empty" />): a map is
-///     never a Nok-San capture shard until an operator configures its site, so the feature is fully dormant
-///     until then.
+///     (<c>GameServerOptions.Zone195MapIds</c>): a map is never a Nok-San capture shard until an operator
+///     configures its site, so the feature is fully dormant until then -- unlike
+///     <see cref="AntiCampingGuardPointCatalog" />, whose per-map coordinates are now recovered legacy data
+///     (<see cref="AntiCampingGuardPointCatalog.Default" />), not operator configuration.
 /// </summary>
 public sealed class Zone195NokSanSiteCatalog
 {

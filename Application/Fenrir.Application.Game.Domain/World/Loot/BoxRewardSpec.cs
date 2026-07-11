@@ -23,7 +23,7 @@ public sealed record BoxRewardSpec
         BoxId = boxId;
         Kind = kind;
         UniformIds = uniformIds;
-        Weighted = weighted;
+        WeightedRewards = weighted;
         RareBands = rareBands;
         Pools = pools;
         RentalDays = rentalDays;
@@ -39,7 +39,7 @@ public sealed record BoxRewardSpec
     public ImmutableArray<int> UniformIds { get; }
 
     /// <summary>Meaningful only when <see cref="Kind" /> is <see cref="BoxRewardKind.Weighted" />.</summary>
-    public ImmutableArray<LootBoxRewardResolver.WeightedReward> Weighted { get; }
+    public ImmutableArray<LootBoxRewardResolver.WeightedReward> WeightedRewards { get; }
 
     /// <summary>Meaningful only when <see cref="Kind" /> is <see cref="BoxRewardKind.RareBandThenPools" />.</summary>
     public ImmutableArray<LootBoxRewardResolver.RewardBand> RareBands { get; }
@@ -79,7 +79,7 @@ public sealed record BoxRewardSpec
         return Kind switch
         {
             BoxRewardKind.Uniform => LootBoxRewardResolver.RollUniform(random, UniformIds),
-            BoxRewardKind.Weighted => LootBoxRewardResolver.RollWeighted(random, Weighted),
+            BoxRewardKind.Weighted => LootBoxRewardResolver.RollWeighted(random, WeightedRewards),
             BoxRewardKind.RareBandThenPools => LootBoxRewardResolver.RollRareBandThenPools(random, RareBands, Pools),
             _ => throw new InvalidOperationException($"Unhandled box reward kind {Kind} for box {BoxId}.")
         };
@@ -92,7 +92,7 @@ public enum BoxRewardKind
     /// <summary>A flat uniform pick over <see cref="BoxRewardSpec.UniformIds" />.</summary>
     Uniform,
 
-    /// <summary>A weighted pick over <see cref="BoxRewardSpec.Weighted" /> (cumulative spans).</summary>
+    /// <summary>A weighted pick over <see cref="BoxRewardSpec.WeightedRewards" /> (cumulative spans).</summary>
     Weighted,
 
     /// <summary>A rare-band draw over <see cref="BoxRewardSpec.RareBands" />, else banded pools.</summary>

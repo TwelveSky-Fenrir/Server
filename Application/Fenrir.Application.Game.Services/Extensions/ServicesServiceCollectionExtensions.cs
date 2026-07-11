@@ -116,12 +116,14 @@ public static class ServicesServiceCollectionExtensions
         // via DI -- BuyFromNpcShopAsync now actually calls TryBuyAsync before falling through to NpcShopPolicy.
         services.AddSingleton<IWarPointShopService, WarPointShopService>();
 
-        // C8-hotkey-money-petbag: hotkey-bind-family (tSort 204/205/211/214/216/253) and pet-bag-family
-        // (tSort 254/255/256) business logic behind GenericActionHandler's dispatch. Registered here even
-        // though GenericActionHandler's own dispatch branches for these sorts are not yet wired (Services
-        // layer's own report flags this as a Handlers-layer, packet-dispatch edit out of this pass's scope) --
-        // a "wired-ready but currently unused" posture, unlike IWarPointShopService immediately above which is
-        // now actually consumed.
+        // C8-hotkey-money-petbag: hotkey-bind-family (tSort 211/214/216/253) and pet-bag-family
+        // (tSort 254/255/256) business logic behind GenericActionHandler's dispatch. GenericActionHandler's
+        // own dispatch already wires both families in (Sort 211/253/214/216 -> hotkeyActionService at
+        // GenericActionHandler.cs:387-414; Sort 254/255/256 -> petBagActionService at
+        // GenericActionHandler.cs:419-447), same "actually consumed" posture as IWarPointShopService
+        // immediately above. tSort 204/205 (skill/emoticon hotkey bind) remain undispatched pending a
+        // dedicated wire payload struct -- see GenericActionHandler.cs:381-386's own remarks, a separate,
+        // still-open gap.
         services.AddSingleton<IHotkeyActionService, HotkeyActionService>();
         services.AddSingleton<IPetBagActionService, PetBagActionService>();
     }
@@ -208,6 +210,11 @@ public static class ServicesServiceCollectionExtensions
         // SocialCrossShardRelayHost.
         services.AddSingleton<ISocialCrossShardRelayHandler, FriendCrossShardRelayHandler>();
         services.AddSingleton<ISocialCrossShardRelayHandler, PartyCrossShardRelayHandler>();
+
+        // D1 party-resync fan-out (Fenrir.Application.Game.Hosting's own PartyResyncRelayHost routes every
+        // delivered row here) -- the party-reconciliation authority its own remarks used to call out as "a
+        // future *.Services party authority", now wired: see PartyResyncRelayHandler's own remarks.
+        services.AddSingleton<IPartyResyncRelayHandler, PartyResyncRelayHandler>();
     }
 
     private static void AddItemModificationServices(IServiceCollection services)
@@ -286,9 +293,9 @@ public static class ServicesServiceCollectionExtensions
         services.AddSingleton<IGmBasicCommandService, GmBasicCommandService>();
 
         // Basic tier (GmCommandTier.Basic), A14-gm-remaining: GM-SETPVPPOINT (tSort 598, confirmed functional
-        // no-op once validated), GM-CALLPVP (tSort 599, relocates a matched connected character -- placeholder
-        // 0,0,0 coordinates until cpp-zone-gameplay-analyst supplies the real S04_MyWork04.cpp:1770-1823
-        // triples, see GmCallPvpService's own remarks), GM_CLEAR_INVENTORY (tSort 701, wipes the invoking GM's
+        // no-op once validated), GM-CALLPVP (tSort 599, relocates a matched connected character to one of two
+        // real recovered fixed coordinate triples, (-232, 36, 2) / (232, 36, 2) -- see GmCallPvpService's own
+        // remarks and S04_MyWork04.cpp:1785-1790), GM_CLEAR_INVENTORY (tSort 701, wipes the invoking GM's
         // own inventory page(s)).
         services.AddSingleton<IGmSetPvpPointService, GmSetPvpPointService>();
         services.AddSingleton<IGmCallPvpService, GmCallPvpService>();
@@ -296,9 +303,9 @@ public static class ServicesServiceCollectionExtensions
     }
 
     /// <summary>
-    ///     tSort 209 (CZ_PROCESS_DATA_SEND, "drop item from inventory to world") -- not yet reachable from
-    ///     GenericActionHandler's own dispatch switch; wiring that up is a separate integration step, see
-    ///     IInventoryToWorldDropService's own remarks.
+    ///     tSort 209 (CZ_PROCESS_DATA_SEND, "drop item from inventory to world") -- already reachable from
+    ///     GenericActionHandler's own dispatch switch (GenericActionHandler.cs:162-187 dispatches to
+    ///     IInventoryToWorldDropService.DropToWorldAsync); see that service's own remarks for behavior.
     /// </summary>
     private static void AddInventoryServices(IServiceCollection services)
     {
@@ -306,9 +313,12 @@ public static class ServicesServiceCollectionExtensions
 
         // C8 BigMoney ("1B") family (tSort 241/242/244/245, Inventory<->Store/Save) -- see
         // Fenrir.Data.ServiceCollectionExtensions' own IBigMoneyRepository registration remarks for the
-        // Characters-vs-Inventory-namespace collision this consumes the resolution of. Not yet reachable from
-        // GenericActionHandler's own dispatch switch; wiring that up is a separate integration step, same
-        // posture as IInventoryToWorldDropService immediately above.
+        // Characters-vs-Inventory-namespace collision this consumes the resolution of. Already reachable from
+        // GenericActionHandler's own dispatch switch (GenericActionHandler.cs:452-466 dispatches sort
+        // 241/244 to TransferStoreAsync and 242/245 to TransferSaveAsync), same "actually consumed" posture
+        // as IInventoryToWorldDropService immediately above. tSort 240/243 (Inventory<->Trade-offer BigMoney)
+        // and 246/247 (BigMoney<->ordinary-money conversion) remain deliberately undispatched -- see
+        // IBigMoneyTransferService's own remarks for why.
         services.AddSingleton<IBigMoneyTransferService, BigMoneyTransferService>();
     }
 }

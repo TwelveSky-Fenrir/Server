@@ -25,15 +25,15 @@ public class StellarBox8112RewardTableTests
     [Fact]
     public void Spec_HasExactlySevenBands_InAscendingCutoffOrder_SummingToOneThousand()
     {
-        Assert.Equal(7, Spec.Weighted.Length);
+        Assert.Equal(7, Spec.WeightedRewards.Length);
 
         int[] expectedIds = [93500, 93501, 93502, 93503, 93504, 93505, 93506];
         int[] expectedWeights = [350, 200, 150, 120, 90, 60, 30];
 
         for (var i = 0; i < 7; i++)
         {
-            Assert.Equal(expectedIds[i], Spec.Weighted[i].ItemId);
-            Assert.Equal(expectedWeights[i], Spec.Weighted[i].Weight);
+            Assert.Equal(expectedIds[i], Spec.WeightedRewards[i].ItemId);
+            Assert.Equal(expectedWeights[i], Spec.WeightedRewards[i].Weight);
         }
 
         Assert.Equal(1000, expectedWeights.Sum());

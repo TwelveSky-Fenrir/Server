@@ -16,10 +16,10 @@ namespace Fenrir.Application.Game.Tests.Handlers.Gm;
 // The success acknowledgment is sent to the calling GM BEFORE any relocation work runs -- the caller has no way
 // to distinguish "found and moved" from "matched nobody" from the response alone. Matching is exact,
 // case-sensitive, full-string equality (deliberately NOT the case-insensitive lookup this dispatch table's
-// sibling by-name commands use). The two fixed relocation coordinates are documented, inert (0,0,0)
-// placeholders pending real Server/ values -- see GmCallPvpService's own remarks; these tests assert the
-// mechanism wires a matched target to whichever placeholder the requested duel slot resolves to, not that the
-// placeholder itself is a real, tested location.
+// sibling by-name commands use). The two fixed relocation coordinates are the REAL recovered legacy values --
+// (-232, 36, 2) for duel slot 1 and (232, 36, 2) for duel slot 2, transcribed from
+// Server/ts25zone/S04_MyWork04.cpp:1785-1790 and cross-confirmed by the sibling case 600 (DUEL READY)
+// re-declaration at :1839-1844 -- see GmCallPvpService's own remarks.
 public class GmCallPvpServiceTests
 {
     private const int CallerId = 10;
@@ -27,7 +27,10 @@ public class GmCallPvpServiceTests
     private const int TargetAccountId = 200;
     private const int Sort = 599;
 
-    private static (float X, float Y, float Z) PlaceholderCoordinate => (0f, 0f, 0f);
+    // Server/ts25zone/S04_MyWork04.cpp:1785-1790 / :1839-1844 -- slot 2 mirrors slot 1 by negating only the
+    // first component.
+    private static (float X, float Y, float Z) Slot1Coordinate => (-232f, 36f, 2f);
+    private static (float X, float Y, float Z) Slot2Coordinate => (232f, 36f, 2f);
 
     /// <summary>
     ///     Asserts the pipe's very next buffered frame (not necessarily the ONLY one) matches
@@ -151,7 +154,7 @@ public class GmCallPvpServiceTests
         await AssertHeadFrameAsync(pipe,
             new GenericActionResponse { Result = 0, Sort = Sort, Data = data, RuneValue = 0 });
 
-        var (x, y, z) = PlaceholderCoordinate;
+        var (x, y, z) = Slot1Coordinate;
         Assert.Equal(x, targetState.PosX);
         Assert.Equal(y, targetState.PosY);
         Assert.Equal(z, targetState.PosZ);
@@ -181,7 +184,7 @@ public class GmCallPvpServiceTests
             service.HandleAsync(new GmCallPvpPayload { DuelSlot = 2, TargetName = "Twin" },
                 GmBasicTestSupport.RequestData(), session, CancellationToken.None), zone);
 
-        var (x, y, z) = PlaceholderCoordinate;
+        var (x, y, z) = Slot2Coordinate;
         Assert.Equal(x, firstState.PosX);
         Assert.Equal(y, firstState.PosY);
         Assert.Equal(z, firstState.PosZ);
@@ -227,7 +230,7 @@ public class GmCallPvpServiceTests
             service.HandleAsync(new GmCallPvpPayload { DuelSlot = 1, TargetName = "TheGm" },
                 GmBasicTestSupport.RequestData(), session, CancellationToken.None), zone);
 
-        var (x, y, z) = PlaceholderCoordinate;
+        var (x, y, z) = Slot1Coordinate;
         Assert.Equal(x, callerState.PosX);
         Assert.Equal(y, callerState.PosY);
         Assert.Equal(z, callerState.PosZ);
@@ -250,10 +253,34 @@ public class GmCallPvpServiceTests
             service.HandleAsync(new GmCallPvpPayload { DuelSlot = 1, TargetName = "Elsewhere" },
                 GmBasicTestSupport.RequestData(), session, CancellationToken.None), targetZone);
 
-        var (x, y, z) = PlaceholderCoordinate;
+        var (x, y, z) = Slot1Coordinate;
         Assert.Equal(x, targetState.PosX);
         Assert.Equal(y, targetState.PosY);
         Assert.Equal(z, targetState.PosZ);
         Assert.Single(eventLog.LoggedEvents);
+    }
+
+    [Theory]
+    [InlineData(1, -232f, 36f, 2f)]
+    [InlineData(2, 232f, 36f, 2f)]
+    public async Task HandleAsync_DuelSlotSelectsTheRecoveredFixedCoordinateTriple(int duelSlot, float expectedX,
+        float expectedY, float expectedZ)
+    {
+        // Server/ts25zone/S04_MyWork04.cpp:1785-1790 (case 599, "CALL PVP") and :1839-1844 (case 600, "DUEL
+        // READY", identical sibling re-declaration) -- newly recovered by the "gm-call-pvp-magnitudes" legacy
+        // re-verification pass. Slot 2 mirrors slot 1 by negating only the first component.
+        var (registry, zone) = GmBasicTestSupport.CreateWorld();
+        var (session, _, _) = GmBasicTestSupport.Enter(zone, CallerId, "TheGm", 1);
+        var (_, _, targetState) = GmBasicTestSupport.Enter(zone, TargetId, "Wanderer");
+        var eventLog = new FakeEventLogRepository();
+        var service = new GmCallPvpService(registry, eventLog, NullLogger<GmCallPvpService>.Instance);
+
+        await GmBasicTestSupport.RunToCompletionAsync(
+            service.HandleAsync(new GmCallPvpPayload { DuelSlot = duelSlot, TargetName = "Wanderer" },
+                GmBasicTestSupport.RequestData(), session, CancellationToken.None), zone);
+
+        Assert.Equal(expectedX, targetState.PosX);
+        Assert.Equal(expectedY, targetState.PosY);
+        Assert.Equal(expectedZ, targetState.PosZ);
     }
 }

@@ -125,6 +125,79 @@ public class ZoneHandoffTests
     }
 
     [Fact]
+    public void Leave_WithHandoffTarget_CarriesTheLivePetBagDateThrough_NotResetToZero()
+    {
+        // C8 pet-bag-entitlement confirmation-pass follow-up: PlayerRuntimeState.PetBagDate must survive a
+        // same-shard zone transfer, not silently reset to 0 (which GenericActionHandler would then read as
+        // an expired pet-bag-upper-half entitlement) -- see that field's own remarks and ZoneTransfer.
+        // CreateEnterData.
+        var dirtyTracker = new DirtyTracker<int>();
+        var source = ZoneTestKit.CreateZone(1, dirtyTracker: dirtyTracker);
+        var target = ZoneTestKit.CreateZone(2, dirtyTracker: dirtyTracker);
+        var (session, _) = ZoneTestKit.CreateSession(1);
+
+        source.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
+        source.Tick(TimeSpan.FromMilliseconds(50));
+        Assert.True(source.TryGetPlayer(10, out var before));
+        before!.PetBagDate = 20991231;
+
+        source.Post(ZoneCommand.Leave(10, target));
+        source.Tick(TimeSpan.FromMilliseconds(50));
+        target.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(target.TryGetPlayer(10, out var after));
+        Assert.Equal(20991231, after!.PetBagDate);
+    }
+
+    [Fact]
+    public void Leave_WithHandoffTarget_CarriesTheLiveDropItemTimeThrough_NotResetToZero()
+    {
+        // Item-usage-consumables follow-up: the Lucky Drop/"Acquisition" Scroll minutes counter must survive a
+        // same-shard zone transfer, not silently reset to 0 -- see PlayerRuntimeState.DropItemTime's own
+        // remarks and ZoneTransfer.CreateEnterData.
+        var dirtyTracker = new DirtyTracker<int>();
+        var source = ZoneTestKit.CreateZone(1, dirtyTracker: dirtyTracker);
+        var target = ZoneTestKit.CreateZone(2, dirtyTracker: dirtyTracker);
+        var (session, _) = ZoneTestKit.CreateSession(1);
+
+        source.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
+        source.Tick(TimeSpan.FromMilliseconds(50));
+        Assert.True(source.TryGetPlayer(10, out var before));
+        before!.DropItemTime = 42;
+
+        source.Post(ZoneCommand.Leave(10, target));
+        source.Tick(TimeSpan.FromMilliseconds(50));
+        target.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(target.TryGetPlayer(10, out var after));
+        Assert.Equal(42, after!.DropItemTime);
+    }
+
+    [Fact]
+    public void Leave_WithHandoffTarget_CarriesTheLiveWarPointThrough_NotResetToZero()
+    {
+        // Migrations/041_characters_warpoint_currency.sql follow-up: the War-Point currency balance must
+        // survive a same-shard zone transfer, not silently reset to 0 -- see PlayerRuntimeState.WarPoint's own
+        // remarks and ZoneTransfer.CreateEnterData.
+        var dirtyTracker = new DirtyTracker<int>();
+        var source = ZoneTestKit.CreateZone(1, dirtyTracker: dirtyTracker);
+        var target = ZoneTestKit.CreateZone(2, dirtyTracker: dirtyTracker);
+        var (session, _) = ZoneTestKit.CreateSession(1);
+
+        source.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
+        source.Tick(TimeSpan.FromMilliseconds(50));
+        Assert.True(source.TryGetPlayer(10, out var before));
+        before!.WarPoint = 1234;
+
+        source.Post(ZoneCommand.Leave(10, target));
+        source.Tick(TimeSpan.FromMilliseconds(50));
+        target.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(target.TryGetPlayer(10, out var after));
+        Assert.Equal(1234, after!.WarPoint);
+    }
+
+    [Fact]
     public void Leave_WithHandoffTarget_CarriesTheLiveQuestProgressThrough_NotResetToDefault()
     {
         // A character mid-quest must not lose its step/kill-counter tracking on a same-shard zone transfer --
@@ -250,6 +323,35 @@ public class ZoneHandoffTests
         Assert.True(target.TryGetPlayer(10, out var after));
         Assert.Equal(250, after!.PetGrowth);
         Assert.Equal((byte)80, after.PetActivity);
+    }
+
+    [Fact]
+    public void Leave_WithHandoffTarget_CarriesTheLiveRuneSocketsThrough_NotResetToEmpty()
+    {
+        // A character's socketed runes must survive a same-shard zone transfer, not silently reset to empty --
+        // see PlayerEnterData.RuneSystem's own remarks and ZoneTransfer.CreateEnterData.
+        var dirtyTracker = new DirtyTracker<int>();
+        var source = ZoneTestKit.CreateZone(1, dirtyTracker: dirtyTracker);
+        var target = ZoneTestKit.CreateZone(2, dirtyTracker: dirtyTracker);
+        var (session, _) = ZoneTestKit.CreateSession(1);
+
+        source.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
+        source.Tick(TimeSpan.FromMilliseconds(50));
+        Assert.True(source.TryGetPlayer(10, out var before));
+        before!.RuneSystem = before.RuneSystem.SetItem(0, 93514);
+        before.RuneSystemStat = before.RuneSystemStat.SetItem(0, 12345);
+
+        source.Post(ZoneCommand.Leave(10, target));
+        source.Tick(TimeSpan.FromMilliseconds(50));
+        target.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(target.TryGetPlayer(10, out var after));
+        Assert.Equal(93514, after!.RuneSystem[0]);
+        Assert.Equal(12345, after.RuneSystemStat[0]);
+        // The other three sockets stay empty -- proves the whole array traveled, not just a single overwritten slot.
+        Assert.Equal(0, after.RuneSystem[1]);
+        Assert.Equal(0, after.RuneSystem[2]);
+        Assert.Equal(0, after.RuneSystem[3]);
     }
 
     [Fact]

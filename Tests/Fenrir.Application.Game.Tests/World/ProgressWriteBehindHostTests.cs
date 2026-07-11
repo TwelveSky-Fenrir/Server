@@ -75,6 +75,29 @@ public sealed class ProgressWriteBehindHostTests
         Assert.Equal(7, row.StatPoints);
     }
 
+    // Item-usage-consumables follow-up: the Lucky Drop/"Acquisition" Scroll minutes counter must be flushed
+    // back to game.Characters.DropItemTime alongside every other Vitals/Progression field, or a live in-memory
+    // increment (Zone.EconomyMirrors' ApplyTribeProgressCommand) would silently revert to its last-persisted
+    // value on the next flush cycle -- see PlayerRuntimeState.DropItemTime's own remarks.
+    [Fact]
+    public async Task FlushAsync_DirtyDropItemTimeCounter_PersistsRowWithTheCurrentValue()
+    {
+        const int characterId = 15;
+        var (registry, dirtyTracker) = CreateRegistryWithOnePlayer(1, characterId, out var state);
+
+        state.DropItemTime = 42;
+        state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+
+        var dirty = dirtyTracker.DrainAll();
+        var characters = new FakeCharacterRepository();
+        var progress = new ProgressWriteBehindHost(registry, characters);
+
+        await progress.FlushAsync(dirty, CancellationToken.None);
+
+        var row = Assert.Single(characters.PersistedProgressRows);
+        Assert.Equal(42, row.DropItemTime);
+    }
+
     [Fact]
     public async Task
         FlushAsync_TwoConsecutiveProgressOnlyDrainCycles_WithZeroMovementBetween_BothPersist_AndFlushSequenceStrictlyIncreases()

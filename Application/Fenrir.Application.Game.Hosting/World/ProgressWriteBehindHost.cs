@@ -101,7 +101,8 @@ public sealed class ProgressWriteBehindHost(ZoneRegistry zones, ICharacterReposi
                 state.Experience, state.Life, state.MaxLife, state.Mana, state.MaxMana, state.StatVit,
                 state.StatStr, state.StatInt, state.StatDex, state.StatPoints, state.SkillPoints,
                 state.ContributionPoints, state.Exp2, state.RebirthCount, state.EatLifePotion, state.EatManaPotion,
-                state.EatStrPotion, state.EatDexPotion, state.EatElePotion));
+                state.EatStrPotion, state.EatDexPotion, state.EatElePotion, state.DropItemTime,
+                state.M15PetLuckyBoxPity));
 
             claimed.Add(characterId);
         }

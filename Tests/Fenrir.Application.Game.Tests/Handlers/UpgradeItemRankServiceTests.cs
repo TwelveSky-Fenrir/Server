@@ -6,12 +6,14 @@ using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Services.ItemModification;
+using Fenrir.Application.Game.Stats;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.Abstractions.Game;
 using Fenrir.Data.Abstractions.World;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
@@ -189,5 +191,72 @@ public class UpgradeItemRankServiceTests
 
         Assert.Equal(UpgradeItemRankOutcome.Rejected, result.Outcome);
         Assert.Empty(eventLog.Enqueued);
+    }
+
+    [Fact]
+    public async Task WarlordRerollEligible_EliteSwap_LogsWarlordSwapNotice()
+    {
+        // Contract side effect B.4 (see UpgradeItemRankService's own remarks at the warlord-swap call site): an
+        // accepted top-tier (encoded level 157) Elite Warlord swap must fire CenterRelayNoticeLog.LogWarlordSwap.
+        // UpgradeItemRankService rolls via SystemRandomSource.Instance with no DI seam (same posture as
+        // ValidPreconditions_AlwaysDeductsMoneyAndLogsAttempt_RegardlessOfRandomOutcome above) -- an extreme
+        // Luck stat forces RankChangeResolver's own success roll unconditionally (probability += luck/300 >=
+        // 1000), isolating the only remaining random gate to RankChangeResolver's internal 75% "warlordEligible"
+        // die. This retries across independent attempts (guarded) rather than asserting a single deterministic
+        // call; each attempt uses a fresh WarlordPityLockState so the pity lock never carries across attempts.
+        const byte eliteItemType = RankChangeResolver.EliteItemType;
+        const byte amuletSort = 7; // WarlordRerollBonusTable's private IAmulet -- mapped in both bonus tables.
+
+        var itemsById = new Dictionary<int, ItemDefinition>
+        {
+            [TargetItemId] = new(
+                WorldDataTestRows.Item(TargetItemId) with
+                {
+                    Type = eliteItemType, Sort = amuletSort, Level = 145, MartialLevel = 11, CheckHighItem = 2,
+                    EquipInfo1 = 1
+                }, []),
+            [CandidateItemId] = new(
+                WorldDataTestRows.Item(CandidateItemId) with
+                {
+                    Type = eliteItemType, Sort = amuletSort, Level = 145, MartialLevel = 12, CheckHighItem = 2,
+                    EquipInfo1 = 1
+                }, []),
+            [MaterialItemId] = new(WorldDataTestRows.Item(MaterialItemId), [])
+        }.ToFrozenDictionary();
+
+        for (var attempt = 0; attempt < 40; attempt++)
+        {
+            var (_, _, zone, state, repo, eventLog) = SetUp();
+            SeedInventory(zone, new ItemStack(TargetItemId, 1, 6, 2, 0, 0, 0, 0, 0, 0, 777),
+                new ItemStack(MaterialItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+            // Forces the success roll unconditionally regardless of the raw (2/1000 or 4/1000) base probability.
+            state.Stats = new EffectiveStats(0, 0, 0, 0, 0, 0, 0, 0, 300_000, 0, 0);
+
+            var logger = new CapturingLogger<UpgradeItemRankService>();
+            var service = new UpgradeItemRankService(repo, ZoneTestKit.EmptyWorldData(itemsById), eventLog,
+                new WarlordPityLockState(), logger);
+
+            var result = await RunToCompletionAsync(
+                service.UpgradeAsync(
+                    new UpgradeItemRankRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1, Luck = 0 }, zone,
+                    state, 10, CancellationToken.None), zone);
+
+            Assert.Equal(UpgradeItemRankOutcome.Applied, result.Outcome);
+            Assert.True(result.Succeeded);
+
+            var noticeEntries = logger.Entries.Where(e => e.Message.Contains("Warlord-swap notice")).ToList();
+            if (noticeEntries.Count == 0)
+                continue; // The 25%-chance warlordEligible die missed this attempt -- retry.
+
+            Assert.Equal(LogLevel.Information, noticeEntries[0].Level);
+            Assert.Contains("tribe 1", noticeEntries[0].Message);
+            Assert.Contains("Hero", noticeEntries[0].Message);
+            // Ties the logged id back to the actual applied replacement item rather than hardcoding
+            // whichever of the Top/Base draw this attempt happened to land on.
+            Assert.Contains(result.Value[0].ToString(), noticeEntries[0].Message);
+            return;
+        }
+
+        Assert.Fail("Warlord-swap notice never logged across 40 attempts (25% miss chance per attempt).");
     }
 }

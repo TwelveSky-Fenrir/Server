@@ -2,7 +2,8 @@
 -- login) -- it exists for crash/restart recovery only. AutoHuntConfig NULL means "never configured".
 --
 -- RS0 (the first result set) is deliberately append-only at the tail: PreviousTribe/Mount*/AutoTime2/
--- Zone241Time are appended after Exp2, never inserted mid-list, so CharacterWorldEntryDto (the narrow,
+-- Zone241Time/PetBagDate/WarPoint/M15PetLuckyBoxPity are appended after Exp2, never inserted mid-list, so
+-- CharacterWorldEntryDto (the narrow,
 -- stable prefix used by CreateAvatarService/ZoneTransferService, ordinally mapped onto this same result set)
 -- keeps reading the exact same first 19 columns it always has and needs no change. Only
 -- CharacterWorldSnapshotDto (RS0's full projection, used by GetWorldEntryBundleAsync/EnterWorldService)
@@ -85,7 +86,10 @@ BEGIN
            c.MountSlotIndex,
            c.MountTime,
            c.AutoTime2,
-           c.Zone241Time
+           c.Zone241Time,
+           c.PetBagDate,
+           c.WarPoint,
+           c.M15PetLuckyBoxPity
     FROM game.Characters AS c
              LEFT JOIN game.CharacterQuests AS q
                        ON q.CharacterId = c.CharacterId

@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Simulation;
+using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World.Loot;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Data.Abstractions.Game;
@@ -76,6 +77,19 @@ namespace Fenrir.Application.Game.Domain.Inventory.UseItems.Boxes;
 ///         <c>MountVariantBoxPity</c>) through <see cref="ResolveRewardIdOverride" />. No placeholder spec is
 ///         needed for these three (<see cref="ResolveSpec" /> already resolves them via
 ///         <see cref="LootBoxCatalog.TryGetSpec" /> since they ARE registered there).
+///     </para>
+///     <para>
+///         <b>Confirmation-pass follow-up -- box 8111 persistence gap closed:</b>
+///         <see cref="ResolveRewardIdOverride" />'s box-8111 branch still writes the freshly-rolled counter
+///         directly onto <see cref="World.PlayerRuntimeState.M15PetLuckyBoxPity" /> synchronously (so a bulk
+///         open's later iterations see the incremented/reset value immediately -- unchanged), but
+///         <see cref="OpenSingleAsync" />/<see cref="OpenBulkAsync" /> now ALSO post a
+///         <see cref="TribeProgressZoneCommand" /> mirror of that same value (see
+///         <c>MirrorM15PetLuckyBoxPityAsync</c>) once per open request so <c>Zone.ApplyTribeProgressCommand</c>
+///         marks Progression dirty and the write-behind flush actually persists it -- see
+///         <see cref="World.PlayerRuntimeState.M15PetLuckyBoxPity" />'s own remarks for the full citation
+///         trail. Boxes 2249/8114/8115 are deliberately NOT touched by this pass and remain session-scoped
+///         only.
 ///     </para>
 ///     <para>
 ///         <b>Workstream C10-remaining-box-pools, box 8108 security hardening:</b> the legacy single-open code
@@ -215,6 +229,13 @@ public sealed class LootBoxUseItemHandler(
             ResolveRewardSort, Random.Shared, today, ResolveRewardIdOverride(context),
             state.InventoryDate >= today);
 
+        // Confirmation-pass follow-up: mirrors box 8111's pity counter for persistence -- see
+        // MirrorM15PetLuckyBoxPityAsync's own remarks. A no-op for every other box id. Fires regardless of
+        // plan.Outcome below: the override delegate above already wrote the counter in-memory before this
+        // point, and a subsequent placement failure never rolls it back (see
+        // M15PetLuckyBox8111RewardTable.Roll's own remarks).
+        await MirrorM15PetLuckyBoxPityAsync(context, cancellationToken);
+
         switch (plan.Outcome)
         {
             case LootBoxOpenResolver.Outcome.RewardNotFound:
@@ -262,6 +283,10 @@ public sealed class LootBoxUseItemHandler(
         var plan = LootBoxOpenResolver.OpenBulk(spec, context.Page, context.Index, context.Item, page0, page1,
             ResolveRewardSort, Random.Shared, today, context.Value, ResolveRewardIdOverride(context),
             state.InventoryDate >= today);
+
+        // Confirmation-pass follow-up: one mirror for the whole bulk request (not one per box opened) -- see
+        // MirrorM15PetLuckyBoxPityAsync's own remarks. A no-op for every other box id.
+        await MirrorM15PetLuckyBoxPityAsync(context, cancellationToken);
 
         if (plan.OpenedCount == 0)
         {
@@ -515,6 +540,41 @@ public sealed class LootBoxUseItemHandler(
         }
 
         return null;
+    }
+
+    /// <summary>
+    ///     Confirmation-pass follow-up: mirrors box 8111's freshly-updated
+    ///     <see cref="World.PlayerRuntimeState.M15PetLuckyBoxPity" /> onto this character's write-behind
+    ///     progress flush. <see cref="ResolveRewardIdOverride" />'s own closure already wrote the rolled
+    ///     counter directly onto <see cref="World.PlayerRuntimeState.M15PetLuckyBoxPity" /> -- synchronously,
+    ///     so a bulk-open's later iterations see the incremented/reset value immediately (unchanged by this
+    ///     method). That direct write alone never reaches game.Characters: <c>DirtyTracker</c> is Zone-internal
+    ///     state, so the sanctioned way to flag <c>DirtyFlags.Progression</c> dirty from a handler is the same
+    ///     <see cref="TribeProgressZoneCommand" /> round trip every other counter mirror in this codebase uses
+    ///     (see <c>EliteDungeonTicketUseItemHandler</c>/<c>DungeonKeyUseItemHandler</c>). Posted once per open
+    ///     request (single or the whole bulk run), mirroring the FINAL post-roll value -- <c>Zone
+    ///     .ApplyTribeProgressCommand</c>'s own apply arm is a plain field overwrite either way, so mirroring
+    ///     the already-current value here is a safe no-op mutation-wise; only its <c>changed=true</c>/
+    ///     <c>MarkProgressDirty</c> side effect is the actual payload. Fires unconditionally -- even on a
+    ///     RewardNotFound/InventoryFull outcome for THIS box -- matching the contract's "pity increment is
+    ///     never rolled back by a subsequent placement failure" rule (see
+    ///     <see cref="M15PetLuckyBox8111RewardTable" />'s own remarks). A no-op (no command posted)
+    ///     for every other box id. Scoped to box 8111 only for this workstream; boxes 2249/8114/8115's own
+    ///     pity counters remain the pre-existing session-scoped-only gap -- see
+    ///     <see cref="World.PlayerRuntimeState.M15PetLuckyBoxPity" />'s own remarks.
+    /// </summary>
+    private async ValueTask MirrorM15PetLuckyBoxPityAsync(UseItemContext context, CancellationToken cancellationToken)
+    {
+        if (context.Item.ItemId != M15PetLuckyBox8111RewardTable.BoxId)
+            return;
+
+        if (!await context.Zone.PostTribeProgressCommandAndWaitAsync(
+                new TribeProgressZoneCommand(context.CharacterId,
+                    M15PetLuckyBoxPity: context.State.M15PetLuckyBoxPity),
+                cancellationToken))
+            logger.LogError(
+                "Zone {MapId} tribe-progress inbox full: dropped M15 Pet Lucky Box (8111) pity-counter persistence mirror for character {CharacterId}",
+                context.Zone.MapId, context.CharacterId);
     }
 
     private ValueTask LogBoxOpenBeforeAsync(UseItemContext context, CancellationToken cancellationToken)

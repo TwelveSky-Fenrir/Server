@@ -52,11 +52,16 @@ public static class LootBoxOpenResolver
     ///     <paramref name="secondPageAccessible" /> is C1-vault-expiry-enforcement's placement-gate input --
     ///     see <see cref="BoxRewardPlacementResolver.Resolve" />'s own remarks; defaults to
     ///     <see langword="true" /> so every pre-existing caller/test keeps searching both pages unconditionally.
+    ///     <paramref name="resolveRewardSerial" /> lets a caller stamp a fixed, non-zero serial onto the granted
+    ///     reward instead of the default 0 (e.g. the Lucky Ticket family's per-ticket constant --
+    ///     Server/ts25zone/S04_MyWork03.cpp:3478) -- optional/defaulted so every pre-existing box keeps its
+    ///     prior Serial-0 behavior; a stackable reward still has it stripped back to 0 regardless (see
+    ///     <see cref="BoxRewardPlacementResolver.ResolvedReward" />'s own remarks).
     /// </summary>
     public static SingleOpenPlan OpenSingle(BoxRewardSpec spec, byte boxContainer, byte boxSlot, ItemStack boxStack,
         ImmutableDictionary<byte, ItemStack> page0, ImmutableDictionary<byte, ItemStack> page1,
         Func<int, byte?> resolveRewardSort, Random random, int today, Func<int>? rewardIdOverride = null,
-        bool secondPageAccessible = true)
+        bool secondPageAccessible = true, Func<int, int>? resolveRewardSerial = null)
     {
         // rewardIdOverride lets a caller substitute a pity-gated roll (e.g. CloakBoxRewardTable.Roll) for the
         // box's own pure spec.RollRewardId -- the spec itself is a process-wide singleton that cannot hold any
@@ -74,8 +79,9 @@ public static class LootBoxOpenResolver
         if (!quantity.IsStackable && spec.RentalDays > 0 && GameDate.TryAddDays(today, spec.RentalDays, out var e))
             expireDate = e;
 
+        var serial = resolveRewardSerial?.Invoke(rewardId) ?? 0;
         var reward = new BoxRewardPlacementResolver.ResolvedReward(rewardId, quantity.Quantity,
-            quantity.IsStackable, 0, 0, 0, 0, expireDate);
+            quantity.IsStackable, 0, 0, 0, 0, expireDate, serial);
 
         var placement = BoxRewardPlacementResolver.Resolve(reward, boxContainer, boxSlot, page0, page1,
             secondPageAccessible);

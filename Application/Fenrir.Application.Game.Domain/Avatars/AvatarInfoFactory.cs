@@ -128,6 +128,17 @@ public static class AvatarInfoFactory
             // value (Migrations/041_character_rebirth_zone241_time.sql) -- same "reflect the currently-
             // persisted value, don't recompute it" precedent as Level2/Exp2/RebirthNum above.
             Zone241Time = character.Zone241Time,
+            // aPetBagDate (C8 pet-bag-entitlement confirmation-pass follow-up): previously left at Zeroed's 0
+            // default even though CharacterWorldSnapshotDto now carries the persisted value
+            // (Migrations/047_characters_petbagdate_column.sql) -- same "reflect the currently-persisted
+            // value, don't recompute it" precedent as Zone241Time immediately above. See
+            // PlayerRuntimeState.PetBagDate's own remarks for the full wiring/citation trail.
+            PetBagDate = character.PetBagDate,
+            // aWarPoint (Migrations/041_characters_warpoint_currency.sql's own flagged follow-up): previously
+            // left at Zeroed's 0 default even though CharacterWorldSnapshotDto now carries the persisted
+            // value -- same "reflect the currently-persisted value, don't recompute it" precedent as
+            // Zone241Time/PetBagDate immediately above. See PlayerRuntimeState.WarPoint's own remarks.
+            WarPoint = character.WarPoint,
             // Stat/elixir-potion lifetime counters (item-usage-consumables finding, Critical): previously
             // left at Zeroed's 0 default on every world entry even though CharacterWorldSnapshotDto already
             // carries the persisted values -- same "reflect the currently-persisted value, don't recompute
@@ -247,6 +258,14 @@ public static class AvatarInfoFactory
             // PlayerRuntimeState field (already carried through a zone-transfer by ZoneTransfer.CreateEnterData)
             // rather than a fresh DB read.
             Zone241Time = state.Zone241Time,
+            // aPetBagDate -- same wiring/precedent as CreateForCharacter above, sourced from the in-memory
+            // PlayerRuntimeState field (already carried through a zone-transfer by ZoneTransfer.CreateEnterData)
+            // rather than a fresh DB read.
+            PetBagDate = state.PetBagDate,
+            // aWarPoint -- same wiring/precedent as CreateForCharacter above, sourced from the in-memory
+            // PlayerRuntimeState field (already carried through a zone-transfer by ZoneTransfer.CreateEnterData)
+            // rather than a fresh DB read.
+            WarPoint = state.WarPoint,
             // Stat/elixir-potion lifetime counters -- same wiring as CreateForCharacter above, sourced from
             // the in-memory PlayerRuntimeState fields (already carried through a zone-transfer by
             // ZoneTransfer.CreateEnterData) rather than a fresh DB read.

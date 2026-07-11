@@ -56,6 +56,11 @@ public class CharacterWorldPersistenceTests
         Assert.Equal(0, bundle.Character.RebirthCount);
         Assert.Equal(0, bundle.Character.EatLifePotion);
         Assert.Equal(0, bundle.Character.InventoryDate);
+        // DF_Characters_PetBagDate: unlike InventoryDate/StoreDate (which the starter kit grants a real
+        // welcome-bonus expiry for), a fresh character's aPetBagDate-equivalent stays at its 0 default --
+        // matching legacy's own confirmed creation-path behavior. See PlayerRuntimeState.PetBagDate's own
+        // remarks and Migrations/047_characters_petbagdate_column.sql.
+        Assert.Equal(0, bundle.Character.PetBagDate);
 
         // No game.CharacterQuests row = all-zeros aQuestInfo (LEFT JOIN + ISNULL).
         Assert.Equal(0, bundle.Character.QuestStepPermanent);
@@ -234,7 +239,7 @@ public class CharacterWorldPersistenceTests
         await _characters.PersistProgressAsync(
             [
                 new CharacterProgressTvp(characterId, 5, 20, 3, 123456789L, 90, 400, 30, 200, 11, 22, 33, 44, 7, 8, 9,
-                    555_555, 2, 0, 0, 0, 0, 0)
+                    555_555, 2, 0, 0, 0, 0, 0, 0, 0)
             ],
             CancellationToken.None);
 
@@ -258,7 +263,7 @@ public class CharacterWorldPersistenceTests
         await _characters.PersistProgressAsync(
             [
                 new CharacterProgressTvp(characterId, 5, 99, 9, 999L, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0,
-                    0)
+                    0, 0, 0)
             ],
             CancellationToken.None);
 

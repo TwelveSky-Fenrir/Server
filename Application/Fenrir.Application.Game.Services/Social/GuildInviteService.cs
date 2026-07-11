@@ -23,10 +23,12 @@ namespace Fenrir.Application.Game.Services.Social;
 ///     stun/death action-state gate (<see cref="PlayerRuntimeState.IsStunned" />/<see cref="PlayerRuntimeState.IsDead" />,
 ///     Server/ts25zone/S07_MyGame04.cpp:438-459,1617-1658) -- both applied to the asker before the target is
 ///     even resolved, and again to the target once found, matching the legacy check order. The target's own
-///     "currently mid zone-transfer" gate (legacy <c>IsMovingZone()</c>) is NOT modeled: no Fenrir zone-transfer
-///     state has an equivalent "pending" flag on <see cref="PlayerRuntimeState" /> today (same gap
-///     <c>RankBuffHandler</c> documents for its own unrelated check) -- left as an open, explicitly-flagged gap
-///     rather than guessed at.
+///     "currently mid zone-transfer" gate (legacy <c>IsMovingZone()</c>) is now modeled too, via
+///     <see cref="PlayerRuntimeState.IsMovingZone" /> -- re-verified 2026-07-11 (the flag now exists, see that
+///     property's own remarks) and wired into the target-busy check alongside stun/death, matching the pattern
+///     already used at <c>Zone.ValleyWar.cs</c>/<c>Zone.Zone038Occupation.cs</c>. Per legacy's own
+///     <c>IsMovingZone()</c> semantics this gate is target-only, mirroring <c>UnstunResolver</c>'s cure-attempt
+///     check -- it is deliberately NOT added to the asker-busy check above.
 ///     <para>
 ///         WS1.4 ASK-PUBLISH-ONLY: <see cref="AskAsync" />'s cross-shard fallback publishes an Ask row via
 ///         <see cref="ISocialCrossShardRelayQueue" /> and registers the asker-side busy gate
@@ -92,7 +94,7 @@ public sealed class GuildInviteService(
         }
 
         if (CommunityWorkGate.IsBusy(target, duels, trades, friends, parties, mentors, invites) ||
-            target.IsStunned || target.IsDead)
+            target.IsStunned || target.IsDead || target.IsMovingZone)
         {
             logger.LogDebug(
                 "Character {CharacterId} guild invite-ask rejected: target {TargetCharacterId} busy",

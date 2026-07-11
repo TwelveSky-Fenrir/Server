@@ -1,15 +1,13 @@
--- Migrations/046_accountvault_bigmoney_transfer_proc.sql
 -- Atomic transfer between a character's on-hand BigMoney (game.Characters.BigMoney) and its account's shared
--- vault BigMoney pool (game.AccountVault.BigMoney, added by Migrations/045) -- CZ_PROCESS_DATA_SEND tSort 242
--- (deposit, DeltaCharacterBigMoney negative/DeltaVaultBigMoney positive) / 245 (withdraw, the reverse).
--- Auto-creates the AccountVault row on first use, same posture as usp_AccountVault_TransferMoneyWithCharacter.
--- Must be a migration (not StoredProcedures/), applied AFTER Migrations/045 adds the column it references.
+-- vault BigMoney pool (game.AccountVault.BigMoney) -- CZ_PROCESS_DATA_SEND tSort 242 (deposit,
+-- DeltaCharacterBigMoney negative/DeltaVaultBigMoney positive) / 245 (withdraw, the reverse). Auto-creates the
+-- AccountVault row on first use, same posture as usp_AccountVault_TransferMoneyWithCharacter.
 -- Réf. C++ : Server/ts25zone/S04_MyWork05.cpp:3736-3769 (ProcessForInventoryMoneyTo1BSaveMoney) ; :3771-3804
 -- (ProcessFor1BSaveMoneyToInventoryMoney) ; Server/Header/Protocol/DEFINE.h:367 (MAX_NUMBER_SIZE2 = 999).
-CREATE OR ALTER PROCEDURE game.usp_AccountVault_TransferBigMoneyWithCharacter @CharacterId            INT,
-                                                                              @DeltaCharacterBigMoney INT,
-                                                                              @AccountId              INT,
-                                                                              @DeltaVaultBigMoney     INT
+CREATE PROCEDURE game.usp_AccountVault_TransferBigMoneyWithCharacter @CharacterId            INT,
+                                                                     @DeltaCharacterBigMoney INT,
+                                                                     @AccountId              INT,
+                                                                     @DeltaVaultBigMoney     INT
 AS
 BEGIN
     SET NOCOUNT ON;

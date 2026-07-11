@@ -22,8 +22,8 @@ public class HighLevelExperienceResolverTests
     [Fact]
     public void Ceiling_EqualsLevel12Threshold()
     {
-        Assert.Equal(RebirthProgression.HighLevelExpTable[RebirthProgression.MaxHighLevel - 1],
-            HighLevelExperienceResolver.RebirthTierExperienceCeiling);
+        Assert.Equal(HighLevelExperienceResolver.RebirthTierExperienceCeiling,
+            RebirthProgression.HighLevelExpTable[RebirthProgression.MaxHighLevel - 1]);
     }
 
     [Fact]

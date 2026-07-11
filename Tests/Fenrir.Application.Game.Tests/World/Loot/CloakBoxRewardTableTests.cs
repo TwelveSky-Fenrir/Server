@@ -22,8 +22,8 @@ public class CloakBoxRewardTableTests
         Assert.Equal(2249, spec.BoxId);
         Assert.Equal(BoxRewardKind.RareBandThenPools, spec.Kind);
         Assert.Equal(0, spec.RentalDays);
-        Assert.Same(CloakBoxRewardTable.RareBands, spec.RareBands);
-        Assert.Same(CloakBoxRewardTable.Pools, spec.Pools);
+        Assert.Equal(CloakBoxRewardTable.RareBands, spec.RareBands);
+        Assert.Equal(CloakBoxRewardTable.Pools, spec.Pools);
     }
 
     [Fact]

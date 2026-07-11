@@ -78,7 +78,15 @@ public static partial class StatCalculator
         hp += SetBonusTables.CapeIuBonus(bySlot[1], 3, 200f);
 
         if (bySlot[8] is { } petAmulet)
+        {
+            // Two separate, unconditional additions -- confirmed to STACK, not alternate (workstream
+            // pet-amulet-bonus-table-mapping, 2026-07-11): the base amulet Life table (ReturnAmuletLifeValue,
+            // GameSystem_07_Pet.cpp:768-770) plus the wholly independent "Custom Phoenix Amulet final HP
+            // correction" (MyFactor.cpp:2202-2214). Net for 76005/76006/76007: 7000/12000/22000 -- mirrors the
+            // already-correct two-pass shape in ComputeDefensePower (same 5000/7500/12500 then 2000/4500/9500).
+            hp += PhoenixFlatBonus(petAmulet.Item.ItemId, 5000, 7500, 12500);
             hp += PhoenixFlatBonus(petAmulet.Item.ItemId, 2000, 4500, 9500);
+        }
 
         // Flat, additive, applied after every multiplicative step (pet-double, coefficients) -- an elixir
         // contribution is never a multiplier and is folded on top of the stat from all other sources.
@@ -190,7 +198,12 @@ public static partial class StatCalculator
             mp += cape.Item.ItemId switch { 1401 => 50, 1404 => 100, _ => 0 };
 
         if (bySlot[8] is { } petAmulet)
+        {
+            // Same two-pass stacking as ComputeMaxLife above (base amulet Mana table, GameSystem_07_Pet.cpp:
+            // 848-850, plus the independent MyFactor.cpp:2335-2347 correction) -- net 7000/12000/22000.
+            mp += PhoenixFlatBonus(petAmulet.Item.ItemId, 5000, 7500, 12500);
             mp += PhoenixFlatBonus(petAmulet.Item.ItemId, 2000, 4500, 9500);
+        }
 
         mp += ManaElixirContributionWithOverride(consumable, zone);
         mp += OrnamentManaContribution(zone, bySlot); // B7 ornament ORN_MP

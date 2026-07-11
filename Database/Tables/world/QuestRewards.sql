@@ -16,5 +16,10 @@ CREATE TABLE world.QuestRewards
     CONSTRAINT CK_QuestRewards_ItemXorAmount CHECK (
         (RewardType = 6 AND ItemId IS NOT NULL AND Amount IS NULL) OR
         (RewardType <> 6 AND ItemId IS NULL AND Amount IS NOT NULL)
-        )
+        ),
+    -- Legacy never lets an out-of-range reward Amount reach the shared-memory quest table at all
+    -- (Quest_CheckValidElement, Server/Header/S15_MyShare.cpp:2044-2054) -- rejects the whole Load_Quest
+    -- call on the first offending record. Reward Amount ranges 3-5,847,771 across all 1,436 seeded reward
+    -- slots (Migrations/Seed/world/051_quest_rewards.sql), comfortably inside this bound.
+    CONSTRAINT CK_QuestRewards_Amount CHECK (Amount IS NULL OR Amount BETWEEN 0 AND 100000000)
 );

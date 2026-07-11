@@ -68,18 +68,18 @@ public class SiegeZoneLiteralEventCatalogTests
 
         Assert.Equal(expected.Length, SiegeZoneLiteralEventCatalog.PureRelayEventCodes.Count);
         foreach (var code in expected)
-            Assert.True(SiegeZoneLiteralEventCatalog.PureRelayEventCodes.Contains(code));
+            Assert.Contains(code, SiegeZoneLiteralEventCatalog.PureRelayEventCodes);
 
         // Never contains the Zone267/Zone241 ranges, nor the known 417 gap.
-        Assert.False(SiegeZoneLiteralEventCatalog.PureRelayEventCodes.Contains(417));
-        Assert.False(SiegeZoneLiteralEventCatalog.PureRelayEventCodes.Contains(402));
-        Assert.False(SiegeZoneLiteralEventCatalog.PureRelayEventCodes.Contains(411));
+        Assert.DoesNotContain(417, SiegeZoneLiteralEventCatalog.PureRelayEventCodes);
+        Assert.DoesNotContain(402, SiegeZoneLiteralEventCatalog.PureRelayEventCodes);
+        Assert.DoesNotContain(411, SiegeZoneLiteralEventCatalog.PureRelayEventCodes);
     }
 
     [Fact]
     public void KnownGapEventCodes_ContainsOnly417()
     {
-        Assert.True(SiegeZoneLiteralEventCatalog.KnownGapEventCodes.Contains(417));
+        Assert.Contains(417, SiegeZoneLiteralEventCatalog.KnownGapEventCodes);
         Assert.Single(SiegeZoneLiteralEventCatalog.KnownGapEventCodes);
     }
 
@@ -87,7 +87,7 @@ public class SiegeZoneLiteralEventCatalogTests
     public void PureRelayEventCodes_And_KnownGapEventCodes_AreDisjoint()
     {
         foreach (var code in SiegeZoneLiteralEventCatalog.PureRelayEventCodes)
-            Assert.False(SiegeZoneLiteralEventCatalog.KnownGapEventCodes.Contains(code));
+            Assert.DoesNotContain(code, SiegeZoneLiteralEventCatalog.KnownGapEventCodes);
     }
 
     [Theory]

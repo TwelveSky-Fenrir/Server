@@ -212,11 +212,35 @@ public enum EventLogCategory : byte
     ///     A big-money ("1B" unit) ledger conversion -- inventory Money/BigMoney &lt;-&gt; Store/Bank BigMoney,
     ///     or Money-to-BigMoney unit conversion (legacy GL_990-GL_997, CZ_PROCESS_DATA_SEND tSort 240-247).
     ///     Eight distinct EventCodes, one per legacy identifier (see
-    ///     <c>EventLogEmitters.BigMoneyConversionEventCode1</c>-<c>8</c>). NOT YET WIRED as of this member's
-    ///     addition -- no GenericActionHandler/GenericActionService dispatch exists for tSort 240-247 yet
-    ///     (C20 audit-log workstream; blocked on that base feature's own dispatch -- BigMoney's DB layer,
-    ///     repo+procs, is otherwise ready per prior-session agent-memory).
+    ///     <c>EventLogEmitters.BigMoneyConversionEventCode1</c>-<c>8</c>).
     /// </summary>
+    /// <remarks>
+    ///     The full tSort/GL/EventCode mapping is now CONFIRMED for all eight siblings (re-read pass,
+    ///     independently cross-checked against both each body's own <c>mGAMELOG.GL_99x_...(...)</c> call in
+    ///     Server/ts25zone/S04_MyWork05.cpp:3512-3804 and its own literal <c>mLogSort = 99N</c> assignment in
+    ///     UpperCom/S06_MyUpperCom05.cpp:1028-1074 -- see <c>EventLogEmitters</c>'s own remarks table for the
+    ///     full mapping and every constant's individual citation). Dispatch/wiring status, updated by this
+    ///     pass:
+    ///     <list type="bullet">
+    ///         <item>
+    ///             tSort 241/244 (Inventory&lt;-&gt;Store) and 242/245 (Inventory&lt;-&gt;Save/vault) ARE
+    ///             dispatched, via <c>IBigMoneyTransferService</c>/<c>BigMoneyTransferService</c>
+    ///             (Application/Fenrir.Application.Game.Services/Inventory/BigMoneyTransferService.cs, called
+    ///             from <c>GenericActionHandler.DispatchAsync</c>'s BigMoney branch), and that service now
+    ///             calls <see cref="IEventLogRepository" />/<c>EventLogEmitters.LogBigMoneyConversionAsync</c>
+    ///             for all four (EventCode5/6/7/8) -- this category now has production writers for this
+    ///             half of the family.
+    ///         </item>
+    ///         <item>
+    ///             tSort 240/243 (trade-offer BigMoney) and 246/247 (Money&lt;-&gt;BigMoney unit conversion,
+    ///             <c>BigMoneyUnitConversionPolicy</c>) still have NO dispatch of any kind anywhere in this
+    ///             codebase (their only callers remain their own unit tests) -- EventCode1-4 remain unused
+    ///             by any production call site. This is an open TODO tracked against whichever future pass
+    ///             wires the trade-offer BigMoney subsystem and the 246/247 unit-conversion dispatch, not an
+    ///             unresolved identifier mapping (the mapping itself is settled).
+    ///         </item>
+    ///     </list>
+    /// </remarks>
     BigMoneyConversion = 25,
 
     /// <summary>

@@ -1,20 +1,33 @@
--- op17 CL_CREATE_AVATAR_SEND2's full creation path: usp_Character_Create's slot/name guards plus the EU33
--- starter kit in the same transaction. Left as a separate proc from usp_Character_Create rather than
--- extending it in place: that proc is still the minimal-dependency character factory every other feature's
--- test suite uses to satisfy game.Characters' FK, and giving every one of those call sites this many new
--- required parameters (plus 4 TVPs) would be unrelated churn.
+-- op17 CL_CREATE_AVATAR_SEND2's full creation path: usp_Character_Create's slot/name guards plus the starter
+-- kit in the same transaction. Left as a separate proc from usp_Character_Create rather than extending it in
+-- place: that proc is still the minimal-dependency character factory every other feature's test suite uses to
+-- satisfy game.Characters' FK, and giving every one of those call sites this many new required parameters
+-- (plus 4 TVPs) would be unrelated churn.
 --
--- EU33/USE_CUSTOME_CREATE creation grant (Server/ts25login/S04_MyWork02.cpp:740-1179, forced on unconditionally
--- in every build configuration -- see Tables/world/StarterKitEquipment.sql's own header for the full
--- USE_CUSTOME_CREATE citation): every stat starts at 1 (not the column default of 0); every new character is
--- granted the same starter pet growth/activity (200%/full activity), starting level/rebirth/experience/
--- stat-skill-point/mount grant, starting death-protection allowance (ProtectForDeath=5), welcome-buff counters
--- (DoubleExpTime1/DoubleExpTime2=300, raw decrementing counters, NOT dates), starting free auto-hunt minute
--- allowance (AutoTime2=1440, 24h), and starting second-inventory-page/second-store-page rental grant
--- (InventoryDate/StoreDate = 7 days from now, same value as AutoBuffTime) -- regardless of tribe/gender. The
--- pet/cape item rows themselves travel in via @Equipment (added by CreateAvatarService.BuildEquipmentRows
--- alongside the tribe's elite armor/gloves/boots/ring/amulet/weapon) -- neither is a world.StarterKitEquipment
--- catalog row, both are C# constants.
+-- CONFIRMED PRODUCT DECISION (character-creation-level1-redesign, NOT a legacy-parity fix): a freshly created
+-- character starts at genuine Level 1 with only a basic weapon + torso/chest armor piece equipped, NOT the
+-- EU33/USE_CUSTOME_CREATE instant-elite grant (Level 145, 6-slot Enchant45/Combine6 gear, starter mount/pet/
+-- cape, one premium day, ProtectForDeath/AutoTime2/DoubleExpTime1-2 instant-boost counters) that the original
+-- EU33-parity version of this procedure used -- see Tables/world/StarterKitEquipment.sql's own header for the
+-- full USE_CUSTOME_CREATE citation this deliberately departs from.
+--   * StatVit/StatStr/StatInt/StatDex = 1 (the Level-1 floor); PetGrowth/PetActivity = 0/0 (no pet is ever
+--     granted by the redesigned equipment set, see CreateAvatarService.BuildEquipmentRows); Level/Level2/
+--     RebirthCount/Experience/Exp2 = 1/0/0/0/0 (genuine Level 1, zero rebirths, no post-cap ladder progress).
+--   * StatPoints/SkillPoints = 50/0: Fenrir product defaults, NOT legacy-cited (no compiled non-
+--     USE_CUSTOME_CREATE branch exists anywhere in the reviewed Server/ts25login source to draw a level-1
+--     starting pool from -- see CreateAvatarService.StartingStatPoint's own remarks). SkillPoints starts at 0
+--     since the starter kit already grants every starting skill directly via game.CharacterSkills
+--     (BuildSkillRows/world.StarterKitSkills).
+--   * MountItemId/MountExpActivity/MountPower/MountSlotIndex/MountTime = 0/0/0/-1/0 (column DEFAULTs, no
+--     starter mount); ProtectForDeath/AutoTime2 = 0/0 and DoubleExpTime1/DoubleExpTime2 = 0/0 (column
+--     DEFAULTs, no "instant boost" grants).
+--   * AutoBuffTime/InventoryDate/StoreDate stay @WelcomeBuffUntilDate (today + 7 days): the welcome-buff/
+--     second-inventory-page/second-store-page rental grant is independent of the old EU33 instant-elite block
+--     and survives the redesign.
+--   * PremiumExpireUtc = 0 (column DEFAULT, "0 = none"): no premium-day grant. @PremiumUntilUnixSeconds stays a
+--     declared parameter (signature parity with every existing caller of
+--     CharacterRepository.CreateWithStarterKitAsync) but is DELIBERATELY UNUSED in the INSERT -- CreateAvatarService.cs
+--     passes a fixed 0 for it.
 --
 -- Errors: 50201 slot already occupied, 50202 name already taken -- both pre-checked; the table's unique
 -- constraints are the race backstop. All 5 write statements (Characters/CharacterItems x2/CharacterSkills/
@@ -73,9 +86,9 @@ BEGIN
      DoubleExpTime1, DoubleExpTime2, AutoBuffTime, InventoryDate, StoreDate, PremiumExpireUtc)
     OUTPUT INSERTED.CharacterId INTO @CharacterId
     VALUES (@AccountId, @Slot, @Name, @Tribe, @PreviousTribe, @Gender, @HeadType, @FaceType, @MapId, @PosX, @PosY,
-            @PosZ, @Life, @MaxLife, @Mana, @MaxMana, 1, 1, 1, 1, 640000000, 100, 145, 12, 0, 2000000000, 0, 3175, 10000,
-            1301, 0, 5, 0, 99999999, 5, 1440, 300, 300, @WelcomeBuffUntilDate, @WelcomeBuffUntilDate,
-            @WelcomeBuffUntilDate, @PremiumUntilUnixSeconds);
+            @PosZ, @Life, @MaxLife, @Mana, @MaxMana, 1, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0, 50, 0,
+            0, 0, 0, -1, 0, 0, 0, 0, 0, @WelcomeBuffUntilDate, @WelcomeBuffUntilDate,
+            @WelcomeBuffUntilDate, 0);
 
     DECLARE @NewCharacterId INT = (SELECT CharacterId FROM @CharacterId);
 

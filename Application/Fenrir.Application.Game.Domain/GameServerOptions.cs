@@ -651,4 +651,23 @@ public sealed class GameServerOptions
     /// </summary>
     public int MountKillExperiencePerKill { get; set; } =
         MountKillExperienceCalculator.PlaceholderBaseExperiencePerKill;
+
+    /// <summary>
+    ///     B9: the game-wide cross-tribe CP add value fed into
+    ///     <see cref="Combat.PvpKillContributionPointBonuses.ComputeGameWideAddValue" /> --
+    ///     <c>MyUtil::ProcessForKillOtherTribe</c>'s own <c>tCPAddNum1</c> base term
+    ///     (<c>Server/ts25zone/S07_MyGame03.cpp:2664-2668</c>). Defaults to the shipped <c>BuildEU33</c> literal, 3
+    ///     (doubled to an effective 6 by the always-active rebirth build macro --
+    ///     <see cref="Combat.PvpKillContributionPointBonuses.RebirthAddValueMultiplier" /> applies that doubling,
+    ///     this knob carries only the raw pre-doubling value).
+    /// </summary>
+    public int CrossTribeCpAddValue { get; set; } = 3;
+
+    /// <summary>
+    ///     B9: the deployment-configured cross-tribe zone multiplier fed into
+    ///     <see cref="Combat.PvpKillExperienceScaling.ResolveZoneMultiplier" /> for every enemy-tribe PvP kill
+    ///     outside the 11-map Regular War <see cref="ZoneWar.RegularWarMapCatalog" /> set (which instead always
+    ///     uses that method's own x150 regular-war multiplier). Defaults to the shipped <c>BuildEU33</c> literal, 2.
+    /// </summary>
+    public int CrossTribeXpRatio { get; set; } = 2;
 }

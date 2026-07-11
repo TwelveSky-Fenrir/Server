@@ -159,6 +159,18 @@ public partial class PlayerRuntimeState
     ///     straight into <see cref="Stats.Context.CosmeticContext.CostumeEnchantCs" /> with no further plumbing
     ///     required.
     /// </summary>
+    /// <remarks>
+    ///     Populated for the first time by the op23 costume-grant path (workstream C9-costume-stellar-whitelist,
+    ///     see <see cref="CostumeExpireDate" />'s own remarks) -- every slot stays 0 until granted, same
+    ///     "no acquisition path yet, real array, permanently empty until this lands" posture
+    ///     <see cref="CostumeWardrobe" />'s own remarks already document for itself. No persisted column exists
+    ///     for this array (same as <see cref="CostumeWardrobe" />/<see cref="StellarCoreWardrobe" /> themselves) --
+    ///     session-scoped only, resets to all-zero on a fresh world entry, and does NOT carry through an
+    ///     in-process zone transfer today (<see cref="ZoneTransfer.CreateEnterData" />/<see cref="PlayerEnterData" />
+    ///     carry none of the eight Costume/StellarCore wardrobe fields yet) -- a known, pre-existing gap, not
+    ///     introduced here; closing it for all eight fields together is a follow-up, out of either workstream's
+    ///     scope.
+    /// </remarks>
     public ImmutableArray<int> CostumeDate { get; set; } = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
     /// <summary>
@@ -181,13 +193,27 @@ public partial class PlayerRuntimeState
 
     /// <summary>
     ///     aRuneSystem[4] -- ItemId currently socketed per rune slot (93514-93517 family, index-aligned), 0 =
-    ///     empty. Session-only, no persisted column exists yet -- same posture as <see cref="MountGarage" />.
+    ///     empty. Durably backed by <c>game.CharacterRunes</c> (<see cref="Fenrir.Data.Abstractions.Characters.IRuneRepository" />):
+    ///     <c>Application.Game.Services.ItemModification.RuneSocketService</c> is the sole writer (op157 insert/
+    ///     remove), and <c>Application.Game.Services.ZoneLifecycle.EnterWorldService</c> (via <see cref="IRuneRepository.GetRunesAsync" />
+    ///     and <see cref="PlayerEnterData.RuneSystem" />) is the sole world-entry reader -- this field itself
+    ///     only ever defaults to all-empty for a never-socketed character, same "default covers the empty case"
+    ///     posture as <see cref="MountGarage" />, not a "no persisted column" one.
     /// </summary>
     public ImmutableArray<int> RuneSystem { get; set; } = [0, 0, 0, 0];
 
     /// <summary>
     ///     aRuneSystemStat[4] -- the socketed rune's raw packed enchant/combine/refine/socket int (<c>ItemValueCodec</c>
-    ///     -encoded), paired 1:1 with <see cref="RuneSystem" />.
+    ///     -encoded), paired 1:1 with <see cref="RuneSystem" />. Same persistence/hydration posture as
+    ///     <see cref="RuneSystem" />'s own remarks. Feeds <see cref="Stats.RuneStatDecoder" />'s four base-attribute
+    ///     contributions (<c>Stats.StatCalculator.PrimaryAttributes</c>), live for any
+    ///     <c>Inventory.EquipmentService.RecomputeStats</c> call that passes a <c>runtimeState</c> --
+    ///     <c>World.Zone.ApplyRuneSocketCommand</c> (op157 insert/remove) is the one production call site that
+    ///     does, so a rune-socket mutation this session already recomputes with the live contribution. The very
+    ///     first post-login stat snapshot (<c>Application.Game.Services.ZoneLifecycle.EnterWorldService</c>)
+    ///     still does not: it runs before <c>Zone.HandleEnter</c> constructs this <see cref="PlayerRuntimeState" />
+    ///     at all, a structural gap, not an omitted wiring -- see <c>EquipmentService.RecomputeStats</c>'s own
+    ///     remarks.
     /// </summary>
     public ImmutableArray<int> RuneSystemStat { get; set; } = [0, 0, 0, 0];
 

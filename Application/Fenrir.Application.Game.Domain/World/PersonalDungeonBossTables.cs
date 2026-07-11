@@ -11,7 +11,7 @@ namespace Fenrir.Application.Game.Domain.World;
 /// <remarks>
 ///     <para>
 ///         Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:1142-1191 (Catalog A -- fires on every zone-entry for any
-///         Zone241 server) ; Server/ts25zone/S07_MyGame03.cpp:6260-6339 (Catalog D -- fires only on servers
+///         Zone241 server) ; Server/ts25zone/S07_MyGame03.cpp:6240-6339 (Catalog D -- fires only on servers
 ///         325-330, gated on at least one unspent LOD round) ; Server/ts25zone/S07_MyGame01.cpp:11755-11901
 ///         (Catalog E -- fires on every subsequent zone tick while the avatar's instance state equals 2).
 ///     </para>

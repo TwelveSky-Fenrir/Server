@@ -7,12 +7,10 @@ namespace Fenrir.Application.Game.Domain.World;
 ///     Key), and the five stat/elixir-potion counters. Most fields here are session-scoped only, same open
 ///     issue as <see cref="ProtectForHalo" />/<see cref="TribeNotifyScrollCount" />/<see cref="UseOrnament" />
 ///     above: some of these (e.g. the protection-charm counters) have no persisted game.Characters column at
-///     all yet, others (e.g. a future Lucky Drop Scroll counter) would reuse an already-existing column
-///     (game.Characters.DropItemTime) that is itself not yet wired through
-///     <c>CharacterWorldSnapshotDto</c>/<c>PlayerEnterData</c> -- durability for that remaining sub-group is
-///     still a follow-up for fenrir-database-engineer. The five <c>Eat*Potion</c> fields below are the one
-///     exception: they are fully wired end-to-end (world-entry hydration, zone-transfer carry-through,
-///     write-behind persist-back) -- see each field's own remarks.
+///     all yet -- durability for that remaining sub-group is still a follow-up for fenrir-database-engineer.
+///     The five <c>Eat*Potion</c> fields and <see cref="DropItemTime" /> are the exceptions: they are fully
+///     wired end-to-end (world-entry hydration, zone-transfer carry-through, write-behind persist-back) -- see
+///     each field's own remarks.
 /// </summary>
 public partial class PlayerRuntimeState
 {
@@ -48,8 +46,13 @@ public partial class PlayerRuntimeState
 
     /// <summary>
     ///     Lucky Drop/"Acquisition" Scroll (world.Items 1152-1154/1233) -- a "drop item time" (minutes) counter.
-    ///     game.Characters.DropItemTime already exists as a persisted column for this exact field, but is not
-    ///     yet read at world entry -- see this type's own remarks.
+    ///     game.Characters.DropItemTime is the persisted column for this exact field, read back at world entry
+    ///     (<c>CharacterWorldSnapshotDto.DropItemTime</c> / <c>PlayerEnterData.DropItemTime</c> /
+    ///     <c>EnterWorldService</c>), carried through an in-process zone transfer
+    ///     (<see cref="ZoneTransfer.CreateEnterData" />), and flushed back durably by the write-behind
+    ///     progress batch (<c>CharacterProgressTvp</c>/<c>usp_Character_PersistProgressBatch</c>, via
+    ///     <c>ProgressWriteBehindHost.FlushAsync</c>) -- the same "fully wired end-to-end" posture as the five
+    ///     <c>Eat*Potion</c> counters above.
     /// </summary>
     public int DropItemTime { get; set; }
 

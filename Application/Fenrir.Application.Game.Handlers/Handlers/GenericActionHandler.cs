@@ -413,9 +413,11 @@ public sealed class GenericActionHandler(
             return;
         }
 
-        // tSort 254/255/256 -- pet-bag family. petBagUpperHalfEntitlementActive is hardcoded true (fail-open)
-        // pending a real aPetBagDate-equivalent field on PlayerRuntimeState -- see IPetBagActionService's own
-        // remarks and this pass's report for the open gap.
+        // tSort 254/255/256 -- pet-bag family. petBagUpperHalfEntitlementActive is now gated on the real
+        // PlayerRuntimeState.PetBagDate field (C8 pet-bag-entitlement confirmation-pass follow-up) -- see
+        // that field's own remarks. Every character reads as expired today (no known grant mechanism yet,
+        // same posture legacy's own creation path leaves it in), which is a stricter default than the prior
+        // hardcoded-true placeholder -- flagged there, not silently changed.
         if (sort is 254 or 255 or 256)
         {
             if (!DefaultPData.TryRead(packet.Data, out var petBagMove))
@@ -432,15 +434,16 @@ public sealed class GenericActionHandler(
                     "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to pet-bag family",
                     zoneSession.SessionId, characterId, sort);
 
+            var petBagUpperHalfEntitlementActive = state.PetBagDate >= GameDate.Today();
             var secondInventoryPageActive = state.InventoryDate >= GameDate.Today();
             var petBagResult = sort switch
             {
-                254 => await petBagActionService.DepositAsync(zone, state, characterId, petBagMove, true,
-                    secondInventoryPageActive, cancellationToken),
-                255 => await petBagActionService.WithdrawAsync(zone, state, characterId, petBagMove, true,
-                    secondInventoryPageActive, cancellationToken),
-                _ => await petBagActionService.RearrangeAsync(zone, state, characterId, petBagMove, true,
-                    cancellationToken)
+                254 => await petBagActionService.DepositAsync(zone, state, characterId, petBagMove,
+                    petBagUpperHalfEntitlementActive, secondInventoryPageActive, cancellationToken),
+                255 => await petBagActionService.WithdrawAsync(zone, state, characterId, petBagMove,
+                    petBagUpperHalfEntitlementActive, secondInventoryPageActive, cancellationToken),
+                _ => await petBagActionService.RearrangeAsync(zone, state, characterId, petBagMove,
+                    petBagUpperHalfEntitlementActive, cancellationToken)
             };
             Respond(session, zoneSession, sort, packet.Data, petBagResult);
             return;
@@ -696,11 +699,9 @@ public sealed class GenericActionHandler(
 
         // tSort 599 -- Basic-tier GM-CALLPVP command (Server/ts25zone/S04_MyWork04.cpp:1770-1823). No dedicated
         // legacy wire opcode; multiplexed inside this same generic envelope. IGmCallPvpService owns every
-        // send/abort itself. *** DO NOT ENABLE THIS BRANCH IN A LIVE/PRODUCTION BUILD until GmCallPvpService's
-        // own DuelSlot1Coordinate/DuelSlot2Coordinate placeholders (currently inert 0,0,0) are replaced with the
-        // real legacy coordinate triples -- see that type's own remarks and this pass's openQuestions. Wiring
-        // the branch itself is harmless (compiles, gate-checks correctly) but a live GM would relocate a target
-        // to (0,0,0) on whatever map they already occupy, not a real duel-arena location. ***
+        // send/abort itself. GmCallPvpService's own DuelSlot1Coordinate/DuelSlot2Coordinate are now the real
+        // recovered legacy coordinates ((-232, 36, 2) / (232, 36, 2), Server/ts25zone/S04_MyWork04.cpp:1785-1790)
+        // -- see that type's own remarks -- so this branch is safe to run in a live build.
         if (sort == 599)
         {
             if (!GmCallPvpPayload.TryRead(packet.Data, out var gmCallPvpPayload))

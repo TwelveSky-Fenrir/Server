@@ -123,6 +123,9 @@ Tables/game/CharacterItems.sql
 # usp_CharacterTradeCommit_ExecuteIdempotent's additive money legs (see that table's own header).
 Tables/game/TradeCommitLedger.sql
 
+# CZ_PROCESS_DATA_SEND pet-bag family (tSort 254/255/256) -- see the table's own header.
+Tables/game/CharacterPetBag.sql
+
 Tables/game/CharacterFriends.sql
 Tables/game/CharacterSkills.sql
 Tables/game/CharacterQuests.sql
@@ -181,6 +184,10 @@ StoredProcedures/auth/usp_Account_RecordLoginAttempt.sql
 StoredProcedures/auth/usp_Account_SetGrade.sql
 StoredProcedures/auth/usp_AccountPin_Get.sql
 StoredProcedures/auth/usp_AccountPin_Set.sql
+
+# pincode-second-password security audit: account-scoped/cross-reconnect brute-force lockout for the mouse PIN.
+StoredProcedures/auth/usp_AccountPin_RecordAttempt.sql
+
 StoredProcedures/game/usp_Character_GetByAccount.sql
 
 # Account-login avatar roster population fix (legacy-behavior-translator contract "Account-login avatar
@@ -194,10 +201,10 @@ StoredProcedures/game/usp_Character_Rename.sql
 StoredProcedures/game/usp_CharacterItem_GetIdAtSlot.sql
 StoredProcedures/game/usp_Character_GetIdByName.sql
 StoredProcedures/game/usp_Character_GetForWorldEntry.sql
+StoredProcedures/game/usp_Character_PersistProgressBatch.sql
 StoredProcedures/game/usp_Character_PersistBatch.sql
 StoredProcedures/game/usp_CharacterItems_ReplaceContainer.sql
 StoredProcedures/game/usp_CharacterItems_ReplaceTwoContainers.sql
-StoredProcedures/game/usp_Character_PersistProgressBatch.sql
 StoredProcedures/game/usp_Character_AdjustMoney.sql
 StoredProcedures/game/usp_Character_AdjustMoneyAndReplaceContainer.sql
 StoredProcedures/game/usp_Character_AdjustMoneyAndReplaceTwoContainers.sql
@@ -212,6 +219,14 @@ StoredProcedures/game/usp_Character_SetMountProgression.sql
 StoredProcedures/game/usp_Character_GrantTribeTransferPermit.sql
 StoredProcedures/game/usp_Character_AdjustDeathProtection.sql
 StoredProcedures/game/usp_Character_ClampVitalsFloor.sql
+
+# C13 War-Point dual-currency NPC shop purchase (USE_WAR_POINT_SYSTEM)
+StoredProcedures/game/usp_Character_BuyWarPointItem.sql
+
+# CZ_PROCESS_DATA_SEND pet-bag family (tSort 254/255/256) atomic procedures -- see game.CharacterPetBag's own header.
+StoredProcedures/game/usp_CharacterPetBag_Deposit.sql
+StoredProcedures/game/usp_CharacterPetBag_Withdraw.sql
+StoredProcedures/game/usp_CharacterPetBag_Rearrange.sql
 
 # B5 Rune system (op157) durable state -- game.CharacterRunes. PersistRunes = atomic runes + optional
 # inventory-container write; GetRunes = standalone world-entry load (NOT merged into GetForWorldEntry).
@@ -420,10 +435,9 @@ StoredProcedures/game/usp_AccountVault_TransferItemWithCharacter.sql
 
 # C8 BigMoney ("1B") family: closes the tSort 241/242/244/245 gap left after the npc-talk gap fix above wired
 # 223-232. usp_Character_AdjustBigStoreMoney is the Inventory<->Store leg (241/244); the Inventory<->Save/vault
-# leg (242/245) is usp_AccountVault_TransferBigMoneyWithCharacter, a Migrations/ script (046) since it depends
-# on the game.AccountVault.BigMoney column Migrations/045 adds -- registered in the Migrations block below, not
-# here.
+# leg (242/245) is usp_AccountVault_TransferBigMoneyWithCharacter.
 StoredProcedures/game/usp_Character_AdjustBigStoreMoney.sql
+StoredProcedures/game/usp_AccountVault_TransferBigMoneyWithCharacter.sql
 
 # V8 Player Commerce & Cash
 StoredProcedures/game/usp_Character_GetRewardClaimState.sql
@@ -506,135 +520,10 @@ StoredProcedures/admin/usp_ServerQuota_GetMaxPlayers.sql
 # cross-process ts25extra MyDB::CheckUpdateSky, which has no Fenrir-side "extra" process to consult.
 StoredProcedures/admin/usp_TribeFourQuota_TryConsume.sql
 
-Migrations/001_roles.sql
-Migrations/002_roles_login_gifts.sql
-
-# Fix-forward for a fail-closed regression: game.Characters.PreviousTribe (see Tables/game/Characters.sql) is
-# NOT NULL DEFAULT 0, which applies retroactively to every row that already existed at the moment its ALTER
-# TABLE originally ran -- i.e. any character created before PreviousTribe was introduced. EnterWorldService.
-# HandleAsync aborts the session outright (Server/ts25zone/S04_MyWork02.cpp:880-901's self-consistency check:
-# a main-faction Tribe 0-2 requires PreviousTribe == Tribe) whenever the two fields disagree. Combined, every
-# already-created character with Tribe = 1 or Tribe = 2 -- the large majority of any pre-existing population --
-# would silently receive PreviousTribe = 0 from the DEFAULT and then be permanently unable to enter the world
-# afterward. This is a fail-closed denial-of-service against legitimate, already-existing accounts, not
-# anything a player did -- backfills PreviousTribe = Tribe for every main-faction row that hasn't already been
-# set to a non-default value. Kept as a standalone migration (not merged into the table's own creation script)
-# since it is a one-time DATA correction against pre-existing rows, not a schema shape change -- a fresh
-# database has no rows for it to touch.
-Migrations/019_character_previous_tribe_backfill.sql
-
-# Fix-forward (session-state-machine legacy-parity audit): usp_AccountSession_TransitionToGame originally
-# only accepted a prior ServerKind = 0 (Login) row, so a Game(ShardA)->Game(ShardB) cross-shard zone transfer
-# -- ZoneMoveService.HandleCrossShardAsync's ticket-remint path -- could never satisfy its precondition and
-# was disconnected on arrival every time. Widens the predicate to accept a prior ServerKind of either 0 or 1;
-# see the script's own header for the full citation trail.
-Migrations/025_account_session_transition_game_to_game.sql
-
-# Fix-forward (shop-and-proxyshop legacy-parity audit): usp_OfflineShop_WithdrawMoney threw the same SQL
-# error (50276) for both a zero-pending-balance withdrawal and a stale/not-closed shop, making the
-# contract's required distinct result-4 "nothing to withdraw" case unreachable; also adds the missing
-# ShopDate expiry check the contract requires alongside the existing ShopState=0 gate. See the script's own
-# header for the full citation trail.
-Migrations/026_offline_shop_withdraw_split_nothing_and_expiry.sql
-
-# character-creation-level1-redesign (CONFIRMED PRODUCT DECISION, not a legacy-parity fix): replaces
-# usp_Character_CreateWithStarterKit's EU33/USE_CUSTOME_CREATE instant-elite creation grant (Level=145,
-# 6-slot Enchant45/Combine6 gear, starter mount/pet/cape, one premium day, ProtectForDeath/AutoTime2/
-# DoubleExpTime1-2 instant-boost counters) with a genuine Level 1 start and a weapon+torso-armor-only
-# starter kit. See the script's own header for the full literal-by-literal rationale.
-Migrations/027_character_create_level1_basic_kit.sql
-
-# pincode-second-password security audit (Major finding, Fenrir-only addition, no legacy analog): adds
-# auth.AccountPins.FailedAttempts/LockedUntilUtc and the new auth.usp_AccountPin_RecordAttempt procedure,
-# an account-scoped/cross-reconnect brute-force lockout for the mouse PIN mirroring auth.Accounts'
-# existing FailedLoginCount/LockoutUntilUtc pattern for the primary password. See the script's own header
-# for the full citation trail.
-Migrations/028_account_pin_lockout.sql
-
-# Fix-forward for auth.usp_AccountPin_Get (see Migrations/028_account_pin_lockout.sql): exposes the two
-# new FailedAttempts/LockedUntilUtc columns so VerifyMousePinService/ChangeMousePinService can check the
-# account-scoped lockout before ever touching PasswordHasher.Verify.
-Migrations/029_account_pin_lockout_get.sql
-
-# Level static-data schema/validation gap: storage-level CHECK constraint mirroring the legacy 0-100
-# RangeInfo3 bound (Server/Header/S15_MyShare.cpp:843-846) that world.Levels' TINYINT column type alone
-# doesn't enforce. Companion to WorldDataCacheBuilder.ValidateLevels' boot-time check of the same bound plus
-# four other gaps closed in the same change -- see the script's own header for the full citation trail.
-Migrations/030_levels_rangeinfo3_check_constraint.sql
-
-# Quest static-data load-time field validation (legacy Load_Quest / Quest_CheckValidElement audit): adds
-# the two CHECK constraints (world.Quests.Step 1-1000, world.QuestRewards.Amount 0-100,000,000) the
-# contract's Edge cases section confirms are unreplicated "concrete gap"s -- every other legacy
-# Quest_CheckValidElement bound is already covered by existing CHECKs/FKs or is deliberately unchecked in
-# both legacy and SQL alike. See the script's own header for the full citation trail.
-Migrations/031_quest_step_and_reward_amount_range_checks.sql
-
-# Skill static-data load-time field validation (legacy SKILLSYSTEM::Init / MyShm::Load_Skill /
-# Skill_CheckValidElement audit): adds the 9 world.Skills + 25 world.SkillGrades CHECK constraints the
-# contract confirms were entirely missing (neither table had ever had a range CHECK on any of these
-# columns). MaxUpgradePoint's floor of 1 is the highest-severity one -- it is the sole guard against a
-# divide-by-zero in the skill-value interpolation formula's unguarded division. See the script's own header
-# for the full citation trail and the note on why affected TINYINT columns are not retyped in this script.
-Migrations/032_skill_static_data_range_checks.sql
-
-# Npc static-data load-time field validation (legacy MyShm::Load_Npc / Npc_CheckValidElement audit): adds
-# the world.Npcs (Tribe/Type/DataSortNumber2D/DataSortNumber3D/Size1-3), world.NpcMenuOptions (OptionId
-# exactly 1 or 2) and world.NpcGambleCosts (Value 0-100,000,000) CHECK constraints the contract confirms
-# were entirely missing -- its own explicit "core finding". Name-length, NpcId-slot-identity and
-# ItemId/SkillId FK bounds are deliberately left out per the contract's own scoping -- see the script's own
-# header for the full citation trail and rationale.
-Migrations/033_npc_static_data_range_checks.sql
-
-# Gem socket static-data load-time field validation (legacy SOCKET_INFO / Load_GSocket /
-# GSocket_CheckValidElement audit): adds the world.GemSockets CK_GemSockets_TypeBandRules CHECK constraint
-# covering the zero-bypass rules (Value02 = 0, Type = 0), the Type 1-46 range gate, and the four live
-# Type-band rules (Type=1, 2-29, 39-42, 43-46). The dead Value01 range check and the dead Type 30-38 band
-# are deliberately NOT reproduced -- both are confirmed inert in the legacy source, so this constraint
-# matches legacy's actual (not intended) runtime behavior. Total-row-count-2891 and GemSocketId-slot-identity
-# are deliberately left out per the same precedent Migrations/031 (QuestId) and Migrations/033 (NpcId)
-# already established. See the script's own header for the full citation trail and rationale.
-Migrations/034_gem_socket_type_band_range_checks.sql
-
-# Monster static-data load-time field validation (legacy Load_Monster / Monster_CheckValidElement audit):
-# adds the value-range and cross-field-ordering CHECK constraints world.Monsters, world.MonsterAnimationFrames,
-# and the five world.MonsterDrop* child tables never had (only structural slot/category-index bounds existed
-# on the drop tables; the two parent tables had none at all). See the script's own header for the full
-# citation trail and the deliberately-out-of-scope items (MonsterId slot-position parity, the Thunder Giant
-# AttackType load-time patch).
-Migrations/036_monster_static_data_range_checks.sql
-
-# Item static-data load-time field validation (legacy Item_CheckValidElement audit): widens
-# CheckDateItem/DataNumber3D/AddDataNumber3D from TINYINT (max 255) to SMALLINT so they can represent their
-# full legacy-valid ranges (365 and 10000 respectively), adds CHECK constraints on those 3 now-widened
-# columns, and adds a compound CHECK reproducing PotionType2's conditional narrowing to 1-3 whenever
-# PotionType1 = 9. See the script's own header for the full citation trail and for what is deliberately
-# left to a companion boot-time loader validation instead (every ordinary single-field legacy bound not
-# individually flagged as a storage-level gap, e.g. Type/Sort/EquipInfo/the eleven Check* flags/stat
-# fields).
-Migrations/038_items_column_width_and_potiontype_checks.sql
-
-# Concurrency fix for the sharded-boot PK_WorldState race (two game-shard-NN processes calling
-# EnsureInitialized at the same time): serializes callers via sp_getapplock before the existence checks.
-# See the script's own header for the full citation/repro trail.
-Migrations/039_worldstate_ensureinitialized_concurrency_fix.sql
-
-# C17 supporting filtered covering index for the max-level tribe-point roster scan
-Migrations/040_characters_maxlevel_tribepoint_index.sql
-
-# C13 War-Point dual-currency NPC shop: 041 adds game.Characters.WarPoint; 042 creates
-# usp_Character_BuyWarPointItem, which references the 041-added column, so 042 MUST come after 041. Both are
-# migrations (not StoredProcedures/) precisely because StoredProcedures run before migrations.
-Migrations/041_characters_warpoint_currency.sql
-Migrations/042_character_buy_warpoint_item.sql
-
-# C8 (wave7) pet-bag table + BigMoney Store/Save transfer procedures -- 043/044 add game.CharacterPetBag
-# and its 3 atomic procedures (both must be migrations: StoredProcedures/ runs before migrations, and
-# every procedure here references a table/column this same wave adds); 045/046 add
-# game.AccountVault.BigMoney and its transfer procedure for the same reason.
-Migrations/043_character_petbag_table.sql
-Migrations/044_character_petbag_procs.sql
-Migrations/045_accountvault_bigmoney_column.sql
-Migrations/046_accountvault_bigmoney_transfer_proc.sql
+# Role grants -- moved to the end of the schema/table/view/procedure creation chain (not right after
+# Schemas/001_schemas.sql) because several GRANT EXECUTE ON OBJECT:: statements below target specific
+# game.usp_* procedures; SQL Server requires the target object to already exist for an object-level GRANT.
+Schemas/002_roles.sql
 
 Migrations/Seed/001_dev_account.sql
 

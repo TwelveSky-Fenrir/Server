@@ -51,16 +51,16 @@ public class PetBoxRewardTableTests
 
         Assert.Equal(60, pools[1].ThresholdCeilingInclusive);
         Assert.Equal(4, pools[1].Ids.Length);
-        Assert.True(pools[1].Ids.Contains(1002));
-        Assert.True(pools[1].Ids.Contains(1003));
-        Assert.True(pools[1].Ids.Contains(1004));
-        Assert.True(pools[1].Ids.Contains(1005));
+        Assert.Contains(1002, pools[1].Ids);
+        Assert.Contains(1003, pools[1].Ids);
+        Assert.Contains(1004, pools[1].Ids);
+        Assert.Contains(1005, pools[1].Ids);
 
         Assert.Equal(120, pools[2].ThresholdCeilingInclusive);
         Assert.Equal(3, pools[2].Ids.Length);
-        Assert.True(pools[2].Ids.Contains(1190));
-        Assert.True(pools[2].Ids.Contains(1491));
-        Assert.True(pools[2].Ids.Contains(1492));
+        Assert.Contains(1190, pools[2].Ids);
+        Assert.Contains(1491, pools[2].Ids);
+        Assert.Contains(1492, pools[2].Ids);
 
         Assert.Equal(180, pools[3].ThresholdCeilingInclusive);
         Assert.Equal(6, pools[3].Ids.Length);

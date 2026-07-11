@@ -84,9 +84,10 @@ public sealed class UseItemHandlerRegistry
         // item-635 C9 stub) is deleted -- fully superseded by this registration.
         foreach (var id in LootBoxUseItemHandler.HandledItemIds)
             byId[id] = lootBox;
-        // C9-tickets-tower: CP Ticket family, Elite Dungeon Ticket family, Ivy Hall Ticket pair, Lucky
-        // Ticket family (stub -- rejects cleanly, draw tables not yet cataloged), Scroll of Seekers family
-        // (stub -- rejects cleanly, 180-vs-900 per-id split not yet cataloged).
+        // C9-tickets-tower: CP Ticket family, Elite Dungeon Ticket family, Ivy Hall Ticket pair, Lucky Ticket
+        // family (draw thresholds/tier cascade/family serial resolved by the recovered
+        // lucky-ticket-handler-thresholds contract), Scroll of Seekers family (180-vs-900 per-id split
+        // resolved by the recovered scroll-of-seekers-per-id-split contract).
         foreach (var id in CpTicketUseItemHandler.HandledItemIds)
             byId[id] = cpTicket;
         foreach (var id in EliteDungeonTicketUseItemHandler.HandledItemIds)

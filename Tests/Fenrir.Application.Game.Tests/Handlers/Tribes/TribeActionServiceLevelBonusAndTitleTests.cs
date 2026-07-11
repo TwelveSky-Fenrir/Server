@@ -80,20 +80,46 @@ public class TribeActionServiceLevelBonusAndTitleTests
     }
 
     [Fact]
-    public async Task ClaimLevelBonus_DeferredMTierLevel_Aborts_WithoutGrantingAnything()
+    public async Task ClaimLevelBonus_UnrecognizedStoredLevel_Aborts_WithoutGrantingAnything()
     {
-        // An armed-but-deferred level should never reach here in practice (LevelMilestoneBonus.ArmableMilestoneLevels
-        // never arms one), but ClaimLevelBonusAsync itself must still refuse it defensively rather than fall
-        // through to an unhandled case.
+        // Every one of the 11 named legacy milestone levels now has a known claim table (the
+        // level-milestone-bonus-item-ids recovery pass supplied the last six, the M-tier levels), so a
+        // genuinely-unrecognized stored level can no longer be one of those -- use an arbitrary value that was
+        // never a legacy milestone at all. ClaimLevelBonusAsync must still refuse it defensively rather than
+        // fall through to an unhandled case.
         var zone = ZoneTestKit.CreateZone(1);
         var (_, _, state) = Setup(zone, CharacterId);
-        state.BonusItemLevel = LevelMilestoneBonus.LvM2; // 114, deferred
+        state.BonusItemLevel = 999; // never a legacy milestone level
         var service = CreateService();
 
         var outcome = await service.ClaimLevelBonusAsync(zone, state, CharacterId, CancellationToken.None);
 
         Assert.True(outcome.Aborted);
-        Assert.Equal(LevelMilestoneBonus.LvM2, state.BonusItemLevel); // untouched -- never cleared on abort
+        Assert.Equal(999, state.BonusItemLevel); // untouched -- never cleared on abort
+    }
+
+    [Fact]
+    public async Task ClaimLevelBonus_MTierLevel132_GrantsTheResolvedDrops_AndClearsTheArmedState()
+    {
+        // Regression guard for the level-milestone-bonus-item-ids recovery: the M-tier levels (114-144) were
+        // previously deferred/unarmable; this proves one of the upper-tier cases (which additionally grants
+        // item 1458) now claims successfully end-to-end through the delegating service.
+        var zone = ZoneTestKit.CreateZone(1);
+        var (_, _, state) = Setup(zone, CharacterId);
+        state.BonusItemLevel = LevelMilestoneBonus.LvM20; // 132
+        state.BonusItemValue = true;
+        var service = CreateService();
+
+        var outcome = await service.ClaimLevelBonusAsync(zone, state, CharacterId, CancellationToken.None);
+        zone.Tick(TimeSpan.FromMilliseconds(50)); // drains the posted TribeProgressZoneCommand mirror
+
+        Assert.False(outcome.Aborted);
+        Assert.True(zone.TryGetPlayer(CharacterId, out var after));
+        Assert.Equal(0, after!.BonusItemLevel);
+        Assert.False(after.BonusItemValue);
+        // The exact item set (850/539x2/1458) for tier 132 is pinned by
+        // LevelMilestoneBonusTests.TryResolveClaimDrops_Level132_LvM20_GrantsItem850PlusItem539PlusItem1458;
+        // this test only proves the claim succeeds end-to-end through the now-delegating service.
     }
 
     [Fact]

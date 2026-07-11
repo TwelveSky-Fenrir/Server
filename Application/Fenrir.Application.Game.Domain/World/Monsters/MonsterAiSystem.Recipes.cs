@@ -4,9 +4,11 @@ namespace Fenrir.Application.Game.Domain.World.Monsters;
 
 /// <summary>
 ///     <see cref="MonsterAiSystem" />'s <c>mSpecialSortNumber</c> archetype recipes (behavior contract
-///     <c>A3-ai-recipes</c>): the car-thrower/ranged annulus recipe (<see cref="MonsterSpecialSort.CarThrower" />)
-///     and the Zone175-type boss multi-candidate acquisition + far/near decision. See the core file
-///     (<c>MonsterAiSystem.cs</c>) for the FSM dispatch and the shared candidate gauntlet these consume.
+///     <c>A3-ai-recipes</c>): the car-thrower/ranged annulus recipe (<see cref="MonsterSpecialSort.CarThrower" />),
+///     the Zone175-type boss multi-candidate acquisition + far/near decision, and the Tribe Guard direct-melee
+///     acquisition recipe (<see cref="MonsterSpecialSort.TribeGuard" />, behavior contract
+///     <c>monster-ai-recipe-bodies</c>, recovered 2026-07-11). See the core file (<c>MonsterAiSystem.cs</c>)
+///     for the FSM dispatch and the shared candidate gauntlet these consume.
 /// </summary>
 public sealed partial class MonsterAiSystem
 {
@@ -268,5 +270,93 @@ public sealed partial class MonsterAiSystem
         var dy = monster.PosY - player.PosY;
         var dz = monster.PosZ - player.PosZ;
         return MathF.Sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
+    /// <summary>
+    ///     Tribe Guard direct-melee guard-attack acquisition recipe (<see cref="MonsterSpecialSort.TribeGuard" />,
+    ///     <c>S07_MyGame05.cpp:596-675,936-950</c>; behavior contract <c>monster-ai-recipe-bodies</c>, recovered
+    ///     2026-07-11): throttled to the same ~1 s cadence as the wide-detect scan (reusing
+    ///     <see cref="MonsterEntity.DetectionThrottleTicks" /> -- a guard is never simultaneously Standard/
+    ///     boss/thrower, so sharing that stamp is safe, same idiom <see cref="RunZone175BossDecision" /> already
+    ///     uses), gated to a positive melee radius (<see cref="MonsterRowDto.RadiusInfo1" /> -- the guard's OWN
+    ///     melee range, never the wider detection radius other archetypes use), scanning every neighbor via the
+    ///     shared candidate gauntlet (<see cref="MonsterAiSystem.IsCandidateValid" />), accepting only a
+    ///     candidate already within that melee range (no fallback the way the Standard recipe's post-prune
+    ///     selection has one), with an independent 50% coin flip per eligible candidate and first-success-wins.
+    ///     A chosen candidate transitions the guard immediately into melee (<see cref="MonsterAiState.AttackWindup" />)
+    ///     -- there is no intermediate chase or pathing step for this archetype at all; a tribe guard never
+    ///     pursues, only strikes from where it already stands.
+    /// </summary>
+    /// <remarks>
+    ///     Three sub-checks the legacy function performs are deliberately NOT modeled here, flagged rather than
+    ///     guessed at (per this session's own citation re-derivation, correcting the input finding's wording in
+    ///     two of the three cases):
+    ///     <list type="bullet">
+    ///         <item>
+    ///             The same-tribe/allied-tribe exclusion: the guard's own Type-code (6/7/8/9) -&gt; tribe-id
+    ///             mapping is not recoverable from the contract (only that it is "fixed and total"), so no
+    ///             tribe-based exclusion is applied -- matching <see cref="RunThrowerDecision" />'s own,
+    ///             identical precedent for its unrecoverable SpecialType -&gt; tribe map. Every valid,
+    ///             in-melee-range candidate is eligible today regardless of tribe.
+    ///         </item>
+    ///         <item>
+    ///             The two-specific-"not a valid target"-action-state exclusion: the contract does not cite the
+    ///             concrete action-state codes, so this is left unapplied -- the same already-cataloged gap
+    ///             <see cref="MonsterAiSystem.IsCandidateValid" />'s own remarks flag for the legacy
+    ///             action-sort-0/33 exclusion.
+    ///         </item>
+    ///         <item>
+    ///             The coarse world-sector-box exclusion: re-opening the guard's own filter directly (session
+    ///             correction to the input finding, which described this as the same "3x3" check the Standard
+    ///             recipe's own candidate gauntlet is already missing) shows the guard's own per-axis threshold
+    ///             is a full unit WIDER in both directions than that already-known gap -- a distinct, wider
+    ///             filter unique to this recipe, not the same check reused verbatim. Still not modeled: the
+    ///             underlying coarse-grid CELL SIZE needed to evaluate either box numerically remains the same
+    ///             unrecovered figure <see cref="MonsterAggroListPruner" />'s own coarse-3D-grid gap already
+    ///             flags -- only the relative threshold is cited, not enough to implement it.
+    ///         </item>
+    ///     </list>
+    ///     Also confirmed by absence (not merely unmodeled): no anti-clump/pursuer-capacity cap exists for this
+    ///     recipe at all, unlike <see cref="TryAcquireTarget" />'s own <c>CountOtherPursuers</c> check -- any
+    ///     number of guards may simultaneously target and coin-flip for the same candidate.
+    /// </remarks>
+    private void RunGuardDecision(Zone zone, MonsterEntity monster, int legacyTicksElapsed)
+    {
+        // 1-second detection throttle, shared field/idiom with TryAcquireTarget/RunZone175BossDecision.
+        monster.DetectionThrottleTicks += legacyTicksElapsed;
+        if (monster.DetectionThrottleTicks < SimulationClock.MonsterDetectionThrottleLegacyTicks)
+            return;
+
+        monster.DetectionThrottleTicks = 0;
+
+        var meleeRadius = monster.Template.RadiusInfo1;
+        if (meleeRadius <= 0)
+            return; // non-positive melee radius disables detection entirely for this monster
+
+        var meleeRadiusSq = (float)meleeRadius * meleeRadius;
+
+        foreach (var characterId in zone.NeighborsOfPosition(monster.PosX, monster.PosZ))
+        {
+            if (!zone.TryGetPlayer(characterId, out var player) || !IsCandidateValid(player))
+                continue;
+
+            // NOT modeled (flagged above): same-tribe/allied-tribe exclusion, the two-specific-action-state
+            // exclusion, and the coarse world-sector-box exclusion.
+
+            if (DistanceSquared(monster.PosX, monster.PosZ, player.PosX, player.PosZ) > meleeRadiusSq)
+                continue; // melee-range-only acceptance -- no fallback, unlike the Standard recipe's own pick
+
+            // Per-candidate 50% coin flip, first success wins (S07_MyGame05.cpp:208-213 shared convention).
+            if (_random.NextInt32(2) != 0)
+                continue;
+
+            // Matches every other acquisition path's zero-seed write-through into the shared attacker table.
+            monster.AssignTarget(characterId, player.UniqueNumber, player.PosX, player.PosY, player.PosZ);
+            monster.RegisterAcquisition(characterId, player);
+            monster.AiState = MonsterAiState.AttackWindup;
+            monster.StateTicks = 0;
+            zone.BroadcastMonsterActionChange(monster);
+            return;
+        }
     }
 }

@@ -40,4 +40,18 @@ public partial class PlayerRuntimeState
     ///     placeholder rather than an invented tighter number.
     /// </summary>
     public int IvyHallTicketTime { get; set; }
+
+    /// <summary>
+    ///     Scroll of Seekers family (world.Items 1124/1187/7016/8409/8410) -- a shared banked zone-time counter,
+    ///     incremented by a fixed per-item amount (180 for 1124/8409, 900 for 1187/7016/8410) on each use. See
+    ///     <see cref="Consumables.ScrollOfSeekersResolver" />. Unlike the three siblings above, the
+    ///     <c>scroll-of-seekers-per-id-split</c> contract DOES independently confirm a real legacy field name
+    ///     for this one -- <c>aZone126Time</c>, a DB-persisted <c>int(11)</c> column
+    ///     (<c>nxtserver.sql:88</c>/<c>CSQLAvatar.cpp:608</c>) -- but Fenrir has no corresponding
+    ///     <c>game.Characters</c> column or write-behind wiring yet, so this field is still session-scoped only
+    ///     and resets to 0 on every zone (re)entry, same interim posture as <see cref="EliteDungeonTime" />/
+    ///     <see cref="DungeonKeyTime" />/<see cref="IvyHallTicketTime" /> until a follow-up adds durable
+    ///     storage.
+    /// </summary>
+    public int ScrollOfSeekersTime { get; set; }
 }

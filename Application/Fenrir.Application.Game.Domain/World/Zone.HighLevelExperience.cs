@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Data.WriteBehind;
+using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Domain.World;
 
@@ -15,12 +16,11 @@ namespace Fenrir.Application.Game.Domain.World;
 ///     <see cref="HighLevelExperienceInputFactory" />/<see cref="HighLevelExperienceOutcomeApplier" /> for the
 ///     two adapter halves either side of it.
 ///     <para>
-///         <b>Not yet wired in.</b> This file only ADDS a new method (<see cref="ApplyHighLevelExperienceGain" />)
-///         -- it does not call it from anywhere, and it never edits <c>Zone.Combat.cs</c>'s own
-///         <c>ApplyCharacterExperienceGain</c> (the single shared level-up cascade both the monster-kill and
-///         PvP-kill award chokepoints already funnel through). The one-line fork a later Domain-combat
-///         integration pass needs to add there is documented as this workstream's own wiringManifest entry,
-///         not applied here.
+///         <b>Wired in.</b> <c>Zone.Combat.cs</c>'s own <c>ApplyCharacterExperienceGain</c> -- the single shared
+///         level-up cascade the monster-kill, PvP-kill, and party-bonus award chokepoints all funnel through --
+///         forks to <see cref="ApplyHighLevelExperienceGain" /> whenever
+///         <see cref="HighLevelExperienceResolver.AppliesAt" /> is true for the recipient, before its own
+///         ordinary level-up branch runs.
 ///     </para>
 /// </summary>
 public sealed partial class Zone
@@ -46,10 +46,9 @@ public sealed partial class Zone
     /// <summary>
     ///     Applies one post-general-level-cap experience award to <paramref name="target" />: resolves it via
     ///     <see cref="HighLevelExperienceResolver" /> and applies whichever of Stage A (general-pool fill) or
-    ///     Stage B (rebirth-tier ladder: level-up or proportional accrual) fires. Intended to be called from
+    ///     Stage B (rebirth-tier ladder: level-up or proportional accrual) fires. Called from
     ///     <c>Zone.Combat.cs</c>'s <c>ApplyCharacterExperienceGain</c> in place of its ordinary level-up branch
-    ///     whenever <see cref="HighLevelExperienceResolver.AppliesAt" /> is true for <paramref name="target" />
-    ///     -- see this file's own wiring note.
+    ///     whenever <see cref="HighLevelExperienceResolver.AppliesAt" /> is true for <paramref name="target" />.
     /// </summary>
     /// <remarks>
     ///     Réf. C++ (B17-rebirth-hook contract) : Server/ts25zone/S07_MyGame03.cpp:161-424.

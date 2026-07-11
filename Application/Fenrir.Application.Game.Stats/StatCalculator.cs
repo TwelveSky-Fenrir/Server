@@ -25,8 +25,10 @@ namespace Fenrir.Application.Game.Stats;
 ///     animal/mount system (Tier-1 grade multiplier and Tier-2 flat-per-point additive; only Tier-2b absorb is
 ///     live, see <see cref="MountAbsorbPrimaryBonus" />) and full PETSYSTEM beyond
 ///     <see cref="PetStatContribution" />'s Life/Mana/AttackPower/DefensePower/SteppedAttackBonus (the graded
-///     IS/IU/IM ladders and amulet flat tables are built but unwired, see
-///     <c>StatCalculator.PetContribution.cs</c>); the decoration ReturnNewStat IU/IM/IZ octets specifically --
+///     IS/IU/IM ladders are built but unwired pending a runtime packed-graded-value field; the amulet flat
+///     ATTACK/DEFENSE tables are wired into <see cref="ComputeAttackPower" />/<see cref="ComputeDefensePower" />
+///     for their 6 non-Phoenix-overlapping ids only, see <c>StatCalculator.PetContribution.cs</c>); the
+///     decoration ReturnNewStat IU/IM/IZ octets specifically --
 ///     WORKSTREAM B3-deco wired ReturnIUEffectValue effect-sorts 2-6 and the IS-only decoration contribution
 ///     (see <c>StatCalculator.DecoUpgradeContribution.cs</c>), but IU/IM/IZ stay unwired for decoration items
 ///     since no legacy citation supports them there (see <see cref="DecorationStatContribution" />'s remarks);

@@ -1,16 +1,15 @@
 namespace Fenrir.Data.Abstractions.Runtime;
 
 /// <summary>
-///     Implemented by the <c>*.Services</c>-side party authority (a future <c>PartyResyncRelayHandler</c> with
-///     access to this shard's live <c>PartyRegistry</c>) and registered in DI alongside it.
+///     Implemented by the <c>*.Services</c>-side party authority (<c>PartyResyncRelayHandler</c>, with access
+///     to this shard's live <c>PartyRegistry</c>/<c>ZoneRegistry</c>) and registered in DI alongside it.
 ///     <c>PartyResyncRelayHost</c>'s own inbound poll routes every delivered row to this handler; it
 ///     deliberately does not reconcile anything itself (unlike its fan-out sibling
 ///     <c>GuildTribeBroadcastRelayHost</c>, which delivers guild/tribe chat directly), because party
 ///     reconciliation needs each shard's own in-memory membership table -- exactly the "route to a handler, do
-///     not deliver generically" split its point-to-point sibling <c>SocialCrossShardRelayHost</c> uses. When no
-///     handler is registered (the current state -- the reconciliation authority is a follow-up not in this
-///     task), a delivered row is logged and dropped, which costs nothing: same-shard party delivery is entirely
-///     unaffected.
+///     not deliver generically" split its point-to-point sibling <c>SocialCrossShardRelayHost</c> uses. If a
+///     given composition has no handler registered (e.g. a narrower test host), a delivered row is logged and
+///     dropped instead, which costs nothing: same-shard party delivery is entirely unaffected.
 /// </summary>
 public interface IPartyResyncRelayHandler
 {

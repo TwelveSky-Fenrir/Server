@@ -61,7 +61,9 @@ public partial class PlayerRuntimeState
 
     /// <summary>
     ///     aRankBuffType -- CZ_RANK_BUFF_SEND (op111) active buff tier (1-7), 0 = none. MyFactor.cpp's per-tier
-    ///     stat bonuses are not modeled yet -- see <see cref="Handlers.RankBuffHandler" />'s remarks.
+    ///     stat bonuses are modeled by <c>StatCalculator</c>'s <c>RankBuffContribution</c> partial, which reads this
+    ///     field via <c>ZoneContext.RankBuffType</c> (populated in <c>EquipmentService</c>) -- see
+    ///     <see cref="Handlers.RankBuffHandler" />'s remarks for the wire-mechanic side of this field.
     /// </summary>
     public int RankBuffType { get; set; }
 }

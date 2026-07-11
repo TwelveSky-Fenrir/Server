@@ -120,4 +120,45 @@ public class BoxRewardPlacementResolverTests
         Assert.Equal(BoxRewardPlacementResolver.Outcome.PlacedInEmptySlot, result.Outcome);
         Assert.Equal(2, result.Slot);
     }
+
+    // ---- Serial (workstream lucky-ticket-handler-thresholds) --------------------------------------------
+
+    [Fact]
+    public void Resolve_NonStackableReward_CarriesTheCallerSuppliedSerial()
+    {
+        var page0 = ImmutableDictionary<byte, ItemStack>.Empty.SetItem(0, Filler);
+
+        var reward = new BoxRewardPlacementResolver.ResolvedReward(700, 0, false, 0, 0, 0, 0, 0, 100000001);
+        var result = BoxRewardPlacementResolver.Resolve(reward, 0, 0, page0,
+            ImmutableDictionary<byte, ItemStack>.Empty);
+
+        Assert.Equal(BoxRewardPlacementResolver.Outcome.PlacedInEmptySlot, result.Outcome);
+        Assert.Equal(100000001, result.NewStack!.Value.Serial);
+    }
+
+    [Fact]
+    public void Resolve_StackableReward_StripsTheCallerSuppliedSerialBackToZero()
+    {
+        var page0 = ImmutableDictionary<byte, ItemStack>.Empty.SetItem(0, Filler);
+
+        // Even though a non-zero Serial is supplied, a stackable reward is always stripped back to 0 -- the
+        // same stackable-safety step that already strips value/expiry.
+        var reward = new BoxRewardPlacementResolver.ResolvedReward(700, 1, true, 0, 0, 0, 0, 0, 100000001);
+        var result = BoxRewardPlacementResolver.Resolve(reward, 0, 0, page0,
+            ImmutableDictionary<byte, ItemStack>.Empty);
+
+        Assert.Equal(BoxRewardPlacementResolver.Outcome.PlacedInEmptySlot, result.Outcome);
+        Assert.Equal(0, result.NewStack!.Value.Serial);
+    }
+
+    [Fact]
+    public void Resolve_DefaultSerial_IsZero_MatchingEveryPreExistingCaller()
+    {
+        var page0 = ImmutableDictionary<byte, ItemStack>.Empty.SetItem(0, Filler);
+
+        var result = BoxRewardPlacementResolver.Resolve(Reward(700, 1, false), 0, 0, page0,
+            ImmutableDictionary<byte, ItemStack>.Empty);
+
+        Assert.Equal(0, result.NewStack!.Value.Serial);
+    }
 }

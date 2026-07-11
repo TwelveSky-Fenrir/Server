@@ -131,6 +131,12 @@ public static class ZoneTransfer
             EatStrPotion: state.EatStrPotion,
             EatDexPotion: state.EatDexPotion,
             EatElePotion: state.EatElePotion,
+            // Lucky Drop/"Acquisition" Scroll minutes counter must travel here too, or it silently resets to 0
+            // on every in-process zone transfer -- see PlayerRuntimeState.DropItemTime's own remarks.
+            DropItemTime: state.DropItemTime,
+            // War Point currency balance must travel here too, or it silently resets to 0 on every in-process
+            // zone transfer -- see PlayerRuntimeState.WarPoint's own remarks.
+            WarPoint: state.WarPoint,
             // Quest step/kill-counter tracking, the daily-mission counters, auto-hunt config, both auto-potion
             // ratios, and pet growth/activity must travel here too, or they silently reset to their zero/
             // disabled default on every in-process zone transfer -- same "must travel or it resets" posture as
@@ -167,10 +173,20 @@ public static class ZoneTransfer
             StoreMoney: state.StoreMoney,
             InventoryDate: state.InventoryDate,
             StoreDate: state.StoreDate,
+            // aPetBagDate must travel here too, or it would silently reset to 0 on every in-process zone
+            // transfer -- see PlayerRuntimeState.PetBagDate's own remarks.
+            PetBagDate: state.PetBagDate,
+            // The M15 Pet Lucky Box (8111) pity counter must travel here too, or it would silently reset to 0
+            // on every in-process zone transfer -- see PlayerRuntimeState.M15PetLuckyBoxPity's own remarks.
+            M15PetLuckyBoxPity: state.M15PetLuckyBoxPity,
             // Carries the live source-IP through the handoff too, or the PvP same-origin kill-credit guard
             // would silently go blind (null vs null never proves same-origin) for every character past their
             // first in-process zone transfer -- see PlayerRuntimeState.SourceIp's own remarks.
-            SourceIp: state.SourceIp);
+            SourceIp: state.SourceIp,
+            // Live rune-socket arrays must travel here too, or a character's socketed runes would silently
+            // reset to empty on every in-process zone transfer -- see PlayerEnterData.RuneSystem's own remarks.
+            RuneSystem: state.RuneSystem,
+            RuneSystemStat: state.RuneSystemStat);
     }
 }
 

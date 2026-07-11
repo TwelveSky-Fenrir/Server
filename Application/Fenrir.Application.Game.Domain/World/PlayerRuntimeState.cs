@@ -142,14 +142,23 @@ public sealed partial class PlayerRuntimeState
     public int Zone241Time { get; set; }
 
     /// <summary>
-    ///     War Point stat -- wire-exposed via <c>AvatarInfo.WarPoint</c> (still always sent as 0 from
-    ///     <c>AvatarInfoTemplates</c>, since this field isn't hydrated from a persisted source at zone entry
-    ///     yet). Granted only via <see cref="Zone.GrantWarPoints" /> -- the Regular-War-host kill-reward override
-    ///     (<c>Zone.ApplyRegularWarCpOverride</c>) and the boss/event monster-drop tier
-    ///     (<c>World.Loot.BossEventDropResolver</c>, identifiers 746/9001). Not yet persisted: no
-    ///     <c>game.Characters</c> column/repository DTO carries this field today, so it resets to 0 on every
-    ///     zone (re)entry until a follow-up adds one -- same "not modeled" posture
-    ///     <c>World.Npcs.NpcShopPolicy</c>'s own remarks describe for the separate WarPoint-shop branch.
+    ///     War Point stat -- wire-exposed via <c>AvatarInfo.WarPoint</c> (now reflects the real persisted
+    ///     value via <c>AvatarInfoFactory</c>). Hydrated at world entry from <c>game.Characters.WarPoint</c>
+    ///     (<c>Migrations/041_characters_warpoint_currency.sql</c>, via <c>CharacterWorldSnapshotDto.WarPoint</c>
+    ///     / <c>PlayerEnterData.WarPoint</c> / <c>EnterWorldService</c>) and carried through an in-process zone
+    ///     transfer by <see cref="ZoneTransfer.CreateEnterData" />, closing that migration's own flagged
+    ///     read-side follow-up. Granted only via <see cref="Zone.GrantWarPoints" /> -- the Regular-War-host
+    ///     kill-reward override (<c>Zone.ApplyRegularWarCpOverride</c>) and the boss/event monster-drop tier
+    ///     (<c>World.Loot.BossEventDropResolver</c>, identifiers 746/9001). The GRANT side remains unpersisted,
+    ///     deliberately: unlike the five Eat*Potion counters, War-Point is a spendable balance in the same
+    ///     family as Money/BloodCoin/BigMoney (see <c>IWarPointRepository</c>'s own header), which this
+    ///     codebase always keeps OUT of the write-behind progress batch so a last-write-wins flush can never
+    ///     clobber a balance -- <c>usp_Character_BuyWarPointItem</c> is the only existing atomic mutator, and
+    ///     it only debits. Adding a credit-side atomic procedure for <see cref="Zone.GrantWarPoints" /> is a
+    ///     genuine new-stored-procedure design decision, not a mechanical wiring gap, and is intentionally left
+    ///     open rather than guessed at here -- a mid-session grant is still correctly reflected to the granted
+    ///     client (the existing <c>AvatarStatUpdateResponse</c> push) and in this in-memory mirror, but does
+    ///     not yet survive a relog/disconnect.
     /// </summary>
     public int WarPoint { get; set; }
 

@@ -16,6 +16,16 @@ public static class PshopPurchasePolicy
     {
         Success,
         UnknownItem,
+
+        /// <summary>
+        ///     <c>ITEM_INFO.iCheckAvatarShop == 1</c> -- item is barred from personal/proxy-shop sale entirely
+        ///     (S04_MyWork02.cpp:6150-6154). Checked immediately after item-definition resolution and before the
+        ///     sell-price/stack-quantity/inventory-match checks below, identically for both stall kinds (personal
+        ///     <c>tSort == 1</c>, proxy <c>tSort == 2</c>). Rejects the whole CZ_START_PSHOP_SEND request on the
+        ///     first offending slot found, not just that slot -- see <see cref="ValidateOpenSlot" />'s remarks.
+        /// </summary>
+        BarredFromShopSale,
+
         PriceOutOfRange,
         InvalidStackQuantity,
 
@@ -57,13 +67,18 @@ public static class PshopPurchasePolicy
     }
 
     /// <summary>
-    ///     iCheckAvatarShop (item barred from personal-shop sale) is not modeled -- no such field exists on ItemRowDto
-    ///     yet.
+    ///     Per-slot validation loop, S04_MyWork02.cpp:6136-6184. The <see cref="OpenSlotOutcome.BarredFromShopSale" />
+    ///     check (iCheckAvatarShop == 1, :6150-6154) is a caller-wide reject like every other non-Success outcome
+    ///     here -- <c>OpenShopStallService</c> disconnects the whole session on any of them, never opening a
+    ///     partial stall and never distinguishing which per-slot rule fired to the client.
     /// </summary>
     public static OpenSlotOutcome ValidateOpenSlot(SlotView slot, ItemDefinition? itemDefinition, ItemStack? liveSlot)
     {
         if (itemDefinition is null)
             return OpenSlotOutcome.UnknownItem;
+
+        if (itemDefinition.Item.CheckAvatarShop == 1)
+            return OpenSlotOutcome.BarredFromShopSale;
 
         if (slot.Price is < 1 or > MaxSellPrice)
             return OpenSlotOutcome.PriceOutOfRange;

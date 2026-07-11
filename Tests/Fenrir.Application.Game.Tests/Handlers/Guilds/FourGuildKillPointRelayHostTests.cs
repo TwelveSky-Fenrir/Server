@@ -33,7 +33,7 @@ public sealed class FourGuildKillPointRelayHostTests
     {
         var repository = new FakeFourGuildScoringRepository();
         var scoring = new FourGuildScoringService(repository, NullLogger<FourGuildScoringService>.Instance);
-        await using var host =
+        using var host =
             new FourGuildKillPointRelayHost(scoring, NullLogger<FourGuildKillPointRelayHost>.Instance);
 
         await host.StartAsync(CancellationToken.None);
@@ -51,7 +51,7 @@ public sealed class FourGuildKillPointRelayHostTests
     {
         var repository = new FakeFourGuildScoringRepository();
         var scoring = new FourGuildScoringService(repository, NullLogger<FourGuildScoringService>.Instance);
-        await using var host =
+        using var host =
             new FourGuildKillPointRelayHost(scoring, NullLogger<FourGuildKillPointRelayHost>.Instance);
 
         await host.StartAsync(CancellationToken.None);

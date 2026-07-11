@@ -10,14 +10,23 @@ namespace Fenrir.Application.Game.Domain.World.Monsters;
 /// </summary>
 /// <remarks>
 ///     Deliberately a pure computation over a snapshot (<see cref="MonsterEntity.SnapshotAttackDamage" />), not a
-///     mutator of <see cref="MonsterEntity" />'s live table -- <see cref="MonsterEntity" /> exposes no in-place
-///     "replace the attacker table with these survivors" mutator yet, and wiring one (plus wiring
-///     <see cref="Result.HasValidAttackers" /> into <see cref="MonsterAiSystem" />'s idle/chase dispatch the way
-///     legacy's own caller immediately branches on it, <c>S07_MyGame05.cpp:1070-1074</c>) is left to a follow-up
-///     integration pass rather than made here -- see this type's own behavior-contract session notes for the exact
-///     snippets that pass needs. <see cref="MonsterAiSystem.RunChase" />'s existing single-locked-target prune
-///     (its own <c>AdjustValidAttackTarget</c> citation) is a narrower, already-wired predecessor of this fuller,
-///     whole-table mechanism -- the two are not yet unified.
+///     mutator of <see cref="MonsterEntity" />'s live table itself -- <see cref="MonsterEntity.ReplaceAttackDamage" />
+///     is the in-place "replace the attacker table with these survivors" write-back this pass needs.
+///     <para>
+///         UPDATE (2026-07-11, recovered <c>monster-ai-recipe-bodies</c> behavior contract): the call site this
+///         type's own remarks used to flag as missing is now wired --
+///         <see cref="MonsterAiSystem" />'s Standard-recipe decision tick (its private
+///         <c>RunPrunedAttackerEngagement</c>) calls <see cref="Prune" /> then
+///         <see cref="MonsterEntity.ReplaceAttackDamage" /> unconditionally once reached, and the
+///         <see cref="Result.HasValidAttackers" /> true/false branch the previous remark flagged as unresolved
+///         is now grounded: false means no transition at all this tick (<c>S07_MyGame05.cpp:1071-1074</c>'s
+///         post-prune empty-table bail); true feeds the recovered survivor-selection recipe (per-entry
+///         melee-range coin flip, uniform fallback, melee/chase/walk-home branch) -- see that method's own
+///         remarks for the full citation trail. <see cref="MonsterAiSystem.RunChase" />'s existing
+///         single-locked-target prune (its own <c>AdjustValidAttackTarget</c> citation) remains a narrower,
+///         separately-wired predecessor of this fuller, whole-table mechanism -- the two are still not unified
+///         (an open question the recovered contract explicitly left unresolved, not this session's to decide).
+///     </para>
 /// </remarks>
 public static class MonsterAggroListPruner
 {
@@ -66,7 +75,10 @@ public static class MonsterAggroListPruner
     ///     (<see cref="MonsterAiSystem.TryAcquireTarget" />'s own anti-clump check, <c>CountOtherPursuers</c>, is
     ///     this same idiom already scoped to one zone's own monster population -- see
     ///     <see cref="CountOtherPursuers" />'s own remarks for why that zone-local scope is a faithful narrowing
-    ///     of the contract's shard-wide framing, not an approximation of different behavior).
+    ///     of the contract's shard-wide framing, not an approximation of different behavior). Typed as
+    ///     <see cref="IEnumerable{T}" /> (not <see cref="IReadOnlyList{T}" />) specifically so
+    ///     <see cref="MonsterAiSystem" /> can pass <see cref="Zone.MonstersSnapshot" /> straight through --
+    ///     nothing here ever needs indexed access, only a single forward scan (<see cref="CountOtherPursuers" />).
     /// </param>
     /// <param name="resultBuffer">
     ///     Optional reused scratch list -- cleared and refilled in place, avoiding a fresh allocation on a hot
@@ -74,7 +86,7 @@ public static class MonsterAggroListPruner
     ///     (valid only until the caller's next <see cref="Prune" /> call reusing it); when omitted, a fresh list
     ///     is allocated and safe to keep indefinitely.
     /// </param>
-    public static Result Prune(Zone zone, MonsterEntity monster, IReadOnlyList<MonsterEntity> allMonsters,
+    public static Result Prune(Zone zone, MonsterEntity monster, IEnumerable<MonsterEntity> allMonsters,
         List<Survivor>? resultBuffer = null)
     {
         var survivors = resultBuffer ?? [];
@@ -117,7 +129,7 @@ public static class MonsterAggroListPruner
     ///     already-documented action-state gap, and see this type's own behavior-contract open questions for the
     ///     grid gap -- the contract itself could not recover the grid-cell-size value needed to reproduce it).
     /// </summary>
-    private static bool TryEvaluateEntry(Zone zone, MonsterEntity monster, IReadOnlyList<MonsterEntity> allMonsters,
+    private static bool TryEvaluateEntry(Zone zone, MonsterEntity monster, IEnumerable<MonsterEntity> allMonsters,
         MonsterAttackDamageEntry entry, float meleeRadiusSq, float leashRadiusSq, out float distanceSquared)
     {
         distanceSquared = 0f;
@@ -178,7 +190,7 @@ public static class MonsterAggroListPruner
     ///     (same counting rule, same states-count-as-"attacking" set), duplicated here rather than shared since
     ///     that method is private to its own file.
     /// </summary>
-    private static int CountOtherPursuers(IReadOnlyList<MonsterEntity> allMonsters, MonsterEntity monster,
+    private static int CountOtherPursuers(IEnumerable<MonsterEntity> allMonsters, MonsterEntity monster,
         int candidateCharacterId)
     {
         var count = 0;

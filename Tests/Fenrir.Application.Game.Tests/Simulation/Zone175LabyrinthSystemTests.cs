@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Monsters;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
+using Fenrir.Network.Dispatch.Sessions;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Simulation;
@@ -93,6 +94,20 @@ public sealed class Zone175LabyrinthSystemTests
         state.IsMovingZone = false;
         state.IsDead = true; // dead but present -> STILL counts as present
         Assert.True(zone.HasAnyZone175QualifyingPlayer());
+    }
+
+    [Fact]
+    public void ForceDisconnectAllForZone175_AbortsEverySessionWithTheMissionsOwnDisconnectReason()
+    {
+        var zone = ZoneTestKit.CreateZone(LabyrinthMapId);
+        var (session, _) = ZoneTestKit.CreateSession(10);
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, zone.MapId)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+        Assert.True(zone.TryGetPlayer(10, out _));
+
+        zone.ForceDisconnectAllForZone175();
+
+        Assert.Equal(DisconnectReason.LabyrinthMissionEnded, session.DisconnectReason);
     }
 
     [Fact]

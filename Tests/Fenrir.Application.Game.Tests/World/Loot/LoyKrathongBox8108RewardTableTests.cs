@@ -171,7 +171,7 @@ public class LoyKrathongBox8108RewardTableTests
     {
         var random = new Random(20260711);
 
-        foreach (byte tribe in [0, 1, 2])
+        foreach (byte tribe in new byte[] { 0, 1, 2 })
             for (var i = 0; i < 5_000; i++)
             {
                 var result = LoyKrathongBox8108RewardTable.Roll(tribe, random);

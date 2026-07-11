@@ -196,6 +196,39 @@ public class GuildInviteServiceTests
         Assert.Equal(GuildInviteAskResultKind.TargetBusy, result);
     }
 
+    /// <summary>
+    ///     Legacy <c>IsMovingZone()</c> gate (Server/ts25zone/H03_MyUser.h:15), target-only -- re-verified
+    ///     2026-07-11 and wired into the target-busy check alongside stun/death.
+    /// </summary>
+    [Fact]
+    public async Task Ask_TargetMovingZone_ReturnsTargetBusy()
+    {
+        var (zone, asker, target) = MakeAskerAndTarget();
+        target.IsMovingZone = true;
+        var service = CreateService();
+
+        var result = await service.AskAsync(zone, asker, target.Name, CancellationToken.None);
+
+        Assert.Equal(GuildInviteAskResultKind.TargetBusy, result);
+    }
+
+    /// <summary>
+    ///     Legacy's <c>IsMovingZone()</c> gate only ever checks the target, never the requester (matching
+    ///     <c>UnstunResolver</c>'s own cure-attempt pattern) -- an asker mid zone-transfer must NOT be rejected
+    ///     by this flag.
+    /// </summary>
+    [Fact]
+    public async Task Ask_AskerMovingZone_DoesNotBlockAsk()
+    {
+        var (zone, asker, target) = MakeAskerAndTarget();
+        asker.IsMovingZone = true;
+        var service = CreateService();
+
+        var result = await service.AskAsync(zone, asker, target.Name, CancellationToken.None);
+
+        Assert.Equal(GuildInviteAskResultKind.Sent, result);
+    }
+
     /// <summary>WS1.4 ASK-PUBLISH-ONLY: a same-shard miss that resolves cross-shard publishes an Ask.</summary>
     [Fact]
     public async Task Ask_SameShardMiss_ResolvesCrossShard_PublishesAskAndReturnsSentCrossShard()

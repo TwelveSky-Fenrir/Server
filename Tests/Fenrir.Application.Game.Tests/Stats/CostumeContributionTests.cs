@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Domain.Enchant;
 using Fenrir.Application.Game.Stats;
 
 namespace Fenrir.Application.Game.Tests.Stats;
@@ -40,7 +41,7 @@ public class CostumeContributionTests
     public void ValidCostume_IncludesEnumeratedIds(int costumeId)
     {
         Assert.True(StatCalculator.IsValidCostume(costumeId));
-        Assert.True(StatCalculator.ValidCostumeIds.Contains(costumeId));
+        Assert.Contains(costumeId, StatCalculator.ValidCostumeIds);
     }
 
     [Theory]
@@ -58,7 +59,7 @@ public class CostumeContributionTests
     public void ValidCostume_ExcludesCommentedOutAndGapIds(int costumeId)
     {
         Assert.False(StatCalculator.IsValidCostume(costumeId));
-        Assert.False(StatCalculator.ValidCostumeIds.Contains(costumeId));
+        Assert.DoesNotContain(costumeId, StatCalculator.ValidCostumeIds);
     }
 
     // ---- Deco-stat set reuse (function.h:2030-2072, same legacy list as IsCustomDecoStatItem) ----
@@ -252,6 +253,31 @@ public class CostumeContributionTests
     public void CriticalContribution_GuardsPositive_WithNinetySixSentinel(int cs, int expected)
     {
         Assert.Equal(expected, StatCalculator.CostumeCriticalContribution(cs));
+    }
+
+    // ---- 96-sentinel rationale, recovered by workstream costume-contribution-magnitude96 ----
+    // (MyFactor.cpp:3409-3414 unchanged; this documents/asserts WHY 96 is special, not a new rule.)
+
+    [Fact]
+    public void CriticalContribution_NinetySixSentinel_MatchesCostumeEnchantHardCap()
+    {
+        // 96 is not an arbitrary Critical-formula constant: it is the literal ceiling the costume-enchant
+        // magnitude can ever reach (CostumeImproveResolver rejects any attempt at/above this value,
+        // Server/ts25zone/S04_MyWork02.cpp:2616-2623) -- the two constants must stay in lockstep.
+        Assert.Equal(96, CostumeImproveResolver.MaxCostumeImprove);
+    }
+
+    [Fact]
+    public void CriticalContribution_AtCap_IsDistinguishableFromTheNearMaxRange()
+    {
+        // Plain truncating division by 10 collapses every magnitude 90-95 to the same value (9) a
+        // genuinely-maxed 96 would otherwise also produce -- the +10 special case is what keeps a
+        // fully-maxed enchant numerically distinguishable from a merely-near-max one.
+        for (var cs = 90; cs <= 95; cs++)
+            Assert.Equal(9, StatCalculator.CostumeCriticalContribution(cs));
+
+        Assert.Equal(10, StatCalculator.CostumeCriticalContribution(96));
+        Assert.NotEqual(95 / 10, StatCalculator.CostumeCriticalContribution(96));
     }
 
     [Fact]

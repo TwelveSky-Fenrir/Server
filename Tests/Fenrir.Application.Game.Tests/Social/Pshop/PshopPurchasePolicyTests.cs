@@ -121,6 +121,34 @@ public class PshopPurchasePolicyTests
     }
 
     [Fact]
+    public void ValidateOpenSlot_ItemCheckAvatarShopEqualsOne_IsBarredFromShopSale()
+    {
+        // ITEM_INFO.iCheckAvatarShop == 1 (S04_MyWork02.cpp:6150-6154): barred from personal/proxy-shop sale
+        // entirely, checked ahead of the sell-price/stack-quantity/inventory-match checks below.
+        var itemDefinition = new ItemDefinition(Item(100, 3).Item with { CheckAvatarShop = 1 }, []);
+        var slot = PshopPurchasePolicy.ReadSlot(
+            WithSlot(0, 0, 100, 1, 0, 5, 500, 0, 0, 0, 0), 0, 0);
+        var liveStack = new ItemStack(100, 1, 0, 0, 0, 0, 0, 0, 0, 0, 5);
+
+        Assert.Equal(PshopPurchasePolicy.OpenSlotOutcome.BarredFromShopSale,
+            PshopPurchasePolicy.ValidateOpenSlot(slot, itemDefinition, liveStack));
+    }
+
+    [Fact]
+    public void ValidateOpenSlot_ItemCheckAvatarShopEqualsTwo_PassesThisCheck()
+    {
+        // The check tests equality to 1 only; every other value (2, the only other value the shared item
+        // table's own load-time range validation permits) passes through to the next per-slot rule.
+        var itemDefinition = new ItemDefinition(Item(100, 3).Item with { CheckAvatarShop = 2 }, []);
+        var slot = PshopPurchasePolicy.ReadSlot(
+            WithSlot(0, 0, 100, 1, 0, 5, 500, 0, 0, 0, 0), 0, 0);
+        var liveStack = new ItemStack(100, 1, 0, 0, 0, 0, 0, 0, 0, 0, 5);
+
+        Assert.Equal(PshopPurchasePolicy.OpenSlotOutcome.Success,
+            PshopPurchasePolicy.ValidateOpenSlot(slot, itemDefinition, liveStack));
+    }
+
+    [Fact]
     public void ResolvePurchase_EmptyDestination_PlacesTheFullListedStack()
     {
         var itemDefinition = Item(100, 3);

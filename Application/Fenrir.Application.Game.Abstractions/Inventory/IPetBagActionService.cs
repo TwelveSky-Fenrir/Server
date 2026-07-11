@@ -18,9 +18,12 @@ namespace Fenrir.Application.Game.Abstractions.Inventory;
 ///     underlying <c>Server/ts25zone/S04_MyWork05.cpp</c> ranges this orchestrates. The three
 ///     entitlement/precondition bools each method takes (pet equipped, pet-bag upper-half rented window,
 ///     second-inventory-page rented window) are caller-resolved, same posture as the policy's own inputs --
-///     <c>PlayerRuntimeState</c> already carries the entitlement dates
-///     (<c>PlayerRuntimeState.PetBagUpperHalfEntitlementExpiryUtc</c>-equivalent is NOT modeled yet; see the C8
-///     wiring manifest's own open question) so callers pass a conservative default until that lands.
+///     <c>PlayerRuntimeState</c> now carries both entitlement dates
+///     (<see cref="PlayerRuntimeState.PetBagDate" />, the sibling <c>PlayerRuntimeState.InventoryDate</c>), so
+///     <c>GenericActionHandler</c> resolves both bools from <c>state.PetBagDate/InventoryDate &gt;=
+///     GameDate.Today()</c> rather than a hardcoded placeholder -- see <c>PlayerRuntimeState.PetBagDate</c>'s
+///     own remarks for why every character reads as expired today (no citation anywhere establishes a real
+///     grant mechanism yet).
 /// </remarks>
 public interface IPetBagActionService
 {

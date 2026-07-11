@@ -29,10 +29,12 @@ namespace Fenrir.Application.Game.Hosting;
 ///         row itself -- party reconciliation needs this shard's own live <c>PartyRegistry</c> (which member is
 ///         where, which party is still alive), which belongs in a <c>*.Services</c> handler, not this generic
 ///         poll loop. That is the same "route to a handler, do not deliver generically" split
-///         <see cref="SocialCrossShardRelayHost" /> uses. Until the party-authority <c>*.Services</c> registry
-///         registers its own <see cref="IPartyResyncRelayHandler" />, a delivered row is logged and dropped --
-///         same fail-safe posture as <see cref="SocialCrossShardRelayHost" />'s own no-registered-handler case,
-///         and it costs nothing: same-shard party membership is entirely unaffected either way.
+///         <see cref="SocialCrossShardRelayHost" /> uses. The party-authority <c>*.Services</c> registry
+///         (<c>PartyResyncRelayHandler</c>) registers itself as <see cref="IPartyResyncRelayHandler" />; if a
+///         given composition has none registered (e.g. a narrower test host), a delivered row is logged and
+///         dropped instead -- same fail-safe posture as <see cref="SocialCrossShardRelayHost" />'s own
+///         no-registered-handler case, and it costs nothing: same-shard party membership is entirely
+///         unaffected either way.
 ///     </para>
 ///     <para>
 ///         Per-entry/per-row isolation on both loops -- one failed publish or one unhandled inbound row must
@@ -167,7 +169,7 @@ public sealed class PartyResyncRelayHost(
         {
             logger.LogWarning(
                 "Relayed party-resync row {RelayId} (sort {Sort}, party {PartyName}) has no registered " +
-                "IPartyResyncRelayHandler; dropped -- the party-reconciliation authority is a follow-up not yet wired",
+                "IPartyResyncRelayHandler in this composition; dropped -- same-shard party membership is unaffected",
                 dto.RelayId, dto.Sort, dto.PartyName);
             return;
         }

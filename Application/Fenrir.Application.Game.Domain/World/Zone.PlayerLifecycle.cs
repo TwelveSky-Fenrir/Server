@@ -305,7 +305,7 @@ public sealed partial class Zone
         if (_partyResyncRelayQueue is null || _partyRegistry.IsInParty(characterId))
             return;
 
-        _partyResyncRelayQueue.Enqueue(new PartyResyncRelayEntry(
+        _partyResyncRelayQueue.Value.Enqueue(new PartyResyncRelayEntry(
             (byte)PartyResyncRelaySort.Request, options.ShardId, characterId, avatarName, avatarName));
     }
 

@@ -47,7 +47,7 @@ public sealed partial class Zone(
     IEventLogQueue? eventLogQueue = null,
     IFourGuildKillPointQueue? fourGuildKillPointQueue = null,
     TribeSymbolCombatModifiers? tribeSymbolCombatModifiers = null,
-    IPartyResyncRelayQueue? partyResyncRelayQueue = null) : IZoneActor
+    Lazy<IPartyResyncRelayQueue>? partyResyncRelayQueue = null) : IZoneActor
 {
     private const int InboxCapacity = 8192;
 
@@ -73,7 +73,7 @@ public sealed partial class Zone(
 
     private readonly PartyRegistry _partyRegistry = partyRegistry ?? new PartyRegistry();
 
-    private readonly IPartyResyncRelayQueue? _partyResyncRelayQueue = partyResyncRelayQueue;
+    private readonly Lazy<IPartyResyncRelayQueue>? _partyResyncRelayQueue = partyResyncRelayQueue;
 
     private readonly ConcurrentDictionary<int, PlayerRuntimeState> _players = new();
 

@@ -31,7 +31,7 @@ public sealed class ZoneRegistry
     private readonly MovementRules _movementRules;
     private readonly GameServerOptions _options;
     private readonly PartyRegistry? _partyRegistry;
-    private readonly IPartyResyncRelayQueue? _partyResyncRelayQueue;
+    private readonly Lazy<IPartyResyncRelayQueue>? _partyResyncRelayQueue;
     private readonly QuestCatalog _questCatalog;
     private readonly RegularWarActiveMapTracker? _regularWarActiveMapTracker;
     private readonly ImmutableArray<ISimulationSystem> _systems;
@@ -55,7 +55,7 @@ public sealed class ZoneRegistry
         IEventLogQueue? eventLogQueue = null,
         IFourGuildKillPointQueue? fourGuildKillPointQueue = null,
         TribeSymbolCombatModifiers? tribeSymbolCombatModifiers = null,
-        IPartyResyncRelayQueue? partyResyncRelayQueue = null)
+        Lazy<IPartyResyncRelayQueue>? partyResyncRelayQueue = null)
     {
         _options = options.Value;
         _movementRules = movementRules;

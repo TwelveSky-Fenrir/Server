@@ -14,15 +14,21 @@ namespace Fenrir.Application.Game.Services.Tribes;
 ///     Server/ts25zone/S04_MyWork02.cpp:806, tier populated from the player-session-tracking process's own
 ///     per-account tier at login) -- the same <c>uUserSort</c>/<see cref="GmCommandTier" /> concept
 ///     <see cref="Chat.GlobalAnnouncementService" /> and <see cref="Gm.GmBlockAvatarService" /> already gate
-///     on. Sort 2 (deposit) is legacy's one mutating tribe-bank operation,
-///     client-invocable by an unmodified legacy client (Server/ts25zone/S04_MyWork02.cpp:11560-11607):
-///     Force Leader role only (sub-masters cannot deposit even though they can view), plus a requirement
-///     that the tribe already have at least 3 appointed sub-masters, plus the slot-range gate -- violating
-///     any one of the three collapses to the same hard-disconnect outcome, matching legacy's undifferentiated
-///     <c>Quit()</c>. There is no legacy sub-command on this opcode that moves money from the tribe bank to a
-///     player; the previous revision of this service wired Sort 2 to a bank-to-player withdraw and invented a
-///     Sort 3 "deposit" with no legacy counterpart -- both the wiring and the doc claims backing it were
-///     wrong, corrected per a freshly re-derived behavior contract off the same citation.
+///     on.
+///     <para>
+///         <b>Correction:</b> a fresh, definitive full read of
+///         Server/ts25zone/S04_MyWork02.cpp:11560-11607 and Server/ts25playuser/S04_MyWork02.cpp:269-377
+///         resolved a 3-way contradiction between this file, <see cref="ITribeBankService" />, and
+///         <c>TribeBankWithdrawService</c>: CZ_TRIBE_BANK_SEND sort 2 is exclusively a WITHDRAW (bank slot
+///         -&gt; player money, now wired via <c>TribeBankWithdrawService.WithdrawAsync</c> in
+///         <see cref="Handlers.Tribes.TribeBankHandler" />), not a deposit. Legacy has no client-invocable
+///         deposit path anywhere on this opcode, or anywhere else -- deposits only happen via the automatic
+///         10-minute server-internal tax-skim sweep (<c>TribeBankTaxSweepFlushHost</c>), never a packet. The
+///         <see cref="DepositAsync" /> method below (player money -&gt; bank slot, Force Leader role only,
+///         same 3-sub-master-quorum and slot-range gates as the withdraw) is consequently no longer reachable
+///         from any opcode -- it is kept, not deleted, pending a decision on whether it should be removed
+///         outright, since it turns out to have no legacy basis as a client-invoked action at all.
+///     </para>
 /// </summary>
 public sealed class TribeBankService(ITribeRepository tribes, ILogger<TribeBankService> logger) : ITribeBankService
 {
@@ -46,6 +52,12 @@ public sealed class TribeBankService(ITribeRepository tribes, ILogger<TribeBankS
         return new TribeBankResult(true, 1, BuildBankArray(slots), 0);
     }
 
+    /// <summary>
+    ///     Player money -&gt; tribe-bank slot. No longer reachable from any opcode -- see this class's own
+    ///     summary for the corrected finding that legacy has no client-invocable deposit path at all. Kept
+    ///     for now rather than deleted; not deleting is an explicit instruction from the correction that
+    ///     surfaced this, pending a separate decision on removing it outright.
+    /// </summary>
     public async ValueTask<TribeBankResult> DepositAsync(int slotValue, PlayerRuntimeState state, int characterId,
         CancellationToken ct)
     {

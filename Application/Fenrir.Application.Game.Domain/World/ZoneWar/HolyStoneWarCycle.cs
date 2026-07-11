@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Microsoft.Extensions.Logging;
@@ -64,10 +65,18 @@ public sealed record HolyStoneWarSite(
 ///         cited wire sort/opcode -- logged only; only the final capture notice reuses the already-modeled
 ///         sort 38 via <see cref="ZoneEventBroadcaster.AnnounceZone038Winner" />, and even that call's payload
 ///         carries only the winning tribe id, not the capturing character's name the contract also calls for;
-///         (2) the previous/new holder's per-tribe "bonus value" (contract: cleared/logged on loss, a fresh
-///         1-3 random value assigned/logged on capture) has no backing field anywhere in
-///         <see cref="WorldStateService" /> -- the random roll is computed and logged here but not persisted,
-///         pending a schema addition from a database-engineer/database-schema owner; (3) candidate
+///         (2) the previous/new holder's per-tribe "bonus value" (contract: cleared on loss, a fresh 1-3 random
+///         value assigned on capture) is now persisted through the per-tribe Zone038-DTM field
+///         (<see cref="ZoneCenterSiegeState.SetZone038DtmValue" />) via <paramref name="siegeIngestor" />'s
+///         <see cref="ZoneCenterBroadcastIngestor.DtmEventCode" /> (1510) path -- the two legacy DTM emits at
+///         S07_MyGame01.cpp:4175 (clear previous holder to 0) and :4184 (set new holder to the 1-3 roll), both
+///         inside this cycle's own :4015-4287 capture body. INFERENCE flagged for cpp-zone-gameplay-analyst
+///         re-check: that the "holy-stone holder bonus" IS the DTM value emitted at :4175/:4184 rests on the
+///         co-location of those citations plus the rvr-siege finding explicitly naming HolyStoneWarCycle the
+///         038-DTM producer; the (0 to clear, 1-3 to set) values themselves are this cycle's own already-cited
+///         contract. Still NOT persisted to SQL -- <see cref="ZoneCenterSiegeState" /> is an in-memory,
+///         restart-transient singleton exactly like the legacy WORLD_INFO it mirrors, so no schema addition is
+///         needed; (3) candidate
 ///         eligibility only checks what <see cref="PlayerRuntimeState" /> actually models today (not dead,
 ///         tribe/ally vs. holder, radius) -- the contract's "not hidden," "not already in the specific
 ///         busy/claiming action state," "still visible," and "not in either of two specific disqualifying
@@ -87,7 +96,8 @@ public sealed class HolyStoneWarCycle(
     ILogger<HolyStoneWarCycle> logger,
     HolyStoneWarSite site,
     IRandomSource? random = null,
-    bool testMode = false)
+    bool testMode = false,
+    ZoneCenterBroadcastIngestor? siegeIngestor = null)
 {
     /// <summary>Ten simulated minutes of "opens in N minutes" countdown steps, plus one final minute before opening.</summary>
     public const int OpeningCountdownMinutes = 10;
@@ -242,9 +252,15 @@ public sealed class HolyStoneWarCycle(
     {
         var previousHolder = worldState.World.Zone038WinTribe;
         if (previousHolder is { } previous)
-            // GAP: no backing "bonus" field to actually clear -- logged only, see class remarks.
-            logger.LogInformation("HolyStoneWar: clearing bonus for previous holder tribe {PreviousHolderTribe}",
+        {
+            // Legacy DTM emit at S07_MyGame01.cpp:4175: clear the losing holder's per-tribe Zone038-DTM value to
+            // 0. Persisted through the ingestor's code-1510 path (no-op if no ingestor was wired, see class
+            // remarks GAP 2).
+            EmitDtmValue(previous, 0);
+            logger.LogInformation(
+                "HolyStoneWar: cleared Zone038-DTM value for previous holder tribe {PreviousHolderTribe}",
                 previous);
+        }
 
         // GAP: sort 38's payload carries only the winning tribe id, not the capturing character's name -- see
         // class remarks. Sets WorldStateService.World.Zone038WinTribe and broadcasts sort 38 in one call --
@@ -256,15 +272,19 @@ public sealed class HolyStoneWarCycle(
             capturer.Tribe, capturer.Name, capturer.CharacterId);
         broadcaster.AnnounceZone038Winner(capturer.Tribe);
 
-        // GAP: no backing field to persist this bonus to -- logged only, see class remarks.
+        // Legacy DTM emit at S07_MyGame01.cpp:4184: assign the new holder's tribe a fresh 1-3 bonus, persisted
+        // through the ingestor's code-1510 path into the per-tribe Zone038-DTM field (no-op if no ingestor was
+        // wired, see class remarks GAP 2).
         var bonus = _random.NextInt32(3) + 1;
+        EmitDtmValue(capturer.Tribe, bonus);
         logger.LogInformation(
-            "HolyStoneWar: new holder tribe {WinningTribe} bonus rolled {Bonus} (not persisted -- no backing field yet)",
+            "HolyStoneWar: new holder tribe {WinningTribe} Zone038-DTM bonus set to {Bonus}",
             capturer.Tribe, bonus);
 
         rewardGateway.GrantCaptureReward(capturer);
         GrantTribeWideParticipationRewards(zone, capturer);
         AdvanceQuestProgressServerWide(capturer.Tribe);
+        PostZone038OccupationCredits(zone, capturer.Tribe);
 
         Phase = HolyStoneWarPhase.Cooldown;
         CooldownRemaining = testMode ? TestModeCooldown : NormalCooldown;
@@ -316,6 +336,42 @@ public sealed class HolyStoneWarCycle(
 
             rewardGateway.AdvanceQuestProgress(player);
         }
+    }
+
+    /// <summary>
+    ///     Contract's Zone038-conclusion qSort-8 credit (Server/ts25zone/S07_MyGame01.cpp:4212-4241): posts one
+    ///     <see cref="ZoneCommand.CreditZone038Occupation" /> per winning-tribe, alive, non-zone-transferring
+    ///     character present on the Stone's own map, for the zone's own tick thread to apply
+    ///     (<see cref="Zone.HandleZone038OccupationCredit" />). Same poster-filters-coarsely /
+    ///     handler-re-validates split as RegularWarSchedulerHost.
+    /// </summary>
+    private static void PostZone038OccupationCredits(Zone zone, byte winningTribe)
+    {
+        foreach (var player in zone.Players)
+        {
+            if (player.Tribe != winningTribe || player.IsDead || player.IsMovingZone)
+                continue;
+
+            zone.Post(ZoneCommand.CreditZone038Occupation(player.CharacterId, winningTribe));
+        }
+    }
+
+    /// <summary>
+    ///     Persists a per-tribe Zone038-DTM value through the ingestor's code-1510 path (which writes
+    ///     <see cref="ZoneCenterSiegeState.SetZone038DtmValue" /> and relays the value cluster-wide), building the
+    ///     130-byte payload <see cref="ZoneCenterBroadcastIngestor" /> expects: tribe id at offset 0, value at
+    ///     offset 4. A no-op when no ingestor was wired (every hand-written test call site, plus any DI wiring
+    ///     that has not yet supplied it -- see class remarks GAP 2).
+    /// </summary>
+    private void EmitDtmValue(byte tribeId, int value)
+    {
+        if (siegeIngestor is null)
+            return;
+
+        Span<byte> payload = stackalloc byte[ZoneCenterBroadcastIngestor.PayloadSize];
+        BinaryPrimitives.WriteInt32LittleEndian(payload[..4], tribeId);
+        BinaryPrimitives.WriteInt32LittleEndian(payload[4..8], value);
+        siegeIngestor.Ingest(ZoneCenterBroadcastIngestor.DtmEventCode, payload);
     }
 
     private static float DistanceSquared(float x1, float z1, float x2, float z2)

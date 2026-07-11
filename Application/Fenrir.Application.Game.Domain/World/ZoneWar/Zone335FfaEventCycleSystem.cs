@@ -167,7 +167,7 @@ public sealed class Zone335FfaEventCycleSystem(
         switch (Phase)
         {
             case Zone335FfaPhase.Idle:
-                AdvanceIdle(legacyTicksElapsed);
+                AdvanceIdle(zone, legacyTicksElapsed);
                 break;
             case Zone335FfaPhase.CountdownArmed:
                 AdvanceCountdownArmed();
@@ -196,7 +196,7 @@ public sealed class Zone335FfaEventCycleSystem(
         }
     }
 
-    private void AdvanceIdle(int legacyTicksElapsed)
+    private void AdvanceIdle(Zone zone, int legacyTicksElapsed)
     {
         var skipWait = startTrigger.ConsumeStartRequest();
 
@@ -209,7 +209,8 @@ public sealed class Zone335FfaEventCycleSystem(
 
         _idleElapsedLegacyTicks = 0;
 
-        // GAP: kill-tracking/leaderboard array clear has no backing structure yet -- see class remarks.
+        // C15: kill-feed leaderboard clear (source contract step 12).
+        zone.ClearKillFeedLeaderboard();
         siegeState.ResetTribeBonusFields();
 
         logger.LogInformation(
@@ -320,8 +321,8 @@ public sealed class Zone335FfaEventCycleSystem(
         if (!lastManStanding && !timerExpired)
             return;
 
-        // GAP: end-of-battle top-1/2/3 kill-leaderboard CP reward (100/50/25) has no backing kill-count
-        // structure to read from yet -- see class remarks.
+        // C15: end-of-battle top-1/2/3 CP reward (source contract steps 9-11), FFA table.
+        zone.ApplyKillFeedEndOfBattleRewards(true, false);
         broadcaster.Value.AnnounceFfaBattleEnd();
 
         _minuteCountdown.Reset();
@@ -370,7 +371,8 @@ public sealed class Zone335FfaEventCycleSystem(
         // GAP: equipment-restore repeat is a no-op here -- see BattlePrep's own remarks.
         ForceReturnEligiblePlayers(zone);
 
-        // GAP: kill-tracking/leaderboard array clear -- no backing structure yet, see class remarks.
+        // C15: kill-feed leaderboard clear (source contract step 12).
+        zone.ClearKillFeedLeaderboard();
 
         broadcaster.Value.AnnounceFfaReset();
 

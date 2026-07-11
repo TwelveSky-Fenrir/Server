@@ -16,16 +16,18 @@ namespace Fenrir.Application.Game.Domain.Combat;
 ///         double-count against MaxLife (<see cref="Stats.StatCalculator" />'s life formula never reads it).
 ///     </para>
 ///     <para>
-///         <b>GAP -- the six tiered MG5ORIGIN slots.</b> The live shipped build (<c>MG5ORIGIN</c> defined)
-///         resolves absorption by first scanning six tiered shield slots in a fixed order and only falling back
-///         to the base slot when none is active; the resolved tier also shifts the broadcast sort code to its
-///         own "slot position + 2". Those six tiered slot indices are NOT enumerated by this behaviour's own
-///         contract (the <c>DecreaseBuff</c>/<c>DecreaseHolyShield</c> bodies were described algorithmically, not
-///         by slot number), and no Fenrir cast path writes any tiered shield slot today, so <see cref="TieredSlots" />
-///         is intentionally empty: the scan below degrades to base-slot-9-only, which is exactly correct for the
-///         current world state and can never corrupt an unrelated buff slot by guessing an index. TODO(legacy):
-///         once <c>cpp-zone-gameplay-analyst</c> hands back the six tiered slot indices, add them here and the
-///         tiered scan/sort-shift becomes live with no other change.
+///         <b>The six tiered MG5ORIGIN slots.</b> The live shipped build (<c>MG5ORIGIN</c> defined) resolves
+///         absorption by first scanning six tiered shield slots in a fixed order and only falling back to the
+///         base slot when none is active; the resolved tier also shifts the broadcast sort code to its own
+///         "slot position + 2" (that sort-shift is a separate, still-unmodeled broadcast concern, not this
+///         class's own arithmetic). B10 grounds <see cref="TieredSlots" /> to the effect-slot tail (indices
+///         29-34, <c>DEFINE.h:331-336</c>'s 35-slot maximum) -- the exact per-slot Holy-Shield-tier identity
+///         (which enchant/skill grade writes which of the six) was not independently re-verified against
+///         <c>DecreaseBuff</c>/<c>DecreaseHolyShield</c>'s own slot-number literals, only the effect-slot range
+///         itself. No Fenrir cast path writes any of these six slots today, so the scan still degrades to
+///         base-slot-9-only in practice -- grounding the indices is inert until a future cast path starts
+///         writing one, and can never corrupt an unrelated buff slot since 29-34 sit past every other named
+///         slot this codebase currently assigns.
 ///     </para>
 /// </remarks>
 public static class HolyShieldResolver
@@ -38,9 +40,13 @@ public static class HolyShieldResolver
 
     /// <summary>
     ///     The six tiered MG5ORIGIN Holy-Shield slots, scanned (in this exact order) ahead of
-    ///     <see cref="BaseSlot" />. Empty until the legacy indices are grounded -- see this class's own remarks.
+    ///     <see cref="BaseSlot" /> -- B10 grounds these to the effect-slot tail per <c>DEFINE.h:331-336</c>'s
+    ///     35-slot effect-slot maximum (loop 29-34). Safe to populate: no Fenrir cast path writes any of these
+    ///     six slots yet, so the tiered scan degrades to the base-slot-9-only fallback exactly as before until a
+    ///     future cast path starts writing one -- see this class's own remarks.
     /// </summary>
-    public static readonly int[] TieredSlots = [];
+    /// <remarks>Réf. C++ : Server/ts25zone/S07_MyGame04.cpp:2689-2749 + Server/Header/Protocol/DEFINE.h:331-336.</remarks>
+    public static readonly int[] TieredSlots = [29, 30, 31, 32, 33, 34];
 
     /// <summary>
     ///     Absorbs up to the active shield's remaining value from <paramref name="incomingDamage" /> (the

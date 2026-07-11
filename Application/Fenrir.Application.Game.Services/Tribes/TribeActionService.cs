@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.Tribes;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Inventory;
@@ -7,6 +6,7 @@ using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
@@ -20,6 +20,7 @@ public sealed class TribeActionService(
     ITribeRepository tribes,
     ICharacterRepository characters,
     WorldDataCache worldData,
+    WorldStateService worldState,
     ILogger<TribeActionService> logger) : ITribeActionService
 {
     private const int TribeWeaponMoneyCost = 100_000_000;
@@ -42,10 +43,6 @@ public sealed class TribeActionService(
     /// </summary>
     private const int MaxRebirth = 6;
 
-    // Indexed by current title rank (0-11) before purchase; the 13th entry is dead but kept for table fidelity.
-    private static readonly int[] TitleCostCp =
-        [800, 1700, 2500, 3400, 4200, 5100, 5900, 6800, 7600, 8500, 9300, 10000, 10000];
-
     /// <summary>
     ///     tSort 1 -- reset spent base stats back into unspent points. Requires level &lt;=39 and a valid tribe-capital
     ///     zone.
@@ -60,7 +57,7 @@ public sealed class TribeActionService(
         var newStatPoints = state.StatPoints + refund;
 
         var attributes = new CharacterBaseAttributes(1, 1, 1, 1, state.Level, state.Tribe, state.PreviousTribe,
-            state.Title, state.Halo, state.RebirthCount);
+            state.Title, state.Halo, state.RebirthCount, state.Level2);
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
         var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
             pet: ComputePetContribution(state, equipmentContainer));
@@ -214,10 +211,26 @@ public sealed class TribeActionService(
     }
 
     /// <summary>
-    ///     tSort 5 -- tribe skill call ability, Force Leader only. The full gate also requires a
-    ///     world-scope "tribe symbol battle" flag that no scheduled job ever sets (that world event is a
-    ///     separate, unimplemented system), so this always aborts today by design, not by omission.
+    ///     tSort 5 -- tribe Formation-ability declaration (B10 branch A), Force Leader only. Declares this
+    ///     character's own tribe's world-scope Formation ability code via
+    ///     <see cref="WorldStateService.SetTribeFormationAbility" /> -- see
+    ///     <see cref="FormationCombatResolver" /> for what a live code does to enemy-class combat math.
     /// </summary>
+    /// <remarks>
+    ///     All five eligibility gates <see cref="WorldStateService.SetTribeFormationAbility" />'s own remarks
+    ///     name are now enforced here, in order: (1) Force Leader role (<c>state.TribeRole == 1</c>) and
+    ///     payload shape/range (<see cref="TribeWorkSkillPayload.TribeSkillSort" />, 0-4) below; then gates
+    ///     (a)-(c) via <see cref="TribeFormationAbilityEligibility" /> -- all four tribes' points above the
+    ///     floor (<see cref="TribeFormationAbilityEligibility.AllTribesAboveFloor" />), the requester's tribe
+    ///     being the strict single lowest by index on a tie
+    ///     (<see cref="TribeFormationAbilityEligibility.FindLowestPointTribe" />), and that tribe's share of
+    ///     the combined total under twenty percent (<see cref="TribeFormationAbilityEligibility.IsUnderShareThreshold" />,
+    ///     evaluated only once gate (a) has already passed, so the combined-points divisor can never be zero);
+    ///     then gate (d), a direct read of <see cref="WorldStateService.World" />'s
+    ///     <see cref="WorldRvrState.TribeSymbolBattle" /> flag -- Tribe Symbol Battle must currently be active.
+    ///     Every gate failure is answered identically to the pre-existing Force-Leader-role/payload-range
+    ///     gates: <see cref="TribeActionOutcome.Abort" />, no further state touched.
+    /// </remarks>
     public TribeActionOutcome ValidateTribeSkill(PlayerRuntimeState state, byte[] data)
     {
         if (state.TribeRole != 1)
@@ -226,7 +239,36 @@ public sealed class TribeActionService(
         if (!TribeWorkSkillPayload.TryRead(data, out var payload) || payload.TribeSkillSort is < 0 or > 4)
             return TribeActionOutcome.Abort;
 
-        return TribeActionOutcome.Abort;
+        var tribes = worldState.GetAllTribes();
+
+        // Gate (a): four-tribe RvR point floor -- a global floor across all four tribes, not scoped to the
+        // requester's own tribe.
+        if (!TribeFormationAbilityEligibility.AllTribesAboveFloor(tribes))
+            return TribeActionOutcome.Abort;
+
+        // Gate (b): the requester's own tribe must be the single strict-lowest-point tribe.
+        var lowestPointTribe = TribeFormationAbilityEligibility.FindLowestPointTribe(tribes);
+        if (state.Tribe != lowestPointTribe)
+            return TribeActionOutcome.Abort;
+
+        // Gate (c): that tribe's share of the four-tribe combined total must be under twenty percent. Safe to
+        // evaluate now -- gate (a) already guarantees the combined total (the divisor) can never be zero.
+        var combinedPoints = TribeFormationAbilityEligibility.CombinedPoints(tribes);
+        if (!TribeFormationAbilityEligibility.IsUnderShareThreshold(tribes[state.Tribe].Points, combinedPoints))
+            return TribeActionOutcome.Abort;
+
+        // Gate (d): the Tribe Symbol Battle world event must currently be active.
+        if (!worldState.World.TribeSymbolBattle)
+            return TribeActionOutcome.Abort;
+
+        var formationCode = (byte)payload.TribeSkillSort;
+        worldState.SetTribeFormationAbility(state.Tribe, formationCode);
+
+        logger.LogInformation(
+            "Character {CharacterId} (tribe {Tribe}) declared Formation ability code {FormationCode}",
+            state.CharacterId, state.Tribe, formationCode);
+
+        return TribeActionOutcome.Ok();
     }
 
     /// <summary>tSort 6 -- title tier purchase, no role gate at all; any tribe member may buy, CP-gated only.</summary>
@@ -240,14 +282,15 @@ public sealed class TribeActionService(
         if (currentRank is < 0 or > 11)
             return TribeActionOutcome.Abort;
 
-        var cost = TitleCostCp[currentRank];
+        var cost = TitleContributionCost.PurchaseStepCost(currentRank);
         if (state.ContributionPoints < cost)
             return TribeActionOutcome.Abort;
 
         var newTitle = (payload.TitleSort - 1) * 100 + currentRank + 1;
 
         var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
-            state.Level, state.Tribe, state.PreviousTribe, newTitle, state.Halo, state.RebirthCount);
+            state.Level, state.Tribe, state.PreviousTribe, newTitle, state.Halo, state.RebirthCount,
+            state.Level2);
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
         var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
             pet: ComputePetContribution(state, equipmentContainer));
@@ -320,7 +363,8 @@ public sealed class TribeActionService(
         if (outcome is TribeHaloEnchantOutcome.Success or TribeHaloEnchantOutcome.Downgraded)
         {
             var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
-                state.Level, state.Tribe, state.PreviousTribe, state.Title, newHalo, state.RebirthCount);
+                state.Level, state.Tribe, state.PreviousTribe, state.Title, newHalo, state.RebirthCount,
+                state.Level2);
             var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
             var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
                 pet: ComputePetContribution(state, equipmentContainer));
@@ -342,59 +386,31 @@ public sealed class TribeActionService(
     }
 
     /// <summary>
-    ///     tSort 8 -- level-milestone bonus claim. <see cref="PlayerRuntimeState.BonusItemLevel" /> is
-    ///     session-scoped and never populated by any batch to date, so this always aborts today, matching
-    ///     the legacy's own behavior for the same zero case. Only tiers 45/65/85/105/145 are matched; other
-    ///     legacy tiers' level values aren't resolved by any available report and fall to the default abort.
+    ///     tSort 8 -- level-milestone bonus claim. <see cref="PlayerRuntimeState.BonusItemLevel" /> is armed by
+    ///     <c>Zone.ApplyCharacterExperienceGain</c>'s own level-milestone step (<see cref="LevelMilestoneBonus" />)
+    ///     the moment a level-up crosses one of <see cref="LevelMilestoneBonus.ArmableMilestoneLevels" />;
+    ///     before that field is ever populated this aborts, matching the legacy's own behavior for the same
+    ///     zero case. Session-scoped only -- an armed-but-unclaimed milestone does not survive logout/zone
+    ///     transfer today (see <see cref="PlayerRuntimeState.BonusItemLevel" />'s own remarks).
     /// </summary>
     public async ValueTask<TribeActionOutcome> ClaimLevelBonusAsync(Zone zone, PlayerRuntimeState state,
         int characterId, CancellationToken ct)
     {
-        if (state.BonusItemLevel < 1)
+        if (!LevelMilestoneBonus.TryResolveClaimDrops(state.BonusItemLevel, state.PreviousTribe, out var drops))
             return TribeActionOutcome.Abort;
 
-        ImmutableArray<TribeGroundItemDrop> drops;
-        switch (state.BonusItemLevel)
-        {
-            case 45:
-                drops = [new TribeGroundItemDrop(99700, 1), new TribeGroundItemDrop(539, 1)];
-                break;
-            case 65:
-                drops = [new TribeGroundItemDrop(99701, 1), new TribeGroundItemDrop(539, 1)];
-                break;
-            case 85:
-                drops = [new TribeGroundItemDrop(99702, 1), new TribeGroundItemDrop(539, 1)];
-                break;
-            case 105:
-                drops = [new TribeGroundItemDrop(845, 1), new TribeGroundItemDrop(539, 2)];
-                break;
-            case 145:
-                var tribeItemId = state.PreviousTribe switch
-                {
-                    0 => 83809,
-                    1 => 83857,
-                    2 => 83906,
-                    _ => 0
-                };
-                var builder = ImmutableArray.CreateBuilder<TribeGroundItemDrop>(tribeItemId == 0 ? 3 : 4);
-                builder.Add(new TribeGroundItemDrop(851, 1));
-                builder.Add(new TribeGroundItemDrop(1022, 10));
-                builder.Add(new TribeGroundItemDrop(1023, 10));
-                builder.Add(new TribeGroundItemDrop(1019, 10));
-                if (tribeItemId != 0)
-                    builder.Add(new TribeGroundItemDrop(tribeItemId, 20));
-                drops = builder.ToImmutable();
-                break;
-            default:
-                return TribeActionOutcome.Abort;
-        }
+        // Captured before the await below: PostTribeProgressCommandAndWaitAsync's own BonusItemLevel: 0 zeroes
+        // this field in place on the tick thread before the await completes, so reading state.BonusItemLevel
+        // afterward for the log line below would always report tier 0 (a pre-existing bug this fixes in
+        // passing while this method is already being touched for the LevelMilestoneBonus wiring).
+        var claimedTier = state.BonusItemLevel;
 
         await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
             BonusItemLevel: 0, BonusItemValue: false, DropItems: drops), ct);
 
         logger.LogInformation(
             "Character {CharacterId} claimed level-milestone bonus for tier {Tier} ({DropCount} items)",
-            characterId, state.BonusItemLevel, drops.Length);
+            characterId, claimedTier, drops.Length);
 
         return TribeActionOutcome.Ok();
     }
@@ -404,7 +420,8 @@ public sealed class TribeActionService(
         bool on, CancellationToken ct)
     {
         var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
-            state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo, state.RebirthCount);
+            state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo, state.RebirthCount,
+            state.Level2);
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
         var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
             pet: ComputePetContribution(state, equipmentContainer));
@@ -464,7 +481,8 @@ public sealed class TribeActionService(
 
         var newRebirthCount = state.RebirthCount + 1;
         var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
-            state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo, newRebirthCount);
+            state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo, newRebirthCount,
+            state.Level2);
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
         var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
             pet: ComputePetContribution(state, equipmentContainer));

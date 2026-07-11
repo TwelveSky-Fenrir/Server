@@ -157,6 +157,24 @@ public static class SessionLoop
 
         while (true)
         {
+            // Contract A (Server/ts25zone/S04_MyWork01.cpp:283-286, :389): the legacy drain loop re-reads its
+            // per-session connection flag at the top of every iteration AND again immediately after every handler
+            // dispatch, gating the buffer advance on it -- so once any handler's Quit()/Exit() clears that flag
+            // synchronously (chain: Quit -> Exit -> Set(UCLOSE), Server/Header/Protocol/DEFINE.h:651,
+            // Server/ts25zone/S03_MyUser.cpp:404,:497-505) no further already-buffered packet is dispatched.
+            // session.Abort(reason) is Fenrir's equivalent of that synchronous flag-clear (it sets both _completed
+            // and DisconnectReason in one call), and a handler CAN abort mid-buffer -- a self-initiated Quit, a
+            // GM KICK/BLOCK against the same session, or an external abort (slow-consumer detector, idle-liveness
+            // sweep, account-session eviction) racing this dispatch thread. Without this re-check, one buffer read
+            // holding several frames would keep decoding and dispatching subsequent frames at an already-aborted
+            // session. Checked here at the top so it also catches an abort from the immediately-preceding
+            // iteration's own dispatch, before any further decode work is done. (Note: the finding's parenthetical
+            // "packets dispatch after a handler Abort/Quit" describes a bug the cited legacy lines do NOT exhibit
+            // -- they re-check and stop; this guard makes Fenrir match that stop-on-disconnect posture rather than
+            // reproducing the mischaracterized behavior.)
+            if (session.DisconnectReason is not null)
+                return new BufferOutcome(remaining.Start, remaining.End, true);
+
             FenrirServer frameServer;
             byte frameOpcode;
             ReadOnlySequence<byte> framePayload;

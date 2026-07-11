@@ -38,7 +38,7 @@ public class ZoneMoveServiceTests
 
         var worldState = ZoneTestKit.CreateWorldState();
         var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
-            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(),
+            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(), PortalProximityCatalog.Empty,
             new FakeGameServerDirectoryRepository(),
             new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
             new FakeSessionTicketRepository(),
@@ -84,7 +84,7 @@ public class ZoneMoveServiceTests
 
         var worldState = ZoneTestKit.CreateWorldState();
         var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
-            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(),
+            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(), PortalProximityCatalog.Empty,
             new FakeGameServerDirectoryRepository(),
             new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
             new FakeSessionTicketRepository(),
@@ -173,7 +173,7 @@ public class ZoneMoveServiceTests
         var worldState = ZoneTestKit.CreateWorldState();
         worldState.SetAllianceOffer(0, 2, true);
         var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
-            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(),
+            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(), PortalProximityCatalog.Empty,
             new FakeGameServerDirectoryRepository(),
             new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
             new FakeSessionTicketRepository(),
@@ -209,7 +209,7 @@ public class ZoneMoveServiceTests
         var worldState = ZoneTestKit.CreateWorldState();
         worldState.SetAllianceOffer(1, 0, true); // tribe 1 (zone 7's owner) allied with tribe 0
         var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
-            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(),
+            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(), PortalProximityCatalog.Empty,
             new FakeGameServerDirectoryRepository(),
             new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
             new FakeSessionTicketRepository(),

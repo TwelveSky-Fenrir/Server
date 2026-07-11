@@ -26,8 +26,17 @@ namespace Fenrir.Application.Game.Tests.World;
 /// </remarks>
 public class ZonePvpTowerCpBonusTests
 {
-    /// <summary>The ever-present base PvP-kill CP grant (see class remarks) every assertion here adds on top of.</summary>
-    private static readonly int BaseKillCp = PvpKillContributionPointCalculator.ComputeBaseAmount(false, false);
+    /// <summary>
+    ///     The ever-present base PvP-kill CP grant (see class remarks) every assertion here adds on top of. B9:
+    ///     the base amount now composes the game-wide cross-tribe add value (config 3, doubled to 6 by the
+    ///     always-active rebirth build macro -- see <see cref="PvpKillContributionPointBonuses.ComputeGameWideAddValue" />)
+    ///     instead of the old flat <see cref="PvpKillContributionPointCalculator.BasePerKillAmount" /> placeholder.
+    ///     <see cref="PvpKillContributionPointBonuses.ComputeConditionalBonuses" /> is omitted here since map 49
+    ///     is none of the three server ids (38/160/minority-capital 1-6-11-140) it gates on, so it always
+    ///     contributes 0 regardless of tribe/level for every test in this file.
+    /// </summary>
+    private static readonly int BaseKillCp = PvpKillContributionPointCalculator.ComputeBaseAmount(false, false,
+        basePerKillAmount: PvpKillContributionPointBonuses.ComputeGameWideAddValue(3));
 
     private static readonly EffectiveStats StrongAttacker =
         new(1000, 1000, 1000, 0, 100, 0, 0, 0, 0, 0, 0);

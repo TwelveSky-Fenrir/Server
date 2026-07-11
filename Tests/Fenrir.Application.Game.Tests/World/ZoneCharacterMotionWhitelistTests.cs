@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Domain.Hotkeys;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Network.Dispatch.Sessions;
@@ -10,8 +11,23 @@ namespace Fenrir.Application.Game.Tests.World;
 ///     <see cref="Fenrir.Application.Game.Domain.Movement.CharacterMotionWhitelist" /> into <c>HandleMove</c>:
 ///     disconnect on an illegal (Sort, Type) pair, and session-state population/reset on a legal one.
 /// </summary>
+/// <remarks>
+///     Sorts 42/44 both resolve to <c>CharacterMotionWhitelist</c>'s skill-cast category (2), so any test
+///     below using either now also passes through D2 hook 4 (<c>Zone.EvaluateSkillCastTamperGuard</c>) --
+///     unrelated to what these two tests actually exercise (attack-budget side effects, not skill-cast
+///     tamper detection). <see cref="Action" />'s default <c>skillNumber = 0</c>/<c>SkillGradeNum1 = 0</c>
+///     means the guard's own <c>HotkeyMismatch</c> check needs a hotkey bound to (skill 0, grade 0) --
+///     nonsensical as a real skill, but a faithful, minimal stand-in for "this whitelist-focused test's
+///     caster is not exercising any particular skill identity."
+/// </remarks>
 public class ZoneCharacterMotionWhitelistTests
 {
+    private static void SeedSkillHotkey(PlayerRuntimeState state, int skillId, int investedGrade)
+    {
+        state.Hotkeys = state.Hotkeys.SetItem((0, 0), new HotkeySlot(HotkeyBindingKind.Skill, skillId,
+            investedGrade));
+    }
+
     private static ActionInfo Action(int sort, int type, float x = 10f, float z = 10f, int skillNumber = 0)
     {
         return new ActionInfo
@@ -117,6 +133,12 @@ public class ZoneCharacterMotionWhitelistTests
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(mover, 1, posX: 10f, posZ: 10f)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
+        // D2 hook 4: Sort 44 resolves to the skill-cast tamper guard's category -- seed a matching (skill 0,
+        // grade 0) hotkey (Action(44, 3)'s own skillNumber/SkillGradeNum1 defaults) so this whitelist-focused
+        // test's caster passes HotkeyMismatch, since it isn't exercising any particular skill identity.
+        Assert.True(zone.TryGetPlayer(10, out var seedState));
+        SeedSkillHotkey(seedState!, 0, 0);
+
         // Sort 44, Type 3 -> enforced, tag 3, ceiling 5. Same position as spawn: MovementRules' speed gate is
         // not this test's concern, so the move is a trivially-plausible zero-distance one.
         zone.Post(ZoneCommand.Move(10, Action(44, 3)));
@@ -158,6 +180,12 @@ public class ZoneCharacterMotionWhitelistTests
 
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(mover, 1, posX: 10f, posZ: 10f)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        // D2 hook 4: both Sort 44 and Sort 42 below resolve to the skill-cast tamper guard's category -- seed
+        // a matching (skill 0, grade 0) hotkey once, covering both actions' shared skillNumber/SkillGradeNum1
+        // defaults (see this class's own remarks).
+        Assert.True(zone.TryGetPlayer(10, out var seedState));
+        SeedSkillHotkey(seedState!, 0, 0);
 
         // First action: Sort 44 -> ceiling 5. Same position as spawn: a trivially-plausible zero-distance move.
         zone.Post(ZoneCommand.Move(10, Action(44, 3)));

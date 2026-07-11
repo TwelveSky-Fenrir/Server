@@ -5,13 +5,18 @@ using Fenrir.Application.Game.Abstractions.FishingConsumables;
 using Fenrir.Application.Game.Abstractions.GenericAction;
 using Fenrir.Application.Game.Abstractions.Gm;
 using Fenrir.Application.Game.Abstractions.Guilds;
+using Fenrir.Application.Game.Abstractions.Hotkeys;
 using Fenrir.Application.Game.Abstractions.Inventory;
 using Fenrir.Application.Game.Abstractions.ItemModification;
 using Fenrir.Application.Game.Abstractions.Progression;
 using Fenrir.Application.Game.Abstractions.Quests;
 using Fenrir.Application.Game.Abstractions.Social;
 using Fenrir.Application.Game.Abstractions.Tribes;
+using Fenrir.Application.Game.Abstractions.WarPoint;
 using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
+using Fenrir.Application.Game.Domain.Forge;
+using Fenrir.Application.Game.Domain.Gm;
+using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Services.BuffsMountsCosmetics;
 using Fenrir.Application.Game.Services.Chat;
 using Fenrir.Application.Game.Services.Commerce;
@@ -19,12 +24,14 @@ using Fenrir.Application.Game.Services.FishingConsumables;
 using Fenrir.Application.Game.Services.GenericAction;
 using Fenrir.Application.Game.Services.Gm;
 using Fenrir.Application.Game.Services.Guilds;
+using Fenrir.Application.Game.Services.Hotkeys;
 using Fenrir.Application.Game.Services.Inventory;
 using Fenrir.Application.Game.Services.ItemModification;
 using Fenrir.Application.Game.Services.Progression;
 using Fenrir.Application.Game.Services.Quests;
 using Fenrir.Application.Game.Services.Social;
 using Fenrir.Application.Game.Services.Tribes;
+using Fenrir.Application.Game.Services.WarPoint;
 using Fenrir.Application.Game.Services.ZoneLifecycle;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -56,6 +63,26 @@ public static class ServicesServiceCollectionExtensions
         AddGmServices(services);
         AddInventoryServices(services);
 
+        // C17: real SQL-backed gateways replace the LoggingOnly placeholders. Registered here (in
+        // AddGameServices, which runs before AddGameHosting) so HostingServiceCollectionExtensions.AddWorldState's
+        // TryAddSingleton<...LoggingOnly...> no-ops and these win -- the mechanism its own comments describe.
+        services.AddSingleton<ITribePointRosterGateway, SqlTribePointRosterGateway>();
+        services.AddSingleton<ITribeBankTaxSweepGateway, SqlTribeBankTaxSweepGateway>();
+        services.AddSingleton<FourGuildScoringService>();
+        services.AddSingleton<TribeBankWithdrawService>();
+
+        // C17 Part B1/B2 wiring: FourGuildKillPointRelayHost bridges Zone's own tick thread (Domain, cannot
+        // depend on this project) into FourGuildScoringService.AccrueKillPointAsync -- same "one instance,
+        // three registrations" shape as Hosting.EventLog.EventLogFlushHost, but rooted here (not in
+        // Fenrir.Application.Game.Hosting) since that project has no reference to this one. See
+        // FourGuildKillPointRelayHost's own remarks for why. FourGuildScoringRecomputeHost is the separate
+        // ~10-second leaderboard-recompute driver (Part B2); both are unconditionally started, matching every
+        // other always-on write-behind/relay host in this codebase.
+        services.AddSingleton<FourGuildKillPointRelayHost>();
+        services.AddSingleton<IFourGuildKillPointQueue>(sp => sp.GetRequiredService<FourGuildKillPointRelayHost>());
+        services.AddHostedService(sp => sp.GetRequiredService<FourGuildKillPointRelayHost>());
+        services.AddHostedService<FourGuildScoringRecomputeHost>();
+
         return services;
     }
 
@@ -82,6 +109,21 @@ public static class ServicesServiceCollectionExtensions
     private static void AddGenericActionServices(IServiceCollection services)
     {
         services.AddSingleton<IGenericActionService, GenericActionService>();
+
+        // C13 War-Point (WP/CP dual-currency) NPC-shop purchase. Registered here alongside GenericActionService
+        // because the WP path is offered ahead of the ordinary NpcShopPolicy buy inside BuyFromNpcShopAsync.
+        // GenericActionService's constructor takes this as an optional (test-seam) parameter, resolved live here
+        // via DI -- BuyFromNpcShopAsync now actually calls TryBuyAsync before falling through to NpcShopPolicy.
+        services.AddSingleton<IWarPointShopService, WarPointShopService>();
+
+        // C8-hotkey-money-petbag: hotkey-bind-family (tSort 204/205/211/214/216/253) and pet-bag-family
+        // (tSort 254/255/256) business logic behind GenericActionHandler's dispatch. Registered here even
+        // though GenericActionHandler's own dispatch branches for these sorts are not yet wired (Services
+        // layer's own report flags this as a Handlers-layer, packet-dispatch edit out of this pass's scope) --
+        // a "wired-ready but currently unused" posture, unlike IWarPointShopService immediately above which is
+        // now actually consumed.
+        services.AddSingleton<IHotkeyActionService, HotkeyActionService>();
+        services.AddSingleton<IPetBagActionService, PetBagActionService>();
     }
 
     private static void AddChatServices(IServiceCollection services)
@@ -90,6 +132,10 @@ public static class ServicesServiceCollectionExtensions
         services.AddSingleton<IGuildAnnouncementService, GuildAnnouncementService>();
         services.AddSingleton<IGuildChatService, GuildChatService>();
         services.AddSingleton<ILocalChatService, LocalChatService>();
+        // A14: shard-wide YangGok PvP-drop-event toggle state read/written by LocalChatService's `ygdrop`
+        // GM command (its first ctor dependency). Domain-owned singleton; the drop-roll consumer is a
+        // separate, not-yet-modeled subsystem.
+        services.AddSingleton<YangGokPvpDropEventState>();
         services.AddSingleton<IPartyChatService, PartyChatService>();
         services.AddSingleton<IShoutService, ShoutService>();
         services.AddSingleton<ITribeAnnouncementService, TribeAnnouncementService>();
@@ -179,6 +225,7 @@ public static class ServicesServiceCollectionExtensions
         services.AddSingleton<IRuneStoneCraftService, RuneStoneCraftService>();
         services.AddSingleton<ISkyUpgradeItemService, SkyUpgradeItemService>();
         services.AddSingleton<IUpgradeCapeService, UpgradeCapeService>();
+        services.AddSingleton<WarlordPityLockState>();
         services.AddSingleton<IUpgradeItemRankService, UpgradeItemRankService>();
     }
 
@@ -237,6 +284,15 @@ public static class ServicesServiceCollectionExtensions
         // (515), NCHAT/YCHAT (516/517), KICK (518), TRIBEBANK (520, dead code), LEVEL (521), STR/DEX/VIT/INT-edit
         // (522, dead code) -- see IGmBasicCommandService's own remarks.
         services.AddSingleton<IGmBasicCommandService, GmBasicCommandService>();
+
+        // Basic tier (GmCommandTier.Basic), A14-gm-remaining: GM-SETPVPPOINT (tSort 598, confirmed functional
+        // no-op once validated), GM-CALLPVP (tSort 599, relocates a matched connected character -- placeholder
+        // 0,0,0 coordinates until cpp-zone-gameplay-analyst supplies the real S04_MyWork04.cpp:1770-1823
+        // triples, see GmCallPvpService's own remarks), GM_CLEAR_INVENTORY (tSort 701, wipes the invoking GM's
+        // own inventory page(s)).
+        services.AddSingleton<IGmSetPvpPointService, GmSetPvpPointService>();
+        services.AddSingleton<IGmCallPvpService, GmCallPvpService>();
+        services.AddSingleton<IGmClearInventoryService, GmClearInventoryService>();
     }
 
     /// <summary>
@@ -247,5 +303,12 @@ public static class ServicesServiceCollectionExtensions
     private static void AddInventoryServices(IServiceCollection services)
     {
         services.AddSingleton<IInventoryToWorldDropService, InventoryToWorldDropService>();
+
+        // C8 BigMoney ("1B") family (tSort 241/242/244/245, Inventory<->Store/Save) -- see
+        // Fenrir.Data.ServiceCollectionExtensions' own IBigMoneyRepository registration remarks for the
+        // Characters-vs-Inventory-namespace collision this consumes the resolution of. Not yet reachable from
+        // GenericActionHandler's own dispatch switch; wiring that up is a separate integration step, same
+        // posture as IInventoryToWorldDropService immediately above.
+        services.AddSingleton<IBigMoneyTransferService, BigMoneyTransferService>();
     }
 }

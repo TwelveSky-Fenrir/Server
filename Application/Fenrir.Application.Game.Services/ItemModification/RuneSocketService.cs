@@ -14,7 +14,7 @@ namespace Fenrir.Application.Game.Services.ItemModification;
 ///     that handler's remarks.
 /// </summary>
 public sealed class RuneSocketService(
-    ICharacterRepository characters,
+    IRuneRepository runes,
     IEventLogQueue eventLogQueue,
     ILogger<RuneSocketService> logger)
     : IRuneSocketService
@@ -54,8 +54,16 @@ public sealed class RuneSocketService(
             sourceStack.Socket);
         var projectedContainer = state.Inventory.GetContainer((byte)packet.Page).Remove((byte)packet.Index);
 
-        await characters.ReplaceContainerAsync(characterId, (byte)packet.Page, ToTvps(projectedContainer),
-            cancellationToken);
+        // B5: the whole 4-socket rune array AND the paired inventory container commit atomically+durably in ONE
+        // proc (usp_Character_PersistRunes), replacing the inventory-only ReplaceContainerAsync so the rune item
+        // can never dupe/lose across the socket<->inventory boundary. Post-mutation rune state == the current
+        // sockets with socket[RuneIndex] claimed to the client-supplied ItemIndex at packedStat -- the same value
+        // the zone mirror below writes into RuneSystem (the legacy client-id-verbatim quirk, see RuneSocketResolver).
+        var projectedRunes = state.RuneSystem.SetItem(packet.RuneIndex, packet.ItemIndex);
+        var projectedRuneStats = state.RuneSystemStat.SetItem(packet.RuneIndex, packedStat);
+
+        await runes.PersistRunesAsync(characterId, ToRuneTvps(projectedRunes, projectedRuneStats),
+            (byte)packet.Page, ToTvps(projectedContainer), cancellationToken);
 
         if (!eventLogQueue.Enqueue(new EventLogEntryTvp(RuneInsertEventCode, (byte)EventLogCategory.Enchant, null,
                 characterId, null, null, null, null, null, sourceStack.ItemId, 1, 0,
@@ -103,8 +111,14 @@ public sealed class RuneSocketService(
         var newStack = new ItemStack(resolved.ItemId, 0, enchant, combine, refine, socket, 0, 0, 0, 0, 0);
         var projectedContainer = state.Inventory.GetContainer(container).SetItem(slot, newStack);
 
-        await characters.ReplaceContainerAsync(characterId, container, ToTvps(projectedContainer),
-            cancellationToken);
+        // B5: rune array + paired inventory container commit atomically in one proc (usp_Character_PersistRunes).
+        // Post-mutation rune state == the current sockets with socket[RuneIndex] cleared; when this was the last
+        // rune, ToRuneTvps yields an empty list the repository omits and the proc's unconditional DELETE clears the table.
+        var projectedRunes = state.RuneSystem.SetItem(packet.RuneIndex, 0);
+        var projectedRuneStats = state.RuneSystemStat.SetItem(packet.RuneIndex, 0);
+
+        await runes.PersistRunesAsync(characterId, ToRuneTvps(projectedRunes, projectedRuneStats), container,
+            ToTvps(projectedContainer), cancellationToken);
 
         if (!eventLogQueue.Enqueue(new EventLogEntryTvp(RuneRemoveEventCode, (byte)EventLogCategory.Enchant, null,
                 characterId, null, null, null, null, null, resolved.ItemId, 1, 0,
@@ -147,6 +161,19 @@ public sealed class RuneSocketService(
         var list = new List<CharacterItemSlotTvp>(container.Count);
         foreach (var (slot, stack) in container)
             list.Add(stack.ToTvp(slot));
+        return list;
+    }
+
+    // Occupied sockets only: RuneItemId == 0 IS the empty-socket encoding (row absence in game.CharacterRunes), so
+    // a fully-empty rune array yields an empty list the repository omits as a TVP (SQL Server rejects a zero-row
+    // TVP; the proc's own DELETE clears the table in that case).
+    private static List<CharacterRuneSocketTvp> ToRuneTvps(ImmutableArray<int> runeSystem,
+        ImmutableArray<int> runeSystemStat)
+    {
+        var list = new List<CharacterRuneSocketTvp>(runeSystem.Length);
+        for (var i = 0; i < runeSystem.Length; i++)
+            if (runeSystem[i] != 0)
+                list.Add(new CharacterRuneSocketTvp((byte)i, runeSystem[i], runeSystemStat[i]));
         return list;
     }
 }

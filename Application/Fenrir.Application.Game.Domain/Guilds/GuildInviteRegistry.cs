@@ -49,6 +49,32 @@ public sealed class GuildInviteRegistry
     }
 
     /// <summary>
+    ///     Read-only lookup for <see cref="Simulation.PendingSocialRequestAutoCancelSystem" />'s per-tick
+    ///     "counterpart still reachable" sweep (behavior contract C21§G). Unlike <see cref="TryCancel" />,
+    ///     does NOT consume/remove the entry.
+    /// </summary>
+    public bool TryPeekPending(int characterId, out int counterpartId, out bool isAsker)
+    {
+        lock (_lock)
+        {
+            if (_pendingByAsker.TryGetValue(characterId, out counterpartId))
+            {
+                isAsker = true;
+                return true;
+            }
+
+            if (_pendingByTarget.TryGetValue(characterId, out counterpartId))
+            {
+                isAsker = false;
+                return true;
+            }
+
+            isAsker = false;
+            return false;
+        }
+    }
+
+    /// <summary>
     ///     WS1.4 asker-side cross-shard invite registration (ASK-PUBLISH-ONLY -- see <see cref="_crossShard" />'s
     ///     own remarks). Same busy gate as <see cref="TryAsk" />. Unlike <see cref="TryAsk" />, this method
     ///     takes its own lock (mirroring the sibling registries' own <c>TryAskCrossShard</c> methods) since,

@@ -27,23 +27,29 @@ public interface ITribeRepository
     ///     balance, never a partial amount -- matches the legacy PlayUser process's
     ///     ZONE_TRIBE_BANK_LOAD_FOR_PLAYUSER_SEND). Returns the character's new Money total. Throws on an
     ///     empty slot or on a resulting balance that would exceed the legacy money cap.
-    ///     Not reachable via CZ_TRIBE_BANK_SEND (opcode 82): a freshly re-derived behavior contract off
-    ///     Server/ts25zone/S04_MyWork02.cpp:11560-11607 confirms that opcode has no client-invocable
-    ///     sub-command that moves money from the tribe bank to a player (an earlier revision of
-    ///     TribeBankService wired this method to that opcode's sort 2 by mistake -- since fixed to route
-    ///     sort 2 to <see cref="DepositBankAsync" /> instead). This method currently has no application-layer
-    ///     caller; whether it should be wired to whatever actually triggers
-    ///     ZONE_TRIBE_BANK_LOAD_FOR_PLAYUSER_SEND in the legacy PlayUser process, or removed, needs its own
-    ///     behavior contract before either action is taken.
+    ///     <para>
+    ///         <b>Correction:</b> backs CZ_TRIBE_BANK_SEND (opcode 82) sort 2 -- a fresh, definitive full read
+    ///         of Server/ts25zone/S04_MyWork02.cpp:11560-11607 and Server/ts25playuser/S04_MyWork02.cpp:269-377
+    ///         resolved a 3-way contradiction in favor of sort 2 being exclusively this withdraw. An earlier
+    ///         revision of this doc comment claimed the opposite (that this method had no application-layer
+    ///         caller and that sort 2 was a deposit); that claim was wrong. The application-layer caller is
+    ///         <c>TribeBankWithdrawService.WithdrawAsync</c>, invoked directly from <c>TribeBankHandler</c>.
+    ///     </para>
     /// </summary>
     public ValueTask<long> WithdrawBankAsync(byte tribeId, byte slotIndex, int characterId, CancellationToken ct);
 
     /// <summary>
     ///     Atomically moves <paramref name="characterId" />'s entire current Money (the whole balance, never a
-    ///     partial amount -- the mirror image of <see cref="WithdrawBankAsync" />; CZ_TRIBE_BANK_SEND carries no
-    ///     separate amount field) into one tribe-bank slot. Returns the character's new (post-deposit) Money
-    ///     total. Throws if the character currently has no money to deposit. Backs CZ_TRIBE_BANK_SEND sort 2,
-    ///     the legacy client-invoked deposit path (Server/ts25zone/S04_MyWork02.cpp:11560-11607).
+    ///     partial amount -- the mirror image of <see cref="WithdrawBankAsync" />) into one tribe-bank slot.
+    ///     Returns the character's new (post-deposit) Money total. Throws if the character currently has no
+    ///     money to deposit.
+    ///     <para>
+    ///         <b>Correction:</b> does NOT back CZ_TRIBE_BANK_SEND sort 2 or any other client-invocable
+    ///         sub-command of opcode 82 -- see <see cref="WithdrawBankAsync" />'s own remarks for the
+    ///         corrected finding. Legacy has no client-invocable deposit path at all; this method has no
+    ///         application-layer caller as of this correction (its one caller, <c>TribeBankService.DepositAsync</c>,
+    ///         is itself no longer reachable from any opcode). Kept, not removed, pending a separate decision.
+    ///     </para>
     /// </summary>
     public ValueTask<long> DepositBankAsync(byte tribeId, byte slotIndex, int characterId, CancellationToken ct);
 }

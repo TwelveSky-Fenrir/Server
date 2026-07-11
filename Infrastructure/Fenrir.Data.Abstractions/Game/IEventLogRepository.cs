@@ -174,7 +174,68 @@ public enum EventLogCategory : byte
     ///     the legacy audit line also displaying it. First consumer:
     ///     Fenrir.Application.Game.Services.BuffsMountsCosmetics.MountStateService.
     /// </summary>
-    MountAttribute = 21
+    MountAttribute = 21,
+
+    /// <summary>
+    ///     A cash-shop purchase (legacy GL_604_BUY_CASH_ITEM, CZ_BUY_CASH_ITEM_SEND op42) -- spend cash
+    ///     currency, gain an item. Distinct from <see cref="CashItemUse" /> (using an already-owned cash item
+    ///     for its effect) since this is the purchase itself. EventCode is app-owned within this category
+    ///     (see <c>EventLogEmitters.CashShopPurchaseEventCode</c>). First consumer:
+    ///     Fenrir.Application.Game.Services.Commerce.BuyCashItemService (C20 audit-log workstream).
+    /// </summary>
+    CashShopPurchase = 22,
+
+    /// <summary>
+    ///     A player picked up a ground item into inventory (legacy GL_619_GAIN_ITEM, and conditionally
+    ///     GL_607_GAIN_SIN_ITEM for an elite-typed pickup) -- the pickup counterpart to <see cref="ItemDrop" />.
+    ///     Only the fresh-slot outcome of GroundItemPickupPolicy.Resolve logs anything; the Money and Stacked
+    ///     outcomes write no record, matching legacy's own silent branches. EventCode is app-owned within
+    ///     this category (see <c>EventLogEmitters.GroundItemGainEventCode</c> /
+    ///     <c>GroundItemGainEliteEventCode</c>). First consumer:
+    ///     Fenrir.Application.Game.Services.GenericAction.GenericActionService.PickupGroundItemAsync (C20
+    ///     audit-log workstream).
+    /// </summary>
+    ItemPickup = 23,
+
+    /// <summary>
+    ///     A non-stackable item moved between a character's Inventory and its equipped pet's own bag (legacy
+    ///     GL_849_PET_INVENTORY, CZ_PROCESS_DATA_SEND tSort 254 inventory-to-pet / 255 pet-to-inventory; tSort
+    ///     256 pet-to-pet writes no legacy record and has no EventCode here either). Legacy hardcodes the same
+    ///     direction marker for both 254/255 -- Fenrir deliberately disambiguates via distinct EventCodes (see
+    ///     <c>EventLogEmitters.PetInventoryToPetEventCode</c> / <c>PetInventoryFromPetEventCode</c>). NOT YET
+    ///     WIRED as of this member's addition -- no GenericActionHandler/GenericActionService dispatch exists
+    ///     for tSort 254-256 yet (C20 audit-log workstream; blocked on that base feature's own dispatch).
+    /// </summary>
+    PetInventoryTransfer = 24,
+
+    /// <summary>
+    ///     A big-money ("1B" unit) ledger conversion -- inventory Money/BigMoney &lt;-&gt; Store/Bank BigMoney,
+    ///     or Money-to-BigMoney unit conversion (legacy GL_990-GL_997, CZ_PROCESS_DATA_SEND tSort 240-247).
+    ///     Eight distinct EventCodes, one per legacy identifier (see
+    ///     <c>EventLogEmitters.BigMoneyConversionEventCode1</c>-<c>8</c>). NOT YET WIRED as of this member's
+    ///     addition -- no GenericActionHandler/GenericActionService dispatch exists for tSort 240-247 yet
+    ///     (C20 audit-log workstream; blocked on that base feature's own dispatch -- BigMoney's DB layer,
+    ///     repo+procs, is otherwise ready per prior-session agent-memory).
+    /// </summary>
+    BigMoneyConversion = 25,
+
+    /// <summary>
+    ///     An anti-cheat tamper guard rejected a client-originated action -- EventCode is the offending guard's
+    ///     own offense enum value (app-owned per guard, matching how <see cref="GmAction" />'s EventCode is
+    ///     app-owned per <c>GmActionEventCodes</c>). First consumer:
+    ///     <c>Fenrir.Application.Game.Domain.World.Zone.PlayerLifecycle.cs</c>'s D2 skill-cast tamper guard
+    ///     (<c>Fenrir.Application.Game.Domain.AntiCheat.SkillCastGuard</c>), whose
+    ///     <c>SkillCastOffense</c> byte value (HotkeyMismatch=1/LearnedSkillMissing=2/BonusGradeMismatch=3/
+    ///     SkillHack1=4) is written directly as EventCode. Written via the best-effort
+    ///     <see cref="IEventLogQueue" /> write-behind path, not the durable <see cref="IEventLogRepository.LogAsync" /> path
+    ///     -- the
+    ///     zone tick thread that detects an offense must never block on SQL I/O (same constraint every other
+    ///     <c>Zone</c> event-log producer already works around, see <c>Zone.PlayerLifecycle.cs</c>'s
+    ///     <c>PendingDeathEventLog</c>); a dropped row under sustained DB unavailability is an accepted
+    ///     trade-off for a signal whose real-time enforcement (the disconnect itself) does not depend on the
+    ///     audit row landing.
+    /// </summary>
+    AntiCheat = 26
 }
 
 /// <summary>

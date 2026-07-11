@@ -4,9 +4,11 @@ using Fenrir.Application.Game.Abstractions.Tribes;
 using Fenrir.Application.Game.Domain.Movement;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Services.Tribes;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
+using Fenrir.Application.Game.Tests.World.WorldState;
 using Fenrir.Data.Abstractions.World;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Dispatch.Sessions;
@@ -58,7 +60,7 @@ public class TribeActionServiceTests
     }
 
     private static TribeActionService CreateService(FakeCharacterRepository? characters = null,
-        ILogger<TribeActionService>? logger = null)
+        ILogger<TribeActionService>? logger = null, WorldStateService? worldState = null)
     {
         var options = ZoneTestKit.Options();
         var registry = new ZoneRegistry(Options.Create(options), new MovementRules(Options.Create(options)),
@@ -71,7 +73,15 @@ public class TribeActionServiceTests
             .ToFrozenDictionary();
 
         return new TribeActionService(registry, new FakeTribeRepository(), characters ?? new FakeCharacterRepository(),
-            ZoneTestKit.EmptyWorldData(levelsByLevel: levels), logger ?? NullLogger<TribeActionService>.Instance);
+            ZoneTestKit.EmptyWorldData(levelsByLevel: levels), worldState ?? CreateInitializedWorldState(),
+            logger ?? NullLogger<TribeActionService>.Instance);
+    }
+
+    private static WorldStateService CreateInitializedWorldState()
+    {
+        var service = new WorldStateService(new FakeWorldStateRepository(), NullLogger<WorldStateService>.Instance);
+        service.InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
+        return service;
     }
 
     private static TribeActionRequest RebirthRequest()

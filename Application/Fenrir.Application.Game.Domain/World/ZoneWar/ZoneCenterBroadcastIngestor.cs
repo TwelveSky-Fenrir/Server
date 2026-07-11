@@ -28,27 +28,24 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 ///         <see cref="Ingest" /> is, by construction, already an authenticated in-process actor.
 ///     </para>
 ///     <para>
-///         GAP 1 -- Zone241 "Den of Rebirth" (cases 411-415, S04_MyWork02.cpp:962-986) is a real, reachable
-///         range in the legacy dispatch, not a dead one, but this cluster's own translated contract could only
-///         establish the CODE SET (411-415, exactly 5) and the output DOMAIN (3 coarse states: idle/
-///         challenge-started/ended-for-any-reason), not which of the 5 codes produces which of the 3 outputs,
-///         nor which 2 of the 5 carry the extra (read-and-discard) secondary field + player name. Binding a
-///         specific code to a specific output here would be inventing a legacy fact this session could not
-///         confirm, so no write is performed for this range -- <see cref="ZoneCenterSiegeState.SetZone241" />/
-///         <see cref="ZoneCenterSiegeState.GetZone241" />/<see cref="ZoneCenterSiegeState.ResetZone241" /> are
-///         ready for a future contract that supplies the exact per-code binding.
+///         Zone241 "Den of Rebirth" (cases 411-415, S04_MyWork02.cpp:962-986) is now BOUND, per the rvr-siege
+///         ingestion behavior contract's exact per-code table (411 &#8594; challenge started, 412/413/414 &#8594;
+///         ended, 415 &#8594; idle), via <see cref="SiegeEventStateMap.TryMapZone241" /> -- what was previously a
+///         recognized-but-unwritten range (this class's old GAP 1). The read-and-discard secondary field + player
+///         name codes 411-414 carry are still ignored here exactly as the legacy center ignores them (it never
+///         persists them into WorldInfo); only the instance index at the front of the payload is consumed.
 ///     </para>
 ///     <para>
-///         GAP 2 -- the tribe-wide bonus-ratio sub-selector event (S04_MyWork02.cpp:854-919) has no cited
-///         event code at all ("a separate event code, outside the numbered ranges named in this task"), and
-///         its payload's own sub-selector encoding (which raw value picks experience/item-drop/Myoung-drop/
-///         kill-other-tribe) is likewise not given. <see cref="ZoneCenterSiegeState.SetExperienceBonusRatio" />/
+///         GAP 2 (CLOSED, workstream C6-zone241-bonus) -- the tribe-wide bonus-ratio sub-selector event
+///         has no cited event code at all before this workstream -- it is now dispatched under
+///         <c>tSort=301</c> via <see cref="TribeBonusRatioEventMap.EventCode" />/
+///         <see cref="TribeBonusRatioEventMap.Apply" />, which decodes the
+///         sub-selector and calls <see cref="ZoneCenterSiegeState.SetExperienceBonusRatio" />/
 ///         <see cref="ZoneCenterSiegeState.SetItemDropBonusRatio" />/
 ///         <see cref="ZoneCenterSiegeState.SetMyoungItemDropBonusRatio" />/
-///         <see cref="ZoneCenterSiegeState.SetKillOtherTribeBonus" /> exist and are fully, precisely
-///         implemented per field (including the kill-other-tribe variant's zero-the-other-three-tribes
-///         write), but nothing in this dispatch table calls them yet -- wiring them in needs both numbers from
-///         a fresh legacy-behavior-translator pass.
+///         <see cref="ZoneCenterSiegeState.SetKillOtherTribeBonus" /> directly -- see
+///         <see cref="TribeBonusRatioEventMap" />'s own remarks for the full citation trail and its own
+///         carried-forward open questions (the reset-asymmetry gap and the unnamed tribe indices).
 ///     </para>
 ///     <para>
 ///         GAP 3 -- the two event codes that skip the general relay entirely (a leaderboard-style record
@@ -65,14 +62,35 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 ///         <see cref="BroadcastAllZonesPing" />.
 ///     </para>
 ///     <para>
-///         Zone175 (cases 64-100 write, case 110 reset, S04_MyWork02.cpp:613-802) and Zone267 (cases within
-///         402-410, S04_MyWork02.cpp:929-961) ARE wired below, but only their MECHANICAL shape is legacy-exact
-///         (grid/tribe addressing, bounds, the separate reset code): the actual per-code STATE VALUE this
-///         class writes is the raw event code itself, a deterministic, distinguishable placeholder -- NOT the
-///         literal legacy constant, which this cluster's contract only gives in aggregate ("roughly 15 of the
-///         37 Zone175 codes collapse onto one shared value, ~22 produce distinct ones"; "one of the 7 Zone267
-///         codes resets to idle" without saying which). Upgrading to byte-exact constants needs a fresh
-///         legacy-behavior-translator pass over the individual case bodies.
+///         Zone175 (cases 64-100 write, case 110 reset, S04_MyWork02.cpp:613-802), Zone267 (cases within
+///         402-410, S04_MyWork02.cpp:929-961) and Zone335 (cases 1501-1507, S04_MyWork02.cpp:1132-1150) are now
+///         byte-exact: the per-code STATE VALUE is resolved through <see cref="SiegeEventStateMap" />'s literal
+///         legacy tables (the rvr-siege ingestion contract supplies all three in full), NOT the raw event code
+///         this class used to store as a placeholder. The mechanical shape (grid/tribe addressing, bounds, the
+///         separate 110 reset) is unchanged; only the stored value is now correct -- crucially, the many codes
+///         that collapse onto a shared state (15 Zone175 codes &#8594; 23, 1501 &#8594; no-op, 1507 &#8594; 0) now
+///         store that shared state rather than distinct raw codes.
+///     </para>
+///     <para>
+///         Zone267/Zone241's individual event codes, plus the pure-relay group (416-428, 500), now have
+///         symbolic names and (where the cited source carries one) verbatim legacy labels in
+///         <see cref="SiegeZoneLiteralEventCatalog" /> -- a documentation-only naming layer over the numeric
+///         dispatch above; it changes no behavior here.
+///     </para>
+///     <para>
+///         Zone051 (6 slots) and Zone053 (10 slots), the two sibling siege-state-VALUE families adjacent to
+///         Zone049 (selectors 10-18 and 19-30, S04_MyWork02.cpp:254-335), are now dispatched via
+///         <see cref="Zone051Zone053BroadcastResolver" /> against the optional <paramref name="zone051Zone053State" />
+///         dependency -- absent (null) in any caller that has not adopted it yet, in which case those selectors
+///         simply fall through with zero state effect via each case's own <c>when</c> guard, same idiom as every
+///         other optional trailing dependency on this constructor.
+///     </para>
+///     <para>
+///         Alliance-proposal discriminators 46-49 (finalize/break-via-ritual/stone-under-attack/
+///         break-via-stone-capture, S04_MyWork02.cpp:408-472) are dispatched via
+///         <see cref="AllianceProposalCenterEventMap" /> against the optional <paramref name="allianceState" />
+///         dependency -- same "absent means the range's own <c>when</c> guard no-ops" idiom as
+///         <paramref name="zone051Zone053State" /> immediately above.
 ///     </para>
 ///     <para>
 ///         Zone049 (siege-zone-slot family, sub-codes 1-9, S04_MyWork02.cpp:212-253) IS byte-exact: the
@@ -105,7 +123,9 @@ public sealed class ZoneCenterBroadcastIngestor(
     ZoneRegistry zones,
     ILogger<ZoneCenterBroadcastIngestor> logger,
     IRvrSiegeEventRelayQueue? relayQueue = null,
-    IOptions<GameServerOptions>? gameOptions = null)
+    IOptions<GameServerOptions>? gameOptions = null,
+    Zone051Zone053SiegeState? zone051Zone053State = null,
+    AllianceProposalCenterState? allianceState = null)
 {
     /// <summary>
     ///     Fixed opaque payload size (<c>Server/Header/Protocol/ZONE.h:19-24</c>), matching
@@ -138,11 +158,14 @@ public sealed class ZoneCenterBroadcastIngestor(
 
     public const int Zone241RangeEnd = 415;
 
-    /// <summary>Same "cited range wider than the prose's live count" caveat as <see cref="Zone267RangeStart" />.</summary>
+    /// <summary>
+    ///     FFA single-scalar family: 1501 is a no-op (pre-start countdown), 1502-1506 &#8594; states 1-5, and
+    ///     1507 &#8594; 0 (the reset -- there is no separate 1520 reset code, contrary to an earlier placeholder
+    ///     guess). See <see cref="SiegeEventStateMap.TryMapZone335" />.
+    /// </summary>
     public const int Zone335RangeStart = 1501;
 
     public const int Zone335RangeEnd = 1507;
-    public const int Zone335ResetEventCode = 1520;
 
     /// <summary>Per-tribe DTM effect value -- fully precise (S04_MyWork02.cpp:1160-1164).</summary>
     public const int DtmEventCode = 1510;
@@ -226,23 +249,50 @@ public sealed class ZoneCenterBroadcastIngestor(
                 ApplyZone267(eventCode, data);
                 break;
 
+            case >= Zone241RangeStart and <= Zone241RangeEnd:
+                ApplyZone241(eventCode, data);
+                break;
+
+            case >= Zone051Zone053BroadcastResolver.Zone051RangeStart and <= Zone051Zone053BroadcastResolver.Zone051RangeEnd
+                when zone051Zone053State is not null:
+                Zone051Zone053BroadcastResolver.ApplyZone051(zone051Zone053State, eventCode, data, logger);
+                break;
+
+            case >= Zone051Zone053BroadcastResolver.Zone053RangeStart and <= Zone051Zone053BroadcastResolver.Zone053RangeEnd
+                when zone051Zone053State is not null:
+                Zone051Zone053BroadcastResolver.ApplyZone053(zone051Zone053State, eventCode, data, logger);
+                break;
+
             case DtmEventCode:
                 ApplyDtm(data);
                 break;
 
-            case Zone335ResetEventCode:
-                state.ResetZone335();
-                break;
-
             case >= Zone335RangeStart and <= Zone335RangeEnd:
-                state.SetZone335(eventCode);
+                if (SiegeEventStateMap.TryMapZone335(eventCode, out var ffaState))
+                    state.SetZone335(ffaState);
                 break;
 
-            // Zone241 (411-415): recognized/reachable, no write -- see class remarks, GAP 1.
-            // Everything else (416-428, 500, 601-628, 659-675, 751-774, 1511-1514, and any genuinely
-            // unrecognized code) is either a legacy empty/commented-out body or truly unknown -- both fall
-            // through with zero state effect, which is exactly the legacy's own observable behavior for
-            // those ranges.
+            case TribeBonusRatioEventMap.EventCode:
+                TribeBonusRatioEventMap.Apply(state, data, logger);
+                break;
+
+            case >= AllianceProposalCenterEventMap.EventCodeRangeStart
+                and <= AllianceProposalCenterEventMap.EventCodeRangeEnd
+                when allianceState is not null:
+                AllianceProposalCenterEventMap.Apply(eventCode, data, allianceState, logger);
+                break;
+
+            case PingEventCode:
+                // A12: case 4000's own zone-side reaction, no server-number restriction -- reset every ready
+                // character's HSB-window reward-eligibility flag. See HsbRewardFlagResetReactor's remarks.
+                HsbRewardFlagResetReactor.Apply(zones);
+                break;
+
+            // Everything else (416-428 minus the unrecovered 417 gap, and 500 -- all individually named in
+            // SiegeZoneLiteralEventCatalog.PureRelayEventCodes/KnownGapEventCodes; 601-628, 659-675, 751-774,
+            // 1501 no-op, 1511-1514, and any genuinely unrecognized code) is either a legacy empty/
+            // commented-out body or truly unknown -- both fall through with zero state effect, which is
+            // exactly the legacy's own observable behavior for those ranges.
         }
     }
 
@@ -299,8 +349,8 @@ public sealed class ZoneCenterBroadcastIngestor(
 
         if (isReset)
             state.ResetZone175(instance, slot);
-        else
-            state.SetZone175(instance, slot, eventCode);
+        else if (SiegeEventStateMap.TryMapZone175(eventCode, out var mapped))
+            state.SetZone175(instance, slot, mapped);
     }
 
     private void ApplyZone267(int eventCode, ReadOnlySpan<byte> data)
@@ -314,7 +364,32 @@ public sealed class ZoneCenterBroadcastIngestor(
             return;
         }
 
-        state.SetZone267((byte)tribeIndex, eventCode);
+        // Code 402 is a no-op (TryMap returns false); 403-410 map to the byte-exact legacy states, including
+        // 410's reset-to-0.
+        if (SiegeEventStateMap.TryMapZone267(eventCode, out var mapped))
+            state.SetZone267((byte)tribeIndex, mapped);
+    }
+
+    /// <summary>
+    ///     Den of Rebirth (cases 411-415, S04_MyWork02.cpp:962-986): reads the instance index from the front of
+    ///     the payload, ignores the read-and-discard secondary/name fields codes 411-414 carry (exactly as the
+    ///     legacy center ignores them), and writes the mapped <see cref="DenOfRebirthChallengeState" /> via
+    ///     <see cref="SiegeEventStateMap.TryMapZone241" />. Bounds-checks the instance even though the legacy
+    ///     center does not (see class remarks / the security note reported by this cluster).
+    /// </summary>
+    private void ApplyZone241(int eventCode, ReadOnlySpan<byte> data)
+    {
+        var instance = ReadInt32(data, 0);
+
+        if (!ZoneCenterSiegeState.IsValidZone241Instance(instance))
+        {
+            logger.LogWarning("Zone241 event {EventCode} referenced out-of-range instance {Instance} -- ignored",
+                eventCode, instance);
+            return;
+        }
+
+        if (SiegeEventStateMap.TryMapZone241(eventCode, out var challengeState))
+            state.SetZone241(instance, challengeState);
     }
 
     private void ApplyDtm(ReadOnlySpan<byte> data)
@@ -340,7 +415,11 @@ public sealed class ZoneCenterBroadcastIngestor(
     private void BroadcastAllZonesPing()
     {
         var empty = new byte[PayloadSize];
-        var response = new ZoneEventInfoResponse { Sort = PingEventCode, Data = empty };
+        // A12 resolves GAP 4: the real, distinct sort for this second broadcast is 1601 -- PingEventCode
+        // (4000) is only the TRIGGER code this Ingest(4000, ...) call itself carries, never this broadcast's
+        // own Sort.
+        var response = new ZoneEventInfoResponse
+            { Sort = ScheduledZoneCenterEventCodes.HsbRewardFlagResetPingEventCode, Data = empty };
 
         BroadcastToEveryZone(in response);
     }

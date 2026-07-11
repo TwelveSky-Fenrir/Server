@@ -3,9 +3,11 @@ using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
+using Fenrir.Application.Game.Services.Progression;
 using Fenrir.Application.Game.Services.ZoneLifecycle;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
@@ -21,9 +23,12 @@ namespace Fenrir.Application.Game.Tests.Handlers;
 /// <summary>
 ///     Drives the real <see cref="UseInventoryItemService" /> (opcode 23) over a real <see cref="Zone" />; ticks
 ///     the zone while the service's own <c>PostInventoryCommandAndWaitAsync</c> await is pending, same pattern as
-///     <c>SkyUpgradeItemServiceTests</c>. Covers the Guild Scroll, Faction Transfer Scroll, GP ticket (itemId
-///     723/725), and proxy-shop rental-extension (itemId 567/592/8422/8423) families added on top of the
-///     pre-existing Bottle-only dispatch, plus one Bottle regression case guarding the dispatch refactor itself.
+///     <c>SkyUpgradeItemServiceTests</c>. Covers the Guild Scroll, GP ticket (itemId 723/725), and proxy-shop
+///     rental-extension (itemId 567/592/8422/8423) families added on top of the pre-existing Bottle-only
+///     dispatch, plus one Bottle regression case guarding the dispatch refactor itself. The Faction Transfer
+///     Scroll family (8153/8154) used to be covered here too, against a since-removed permit-banking stub --
+///     see <c>Tests/Fenrir.Application.Game.Tests/Inventory/UseItems/TribeScrollTransferUseItemHandlerTests.cs</c>
+///     for its real coverage now.
 /// </summary>
 public class UseInventoryItemServiceTests
 {
@@ -31,7 +36,6 @@ public class UseInventoryItemServiceTests
     private const byte SpecialUseSort = 3;
     private const int GuildScroll30MinItemId = 558;
     private const int GuildScroll60MinItemId = 1211;
-    private const int TribeTransferScrollItemId = 8153;
     private const int BottleItemId = 501;
     private const int UnhandledItemId = 999001;
     private const int Ticket500ItemId = 723;
@@ -100,8 +104,6 @@ public class UseInventoryItemServiceTests
                 new(WorldDataTestRows.Item(GuildScroll30MinItemId) with { Sort = SpecialUseSort }, []),
             [GuildScroll60MinItemId] =
                 new(WorldDataTestRows.Item(GuildScroll60MinItemId) with { Sort = SpecialUseSort }, []),
-            [TribeTransferScrollItemId] =
-                new(WorldDataTestRows.Item(TribeTransferScrollItemId) with { Sort = SpecialUseSort }, []),
             [BottleItemId] = new(WorldDataTestRows.Item(BottleItemId) with { Sort = BottleSort }, []),
             [Ticket500ItemId] =
                 new(WorldDataTestRows.Item(Ticket500ItemId) with { Sort = SpecialUseSort }, []),
@@ -118,10 +120,13 @@ public class UseInventoryItemServiceTests
             [UnhandledItemId] = new(WorldDataTestRows.Item(UnhandledItemId) with { Sort = SpecialUseSort }, [])
         }.ToFrozenDictionary();
 
+        var towerUpgrade = new TowerUpgradeService(new TowerWarState(), characters,
+            NullLogger<TowerUpgradeService>.Instance);
+
         return new UseInventoryItemService(characters, guilds, cash, offlineShops ?? new FakeOfflineShopRepository(),
             eventLog, relay ?? new FakeProxyShopExpirationRelayQueue(),
             Options.Create(new GameServerOptions { ShardId = ShardId }), ZoneTestKit.EmptyWorldData(itemsById),
-            NullLogger<UseInventoryItemService>.Instance);
+            NullLogger<UseInventoryItemService>.Instance, towerUpgrade);
     }
 
     [Fact]
@@ -132,6 +137,7 @@ public class UseInventoryItemServiceTests
         guilds.Seed(new GuildSummaryDto(77, "TestGuild", 1, 10, 0, 2, 1, 5, 1000L, 0, DateTime.UtcNow, 1));
         SeedInventory(zone, new ItemStack(GuildScroll60MinItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1));
         var service = CreateService(characters, guilds, cash, eventLog);
+        var before = DateTime.UtcNow;
 
         var response = await RunToCompletionAsync(
             service.ResolveAsync(zone, state, 10, AccountId, ContainerMatrix.InventoryPage0, 0, 0,
@@ -140,8 +146,16 @@ public class UseInventoryItemServiceTests
         Assert.Null(session.DisconnectReason);
         Assert.Equal(0, response.Result);
 
-        // BuffType/BuffState/BuffTimeForDiff carried through unchanged; only BuffTime (5 -> 5+60) moves.
-        Assert.Equal((77, 2, 1, 65, 1000L), guilds.LastSetBuff);
+        // BuffType/BuffState carried through unchanged. The seeded baseline (1000L ticks -- effectively
+        // year 1) is already in the past relative to "now", so GuildBuffTopUp restarts counting from now
+        // rather than stacking onto that stale timestamp (Server/ts25extra/S08_MyDB.cpp:1151-1186's own
+        // "already expired" branch) -- BuffTime becomes exactly the scroll's 60 minutes, not 5+60.
+        var setBuff = guilds.LastSetBuff!.Value;
+        Assert.Equal(77, setBuff.GuildId);
+        Assert.Equal(2, setBuff.BuffType);
+        Assert.Equal(1, setBuff.BuffState);
+        Assert.Equal(60, setBuff.BuffTime);
+        Assert.InRange(setBuff.BuffTimeForDiff, before.AddMinutes(60).Ticks, DateTime.UtcNow.AddMinutes(60).Ticks);
 
         Assert.NotNull(characters.LastReplacedContainer);
         Assert.DoesNotContain(characters.LastReplacedContainer!.Value.Items, i => i.Slot == 0);
@@ -203,25 +217,11 @@ public class UseInventoryItemServiceTests
         Assert.Null(characters.LastReplacedContainer);
     }
 
-    [Fact]
-    public async Task TribeTransferScroll_Use_GrantsOnePermit_AndConsumesTheScroll()
-    {
-        var (session, _, zone, state, characters, guilds, cash, eventLog) = SetUp();
-        SeedInventory(zone, new ItemStack(TribeTransferScrollItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1));
-        var service = CreateService(characters, guilds, cash, eventLog);
-
-        var response = await RunToCompletionAsync(
-            service.ResolveAsync(zone, state, 10, AccountId, ContainerMatrix.InventoryPage0, 0, 0,
-                CancellationToken.None), zone);
-
-        Assert.Null(session.DisconnectReason);
-        Assert.Equal(0, response.Result);
-        Assert.Equal((10, 1), characters.LastGrantTribeTransferPermit);
-        Assert.Equal(1, characters.TribeTransferPermitCount);
-
-        Assert.NotNull(characters.LastReplacedContainer);
-        Assert.DoesNotContain(characters.LastReplacedContainer!.Value.Items, i => i.Slot == 0);
-    }
+    // The old "TribeTransferScroll_Use_GrantsOnePermit_AndConsumesTheScroll" test was removed here: it covered
+    // a superseded permit-banking stub (ResolveTribeTransferScrollAsync). The real op23 items 8153/8154
+    // mechanism (13-gate precondition chain + atomic best-effort equip/skill remap) is now
+    // TribeScrollTransferUseItemHandler (workstream C11), covered by its own dedicated test file
+    // (Tests/Fenrir.Application.Game.Tests/Inventory/UseItems/TribeScrollTransferUseItemHandlerTests.cs).
 
     [Fact]
     public async Task UnhandledItemFamily_RepliesResultOne_AndLeavesTheItemUntouched()

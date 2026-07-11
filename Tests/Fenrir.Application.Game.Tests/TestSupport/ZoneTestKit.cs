@@ -13,6 +13,7 @@ using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Tests.World.WorldState;
+using Fenrir.Data.Abstractions.Game;
 using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Data.Abstractions.World;
 using Fenrir.Data.WriteBehind;
@@ -40,7 +41,10 @@ internal static class ZoneTestKit
         DuelRegistry? duelRegistry = null, ICharacterShardLocationRepository? characterShardLocations = null,
         TribeBankTaxAccumulator? tribeBankTax = null,
         RegularWarActiveMapTracker? regularWarActiveMapTracker = null,
-        Domain.World.Geometry.ZoneGeometry? geometry = null)
+        Domain.World.Geometry.ZoneGeometry? geometry = null,
+        IEventLogQueue? eventLogQueue = null,
+        Fenrir.Data.Abstractions.Guilds.IFourGuildKillPointQueue? fourGuildKillPointQueue = null,
+        TribeSymbolCombatModifiers? tribeSymbolCombatModifiers = null)
     {
         var opts = options ?? Options();
         return new Zone(mapId, opts, new MovementRules(Microsoft.Extensions.Options.Options.Create(opts)),
@@ -48,7 +52,9 @@ internal static class ZoneTestKit
             worldData ?? EmptyWorldData(), randomSource, killCooldownTracker: killCooldownTracker,
             towerWar: towerWar, worldState: worldState, partyRegistry: partyRegistry, duelRegistry: duelRegistry,
             characterShardLocations: characterShardLocations, tribeBankTax: tribeBankTax,
-            regularWarActiveMapTracker: regularWarActiveMapTracker, geometry: geometry);
+            regularWarActiveMapTracker: regularWarActiveMapTracker, geometry: geometry,
+            eventLogQueue: eventLogQueue, fourGuildKillPointQueue: fourGuildKillPointQueue,
+            tribeSymbolCombatModifiers: tribeSymbolCombatModifiers);
     }
 
     public static (ZoneClientSession Session, FakeDuplexPipe Pipe) CreateSession(long sessionId)
@@ -86,7 +92,7 @@ internal static class ZoneTestKit
 
     public static PlayerEnterData EnterData(ZoneClientSession session, short mapId, string name = "Hero",
         float posX = 100f, float posY = 0f, float posZ = 100f, long flushSequence = 7, byte tribe = 1,
-        short level = 42)
+        short level = 42, string? sourceIp = null)
     {
         return new PlayerEnterData(
             session,
@@ -105,7 +111,8 @@ internal static class ZoneTestKit
             840,
             300,
             320,
-            flushSequence);
+            flushSequence,
+            SourceIp: sourceIp);
     }
 
     /// <summary>Drains every byte the session has written so far (empty array when nothing is pending).</summary>
@@ -137,6 +144,7 @@ internal static class ZoneTestKit
             LevelsByLevel = levelsByLevel ?? EmptyFrozen<short, LevelRowDto>(),
             ZonesByNumber = zonesByNumber ?? EmptyFrozen<short, ZoneDefinition>(),
             GemSocketsById = EmptyFrozen<int, GemSocketRowDto>(),
+            GemSocketsByTypeAndValue = EmptyFrozen<int, GemSocketRowDto>(),
             BloodExchangeCatalog = [],
             EventDefinitions = [],
             ItemMallProductsById = EmptyFrozen<int, ItemMallProductRowDto>(),

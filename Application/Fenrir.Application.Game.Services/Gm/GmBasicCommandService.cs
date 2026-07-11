@@ -470,7 +470,7 @@ public sealed class GmBasicCommandService(
         var petContribution =
             PetGrowthCalculator.Compute(petItemId, state.PetGrowth, state.PetActivity, worldData.ItemsById);
         var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
-            newLevel, state.Tribe, state.PreviousTribe, state.Title, state.Halo, newRebirthCount);
+            newLevel, state.Tribe, state.PreviousTribe, state.Title, state.Halo, newRebirthCount, newLevel2);
         var stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
             petContribution);
 

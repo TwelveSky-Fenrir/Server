@@ -61,6 +61,9 @@ public sealed partial class Zone
                 // contract notes for a reflect kill is a pre-existing gap, not introduced here.
                 case CrossAvatarAttackKind.EnemyTribe:
                     ApplyPvpKillRewards(defenderState, attackerState);
+                    RecordEnemyKillForFeed(defenderState, attackerState, false,
+                        regularWarActiveMapTracker?.IsBattleInProgress(MapId) == true ||
+                        MapId == KillFeedZoneCatalog.FfaMapNumber);
                     ApplyDeath(attackerState.CharacterId, DeathCause.PlayerKill);
                     break;
                 // Duel reflect-kill (death-reason 1): no reward pipeline, matching every other duel kill in

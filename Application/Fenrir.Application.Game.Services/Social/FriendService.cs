@@ -38,12 +38,13 @@ public sealed class FriendService(
     ///     pre-check family) -- legacy checks the requester's OWN busy/pose state before it ever resolves
     ///     the target avatar by name, so a busy asker naming a nonexistent/offline target gets the busy
     ///     reply, not "target not found". <see cref="FriendRegistry.IsNegotiating" /> and
-    ///     <see cref="IsExcludedByCommunityWork" /> are therefore both checked ahead of
+    ///     <see cref="Fenrir.Application.Game.Domain.Social.CommunityWorkGate.IsBusy" /> are therefore both checked ahead of
     ///     <see cref="FindPlayerByName" />; the same <see cref="FriendRegistry.IsNegotiating" /> check inside
     ///     <see cref="FriendRegistry.TryAsk" /> stays in place for the actual registration.
     ///     <para>
     ///         Server/ts25zone/S07_MyGame04.cpp:185-216 (<c>CheckCommunityWork</c>'s shared seven-flag busy
-    ///         check) is also re-applied to the resolved target below (<see cref="IsExcludedByCommunityWork" />),
+    ///         check) is also re-applied to the resolved target below (
+    ///         <see cref="Fenrir.Application.Game.Domain.Social.CommunityWorkGate.IsBusy" />),
     ///         mirroring <c>GuildInviteService.IsExcludedByCommunityWorkOrStunDeath</c>/
     ///         <c>TradeInviteService.IsExcludedByCommunityWorkOrStunDeath</c> -- this closes a gap where only
     ///         this family's own <see cref="FriendRegistry" /> state was previously consulted for either side.
@@ -70,7 +71,7 @@ public sealed class FriendService(
             return FriendAskResultKind.MapForbidden;
         }
 
-        if (friends.IsNegotiating(asker.CharacterId) || IsExcludedByCommunityWork(asker))
+        if (CommunityWorkGate.IsBusy(asker, duels, trades, friends, parties, mentors, guildInvites))
         {
             logger.LogDebug("Friend ask rejected: character {AskerId} already has a pending negotiation",
                 asker.CharacterId);
@@ -99,7 +100,7 @@ public sealed class FriendService(
             return FriendAskResultKind.TribeMismatch;
         }
 
-        if (IsExcludedByCommunityWork(target))
+        if (CommunityWorkGate.IsBusy(target, duels, trades, friends, parties, mentors, guildInvites))
         {
             logger.LogDebug("Friend ask rejected: target character {TargetCharacterId} is busy",
                 target.CharacterId);
@@ -356,26 +357,6 @@ public sealed class FriendService(
             "Friend ask published cross-shard: character {AskerId} ({AskerName}) -> character {TargetCharacterId} on shard {TargetShardId}",
             asker.CharacterId, asker.Name, remote.CharacterId, remote.ShardId);
         return FriendAskResultKind.SentCrossShard;
-    }
-
-    /// <summary>
-    ///     <c>CheckCommunityWork()</c>'s six OTHER exclusivity flags (personal shop, duel, trade, party, guild,
-    ///     mentor/teacher negotiation -- this family's own friend-negotiation flag is checked separately, and
-    ///     atomically, by <see cref="FriendRegistry.IsNegotiating" />/<see cref="FriendRegistry.TryAsk" />). Any
-    ///     one of these being true excludes <paramref name="player" /> from starting or receiving a friend ask,
-    ///     exactly as it does for every other ASK family in this codebase (mirrors
-    ///     <c>GuildInviteService.IsExcludedByCommunityWorkOrStunDeath</c>/
-    ///     <c>TradeInviteService.IsExcludedByCommunityWorkOrStunDeath</c>, minus their additional stun/post-death
-    ///     gate -- not modeled here, see this class's own <see cref="Ask" /> remarks).
-    /// </summary>
-    private bool IsExcludedByCommunityWork(PlayerRuntimeState player)
-    {
-        return player.PshopOpen
-               || duels.IsNegotiating(player.CharacterId)
-               || trades.IsBusy(player.CharacterId)
-               || parties.IsNegotiating(player.CharacterId)
-               || guildInvites.IsNegotiating(player.CharacterId)
-               || mentors.IsNegotiating(player.CharacterId);
     }
 
     private static PlayerRuntimeState? FindPlayerByName(Zone zone, string avatarName)

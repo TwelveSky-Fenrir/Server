@@ -34,9 +34,6 @@ namespace Fenrir.Application.Game.Domain.World.Loot;
 /// </remarks>
 public sealed class BossDropCatalog
 {
-    /// <summary>The one process-wide instance, shared by every zone via <see cref="Monsters.MonsterSpawnScheduler" />.</summary>
-    public static BossDropCatalog Default { get; } = new();
-
     /// <summary>The elixir slot's index inside the 6-entry 746/9001 shared pool (see <see cref="SharedRandomPoolFixedIds" />).</summary>
     public const int SharedRandomPoolElixirSlotIndex = 3;
 
@@ -88,6 +85,9 @@ public sealed class BossDropCatalog
         // fourth fixed id -- BossEventDropResolver splices the per-kill elixir draw in at that position.
         SharedRandomPoolFixedIds = [1023, 1022, 8102, 695, 696];
     }
+
+    /// <summary>The one process-wide instance, shared by every zone via <see cref="Monsters.MonsterSpawnScheduler" />.</summary>
+    public static BossDropCatalog Default { get; } = new();
 
     /// <summary>Identifier 1404's nine-item guaranteed list (attributed to the killer).</summary>
     public IReadOnlyList<DroppedItem> NineItemEventList { get; }

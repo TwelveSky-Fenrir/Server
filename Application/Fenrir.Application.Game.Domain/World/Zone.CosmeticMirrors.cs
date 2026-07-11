@@ -168,7 +168,7 @@ public sealed partial class Zone
 
     /// <summary>
     ///     Op 94/95 (<c>ContinueSkillStat</c>/<c>ContinueSkillUse</c>) auto-buff registration + activation
-    ///     mirror. See <see cref="ApplyAutoBuffCommand" />'s remarks for what this stub does/doesn't mirror yet.
+    ///     mirror. See <see cref="ApplyAutoBuffCommand" />'s remarks for what it does and deliberately does not mirror.
     /// </summary>
     private readonly Channel<AutoBuffZoneCommand> _autoBuffInbox =
         Channel.CreateBounded<AutoBuffZoneCommand>(
@@ -184,7 +184,7 @@ public sealed partial class Zone
 
     /// <summary>
     ///     Op 97/111 (<c>PlaytimeBuff</c>/<c>RankBuff</c>) self-mutation mirror. See
-    ///     <see cref="ApplyAvatarBuffCommand" />'s remarks for what this stub does/doesn't mirror yet.
+    ///     <see cref="ApplyAvatarBuffCommand" />'s remarks for what it does and deliberately does not mirror.
     /// </summary>
     private readonly Channel<AvatarBuffZoneCommand> _avatarBuffInbox =
         Channel.CreateBounded<AvatarBuffZoneCommand>(
@@ -217,7 +217,7 @@ public sealed partial class Zone
 
     /// <summary>
     ///     Op 90/139 (<c>CostumeState</c>/<c>CostumeVisibility</c>) self-mutation mirror. See
-    ///     <see cref="ApplyCostumeCommand" />'s remarks for what this stub does/doesn't mirror yet.
+    ///     <see cref="ApplyCostumeCommand" />'s remarks for what it does and deliberately does not mirror.
     /// </summary>
     private readonly Channel<CostumeZoneCommand> _costumeInbox =
         Channel.CreateBounded<CostumeZoneCommand>(
@@ -276,7 +276,7 @@ public sealed partial class Zone
 
     /// <summary>
     ///     Op 87/113 (<c>MountState</c>/<c>MountAbsorb</c>) self-mutation mirror. See
-    ///     <see cref="ApplyMountCommand" />'s remarks for what this stub does/doesn't mirror yet.
+    ///     <see cref="ApplyMountCommand" />'s remarks for what it does and deliberately does not mirror.
     /// </summary>
     private readonly Channel<MountZoneCommand> _mountInbox =
         Channel.CreateBounded<MountZoneCommand>(
@@ -301,7 +301,7 @@ public sealed partial class Zone
 
     /// <summary>
     ///     Op 157 <c>RuneSocket</c> self-mutation mirror. See <see cref="ApplyRuneSocketCommand" />'s remarks
-    ///     for what this stub does/doesn't mirror yet.
+    ///     for what it does and deliberately does not mirror.
     /// </summary>
     private readonly Channel<RuneSocketZoneCommand> _runeInbox =
         Channel.CreateBounded<RuneSocketZoneCommand>(
@@ -957,6 +957,17 @@ public sealed partial class Zone
         if (command.WardrobeSlotCleared is { } clearedSlot)
             state.CostumeWardrobe = state.CostumeWardrobe.SetItem(clearedSlot, 0);
 
+        // Workstream C9-costume-stellar-whitelist: op23 costume grant -- writes the new item id (plus its
+        // packed costume-date word and expire-date) into the first free wardrobe slot. Never marks
+        // DirtyFlags.Progression -- no persisted column exists for any of these three arrays yet, same
+        // posture ApplyMountCommand's own MountGarage handling already documents for itself.
+        if (command.WardrobeSlotGranted is { } grantedSlot)
+        {
+            state.CostumeWardrobe = state.CostumeWardrobe.SetItem(grantedSlot, command.GrantedItemId ?? 0);
+            state.CostumeDate = state.CostumeDate.SetItem(grantedSlot, command.GrantedCostumeDate ?? 0);
+            state.CostumeExpireDate = state.CostumeExpireDate.SetItem(grantedSlot, command.GrantedExpireDate ?? 0);
+        }
+
         if (command.Life is { } life)
         {
             state.Life = life;
@@ -1042,6 +1053,17 @@ public sealed partial class Zone
 
         if (command.WardrobeSlotCleared is { } clearedSlot)
             state.StellarCoreWardrobe = CompactStellarCoreWardrobe(state.StellarCoreWardrobe, clearedSlot);
+
+        // Workstream C9-costume-stellar-whitelist: op23 stellar-core grant -- writes the new item id (plus
+        // its expire-date) into the first free wardrobe slot. Never marks DirtyFlags.Progression -- no
+        // persisted column exists for either array yet, same posture as ApplyCostumeCommand's own grant
+        // handling.
+        if (command.WardrobeSlotGranted is { } grantedSlot)
+        {
+            state.StellarCoreWardrobe = state.StellarCoreWardrobe.SetItem(grantedSlot, command.GrantedItemId ?? 0);
+            state.StellarCoreExpireDate =
+                state.StellarCoreExpireDate.SetItem(grantedSlot, command.GrantedExpireDate ?? 0);
+        }
 
         if (command.Life is { } life)
         {
@@ -1197,6 +1219,11 @@ public sealed partial class Zone
         state.RuneSystem = state.RuneSystem.SetItem(command.RuneIndex, command.RuneItemId ?? 0);
         state.RuneSystemStat = state.RuneSystemStat.SetItem(command.RuneIndex, command.RuneStat ?? 0);
 
+        // TODO(wiring B5): recompute-trigger deferred to fenrir-gameplay-domain-engineer (real gameplay change,
+        // out of this wiring pass's scope). Per the B5 manifest, rune arrays now feed EquipmentService.RecomputeStats
+        // (via AssembleStatContexts -> CosmeticContext), so recomputing is no longer the pure no-op this method's
+        // doc above describes: either compute UpdatedStats on the posting thread and pass it via
+        // RuneSocketZoneCommand.UpdatedStats, or recompute here on the tick thread -- before the op199 response.
         if (command.UpdatedStats is { } stats)
             state.Stats = stats;
     }
@@ -1502,6 +1529,24 @@ public enum CostumeBroadcastKind : byte
 ///     Op 90/139 (<c>CostumeState</c>/<c>CostumeVisibility</c>) self-mutation mirror, same shape as
 ///     <see cref="MountZoneCommand" />.
 /// </summary>
+/// <param name="WardrobeSlotGranted">
+///     Workstream C9-costume-stellar-whitelist (op23's costume intermediate dispatch): the first free
+///     <see cref="PlayerRuntimeState.CostumeWardrobe" /> slot a newly-consumed costume item was just granted
+///     into. Always paired with <see cref="GrantedItemId" /> (both set together, never independently) --
+///     distinct from <see cref="WardrobeSlotCleared" />, which only ever zeroes an existing slot.
+/// </param>
+/// <param name="GrantedItemId">See <see cref="WardrobeSlotGranted" />.</param>
+/// <param name="GrantedCostumeDate">
+///     The granted item's packed enchant/combine/refine/socket word, written into
+///     <see cref="PlayerRuntimeState.CostumeDate" /> at <see cref="WardrobeSlotGranted" /> -- see
+///     <see cref="Inventory.UseItems.CostumeStellarCoreUseItemHandler" />'s own remarks for why this
+///     translation was chosen. Null means "grant with no costume-date payload" (defensive default; the
+///     posting handler always supplies one alongside <see cref="WardrobeSlotGranted" />).
+/// </param>
+/// <param name="GrantedExpireDate">
+///     The granted item's own ExpireDate, written into <see cref="PlayerRuntimeState.CostumeExpireDate" /> at
+///     <see cref="WardrobeSlotGranted" />.
+/// </param>
 public readonly record struct CostumeZoneCommand(
     int CharacterId,
     int? CostumeIndex = null,
@@ -1513,6 +1558,10 @@ public readonly record struct CostumeZoneCommand(
     EffectiveStats? UpdatedStats = null,
     CostumeBroadcastKind Broadcast = CostumeBroadcastKind.None,
     bool FullActionRebroadcast = false,
+    int? WardrobeSlotGranted = null,
+    int? GrantedItemId = null,
+    int? GrantedCostumeDate = null,
+    int? GrantedExpireDate = null,
     TaskCompletionSource? Applied = null);
 
 /// <summary>
@@ -1527,6 +1576,18 @@ public enum StellarCoreBroadcastKind : byte
 }
 
 /// <summary>Op 153 <c>StellarCoreState</c> self-mutation mirror, same shape as <see cref="CostumeZoneCommand" />.</summary>
+/// <param name="WardrobeSlotGranted">
+///     Workstream C9-costume-stellar-whitelist (op23's stellar-core intermediate dispatch): the first free
+///     <see cref="PlayerRuntimeState.StellarCoreWardrobe" /> slot a newly-consumed stellar-core item was just
+///     granted into. Always paired with <see cref="GrantedItemId" />. Unlike
+///     <see cref="CostumeZoneCommand.WardrobeSlotGranted" />, there is no "granted date" companion -- see
+///     <see cref="PlayerRuntimeState.StellarCoreExpireDate" />'s own remarks for why no such field exists.
+/// </param>
+/// <param name="GrantedItemId">See <see cref="WardrobeSlotGranted" />.</param>
+/// <param name="GrantedExpireDate">
+///     The granted item's own ExpireDate, written into <see cref="PlayerRuntimeState.StellarCoreExpireDate" />
+///     at <see cref="WardrobeSlotGranted" />.
+/// </param>
 public readonly record struct StellarCoreZoneCommand(
     int CharacterId,
     int? CoreIndex = null,
@@ -1536,6 +1597,9 @@ public readonly record struct StellarCoreZoneCommand(
     int? Mana = null,
     EffectiveStats? UpdatedStats = null,
     StellarCoreBroadcastKind Broadcast = StellarCoreBroadcastKind.None,
+    int? WardrobeSlotGranted = null,
+    int? GrantedItemId = null,
+    int? GrantedExpireDate = null,
     TaskCompletionSource? Applied = null);
 
 /// <summary>

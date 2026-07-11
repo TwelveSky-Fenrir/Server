@@ -334,7 +334,7 @@ public class RegularWarScheduleTests
     }
 
     [Fact]
-    public void PostWarCleanup_BossMap_BossAlreadyGone_OnlyWaitsBaseAndConfirmedAbsence()
+    public void PostWarCleanup_BossMap_BossAlreadyGone_TimesOutAtFlatPollWindow()
     {
         var schedule = AdvanceToActive(BossWarMap);
         TickMany(schedule, RegularWarSchedule.ActiveEvaluationCadenceTicks, Present(3, 0, 0, 3)); // TribeWin
@@ -342,14 +342,12 @@ public class RegularWarScheduleTests
 
         var bossGone = new RegularWarEnvironmentSnapshot(1, [0, 0, 1, 0]);
 
-        // Base wait (180) -- boss already reported gone, so confirmed-absence starts immediately at tick 180.
-        TickMany(schedule, RegularWarSchedule.PostWarCleanupTicks - 1, bossGone);
-        Assert.Equal(RegularWarPhase.PostWarCleanup, schedule.Phase);
-
-        schedule.Tick(bossGone); // tick 180: base wait elapses AND confirmed-absence starts same tick
-        Assert.Equal(RegularWarPhase.PostWarCleanup, schedule.Phase);
-
-        TickMany(schedule, RegularWarSchedule.BossConfirmedAbsenceTicks - 1, bossGone);
+        // Confirmed legacy defect (A4-missing-bosses): the post-war "is the boss still alive" comparison is
+        // unconditionally true every tick, so BossMonsterAlive plays no role here -- this phase is governed
+        // purely by the flat PostWarCleanupTicks + BossPollMaxTicks - 1 timeout (the -1 because the tick that
+        // crosses the PostWarCleanupTicks threshold is the SAME Tick() call that starts the boss-poll count).
+        TickMany(schedule,
+            RegularWarSchedule.PostWarCleanupTicks + RegularWarSchedule.BossPollMaxTicks - 2, bossGone);
         Assert.Equal(RegularWarPhase.PostWarCleanup, schedule.Phase);
 
         var final = schedule.Tick(bossGone);
@@ -358,22 +356,23 @@ public class RegularWarScheduleTests
     }
 
     [Fact]
-    public void PostWarCleanup_BossMap_BossAliveTheWholeMaxPoll_EventuallyTimesOutIntoConfirmedAbsence()
+    public void PostWarCleanup_BossMap_BossReportedAliveWholeWindow_StillTimesOutAtSameFlatPollWindow()
     {
         var schedule = AdvanceToActive(BossWarMap);
         TickMany(schedule, RegularWarSchedule.ActiveEvaluationCadenceTicks, Present(3, 0, 0, 3)); // TribeWin
 
         var bossAlive = new RegularWarEnvironmentSnapshot(1, [0, 0, 1, 0], true);
 
-        // Base wait + the full poll window -- boss never dies, poll simply exhausts.
-        TickMany(schedule, RegularWarSchedule.PostWarCleanupTicks + RegularWarSchedule.BossPollMaxTicks, bossAlive);
-        Assert.Equal(RegularWarPhase.PostWarCleanup, schedule.Phase);
-
-        TickMany(schedule, RegularWarSchedule.BossConfirmedAbsenceTicks - 1, bossAlive);
+        // Same flat PostWarCleanupTicks + BossPollMaxTicks - 1 timeout as the boss-already-gone sibling test
+        // above -- BossMonsterAlive is carried on the snapshot but never actually read by TickPostWarCleanup
+        // under the confirmed legacy defect, so reporting the boss alive for the WHOLE window changes nothing.
+        TickMany(schedule,
+            RegularWarSchedule.PostWarCleanupTicks + RegularWarSchedule.BossPollMaxTicks - 2, bossAlive);
         Assert.Equal(RegularWarPhase.PostWarCleanup, schedule.Phase);
 
         var final = schedule.Tick(bossAlive);
         Assert.Equal(RegularWarPhase.ForcedReset, final.Phase);
+        Assert.True(final.MonstersShouldDespawn);
     }
 
     [Fact]

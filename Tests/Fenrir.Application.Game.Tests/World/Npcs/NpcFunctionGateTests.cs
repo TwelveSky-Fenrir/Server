@@ -37,6 +37,7 @@ public class NpcFunctionGateTests
             LevelsByLevel = FrozenDictionary<short, LevelRowDto>.Empty,
             ZonesByNumber = FrozenDictionary<short, ZoneDefinition>.Empty,
             GemSocketsById = FrozenDictionary<int, GemSocketRowDto>.Empty,
+            GemSocketsByTypeAndValue = FrozenDictionary<int, GemSocketRowDto>.Empty,
             BloodExchangeCatalog = [],
             EventDefinitions = [],
             ItemMallProductsById = FrozenDictionary<int, ItemMallProductRowDto>.Empty,

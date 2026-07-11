@@ -4,7 +4,28 @@ using Fenrir.Application.Game.GameData;
 namespace Fenrir.Application.Game.Domain.World.Loot;
 
 /// <summary>One resolved, ready-to-spawn drop item (never money -- see <see cref="MonsterDropResult.Money" />).</summary>
-public readonly record struct DroppedItem(int ItemId, int Quantity);
+/// <param name="ItemId">The item id to spawn.</param>
+/// <param name="Quantity">Stack size for this drop.</param>
+/// <param name="Serial">
+///     Optional ground-item recognition serial (legacy <c>tItemRecognitionNumber</c>, carried on the wire by
+///     <see cref="GroundItemEntity.SerialNumber" /> -- Server/Header/Protocol/STRUCT.h:941-955, serial at :946).
+///     0 (the default) means "no explicit serial supplied", which is what every generic/boss/CP-Gift drop
+///     passes today (Server/ts25zone/S07_MyGame05.cpp:3424 passes a literal 0 for the CP-Gift tier). A non-zero
+///     value models the tail tiers that stamp a serial explicitly -- the LOD rebirth-item tier and the
+///     boss/special drop near the routine's start both pass <c>ReturnItemSerial(IELITE)</c> (elite type code 4)
+///     for this slot (Server/ts25zone/S07_MyGame05.cpp:3548,3579,1881). The serial is clock-derived (down to
+///     the second) and collision-prone -- a display/recognition stamp, never a unique key
+///     (Server/Header/function.h:5-27).
+///     <para>
+///         <b>Not yet produced or threaded (out of this wave's file scope).</b> No resolver populates a non-zero
+///         value yet (<c>MonsterDropTailResolver.ResolveRebirthItem</c> would be the first), and
+///         <c>Zone.SpawnGroundItem</c> does not yet accept a serial argument, so this field does not reach
+///         <see cref="GroundItemEntity.SerialNumber" /> today (that spawn call hardcodes 0). This adds the
+///         carry capacity the finding asked for; the producer + spawn-threading follow-up is reported in the
+///         wave's wiring manifest, and the exact legacy serial-value composition is an open question.
+///     </para>
+/// </param>
+public readonly record struct DroppedItem(int ItemId, int Quantity, int Serial = 0);
 
 /// <summary>
 ///     Everything one monster's death rolled, in pipeline order: money, potions, general items, quest item, extra

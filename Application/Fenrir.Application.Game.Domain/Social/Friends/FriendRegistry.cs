@@ -49,6 +49,32 @@ public sealed class FriendRegistry
         }
     }
 
+    /// <summary>
+    ///     Read-only lookup for <see cref="Simulation.PendingSocialRequestAutoCancelSystem" />'s per-tick
+    ///     "counterpart still reachable" sweep (behavior contract C21§G). Unlike <see cref="TryCancel" />,
+    ///     does NOT consume/remove the entry.
+    /// </summary>
+    public bool TryPeekPending(int characterId, out int counterpartId, out bool isAsker)
+    {
+        lock (_lock)
+        {
+            if (_pendingByAsker.TryGetValue(characterId, out counterpartId))
+            {
+                isAsker = true;
+                return true;
+            }
+
+            if (_pendingByTarget.TryGetValue(characterId, out counterpartId))
+            {
+                isAsker = false;
+                return true;
+            }
+
+            isAsker = false;
+            return false;
+        }
+    }
+
     public FriendAskOutcome TryAsk(int askerId, int targetId)
     {
         lock (_lock)

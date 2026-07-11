@@ -1,7 +1,9 @@
 using System.Buffers;
 using System.Threading.Channels;
+using Fenrir.Application.Game.Domain.AntiCheat;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Mounts;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Quests;
@@ -9,6 +11,7 @@ using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.World.Monsters;
 using Fenrir.Application.Game.Domain.World.WorldState;
+using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Dispatch.Sessions;
@@ -57,6 +60,15 @@ public sealed partial class Zone
     ///     jump plus the post-grant stat/skill point totals, never one send per level crossed.
     /// </summary>
     private const int LevelUpAvatarChangeInfoSort = 1;
+
+    /// <summary>
+    ///     Sort=107 on <c>AvatarStateFlagResponse</c> -- the level-milestone bonus-item ARM notification (the
+    ///     live <c>LNW33</c> milestone-arming switch, <c>Server/ts25zone/S07_MyGame03.cpp:5109-5132</c>, cited
+    ///     in full on <see cref="LevelMilestoneBonus" />): sent once when a level-up crosses one of
+    ///     <see cref="LevelMilestoneBonus.ArmableMilestoneLevels" />, carrying the armed flag (1)
+    ///     and the armed milestone level -- Value03 unused.
+    /// </summary>
+    private const int BonusItemAvatarChangeInfoSort = 107;
 
     /// <summary>
     ///     QuestProgressResponse.Sort marker for the archetype-1 (kill-monster) SOLO kill-credit push to the
@@ -334,7 +346,9 @@ public sealed partial class Zone
             ZonePvpZoneCatalog.IsSameTribeAttackExempt(MapId),
             ZonePvpZoneCatalog.IsNewbieProtectionZone(MapId),
             defenderState.PshopOpen, defenderState.ActionSort,
-            worldState?.GetAllyOf(attackerSnapshot.Tribe));
+            worldState?.GetAllyOf(attackerSnapshot.Tribe),
+            worldState?.GetTribeFormationAbility(attackerSnapshot.Tribe) ?? FormationCombatResolver.NoFormation,
+            worldState?.GetTribeFormationAbility(defenderSnapshot.Tribe) ?? FormationCombatResolver.NoFormation);
 
         if (outcome.Rejected)
             return;
@@ -392,7 +406,16 @@ public sealed partial class Zone
 
         if (defenderState.Life <= 0)
         {
-            ApplyPvpKillRewards(attackerState, defenderState);
+            // B14: classify the lethal blow (one-shot skill-index set is currently empty -> NormalHit; the
+            // reflect-kill path is handled separately in the damage pipeline) and pass the stun-vs-not collapse.
+            // Behaviorally neutral today -- ClassifyPvpKillType never returns Stun from this non-reflect death
+            // path, so isStunTrigger is always false, exactly the prior default. Establishes the classification
+            // seam the enemy-tribe kill-DROP slice will consume (NormalHit vs CriticalHit) when it lands.
+            var killType = ClassifyPvpKillType(command.AttackInfo.AttackActionValue2, false);
+            ApplyPvpKillRewards(attackerState, defenderState, killType == KillCpType.Stun);
+            RecordEnemyKillForFeed(attackerState, defenderState, killType == KillCpType.Stun,
+                regularWarActiveMapTracker?.IsBattleInProgress(MapId) == true ||
+                MapId == KillFeedZoneCatalog.FfaMapNumber);
             ApplyDeath(defenderState.CharacterId, DeathCause.PlayerKill);
         }
     }
@@ -440,6 +463,17 @@ public sealed partial class Zone
         if (attackerState.CharacterId == defenderState.CharacterId)
             return;
 
+        // D2 hook 3: PvP same-origin kill-credit guard -- denies reward credit (never the kill itself, which
+        // already stands via this method's caller's own unconditional ApplyDeath call) when the killer and
+        // victim look like the same real-world actor farming CP off an alt on the same machine. Purely
+        // additive: does NOT replace or duplicate the level-gap cap (CombinedLevelGapCap) below or the 10-min
+        // repeat-kill window (_killCooldownTracker), both already enforced independently. No account-id signal
+        // is threaded through yet -- PlayerRuntimeState carries no AccountId field today -- so this runs
+        // IP-only (SessionSourceIp-normalized, null-safe: two absent IPs never falsely match, per
+        // PvpKillCreditGuard.IsSameOrigin's own remarks).
+        if (PvpKillCreditGuard.IsSameOrigin(attackerState.SourceIp, defenderState.SourceIp))
+            return;
+
         // aLevel1 == Level + Level2 (the post-cap high-level ladder), NEVER RebirthCount -- confirmed against
         // MyUtil::ProcessForKillOtherTribe, S07_MyGame03.cpp:2660-2661. RebirthCount (aRebirthNum) is a
         // distinct 0-6 counter that only ever reaches nonzero once Level2 is already pinned at its own cap
@@ -450,11 +484,26 @@ public sealed partial class Zone
         if (attackerCombinedLevel - defenderCombinedLevel > CombinedLevelGapCap)
             return;
 
+        // C16: popup-event kill-streak counter -- see NotifyPopupEventPvpKill's own remarks for why this must
+        // run BEFORE the C05 anti-farm cooldown gate immediately below rather than after it.
+        NotifyPopupEventPvpKill(attackerState, defenderState);
+
         if (!_killCooldownTracker.TryRegisterKill(attackerState.CharacterId, defenderState.CharacterId,
                 DateTime.UtcNow))
             return;
 
-        var profile = PvpKillRewardZoneCatalog.Resolve(MapId, isStunTrigger);
+        // B9: the four extended zone families (symbol-battle, DTM/38, regular-war-drop, 195/196) now resolve
+        // through PvpKillExtendedRewardZones first; every other zone (FFA-335, the four city zones, 194/267-269,
+        // and the catch-all default) still falls through to PvpKillRewardZoneCatalog exactly as before. The
+        // runtime world/event toggles below are not yet sourced from live world state -- see this method's own
+        // remarks for the follow-up.
+        var zoneRuntime = new PvpKillRewardZoneRuntimeState(
+            false, // TODO(world-state): mWorldInfo->mTribeSymbolBattle for MapId
+            false, // TODO(world-state): mGAME.isZone195TimeEvent
+            false, // TODO(world-state): map-38 battle-post-distance/state branch
+            false); // TODO(world-state): same map-38 branch
+        var profile = PvpKillExtendedRewardZones.TryResolve(MapId, isStunTrigger, zoneRuntime)
+                      ?? PvpKillRewardZoneCatalog.Resolve(MapId, isStunTrigger);
 
         if (profile.GrantDailyMissionProgress)
         {
@@ -538,12 +587,26 @@ public sealed partial class Zone
         if (!profile.GrantContributionPoints)
             return;
 
-        // Premium status/warrior-scroll buff are not modeled in Fenrir yet -- always false until a buff slot
-        // for each is identified (see PvpKillContributionPointCalculator's own remarks for the other three
-        // formula terms this deliberately omits entirely).
+        // B9: the game-wide cross-tribe add value (doubled by the always-active rebirth build macro) and the
+        // three server/tribe/level-conditional bonuses now feed the base amount too. Premium status/warrior-
+        // scroll buff are still not modeled in Fenrir yet -- always false until a buff slot for each is
+        // identified. CrossTribeCpAddValue is the same "hardcode the cited shipped literal, pending a
+        // GameServerOptions knob" treatment as the XP ratio above.
         var baseAmount = PvpKillContributionPointCalculator.ComputeBaseAmount(
             false,
-            false);
+            false,
+            PvpKillContributionPointBonuses.ComputePerUserAddValue(false), // TODO: time-effect code 300
+            0, // TODO(world-state): mTribeKillOtherTribeAddValueInfo[tribe]
+            0, // KEEP 0 -- tower CP already granted separately by ApplyTowerCpForPvpBonus (do NOT double-count)
+            PvpKillContributionPointBonuses
+                .ComputeGameWideAddValue(
+                    3)); // TODO(config): GameServerOptions CrossTribeCpAddValue, shipped BuildEU33 = 3 (=>6 after rebirth x2)
+        baseAmount += PvpKillContributionPointBonuses.ComputeConditionalBonuses(
+            MapId, attackerState.Tribe,
+            -1, // TODO(world-state): mTribeAddCP runtime tribe
+            attackerState.Level, // BASE level only (Level, not Level+Level2)
+            false, // TODO(world-state)
+            -1); // UNRECOVERABLE per-server home-tribe map -- withholds minority-capital +10
 
         var grantedAmount = PvpKillContributionPointCalculator.ClampGrant(attackerState.ContributionPoints,
             baseAmount, PvpKillContributionPointCalculator.PlaceholderHardCap);
@@ -624,9 +687,8 @@ public sealed partial class Zone
     ///     same crediting resolver (<see cref="PetExperienceCreditResolver" />), matching legacy's own shared
     ///     <c>PETSYSTEM::ProcessForExperience</c> entry point for both kill types
     ///     (<c>MyUtil::ProcessForKillOtherTribe</c>, S07_MyGame03.cpp:3173-3188, and
-    ///     <c>MONSTER_OBJECT::ProcessForExp</c>, S07_MyGame05.cpp:3855-3875). Mount-activity-experience is
-    ///     still not modeled: no per-slot experience array exists on <see cref="PlayerRuntimeState" /> yet
-    ///     (<see cref="Fenrir.Application.Game.Domain.Mounts.MountStateResolver" />'s own remarks).
+    ///     <c>MONSTER_OBJECT::ProcessForExp</c>, S07_MyGame05.cpp:3855-3875). B16: mount-activity-experience is
+    ///     now also granted here -- see <see cref="ApplyPvpKillMountExperience" />.
     /// </summary>
     /// <remarks>
     ///     The pet-growth-EXP grant is deliberately evaluated unconditionally, NOT gated by
@@ -643,16 +705,26 @@ public sealed partial class Zone
     {
         if (profile.GrantExperience)
         {
-            // Warrior-scroll/double-EXP-charge buffs are not modeled in Fenrir yet -- see
-            // PvpKillExperienceCalculator's own remarks for why the base amount and zone multiplier are also
-            // placeholders rather than the real per-defender-level table/per-zone table the source contract
-            // calls for.
+            // B9: the real victim-combined-level base table (PvpKillExperienceBaseTable) and the
+            // attacker/victim level-gap scaling (PvpKillExperienceScaling.Scale) replace the flat placeholder;
+            // the zone multiplier is the regular-war x150 (the 11-map SERVER set, RegularWarMapCatalog -- NOT
+            // the broader 26-map drop-eligibility family PvpKillExtendedRewardZones uses) vs. the deployment-
+            // configured cross-tribe ratio. Warrior-scroll/double-EXP-charge buffs are still not modeled in
+            // Fenrir yet -- see PvpKillExperienceCalculator's own remarks.
+            var scaledBase = PvpKillExperienceScaling.Scale(
+                PvpKillExperienceBaseTable.Lookup(defenderCombinedLevel),
+                attackerCombinedLevel,
+                defenderCombinedLevel);
+            var zoneMultiplier = PvpKillExperienceScaling.ResolveZoneMultiplier(
+                RegularWarMapCatalog.TryGet(MapId, out _),
+                2); // TODO(config): GameServerOptions CrossTribeXpRatio, shipped BuildEU33 = 2
             var gain = PvpKillExperienceCalculator.ComputeGain(
-                PvpKillExperienceCalculator.PlaceholderBaseAmountPerKill,
+                scaledBase,
                 attackerCombinedLevel,
                 defenderCombinedLevel,
                 false,
-                false);
+                false,
+                zoneMultiplier);
 
             if (gain > 0)
                 ApplyCharacterExperienceGain(attackerState, gain);
@@ -660,6 +732,46 @@ public sealed partial class Zone
 
         var petExpGain = PvpKillPetExperienceCalculator.ComputeGain(attackerCombinedLevel);
         CreditPetGrowthFromPvpKill(attackerState, petExpGain);
+
+        // B16: mount-experience grant, the sibling of the pet-growth grant immediately above -- same
+        // deliberately-unconditional posture (NOT gated by profile.GrantExperience), since the cited legacy
+        // mount branch sits right next to the pet-exp branch this method's own <remarks/> already describe as
+        // having no zone-eligibility precondition of its own.
+        ApplyPvpKillMountExperience(attackerState);
+    }
+
+    /// <summary>
+    ///     B16: inter-tribe-kill mount-experience grant (<c>MyUtil::ProcessForKillOtherTribe</c>'s own mount
+    ///     branch, <c>Server/ts25zone/S07_MyGame03.cpp:3190-3210</c>) -- previously entirely unwired: no call
+    ///     site anywhere ever invoked <see cref="MountKillExperienceCalculator.ComputeGain" />, so
+    ///     <see cref="PlayerRuntimeState.MountAccumulatedExp" /> stayed frozen at 0 forever regardless of kill
+    ///     count. Resolves the attacker's ACTIVE mount slot only (<see cref="PlayerRuntimeState.AnimalIndex" />
+    ///     10-19, legacy's own "actively mounted" offset band -- the decoded garage slot is
+    ///     <c>AnimalIndex % 10</c>); a killer with a mount merely SELECTED but not actively ridden (0-9) or with
+    ///     none selected (-1) grants nothing, so this skips the array lookups entirely for those cases rather
+    ///     than indexing with an unmounted/negative slot -- <see cref="MountKillExperienceCalculator" />'s own
+    ///     <c>isMounted</c> gate would have rejected the grant anyway, this just avoids the invalid index.
+    /// </summary>
+    private void ApplyPvpKillMountExperience(PlayerRuntimeState attackerState)
+    {
+        if (attackerState.AnimalIndex is < 10 or > 19)
+            return;
+
+        var slot = attackerState.AnimalIndex % 10;
+        var mountActivity = attackerState.MountActivity[slot];
+        var mountExperience = attackerState.MountAccumulatedExp[slot];
+
+        var gain = MountKillExperienceCalculator.ComputeGain(
+            true, mountActivity, mountExperience,
+            attackerState.AnimalDoubleExp > 0, attackerState.MountExpUp,
+            options.MountKillExperiencePerKill);
+
+        if (gain <= 0)
+            return;
+
+        attackerState.MountAccumulatedExp = attackerState.MountAccumulatedExp.SetItem(slot,
+            MountActivityExpCodec.ClampExp(mountExperience + gain));
+        attackerState.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
     }
 
     /// <summary>
@@ -776,9 +888,13 @@ public sealed partial class Zone
             return; // silent no-op -- same as every other ProcessAttack03 rejection path
 
         var attackerSnapshot = ToCombatantSnapshot(attackerState);
+        // B15 (wave15 contract): PvM tribe-symbol malus -- see MonsterCombatResolver.ResolvePvmAttack's own
+        // attackerSymbolDamageDownPenalty remarks for the level gate/ordering, and Zone's own
+        // tribeSymbolCombatModifiers remarks for why this degrades to "never malused" (0f) when null.
         var outcome = MonsterCombatResolver.ResolvePvmAttack(attackerSnapshot, monster, command.AttackInfo, _clock,
             _random, attackerState.AttackBudgetEnforced, attackerState.ActionSkillNumber,
-            attackerState.ActionSkillGradeNum1 + attackerState.ActionSkillGradeNum2);
+            attackerState.ActionSkillGradeNum1 + attackerState.ActionSkillGradeNum2,
+            tribeSymbolCombatModifiers?.GetDamageDownPenalty(attackerSnapshot.Tribe) ?? 0f);
 
         if (outcome.Rejected)
             return;
@@ -824,6 +940,17 @@ public sealed partial class Zone
 
         TryDamageMonster(monster.ServerIndex, outcome.DamageApplied, attackerState.CharacterId, out var monsterDied,
             out _);
+
+        // Knockback fling + corpse-facing-killer transition (behavior contract wave12/A3-death-sequence.md,
+        // side effects 1-3). Must run here, not later in MonsterSpawnScheduler.ProcessDeath, since only this
+        // call site has both the killing blow's own critical-hit flag and the killer's just-received position
+        // (attackerState.PosX/Z, written by ApplySenderLocation above) -- ProcessDeath's own DeadMonsterEvent
+        // carries neither. Zone.Monsters.cs's BuildMonsterActionRecv serializes monster.TargetLocation*/Heading
+        // verbatim, so the single death broadcast MonsterSpawnScheduler.ProcessDeath -> BroadcastMonsterDeath
+        // fires afterward already carries the repurposed knockback vector and facing angle this call sets.
+        if (monsterDied)
+            MonsterDeathSequence.BeginCorpseCountdown(monster, attackerState.PosX, attackerState.PosZ,
+                outcome.Critical, _random);
 
         // A009 hit-stagger trigger -- only meaningful for a hit the monster actually survived; a killing
         // blow goes straight to BroadcastMonsterDeath instead (Monsters.MonsterSpawnScheduler.ProcessDeath).
@@ -1096,6 +1223,15 @@ public sealed partial class Zone
     /// </remarks>
     private void ApplyCharacterExperienceGain(PlayerRuntimeState target, int gain)
     {
+        // B17-rebirth-hook: once the recipient is already at the general-level cap, the ordinary level-up
+        // path below no longer applies -- route to the dedicated post-cap resolver instead. See
+        // Zone.HighLevelExperience.cs for HighLevelExperienceResolver/ApplyHighLevelExperienceGain.
+        if (HighLevelExperienceResolver.AppliesAt(target.Level))
+        {
+            ApplyHighLevelExperienceGain(target, gain);
+            return;
+        }
+
         var previousExperience = target.Experience;
         target.Experience += gain;
         target.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
@@ -1103,6 +1239,7 @@ public sealed partial class Zone
         var levelUp = LevelProgressionCalculator.ResolveLevelUp(previousExperience, gain, worldData.LevelsByLevel);
         if (levelUp.LeveledUp)
         {
+            var previousLevel = target.Level;
             target.Level = levelUp.NewLevel;
             target.StatPoints += levelUp.StatPointsGranted;
             target.SkillPoints += levelUp.SkillPointsGranted;
@@ -1115,7 +1252,7 @@ public sealed partial class Zone
                 worldData.ItemsById);
             var attributes = new CharacterBaseAttributes(target.StatVit, target.StatStr, target.StatInt,
                 target.StatDex, target.Level, target.Tribe, target.PreviousTribe, target.Title, target.Halo,
-                target.RebirthCount);
+                target.RebirthCount, target.Level2);
             var stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, target.Buffs,
                 petContribution);
 
@@ -1138,6 +1275,20 @@ public sealed partial class Zone
                 target.SkillPoints);
             BroadcastAvatarStateFlag(target, LevelUpAvatarChangeInfoSort, target.Level, target.StatPoints,
                 target.SkillPoints);
+
+            // Level-milestone bonus-item ARM step (LevelMilestoneBonus's own <remarks/>): a single experience
+            // gain can cross several levels in one jump, so this resolves the HIGHEST armable milestone in the
+            // whole [previousLevel, target.Level] span -- "single field, unconditionally overwritten, most
+            // recent milestone wins." Session-scoped only, matching PlayerRuntimeState.BonusItemLevel/
+            // BonusItemValue's own documented posture (no DB column yet -- does not survive logout/zone
+            // transfer today).
+            var armedMilestone = LevelMilestoneBonus.ResolveHighestMilestoneCrossed(previousLevel, target.Level);
+            if (armedMilestone > 0)
+            {
+                target.BonusItemLevel = armedMilestone;
+                target.BonusItemValue = true;
+                BroadcastAvatarStateFlag(target, BonusItemAvatarChangeInfoSort, 1, armedMilestone, 0);
+            }
         }
 
         target.Session.Send(new AvatarStatUpdateResponse
@@ -1146,32 +1297,40 @@ public sealed partial class Zone
 
     /// <summary>
     ///     Monster-kill pet-growth credit (port of <c>PETSYSTEM::ProcessForExperience</c> via
-    ///     <see cref="PetExperienceCreditResolver" />). Takes the monster's raw <c>PatExperience</c> (no
-    ///     global/personal-rate/double-time/premium scaling modeled yet, see
-    ///     <see cref="PetExperienceCreditResolver" />'s own remarks -- except for the Pet EXP boost pill
-    ///     doubling below, which now IS modeled) and forwards it to the shared <see cref="CreditPetGrowth" />
-    ///     helper -- see <see cref="CreditPetGrowthFromPvpKill" /> for the PvP sibling that credits the same
-    ///     counters from a different source amount.
+    ///     <see cref="PetExperienceCreditResolver" />). Takes the monster's raw <c>PatExperience</c> and
+    ///     applies the full B8-pet-growth-depth scaling chain (<see cref="PetKillExperienceScalingCalculator" />:
+    ///     global x20 ratio, personal add-on, double-EXP-timer doubling, premium doubling) before forwarding
+    ///     the result to the shared <see cref="CreditPetGrowth" /> helper -- see
+    ///     <see cref="CreditPetGrowthFromPvpKill" /> for the PvP sibling that credits the same counters from
+    ///     a different source amount.
     /// </summary>
     /// <remarks>
-    ///     Réf. C++ : Server/ts25zone/S07_MyGame05.cpp:3855-3863 (<c>MONSTER_OBJECT::ProcessForExp</c>): the
-    ///     killer's pet EXP is doubled while <see cref="PlayerRuntimeState.PetExpX2Time" /> is above zero,
-    ///     then doubled AGAIN, independently and unconditionally, for premium-account status -- only the
-    ///     first doubling is reproduced here, matching this method's own documented "no premium scaling
-    ///     modeled yet" gap above. Monster-kill-only: the cited doubling lives in <c>MONSTER_OBJECT::ProcessForExp</c>
+    ///     Réf. C++ : Server/ts25zone/S07_MyGame05.cpp:3855-3863 (<c>MONSTER_OBJECT::ProcessForExp</c>): base
+    ///     value, x20 global ratio, +10% personal add-on, x2 double-EXP-timer, x2 premium, in that exact
+    ///     order -- see <see cref="PetKillExperienceScalingCalculator" />'s own remarks for the full citation
+    ///     chain. The personal add-on ratio has no <see cref="PlayerRuntimeState" /> field yet (no state-effect
+    ///     selector modeled), so 0f is passed until that lands -- see this workstream's openQuestions.
+    ///     "Premium active" mirrors <see cref="PlayerRuntimeState.RecomputeSupportSkillTimeUpRatio" />'s own
+    ///     &gt;= comparison against the current Unix time -- <see cref="PlayerRuntimeState.PremiumExpireUtc" />
+    ///     is an expiry timestamp, not a countdown, so a bare <c>&gt; 0</c> check would treat a long-expired
+    ///     premium grant as still active.
+    ///     Monster-kill-only: the cited scaling chain lives in <c>MONSTER_OBJECT::ProcessForExp</c>
     ///     specifically, not in the shared <c>MyUtil::ProcessForExperience</c> entry point
     ///     <see cref="CreditPetGrowthFromPvpKill" />'s own citation (S07_MyGame03.cpp:3173-3188) uses, so it is
     ///     not applied there.
     /// </remarks>
     private void CreditPetGrowthFromMonsterKill(PlayerRuntimeState target, int monsterPatExperience)
     {
-        if (target.PetExpX2Time > 0)
-            monsterPatExperience *= 2;
+        var scaledPetExperience = PetKillExperienceScalingCalculator.ComputeScaledAmount(
+            monsterPatExperience,
+            personalAddOnRatio: 0f, // TODO: wire once a state-effect-driven personal ratio field lands on PlayerRuntimeState.
+            doubleExpTimerActive: target.PetExpX2Time > 0,
+            premiumActive: target.PremiumExpireUtc >= DateTimeOffset.UtcNow.ToUnixTimeSeconds());
 
-        if (monsterPatExperience < 1)
+        if (scaledPetExperience < 1)
             return;
 
-        CreditPetGrowth(target, monsterPatExperience);
+        CreditPetGrowth(target, scaledPetExperience);
     }
 
     /// <summary>

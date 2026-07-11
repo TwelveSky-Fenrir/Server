@@ -1,11 +1,17 @@
+using Fenrir.Application.Game.Stats.Context;
+
 namespace Fenrir.Application.Game.Stats;
 
 public static partial class StatCalculator
 {
     // ---- GetBaseAttackSuccess (HIT) ----
 
+    // mount (grade whole-value multiplier on hit) context is a B1 plumbing seam -- not read yet. WORKSTREAM B2:
+    // zone/consumable are trailing optional adds -- the dexterity-elixir counter (consumable.EatDexPotion) feeds
+    // hit at +2/elixir when the zone is elixir-eligible (MyFactor.cpp:694,699).
     private static int ComputeAttackSuccess(int strength, LevelRowDto levelRow, int setNumber,
-        EquippedItemSlot?[] bySlot)
+        EquippedItemSlot?[] bySlot, MountContext mount = default, ZoneContext zone = default,
+        ConsumableContext consumable = default)
     {
         var hit = (int)(strength * 1.71f);
         hit += levelRow.AttackSuccess;
@@ -21,6 +27,13 @@ public static partial class StatCalculator
 
         hit += ComputeGlovesAttackSuccessBonus(bySlot[3]);
         hit += ComputeWeaponAttackSuccessBonus(bySlot[7]);
+
+        // B7 layered the four-guild/event override on top of B2's raw +2/elixir floor (MyFactor.cpp:694,699).
+        hit += AccuracyElixirContributionWithOverride(consumable, zone);
+
+        // B3-deco effect-sort 3 (hit ramp): weapon slot only, IU count = Combine (MyFactor.cpp:3144).
+        if (bySlot[7] is { } weaponIu3)
+            hit += IUEffectSlotContribution(3, weaponIu3.Item.Sort, weaponIu3.Item.Level, weaponIu3.Combine);
 
         return hit;
     }
@@ -59,8 +72,12 @@ public static partial class StatCalculator
 
     // ---- GetBaseAttackBlock (DODGE) ----
 
+    // mount (grade whole-value multiplier on block) context is a B1 plumbing seam -- not read yet. WORKSTREAM B2:
+    // zone/consumable are trailing optional adds -- the dexterity-elixir counter (consumable.EatDexPotion) feeds
+    // dodge at +2/elixir when the zone is elixir-eligible (MyFactor.cpp:726,731).
     private static int ComputeAttackBlock(int wisdom, int vitality, LevelRowDto levelRow, int setNumber,
-        EquippedItemSlot?[] bySlot)
+        EquippedItemSlot?[] bySlot, MountContext mount = default, ZoneContext zone = default,
+        ConsumableContext consumable = default)
     {
         var dodge = (int)(wisdom * 1.67f) + (int)(vitality * 0.90f); // two separate truncations
         dodge += levelRow.AttackBlock;
@@ -76,7 +93,19 @@ public static partial class StatCalculator
 
         dodge += ComputeArmorAttackBlockBonus(bySlot[2]);
         dodge += ComputeBootsAttackBlockBonus(bySlot[5]);
-        // Deco 9-12 sort2: ReturnNewStat(6) unread, contributes 0 beyond the generic loop above.
+
+        // B3-deco effect-sort 4 (dodge ramp): armor slot 2 AND boots slot 5, IU count = Combine
+        // (MyFactor.cpp:3280, :3303-3304).
+        if (bySlot[2] is { } armorIu4)
+            dodge += IUEffectSlotContribution(4, armorIu4.Item.Sort, armorIu4.Item.Level, armorIu4.Combine);
+        if (bySlot[5] is { } bootsIu4)
+            dodge += IUEffectSlotContribution(4, bootsIu4.Item.Sort, bootsIu4.Item.Level, bootsIu4.Combine);
+
+        // B3-deco decoration ReturnNewStat (slots 9-12, IS octet only -- see DecorationStatContribution remarks).
+        dodge += DecorationStatContribution(DecorationStatKind.AttackBlock, bySlot);
+
+        // B7 layered the four-guild/event override on top of B2's raw +2/elixir floor (MyFactor.cpp:726,731).
+        dodge += BlockElixirContributionWithOverride(consumable, zone);
 
         return dodge;
     }

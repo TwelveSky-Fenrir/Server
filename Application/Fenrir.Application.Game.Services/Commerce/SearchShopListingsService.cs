@@ -1,4 +1,5 @@
 using Fenrir.Application.Game.Abstractions.Commerce;
+using Fenrir.Application.Game.Domain.Commerce;
 using Fenrir.Application.Game.Domain.Social.Pshop;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
@@ -9,16 +10,18 @@ namespace Fenrir.Application.Game.Services.Commerce;
 
 /// <remarks>
 ///     One remaining scope cut vs. S04_MyWork02.cpp:6475's full <c>CHK_SELL_TYPE</c> switch: the
-///     item-&gt;category mapping only reproduces the <c>tITEM_INFO-&gt;iSort</c>-keyed first pass
-///     (<see cref="SortToCategory" />, ~10 categories, all backed by fields Fenrir already catalogs) -- the
-///     secondary <c>IsValidCostume</c> re-check and the huge <c>tITEM_INFO-&gt;iIndex</c> whitelist (hundreds
-///     of cash/fish/misc-consumable item-id overrides) are not modeled, matching this codebase's established
-///     precedent for uncataloged legacy data (e.g. <c>CraftResolver</c>'s own scope disclaimer). An item
-///     whose sort isn't in <see cref="SortToCategory" /> still surfaces under an unfiltered "show all" query
-///     (<see cref="IsMatch" />'s default branch, S04_MyWork02.cpp:6681-6909's own default-inclusion rule) --
-///     it is genuinely excluded only from a search with an explicit, non-ALL category filter. The legacy
-///     catch-all "other" category code itself is not modeled (no citation available), so that one specific
-///     explicit-filter case still under-approximates. The one exception to this default-inclusion behavior
+///     item-&gt;category mapping reproduces the <c>tITEM_INFO-&gt;iSort</c>-keyed first pass
+///     (<see cref="SortToCategory" />, ~10 categories, all backed by fields Fenrir already catalogs) PLUS,
+///     as of C21a, the secondary <c>IsValidCostume</c> re-check -- see
+///     <see cref="Fenrir.Application.Game.Domain.Commerce.CostumeSearchWhitelist" /> for the 195-id
+///     <c>tITEM_INFO-&gt;iIndex</c> whitelist and its own citations -- applied in <see cref="IsMatch" /> as a
+///     second, independent classification pass only once <see cref="SortToCategory" /> has already fallen
+///     through for a given item. An item whose sort isn't in <see cref="SortToCategory" /> AND whose id isn't
+///     on the costume whitelist still surfaces under an unfiltered "show all" query (<see cref="IsMatch" />'s
+///     default branch, S04_MyWork02.cpp:6681-6909's own default-inclusion rule) -- it is genuinely excluded
+///     only from a search with an explicit, non-ALL category filter. The legacy catch-all "other" category
+///     code itself is still not modeled (no citation available), so that one specific explicit-filter case
+///     still under-approximates. The one exception to this default-inclusion behavior
 ///     is <see cref="ExcludedRawSort" /> (raw <c>iSort</c> 3): the legacy switch's arm for that value is an
 ///     empty <c>break</c> performing no inclusion check at all, so it is excluded unconditionally, even from
 ///     an unfiltered "show all" query -- <see cref="IsMatch" /> special-cases it ahead of the
@@ -175,6 +178,11 @@ public sealed class SearchShopListingsService(
 
         if (SortToCategory.TryGetValue(itemDefinition.Item.Sort, out var category))
             return Matches(sort1, sort2, category, itemDefinition.Item.Type);
+
+        // C21a IsValidCostume secondary filter: an item whose iSort the primary switch above couldn't
+        // classify still counts as a costume when its iIndex (item id) is on the hardcoded whitelist.
+        if (CostumeSearchWhitelist.Contains(itemDefinition.Item.ItemId))
+            return Matches(sort1, sort2, CostumeSearchWhitelist.CostumeCategory, itemDefinition.Item.Type);
 
         return sort1 == TypeAll && sort2 == SortAll;
     }

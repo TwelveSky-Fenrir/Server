@@ -12,6 +12,7 @@ using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
+using Fenrir.Data.Abstractions.Game;
 using Fenrir.Data.WriteBehind;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -27,6 +28,8 @@ public sealed class ZoneRegistry
     private readonly ICharacterShardLocationRepository? _characterShardLocations;
     private readonly DirtyTracker<int> _dirtyTracker;
     private readonly DuelRegistry? _duelRegistry;
+    private readonly IEventLogQueue? _eventLogQueue;
+    private readonly IFourGuildKillPointQueue? _fourGuildKillPointQueue;
     private readonly HeroRankPointAccumulator? _heroRankPointAccumulator;
     private readonly KillCooldownTracker _killCooldownTracker;
     private readonly MovementRules _movementRules;
@@ -39,6 +42,7 @@ public sealed class ZoneRegistry
     private readonly TradeRegistry? _tradeRegistry;
     private readonly WorldDataCache _worldData;
     private readonly WorldStateService? _worldState;
+    private readonly TribeSymbolCombatModifiers? _tribeSymbolCombatModifiers;
     private readonly ILogger<Zone> _zoneLogger;
     private FrozenDictionary<short, Zone> _zones = FrozenDictionary<short, Zone>.Empty;
 
@@ -50,7 +54,10 @@ public sealed class ZoneRegistry
         DuelRegistry? duelRegistry = null, HeroRankPointAccumulator? heroRankPointAccumulator = null,
         ICharacterShardLocationRepository? characterShardLocations = null,
         RegularWarActiveMapTracker? regularWarActiveMapTracker = null,
-        TradeRegistry? tradeRegistry = null)
+        TradeRegistry? tradeRegistry = null,
+        IEventLogQueue? eventLogQueue = null,
+        IFourGuildKillPointQueue? fourGuildKillPointQueue = null,
+        TribeSymbolCombatModifiers? tribeSymbolCombatModifiers = null)
     {
         _options = options.Value;
         _movementRules = movementRules;
@@ -103,6 +110,23 @@ public sealed class ZoneRegistry
         // process-wide RegularWarActiveMapTracker singleton that RegularWarSchedulerHost (Hosting) updates once
         // per tick for every map it hosts.
         _regularWarActiveMapTracker = regularWarActiveMapTracker;
+
+        // Optional: null only in test call sites that don't exercise the D2 skill-cast tamper guard's
+        // audit-log side effect (Zone.PlayerLifecycle.cs) -- every zone shares the same process-wide
+        // IEventLogQueue write-behind singleton every other hot event-log producer already depends on.
+        _eventLogQueue = eventLogQueue;
+
+        // Optional: null only in test call sites that don't exercise the C17 four-guild per-kill point
+        // accrual (Zone.KillFeed.cs's RecordEnemyKillForFeed) -- every zone shares the same process-wide
+        // relay singleton (Services.Guilds.FourGuildKillPointRelayHost) so a kill farmed across a zone
+        // handoff still hits the same drain loop instead of each zone needing its own.
+        _fourGuildKillPointQueue = fourGuildKillPointQueue;
+
+        // Optional: null only in test call sites that don't exercise the B15 PvM tribe-symbol malus
+        // (Zone.Combat.cs's ResolvePvmAttack call site) -- every zone shares the same process-wide
+        // TribeSymbolCombatModifiers singleton ZoneWar.TribeSymbolDamageModifierSystem already recomputes
+        // every tick.
+        _tribeSymbolCombatModifiers = tribeSymbolCombatModifiers;
     }
 
     /// <summary>Every hosted zone, in no particular order — the tick host launches one loop per entry.</summary>
@@ -131,17 +155,28 @@ public sealed class ZoneRegistry
     {
         _zones = maps.ToFrozenDictionary(
             mapId => mapId,
-            mapId => new Zone(mapId, _options, _movementRules, _dirtyTracker, _systems, _zoneLogger, _worldData,
-                questCatalog: _questCatalog, killCooldownTracker: _killCooldownTracker, towerWar: _towerWar,
-                worldState: _worldState, partyRegistry: _partyRegistry, duelRegistry: _duelRegistry,
-                tradeRegistry: _tradeRegistry,
-                heroRankPointAccumulator: _heroRankPointAccumulator,
-                characterShardLocations: _characterShardLocations,
-                regularWarActiveMapTracker: _regularWarActiveMapTracker,
-                // Safe: this ZoneRegistry instance is already fully constructed by the time Initialize runs
-                // (see Zone's own _zoneRegistry remarks) -- no DI-container cycle, since Zone is never itself
-                // DI-resolved.
-                zoneRegistry: this));
+            mapId =>
+            {
+                var zone = new Zone(mapId, _options, _movementRules, _dirtyTracker, _systems, _zoneLogger, _worldData,
+                    questCatalog: _questCatalog, killCooldownTracker: _killCooldownTracker, towerWar: _towerWar,
+                    worldState: _worldState, partyRegistry: _partyRegistry, duelRegistry: _duelRegistry,
+                    tradeRegistry: _tradeRegistry,
+                    heroRankPointAccumulator: _heroRankPointAccumulator,
+                    characterShardLocations: _characterShardLocations,
+                    regularWarActiveMapTracker: _regularWarActiveMapTracker,
+                    // Safe: this ZoneRegistry instance is already fully constructed by the time Initialize runs
+                    // (see Zone's own _zoneRegistry remarks) -- no DI-container cycle, since Zone is never itself
+                    // DI-resolved.
+                    zoneRegistry: this,
+                    eventLogQueue: _eventLogQueue,
+                    fourGuildKillPointQueue: _fourGuildKillPointQueue,
+                    tribeSymbolCombatModifiers: _tribeSymbolCombatModifiers);
+
+                // A4-missing-bosses: real Zone-241 rebirth-tier boss catalog (was NullPersonalDungeonBossCatalog).
+                zone.PersonalDungeonBossCatalog = Zone241RebirthTierBossCatalog.Instance;
+
+                return zone;
+            });
     }
 
     public bool TryGet(short mapId, [NotNullWhen(true)] out Zone? zone)

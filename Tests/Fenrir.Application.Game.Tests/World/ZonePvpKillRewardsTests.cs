@@ -93,8 +93,16 @@ public class ZonePvpKillRewardsTests
         KillDefender(zone);
 
         Assert.True(zone.TryGetPlayer(1, out var attacker));
-        Assert.Equal(PvpKillContributionPointCalculator.ComputeBaseAmount(false, false),
-            attacker!.ContributionPoints);
+        // B9: the base amount now composes the game-wide cross-tribe add value (config 3, doubled to 6 by the
+        // always-active rebirth build macro -- see ComputeGameWideAddValue) instead of the old flat
+        // BasePerKillAmount placeholder; the conditional server/tribe/level bonuses are all 0 for this
+        // zone/tribe/level combination (map 1 is a minority-capital server, but the bonus is withheld while
+        // serverHomeTribe stays at its default -1, and neither the server-160 nor server-38 gate applies here).
+        var expectedCp = PvpKillContributionPointCalculator.ComputeBaseAmount(false, false,
+                basePerKillAmount: PvpKillContributionPointBonuses.ComputeGameWideAddValue(3))
+            + PvpKillContributionPointBonuses.ComputeConditionalBonuses(1, 0, addedCpTribe: -1,
+                attackerBaseLevel: 42, symbolBattleActive: false);
+        Assert.Equal(expectedCp, attacker!.ContributionPoints);
     }
 
     [Fact]
@@ -196,7 +204,13 @@ public class ZonePvpKillRewardsTests
         KillDefender(zone);
 
         Assert.True(zone.TryGetPlayer(1, out var attacker));
-        Assert.Equal(PvpKillContributionPointCalculator.ComputeBaseAmount(false, false),
-            attacker!.ContributionPoints);
+        // B9: same CP-formula composition as DefaultZoneKill_GrantsFormulaBasedContributionPoints -- see that
+        // test's own comment. attackerBaseLevel differs (53 here) but doesn't change the result: map 1 is
+        // neither the server-38 symbol-battle gate nor the server-160 added-tribe gate.
+        var expectedCp = PvpKillContributionPointCalculator.ComputeBaseAmount(false, false,
+                basePerKillAmount: PvpKillContributionPointBonuses.ComputeGameWideAddValue(3))
+            + PvpKillContributionPointBonuses.ComputeConditionalBonuses(1, 0, addedCpTribe: -1,
+                attackerBaseLevel: 53, symbolBattleActive: false);
+        Assert.Equal(expectedCp, attacker!.ContributionPoints);
     }
 }

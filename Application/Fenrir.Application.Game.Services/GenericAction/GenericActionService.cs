@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.GenericAction;
+using Fenrir.Application.Game.Abstractions.WarPoint;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Quests;
@@ -26,7 +27,8 @@ public sealed class GenericActionService(
     PartyRegistry partyRegistry,
     IEventLogRepository eventLog,
     IAccountVaultRepository accountVault,
-    ILogger<GenericActionService> logger)
+    ILogger<GenericActionService> logger,
+    IWarPointShopService? warPointShop = null)
     : IGenericActionService
 {
     /// <summary>game.EventLog.EventCode for TimeExchange (legacy <c>GL_851_PLAYTIME_EXCHANGE</c>).</summary>
@@ -192,7 +194,7 @@ public sealed class GenericActionService(
             var equipmentContainer = fromContainer == ContainerMatrix.Equipment ? projected.From : projected.To;
             var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt,
                 state.StatDex, state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo,
-                state.RebirthCount);
+                state.RebirthCount, state.Level2);
 
             // Pet stat contribution uses the PROJECTED equipment but the still-current growth/activity -- a pet
             // swap within one request can transiently keep the old pet's growth for the new one until the next
@@ -235,7 +237,7 @@ public sealed class GenericActionService(
     }
 
     public async ValueTask<GenericActionResult> PickupGroundItemAsync(byte[] data, Zone zone,
-        PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
+        PlayerRuntimeState state, int accountId, int characterId, CancellationToken cancellationToken)
     {
         if (!DefaultPData.TryRead(data, out var move))
         {
@@ -326,6 +328,12 @@ public sealed class GenericActionService(
             logger.LogError(
                 "Zone {MapId} inventory inbox full: dropped pickup mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
+
+        // GL_619_GAIN_ITEM (+ conditional GL_607_GAIN_SIN_ITEM for an elite-typed item) -- C20 audit-log
+        // contract. Only the fresh-slot ("Placed") outcome reaches here; Money/Stacked outcomes return
+        // earlier above and log nothing, matching legacy's own silent branches.
+        await eventLog.LogGroundItemGainAsync(accountId, characterId, groundItem.ItemId,
+            resolved.NewSlot!.Value.Quantity, itemDefinition.Item.Type, cancellationToken);
 
         // Quest pickup hook: a pure notification (no quest-state mutation), sent only when the picked-up item
         // matches the active qSort-2 quest's target and the quest is still in-progress at this instant. Reads
@@ -619,6 +627,41 @@ public sealed class GenericActionService(
         }
 
         var destinationSlot = state.Inventory.GetSlot((byte)page2, (byte)index2);
+
+        // War-Point NPC-shop routing (C13, USE_WAR_POINT_SYSTEM): offered BEFORE NpcShopPolicy.ResolveBuy, because
+        // a War-Point item bypasses the ordinary iCheckNPCShop==2/rent gates entirely -- it is validated by the
+        // global WarPointShopCatalog price table alone. move.Page1 is the npcId and move.Index1 the itemId (see
+        // the NPC/item resolution above). NotHandled means "not a War-Point NPC, or item absent from the price
+        // table" -- fall through to the ordinary shop path unchanged. Every other outcome short-circuits this
+        // method entirely: WarPointShopService.TryBuyAsync already performs its own atomic WP debit + item grant,
+        // inventory mirror, audit log, and balance-update packets on success, so there is nothing left for the
+        // ordinary path below to do.
+        if (warPointShop is not null)
+        {
+            var warPointResult = await warPointShop.TryBuyAsync(zone, state, accountId, characterId, move.Page1,
+                move.Index1, move.Quantity1, (byte)page2, (byte)index2, cancellationToken);
+
+            switch (warPointResult.Status)
+            {
+                case WarPointBuyStatus.Aborted:
+                    logger.LogInformation(
+                        "Character {CharacterId} NPC-shop-buy aborted by War-Point routing (NPC {NpcId}, item {ItemId})",
+                        characterId, move.Page1, move.Index1);
+                    return GenericActionResult.Aborted;
+
+                case WarPointBuyStatus.SoftRejected:
+                    logger.LogInformation(
+                        "Character {CharacterId} NPC-shop-buy soft-rejected by War-Point routing (NPC {NpcId}, item {ItemId})",
+                        characterId, move.Page1, move.Index1);
+                    return GenericActionResult.Failed;
+
+                case WarPointBuyStatus.Succeeded:
+                    return GenericActionResult.Succeeded;
+
+                case WarPointBuyStatus.NotHandled:
+                    break; // Not a War-Point transaction -- fall through to the ordinary shop path below.
+            }
+        }
 
         var resolved = NpcShopPolicy.ResolveBuy(npc, itemDefinition, move.Quantity1, destinationSlot, state.Level,
             zone.MapId, state.ContributionPoints);
@@ -1178,7 +1221,7 @@ public sealed class GenericActionService(
         var newDex = state.StatDex + (resolved.Stat == StatAllocationResolver.BaseStat.Dexterity ? resolved.Amount : 0);
 
         var attributes = new CharacterBaseAttributes(newVit, newStr, newInt, newDex, state.Level, state.Tribe,
-            state.PreviousTribe, state.Title, state.Halo, state.RebirthCount);
+            state.PreviousTribe, state.Title, state.Halo, state.RebirthCount, state.Level2);
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
 
         var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)

@@ -24,15 +24,29 @@ namespace Fenrir.Application.Game.Domain.Combat;
 ///     deliberately does NOT reach that same reward pipeline -- see <c>Zone.ApplyDuelAttack</c>'s own remarks
 ///     for why (the source contract this method was authored from left kill-reward parity between the two
 ///     kill paths an explicitly open question, not something to assume).
-///     Also not implemented: the tribe "Formation Skill" x1.1 ATK/DEF modifier gated on
-///     <c>mWorldInfo->mTribeMasterCallAbility[tribe]</c> (S07_MyGame02.cpp:1071-1079) -- that world-scope buff state isn't
-///     wired up anywhere yet (see <see cref="Fenrir.Application.Game.Handlers.Tribes.TribeActionHandler" /> tSort 5, which
-///     always aborts because its own gating flag is never set); this modifier is contrasted with, not shared by,
-///     <see cref="ResolveDuelAttack" />'s own flat (non-formation-adjusted) critical rule, which duel combat
-///     never evaluates either way.
-///     Also not implemented on the duel side: the zone124 unconditional x3-damage/forced-crit override in the
-///     final 10s of a duel countdown (S07_MyGame02.cpp:1146-1150) -- see <c>Zone.ApplyDuelAttack</c>'s own
-///     remarks for why.
+///     The tribe "Formation Skill" x1.1 ATK/DEF/critical-threshold modifier gated on
+///     <c>mWorldInfo->mTribeMasterCallAbility[tribe]</c> (S07_MyGame02.cpp:1071-1079,:1174-1200) is now modeled by
+///     <see cref="ResolveEnemyTribeAttack" />'s own <c>attackerFormationCode</c>/<c>defenderFormationCode</c>
+///     parameters (see <see cref="FormationCombatResolver" />) -- enemy-class hits only, never evaluated by
+///     <see cref="ResolveDuelAttack" />. <c>Zone.ApplyCombatCommand</c> (<c>Zone.Combat.cs</c>) now threads both
+///     codes from <c>WorldStateService.GetTribeFormationAbility</c> (falling back to
+///     <see cref="FormationCombatResolver.NoFormation" /> when <c>worldState</c> itself is null) instead of
+///     always passing the default. The one write path (<c>WorldStateService.SetTribeFormationAbility</c>) now
+///     has a live caller -- <c>Fenrir.Application.Game.Services.Tribes.TribeActionService.ValidateTribeSkill</c>
+///     (tSort 5) -- so a declaration reaching this pipeline is possible end-to-end. That caller now enforces
+///     all five eligibility gates the legacy hub write site expects: Force Leader role; all-tribes-above-the-
+///     points-floor, requester's-tribe-the-strict-single-lowest, and that-lowest-tribe's-share-under-twenty-
+///     percent (all three via <c>Fenrir.Application.Game.Domain.World.WorldState.TribeFormationAbilityEligibility</c>);
+///     and Tribe Symbol Battle currently active -- see that method's own remarks for the exact gate order and
+///     citations. No further <see cref="CombatResolver" />/<c>Zone.Combat.cs</c> change was needed to close
+///     this gap.
+///     The zone124 unconditional x3-damage/forced-crit override in the final 10s of a duel countdown
+///     (S07_MyGame02.cpp:1146-1150) is now modeled by <see cref="ResolveDuelAttack" />'s own
+///     <c>zone124OverrideActive</c> parameter (see <see cref="Zone124DuelOverrideResolver" />) -- see
+///     <c>Zone.ApplyDuelAttack</c>'s own remarks for the production reachability caveat (map 124 duels are
+///     still refused outright by <c>DuelMaintenanceSystem</c>'s <c>ScriptedDuelArenaMapId</c> guard, so no
+///     ordinary <c>ActiveDuel</c> can exist there; reconciling mass-duel enrollment with that guard is a
+///     separate, still-open integration question).
 ///     PRESERVED VERBATIM: after the min-5 floor and crit doubling, damage is divided by
 ///     <see cref="MinimumDamageAgainstAvatar" /> (5) -- verified at two call sites, absent from PvM. Makes PvP damage ~5x
 ///     lower than raw ATK-DEF suggests; do not "fix".
@@ -136,6 +150,20 @@ public static class CombatResolver
     ///     <c>null</c> (no active alliance) so existing/test callers that don't source this per-tribe fact keep
     ///     prior (same-tribe-only) behavior.
     /// </param>
+    /// <param name="attackerFormationCode">
+    ///     B10 branch A: the attacker's tribe's Formation ability code (<see cref="FormationCombatResolver" />)
+    ///     -- scales the attacker's own attack power up by one-tenth when it equals
+    ///     <see cref="FormationCombatResolver.AttackerPowerBoostCode" />, and shifts the critical threshold when
+    ///     it equals <see cref="FormationCombatResolver.AttackerCriticalBoostCode" />. Caller's responsibility
+    ///     to resolve from world state, same pattern as <paramref name="allyOfAttackerTribe" />. Defaults to
+    ///     <see cref="FormationCombatResolver.NoFormation" /> (inert) so existing/test callers keep prior
+    ///     behavior; never evaluated by <see cref="ResolveDuelAttack" />.
+    /// </param>
+    /// <param name="defenderFormationCode">
+    ///     B10 branch A: the defender's tribe's Formation ability code -- the same
+    ///     <see cref="FormationCombatResolver" /> codes as <paramref name="attackerFormationCode" />, applied to
+    ///     the defender's own defense power / critical-reduction side instead.
+    /// </param>
     public static AttackOutcome ResolveEnemyTribeAttack(
         CombatantSnapshot attacker,
         CombatantSnapshot defender,
@@ -148,7 +176,9 @@ public static class CombatResolver
         bool newbieProtectionZone = false,
         bool defenderPshopOpen = false,
         int defenderActionSort = 1,
-        byte? allyOfAttackerTribe = null)
+        byte? allyOfAttackerTribe = null,
+        byte attackerFormationCode = FormationCombatResolver.NoFormation,
+        byte defenderFormationCode = FormationCombatResolver.NoFormation)
     {
         if (attacker.CharacterId == defender.CharacterId)
             return AttackOutcome.Reject(AttackRejectReason.SameCharacter);
@@ -183,7 +213,8 @@ public static class CombatResolver
         if (newbieProtectionZone && attacker.Level >= 90 && defender.Level < 90)
             return AttackOutcome.Reject(AttackRejectReason.NewbieProtectionLevelGap);
 
-        return ResolveDamage(attacker, defender, request, zoneClock, attackSkill, rng);
+        return ResolveDamage(attacker, defender, request, zoneClock, attackSkill, rng, attackerFormationCode,
+            defenderFormationCode);
     }
 
     /// <summary>
@@ -210,12 +241,23 @@ public static class CombatResolver
     ///     The defender's last-accepted avatar action Sort (<c>PlayerRuntimeState.ActionSort</c>) -- see
     ///     <see cref="AttackRejectReason.DefenderActionStateBlocksTargeting" />.
     /// </param>
+    /// <param name="zone124OverrideActive">
+    ///     B10 branch C: whether the zone124 final-countdown duel override
+    ///     (<see cref="Zone124DuelOverrideResolver" />) is active for this hit -- resolved by the caller from
+    ///     <see cref="Zone124DuelOverrideResolver.IsActive" /> against the map-124 zone's own
+    ///     <see cref="Zone124MassDuelState.RemainingUnits" />. Defaults to <see langword="false" /> (inert) so
+    ///     existing/test callers keep prior behavior; never evaluated by <see cref="ResolveEnemyTribeAttack" />.
+    /// </param>
     /// <remarks>
-    ///     NOT implemented: the zone124 unconditional x3-damage/forced-crit override in the final 10s of a duel
-    ///     countdown (S07_MyGame02.cpp:1146-1150) -- see <c>Zone.ApplyDuelAttack</c>'s own remarks for why (map
-    ///     124 duels are already refused outright before an <c>ActiveDuel</c> can ever exist, and the override's
-    ///     own "remaining time" counter identity/owner was left an open question by this method's own source
-    ///     contract).
+    ///     The zone124 unconditional x3-damage/forced-crit override in the final 10s of a duel countdown
+    ///     (S07_MyGame02.cpp:1146-1150) is modeled by the <paramref name="zone124OverrideActive" /> parameter
+    ///     below (see <see cref="Zone124DuelOverrideResolver" />) -- the caller (<c>Zone.ApplyDuelAttack</c>)
+    ///     resolves it from <see cref="Zone124DuelOverrideResolver.IsActive" /> against the zone's own
+    ///     <see cref="Zone124MassDuelState.RemainingUnits" />. Production reachability still depends on an open
+    ///     integration question: map 124 duels are refused outright before an <c>ActiveDuel</c> can ever exist
+    ///     (<c>DuelMaintenanceSystem</c>'s <c>ScriptedDuelArenaMapId</c> guard), so reconciling mass-duel
+    ///     enrollment with <c>SharesActiveDuel</c>/<c>ActiveDuel</c> is still needed before this parameter is
+    ///     ever actually true in production -- see <c>Zone.ApplyDuelAttack</c>'s own remarks.
     /// </remarks>
     public static AttackOutcome ResolveDuelAttack(
         CombatantSnapshot attacker,
@@ -226,7 +268,8 @@ public static class CombatResolver
         IRandomSource rng,
         bool attackerAndDefenderShareActiveDuel,
         bool defenderPshopOpen,
-        int defenderActionSort)
+        int defenderActionSort,
+        bool zone124OverrideActive = false)
     {
         if (attacker.CharacterId == defender.CharacterId)
             return AttackOutcome.Reject(AttackRejectReason.SameCharacter);
@@ -246,7 +289,8 @@ public static class CombatResolver
         if (!attackerAndDefenderShareActiveDuel)
             return AttackOutcome.Reject(AttackRejectReason.DuelNotAuthorized);
 
-        return ResolveDamage(attacker, defender, request, zoneClock, attackSkill, rng);
+        return ResolveDamage(attacker, defender, request, zoneClock, attackSkill, rng,
+            zone124OverrideActive: zone124OverrideActive);
     }
 
     /// <summary>
@@ -262,7 +306,10 @@ public static class CombatResolver
         AttackForProtocol request,
         TimeSpan zoneClock,
         SkillDefinition? attackSkill,
-        IRandomSource rng)
+        IRandomSource rng,
+        byte attackerFormationCode = FormationCombatResolver.NoFormation,
+        byte defenderFormationCode = FormationCombatResolver.NoFormation,
+        bool zone124OverrideActive = false)
     {
         if (attacker.ZoneEntryAtZoneClock is { } attackerZoneEntry &&
             zoneClock - attackerZoneEntry < ProtectDuration)
@@ -300,7 +347,13 @@ public static class CombatResolver
                 attackPower = CombatMath.ApplySkillPowerRatio(attackPower, ratio);
         }
 
-        var damage = attackPower - defender.Stats.DefensePower;
+        // B10 branch A (Formation, enemy-class only): attacker code 1 scales attack power, defender code 2
+        // scales defense power, both by one-tenth, immediately before the raw subtraction (S07_MyGame02.cpp:
+        // 1071-1078). Duel hits pass NoFormation -> unchanged.
+        attackPower = FormationCombatResolver.ScaleAttackPower(attackPower, attackerFormationCode);
+        var defensePower =
+            FormationCombatResolver.ScaleDefensePower(defender.Stats.DefensePower, defenderFormationCode);
+        var damage = attackPower - defensePower;
         if (damage < 1) damage = 1;
 
         if (chargeConsumed)
@@ -312,12 +365,22 @@ public static class CombatResolver
         var critical = false;
         if (CanRollCritical(request, attackSkill))
         {
-            var criticalChance = attacker.Stats.Critical - defender.Stats.CriticalDefence;
+            var criticalChance = FormationCombatResolver.AdjustCriticalChance(
+                attacker.Stats.Critical, defender.Stats.CriticalDefence, attackerFormationCode, defenderFormationCode);
             if (criticalChance > 0 && CombatMath.RollCritical(criticalChance, rng))
             {
                 damage *= 2;
                 critical = true;
             }
+        }
+
+        // B10 branch C (zone124 duel override): on a map-124 process in the final <10 countdown units, triple the
+        // (post-crit) damage and force the crit flag, BEFORE the divide-by-five (S07_MyGame02.cpp:1146-1150).
+        // Duel-class only -- enemy hits pass zone124OverrideActive = false.
+        if (zone124OverrideActive)
+        {
+            damage *= Zone124DuelOverrideResolver.DamageMultiplier;
+            critical = true;
         }
 
         damage /= MinimumDamageAgainstAvatar; // PvP-only division -- see class remarks

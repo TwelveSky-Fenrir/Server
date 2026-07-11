@@ -1,6 +1,11 @@
 using Fenrir.Application.Game.Abstractions.Social;
 using Fenrir.Application.Game.Domain;
+using Fenrir.Application.Game.Domain.Guilds;
+using Fenrir.Application.Game.Domain.Social.Duel;
+using Fenrir.Application.Game.Domain.Social.Friends;
+using Fenrir.Application.Game.Domain.Social.Mentor;
 using Fenrir.Application.Game.Domain.Social.Party;
+using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Services.Social;
 using Fenrir.Application.Game.Tests.TestSupport;
@@ -27,8 +32,10 @@ public class PartyInviteServiceTests
         var parties = new PartyRegistry();
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([mapId]);
-        return (new PartyInviteService(parties, directory, relay, Options.Create(new GameServerOptions { ShardId = 1 }),
-            new CapturingLogger<PartyInviteService>()), zones, parties);
+        return (new PartyInviteService(parties, new DuelRegistry(), new TradeRegistry(), new FriendRegistry(),
+                new MentorRegistry(), new GuildInviteRegistry(), directory, relay,
+                Options.Create(new GameServerOptions { ShardId = 1 }), new CapturingLogger<PartyInviteService>()),
+            zones, parties);
     }
 
     private static PlayerRuntimeState Enter(ZoneRegistry zones, short mapId, int characterId, string name,

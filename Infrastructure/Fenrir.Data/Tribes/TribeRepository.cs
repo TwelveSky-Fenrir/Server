@@ -90,8 +90,8 @@ public sealed record TribeRepository(ICaeriusNetDbContext Db) : ITribeRepository
     }
 
     /// <summary>
-    ///     Not reachable via CZ_TRIBE_BANK_SEND -- see the remarks on <see cref="ITribeRepository.WithdrawBankAsync" />.
-    ///     Throws SQL 50210 (empty slot) or 50261 (would exceed the legacy money cap).
+    ///     Backs CZ_TRIBE_BANK_SEND sort 2 -- see the remarks on <see cref="ITribeRepository.WithdrawBankAsync" />
+    ///     for the corrected finding. Throws SQL 50210 (empty slot) or 50261 (would exceed the legacy money cap).
     /// </summary>
     public async ValueTask<long> WithdrawBankAsync(byte tribeId, byte slotIndex, int characterId, CancellationToken ct)
     {
@@ -105,7 +105,8 @@ public sealed record TribeRepository(ICaeriusNetDbContext Db) : ITribeRepository
     }
 
     /// <summary>
-    ///     CZ_TRIBE_BANK_SEND sort 3 (Fenrir-only addition, see ITribeRepository.DepositBankAsync); throws SQL 50212
+    ///     No longer reachable via any CZ_TRIBE_BANK_SEND sort -- see the remarks on
+    ///     <see cref="ITribeRepository.DepositBankAsync" /> for the corrected finding. Throws SQL 50212
     ///     (nothing to deposit).
     /// </summary>
     public async ValueTask<long> DepositBankAsync(byte tribeId, byte slotIndex, int characterId, CancellationToken ct)

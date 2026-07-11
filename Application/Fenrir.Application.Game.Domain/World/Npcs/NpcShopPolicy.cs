@@ -15,9 +15,13 @@ namespace Fenrir.Application.Game.Domain.World.Npcs;
 ///     lives in-memory, the same posture <c>CraftLegendaryPetHandler</c>/<c>TribeActionHandler</c> use.
 /// </summary>
 /// <remarks>
-///     Not modeled: the WarPoint-shop branch (<c>USE_WAR_POINT_SYSTEM</c>) -- Fenrir has no WarPoint NPC/item
-///     catalog to drive it, so only the plain Contribution-Point cost (<c>BuyCost2</c>) that every NPC shop
-///     (WarPoint or not) also charges is reproduced.
+///     The buy-side WarPoint-shop branch (<c>USE_WAR_POINT_SYSTEM</c>) is now modeled separately by
+///     <see cref="WarPointShopPolicy" />/<c>WarPointShopService</c> (a WarPoint item bypasses the ordinary
+///     <c>iCheckNPCShop == 2</c> / rent gates this policy enforces); the ordinary silver + Contribution-Point
+///     cost (<c>BuyCost2</c>) that every non-WarPoint NPC shop charges is still reproduced here. The sell-side
+///     WarPoint exemption -- the <c>99703</c>-<c>99756</c> range that skips the rare/costume sell-block
+///     (<c>Server/ts25zone/S04_MyWork05.cpp:1496-1522</c>, <c>#elif defined LNW33</c> branch) -- IS handled
+///     here, see <see cref="IsSellExempt" />.
 /// </remarks>
 public static class NpcShopPolicy
 {
@@ -90,6 +94,21 @@ public static class NpcShopPolicy
 
     private const int RentItemIdEndInclusive = 76540;
 
+    /// <summary>
+    ///     NPC-sell exemption range (<c>Server/ts25zone/S04_MyWork05.cpp:1496-1522</c>): a WarPoint-adjacent gear
+    ///     range that is allowed to skip the normal rare-item and costume sell-block checks and be sold to the
+    ///     NPC for its sell price. The <c>#elif defined LNW33</c> branch (<c>99703</c>-<c>99756</c>) is the one
+    ///     that actually compiles in this zone translation unit; the alternate <c>74200</c>-<c>74223</c> branch
+    ///     is gated by <c>#ifdef USE_CUSTOME_CREATE</c>, which is force-defined only in the separate
+    ///     <c>ts25login/S04_MyWork02.cpp:1</c> and is dead here (its <c>DEFINE.h:37</c> definition sits in the
+    ///     dead <c>#else</c> of <c>#ifdef M33</c>) -- so the <c>74200</c>-<c>74223</c> range is deliberately NOT
+    ///     carried. The exemption is scoped to the rare/costume blocks only; it does not override the earlier
+    ///     <c>CheckNpcSell == 1</c> or rent-item rejections.
+    /// </summary>
+    private const int SellExemptRangeStart = 99703;
+
+    private const int SellExemptRangeEndInclusive = 99756;
+
     /// <summary><c>IsValidTownAll</c> (mapcheck.h:116-128) -- both buy and sell require the CURRENT zone to be one of these.</summary>
     public static readonly IReadOnlySet<short> TownZoneNumbers = new HashSet<short> { 1, 6, 11, 37, 140 };
 
@@ -117,6 +136,12 @@ public static class NpcShopPolicy
     private static bool IsRentItem(int itemId)
     {
         return itemId is >= RentItemIdStart and <= RentItemIdEndInclusive;
+    }
+
+    /// <summary>See <see cref="SellExemptRangeStart" /> -- the live (LNW33) NPC-sell rare/costume-block exemption.</summary>
+    public static bool IsSellExempt(int itemId)
+    {
+        return itemId is >= SellExemptRangeStart and <= SellExemptRangeEndInclusive;
     }
 
     private static bool IsCostumeItem(int itemId)
@@ -158,6 +183,13 @@ public static class NpcShopPolicy
                 : (ItemStack?)null;
             return new SellResult(SellOutcome.Success, gained, remaining);
         }
+
+        // WarPoint-adjacent sell exemption (S04_MyWork05.cpp:1496-1522, live LNW33 branch): items in
+        // 99703-99756 jump past the rare/costume sell-block straight to the sell for their sell price. Placed
+        // after the CheckNpcSell==1 / rent-item gates above (which the exemption does not override) and before
+        // the rare/costume blocks below (which it does skip).
+        if (IsSellExempt(item.ItemId))
+            return new SellResult(SellOutcome.Success, item.SellCost, null);
 
         // iType >= IRARE && iValue != 0 (S04_MyWork05.cpp:1508-1513): Fenrir never reassembles the packed
         // iValue int -- "any of its 4 decomposed bytes nonzero" is the closest faithful reading here.

@@ -1,7 +1,7 @@
-using Fenrir.Network.Serialization.Wire;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Domain.World.Configuration;
 using Fenrir.Application.Game.Domain.World.Monsters;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
@@ -9,6 +9,7 @@ using Fenrir.Application.Game.Hosting.Commerce;
 using Fenrir.Application.Game.Hosting.EventLog;
 using Fenrir.Application.Game.Hosting.Guilds;
 using Fenrir.Application.Game.Hosting.Progression;
+using Fenrir.Application.Game.Hosting.Simulation;
 using Fenrir.Application.Game.Hosting.World;
 using Fenrir.Application.Game.Hosting.World.Monsters;
 using Fenrir.Application.Game.Hosting.World.WorldState;
@@ -20,6 +21,7 @@ using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.FloodProtection;
 using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Serialization.Wire;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
@@ -37,6 +39,12 @@ public static class HostingServiceCollectionExtensions
     public static IServiceCollection AddGameHosting(this IServiceCollection services)
     {
         services.AddSingleton<IOpcodeFrameSizeProvider>(ZoneOpcodeRegistry.Provider);
+
+        // A7: per-zone configuration/data table (level band, owner tribe, MaxUser cap, XP/drop/war ratios),
+        // frozen once at boot from GameServerOptions.Zones. Reads only options, so no async preload step is
+        // needed -- the singleton is built the first time it's resolved, before the first connection/tick.
+        services.AddSingleton(sp =>
+            new ZoneConfigCatalog(sp.GetRequiredService<IOptions<GameServerOptions>>().Value.Zones));
 
         AddWorldState(services);
         AddZoneWar(services);
@@ -131,6 +139,22 @@ public static class HostingServiceCollectionExtensions
             sp.GetRequiredService<SocialCrossShardRelayHost>());
         services.AddHostedService(sp => sp.GetRequiredService<SocialCrossShardRelayHost>());
 
+        // D1 party-resync fan-out, one-instance-three-registrations like SocialCrossShardRelayHost. A future
+        // *.Services party authority registers its own IPartyResyncRelayHandler; until then a delivered row is
+        // logged+dropped (same-shard party membership unaffected).
+        services.AddSingleton<PartyResyncRelayHost>();
+        services.AddSingleton<IPartyResyncRelayQueue>(sp => sp.GetRequiredService<PartyResyncRelayHost>());
+        services.AddHostedService(sp => sp.GetRequiredService<PartyResyncRelayHost>());
+
+        // WS-C3 cross-shard whisper (op39 / SECRET_CHAT) relay -- point-to-point sibling of
+        // SocialCrossShardRelayHost above, same "one instance, three registrations" pattern. WhisperService
+        // (Fenrir.Application.Game.Services) is the sole producer, consuming IChatCrossShardRelayQueue only;
+        // this host delivers each inbound row directly (no per-Kind handler -- whisper is fire-and-forget).
+        services.AddSingleton<ChatCrossShardRelayHost>();
+        services.AddSingleton<IChatCrossShardRelayQueue>(sp =>
+            sp.GetRequiredService<ChatCrossShardRelayHost>());
+        services.AddHostedService(sp => sp.GetRequiredService<ChatCrossShardRelayHost>());
+
         // Registered as a factory (opaque to the DI container's constructor-graph cycle check), same
         // "Lazy<T> breaks the cycle" pattern as Lazy<ZoneEventBroadcaster>/Lazy<ZoneCenterBroadcastIngestor>/
         // Lazy<ZoneRegistry> in AddZoneWar below -- FriendCrossShardRelayHandler/PartyCrossShardRelayHandler
@@ -224,7 +248,27 @@ public static class HostingServiceCollectionExtensions
         // ZoneCenterBroadcastIngestor's own remarks for why. Real API, not yet called by anything (no producer
         // wired up in this cluster), same posture as ZoneWarTickService before anything calls StartWar.
         services.AddSingleton<ZoneCenterSiegeState>();
+        // Zone051/Zone053 sibling state -- same "plain, not-yet-persisted in-memory singleton" posture as
+        // ZoneCenterSiegeState immediately above, kept in its own type per the A5-zone051-053-states slice's
+        // file-collision-avoidance note. ZoneCenterBroadcastIngestor's constructor resolves this as an optional
+        // parameter; this registration is what makes the two new selectors-10-30 dispatch cases actually fire
+        // instead of silently no-op-ing via their `when` guard.
+        services.AddSingleton<Zone051Zone053SiegeState>();
+        // Alliance-proposal sibling state (discriminators 46-49, S04_MyWork02.cpp:408-472) -- same posture as
+        // Zone051Zone053SiegeState immediately above. ZoneCenterBroadcastIngestor's constructor resolves this
+        // as its own optional trailing parameter; this registration is what makes the new 46-49 dispatch case
+        // actually fire instead of silently no-op-ing via its `when` guard.
+        services.AddSingleton<AllianceProposalCenterState>();
         services.AddSingleton<ZoneCenterBroadcastIngestor>();
+
+        // A12: case-38 Zone039-arming reaction (server-74 monster-summon reset, see
+        // IZone039MonsterSummonResetGateway's own remarks for why this defaults to a logging-only
+        // placeholder) + case-4000/case-1600 broadcasters.
+        services.TryAddSingleton<IZone039MonsterSummonResetGateway, LoggingOnlyZone039MonsterSummonResetGateway>();
+        services.AddSingleton<Zone039ArmingReactor>();
+        services.AddSingleton<DailyResetBroadcaster>();
+        services.AddHostedService<DailyResetBroadcastHost>();
+        services.AddHostedService<PopupEventScheduleHost>();
 
         // Elevated-tier zone-wide FFA-start GM command (tSort 333) process-local countdown/start-trigger
         // bookkeeping -- same "plain in-memory singleton" posture as ZoneCenterSiegeState just above, but
@@ -261,6 +305,30 @@ public static class HostingServiceCollectionExtensions
         // whichever OTHER zone currently hosts them, see that class's own remarks) without a same-container cycle.
         services.AddSingleton(sp => new Lazy<ZoneRegistry>(sp.GetRequiredService<ZoneRegistry>));
 
+        // Zone195 "Nok-San" solo point-capture war: process-wide stone state + operator-configured site
+        // catalog + the cluster-broadcast seam + the per-zone-tick capture state machine. Same "Lazy<T> breaks
+        // the ZoneRegistry constructor-graph cycle" pattern as Lazy<ZoneEventBroadcaster>/ValleyWarSystem above
+        // -- Zone195NokSanSystem is itself an ISimulationSystem ZoneRegistry resolves at construction time, and
+        // Zone195NokSanBroadcaster needs ZoneRegistry back for the shard-wide op94 fan-out. The site catalog
+        // defaults to Empty (feature dormant on every map until an operator supplies real per-map sites -- see
+        // DEFERRED options wiring). Zone195NokSanSystem is self-contained (reads its own state + the passed
+        // zone's Players, grants via the public Zone.GrantContributionPoints + injected HeroRankPointAccumulator,
+        // broadcasts via the seam) and never force-quits a session, so its tick order relative to the other
+        // ISimulationSystems does not matter -- registering it here (same as Zone335FfaEventCycleSystem) is fine.
+        services.AddSingleton<Zone195NokSanState>();
+        services.AddSingleton(Zone195NokSanSiteCatalog.Empty);
+        services.AddSingleton<Zone195NokSanBroadcaster>();
+        services.AddSingleton<IZone195NokSanBroadcaster>(sp => sp.GetRequiredService<Zone195NokSanBroadcaster>());
+        services.AddSingleton(sp =>
+            new Lazy<IZone195NokSanBroadcaster>(sp.GetRequiredService<IZone195NokSanBroadcaster>));
+        services.AddSingleton<ISimulationSystem, Zone195NokSanSystem>();
+
+        // A5-worldinfo-boot-reset: boot-time regression tripwire over DTM/Nok-San/popup/alliance-possibility's
+        // process-wide singletons -- verified once from Program.cs's boot-preload chain (see that file's note).
+        // Depends on AllianceProposalCenterState (registered above) and PopupEventState (registered by
+        // DomainServiceCollectionExtensions) in addition to ZoneCenterSiegeState/Zone195NokSanState above.
+        services.AddSingleton<WorldInfoBootResetVerifier>();
+
         // rvr-siege: cross-shard fan-out for the Zone049 siege-zone-slot family (sub-codes 1-9, owned by
         // ZoneCenterBroadcastIngestor above) and the tribe-symbol/alliance family (tSort 38/39/40/42/45/46/47,
         // owned by ZoneEventBroadcaster above) -- same "one instance, three registrations" pattern as
@@ -275,11 +343,24 @@ public static class HostingServiceCollectionExtensions
         services.AddSingleton<ZoneWarTickService>();
         services.AddHostedService(static provider => provider.GetRequiredService<ZoneWarTickService>());
 
-        // Regular War (Zone049) schedule/capture/victory/reward engine -- LoggingRegularWarEventSink and
-        // UnavailableRegularWarRewardValueProvider are the safe, currently-inert defaults; see their own
-        // remarks for why this host is nonetheless registered and running unconditionally (same posture as
-        // ZoneWarTickService above before anything calls StartWar).
-        services.AddSingleton<IRegularWarEventSink, LoggingRegularWarEventSink>();
+        // Regular War (Zone049) schedule/capture/victory/reward engine -- UnavailableRegularWarRewardValueProvider
+        // is the safe, currently-inert reward default; see its own remarks for why this host is registered and
+        // running unconditionally (same posture as ZoneWarTickService above before anything calls StartWar).
+        // A5/C15: ZoneCenterRegularWarEventSink (siege-state relay to center) and C15's RegularWarRewardGrantSink
+        // (the real money/xp/CP/hero-rank/item-drop reward payout) both need to observe every RegularWarSchedulerHost
+        // event, but that host's constructor accepts only one IRegularWarEventSink -- CompositeRegularWarEventSink
+        // fans each event out to both, isolating either sink's own failure so one broken sink can't suppress the
+        // other. Register each concrete sink on its own type first (ZoneCenterRegularWarEventSink still depends
+        // only on ZoneCenterBroadcastIngestor + ILogger; RegularWarRewardGrantSink only on ZoneRegistry + ILogger --
+        // no DI cycle either way), then compose.
+        services.AddSingleton<ZoneCenterRegularWarEventSink>();
+        services.AddSingleton<RegularWarRewardGrantSink>();
+        services.AddSingleton<IRegularWarEventSink>(sp => new CompositeRegularWarEventSink(
+            [
+                sp.GetRequiredService<ZoneCenterRegularWarEventSink>(),
+                sp.GetRequiredService<RegularWarRewardGrantSink>()
+            ],
+            sp.GetRequiredService<ILogger<CompositeRegularWarEventSink>>()));
         services.AddSingleton<IRegularWarRewardValueProvider, UnavailableRegularWarRewardValueProvider>();
         services.AddSingleton<RegularWarSchedulerHost>();
         services.AddHostedService(static provider => provider.GetRequiredService<RegularWarSchedulerHost>());
@@ -294,7 +375,10 @@ public static class HostingServiceCollectionExtensions
         // resummon hooks resolve them directly) and as ISimulationSystem (their own periodic/boot-pass
         // evaluation), same "one instance, two registrations" pattern as PositionWriteBehindHost above.
         services.AddSingleton(GuardPostCatalog.Empty);
-        services.AddSingleton(TribeSymbolCatalog.Empty);
+        // A4-symbol: TribeSymbolPlacementCatalog.Default replaces the previous inert TribeSymbolCatalog.Empty --
+        // populates all four captor rows for every tribe symbol (see TribeSymbolSpawner's own remarks for the
+        // real spawn-cadence enablement this activates). Same registered TribeSymbolCatalog type either way.
+        services.AddSingleton(TribeSymbolPlacementCatalog.Default);
         services.AddSingleton<TribeGuardOptions>();
         services.AddSingleton<TribeGuardSpawner>();
         services.AddSingleton<ISimulationSystem>(sp => sp.GetRequiredService<TribeGuardSpawner>());
@@ -304,18 +388,35 @@ public static class HostingServiceCollectionExtensions
         // Tribe-guard CORRIDOR gate (mTribeGuardState[4][4], MyGame::ProcessForGuardState) -- an entirely
         // different mechanic from TribeGuardSpawner/GuardPostCatalog above (that one is MySummon::SummonGuard's
         // capital-guard spawner); this one only tracks per-checkpoint passability and re-derives it every tick,
-        // with no spawning of its own. TribeGuardCorridorCatalog.Empty is the same documented "safe no-op until
-        // the real sixteen-zone/hub table is supplied" posture as GuardPostCatalog.Empty above -- ZoneMoveService
-        // now resolves both TribeGuardCorridorCatalog and TribeGuardCorridorState directly (constructor injection)
-        // to run TribeGuardCorridorGate.Evaluate on every zone-transfer request, so this evaluates as a documented
-        // always-allow until the real table replaces Empty, not an unwired no-op. Registered both as its own
+        // with no spawning of its own. ZoneMoveService resolves both TribeGuardCorridorCatalog and
+        // TribeGuardCorridorState directly (constructor injection) to run WrapCheckSpecialDestinationGate.Evaluate
+        // (which itself falls through to TribeGuardCorridorGate.Evaluate for the tribe-corridor group -- see
+        // the A8-corridor-respawn note just below) on every zone-transfer request. Registered both as its own
         // concrete type and as ISimulationSystem, same "one instance, two registrations" pattern as
         // TribeGuardSpawner above.
         //
         // CROSS-SHARD SCOPE: TribeGuardCorridorState below is a per-PROCESS singleton (this AddSingleton), not a
         // per-cluster one -- see that class's own remarks for the open, unaddressed gap if the hub zone and the
         // sixteen corridor zones it re-derives/gates are ever split across more than one live shard.
-        services.AddSingleton(TribeGuardCorridorCatalog.Empty);
+        //
+        // A8-corridor-respawn: TribeGuardCorridorCatalogFactory.BuildLive() replaces the Empty placeholder --
+        // the real sixteen-corridor-zone/hub chain data is now populated (the per-checkpoint guard-post
+        // monster-slot table, TribeGuardCorridorCatalog.TryGetGuardPostSlots, deliberately stays empty -- see
+        // that factory's own remarks for the still-open "closes again once guards respawn" gap). ZoneMoveService
+        // now dispatches through WrapCheckSpecialDestinationGate (not TribeGuardCorridorGate directly) so the
+        // win-zone-038/rebirth-exact/instanced destination groups this catalog's data also feeds are evaluated,
+        // not just the tribe-corridor group.
+        services.AddSingleton(TribeGuardCorridorCatalogFactory.BuildLive());
+
+        // Portal-proximity hardening catalog (PortalProximityCatalog/PortalProximityGate, contract
+        // A8-portal-warzone) -- same "documented always-allow until real per-zone portal coordinate data
+        // lands" posture as TribeGuardCorridorCatalog.Empty immediately above. Registered here so it is
+        // resolvable the moment ZoneMoveService's constructor gains the corresponding parameter; that
+        // constructor change (and the PortalProximityGate.Evaluate call-site insertion in
+        // ZoneMoveService.HandleAsync) is Services-layer gameplay wiring, out of this pass's scope -- see
+        // this integration pass's own report for why it is deliberately left for fenrir-gameplay-domain-engineer.
+        services.AddSingleton(PortalProximityCatalog.Empty);
+
         services.AddSingleton<TribeGuardCorridorState>();
         services.AddSingleton<TribeGuardCorridorStateDerivationSystem>();
         services.AddSingleton<ISimulationSystem>(sp =>
@@ -387,7 +488,10 @@ public static class HostingServiceCollectionExtensions
                 sp.GetRequiredService<IHolyStoneCaptureRewardGateway>(),
                 sp.GetRequiredService<ILogger<HolyStoneWarCycle>>(),
                 site,
-                testMode: opts.HolyStoneTestMode);
+                testMode: opts.HolyStoneTestMode,
+                // A5: wires the Zone038-DTM (holy-stone holder bonus) capture persist through
+                // ZoneCenterBroadcastIngestor's code-1510 path -- until supplied, EmitDtmValue no-ops in production.
+                siegeIngestor: sp.GetRequiredService<ZoneCenterBroadcastIngestor>());
         });
         services.AddHostedService<HolyStoneWarCycleHost>();
 

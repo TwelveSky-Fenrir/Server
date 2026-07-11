@@ -46,8 +46,14 @@ public enum GemSocketStatRequest
 ///         the actual (requested-stat-type, gem-type, gem-tier) -&gt; value routing performed by the legacy's
 ///         ~315-line <c>GetSocketType</c> switch was not transcribed into the originating contract -- only its
 ///         shape was (route to one of two columns, <c>mValue03</c>/<c>mValue04</c>, of a
-///         <c>world.GemSockets</c>-shaped row keyed by gem type + tier). Do not hardcode a guessed mapping here;
-///         get a follow-up contract citing <c>GetSocketType</c>'s full body first.
+///         <c>world.GemSockets</c>-shaped row keyed by gem type + tier). Do not hardcode a guessed mapping here.
+///         WORKSTREAM B13-socket / B13-socket-prerequisites obtained and wired that follow-up routing, but
+///         it lives in <c>Fenrir.Application.Game.Stats.StatCalculator.GemSocketContribution.cs</c>
+///         (<c>ResolveGemSocketColumn</c>/<c>SumGemSocketContribution</c>) and is what
+///         <c>StatCalculator.ComputeAttackPower</c> actually calls -- Domain cannot reference Stats, so this
+///         resolver could not simply delegate to it and remains an UNUSED twin (no production call site).
+///         Reconciling the two (retire this type, or have it delegate through an injected value instead of
+///         duplicating the routing) is a tracked follow-up, not done as part of that workstream.
 ///     </para>
 ///     A (gem-type, gem-tier) combination absent from the real gem-socket table is an unguarded
 ///     null-pointer dereference (a crash) in the legacy server (S07_MyGame03.cpp:10440-10461,

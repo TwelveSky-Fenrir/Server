@@ -11,21 +11,25 @@ namespace Fenrir.Application.Game.Domain.Enchant;
 ///     Zone dependency.
 /// </summary>
 /// <remarks>
-///     The costume/stellar-core branches (reached via a `goto` ahead of this band's own slot-type check, per
-///     the contract's cross-cutting gap note) remain out of scope -- a target outside slot-type 6..29 is
-///     <see cref="EnchantOutcome.Rejected" /> here, same as before, and the caller must disconnect on
-///     <see cref="EnchantOutcome.Rejected" />. Wings (slot-type 6) are now resolved by the SAME
+///     The costume and stellar-core branches (reached via a `goto` ahead of this band's own slot-type check)
+///     live in sibling resolvers, <see cref="CostumeImproveResolver" /> and <see cref="StellarCoreResolver" />,
+///     not here: a target outside slot-type 6..29 is <see cref="EnchantOutcome.Rejected" /> by THIS resolver,
+///     and the routing service is responsible for dispatching a costume/stellar target to the right sibling
+///     before falling back to this band (see those two types' own remarks). Wings (slot-type 6) are resolved by
+///     the SAME
 ///     <see cref="ResolveStandard" />/<see cref="ResolveAdvanced" /> machinery as every other equipment slot
 ///     in the band (materials, probabilities, and the +40/+41-50 regime split are all shared) -- the only
 ///     wing-specific difference this resolver surfaces is <see cref="EnchantResult.IsWing" />, which the
 ///     caller (<c>EnchantItemService</c>) uses to route the already-computed <see cref="EnchantResult.Cost" />
-///     to the character's CP resource instead of money/tribe-bank credit. Two production-build-only
-///     special-material short-circuits (a hardcoded material forcing an immediate ZC result 8 on the
-///     non-wing path, 9 on the wing path, in place of the destroy roll) are NOT modeled: the contract this
-///     resolver was built from cites the switch that contains them (S04_MyWork02.cpp:3222-3450) but does not
-///     enumerate either branch's specific hardcoded material item id, so there is nothing to key a
-///     short-circuit on without guessing -- flagged for a supplemental legacy-behavior-translator finding
-///     rather than invented here. The wing-specific enchant-cap realm-wide broadcast (a distinct opcode from
+///     to the character's CP resource instead of money/tribe-bank credit. Of the two production-build
+///     special-material "no-change" short-circuits, the NON-wing one (item 8101, ZC result 8) is now modeled
+///     -- 8101 is <see cref="EnchantMaterialCatalog.StandardMaterial.NoChangeOnFailure" />, so a failed roll
+///     returns <see cref="EnchantOutcome.NoChange" /> with the enchant untouched
+///     (S04_MyWork02.cpp:3315-3318,3370-3378). The WING one (item 8106, ZC result 9) is still NOT modeled: its
+///     +value and money cost are not cited by any contract handed to this workstream, so there is nothing to
+///     put in the wing material whitelist without guessing -- a wing target enchanted with 8106 stays
+///     <see cref="EnchantOutcome.Rejected" /> until a supplemental finding supplies those magnitudes. The
+///     wing-specific enchant-cap realm-wide broadcast (a distinct opcode from
 ///     the non-wing cap broadcast, per the same contract) is a cross-server relay Fenrir has no equivalent
 ///     for and is not reproduced, matching the precedent already set for <c>CapeUpgradeResolver</c>'s RANKUP
 ///     notice and <c>CraftPetHandler</c>'s "notable craft" announcement -- neither broadcast (wing or
@@ -76,7 +80,14 @@ public static class EnchantResolver
         Protected,
 
         /// <summary>+41..+49 failure with no protect charge available -- hard reset to exactly +40 (ZC result 3), NEVER a destroy.</summary>
-        ResetToForty
+        ResetToForty,
+
+        /// <summary>
+        ///     A "no-change" material (item 8101) failed its success roll: enchant is left untouched -- no
+        ///     downgrade, no destroy (ZC result 8 for a non-wing target, 9 for a wing). The caller maps the
+        ///     result code by <see cref="EnchantResult.IsWing" />.
+        /// </summary>
+        NoChange
     }
 
     public const int RegimeBoundary = 40;
@@ -151,6 +162,13 @@ public static class EnchantResolver
 
         if (random.NextInt32(100) < p1)
             return new EnchantResult(EnchantOutcome.Success, newImprove, material.MoneyCost, false,
+                ConsumesImproveCharge: consumesImproveCharge);
+
+        // Special "no-change" material (8101): the failed roll never downgrades or destroys -- the enchant is
+        // left exactly where it was (Server/ts25zone/S04_MyWork02.cpp:3315-3318,3370-3378). Checked before the
+        // destroy block below, which it fully short-circuits.
+        if (material.NoChangeOnFailure)
+            return new EnchantResult(EnchantOutcome.NoChange, currentImprove, material.MoneyCost, false,
                 ConsumesImproveCharge: consumesImproveCharge);
 
         if (currentImprove + value > SafeImproveValue)

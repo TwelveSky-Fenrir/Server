@@ -57,7 +57,9 @@ public class ZoneCenterBroadcastIngestorTests
 
         ingestor.Ingest(70, Payload(2, 5));
 
-        Assert.Equal(70, state.GetZone175(2, 5));
+        // Code 70 maps to the shared "generic" Zone175 state 23 -- NOT the raw event code (the retired
+        // placeholder). The relayed frame still carries the raw sort/payload unchanged.
+        Assert.Equal(23, state.GetZone175(2, 5));
 
         foreach (var pipe in new[] { pipeA, pipeB })
         {
@@ -119,7 +121,8 @@ public class ZoneCenterBroadcastIngestorTests
 
         ingestor.Ingest(405, Payload(2));
 
-        Assert.Equal(405, state.GetZone267(2));
+        // Code 405 maps to Zone267 state 3 (not the raw event code).
+        Assert.Equal(3, state.GetZone267(2));
         Assert.Equal(0, state.GetZone267(0));
     }
 
@@ -145,10 +148,12 @@ public class ZoneCenterBroadcastIngestorTests
         var ingestor = new ZoneCenterBroadcastIngestor(state, registry,
             NullLogger<ZoneCenterBroadcastIngestor>.Instance);
 
+        // Code 1503 maps to Zone335 state 2 (not the raw event code); code 1507 is the reset to 0 (there is no
+        // separate 1520 reset code).
         ingestor.Ingest(1503, Payload());
-        Assert.Equal(1503, state.Zone335);
+        Assert.Equal(2, state.Zone335);
 
-        ingestor.Ingest(ZoneCenterBroadcastIngestor.Zone335ResetEventCode, Payload());
+        ingestor.Ingest(1507, Payload());
         Assert.Equal(0, state.Zone335);
     }
 
@@ -160,7 +165,6 @@ public class ZoneCenterBroadcastIngestorTests
     [InlineData(674)] // rank/RFC/cape/skill notification
     [InlineData(760)] // Proving Grounds / EXP Tower -- commented-out assignments
     [InlineData(1512)] // dead popup-state code
-    [InlineData(411)] // Zone241 Den of Rebirth -- recognized/reachable but unbound, see GAP 1
     [InlineData(999999)] // genuinely unrecognized
     public void Ingest_DeadOrUnboundOrUnrecognizedCode_WritesNoState_ButStillRelays(int eventCode)
     {
@@ -274,8 +278,8 @@ public class ZoneCenterBroadcastIngestorTests
         ingestor.Ingest(ZoneCenterBroadcastIngestor.PingEventCode, Payload());
 
         // The write still happens locally (it doesn't depend on any zone existing); what this test actually
-        // guards is that relaying to an empty zone-player set never throws.
-        Assert.Equal(70, state.GetZone175(0, 0));
+        // guards is that relaying to an empty zone-player set never throws. Code 70 maps to Zone175 state 23.
+        Assert.Equal(23, state.GetZone175(0, 0));
     }
 
     [Fact]

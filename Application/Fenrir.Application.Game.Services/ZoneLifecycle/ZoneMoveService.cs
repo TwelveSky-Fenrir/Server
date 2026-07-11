@@ -22,6 +22,7 @@ public sealed class ZoneMoveService(
     WorldStateService worldState,
     TribeGuardCorridorCatalog corridorCatalog,
     TribeGuardCorridorState corridorState,
+    PortalProximityCatalog portalProximityCatalog,
     IGameServerDirectoryRepository directory,
     IShardMapAssignmentRepository shardMapAssignments,
     ISessionTicketRepository tickets,
@@ -148,6 +149,38 @@ public sealed class ZoneMoveService(
             return ValueTask.CompletedTask;
         }
 
+        // Fenrir-only hardening (PortalProximityGate/PortalProximityCatalog, contract A8-portal-warzone Edge
+        // cases): the legacy 30-unit portal proximity check exists but was never wired into any live handler
+        // (Server/Header/S19_MyZoneMoveInfo.cpp:1260) -- reproducing that gap was explicitly flagged as
+        // unacceptable, so this closes it deliberately instead. Sourced from the server-authoritative
+        // PlayerRuntimeState position, never a client-supplied coordinate (the live wire packet carries none).
+        // No-ops to Allowed for every non-portal Sort and for any zone with no PortalProximityCatalog entry yet
+        // (the shipped Empty catalog) -- see both types' own remarks. Evaluated for same-shard AND cross-shard
+        // targets alike (only needs targetZoneNumber + state, not a resolved Zone).
+        if (PortalProximityGate.Evaluate(portalProximityCatalog, sourceZone.MapId, state.PosX, state.PosY,
+                state.PosZ, packet.Sort, targetZoneNumber) == PortalProximityOutcome.RejectedNotNearRegisteredPortal)
+        {
+            logger.LogWarning(
+                "Zone-move aborted for character {CharacterId}: portal move requested with no registered portal within range ({SourceMapId} -> {TargetZoneNumber})",
+                characterId, sourceZone.MapId, targetZoneNumber);
+            zoneSession.Abort(DisconnectReason.StateViolation);
+            return ValueTask.CompletedTask;
+        }
+
+        // War-zone registration eligibility (WarZoneEntryGate, Server/ts25zone/S04_MyWork02.cpp:902,
+        // CheckRegisterAvatar) -- evaluated for every transfer target, same-shard or cross-shard, since
+        // legacy's own registration gate never distinguishes the two (every zone is its own process there).
+        // Denial is a hard disconnect ("out-of-range eviction"), never a soft redirect.
+        if (WarZoneEntryGate.Evaluate(targetZoneNumber, state.CombinedLevel, state.RebirthCount) ==
+            WarZoneEntryOutcome.RejectedOutOfRange)
+        {
+            logger.LogWarning(
+                "Zone-move aborted for character {CharacterId}: combined level {CombinedLevel}/rebirth {RebirthCount} out of range for war zone {TargetZoneNumber}",
+                characterId, state.CombinedLevel, state.RebirthCount, targetZoneNumber);
+            zoneSession.Abort(DisconnectReason.StateViolation);
+            return ValueTask.CompletedTask;
+        }
+
         // Not hosted by THIS shard's static ZoneRegistry -- legacy never distinguishes "local" from "remote"
         // here (Server/ts25zone/S04_MyWork02.cpp:2017-2186): every zone number is resolved live against the
         // same cross-process directory (Server/ts25center/S04_MyWork02.cpp:74-109's mZoneConnectionInfo), and
@@ -155,11 +188,11 @@ public sealed class ZoneMoveService(
         // Fenrir's current shard/map coverage this "not local" case is the routine one, not the rare one, so
         // it must be resolved against the live runtime.GameServerDirectory + admin.ShardMapAssignments pair
         // before concluding the zone is genuinely unavailable -- see HandleCrossShardAsync, which now also
-        // runs the same TribeGuardCorridorGate check the same-shard path runs just below (a cross-shard
+        // runs the same WrapCheckSpecialDestinationGate check the same-shard path runs just below (a cross-shard
         // destination used to bypass the corridor gate entirely -- see HandleCrossShardAsync's own remarks).
         if (!zones.TryGet(targetZoneNumber, out var targetZone))
-            return HandleCrossShardAsync(targetZoneNumber, characterId, state.Tribe, sourceZone.MapId, zoneSession,
-                cancellationToken);
+            return HandleCrossShardAsync(targetZoneNumber, characterId, state.Tribe, sourceZone.MapId,
+                state.RebirthCount, zoneSession, cancellationToken);
 
         if (!worldData.ZonesByNumber.TryGetValue(targetZoneNumber, out var targetDefinition))
         {
@@ -170,21 +203,24 @@ public sealed class ZoneMoveService(
             return ValueTask.CompletedTask;
         }
 
-        // Tribe-guard corridor legality (MyUtil::WrapCheck, Server/ts25zone/S07_MyGame03.cpp:5721-5943), invoked
-        // exactly where the legacy handler invokes it: after the mProtect_ReviveHack companion gate just above,
-        // for every non-GM zone-transfer request regardless of reason (Server/ts25zone/S04_MyWork02.cpp:2143-2166,
-        // gated on tUserInfo->uUserSort < 1 -- zoneSession.IsGm is the same uUserSort < 1 threshold). corridorCatalog
-        // is registered as TribeGuardCorridorCatalog.Empty until the real sixteen-zone/hub table is populated (a
-        // separate, not-yet-done data-gathering task -- see the catalog's own remarks), so this evaluates as a
-        // documented always-allow for every destination today; enforcement activates automatically once that data
-        // lands, with no further change to this handler required.
-        var corridorOutcome = TribeGuardCorridorGate.Evaluate(
+        // Full MyUtil::WrapCheck legality (Server/ts25zone/S07_MyGame03.cpp:5721-5943), invoked exactly where the
+        // legacy handler invokes it: after the mProtect_ReviveHack companion gate just above, for every non-GM
+        // zone-transfer request regardless of reason (Server/ts25zone/S04_MyWork02.cpp:2143-2166, gated on
+        // tUserInfo->uUserSort < 1 -- zoneSession.IsGm is the same uUserSort < 1 threshold).
+        // WrapCheckSpecialDestinationGate composes the sixteen-zone tribe-corridor group (TribeGuardCorridorGate,
+        // now fed a real chain/hub table via TribeGuardCorridorCatalogFactory.BuildLive() -- see that factory's
+        // own remarks for the still-open guard-post-slot-table gap) with the three additional WrapCheck
+        // destination groups (win-zone-038, rebirth-exact-count, rebirth-at-least-one instanced) this class alone
+        // used to leave unmodeled.
+        var corridorOutcome = WrapCheckSpecialDestinationGate.Evaluate(
             corridorCatalog,
             corridorState,
             state.Tribe,
             sourceZone.MapId,
             targetZoneNumber,
             zoneSession.IsGm,
+            state.RebirthCount,
+            worldState.World.Zone038WinTribe,
             worldState.GetAllyOf);
 
         switch (corridorOutcome)
@@ -319,8 +355,8 @@ public sealed class ZoneMoveService(
     ///     client is expected to disconnect this connection on its own -- the ordinary connection-close path
     ///     already flushes/tidies this player's in-memory state the same way any other disconnect does.
     ///     <para>
-    ///         Fix: also runs <see cref="TribeGuardCorridorGate" /> once a live destination shard is found, for
-    ///         the identical reason and against the identical <c>MyUtil::WrapCheck</c> switch
+    ///         Fix: also runs <see cref="WrapCheckSpecialDestinationGate" /> once a live destination shard is
+    ///         found, for the identical reason and against the identical <c>MyUtil::WrapCheck</c> switch
     ///         (Server/ts25zone/S07_MyGame03.cpp:5721-5943) as <see cref="HandleAsync" />'s own same-shard
     ///         evaluation just above -- legacy resolves every destination zone against the same single
     ///         connection-info table regardless of which process ultimately hosts it
@@ -334,7 +370,8 @@ public sealed class ZoneMoveService(
     ///     </para>
     /// </remarks>
     private async ValueTask HandleCrossShardAsync(short targetZoneNumber, int characterId, byte requesterTribe,
-        short originZoneId, ZoneClientSession zoneSession, CancellationToken cancellationToken)
+        short originZoneId, int requesterRebirthCount, ZoneClientSession zoneSession,
+        CancellationToken cancellationToken)
     {
         var shards = await directory.GetDirectoryAsync(cancellationToken);
         foreach (var candidate in shards)
@@ -349,13 +386,15 @@ public sealed class ZoneMoveService(
             if (!hostedMaps.Contains(targetZoneNumber))
                 continue;
 
-            var corridorOutcome = TribeGuardCorridorGate.Evaluate(
+            var corridorOutcome = WrapCheckSpecialDestinationGate.Evaluate(
                 corridorCatalog,
                 corridorState,
                 requesterTribe,
                 originZoneId,
                 targetZoneNumber,
                 zoneSession.IsGm,
+                requesterRebirthCount,
+                worldState.World.Zone038WinTribe,
                 worldState.GetAllyOf);
 
             if (corridorOutcome == TribeGuardCorridorMoveOutcome.RejectedHardDisconnect)

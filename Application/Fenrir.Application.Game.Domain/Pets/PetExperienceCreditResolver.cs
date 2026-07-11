@@ -15,9 +15,11 @@ namespace Fenrir.Application.Game.Domain.Pets;
 ///     The pet-experience amount fed into <see cref="Resolve" /> is expected to already be the monster's
 ///     <c>mPatExperience</c> scaled by the global/personal pet-experience-rate settings and the
 ///     double-time/premium-status multipliers (<c>MONSTER_OBJECT::ProcessForExp</c>,
-///     S07_MyGame05.cpp:3855-3863) -- that scaling chain has no concrete rate/threshold values in the source
-///     contract and depends on buff/premium state not yet modeled on <c>PlayerRuntimeState</c>, so it is out
-///     of scope here; callers should pass the monster's raw <c>PatExperience</c> value until it exists.
+///     S07_MyGame05.cpp:3855-3863) -- <see cref="PetKillExperienceScalingCalculator" /> (added by the
+///     B8-pet-growth-depth contract) now models that exact chain (global x20 ratio, personal add-on, both
+///     doublings), and the zone tick's own monster-kill call site
+///     (<c>Zone.CreditPetGrowthFromMonsterKill</c>, World/Zone.Combat.cs) now runs the raw amount through it
+///     before ever reaching <see cref="Resolve" />.
 /// </remarks>
 public static class PetExperienceCreditResolver
 {

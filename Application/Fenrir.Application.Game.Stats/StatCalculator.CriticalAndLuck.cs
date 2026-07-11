@@ -1,10 +1,15 @@
+using Fenrir.Application.Game.Stats.Context;
+
 namespace Fenrir.Application.Game.Stats;
 
 public static partial class StatCalculator
 {
     // ---- GetBaseCritical ----
 
-    private static int ComputeCritical(int setNumber, EquippedItemSlot?[] bySlot)
+    // WORKSTREAM B6 (Wave-6): cosmetic (costume-enchant cs -- CostumeCriticalContribution) is now live. mount
+    // (grade whole-value multiplier on crit) context remains a B1 plumbing seam -- not read yet.
+    private static int ComputeCritical(int setNumber, EquippedItemSlot?[] bySlot,
+        CosmeticContext cosmetic = default, MountContext mount = default)
     {
         var crit = 2; // base
         for (var i = 0; i < bySlot.Length; i++)
@@ -27,12 +32,17 @@ public static partial class StatCalculator
         if (bySlot[8] is { } petAmulet)
             crit += PhoenixFlatBonus(petAmulet.Item.ItemId, 1, 2, 3);
 
+        crit += CostumeCriticalContribution(cosmetic.CostumeEnchantCs); // B6 costume-enchant cs
+
         return crit;
     }
 
     // ---- GetBaseCriticalDefence ----
 
-    private static int ComputeCriticalDefence(int setNumber, int rebirthCount, int halo, EquippedItemSlot?[] bySlot)
+    // WORKSTREAM B6/B7 (Wave-6): cosmetic (stellar-core crit-defense) and zone (878 drunk -10%, CACHED leg)
+    // are now live -- see the two terms below. mount (grade whole-value multiplier) remains a B1 seam.
+    private static int ComputeCriticalDefence(int setNumber, int rebirthCount, int halo, EquippedItemSlot?[] bySlot,
+        CosmeticContext cosmetic = default, MountContext mount = default, ZoneContext zone = default)
     {
         var critDef = 0;
         for (var i = 0; i < bySlot.Length; i++)
@@ -56,12 +66,19 @@ public static partial class StatCalculator
         if (bySlot[8] is { } petAmulet)
             critDef += PhoenixFlatBonus(petAmulet.Item.ItemId, 7, 9, 12);
 
+        critDef += StellarCoreCriticalDefenceContribution(cosmetic); // B6 stellar core (narrower crit-def table)
+
+        // B7 drunk-rage: 880 critical-defence -10%, CACHED leg applied to the fully summed base critical-defence
+        // (after every additive contribution above) -- GetBaseCriticalDefence, MyFactor.cpp:3588-3589.
+        critDef = ApplyDrunkCriticalDefence(critDef, zone);
+
         return critDef;
     }
 
     // ---- GetBaseLuck ----
 
-    private static int ComputeLuck(int setNumber, EquippedItemSlot?[] bySlot)
+    // WORKSTREAM B6 (Wave-6): cosmetic (costume valid-id +100 / costume-enchant cs*2) is now live.
+    private static int ComputeLuck(int setNumber, EquippedItemSlot?[] bySlot, CosmeticContext cosmetic = default)
     {
         var luck = 0;
         for (var i = 0; i < bySlot.Length; i++)
@@ -78,6 +95,8 @@ public static partial class StatCalculator
 
         if (bySlot[1] is { } cape && cape.Item.ItemId == 1404)
             luck += 200;
+
+        luck += CostumeLuckContribution(cosmetic.CostumeNumber, cosmetic.CostumeEnchantCs); // B6 costume
 
         return luck;
     }

@@ -208,6 +208,32 @@ public sealed class PartyRegistry
     }
 
     /// <summary>
+    ///     Read-only lookup for <see cref="Simulation.PendingSocialRequestAutoCancelSystem" />'s per-tick
+    ///     "counterpart still reachable" sweep (behavior contract C21§G). Unlike <see cref="TryCancel" />,
+    ///     does NOT consume/remove the entry.
+    /// </summary>
+    public bool TryPeekPending(int characterId, out int counterpartId, out bool isInviter)
+    {
+        lock (_lock)
+        {
+            if (_pendingByInviter.TryGetValue(characterId, out counterpartId))
+            {
+                isInviter = true;
+                return true;
+            }
+
+            if (_pendingByInvitee.TryGetValue(characterId, out counterpartId))
+            {
+                isInviter = false;
+                return true;
+            }
+
+            isInviter = false;
+            return false;
+        }
+    }
+
+    /// <summary>
     ///     WS1.4 asker-side cross-shard invite registration -- same inviter-busy gate as <see cref="TryInvite" />,
     ///     but the invitee is not locally resolvable (it lives on <paramref name="ask" />'s own
     ///     <see cref="CrossShardOutboundAsk.TargetShardId" />), so neither the invitee-already-partied nor the

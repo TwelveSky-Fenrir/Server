@@ -6,6 +6,7 @@ using Fenrir.Data.Abstractions.Characters;
 using Fenrir.Data.Abstractions.Commerce;
 using Fenrir.Data.Abstractions.Game;
 using Fenrir.Data.Abstractions.Guilds;
+using Fenrir.Data.Abstractions.Inventory;
 using Fenrir.Data.Abstractions.Progression;
 using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Data.Abstractions.Security;
@@ -18,6 +19,7 @@ using Fenrir.Data.Characters;
 using Fenrir.Data.Commerce;
 using Fenrir.Data.Game;
 using Fenrir.Data.Guilds;
+using Fenrir.Data.Inventory;
 using Fenrir.Data.Progression;
 using Fenrir.Data.Runtime;
 using Fenrir.Data.Security;
@@ -63,10 +65,54 @@ public static class FenrirDataServiceCollectionExtensions
         builder.Services.AddSingleton<IAccountPinRepository, AccountPinRepository>();
         builder.Services.AddSingleton<ICharacterRepository, CharacterRepository>();
         builder.Services.AddSingleton<ICharacterRenameRepository, CharacterRenameRepository>();
+
+        // C8-hotkey-money-petbag: game.CharacterPetBag (20-slot pet/animal cargo bag, tSort 254/255/256) --
+        // dedicated repository, not added to ICharacterRepository (same "hot magnet file" precedent as
+        // IRuneRepository/RuneRepository above). Consumed by PetBagActionService (Fenrir.Application.Game.Services)
+        // once IPetBagActionService is registered there. Gated on Database/_manifest.txt registering
+        // Migrations/043_character_petbag_table.sql + Migrations/044_character_petbag_procs.sql -- not touched
+        // here, that is fenrir-database-engineer's call per this project's own manifest-ownership rule.
+        builder.Services.AddSingleton<IPetBagRepository, PetBagRepository>();
+
+        // C8 BigMoney ("1B") family (tSort 241/242/244/245, Inventory<->Store/Save) --
+        // Fenrir.Data.Abstractions.Inventory.IBigMoneyRepository, NOT the now-deleted
+        // Fenrir.Data.Abstractions.Characters.IBigMoneyRepository duplicate a sibling wave7 pass independently
+        // built for the same opcodes: that Characters-namespace version (usp_Character_AdjustBigMoneyStore /
+        // usp_AccountVault_TransferBigMoneyWithCharacter [old CREATE PROCEDURE, codes 50350/50351] /
+        // usp_Character_AdjustBigMoneyConversion, backed by game.AccountVault.Money2) had zero consumers
+        // anywhere in Application/, while this Inventory-namespace version already had a real one
+        // (BigMoneyTransferService) plus its own migration-added game.AccountVault.BigMoney column
+        // (Migrations/045-046, CREATE OR ALTER, codes 50353/50354) -- see this pass's own integration report
+        // for the full collision writeup. Consumed by BigMoneyTransferService (Fenrir.Application.Game.Services)
+        // once IBigMoneyTransferService is registered there.
+        builder.Services.AddSingleton<IBigMoneyRepository, BigMoneyRepository>();
+
+        // B5 rune-socket durable state (game.CharacterRunes, op157) -- deliberately off ICharacterRepository's
+        // hot write-behind path; each rune change is a rare, player-initiated, transactional socket<->inventory swap.
+        builder.Services.AddSingleton<IRuneRepository, RuneRepository>();
+
+        // C8-trade durable, anti-dupe two-character trade commit (game.TradeCommitLedger) -- deliberately a
+        // dedicated repository, not added to ICharacterRepository/CharacterRepository (same "hot magnet file"
+        // precedent as IRuneRepository/RuneRepository above). Registered here so it is resolvable the moment
+        // TradeLockService's constructor gains the corresponding parameter and switches CommitAsync over to
+        // ExecuteIdempotentAsync -- that Services-layer switch-over (plus the TradeSession.CommitToken field) is
+        // out of this pass's scope; see this integration pass's own report. Also gated on
+        // Database/_manifest.txt registering Tables/game/TradeCommitLedger.sql and
+        // StoredProcedures/game/usp_CharacterTradeCommit_ExecuteIdempotent.sql -- not touched here, that is
+        // fenrir-database-engineer's call per this project's own manifest-ownership rule.
+        builder.Services.AddSingleton<ITradeCommitRepository, TradeCommitRepository>();
+
+        // C13 War-Point dual-currency NPC-shop purchase (atomic WP debit + item grant, game.usp_Character_BuyWarPointItem).
+        builder.Services.AddSingleton<IWarPointRepository, WarPointRepository>();
+
         builder.Services.AddSingleton<IStarterKitRepository, StarterKitRepository>();
         builder.Services.AddSingleton<ISessionTicketRepository, SessionTicketRepository>();
         builder.Services.AddSingleton<IGameServerDirectoryRepository, GameServerDirectoryRepository>();
         builder.Services.AddSingleton<ICharacterShardLocationRepository, CharacterShardLocationRepository>();
+
+        // D1 logout-info snapshot -- GameServer's EnterWorldService captures via UpsertAsync. Resolved on GameServer
+        // only (the login-train sources LogoutInfo from the roster DTO, so LoginService does NOT inject this).
+        builder.Services.AddSingleton<ICharacterLogoutStateRepository, CharacterLogoutStateRepository>();
         builder.Services.AddSingleton<IAccountSessionRepository, AccountSessionRepository>();
 
         // Cross-shard fan-out for GuildAnnouncement/GuildChat/TribeAnnouncement/TribeAnnouncementScroll --
@@ -78,6 +124,10 @@ public static class FenrirDataServiceCollectionExtensions
         // -- point-to-point sibling of the fan-out registration above; consumed by a future
         // SocialCrossShardRelayHost (Fenrir.Application.Game.Hosting), not by *.Services directly.
         builder.Services.AddSingleton<ISocialCrossShardRelayRepository, SocialCrossShardRelayRepository>();
+
+        // WS-C3 cross-shard whisper relay -- consumed only by ChatCrossShardRelayHost
+        // (Fenrir.Application.Game.Hosting), never by *.Services directly.
+        builder.Services.AddSingleton<IChatCrossShardRelayRepository, ChatCrossShardRelayRepository>();
 
         // proxy-shop-rental-sync: cross-shard fan-out for the proxy/deputy-shop rental-extension consumables'
         // best-effort live-registry mirror update -- single-purpose sibling of the fan-out registration
@@ -95,6 +145,9 @@ public static class FenrirDataServiceCollectionExtensions
         // registrations above; consumed by RvrSiegeEventRelayHost (Fenrir.Application.Game.Hosting), not by
         // *.Domain/*.Services directly.
         builder.Services.AddSingleton<IRvrSiegeEventRelayRepository, RvrSiegeEventRelayRepository>();
+
+        // D1 party-resync cross-shard fan-out relay -- consumed only by PartyResyncRelayHost, never *.Services directly.
+        builder.Services.AddSingleton<IPartyResyncRelayRepository, PartyResyncRelayRepository>();
         builder.Services.AddSingleton<IShardMapAssignmentRepository, ShardMapAssignmentRepository>();
         builder.Services.AddSingleton<IGameSettingsRepository, GameSettingsRepository>();
         builder.Services.AddSingleton<IServerQuotaRepository, ServerQuotaRepository>();
@@ -109,6 +162,10 @@ public static class FenrirDataServiceCollectionExtensions
         builder.Services.AddSingleton<ApplicationFirewall>();
         builder.Services.AddSingleton<IGuildRepository, GuildRepository>();
         builder.Services.AddSingleton<ITribeRepository, TribeRepository>();
+        builder.Services.AddSingleton<ITribeRosterRepository, TribeRosterRepository>();
+        builder.Services.AddSingleton<ITribeBankSweepRepository, TribeBankSweepRepository>();
+        builder.Services.AddSingleton<ITribeConversionRepository, TribeConversionRepository>();
+        builder.Services.AddSingleton<IFourGuildScoringRepository, FourGuildScoringRepository>();
         builder.Services.AddSingleton<IFriendRepository, FriendRepository>();
         builder.Services.AddSingleton<IMentorRepository, MentorRepository>();
 

@@ -43,13 +43,15 @@ public sealed class MentorAskService(
     ///     pre-check family) -- legacy checks the requester's OWN busy/pose state before it ever resolves
     ///     the target avatar by name. The level/existing-teacher/existing-student disconnect gate already
     ///     ran before target resolution here; the still-negotiating soft-busy check
-    ///     (<see cref="MentorRegistry.IsNegotiating" />, <see cref="IsExcludedByCommunityWork" />) did not, and
+    ///     (<see cref="MentorRegistry.IsNegotiating" />,
+    ///     <see cref="Fenrir.Application.Game.Domain.Social.CommunityWorkGate.IsBusy" />) did not, and
     ///     is moved up to join it so a busy master naming a nonexistent/offline student gets the busy reply,
     ///     not "target not found". The same <see cref="MentorRegistry.IsNegotiating" /> check inside
     ///     <see cref="MentorRegistry.TryAsk" /> stays in place for the actual registration.
     ///     <para>
     ///         Server/ts25zone/S07_MyGame04.cpp:185-216 (<c>CheckCommunityWork</c>'s shared seven-flag busy
-    ///         check) is also re-applied to the resolved target below (<see cref="IsExcludedByCommunityWork" />),
+    ///         check) is also re-applied to the resolved target below (
+    ///         <see cref="Fenrir.Application.Game.Domain.Social.CommunityWorkGate.IsBusy" />),
     ///         mirroring <c>GuildInviteService.IsExcludedByCommunityWorkOrStunDeath</c>/
     ///         <c>TradeInviteService.IsExcludedByCommunityWorkOrStunDeath</c> -- this closes a gap where only
     ///         this family's own <see cref="MentorRegistry" /> state was previously consulted for either side.
@@ -72,7 +74,7 @@ public sealed class MentorAskService(
             return new MentorAskResult(MentorAskResultKind.AskerMustDisconnect);
         }
 
-        if (mentors.IsNegotiating(master.CharacterId) || IsExcludedByCommunityWork(master))
+        if (CommunityWorkGate.IsBusy(master, duels, trades, friends, parties, mentors, guildInvites))
         {
             logger.LogDebug("Mentor ask rejected: character {MasterId} already has a pending negotiation",
                 master.CharacterId);
@@ -99,7 +101,7 @@ public sealed class MentorAskService(
             return new MentorAskResult(MentorAskResultKind.TargetMustDisconnect);
         }
 
-        if (IsExcludedByCommunityWork(student))
+        if (CommunityWorkGate.IsBusy(student, duels, trades, friends, parties, mentors, guildInvites))
         {
             logger.LogDebug("Mentor ask rejected: target character {TargetCharacterId} is busy",
                 student.CharacterId);
@@ -189,25 +191,5 @@ public sealed class MentorAskService(
             "Mentor ask published cross-shard: character {MasterId} ({MasterName}) -> character {TargetCharacterId} on shard {TargetShardId} (never delivered today -- see MentorAskService's own remarks)",
             master.CharacterId, master.Name, remote.CharacterId, remote.ShardId);
         return new MentorAskResult(MentorAskResultKind.SentCrossShard);
-    }
-
-    /// <summary>
-    ///     <c>CheckCommunityWork()</c>'s six OTHER exclusivity flags (personal shop, duel, trade, friend, party,
-    ///     guild negotiation -- this family's own mentor/teacher-negotiation flag is checked separately, and
-    ///     atomically, by <see cref="MentorRegistry.IsNegotiating" />/<see cref="MentorRegistry.TryAsk" />). Any
-    ///     one of these being true excludes <paramref name="player" /> from starting or receiving a mentor ask,
-    ///     exactly as it does for every other ASK family in this codebase (mirrors
-    ///     <c>GuildInviteService.IsExcludedByCommunityWorkOrStunDeath</c>/
-    ///     <c>TradeInviteService.IsExcludedByCommunityWorkOrStunDeath</c>, minus their additional stun/post-death
-    ///     gate -- not modeled here, see this class's own <see cref="Ask" /> remarks).
-    /// </summary>
-    private bool IsExcludedByCommunityWork(PlayerRuntimeState player)
-    {
-        return player.PshopOpen
-               || duels.IsNegotiating(player.CharacterId)
-               || trades.IsBusy(player.CharacterId)
-               || friends.IsNegotiating(player.CharacterId)
-               || parties.IsNegotiating(player.CharacterId)
-               || guildInvites.IsNegotiating(player.CharacterId);
     }
 }

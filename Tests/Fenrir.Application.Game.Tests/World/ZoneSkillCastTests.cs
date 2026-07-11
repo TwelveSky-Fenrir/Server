@@ -1,7 +1,11 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
+using Fenrir.Application.Game.Domain.Hotkeys;
+using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
+using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.Abstractions.World;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
@@ -16,8 +20,34 @@ namespace Fenrir.Application.Game.Tests.World;
 ///     forward for every action. See the skill-casting-cooldown-mechanics behavior contract for why casting
 ///     is split into these two phases.
 /// </summary>
+/// <remarks>
+///     D2 hook 4 (<c>Zone.EvaluateSkillCastTamperGuard</c>) now runs ahead of every Phase-A cast-start in this
+///     file, so every caster exercising a real cast below must have a matching skill-bound hotkey seeded first
+///     (<see cref="SeedSkillHotkey" />) -- a bare <c>ZoneTestKit.EnterData</c> caster has no hotkeys at all and
+///     would otherwise be rejected as a <c>HotkeyMismatch</c> tamper offense before ever reaching mana-charge
+///     logic. This mirrors the real client contract the guard enforces: a skill cast must be backed by a
+///     hotkey bound to the exact (skill#, invested grade) pair claimed on the wire.
+/// </remarks>
 public class ZoneSkillCastTests
 {
+    /// <summary>
+    ///     Seeds a skill-bound hotkey matching <paramref name="skillId" />/<paramref name="investedGrade" /> so
+    ///     <c>Zone.EvaluateSkillCastTamperGuard</c>'s <c>HotkeyMismatch</c> check passes for a subsequent
+    ///     <see cref="SkillCastStartAction" /> using the same pair -- see this class's own remarks. Also seeds a
+    ///     matching <see cref="LearnedSkill" /> slot at the same invested grade: since the D2 special-case
+    ///     exclusion set was wired in (wave15), <c>SkillGradeAuthority.GetMaxSkillGradeNum</c> returns -1 for an
+    ///     unlearned skill, and any positive claimed invested grade would then trip <c>SkillHack1</c> against a
+    ///     -1 server max -- a real client can only ever have a skill hotkeyed if it has actually learned that
+    ///     skill at that grade, so this mirrors that precondition rather than leaving it unrealistically absent.
+    /// </summary>
+    private static void SeedSkillHotkey(PlayerRuntimeState state, int skillId, int investedGrade, byte page = 0,
+        byte index = 0)
+    {
+        state.Hotkeys = state.Hotkeys.SetItem((page, index), new HotkeySlot(HotkeyBindingKind.Skill, skillId,
+            investedGrade));
+        state.LearnedSkills = state.LearnedSkills.SetItem(index, new LearnedSkill(skillId, investedGrade));
+    }
+
     private static SkillDefinition HolyShieldSkill(byte maxUpgradePoint, short manaUse, byte shieldPercent,
         short runTime)
     {
@@ -107,6 +137,7 @@ public class ZoneSkillCastTests
 
         Assert.True(zone.TryGetPlayer(10, out var state));
         var manaBefore = state!.Mana; // 300 (EnterData default), MaxLife=840
+        SeedSkillHotkey(state, 82, 10);
 
         // Phase A: charges mana, does NOT write the buff yet.
         zone.Post(ZoneCommand.Move(10, SkillCastStartAction(82, 10)));
@@ -142,7 +173,14 @@ public class ZoneSkillCastTests
         {
             [82] = HolyShieldSkillGraded(10, (0, 0, 40), (100, 20, 40))
         }.ToFrozenDictionary();
-        var worldData = ZoneTestKit.EmptyWorldData(skillsById: skillsById);
+        // D2 hook 4: the caster's CLAIMED item-bonus grade (num2=5 below) must be backed by a real equipped
+        // item granting +5 to skill 82, or Zone.EvaluateSkillCastTamperGuard's server-computed
+        // SkillGradeAuthority.GetBonusSkillValue (0, no equipment) would disagree with the claim and reject
+        // this as a BonusGradeMismatch offense before Phase A ever runs.
+        var bonusItem = new ItemDefinition(WorldDataTestRows.Item(9000),
+            [new ItemBonusSkillRowDto(9000, 0, 82, 5)]);
+        var itemsById = new Dictionary<int, ItemDefinition> { [9000] = bonusItem }.ToFrozenDictionary();
+        var worldData = ZoneTestKit.EmptyWorldData(skillsById: skillsById, itemsById: itemsById);
         var zone = ZoneTestKit.CreateZone(1, worldData: worldData);
         var (session, _) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
@@ -150,6 +188,9 @@ public class ZoneSkillCastTests
 
         Assert.True(zone.TryGetPlayer(10, out var state));
         var manaBefore = state!.Mana; // 300 (EnterData default), MaxLife=840
+        SeedSkillHotkey(state, 82, 5); // invested grade (num1) is the hotkey's own stored grade, not the combined one
+        state.Inventory.ReplaceContainer(ContainerMatrix.Equipment,
+            ImmutableDictionary<byte, ItemStack>.Empty.Add(0, new ItemStack(9000, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0)));
 
         // Invested points num1=5, item-bonus num2=5 -> combined grade 10 (== MaxUpgradePoint, the max value).
         // Phase A charges from num1=5 alone: ReturnSkillValue(sPoint=5) = 0 + (100-0)*5/10 = 50.
@@ -210,6 +251,7 @@ public class ZoneSkillCastTests
 
         Assert.True(zone.TryGetPlayer(10, out var state));
         var manaBefore = state!.Mana;
+        SeedSkillHotkey(state, 82, 10);
 
         zone.Post(ZoneCommand.Move(10, SkillCastStartAction(82, 10)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -233,6 +275,7 @@ public class ZoneSkillCastTests
 
         Assert.True(zone.TryGetPlayer(10, out var state));
         var manaBefore = state!.Mana;
+        SeedSkillHotkey(state, 82, 10);
 
         zone.Post(ZoneCommand.Move(10, SkillCastStartAction(82, 10)));
         zone.Tick(TimeSpan.FromMilliseconds(50)); // first cast succeeds: -10 mana
@@ -266,6 +309,7 @@ public class ZoneSkillCastTests
 
         Assert.True(zone.TryGetPlayer(10, out var state));
         var manaBefore = state!.Mana;
+        SeedSkillHotkey(state, 82, 10);
 
         // First application: PlayerRuntimeState.LastHolyShieldAppliedUtc's own zero-init default
         // (DateTime.MinValue, not DateTime.UtcNow) means a freshly-registered avatar's very first cast on
@@ -331,6 +375,7 @@ public class ZoneSkillCastTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.True(zone.TryGetPlayer(10, out var state));
+        SeedSkillHotkey(state!, 82, 10);
 
         zone.Post(ZoneCommand.Move(10, SkillCastStartAction(82, 10)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -373,6 +418,8 @@ public class ZoneSkillCastTests
 
         Assert.True(zone.TryGetPlayer(20, out var target));
         target!.Life = 700; // MaxLife=840 -> 140 of headroom, less than the 100 flat heal
+        Assert.True(zone.TryGetPlayer(10, out var healer));
+        SeedSkillHotkey(healer!, 106, 10);
 
         zone.Post(ZoneCommand.Move(10, SkillCastStartAction(106, 10)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -400,6 +447,8 @@ public class ZoneSkillCastTests
 
         Assert.True(zone.TryGetPlayer(20, out var target));
         target!.Life = 800; // MaxLife=840 -> only 40 of headroom, less than the 200 flat heal
+        Assert.True(zone.TryGetPlayer(10, out var healer));
+        SeedSkillHotkey(healer!, 106, 10);
 
         zone.Post(ZoneCommand.Move(10, SkillCastStartAction(106, 10)));
         zone.Tick(TimeSpan.FromMilliseconds(50));

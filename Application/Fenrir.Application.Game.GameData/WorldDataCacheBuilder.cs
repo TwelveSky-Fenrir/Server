@@ -135,6 +135,69 @@ public static class WorldDataCacheBuilder
     private const int MaxMonsterDropMoneyAmount = 100_000_000;
 
     /// <summary>
+    ///     Shared 1-based lowest legal reference index -- the floor of the SKILL (1-300) and NPC (1-500) index
+    ///     ranges below, and the canonical key the lowest-index self-test (<see cref="RunLowestIndexSelfTest" />)
+    ///     probes for.
+    /// </summary>
+    private const int MinReferenceIndex = 1;
+
+    // Skill_CheckValidElement bounds (Server/Header/S15_MyShare.cpp:1277-1497) -- see ValidateSkills for how each
+    // is used. The 300 cap is the legacy fixed-capacity SKILL table size (Server/Header/S15_MyShare.cpp:518); a
+    // skill whose index would exceed it cannot exist. Name/description buffer sizes are the live non-GXCW_SV
+    // definitions (Server/Header/Protocol/STRUCT.h:123-125), expressed as "buffer size minus the terminator byte".
+    private const int MaxSkillIndex = 300;
+    private const int MaxSkillNameLength = 24;
+    private const int MaxSkillDescriptionLength = 50;
+    private const int MinSkillType = 1;
+    private const int MaxSkillType = 4;
+    private const int MinSkillAttackType = 1;
+    private const int MaxSkillAttackType = 5;
+    private const int MinSkillDataNumber2D = 1;
+    private const int MaxSkillDataNumber2D = 10000;
+    private const int MinSkillTribeInfo1 = 1;
+    private const int MaxSkillTribeInfo1 = 4;
+    private const int MinSkillTribeInfo2 = 1;
+    private const int MaxSkillTribeInfo2 = 10;
+
+    /// <summary>
+    ///     Legacy floor (1) on LearnSkillPoint/MaxUpgradePoint (Server/Header/S15_MyShare.cpp:1350-1357). The legacy
+    ///     ceiling of 1000 on both is unreachable beneath their <c>byte</c> DTO storage (max 255), so only the floor
+    ///     is a live check here -- same column-width note the companion CK_Skills_LearnSkillPoint/MaxUpgradePoint
+    ///     constraints carry (Database/Migrations/032_skill_static_data_range_checks.sql).
+    /// </summary>
+    private const int MinSkillLearnOrUpgradePoint = 1;
+
+    private const int MaxSkillTotalHitNumber = 10;
+    private const int MaxSkillValidRadius = 1000;
+    private const int MaxSkillGradeManaUse = 10000;
+    private const int MaxSkillGradeStun = 100;
+    private const int MaxSkillGradeFastRunSpeed = 1000;
+    private const int MaxSkillGradeAttackInfo1 = 1000;
+    private const int MaxSkillGradeRunTime = 10000;
+
+    // Npc_CheckValidElement bounds (Server/Header/S15_MyShare.cpp:1836-1963) -- see ValidateNpcs. The 500 cap is the
+    // legacy fixed-capacity NPC table size (Server/Header/S15_MyShare.cpp:622). Name/speech buffer sizes are the
+    // unconditional STRUCT.h:206-212 definitions, again "buffer minus terminator". These bounds also live as CHECK
+    // constraints (Database/Migrations/033_npc_static_data_range_checks.sql) -- reproduced here for the same
+    // fail-fast-at-boot parity ValidateMonsters carries.
+    private const int MaxNpcIndex = 500;
+    private const int MaxNpcNameLength = 27;
+    private const int MaxNpcSpeechLength = 50;
+    private const int MinNpcTribe = 1;
+    private const int MaxNpcTribe = 5;
+    private const int MinNpcType = 1;
+    private const int MaxNpcType = 17;
+    private const int MinNpcDataSortNumber = 1;
+    private const int MaxNpcDataSortNumber = 10000;
+    private const int MinNpcSize = 1;
+    private const int MaxNpcSize = 1000;
+    private const int MinNpcMenuOption = 1;
+    private const int MaxNpcMenuOption = 2;
+    private const int MaxNpcShopItemId = 99999;
+    private const int MaxNpcSkillOfferId = 300;
+    private const int MaxNpcGambleCost = 100_000_000;
+
+    /// <summary>
     ///     Throws when a critical dataset (Items, Monsters, Zones, ZonePortals, Levels, Skills) is empty -- an
     ///     unseeded GameServer must not accept a single connection.
     /// </summary>
@@ -175,6 +238,10 @@ public static class WorldDataCacheBuilder
         ValidateMonsters(rows.Monsters, rows.MonsterDropMoney, rows.MonsterDropPotions, rows.MonsterDropCategoryRates,
             rows.MonsterDropExtraItems, rows.MonsterDropQuestItems);
         ValidateGemSockets(rows.GemSockets);
+        ValidateSkills(rows.Skills, rows.SkillDescriptions, rows.SkillGrades);
+        ValidateNpcs(rows.Npcs, rows.NpcMenuOptions, rows.NpcShopItems, rows.NpcSkillOffers, rows.NpcSpeeches,
+            rows.NpcGambleCosts);
+        RunLowestIndexSelfTest(rows);
 
         var (zonesByNumber, stats) = BuildZones(
             rows.Zones, rows.ZonePortals, rows.ZoneSpawnPoints, rows.ZoneNpcSpawns, rows.MonsterSpawnRegions);
@@ -191,6 +258,7 @@ public static class WorldDataCacheBuilder
             LevelsByLevel = rows.Levels.ToFrozenDictionary(static level => level.Level),
             ZonesByNumber = zonesByNumber,
             GemSocketsById = rows.GemSockets.ToFrozenDictionary(static gem => gem.GemSocketId),
+            GemSocketsByTypeAndValue = BuildGemSocketTypeValueIndex(rows.GemSockets),
             BloodExchangeCatalog = [.. rows.BloodExchangeCatalog],
             EventDefinitions = [.. rows.EventDefinitions],
             ItemMallProductsById =
@@ -209,10 +277,11 @@ public static class WorldDataCacheBuilder
     ///     the LEVEL/ITEM/SKILL/MONSTER/NPC/QUEST/GSOCKET "a single malformed row aborts the whole dataset"
     ///     systems whose per-row rule set (<c>Level_CheckValidElement</c>) was read in full for the behavior
     ///     contract backing this method; QUEST (<see cref="ValidateQuests" />), ITEM (<see cref="ValidateItems" />),
-    ///     MONSTER (<see cref="ValidateMonsters" />), and GSOCKET (<see cref="ValidateGemSockets" />) since gained
-    ///     their own partial per-row validation, each covering only the specific bounds their backing contract
-    ///     confirmed -- see those methods' own remarks for what remains unreproduced in each. SKILL/NPC remain
-    ///     wholly open gaps.
+    ///     MONSTER (<see cref="ValidateMonsters" />), GSOCKET (<see cref="ValidateGemSockets" />), SKILL
+    ///     (<see cref="ValidateSkills" />), and NPC (<see cref="ValidateNpcs" />) since gained their own partial
+    ///     per-row validation, each covering only the specific bounds their backing contract confirmed -- see those
+    ///     methods' own remarks for what remains unreproduced in each. A coarse lowest-index self-test
+    ///     (<see cref="RunLowestIndexSelfTest" />) rounds this out, mirroring the legacy boot smoke test.
     /// </summary>
     /// <remarks>
     ///     Réf. C++ : Server/Header/S15_MyShare.cpp:373-421 (<c>Load_Level</c>, first-invalid-row abort, no
@@ -231,12 +300,12 @@ public static class WorldDataCacheBuilder
     ///     fixed-size-shared-memory-array sizing artifact with no Fenrir equivalent (same reasoning as the
     ///     ZonePortals SHM parity note on <see cref="Build" /> above), so a seed with fewer than 145 contiguous
     ///     levels is accepted here as long as every row it does have is internally consistent.
-    ///     SKILL/NPC intentionally get no per-row validation here (ITEM, QUEST, MONSTER, and GSOCKET now have
-    ///     their own partial validation, see <see cref="ValidateItems" />/<see cref="ValidateQuests" />/
-    ///     <see cref="ValidateMonsters" />/<see cref="ValidateGemSockets" />): the behavior contract backing this
-    ///     method explicitly flags those two remaining systems' <c>*_CheckValidElement</c> rule sets as
-    ///     unread/unverified, so nothing was guessed at for them -- closing that remains an open gap for a
-    ///     follow-up <c>legacy-behavior-translator</c> contract per system.
+    ///     Each of ITEM, QUEST, MONSTER, GSOCKET, SKILL, and NPC now has its own partial validation
+    ///     (<see cref="ValidateItems" />/<see cref="ValidateQuests" />/<see cref="ValidateMonsters" />/
+    ///     <see cref="ValidateGemSockets" />/<see cref="ValidateSkills" />/<see cref="ValidateNpcs" />), each
+    ///     reproducing only the specific bounds its backing contract confirmed and each documenting in its own
+    ///     remarks what it deliberately leaves unreproduced (e.g. the fixed-array positional-identity rule, or a
+    ///     legacy bound already made unreachable by the DTO's narrower storage type).
     ///     A companion storage-level <c>CK_Levels_RangeInfo3</c> CHECK constraint
     ///     (Database/Migrations/030_levels_rangeinfo3_check_constraint.sql) mirrors the RangeInfo3 bound below
     ///     directly on world.Levels, since the column's own TINYINT type (0-255) is wider than the legacy 0-100
@@ -321,9 +390,9 @@ public static class WorldDataCacheBuilder
     ///     Levels' RangeInfo3 case, both bounds here are already narrower than their column types (Step is
     ///     SMALLINT, Amount is INT), so the DB constraint is not compensating for a wider column -- this method
     ///     still reproduces the same fail-fast-at-boot contract in C# for parity with every other per-row-validated
-    ///     dataset (LEVEL/ITEM/MONSTER/GSOCKET today, see also <see cref="ValidateItems" />/
-    ///     <see cref="ValidateMonsters" />/<see cref="ValidateGemSockets" />; SKILL/NPC remain open gaps per
-    ///     <see cref="ValidateLevels" />'s own remarks).
+    ///     dataset (LEVEL/ITEM/MONSTER/GSOCKET/SKILL/NPC today, see also <see cref="ValidateItems" />/
+    ///     <see cref="ValidateMonsters" />/<see cref="ValidateGemSockets" />/<see cref="ValidateSkills" />/
+    ///     <see cref="ValidateNpcs" />).
     ///     Deliberately NOT reproduced here: a 1-1000 bound on QuestId itself, and the legacy array's
     ///     positional-consistency rule (index equals array slot) -- the contract backing this method explicitly
     ///     ranks both lower severity / not applicable to a relational PRIMARY KEY, unlike Step/Amount which it
@@ -450,8 +519,8 @@ public static class WorldDataCacheBuilder
     ///     (Database/Migrations/034_gem_socket_type_band_range_checks.sql) mirrors every bound above directly on
     ///     world.GemSockets, since none of them were enforced by the table's schema before that migration. This
     ///     method still reproduces the same fail-fast-at-boot contract in C# for parity with every other
-    ///     per-row-validated dataset (LEVEL/QUEST/ITEM above; SKILL/NPC remain open gaps per
-    ///     <see cref="ValidateLevels" />'s own remarks).
+    ///     per-row-validated dataset (LEVEL/QUEST/ITEM/SKILL/NPC above, see also <see cref="ValidateSkills" />/
+    ///     <see cref="ValidateNpcs" />).
     /// </remarks>
     private static void ValidateGemSockets(IReadOnlyList<GemSocketRowDto> gemSockets)
     {
@@ -492,6 +561,53 @@ public static class WorldDataCacheBuilder
                     $"violating the legacy Type-band rules (Type must be {MinGemSocketType}-{MaxGemSocketType} " +
                     "with band-specific Value02/Value03/Value04 bounds).");
         }
+    }
+
+    /// <summary>
+    ///     Builds <see cref="WorldDataCache.GemSocketsByTypeAndValue" /> from the same rows
+    ///     <see cref="ValidateGemSockets" /> already validated -- keyed by (Type, Value02), first-GemSocketId-wins
+    ///     on a duplicate key, reproducing <c>GSOCKET::Search</c>'s first-match linear scan
+    ///     (Server/ts25zone/GameSystem/GameSystem_08_Socket.cpp:22-32: reject a query whose type or value is below
+    ///     1 -- enforced by the reader, <c>StatCalculator.ResolveGemSocketValue</c>, not by this index -- else
+    ///     return the first row matching both fields).
+    /// </summary>
+    /// <remarks>
+    ///     Workstream B13-socket-prerequisites: the resolver-side routing/decode logic
+    ///     (<c>Fenrir.Application.Game.Stats.StatCalculator.GemSocketContribution.cs</c>) already existed and
+    ///     needed exactly this shape of table, keyed with
+    ///     <c>StatCalculator.GemSocketTypeValueKey(byte gemType, byte gemValue)</c> =
+    ///     <c>(gemType &lt;&lt; 8) | gemValue</c>. That formula is duplicated in <see cref="GemSocketTypeValueKey" />
+    ///     below rather than called directly because <c>Fenrir.Application.Game.GameData</c> has no project
+    ///     reference to <c>Fenrir.Application.Game.Stats</c> (siblings under Application/, Stats depends on
+    ///     neither GameData nor the reverse) -- the same "leaf project can't share a tiny formula across an
+    ///     un-referenced sibling" situation already accepted for the valid-costume set duplicated in
+    ///     <c>NpcShopPolicy</c>. Both formulas must be kept in sync if either changes; there is no compiler
+    ///     enforcement of that today.
+    /// </remarks>
+    private static FrozenDictionary<int, GemSocketRowDto> BuildGemSocketTypeValueIndex(
+        IReadOnlyList<GemSocketRowDto> gemSockets)
+    {
+        var byTypeAndValue = new Dictionary<int, GemSocketRowDto>(gemSockets.Count);
+        foreach (var gemSocket in gemSockets.OrderBy(static gemSocket => gemSocket.GemSocketId))
+            byTypeAndValue.TryAdd(GemSocketTypeValueKey(gemSocket.Type, gemSocket.Value02), gemSocket);
+
+        return byTypeAndValue.ToFrozenDictionary();
+    }
+
+    /// <summary>
+    ///     MUST stay byte-for-byte identical to
+    ///     <c>Fenrir.Application.Game.Stats.StatCalculator.GemSocketTypeValueKey(byte, byte)</c> -- see
+    ///     <see cref="BuildGemSocketTypeValueIndex" />'s own remarks for why this project cannot simply call that
+    ///     one. Every <see cref="GemSocketRowDto.Type" />/<see cref="GemSocketRowDto.Value02" /> that reaches this
+    ///     method has already passed <see cref="ValidateGemSockets" /> (Type is 0 or <see cref="MinGemSocketType" />-
+    ///     <see cref="MaxGemSocketType" />; Value02 is band-bounded, at most 100, whenever Type is nonzero and
+    ///     Value02 is nonzero) -- both operands fit a byte in every case this index is ever actually queried for
+    ///     (a query with type or value below 1 is rejected by the reader before any lookup, so an out-of-band
+    ///     Type=0/Value02=0 escape row masking to an unexpected key is harmless).
+    /// </summary>
+    private static int GemSocketTypeValueKey(int type, int value02)
+    {
+        return ((type & 0xFF) << 8) | (value02 & 0xFF);
     }
 
     /// <summary>
@@ -767,6 +883,350 @@ public static class WorldDataCacheBuilder
                     $"{MaxMonsterDropItemId}).");
     }
 
+    /// <summary>
+    ///     Per-row SKILL validation across world.Skills and its two child tables (world.SkillDescriptions,
+    ///     world.SkillGrades): aborts the whole load on the first invalid row, matching the legacy loader's
+    ///     no-skip-and-continue failure contract. Reproduces the 300-slot capacity cap and every
+    ///     <c>Skill_CheckValidElement</c> single-field bound that is actually representable-and-violable given the
+    ///     relational DTO's column types -- see this method's own remarks for what is deliberately left out and why.
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/Header/S15_MyShare.cpp:1277-1497 (<c>MyShm::Skill_CheckValidElement</c> -- empty-row
+    ///     sentinel, 1-300 index bound, name/description termination, every scalar bound, and the 2 grade rows'
+    ///     per-field bounds) ; Server/Header/S15_MyShare.cpp:515-563 (<c>Load_Skill</c> -- the 300-row fixed
+    ///     capacity at :518, the full-capacity validation scan at :544 iterating the fixed cap rather than the
+    ///     loaded count, first-invalid logs the row index and aborts at :546-550) ;
+    ///     Server/Header/Protocol/STRUCT.h:123-125 (the live non-<c>GXCW_SV</c> name 25-byte / description 10×51-byte
+    ///     buffer definitions -- <c>GXCW_SV</c> is never <c>#define</c>d anywhere under Server/, only two
+    ///     <c>#ifndef GXCW_SV</c> guards at STRUCT.h:122,218).
+    ///     A companion set of storage-level CHECK constraints
+    ///     (Database/Migrations/032_skill_static_data_range_checks.sql) already enforces every one of these numeric
+    ///     bounds directly on world.Skills/world.SkillGrades; this method reproduces the same fail-fast-at-boot
+    ///     contract in C# for parity with every other per-row-validated dataset and to catch a bad row that predates
+    ///     those constraints or reached the tables by a path they don't cover, matching <see cref="ValidateMonsters" />'s
+    ///     own defense-in-depth reasoning.
+    ///     <para>
+    ///         Deliberately NOT reproduced here, each for a cited reason:
+    ///         <list type="bullet">
+    ///             <item>
+    ///                 The legacy "index must equal its own array slot position + 1" dense-positional-identity rule
+    ///                 (Server/Header/S15_MyShare.cpp:1291-1295) -- SkillId is Fenrir's relational PRIMARY KEY /
+    ///                 NOT NULL, boot-time/generator-assigned reference data, so this fixed-array-storage artifact
+    ///                 has no analogue once represented relationally. Same disposition
+    ///                 Database/Migrations/032_skill_static_data_range_checks.sql took, and the same one
+    ///                 <see cref="ValidateMonsters" />/<see cref="ValidateQuests" /> take for MonsterId/QuestId. The
+    ///                 1-300 <em>range</em> cap IS reproduced (a distinct rule -- it is the fixed-capacity bound, not
+    ///                 positional identity).
+    ///             </item>
+    ///             <item>
+    ///                 Every <c>Skill_CheckValidElement</c> bound whose field is a <c>byte</c> in the DTO with a
+    ///                 legacy ceiling above 255 -- LearnSkillPoint/MaxUpgradePoint (ceiling 1000, only their floor of
+    ///                 1 is checked), the two RecoverInfo values (0-10000), AttackInfo2/AttackInfo3 (0-1000), and the
+    ///                 ~18 grade "up" fields plus ReturnSuccessUp/DestroySuccessUp (0-1000 or 0-10000). A
+    ///                 <c>byte</c>'s 0-255 storage range already sits inside every one of those ceilings, so the
+    ///                 upper check can never fire and the lower check (0) is vacuous -- reproducing them would be
+    ///                 dead comparisons (and, written as a relational pattern against a wider constant, a compiler
+    ///                 warning under this repo's warnings-as-errors). Only ManaUse/FastRunSpeed/AttackInfo1/RunTime
+    ///                 (<c>short</c>) and StunAttack/StunDefense (<c>byte</c>, ceiling 100, within range) can
+    ///                 actually be violated, so only those are checked -- the same column-width note
+    ///                 Database/Migrations/032 carries.
+    ///             </item>
+    ///             <item>
+    ///                 The exactly-two-grade-rows-per-skill requirement -- a fixed-array-shape artifact; the
+    ///                 composite PK plus CK_SkillGrades_GradeIndex already bound each skill to at most one grade-0
+    ///                 and one grade-1 row, and this method validates whichever grade rows are present rather than
+    ///                 mandating a count.
+    ///             </item>
+    ///         </list>
+    ///     </para>
+    ///     Name/description translation note (same as <see cref="ValidateMonsters" />): legacy's "must contain a
+    ///     terminator within its N-byte buffer" becomes, for a real string, "content is at most N-1 characters"
+    ///     (<see cref="MaxSkillNameLength" /> = 24 for the 25-byte buffer, <see cref="MaxSkillDescriptionLength" /> =
+    ///     50 for the 51-byte one). This is safe against the imported seed by construction: every seeded name came
+    ///     from legacy-validated data whose byte length was already within the buffer, and a UTF-16 string's
+    ///     character count never exceeds that byte length.
+    /// </remarks>
+    private static void ValidateSkills(
+        IReadOnlyList<SkillRowDto> skills,
+        IReadOnlyList<SkillDescriptionRowDto> descriptions,
+        IReadOnlyList<SkillGradeRowDto> grades)
+    {
+        foreach (var skill in skills.OrderBy(static skill => skill.SkillId))
+        {
+            // SkillId == 0 marks an empty/unused slot in the legacy fixed 300-slot table -- accepted (skipped),
+            // never a real record. world.Skills never seeds one (SkillId is PK/NOT NULL), but the skip is kept for
+            // parity, the same shape as ValidateItems' ItemId == 0 skip.
+            if (skill.SkillId == 0)
+                continue;
+
+            // The 300-slot capacity cap: a skill whose index would exceed the fixed 300 capacity cannot exist.
+            if (skill.SkillId is < MinReferenceIndex or > MaxSkillIndex)
+                throw new InvalidOperationException(
+                    $"world.Skills row SkillId={skill.SkillId} is outside the legacy {MinReferenceIndex}-" +
+                    $"{MaxSkillIndex} index cap (the fixed skill-table capacity).");
+
+            if (skill.Name.Length > MaxSkillNameLength)
+                throw new InvalidOperationException(
+                    $"world.Skills row SkillId={skill.SkillId} has a Name longer than {MaxSkillNameLength} " +
+                    "characters.");
+
+            if (skill.Type is < MinSkillType or > MaxSkillType)
+                throw new InvalidOperationException(
+                    $"world.Skills row SkillId={skill.SkillId} has Type={skill.Type} outside the legacy " +
+                    $"{MinSkillType}-{MaxSkillType} bound.");
+
+            if (skill.AttackType is < MinSkillAttackType or > MaxSkillAttackType)
+                throw new InvalidOperationException(
+                    $"world.Skills row SkillId={skill.SkillId} has AttackType={skill.AttackType} outside the " +
+                    $"legacy {MinSkillAttackType}-{MaxSkillAttackType} bound.");
+
+            if (skill.DataNumber2D is < MinSkillDataNumber2D or > MaxSkillDataNumber2D)
+                throw new InvalidOperationException(
+                    $"world.Skills row SkillId={skill.SkillId} has DataNumber2D={skill.DataNumber2D} outside the " +
+                    $"legacy {MinSkillDataNumber2D}-{MaxSkillDataNumber2D} bound.");
+
+            if (skill.TribeInfo1 is < MinSkillTribeInfo1 or > MaxSkillTribeInfo1)
+                throw new InvalidOperationException(
+                    $"world.Skills row SkillId={skill.SkillId} has TribeInfo1={skill.TribeInfo1} outside the " +
+                    $"legacy {MinSkillTribeInfo1}-{MaxSkillTribeInfo1} bound.");
+
+            if (skill.TribeInfo2 is < MinSkillTribeInfo2 or > MaxSkillTribeInfo2)
+                throw new InvalidOperationException(
+                    $"world.Skills row SkillId={skill.SkillId} has TribeInfo2={skill.TribeInfo2} outside the " +
+                    $"legacy {MinSkillTribeInfo2}-{MaxSkillTribeInfo2} bound.");
+
+            // LearnSkillPoint/MaxUpgradePoint: only the floor of 1 is a live check -- the legacy 1000 ceiling is
+            // unreachable beneath the byte DTO column (see this method's remarks).
+            if (skill.LearnSkillPoint < MinSkillLearnOrUpgradePoint)
+                throw new InvalidOperationException(
+                    $"world.Skills row SkillId={skill.SkillId} has LearnSkillPoint={skill.LearnSkillPoint} below " +
+                    $"the legacy floor of {MinSkillLearnOrUpgradePoint}.");
+
+            if (skill.MaxUpgradePoint < MinSkillLearnOrUpgradePoint)
+                throw new InvalidOperationException(
+                    $"world.Skills row SkillId={skill.SkillId} has MaxUpgradePoint={skill.MaxUpgradePoint} below " +
+                    $"the legacy floor of {MinSkillLearnOrUpgradePoint} (also the divide-by-zero guard in " +
+                    "SKILLSYSTEM::ReturnSkillValue).");
+
+            if (skill.TotalHitNumber > MaxSkillTotalHitNumber)
+                throw new InvalidOperationException(
+                    $"world.Skills row SkillId={skill.SkillId} has TotalHitNumber={skill.TotalHitNumber} outside " +
+                    $"the legacy 0-{MaxSkillTotalHitNumber} bound.");
+
+            if (skill.ValidRadius is < 0 or > MaxSkillValidRadius)
+                throw new InvalidOperationException(
+                    $"world.Skills row SkillId={skill.SkillId} has ValidRadius={skill.ValidRadius} outside the " +
+                    $"legacy 0-{MaxSkillValidRadius} bound.");
+        }
+
+        foreach (var description in descriptions.OrderBy(static row => row.SkillId)
+                     .ThenBy(static row => row.LineIndex))
+            if (description.Text.Length > MaxSkillDescriptionLength)
+                throw new InvalidOperationException(
+                    $"world.SkillDescriptions row SkillId={description.SkillId} LineIndex={description.LineIndex} " +
+                    $"has Text longer than {MaxSkillDescriptionLength} characters.");
+
+        foreach (var grade in grades.OrderBy(static row => row.SkillId).ThenBy(static row => row.GradeIndex))
+        {
+            if (grade.ManaUse is < 0 or > MaxSkillGradeManaUse)
+                throw new InvalidOperationException(
+                    $"world.SkillGrades row SkillId={grade.SkillId} GradeIndex={grade.GradeIndex} has " +
+                    $"ManaUse={grade.ManaUse} outside the legacy 0-{MaxSkillGradeManaUse} bound.");
+
+            if (grade.StunAttack > MaxSkillGradeStun || grade.StunDefense > MaxSkillGradeStun)
+                throw new InvalidOperationException(
+                    $"world.SkillGrades row SkillId={grade.SkillId} GradeIndex={grade.GradeIndex} has a StunAttack/" +
+                    $"StunDefense outside the legacy 0-{MaxSkillGradeStun} bound.");
+
+            if (grade.FastRunSpeed is < 0 or > MaxSkillGradeFastRunSpeed)
+                throw new InvalidOperationException(
+                    $"world.SkillGrades row SkillId={grade.SkillId} GradeIndex={grade.GradeIndex} has " +
+                    $"FastRunSpeed={grade.FastRunSpeed} outside the legacy 0-{MaxSkillGradeFastRunSpeed} bound.");
+
+            if (grade.AttackInfo1 is < 0 or > MaxSkillGradeAttackInfo1)
+                throw new InvalidOperationException(
+                    $"world.SkillGrades row SkillId={grade.SkillId} GradeIndex={grade.GradeIndex} has " +
+                    $"AttackInfo1={grade.AttackInfo1} outside the legacy 0-{MaxSkillGradeAttackInfo1} bound.");
+
+            if (grade.RunTime is < 0 or > MaxSkillGradeRunTime)
+                throw new InvalidOperationException(
+                    $"world.SkillGrades row SkillId={grade.SkillId} GradeIndex={grade.GradeIndex} has " +
+                    $"RunTime={grade.RunTime} outside the legacy 0-{MaxSkillGradeRunTime} bound.");
+        }
+    }
+
+    /// <summary>
+    ///     Per-row NPC validation across world.Npcs and its child tables (menu options, shop items, skill offers,
+    ///     speeches, gamble costs): aborts the whole load on the first invalid row, matching the legacy loader's
+    ///     no-skip-and-continue failure contract. Reproduces the 500-slot capacity cap and every
+    ///     <c>Npc_CheckValidElement</c> bound that is representable-and-violable given the relational DTOs -- see
+    ///     this method's own remarks for what is deliberately left out and why.
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/Header/S15_MyShare.cpp:1836-1963 (<c>MyShm::Npc_CheckValidElement</c> -- empty-row
+    ///     sentinel, 1-500 index bound, name/speech termination, tribe/type/sort-number/size scalars, menu 1-2,
+    ///     shop-info 0-99999, skill-info form-1 and form-2 0-300, gamble-cost 0-100,000,000) ;
+    ///     Server/Header/S15_MyShare.cpp:619-668 (<c>Load_Npc</c> -- the 500-row capacity at :622, per-row
+    ///     validation over the loaded count at :648, first-invalid logs the row index and aborts at :650-654) ;
+    ///     Server/Header/Protocol/STRUCT.h:206-212 (name 28-byte, speech 5×5×51-byte, menu 100, shop 3-page×28-slot
+    ///     buffer/count constants, unconditional ahead of the STRUCT.h:218 <c>GXCW_SV</c> guard).
+    ///     A companion set of storage-level CHECK constraints
+    ///     (Database/Migrations/033_npc_static_data_range_checks.sql) already enforces the scalar/menu/gamble bounds
+    ///     directly on the tables; this method reproduces the same fail-fast-at-boot contract in C# for parity and
+    ///     defense-in-depth, matching <see cref="ValidateMonsters" />.
+    ///     <para>
+    ///         Deliberately NOT reproduced here, each for a cited reason:
+    ///         <list type="bullet">
+    ///             <item>
+    ///                 The dense-positional-identity rule (index equals slot + 1, Server/Header/S15_MyShare.cpp:
+    ///                 1851-1854) -- NpcId is the relational PRIMARY KEY, same disposition as SkillId/MonsterId/
+    ///                 QuestId and as Database/Migrations/033. The 1-500 <em>range</em> cap IS reproduced.
+    ///             </item>
+    ///             <item>
+    ///                 The speech-count 1-5 bound (Server/Header/S15_MyShare.cpp:1866-1869) -- the legacy
+    ///                 <c>nSpeechNum</c> scalar is parsed then discarded by the import tool and has no column in the
+    ///                 Fenrir schema (per Database/Migrations/033's own note), so there is nothing to validate; the
+    ///                 count is implicit in the number of world.NpcSpeeches rows. Left as a documented gap.
+    ///             </item>
+    ///         </list>
+    ///     </para>
+    ///     Name/speech translation note is identical to <see cref="ValidateSkills" />'s
+    ///     (<see cref="MaxNpcNameLength" /> = 27 for the 28-byte buffer, <see cref="MaxNpcSpeechLength" /> = 50 for
+    ///     the 51-byte one). Shop-item and skill-offer ids are additionally FK-constrained in the schema (stricter
+    ///     than legacy's raw 0-99999 / 0-300 numeric bound); the numeric bound is still reproduced here because the
+    ///     C# builder has no foreign key to lean on.
+    /// </remarks>
+    private static void ValidateNpcs(
+        IReadOnlyList<NpcRowDto> npcs,
+        IReadOnlyList<NpcMenuOptionRowDto> menuOptions,
+        IReadOnlyList<NpcShopItemRowDto> shopItems,
+        IReadOnlyList<NpcSkillOfferRowDto> skillOffers,
+        IReadOnlyList<NpcSpeechRowDto> speeches,
+        IReadOnlyList<NpcGambleCostRowDto> gambleCosts)
+    {
+        foreach (var npc in npcs.OrderBy(static npc => npc.NpcId))
+        {
+            // NpcId == 0 marks an empty/unused slot in the legacy fixed 500-slot table -- accepted (skipped), same
+            // parity shape as the SkillId == 0 / ItemId == 0 skips above.
+            if (npc.NpcId == 0)
+                continue;
+
+            if (npc.NpcId is < MinReferenceIndex or > MaxNpcIndex)
+                throw new InvalidOperationException(
+                    $"world.Npcs row NpcId={npc.NpcId} is outside the legacy {MinReferenceIndex}-{MaxNpcIndex} " +
+                    "index cap (the fixed NPC-table capacity).");
+
+            if (npc.Name.Length > MaxNpcNameLength)
+                throw new InvalidOperationException(
+                    $"world.Npcs row NpcId={npc.NpcId} has a Name longer than {MaxNpcNameLength} characters.");
+
+            if (npc.Tribe is < MinNpcTribe or > MaxNpcTribe)
+                throw new InvalidOperationException(
+                    $"world.Npcs row NpcId={npc.NpcId} has Tribe={npc.Tribe} outside the legacy {MinNpcTribe}-" +
+                    $"{MaxNpcTribe} bound.");
+
+            if (npc.Type is < MinNpcType or > MaxNpcType)
+                throw new InvalidOperationException(
+                    $"world.Npcs row NpcId={npc.NpcId} has Type={npc.Type} outside the legacy {MinNpcType}-" +
+                    $"{MaxNpcType} bound.");
+
+            if (npc.DataSortNumber2D is < MinNpcDataSortNumber or > MaxNpcDataSortNumber
+                || npc.DataSortNumber3D is < MinNpcDataSortNumber or > MaxNpcDataSortNumber)
+                throw new InvalidOperationException(
+                    $"world.Npcs row NpcId={npc.NpcId} has a DataSortNumber2D/DataSortNumber3D outside the legacy " +
+                    $"{MinNpcDataSortNumber}-{MaxNpcDataSortNumber} bound.");
+
+            if (npc.Size1 is < MinNpcSize or > MaxNpcSize
+                || npc.Size2 is < MinNpcSize or > MaxNpcSize
+                || npc.Size3 is < MinNpcSize or > MaxNpcSize)
+                throw new InvalidOperationException(
+                    $"world.Npcs row NpcId={npc.NpcId} has a Size1/Size2/Size3 outside the legacy {MinNpcSize}-" +
+                    $"{MaxNpcSize} bound.");
+        }
+
+        foreach (var speech in speeches.OrderBy(static row => row.NpcId).ThenBy(static row => row.SpeechGroup)
+                     .ThenBy(static row => row.SpeechIndex))
+            if (speech.Text.Length > MaxNpcSpeechLength)
+                throw new InvalidOperationException(
+                    $"world.NpcSpeeches row NpcId={speech.NpcId} SpeechGroup={speech.SpeechGroup} " +
+                    $"SpeechIndex={speech.SpeechIndex} has Text longer than {MaxNpcSpeechLength} characters.");
+
+        foreach (var option in menuOptions.OrderBy(static row => row.NpcId).ThenBy(static row => row.SlotIndex))
+            if (option.OptionId is < MinNpcMenuOption or > MaxNpcMenuOption)
+                throw new InvalidOperationException(
+                    $"world.NpcMenuOptions row NpcId={option.NpcId} SlotIndex={option.SlotIndex} has " +
+                    $"OptionId={option.OptionId} outside the legacy {MinNpcMenuOption}-{MaxNpcMenuOption} bound.");
+
+        foreach (var shopItem in shopItems.OrderBy(static row => row.NpcId).ThenBy(static row => row.ShopPage)
+                     .ThenBy(static row => row.SlotIndex))
+            if (shopItem.ItemId is { } itemId && itemId is < 0 or > MaxNpcShopItemId)
+                throw new InvalidOperationException(
+                    $"world.NpcShopItems row NpcId={shopItem.NpcId} ShopPage={shopItem.ShopPage} " +
+                    $"SlotIndex={shopItem.SlotIndex} has ItemId={itemId} outside the legacy 0-{MaxNpcShopItemId} " +
+                    "bound.");
+
+        foreach (var offer in skillOffers.OrderBy(static row => row.NpcId).ThenBy(static row => row.NpcSkillOfferId))
+            if (offer.SkillId is { } skillId && skillId is < 0 or > MaxNpcSkillOfferId)
+                throw new InvalidOperationException(
+                    $"world.NpcSkillOffers row NpcId={offer.NpcId} NpcSkillOfferId={offer.NpcSkillOfferId} has " +
+                    $"SkillId={skillId} outside the legacy 0-{MaxNpcSkillOfferId} bound.");
+
+        foreach (var gamble in gambleCosts.OrderBy(static row => row.NpcId).ThenBy(static row => row.GambleTier)
+                     .ThenBy(static row => row.CostIndex))
+            if (gamble.Value is < 0 or > MaxNpcGambleCost)
+                throw new InvalidOperationException(
+                    $"world.NpcGambleCosts row NpcId={gamble.NpcId} GambleTier={gamble.GambleTier} " +
+                    $"CostIndex={gamble.CostIndex} has Value={gamble.Value} outside the legacy 0-{MaxNpcGambleCost} " +
+                    "bound.");
+    }
+
+    /// <summary>
+    ///     Coarse lowest-index self-test: after all reference tables are validated, confirms the canonical
+    ///     lowest-index element of the SKILL and NPC tables resolves, aborting boot if it does not. Mirrors legacy
+    ///     <c>MyGame::Init</c>'s "the first element of each table actually loaded" smoke test, distinct from the
+    ///     exhaustive per-row validation above.
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S07_MyGame01.cpp:1611-1636 -- probes skill index 1 (:1611-1618), NPC index 1
+    ///     (:1620-1627), and quest (type 0, step 1) (:1629-1636); each null lookup logs an error and returns boot
+    ///     failure.
+    ///     <para>
+    ///         Adapted to Fenrir's relational model, which diverges from legacy in two deliberate, pre-existing
+    ///         ways this self-test must respect rather than override:
+    ///         <list type="bullet">
+    ///             <item>
+    ///                 world.Npcs and world.Quests are allowed to be empty here (neither is a critical dataset in
+    ///                 <see cref="Build" />, and the test fixtures rely on that), unlike legacy where those tables
+    ///                 are always populated. So the SKILL probe is unconditional (world.Skills IS a critical,
+    ///                 must-be-non-empty dataset), while the NPC probe fires only when NPC rows are actually present
+    ///                 -- an NPC table that loaded rows must still contain its canonical first element.
+    ///             </item>
+    ///             <item>
+    ///                 The quest probe is deliberately NOT reproduced. Its legacy key is (type 0, step 1), but
+    ///                 Fenrir's world.Quests.Type is CHECK-constrained to 1-2 (CK_Quests_Type,
+    ///                 Database/Tables/world/Quests.sql) and can never be 0 -- legacy's quest-lookup "type" is a
+    ///                 different indexing concept from Fenrir's relational Type column, and this contract does not
+    ///                 establish the mapping. Reproducing it with a guessed mapping would risk aborting boot on
+    ///                 valid data, so it is left for a follow-up <c>legacy-behavior-translator</c> contract.
+    ///             </item>
+    ///         </list>
+    ///     </para>
+    /// </remarks>
+    private static void RunLowestIndexSelfTest(WorldDataRows rows)
+    {
+        if (!rows.Skills.Any(static skill => skill.SkillId == MinReferenceIndex))
+            throw new InvalidOperationException(
+                $"world.Skills lowest-index self-test failed: the canonical skill (SkillId {MinReferenceIndex}) " +
+                "did not resolve -- the skill reference table loaded but is missing its first element, so the " +
+                "GameServer must not begin serving (legacy MyGame::Init lowest-index probe).");
+
+        if (rows.Npcs.Count > 0 && !rows.Npcs.Any(static npc => npc.NpcId == MinReferenceIndex))
+            throw new InvalidOperationException(
+                $"world.Npcs lowest-index self-test failed: the table is non-empty but the canonical NPC " +
+                $"(NpcId {MinReferenceIndex}) did not resolve -- an NPC table that loaded rows must contain its " +
+                "first element, so the GameServer must not begin serving (legacy MyGame::Init lowest-index probe).");
+    }
+
     /// <summary>Zips world.ItemBonusSkills back under its parent item (world.usp_Item_GetAll RS0+RS1).</summary>
     public static FrozenDictionary<int, ItemDefinition> BuildItems(
         IReadOnlyList<ItemRowDto> items,
@@ -989,7 +1449,12 @@ public static class WorldDataCacheBuilder
                 TakeGroup(portalsByZone, zone.ZoneNumber),
                 TakeGroup(spawnPointsByZone, zone.ZoneNumber),
                 TakeGroup(npcSpawnsByZone, zone.ZoneNumber),
-                TakeGroup(spawnRegionsByZone, zone.ZoneNumber)));
+                // A1/Table B: world.MonsterSpawnRegions.ZoneNumber is populated from each on-disk *.WREGION.csv
+                // file's own canonical "Z0NN_" filename prefix (Tools/.../MonsterSpawnRegionReader.cs) -- one
+                // file per canonical mSameSummon group, not per physical zone. A physical-number lookup here
+                // silently starves every non-canonical zone in a group of its spawn regions.
+                TakeGroup(spawnRegionsByZone,
+                    ZoneCanonicalSpawnRegionMap.ResolveCanonicalSpawnZoneId(zone.ZoneNumber))));
 
         var stats = new WorldDataFilterStats(
             portalsWithoutDestination,

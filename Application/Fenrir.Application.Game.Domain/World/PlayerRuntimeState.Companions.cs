@@ -99,10 +99,12 @@ public partial class PlayerRuntimeState
     /// <summary>
     ///     aAnimalExpActivity[10] -- per-garage-slot accumulated mount experience/activity gating
     ///     CZ_ANIMAL_STATE_SEND Sort 6 (Convert Attribute)'s ==MAX_MOUNT_EXP (100000) requirement, reset to 0
-    ///     by a successful convert. Same "no acquisition/gain path yet" posture as <see cref="MountGarage" />:
-    ///     every slot stays 0 until a mount-experience-gain system lands, so Sort 6 stays
-    ///     reachable-but-never-completable by construction today, not by an explicit scope cut -- see
-    ///     <see cref="MountStateResolver" />'s own remarks.
+    ///     by a successful convert. B16: now actually gains on an inter-tribe kill while the garage slot's own
+    ///     <see cref="MountActivity" /> half is above 0 (fed only by a mount-activity potion) -- see
+    ///     <c>World.Zone.ApplyPvpKillMountExperience</c>. A slot that has never been fed still stays at 0
+    ///     forever, and Sort 6 stays reachable-but-never-completable for it, but this is no longer true of every
+    ///     slot unconditionally the moment acquisition/feed paths exist. See <see cref="MountStateResolver" />'s
+    ///     own remarks.
     /// </summary>
     public ImmutableArray<int> MountAccumulatedExp { get; set; } = ImmutableArray.Create(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
@@ -144,6 +146,20 @@ public partial class PlayerRuntimeState
 
     /// <summary>aCostumeState -- CZ_COSTUME_STATE2_SEND visibility toggle (0/1).</summary>
     public int CostumeState { get; set; }
+
+    /// <summary>
+    ///     aCostumeDate[10] -- the packed enchant-slot word backing each owned costume-wardrobe slot
+    ///     (index-aligned with <see cref="CostumeWardrobe" />); only the low byte of the slot selected by
+    ///     <see cref="CostumeIndex" /> is ever load-bearing (<see cref="Stats.StatCalculator.DecodeCostumeEnchantCs" />,
+    ///     function.h:2141-2163). Same "no acquisition path yet" posture as <see cref="CostumeWardrobe" />: the
+    ///     legacy equip flow that copies a source item's packed value verbatim into this array
+    ///     (Server/ts25zone/S04_MyWork03.cpp:2519-2520) is not modeled yet, so every slot stays 0 until that
+    ///     lands -- workstream B6 wires <c>Inventory.EquipmentService.AssembleStatContexts</c> to decode this
+    ///     array unconditionally, so a real value the moment an equip/enchant path populates a slot flows
+    ///     straight into <see cref="Stats.Context.CosmeticContext.CostumeEnchantCs" /> with no further plumbing
+    ///     required.
+    /// </summary>
+    public ImmutableArray<int> CostumeDate { get; set; } = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
     /// <summary>
     ///     aAction.aPetSort -- last accepted CZ_UPDATE_PET_ACTION_SEND's pet sub-fields. The legacy handler has

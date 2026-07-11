@@ -21,6 +21,13 @@ public static class MonsterCombatResolver
     private const int OwnerNameLockExemptMonsterId = 9002;
 
     /// <summary>
+    ///     Catapult flat attack-power bonus (<c>Server/ts25zone/S07_MyGame02.cpp:3273-3287</c>, live under
+    ///     <c>__REBIRTH__</c>): a monster of one of the four "catapult" special-types adds this to its own attack
+    ///     power BEFORE the defender's defense is subtracted, in the monster-attacks-avatar damage path.
+    /// </summary>
+    public const int CatapultAttackPowerBonus = 15000;
+
+    /// <summary>
     ///     <c>GetMinuteFromTick(1.0f)</c> (<c>Server/ts25zone/S07_MyGame02.cpp:1893</c>) -- the elapsed-time gate
     ///     for <see cref="OwnerNameLockExemptMonsterId" />'s owner-name-lock exemption, measured against
     ///     <see cref="World.Monsters.MonsterEntity.OwnerNameLockExemptionArmedAt" />.
@@ -28,11 +35,11 @@ public static class MonsterCombatResolver
     public static readonly TimeSpan OwnerNameLockExemptionCooldown = TimeSpan.FromMinutes(1);
 
     /// <summary>
-    ///     Catapult flat attack-power bonus (<c>Server/ts25zone/S07_MyGame02.cpp:3273-3287</c>, live under
-    ///     <c>__REBIRTH__</c>): a monster of one of the four "catapult" special-types adds this to its own attack
-    ///     power BEFORE the defender's defense is subtracted, in the monster-attacks-avatar damage path.
+    ///     B15 (wave15 contract, Preconditions/Side effects §2b) -- the attacking avatar's own level must
+    ///     STRICTLY exceed this for the PvM tribe-symbol malus to apply at all; a level of exactly 112 or below
+    ///     never carries the malus regardless of the attacking tribe's own cached penalty.
     /// </summary>
-    public const int CatapultAttackPowerBonus = 15000;
+    public const short MalusMinimumAttackerLevel = 112;
 
     /// <param name="request">
     ///     <c>AttackActionValue1</c> (attack-mode selector, 1=melee/2=skill -- any other value is an
@@ -57,6 +64,20 @@ public static class MonsterCombatResolver
     ///     <see cref="World.PlayerRuntimeState.ActionSkillGradeNum2" /> -- already the combined grade, not
     ///     summed here.
     /// </param>
+    /// <param name="attackerSymbolDamageDownPenalty">
+    ///     B15 (wave15 contract) -- the attacking tribe's current PvM tribe-symbol malus, from
+    ///     <see cref="World.ZoneWar.TribeSymbolCombatModifiers.GetDamageDownPenalty" /> (0 = not currently
+    ///     malused). Applied only when <paramref name="attacker" />'s own <see cref="CombatantSnapshot.Level" />
+    ///     (aLevel1, the same base-level field this resolver's owner-name-lock/newbie-protection-style gates
+    ///     already read directly -- the contract's own citation does not disambiguate base vs. combined level,
+    ///     so this reuses the one field this file's sibling gates already establish as the convention rather
+    ///     than inventing a second one) exceeds <see cref="MalusMinimumAttackerLevel" />, applied AFTER the
+    ///     elemental-damage term and BEFORE the view-damage capture, compounding on the already-modified damage
+    ///     (not the pre-bonus base) -- see this method's own body for the exact insertion point and
+    ///     <see cref="World.ZoneWar.TribeSymbolCombatModifiers" />'s own remarks for why the companion damage-UP
+    ///     bonus is NOT applied here (its per-increment magnitude is not recoverable from the contract).
+    ///     Defaults to 0 so every existing positional caller (tests) keeps compiling with no behavior change.
+    /// </param>
     public static AttackOutcome ResolvePvmAttack(
         CombatantSnapshot attacker,
         MonsterEntity monster,
@@ -65,7 +86,8 @@ public static class MonsterCombatResolver
         IRandomSource rng,
         bool attackerAttackBudgetEnforced,
         int attackerActionSkillNumber,
-        int attackerActionSkillGradePoints)
+        int attackerActionSkillGradePoints,
+        float attackerSymbolDamageDownPenalty = 0f)
     {
         if (attacker.IsDead)
             return AttackOutcome.Reject(AttackRejectReason.AttackerDead);
@@ -146,6 +168,17 @@ public static class MonsterCombatResolver
         if (attacker.Stats.ElementAttackPower > monster.Template.ElementDefensePower)
             elementDamage = attacker.Stats.ElementAttackPower - monster.Template.ElementDefensePower;
         damage += elementDamage;
+
+        // B15 (wave15 contract, Side effects §2b): PvM tribe-symbol malus -- a genuine percentage reduction
+        // that compounds AFTER the elemental term above (on the already-modified damage), gated on the
+        // attacker's own level strictly exceeding MalusMinimumAttackerLevel. Runs before the view-damage
+        // capture below, matching the contract's own ordering ("this is a genuine percentage reduction, and it
+        // compounds after the flat bonus... it does not apply to the pre-bonus base damage" -- the companion
+        // damage-UP bonus is not applied anywhere in this codebase yet, so there is currently nothing for this
+        // reduction to compound after besides the elemental term; see attackerSymbolDamageDownPenalty's own
+        // remarks for why).
+        if (attackerSymbolDamageDownPenalty > 0f && attacker.Level > MalusMinimumAttackerLevel)
+            damage -= (int)(damage * attackerSymbolDamageDownPenalty);
 
         // "View" damage (S07_MyGame02.cpp:2371) is captured BEFORE the life-cap clamp (:2372-2375); "real"
         // damage (:2376) is the clamped value -- same view-before-clamp / real-after-clamp split as PvP.

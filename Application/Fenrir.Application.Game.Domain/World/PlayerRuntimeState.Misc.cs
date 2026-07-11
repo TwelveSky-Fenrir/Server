@@ -69,12 +69,19 @@ public partial class PlayerRuntimeState
     public DateTime LastHaloEnchantAttemptUtc { get; set; } = DateTime.UtcNow;
 
     /// <summary>
-    ///     aBonusItemLevel -- which level-up milestone's bonus-item claim is pending. Session-scoped only; always 0 until
-    ///     a leveling-milestone system grants it.
+    ///     aBonusItemLevel -- which level-up milestone's bonus-item claim is pending. Armed by
+    ///     <c>Zone.ApplyCharacterExperienceGain</c>'s own level-milestone step
+    ///     (<c>Progression.LevelMilestoneBonus.ResolveHighestMilestoneCrossed</c>) the moment a level-up
+    ///     crosses one of <c>Progression.LevelMilestoneBonus.ArmableMilestoneLevels</c>, and cleared back
+    ///     to 0 by <c>TribeActionService.ClaimLevelBonusAsync</c> (tSort 8) once claimed. Session-scoped only --
+    ///     no <c>game.Characters</c> column backs this yet, so an armed-but-unclaimed milestone does not survive
+    ///     logout or a zone transfer today; full parity needs a persisted column plus
+    ///     <see cref="PlayerEnterData" /> hydration (see that record's own "must travel here or it
+    ///     resets" remarks for the pattern to follow).
     /// </summary>
     public int BonusItemLevel { get; set; }
 
-    /// <summary>aBonusItemValue -- companion flag to <see cref="BonusItemLevel" />, same open issue.</summary>
+    /// <summary>aBonusItemValue -- companion flag to <see cref="BonusItemLevel" />, same posture.</summary>
     public bool BonusItemValue { get; set; }
 
     /// <summary>

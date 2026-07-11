@@ -5,6 +5,7 @@ using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
+using Fenrir.Application.Game.Services.Progression;
 using Fenrir.Application.Game.Services.ZoneLifecycle;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
@@ -94,10 +95,13 @@ public class UseInventoryItemRebirthPillServiceTests
                 new(WorldDataTestRows.Item(RebirthPillItemIdC) with { Sort = SpecialUseSort }, [])
         }.ToFrozenDictionary();
 
+        var towerUpgrade = new TowerUpgradeService(new TowerWarState(), characters,
+            NullLogger<TowerUpgradeService>.Instance);
+
         return new UseInventoryItemService(characters, new FakeGuildRepository(), new FakeCashRepository(),
             new FakeOfflineShopRepository(), new FakeEventLogRepository(), new FakeProxyShopExpirationRelayQueue(),
             Options.Create(new GameServerOptions()), ZoneTestKit.EmptyWorldData(itemsById),
-            NullLogger<UseInventoryItemService>.Instance);
+            NullLogger<UseInventoryItemService>.Instance, towerUpgrade);
     }
 
     [Theory]

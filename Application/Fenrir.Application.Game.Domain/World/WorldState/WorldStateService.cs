@@ -34,6 +34,58 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
     /// </summary>
     private readonly int[] _pendingTribePointDeltas = new int[TribeCount];
 
+    /// <summary>
+    ///     B10 branch A (Formation ability) -- legacy <c>mWorldInfo-&gt;mTribeMasterCallAbility[tribe]</c>
+    ///     (Server/Header/Protocol/STRUCT.h:623), one code per tribe: 0 = inactive, 1-4 = an active ability
+    ///     (see <see cref="Combat.FormationCombatResolver" /> for what each code does to combat math).
+    ///     Declared by <see cref="SetTribeFormationAbility" /> (the "Tribe Work" sub-command-5 request's
+    ///     hub-side write, Server/ts25center/S04_MyWork02.cpp:921-925, reached only after the zone side has
+    ///     already run every eligibility gate -- Server/ts25zone/S04_MyWork02.cpp:11054-11093); cleared for
+    ///     every tribe, unconditionally, when the Tribe Symbol Battle world event ends
+    ///     (<see cref="EndTribeSymbolBattle" />, the same legacy dispatch site,
+    ///     Server/ts25center/S04_MyWork02.cpp:400-407).
+    ///     <para>
+    ///         Fenrir-local divergence from legacy, left open rather than silently assumed away: in legacy
+    ///         this value lives in the cluster's physically shared memory segment
+    ///         (Server/Header/H15_MyShare.h:3-5, Server/Header/S15_MyShare.cpp:101-109), so one hub write is
+    ///         instantaneously visible to every zone shard, the login process, and the "extra" process, with
+    ///         no propagation step and no per-process copy. This schema has no DB column backing this field
+    ///         (unlike every other field this class caches, it never participates in
+    ///         <see cref="_dirty" />/<see cref="FlushIfDirtyAsync" />/<see cref="ReconcileAsync" />), so this
+    ///         array is this ONE shard process's own local copy only -- a declaration made on one shard is
+    ///         NOT currently visible to a different shard's own <see cref="WorldStateService" /> instance.
+    ///         Closing that gap (a DB column plus flush/reconcile participation, or an equivalent cross-shard
+    ///         channel) is future work; see this task's own wiring-manifest notes rather than assuming it
+    ///         already converges cross-shard the way the rest of this class does.
+    ///     </para>
+    /// </summary>
+    private readonly byte[] _tribeFormationAbility = new byte[TribeCount];
+
+    /// <summary>
+    ///     B15 -- <c>mWorldInfo-&gt;mTribeSymbol[MAX_TRIBE_NUM]</c> (Server/Header/Protocol/STRUCT.h:595): the
+    ///     current OWNER tribe id (0-3) of each of the four tribe-home stone slots, one entry per slot -- richer
+    ///     than <see cref="TribeRvrState.HasSymbol" /> (a per-tribe boolean: "does THIS tribe still hold its OWN
+    ///     slot"), which can never answer "which tribe currently holds slot Y" once Y's own tribe has lost it.
+    ///     Added to unblock the PvM tribe-symbol damage-up bonus's cross-tribe-ownership input (see
+    ///     <see cref="ZoneWar.TribeSymbolDamageModifierSystem" />'s bonus half) -- the exact "no unbuilt
+    ///     world-state producer/accessor" gap <see cref="ZoneWar.TribeSymbolCombatModifiers" />'s own pre-existing
+    ///     GAP remarks flagged as blocking that computation.
+    ///     <para>
+    ///         Same Fenrir-local divergence as <see cref="_tribeFormationAbility" /> above (see its own remarks
+    ///         for the general pattern): no DB column backs this array (unlike <c>HasSymbol</c>/<c>SymbolDate</c>,
+    ///         which ARE persisted via <see cref="IWorldStateRepository.UpdateTribeSymbolStateAsync" />), so it
+    ///         never participates in <see cref="_dirty" />/<see cref="FlushIfDirtyAsync" />/
+    ///         <see cref="ReconcileAsync" /> -- this is this ONE shard process's own local, best-effort copy.
+    ///         Reset to "every tribe owns its own slot" at boot (<see cref="InitializeAsync" />) regardless of
+    ///         what the persisted <c>HasSymbol</c> boolean says at that moment, because the persisted boolean
+    ///         cannot recover WHICH tribe actually captured a lost slot -- a slot captured before this process's
+    ///         last boot is conservatively (and incorrectly, until the next live capture) treated as reclaimed by
+    ///         its own tribe. A real, accepted limitation on process restart mid-siege, not silently glossed
+    ///         over; corrected the moment the next live <see cref="ResolveTribeSymbol" /> call for that slot runs.
+    ///     </para>
+    /// </summary>
+    private readonly byte[] _tribeSymbolOwner = new byte[TribeCount];
+
     private readonly TribeRvrState[] _tribes = new TribeRvrState[TribeCount];
 
     private bool _dirty;
@@ -101,6 +153,11 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
                         new TribeRvrState(tribe.TribeId, tribe.SymbolDate, tribe.HasSymbol, tribe.Points,
                             tribe.IsClosed);
 
+            // See _tribeSymbolOwner's own remarks: every slot conservatively reclaimed by its own tribe at
+            // boot -- the persisted HasSymbol boolean cannot recover which tribe actually holds a lost slot.
+            for (byte i = 0; i < TribeCount; i++)
+                _tribeSymbolOwner[i] = i;
+
             foreach (var offer in allianceOffers)
                 _allianceOffers[(offer.FromTribeId, offer.ToTribeId)] =
                     new AllianceOfferState(offer.FromTribeId, offer.ToTribeId, offer.IsAccepted);
@@ -121,6 +178,39 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         lock (_lock)
         {
             return _tribes[tribeId];
+        }
+    }
+
+    /// <summary>
+    ///     B10 branch A: the current Formation ability code (0 = inactive, 1-4 -- see
+    ///     <see cref="Combat.FormationCombatResolver" />) held by <paramref name="tribeId" />'s tribe. Read
+    ///     live at attack-resolution time, never cached per-character -- see
+    ///     <see cref="Combat.CombatResolver" />'s own <c>attackerFormationCode</c>/<c>defenderFormationCode</c>
+    ///     parameter remarks for the intended call-site shape, and this field's own remarks for the current
+    ///     Fenrir-local (not yet cross-shard-converged) scope.
+    /// </summary>
+    public byte GetTribeFormationAbility(byte tribeId)
+    {
+        EnsureInitialized();
+        ValidateTribeId(tribeId);
+        lock (_lock)
+        {
+            return _tribeFormationAbility[tribeId];
+        }
+    }
+
+    /// <summary>
+    ///     B15 -- the current owner tribe id (0-3) of tribe <paramref name="slotTribeId" />'s own home-stone
+    ///     slot. See <see cref="_tribeSymbolOwner" />'s own remarks for why this is richer than, and tracked
+    ///     independently of, <see cref="TribeRvrState.HasSymbol" />.
+    /// </summary>
+    public byte GetTribeSymbolOwner(byte slotTribeId)
+    {
+        EnsureInitialized();
+        ValidateTribeId(slotTribeId);
+        lock (_lock)
+        {
+            return _tribeSymbolOwner[slotTribeId];
         }
     }
 
@@ -184,6 +274,9 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
     // ---- Mutations -- legacy ZCP_ZONE_BROADCAST_FOR_CENTER_SEND tSort 38/40/42/45/46 equivalents ----
     // (S04_MyWork02.cpp:357-472). Everything else the legacy switch touches (Zone049/051/175/241/etc,
     // TribeGuardState, GuildBattle...) has no column in this schema yet -- out of scope here.
+    // SetTribeFormationAbility below is the one exception sourced from a DIFFERENT hub-side sub-command
+    // dispatch value (302, S04_MyWork02.cpp:921-925) than the 38/40/42/45/46 family above -- grouped here
+    // because its own reset is tSort 45's own dispatch site, not because it shares 302's own numbering.
 
     /// <summary>tSort 38 (ZONE_038): records the deciding tribe and moment.</summary>
     public void SetZone038Winner(byte tribeId)
@@ -197,6 +290,31 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
+    /// <summary>
+    ///     B10 branch A, declaration path terminus -- the "Tribe Work" sub-command-5 request's hub-side
+    ///     write (Server/ts25center/S04_MyWork02.cpp:921-925): unconditionally overwrites
+    ///     <paramref name="tribeId" />'s own Formation ability slot with <paramref name="formationCode" />,
+    ///     always a full replace, never additive/stacking with whatever code that tribe previously held.
+    ///     Every gate on WHETHER a declaration is allowed at all (requester is the exact Tribe Master, all
+    ///     four tribes' points above the floor, requester's tribe is the strict single lowest, that lowest
+    ///     tribe's share is under twenty percent, Tribe Symbol Battle currently active) is the caller's own
+    ///     responsibility, resolved before this method is ever reached -- this method, like the legacy hub
+    ///     write site it models, performs no re-validation of <paramref name="formationCode" />'s own 0-4
+    ///     range either (an open question the source contract flags rather than resolves: no second,
+    ///     unvalidated caller was found in the legacy source, but its absence was not proven exhaustively).
+    ///     Does not bump <see cref="_dirty" />/<see cref="_scalarVersion" /> -- see
+    ///     <see cref="_tribeFormationAbility" />'s own remarks for why this field never participates in the
+    ///     DB flush/reconcile cycle the rest of this class's mutators do.
+    /// </summary>
+    public void SetTribeFormationAbility(byte tribeId, byte formationCode)
+    {
+        ValidateTribeId(tribeId);
+        lock (_lock)
+        {
+            _tribeFormationAbility[tribeId] = formationCode;
+        }
+    }
+
     /// <summary>tSort 40: opens the tribe-symbol battle window; every tribe starts back on its own symbol.</summary>
     public void StartTribeSymbolBattle()
     {
@@ -205,7 +323,11 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         {
             _world = _world with { TribeSymbolBattle = true };
             for (byte i = 0; i < TribeCount; i++)
+            {
                 _tribes[i] = _tribes[i] with { TribeId = i, HasSymbol = true, SymbolDate = now };
+                _tribeSymbolOwner[i] = i; // see _tribeSymbolOwner's own remarks -- kept in sync with HasSymbol
+            }
+
             _dirty = true;
             _scalarVersion++;
         }
@@ -213,12 +335,20 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         logger.LogInformation("WorldState: tribe symbol battle window opened at {SymbolBattleStarted:O}", now);
     }
 
-    /// <summary>tSort 45: closes the tribe-symbol battle window. Per-tribe symbol ownership is left as-is.</summary>
+    /// <summary>
+    ///     tSort 45: closes the tribe-symbol battle window. Per-tribe symbol ownership is left as-is, but
+    ///     every tribe's Formation ability slot (<see cref="_tribeFormationAbility" />) is unconditionally
+    ///     cleared back to inactive (0) here too -- the same legacy hub dispatch site
+    ///     (Server/ts25center/S04_MyWork02.cpp:400-407) performs both resets as one atomic step, including
+    ///     for a tribe that never activated a Formation ability in the first place (B10 contract Reset-path
+    ///     step 2: the reset is unconditional on prior state, not a no-op for an already-inactive tribe).
+    /// </summary>
     public void EndTribeSymbolBattle()
     {
         lock (_lock)
         {
             _world = _world with { TribeSymbolBattle = false };
+            Array.Clear(_tribeFormationAbility);
             _dirty = true;
             _scalarVersion++;
         }
@@ -228,9 +358,12 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
 
     /// <summary>
     ///     tSort 42, tTribeSymbolIndex 0-3: tribe <paramref name="slotTribeId" />'s own symbol slot is contested.
-    ///     The schema only records ownership as a bool on the slot's own row (game.WorldStateTribes.HasSymbol),
-    ///     not the challenger's identity, so <paramref name="winnerTribeId" /> only decides whether the slot's
-    ///     own tribe keeps it (winner == slot) or loses it (winner != slot).
+    ///     The DURABLE (DB-backed) schema only records ownership as a bool on the slot's own row
+    ///     (game.WorldStateTribes.HasSymbol) -- <paramref name="winnerTribeId" /> decides whether the slot's own
+    ///     tribe keeps it (winner == slot) or loses it (winner != slot) for that column. The IN-MEMORY-ONLY
+    ///     <see cref="_tribeSymbolOwner" /> (B15) additionally preserves the challenger's own identity when the
+    ///     slot's own tribe loses it -- see that field's own remarks for why this one extra fact cannot be
+    ///     recovered from the durable boolean alone, and is therefore tracked separately rather than persisted.
     /// </summary>
     public void ResolveTribeSymbol(byte slotTribeId, byte winnerTribeId)
     {
@@ -245,6 +378,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
                 HasSymbol = winnerTribeId == slotTribeId,
                 SymbolDate = now
             };
+            _tribeSymbolOwner[slotTribeId] = winnerTribeId;
             _dirty = true;
             _scalarVersion++;
         }

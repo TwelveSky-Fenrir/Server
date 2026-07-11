@@ -58,7 +58,7 @@ public class GuildBuffDecayHostTests
         // query has no gBuffState condition -- a guild that topped up its reserve but never chose/activated a
         // buff type (BuffState=0) still decays every pass exactly like an already-active one.
         var repository = new FakeGuildRepository();
-        repository.Seed(Guild(1, 0, 60, DateTime.UtcNow.AddMinutes(-7).Ticks));
+        repository.Seed(Guild(1, 0, 60, DateTime.UtcNow.AddMinutes(53).AddSeconds(30).Ticks));
         var host = CreateHost(repository);
 
         await host.DecayOnceAsync(CancellationToken.None);
@@ -73,7 +73,7 @@ public class GuildBuffDecayHostTests
     public async Task DecayOnceAsync_ActiveWithReserveStillRemaining_PersistsTheDecrementedTime()
     {
         var repository = new FakeGuildRepository();
-        repository.Seed(Guild(1, 1, 60, DateTime.UtcNow.AddMinutes(-7).Ticks));
+        repository.Seed(Guild(1, 1, 60, DateTime.UtcNow.AddMinutes(53).AddSeconds(30).Ticks));
         var host = CreateHost(repository);
 
         await host.DecayOnceAsync(CancellationToken.None);
@@ -114,7 +114,7 @@ public class GuildBuffDecayHostTests
     public async Task DecayOnceAsync_ReserveStillPositive_NeverEnqueuesAnExpiryPush()
     {
         var repository = new FakeGuildRepository();
-        repository.Seed(Guild(1, 1, 60, DateTime.UtcNow.AddMinutes(-7).Ticks));
+        repository.Seed(Guild(1, 1, 60, DateTime.UtcNow.AddMinutes(53).AddSeconds(30).Ticks));
         var relay = new FakeGuildBuffExpiryRelayQueue();
         var host = CreateHost(repository, relay);
 

@@ -1,0 +1,73 @@
+using Fenrir.Application.Game.Domain.World.WorldState;
+using Fenrir.Application.Game.Domain.World.ZoneWar;
+using Fenrir.Application.Game.Tests.World.WorldState;
+using Microsoft.Extensions.Logging.Abstractions;
+
+namespace Fenrir.Application.Game.Tests.World.ZoneWar;
+
+/// <summary>
+///     Covers <see cref="WeakestTribeByPoints" /> (legacy <c>ReturnSmallTribe</c>,
+///     <c>Server/Header/function.h:3145-3165</c>): strictly-lowest tribe-point total, ties to the lowest index.
+/// </summary>
+public class WeakestTribeByPointsTests
+{
+    [Fact]
+    public void PicksStrictlyLowestPointTotal()
+    {
+        Assert.Equal(2, WeakestTribeByPoints.Resolve([500, 300, 100, 400]));
+    }
+
+    [Fact]
+    public void TieResolvesToLowestTribeIndex()
+    {
+        // Tribes 1 and 3 tie at the lowest total (10); the lower index (1) wins.
+        Assert.Equal(1, WeakestTribeByPoints.Resolve([50, 10, 50, 10]));
+    }
+
+    [Fact]
+    public void AllEqual_ReturnsTribeZero()
+    {
+        Assert.Equal(0, WeakestTribeByPoints.Resolve([0, 0, 0, 0]));
+    }
+
+    [Fact]
+    public void NegativeTotalsAreLowerThanZero()
+    {
+        Assert.Equal(3, WeakestTribeByPoints.Resolve([0, 0, 0, -1]));
+    }
+
+    [Fact]
+    public void WrongCount_Throws()
+    {
+        Assert.Throws<ArgumentException>(() => WeakestTribeByPoints.Resolve([1, 2, 3]));
+    }
+
+    [Fact]
+    public void Null_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() => WeakestTribeByPoints.Resolve((IReadOnlyList<int>)null!));
+    }
+
+    [Fact]
+    public void WorldStateOverload_ReadsCachedPointsInTribeIdOrder()
+    {
+        var worldState = new WorldStateService(new FakeWorldStateRepository(), NullLogger<WorldStateService>.Instance);
+        worldState.InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
+
+        worldState.SetTribePoints(0, 900);
+        worldState.SetTribePoints(1, 250);
+        worldState.SetTribePoints(2, 700);
+        worldState.SetTribePoints(3, 700);
+
+        Assert.Equal(1, WeakestTribeByPoints.Resolve(worldState));
+    }
+
+    [Fact]
+    public void WorldStateOverload_FreshBoot_AllZero_ReturnsTribeZero()
+    {
+        var worldState = new WorldStateService(new FakeWorldStateRepository(), NullLogger<WorldStateService>.Instance);
+        worldState.InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
+
+        Assert.Equal(0, WeakestTribeByPoints.Resolve(worldState));
+    }
+}

@@ -1,9 +1,9 @@
-using Fenrir.Network.Serialization.Wire;
 using Fenrir.Application.Login.Domain;
 using Fenrir.Data.Abstractions.Security;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.FloodProtection;
 using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Serialization.Wire;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -55,6 +55,17 @@ public static class HostingServiceCollectionExtensions
                 registry,
                 logger: sp.GetRequiredService<ILogger<IpFloodGuard>>());
         });
+
+        // Legacy ts25firewall RemoveIPTick allowlist reconcile (~120s). The reconcile delegate is the DB half
+        // (workstream D3): IFirewallRuleRepository.ReconcileAllowlistAsync, a single atomic stored-procedure
+        // call -- see that method's own remarks for exactly which of legacy's three reconcile sub-steps this
+        // implements (prune stale allow rows) and which two are deliberately not reproduced (infra-IP reseed;
+        // per-account IP resync -- both need data Fenrir's schema doesn't have and this project's rules forbid
+        // guessing).
+        services.AddSingleton(sp => new FirewallAllowlistReconcileService(
+            sp.GetRequiredService<IFirewallRuleRepository>().ReconcileAllowlistAsync,
+            logger: sp.GetService<ILogger<FirewallAllowlistReconcileService>>()));
+        services.AddHostedService<FirewallAllowlistReconcileHost>();
 
         return services;
     }

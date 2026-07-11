@@ -59,6 +59,22 @@ internal static class WorldDataTestRows
             0, 0, 0, 0);
     }
 
+    /// <summary>
+    ///     A skill row whose every field sits at the smallest legacy-valid value, so it passes
+    ///     <c>WorldDataCacheBuilder.ValidateSkills</c> (backed by <c>Skill_CheckValidElement</c>,
+    ///     Server/Header/S15_MyShare.cpp:1277-1497). Unlike <see cref="Skill" /> (which zeroes non-essential fields
+    ///     for the many direct <c>SkillDefinition</c> consumers that never touch Build), this is the row shape used
+    ///     on the <c>Build</c> validation path -- Type/AttackType/DataNumber2D/TribeInfo1/TribeInfo2/LearnSkillPoint/
+    ///     MaxUpgradePoint are all rejected at 0. TotalHitNumber/ValidRadius stay 0 (their legacy ranges include 0).
+    /// </summary>
+    internal static SkillRowDto ValidSkill(int skillId)
+    {
+        return new SkillRowDto(
+            skillId, $"Skill{skillId}",
+            1, 1, 1, 1, 1,
+            1, 1, 0, 0);
+    }
+
     internal static SkillGradeRowDto SkillGrade(int skillId, byte gradeIndex)
     {
         return new SkillGradeRowDto(
@@ -74,6 +90,19 @@ internal static class WorldDataTestRows
     {
         return new NpcRowDto(npcId, $"Npc{npcId}", 1, 1,
             0, 0, 0, 0, 0);
+    }
+
+    /// <summary>
+    ///     An NPC row whose every field sits at the smallest legacy-valid value, so it passes
+    ///     <c>WorldDataCacheBuilder.ValidateNpcs</c> (backed by <c>Npc_CheckValidElement</c>,
+    ///     Server/Header/S15_MyShare.cpp:1836-1963). <see cref="Npc" /> zeroes DataSortNumber2D/3D and Size1-3 for
+    ///     the direct <c>NpcDefinition</c> consumers that never touch Build; those fields are rejected at 0 on the
+    ///     Build validation path, so this row sets them to 1.
+    /// </summary>
+    internal static NpcRowDto ValidNpc(int npcId)
+    {
+        return new NpcRowDto(npcId, $"Npc{npcId}", 1, 1,
+            1, 1, 1, 1, 1);
     }
 
     internal static QuestRowDto Quest(int questId)
@@ -127,7 +156,10 @@ internal static class WorldDataTestRows
         {
             Items = [Item(1)],
             ItemBonusSkills = [],
-            Skills = [Skill(1)],
+            // A legacy-valid skill (not the zero-field Skill(1)): MinimalRows flows through Build, which now runs
+            // ValidateSkills + the lowest-index self-test, both of which reject the zero-field row and require
+            // SkillId 1 to be present.
+            Skills = [ValidSkill(1)],
             SkillDescriptions = [],
             SkillGrades = [],
             Monsters = [Monster(1)],

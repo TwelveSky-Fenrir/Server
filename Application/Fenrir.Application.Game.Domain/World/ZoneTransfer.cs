@@ -166,7 +166,11 @@ public static class ZoneTransfer
             // reset to 0 on every in-process zone transfer -- see PlayerRuntimeState.Vault.cs's own remarks.
             StoreMoney: state.StoreMoney,
             InventoryDate: state.InventoryDate,
-            StoreDate: state.StoreDate);
+            StoreDate: state.StoreDate,
+            // Carries the live source-IP through the handoff too, or the PvP same-origin kill-credit guard
+            // would silently go blind (null vs null never proves same-origin) for every character past their
+            // first in-process zone transfer -- see PlayerRuntimeState.SourceIp's own remarks.
+            SourceIp: state.SourceIp);
     }
 }
 

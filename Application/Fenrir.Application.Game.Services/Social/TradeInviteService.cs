@@ -68,8 +68,8 @@ public sealed class TradeInviteService(
     ///     pre-check family) -- legacy checks the requester's OWN busy/pose state before it ever resolves
     ///     the target avatar by name, so a busy asker naming a nonexistent/offline target gets the busy
     ///     reply, not "target not found". <see cref="TradeRegistry.IsBusy" /> and
-    ///     <see cref="IsExcludedByCommunityWorkOrStunDeath" /> are therefore both checked ahead of the by-name
-    ///     target lookup below; the same <see cref="TradeRegistry.IsBusy" /> check inside
+    ///     <see cref="Fenrir.Application.Game.Domain.Social.CommunityWorkGate.IsBusy" /> are therefore both
+    ///     checked ahead of the by-name target lookup below; the same <see cref="TradeRegistry.IsBusy" /> check inside
     ///     <see cref="TradeRegistry.TryAsk" /> stays in place for the actual registration.
     ///     <para>
     ///         Trade-ask displayed-level combined-level extension: Server/ts25zone/S04_MyWork02.cpp:8456-8517
@@ -82,7 +82,8 @@ public sealed class TradeInviteService(
     public async ValueTask<TradeInviteResult> InviteAsync(Zone zone, PlayerRuntimeState asker,
         string targetAvatarName, CancellationToken cancellationToken)
     {
-        if (trades.IsBusy(asker.CharacterId) || IsExcludedByCommunityWorkOrStunDeath(asker))
+        if (CommunityWorkGate.IsBusy(asker, duels, trades, friends, parties, mentors, guildInvites) ||
+            asker.IsStunned || asker.IsDead)
         {
             logger.LogDebug("Trade invite rejected: character {AskerCharacterId} is busy", asker.CharacterId);
             return new TradeInviteResult(TradeInviteResultKind.AskerBusy);
@@ -108,7 +109,8 @@ public sealed class TradeInviteService(
             return new TradeInviteResult(TradeInviteResultKind.MustDisconnect);
         }
 
-        if (IsExcludedByCommunityWorkOrStunDeath(target))
+        if (CommunityWorkGate.IsBusy(target, duels, trades, friends, parties, mentors, guildInvites) ||
+            target.IsStunned || target.IsDead)
         {
             logger.LogDebug("Trade invite rejected: target character {TargetCharacterId} is busy",
                 target.CharacterId);
@@ -183,25 +185,5 @@ public sealed class TradeInviteService(
             "Trade invite published cross-shard: character {AskerCharacterId} ({AskerName}) -> character {TargetCharacterId} on shard {TargetShardId} (never delivered today -- see TradeInviteService's own remarks)",
             asker.CharacterId, asker.Name, remote.CharacterId, remote.ShardId);
         return new TradeInviteResult(TradeInviteResultKind.SentCrossShard);
-    }
-
-    /// <summary>
-    ///     <c>CheckCommunityWork()</c>'s six OTHER exclusivity flags (personal shop, duel, friend, party,
-    ///     guild, mentor/teacher negotiation -- this family's own trade-negotiation flag is checked
-    ///     separately, and atomically, by <see cref="TradeRegistry.IsBusy" />/<see cref="TradeRegistry.TryAsk" />),
-    ///     plus the independent stun/post-death action-state gate. Any one of these being true excludes
-    ///     <paramref name="player" /> from starting or receiving a trade ask, exactly as it does for every
-    ///     other ASK family in this codebase (mirrors <c>GuildInviteService.IsExcludedByCommunityWorkOrStunDeath</c>).
-    /// </summary>
-    private bool IsExcludedByCommunityWorkOrStunDeath(PlayerRuntimeState player)
-    {
-        return player.PshopOpen
-               || duels.IsNegotiating(player.CharacterId)
-               || friends.IsNegotiating(player.CharacterId)
-               || parties.IsNegotiating(player.CharacterId)
-               || mentors.IsNegotiating(player.CharacterId)
-               || guildInvites.IsNegotiating(player.CharacterId)
-               || player.IsStunned
-               || player.IsDead;
     }
 }

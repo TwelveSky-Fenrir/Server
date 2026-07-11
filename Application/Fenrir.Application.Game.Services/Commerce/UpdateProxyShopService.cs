@@ -18,13 +18,21 @@ namespace Fenrir.Application.Game.Services.Commerce;
 ///     UpdateProxyShop Outputs section; ServerDocs/12_ts25zone/15_MyGame08_09_EventsCenter_ProxyShops.md
 ///     §5.7 confirms <c>case 1</c> of <c>PROXY_SHOP_SYSTEM::Process</c>, Server/ts25zone/S07_MyGame09.cpp:557-884,
 ///     is where both sub-operations are dispatched). That success split is preserved below.
-///     The remaining eight legacy failure codes are NOT itemized by the behavior contract or by
-///     ServerDocs (both explicitly flag the retrieval mutation and the full result-code enumeration as "not
-///     observed / needs a follow-up finding" before implementing them faithfully) -- per this project's "no
-///     legacy parity from memory" rule, they are intentionally left collapsed to 1 (mismatch, unknown shop,
-///     or any other RetrieveItemAndReplaceContainerAsync failure) / 2 (insufficient funds, a cap, or any
-///     other ExecutePurchaseAsync failure) until a dedicated legacy-behavior-translator follow-up contract
-///     supplies the full ten-code enumeration and the exact SQL error each stored procedure throws per case.
+///     The C21-commerce-social.md contract (2026-07-10) refines the failure-side picture: of legacy's ten
+///     total outcomes, only 7 (not 8) are actually coded failure wire values -- two further conditions (an
+///     invalid requested action code, and a stale inventory page detected specifically on the "purchase"
+///     path) bypass the coded response entirely and hard-disconnect instead. The invalid-action-code case was
+///     already handled correctly (<see cref="Validate" />'s <c>BuySort</c> range check); the stale-purchase
+///     case is now handled the same way too, via <see cref="ProxyShopDeputyFailureClassifier" /> (C21a) in
+///     <see cref="PurchaseAsync" />'s catch clause. The remaining 7 legacy failure codes' exact
+///     numeric-value-to-condition mapping is STILL NOT itemized by the C21 contract or by ServerDocs (the
+///     contract's own Edge cases C explicitly preserves this as an open question rather than guessing) -- per
+///     this project's "no legacy parity from memory" rule, they remain intentionally left collapsed to 1
+///     (mismatch, unknown shop, or any other RetrieveItemAndReplaceContainerAsync failure minus the
+///     hard-disconnect case above) / 2 (insufficient funds, a cap, or any other ExecutePurchaseAsync failure
+///     minus the stale-listing hard-disconnect case above) until a dedicated legacy-behavior-translator
+///     follow-up contract supplies the full seven-code enumeration and the exact SQL error each stored
+///     procedure throws per case.
 /// </remarks>
 public sealed class UpdateProxyShopService(
     IOfflineShopRepository offlineShops,
@@ -189,6 +197,17 @@ public sealed class UpdateProxyShopService(
             await offlineShops.ExecutePurchaseAsync(sellerId.Value, slotIndex, packet.SellItemIndex, packet.Quantity,
                 packet.Value, packet.Price, characterId, (byte)packet.SelfPage, ToTvps(projectedContainer),
                 cancellationToken);
+        }
+        catch (Exception ex) when (ProxyShopDeputyFailureClassifier.IsStaleListingFailure(ex))
+        {
+            // C21 contract, Edge cases C: a stale inventory page detected specifically on the "purchase"
+            // path bypasses the coded response entirely and hard-disconnects -- unlike opcode 35's own
+            // Result=4 coded reply for the identical underlying SQL error (BuyShopItemService.
+            // ProxyListingStaleErrorNumber, same stored procedure).
+            logger.LogInformation(ex,
+                "Offline-shop purchase rejected: character {CharacterId} proxy listing changed since it was read (stale purchase) -- session will be disconnected",
+                characterId);
+            return null;
         }
         catch (Exception ex)
         {

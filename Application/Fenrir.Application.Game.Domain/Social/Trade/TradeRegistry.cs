@@ -90,6 +90,34 @@ public sealed class TradeRegistry
     }
 
     /// <summary>
+    ///     Read-only lookup for <see cref="Simulation.PendingSocialRequestAutoCancelSystem" />'s per-tick
+    ///     "counterpart still reachable" sweep (behavior contract C21§G). Unlike <see cref="TryCancel" />,
+    ///     does NOT consume/remove the entry -- the caller decides whether to actually cancel, via
+    ///     <see cref="TryCancel" /> when <paramref name="isAsker" /> is true, or <see cref="TryAnswer" /> with
+    ///     accepted=false when it is false.
+    /// </summary>
+    public bool TryPeekPending(int characterId, out int counterpartId, out bool isAsker)
+    {
+        lock (_lock)
+        {
+            if (_pendingByAsker.TryGetValue(characterId, out counterpartId))
+            {
+                isAsker = true;
+                return true;
+            }
+
+            if (_pendingByTarget.TryGetValue(characterId, out counterpartId))
+            {
+                isAsker = false;
+                return true;
+            }
+
+            isAsker = false;
+            return false;
+        }
+    }
+
+    /// <summary>
     ///     WS1.4 asker-side cross-shard invite registration (ASK-PUBLISH-ONLY -- see <see cref="_crossShard" />'s
     ///     own remarks). Same busy gate as <see cref="TryAsk" />.
     /// </summary>

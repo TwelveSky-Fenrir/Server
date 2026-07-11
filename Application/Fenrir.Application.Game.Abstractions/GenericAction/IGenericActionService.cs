@@ -44,8 +44,9 @@ public interface IGenericActionService
     public ValueTask<GenericActionResult> MoveContainerAsync(int sort, byte[] data, Zone zone, PlayerRuntimeState state,
         int characterId, CancellationToken cancellationToken);
 
+    /// <param name="accountId">The acting character's account, for the ground-pickup audit trail (C20 contract).</param>
     public ValueTask<GenericActionResult> PickupGroundItemAsync(byte[] data, Zone zone, PlayerRuntimeState state,
-        int characterId, CancellationToken cancellationToken);
+        int accountId, int characterId, CancellationToken cancellationToken);
 
     public ValueTask<GenericActionResult> PayTeleportTollAsync(byte[] data, int characterId,
         CancellationToken cancellationToken);

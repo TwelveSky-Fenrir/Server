@@ -55,8 +55,10 @@ internal sealed class MonsterZoneSpawnState
 ///         both summon their monsters outside <c>world.MonsterSpawnRegions</c> entirely, so neither is reachable
 ///         from this scheduler's own per-region pool. The dungeon <c>mNumber</c>-forced-to-20 instance-population
 ///         override (<c>Server/ts25zone/S10_MySummon.cpp:561-573</c>: dungeon zones requesting 5-19 copies of a
-///         monster with ID &lt; 500 get bumped to 20) is also not ported: it depends on a dungeon/instance flag
-///         this schema does not catalog on <c>world.Zones</c> yet. Since boss-sourced rows
+///         monster with ID &lt; 500 get bumped to 20) IS now ported as <see cref="DungeonSpawnDensityPolicy" />,
+///         wired here via <see cref="BuildState" />'s <c>isDungeonZone</c> parameter
+///         (<see cref="Zone.IsDungeonServerZone" />/<see cref="GameServerOptions.DungeonServerMapIds" />) --
+///         empty by default, so inert until an operator lists a map id there. Since boss-sourced rows
 ///         (<c>Z0NN_SUMMONBOSSMONSTER.WREGION</c>) still ride in this same per-region pool rather than a
 ///         separate boss table, the boss-file-specific load-time adjustments legacy applies before
 ///         <c>SummonBossMonster</c> ever runs -- silently dropping the last row of an odd-count boss file, and
@@ -94,13 +96,6 @@ public sealed class MonsterSpawnScheduler(
     : ISimulationSystem
 {
     /// <summary>
-    ///     The boss/event drop item-id data (<see cref="BossEventDropResolver" />'s DATA half). Defaults to the
-    ///     process-wide <see cref="BossDropCatalog.Default" /> when DI/tests don't supply one -- it is an immutable
-    ///     static asset, so a shared single instance across every zone is correct.
-    /// </summary>
-    private readonly BossDropCatalog _bossDropCatalog = bossDropCatalog ?? BossDropCatalog.Default;
-
-    /// <summary>
     ///     Legacy's <c>END_NORMAL_MONSTER_OBJECT_NUM</c> (<c>Server/ts25zone/S01_MainApplication.cpp:38-57</c>,
     ///     per <c>ServerDocs/12_ts25zone/21_MyWorld_MySummon_Navmesh_Spawn.md</c> &#167;3.3): the running total of
     ///     every <c>world.MonsterSpawnRegions</c> row's slot count that <c>LoadRegionInfo_1</c> checks against
@@ -108,9 +103,12 @@ public sealed class MonsterSpawnScheduler(
     ///     truncating it the moment the total crosses this ceiling (<c>Server/ts25zone/S10_MySummon.cpp:575-580</c>).
     ///     Legacy additionally resizes this ceiling per physical server number at boot -- doubled for the five
     ///     "_FIX" dungeon variants (39/144/145/313/74), collapsed to 1000 for instance-zone shards (241-330), to
-    ///     1 for FFA maps (<c>Server/ts25zone/S02_MyServer.cpp:140-227</c>) -- which Fenrir does not model (no
-    ///     equivalent per-shard object-pool resizing concept exists here), so this is always the un-resized base
-    ///     default. Applied to a zone's whole combined spawn-region pool rather than a "regular-monster-only"
+    ///     1 for FFA maps (<c>Server/ts25zone/S02_MyServer.cpp:140-227</c>). The dungeon-variant doubling half of
+    ///     that resizing IS now modeled, via <see cref="DungeonSpawnDensityPolicy.ResolveTableCapacity" />
+    ///     (<see cref="BuildState" />'s <c>isDungeonZone</c> parameter) -- this constant remains the un-doubled
+    ///     base value passed into that resolver. The instance-zone/FFA collapses are still not modeled (no
+    ///     equivalent per-shard object-pool resizing concept exists here for those two cases). Applied to a
+    ///     zone's whole combined spawn-region pool rather than a "regular-monster-only"
     ///     subset, because <see cref="BuildState" /> -- like the rest of this scheduler, see its own class
     ///     remarks -- does not separate boss-sourced rows (<c>Z0NN_SUMMONBOSSMONSTER.WREGION</c>) into a
     ///     distinct table the way legacy's <c>LoadRegionInfo_2</c> does; every live zone's seeded row total sits
@@ -118,6 +116,13 @@ public sealed class MonsterSpawnScheduler(
     ///     as legacy's own experience of the check.
     /// </summary>
     private const int RegularMonsterTableCapacity = 3400;
+
+    /// <summary>
+    ///     The boss/event drop item-id data (<see cref="BossEventDropResolver" />'s DATA half). Defaults to the
+    ///     process-wide <see cref="BossDropCatalog.Default" /> when DI/tests don't supply one -- it is an immutable
+    ///     static asset, so a shared single instance across every zone is correct.
+    /// </summary>
+    private readonly BossDropCatalog _bossDropCatalog = bossDropCatalog ?? BossDropCatalog.Default;
 
     /// <summary>
     ///     A fresh <see cref="System.Random" /> per zone -- never shared across zones, since different zones
@@ -141,7 +146,7 @@ public sealed class MonsterSpawnScheduler(
 
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
-        var state = _stateByZone.GetOrAdd(zone.MapId, _ => BuildState(zone.MapId));
+        var state = _stateByZone.GetOrAdd(zone.MapId, _ => BuildState(zone.MapId, zone.IsDungeonServerZone));
 
         if (!state.InitialPopDone)
         {
@@ -175,13 +180,13 @@ public sealed class MonsterSpawnScheduler(
         return _stateByZone.TryGetValue(mapId, out var state) ? state.Slots.Count : 0;
     }
 
-    private MonsterZoneSpawnState BuildState(short mapId)
+    private MonsterZoneSpawnState BuildState(short mapId, bool isDungeonZone)
     {
         var regions = worldData.ZonesByNumber.TryGetValue(mapId, out var zoneDef)
             ? zoneDef.MonsterSpawnRegions
             : [];
 
-        var resolved = new List<(MonsterSpawnRegionRowDto Region, MonsterRowDto Monster)>();
+        var resolved = new List<(MonsterSpawnRegionRowDto Region, MonsterRowDto Monster, int SpawnCount)>();
         var totalRequested = 0;
         foreach (var region in regions)
         {
@@ -189,8 +194,10 @@ public sealed class MonsterSpawnScheduler(
                 !worldData.MonstersById.TryGetValue(monsterId, out var monsterDefinition))
                 continue; // the cache is already filtered of these (WorldDataFilterStats) -- defensive only
 
-            resolved.Add((region, monsterDefinition.Monster));
-            totalRequested += Math.Max(0, region.Number);
+            var spawnCount = DungeonSpawnDensityPolicy.ResolveConfiguredSpawnCount(isDungeonZone,
+                Math.Max(0, region.Number), monsterDefinition.Monster.MonsterId);
+            resolved.Add((region, monsterDefinition.Monster, spawnCount));
+            totalRequested += spawnCount;
         }
 
         var slots = new List<MonsterSpawnSlot>();
@@ -198,11 +205,12 @@ public sealed class MonsterSpawnScheduler(
         var now = DateTime.UtcNow;
 
         // RegularMonsterTableCapacity overflow discards the whole zone's table rather than truncating it --
-        // see that constant's own remarks.
-        if (totalRequested <= RegularMonsterTableCapacity)
-            foreach (var (region, monster) in resolved)
+        // see that constant's own remarks. Doubled when this shard is dungeon-flagged, matching legacy's own
+        // per-process object-pool resizing (DungeonSpawnDensityPolicy.ResolveTableCapacity).
+        var capacity = DungeonSpawnDensityPolicy.ResolveTableCapacity(isDungeonZone, RegularMonsterTableCapacity);
+        if (totalRequested <= capacity)
+            foreach (var (region, monster, slotCount) in resolved)
             {
-                var slotCount = Math.Max(0, region.Number);
                 for (var i = 0; i < slotCount; i++)
                 {
                     var slot = new MonsterSpawnSlot
@@ -354,6 +362,15 @@ public sealed class MonsterSpawnScheduler(
         if (killer is null)
             return; // no resolvable killer -- nothing to roll
 
+        // C16: popup-event kill-streak counter, using the SAME drop-eligibility flag the generic loot pipeline
+        // below already computes (tCheckPossibleDrop's normal branch -- killer not more than 9 levels above the
+        // monster, with the martial-item/boss exemption) rather than a second, independently-derived gate --
+        // see MonsterDropRoller.IsEligible and Zone.NotifyPopupEventMonsterKill's own remarks. Hoisted here,
+        // ahead of that pipeline's own SkipGenericTiers branch below, so the popup counter still advances even
+        // on a kill (identifiers 287/564-568/1407/etc.) that skips the generic tiers entirely.
+        var dropEligible = MonsterDropRoller.IsEligible(monsterDefinition.Monster, killer.Level);
+        zone.NotifyPopupEventMonsterKill(killer, dropEligible);
+
         // Valley of the Deceased (Zone 200/297/298/299) kill-race quota decrement -- no-op on every other map
         // (ValleyWarKillRegistry.RegisterMonsterKill gates on ValleyWarMapCatalog itself) and no-op outside that
         // schedule's own KillRace phase. Réf. C++ : Server/ts25zone/S07_MyGame02.cpp:3162-3170.
@@ -414,14 +431,16 @@ public sealed class MonsterSpawnScheduler(
             // Tail-span tiers (MonsterDropTailResolver, Server/ts25zone/S07_MyGame05.cpp:3391-3427 "CP Gift
             // Card", :3515-3582 "LOD Rebirth Item"): sit after MonsterDropRoller's own documented :2999
             // boundary, still gated by the same early-return (SkipGenericTiers, this branch) that guards
-            // every other generic tier above.
-            var generalDropEligible = MonsterDropRoller.IsEligible(monsterDefinition.Monster, killer.Level);
-            var cpGiftItems = MonsterDropTailResolver.ResolveCpGiftCard(generalDropEligible,
+            // every other generic tier above. Reuses the SAME dropEligible flag computed above (for the C16
+            // popup-event trigger) rather than a second call to MonsterDropRoller.IsEligible.
+            var cpGiftItems = MonsterDropTailResolver.ResolveCpGiftCard(dropEligible,
                 monster.Template.MonsterId, zone.IsZone241TypeZone, killer.Level2,
-                // mCheckZone126TypeServer's legacy-server-number-to-Fenrir-shard mapping is still an open
-                // question (see MonsterDropTailResolver's own remarks) -- hardcoded false pending that work,
-                // not a claim that no live shard is ever "Zone126-type".
-                false, state.Random);
+                // mCheckZone126TypeServer's CP-gift 50-vs-25 base-rate knob, now resolved from this shard's own
+                // config-driven Zone126-type classification (Zone.ZoneTypeClassification.cs -- the Fenrir
+                // translation of the legacy boot-time server-number gate, Server/ts25zone/S07_MyGame05.cpp:3402).
+                // NOTE: the sibling zone.IsZone039TypeZone flag is deliberately NOT passed here -- Zone039-type
+                // gates a separate, unported mount/pet event tier (:3197-3204), not this rate.
+                zone.IsZone126TypeZone, state.Random);
             var rebirthItems = MonsterDropTailResolver.ResolveRebirthItem(monster.Template.MonsterId, state.Random);
 
             genericItems = cpGiftItems.Count == 0 && rebirthItems.Count == 0
@@ -437,6 +456,16 @@ public sealed class MonsterSpawnScheduler(
             // its own currency grant -- the one line that would have (S07_MyGame05.cpp:2689) is commented
             // out. See Zone.TribeBankTax.cs's own remarks for the full citation set and the still-live 1%
             // NPC-service tax this does not affect.
+            //
+            // C14 reconciliation: the C14 contract's money->world reshape (the 15% ground reduction + the 9%
+            // tribe-bank deposit + the tower-silver add-back) IS now ported -- as the pure, reusable
+            // InventoryToWorldDropPolicy.ReshapeGroundDrop money branch (which returns TribeBankDepositAmount
+            // for a Zone.CreditMonsterKillTribeTax caller). It is NOT fired here because the monster-kill money
+            // GRANT (a direct award to the killer, not a money->world ground drop) never enters ProcessForDropItem
+            // in the live LNW33 build per :2689 above -- so crediting from here would manufacture tribe-bank
+            // income production never generates AND break MonsterSpawnSchedulerTribeBankTaxTests. If
+            // cpp-zone-gameplay-analyst confirms :2689 is in fact live for monster kills, the wiring is a one-line
+            // Zone.CreditMonsterKillTribeTax(killer.Tribe, reshape.TribeBankDepositAmount) plus deleting that test.
             zone.QueueMoneyGrant(killer.CharacterId, amount);
 
         foreach (var publicItem in bossOutcome.PublicItems)
@@ -450,6 +479,15 @@ public sealed class MonsterSpawnScheduler(
             return;
 
         var (partyName, dropSort) = ResolvePartyDrop(zone, killer, partyMemberIds);
+
+        // C14 reconciliation: the ELITE_NOTICE code-2000 "notable drop" relay IS now ported -- as the pure
+        // Inventory.EliteDropNoticeResolver (type codes 55/56/0/1/2, STRUCT.h:1306-1313). It is NOT fired for
+        // these monster->world drops because a monster->world drop never passes the notice's "show name" test in
+        // the live build: the elite-tier auto-announce block is commented out in the source
+        // (S07_MyGame03.cpp:650-717), and neither the pets-1002..1005 (treasure-chest-only) nor the pvp-forced
+        // branch applies to ordinary monster loot -- so EliteDropNoticeResolver.Resolve(MonsterToWorld, ...)
+        // returns null for every item here. The resolver is wired by the origins that DO announce (the
+        // treasure-chest open path and the pvp-death path), each owned by its own future handler.
         foreach (var item in bossOutcome.Items.Concat(genericItems))
             // Zone-241 "LOD" personal-dungeon loot tag (Server/ts25zone/S07_MyGame03.cpp:599): a dying
             // personal boss carries its own instance id (Zone.SummonPersonalBoss); every ordinary monster's

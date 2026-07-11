@@ -1,0 +1,38 @@
+using Fenrir.Application.Game.Domain.Inventory.UseItems.Boxes;
+
+namespace Fenrir.Application.Game.Tests.Inventory.UseItems.Boxes;
+
+/// <summary>
+///     Coverage for <see cref="NoticeForBoxResolver" />: the elite-typed gate for the 1035/1036/1037 boxes and
+///     the (currently empty, so never-broadcasting) reward whitelist that gates every box's actual notice.
+/// </summary>
+public class NoticeForBoxResolverTests
+{
+    [Fact]
+    public void OrdinaryBox_NeverBroadcasts_WhileTheRewardWhitelistIsEmpty()
+    {
+        var decision = NoticeForBoxResolver.Decide(601, 92286, rewardItemType: 4);
+
+        Assert.False(decision.ShouldBroadcast);
+        Assert.False(decision.WriteEliteGainAudit);
+    }
+
+    [Fact]
+    public void EliteOnlyBox_WithEliteTypedReward_FlagsGainAudit_ButStillDoesNotBroadcastWithoutWhitelist()
+    {
+        var decision = NoticeForBoxResolver.Decide(1035, 1500, rewardItemType: NoticeForBoxResolver.EliteItemTypeThreshold);
+
+        Assert.True(decision.WriteEliteGainAudit);
+        Assert.False(decision.ShouldBroadcast);
+    }
+
+    [Fact]
+    public void EliteOnlyBox_WithNonEliteReward_DoesNotFlagGainAudit()
+    {
+        var decision = NoticeForBoxResolver.Decide(1036, 1500,
+            rewardItemType: (byte)(NoticeForBoxResolver.EliteItemTypeThreshold - 1));
+
+        Assert.False(decision.WriteEliteGainAudit);
+        Assert.False(decision.ShouldBroadcast);
+    }
+}

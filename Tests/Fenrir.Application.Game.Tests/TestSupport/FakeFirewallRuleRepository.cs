@@ -13,4 +13,9 @@ internal sealed class FakeFirewallRuleRepository(bool blocked = false) : IFirewa
     {
         return ValueTask.CompletedTask;
     }
+
+    public ValueTask ReconcileAllowlistAsync(CancellationToken ct)
+    {
+        return ValueTask.CompletedTask;
+    }
 }

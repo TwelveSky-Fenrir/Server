@@ -30,8 +30,11 @@ public static class EnchantMaterialCatalog
             [1021] = new(1021, 3, 50000, false, false, TypeRequirement.None, null, false),
             [1022] = new(1022, 4, 70000, false, false, TypeRequirement.None, null, false),
             [1023] = new(1023, 5, 90000, false, false, TypeRequirement.None, null, false),
-            // Alternate id for the same +1 stone, at 1000x the money cost (verified, not a typo).
-            [8101] = new(8101, 1, 10000000, false, false, TypeRequirement.None, null, false),
+            // Alternate id for the same +1 stone, at 1000x the money cost (verified, not a typo). Unlike every
+            // other stone it is a "no-change" material: it forces the destroy chance to 0 and, on a failed
+            // success roll, leaves the enchant untouched (ZC result 8) rather than downgrading or destroying
+            // (Server/ts25zone/S04_MyWork02.cpp:3315-3318,3370-3378) -- hence NoChangeOnFailure: true.
+            [8101] = new(8101, 1, 10000000, false, false, TypeRequirement.None, null, false, true),
             // These 7 all force p1=100 -- the destroy roll is unreachable for any of them.
             [633] = new(633, 1, 0, false, true, TypeRequirement.None, null, false),
             [619] = new(619, 40, 0, true, true, TypeRequirement.RareOrElite, null, false),
@@ -57,6 +60,9 @@ public static class EnchantMaterialCatalog
     /// <summary>
     ///     <see cref="IsFillToValue" />: <see cref="Value" /> is a target absolute level, not a flat increment.
     ///     <see cref="IgnoresFortyCap" /> (material 825 only): the sole material allowed to jump straight past +40.
+    ///     <see cref="NoChangeOnFailure" /> (material 8101 only): destroy chance forced to 0 and a failed roll
+    ///     leaves the enchant untouched (ZC result 8) instead of downgrading/destroying. Defaults false, so the
+    ///     existing entries need no change.
     /// </summary>
     public readonly record struct StandardMaterial(
         int ItemId,
@@ -66,7 +72,8 @@ public static class EnchantMaterialCatalog
         bool ForcesGuaranteedSuccess,
         TypeRequirement RequiredType,
         int? MaxCurrentImproveExclusive,
-        bool IgnoresFortyCap);
+        bool IgnoresFortyCap,
+        bool NoChangeOnFailure = false);
 
     public readonly record struct AdvancedMaterial(int ItemId, int Value, int MoneyCost, bool ForcesGuaranteedSuccess);
 }

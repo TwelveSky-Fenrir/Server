@@ -259,37 +259,63 @@ public sealed partial class Zone
     ///     <c>ProcessAttack03</c>'s kill-credit dispatch on <c>mSpecialSortNumber</c>
     ///     (<c>S07_MyGame02.cpp:2794-2830</c>): the five hardcoded boss ids
     ///     (<see cref="IsKillingBlowOverrideMonster" />) always credit the killing blow
-    ///     (<paramref name="killingBlowAttackerId" />); every other monster -- the "ordinary" category, the
-    ///     vast majority, the default/fallthrough result of legacy's own <c>ReturnSpecialSortNumber</c>
-    ///     (<c>Server/ts25zone/S10_MySummon.cpp:612-647</c>) -- instead credits whichever tracked attacker dealt
-    ///     the single highest cumulative damage, via <see cref="SelectDamageBasedKillCredit" />. A null result
-    ///     (no eligible damage-history entry, or none tracked at all) leaves the kill fully unattributed --
-    ///     <see cref="Monsters.MonsterSpawnScheduler.ProcessDeath" /> already gates both the loot-drop and
-    ///     experience-grant calls on this being non-null, matching legacy's own <c>tSelectAvatarIndex == -1</c>
-    ///     gate (<c>S07_MyGame02.cpp:2830</c>, reused at <c>:3173-3176</c> for experience).
+    ///     (<paramref name="killingBlowAttackerId" />) regardless of <see cref="MonsterEntity.SpecialSort" />;
+    ///     otherwise only a <see cref="Monsters.MonsterSpecialSort.Standard" /> (class 1, "standard monster")
+    ///     kill credits anyone at all -- the single highest cumulative tracked damage, via
+    ///     <see cref="SelectDamageBasedKillCredit" />. A null result (class isn't Standard and no override
+    ///     applies, OR the class is Standard but no eligible damage-history entry exists) leaves the kill fully
+    ///     unattributed -- <see cref="Monsters.MonsterSpawnScheduler.ProcessDeath" /> already gates both the
+    ///     loot-drop and experience-grant calls on this being non-null, matching legacy's own
+    ///     <c>tSelectAvatarIndex == -1</c> gate (<c>S07_MyGame02.cpp:2830</c>, reused at <c>:3173-3176</c> for
+    ///     experience).
     /// </summary>
     /// <remarks>
-    ///     Categories other than "ordinary" that legacy also accumulates this same damage table for (e.g.
-    ///     category 6, <c>S07_MyGame02.cpp:2459-2468</c>) have no matching case in legacy's own death-time
-    ///     dispatch either (<c>S07_MyGame02.cpp:2794-2799</c>) -- Fenrir does not model
-    ///     <c>mSpecialSortNumber</c> as its own field today, so every monster other than the five override ids
-    ///     is treated as "ordinary" here. This intentionally does not chase down every legacy category (an open
-    ///     question the source contract itself flags as unresolved, not something to guess at); it is exactly
-    ///     the fix this method exists for, and it does not disturb the two categories Fenrir already
-    ///     special-cases through entirely separate mechanisms that never consult this table -- the tribe-symbol
-    ///     "Holy Stone" per-faction accumulator (<see cref="Monsters.MonsterSpawnScheduler.ProcessDeath" />'s own
-    ///     tribe-symbol branch) and tower guardians (identified by their own reserved negative
-    ///     <see cref="MonsterEntity.ServerIndex" /> range, see <see cref="ApplyPvmAttack" />'s remarks).
+    ///     Behavior contract <c>A3-kill-credit-class</c>: legacy's own death-time recipient-decision switch
+    ///     (<c>S07_MyGame02.cpp:2794-2799</c>) has exactly one matching case -- class 1 -- and no default; every
+    ///     other reachable class (2, 3, 4, 5, 6, 10) falls through with no recipient computed here, independent
+    ///     of whether that class ever wrote entries into the shared 50-slot attacker table in the first place.
+    ///     <para>
+    ///         Class 6 ("car-thrower") is the one genuinely surprising case: legacy DOES register class-6
+    ///         attackers into the same shared table classes 1 does (<c>S07_MyGame02.cpp:2163-2169,2459-2468</c>),
+    ///         but the recipient-decision switch still has no case for it -- so a class-6 kill tracks damage
+    ///         data that is never read back for reward purposes. Fenrir does not attempt to replicate that
+    ///         write-side asymmetry (<see cref="TryDamageMonster" /> registers every class unconditionally,
+    ///         a harmless superset since this method already filters non-Standard classes out on the read
+    ///         side) -- only the class filter here, which is the one place the asymmetry is actually
+    ///         observable, is modeled.
+    ///     </para>
+    ///     <para>
+    ///         Classes 2 ("tribe/holy stone") and 10 (tower) are already special-cased through entirely
+    ///         separate mechanisms that never consult this table -- the tribe-symbol "Holy Stone" per-faction
+    ///         accumulator (<see cref="Monsters.MonsterSpawnScheduler.ProcessDeath" />'s own tribe-symbol
+    ///         branch) and tower guardians (identified by their own reserved negative
+    ///         <see cref="MonsterEntity.ServerIndex" /> range, see <see cref="ApplyPvmAttack" />'s remarks) --
+    ///         this class filter is a no-op harness for both, not their actual gate.
+    ///     </para>
     ///     <para>
     ///         The one extra tribe-state side effect the source contract notes as unique to override id 1407 is
     ///         deliberately not modeled: it needs a piece of round-scoped state no Fenrir equivalent has been
     ///         identified for yet.
+    ///     </para>
+    ///     <para>
+    ///         Open question (source contract, unrecoverable from <c>Server/</c>): whether the five override
+    ///         catalog ids actually carry class 1 in their template data (making the override redundant with
+    ///         the Standard-only rule below) or a different class (making it a genuine carve-out) cannot be
+    ///         determined -- the override is applied unconditionally either way, exactly matching legacy, so
+    ///         this ambiguity has no effect on the code here.
     ///     </para>
     /// </remarks>
     private int? SelectMonsterKillCredit(MonsterEntity monster, int? killingBlowAttackerId)
     {
         if (killingBlowAttackerId is { } blowAttacker && IsKillingBlowOverrideMonster(monster.Template.MonsterId))
             return blowAttacker;
+
+        // Behavior contract A3-kill-credit-class, side effect 1: only class 1 ("standard monster") ever
+        // resolves a recipient through the generic max-damage path. Every other reachable class (2, 3, 4, 5,
+        // 6, 10) has no matching case in legacy's own recipient-decision switch, so the kill-credit
+        // restriction is enforced right here, before ever touching the damage-history table.
+        if (monster.SpecialSort != MonsterSpecialSort.Standard)
+            return null;
 
         return SelectDamageBasedKillCredit(monster);
     }

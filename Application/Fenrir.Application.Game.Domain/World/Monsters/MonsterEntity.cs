@@ -8,9 +8,10 @@ namespace Fenrir.Application.Game.Domain.World.Monsters;
 ///     <see cref="PlayerRuntimeState" />. Mutated only by that zone's own tick (single-writer invariant).
 /// </summary>
 /// <remarks>
-///     <see cref="Life" /> is the one exception: <see cref="TakeDamage" /> is safe to call from any thread (a
-///     future combat handler's own session thread), touching only the interlocked <c>_life</c>/
-///     <c>_deathClaimed</c> fields, so it can never tear or corrupt the tick-owned fields.
+///     <see cref="Life" /> is the one exception: <see cref="TakeDamage" /> and <see cref="Heal" /> are both safe
+///     to call from any thread (a future combat handler's own session thread, or a tower's own zone tick for
+///     the A11 item-667 guardian heal), touching only the interlocked <c>_life</c>/<c>_deathClaimed</c> fields,
+///     so neither can ever tear or corrupt the tick-owned fields.
 ///     <see cref="RegisterAttackDamage" />/<see cref="RegisterAcquisition" />/<see cref="SnapshotAttackDamage" />
 ///     share that same any-thread-safe posture, guarded by their own <see cref="_attackDamageLock" /> instead
 ///     of an interlocked primitive since a whole entry (not a single scalar) is mutated per call.
@@ -166,7 +167,10 @@ public sealed class MonsterEntity
     /// </summary>
     public List<Vector2> PathWaypoints { get; } = [];
 
-    /// <summary>Index of the next unreached waypoint in <see cref="PathWaypoints" />; at or past <c>Count</c> means the route is exhausted.</summary>
+    /// <summary>
+    ///     Index of the next unreached waypoint in <see cref="PathWaypoints" />; at or past <c>Count</c> means the route
+    ///     is exhausted.
+    /// </summary>
     public int WaypointCursor { get; set; }
 
     /// <summary>Goal X the cached <see cref="PathWaypoints" /> route was computed for -- see <see cref="PathWaypoints" />.</summary>
@@ -174,13 +178,6 @@ public sealed class MonsterEntity
 
     /// <summary>Goal Z the cached <see cref="PathWaypoints" /> route was computed for -- see <see cref="PathWaypoints" />.</summary>
     public float PathGoalZ { get; set; }
-
-    /// <summary>Discards the cached navmesh route (e.g. when it can no longer be reached), forcing a fresh plan.</summary>
-    public void ClearPath()
-    {
-        PathWaypoints.Clear();
-        WaypointCursor = 0;
-    }
 
     /// <summary>
     ///     Legacy ticks accumulated since the last <c>SelectAvatarIndexForPossibleAttack</c> throttle-check
@@ -250,6 +247,13 @@ public sealed class MonsterEntity
 
     /// <summary>Current HP -- safe to read from any thread (<see cref="Volatile.Read(ref int)" />).</summary>
     public int Life => Volatile.Read(ref _life);
+
+    /// <summary>Discards the cached navmesh route (e.g. when it can no longer be reached), forcing a fresh plan.</summary>
+    public void ClearPath()
+    {
+        PathWaypoints.Clear();
+        WaypointCursor = 0;
+    }
 
     /// <summary>
     ///     Locks <paramref name="characterId" /> as the pursuit target and captures its wire identity and live
@@ -365,6 +369,32 @@ public sealed class MonsterEntity
     }
 
     /// <summary>
+    ///     Applies healing, clamped to never exceed <see cref="MaxLife" />. Thread-safe (see class remarks): the
+    ///     inverse of <see cref="TakeDamage" />, same CAS-loop posture, so it can be called concurrently with this
+    ///     monster's own zone tick. Sole consumer today is the A11 item-667 guardian-heal tick-side drain (see
+    ///     <see cref="Progression.TowerLifecycleSystem" />, <see cref="Progression.TowerWarState.TryConsumeGuardianHeal" />).
+    /// </summary>
+    /// <param name="amount">
+    ///     Negative/zero contributes no healing -- a malformed caller must never damage a monster through
+    ///     this path.
+    /// </param>
+    public void Heal(int amount)
+    {
+        if (amount <= 0)
+            return;
+
+        int oldLife, newLife;
+        do
+        {
+            oldLife = Volatile.Read(ref _life);
+            if (oldLife <= 0)
+                return; // already dead -- healing never resurrects, mirroring TakeDamage's own dead short-circuit
+
+            newLife = Math.Min(MaxLife, oldLife + amount);
+        } while (Interlocked.CompareExchange(ref _life, newLife, oldLife) != oldLife);
+    }
+
+    /// <summary>
     ///     Accrues one hit's damage onto <paramref name="attackerCharacterId" />'s own tracked entry (legacy
     ///     <c>SetAttackInfoWithAvatar</c>, <c>Server/ts25zone/S07_MyGame05.cpp:1675-1720</c>, called from the
     ///     real-damage call site at <c>Server/ts25zone/S07_MyGame02.cpp:2159-2169</c>), creating it at zero
@@ -474,6 +504,31 @@ public sealed class MonsterEntity
         lock (_attackDamageLock)
         {
             return _attackDamage.ToArray();
+        }
+    }
+
+    /// <summary>
+    ///     Write-back half of <see cref="MonsterAggroListPruner.Prune" /> (behavior contract A3-aggro-pruning,
+    ///     legacy AdjustValidAttackTarget, Server/ts25zone/S07_MyGame05.cpp:336-447): replaces the live
+    ///     attacker table with the pruned/compacted survivor set, in the order supplied. Prune itself is a pure
+    ///     computation over a SnapshotAttackDamage() read -- this is the only place that actually mutates
+    ///     _attackDamage on its behalf. Call only from this zone's own tick thread (same single-writer
+    ///     invariant as every other MonsterEntity mutation).
+    /// </summary>
+    internal void ReplaceAttackDamage(IReadOnlyList<MonsterAggroListPruner.Survivor> survivors)
+    {
+        lock (_attackDamageLock)
+        {
+            _attackDamage.Clear();
+            foreach (var survivor in survivors)
+            {
+                _attackDamage.Add(new MonsterAttackDamageEntry
+                {
+                    CharacterId = survivor.CharacterId,
+                    SessionToken = survivor.SessionToken,
+                    CumulativeDamage = survivor.CumulativeDamage
+                });
+            }
         }
     }
 }

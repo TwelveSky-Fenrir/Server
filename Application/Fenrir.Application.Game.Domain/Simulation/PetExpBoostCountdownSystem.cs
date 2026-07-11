@@ -26,16 +26,16 @@ namespace Fenrir.Application.Game.Domain.Simulation;
 ///         one.
 ///     </para>
 ///     <para>
-///         The "growth percentage still below 200%" gate is modeled here as
-///         <c>PetGrowth &lt; PetGrowthCaps.Values[^1]</c> -- the shared cap array's own highest entry
-///         (640,000,000), the one value this codebase already establishes as the designer-facing "200%
-///         growth" ceiling (see <c>CreateAvatarService.StarterPetGrowth</c>'s own citation) and the only
-///         growth cap any equipped pet item can ever reach (<see cref="PetExperienceCreditCalculator" />
-///         already clamps growth at each item's own, always-lower-or-equal, category cap, so no pet's growth
-///         can ever exceed this global maximum). The general <c>ReturnGrowPercent</c> formula itself is not
-///         reproduced here -- same "out of scope" posture <see cref="PetGrowthTierCalculator" />'s own
-///         remarks already document for that sibling routine; only the single 200% threshold this
-///         consumable's own behavior contract calls for is checked.
+///         B8-pet-growth-depth correction: the "growth percentage still below 200%" gate now delegates to
+///         <see cref="DoublePetExpTimerGate" />, which reproduces <c>PETSYSTEM::ReturnGrowPercent</c>'s real
+///         per-item-category formula (via <c>StatCalculator.PetGrowPercent</c>) instead of the earlier
+///         approximation this system used (<c>PetGrowth &gt;= PetGrowthCaps.Values[^1]</c>, the shared cap
+///         array's global maximum) -- that approximation could only ever freeze the timer for a pet whose
+///         own category cap equals the 640,000,000 global maximum, never for any lower-tier pet whose
+///         growth is clamped well below it by <see cref="PetExperienceCreditCalculator" />. This also fixes a
+///         second bug the approximation carried: an absent/unresolved pet slot now correctly keeps the timer
+///         draining (the gate's own "lookup miss, not an explicit no-pet branch" edge case) instead of
+///         freezing the countdown outright.
 ///     </para>
 /// </remarks>
 public sealed class PetExpBoostCountdownSystem : ISimulationSystem
@@ -58,15 +58,18 @@ public sealed class PetExpBoostCountdownSystem : ISimulationSystem
         if (state.PetExpX2Time < 1)
             return;
 
-        // The countdown only ever evaluates once an equipped pet item is found -- independent of the
-        // growth-percentage gate below (this consumable's own behavior contract, "no pet equipped" edge case).
-        if (!state.Inventory.GetContainer(ContainerMatrix.Equipment)
-                .TryGetValue(PetSlots.EquipmentSlot, out var petStack) || petStack.ItemId == 0)
-            return;
+        // A missing/unresolved pet slot is a lookup miss, not an explicit "no pet" branch -- ItemId 0 falls
+        // through DoublePetExpTimerGate's own table lookup the same way any other unrecognized id does, so
+        // the countdown keeps draining unimpeded rather than freezing (contract edge case).
+        var petItemId = state.Inventory.GetContainer(ContainerMatrix.Equipment)
+            .TryGetValue(PetSlots.EquipmentSlot, out var petStack)
+            ? petStack.ItemId
+            : 0;
 
-        // "Growth percentage still below 200%" -- see this type's own remarks for why PetGrowthCaps.Values[^1]
-        // is the faithful stand-in for the un-reproduced ReturnGrowPercent formula.
-        if (state.PetGrowth >= PetGrowthCaps.Values[^1])
+        // Frozen at (or above) the 200% ceiling: left completely untouched for this tick, matching the
+        // contract's own "drain normally below the ceiling, freeze completely at or above it" wording --
+        // NOT decremented by even one minute of the elapsed catch-up burst.
+        if (DoublePetExpTimerGate.IsAtFreezeThreshold(petItemId, state.PetGrowth))
             return;
 
         state.PetExpX2Time = Math.Max(0, state.PetExpX2Time - minutesElapsed);

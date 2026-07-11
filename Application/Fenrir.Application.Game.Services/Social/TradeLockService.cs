@@ -10,7 +10,7 @@ namespace Fenrir.Application.Game.Services.Social;
 
 public sealed class TradeLockService(
     TradeRegistry trades,
-    ICharacterRepository characters,
+    ITradeCommitRepository tradeCommits,
     ILogger<TradeLockService> logger) : ITradeLockService
 {
     public TradeLockAttempt TryLock(int characterId)
@@ -64,9 +64,21 @@ public sealed class TradeLockService(
         var moneyDeltaB = trade.SideA.Money - trade.SideB.Money;
         var bigMoneyDeltaB = trade.SideA.BigMoney - trade.SideB.BigMoney;
 
+        // C8-trade-finalize: commit through the anti-dupe/idempotent repository rather than the plain
+        // ICharacterRepository.ExecuteTradeAsync -- see ITradeCommitRepository's own doc for why (a retried
+        // usp_CharacterTradeCommit_ExecuteIdempotent call carrying the SAME token is a guaranteed no-op via
+        // game.TradeCommitLedger, closing a "transport hiccup after the DB actually committed" double-credit
+        // risk on this economy-sensitive path). The token is generated once per commit attempt: this call site
+        // never re-invokes CommitAsync for an already-committed trade (TryLock's MenuState>=2 guard rejects a
+        // second lock-in from either side once committed), so today this token's only value is defending
+        // against a lower-level ADO.NET/transport retry of this exact call -- not a higher-level application
+        // retry, which doesn't exist yet at this call site.
+        var tradeToken = TradeCommitToken.NewForCommit();
+
         try
         {
-            await characters.ExecuteTradeAsync(
+            await tradeCommits.ExecuteIdempotentAsync(
+                tradeToken,
                 trade.PlayerAId, ToTvps(planA.Page0), ToTvps(planA.Page1), moneyDeltaA, bigMoneyDeltaA,
                 trade.PlayerBId, ToTvps(planB.Page0), ToTvps(planB.Page1), moneyDeltaB, bigMoneyDeltaB,
                 cancellationToken,
@@ -76,7 +88,7 @@ public sealed class TradeLockService(
         catch (Exception ex)
         {
             logger.LogError(ex,
-                "Trade commit failed: character {PlayerAId}/{PlayerBId} ExecuteTradeAsync threw -- both sessions will be torn down",
+                "Trade commit failed: character {PlayerAId}/{PlayerBId} ExecuteIdempotentAsync threw -- both sessions will be torn down",
                 trade.PlayerAId, trade.PlayerBId);
             throw;
         }

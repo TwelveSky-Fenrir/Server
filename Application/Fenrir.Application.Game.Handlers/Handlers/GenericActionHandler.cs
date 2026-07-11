@@ -1,10 +1,12 @@
 using System.Buffers.Binary;
 using Fenrir.Application.Game.Abstractions.GenericAction;
 using Fenrir.Application.Game.Abstractions.Gm;
+using Fenrir.Application.Game.Abstractions.Hotkeys;
 using Fenrir.Application.Game.Abstractions.Inventory;
 using Fenrir.Application.Game.Abstractions.ItemModification;
 using Fenrir.Application.Game.Domain.Crafting;
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
@@ -20,7 +22,9 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 ///     inventory&lt;-&gt;equipment), ground pickup, manual drop-to-world, NPC teleport toll, skill learn/upgrade,
 ///     stat-point allocation, NPC shop buy/sell, rune-stone stat crafting, TimeExchange
 ///     (play-time-event-to-teacher-point/pet-experience conversion), the Store/coffre (menu index 2) and
-///     Save/vault (menu index 8, account-scoped bank) item/money transfer families, GM-BLOCK (tSort 519), the
+///     Save/vault (menu index 8, account-scoped bank) item/money transfer families, the hotkey-bind item
+///     family (tSort 211/253/214/216), the pet-bag family (tSort 254/255/256), the BigMoney ("1B")
+///     Store/Save transfer family (tSort 241/242/244/245), GM-BLOCK (tSort 519), the
 ///     Admin-tier spawn-item/MAX-stat-cheat/grant-pet-experience commands (tSort 505/523, 509, 700), the
 ///     Elevated-tier grant-experience-to-self/grant-money/zone-wide-FFA-start/summon-monster commands (tSort
 ///     503, 504, 333, 506), and the sixteen Basic-tier commands (HIDE/SHOW 501/502, self-teleport-to-coordinate
@@ -51,6 +55,12 @@ public sealed class GenericActionHandler(
     IGmFfaEventStartService gmFfaEventStartService,
     IGmSummonMonsterService gmSummonMonsterService,
     IGmBasicCommandService gmBasicCommandService,
+    IGmSetPvpPointService gmSetPvpPointService,
+    IGmCallPvpService gmCallPvpService,
+    IGmClearInventoryService gmClearInventoryService,
+    IHotkeyActionService hotkeyActionService,
+    IPetBagActionService petBagActionService,
+    IBigMoneyTransferService bigMoneyTransferService,
     ILogger<GenericActionHandler> logger)
     : IAsyncPacketHandler<GenericActionRequest>
 {
@@ -121,8 +131,11 @@ public sealed class GenericActionHandler(
                 logger.LogDebug(
                     "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
                     zoneSession.SessionId, characterId, sort, nameof(IGenericActionService.PickupGroundItemAsync));
-            var result = await genericActionService.PickupGroundItemAsync(packet.Data, zone, state, characterId,
-                cancellationToken);
+            // AccountId is guaranteed set alongside CharacterId (both written together by MarkTicketConsumed
+            // before InWorld is reachable) -- same non-null posture used by every other accountId-bearing
+            // branch in this handler.
+            var result = await genericActionService.PickupGroundItemAsync(packet.Data, zone, state,
+                zoneSession.AccountId!.Value, characterId, cancellationToken);
             Respond(session, zoneSession, sort, packet.Data, result);
             if (result.NotifyQuestProgress)
                 session.Send(new QuestProgressResponse { Sort = 7, Page = 0, Index = 0, XPost = 0, YPost = 0 });
@@ -365,6 +378,93 @@ public sealed class GenericActionHandler(
             return;
         }
 
+        // tSort 211/253/214/216 -- hotkey-bind item family (bind/withdraw/rearrange), generic DefaultPData
+        // envelope. See IHotkeyActionService's own remarks -- tSort 204/205 (skill/emoticon bind, unbind) are
+        // deliberately NOT dispatched here yet: they need a dedicated wire payload struct
+        // (Server/Header/Protocol/STRUCT.h:1248-1255/:1256-1260) that does not exist in this codebase yet
+        // (fenrir-wire-protocol-implementer's territory), even though BindSkillAsync/BindEmoticonAsync/
+        // UnbindAsync are already fully implemented and tested against raw decoded ints.
+        if (sort is 211 or 253 or 214 or 216)
+        {
+            if (!DefaultPData.TryRead(packet.Data, out var hotkeyMove))
+            {
+                logger.LogInformation(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} aborted, malformed DefaultPData payload",
+                    zoneSession.SessionId, characterId, sort);
+                zoneSession.Abort(DisconnectReason.Faulted);
+                return;
+            }
+
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to hotkey family",
+                    zoneSession.SessionId, characterId, sort);
+
+            var hotkeyResult = sort switch
+            {
+                211 or 253 => await hotkeyActionService.BindItemAsync(zone, state, characterId, hotkeyMove,
+                    cancellationToken),
+                214 => await hotkeyActionService.WithdrawItemAsync(zone, state, characterId, hotkeyMove,
+                    cancellationToken),
+                _ => await hotkeyActionService.RearrangeAsync(zone, state, characterId, hotkeyMove,
+                    cancellationToken)
+            };
+            Respond(session, zoneSession, sort, packet.Data, hotkeyResult);
+            return;
+        }
+
+        // tSort 254/255/256 -- pet-bag family. petBagUpperHalfEntitlementActive is hardcoded true (fail-open)
+        // pending a real aPetBagDate-equivalent field on PlayerRuntimeState -- see IPetBagActionService's own
+        // remarks and this pass's report for the open gap.
+        if (sort is 254 or 255 or 256)
+        {
+            if (!DefaultPData.TryRead(packet.Data, out var petBagMove))
+            {
+                logger.LogInformation(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} aborted, malformed DefaultPData payload",
+                    zoneSession.SessionId, characterId, sort);
+                zoneSession.Abort(DisconnectReason.Faulted);
+                return;
+            }
+
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to pet-bag family",
+                    zoneSession.SessionId, characterId, sort);
+
+            var secondInventoryPageActive = state.InventoryDate >= GameDate.Today();
+            var petBagResult = sort switch
+            {
+                254 => await petBagActionService.DepositAsync(zone, state, characterId, petBagMove, true,
+                    secondInventoryPageActive, cancellationToken),
+                255 => await petBagActionService.WithdrawAsync(zone, state, characterId, petBagMove, true,
+                    secondInventoryPageActive, cancellationToken),
+                _ => await petBagActionService.RearrangeAsync(zone, state, characterId, petBagMove, true,
+                    cancellationToken)
+            };
+            Respond(session, zoneSession, sort, packet.Data, petBagResult);
+            return;
+        }
+
+        // tSort 241/244 -- BigMoney ("1B") Inventory<->Store. tSort 242/245 -- BigMoney Inventory<->Save/vault.
+        // tSort 240/243 (Inventory<->Trade-offer BigMoney) and 246/247 (BigMoney<->ordinary-money conversion)
+        // are deliberately NOT dispatched here -- see IBigMoneyTransferService's own remarks for why.
+        if (sort is 241 or 244 or 242 or 245)
+        {
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to BigMoney family",
+                    zoneSession.SessionId, characterId, sort);
+
+            var bigMoneyResult = sort is 241 or 244
+                ? await bigMoneyTransferService.TransferStoreAsync(sort, packet.Data, characterId,
+                    cancellationToken)
+                : await bigMoneyTransferService.TransferSaveAsync(sort, packet.Data, zoneSession.AccountId!.Value,
+                    characterId, cancellationToken);
+            Respond(session, zoneSession, sort, packet.Data, bigMoneyResult);
+            return;
+        }
+
         // tSort 519 -- [GM]-BLOCK (Server/ts25zone/S04_MyWork04.cpp:1487-1515). Legacy has no dedicated wire
         // opcode for this command; it is multiplexed inside this same generic envelope like every other tSort
         // in this handler. IGmBlockAvatarService owns every send/abort on this path itself -- its own three
@@ -568,6 +668,78 @@ public sealed class GenericActionHandler(
                     "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
                     zoneSession.SessionId, characterId, sort, nameof(IGmBasicCommandService.HandleStatEditAsync));
             await gmBasicCommandService.HandleStatEditAsync(packet.Data, zoneSession, cancellationToken);
+            return;
+        }
+
+        // tSort 598 -- Basic-tier GM-SETPVPPOINT command (Server/ts25zone/S04_MyWork04.cpp:1755-1769). No
+        // dedicated legacy wire opcode; multiplexed inside this same generic envelope. Confirmed functional
+        // no-op once the duel-slot input validates -- IGmSetPvpPointService owns every send/abort itself, so
+        // this branch never calls Respond() itself.
+        if (sort == 598)
+        {
+            if (!GmSetPvpPointPayload.TryRead(packet.Data, out var gmSetPvpPointPayload))
+            {
+                logger.LogInformation(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} aborted, malformed GmSetPvpPointPayload payload",
+                    zoneSession.SessionId, characterId, sort);
+                zoneSession.Abort(DisconnectReason.Faulted);
+                return;
+            }
+
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort, nameof(IGmSetPvpPointService.HandleAsync));
+            await gmSetPvpPointService.HandleAsync(gmSetPvpPointPayload, packet.Data, zoneSession, cancellationToken);
+            return;
+        }
+
+        // tSort 599 -- Basic-tier GM-CALLPVP command (Server/ts25zone/S04_MyWork04.cpp:1770-1823). No dedicated
+        // legacy wire opcode; multiplexed inside this same generic envelope. IGmCallPvpService owns every
+        // send/abort itself. *** DO NOT ENABLE THIS BRANCH IN A LIVE/PRODUCTION BUILD until GmCallPvpService's
+        // own DuelSlot1Coordinate/DuelSlot2Coordinate placeholders (currently inert 0,0,0) are replaced with the
+        // real legacy coordinate triples -- see that type's own remarks and this pass's openQuestions. Wiring
+        // the branch itself is harmless (compiles, gate-checks correctly) but a live GM would relocate a target
+        // to (0,0,0) on whatever map they already occupy, not a real duel-arena location. ***
+        if (sort == 599)
+        {
+            if (!GmCallPvpPayload.TryRead(packet.Data, out var gmCallPvpPayload))
+            {
+                logger.LogInformation(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} aborted, malformed GmCallPvpPayload payload",
+                    zoneSession.SessionId, characterId, sort);
+                zoneSession.Abort(DisconnectReason.Faulted);
+                return;
+            }
+
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort, nameof(IGmCallPvpService.HandleAsync));
+            await gmCallPvpService.HandleAsync(gmCallPvpPayload, packet.Data, zoneSession, cancellationToken);
+            return;
+        }
+
+        // tSort 701 -- Basic-tier GM_CLEAR_INVENTORY command (Server/ts25zone/S04_MyWork04.cpp:2084-2111). No
+        // dedicated legacy wire opcode; multiplexed inside this same generic envelope. IGmClearInventoryService
+        // owns every send/abort itself.
+        if (sort == 701)
+        {
+            if (!GmClearInventoryPayload.TryRead(packet.Data, out var gmClearInventoryPayload))
+            {
+                logger.LogInformation(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} aborted, malformed GmClearInventoryPayload payload",
+                    zoneSession.SessionId, characterId, sort);
+                zoneSession.Abort(DisconnectReason.Faulted);
+                return;
+            }
+
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort, nameof(IGmClearInventoryService.HandleAsync));
+            await gmClearInventoryService.HandleAsync(gmClearInventoryPayload, packet.Data, zoneSession, state, zone,
+                cancellationToken);
             return;
         }
 

@@ -59,19 +59,73 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
     public const int TowerCount = 12;
 
     /// <summary>
+    ///     A11 -- the maximum number of towers of a single kind that may exist cluster-wide (across all 12 slots,
+    ///     states 1-8); an item-665 construct is refused as a soft inventory-use failure once this many of the
+    ///     requested kind already exist (S04_MyWork03.cpp:7340-7355, contract edge case "more than 3 already
+    ///     exist"). The exact comparison boundary (&gt;3 vs &gt;=3) was summarized from the un-opened count loop --
+    ///     flagged for cpp-zone-gameplay-analyst re-check; implemented here as "refuse once the existing count of
+    ///     the kind exceeds this value".
+    /// </summary>
+    public const int MaxTowersPerKind = 3;
+
+    /// <summary>
     ///     Legacy <c>destroyCoolDown</c> = 5.0f minutes (<c>GetGameTickMinute(5f)</c> = 600 legacy ticks @ 500 ms
     ///     = 300 s), the wait in legacy state 90 between the guardian dying and the tower fully reverting to 0
     ///     (S07_MyGame01.cpp:13662,13768).
     /// </summary>
     public static readonly TimeSpan SiegeCollapseCooldown = TimeSpan.FromMinutes(5);
 
+    /// <summary>
+    ///     A11 -- legacy <c>createCoolDown</c> = 5.0f minutes: the post-create wait in legacy state 1 between a
+    ///     freshly-summoned level-1 guardian and the tower becoming a live, attackable "created level-1" tower
+    ///     (state 2). Same 5-minute magnitude as <see cref="SiegeCollapseCooldown" /> but a distinct lifecycle
+    ///     phase (S07_MyGame01.cpp:13661,13714-13722, contract side effect A.4).
+    /// </summary>
+    public static readonly TimeSpan CreateCooldown = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    ///     A11 -- the tower-attack AI's ~30-second "no further hits" window after which a guardian's attack-state
+    ///     returns to "ready" (S07_MyGame05.cpp:851, contract side effect D). Wall-clock derived, not tick-counted.
+    /// </summary>
+    public static readonly TimeSpan AttackStateIdleReset = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    ///     A11 -- the tower-attack AI's 10-minute auto-clear of an engagement's one-shot first-attack tracking, so
+    ///     a fresh engagement re-arms the one-time Center-754 notification (S07_MyGame05.cpp:857, contract side
+    ///     effect D). Wall-clock derived.
+    /// </summary>
+    public static readonly TimeSpan EngagementAutoClear = TimeSpan.FromMinutes(10);
+
+    /// <summary>
+    ///     A11 -- the queued construct kind (1/2/3) for a tower armed by an item-665 use but whose level-1 guardian
+    ///     has not been summoned yet (legacy "creating" states 101/102/103). 0 = not constructing. Cleared to 0 by
+    ///     <see cref="CompleteConstructionSpawn" /> once the guardian is up (the kind then lives in the packed
+    ///     state as its DecodeType). See <see cref="TowerLifecycleSystem" /> for the tick-side advance.
+    /// </summary>
+    private readonly int[] _constructKind = new int[TowerCount];
+
     private readonly byte?[] _controllingTribe = new byte?[TowerCount];
+
+    /// <summary>
+    ///     A11 -- when the post-create cooldown (legacy state 1) started for a tower whose level-1 guardian is up
+    ///     but not yet attackable; null once the tower has advanced to the live "created level-1" state (2).
+    /// </summary>
+    private readonly DateTime?[] _createCooldownStartedAtUtc = new DateTime?[TowerCount];
+
     private readonly bool[] _dirty = new bool[TowerCount];
 
     private readonly DateTime?[] _firstAttackAtUtc = new DateTime?[TowerCount];
 
     /// <summary>One-shot per guardian lifetime, reset alongside everything else in <see cref="CompleteUpgrade" />.</summary>
     private readonly bool[] _firstAttackRecorded = new bool[TowerCount];
+
+    /// <summary>
+    ///     A11 -- an item-667 heal (guardian +10% max life) has been validated and its item consumed on the
+    ///     handler thread and is waiting to be applied to the live guardian <c>MonsterEntity</c> on that tower's
+    ///     own zone tick (the life mutation + broadcast is a tick-owned handoff -- see this file's own remarks and
+    ///     the wiring manifest). Drained by <see cref="TryConsumeGuardianHeal" />.
+    /// </summary>
+    private readonly bool[] _guardianHealPending = new bool[TowerCount];
 
     private readonly DateTime?[] _lastAttackAtUtc = new DateTime?[TowerCount];
     private readonly Lock _lock = new();
@@ -371,6 +425,255 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
             _pendingPackedState[towerIndex] = 0;
             _pendingTribe[towerIndex] = null;
             _dirty[towerIndex] = true;
+
+            // A11 -- a destroyed slot returns fully to idle: any in-flight construction/cooldown/heal for the
+            // now-gone tower is discarded so a subsequent item-665 can start cleanly from state 0.
+            _constructKind[towerIndex] = 0;
+            _createCooldownStartedAtUtc[towerIndex] = null;
+            _guardianHealPending[towerIndex] = false;
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------------------------
+    // A11 -- from-scratch construction (item 665), the tower-attack AI's idle timers, and the item-667 heal
+    // handoff. All lifecycle advance runs on the tower's own zone tick via TowerLifecycleSystem; the item-use
+    // handler thread only ever arms these here. Construction deliberately does NOT set _pendingPackedState/_valid
+    // while "creating", so a tower under construction reads as TowerSiegePhase.Dormant to the existing
+    // TowerGuardianSystem (whose Dormant branch is a no-op) -- the two systems drive disjoint states with no edit
+    // to TowerGuardianSystem needed. Contract: S04_MyWork03.cpp:7283-7565, S07_MyGame01.cpp:13659-13780,
+    // S07_MyGame02.cpp:2107-2157, S07_MyGame05.cpp:838-863.
+    // ---------------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    ///     Arms an item-665 from-scratch construction: records the requested kind and controlling tribe for a
+    ///     tower that is currently fully idle (legacy state 0, no live guardian, no pending upgrade, not already
+    ///     constructing). Atomic idle-claim -- returns false, changing nothing, if the slot is not idle (including
+    ///     losing a race to a second concurrent item-665 on the same tower), so the caller can retain the item.
+    ///     The level-1 guardian is summoned by <see cref="TowerLifecycleSystem" /> on the tower's next tick, not
+    ///     here (contract side effect A.2-A.3).
+    /// </summary>
+    public bool BeginConstruction(int towerIndex, int constructKind, byte controllingTribeId)
+    {
+        lock (_lock)
+        {
+            var idle = _packedState[towerIndex] == 0 && !_valid[towerIndex]
+                                                     && _siegeStartedAtUtc[towerIndex] is null
+                                                     && _pendingPackedState[towerIndex] == 0
+                                                     && _constructKind[towerIndex] == 0;
+            if (!idle)
+                return false;
+
+            _constructKind[towerIndex] = constructKind;
+            _pendingTribe[towerIndex] = controllingTribeId;
+            return true;
+        }
+    }
+
+    /// <summary>
+    ///     Rolls back a <see cref="BeginConstruction" /> claim (used when the item-consumption DB write that was
+    ///     meant to follow it fails) -- returns the slot to idle so the retained item can be used again.
+    /// </summary>
+    public void CancelConstruction(int towerIndex)
+    {
+        lock (_lock)
+        {
+            if (_createCooldownStartedAtUtc[towerIndex] is not null)
+                return; // already spawned/cooling -- past the point a plain cancel is safe
+
+            _constructKind[towerIndex] = 0;
+            _pendingTribe[towerIndex] = null;
+        }
+    }
+
+    /// <summary>The queued construct kind (1/2/3) for a tower still "creating" its level-1 guardian; 0 otherwise.</summary>
+    public int GetPendingConstructKind(int towerIndex)
+    {
+        lock (_lock)
+        {
+            return _createCooldownStartedAtUtc[towerIndex] is null ? _constructKind[towerIndex] : 0;
+        }
+    }
+
+    /// <summary>
+    ///     Legacy creating-state completion (S07_MyGame01.cpp:13465-13489): once the level-1 guardian has actually
+    ///     been summoned, the slot value becomes level-1 of the constructed kind (packed = 200 + kind, i.e.
+    ///     DecodeLevel 2), ownership is recorded, the attack-state resets to "ready", the tower is marked invalid
+    ///     pending the create-cooldown, and the post-create cooldown clock starts. The tower stays NOT
+    ///     <see cref="IsValid" /> (hence not attackable) until <see cref="CompleteConstructionCooldown" />.
+    /// </summary>
+    public void CompleteConstructionSpawn(int towerIndex, DateTime utcNow)
+    {
+        lock (_lock)
+        {
+            var kind = _constructKind[towerIndex];
+            if (kind == 0)
+                return;
+
+            // Level-1 created tower of this kind: DecodeLevel(200 + kind) == 2, DecodeType == kind.
+            _packedState[towerIndex] = 200 + kind;
+            _controllingTribe[towerIndex] = _pendingTribe[towerIndex];
+            _pendingTribe[towerIndex] = null;
+            _constructKind[towerIndex] = 0;
+            _createCooldownStartedAtUtc[towerIndex] = utcNow;
+            _valid[towerIndex] = false;
+            _dirty[towerIndex] = true;
+
+            // Fresh guardian instance: attack-state "ready" (-1) and hit bookkeeping reset, same as CompleteUpgrade.
+            _underAttack[towerIndex] = false;
+            _firstAttackRecorded[towerIndex] = false;
+            _firstAttackAtUtc[towerIndex] = null;
+            _lastAttackAtUtc[towerIndex] = null;
+        }
+    }
+
+    /// <summary>True once <see cref="CreateCooldown" /> has elapsed since <see cref="CompleteConstructionSpawn" />.</summary>
+    public bool IsCreateCooldownElapsed(int towerIndex, DateTime utcNow)
+    {
+        lock (_lock)
+        {
+            return _createCooldownStartedAtUtc[towerIndex] is { } startedAt && utcNow - startedAt >= CreateCooldown;
+        }
+    }
+
+    /// <summary>
+    ///     Legacy state 1 -&gt; 2 (S07_MyGame01.cpp:13714-13722): the post-create cooldown has elapsed, so the
+    ///     level-1 tower becomes live and attackable (<see cref="IsValid" /> true, <see cref="GetPhase" /> Active).
+    /// </summary>
+    public void CompleteConstructionCooldown(int towerIndex)
+    {
+        lock (_lock)
+        {
+            if (_createCooldownStartedAtUtc[towerIndex] is null)
+                return;
+
+            _createCooldownStartedAtUtc[towerIndex] = null;
+            _valid[towerIndex] = true;
+        }
+    }
+
+    /// <summary>
+    ///     Count of towers of <paramref name="kind" /> that currently exist cluster-wide -- both live/cooling
+    ///     built towers (packed state present with this DecodeType) and towers still "creating" this kind --
+    ///     for the item-665 max-of-a-kind gate (contract edge case, S04_MyWork03.cpp:7340-7355).
+    /// </summary>
+    public int CountTowersOfKind(int kind)
+    {
+        lock (_lock)
+        {
+            var count = 0;
+            for (var i = 0; i < TowerCount; i++)
+                if ((_packedState[i] > 0 && DecodeType(_packedState[i]) == kind) || _constructKind[i] == kind)
+                    count++;
+
+            return count;
+        }
+    }
+
+    /// <summary>
+    ///     True if another slot in <paramref name="towerIndex" />'s own 3-slot tribe group already holds (or is
+    ///     constructing) <paramref name="kind" /> -- the intent of the un-opened <c>CHUGSOUNG_WAR_UI_CheckTowerType</c>
+    ///     group-adjacency reject (contract edge case, S04_MyWork03.cpp:7357-7494). Only the "rejects a duplicate
+    ///     kind within the tribe's 3-slot group" intent is relied on here; flagged for re-check.
+    /// </summary>
+    public bool IsKindPresentInTribeGroup(int towerIndex, int kind)
+    {
+        lock (_lock)
+        {
+            var groupStart = towerIndex / 3 * 3;
+            for (var i = groupStart; i < groupStart + 3 && i < TowerCount; i++)
+            {
+                if (i == towerIndex)
+                    continue;
+
+                if ((_packedState[i] > 0 && DecodeType(_packedState[i]) == kind) || _constructKind[i] == kind)
+                    return true;
+            }
+
+            return false;
+        }
+    }
+
+    /// <summary>
+    ///     Tower-attack AI ~30s idle reset (S07_MyGame05.cpp:844-863, contract side effect D): once
+    ///     <see cref="AttackStateIdleReset" /> has elapsed with no further landed hit, the guardian's attack-state
+    ///     returns to "ready". Modeled against <see cref="_underAttack" />'s existing polarity -- a landed hit
+    ///     clears the flag (<see cref="RecordGuardianHit" />), this idle timer sets it back, exactly as that
+    ///     field's own remarks describe the (previously out-of-scope) timer doing. No-op until at least one hit has
+    ///     landed. Returns true only on the tick that actually performed the reset.
+    /// </summary>
+    public bool TryResetIdleAttackState(int towerIndex, DateTime utcNow)
+    {
+        lock (_lock)
+        {
+            if (_underAttack[towerIndex] || _lastAttackAtUtc[towerIndex] is not { } last)
+                return false;
+
+            if (utcNow - last < AttackStateIdleReset)
+                return false;
+
+            _underAttack[towerIndex] = true;
+            return true;
+        }
+    }
+
+    /// <summary>
+    ///     Tower-attack AI 10-minute engagement auto-clear (S07_MyGame05.cpp:857, contract side effect D): once an
+    ///     engagement's first landed hit is <see cref="EngagementAutoClear" /> old, the one-shot first-attack
+    ///     tracking is reset so a subsequent hit is again treated as a fresh "first hit" (re-arming the one-time
+    ///     Center-754 notification via <see cref="RecordGuardianHit" />). Returns true only on the clearing tick.
+    /// </summary>
+    public bool TryClearStaleEngagement(int towerIndex, DateTime utcNow)
+    {
+        lock (_lock)
+        {
+            if (!_firstAttackRecorded[towerIndex] || _firstAttackAtUtc[towerIndex] is not { } first)
+                return false;
+
+            if (utcNow - first < EngagementAutoClear)
+                return false;
+
+            _firstAttackRecorded[towerIndex] = false;
+            _firstAttackAtUtc[towerIndex] = null;
+            return true;
+        }
+    }
+
+    /// <summary>
+    ///     Arms an item-667 guardian heal for tick-side application (guardian +10% max life, clamped, then a
+    ///     repair-info broadcast -- the actual life mutation is tick-owned and handed off, see this file's remarks
+    ///     and the wiring manifest). Idempotent: a heal already pending stays pending.
+    /// </summary>
+    public void RequestGuardianHeal(int towerIndex)
+    {
+        lock (_lock)
+        {
+            _guardianHealPending[towerIndex] = true;
+        }
+    }
+
+    /// <summary>True while an item-667 heal is queued for this tower's guardian.</summary>
+    public bool IsGuardianHealPending(int towerIndex)
+    {
+        lock (_lock)
+        {
+            return _guardianHealPending[towerIndex];
+        }
+    }
+
+    /// <summary>
+    ///     Drains a queued item-667 heal for tick-side application -- returns true (and clears the flag) exactly
+    ///     once per queued heal. Called only from the tower's own zone tick (see the wiring manifest's heal-drain
+    ///     handoff).
+    /// </summary>
+    public bool TryConsumeGuardianHeal(int towerIndex)
+    {
+        lock (_lock)
+        {
+            if (!_guardianHealPending[towerIndex])
+                return false;
+
+            _guardianHealPending[towerIndex] = false;
+            return true;
         }
     }
 

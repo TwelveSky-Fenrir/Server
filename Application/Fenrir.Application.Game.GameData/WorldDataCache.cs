@@ -37,6 +37,21 @@ public sealed class WorldDataCache
     public required FrozenDictionary<int, GemSocketRowDto> GemSocketsById { get; init; }
 
     /// <summary>
+    ///     Gem-socket effect-table rows keyed by (Type, Value02) instead of GemSocketId -- the lookup shape
+    ///     <c>StatCalculator.SumGemSocketContribution</c> actually needs to fold a gem's contribution into a
+    ///     derived stat (<c>GSOCKET::Search</c>, Server/ts25zone/GameSystem/GameSystem_08_Socket.cpp:22-32).
+    ///     Built once by <see cref="WorldDataCacheBuilder" /> from the same validated <see cref="GemSocketsById" />
+    ///     rows, first-GemSocketId-wins on a duplicate key (matching legacy's first-match linear scan; the loaded
+    ///     data set enforces key uniqueness today, so this tiebreak is not currently exercised). The key MUST be
+    ///     built with the same formula as
+    ///     <see cref="Fenrir.Application.Game.Stats.StatCalculator.GemSocketTypeValueKey(byte, byte)" /> --
+    ///     duplicated here rather than shared because <c>Fenrir.Application.Game.GameData</c> does not (and
+    ///     should not) reference <c>Fenrir.Application.Game.Stats</c>; see
+    ///     <see cref="WorldDataCacheBuilder" />'s own gem-socket-index remarks.
+    /// </summary>
+    public required FrozenDictionary<int, GemSocketRowDto> GemSocketsByTypeAndValue { get; init; }
+
+    /// <summary>
     ///     Blood-exchange catalog in BloodExchangeSlot order (world.BloodExchangeCatalog, 3 real rows), as of
     ///     this boot -- never mutated afterwards, per this type's own contract. A live reader (purchase
     ///     resolution, CZ_DEMAND_BLOOD_MARK_SEND) must instead read

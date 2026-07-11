@@ -79,10 +79,11 @@ public static class PvpKillRewardZoneCatalog
     public const short FfaMapNumber = 335;
 
     /// <summary>
-    ///     No legacy source value plumbed to this contract for the FFA branch's fixed hero-point amount --
-    ///     "only worth exactly a fixed small amount." Placeholder, not real game-balance tuning.
+    ///     B9: confirmed +2 -- the FFA branch sets the hero-rank point award to 2
+    ///     (S07_MyGame03.cpp:3010,3103-3104). No combined-level floor gates it (see
+    ///     <see cref="HeroPointMinimumCombinedLevel" />'s own remarks).
     /// </summary>
-    public const int FfaHeroPointAmount = 1;
+    public const int FfaHeroPointAmount = 2;
 
     /// <summary>
     ///     "Gated on the attacker's combined level being at least a fixed minimum threshold." No legacy value

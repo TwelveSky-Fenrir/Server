@@ -62,7 +62,8 @@ public sealed class GuildInviteService(
             return GuildInviteAskResultKind.NotAuthorized;
         }
 
-        if (IsExcludedByCommunityWorkOrStunDeath(asker))
+        if (CommunityWorkGate.IsBusy(asker, duels, trades, friends, parties, mentors, invites) ||
+            asker.IsStunned || asker.IsDead)
         {
             logger.LogDebug(
                 "Character {CharacterId} guild invite-ask rejected: caller busy (community-work/stun/death gate)",
@@ -90,7 +91,8 @@ public sealed class GuildInviteService(
             return GuildInviteAskResultKind.TribeMismatch;
         }
 
-        if (IsExcludedByCommunityWorkOrStunDeath(target))
+        if (CommunityWorkGate.IsBusy(target, duels, trades, friends, parties, mentors, invites) ||
+            target.IsStunned || target.IsDead)
         {
             logger.LogDebug(
                 "Character {CharacterId} guild invite-ask rejected: target {TargetCharacterId} busy",
@@ -206,25 +208,6 @@ public sealed class GuildInviteService(
             "Character {CharacterId} published a guild invite cross-shard to character {TargetCharacterId} on shard {TargetShardId} (never delivered today -- see GuildInviteService's own remarks)",
             asker.CharacterId, remote.CharacterId, remote.ShardId);
         return GuildInviteAskResultKind.SentCrossShard;
-    }
-
-    /// <summary>
-    ///     <c>CheckCommunityWork()</c>'s six OTHER exclusivity flags (personal shop, duel, trade, friend, party,
-    ///     mentor/teacher negotiation -- this family's own guild-negotiation flag is checked separately, and
-    ///     atomically, by <see cref="GuildInviteRegistry.TryAsk" />), plus the independent stun/post-death
-    ///     action-state gate. Any one of these being true excludes <paramref name="player" /> from starting or
-    ///     receiving a guild ask, exactly as it does for every other ASK family in this document.
-    /// </summary>
-    private bool IsExcludedByCommunityWorkOrStunDeath(PlayerRuntimeState player)
-    {
-        return player.PshopOpen
-               || duels.IsNegotiating(player.CharacterId)
-               || trades.IsBusy(player.CharacterId)
-               || friends.IsNegotiating(player.CharacterId)
-               || parties.IsNegotiating(player.CharacterId)
-               || mentors.IsNegotiating(player.CharacterId)
-               || player.IsStunned
-               || player.IsDead;
     }
 
     private static PlayerRuntimeState? FindPlayerByName(Zone zone, string avatarName)

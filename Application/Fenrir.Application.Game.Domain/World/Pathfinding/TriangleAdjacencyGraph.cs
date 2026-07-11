@@ -56,7 +56,10 @@ public sealed class TriangleAdjacencyGraph
     /// <summary>Total triangle count of the source mesh (walkable and not) -- the sizing basis for A* scratch.</summary>
     public int TriangleCount => _centroidsXz.Length;
 
-    /// <summary>Builds the connectivity graph for <paramref name="triangles" />. O(triangles), called once (lazily) per geometry.</summary>
+    /// <summary>
+    ///     Builds the connectivity graph for <paramref name="triangles" />. O(triangles), called once (lazily) per
+    ///     geometry.
+    /// </summary>
     public static TriangleAdjacencyGraph Build(IReadOnlyList<WorldTriangle> triangles)
     {
         var count = triangles.Count;

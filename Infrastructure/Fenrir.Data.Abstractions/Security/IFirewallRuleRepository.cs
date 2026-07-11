@@ -20,4 +20,13 @@ public interface IFirewallRuleRepository
     ///     rule" action, where hitting a duplicate really is an operator mistake worth surfacing loudly.
     /// </summary>
     public ValueTask BlockAsync(string ipAddress, CancellationToken ct);
+
+    /// <summary>
+    ///     Workstream D3 -- the DB half of <c>Fenrir.Network.Dispatch.FloodProtection.FirewallAllowlistReconcileService</c>
+    ///     (legacy <c>ts25firewall</c>'s <c>RemoveIPTick</c>, <c>Server/ts25firewall/main.cpp:682-698</c>). See
+    ///     <c>FirewallRuleRepository.ReconcileAllowlistAsync</c>'s own implementation remarks for exactly what
+    ///     this narrows the legacy three-step reconcile down to, and why -- Fenrir's schema cannot faithfully
+    ///     support the other two legacy sub-steps without inventing data this project's rules forbid guessing.
+    /// </summary>
+    public ValueTask ReconcileAllowlistAsync(CancellationToken ct);
 }

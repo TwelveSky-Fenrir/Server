@@ -55,6 +55,32 @@ public sealed class MentorRegistry
     }
 
     /// <summary>
+    ///     Read-only lookup for <see cref="Simulation.PendingSocialRequestAutoCancelSystem" />'s per-tick
+    ///     "counterpart still reachable" sweep (behavior contract C21§G). Unlike <see cref="TryCancel" />,
+    ///     does NOT consume/remove the entry.
+    /// </summary>
+    public bool TryPeekPending(int characterId, out int counterpartId, out bool isMaster)
+    {
+        lock (_lock)
+        {
+            if (_pendingByMaster.TryGetValue(characterId, out counterpartId))
+            {
+                isMaster = true;
+                return true;
+            }
+
+            if (_pendingByStudent.TryGetValue(characterId, out counterpartId))
+            {
+                isMaster = false;
+                return true;
+            }
+
+            isMaster = false;
+            return false;
+        }
+    }
+
+    /// <summary>
     ///     WS1.4 master-side cross-shard ask registration (ASK-PUBLISH-ONLY -- see <see cref="_crossShard" />'s
     ///     own remarks). Same negotiating gate as <see cref="TryAsk" />; the target-already-has-teacher/student
     ///     checks are not evaluable here (no local target state), so they are omitted -- caller-side risk

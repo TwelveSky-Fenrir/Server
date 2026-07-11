@@ -1,12 +1,14 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 using Fenrir.Application.Game.Domain;
+using Fenrir.Application.Game.Domain.AntiCheat;
 using Fenrir.Application.Game.Domain.Avatars;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Quests;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Social;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.WorldState;
@@ -37,6 +39,7 @@ public sealed class EnterWorldService(
     IMentorRepository mentors,
     IHeroRankingRepository heroRankings,
     ICharacterShardLocationRepository characterShardLocations,
+    ICharacterLogoutStateRepository logoutState,
     WorldStateService worldState,
     TowerWarState towerWar,
     ZoneCenterSiegeState zoneCenterSiegeState,
@@ -140,6 +143,24 @@ public sealed class EnterWorldService(
             return;
         }
 
+        // War-zone registration eligibility (WarZoneEntryGate, Server/ts25zone/S04_MyWork02.cpp:902,
+        // CheckRegisterAvatar) -- a character whose persisted combined level/rebirth count no longer qualifies
+        // for the war zone it was last saved on (an operator/DB edit, or a product rule change since its last
+        // session) must never be allowed to materialize back into it. Denial is a hard disconnect
+        // ("out-of-range eviction"), matching this gate's sibling use in ZoneMoveService. This also covers the
+        // cross-shard-transfer re-entry case: the client reconnects to the destination shard and re-sends
+        // EnterWorldRequest there, routing back through this same check.
+        var combinedLevel = character.Level + character.Level2;
+        if (WarZoneEntryGate.Evaluate(character.MapId, combinedLevel, character.RebirthCount) ==
+            WarZoneEntryOutcome.RejectedOutOfRange)
+        {
+            logger.LogWarning(
+                "Enter-world rejected for character {CharacterId}: combined level {CombinedLevel}/rebirth {RebirthCount} out of range for war zone {MapId}",
+                characterId, combinedLevel, character.RebirthCount, character.MapId);
+            zoneSession.Abort(DisconnectReason.Faulted);
+            return;
+        }
+
         // Fenrir-only failure boundary -- no Server/ citation applies (there is no legacy counterpart to
         // mirror here; this segment's shape is purely a Fenrir C# call-chain composition concern). Before
         // this try/catch, any exception raised anywhere from here through zone.Post() below -- equipment/
@@ -153,7 +174,7 @@ public sealed class EnterWorldService(
             var equipmentContainer = BuildEquipmentContainer(bundle.Items);
             var attributes = new CharacterBaseAttributes(character.StatVit, character.StatStr, character.StatInt,
                 character.StatDex, character.Level, character.Tribe, character.PreviousTribe, character.Title,
-                character.Halo, character.RebirthCount);
+                character.Halo, character.RebirthCount, character.Level2);
 
             var petItemId = PetSlots.ResolveEquippedPetItemId(bundle.Items);
             var petContribution = PetGrowthCalculator.Compute(petItemId, character.PetGrowth, character.PetActivity,
@@ -379,6 +400,11 @@ public sealed class EnterWorldService(
                 CheckChangeActionState = 0
             });
 
+            // TODO(wiring B5): rune world-entry hydration deferred to fenrir-gameplay-domain-engineer (new app
+            // caller, out of this wiring pass's scope). Inject IRuneRepository, call GetRunesAsync(characterId), and
+            // seed PlayerRuntimeState.RuneSystem/RuneSystemStat by SocketIndex (absent sockets stay 0) so the rune
+            // contribution is live in the first RecomputeStats. The exact seeding mechanism (a new PlayerEnterData
+            // field consumed by Zone.HandleEnter vs. a post-enter mirror command) is a design decision left to that pass.
             var entered = zone.Post(ZoneCommand.Enter(characterId, new PlayerEnterData(
                 zoneSession,
                 character.Name,
@@ -463,8 +489,16 @@ public sealed class EnterWorldService(
                 // these three, but nothing read them back into PlayerRuntimeState until now (npc-talk
                 // Store/Save transfer gap fix). See PlayerRuntimeState.Vault.cs's own remarks.
                 StoreMoney: character.StoreMoney,
-                InventoryDate: character.InventoryDate,
-                StoreDate: character.StoreDate)));
+                // C1-vault-expiry-enforcement, trigger 4: normalized once per avatar registration (never once
+                // per tick) -- an already-lapsed InventoryDate collapses to the zero sentinel here; a
+                // currently-valid one passes through unchanged. See VaultDateNormalization's own remarks.
+                // StoreDate is a sibling field this contract does not cover -- deliberately left un-normalized.
+                InventoryDate: VaultDateNormalization.NormalizeIfExpired(character.InventoryDate, GameDate.Today()),
+                StoreDate: character.StoreDate,
+                // D2 hook 2: canonical source-IP for the PvP same-origin kill-credit guard
+                // (AntiCheat.PvpKillCreditGuard.IsSameOrigin) -- captured from this session's own accepted
+                // socket at world entry. See PlayerRuntimeState.SourceIp's own remarks.
+                SourceIp: SessionSourceIp.Normalize(zoneSession.RemoteEndPoint))));
 
             // A dropped Enter is never replayed -- the character would stay permanently invisible despite the two
             // packets above already telling the client registration succeeded, so treat it as fatal.
@@ -483,6 +517,31 @@ public sealed class EnterWorldService(
             logger.LogInformation(
                 "Character {CharacterId} (account {AccountId}) entered world on map {MapId} -- awaiting zone-ready",
                 characterId, accountId, character.MapId);
+
+            // D1 logout-info capture (Server/Header/Protocol/DEFINE.h:750-757's UPDATE_LOGOUT_INFO[6]: element
+            // 0 = zone, 1-3 = position, 4 = life, 5 = mana): re-anchor game.CharacterLogoutState to this
+            // character's just-loaded, authoritative placement so a later reconnect can carry its last-session
+            // zone/position/life/mana back to it -- a snapshot Fenrir never populated before (workstream D1).
+            // Best-effort and isolated in its own try/catch, PAST the point of no return above: this write is a
+            // client-facing snapshot / login-redirect hint only, never the world-spawn source (game.Characters
+            // already owns that via the write-behind flush), so a failure here must never undo an entry the
+            // client was already told succeeded. Position floats are truncated to whole numbers exactly like
+            // the legacy capture. The continuous in-session re-capture (movement/teleport/periodic/quit --
+            // Server/ts25zone/S04_MyWork02.cpp:1778,1920, ZoneWorker.cpp:53-62) is a deferred follow-up owned by
+            // the write-behind/disconnect path, not this enter-world segment.
+            try
+            {
+                await logoutState.UpsertAsync(characterId, character.MapId,
+                    (int)character.PosX, (int)character.PosY, (int)character.PosZ,
+                    character.Life, character.Mana, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex,
+                    "Failed to capture the logout-info snapshot for character {CharacterId} on map {MapId} after " +
+                    "a successful world entry; the entry itself stands, only the snapshot write is skipped",
+                    characterId, character.MapId);
+            }
         }
 
         try

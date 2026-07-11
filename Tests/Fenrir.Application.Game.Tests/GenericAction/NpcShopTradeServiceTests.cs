@@ -90,6 +90,7 @@ public class NpcShopTradeServiceTests
             ZonesByNumber =
                 new Dictionary<short, ZoneDefinition> { [ZoneNumber] = zoneDefinition }.ToFrozenDictionary(),
             GemSocketsById = FrozenDictionary<int, GemSocketRowDto>.Empty,
+            GemSocketsByTypeAndValue = FrozenDictionary<int, GemSocketRowDto>.Empty,
             BloodExchangeCatalog = [],
             EventDefinitions = [],
             ItemMallProductsById = FrozenDictionary<int, ItemMallProductRowDto>.Empty,

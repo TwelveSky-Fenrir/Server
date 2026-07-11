@@ -69,6 +69,12 @@ public sealed class GameServerOptionsValidator : IValidateOptions<GameServerOpti
         if (options.SocialCrossShardRelayRetentionSeconds <= 0)
             errors.Add(
                 $"Game:SocialCrossShardRelayRetentionSeconds must be positive (was {options.SocialCrossShardRelayRetentionSeconds}).");
+        if (options.ChatCrossShardRelayPollIntervalSeconds <= 0)
+            errors.Add(
+                $"Game:ChatCrossShardRelayPollIntervalSeconds must be positive (was {options.ChatCrossShardRelayPollIntervalSeconds}).");
+        if (options.ChatCrossShardRelayRetentionSeconds <= 0)
+            errors.Add(
+                $"Game:ChatCrossShardRelayRetentionSeconds must be positive (was {options.ChatCrossShardRelayRetentionSeconds}).");
         if (options.ProxyShopExpirationRelayPollIntervalSeconds <= 0)
             errors.Add(
                 $"Game:ProxyShopExpirationRelayPollIntervalSeconds must be positive (was {options.ProxyShopExpirationRelayPollIntervalSeconds}).");
@@ -87,6 +93,12 @@ public sealed class GameServerOptionsValidator : IValidateOptions<GameServerOpti
         if (options.RvrSiegeEventRelayRetentionSeconds <= 0)
             errors.Add(
                 $"Game:RvrSiegeEventRelayRetentionSeconds must be positive (was {options.RvrSiegeEventRelayRetentionSeconds}).");
+        if (options.PartyResyncRelayPollIntervalSeconds <= 0)
+            errors.Add(
+                $"Game:PartyResyncRelayPollIntervalSeconds must be positive (was {options.PartyResyncRelayPollIntervalSeconds}).");
+        if (options.PartyResyncRelayRetentionSeconds <= 0)
+            errors.Add(
+                $"Game:PartyResyncRelayRetentionSeconds must be positive (was {options.PartyResyncRelayRetentionSeconds}).");
 
         // Every cross-shard relay's *RetentionSeconds must outlive its own *PollIntervalSeconds: each relay host
         // reaps rows older than RetentionSeconds on every poll cycle, so a RetentionSeconds <= PollIntervalSeconds
@@ -99,6 +111,9 @@ public sealed class GameServerOptionsValidator : IValidateOptions<GameServerOpti
         if (options.SocialCrossShardRelayRetentionSeconds <= options.SocialCrossShardRelayPollIntervalSeconds)
             errors.Add(
                 $"Game:SocialCrossShardRelayRetentionSeconds ({options.SocialCrossShardRelayRetentionSeconds}) must be greater than Game:SocialCrossShardRelayPollIntervalSeconds ({options.SocialCrossShardRelayPollIntervalSeconds}).");
+        if (options.ChatCrossShardRelayRetentionSeconds <= options.ChatCrossShardRelayPollIntervalSeconds)
+            errors.Add(
+                $"Game:ChatCrossShardRelayRetentionSeconds ({options.ChatCrossShardRelayRetentionSeconds}) must be greater than Game:ChatCrossShardRelayPollIntervalSeconds ({options.ChatCrossShardRelayPollIntervalSeconds}).");
         if (options.ProxyShopExpirationRelayRetentionSeconds <= options.ProxyShopExpirationRelayPollIntervalSeconds)
             errors.Add(
                 $"Game:ProxyShopExpirationRelayRetentionSeconds ({options.ProxyShopExpirationRelayRetentionSeconds}) must be greater than Game:ProxyShopExpirationRelayPollIntervalSeconds ({options.ProxyShopExpirationRelayPollIntervalSeconds}).");
@@ -108,6 +123,9 @@ public sealed class GameServerOptionsValidator : IValidateOptions<GameServerOpti
         if (options.GuildBuffExpiryRelayRetentionSeconds <= options.GuildBuffExpiryRelayPollIntervalSeconds)
             errors.Add(
                 $"Game:GuildBuffExpiryRelayRetentionSeconds ({options.GuildBuffExpiryRelayRetentionSeconds}) must be greater than Game:GuildBuffExpiryRelayPollIntervalSeconds ({options.GuildBuffExpiryRelayPollIntervalSeconds}).");
+        if (options.PartyResyncRelayRetentionSeconds <= options.PartyResyncRelayPollIntervalSeconds)
+            errors.Add(
+                $"Game:PartyResyncRelayRetentionSeconds ({options.PartyResyncRelayRetentionSeconds}) must be greater than Game:PartyResyncRelayPollIntervalSeconds ({options.PartyResyncRelayPollIntervalSeconds}).");
 
         // Zero/negative squared-distance-check radii make their feature permanently, silently inert (no boot-time
         // signal) rather than a validation failure -- see AlliancePostRadius/HolyStoneCaptureRadius/

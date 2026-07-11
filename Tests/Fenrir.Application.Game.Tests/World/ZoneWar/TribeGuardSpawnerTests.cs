@@ -142,7 +142,7 @@ public class TribeGuardSpawnerTests
     }
 
     [Fact]
-    public void ForcedResummon_NeverReplacesAnAlreadyAliveGuard()
+    public void ForcedResummon_ReplacesTheLiveGuardWithAFreshOne()
     {
         var cache = CacheWithGuardTemplate();
         var catalog = new GuardPostCatalog([Post(2, 0, 1)], []);
@@ -156,8 +156,10 @@ public class TribeGuardSpawnerTests
         spawner.ForceOrdinaryResummon(zone);
         zone.Tick(SimulationClock.LegacyTick);
 
+        // Side effect §1: a force-reset (tCheckFirst) wipes and re-plants the region, so the live guard is
+        // replaced with a fresh one (new unique number), not left untouched.
         Assert.Equal(1, zone.MonsterCount);
-        Assert.Equal(before, zone.MonstersSnapshot.Single().UniqueNumber);
+        Assert.NotEqual(before, zone.MonstersSnapshot.Single().UniqueNumber);
     }
 
     [Fact]

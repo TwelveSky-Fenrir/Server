@@ -1,7 +1,12 @@
 using Fenrir.Application.Game.Abstractions.Social;
 using Fenrir.Application.Game.Domain;
+using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Social;
 using Fenrir.Application.Game.Domain.Social.Duel;
+using Fenrir.Application.Game.Domain.Social.Friends;
+using Fenrir.Application.Game.Domain.Social.Mentor;
+using Fenrir.Application.Game.Domain.Social.Party;
+using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Microsoft.Extensions.Logging;
@@ -28,6 +33,11 @@ namespace Fenrir.Application.Game.Services.Social;
 public sealed class DuelService(
     ZoneRegistry zones,
     DuelRegistry duels,
+    TradeRegistry trades,
+    FriendRegistry friends,
+    PartyRegistry parties,
+    MentorRegistry mentors,
+    GuildInviteRegistry guildInvites,
     ICharacterShardLocationRepository characterShardLocations,
     ISocialCrossShardRelayQueue crossShardRelay,
     IOptions<GameServerOptions> options,
@@ -65,7 +75,7 @@ public sealed class DuelService(
             return DuelAskResultKind.ChallengerAlreadyDueling;
         }
 
-        if (duels.IsNegotiating(challenger.CharacterId))
+        if (CommunityWorkGate.IsBusy(challenger, duels, trades, friends, parties, mentors, guildInvites))
         {
             logger.LogInformation(
                 "Duel ask rejected: challenger {ChallengerId} is already negotiating another duel",
@@ -86,6 +96,13 @@ public sealed class DuelService(
                 "Duel ask rejected and challenger {ChallengerId}'s session will be terminated: cross-tribe duel with target {TargetId} not allowed on map {MapId}",
                 challenger.CharacterId, target.CharacterId, zone.MapId);
             return DuelAskResultKind.TribeMismatch;
+        }
+
+        if (CommunityWorkGate.IsBusy(target, duels, trades, friends, parties, mentors, guildInvites))
+        {
+            logger.LogInformation("Duel ask rejected: target {TargetId} is busy (community-work gate)",
+                target.CharacterId);
+            return DuelAskResultKind.TargetBusy;
         }
 
         switch (duels.TryAsk(challenger.CharacterId, target.CharacterId, sort == 1))

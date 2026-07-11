@@ -1,6 +1,11 @@
 using Fenrir.Application.Game.Abstractions.Social;
 using Fenrir.Application.Game.Domain;
+using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Social.Duel;
+using Fenrir.Application.Game.Domain.Social.Friends;
+using Fenrir.Application.Game.Domain.Social.Mentor;
+using Fenrir.Application.Game.Domain.Social.Party;
+using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Services.Social;
 using Fenrir.Application.Game.Tests.TestSupport;
@@ -32,8 +37,10 @@ public class DuelServiceTests
         var duels = new DuelRegistry();
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([mapId]);
-        return (new DuelService(zones, duels, directory, relay, Options.Create(new GameServerOptions { ShardId = 1 }),
-            NullLogger<DuelService>.Instance), zones, duels);
+        return (new DuelService(zones, duels, new TradeRegistry(), new FriendRegistry(), new PartyRegistry(),
+                new MentorRegistry(), new GuildInviteRegistry(), directory, relay,
+                Options.Create(new GameServerOptions { ShardId = 1 }), NullLogger<DuelService>.Instance),
+            zones, duels);
     }
 
     private static PlayerRuntimeState Enter(ZoneRegistry zones, short mapId, int characterId, string name, byte tribe)

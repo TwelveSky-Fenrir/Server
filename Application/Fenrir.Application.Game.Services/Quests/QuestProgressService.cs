@@ -3,12 +3,42 @@ using Fenrir.Application.Game.Abstractions.Quests;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Domain.World.Npcs;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Quests;
 
+/// <remarks>
+///     NPC-proximity gate on Accept/Complete is a deliberate <b>Fenrir hardening decision, NOT legacy parity</b>.
+///     The legacy <c>PROCESS_QUEST_SEND</c> handler (Server/ts25zone/S04_MyWork02.cpp:7307-7559) gates neither
+///     accept nor complete on distance -- it never resolves the step's anchor NPC number nor reads the player's
+///     position, so a client can accept/complete from arbitrarily far from the quest NPC as long as the
+///     quest-STATE guard passes. Fenrir closes that exploit here by reusing the same squared-distance rule legacy
+///     already applies to the comparable NPC skill-learn/shop functions (<c>CheckNPCFunction</c>, radius
+///     <see cref="NpcFunctionGate.ProximityRadius" />, Server/ts25zone/S07_MyGame07.cpp:230-257 +
+///     Server/Header/mapcheck.h:17-20) via <see cref="NpcFunctionGate.CheckNpcProximity" />, keyed on the step's
+///     concrete anchor NPC number rather than a menu-function.
+///     <para>
+///         The anchor-per-action mapping IS legacy-grounded: <c>ReturnQuestNextNPCNumber</c>
+///         (Server/ts25zone/S07_MyGame04.cpp:1937-1975) resolves an in-progress step to its <c>qStartNPCNumber</c>
+///         and a completed step to its <c>qEndNPCNumber</c> -- so Accept anchors on the accepted (next) step's
+///         Start NPC and Complete anchors on the current step's End NPC.
+///     </para>
+///     <para>
+///         The gate is intentionally <b>fail-open</b> in three cases, so it never disconnects a legitimate player
+///         on a data gap: (1) the step declares no anchor NPC (number &lt;= 0); (2) the current map has no loaded
+///         placement data; (3) the anchor NPC is not placed on the current map at all
+///         (<see cref="NpcProximity.NpcNotInZone" />). Only case (3)'s residual -- accept/complete while on a map
+///         the anchor NPC isn't on -- is left un-gated; tightening it to also require the correct map is an open
+///         product decision (see this workstream's openQuestions). A proximity failure surfaces as a failed
+///         <see cref="QuestActionResult" />, which <c>QuestProgressHandler</c> turns into a session disconnect --
+///         the same outward signal legacy uses at every live <c>CheckNPCFunction</c> failure
+///         (Server/ts25zone/S04_MyWork04.cpp:382-386). Receive/Exchange/Abandon are NOT gated: the contract does
+///         not establish their anchors, and legacy gates none of them.
+///     </para>
+/// </remarks>
 public sealed class QuestProgressService(
     ICharacterRepository characters,
     IEventLogRepository eventLog,
@@ -45,6 +75,16 @@ public sealed class QuestProgressService(
         var result = QuestStateMachine.Accept(progress, state.Tribe, state.Level, questCatalog, HasItem);
         if (!result.Success)
             return new QuestActionResult(false);
+
+        // NPC-proximity hardening gate (Fenrir decision, not legacy parity -- see class remarks). Accept anchors
+        // on the ACCEPTED (next) step's quest-giver, qStartNPCNumber.
+        if (!IsNearQuestAnchorNpc(zone, state, progress.StepPermanent + 1, false))
+        {
+            logger.LogInformation(
+                "Character {CharacterId} quest-accept rejected: not within range of the step {Step} start NPC",
+                characterId, progress.StepPermanent + 1);
+            return new QuestActionResult(false);
+        }
 
         if (result.DepositItemId is { } depositItemId)
         {
@@ -84,6 +124,16 @@ public sealed class QuestProgressService(
         var result = QuestStateMachine.Complete(progress, state.Tribe, state.Level, questCatalog, HasItem, ItemSort);
         if (!result.Success)
             return new QuestActionResult(false);
+
+        // NPC-proximity hardening gate (Fenrir decision, not legacy parity -- see class remarks). Complete anchors
+        // on the CURRENT step's turn-in NPC, qEndNPCNumber.
+        if (!IsNearQuestAnchorNpc(zone, state, progress.StepPermanent, true))
+        {
+            logger.LogInformation(
+                "Character {CharacterId} quest-complete rejected: not within range of the step {Step} end NPC",
+                characterId, progress.StepPermanent);
+            return new QuestActionResult(false);
+        }
 
         var itemRewardGranted = false;
 
@@ -269,6 +319,31 @@ public sealed class QuestProgressService(
     {
         return new QuestProgress(state.QuestStepPermanent, state.QuestActiveFlag, state.QuestSort,
             state.QuestTargetPhase, state.QuestKillCounter);
+    }
+
+    /// <summary>
+    ///     True when the player is within <see cref="NpcFunctionGate.ProximityRadius" /> of the anchor NPC for
+    ///     <paramref name="anchorStep" /> (its <c>qEndNPCNumber</c> when <paramref name="useEndNpc" />, else its
+    ///     <c>qStartNPCNumber</c>), OR when the gate is fail-open for a data gap. See the class remarks for the
+    ///     three fail-open cases and why this is a Fenrir hardening decision rather than legacy parity. Rejects
+    ///     (returns false) only when the anchor NPC IS placed on the current map but every placement is beyond
+    ///     radius -- exactly the "accept/complete from anywhere on the same map" exploit the contract cites.
+    /// </summary>
+    private bool IsNearQuestAnchorNpc(Zone zone, PlayerRuntimeState state, int anchorStep, bool useEndNpc)
+    {
+        var quest = questCatalog.TryGet(state.Tribe, anchorStep);
+        if (quest is null)
+            return true;
+
+        var anchorNpcNumber = useEndNpc ? quest.Quest.EndNPCNumber : quest.Quest.StartNPCNumber;
+        if (anchorNpcNumber <= 0)
+            return true;
+
+        if (!worldData.ZonesByNumber.TryGetValue(zone.MapId, out var zoneDefinition))
+            return true;
+
+        return NpcFunctionGate.CheckNpcProximity(zoneDefinition, anchorNpcNumber, state.PosX, state.PosY,
+            state.PosZ) != NpcProximity.Far;
     }
 
     /// <summary>Bounds/occupancy validation shared by Accept/Complete/Receive.</summary>

@@ -156,6 +156,37 @@ public class QuestStateMachineTests
             QuestStateMachine.ComputePresentState(done, Tribe, 10, catalog, NoItems));
     }
 
+    // qSort 8 "occupation of WaterFall": TargetPhase must equal the quest's own first solution value, then
+    // KillCounter below 1 is In-Progress (2), otherwise Condition-Met (3) -- the exact < 1 gate the two
+    // war-conclusion credit hooks (Zone.HandleZone038OccupationCredit / Zone.HandleRegularWarConclusionCredit)
+    // reproduce. Réf. C++ : Server/ts25zone/S07_MyGame04.cpp:1865-1874.
+    [Fact]
+    public void PresentState_WaterfallOccupationQuest_ZeroCounter_IsInProgress_OneCounter_IsConditionMet()
+    {
+        var quest = WorldDataTestRows.Quest(1) with { Category = Category, Step = 4, Sort = 8, Solution1 = 38 };
+        var catalog = Catalog(quest);
+
+        var notYet = new QuestProgress(4, 1, 8, 38, 0);
+        var done = new QuestProgress(4, 1, 8, 38, 1);
+
+        Assert.Equal(QuestStateMachine.StateInProgress,
+            QuestStateMachine.ComputePresentState(notYet, Tribe, 10, catalog, NoItems));
+        Assert.Equal(QuestStateMachine.StateConditionMet,
+            QuestStateMachine.ComputePresentState(done, Tribe, 10, catalog, NoItems));
+        Assert.True(QuestStateMachine.ComputeEndConditionMet(done, Tribe, 10, catalog, NoItems));
+    }
+
+    [Fact]
+    public void PresentState_WaterfallOccupationQuest_TargetPhaseNotMatchingSolution1_IsInvalid()
+    {
+        var quest = WorldDataTestRows.Quest(1) with { Category = Category, Step = 4, Sort = 8, Solution1 = 38 };
+        var catalog = Catalog(quest);
+        var mismatch = new QuestProgress(4, 1, 8, 49, 0); // TargetPhase 49 != Solution1 38
+
+        Assert.Equal(QuestStateMachine.StateInvalid,
+            QuestStateMachine.ComputePresentState(mismatch, Tribe, 10, catalog, NoItems));
+    }
+
     [Fact]
     public void PresentState_ExchangeQuest_Phase1_ItemPresent_IsConditionMet()
     {

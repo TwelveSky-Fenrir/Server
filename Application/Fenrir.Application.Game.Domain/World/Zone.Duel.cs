@@ -24,6 +24,23 @@ public sealed partial class Zone
     private readonly List<int> _duelEndNeighborScratch = [];
 
     /// <summary>
+    ///     B10 branch C: this zone's own zone124 final-countdown mass-duel state (see
+    ///     <see cref="Zone124DuelOverrideResolver" />/<see cref="Zone124MassDuelState" />). Constructed
+    ///     unconditionally for every zone -- harmless, and avoids any dependency on partial-class
+    ///     field-initializer ordering across <c>Zone.*.cs</c> files for a value keyed on <see cref="Zone.MapId" />
+    ///     -- but only ever meaningful on the single map-124 process, since
+    ///     <see cref="Zone124DuelOverrideResolver.IsActive" /> already gates on
+    ///     <c>MapId == Zone124DuelOverrideResolver.Zone124MapId</c> before ever consulting
+    ///     <see cref="Zone124MassDuelState.RemainingUnits" />. The event lifecycle itself (start/end/out
+    ///     sub-commands 601/602/603, enrollment, and the per-tick <see cref="Zone124MassDuelState.Advance" />
+    ///     hook) is NOT wired here -- see the B10 workstream's own open questions for why (unrecoverable
+    ///     enrollment literals, tick-cadence ownership belongs to the realtime-simulation owner). Until that
+    ///     lands, this state can never actually be started, so <see cref="Zone124MassDuelState.RemainingUnits" />
+    ///     stays permanently 0 and <see cref="ApplyDuelAttack" />'s override check stays inert.
+    /// </summary>
+    private readonly Zone124MassDuelState _zone124MassDuel = new();
+
+    /// <summary>
     ///     ProcessAttack01 -- an avatar attacks its matched duel opponent. Shares <c>AttackPlayer</c>'s core
     ///     damage resolution with <c>mCase</c> 2 (<see cref="CombatResolver.ResolveDuelAttack" />), but gated by
     ///     the duel-specific authorization check (<see cref="SharesActiveDuel" />, already used identically for
@@ -44,13 +61,17 @@ public sealed partial class Zone
     ///     duel's outcome.
     /// </summary>
     /// <remarks>
-    ///     NOT implemented: the zone124 unconditional x3-damage/forced-crit override in the final 10s of a duel
-    ///     countdown (S07_MyGame02.cpp:1146-1150). Map 124 duels are already refused outright at
+    ///     The zone124 unconditional x3-damage/forced-crit override in the final 10s of a duel countdown
+    ///     (S07_MyGame02.cpp:1146-1150) is now computed below via <see cref="Zone124DuelOverrideResolver.IsActive" />
+    ///     against this zone's own <see cref="_zone124MassDuel" /> and threaded into
+    ///     <see cref="CombatResolver.ResolveDuelAttack" />'s <c>zone124OverrideActive</c> parameter. It remains
+    ///     structurally unreachable in production today: map 124 duels are already refused outright at
     ///     CZ_DUEL_ASK_SEND (<see cref="Simulation.DuelMaintenanceSystem" />'s own
     ///     <c>ScriptedDuelArenaMapId</c> guard), so no <see cref="Social.Duel.ActiveDuel" /> can ever exist there
-    ///     today -- and the override's own "remaining time" counter identity/owner (not the same counter as
-    ///     <see cref="Social.Duel.ActiveDuel.RemainingTicks" />) was left an open question by the source
-    ///     contract this method was authored from, rather than guessed at here.
+    ///     today and <see cref="SharesActiveDuel" /> always rejects first -- and the zone124 mass-duel event's
+    ///     own lifecycle (start/end/out sub-commands 601/602/603, enrollment, per-tick countdown) is not wired
+    ///     yet either, so <see cref="_zone124MassDuel" /> can never actually be started (see the B10 workstream's
+    ///     open questions for the unrecoverable enrollment literals and tick-cadence ownership this still needs).
     /// </remarks>
     private void ApplyDuelAttack(in CombatCommand command)
     {
@@ -84,8 +105,14 @@ public sealed partial class Zone
             ? skillDef
             : null;
 
+        // B10 branch C (zone124 duel override) -- see this method's own remarks for why this is still
+        // structurally unreachable in production even though the resolver-side wiring is now live.
+        var zone124OverrideActive = Zone124DuelOverrideResolver.IsActive(
+            MapId == Zone124DuelOverrideResolver.Zone124MapId, _zone124MassDuel.RemainingUnits);
+
         var outcome = CombatResolver.ResolveDuelAttack(attackerSnapshot, defenderSnapshot, command.AttackInfo,
-            _clock, attackSkill, _random, sharesActiveDuel, defenderState.PshopOpen, defenderState.ActionSort);
+            _clock, attackSkill, _random, sharesActiveDuel, defenderState.PshopOpen, defenderState.ActionSort,
+            zone124OverrideActive);
 
         if (outcome.Rejected)
             return;

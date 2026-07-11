@@ -29,6 +29,7 @@ public sealed class BuyCashItemService(
     ICashRepository cash,
     WorldDataCache worldData,
     CommerceCatalogCache catalog,
+    IEventLogRepository eventLog,
     ILogger<BuyCashItemService> logger) : IBuyCashItemService
 {
     // Shared "shop-specific" error code, reused across cash-shop-family rejects.
@@ -192,6 +193,12 @@ public sealed class BuyCashItemService(
             return new BuyCashItemResponse
                 { Result = 2, CashSize = 0, Page = page, Index = slot, Value = packet.Value };
         }
+
+        // GL_604_BUY_CASH_ITEM parity (C20 audit-log contract) -- item/quantity/serial only, deliberately no
+        // DeltaMoney (legacy discards the cost fields before any durable record -- see EventLogEmitters'
+        // own remarks).
+        await eventLog.LogCashShopPurchaseAsync(accountId, characterId, entry.ItemId, grantQuantity,
+            newStack.Serial, cancellationToken);
 
         // Only advance the throttle timestamp once the debit/inventory write has actually succeeded --
         // matching legacy's own restamp point (Server/ts25zone/S04_MyWork02.cpp:8243), not on any earlier

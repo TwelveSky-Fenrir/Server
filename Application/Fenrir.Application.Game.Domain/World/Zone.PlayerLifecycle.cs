@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
+using Fenrir.Application.Game.Domain.AntiCheat;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Hotkeys;
 using Fenrir.Application.Game.Domain.Inventory;
@@ -12,6 +13,7 @@ using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
+using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Data.Abstractions.Game;
 using Fenrir.Data.WriteBehind;
@@ -378,8 +380,18 @@ public sealed partial class Zone
             // world entry and an in-process zone transfer.
             StoreMoney = data.StoreMoney,
             InventoryDate = data.InventoryDate,
-            StoreDate = data.StoreDate
+            StoreDate = data.StoreDate,
+            // D2 hook 2: canonical source-IP for the PvP same-origin kill-credit guard -- must be set here,
+            // in the object initializer, since PlayerRuntimeState.SourceIp is init-only. Populated end-to-end
+            // by EnterWorldService (fresh login) and ZoneTransfer.CreateEnterData (in-process handoff) -- see
+            // PlayerRuntimeState.SourceIp's own remarks.
+            SourceIp = data.SourceIp
         };
+
+        // D2 side effect #1: baseline the volatile anti-cheat cadence timers (Cadences, CpExchangeTick,
+        // CpRfcTick) to this zone's clock on entry -- integer/flag counters already default to 0/false on fresh
+        // construction, but the TimeSpan timers must start from _clock, which only HandleEnter knows.
+        state.ResetVolatileAntiCheatCountersOnEntry(_clock);
 
         // Trigger 1 of the mSupportSkillTimeUpRatio behavior contract ("buff-application-stacking-decay"):
         // recompute on every zone-enter/character-load, fresh login and in-process zone transfer alike --
@@ -885,6 +897,12 @@ public sealed partial class Zone
 
         ClearAllBuffs(state);
 
+        // B14 hook 5: reset the party-buff CAST/DONE lifecycle marker on this in-place death transition (the
+        // same PlayerRuntimeState object survives, unlike a zone-entry which builds a fresh state already
+        // defaulted to None). Behaviorally neutral today -- the marker has no consumer wired yet (hook 3
+        // deferred) -- but keeps a dead player's stale in-flight party-buff cast from lingering.
+        ResetPartyBuffMarker(state);
+
         // Death pose (aAction.aSort = 12) so nearby clients see the character fall immediately. Self is
         // excluded: the combat handler tells the dying player's own client via combat-result packets instead.
         var deathPet = PetActionFieldsOf(state);
@@ -1073,6 +1091,14 @@ public sealed partial class Zone
             return;
         }
 
+        // B14: Formation-skill (76-81) zone-lock silent drop. In a 124-type or 049-type war/duel zone the whole
+        // action (including its position update below) is dropped with no mana charge, marker change, broadcast,
+        // response, or disconnect -- for both the op15 (isResumeAction==false) and op16 (isResumeAction==true)
+        // paths, matching legacy's top-of-handler drop in each. A no-op (returns false) for every non-Formation
+        // skill number and every non-war zone, so ordinary moves are never dropped.
+        if (IsFormationSkillZoneLocked(action.SkillNumber))
+            return;
+
         // Captured BEFORE the unconditional recorded-action overwrite just below, so ApplySkillEffectConfirm
         // (op16 Sort==1) can compare the just-echoed skill number/grade against what this character's own
         // most recent accepted op15 action last recorded -- the legacy op16 handler's own ordering
@@ -1155,6 +1181,13 @@ public sealed partial class Zone
             BroadcastAvatarAction(_moveNeighborScratch, state, action);
         }
 
+        // D2 hook 4: skill-cast tamper guard (hotkey match + bonus-grade consistency; the "Skill Hack1"
+        // grade-bound sub-check is deliberately left disabled for now -- see EvaluateSkillCastTamperGuard's
+        // own remarks) -- runs for every accepted op15 category-2 real skill-cast Sort (32/33/38-90) BEFORE
+        // ApplySkillCastManaCharge below, using server-authoritative bonus/max-grade values
+        // (Skills.SkillGradeAuthority), never the client-echoed aSkillGradeNum1/2. On any enforced offense:
+        // audit-log then disconnect -- see that method's own remarks.
+
         // Phase A (cast-start mana charge, op15 category-2 Sorts only) vs. Phase B (effect confirm, op16
         // Sort==1 only) -- see the skill-casting-cooldown-mechanics behavior contract. Neither phase is
         // keyed on action.Sort == 30: that action-Sort is the unrelated "stand up from death" request
@@ -1163,15 +1196,154 @@ public sealed partial class Zone
         if (!isResumeAction)
         {
             if (motion.SkillCategoryCode == SkillCastEffectCategoryCode)
+            {
+                if (!EvaluateSkillCastTamperGuard(state, action))
+                    return; // offense found, audit-logged, and session disconnected -- see method remarks
+
                 ApplySkillCastManaCharge(state, action);
+            }
             else if (action.Sort == RestActionSort)
+            {
                 ApplyRestActionProtectionAndHeal(state);
+            }
+            // B14 (reconciled, wave9 B14-partybuff-sort): CAST(64) and DONE(65) both live outside the
+            // category-2 mana-charge path (CharacterMotionWhitelist resolves both Sorts to SkillCategoryCode
+            // 0), so they need their own explicit dispatch here rather than nesting inside
+            // ApplySkillCastManaCharge -- see PartyBuffMarkerDispatchRules' own remarks for why the previous
+            // nested call site was unreachable dead code.
+            else if (PartyBuffMarkerDispatchRules.ShouldAdvancePartyBuffMarker(isResumeAction, action.Sort))
+            {
+                AdvanceCasterPartyBuffMarker(state, action.SkillNumber, action.Sort);
+            }
         }
         else if (action.Sort == SkillEffectConfirmActionSort)
         {
             ApplySkillEffectConfirm(state, action, previousActionSkillNumber, previousActionSkillGradeNum1,
                 previousActionSkillGradeNum2);
         }
+        // B14 (reconciled): CAST(64) is reachable via op16 too (DONE(65) never reaches here on op16 -- see
+        // PartyBuffMarkerDispatchRules' remarks for why the AvatarActionResumeWhitelist gate above already
+        // makes that case unreachable).
+        else if (PartyBuffMarkerDispatchRules.ShouldAdvancePartyBuffMarker(isResumeAction, action.Sort))
+        {
+            AdvanceCasterPartyBuffMarker(state, action.SkillNumber, action.Sort);
+        }
+    }
+
+    /// <summary>
+    ///     D2 hook 4: server-authoritative skill-cast tamper guard for an accepted op15 category-2 skill-cast
+    ///     action (the real skill-cast Sorts 32/33/38-90, <see cref="SkillCastEffectCategoryCode" />) --
+    ///     <see cref="AntiCheat.SkillCastGuard.Evaluate" />, fed by <see cref="Skills.SkillGradeAuthority" />'s
+    ///     server-computed bonus/max-grade values so the client-echoed <c>aSkillGradeNum1</c>/
+    ///     <c>aSkillGradeNum2</c> are never trusted directly. Runs BEFORE <see cref="ApplySkillCastManaCharge" />
+    ///     -- see <see cref="AntiCheat.SkillCastGuard" />'s own remarks on why validation must complete before
+    ///     any mutation. Returns true when the cast may proceed unmodified; false when an offense was found, an
+    ///     audit row was queued, and the session was disconnected -- the caller must return immediately in that
+    ///     case, matching every other malformed-input handler in this class (see the whitelist-violation
+    ///     disconnects earlier in <see cref="HandleMove" />).
+    /// </summary>
+    /// <remarks>
+    ///     <b>IsRealSkillCast is now the real, fully-cited classification</b> (wave15 D2-skillhack1-special-cases
+    ///     contract, translating <c>S04_MyWork02.cpp:1684-1723</c>/<c>:1884-1916</c>): the "Skill Hack1" grade-bound
+    ///     sub-check (<see cref="AntiCheat.SkillCastOffense.SkillHack1" />) applies to every non-zero skill number
+    ///     EXCEPT the six Formation skills (76-81, exempt unconditionally regardless of action-sort -- 76/77/79/81
+    ///     because they reach the party-buff marker case instead, 78/80 because they hit an empty case) and, in
+    ///     this handler only (the primary op15 <c>AVATAR_ACTION_SEND</c> handler -- op16's own mirror has no such
+    ///     exemption, since sort 16 is outside op16's own action-sort whitelist and can never reach it), the Bottle
+    ///     pair (skill number 1 with action-sort exactly 16). <see cref="FormationSkillCatalog.IsExemptFromGradeBoundCheck" />
+    ///     is the shared, already-tested classification for exactly this exclusion set -- reused here rather than
+    ///     re-deriving it, since it was built for the sibling B14 workstream against the identical citation range.
+    ///     This call site only ever runs for an accepted op15 category-2 action, so <c>isPrimaryHandler: true</c> is
+    ///     hardcoded rather than threaded through as a parameter (see this method's own summary).
+    ///     <para>
+    ///         All four offenses -- <see cref="AntiCheat.SkillCastOffense.HotkeyMismatch" />/
+    ///         <see cref="AntiCheat.SkillCastOffense.LearnedSkillMissing" />/
+    ///         <see cref="AntiCheat.SkillCastOffense.BonusGradeMismatch" />/<see cref="AntiCheat.SkillCastOffense.SkillHack1" />
+    ///         -- are now fully enforced by this call.
+    ///     </para>
+    ///     <para>
+    ///         Audit-log write uses the best-effort <see cref="IEventLogQueue" /> write-behind path, not the
+    ///         durable <see cref="IEventLogRepository.LogAsync" /> path -- this zone's own tick thread must
+    ///         never block on SQL I/O (same constraint <see cref="QueueDeathEventLog" /> exists to work around
+    ///         for death events); a dropped audit row under sustained DB unavailability does not weaken the
+    ///         guard itself, since the disconnect already happened synchronously regardless. <c>eventLogQueue</c>
+    ///         is optional (null in test call sites that don't exercise this side effect -- see <see cref="Zone" />'s
+    ///         own constructor remarks), so a null queue silently skips the audit write rather than throwing.
+    ///     </para>
+    /// </remarks>
+    private bool EvaluateSkillCastTamperGuard(PlayerRuntimeState state, ActionInfo action)
+    {
+        worldData.SkillsById.TryGetValue(action.SkillNumber, out var skillDef);
+
+        // SkillGradeAuthority.GetBonusSkillValue's own equip-slot-indexed input shape (cape = CapeSlotIndex,
+        // pet = PetSlotIndex) -- a fresh, small array is fine here: this branch only runs for an accepted
+        // real skill-cast action (op15 category-2), never on every ordinary move.
+        var equipSlotItems = new ItemDefinition?[SkillGradeAuthority.EquipSlotCount];
+        for (var slot = 0; slot < SkillGradeAuthority.EquipSlotCount; slot++)
+        {
+            var equippedStack = state.Inventory.GetSlot(ContainerMatrix.Equipment, (byte)slot);
+            if (equippedStack is { } stack && worldData.ItemsById.TryGetValue(stack.ItemId, out var itemDef))
+                equipSlotItems[slot] = itemDef;
+        }
+
+        // petPackedValue: 0 (SkillGradeAuthority's own documented safe default -- no confirmed live source
+        // yet, see that class's remarks). guildBuffType/guildBuffActive: term 6 is a documented no-op today
+        // (SkillGradeAuthority.IsBuffCategorySkill always returns false), so state.GuildBuffActive is passed
+        // for completeness but cannot change the result either way.
+        var serverBonusGrade = SkillGradeAuthority.GetBonusSkillValue(action.SkillNumber, equipSlotItems, 0,
+            skillDef, 0, state.GuildBuffActive);
+        var serverMaxGrade = SkillGradeAuthority.GetMaxSkillGradeNum(action.SkillNumber, state.LearnedSkills);
+
+        // D2 special-case exclusion set (wave15 contract): a non-zero skill number is a "real" skill cast for
+        // the Skill-Hack1 bound check unless it's one of the six Formation skills (76-81, unconditional) or the
+        // primary-handler-only Bottle pair (skill 1, action-sort 16) -- see method remarks.
+        var isRealSkillCast = action.SkillNumber != 0 &&
+            !FormationSkillCatalog.IsExemptFromGradeBoundCheck(action.SkillNumber, action.Sort,
+                isPrimaryHandler: true);
+
+        // SkillCastEffectCategoryCode (2), not a re-read of the caller's own `motion` local -- this method is
+        // only ever invoked from the branch that already tested motion.SkillCategoryCode ==
+        // SkillCastEffectCategoryCode, so hardcoding the same constant here is equivalent and keeps this
+        // method's signature independent of HandleMove's own local evaluation result.
+        var offense = SkillCastGuard.Evaluate(new SkillCastGuardContext(
+            SkillCastEffectCategoryCode,
+            state.AutoHuntEnabled,
+            action.SkillNumber,
+            action.SkillGradeNum1,
+            action.SkillGradeNum2,
+            serverBonusGrade,
+            serverMaxGrade,
+            isRealSkillCast,
+            state.Hotkeys,
+            state.LearnedSkills));
+
+        if (offense == SkillCastOffense.None)
+            return true;
+
+        eventLogQueue?.Enqueue(new EventLogEntryTvp(
+            (short)offense,
+            (byte)EventLogCategory.AntiCheat,
+            null,
+            state.CharacterId,
+            null,
+            null,
+            options.ShardId,
+            null,
+            null,
+            null,
+            null,
+            null,
+            $"SkillCastOffense={offense};Skill={action.SkillNumber};ClaimedGrade1={action.SkillGradeNum1};ClaimedGrade2={action.SkillGradeNum2};ServerBonus={serverBonusGrade};ServerMax={serverMaxGrade}",
+            DateTime.UtcNow));
+
+        logger.LogWarning(
+            "Character {CharacterId} skill-cast tamper guard tripped ({Offense}) on zone {MapId} -- disconnecting",
+            state.CharacterId, offense, MapId);
+
+        if (state.Session is ClientSession client)
+            client.Abort(DisconnectReason.Faulted);
+
+        return false;
     }
 
     /// <summary>
@@ -1285,6 +1457,13 @@ public sealed partial class Zone
         state.Mana -= result.ManaCost;
         state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
 
+        // B14 (reconciled, wave9 B14-partybuff-sort): the party-buff CAST(64)/DONE(65) marker advance does
+        // NOT belong here -- Sort 64/65 both resolve to CharacterMotionWhitelist category 0, never category 2
+        // (SkillCastEffectCategoryCode), so this method is never actually invoked for either of those Sorts;
+        // the call that used to sit here was dead code. The real advance now happens directly in HandleMove's
+        // own dispatch, gated by PartyBuffMarkerDispatchRules.ShouldAdvancePartyBuffMarker -- see that class's
+        // remarks for the full opcode-reachability reconciliation.
+
         // Effect write (buff slots / targeted heal) is deliberately NOT applied here -- see
         // ApplySkillEffectConfirm, which is what actually writes it, and only once a matching op16
         // confirmation arrives.
@@ -1364,6 +1543,24 @@ public sealed partial class Zone
         if (!result.Success)
             return;
 
+        // B14 (reconciled, wave9 B14-partybuff-sort): the call that used to sit here passed action.Sort
+        // (== SkillEffectConfirmActionSort, 1) into AdvanceCasterPartyBuffMarker, which only recognizes Sort
+        // 64/65 -- so it was permanently a no-op (action.Sort is a DIFFERENT value space here, not the
+        // party-buff DONE sort, despite both loosely being called "confirm" -- see
+        // PartyBuffMarkerDispatchRules' own remarks for the naming collision this caused). The party-buff
+        // contract's own reset-on-success side effect (the single-use, anti-replay consumption of the DONE
+        // state, S07_MyGame03.cpp:9600/9607/9614/9621) is applied below, once the buff has actually been
+        // written, not here.
+        //
+        // TODO(wiring B14): hook 3 (gate the formation buff broadcast on PartyBuffAct == Done) is STILL
+        // DEFERRED as a genuine design decision for this partial's owner -- this reconciliation fixes WHICH
+        // Sort/opcode advances and consumes the marker, not whether buff creation should additionally be
+        // gated on it. The B14 contract wants the party-buff CAST/DONE marker to be the broadcast gate; but
+        // this method's own remarks state the existing op15/op16 skill/grade staleness check already "stands
+        // in as the structural equivalent". Adding `if (result.RequiresFullParty && state.PartyBuffAct !=
+        // PartyBuffAction.Done) return;` here would change the existing HasFullPartyPresent-gated behavior, so
+        // it is intentionally NOT applied without adjudication -- see the B14 openQuestions.
+
         // Formation skills 76/77/79/81 only (SkillEffectCatalog.RequiresFullParty) -- see this method's own
         // remarks and the "Formation Party-Buff Exact-Five-Member Gate" behavior contract. Every other skill
         // number leaves RequiresFullParty false and this check is a no-op for it.
@@ -1388,6 +1585,13 @@ public sealed partial class Zone
                 }
 
                 ApplyBuffWrites(state, result.BuffWrites);
+
+                // B14 (reconciled): single-use, anti-replay consumption of the party-buff DONE state --
+                // ProcessForCreateBuff's own per-skill cases (76/77/79/81) reset mParty_Buff_Act back to None
+                // immediately after writing the buff (S07_MyGame03.cpp:9600/9607/9614/9621). A no-op for
+                // every other skill number (they never advanced the marker off None in the first place).
+                if (PartyBuffMarkerDispatchRules.ShouldResetPartyBuffMarkerOnConfirmSuccess(action.SkillNumber))
+                    ResetPartyBuffMarker(state);
                 break;
             case SkillEffectKind.HealLife:
                 ApplyTargetedHeal(action, true, result.HealAmount);
@@ -1499,7 +1703,7 @@ public sealed partial class Zone
     public void RecomputeStatsAndBroadcastBuffs(PlayerRuntimeState state, int[] changedSlots)
     {
         var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
-            state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo, state.RebirthCount);
+            state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo, state.RebirthCount, state.Level2);
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
 
         var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)

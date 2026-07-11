@@ -48,6 +48,7 @@ public class EquipmentServiceTests
             LevelsByLevel = EmptyFrozen<short, LevelRowDto>(),
             ZonesByNumber = EmptyFrozen<short, ZoneDefinition>(),
             GemSocketsById = EmptyFrozen<int, GemSocketRowDto>(),
+            GemSocketsByTypeAndValue = EmptyFrozen<int, GemSocketRowDto>(),
             BloodExchangeCatalog = [],
             EventDefinitions = [],
             ItemMallProductsById = EmptyFrozen<int, ItemMallProductRowDto>(),

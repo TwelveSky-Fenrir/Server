@@ -56,7 +56,7 @@ public class ZoneMoveServiceCrossShardTests
         var tickets = new FakeSessionTicketRepository();
         var options = new GameServerOptions { ShardId = SourceShardId };
         var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
-            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(),
+            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(), PortalProximityCatalog.Empty,
             new FakeGameServerDirectoryRepository(shards),
             new FakeShardMapAssignmentRepository(hostedMapsByShard),
             tickets,
@@ -208,7 +208,7 @@ public class ZoneMoveServiceCrossShardTests
         var tickets = new FakeSessionTicketRepository();
         var options = new GameServerOptions { ShardId = SourceShardId };
         var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
-            corridorCatalog, corridorState,
+            corridorCatalog, corridorState, PortalProximityCatalog.Empty,
             new FakeGameServerDirectoryRepository(shards),
             new FakeShardMapAssignmentRepository(hostedMapsByShard),
             tickets,

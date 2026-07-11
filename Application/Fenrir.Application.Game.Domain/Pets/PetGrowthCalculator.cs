@@ -82,13 +82,21 @@ public static class PetGrowthCalculator
         if (!itemsById.TryGetValue(petItemId, out var definition) || definition.Item.Sort != 22)
             return default;
 
+        // B8-pet-growth-depth: PETSYSTEM::ReturnAttackPower2's own item-id -> category table
+        // (PetSteppedAttackPowerCategoryTable) is a strictly smaller, non-identical subset of the four
+        // families above -- an unresolved id here correctly yields 0, independent of growth/activity.
+        var steppedAttackBonus = PetSteppedAttackPowerCategoryTable.TryResolveTierMax(petItemId, out var steppedTierMax)
+            ? StatCalculator.PetSteppedAttackBonus(growth, steppedTierMax, activity)
+            : 0;
+
         return new PetStatContribution(
             ComputeTiered(petItemId, growth, LifeFamily, LifePremium, 2000f, 2200f, 4000f, 4400f),
             ComputeTiered(petItemId, growth, ManaFamily, ManaPremium, 1800f, 2000f, 3600f, 4000f),
             activity < 1
                 ? 0
                 : ComputeTiered(petItemId, growth, AttackFamily, AttackPremium, 1000f, 1100f, 2000f, 2200f),
-            ComputeTiered(petItemId, growth, DefenseFamily, DefensePremium, 2000f, 2200f, 4000f, 4400f));
+            ComputeTiered(petItemId, growth, DefenseFamily, DefensePremium, 2000f, 2200f, 4000f, 4400f),
+            steppedAttackBonus);
     }
 
     private static int ComputeTiered(int petItemId, int growth, FrozenDictionary<int, int> family,

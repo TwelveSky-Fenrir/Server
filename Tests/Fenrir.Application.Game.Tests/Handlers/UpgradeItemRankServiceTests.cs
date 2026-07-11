@@ -97,7 +97,7 @@ public class UpgradeItemRankServiceTests
             itemsById[CandidateItemId] = new ItemDefinition(CandidateRow(), []);
 
         return new UpgradeItemRankService(characters, ZoneTestKit.EmptyWorldData(itemsById.ToFrozenDictionary()),
-            eventLog, NullLogger<UpgradeItemRankService>.Instance);
+            eventLog, new WarlordPityLockState(), NullLogger<UpgradeItemRankService>.Instance);
     }
 
     [Fact]
@@ -145,7 +145,7 @@ public class UpgradeItemRankServiceTests
             [MaterialItemId] = new(WorldDataTestRows.Item(MaterialItemId), [])
         }.ToFrozenDictionary();
         var service = new UpgradeItemRankService(repo, ZoneTestKit.EmptyWorldData(itemsById), eventLog,
-            NullLogger<UpgradeItemRankService>.Instance);
+            new WarlordPityLockState(), NullLogger<UpgradeItemRankService>.Instance);
 
         var result = await service.UpgradeAsync(
             new UpgradeItemRankRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1, Luck = 0 }, zone, state, 10,

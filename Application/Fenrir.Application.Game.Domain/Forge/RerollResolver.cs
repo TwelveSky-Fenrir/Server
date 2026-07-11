@@ -25,6 +25,12 @@ public static class RerollResolver
     public const byte RareItemType = 3;
     public const byte EliteItemType = 4;
     private const int MaxBaseLevel = 145;
+    private const int MaxMartialLevel = 12;
+
+    /// <summary>MG5ORIGIN top-tier set-item price override (Server/Header/function.h:1489-1497,1584-1592).</summary>
+    private const int Mg5OriginRareTopPrice = 250_000_000;
+
+    private const int Mg5OriginEliteTopPrice = 500_000_000;
 
     private const byte IAmulet = 7;
     private const byte ICape = 8;
@@ -155,21 +161,30 @@ public static class RerollResolver
     }
 
     /// <summary>
-    ///     Verified against every literal case in GetExchangeMoney (function.h:1385-1568): a flat 200,000
+    ///     Verified against every literal case in GetExchangeMoney (function.h:1385-1596): a flat 200,000
     ///     (Rare) / 400,000 (Elite) increment per tier index, tiers 45..144 (Rare) / 100..142 (Elite) followed
     ///     by 13 level-145 martial sub-tiers (0..12). Level values outside the table return 0, matching the
-    ///     legacy switch falling through with tMoney's zero-initialized default.
+    ///     legacy switch falling through with tMoney's zero-initialized default. The normal top-tier value
+    ///     (level 145, martial 12) works out to 7,000,000 (Rare) / 14,000,000 (Elite) -- but the MG5ORIGIN
+    ///     override (DEFINE.h:18, defined unconditionally -- live) replaces that with a flat 250,000,000 /
+    ///     500,000,000 when the target is a set item at that exact top tier (function.h:1489-1497,1584-1592).
     /// </summary>
     private static int GetExchangeMoney(ItemRowDto item)
     {
         var isRare = item.Type == RareItemType;
+
+        // MG5ORIGIN premium override: a set item (CheckSetItem > 1) at the absolute top tier costs the flat
+        // override instead of the normal table value. Checked first, since it wholly replaces the table result.
+        if (item.Level == MaxBaseLevel && item.MartialLevel == MaxMartialLevel && item.CheckSetItem > 1)
+            return isRare ? Mg5OriginRareTopPrice : Mg5OriginEliteTopPrice;
+
         var tiers = isRare ? RareLevelTiers : EliteLevelTiers;
         var baseMoney = isRare ? 1_000_000 : 4_000_000;
         var increment = isRare ? 200_000 : 400_000;
 
         var tierIndex = Array.IndexOf(tiers, item.Level);
         if (tierIndex >= 0) return baseMoney + increment * tierIndex;
-        if (item.Level != MaxBaseLevel || item.MartialLevel is < 0 or > 12)
+        if (item.Level != MaxBaseLevel || item.MartialLevel is > 12)
             return 0;
 
         tierIndex = tiers.Length + item.MartialLevel;

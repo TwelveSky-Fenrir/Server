@@ -19,6 +19,7 @@ public sealed class UpgradeItemRankService(
     ICharacterRepository characters,
     WorldDataCache worldData,
     IEventLogQueue eventLogQueue,
+    WarlordPityLockState warlordPityLock,
     ILogger<UpgradeItemRankService> logger)
     : IUpgradeItemRankService
 {
@@ -87,10 +88,34 @@ public sealed class UpgradeItemRankService(
 
         var succeeded = resolved.Outcome == RankChangeResolver.RankChangeOutcome.Success;
 
+        var resultItemId = resolved.ResultItemId;
+        var resultCombine = resolved.NewCombine;
+
+        if (succeeded && resolved.WarlordRerollEligible)
+        {
+            var warlordDraw = WarlordRerollBonusTable.TryDrawReplacement(
+                targetDefinition.Item.Sort, targetDefinition.Item.Type, state.PreviousTribe,
+                warlordPityLock, SystemRandomSource.Instance);
+
+            if (warlordDraw.Outcome != WarlordRerollBonusTable.WarlordRerollOutcome.NoCandidate)
+            {
+                // Contract side effect B.3: the sub-counter is reset then re-incremented by one on an
+                // accepted swap (984-material dead-code exclusion already guaranteed upstream by
+                // RankChangeResolver's own material gate -- materialItem.ItemId is not (1024 or 1025) is
+                // already rejected before this point, so the re-increment always applies in practice).
+                resultItemId = warlordDraw.ReplacementItemId;
+                resultCombine = 1;
+
+                // TODO (deferred, out of this workstream's scope -- ZoneEventBroadcaster is off-limits):
+                // if (WarlordRerollBonusTable.NoticeReachesRecipients(targetDefinition.Item.Type))
+                //     /* broadcast a server-wide notice naming resultItemId, per contract side effect B.4 */;
+            }
+        }
+
         var newTargetStack = succeeded
             ? target with
             {
-                ItemId = resolved.ResultItemId, Enchant = (byte)resolved.NewEnchant, Combine = (byte)resolved.NewCombine
+                ItemId = resultItemId, Enchant = (byte)resolved.NewEnchant, Combine = (byte)resultCombine
             }
             : target;
 
@@ -144,7 +169,7 @@ public sealed class UpgradeItemRankService(
         if (!eventLogQueue.Enqueue(new EventLogEntryTvp(UpgradeItemRankEventCode, (byte)EventLogCategory.Enchant,
                 null, characterId, null, null, null, -(long)resolved.Cost, null, target.ItemId, target.Quantity,
                 succeeded ? SuccessOutcome : FailedOutcome,
-                $"Serial={target.Serial};Material={material.ItemId};ResultItemId={(succeeded ? resolved.ResultItemId : target.ItemId)}",
+                $"Serial={target.Serial};Material={material.ItemId};ResultItemId={(succeeded ? resultItemId : target.ItemId)}",
                 DateTime.UtcNow)))
             logger.LogWarning(
                 "game.EventLog write-behind queue full: dropped upgrade-item-rank audit row for character {CharacterId}",
@@ -153,8 +178,8 @@ public sealed class UpgradeItemRankService(
         var value = succeeded
             ? new[]
             {
-                resolved.ResultItemId, 0, 0, target.Quantity,
-                ItemValueCodec.Encode((byte)resolved.NewEnchant, (byte)resolved.NewCombine, target.Refine,
+                resultItemId, 0, 0, target.Quantity,
+                ItemValueCodec.Encode((byte)resolved.NewEnchant, (byte)resultCombine, target.Refine,
                     target.Socket),
                 target.Serial
             }

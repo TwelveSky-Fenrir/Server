@@ -1,8 +1,9 @@
 using Fenrir.Application.Game.Abstractions.Chat;
+using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Services.Chat;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Data.Abstractions.Runtime;
+using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Chat;
 
@@ -35,10 +36,11 @@ public class WhisperServiceTests
         var directory = new FakeCharacterShardLocationRepository { ThrowOnUpsert = true };
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([]);
-        var service = new WhisperService(zones, directory);
+        var service = new WhisperService(zones, directory, new FakeChatCrossShardRelayQueue(),
+            Options.Create(new GameServerOptions()));
         var sender = MakePlayer(1, "Hero");
 
-        var resolution = await service.ResolveAsync(sender, "Hero", CancellationToken.None);
+        var resolution = await service.ResolveAsync(sender, "Hero", "hi", 0, CancellationToken.None);
 
         Assert.Equal(WhisperOutcome.SelfWhisper, resolution.Outcome);
     }
@@ -54,10 +56,11 @@ public class WhisperServiceTests
         zone!.Post(ZoneCommand.Enter(2, ZoneTestKit.EnterData(session, 1, "Target")));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
-        var service = new WhisperService(zones, directory);
+        var service = new WhisperService(zones, directory, new FakeChatCrossShardRelayQueue(),
+            Options.Create(new GameServerOptions()));
         var sender = MakePlayer(1, "Hero");
 
-        var resolution = await service.ResolveAsync(sender, "Target", CancellationToken.None);
+        var resolution = await service.ResolveAsync(sender, "Target", "hi", 0, CancellationToken.None);
 
         Assert.Equal(WhisperOutcome.Delivered, resolution.Outcome);
         Assert.Equal("Target", resolution.Target!.Name);
@@ -71,30 +74,12 @@ public class WhisperServiceTests
         var directory = new FakeCharacterShardLocationRepository();
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([]);
-        var service = new WhisperService(zones, directory);
+        var service = new WhisperService(zones, directory, new FakeChatCrossShardRelayQueue(),
+            Options.Create(new GameServerOptions()));
         var sender = MakePlayer(1, "Hero");
 
-        var resolution = await service.ResolveAsync(sender, "Nobody", CancellationToken.None);
+        var resolution = await service.ResolveAsync(sender, "Nobody", "hi", 0, CancellationToken.None);
 
         Assert.Equal(WhisperOutcome.TargetNotFound, resolution.Outcome);
-    }
-
-    [Fact]
-    public async Task ResolveAsync_SameShardMiss_ButFoundOnAnotherShard_ReturnsTargetOnAnotherShard_NotDelivered()
-    {
-        var directory = new FakeCharacterShardLocationRepository();
-        directory.Seed(new CharacterShardLocationDto(99, 3, 42, "Remote", 0,
-            DateTime.UtcNow));
-        var zones = ZoneTestKit.CreateRegistry();
-        zones.Initialize([]);
-        var service = new WhisperService(zones, directory);
-        var sender = MakePlayer(1, "Hero");
-
-        var resolution = await service.ResolveAsync(sender, "Remote", CancellationToken.None);
-
-        Assert.Equal(WhisperOutcome.TargetOnAnotherShard, resolution.Outcome);
-        Assert.Equal((byte?)3, resolution.OtherShardId);
-        Assert.Equal((short?)42, resolution.OtherMapId);
-        Assert.Null(resolution.Target);
     }
 }

@@ -746,6 +746,24 @@ public sealed partial class Zone
             changed = true;
         }
 
+        if (command.EliteDungeonTime is { } eliteDungeonTime)
+        {
+            state.EliteDungeonTime = eliteDungeonTime;
+            changed = true;
+        }
+
+        if (command.DungeonKeyTime is { } dungeonKeyTime)
+        {
+            state.DungeonKeyTime = dungeonKeyTime;
+            changed = true;
+        }
+
+        if (command.IvyHallTicketTime is { } ivyHallTicketTime)
+        {
+            state.IvyHallTicketTime = ivyHallTicketTime;
+            changed = true;
+        }
+
         if (command.TeacherPoint is { } teacherPoint)
         {
             state.TeacherPoint = teacherPoint;

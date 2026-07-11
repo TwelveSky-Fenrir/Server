@@ -13,6 +13,18 @@ public sealed class SocketConnection : IDuplexPipe, IAsyncDisposable
 {
     private const int ReceiveBufferSize = 4096;
 
+    // OS-level per-connection socket send/receive buffers (SO_SNDBUF/SO_RCVBUF), applied only when the
+    // constructor's applyOsSocketBuffers flag is set. A completely separate knob from ReceiveBufferSize above
+    // (a request-size hint to the Pipe's own buffer segment, not a socket option) and from PipeOptionsFactory's
+    // in-process managed-memory watermarks -- these two constants govern how much the kernel buffers on the wire
+    // before applying TCP flow control. Legacy applied them ONLY to zone (GameServer) accepted sockets
+    // (Server/ts25zone/S02_MyServer.cpp:481 passes the "set buffers" flag on; the login/playuser/extra/center
+    // accept paths and every listen socket leave it off via the default at Server/Header/socket.h:16,:95), so
+    // this defaults off and only the GameServer opts in. Values are legacy's own (Server/Header/socket.h:33,:38):
+    // SO_SNDBUF is deliberately ~10x SO_RCVBUF.
+    private const int SocketSendBufferSize = 204800;
+    private const int SocketReceiveBufferSize = 20480;
+
     // Governs ONLY the two loops' own blocking socket calls (_socket.ReceiveAsync/SendAsync) -- see Abort's
     // own remarks for why this exists separately from the pipe-level cancellation ClientSession.Abort already
     // performs on Transport.Input/Output.
@@ -23,11 +35,26 @@ public sealed class SocketConnection : IDuplexPipe, IAsyncDisposable
     private readonly Socket _socket;
     private readonly Pipe _txPipe;
 
-    public SocketConnection(Socket socket, ILogger? logger = null)
+    // applyOsSocketBuffers defaults off to match every non-zone accept path and every listen socket (legacy's
+    // own default, Server/Header/socket.h:16,:95); only the GameServer's per-connection sockets pass it on
+    // (Server/ts25zone/S02_MyServer.cpp:481). See SocketSendBufferSize/SocketReceiveBufferSize's own remarks.
+    public SocketConnection(Socket socket, ILogger? logger = null, bool applyOsSocketBuffers = false)
     {
         _socket = socket;
         _socket.NoDelay = true; // Nagle OFF: an MMO's tick-driven traffic wants latency over throughput
         _logger = logger;
+
+        // Applied after NoDelay, matching legacy's own option order (non-blocking -> TCP_NODELAY -> SO_SNDBUF ->
+        // SO_RCVBUF, Server/Header/socket.h:18-41). A failure here (SocketException from either property setter)
+        // propagates out of this constructor -- FenrirTcpListener's own new-SocketConnection try/catch then
+        // disposes the socket and logs ConnectionConstructionFailed, which is exactly legacy's "a setsockopt
+        // failure aborts acceptance of that socket" behavior (Server/Header/socket.h:32-41); it is never
+        // swallowed into a half-configured connection.
+        if (applyOsSocketBuffers)
+        {
+            _socket.SendBufferSize = SocketSendBufferSize;
+            _socket.ReceiveBufferSize = SocketReceiveBufferSize;
+        }
 
         RemoteEndPoint = socket.RemoteEndPoint as IPEndPoint;
 

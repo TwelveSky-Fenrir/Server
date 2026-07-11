@@ -150,6 +150,12 @@ public sealed class TribeGuardSpawner(
         if (!OrdinaryEligibleMapIds.Contains(zone.MapId))
             return; // whole call is a no-op for this map
 
+        // Side effect §1 (S10_MySummon.cpp:1809-1816): force-reset (tCheckFirst) wipes the whole normal-guard
+        // region BEFORE the spawn loop, so every configured post is re-planted fresh (a damaged guard is reset
+        // to full HP), not left untouched. The periodic 20-tick pass runs in cooldown mode and never wipes.
+        if (forceFirstPass)
+            TribeGuardForceResetSweep.Wipe(zone, OrdinaryPoolServerIndexBase);
+
         foreach (var post in catalog.OrdinaryPosts)
         {
             if (post.MapId != zone.MapId)
@@ -176,6 +182,11 @@ public sealed class TribeGuardSpawner(
 
         if (worldState is null || worldState.World.Zone038WinTribe is not { } winningTribe)
             return; // sentinel -- no winner recorded yet
+
+        // Side effect §1: force-reset wipes the whole tribe-guard region before re-planting the winner's posts.
+        // Placed after the no-victor guard (legacy returns before the wipe on the no-victor sentinel).
+        if (forceFirstPass)
+            TribeGuardForceResetSweep.Wipe(zone, Zone038WinnerPoolServerIndexBase);
 
         foreach (var post in catalog.Zone038WinnerPosts)
         {

@@ -111,5 +111,17 @@ public enum DisconnectReason
     ///     connected session on the map regardless of that player's own state.
     /// </summary>
     /// <remarks>Réf. C++ : Server/ts25zone/S07_MyGame01.cpp:11558-11571.</remarks>
-    ValleyWarForcedReset
+    ValleyWarForcedReset,
+
+    /// <summary>
+    ///     Torn down by op23's costume/stellar-core intermediate dispatch (workstream C9-costume-stellar-
+    ///     whitelist) when every one of the ten wardrobe slots is already occupied at the moment a new
+    ///     costume/stellar-core item is used -- a real, distinct legacy <c>Quit()</c> condition, not a
+    ///     protocol/anti-tamper fault (<see cref="Faulted" />) or an anti-exploit state re-check
+    ///     (<see cref="StateViolation" />). No acknowledgment of any kind is sent first, matching the legacy
+    ///     source's own asymmetry against the sibling "already worn" rejection (a normal Result=1 reply, no
+    ///     disconnect).
+    /// </summary>
+    /// <remarks>Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:2503-2514 (costume), :2542-2553 (stellar core).</remarks>
+    WardrobeFull
 }

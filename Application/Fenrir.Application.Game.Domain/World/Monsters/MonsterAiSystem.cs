@@ -58,11 +58,22 @@ namespace Fenrir.Application.Game.Domain.World.Monsters;
 ///             <c>ReturnSpecialSortNumber</c> <c>(Type, SpecialType) -&gt; sort</c> discriminator table (only
 ///             standard-default + tribe-symbol are grounded), the guard/thrower monster-type/special-type -&gt;
 ///             tribe maps (the contract's tribe/allied-tribe exclusion, so the thrower recipe currently applies
-///             no such exclusion), the short-range re-target's body-size height filter (which <c>Size*</c> field
-///             it reads is unknown), and any <c>BulletInfo1/2</c> server-side projectile hit-test (the contract
-///             states the ranged attack is client-echoed, not server-resolved -- so <see cref="MonsterAiState.RangedAttackWindup" />
+///             no such exclusion), and any <c>BulletInfo1/2</c> server-side projectile hit-test (the contract
+///             states the ranged attack is client-echoed, not server-resolved -- so
+///             <see cref="MonsterAiState.RangedAttackWindup" />
 ///             stays pure-timed and only the melee <see cref="MonsterAiState.AttackWindup" /> resolves damage
 ///             through <see cref="Zone.ResolveMonsterAttack" />).
+///         </item>
+///         <item>
+///             UPDATE (2026-07, A3-mid-chase-retarget behavior contract): <see cref="TryShortRangeRetarget" />
+///             now matches the resolved contract exactly -- the previously-unresolved body-height filter now
+///             reads <see cref="MonsterRowDto.Size2" /> (legacy <c>mSize[1]</c>,
+///             <c>Server/Header/Protocol/STRUCT.h:165</c>), acceptance is a per-candidate 50% roll with
+///             first-success-wins rather than a "strictly closer than current target" comparison, the
+///             currently-locked target is no longer excluded from candidacy, and the reselect throttle now
+///             accrues in real elapsed time (<c>legacyTicksElapsed</c>, threaded through <see cref="RunChase" />)
+///             instead of once per call. All three were behavioral deviations from the resolved contract in
+///             the prior revision of this method, not merely undocumented gaps.
 ///         </item>
 ///         <item>
 ///             UPDATE: <see cref="MonsterAiState.Flinch" />'s entry condition (a big single hit interrupting
@@ -221,7 +232,7 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
                 break;
 
             case MonsterAiState.Chase:
-                RunChase(zone, monster, dt);
+                RunChase(zone, monster, dt, legacyTicksElapsed);
                 break;
 
             case MonsterAiState.AttackWindup:
@@ -590,22 +601,35 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
     }
 
     /// <summary>
-    ///     Short-range mid-chase re-target scan (<c>SelectAvatarIndexForShortRange</c>,
-    ///     <c>S07_MyGame05.cpp:518-594</c>): throttled to the same ~1 s window as wide-detect, gated to attack
-    ///     type {1,3,6}, using the short/melee radius (<see cref="MonsterRowDto.RadiusInfo1" />) with a squared
-    ///     HORIZONTAL distance test. Returns a valid candidate strictly closer than the current target if one is
-    ///     found (re-committing the target descriptor + anti-clump), otherwise the unchanged
-    ///     <paramref name="current" />. The body-size height rejection filter (<c>:581-584</c>) is NOT applied --
-    ///     the contract does not establish which <see cref="MonsterRowDto" /> size field is "body-size height"
-    ///     (flagged for a <c>legacy-behavior-translator</c> follow-up). Never itself transitions state; the
-    ///     caller's own attack/close logic acts on whichever target this returns.
+    ///     Short-range mid-chase re-target scan (<c>SelectAvatarIndexForAttackAction</c>, legacy source also
+    ///     refers to it as <c>SelectAvatarIndexForShortRange</c>, <c>S07_MyGame05.cpp:518-594</c>; behavior
+    ///     contract <c>A3-mid-chase-retarget</c>): throttled to the same ~1 s REAL-TIME window as wide-detect
+    ///     (accrued via <paramref name="legacyTicksElapsed" />, restarting on every attempted scan whether or not
+    ///     it finds a candidate), gated to attack type {1,3,6}, scanning every neighbor against the short/melee
+    ///     radius (<see cref="MonsterRowDto.RadiusInfo1" />, squared HORIZONTAL distance only) plus a vertical
+    ///     gate against the species' own body-height half-extent (<see cref="MonsterRowDto.Size2" />, legacy
+    ///     <c>mSize[1]</c>, <c>Server/Header/Protocol/STRUCT.h:165</c>). Acceptance is PROBABILISTIC, not
+    ///     best-candidate: each surviving candidate gets an independent 50% roll in neighbor-scan order and the
+    ///     scan stops at the very first accepted one -- this is deliberately NOT a "closest to the monster" or
+    ///     "strictly closer than the current target" search (an earlier revision of this method used that
+    ///     comparison; the contract establishes legacy has no such tie-break). The currently-locked target is
+    ///     also NOT excluded from candidacy -- legacy can legally re-accept the same avatar it already has (a
+    ///     behavioral no-op that still re-commits the target descriptor). Never itself transitions state; the
+    ///     caller (<see cref="RunChase" />) acts on whichever target this returns -- see that method's remarks
+    ///     for why a freshly re-targeted candidate is guaranteed to already be within melee range (same radius
+    ///     field backs both this scan's acceptance test and <see cref="RunChase" />'s attack-transition check).
     /// </summary>
-    private PlayerRuntimeState TryShortRangeRetarget(Zone zone, MonsterEntity monster, PlayerRuntimeState current)
+    private PlayerRuntimeState TryShortRangeRetarget(Zone zone, MonsterEntity monster, PlayerRuntimeState current,
+        int legacyTicksElapsed)
     {
         if (monster.Template.AttackType is not (1 or 3 or 6))
             return current;
 
-        monster.ShortRangeRetargetThrottleTicks++;
+        // 1000 ms real-time reselect throttle (S07_MyGame05.cpp:529-533): restarts on every attempted scan,
+        // whether or not it ends up finding a candidate. Accrued in legacyTicksElapsed (not a flat per-call
+        // increment) so a stalled host's multi-tick catch-up still consumes the correct real-time window --
+        // same convention as TryAcquireTarget's DetectionThrottleTicks.
+        monster.ShortRangeRetargetThrottleTicks += legacyTicksElapsed;
         if (monster.ShortRangeRetargetThrottleTicks < SimulationClock.MonsterDetectionThrottleLegacyTicks)
             return current;
 
@@ -613,25 +637,34 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
 
         var shortRadius = monster.Template.RadiusInfo1;
         if (shortRadius <= 0)
-            return current; // radius-at-least-1 gate (:518-594) -- no short-range scan for a non-positive melee radius
+            return current; // radius-at-least-1 gate (:534-537) -- no short-range scan for a non-positive melee radius
 
         var shortRadiusSq = (float)shortRadius * shortRadius;
-        var currentDistSq = DistanceSquared(monster.PosX, monster.PosZ, current.PosX, current.PosZ);
+        var heightHalfExtent = (float)monster.Template.Size2; // mSize[1], STRUCT.h:165 -- body-height half-extent
 
         foreach (var characterId in zone.NeighborsOfPosition(monster.PosX, monster.PosZ))
         {
-            if (characterId == current.CharacterId)
-                continue; // never "re-target" to the one already locked
-
+            // No exclusion of the current target from candidacy (A3-mid-chase-retarget contract's own edge
+            // case): legacy's own scan can legally re-iterate and re-accept the avatar already locked.
             if (!zone.TryGetPlayer(characterId, out var candidate) || !IsCandidateValid(candidate))
                 continue;
 
             if (monster.InstanceId is { } requiredInstanceId && candidate.DungeonInstanceId != requiredInstanceId)
-                continue; // instance-id filter (short-range function, :562-570)
+                continue; // instance-id filter (short-range function, :562-569)
 
             var candidateDistSq = DistanceSquared(monster.PosX, monster.PosZ, candidate.PosX, candidate.PosZ);
-            if (candidateDistSq > shortRadiusSq || candidateDistSq >= currentDistSq)
-                continue; // must be inside the short radius AND strictly closer than the current target
+            if (candidateDistSq > shortRadiusSq)
+                continue; // horizontal short-radius acceptance test (:575-578)
+
+            if (MathF.Abs(monster.PosY - candidate.PosY) > heightHalfExtent)
+                continue; // vertical height gate against the species' body-height half-extent (:579-585)
+
+            // Probabilistic acceptance, not best-candidate (:586-591): each surviving candidate gets an
+            // independent 50% roll, tested in neighbor-scan order; the scan stops at the very first accepted
+            // candidate rather than searching for the closest/most eligible one. A lost flip skips this
+            // candidate only for the rest of THIS scan -- it is not revisited until the next throttle window.
+            if (_random.NextInt32(2) != 0)
+                continue;
 
             monster.AssignTarget(characterId, candidate.UniqueNumber, candidate.PosX, candidate.PosY,
                 candidate.PosZ);
@@ -642,7 +675,7 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
         return current;
     }
 
-    private void RunChase(Zone zone, MonsterEntity monster, float dt)
+    private void RunChase(Zone zone, MonsterEntity monster, float dt, int legacyTicksElapsed)
     {
         // AdjustValidAttackTarget prune (S07_MyGame05.cpp:387-391, per-A005-tick target re-validation): a
         // locked target that is disconnected / mid-cross-shard-transfer (IsMovingZone) / (unmodeled) hiding /
@@ -663,12 +696,13 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
             return;
         }
 
-        // Short-range mid-chase re-target (SelectAvatarIndexForShortRange, S07_MyGame05.cpp:518-594): a chasing
-        // monster may switch to a valid candidate that has come strictly closer than its current target, within
-        // the short/melee radius (RadiusInfo1). Throttled like the wide-detect scan. NOT reproduced: the
-        // body-size height rejection filter (:581-584) -- which MonsterRowDto.Size* field is "body-size height"
-        // is not established by the A3 contract, so no vertical filter is applied here (flagged for follow-up).
-        target = TryShortRangeRetarget(zone, monster, target);
+        // Short-range mid-chase re-target (SelectAvatarIndexForAttackAction / SelectAvatarIndexForShortRange,
+        // S07_MyGame05.cpp:518-594; behavior contract A3-mid-chase-retarget): a chasing monster may re-roll onto
+        // a DIFFERENT eligible candidate within the short/melee radius (RadiusInfo1) via an independent 50% roll
+        // per candidate, first-success-wins -- NOT a "closer than current" search, and the currently-locked
+        // target is NOT excluded from candidacy (see TryShortRangeRetarget's own remarks). Throttled like the
+        // wide-detect scan, accrued in REAL elapsed time (legacyTicksElapsed), not once per call.
+        target = TryShortRangeRetarget(zone, monster, target, legacyTicksElapsed);
 
         var distanceToTargetSq = DistanceSquared(monster.PosX, monster.PosZ, target.PosX, target.PosZ);
 
@@ -731,7 +765,8 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
             return;
         }
 
-        MoveToward(zone, monster, target.PosX, target.PosZ, monster.Template.RunSpeed, dt);
+        MoveToward(zone, monster, target.PosX, target.PosZ, monster.Template.RunSpeed, dt,
+            tetherRadius: monster.Template.RadiusInfo1);
     }
 
     /// <summary><c>mSpecialType</c> 40-44 (S07_MyGame05.cpp:59-92): the 5 seeded "elite boss" monsters (564-568).</summary>
@@ -752,7 +787,7 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
     ///     wall), the same conservative fallback used when no route can be found at all.
     /// </summary>
     private static void MoveToward(Zone zone, MonsterEntity monster, float targetX, float targetZ, float speed,
-        float dt)
+        float dt, float? tetherRadius = null)
     {
         if (zone.Geometry is not { } geometry)
         {
@@ -763,7 +798,7 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
 
         if (zone.Pathfinder is { } pathfinder)
         {
-            MoveAlongPath(pathfinder, geometry, monster, targetX, targetZ, speed, dt);
+            MoveAlongPath(pathfinder, geometry, monster, targetX, targetZ, speed, dt, tetherRadius);
             return;
         }
 
@@ -779,7 +814,7 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
     ///     only if the per-tick pathfinding budget permits; following an existing route costs no budget.
     /// </summary>
     private static void MoveAlongPath(MonsterPathfinder pathfinder, ZoneGeometry geometry, MonsterEntity monster,
-        float targetX, float targetZ, float speed, float dt)
+        float targetX, float targetZ, float speed, float dt, float? tetherRadius)
     {
         var exhausted = monster.WaypointCursor >= monster.PathWaypoints.Count;
         var needReplan = exhausted
@@ -792,7 +827,10 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
             {
                 var from = new Vector3(monster.PosX, monster.PosY, monster.PosZ);
                 var to = new Vector3(targetX, monster.PosY, targetZ);
-                if (pathfinder.TryFindPath(from, to, monster.PathWaypoints))
+                var found = tetherRadius is { } radius
+                    ? pathfinder.TryFindPursuitPath(from, to, new Vector2(targetX, targetZ), radius, monster.PathWaypoints)
+                    : pathfinder.TryFindPathClamped(from, to, monster.PathWaypoints);
+                if (found)
                 {
                     monster.WaypointCursor = 0;
                     monster.PathGoalX = targetX;

@@ -80,8 +80,9 @@ public sealed class ZoneCenterSiegeState
     private readonly int[] _zone267 = new int[TribeCount];
     private int _zone335;
 
-    // ---- Free-for-all zone / Zone335 (6 events -- 1 no-op -- cases within 1501-1507, reset 1520;
-    // S04_MyWork02.cpp:1132-1150) -- a single shared scalar, no index.
+    // ---- Free-for-all zone / Zone335 (7 events -- 1501 no-op, 1502-1506 -> states 1-5, 1507 -> reset 0;
+    // S04_MyWork02.cpp:1132-1150) -- a single shared scalar, no index. The code->state mapping lives in
+    // SiegeEventStateMap.TryMapZone335; this class just stores whatever mapped state it is handed.
 
     public int Zone335
     {
@@ -170,11 +171,10 @@ public sealed class ZoneCenterSiegeState
     }
 
     /// <summary>
-    ///     GAP: <paramref name="stateCode" /> is whatever the caller supplies -- this cluster's contract only
-    ///     gives the AGGREGATE fact that ~15 of the 37 legacy codes collapse onto one shared "generic" state
-    ///     constant while ~22 produce a distinct one, not the individual per-code binding, so this class makes
-    ///     no attempt to reproduce the literal legacy constant. See <see cref="ZoneCenterBroadcastIngestor" />'s
-    ///     own remarks for what it stores here today (the raw event code itself, a placeholder).
+    ///     <paramref name="stateCode" /> is the byte-exact legacy state constant (1-23) the caller resolves
+    ///     through <see cref="SiegeEventStateMap.TryMapZone175" /> -- NOT the raw event code (that was the old
+    ///     placeholder). The 15 codes that collapse onto the shared "generic" state 23 are already mapped there,
+    ///     so this method simply stores whatever mapped value it is handed.
     /// </summary>
     public void SetZone175(int instance, int slot, int stateCode)
     {

@@ -64,6 +64,15 @@ namespace Fenrir.Application.Game.Domain.Tribes;
 /// <param name="HighItemValue">Lucky Upgrade Scroll -- see <see cref="PlayerRuntimeState.HighItemValue" />.</param>
 /// <param name="DropItemTime">Lucky Drop Scroll -- see <see cref="PlayerRuntimeState.DropItemTime" />.</param>
 /// <param name="TaiyanKeyTimer">Taiyan Key -- see <see cref="PlayerRuntimeState.TaiyanKeyTimer" />.</param>
+/// <param name="EliteDungeonTime">
+///     Elite Dungeon Ticket family (1047/1097/1098) -- see
+///     <see cref="PlayerRuntimeState.EliteDungeonTime" />.
+/// </param>
+/// <param name="DungeonKeyTime">Item 1048 -- see <see cref="PlayerRuntimeState.DungeonKeyTime" />.</param>
+/// <param name="IvyHallTicketTime">
+///     Ivy Hall Ticket pair (553/1219) -- see
+///     <see cref="PlayerRuntimeState.IvyHallTicketTime" />.
+/// </param>
 /// <param name="TeacherPoint">
 ///     tSort 237 (TimeExchange) -- the character's new total after granting 694 points per accrued
 ///     play-time-event minute. See <see cref="PlayerRuntimeState.TeacherPoint" />.
@@ -229,6 +238,9 @@ public readonly record struct TribeProgressZoneCommand(
     int? HighItemValue = null,
     int? DropItemTime = null,
     int? TaiyanKeyTimer = null,
+    int? EliteDungeonTime = null,
+    int? DungeonKeyTime = null,
+    int? IvyHallTicketTime = null,
     int? TeacherPoint = null,
     int? PetGrowth = null,
     byte? PetActivity = null,

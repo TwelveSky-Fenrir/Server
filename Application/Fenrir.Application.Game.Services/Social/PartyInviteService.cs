@@ -1,7 +1,12 @@
 using Fenrir.Application.Game.Abstractions.Social;
 using Fenrir.Application.Game.Domain;
+using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Social;
+using Fenrir.Application.Game.Domain.Social.Duel;
+using Fenrir.Application.Game.Domain.Social.Friends;
+using Fenrir.Application.Game.Domain.Social.Mentor;
 using Fenrir.Application.Game.Domain.Social.Party;
+using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -14,6 +19,11 @@ namespace Fenrir.Application.Game.Services.Social;
 /// </summary>
 public sealed class PartyInviteService(
     PartyRegistry parties,
+    DuelRegistry duels,
+    TradeRegistry trades,
+    FriendRegistry friends,
+    MentorRegistry mentors,
+    GuildInviteRegistry guildInvites,
     ICharacterShardLocationRepository characterShardLocations,
     ISocialCrossShardRelayQueue crossShardRelay,
     IOptions<GameServerOptions> options,
@@ -60,7 +70,7 @@ public sealed class PartyInviteService(
             return new PartyInviteResult(PartyInviteResultKind.InviterMustDisconnect);
         }
 
-        if (parties.IsNegotiating(inviter.CharacterId))
+        if (CommunityWorkGate.IsBusy(inviter, duels, trades, friends, parties, mentors, guildInvites))
         {
             logger.LogDebug("Party invite rejected: character {InviterCharacterId} already has a pending invite",
                 inviter.CharacterId);
@@ -77,6 +87,12 @@ public sealed class PartyInviteService(
 
         if (target is null)
             return await InviteCrossShardAsync(inviter, targetAvatarName, cancellationToken).ConfigureAwait(false);
+
+        if (CommunityWorkGate.IsBusy(target, duels, trades, friends, parties, mentors, guildInvites))
+        {
+            logger.LogDebug("Party invite rejected: target character {TargetCharacterId} is busy", target.CharacterId);
+            return new PartyInviteResult(PartyInviteResultKind.TargetBusy);
+        }
 
         var outcome = parties.TryInvite(inviter.CharacterId, inviter.CombinedLevel, inviter.Tribe,
             target.CharacterId, target.CombinedLevel, target.Tribe);

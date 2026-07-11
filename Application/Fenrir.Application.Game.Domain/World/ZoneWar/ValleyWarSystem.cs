@@ -17,8 +17,9 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 /// <remarks>
 ///     <para>
 ///         <b>
-///             Documented gaps, not silent ones -- three pieces of concrete legacy data are unavailable in the
-///             source behavior contract this ports, so the corresponding side effects are logged, not fabricated:
+///             Documented gaps, not silent ones -- two pieces of concrete legacy data are still unavailable in
+///             the source behavior contract this ports, so the corresponding side effects are logged, not
+///             fabricated:
 ///         </b>
 ///     </para>
 ///     <list type="bullet">
@@ -27,20 +28,23 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 ///             coordinate is given ("an unlimited/untimed monster summon is triggered... unconditionally").
 ///         </item>
 ///         <item>
-///             The kill-race-win boss summon (contract §6b): monster id 756 (
-///             <see cref="ValleyWarSchedule.BossMonsterId" />)
-///             is given, but its "fixed coordinate" is not.
-///         </item>
-///         <item>
 ///             The "animal5" randomized boss-win reward item (contract §8b, one of eight drops) has no resolved
 ///             concrete item id -- see <see cref="Zone.HandleGrantValleyWarRewardDrop" />'s own remarks for the
 ///             other 7, which ARE granted for real.
 ///         </item>
 ///     </list>
 ///     <para>
-///         A direct consequence of never spawning the boss: <see cref="ValleyWarSchedule.BossWindow" /> always
-///         resolves as "boss already dead" on its first tick (<see cref="ValleyWarEnvironmentSnapshot.BossSlotOccupied" />
-///         is always reported <see langword="false" /> here) -- see that snapshot parameter's own remarks.
+///         The kill-race-win boss summon itself (contract §6b, monster id 756 =
+///         <see cref="ValleyWarSchedule.BossMonsterId" />) is NOT a gap: its fixed coordinate is available (
+///         <see cref="Zone200GateBreachBossCatalog.SummonX" />/<c>SummonY</c>/<c>SummonZ</c>) and this class calls
+///         <see cref="Zone.HandleSummonValleyWarBoss" /> directly on <see cref="React" />'s <c>TribeWin</c> branch.
+///     </para>
+///     <para>
+///         A direct consequence of <see cref="ValleyWarEnvironmentSnapshot.BossSlotOccupied" /> always being
+///         reported <see langword="false" /> here (see that snapshot parameter's own remarks -- a SEPARATE,
+///         still-open gap: nothing wires the summoned boss's live/dead status back into the environment
+///         snapshot): <see cref="ValleyWarSchedule.BossWindow" /> still always resolves as "boss already dead" on
+///         its first tick, even though the boss is now genuinely summoned as a client-visible monster.
 ///     </para>
 ///     <para>
 ///         <b>Reward-grant scope.</b> The source contract's §8b eligibility ("every member of the winning tribe
@@ -135,8 +139,14 @@ public sealed class ValleyWarSystem(
         if (result.TribeWin && result.WinningTribe is { } winner)
         {
             broadcaster.Value.AnnounceValleyWarTribeWin(winner);
-            LogMonsterSummonGap(zone,
-                $"boss monster id {ValleyWarSchedule.BossMonsterId} at its fixed coordinate (coordinate not available)");
+
+            // Boss-756's fixed summon coordinate IS available (Zone200GateBreachBossCatalog.SummonX/Y/Z,
+            // re-derived byte-for-byte identical from Server/ts25zone/S07_MyGame01.cpp:11413-11416) -- unlike
+            // the general kill-race population gap logged below, this is no longer a documented gap. This class
+            // is itself a genuine ISimulationSystem already running on THIS zone's own tick thread (unlike
+            // RegularWarSchedulerHost's background-timer thread for the sibling Boss-561 family), so the summon
+            // primitive is called directly, with no ZoneCommand/Post hop needed.
+            zone.HandleSummonValleyWarBoss();
         }
 
         if (result.BattleScrollDeleted)

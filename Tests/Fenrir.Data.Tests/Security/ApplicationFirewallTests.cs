@@ -75,6 +75,11 @@ public class ApplicationFirewallTests
         {
             return ValueTask.CompletedTask;
         }
+
+        public ValueTask ReconcileAllowlistAsync(CancellationToken ct)
+        {
+            return ValueTask.CompletedTask;
+        }
     }
 
     private sealed class FakeGmAllowlistRepository(bool allowed) : IGmAllowlistRepository

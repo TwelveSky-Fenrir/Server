@@ -1,4 +1,6 @@
+using Fenrir.Application.Game.Domain.Mounts;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Domain.World.Configuration;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 
 namespace Fenrir.Application.Game.Domain;
@@ -253,6 +255,40 @@ public sealed class GameServerOptions
     public ISet<short> Zone241DungeonMapIds { get; set; } = new HashSet<short>();
 
     /// <summary>
+    ///     Map ids this shard's zones are classified as "Zone-126-type" on -- legacy arms mCheckZone126TypeServer
+    ///     per-process at boot for server numbers 210-218 (Server/ts25zone/S07_MyGame01.cpp:895-913). Drives the
+    ///     CP-Gift-Card tail tier's base rate (50 vs 25, S07_MyGame05.cpp:3402), read via
+    ///     <see cref="World.Zone.IsZone126TypeZone" />. Empty by default (inert); same shape/rationale as
+    ///     <see cref="Zone241DungeonMapIds" /> (Fenrir shards by map, so a config map-id set translates the legacy
+    ///     boot-time server-number gate).
+    /// </summary>
+    public ISet<short> Zone126TypeMapIds { get; set; } = new HashSet<short>();
+
+    /// <summary>
+    ///     Map ids this shard's zones are classified as "Zone-039-type" on -- legacy arms mCheckZone039TypeServer
+    ///     per-process at boot for server numbers 39/74/144/145/313 (Server/ts25zone/S07_MyGame01.cpp:821-834).
+    ///     Gates a (not-yet-ported) mount/pet event drop tier (S07_MyGame05.cpp:3197-3204), NOT the CP-Gift rate;
+    ///     read via <see cref="World.Zone.IsZone039TypeZone" />. Empty by default. Same shape as
+    ///     <see cref="Zone241DungeonMapIds" />.
+    /// </summary>
+    public ISet<short> Zone039TypeMapIds { get; set; } = new HashSet<short>();
+
+    /// <summary>
+    ///     Map ids this shard's zones are classified as dungeon-flagged on -- legacy arms this zone-server
+    ///     process's own <c>mIsDungeon</c> flag (Server/Header/api.h:76) once at boot, from that process's own
+    ///     configured server number falling in a fixed, hardcoded list (Server/ts25zone/S02_MyServer.cpp:30-149).
+    ///     The same boot step also doubles a fixed set of object-slot capacity ceilings for the process
+    ///     (Server/ts25zone/S02_MyServer.cpp:149-168). Drives
+    ///     <see cref="World.Monsters.DungeonSpawnDensityPolicy" />'s 5-19-to-20 field-monster spawn-count bump
+    ///     and its whole-table capacity-ceiling doubling, read via <see cref="World.Zone.IsDungeonServerZone" />.
+    ///     Empty by default (inert); same shape/rationale as <see cref="Zone241DungeonMapIds" /> (Fenrir shards
+    ///     by map, so a config map-id set translates the legacy boot-time server-number gate) -- NOT the same
+    ///     concept as <see cref="Zone241DungeonMapIds" /> itself (that one is the Zone-241 "LOD"
+    ///     personal-boss-chain content flag specifically, a distinct legacy field/gate).
+    /// </summary>
+    public ISet<short> DungeonServerMapIds { get; set; } = new HashSet<short>();
+
+    /// <summary>
     ///     Legacy per-instance <c>Zone.Server</c> INI flag arming Zone037's scheduled Tribe Symbol Battle
     ///     open/close cycle (<c>Fenrir.Application.Game.Hosting.World.ZoneWar.TribeSymbolBattleSchedulerHost</c>)
     ///     on whichever live shard currently hosts <see cref="TribeSymbolBattleMapId" />
@@ -359,6 +395,40 @@ public sealed class GameServerOptions
     public bool TribeFourConversionEnabled { get; set; }
 
     /// <summary>
+    ///     The map id Fenrir's forced-neutral-tribe-reset consumable (world.Items 8100,
+    ///     <c>Fenrir.Application.Game.Domain.Inventory.UseItems.ForcedNeutralTribeResetUseItemHandler</c>)
+    ///     requires to be currently hosted by a live shard before it will let a character use the item --
+    ///     Fenrir's map-sharded translation of the legacy's own "server number 140 must have a nonzero
+    ///     connection port" precondition (Server/ts25zone/S04_MyWork03.cpp:7266). The legacy identification of
+    ///     server number 140 as the neutral faction's home zone is only circumstantially corroborated (see
+    ///     that handler's own remarks), so this is deliberately operator-configured rather than a hardcoded
+    ///     map id. 0 (never a real hosted map) by default, matching <see cref="VoteTribeMapId" />/
+    ///     <see cref="HolyStoneMapId" />'s own fail-safe convention -- item 8100 stays permanently unusable
+    ///     until an operator confirms the real Fenrir map id and configures it here.
+    /// </summary>
+    public short ForcedNeutralResetHomeMapId { get; set; }
+
+    /// <summary>
+    ///     The map id the Faction Transfer scroll (world.Items 8153/8154,
+    ///     <c>Fenrir.Application.Game.Domain.Inventory.UseItems.TribeScrollTransferUseItemHandler</c>) requires
+    ///     to be currently hosted by a live shard before it will let a character use the scroll -- Fenrir's
+    ///     map-sharded translation of the legacy's own "specific numbered zone/server slot must be marked
+    ///     online" precondition (Server/ts25zone/S04_MyWork03.cpp:4775-4782). The behavior contract's own
+    ///     research could not pin this zone's exact identity beyond "a town-like location accepted for every
+    ///     tribe with its own tribe-agnostic proxy-shop coordinate" (Server/Header/mapcheck.h:116-128,
+    ///     IsValidTownAll) -- but <c>CraftRecipeCatalog.WingAssemblyTownMapIds</c> (an independently-extracted
+    ///     Fenrir citation of that SAME IsValidTownAll set: {1, 6, 11, 37, 140}) corroborates 37 as the one
+    ///     entry that is neither a per-tribe capital (1/6/11, see <see cref="TribeScrollTransferGate.IsValidTown" />)
+    ///     nor the neutral-tribe capital (140) -- and 37 is independently confirmed elsewhere in this codebase
+    ///     (<c>ProxyShopZonePolicy.ZoneNumber</c>) as exactly this kind of tribe-agnostic shared town. This
+    ///     cross-reference is corroborating, not a direct citation for THIS specific gate, so this value is
+    ///     still deliberately left operator-configured rather than hardcoded to 37 -- 0 (never a real hosted
+    ///     map) by default, matching <see cref="ForcedNeutralResetHomeMapId" />'s own fail-safe convention, so
+    ///     the Faction Transfer scroll stays permanently unusable until an operator confirms and configures it.
+    /// </summary>
+    public short FactionTransferHomeZoneMapId { get; set; }
+
+    /// <summary>
     ///     How often <c>GuildTribeBroadcastRelayHost</c> both flushes this shard's own queued outbound
     ///     GuildAnnouncement/GuildChat/TribeAnnouncement/TribeAnnouncementScroll broadcasts to
     ///     <c>runtime.GuildTribeBroadcastRelay</c> and polls that same table for broadcasts published by every
@@ -410,6 +480,27 @@ public sealed class GameServerOptions
     ///     its own poll cadence.
     /// </summary>
     public int SocialCrossShardRelayRetentionSeconds { get; set; } = 30;
+
+    /// <summary>
+    ///     How often <c>ChatCrossShardRelayHost</c> both flushes this shard's own queued outbound cross-shard
+    ///     whispers (op39 / <c>SECRET_CHAT</c>) to <c>runtime.ChatCrossShardRelay</c> and polls that same table
+    ///     for whispers addressed to THIS shard (<c>TargetShardId = ShardId</c>), delivering each to the one
+    ///     locally-present target. Point-to-point sibling of <see cref="SocialCrossShardRelayPollIntervalSeconds" />;
+    ///     a NEW, Fenrir-internal operational knob, not a legacy-cited value (legacy's single-process
+    ///     <c>ts25zone</c> had no cross-shard concept). Tight default because a whisper is a synchronous,
+    ///     latency-sensitive human interaction; the same-shard whisper path is unaffected and stays immediate,
+    ///     only the cross-shard leg lags by up to this many seconds.
+    /// </summary>
+    public int ChatCrossShardRelayPollIntervalSeconds { get; set; } = 1;
+
+    /// <summary>
+    ///     How long a row survives in <c>runtime.ChatCrossShardRelay</c> before <c>ChatCrossShardRelayHost</c>'s
+    ///     own poll cycle reaps it, regardless of whether its target shard has already consumed it -- same "safe
+    ///     direction to fail toward" posture and default as <see cref="SocialCrossShardRelayRetentionSeconds" />:
+    ///     comfortably wider than <see cref="ChatCrossShardRelayPollIntervalSeconds" /> so a normally-alive shard
+    ///     never races its own poll cadence.
+    /// </summary>
+    public int ChatCrossShardRelayRetentionSeconds { get; set; } = 30;
 
     /// <summary>
     ///     How often <c>ProxyShopExpirationRelayHost</c> both flushes this shard's own queued proxy-shop
@@ -523,4 +614,41 @@ public sealed class GameServerOptions
     ///     the same default value.
     /// </summary>
     public int GuildBuffExpiryRelayRetentionSeconds { get; set; } = 30;
+
+    /// <summary>
+    ///     How often <c>PartyResyncRelayHost</c> both flushes this shard's own queued outbound party-membership
+    ///     resync-on-reconnect rows to <c>runtime.PartyResyncRelay</c> and polls that same table for rows
+    ///     published by every OTHER live shard (legacy RELAY_LOGIN_PARTY_CHECK / hub case 108) -- the fan-out
+    ///     sibling of <see cref="GuildTribeBroadcastPollIntervalSeconds" />. Same default (2s) as every other
+    ///     fan-out relay; a NEW, Fenrir-internal operational knob, not a legacy-cited value.
+    /// </summary>
+    public int PartyResyncRelayPollIntervalSeconds { get; set; } = 2;
+
+    /// <summary>
+    ///     How long a row survives in <c>runtime.PartyResyncRelay</c> before <c>PartyResyncRelayHost</c>'s own
+    ///     poll cycle reaps it, regardless of whether every live shard has already consumed it -- same "safe
+    ///     direction to fail toward" posture as <see cref="GuildTribeBroadcastRetentionSeconds" />, and the same
+    ///     default value: comfortably wider than <see cref="PartyResyncRelayPollIntervalSeconds" /> so a
+    ///     normally-alive shard never races its own poll cadence.
+    /// </summary>
+    public int PartyResyncRelayRetentionSeconds { get; set; } = 30;
+
+    /// <summary>
+    ///     Per-zone configuration/data table (A7): level band, owner tribe, MaxUser cap, XP/drop/war ratio tunables,
+    ///     keyed by map id. Frozen into ZoneConfigCatalog at boot.
+    /// </summary>
+    public Dictionary<int, ZoneConfig> Zones { get; set; } = new();
+
+    /// <summary>
+    ///     B16: per-kill mount-experience base amount awarded to an actively-mounted attacker on an inter-tribe
+    ///     kill (<see cref="Mounts.MountKillExperienceCalculator" />, <c>MyUtil::ProcessForKillOtherTribe</c>'s own
+    ///     mount branch, Server/ts25zone/S07_MyGame03.cpp:3190-3210) -- legacy loads this from a deployment ini
+    ///     value, not a compile-time constant, and no production number was ever recovered for this contract.
+    ///     Defaults to <see cref="Mounts.MountKillExperienceCalculator.PlaceholderBaseExperiencePerKill" /> (10),
+    ///     the same "real gate, placeholder magnitude" posture as <see cref="World.Loot.MonsterDropRoller" />'s own
+    ///     constructor-level drop ratios -- an operator-configurable value should replace this once the real
+    ///     deployment number is known.
+    /// </summary>
+    public int MountKillExperiencePerKill { get; set; } =
+        MountKillExperienceCalculator.PlaceholderBaseExperiencePerKill;
 }

@@ -6,30 +6,65 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Data.WriteBehind;
+using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Serialization.Shared.Packets.Shared;
+using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Domain.Simulation;
 
 /// <summary>
-///     Auto-hunt bot buff loop (<c>AVATAR_OBJECT::BotBuff</c>, S07_MyGame04.cpp:2271-2497): while
-///     <see cref="PlayerRuntimeState.AutoHuntEnabled" />, auto-casts the first eligible configured buff skill
-///     from <see cref="PlayerRuntimeState.AutoHuntConfig" />'s BuffStore, at most one cast per legacy tick --
-///     matching legacy's own single <c>break</c> the moment a slot clears its "already buffed" gate, win or
-///     lose on the mana/weapon check that follows.
+///     The auto-hunt bot's per-tick server-driven upkeep, run once per <see cref="Simulate" /> for every
+///     <see cref="PlayerRuntimeState.AutoHuntEnabled" /> player, in the legacy order:
+///     <list type="number">
+///         <item>
+///             the two-tier paid auto-hunt-time budget decrement (<c>S07_MyGame04.cpp:787-824</c>, via
+///             <see cref="AutoHuntBudgetPolicy" />) -- runs first, gated only on the auto-hunt flag, and on
+///             exhaustion relocates the character to the auto zone (<c>ReturnToHomeZoneResponse</c>) and abandons
+///             the rest of this tick's upkeep;
+///         </item>
+///         <item>
+///             the bot buff-cast (<c>AVATAR_OBJECT::BotBuff</c>, <c>S07_MyGame04.cpp:2271-2497</c>): auto-casts
+///             the first eligible configured buff skill from <see cref="PlayerRuntimeState.AutoHuntConfig" />'s
+///             BuffStore, at most one cast per legacy tick -- matching legacy's own single <c>break</c> the moment
+///             a slot clears its "already buffed" gate -- including the zone-126-type-server no-mana escalation
+///             (<c>:2469-2485</c>);
+///         </item>
+///         <item>
+///             the hotkey resupply pass (<c>BotHotKey</c>, <c>S07_MyGame04.cpp:2499-2559</c>): implemented as the
+///             pure, fully-tested <see cref="Hotkeys.BotHotKeyResupplyPolicy" /> but deliberately NOT applied live
+///             yet -- see that policy's own remarks and this class's own below.
+///         </item>
+///     </list>
 /// </summary>
 /// <remarks>
-///     Not reproduced, and why:
+///     <para>
+///         <b>Regen / no-server-side-auto-attack fidelity (zero-code note, do not "fix"):</b> the auto-hunt tick
+///         upkeep path deliberately performs NO server-side auto-attack -- legacy's own bot tick invokes only the
+///         buff-cast and hotkey-resupply steps (<c>S07_MyGame04.cpp:345-346</c>), never an attack step; the
+///         actual attacking is client-driven, and reproducing a server-side auto-attacker would be a divergence,
+///         not a fix. HP/MP regeneration likewise stays sit-only (owned by <see cref="MeditationRegenSystem" />,
+///         gated on <c>ActionSort == 31</c>) and is never added to this path. Both are legacy-faithful and
+///         intentional. NOTE: the "regeneration is sit-only" half was flagged in the originating B11 behavior
+///         contract as uncited (not observed in any citation opened for it) and carried forward for a
+///         cpp-zone-gameplay-analyst re-check -- documented here, not relied upon for any new behavior.
+///     </para>
+///     Not reproduced (or reproduced only as an unwired policy), and why:
 ///     <list type="bullet">
 ///         <item>
 ///             <c>BotHotKey</c>/<c>BotHotKeySend</c> (the hotkey-refill half of the same legacy bot loop,
 ///             Server/ts25zone/S07_MyGame04.cpp:341-350 call site, :2499-2559 bodies,
-///             Server/ts25zone/S07_MyGame03.cpp:9165-9219 <c>ProcessHotkeyForAutoHunt</c>) -- still not
-///             reproduced. Re-checked rather than assumed stale: two of the three prerequisite gaps previously
+///             Server/ts25zone/S07_MyGame03.cpp:9165-9219 <c>ProcessHotkeyForAutoHunt</c>) -- the resupply
+///             DECISION is now implemented and fully unit-tested as the pure
+///             <see cref="Hotkeys.BotHotKeyResupplyPolicy" />, but its result is deliberately NOT applied live on
+///             this tick path. Re-checked rather than assumed stale: two of the three prerequisite gaps previously
 ///             cited here have since closed elsewhere in the codebase -- <see cref="PlayerRuntimeState.Hotkeys" />
 ///             now exists as an in-memory model, and pet-equipped (Equipment container slot 8) / active-mount
 ///             (<c>PlayerRuntimeState.AnimalNumber</c>) state plus the two auto-hunt consumption flags
 ///             (<c>AutoHunt.AnimalPreyCmd</c>/<c>AnimalFoodCmd</c>) this behavior needs are all readable today.
-///             Two concrete blockers remain:
+///             Two concrete blockers remain (either alone makes applying a move here unsafe -- an unnotified,
+///             unpersisted inventory debit would desync the client and risk item loss, violating the atomic-move
+///             invariant):
 ///             <list type="bullet">
 ///                 <item>
 ///                     <see cref="PlayerRuntimeState.Hotkeys" /> is never actually populated -- neither world
@@ -75,10 +110,20 @@ namespace Fenrir.Application.Game.Domain.Simulation;
 ///         </item>
 ///         <item>
 ///             The zone-type-flag/no-mana escalation branch (<c>mCheckZone126TypeServer</c>'s "kick after 1000
-///             failed ticks") -- distinct from the RvR/event zone-server-type gate now modeled below (see
-///             <see cref="IsSuppressedByZoneServerType" />), this is a separate zone-126-only "test server"
-///             escalation legacy itself only exercises under that configuration; an ordinary insufficient-mana
-///             slot is simply skipped here instead of ever escalating to a kick.
+///             failed ticks", <c>S07_MyGame04.cpp:2469-2485</c>) -- implemented (see <see cref="EscalateNoMana" />
+///             / <see cref="PlayerRuntimeState.NoManaCount" />), distinct from the RvR/event zone-server-type gate
+///             (see <see cref="IsSuppressedByZoneServerType" />): a separate zone-126-only "test server"
+///             escalation. On a zone-126-type server a selected buff whose mana cost exceeds current mana
+///             increments the counter (relocate at exactly 1000, disconnect beyond); a proceeding cast resets it.
+///             Outside a zone-126-type server the counter never grows -- an ordinary insufficient-mana slot is
+///             simply skipped here, deliberately NOT reproducing legacy's "cast anyway into negative mana"
+///             fall-through (a defect-shaped quirk this project's harden-never-reproduce policy declines to copy,
+///             and one that would contradict the existing insufficient-mana-skips-cast test coverage). The
+///             zone-126-type flag itself now resolves through the canonical, config-driven
+///             <see cref="World.Zone.IsZone126TypeZone" /> (<see cref="GameServerOptions.Zone126TypeMapIds" />,
+///             verified server numbers 210-218 at <c>S07_MyGame01.cpp:895-913</c>) rather than a hardcoded
+///             <c>MapId == 126</c> guess -- corrected per the B11-zone126-escalation contract's own citation,
+///             which resolves what was previously flagged here as an unverified "inference by analogy."
 ///         </item>
 ///         <item>
 ///             <c>mCheckZone053TypeServer</c> ("Stone War"), the fourth term of that same gate -- deliberately
@@ -96,6 +141,12 @@ public sealed class AutoHuntTickSystem(
 {
     /// <summary>FEQUIP_TYPE::EWEAPON slot index -- same convention as AutoHuntToggleHandler/Zone.ApplySkillCastManaCharge.</summary>
     private const byte WeaponSlot = 7;
+
+    /// <summary>
+    ///     The persistent no-mana counter value at which the character is relocated to the auto zone; strictly
+    ///     beyond it the session is disconnected (S07_MyGame04.cpp:2474-2481).
+    /// </summary>
+    private const int NoManaRelocateThreshold = 1000;
 
     /// <summary>
     ///     Exactly the skill-id switch BotBuff() recognizes (S07_MyGame04.cpp:2337-2459), mapped to which
@@ -124,15 +175,21 @@ public sealed class AutoHuntTickSystem(
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
         foreach (var state in zone.Players)
-            TryAutoCastBuff(zone, state);
+            RunBotUpkeep(zone, state, legacyTicksElapsed);
     }
 
-    private void TryAutoCastBuff(Zone zone, PlayerRuntimeState state)
+    private void RunBotUpkeep(Zone zone, PlayerRuntimeState state, int legacyTicksElapsed)
     {
         if (!state.AutoHuntEnabled || state.AutoHuntConfig is not { } config)
             return;
 
-        // BotBuff's own top-level gates: mCheckDeath, aPShopState == 1, aManaValue < 1, !mCheckStun
+        // Group D (S07_MyGame04.cpp:787-824): the two-tier paid auto-hunt-time budget decrement runs FIRST and
+        // is gated only on the auto-hunt flag (NOT the buff/hotkey death/stun/zone-type gate below). On
+        // exhaustion it relocates the character to the auto zone and abandons the rest of this tick's upkeep.
+        if (AdvanceBudgetAndRelocateIfExhausted(state, legacyTicksElapsed))
+            return;
+
+        // BotBuff/BotHotKey's own top-level gates: mCheckDeath, aPShopState == 1, aManaValue < 1, !mCheckStun
         // (S07_MyGame04.cpp:341, "!mCheckStun" -- previously undocumented as a real gap, now modeled).
         if (state.IsDead || state.PshopOpen || state.Mana < 1 || state.IsStunned)
             return;
@@ -142,6 +199,16 @@ public sealed class AutoHuntTickSystem(
         if (IsSuppressedByZoneServerType(zone))
             return;
 
+        TryAutoCastBuff(zone, state, config);
+
+        // Group A (hotkey resupply, S07_MyGame04.cpp:2499-2559) would run here next. Its decision is implemented
+        // and unit-tested as Hotkeys.BotHotKeyResupplyPolicy, but is deliberately NOT applied on this live path
+        // yet -- see this class's remarks and that policy's own for the prerequisites (Hotkeys population at
+        // entry, the op120 notification's uncited wire mapping, and a persistence path) a follow-up must close.
+    }
+
+    private void TryAutoCastBuff(Zone zone, PlayerRuntimeState state, AutoHunt config)
+    {
         // aBotSkillNum: only the first 2 configured slots, or all 8 while a "continuous auto-buff" cash-shop
         // timer is active (AutoBuffTime, CZ_CONTINUE_SKILL_USE_SEND op95 -- see ContinueSkillUseHandler).
         var slotCount = state.AutoBuffTime >= GameDate.Today() ? 8 : 2;
@@ -151,6 +218,14 @@ public sealed class AutoHuntTickSystem(
             ? (int?)weaponDef.Item.Sort
             : null;
         var maxLife = state.Stats?.MaxLife ?? state.MaxLife;
+
+        // Legacy mCheckZone126TypeServer (S07_MyGame01.cpp:895-913, server numbers 210-218) -- resolved via the
+        // canonical, config-driven Zone.IsZone126TypeZone (Zone.ZoneTypeClassification.cs /
+        // GameServerOptions.Zone126TypeMapIds) rather than a hardcoded MapId literal, matching the same
+        // server-number-to-map-id translation MonsterDropTailResolver/MonsterSpawnScheduler already use for this
+        // exact flag. Empty by default (inert on every shard until an operator lists a map id), same posture as
+        // IsZone241TypeZone/IsZone039TypeZone.
+        var isZone126 = zone.IsZone126TypeZone;
 
         for (var i = 0; i < slotCount; i++)
         {
@@ -164,21 +239,85 @@ public sealed class AutoHuntTickSystem(
             // GetMaxSkillGradeNum: clamps to the character's own learned grade, -1 if the skill was never
             // learned at all -- matched verbatim rather than skipped, since SkillCatalog.ReturnSkillValue
             // already resolves any sub-1 grade to a harmless zero-cost/zero-value/zero-duration cast, the same
-            // fate this slot would meet in legacy too.
+            // fate this slot would meet in legacy too. This is the one stored-config field legacy re-validates
+            // server-side at use time (S07_MyGame04.cpp:2333-2336).
             var requestedGrade = config.BuffStore[i * 2 + 1];
             var grade = Math.Min(requestedGrade, GetMaxLearnedGrade(skillId, state.LearnedSkills));
 
             worldData.SkillsById.TryGetValue(skillId, out var skillDef);
             var result = SkillCastResolver.TryCast(skillDef, grade, state.Mana, maxLife, weaponSort,
                 state.SupportSkillTimeUpRatio);
-            if (!result.Success || result.Kind != SkillEffectKind.SelfBuff)
-                continue;
 
-            state.Mana -= result.ManaCost;
-            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
-            zone.ApplyBuffWrites(state, result.BuffWrites);
-            return; // BotBuff's own `break` -- at most one auto-cast per legacy tick.
+            if (result.Success && result.Kind == SkillEffectKind.SelfBuff)
+            {
+                state.Mana -= result.ManaCost;
+                state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
+                zone.ApplyBuffWrites(state, result.BuffWrites);
+                state.NoManaCount =
+                    0; // a proceeding cast resets the no-mana escalation counter (S07_MyGame04.cpp:2485)
+                return; // BotBuff's own `break` -- at most one auto-cast per legacy tick.
+            }
+
+            // Group C (S07_MyGame04.cpp:2469-2485): on a zone-126-type server, a SELECTED buff (one that cleared
+            // the whitelist + already-buffed gate) whose mana cost exceeds current mana escalates the no-mana
+            // counter instead of casting, and legacy breaks here regardless. Outside a zone-126-type server the
+            // counter never grows and this slot is simply skipped (we do NOT reproduce legacy's cast-into-
+            // negative-mana fall-through -- see this class's remarks for why).
+            if (isZone126 && result.Failure == SkillCastResolver.FailureReason.InsufficientMana)
+            {
+                EscalateNoMana(state);
+                return;
+            }
+
+            // Any other skip reason (wrong weapon class, non-buff, or a non-zone-126 mana shortfall): try the
+            // next configured slot, matching the pre-B11 loop's own continue-on-failure behavior.
         }
+    }
+
+    /// <summary>
+    ///     Group D: advances the two-tier paid auto-hunt-time budget via <see cref="AutoHuntBudgetPolicy" /> and,
+    ///     when both tiers reach zero, sends the relocate-to-auto-zone signal (the real
+    ///     <c>ZC_RETURN_TO_AUTO_ZONE</c>, same packet <see cref="AntiCampingForcedReturnSystem" /> uses) and
+    ///     returns <see langword="true" /> so the caller abandons the rest of this tick's upkeep.
+    /// </summary>
+    /// <remarks>
+    ///     The day/minute-budget CHANGE notifications (S07_MyGame04.cpp:795,808) are deferred: no auto-hunt-time
+    ///     change wire packet exists in Fenrir yet (none identified this session) -- a fenrir-wire-protocol-
+    ///     implementer concern flagged in this workstream's wiring notes. Because no paid-time acquisition path
+    ///     grants a budget yet, both tiers are always zero and this whole step is a dormant no-op in practice
+    ///     (<see cref="AutoHuntBudgetPolicy" />'s present-based gate), so the missing change notifications have no
+    ///     observable effect today; only the exhaustion relocation (real packet) is wired.
+    /// </remarks>
+    private static bool AdvanceBudgetAndRelocateIfExhausted(PlayerRuntimeState state, int legacyTicksElapsed)
+    {
+        var result = AutoHuntBudgetPolicy.Advance(state.AutoHuntPaidDayBudget, state.AutoHuntPaidMinuteBudget,
+            state.AutoHuntBudgetMinuteAccrualTicks, legacyTicksElapsed, GameDate.Today());
+
+        state.AutoHuntPaidDayBudget = result.DayBudget;
+        state.AutoHuntPaidMinuteBudget = result.MinuteBudget;
+        state.AutoHuntBudgetMinuteAccrualTicks = result.MinuteAccrualTicks;
+
+        if (result.Signal != AutoHuntBudgetPolicy.Signal.Exhausted)
+            return false;
+
+        state.Session.Send(new ReturnToHomeZoneResponse());
+        return true;
+    }
+
+    /// <summary>
+    ///     Group C escalation (S07_MyGame04.cpp:2469-2485): increment the persistent no-mana counter; at exactly
+    ///     <see cref="NoManaRelocateThreshold" /> relocate the character to the auto zone, strictly beyond it
+    ///     disconnect the session. Incremented once per <see cref="Simulate" /> pass (the bot buff-cast is itself
+    ///     at-most-once-per-tick), never scaled by a stalled-host catch-up burst, so the exact-1000 relocate
+    ///     threshold is always reached before the disconnect step rather than skipped by a multi-tick jump.
+    /// </summary>
+    private static void EscalateNoMana(PlayerRuntimeState state)
+    {
+        state.NoManaCount++;
+        if (state.NoManaCount == NoManaRelocateThreshold)
+            state.Session.Send(new ReturnToHomeZoneResponse());
+        else if (state.NoManaCount > NoManaRelocateThreshold && state.Session is ClientSession client)
+            client.Abort(DisconnectReason.StateViolation);
     }
 
     /// <summary>

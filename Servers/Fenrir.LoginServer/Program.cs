@@ -13,7 +13,6 @@
 // an unauthenticated GET (or any verb without a real credential check), and must bind to a scope no
 // broader than the ts25 loopback-only precedent unless there is an explicit, reviewed reason to widen it.
 
-using Fenrir.Network.Dispatch;
 using Fenrir.Application.Login.Domain;
 using Fenrir.Application.Login.Domain.Extensions;
 using Fenrir.Application.Login.Handlers.Extensions;
@@ -21,6 +20,7 @@ using Fenrir.Application.Login.Hosting;
 using Fenrir.Application.Login.Hosting.Extensions;
 using Fenrir.Application.Login.Services.Extensions;
 using Fenrir.Data;
+using Fenrir.Network.Dispatch;
 using Fenrir.Network.Dispatch.RateLimiting;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.ServiceDefaults;

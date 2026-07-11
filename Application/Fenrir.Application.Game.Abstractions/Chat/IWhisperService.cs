@@ -12,11 +12,11 @@ public interface IWhisperService
     /// <summary>
     ///     Resolves the recipient of <paramref name="sender" />'s whisper to <paramref name="targetAvatarName" />.
     ///     Falls back to the cross-shard character-location directory when the same-shard
-    ///     <see cref="ZoneRegistry" /> lookup misses -- see <see cref="WhisperOutcome.TargetOnAnotherShard" />
+    ///     <see cref="ZoneRegistry" /> lookup misses -- see <see cref="WhisperOutcome.QueuedCrossShard" />
     ///     for why that fallback hit is not the same thing as <see cref="WhisperOutcome.Delivered" />.
     /// </summary>
     public ValueTask<WhisperResolution> ResolveAsync(PlayerRuntimeState sender, string targetAvatarName,
-        CancellationToken cancellationToken);
+        string content, int senderAuthType, CancellationToken cancellationToken);
 }
 
 public enum WhisperOutcome
@@ -34,14 +34,16 @@ public enum WhisperOutcome
     Delivered,
 
     /// <summary>
-    ///     The cross-shard character-location directory found the target alive on a DIFFERENT shard, but this
-    ///     codebase has no inter-shard message relay/bus yet -- delivery genuinely cannot happen, which is a
-    ///     distinct fact from "nobody online has this name" and must not be silently reported as
-    ///     <see cref="TargetNotFound" />. <see cref="WhisperResolution.OtherShardId" />/
-    ///     <see cref="WhisperResolution.OtherMapId" /> identify where the target actually is, for logging.
-    ///     Actual cross-shard delivery is a follow-up, not implemented here.
+    ///     The same-shard lookup missed but the cross-shard character-location directory found the target alive
+    ///     on a DIFFERENT live shard. The whisper has been enqueued onto the cross-shard whisper relay
+    ///     (best-effort, fire-and-forget); the sender is acknowledged with Result=0 (accepted, target located)
+    ///     carrying <see cref="WhisperResolution.OtherMapId" /> as the target's zone number, exactly as the
+    ///     legacy op39 path does the instant its own point-in-time lookup succeeds. Delivery to the target, if
+    ///     still present when the relay lands, is a separate best-effort leg with no acknowledgement back to the
+    ///     sender (op39 clean-drop parity). <see cref="WhisperResolution.OtherShardId" />/
+    ///     <see cref="WhisperResolution.OtherMapId" /> identify where the target was resolved.
     /// </summary>
-    TargetOnAnotherShard
+    QueuedCrossShard
 }
 
 public readonly record struct WhisperResolution(

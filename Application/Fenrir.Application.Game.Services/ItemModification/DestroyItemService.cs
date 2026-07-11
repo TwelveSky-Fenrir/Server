@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.ItemModification;
 using Fenrir.Application.Game.Domain.Forge;
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
@@ -13,6 +14,15 @@ namespace Fenrir.Application.Game.Services.ItemModification;
 ///     Business logic for op89, CZ_DESTROY_ITEM_SEND -- extracted from <see cref="DestroyItemHandler" />, see
 ///     that handler's remarks.
 /// </summary>
+/// <remarks>
+///     C1-vault-expiry-enforcement: destroying/salvaging an item is this protocol's closest "discard" analog
+///     for the dated-vault (last inventory page) mechanism, gated identically to the primary
+///     CZ_USE_INVENTORY_ITEM_SEND trigger -- see <see cref="UseInventoryItemService.ResolveAsync" />'s own
+///     remarks for the sibling gate and its citation (Server/ts25zone/S04_MyWork03.cpp:1895-1939). A rejection
+///     here already collapses into the same hard disconnect every other Rejected outcome of this handler uses
+///     (<see cref="DestroyItemHandler" />'s own <c>DisconnectReason.Faulted</c> Abort), matching the legacy's
+///     own force-disconnect-on-expiry posture with no code changes needed at the handler layer.
+/// </remarks>
 public sealed class DestroyItemService(
     ICharacterRepository characters,
     WorldDataCache worldData,
@@ -50,6 +60,15 @@ public sealed class DestroyItemService(
         {
             logger.LogDebug("Character {CharacterId} destroy-item rejected: invalid slot ({Page1}:{Index1})",
                 characterId, page1, index1);
+            return new DestroyItemResult(DestroyItemOutcome.Rejected, 0, 0, 0, 0);
+        }
+
+        // Dated-vault last-page gate (C1-vault-expiry-enforcement) -- see this class's own <remarks>.
+        if (page1 == ContainerMatrix.InventoryPage1 && state.InventoryDate < GameDate.Today())
+        {
+            logger.LogDebug(
+                "Character {CharacterId} destroy-item rejected: dated-vault last page expired (InventoryDate {InventoryDate})",
+                characterId, state.InventoryDate);
             return new DestroyItemResult(DestroyItemOutcome.Rejected, 0, 0, 0, 0);
         }
 

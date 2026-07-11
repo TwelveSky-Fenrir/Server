@@ -42,7 +42,8 @@ public sealed class WhisperHandler(IWhisperService whisperService, ILogger<Whisp
         if (!zone.TryGetPlayer(characterId, out var sender) || sender is null)
             return;
 
-        var resolution = await whisperService.ResolveAsync(sender, packet.AvatarName, cancellationToken)
+        var resolution = await whisperService
+            .ResolveAsync(sender, packet.AvatarName, packet.Content, zoneSession.IsGm ? 1 : 0, cancellationToken)
             .ConfigureAwait(false);
 
         switch (resolution.Outcome)
@@ -64,22 +65,24 @@ public sealed class WhisperHandler(IWhisperService whisperService, ILogger<Whisp
                 });
                 return;
 
-            case WhisperOutcome.TargetOnAnotherShard:
-                // No inter-shard relay exists yet (see IWhisperService's own remarks) -- the M1 wire protocol
-                // has no distinct "can't deliver yet" Result value, so this degrades to the same code the
-                // client already understands as "target not found," but is logged distinctly here so the gap
-                // stays visible in telemetry instead of looking identical to a genuinely offline target.
-                logger.LogInformation(
-                    "Whisper from {SenderName} to {TargetName} could not be delivered: target is on shard {ShardId} (map {MapId}), and no inter-shard relay exists yet",
+            case WhisperOutcome.QueuedCrossShard:
+                // Target located on another shard; WhisperService already enqueued the whisper onto the
+                // cross-shard relay. Acknowledge the sender with Result=0 (accepted, with the target's map
+                // number for display) exactly as the legacy op39 path does the instant its own point-in-time
+                // lookup succeeds -- delivery to the target, if still present when the relay lands, is a separate
+                // best-effort leg with no acknowledgement back to the sender (op39 contract, side-effects
+                // ordering). AuthType on the sender echo is a literal 0, same as the same-shard Result=0 echo.
+                logger.LogDebug(
+                    "Whisper from {SenderName} to {TargetName} queued for cross-shard delivery to shard {ShardId} (map {MapId})",
                     sender.Name, packet.AvatarName, resolution.OtherShardId, resolution.OtherMapId);
                 session.Send(new WhisperResponse
                 {
-                    Result = 1,
-                    ZoneNumber = 0,
+                    Result = 0,
+                    ZoneNumber = resolution.OtherMapId ?? 0,
                     AvatarName = packet.AvatarName,
-                    Content = "",
+                    Content = packet.Content,
                     AuthType = 0,
-                    Link = EmptyLink
+                    Link = packet.Link
                 });
                 return;
 

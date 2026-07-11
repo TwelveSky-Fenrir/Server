@@ -20,14 +20,14 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 ///         template already carries.
 ///     </para>
 ///     <para>
-///         Some of the values surfaced here are themselves known placeholders one layer down, not a new
-///         approximation introduced by this class: <see cref="ZoneCenterSiegeState.SetZone175" />/
-///         <see cref="ZoneCenterSiegeState.SetZone267" />'s own remarks note the stored value is the raw
-///         legacy event code, not the byte-exact legacy state constant, and Zone241/the four bonus-ratio
-///         fields have no confirmed write path yet (<see cref="ZoneCenterBroadcastIngestor" />'s GAP 1/GAP 2) so
-///         they currently always read back as their type's default until a future contract supplies the missing
-///         binding -- this projection exists so that binding starts reaching the wire the moment it lands,
-///         without a second follow-up change here.
+///         Zone049/Zone175/Zone267/Zone241/Zone335 now surface the byte-exact legacy state constants
+///         (<see cref="SiegeEventStateMap" />), not the old raw-event-code placeholder -- and Zone241 now has a
+///         real write path (<see cref="ZoneCenterBroadcastIngestor" /> cases 411-415). The one group still
+///         reading back as its type's default is the three tribe bonus-ratio arrays plus the kill-other-tribe
+///         bonus: their producing event code and payload sub-selector are still unbound
+///         (<see cref="ZoneCenterBroadcastIngestor" />'s GAP 2), so those four continue to read back as zero
+///         until a fresh contract supplies the missing binding -- this projection exists so that binding starts
+///         reaching the wire the moment it lands, without a second follow-up change here.
 ///     </para>
 /// </summary>
 public static class ZoneCenterSiegeProjection

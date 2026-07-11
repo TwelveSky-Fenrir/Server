@@ -34,8 +34,12 @@ namespace Fenrir.Application.Game.Domain.World.Monsters;
 ///                 <b>Everything else -&gt; <see cref="Standard" /> (1).</b> The guard/tower/alliance/thrower
 ///                 discriminators (which <c>Type</c>/<c>SpecialType</c> values map to 5/10/4/6) are NOT
 ///                 available from this contract, so those monsters fall to the standard-mob default here rather
-///                 than being guessed at -- flagged for a <c>legacy-behavior-translator</c> / <c>cpp-zone-
-///                 gameplay-analyst</c> follow-up (reopen <c>ReturnSpecialSortNumber</c> and hand back the
+///                 than being guessed at -- flagged for a <c>legacy-behavior-translator</c> /
+///                 <c>
+///                     cpp-zone-
+///                     gameplay-analyst
+///                 </c>
+///                 follow-up (reopen <c>ReturnSpecialSortNumber</c> and hand back the
 ///                 concrete table). Until then, the <see cref="CarThrower" />/<see cref="TribeGuard" />/etc.
 ///                 recipes in <see cref="MonsterAiSystem" /> are reachable only by an explicit
 ///                 <see cref="MonsterEntity.Create" /> <c>specialSort</c> override (tests), never by live

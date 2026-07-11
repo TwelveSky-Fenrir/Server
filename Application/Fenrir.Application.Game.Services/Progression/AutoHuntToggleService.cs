@@ -1,5 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Progression;
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
@@ -14,24 +15,25 @@ public sealed class AutoHuntToggleService(ICharacterRepository characters, ILogg
     /// <summary>FEQUIP_TYPE::EWEAPON slot index.</summary>
     private const byte WeaponSlot = 7;
 
-    /// <summary>
-    ///     Zones where enabling auto-hunt is refused. Legacy's "zone 241" flag is actually 20 distinct server
-    ///     numbers (241-249, 292-294, 311-312, 325-330), all refused here, not just 241.
-    /// </summary>
-    private static readonly HashSet<short> DisallowedZones =
-    [
-        38, 319, 320, 321, 322, 323,
-        241, 242, 243, 244, 245, 246, 247, 248, 249,
-        292, 293, 294,
-        311, 312,
-        325, 326, 327, 328, 329, 330
-    ];
-
     public async ValueTask<AutoHuntToggleResult> ToggleAsync(int characterId, Zone zone, PlayerRuntimeState state,
         AutoHuntToggleRequest packet, CancellationToken cancellationToken)
     {
         if (packet.Sort is not (0 or 1))
             return new AutoHuntToggleResult(true, false);
+
+        // Security hardening (finding: the legacy 112-byte AUTO_HUNT blob is copied into stored server state
+        // verbatim with no field validation, S04_MyWork02.cpp:13612). Validate every field server-side BEFORE
+        // storing it -- for both the enable and disable paths, since both copy the blob into stored state. A
+        // malformed blob is a hard disconnect, matching legacy's own malformed-input handling; the validator is
+        // conservative (rejects only never-legitimate values) so a well-behaved client is never wrongly kicked.
+        var validation = AutoHuntConfigValidator.Validate(packet.AutoHunt);
+        if (!validation.IsValid)
+        {
+            logger.LogWarning(
+                "Auto-hunt config rejected for character {CharacterId}: {Rejection} -- aborting session",
+                characterId, validation.Rejection);
+            return new AutoHuntToggleResult(true, false);
+        }
 
         if (packet.Sort == 1)
         {
@@ -40,11 +42,17 @@ public sealed class AutoHuntToggleService(ICharacterRepository characters, ILogg
             var hasAttackSkill = packet.AutoHunt.AttackType.Length >= 3 &&
                                  (packet.AutoHunt.AttackType[0] != 0 || packet.AutoHunt.AttackType[2] != 0);
 
-            if (DisallowedZones.Contains(zone.MapId) || !hasWeapon || !hasAttackSkill)
+            // The cited fixed-number blocked-zone set (38 / 319-323 / the 20 "zone 241 type" numbers) --
+            // AutoHuntEnableGate, Terms A/B -- plus the level-and-rebirth-gated battle-zone eligibility term
+            // (S18_MyZoneInfo.cpp:440-508) -- AutoHuntBattleZoneEligibilityCatalog, Term C.
+            var enableBlocked = AutoHuntEnableGate.IsEnableBlocked(zone.MapId) ||
+                                 AutoHuntBattleZoneEligibilityCatalog.IsBlocked(zone.MapId, state.CombinedLevel,
+                                     state.RebirthCount);
+            if (enableBlocked || !hasWeapon || !hasAttackSkill)
             {
                 logger.LogDebug(
-                    "Auto-hunt enable rejected for character {CharacterId} on map {MapId}: disallowedZone={DisallowedZone} hasWeapon={HasWeapon} hasAttackSkill={HasAttackSkill}",
-                    characterId, zone.MapId, DisallowedZones.Contains(zone.MapId), hasWeapon, hasAttackSkill);
+                    "Auto-hunt enable rejected for character {CharacterId} on map {MapId}: enableBlocked={EnableBlocked} hasWeapon={HasWeapon} hasAttackSkill={HasAttackSkill}",
+                    characterId, zone.MapId, enableBlocked, hasWeapon, hasAttackSkill);
                 return new AutoHuntToggleResult(true, false);
             }
         }

@@ -1,11 +1,25 @@
+using System.Collections.Frozen;
+using Fenrir.Application.Game.Stats.Context;
+
 namespace Fenrir.Application.Game.Stats;
 
 public static partial class StatCalculator
 {
     // ---- GetBaseAttackPower ----
 
+    // WORKSTREAM B2 (consumable stat feed): the strength-elixir counter (consumable.EatStrPotion) feeds ATTACK
+    // POWER here (+3/elixir, MyFactor.cpp:657,662, now layered with B7's four-guild/event override) -- NOT base
+    // Strength; see the discrepancy note in StatCalculator.PrimaryAttributes.cs. WORKSTREAM B6/B7 (Wave-6): the
+    // Stellar-Core damage table and the ornament ORN_DMG bonus are now live too. WORKSTREAM B13-socket-
+    // prerequisites: the gem-socket contribution (GetSocketInfo(1,...), the one stat-type call site not gated by
+    // USE_SOCKET_GEM) is now live too, folded per occupied slot inside the same equip-slot loop as legacy's own
+    // call-site placement (MyFactor.cpp:4031-4035). Still not read here: zone rage-gauge scaling (dormant, see
+    // StatCalculator.DrunkRageContribution.cs) and the mount grade whole-value multiplier (B8-mount Tier 1,
+    // blocked). (zone IS read below for the elixir zone-eligibility gate.)
     private static int ComputeAttackPower(int strength, int ki, LevelRowDto levelRow, int setNumber,
-        EquippedItemSlot?[] bySlot)
+        EquippedItemSlot?[] bySlot, CosmeticContext cosmetic = default, ZoneContext zone = default,
+        MountContext mount = default, ConsumableContext consumable = default,
+        FrozenDictionary<int, GemSocketRowDto>? gemSocketsByTypeAndValue = null)
     {
         var weaponSlot = bySlot[7];
         var coefficients = ResolveWeaponAttackCoefficients(weaponSlot);
@@ -20,6 +34,9 @@ public static partial class StatCalculator
             if (i != 8) // EPET: coefSet multiplier skipped, flat += above still applies
                 atk += (int)(slot.Item.AttackPower *
                              SetBonusTables.GetCoefficients(setNumber, i, IsLegendary(slot.Item)).AttackPower);
+            if (gemSocketsByTypeAndValue is not null)
+                atk += SumGemSocketContribution(GemSocketStatKind.AttackPower, slot.SocketGem1, slot.SocketGem2,
+                    slot.SocketGem3, gemSocketsByTypeAndValue);
         }
 
         if (bySlot[1] is { } capeSlot)
@@ -32,16 +49,27 @@ public static partial class StatCalculator
 
         if (bySlot[10] is { } deco2)
             atk += ComputeDeco2AttackPowerBonus(deco2);
-        // Deco 9/11/12 (and deco2's own sort==2 branch): ReturnNewStat unread, contributes 0 beyond the generic loop above.
+        // B3-deco: AttackPower (DecorationStatKind.AttackPower/selector 3) is a DELIBERATE no-op -- neither the
+        // tSort=1 nor tSort=2 ReturnNewValue switch has a case 3 branch (GameSystem_02_Item.cpp:1215-1356), so
+        // decoration slots 9-12 never contribute to attack power under any legacy path. Not wired here on
+        // purpose, not an oversight -- see DecorationStatKind.AttackPower's own doc.
 
         if (bySlot[8] is { } petAmulet)
         {
             atk -= petAmulet.Item
                 .AttackPower; // Phoenix removes the item's own AttackPower stat, undoing the flat += above
-            atk += PhoenixFlatBonus(petAmulet.Item.ItemId, 3000, 4000, 5000);
+            atk += PhoenixFlatBonus(petAmulet.Item.ItemId, 3000, 4000, 5000); // first pass (occupancy-guarded)
+            // B12 fix: the legacy has a SECOND, no-occupancy-guard pass keyed on the slot-8 id
+            // (MyFactor.cpp:2699-2711); safe inside this guard since it returns 0 for non-Phoenix ids.
+            // Net damage delta becomes +3000/+5000/+7000 (was +3000/+4000/+5000).
+            atk += PhoenixDamageSecondPassBonus(petAmulet.Item.ItemId);
         }
 
         atk += SetBonusTables.GetBaseFlatAttackPowerBonus(setNumber); // NXT +500/1000/1500
+
+        atk += StrengthElixirAttackContributionWithOverride(consumable, zone);
+        atk += StellarCoreAttackPowerContribution(cosmetic); // B6 stellar core (shared DMG/DEF table)
+        atk += OrnamentAttackContribution(zone, bySlot); // B7 ornament ORN_DMG
 
         return atk;
     }

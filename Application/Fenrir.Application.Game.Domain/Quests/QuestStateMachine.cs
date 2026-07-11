@@ -66,12 +66,16 @@ public static class QuestStateMachine
                 : // meet NPC: end condition is PresentState == 2, holding the matching TargetPhase already satisfies it
                 return progress.TargetPhase == (q.Solution1 ?? 0) ? StateInProgress : StateInvalid;
 
-            case 8: // "Waterfall occupation" (zone038 event): its own live-occupation increment hook still
-                // lives in the zone038 tick loop (out of Fenrir's scope). A second, independently-cited
-                // increment hook DOES exist now -- Zone.HandleRegularWarConclusionCredit credits any
-                // holder present when a Regular War (Zone049) map whose id matches this quest's own
-                // TargetPhase concludes (Server/ts25zone/S07_MyGame01.cpp:5293-5314) -- so KillCounter can
-                // advance to 1 via that path even though the zone038-native path remains unported.
+            case 8: // "occupation of WaterFall" (qSort 8): the counter (0 -> 1) is moved once, at a war
+                // conclusion, by BOTH cited increment hooks -- there is no continuous per-tick occupation
+                // accrual anywhere in the legacy source. Zone.HandleZone038OccupationCredit credits every
+                // winning-tribe, alive holder present when the Holy Stone / Waterfall (Zone038) war concludes
+                // (Server/ts25zone/S07_MyGame01.cpp:4212-4241), and Zone.HandleRegularWarConclusionCredit
+                // credits any holder present when a Regular War (Zone049) map whose id matches this quest's own
+                // TargetPhase concludes (Server/ts25zone/S07_MyGame01.cpp:5293-5314). The present-state rule
+                // itself is at Server/ts25zone/S07_MyGame04.cpp:1865-1874: TargetPhase must equal the quest's
+                // own first solution value (else Invalid), then KillCounter below 1 is In-Progress (2),
+                // otherwise Condition-Met (3) -- which is exactly the < 1 gate both credit hooks reproduce.
                 if (progress.TargetPhase != (q.Solution1 ?? 0)) return StateInvalid;
                 return progress.KillCounter < 1 ? StateInProgress : StateConditionMet;
 

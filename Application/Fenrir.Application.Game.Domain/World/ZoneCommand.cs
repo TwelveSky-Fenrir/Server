@@ -1,4 +1,5 @@
 using Fenrir.Application.Game.Domain.Quests;
+using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
@@ -53,7 +54,43 @@ public enum ZoneCommandKind : byte
     ///     tick thread evaluated the win -- possibly a DIFFERENT zone than the one that now hosts the recipient,
     ///     same cross-zone <see cref="Post" /> precedent as <see cref="CreditRegularWarConclusion" />.
     /// </summary>
-    GrantValleyWarRewardDrop
+    GrantValleyWarRewardDrop,
+
+    /// <summary>
+    ///     Zone038 (Holy Stone / "Waterfall") war-conclusion qSort-8 occupation credit -- see
+    ///     <see cref="Zone.HandleZone038OccupationCredit" />'s own remarks for the full behavior and citation.
+    ///     Posted once per winning-tribe, alive, non-zone-transferring character present on the Zone038 map at
+    ///     Stone-capture time by
+    ///     <see cref="Fenrir.Application.Game.Domain.World.ZoneWar.HolyStoneWarCycle" />, carrying the winning
+    ///     tribe (<see cref="ZoneCommand.WinningTribe" />) so the handler can re-validate the participant filter
+    ///     on the zone's own tick thread -- same single-writer-preserving posture as
+    ///     <see cref="CreditRegularWarConclusion" />.
+    /// </summary>
+    CreditZone038Occupation,
+
+    /// <summary>
+    ///     Regular War (Zone049) battle-end reward-loop grant application (C15-regwar-reward) -- see
+    ///     <see cref="Zone.HandleApplyRegularWarReward" />'s own remarks for the full behavior and citation.
+    ///     Posted once per already-computed <see cref="RegularWarRewardGrant" /> by
+    ///     <see cref="Fenrir.Application.Game.Hosting.World.ZoneWar.RegularWarRewardGrantSink" />, from
+    ///     <see cref="Fenrir.Application.Game.Hosting.World.ZoneWar.RegularWarSchedulerHost" />'s own
+    ///     background-timer thread -- same cross-thread <see cref="Post" /> precedent as
+    ///     <see cref="CreditRegularWarConclusion" />/<see cref="GrantValleyWarRewardDrop" />.
+    /// </summary>
+    ApplyRegularWarReward,
+
+    /// <summary>
+    ///     A4-missing-bosses: Regular War (Zone049, legacy server 295 only) battle-end Boss-561 summon -- see
+    ///     <see cref="Zone.HandleSummonRegularWarBoss" />'s own remarks for the full behavior and citation.
+    ///     Posted once per decisive server-295 Regular War conclusion (never on a draw or an empty-map
+    ///     abort) by <see cref="Fenrir.Application.Game.Hosting.World.ZoneWar.RegularWarRewardGrantSink" />,
+    ///     from <see cref="Fenrir.Application.Game.Hosting.World.ZoneWar.RegularWarSchedulerHost" />'s own
+    ///     background-timer thread -- same cross-thread <see cref="Post" /> precedent as
+    ///     <see cref="ApplyRegularWarReward" />. Unlike every other kind on this enum,
+    ///     <see cref="ZoneCommand.CharacterId" /> carries no meaning at all here -- this summon targets the
+    ///     map itself, not any particular avatar -- so its factory method fixes it at 0.
+    /// </summary>
+    SummonRegularWarBoss
 }
 
 /// <summary>
@@ -98,6 +135,12 @@ public readonly struct ZoneCommand
 
     /// <summary>Meaningful only when <see cref="Kind" /> is <see cref="ZoneCommandKind.SetMuted" />.</summary>
     public bool Muted { get; init; }
+
+    /// <summary>Meaningful only when <see cref="Kind" /> is <see cref="ZoneCommandKind.CreditZone038Occupation" />.</summary>
+    public byte WinningTribe { get; init; }
+
+    /// <summary>Meaningful only when <see cref="Kind" /> is <see cref="ZoneCommandKind.ApplyRegularWarReward" />.</summary>
+    public RegularWarRewardGrant RegularWarReward { get; init; }
 
     public static ZoneCommand Enter(int characterId, PlayerEnterData data)
     {
@@ -151,6 +194,30 @@ public readonly struct ZoneCommand
     public static ZoneCommand GrantValleyWarRewardDrop(int characterId)
     {
         return new ZoneCommand { Kind = ZoneCommandKind.GrantValleyWarRewardDrop, CharacterId = characterId };
+    }
+
+    /// <summary>See <see cref="ZoneCommandKind.CreditZone038Occupation" />'s own remarks.</summary>
+    public static ZoneCommand CreditZone038Occupation(int characterId, byte winningTribe)
+    {
+        return new ZoneCommand
+        {
+            Kind = ZoneCommandKind.CreditZone038Occupation, CharacterId = characterId, WinningTribe = winningTribe
+        };
+    }
+
+    /// <summary>See <see cref="ZoneCommandKind.ApplyRegularWarReward" />'s own remarks.</summary>
+    public static ZoneCommand ApplyRegularWarReward(RegularWarRewardGrant grant)
+    {
+        return new ZoneCommand
+        {
+            Kind = ZoneCommandKind.ApplyRegularWarReward, CharacterId = grant.CharacterId, RegularWarReward = grant
+        };
+    }
+
+    /// <summary>See <see cref="ZoneCommandKind.SummonRegularWarBoss" />'s own remarks.</summary>
+    public static ZoneCommand SummonRegularWarBoss()
+    {
+        return new ZoneCommand { Kind = ZoneCommandKind.SummonRegularWarBoss, CharacterId = 0 };
     }
 }
 
@@ -304,4 +371,11 @@ public sealed record PlayerEnterData(
     // remarks.
     long StoreMoney = 0,
     int InventoryDate = 0,
-    int StoreDate = 0);
+    int StoreDate = 0,
+    // D2 hook 2 (PvP same-origin kill-credit guard input): the accepted socket's canonical remote-IP string
+    // (AntiCheat.SessionSourceIp.Normalize), null for a transport with no accepted socket (test transports).
+    // Must travel through an in-process zone transfer too, or PlayerRuntimeState.SourceIp would silently reset
+    // to null on every map hop, re-opening the PvP same-origin guard as a no-op after the character's first
+    // hop. See PlayerRuntimeState.SourceIp's own remarks and AntiCheat.PvpKillCreditGuard.IsSameOrigin, the
+    // guard this field feeds.
+    string? SourceIp = null);

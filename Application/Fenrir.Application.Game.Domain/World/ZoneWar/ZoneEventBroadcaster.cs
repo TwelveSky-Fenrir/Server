@@ -60,7 +60,8 @@ public sealed class ZoneEventBroadcaster(
     TribeSymbolSpawner? symbolSpawner = null,
     ZoneCenterSiegeState? siegeState = null,
     IRvrSiegeEventRelayQueue? relayQueue = null,
-    IOptions<GameServerOptions>? gameOptions = null)
+    IOptions<GameServerOptions>? gameOptions = null,
+    Zone039ArmingReactor? zone039Reactor = null)
 {
     private const int DataSize = 130;
 
@@ -77,6 +78,10 @@ public sealed class ZoneEventBroadcaster(
         if (guardSpawner is not null)
             foreach (var zone in zones.Zones)
                 guardSpawner.ForceZone038WinnerResummon(zone);
+
+        // A12: case-38 zone-side reaction (server-74 monster-summon reset + vestigial battle-state flag) on
+        // this shard's own five gated zones.
+        zone039Reactor?.Apply(zones);
 
         EnqueueForOtherShards(38, data);
     }
@@ -117,6 +122,11 @@ public sealed class ZoneEventBroadcaster(
         if (guardSpawner is not null)
             foreach (var zone in zones.Zones)
                 guardSpawner.ForceOrdinaryResummon(zone);
+
+        // C15-hsb-reset: the code-40 handler's own per-player rank-point/date/buff reset (S07_MyGame08.cpp:
+        // 233-271), posted once per zone for that zone's own tick to drain -- see Zone.HolyStoneBattleReset.cs.
+        foreach (var zone in zones.Zones)
+            zone.PostHolyStoneBattleRankReset();
 
         EnqueueForOtherShards(40, data);
 
@@ -506,6 +516,10 @@ public sealed class ZoneEventBroadcaster(
                 if (guardSpawner is not null)
                     foreach (var zone in zones.Zones)
                         guardSpawner.ForceZone038WinnerResummon(zone);
+
+                // A12: same case-38 zone-side reaction as AnnounceZone038Winner's own origin-shard leg,
+                // reproduced here for every OTHER shard's own replay.
+                zone039Reactor?.Apply(zones);
                 break;
 
             case 39:
@@ -522,6 +536,12 @@ public sealed class ZoneEventBroadcaster(
                 if (guardSpawner is not null)
                     foreach (var zone in zones.Zones)
                         guardSpawner.ForceOrdinaryResummon(zone);
+
+                // C15-hsb-reset: same per-zone HSB rank-reset trigger as the origin shard's own
+                // AnnounceTribeSymbolBattleStarted -- must be replayed here too so players connected to a
+                // shard that did NOT originate this event still receive the reset.
+                foreach (var zone in zones.Zones)
+                    zone.PostHolyStoneBattleRankReset();
                 break;
 
             // 42/45/46/47: no reactive guard/symbol effect on the zone side -- the shared local broadcast

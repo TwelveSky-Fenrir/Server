@@ -1,10 +1,13 @@
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
+using Fenrir.Application.Game.Abstractions.Progression;
 using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Commerce;
 using Fenrir.Application.Game.Domain.Consumables;
+using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Inventory.UseItems;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Simulation;
@@ -29,9 +32,28 @@ public sealed class UseInventoryItemService(
     IProxyShopExpirationRelayQueue proxyShopExpirationRelay,
     IOptions<GameServerOptions> options,
     WorldDataCache worldData,
-    ILogger<UseInventoryItemService> logger) : IUseInventoryItemService
+    ILogger<UseInventoryItemService> logger,
+    ITowerUpgradeService towerUpgrade,
+    UseItemHandlerRegistry? useItemRegistry = null) : IUseInventoryItemService
 {
     private const byte BottleSort = 26;
+
+    /// <summary>
+    ///     A11 -- world.Items id of the from-scratch "construct tower" item (S04_MyWork03.cpp:7283-7284),
+    ///     routed to <see cref="ITowerUpgradeService.ConstructAsync" />. Same numeric value as
+    ///     <c>TowerUpgradeService.TowerConstructItemId</c> (a private constant there) -- kept as a separate,
+    ///     locally-owned constant here rather than exposing that one publicly, matching this file's own
+    ///     convention of declaring every dispatched item id locally (<see cref="LodTicketItemId" />,
+    ///     <see cref="FactionNoticeItemId" />, <see cref="TaiyanKeyItemId" /> below).
+    /// </summary>
+    private const int TowerConstructItemId = 665;
+
+    /// <summary>
+    ///     A11 -- world.Items id of the "heal tower guardian" item (S04_MyWork03.cpp:7506-7511), routed to
+    ///     <see cref="ITowerUpgradeService.HealAsync" />. See <see cref="TowerConstructItemId" />'s own remarks
+    ///     on the deliberate constant duplication.
+    /// </summary>
+    private const int TowerHealItemId = 667;
 
     /// <summary>world.Items.Sort for the "skill grimoire" category -- see <see cref="ResolveSkillGrimoireAsync" />.</summary>
     private const byte SkillGrimoireSort = 5;
@@ -141,6 +163,24 @@ public sealed class UseInventoryItemService(
     public async ValueTask<UseInventoryItemResponse> ResolveAsync(Zone zone, PlayerRuntimeState state,
         int characterId, int accountId, byte page, byte index, int value, CancellationToken cancellationToken)
     {
+        // Dated-vault last-page access gate (part of the legacy common gate,
+        // Server/ts25zone/S04_MyWork03.cpp:1924-1931): the last inventory page is a rental "vault" whose
+        // access lapses on game.Characters.InventoryDate; a use addressed to it after that date has passed is
+        // illegal input. Legacy DISCONNECTS here; this port answers with the same clean Result=1 every other
+        // op23 disconnect-worthy precondition in this file already collapses to (ResolveStatCleanseAsync/
+        // ResolveTaiyanKeyAsync's own remarks) -- IUseInventoryItemService's return shape cannot signal
+        // "disconnect" this deep, and a clean failure avoids ever kicking a legitimately-lapsed player. Flagged
+        // for a follow-up if byte-exact disconnect is required (it would move to UseInventoryItemHandler, the
+        // only layer that can Abort). InventoryDate is hydrated at world entry (Zone.PlayerLifecycle.cs:380),
+        // so this never false-positives on unhydrated state.
+        if (page == ContainerMatrix.InventoryPage1 && state.InventoryDate < GameDate.Today())
+        {
+            logger.LogDebug(
+                "Character {CharacterId} use-inventory-item rejected: dated-vault last page {Page} expired (InventoryDate {InventoryDate})",
+                characterId, page, state.InventoryDate);
+            return new UseInventoryItemResponse { Result = 1, Page = page, Index = index, Value = 0, Value2 = 0 };
+        }
+
         var itemStack = state.Inventory.GetSlot(page, index);
         if (itemStack is not { } item || !worldData.ItemsById.TryGetValue(item.ItemId, out var itemDefinition))
             return Fail(characterId, itemStack, page, index);
@@ -185,9 +225,12 @@ public sealed class UseInventoryItemService(
             return await ResolveGuildScrollAsync(zone, state, characterId, page, index, item, minutes,
                 cancellationToken);
 
-        if (IsTribeTransferScroll(item.ItemId))
-            return await ResolveTribeTransferScrollAsync(zone, state, characterId, page, index, item,
-                cancellationToken);
+        // Faction Transfer Scroll (8153/8154) is no longer handled here -- the real TChangeTribe mechanism
+        // (13-gate precondition chain + atomic best-effort equip/skill remap) is now a registered
+        // TribeScrollTransferUseItemHandler (workstream C11), reached via the useItemRegistry terminal
+        // dispatch below. This removes the old permit-banking stub (ResolveTribeTransferScrollAsync) that only
+        // ever credited game.Characters.TribeTransferPermitCount with no matching spend path -- see this file's
+        // git history / agent memory for that superseded placeholder.
 
         if (ProxyShopRentalExtensionResolver.ExtensionDaysFor(item.ItemId) is not null)
             return await ResolveProxyShopRentalExtensionAsync(zone, state, characterId, page, index, item,
@@ -207,6 +250,38 @@ public sealed class UseInventoryItemService(
 
         if (IsRebirthPill(item.ItemId))
             return await ResolveRebirthPillAsync(zone, state, characterId, page, index, item, cancellationToken);
+
+        // A11 -- tower construct/heal items (665/667, S04_MyWork03.cpp:7283-7568): routed to the dedicated
+        // ITowerUpgradeService rather than modeled inline here, since every gate/side-effect (leadership role,
+        // idle/max-of-kind/tribe-group checks, atomic construction claim, tick-armed heal) already lives there
+        // (workstream A11, reached via TowerUpgradeHandler/op120 for the war-UI path and here for the
+        // use-inventory-item path). `value` is passed through unmodified as item 665's constructType (the
+        // request's own, and only, numeric value field, CLIENT.h's CZ_USE_INVENTORY_ITEM_SEND `tValue` --
+        // confirmed the sole such field on this packet, no separate tValue01/tValue1); item 667's heal has no
+        // per-request parameter and ignores it (see ITowerUpgradeService.HealAsync's own remarks).
+        if (item.ItemId == TowerConstructItemId)
+            return await towerUpgrade.ConstructAsync(characterId, zone, state, page, index, item, value,
+                cancellationToken);
+
+        if (item.ItemId == TowerHealItemId)
+            return await towerUpgrade.HealAsync(characterId, zone, state, page, index, item, cancellationToken);
+
+        // Terminal dispatch (workstream C9): everything the if-cascade above did not claim is offered to the
+        // per-item registry -- the double-click-to-equip swap (equipment categories), the id-891 title
+        // upgrade, the id-2193 palace-rank upgrade, and the id-635 mount box. The registry's own families are
+        // disjoint from every family above (Bottle sort 26 / skill-grimoire sort 5 / the specific consumable
+        // ids), so an item reaching here was already destined for the generic failure -- a registered handler
+        // strictly extends, never overrides, the cascade above. An item the registry also declines falls
+        // through to the same clean Result=1 as before this feature existed.
+        // useItemRegistry is an optional constructor dependency (defaulted null) -- the same test-seam pattern
+        // Zone.cs's own optional collaborators use. Production DI injects the registered
+        // UseItemHandlerRegistry (see this feature's wiring manifest); unit tests that don't exercise the
+        // C9 families leave it null and this whole block no-ops (those items fall to the same clean failure
+        // they did before C9).
+        if (useItemRegistry?.Resolve(item, itemDefinition) is { } useItemHandler)
+            return await useItemHandler.HandleAsync(
+                new UseItemContext(zone, state, characterId, accountId, page, index, item, itemDefinition, value),
+                cancellationToken);
 
         return Fail(characterId, item, page, index);
     }
@@ -417,8 +492,11 @@ public sealed class UseInventoryItemService(
     ///     this reserve is non-zero (see its own remarks: "only ever recharged by tSort 15's guild scrolls").
     ///     Requires guild membership, matching every scroll's own item text ("Need to join/be in a guild to
     ///     use the item"); a non-member or an already-vanished guild gets the same clean Result=1 as any
-    ///     other rejected use, not a disconnect. BuffType/BuffState/BuffTimeForDiff are carried through
-    ///     unchanged -- this only tops up the time reserve, it never itself activates/changes a buff type.
+    ///     other rejected use, not a disconnect. BuffType/BuffState are carried through unchanged -- this
+    ///     only tops up the time reserve, it never itself activates/changes a buff type. BuffTimeForDiff
+    ///     (the absolute future-expiry baseline the reserve counts down to) DOES move -- see
+    ///     <see cref="GuildBuffTopUp" /> for the exact legacy-parity extend/restart formula
+    ///     (Server/ts25extra/S08_MyDB.cpp:1151-1186, <c>MyDB::UpdateGuildBuffTime</c>).
     /// </summary>
     private async ValueTask<UseInventoryItemResponse> ResolveGuildScrollAsync(Zone zone, PlayerRuntimeState state,
         int characterId, byte page, byte index, ItemStack item, int minutes, CancellationToken cancellationToken)
@@ -432,8 +510,9 @@ public sealed class UseInventoryItemService(
 
         try
         {
-            await guilds.SetBuffAsync(guildId, guild.BuffType, guild.BuffState, guild.BuffTime + minutes,
-                guild.BuffTimeForDiff, cancellationToken);
+            var topUp = GuildBuffTopUp.Apply(guild, minutes, DateTime.UtcNow);
+            await guilds.SetBuffAsync(guildId, topUp.BuffType, topUp.BuffState, topUp.BuffTime,
+                topUp.BuffTimeForDiff, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -441,47 +520,6 @@ public sealed class UseInventoryItemService(
                 "Character {CharacterId} guild scroll recharge failed for guild {GuildId}", characterId, guildId);
             return Fail(characterId, item, page, index);
         }
-
-        return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
-    }
-
-    /// <summary>
-    ///     Faction Transfer Scroll items (world.Items 8153/8154, "Transfer to any Faction. Right click to
-    ///     use.") -- still only the permission gate is modeled here: consuming the scroll credits one banked
-    ///     transfer permit (game.Characters.TribeTransferPermitCount) via
-    ///     <see cref="ICharacterRepository.GrantTribeTransferPermitAsync" />. This remains a grant path with
-    ///     no spend path, but the earlier premise for that gap ("no legacy source available here documents
-    ///     the actual tribe-change mechanic") is now known to be false and must not be relied on going
-    ///     forward: the full legacy mechanic (precondition chain, error messages, and the
-    ///     costume/equipment/skill remap mutation) has since been located and is cited below. It is not yet
-    ///     ported here because the legacy source itself has open gaps a wire-protocol-scoped change cannot
-    ///     close: the equipment/costume equivalence tables' exact contents were not traced line-by-line (only
-    ///     their shape was confirmed), the legacy "zone 37 reachability" and cross-process admin-toggle
-    ///     checks (ts25extra's <c>skyinfo.s_tchange0/1/2</c>) have no Fenrir-side equivalent table/service
-    ///     yet, and legacy's zone-relocation dispatch (<c>B_RETURN_TO_AUTO_ZONE</c>) has no settled mapping
-    ///     onto Fenrir's map-sharded topology. Porting the actual spend/mutation is Domain+Services+Data work
-    ///     (tribe-role/party/guild/mentor/cape/friend-list gates, the remap tables themselves, a new
-    ///     admin-toggle equivalent, and a zone-relocation decision) that belongs with
-    ///     <c>fenrir-gameplay-domain-engineer</c>/<c>fenrir-database-engineer</c>/
-    ///     <c>fenrir-realtime-simulation-architect</c>, not invented here. No tribe mutation is invented.
-    /// </summary>
-    /// <remarks>
-    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:4740-4856 (full precondition chain, error messages,
-    ///     mutation call, item removal, proxy-shop closure, zone-routing dispatch) ;
-    ///     Server/ts25zone/UpperCom/S06_MyUpperCom04.cpp:446-456 (the cross-process
-    ///     U_ZONE_CHECK_CHANGE_TRIBE_FOR_EXTRA_SEND call shape) ; Server/ts25extra/S04_MyWork02.cpp:1322-1341
-    ///     and Server/ts25extra/S08_MyDB.cpp:1217-1238 (the admin per-tribe transfer toggle,
-    ///     <c>skyinfo.s_tchange&lt;N&gt;</c>) ; Server/ts25zone/S07_MyGame03.cpp:11525-11744
-    ///     (<c>TChangeTribe</c>, the costume/equipment/skill/hotkey/auto-buff remap -- table contents
-    ///     unverified, see this method's own summary) ; Server/Header/mapcheck.h:83-114 (<c>IsValidTown</c>) ;
-    ///     Server/Header/function.h:92-114 (<c>ReturnTribeRole</c>) ; Server/Header/Protocol/DEFINE.h:483
-    ///     (<c>LV_M33</c> = 145, the exact-equality level gate).
-    /// </remarks>
-    private async ValueTask<UseInventoryItemResponse> ResolveTribeTransferScrollAsync(Zone zone,
-        PlayerRuntimeState state, int characterId, byte page, byte index, ItemStack item,
-        CancellationToken cancellationToken)
-    {
-        await characters.GrantTribeTransferPermitAsync(characterId, 1, cancellationToken);
 
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
@@ -1039,7 +1077,7 @@ public sealed class UseInventoryItemService(
         int statInt, int statDex)
     {
         var attributes = new CharacterBaseAttributes(statVit, statStr, statInt, statDex, state.Level, state.Tribe,
-            state.PreviousTribe, state.Title, state.Halo, state.RebirthCount);
+            state.PreviousTribe, state.Title, state.Halo, state.RebirthCount, state.Level2);
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
         var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
             ? petStack.ItemId
@@ -1347,7 +1385,7 @@ public sealed class UseInventoryItemService(
 
         var newRebirthCount = state.RebirthCount + 1;
         var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
-            state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo, newRebirthCount);
+            state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo, newRebirthCount, state.Level2);
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
         var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
             ? petStack.ItemId
@@ -1468,11 +1506,6 @@ public sealed class UseInventoryItemService(
             1211 or 8415 => 60,
             _ => null
         };
-    }
-
-    private static bool IsTribeTransferScroll(int itemId)
-    {
-        return itemId is 8153 or 8154;
     }
 
     /// <summary>world.Items 1190/17035/8413 -- see <see cref="ResolvePetExpBoostPillAsync" />.</summary>

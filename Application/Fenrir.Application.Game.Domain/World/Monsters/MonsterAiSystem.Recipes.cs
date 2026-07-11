@@ -18,7 +18,8 @@ public sealed partial class MonsterAiSystem
 
     /// <summary>
     ///     Thrower idle-wander trigger roll span (contract cites a "~1%" per-tick roll,
-    ///     <c>S07_MyGame05.cpp:682-688</c>, carried-forward/not-reopened): modeled as a 1-in-<see cref="ThrowerWanderRollSpan" />
+    ///     <c>S07_MyGame05.cpp:682-688</c>, carried-forward/not-reopened): modeled as a 1-in-
+    ///     <see cref="ThrowerWanderRollSpan" />
     ///     draw. The exact legacy probability basis is NOT in the contract's directly-verified ranges -- this is
     ///     a documented ~1% approximation, flagged for a <c>legacy-behavior-translator</c> follow-up alongside
     ///     the rest of the thrower recipe's ungrounded specifics (its <c>SpecialType -&gt; tribe</c> exclusion map).
@@ -150,16 +151,14 @@ public sealed partial class MonsterAiSystem
         // 1/3 far (ranged cry) vs 2/3 near (melee/chase) branch (:1197-1297).
         if (_random.NextInt32(3) == 0)
         {
-            if (TryPickBossTarget(aggro, meleeRadiusSq, wantFar: true, out var far))
-            {
+            if (TryPickBossTarget(aggro, meleeRadiusSq, true, out var far))
                 CommitBossTarget(zone, monster, far, MonsterAiState.RangedAttackWindup);
-            }
 
             // No far target accepted this tick -> take no action (:1229-1230).
             return;
         }
 
-        if (!TryPickBossTarget(aggro, meleeRadiusSq, wantFar: false, out var near))
+        if (!TryPickBossTarget(aggro, meleeRadiusSq, false, out var near))
             near = aggro[_random.NextInt32(aggro.Count)]; // uniformly random fallback entry (:1246-1250)
 
         // Within melee range -> melee attack; otherwise close in via the generic chase (RunChase moves it

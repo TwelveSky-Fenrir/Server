@@ -10,10 +10,12 @@ using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World.Geometry;
+using Fenrir.Application.Game.Domain.World.Monsters;
 using Fenrir.Application.Game.Domain.World.Pathfinding;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
+using Fenrir.Data.Abstractions.Game;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 using Microsoft.Extensions.Logging;
@@ -48,7 +50,24 @@ namespace Fenrir.Application.Game.Domain.World;
 ///     <c>Zone.EconomyMirrors.cs</c>'s already-decided-field-mirror shape), and <c>Zone.GuildBuffExpiry.cs</c>
 ///     (the guild-buff-reserve-exhaustion immediate strip-effect push, posted by
 ///     <c>Hosting.Guilds.GuildBuffDecayHost</c>/<c>Hosting.GuildBuffExpiryRelayHost</c> rather than by any
-///     opcode handler). This file keeps the constructor, the fields/state
+///     opcode handler). Further partial files added since this list was last refreshed: <c>Zone.Duel.cs</c>
+///     (mCase-1 duel attack resolution + the zone124 mass-duel countdown state), <c>Zone.Stun.cs</c> (mCase 5/6
+///     stun/unstun resolution + shared stun-pose broadcast/clear), <c>Zone.DungeonInstance.cs</c> (Zone-241-type
+///     personal-instance entry), <c>Zone.RegularWarConclusion.cs</c> (Regular War qSort-8 occupation credit),
+///     <c>Zone.RegularWarReward.cs</c> (Regular War battle-end ground-item drops), <c>Zone.RegularWarBossSummon.cs</c>
+///     (A4 Regular War server-295 Boss-561 summon), <c>Zone.ValleyWar.cs</c>
+///     (Valley of the Deceased boss-win rewards), <c>Zone.ValleyWarBossSummon.cs</c> (Valley of the Deceased
+///     Boss-756 summon primitive, called directly from <c>ZoneWar.ValleyWarSystem</c>'s own tick-thread
+///     <c>React</c> method -- no <see cref="ZoneCommand" />/<see cref="Post" /> hop needed, unlike the sibling
+///     Boss-561 family), <c>Zone.Zone038Occupation.cs</c> (Zone038 Holy Stone occupation
+///     credit), <c>Zone.Zone175Labyrinth.cs</c> (Zone175 Labyrinth 5-wave PvE mission primitives),
+///     <c>Zone.ZoneTypeClassification.cs</c> (Zone126/Zone039 boot-time shard-type classification),
+///     <c>Zone.SkillValidation.cs</c> (B14 Formation-skill zone-lock + party-buff marker dispatch),
+///     <c>Zone.HolyStoneBattleReset.cs</c> (Zone037 HSB cluster-wide rank reset), <c>Zone.HotkeyMoveCommands.cs</c>
+///     (hotkey-bind self-mutation mirror), <c>Zone.KillFeed.cs</c> (C15 kill-feed broadcast + top-3 leaderboard),
+///     <c>Zone.PetBagCommands.cs</c> (pet-bag deposit/withdraw/rearrange mirror), <c>Zone.TowerPush.cs</c>
+///     (A11 periodic per-player tower-war info push), and <c>Zone.PopupEvent.cs</c> (C16 popup-event PvP/monster
+///     kill-trigger forwarding). This file keeps the constructor, the fields/state
 ///     shared across several of those concerns (the AOI grid, the player map, the tick clock, RNG), and the
 ///     tick loop itself.
 /// </remarks>
@@ -73,7 +92,24 @@ public sealed partial class Zone(
     TribeBankTaxAccumulator? tribeBankTax = null,
     RegularWarActiveMapTracker? regularWarActiveMapTracker = null,
     ZoneRegistry? zoneRegistry = null,
-    ZoneGeometry? geometry = null) : IZoneActor
+    ZoneGeometry? geometry = null,
+    // D2 hook 4's audit-log sink (Zone.PlayerLifecycle.cs's skill-cast tamper guard) -- the best-effort
+    // write-behind path (see IEventLogQueue's own remarks), never awaited from this zone's own tick thread.
+    // Null only in test call sites that don't exercise the guard's audit-log side effect -- same "optional,
+    // degrades to a silent no-op" posture as ICharacterShardLocationRepository above.
+    IEventLogQueue? eventLogQueue = null,
+    // C17 Part B1: non-blocking producer handle for the four-guild per-kill point accrual relay
+    // (Zone.KillFeed.cs's RecordEnemyKillForFeed) -- same "best-effort, never awaited from this zone's own
+    // tick thread" posture as eventLogQueue above. Null only in test call sites that don't exercise the
+    // four-guild accrual side effect; see IFourGuildKillPointQueue's own remarks for why the real
+    // implementation lives in Fenrir.Application.Game.Services rather than *.Hosting.
+    IFourGuildKillPointQueue? fourGuildKillPointQueue = null,
+    // B15 (wave15 contract): process-wide PvM tribe-symbol damage-down malus cache (Zone.Combat.cs's
+    // ResolvePvmAttack call site) -- every zone shares the same process-wide TribeSymbolCombatModifiers
+    // singleton TribeSymbolDamageModifierSystem already recomputes every tick. Null only in test call sites
+    // that don't exercise the PvM tribe-symbol malus (degrades to "never malused", same posture as worldState
+    // above for GetTribeFormationAbility).
+    TribeSymbolCombatModifiers? tribeSymbolCombatModifiers = null) : IZoneActor
 {
     /// <summary>Bounded capacity for <see cref="_inbox" /> -- also the basis for <see cref="InboxDrainCapPerTick" />.</summary>
     private const int InboxCapacity = 8192;
@@ -148,7 +184,7 @@ public sealed partial class Zone(
     ///     <see cref="Monsters.MonsterAiSystem" /> singleton cannot own it, only <see cref="Zone" /> is
     ///     guaranteed one tick thread. Cleared on every borrow, valid only until the next borrow.
     /// </summary>
-    private readonly List<Monsters.MonsterAggroCandidate> _monsterBossAggroScratch = [];
+    private readonly List<MonsterAggroCandidate> _monsterBossAggroScratch = [];
 
     /// <summary>
     ///     Process-wide party authority (team-stun's exact-5-member gate, <see cref="ApplyStunAttack" />) --
@@ -191,6 +227,15 @@ public sealed partial class Zone(
     /// </summary>
     private TimeSpan _clock;
 
+    /// <summary>
+    ///     Lazily-built A* + funnel navmesh router for monster movement (<see cref="Monsters.MonsterAiSystem" />),
+    ///     tick-thread-only. Null when <see cref="Geometry" /> is absent (movement degrades to unconstrained
+    ///     straight-line). Created on the first monster path request rather than at construction so a zone with
+    ///     geometry but no aggressive, actually-pathing monster never pays the triangle-adjacency build cost --
+    ///     see <see cref="Pathfinder" />.
+    /// </summary>
+    private MonsterPathfinder? _pathfinder;
+
     /// <summary>The legacy map this actor simulates -- its key in <see cref="ZoneRegistry" />.</summary>
     public short MapId { get; } = mapId;
 
@@ -216,15 +261,6 @@ public sealed partial class Zone(
     ///     </para>
     /// </summary>
     public ZoneGeometry? Geometry { get; } = geometry ?? TryLoadGeometry(mapId, options, logger);
-
-    /// <summary>
-    ///     Lazily-built A* + funnel navmesh router for monster movement (<see cref="Monsters.MonsterAiSystem" />),
-    ///     tick-thread-only. Null when <see cref="Geometry" /> is absent (movement degrades to unconstrained
-    ///     straight-line). Created on the first monster path request rather than at construction so a zone with
-    ///     geometry but no aggressive, actually-pathing monster never pays the triangle-adjacency build cost --
-    ///     see <see cref="Pathfinder" />.
-    /// </summary>
-    private MonsterPathfinder? _pathfinder;
 
     /// <summary>
     ///     Tick-thread-only accessor that lazily creates <see cref="_pathfinder" /> on first use. Returns null
@@ -295,7 +331,7 @@ public sealed partial class Zone(
     ///     just an id. Distinct buffer from <see cref="_monsterAiNeighborScratch" /> so the acquisition loop can
     ///     iterate the neighbor-id list and populate this one at the same time without aliasing.
     /// </summary>
-    public List<Monsters.MonsterAggroCandidate> BorrowBossAggroScratch()
+    public List<MonsterAggroCandidate> BorrowBossAggroScratch()
     {
         _monsterBossAggroScratch.Clear();
         return _monsterBossAggroScratch;
@@ -367,8 +403,11 @@ public sealed partial class Zone(
         DrainMissionCommands();
         DrainDrinkBottleCommands();
         DrainHotkeySlotMirrorCommands();
+        DrainHotkeyMoveCommands();
+        DrainPetBagCommands();
         DrainHeroRankingQueryCommands();
         DrainHeroRankingRolloverCommands();
+        DrainHolyStoneBattleRankResetCommands();
         DrainFishingCommands();
         DrainMountCommands();
         DrainCostumeCommands();
@@ -546,6 +585,15 @@ public sealed partial class Zone(
                         break;
                     case ZoneCommandKind.GrantValleyWarRewardDrop:
                         HandleGrantValleyWarRewardDrop(command.CharacterId);
+                        break;
+                    case ZoneCommandKind.CreditZone038Occupation:
+                        HandleZone038OccupationCredit(command.CharacterId, command.WinningTribe);
+                        break;
+                    case ZoneCommandKind.ApplyRegularWarReward:
+                        HandleApplyRegularWarReward(command.RegularWarReward);
+                        break;
+                    case ZoneCommandKind.SummonRegularWarBoss:
+                        HandleSummonRegularWarBoss();
                         break;
                 }
             }

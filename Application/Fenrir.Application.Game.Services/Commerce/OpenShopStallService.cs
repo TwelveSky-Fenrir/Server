@@ -132,6 +132,14 @@ public sealed class OpenShopStallService(
                 view.PosX is < 0 or > 7 || view.PosY is < 0 or > 7)
                 return Abort(state.CharacterId, $"slot {page}/{slot} has invalid inventory coordinates");
 
+            // Dated-vault last-page gate (C1-vault-expiry-enforcement): depositing into a proxy/personal shop
+            // listing out of the last inventory page is one of this protocol's "move between containers"
+            // stand-ins for a literal drop/move request (no such request exists at all -- see the originating
+            // contract's own Edge cases). Same hard-disconnect posture as every other coordinate failure in
+            // this loop.
+            if (view.InventoryPage == ContainerMatrix.InventoryPage1 && state.InventoryDate < GameDate.Today())
+                return Abort(state.CharacterId, $"slot {page}/{slot} references the expired dated-vault last page");
+
             worldData.ItemsById.TryGetValue(view.ItemId, out var itemDefinition);
             var liveSlot = state.Inventory.GetSlot((byte)view.InventoryPage, (byte)view.InventoryIndex);
 

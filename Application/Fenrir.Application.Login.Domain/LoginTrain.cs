@@ -115,10 +115,13 @@ public static class LoginTrain
     ///     <para>
     ///         Deliberately NOT overlaid here, per that contract's own "never invent legacy formulas from
     ///         memory" boundary: the logout-position tribe-consistency correction and the forced logout-flag
-    ///         pair (<c>LogoutInfo</c> stays at the zero template -- the four fixed tribe-specific town-spawn
-    ///         value sets behind <c>Server/Header/mapcheck.h:298-326</c> were never enumerated by the
-    ///         contract, only cited by location), and the two hardcoded blacklisted-item-id resets (their
-    ///         actual item ids were likewise never established). <c>VisibleState</c>/<c>SpecialState</c>/
+    ///         pair (the raw <c>LogoutInfo</c>[6] values -- zone/position plus the LOGIN_SEND-tail-floored
+    ///         life/mana -- ARE now populated, by <see cref="BuildOccupiedSlot" />'s
+    ///         <c>BuildLogoutInfoArray</c> from the character's own persisted placement; only the two ON-TOP
+    ///         transforms stay deferred -- the four fixed tribe-specific town-spawn value sets behind
+    ///         <c>Server/Header/mapcheck.h:298-326</c> that the tribe-mismatch position reset needs were never
+    ///         enumerated by the contract, only cited by location), and the two hardcoded blacklisted-item-id
+    ///         resets (their actual item ids were likewise never established). <c>VisibleState</c>/<c>SpecialState</c>/
     ///         <c>CostumeIndex</c>/<c>PetBag</c>/<c>Costume</c> stay at the wire-zero/-1 template too -- no
     ///         persisted storage exists anywhere in this schema for any of the five yet (see
     ///         <c>usp_Character_GetAccountRoster.sql</c>'s own header for the same admission on the read side).
@@ -167,8 +170,48 @@ public static class LoginTrain
             Equip = AvatarInfoFactory.BuildEquipArrayFromRosterItems(entry.Items, character.PetGrowth,
                 character.PetActivity),
             Inventory = AvatarInfoFactory.BuildInventoryArrayFromRosterItems(entry.Items),
-            StoreItem = AvatarInfoFactory.BuildStoreItemArrayFromRosterItems(entry.Items)
+            StoreItem = AvatarInfoFactory.BuildStoreItemArrayFromRosterItems(entry.Items),
+            LogoutInfo = BuildLogoutInfoArray(character)
         };
+    }
+
+    /// <summary>
+    ///     The <c>UPDATE_LOGOUT_INFO[6]</c> wire array (Server/Header/Protocol/DEFINE.h:750-757: [0] =
+    ///     zone/map number, [1..3] = position, [4] = life, [5] = mana) for a returning character's
+    ///     character-select slot -- Fenrir's close of the D1 finding "UPDATE_LOGOUT_INFO[6] is never
+    ///     populated/restored on reconnect". Sourced from the character's own persisted placement
+    ///     (<c>usp_Character_GetAccountRoster</c>'s raw <c>MapId/PosX/PosY/PosZ/Life/Mana</c>, i.e. the
+    ///     continuously write-behind-flushed authoritative values <c>game.Characters</c> already holds --
+    ///     the most-current "last-session" placement, not a separately-captured snapshot), no longer left at
+    ///     the all-zero <see cref="EmptyAvatarSlot" /> template.
+    /// </summary>
+    /// <remarks>
+    ///     The two vitals get the legacy LOGIN_SEND-tail low-word floor (Server/ts25login/S04_MyWork02.cpp:
+    ///     357-358, via <see cref="AvatarVitalsFloor" />: life &gt;= 1, mana's low word &gt;= 0) -- the same
+    ///     correction the legacy login train applies to every occupied avatar slot. The three position floats
+    ///     are truncated to whole numbers exactly as the legacy capture does, and exactly as this Domain's own
+    ///     <see cref="AvatarInfoFactory.CreateForCharacter" /> already lays out the identical six-element array
+    ///     for the create-response AVATAR_INFO. Deliberately NOT applied here (deferred, contract-blocked):
+    ///     the logout-position tribe-consistency correction (Server/ts25login/S04_MyWork02.cpp:330-356 -- a
+    ///     last-zone whose classification does not match the character's tribe resets [1..3] to that tribe's
+    ///     born-in-town spawn), because the four fixed tribe-specific town-spawn value sets behind
+    ///     Server/Header/mapcheck.h:298-326 were never enumerated by the D1 behavior contract, only cited by
+    ///     location -- so the raw persisted position is carried through until a follow-up
+    ///     legacy-behavior-translator pass establishes them (see <c>usp_Character_GetAccountRoster.sql</c>'s
+    ///     own header: "returned raw in RS0 for the caller to apply both transforms to").
+    /// </remarks>
+    private static int[] BuildLogoutInfoArray(CharacterRosterDto character)
+    {
+        var (life, mana) = AvatarVitalsFloor.Clamp(character.Life, character.Mana);
+        return
+        [
+            character.MapId,
+            (int)character.PosX,
+            (int)character.PosY,
+            (int)character.PosZ,
+            life,
+            mana
+        ];
     }
 
     /// <summary>Slots are client-chosen, so gaps in the sparse map are normal -- unfilled slots stay empty string.</summary>

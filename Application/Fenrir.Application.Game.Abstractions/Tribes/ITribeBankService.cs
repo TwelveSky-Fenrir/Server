@@ -13,10 +13,18 @@ public readonly record struct TribeBankResult(bool Success, int Sort, int[]? Tri
 }
 
 /// <summary>
-///     Business logic behind CZ_TRIBE_BANK_SEND (opcode 82), extracted out of <see cref="TribeBankHandler" />.
-///     Legacy recognizes exactly two live sub-commands, view (sort 1) and deposit (sort 2) -- there is no
-///     legacy sub-command that withdraws bank funds to a player via this opcode (see
-///     Server/ts25zone/S04_MyWork02.cpp:11560-11607), so this interface has no withdraw member.
+///     Business logic behind CZ_TRIBE_BANK_SEND (opcode 82) sort 1 (view), extracted out of
+///     <see cref="TribeBankHandler" />.
+///     <para>
+///         <b>Correction:</b> a fresh, definitive full read of Server/ts25zone/S04_MyWork02.cpp:11560-11607
+///         and Server/ts25playuser/S04_MyWork02.cpp:269-377 resolved a 3-way contradiction: sort 2 is
+///         exclusively a WITHDRAW (bank slot -&gt; player money), not the deposit this interface previously
+///         claimed it was -- legacy has no client-invocable deposit path at all, on this opcode or anywhere
+///         else. <see cref="TribeBankHandler" /> now routes sort 2 to <c>TribeBankWithdrawService.WithdrawAsync</c>
+///         directly rather than through this interface. <see cref="DepositAsync" /> below is consequently no
+///         longer reachable from any opcode; it is kept on the interface for now (not removed) pending a
+///         separate decision, since it turns out to have no legacy basis as a client-invoked action at all.
+///     </para>
 /// </summary>
 public interface ITribeBankService
 {
@@ -29,6 +37,10 @@ public interface ITribeBankService
     public ValueTask<TribeBankResult> ViewAsync(ZoneClientSession zoneSession, PlayerRuntimeState state,
         CancellationToken ct);
 
+    /// <summary>
+    ///     Player money -&gt; tribe-bank slot. No longer reachable from any opcode -- see this interface's own
+    ///     summary. Kept, not removed, pending a separate decision.
+    /// </summary>
     public ValueTask<TribeBankResult> DepositAsync(int slotValue, PlayerRuntimeState state, int characterId,
         CancellationToken ct);
 }

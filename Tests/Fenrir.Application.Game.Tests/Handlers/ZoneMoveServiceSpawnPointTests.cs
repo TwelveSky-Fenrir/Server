@@ -38,7 +38,7 @@ public class ZoneMoveServiceSpawnPointTests
 
         var worldState = ZoneTestKit.CreateWorldState();
         var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
-            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(),
+            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(), PortalProximityCatalog.Empty,
             new FakeGameServerDirectoryRepository(),
             new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
             new FakeSessionTicketRepository(),

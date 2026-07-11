@@ -5,16 +5,15 @@ namespace Fenrir.Application.Game.Domain.World;
 ///     rebirth tier.
 /// </summary>
 /// <remarks>
-///     Legacy hardcodes two DIVERGENT tier-&gt;boss tables inline (one in the zone-enter handler, one in the
-///     tick-driven summon step), disagreeing at tiers 4 and 5 (Server/ts25zone/S04_MyWork02.cpp:1167-1183 vs.
-///     Server/ts25zone/S07_MyGame01.cpp:11819-11861). Neither table's concrete monster ids were captured by
-///     the behavior contract this was implemented from, and inventing specific legacy monster ids without a
-///     citation would violate the "no legacy parity from memory" rule -- so this interface exists to hold the
-///     table's SHAPE only. <see cref="Fenrir.Application.Game.Domain.World.Zone" /> only ever calls the one
-///     method below (the zone-enter-handler table's Fenrir equivalent); the tick-driven step's own divergent
-///     copy has no call site in this codebase since Fenrir's tick loop never re-summons on its own (see
-///     <c>Zone.DungeonInstance.cs</c>'s remarks) -- a future contract citing concrete monster ids per tier for
-///     both tables is needed before this can be wired to real game data.
+///     Legacy hardcodes THREE divergent tier/server-&gt;boss tables inline across three call sites (a
+///     zone-enter handler table, a server-325-330-only registration-validation table, and a tick-driven
+///     summon-step table), confirmed by the A4-missing-bosses contract to race against each other on entry --
+///     see <see cref="PersonalDungeonBossTables" />'s own class remarks for the concrete ids and the confirmed
+///     race resolution. <see cref="Fenrir.Application.Game.Domain.World.Zone" /> only ever calls the one
+///     method below; <see cref="Zone241RebirthTierBossCatalog" /> is the concrete implementation, backed by
+///     the tick-driven summon-step table (<see cref="PersonalDungeonBossTables.ResolveCatalogE" />) since that
+///     is the table the confirmed race resolves to in practice, not the zone-enter-handler table this
+///     interface's method was originally modeled after -- see that class's own remarks for why.
 /// </remarks>
 public interface IPersonalDungeonBossCatalog
 {
@@ -25,7 +24,9 @@ public interface IPersonalDungeonBossCatalog
 ///     Default <see cref="IPersonalDungeonBossCatalog" /> wired into every <see cref="Zone" />: no tier ever
 ///     resolves, so every Zone-241 entry attempt fails the summon step and is refused (see
 ///     <c>Zone.TryEnterZone241PersonalInstance</c>'s <c>SummonFailed</c> outcome) until a real catalog is
-///     supplied (e.g. by <c>Fenrir.Application.Game.Hosting</c> once the tier tables above are captured).
+///     supplied. <see cref="Zone241RebirthTierBossCatalog" /> is now available with real, cited ids -- see its
+///     own remarks -- but is not yet assigned to any production <see cref="Zone" /> instance; see this
+///     cluster's wiring report for the exact change needed.
 /// </summary>
 public sealed class NullPersonalDungeonBossCatalog : IPersonalDungeonBossCatalog
 {

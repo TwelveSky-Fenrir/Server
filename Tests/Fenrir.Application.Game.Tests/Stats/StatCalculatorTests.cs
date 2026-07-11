@@ -60,12 +60,14 @@ public class StatCalculatorTests
         short elementAttackPower = 0,
         short elementDefensePower = 0,
         byte critical = 0,
-        byte capeInfo2 = 0)
+        byte capeInfo2 = 0,
+        byte type = 0,
+        byte equipInfo2 = 0)
     {
         return new ItemRowDto(
             itemId, $"Item{itemId}", null, null, null,
-            0, sort, 0, 0, 0,
-            level, 0, 0, 0,
+            type, sort, 0, 0, 0,
+            level, 0, 0, equipInfo2,
             0, 0, 0, 1, martialLevelLimit,
             0, 0, 0, 0, 0,
             0, 0, 0, 0, 0,
@@ -457,5 +459,80 @@ public class StatCalculatorTests
 
         Assert.Equal(29, baseStats.AttackPower); // undoubled at the base/cache layer
         Assert.Equal(58, effectiveStats.AttackPower); // doubled once the wrapper applies the pet rule
+    }
+
+    // ---- B3-deco wiring: effect-sort 2-6 getter insertions + the IS-only decoration contribution ----
+    // Delta tests (with vs. without the one varying input) rather than full hand-computed totals, so each
+    // isolates exactly the new term without needing to re-derive every other contribution in the pipeline.
+
+    [Fact]
+    public void ComputeBaseStats_CapeEffectSort2_AddsDefenseRampContribution()
+    {
+        // Cape slot (1) only, IU count = Combine (MyFactor.cpp:2846). Category 8 -> (base 2.00, K 0.10); at
+        // item level 100, r=6.0 -> (int)(2.00 + 6*0.10) = 2 per IU point (pinned by
+        // ReturnIUEffectValue_Sorts2To6_BaseKRows[2,8] above).
+        var attributes = Attributes(level: 1);
+        var levels = Levels(LevelRow(1));
+        var cape = Item(90010, 8, 100);
+        IReadOnlyList<EquippedItemSlot> withoutIu = [Equip(1, cape)];
+        IReadOnlyList<EquippedItemSlot> withIu = [Equip(1, cape, combine: 5)];
+
+        var without = StatCalculator.ComputeBaseStats(attributes, withoutIu, levels);
+        var with = StatCalculator.ComputeBaseStats(attributes, withIu, levels);
+
+        Assert.Equal(10, with.DefensePower - without.DefensePower); // 2 * 5
+    }
+
+    [Fact]
+    public void ComputeBaseStats_WeaponEffectSort3_AddsHitRampContribution()
+    {
+        // Weapon slot (7) only, IU count = Combine (MyFactor.cpp:3144). Category 14 is within the shared
+        // 13-21 weapon-class row (base 5.73, K 0.29); at item level 100, r=6.0 -> (int)(5.73 + 6*0.29) = 7.
+        var attributes = Attributes(strength: 0, level: 1);
+        var levels = Levels(LevelRow(1));
+        var weapon = Item(90011, 14, 100);
+        IReadOnlyList<EquippedItemSlot> withoutIu = [Equip(7, weapon)];
+        IReadOnlyList<EquippedItemSlot> withIu = [Equip(7, weapon, combine: 5)];
+
+        var without = StatCalculator.ComputeBaseStats(attributes, withoutIu, levels);
+        var with = StatCalculator.ComputeBaseStats(attributes, withIu, levels);
+
+        Assert.Equal(35, with.AttackSuccess - without.AttackSuccess); // 7 * 5
+    }
+
+    [Fact]
+    public void ComputeBaseStats_DecorationSlot_OnlyIsOctetContributesToMaxLife()
+    {
+        // B3-deco decoration ReturnNewStat: ONLY the IS (Enchant) octet is packed for decoration items -- see
+        // StatCalculator.DecorationStatContribution's own remarks (the re-verified B3-octet-mapping contract
+        // states IS is "the only octet decoded for decoration-category items"). Enchant=45 falls in MaxLife's
+        // IS band [41,60] -> 100*(45-40)=500; Combine=99 is deliberately nonzero to prove it is NOT read for a
+        // decoration slot (unlike effect-sort 2-6 above, which DOES read Combine for non-decoration slots).
+        var attributes = Attributes(level: 1);
+        var levels = Levels(LevelRow(1));
+        var deco = Item(90012, type: 5, equipInfo2: 11);
+        IReadOnlyList<EquippedItemSlot> withDeco = [Equip(9, deco, enchant: 45, combine: 99)];
+
+        var without = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels);
+        var with = StatCalculator.ComputeBaseStats(attributes, withDeco, levels);
+
+        Assert.Equal(500, with.MaxLife - without.MaxLife);
+    }
+
+    [Fact]
+    public void ComputeBaseStats_DecorationSlot_WrongEquipInfoCategory_ContributesNothing()
+    {
+        // EquipInfo2 must be one of 11-14 (MyUtil::ReturnItemSort==2, S07_MyGame03.cpp:7484-7513) -- confirms
+        // the wiring reads EquipInfo2 (not EquipInfo1, which stays 0 in this fixture either way) and that the
+        // gate is actually enforced, not a pass-through.
+        var attributes = Attributes(level: 1);
+        var levels = Levels(LevelRow(1));
+        var wrongCategory = Item(90013, type: 5, equipInfo2: 10); // 10 is one below the valid 11-14 band
+        IReadOnlyList<EquippedItemSlot> equipment = [Equip(9, wrongCategory, enchant: 45)];
+
+        var without = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels);
+        var with = StatCalculator.ComputeBaseStats(attributes, equipment, levels);
+
+        Assert.Equal(without.MaxLife, with.MaxLife);
     }
 }

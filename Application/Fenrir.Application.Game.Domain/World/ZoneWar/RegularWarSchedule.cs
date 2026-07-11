@@ -57,8 +57,12 @@ public enum RegularWarOutcome : byte
 ///     smallest-tribe flag and the mid-war elimination victory check.
 /// </param>
 /// <param name="BossMonsterAlive">
-///     Only read on the one configured "boss war" map (295) during <see cref="RegularWarPhase.PostWarCleanup" />
-///     -- whether the post-war boss spawn is still alive. Ignored everywhere else.
+///     Whether the post-war boss spawn is still alive, on the one configured "boss war" map (295). Confirmed
+///     legacy defect (A4-missing-bosses contract): <see cref="RegularWarSchedule" />'s own
+///     <c>TickPostWarCleanup</c> no longer reads this field at all -- the comparison it originally gated is
+///     unconditionally true in legacy, so this phase is governed purely by a flat tick timeout regardless of
+///     actual liveness. Kept on the snapshot for citation fidelity and because <see cref="RegularWarBossSummonCatalog" />'s
+///     own remarks still reference it.
 /// </param>
 public readonly record struct RegularWarEnvironmentSnapshot(
     int TotalPresentCount,
@@ -158,7 +162,12 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
     /// <summary>~15 min max poll, boss-war map (295) only.</summary>
     public const int BossPollMaxTicks = 1800;
 
-    /// <summary>~1.5 min of confirmed boss absence required after the poll ends, boss-war map only.</summary>
+    /// <summary>
+    ///     ~1.5 min of confirmed boss absence required after the poll ends, boss-war map only. Confirmed legacy
+    ///     defect (A4-missing-bosses contract): the post-war "boss still alive" comparison in
+    ///     <see cref="TickPostWarCleanup" /> is unconditionally true, so this sub-wait is legacy-unreachable and
+    ///     no longer read by that method -- kept as a public constant for citation fidelity only.
+    /// </summary>
     public const int BossConfirmedAbsenceTicks = 180;
 
     /// <summary>
@@ -175,8 +184,6 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
 
     private readonly int[] _tribeKillTally = new int[TribeCount];
     private int _activeEvaluationTicksElapsed;
-    private int _bossAbsenceTicksElapsed;
-    private bool _bossConfirmedAbsenceInProgress;
     private int _bossPollTicksElapsed;
     private int _cooldownTicksElapsed;
     private int _countdownAnnounceTicksElapsed;
@@ -410,8 +417,6 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
         Phase = RegularWarPhase.PostWarCleanup;
         _postWarTicksElapsed = 0;
         _bossPollTicksElapsed = 0;
-        _bossConfirmedAbsenceInProgress = false;
-        _bossAbsenceTicksElapsed = 0;
     }
 
     private void TickPostWarCleanup(RegularWarEnvironmentSnapshot snapshot, ref bool monstersShouldDespawn)
@@ -427,22 +432,13 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
             return;
         }
 
-        if (!_bossConfirmedAbsenceInProgress)
-        {
-            if (_bossPollTicksElapsed < BossPollMaxTicks && snapshot.BossMonsterAlive &&
-                snapshot.TotalPresentCount > 0)
-            {
-                _bossPollTicksElapsed++;
-                return;
-            }
-
-            _bossConfirmedAbsenceInProgress = true;
-            _bossAbsenceTicksElapsed = 0;
-            return;
-        }
-
-        _bossAbsenceTicksElapsed++;
-        if (_bossAbsenceTicksElapsed < BossConfirmedAbsenceTicks)
+        // Confirmed legacy defect (A4-missing-bosses contract, independently re-verified): the post-war
+        // "is the boss still alive" scan is compared against the wrong bound, making the "keep waiting"
+        // branch unconditionally true every tick regardless of actual liveness -- so this phase is governed
+        // purely by the flat BossPollMaxTicks timeout; the confirmed-absence sub-wait below it fed is
+        // legacy-unreachable and intentionally bypassed here to match.
+        _bossPollTicksElapsed++;
+        if (_bossPollTicksElapsed < BossPollMaxTicks)
             return;
 
         monstersShouldDespawn = true;

@@ -9,9 +9,9 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
 /// <summary>
 ///     CZ_TRADE_MENU_SEND (opcode 51) -- 2-notch confirm: first call locks (menu 0→1), second confirms
-///     (1→2). At menu==2 on both sides, commits atomically
-///     (<see cref="Fenrir.Data.Abstractions.Characters.ICharacterRepository.ExecuteTradeAsync" />) and mirrors each side's
-///     new
+///     (1→2). At menu==2 on both sides, commits atomically and idempotently
+///     (<see cref="Fenrir.Data.Abstractions.Characters.ITradeCommitRepository.ExecuteIdempotentAsync" />) and
+///     mirrors each side's new
 ///     container back to their own zone. An overflow aborts the whole commit -- no partial state.
 /// </summary>
 /// <remarks>

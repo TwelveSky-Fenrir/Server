@@ -89,13 +89,16 @@ public class TribeBankServiceTests
     [Fact]
     public async Task UnknownSort_Aborts()
     {
-        // Sort 1/2 dispatch to View/DepositAsync respectively; any other sort -- including the removed,
-        // never-legacy Sort 3 a previous revision of this handler mistakenly recognized as "deposit" -- is a
-        // handler-owned fallback the service itself never sees; exercise the real handler here.
+        // Sort 1/2 dispatch to View/Withdraw (via TribeBankWithdrawService) respectively; any other sort --
+        // including the removed, never-legacy Sort 3 a previous revision of this handler mistakenly
+        // recognized as "deposit" -- is a handler-owned fallback neither service ever sees; exercise the
+        // real handler here.
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, _) = Setup(zone, 1, 1);
-        var service = new TribeBankService(new FakeTribeRepository(), NullLogger<TribeBankService>.Instance);
-        var handler = new TribeBankHandler(service);
+        var repository = new FakeTribeRepository();
+        var service = new TribeBankService(repository, NullLogger<TribeBankService>.Instance);
+        var withdrawService = new TribeBankWithdrawService(repository, NullLogger<TribeBankWithdrawService>.Instance);
+        var handler = new TribeBankHandler(service, withdrawService);
 
         await handler.HandleAsync(new TribeBankRequest { Sort = 4, Value = 0 }, session, CancellationToken.None);
 
@@ -105,9 +108,9 @@ public class TribeBankServiceTests
     [Fact]
     public async Task FabricatedSort3_NoLongerRecognized_Aborts()
     {
-        // Regression test for the confirmed audit gap: a previous revision of this handler mapped Sort 2 to
-        // a bank-to-player withdraw and invented a Sort 3 "deposit" with no legacy counterpart. Sort 3 must
-        // now hit the same unrecognized-sub-command fallback as any other invalid value.
+        // Regression test for the confirmed audit gap: there is no legacy Sort 3 on this opcode. Sort 3 must
+        // hit the same unrecognized-sub-command fallback as any other invalid value, and must invoke neither
+        // the (now-orphaned) deposit path nor the withdraw path.
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, _) = Setup(zone, 1, 1);
         var repository = new FakeTribeRepository();
@@ -116,38 +119,49 @@ public class TribeBankServiceTests
             new TribeSubMasterDto(1, 0, 100), new TribeSubMasterDto(1, 1, 101), new TribeSubMasterDto(1, 2, 102)
         ]);
         var service = new TribeBankService(repository, NullLogger<TribeBankService>.Instance);
-        var handler = new TribeBankHandler(service);
+        var withdrawService = new TribeBankWithdrawService(repository, NullLogger<TribeBankWithdrawService>.Instance);
+        var handler = new TribeBankHandler(service, withdrawService);
 
         await handler.HandleAsync(new TribeBankRequest { Sort = 3, Value = 4 }, session, CancellationToken.None);
 
         Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);
         Assert.Null(repository.LastDepositCall);
+        Assert.Null(repository.LastWithdrawCall);
     }
 
     [Fact]
-    public async Task Sort2ThroughHandler_InvokesDeposit_NotWithdraw()
+    public async Task Sort2ThroughHandler_InvokesWithdraw_NotDeposit()
     {
-        // Regression test for the confirmed audit gap (see FabricatedSort3_NoLongerRecognized_Aborts): Sort 2
-        // must route to the deposit path (caller's money debited, tribe-bank slot credited), matching legacy's
-        // CZ_TRIBE_BANK_SEND (Server/ts25zone/S04_MyWork02.cpp:11560-11607) -- not a withdraw.
+        // Regression test for the confirmed economy bug this fix closes: a fresh, definitive full read of
+        // Server/ts25zone/S04_MyWork02.cpp:11560-11607 and Server/ts25playuser/S04_MyWork02.cpp:269-377
+        // resolved a 3-way source contradiction -- CZ_TRIBE_BANK_SEND sort 2 is EXCLUSIVELY a withdraw
+        // (bank slot -> player money). Legacy has no client-invocable deposit path anywhere; deposits only
+        // happen via the automatic 10-minute server-internal tax-skim flush, never a packet. This test used
+        // to assert the opposite (that sort 2 invoked deposit), which was itself the bug.
         var zone = ZoneTestKit.CreateZone(1);
         var (session, pipe, _) = Setup(zone, 1, 1);
-        var repository = new FakeTribeRepository { MoneyAfterDeposit = 0, DepositAmount = 12_345 };
+        var repository = new FakeTribeRepository { MoneyAfterWithdraw = 12_345 };
+        repository.Bank[(1, 4)] = 12_345;
         repository.SubMasters.AddRange(
         [
             new TribeSubMasterDto(1, 0, 100), new TribeSubMasterDto(1, 1, 101), new TribeSubMasterDto(1, 2, 102)
         ]);
         var service = new TribeBankService(repository, NullLogger<TribeBankService>.Instance);
-        var handler = new TribeBankHandler(service);
+        var withdrawService = new TribeBankWithdrawService(repository, NullLogger<TribeBankWithdrawService>.Instance);
+        var handler = new TribeBankHandler(service, withdrawService);
 
         await handler.HandleAsync(new TribeBankRequest { Sort = 2, Value = 4 }, session, CancellationToken.None);
 
-        Assert.Equal(((byte)1, (byte)4, CharacterId), repository.LastDepositCall);
-        Assert.Null(repository.LastWithdrawCall);
+        Assert.Equal(((byte)1, (byte)4, CharacterId), repository.LastWithdrawCall);
+        Assert.Null(repository.LastDepositCall);
         Assert.Null(session.DisconnectReason);
         ZoneTestKit.DrainOutbound(pipe);
     }
 
+    // The following tests exercise TribeBankService.DepositAsync directly at the service level. As of the
+    // sort-2 correction above, this method is no longer reachable from any opcode (there is no legacy
+    // client-invocable deposit path at all) -- it is retained, not deleted, pending a separate decision on
+    // whether to remove it outright, so these tests intentionally keep covering its still-existing behavior.
     [Fact]
     public async Task Deposit_SlotIndexOutOfRange_Aborts()
     {

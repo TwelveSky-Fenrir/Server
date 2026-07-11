@@ -14,12 +14,12 @@
 // scope no broader than the ts25 loopback-only precedent unless there is an explicit, reviewed reason to
 // widen it.
 
-using Fenrir.Network.Dispatch;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Commerce;
 using Fenrir.Application.Game.Domain.Extensions;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Progression;
+using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Monsters;
 using Fenrir.Application.Game.Domain.World.WorldState;
@@ -37,6 +37,7 @@ using Fenrir.Data.Abstractions.Guilds;
 using Fenrir.Data.Abstractions.Progression;
 using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Data.Abstractions.World;
+using Fenrir.Network.Dispatch;
 using Fenrir.Network.Dispatch.RateLimiting;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.ServiceDefaults;
@@ -80,6 +81,13 @@ try
     // cache is populated before the first connection -- a SQL failure aborts startup instead of serving an empty world.
     bootStep = "WorldDataLoader.InitializeAsync";
     await host.Services.GetRequiredService<WorldDataLoader>().InitializeAsync(CancellationToken.None);
+
+    // C11 faction-transfer scroll: same rationale as WorldDataLoader just above -- TribeConversionResolver
+    // (world.usp_TribeConversionCatalog_GetAll's equivalence data) must be built before the first op23
+    // faction-transfer-scroll use, or TribeConversionCatalogLoader.Resolver throws.
+    bootStep = "TribeConversionCatalogLoader.InitializeAsync";
+    await host.Services.GetRequiredService<TribeConversionCatalogLoader>()
+        .InitializeAsync(host.Services.GetRequiredService<IWorldDataRepository>(), CancellationToken.None);
 
     // Same rationale again: mirrors legacy MyGame::Init's own one-shot synchronous InitItemMall/InitBloodShop
     // pass -- without this, the first CZ_GET_CASH_ITEM_INFO_SEND/CZ_DEMAND_BLOOD_MARK_SEND of the shard's life

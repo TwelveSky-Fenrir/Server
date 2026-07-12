@@ -202,7 +202,7 @@ public sealed partial class Zone
 
         state.ResetVolatileAntiCheatCountersOnEntry(_clock);
 
-        state.RecomputeSupportSkillTimeUpRatio(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        state.RecomputeSupportSkillTimeUpRatio();
 
         if (data.Items is { } items)
             state.Inventory.Seed(items);
@@ -651,7 +651,7 @@ public sealed partial class Zone
         state.DodgeRateTick = 0;
 
         state.IsUnderDarkAttackPotionDebuff = false;
-        state.DarkAttackDebuffAccumulatorTicks = 0;
+        state.DarkAttackDebuffActivatedAtUtc = default;
 
         if (anyChanged)
             RecomputeStatsAndBroadcastBuffs(state, changedSlots);
@@ -839,7 +839,8 @@ public sealed partial class Zone
                 if (!EvaluateSkillCastPreCastGuard(state, action, motion.SkillCategoryCode, out var guardContext))
                     return;
 
-                if (!ApplySkillCastManaCharge(state, action))
+                if (motion.SkillCategoryCode == SkillCastGuard.SkillEffectCategoryCode &&
+                    !ApplySkillCastManaCharge(state, action))
                     return;
 
                 if (!EvaluateSkillCastPostCastGuard(state, action, in guardContext))

@@ -4,12 +4,9 @@ namespace Fenrir.Application.Game.Domain.Combat;
 
 public static class AttackPacketBudget
 {
-    public static bool TryConsume(PlayerRuntimeState state, int attackActionValue4, bool countAttempt = true)
+    public static bool TryConsume(PlayerRuntimeState state, int attackActionValue4, bool enforceCeiling = true)
     {
-        if (!state.AttackBudgetEnforced)
-            return true;
-
-        if (countAttempt)
+        if (enforceCeiling && state.AttackBudgetEnforced)
         {
             state.AttackSubPacketsUsed++;
             if (state.AttackSubPacketsUsed > state.AttackSubPacketCeiling)

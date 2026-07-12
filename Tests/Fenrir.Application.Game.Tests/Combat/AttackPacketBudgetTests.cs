@@ -26,13 +26,22 @@ public class AttackPacketBudgetTests
     }
 
     [Fact]
-    public void EnforcementOff_AlwaysAccepted_AndNeverCounts()
+    public void EnforcementOff_CeilingNeverCounted_ButReplayGuardStillEnforced()
     {
         var state = State(false, 0, 42);
 
-        Assert.True(AttackPacketBudget.TryConsume(state, 999));
-        Assert.True(AttackPacketBudget.TryConsume(state, 999));
+        Assert.True(AttackPacketBudget.TryConsume(state, 42));
+        Assert.True(AttackPacketBudget.TryConsume(state, 42));
 
+        Assert.Equal(0, state.AttackSubPacketsUsed);
+    }
+
+    [Fact]
+    public void EnforcementOff_MismatchedReplayGuard_IsStillRejected()
+    {
+        var state = State(false, 0, 42);
+
+        Assert.False(AttackPacketBudget.TryConsume(state, 999));
         Assert.Equal(0, state.AttackSubPacketsUsed);
     }
 
@@ -86,14 +95,14 @@ public class AttackPacketBudgetTests
     }
 
     [Fact]
-    public void CountingDisabled_SkipsCeiling_ButStillEnforcesReplayGuard()
+    public void CeilingDisabledPerCall_SkipsCeiling_ButStillEnforcesReplayGuard()
     {
         var state = State(true, 0, 42);
 
-        Assert.True(AttackPacketBudget.TryConsume(state, 42, false));
+        Assert.True(AttackPacketBudget.TryConsume(state, 42, enforceCeiling: false));
         Assert.Equal(0, state.AttackSubPacketsUsed);
 
-        Assert.False(AttackPacketBudget.TryConsume(state, 1, false));
+        Assert.False(AttackPacketBudget.TryConsume(state, 1, enforceCeiling: false));
         Assert.Equal(0, state.AttackSubPacketsUsed);
     }
 

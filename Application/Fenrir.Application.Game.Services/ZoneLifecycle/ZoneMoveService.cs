@@ -23,7 +23,6 @@ public sealed class ZoneMoveService(
     WorldStateService worldState,
     TribeGuardCorridorCatalog corridorCatalog,
     TribeGuardCorridorState corridorState,
-    PortalProximityCatalog portalProximityCatalog,
     IGameServerDirectoryRepository directory,
     IShardMapAssignmentRepository shardMapAssignments,
     ISessionTicketRepository tickets,
@@ -112,26 +111,6 @@ public sealed class ZoneMoveService(
             logger.LogWarning(
                 "Zone-move aborted for character {CharacterId}: tribe-symbol-battle zone lockout ({SourceMapId} -> {TargetZoneNumber})",
                 characterId, sourceZone.MapId, targetZoneNumber);
-            zoneSession.Abort(DisconnectReason.StateViolation);
-            return;
-        }
-
-        if (PortalProximityGate.Evaluate(portalProximityCatalog, sourceZone.MapId, state.PosX, state.PosY,
-                state.PosZ, packet.Sort, targetZoneNumber) == PortalProximityOutcome.RejectedNotNearRegisteredPortal)
-        {
-            logger.LogWarning(
-                "Zone-move aborted for character {CharacterId}: portal move requested with no registered portal within range ({SourceMapId} -> {TargetZoneNumber})",
-                characterId, sourceZone.MapId, targetZoneNumber);
-            zoneSession.Abort(DisconnectReason.StateViolation);
-            return;
-        }
-
-        if (WarZoneEntryGate.Evaluate(targetZoneNumber, state.CombinedLevel, state.RebirthCount) ==
-            WarZoneEntryOutcome.RejectedOutOfRange)
-        {
-            logger.LogWarning(
-                "Zone-move aborted for character {CharacterId}: combined level {CombinedLevel}/rebirth {RebirthCount} out of range for war zone {TargetZoneNumber}",
-                characterId, state.CombinedLevel, state.RebirthCount, targetZoneNumber);
             zoneSession.Abort(DisconnectReason.StateViolation);
             return;
         }

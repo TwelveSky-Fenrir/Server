@@ -6,6 +6,8 @@ public sealed class DarkAttackPotionDebuffExpirySystem : ISimulationSystem
 {
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
+        var now = DateTime.UtcNow;
+
         foreach (var state in zone.Players)
         {
             if (state.IsMovingZone)
@@ -14,8 +16,7 @@ public sealed class DarkAttackPotionDebuffExpirySystem : ISimulationSystem
             if (!state.IsUnderDarkAttackPotionDebuff)
                 continue;
 
-            state.DarkAttackDebuffAccumulatorTicks += legacyTicksElapsed;
-            if (state.DarkAttackDebuffAccumulatorTicks < SimulationClock.DarkAttackPotionDebuffLegacyTicks)
+            if (now - state.DarkAttackDebuffActivatedAtUtc < SimulationClock.DarkAttackPotionDebuffDuration)
                 continue;
 
             zone.ClearDarkAttackPotionDebuff(state);

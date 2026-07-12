@@ -34,6 +34,9 @@ public sealed partial class Zone
         if (defenderState.UniqueNumber != command.AttackInfo.UniqueNumber2)
             return;
 
+        if (!AttackPacketBudget.TryConsume(attackerState, command.AttackInfo.AttackActionValue4, enforceCeiling: false))
+            return;
+
         var usedSkillId = command.AttackInfo.AttackActionValue2;
         var usedSkillGradePoints = command.AttackInfo.AttackActionValue3;
         worldData.SkillsById.TryGetValue(usedSkillId, out var usedSkill);

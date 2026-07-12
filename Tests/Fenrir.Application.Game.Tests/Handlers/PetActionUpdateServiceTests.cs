@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Services.BuffsMountsCosmetics;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 
@@ -53,7 +54,7 @@ public class PetActionUpdateServiceTests
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, pipe) = Setup(zone, 10);
-        var service = new PetActionUpdateService();
+        var service = new PetActionUpdateService(NullLogger<PetActionUpdateService>.Instance);
 
         var action = PetAction(3, 1.5f, [1f, 2f, 3f], [4f, 5f, 6f]);
         service.Apply(zone, session.CharacterId!.Value, in action);

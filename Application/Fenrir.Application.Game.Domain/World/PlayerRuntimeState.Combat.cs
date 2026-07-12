@@ -63,5 +63,5 @@ public partial class PlayerRuntimeState
 
     public bool IsUnderDarkAttackPotionDebuff { get; set; }
 
-    public int DarkAttackDebuffAccumulatorTicks { get; set; }
+    public DateTime DarkAttackDebuffActivatedAtUtc { get; set; }
 }

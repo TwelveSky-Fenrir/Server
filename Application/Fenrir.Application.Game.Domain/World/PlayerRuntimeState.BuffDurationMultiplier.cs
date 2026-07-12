@@ -12,10 +12,10 @@ public partial class PlayerRuntimeState
 
     public int SupportSkillTimeUpRatioAccrualTicks { get; set; }
 
-    public void RecomputeSupportSkillTimeUpRatio(long nowUnixSeconds)
+    public void RecomputeSupportSkillTimeUpRatio()
     {
         var buffDurationExtensionActive = BuffX2Time > 0;
-        var premiumActive = PremiumExpireUtc >= nowUnixSeconds;
+        var premiumActive = PremiumExpireUtc != 0;
         SupportSkillTimeUpRatio =
             SupportSkillTimeUpRatioCalculator.Compute(buffDurationExtensionActive, premiumActive);
     }

@@ -57,7 +57,7 @@ public class ZoneStunCombatTests
     }
 
     private static AttackForProtocol StunRequest(int attackerId, int defenderId, uint defenderUniqueNumber,
-        int usedSkillId = StunSkillId, int usedSkillGradePoints = 10, int mCase = 5)
+        int usedSkillId = StunSkillId, int usedSkillGradePoints = 10, int mCase = 5, int attackActionValue4 = 0)
     {
         return new AttackForProtocol
         {
@@ -70,7 +70,7 @@ public class ZoneStunCombatTests
             AttackActionValue1 = 2,
             AttackActionValue2 = usedSkillId,
             AttackActionValue3 = usedSkillGradePoints,
-            AttackActionValue4 = 0,
+            AttackActionValue4 = attackActionValue4,
             AttackResultValue = 0,
             AttackCriticalExist = 0,
             AttackElementDamage = 0,
@@ -524,6 +524,62 @@ public class ZoneStunCombatTests
         zone.Tick(SimulationClock.LegacyTick);
 
         Assert.False(defender.IsStunned);
+    }
+
+    [Fact]
+    public void StunAttempt_SubPacketActionSortMismatch_IsSilentlyIgnored()
+    {
+        var zone = ZoneTestKit.CreateZone(1, worldData: StunCatalog(), randomSource: new ScriptedRandomSource(0));
+        var (_, attacker, defender) = EnterTwoPlayers(zone, 10, 0, 20, 1);
+        attacker.ActionSort = 5;
+
+        zone.PostCombatCommand(new CombatCommand
+        {
+            AttackerCharacterId = attacker.CharacterId,
+            AttackInfo = StunRequest(attacker.CharacterId, defender.CharacterId, defender.UniqueNumber,
+                attackActionValue4: 9)
+        });
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.False(defender.IsStunned);
+    }
+
+    [Fact]
+    public void StunAttempt_SubPacketActionSortMismatch_IsRejected_RegardlessOfCeilingEnforcement()
+    {
+        var zone = ZoneTestKit.CreateZone(1, worldData: StunCatalog(), randomSource: new ScriptedRandomSource(0));
+        var (_, attacker, defender) = EnterTwoPlayers(zone, 10, 0, 20, 1);
+        attacker.AttackBudgetEnforced = true;
+        attacker.ActionSort = 5;
+
+        zone.PostCombatCommand(new CombatCommand
+        {
+            AttackerCharacterId = attacker.CharacterId,
+            AttackInfo = StunRequest(attacker.CharacterId, defender.CharacterId, defender.UniqueNumber,
+                attackActionValue4: 9)
+        });
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.False(defender.IsStunned);
+    }
+
+    [Fact]
+    public void UnstunAttempt_SubPacketActionSortMismatch_IsSilentlyIgnored()
+    {
+        var zone = ZoneTestKit.CreateZone(1, worldData: StunCatalog(), randomSource: new ScriptedRandomSource(0));
+        var (_, curer, target) = EnterTwoPlayers(zone, 10, 0, 20, 0);
+        target.IsStunned = true;
+        curer.ActionSort = 5;
+
+        zone.PostCombatCommand(new CombatCommand
+        {
+            AttackerCharacterId = curer.CharacterId,
+            AttackInfo = StunRequest(curer.CharacterId, target.CharacterId, target.UniqueNumber,
+                StunResistSkillId, 20, 6, attackActionValue4: 9)
+        });
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.True(target.IsStunned);
     }
 
     [Fact]

@@ -39,7 +39,7 @@ public class ZoneMoveServiceCrossShardTests
         var tickets = new FakeSessionTicketRepository();
         var options = new GameServerOptions { ShardId = SourceShardId };
         var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
-            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(), PortalProximityCatalog.Empty,
+            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(),
             new FakeGameServerDirectoryRepository(shards),
             new FakeShardMapAssignmentRepository(hostedMapsByShard),
             tickets,
@@ -190,7 +190,7 @@ public class ZoneMoveServiceCrossShardTests
         var tickets = new FakeSessionTicketRepository();
         var options = new GameServerOptions { ShardId = SourceShardId };
         var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
-            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(), PortalProximityCatalog.Empty,
+            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(),
             new FakeGameServerDirectoryRepository(),
             new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
             tickets,
@@ -283,7 +283,7 @@ public class ZoneMoveServiceCrossShardTests
         var tickets = new FakeSessionTicketRepository();
         var options = new GameServerOptions { ShardId = SourceShardId };
         var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
-            corridorCatalog, corridorState, PortalProximityCatalog.Empty,
+            corridorCatalog, corridorState,
             new FakeGameServerDirectoryRepository(shards),
             new FakeShardMapAssignmentRepository(hostedMapsByShard),
             tickets,
@@ -441,7 +441,7 @@ public class ZoneMoveServiceCrossShardTests
         var shardLocations = new FakeCharacterShardLocationRepository();
         var options = new GameServerOptions { ShardId = SourceShardId };
         var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
-            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(), PortalProximityCatalog.Empty,
+            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(),
             new FakeGameServerDirectoryRepository(shards),
             new FakeShardMapAssignmentRepository(hostedMapsByShard),
             new FakeSessionTicketRepository(),

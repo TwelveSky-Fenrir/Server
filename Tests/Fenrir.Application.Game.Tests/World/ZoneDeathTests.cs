@@ -201,7 +201,7 @@ public class ZoneDeathTests
         state.DodgeRateTick = 123;
         state.Buffs.Buff[16 * 2] = 1;
         state.IsUnderDarkAttackPotionDebuff = true;
-        state.DarkAttackDebuffAccumulatorTicks = 3;
+        state.DarkAttackDebuffActivatedAtUtc = DateTime.UtcNow;
 
         zone.ApplyDeath(10);
 
@@ -214,7 +214,7 @@ public class ZoneDeathTests
         Assert.Equal(0, state.DodgeRateTick);
         Assert.Equal(0, state.Buffs.Buff[16 * 2]);
         Assert.False(state.IsUnderDarkAttackPotionDebuff);
-        Assert.Equal(0, state.DarkAttackDebuffAccumulatorTicks);
+        Assert.Equal(default, state.DarkAttackDebuffActivatedAtUtc);
     }
 
     [Fact]

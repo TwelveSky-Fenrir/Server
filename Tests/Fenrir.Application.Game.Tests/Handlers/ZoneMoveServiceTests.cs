@@ -32,7 +32,7 @@ public class ZoneMoveServiceTests
 
         var worldState = ZoneTestKit.CreateWorldState();
         var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
-            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(), PortalProximityCatalog.Empty,
+            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(),
             new FakeGameServerDirectoryRepository(),
             new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
             new FakeSessionTicketRepository(),
@@ -75,7 +75,7 @@ public class ZoneMoveServiceTests
 
         var worldState = ZoneTestKit.CreateWorldState();
         var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
-            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(), PortalProximityCatalog.Empty,
+            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(),
             new FakeGameServerDirectoryRepository(),
             new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
             new FakeSessionTicketRepository(),
@@ -155,7 +155,7 @@ public class ZoneMoveServiceTests
     {
         var worldData = ZoneTestKit.EmptyWorldData(zonesByNumber: new Dictionary<short, ZoneDefinition>
         {
-            [2] = new(new ZoneRowDto(2, 0f, 0f, 0f), [], [], [], [])
+            [2] = new(new ZoneRowDto(2, 0f, 0f, 0f), [], [], [], [], [])
         }.ToFrozenDictionary());
         var zones = ZoneTestKit.CreateRegistry(worldData: worldData);
         zones.Initialize([50, 2]);
@@ -163,7 +163,7 @@ public class ZoneMoveServiceTests
         var worldState = ZoneTestKit.CreateWorldState();
         worldState.SetAllianceOffer(0, 2, true);
         var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
-            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(), PortalProximityCatalog.Empty,
+            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(),
             new FakeGameServerDirectoryRepository(),
             new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
             new FakeSessionTicketRepository(),
@@ -190,7 +190,7 @@ public class ZoneMoveServiceTests
     {
         var worldData = ZoneTestKit.EmptyWorldData(zonesByNumber: new Dictionary<short, ZoneDefinition>
         {
-            [7] = new(new ZoneRowDto(7, 0f, 0f, 0f), [], [], [], [])
+            [7] = new(new ZoneRowDto(7, 0f, 0f, 0f), [], [], [], [], [])
         }.ToFrozenDictionary());
         var zones = ZoneTestKit.CreateRegistry(worldData: worldData);
         zones.Initialize([50, 7]);
@@ -198,7 +198,7 @@ public class ZoneMoveServiceTests
         var worldState = ZoneTestKit.CreateWorldState();
         worldState.SetAllianceOffer(1, 0, true);
         var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
-            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(), PortalProximityCatalog.Empty,
+            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(),
             new FakeGameServerDirectoryRepository(),
             new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
             new FakeSessionTicketRepository(),
@@ -403,7 +403,7 @@ public class ZoneMoveServiceTests
             worldState.StartTribeSymbolBattle();
 
         var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
-            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(), PortalProximityCatalog.Empty,
+            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(),
             new FakeGameServerDirectoryRepository(),
             new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
             new FakeSessionTicketRepository(),
@@ -494,7 +494,7 @@ public class ZoneMoveServiceTests
         var shardLocations = new FakeCharacterShardLocationRepository();
         var options = new GameServerOptions { ShardId = 9 };
         var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
-            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(), PortalProximityCatalog.Empty,
+            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(),
             new FakeGameServerDirectoryRepository(),
             new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
             new FakeSessionTicketRepository(),

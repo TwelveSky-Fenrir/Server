@@ -753,8 +753,6 @@ public sealed partial class Zone
 
             BroadcastAvatarStateFlag(target, LevelUpAvatarChangeInfoSort, target.Level, target.StatPoints,
                 target.SkillPoints);
-            BroadcastAvatarStateFlag(target, LevelUpAvatarChangeInfoSort, target.Level, target.StatPoints,
-                target.SkillPoints);
 
             var armedMilestone = LevelMilestoneBonus.ResolveHighestMilestoneCrossed(previousLevel, target.Level);
             if (armedMilestone > 0)

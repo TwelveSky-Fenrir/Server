@@ -24,9 +24,9 @@ public static class SimulationClock
 
     public const int AntiAbuseForceQuitLegacyTicks = 50;
 
-    public const int DarkAttackPotionDebuffLegacyTicks = 4;
-
     public static readonly TimeSpan LegacyTick = TimeSpan.FromMilliseconds(LegacyTickMilliseconds);
+
+    public static readonly TimeSpan DarkAttackPotionDebuffDuration = TimeSpan.FromSeconds(2);
 
     public static readonly TimeSpan AvatarRebroadcastInterval = TimeSpan.FromSeconds(3.5);
 

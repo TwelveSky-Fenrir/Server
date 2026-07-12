@@ -97,7 +97,7 @@ public class ZoneDarkAttackPotionTests
 
         Assert.True(defender.IsUnderDarkAttackPotionDebuff);
         Assert.False(defender.CanUseConsumables);
-        Assert.Equal(0, defender.DarkAttackDebuffAccumulatorTicks);
+        Assert.True(defender.DarkAttackDebuffActivatedAtUtc > DateTime.UtcNow.AddSeconds(-5));
         Assert.Equal(0, defender.Buffs.Buff[DefenderEffectSlot * 2]);
     }
 
@@ -136,12 +136,13 @@ public class ZoneDarkAttackPotionTests
         attacker.Buffs.Buff[AttackerBuffSlot * 2] = 100;
         attacker.Buffs.Buff[AttackerBuffSlot * 2 + 1] = 10;
         defender.IsUnderDarkAttackPotionDebuff = true;
-        defender.DarkAttackDebuffAccumulatorTicks = 3;
+        var priorActivation = DateTime.UtcNow.AddSeconds(-1);
+        defender.DarkAttackDebuffActivatedAtUtc = priorActivation;
 
         zone.PostCombatCommand(new CombatCommand { AttackerCharacterId = 1, AttackInfo = MeleeRequest(1, 2) });
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
-        Assert.Equal(3, defender.DarkAttackDebuffAccumulatorTicks);
+        Assert.Equal(priorActivation, defender.DarkAttackDebuffActivatedAtUtc);
     }
 
     [Fact]
@@ -155,12 +156,13 @@ public class ZoneDarkAttackPotionTests
         Assert.True(zone.TryGetPlayer(10, out var state));
         state!.IsUnderDarkAttackPotionDebuff = true;
         state.CanUseConsumables = false;
+        state.DarkAttackDebuffActivatedAtUtc =
+            DateTime.UtcNow - SimulationClock.DarkAttackPotionDebuffDuration - TimeSpan.FromMilliseconds(1);
 
-        zone.Tick(SimulationClock.ToTimeSpan(SimulationClock.DarkAttackPotionDebuffLegacyTicks));
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.False(state.IsUnderDarkAttackPotionDebuff);
         Assert.True(state.CanUseConsumables);
-        Assert.Equal(0, state.DarkAttackDebuffAccumulatorTicks);
     }
 
     [Fact]
@@ -175,8 +177,10 @@ public class ZoneDarkAttackPotionTests
         state!.IsUnderDarkAttackPotionDebuff = true;
         state.CanUseConsumables = false;
         state.IsMovingZone = true;
+        state.DarkAttackDebuffActivatedAtUtc =
+            DateTime.UtcNow - SimulationClock.DarkAttackPotionDebuffDuration - TimeSpan.FromMilliseconds(1);
 
-        zone.Tick(SimulationClock.ToTimeSpan(SimulationClock.DarkAttackPotionDebuffLegacyTicks));
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.True(state.IsUnderDarkAttackPotionDebuff);
         Assert.False(state.CanUseConsumables);
@@ -215,8 +219,9 @@ public class ZoneDarkAttackPotionTests
         Assert.True(zone.TryGetPlayer(10, out var state));
         state!.IsUnderDarkAttackPotionDebuff = true;
         state.CanUseConsumables = false;
+        state.DarkAttackDebuffActivatedAtUtc = DateTime.UtcNow;
 
-        zone.Tick(SimulationClock.ToTimeSpan(SimulationClock.DarkAttackPotionDebuffLegacyTicks - 1));
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.True(state.IsUnderDarkAttackPotionDebuff);
         Assert.False(state.CanUseConsumables);

@@ -130,17 +130,6 @@ public sealed class EnterWorldService(
             return;
         }
 
-        var combinedLevel = character.Level + character.Level2;
-        if (WarZoneEntryGate.Evaluate(character.MapId, combinedLevel, character.RebirthCount) ==
-            WarZoneEntryOutcome.RejectedOutOfRange)
-        {
-            logger.LogWarning(
-                "Enter-world rejected for character {CharacterId}: combined level {CombinedLevel}/rebirth {RebirthCount} out of range for war zone {MapId}",
-                characterId, combinedLevel, character.RebirthCount, character.MapId);
-            zoneSession.Abort(DisconnectReason.Faulted);
-            return;
-        }
-
         if (WrapCheckSpecialDestinationCatalog.IsInstancedDestination(character.MapId))
         {
             if (character.Zone241Time < 1)

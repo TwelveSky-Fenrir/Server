@@ -36,6 +36,6 @@ public sealed class SupportSkillTimeUpRatioMaintenanceSystem : ISimulationSystem
         }
 
         if (recomputeNeeded)
-            state.RecomputeSupportSkillTimeUpRatio(nowUnixSeconds);
+            state.RecomputeSupportSkillTimeUpRatio();
     }
 }

@@ -167,4 +167,27 @@ public class DuelRegistryTests
 
         Assert.Equal(DuelAskOutcome.Sent, registry.TryAsk(42, 43, false));
     }
+
+    [Fact]
+    public void TryClearAcceptedForDisconnect_PartnerDisconnects_UnsticksTheSurvivor()
+    {
+        var registry = new DuelRegistry();
+        registry.TryAsk(1, 2, false);
+        registry.TryAnswer(2, true, out _);
+
+        Assert.True(registry.TryClearAcceptedForDisconnect(2, out var partnerId));
+        Assert.Equal(1, partnerId);
+
+        Assert.Equal(DuelAskOutcome.Sent, registry.TryAsk(1, 3, false));
+        Assert.False(registry.TryStart(1, out _));
+        Assert.False(registry.TryStart(2, out _));
+    }
+
+    [Fact]
+    public void TryClearAcceptedForDisconnect_NoAcceptedState_ReturnsFalse()
+    {
+        var registry = new DuelRegistry();
+
+        Assert.False(registry.TryClearAcceptedForDisconnect(1, out _));
+    }
 }

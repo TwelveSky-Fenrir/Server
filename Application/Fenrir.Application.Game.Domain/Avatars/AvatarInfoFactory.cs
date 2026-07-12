@@ -1,4 +1,5 @@
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Mounts;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Social;
@@ -73,7 +74,7 @@ public static class AvatarInfoFactory
             AutoBuffTime = character.AutoBuffTime,
             Premium = character.PremiumExpireUtc,
             Animal = BuildSingleMountSlotArray(character.MountItemId, character.MountSlotIndex),
-            AnimalIndex = character.MountSlotIndex,
+            AnimalIndex = MountCatalog.ResolveDisplayedSlotMarker(character.MountItemId, character.MountSlotIndex),
             AnimalTime = character.MountTime,
             AnimalPower = BuildSingleMountSlotArray(character.MountPower, character.MountSlotIndex),
             AnimalExpActivity = BuildSingleMountSlotArray(character.MountExpActivity, character.MountSlotIndex),

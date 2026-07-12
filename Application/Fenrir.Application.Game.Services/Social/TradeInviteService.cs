@@ -8,6 +8,7 @@ using Fenrir.Application.Game.Domain.Social.Mentor;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Domain.World.WorldState;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -21,6 +22,7 @@ public sealed class TradeInviteService(
     PartyRegistry parties,
     MentorRegistry mentors,
     GuildInviteRegistry guildInvites,
+    WorldStateService worldState,
     ICharacterShardLocationRepository characterShardLocations,
     ISocialCrossShardRelayQueue crossShardRelay,
     IOptions<GameServerOptions> options,
@@ -39,8 +41,9 @@ public sealed class TradeInviteService(
         if (!zones.TryGetPlayerByName(targetAvatarName, out var target))
             return await InviteCrossShardAsync(asker, targetAvatarName, cancellationToken).ConfigureAwait(false);
 
+        var allyOfAskerTribe = worldState.GetAllyOf(asker.Tribe);
         var interTribeAllowed = zone.MapId is 37 or 119 or 124;
-        if (!interTribeAllowed && asker.Tribe != target.Tribe)
+        if (!interTribeAllowed && asker.Tribe != target.Tribe && target.Tribe != allyOfAskerTribe)
         {
             logger.LogWarning(
                 "Trade invite rejected: character {AskerCharacterId} (tribe {AskerTribe}) targeted cross-tribe character {TargetCharacterId} (tribe {TargetTribe}) in map {MapId} -- session will be disconnected",
@@ -49,7 +52,7 @@ public sealed class TradeInviteService(
         }
 
         if (CommunityWorkGate.IsBusy(target, duels, trades, friends, parties, mentors, guildInvites) ||
-            target.IsStunned || target.IsDead)
+            target.IsStunned || target.IsDead || target.IsMovingZone)
         {
             logger.LogDebug("Trade invite rejected: target character {TargetCharacterId} is busy",
                 target.CharacterId);
@@ -96,8 +99,9 @@ public sealed class TradeInviteService(
             return new TradeInviteResult(TradeInviteResultKind.TargetNotFound);
         }
 
+        var allyOfAskerTribe = worldState.GetAllyOf(asker.Tribe);
         var interTribeAllowed = asker.MapId is 37 or 119 or 124;
-        if (!interTribeAllowed && asker.Tribe != remote.Tribe)
+        if (!interTribeAllowed && asker.Tribe != remote.Tribe && remote.Tribe != allyOfAskerTribe)
         {
             logger.LogWarning(
                 "Trade invite rejected: character {AskerCharacterId} (tribe {AskerTribe}) targeted cross-shard cross-tribe character {TargetCharacterId} (tribe {TargetTribe}) -- session will be disconnected",

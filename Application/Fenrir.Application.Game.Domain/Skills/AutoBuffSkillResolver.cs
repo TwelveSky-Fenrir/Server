@@ -14,21 +14,12 @@ public static class AutoBuffSkillResolver
         {
             var skillId = flatSkillGrades[i * 2];
             var grade = flatSkillGrades[i * 2 + 1];
-            var maxGrade = GetMaxSkillGradeNum(skillId, learnedSkills);
+            var maxGrade = SkillGradeAuthority.GetMaxSkillGradeNum(skillId, learnedSkills);
             if (grade > maxGrade)
                 grade = maxGrade;
             builder.Add((skillId, grade));
         }
 
         return builder.MoveToImmutable();
-    }
-
-    private static int GetMaxSkillGradeNum(int skillId, IReadOnlyDictionary<byte, LearnedSkill> learnedSkills)
-    {
-        foreach (var learned in learnedSkills.Values)
-            if (learned.SkillId == skillId)
-                return learned.Grade;
-
-        return -1;
     }
 }

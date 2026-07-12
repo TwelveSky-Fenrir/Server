@@ -81,7 +81,8 @@ public sealed class EndToEndScenarioTests
 
         Assert.Equal(0, handshakeResult);
 
-        var enterResult = await zone.EnterWorldAsync(_environment.TestAccountId, AvatarName, ct);
+        var enterResult = await zone.EnterWorldAsync(_environment.TestAccountId, AvatarName, ct,
+            plan.MonsterX, plan.MonsterY, plan.MonsterZ);
         Assert.Equal(AvatarName, enterResult.AvatarInfo.Name);
         Assert.Equal(1, enterResult.AvatarInfo.Level1);
 

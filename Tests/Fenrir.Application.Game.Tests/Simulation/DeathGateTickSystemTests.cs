@@ -159,4 +159,57 @@ public class DeathGateTickSystemTests
         Assert.Null(session.DisconnectReason);
         Assert.True(player.IsDead);
     }
+
+    [Fact]
+    public void DeathClearOnlyZone_AtTenTicks_ClearsDeathWindowButLeavesLockArmed()
+    {
+        var (zone, _) = SetUp(322);
+        EnterAndKill(zone, 10, 1);
+
+        zone.Tick(TimeSpan.FromMilliseconds(5000));
+
+        Assert.True(zone.TryGetPlayer(10, out var player));
+        Assert.False(player!.IsDead);
+        Assert.True(player.CanUseConsumables);
+        Assert.True(player.ReviveHackFlag);
+    }
+
+    [Fact]
+    public void DeathClearOnlyZone_ForceQuitsAtFiftyTicks_EvenThoughDeathWindowAlreadyCleared()
+    {
+        var (zone, _) = SetUp(323);
+        var (session, _) = ZoneTestKit.CreateSession(10);
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, zone.MapId, tribe: 1)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+        zone.ApplyDeath(10, DeathCause.MonsterKill);
+
+        zone.Tick(TimeSpan.FromMilliseconds(5000));
+        Assert.True(zone.TryGetPlayer(10, out var clearedButStillFlagged));
+        Assert.False(clearedButStillFlagged!.IsDead);
+        Assert.Null(session.DisconnectReason);
+
+        zone.Tick(TimeSpan.FromMilliseconds(19_500));
+        Assert.Null(session.DisconnectReason);
+
+        zone.Tick(TimeSpan.FromMilliseconds(500));
+
+        Assert.Equal(DisconnectReason.StateViolation, session.DisconnectReason);
+    }
+
+    [Fact]
+    public void AlwaysBlockedZone_ForceQuitsAtFiftyTicks_EvenThoughNeverEligible()
+    {
+        var (zone, _) = SetUp(200);
+        var (session, _) = ZoneTestKit.CreateSession(10);
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, zone.MapId, tribe: 0)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+        zone.ApplyDeath(10, DeathCause.MonsterKill);
+
+        zone.Tick(TimeSpan.FromMilliseconds(24_500));
+        Assert.Null(session.DisconnectReason);
+
+        zone.Tick(TimeSpan.FromMilliseconds(500));
+
+        Assert.Equal(DisconnectReason.StateViolation, session.DisconnectReason);
+    }
 }

@@ -12,10 +12,18 @@ public sealed class ContinueSkillUseService : IContinueSkillUseService
         var context = new AutoBuffActivationResolver.Context(state.AutoBuffTime, state.ActionSort, state.Mana);
         var result = AutoBuffActivationResolver.Resolve(sort, in context, GameDate.Today());
 
-        if (result.Kind == AutoBuffActivationResolver.ResultKind.Activate)
-            zone.PostAutoBuffCommand(new AutoBuffZoneCommand(characterId,
-                ActivateAutoBuff: true,
-                ActionSort: AutoBuffActivationResolver.ChannelingActionSort, Broadcast: true));
+        switch (result.Kind)
+        {
+            case AutoBuffActivationResolver.ResultKind.Activate:
+                zone.PostAutoBuffCommand(new AutoBuffZoneCommand(characterId,
+                    ActivateAutoBuff: true,
+                    ActionSort: AutoBuffActivationResolver.ChannelingActionSort, Broadcast: true));
+                break;
+
+            case AutoBuffActivationResolver.ResultKind.Tick:
+                zone.PostAutoBuffCommand(new AutoBuffZoneCommand(characterId, ApplyRegisteredBuffs: true));
+                break;
+        }
 
         return result;
     }

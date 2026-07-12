@@ -199,7 +199,7 @@ public static class HostingServiceCollectionExtensions
                 sp.GetRequiredService<RegularWarRewardGrantSink>()
             ],
             sp.GetRequiredService<ILogger<CompositeRegularWarEventSink>>()));
-        services.AddSingleton<IRegularWarRewardValueProvider, UnavailableRegularWarRewardValueProvider>();
+        services.AddSingleton<IRegularWarRewardValueProvider, RegularWarRewardValueProvider>();
         services.AddSingleton<RegularWarSchedulerHost>();
         services.AddHostedService(static provider => provider.GetRequiredService<RegularWarSchedulerHost>());
 
@@ -241,7 +241,7 @@ public static class HostingServiceCollectionExtensions
 
     private static void AddHolyStoneScheduling(IServiceCollection services)
     {
-        services.TryAddSingleton<IHolyStoneCaptureRewardGateway, LoggingOnlyHolyStoneCaptureRewardGateway>();
+        services.TryAddSingleton<IHolyStoneCaptureRewardGateway, HolyStoneCaptureRewardGateway>();
         services.TryAddSingleton<IHolyStoneForcedReturnGateway, LoggingOnlyHolyStoneForcedReturnGateway>();
 
         services.AddSingleton(sp =>

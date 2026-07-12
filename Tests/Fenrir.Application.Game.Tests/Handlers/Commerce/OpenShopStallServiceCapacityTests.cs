@@ -158,7 +158,7 @@ public class OpenShopStallServiceCapacityTests
             "ExpiredStall", 0f, 0f, 0f, GameDate.Today() - 1));
         Assert.Equal(Zone.MaxProxyShopSlots, zone.ProxyShopCount);
 
-        zone.Tick(TimeSpan.FromMilliseconds(50));
+        zone.Tick(SimulationClock.ProxyShopRebroadcastInterval);
         Assert.Equal(Zone.MaxProxyShopSlots - 1, zone.ProxyShopCount);
         Assert.Contains(999_999, zone.DrainPendingProxyShopCloses());
 

@@ -67,7 +67,7 @@ public class MonsterCombatResolverTribeSymbolDamageUpBonusTests
     {
         var monster = Monster();
         var outcome = MonsterCombatResolver.ResolvePvmAttack(Attacker(), monster, MeleeRequest(monster),
-            TimeSpan.Zero, NoVarianceRng(), false, 0,
+            TimeSpan.Zero, null, NoVarianceRng(), false, 0,
             0, 0f,
             incrementCount);
 
@@ -81,7 +81,7 @@ public class MonsterCombatResolverTribeSymbolDamageUpBonusTests
     {
         var monster = Monster();
         var outcome = MonsterCombatResolver.ResolvePvmAttack(Attacker(), monster, MeleeRequest(monster),
-            TimeSpan.Zero, NoVarianceRng(), false, 0,
+            TimeSpan.Zero, null, NoVarianceRng(), false, 0,
             0, 0f,
             0);
 
@@ -94,7 +94,7 @@ public class MonsterCombatResolverTribeSymbolDamageUpBonusTests
     {
         var monster = Monster();
         var outcome = MonsterCombatResolver.ResolvePvmAttack(Attacker(), monster, MeleeRequest(monster),
-            TimeSpan.Zero, NoVarianceRng(), false, 0, 0);
+            TimeSpan.Zero, null, NoVarianceRng(), false, 0, 0);
 
         Assert.True(outcome.Hit);
         Assert.Equal(AttackerAttackPower, outcome.DamageApplied);
@@ -105,7 +105,7 @@ public class MonsterCombatResolverTribeSymbolDamageUpBonusTests
     {
         var monster = Monster();
         var outcome = MonsterCombatResolver.ResolvePvmAttack(Attacker(113), monster, MeleeRequest(monster),
-            TimeSpan.Zero, NoVarianceRng(), false, 0,
+            TimeSpan.Zero, null, NoVarianceRng(), false, 0,
             0,
             TribeSymbolCombatModifiers.OwnSymbolLostDamageDownPenalty,
             1);

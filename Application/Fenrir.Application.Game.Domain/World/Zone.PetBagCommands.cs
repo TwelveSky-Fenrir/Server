@@ -8,8 +8,6 @@ public sealed partial class Zone
 {
     private const int PetBagInboxCapacity = 256;
 
-    private const int PetBagInboxDrainCapPerTick = PetBagInboxCapacity / 2;
-
     private readonly Channel<PetBagZoneCommand> _petBagInbox =
         Channel.CreateBounded<PetBagZoneCommand>(
             new BoundedChannelOptions(PetBagInboxCapacity)
@@ -42,10 +40,8 @@ public sealed partial class Zone
 
     private void DrainPetBagCommands()
     {
-        var processed = 0;
-        while (processed < PetBagInboxDrainCapPerTick && _petBagInbox.Reader.TryRead(out var command))
+        while (_petBagInbox.Reader.TryRead(out var command))
         {
-            processed++;
             try
             {
                 ApplyPetBagCommand(in command);
@@ -58,9 +54,6 @@ public sealed partial class Zone
                 command.Applied?.TrySetException(ex);
             }
         }
-
-        if (processed >= PetBagInboxDrainCapPerTick)
-            LogDrainCapEngaged(_petBagInbox.Reader, "pet-bag", PetBagInboxDrainCapPerTick);
     }
 
     private void ApplyPetBagCommand(in PetBagZoneCommand command)

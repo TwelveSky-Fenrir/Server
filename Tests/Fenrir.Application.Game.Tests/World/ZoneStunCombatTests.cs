@@ -96,6 +96,7 @@ public class ZoneStunCombatTests
         defender!.ActionSort = defenderActionSort;
 
         attacker!.AttackSubPacketCeiling = int.MaxValue;
+        attacker.AttackBudgetEnforced = false;
 
         zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1));
 
@@ -481,5 +482,91 @@ public class ZoneStunCombatTests
         zone.Tick(SimulationClock.LegacyTick);
 
         Assert.True(defender.IsStunned);
+    }
+
+    [Fact]
+    public void StunAttempt_ReplayGuardEnforced_MatchingAnimatingSkillAndGrade_Succeeds()
+    {
+        var zone = ZoneTestKit.CreateZone(1, worldData: StunCatalog(), randomSource: new ScriptedRandomSource(0));
+        var (_, attacker, defender) = EnterTwoPlayers(zone, 10, 0, 20, 1);
+        attacker.AttackBudgetEnforced = true;
+        attacker.ActionSkillNumber = StunSkillId;
+        attacker.ActionSkillGradeNum1 = 6;
+        attacker.ActionSkillGradeNum2 = 4;
+
+        zone.PostCombatCommand(new CombatCommand
+        {
+            AttackerCharacterId = attacker.CharacterId,
+            AttackInfo = StunRequest(attacker.CharacterId, defender.CharacterId, defender.UniqueNumber,
+                StunSkillId, 10)
+        });
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.True(defender.IsStunned);
+    }
+
+    [Fact]
+    public void StunAttempt_ReplayGuardEnforced_AnimatingSkillMismatch_IsSilentlyIgnored()
+    {
+        var zone = ZoneTestKit.CreateZone(1, worldData: StunCatalog(), randomSource: new ScriptedRandomSource(0));
+        var (_, attacker, defender) = EnterTwoPlayers(zone, 10, 0, 20, 1);
+        attacker.AttackBudgetEnforced = true;
+        attacker.ActionSkillNumber = TeamStunSkillId;
+        attacker.ActionSkillGradeNum1 = 6;
+        attacker.ActionSkillGradeNum2 = 4;
+
+        zone.PostCombatCommand(new CombatCommand
+        {
+            AttackerCharacterId = attacker.CharacterId,
+            AttackInfo = StunRequest(attacker.CharacterId, defender.CharacterId, defender.UniqueNumber,
+                StunSkillId, 10)
+        });
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.False(defender.IsStunned);
+    }
+
+    [Fact]
+    public void UnstunAttempt_ReplayGuardEnforced_MatchingAnimatingSkillAndGrade_Succeeds()
+    {
+        var zone = ZoneTestKit.CreateZone(1, worldData: StunCatalog(), randomSource: new ScriptedRandomSource(0));
+        var (_, curer, target) = EnterTwoPlayers(zone, 10, 0, 20, 0);
+        target.IsStunned = true;
+        curer.AttackBudgetEnforced = true;
+        curer.ActionSkillNumber = StunResistSkillId;
+        curer.ActionSkillGradeNum1 = 20;
+        curer.ActionSkillGradeNum2 = 0;
+
+        zone.PostCombatCommand(new CombatCommand
+        {
+            AttackerCharacterId = curer.CharacterId,
+            AttackInfo = StunRequest(curer.CharacterId, target.CharacterId, target.UniqueNumber,
+                StunResistSkillId, 20, 6)
+        });
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.False(target.IsStunned);
+    }
+
+    [Fact]
+    public void UnstunAttempt_ReplayGuardEnforced_AnimatingGradeMismatch_IsSilentlyIgnored()
+    {
+        var zone = ZoneTestKit.CreateZone(1, worldData: StunCatalog(), randomSource: new ScriptedRandomSource(0));
+        var (_, curer, target) = EnterTwoPlayers(zone, 10, 0, 20, 0);
+        target.IsStunned = true;
+        curer.AttackBudgetEnforced = true;
+        curer.ActionSkillNumber = StunResistSkillId;
+        curer.ActionSkillGradeNum1 = 5;
+        curer.ActionSkillGradeNum2 = 0;
+
+        zone.PostCombatCommand(new CombatCommand
+        {
+            AttackerCharacterId = curer.CharacterId,
+            AttackInfo = StunRequest(curer.CharacterId, target.CharacterId, target.UniqueNumber,
+                StunResistSkillId, 20, 6)
+        });
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.True(target.IsStunned);
     }
 }

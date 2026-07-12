@@ -11,9 +11,13 @@ public static class WarPointShopPolicy
 
         Proceed,
 
-        WrongNpc,
+        PriceUnavailable,
+
+        WrongNpcForItem,
 
         DestinationConflict,
+
+        InvalidQuantity,
 
         InsufficientContributionPoints
     }
@@ -21,6 +25,10 @@ public static class WarPointShopPolicy
     private const int FixedStateStampRangeStart = 86700;
 
     private const int FixedStateStampRangeEndInclusive = 86725;
+
+    private const byte FixedStateStampEnchant = 40;
+
+    private const byte FixedStateStampCombine = 12;
 
     public static bool IsFixedStateStampItem(int itemId)
     {
@@ -32,15 +40,21 @@ public static class WarPointShopPolicy
     {
         var item = itemDefinition.Item;
 
-        if (!WarPointShopCatalog.IsWarPointNpc(npcId) || !catalog.TryGetPrice(item.ItemId, out var price))
+        if (!WarPointShopCatalog.IsWarPointNpc(npcId))
             return new BuyResolution(BuyOutcome.NotWarPointItem, 0, 0, null);
 
+        if (!catalog.TryGetPrice(item.ItemId, out var price))
+            return new BuyResolution(BuyOutcome.PriceUnavailable, 0, 0, null);
+
         if (!price.DisplaysAtNpc(npcId))
-            return new BuyResolution(BuyOutcome.WrongNpc, 0, 0, null);
+            return new BuyResolution(BuyOutcome.WrongNpcForItem, 0, 0, null);
 
         if (ContainerMatrix.IsStackableSort(item.Sort))
         {
             var quantity = requestedQuantity < 1 ? 1 : requestedQuantity;
+
+            if (quantity > GroundItemPickupPolicy.MaxStackQuantity)
+                return new BuyResolution(BuyOutcome.InvalidQuantity, 0, 0, null);
 
             if (destinationSlot is { } existing)
             {
@@ -61,8 +75,11 @@ public static class WarPointShopPolicy
         if (destinationSlot is not null)
             return new BuyResolution(BuyOutcome.DestinationConflict, 0, 0, null);
 
-        return Cost(price, requestedQuantity, playerContributionPoints,
-            new ItemStack(item.ItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+        var grantedStack = IsFixedStateStampItem(item.ItemId)
+            ? new ItemStack(item.ItemId, 1, FixedStateStampEnchant, FixedStateStampCombine, 0, 0, 0, 0, 0, 0, 0)
+            : new ItemStack(item.ItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+        return Cost(price, requestedQuantity, playerContributionPoints, grantedStack);
     }
 
     private static BuyResolution Cost(WarPointPriceEntry price, int quantity, int playerContributionPoints,

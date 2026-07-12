@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using Fenrir.Application.Game.Domain.Movement;
+using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
@@ -311,26 +312,30 @@ public class HolyStoneWarCycleTests
     }
 
     [Fact]
-    public void ResolveCapture_AdvancesQuestProgress_ForEveryOnlineNonDeadWinningTribeCharacter_ServerWide()
+    public void ResolveCapture_AdvancesWaterfallQuestProgress_OnlyForCharactersInsideTheCaptureZone()
     {
         var worldState = CreateWorldState();
         var registry = CreateRegistry(StoneMapId, 99);
+        var questProgress = new QuestProgress(3, 1, 8, StoneMapId, 0);
+        var elsewhereQuestProgress = new QuestProgress(3, 1, 8, 99, 0);
 
         var (capturerSession, _) = ZoneTestKit.CreateSession(1);
         registry[StoneMapId].Post(ZoneCommand.Enter(10,
-            ZoneTestKit.EnterData(capturerSession, StoneMapId, tribe: 1, posX: Site.StoneX, posZ: Site.StoneZ)));
+            ZoneTestKit.EnterData(capturerSession, StoneMapId, tribe: 1, posX: Site.StoneX, posZ: Site.StoneZ) with
+            {
+                QuestProgress = questProgress
+            }));
 
         var (elsewhereSession, _) = ZoneTestKit.CreateSession(2);
-        registry[99].Post(ZoneCommand.Enter(20, ZoneTestKit.EnterData(elsewhereSession, 99, tribe: 1)));
-
-        var (otherTribeSession, _) = ZoneTestKit.CreateSession(3);
-        registry[99].Post(ZoneCommand.Enter(21, ZoneTestKit.EnterData(otherTribeSession, 99, tribe: 2)));
+        registry[99].Post(ZoneCommand.Enter(20, ZoneTestKit.EnterData(elsewhereSession, 99, tribe: 1) with
+        {
+            QuestProgress = elsewhereQuestProgress
+        }));
 
         registry[StoneMapId].Tick(TimeSpan.FromMilliseconds(50));
         registry[99].Tick(TimeSpan.FromMilliseconds(50));
 
-        var gateway = new FakeRewardGateway();
-        var cycle = CreateCycle(worldState, registry, gateway);
+        var cycle = CreateCycle(worldState, registry);
         cycle.Tick(HolyStoneWarCycle.NormalCooldown);
         AdvanceThroughOpeningCountdown(cycle);
         cycle.Tick(TimeSpan.Zero);
@@ -338,16 +343,19 @@ public class HolyStoneWarCycleTests
         for (var i = 0; i < HolyStoneWarCycle.ChallengeCountdownMinutes; i++)
             cycle.Tick(TimeSpan.FromMinutes(1));
 
-        Assert.Contains(10, gateway.QuestProgressAdvancedCharacterIds);
-        Assert.Contains(20, gateway.QuestProgressAdvancedCharacterIds);
-        Assert.DoesNotContain(21, gateway.QuestProgressAdvancedCharacterIds);
+        registry[StoneMapId].Tick(TimeSpan.FromMilliseconds(50));
+        registry[99].Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(registry[StoneMapId].TryGetPlayer(10, out var capturer));
+        Assert.True(registry[99].TryGetPlayer(20, out var elsewhere));
+        Assert.Equal(1, capturer!.QuestKillCounter);
+        Assert.Equal(0, elsewhere!.QuestKillCounter);
     }
 
     private sealed class FakeRewardGateway : IHolyStoneCaptureRewardGateway
     {
         public List<int> CaptureRewardedCharacterIds { get; } = [];
         public List<int> ParticipationRewardedCharacterIds { get; } = [];
-        public List<int> QuestProgressAdvancedCharacterIds { get; } = [];
 
         public void GrantCaptureReward(PlayerRuntimeState capturer)
         {
@@ -357,11 +365,6 @@ public class HolyStoneWarCycleTests
         public void GrantParticipationReward(PlayerRuntimeState tribemate)
         {
             ParticipationRewardedCharacterIds.Add(tribemate.CharacterId);
-        }
-
-        public void AdvanceQuestProgress(PlayerRuntimeState tribemate)
-        {
-            QuestProgressAdvancedCharacterIds.Add(tribemate.CharacterId);
         }
     }
 }

@@ -1,17 +1,29 @@
 using Fenrir.Application.Game.Abstractions.Social;
 using Fenrir.Application.Game.Domain.Social.Trade;
+using Fenrir.Application.Game.Domain.World;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Social;
 
-public sealed class TradeStartService(TradeRegistry trades, ILogger<TradeStartService> logger) : ITradeStartService
+public sealed class TradeStartService(TradeRegistry trades, ZoneRegistry zones, ILogger<TradeStartService> logger)
+    : ITradeStartService
 {
     public TradeStartResult Start(int callerId)
     {
-        if (!trades.TryStart(callerId, out var trade))
+        if (!trades.TryPeekAccepted(callerId, out var opponentId))
         {
             logger.LogDebug("Trade start ignored: character {CallerId} has no accepted negotiation to start",
                 callerId);
+            return new TradeStartResult(false, null);
+        }
+
+        var opponentBusyByZoneTransfer = !zones.TryGetPlayer(opponentId, out var opponent) || opponent.IsMovingZone;
+
+        if (!trades.TryStart(callerId, opponentId, opponentBusyByZoneTransfer, out var trade))
+        {
+            logger.LogDebug(
+                "Trade start rejected: character {CallerId}'s counterpart {OpponentId} is unreachable, mid zone-transfer, or the accepted negotiation changed -- caller's accepted state reset to idle",
+                callerId, opponentId);
             return new TradeStartResult(false, null);
         }
 

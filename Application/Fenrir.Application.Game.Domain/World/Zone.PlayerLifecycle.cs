@@ -37,8 +37,6 @@ public sealed partial class Zone
 
     private const byte ContributionPointsLossOutcome = 1;
 
-    private const int SkillCastEffectCategoryCode = 2;
-
     private const int RestActionSort = 0;
 
     private const int SkillEffectConfirmActionSort = 1;
@@ -58,6 +56,8 @@ public sealed partial class Zone
     private readonly List<int> _deathNeighborScratch = [];
 
     private readonly List<int> _enterNeighborScratch = [];
+
+    private readonly List<int> _healTargetNeighborScratch = [];
 
     private readonly List<int> _moveNeighborScratch = [];
 
@@ -98,10 +98,11 @@ public sealed partial class Zone
             if (_clock - state.LastAvatarRebroadcastAt < SimulationClock.AvatarRebroadcastInterval)
                 continue;
 
-            state.LastAvatarRebroadcastAt = _clock;
-
-            if (state.IsDead)
+            if (state.IsDead || IsHiding(state))
+            {
+                state.LastAvatarRebroadcastAt = _clock;
                 continue;
+            }
 
             _rebroadcastNeighborScratch.Clear();
             _grid.NeighborsExcludingSelf(_rebroadcastNeighborScratch, state.CurrentCell, characterId, state.PosX,
@@ -129,6 +130,9 @@ public sealed partial class Zone
             PosY = data.PosY,
             PosZ = data.PosZ,
             Heading = data.Heading,
+            PetActionLocationX = data.PosX,
+            PetActionLocationY = data.PosY,
+            PetActionLocationZ = data.PosZ,
             Life = data.Life,
             MaxLife = data.MaxLife,
             Mana = data.Mana,
@@ -287,7 +291,8 @@ public sealed partial class Zone
         _grid.NeighborsExcludingSelf(_enterNeighborScratch, cell, characterId, state.PosX, state.PosY, state.PosZ);
 
         foreach (var otherId in _enterNeighborScratch)
-            if (_players.TryGetValue(otherId, out var other))
+            if (_players.TryGetValue(otherId, out var other) &&
+                IsVisibleAcrossDungeonInstance(other.DungeonInstanceId, state.DungeonInstanceId))
                 SendAvatarAction(state.Session, other);
 
         BroadcastAvatarAction(_enterNeighborScratch, state);
@@ -321,14 +326,19 @@ public sealed partial class Zone
             logger.LogInformation("Character {CharacterId} left zone {MapId}", characterId, MapId);
 
             if (!state.IsMovingZone)
+            {
                 BreakPartyOnDisconnect(characterId, state.Name);
+
+                if (characterShardLocations is not null)
+                    _ = CleanupShardLocationAsync(characterId);
+            }
 
             ClearTradeOnDisconnect(characterId);
 
+            ClearAcceptedNegotiationsOnDisconnect(characterId);
+
             ClearDungeonInstanceOnDisconnect(state);
 
-            if (characterShardLocations is not null)
-                _ = CleanupShardLocationAsync(characterId);
             return;
         }
 
@@ -419,6 +429,12 @@ public sealed partial class Zone
         }
     }
 
+    private void ClearAcceptedNegotiationsOnDisconnect(int characterId)
+    {
+        _duelRegistry.TryClearAcceptedForDisconnect(characterId, out _);
+        _friendRegistry.TryClearAcceptedForDisconnect(characterId, out _);
+    }
+
     private void RestoreStagedBigMoney(int characterId, int amount)
     {
         if (amount == 0)
@@ -470,6 +486,12 @@ public sealed partial class Zone
     {
         if (_players.TryGetValue(characterId, out var state))
             state.IsMovingZone = true;
+    }
+
+    private void HandleClearZoneTransferPending(int characterId)
+    {
+        if (_players.TryGetValue(characterId, out var state))
+            state.IsMovingZone = false;
     }
 
     private void HandleSetMuted(int characterId, bool muted)
@@ -617,15 +639,29 @@ public sealed partial class Zone
 
     public void GrantReviveEligibility(PlayerRuntimeState state)
     {
+        ClearDeathWindow(state, clearLock: true);
+    }
+
+    public void ClearDeathWindowKeepLockArmed(PlayerRuntimeState state)
+    {
+        ClearDeathWindow(state, clearLock: false);
+    }
+
+    private void ClearDeathWindow(PlayerRuntimeState state, bool clearLock)
+    {
         if (!state.IsDead)
             return;
 
         state.IsDead = false;
         state.Life = 1;
-        state.ReviveHackFlag = false;
         state.CanUseConsumables = true;
-        state.TicksSinceDeath = 0;
         state.DeathSubCounter = ReviveEligibilityRules.DeathSubCounterBaseline;
+
+        if (clearLock)
+        {
+            state.ReviveHackFlag = false;
+            state.TicksSinceDeath = 0;
+        }
 
         state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
 
@@ -698,6 +734,9 @@ public sealed partial class Zone
         if (IsFormationSkillZoneLocked(action.SkillNumber))
             return;
 
+        if (isResumeAction && !EvaluateResumeActionSkillGradeGuard(state, in action))
+            return;
+
         var previousActionSkillNumber = state.ActionSkillNumber;
         var previousActionSkillGradeNum1 = state.ActionSkillGradeNum1;
         var previousActionSkillGradeNum2 = state.ActionSkillGradeNum2;
@@ -742,12 +781,16 @@ public sealed partial class Zone
 
         if (!isResumeAction)
         {
-            if (motion.SkillCategoryCode == SkillCastEffectCategoryCode)
+            if (motion.SkillCategoryCode is SkillCastGuard.HotkeyBoundCategoryCode or SkillCastGuard.SkillEffectCategoryCode)
             {
-                if (!EvaluateSkillCastTamperGuard(state, action))
+                if (!EvaluateSkillCastPreCastGuard(state, action, motion.SkillCategoryCode, out var guardContext))
                     return;
 
-                ApplySkillCastManaCharge(state, action);
+                if (!ApplySkillCastManaCharge(state, action))
+                    return;
+
+                if (!EvaluateSkillCastPostCastGuard(state, action, in guardContext))
+                    return;
             }
             else if (action.Sort == RestActionSort)
             {
@@ -769,17 +812,11 @@ public sealed partial class Zone
         }
     }
 
-    private bool EvaluateSkillCastTamperGuard(PlayerRuntimeState state, ActionInfo action)
+    private SkillCastGuardContext BuildSkillCastGuardContext(PlayerRuntimeState state, ActionInfo action,
+        int skillCategoryCode)
     {
         worldData.SkillsById.TryGetValue(action.SkillNumber, out var skillDef);
-
-        var equipSlotItems = new ItemDefinition?[SkillGradeAuthority.EquipSlotCount];
-        for (var slot = 0; slot < SkillGradeAuthority.EquipSlotCount; slot++)
-        {
-            var equippedStack = state.Inventory.GetSlot(ContainerMatrix.Equipment, (byte)slot);
-            if (equippedStack is { } stack && worldData.ItemsById.TryGetValue(stack.ItemId, out var itemDef))
-                equipSlotItems[slot] = itemDef;
-        }
+        var equipSlotItems = BuildEquipSlotItems(state);
 
         var serverBonusGrade = SkillGradeAuthority.GetBonusSkillValue(action.SkillNumber, equipSlotItems, 0,
             skillDef, state.GuildBuffType, state.GuildBuffActive);
@@ -789,8 +826,8 @@ public sealed partial class Zone
                               !FormationSkillCatalog.IsExemptFromGradeBoundCheck(action.SkillNumber, action.Sort,
                                   true);
 
-        var offense = SkillCastGuard.Evaluate(new SkillCastGuardContext(
-            SkillCastEffectCategoryCode,
+        return new SkillCastGuardContext(
+            skillCategoryCode,
             state.AutoHuntEnabled,
             action.SkillNumber,
             action.SkillGradeNum1,
@@ -799,13 +836,59 @@ public sealed partial class Zone
             serverMaxGrade,
             isRealSkillCast,
             state.Hotkeys,
-            state.LearnedSkills));
+            state.LearnedSkills);
+    }
 
-        if (offense == SkillCastOffense.None)
+    private bool EvaluateResumeActionSkillGradeGuard(PlayerRuntimeState state, in ActionInfo action)
+    {
+        if (action.SkillNumber == 0 ||
+            FormationSkillCatalog.IsExemptFromGradeBoundCheck(action.SkillNumber, action.Sort, false))
+            return true;
+
+        worldData.SkillsById.TryGetValue(action.SkillNumber, out var skillDef);
+        var equipSlotItems = BuildEquipSlotItems(state);
+
+        var serverMaxGrade = SkillGradeAuthority.GetMaxSkillGradeNum(action.SkillNumber, state.LearnedSkills);
+        var serverBonusGrade = SkillGradeAuthority.GetBonusSkillValue(action.SkillNumber, equipSlotItems, 0,
+            skillDef, state.GuildBuffType, state.GuildBuffActive);
+
+        return action.SkillGradeNum1 <= serverMaxGrade && action.SkillGradeNum2 <= serverBonusGrade;
+    }
+
+    private ItemDefinition?[] BuildEquipSlotItems(PlayerRuntimeState state)
+    {
+        var equipSlotItems = new ItemDefinition?[SkillGradeAuthority.EquipSlotCount];
+        for (var slot = 0; slot < SkillGradeAuthority.EquipSlotCount; slot++)
+        {
+            var equippedStack = state.Inventory.GetSlot(ContainerMatrix.Equipment, (byte)slot);
+            if (equippedStack is { } stack && worldData.ItemsById.TryGetValue(stack.ItemId, out var itemDef))
+                equipSlotItems[slot] = itemDef;
+        }
+
+        return equipSlotItems;
+    }
+
+    private bool EvaluateSkillCastPreCastGuard(PlayerRuntimeState state, ActionInfo action, int skillCategoryCode,
+        out SkillCastGuardContext context)
+    {
+        context = BuildSkillCastGuardContext(state, action, skillCategoryCode);
+        return HandleSkillCastVerdict(state, action, SkillCastGuard.EvaluatePreCast(context), in context);
+    }
+
+    private bool EvaluateSkillCastPostCastGuard(PlayerRuntimeState state, ActionInfo action,
+        in SkillCastGuardContext context)
+    {
+        return HandleSkillCastVerdict(state, action, SkillCastGuard.EvaluatePostCast(context), in context);
+    }
+
+    private bool HandleSkillCastVerdict(PlayerRuntimeState state, ActionInfo action, SkillCastVerdict verdict,
+        in SkillCastGuardContext context)
+    {
+        if (verdict.Offense == SkillCastOffense.None)
             return true;
 
         eventLogQueue?.Enqueue(new EventLogEntryTvp(
-            (short)offense,
+            (short)verdict.Offense,
             (byte)EventLogCategory.AntiCheat,
             null,
             state.CharacterId,
@@ -817,12 +900,21 @@ public sealed partial class Zone
             null,
             null,
             null,
-            $"SkillCastOffense={offense};Skill={action.SkillNumber};ClaimedGrade1={action.SkillGradeNum1};ClaimedGrade2={action.SkillGradeNum2};ServerBonus={serverBonusGrade};ServerMax={serverMaxGrade}",
+            $"SkillCastOffense={verdict.Offense};Skill={action.SkillNumber};ClaimedGrade1={action.SkillGradeNum1};ClaimedGrade2={action.SkillGradeNum2};ServerBonus={context.ServerBonusGrade};ServerMax={context.ServerMaxGrade}",
             DateTime.UtcNow));
+
+        if (verdict.Enforcement != SkillCastEnforcement.Disconnect)
+        {
+            logger.LogWarning(
+                "Character {CharacterId} skill-cast tamper guard tripped ({Offense}) on zone {MapId} -- dropping packet",
+                state.CharacterId, verdict.Offense, MapId);
+
+            return false;
+        }
 
         logger.LogWarning(
             "Character {CharacterId} skill-cast tamper guard tripped ({Offense}) on zone {MapId} -- disconnecting",
-            state.CharacterId, offense, MapId);
+            state.CharacterId, verdict.Offense, MapId);
 
         if (state.Session is ClientSession client)
             client.Abort(DisconnectReason.Faulted);
@@ -857,11 +949,8 @@ public sealed partial class Zone
         state.PetActionTargetLocationZ = action.PetTargetLocation[2];
     }
 
-    private void ApplySkillCastManaCharge(PlayerRuntimeState state, ActionInfo action)
+    private bool ApplySkillCastManaCharge(PlayerRuntimeState state, ActionInfo action)
     {
-        if (state.LastSkillCastAtZoneClock is { } lastCast && _clock - lastCast < SimulationClock.LegacyTick)
-            return;
-
         worldData.SkillsById.TryGetValue(action.SkillNumber, out var skillDef);
         var manaGradePoints = action.SkillGradeNum1;
         var weaponItemId = state.Inventory.GetSlot(ContainerMatrix.Equipment, 7)?.ItemId;
@@ -871,13 +960,18 @@ public sealed partial class Zone
         var maxLife = state.Stats?.MaxLife ?? state.MaxLife;
 
         var result = SkillCastResolver.TryCast(skillDef, manaGradePoints, state.Mana, maxLife, weaponSort,
-            state.SupportSkillTimeUpRatio);
-        if (!result.Success)
-            return;
+            state.SupportSkillTimeUpRatio, manaReductionRatioPercent: 0);
 
-        state.LastSkillCastAtZoneClock = _clock;
-        state.Mana -= result.ManaCost;
-        state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
+        if (result.Failure == SkillCastResolver.FailureReason.InsufficientMana)
+            return false;
+
+        if (result.ManaCost > 0)
+        {
+            state.Mana -= result.ManaCost;
+            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
+        }
+
+        return true;
     }
 
     private void ApplySkillEffectConfirm(PlayerRuntimeState state, ActionInfo action, int previousSkillNumber,
@@ -901,7 +995,51 @@ public sealed partial class Zone
         if (!result.Success)
             return;
 
+        if (!result.RequiresFullParty)
+        {
+            var equipSlotItems = BuildEquipSlotItems(state);
+            var serverBonusGrade = SkillGradeAuthority.GetBonusSkillValue(action.SkillNumber, equipSlotItems, 0,
+                skillDef, state.GuildBuffType, state.GuildBuffActive);
+            var serverMaxGrade = SkillGradeAuthority.GetMaxSkillGradeNum(action.SkillNumber, state.LearnedSkills);
 
+            if (action.SkillGradeNum1 > serverMaxGrade || action.SkillGradeNum2 > serverBonusGrade)
+                return;
+        }
+
+        DispatchSkillEffect(state, result, action.SkillNumber, action);
+    }
+
+    private void ApplyRegisteredAutoBuffs(PlayerRuntimeState state)
+    {
+        var equipSlotItems = BuildEquipSlotItems(state);
+        var weaponItemId = state.Inventory.GetSlot(ContainerMatrix.Equipment, 7)?.ItemId;
+        var weaponSort = weaponItemId is { } id && worldData.ItemsById.TryGetValue(id, out var weaponDef)
+            ? (int?)weaponDef.Item.Sort
+            : null;
+        var maxLife = state.Stats?.MaxLife ?? state.MaxLife;
+
+        foreach (var (skillId, _) in state.AutoBuffSkill)
+        {
+            if (skillId == 0)
+                continue;
+
+            worldData.SkillsById.TryGetValue(skillId, out var skillDef);
+            var gradePoints = SkillGradeAuthority.GetMaxSkillGradeNum(skillId, state.LearnedSkills) +
+                               SkillGradeAuthority.GetBonusSkillValue(skillId, equipSlotItems, 0, skillDef,
+                                   state.GuildBuffType, state.GuildBuffActive);
+
+            var result = SkillCastResolver.TryCast(skillDef, gradePoints, int.MaxValue, maxLife, weaponSort,
+                state.SupportSkillTimeUpRatio);
+            if (!result.Success)
+                continue;
+
+            DispatchSkillEffect(state, result, skillId, default);
+        }
+    }
+
+    private void DispatchSkillEffect(PlayerRuntimeState state, SkillCastResolver.Result result, int skillNumber,
+        ActionInfo action)
+    {
         if (result.RequiresFullParty &&
             (!HasFullPartyPresent(state.CharacterId) || state.PartyBuffAct != PartyBuffAction.Done))
             return;
@@ -909,7 +1047,7 @@ public sealed partial class Zone
         switch (result.Kind)
         {
             case SkillEffectKind.SelfBuff:
-                if (action.SkillNumber == HolyShieldSkillId && MapId == HolyShieldCooldownZoneId)
+                if (skillNumber == HolyShieldSkillId && MapId == HolyShieldCooldownZoneId)
                 {
                     var now = DateTime.UtcNow;
                     if (now - state.LastHolyShieldAppliedUtc < HolyShieldReapplyCooldown)
@@ -920,14 +1058,19 @@ public sealed partial class Zone
 
                 ApplyBuffWrites(state, result.BuffWrites);
 
-                if (PartyBuffMarkerDispatchRules.ShouldResetPartyBuffMarkerOnConfirmSuccess(action.SkillNumber))
+                if (PartyBuffMarkerDispatchRules.ShouldResetPartyBuffMarkerOnConfirmSuccess(skillNumber))
                     ResetPartyBuffMarker(state);
                 break;
             case SkillEffectKind.HealLife:
-                ApplyTargetedHeal(action, true, result.HealAmount);
+                if (ApplyTargetedHeal(state, action, true, result.HealAmount) is not null)
+                    BroadcastCasterEffectSnapshot(state);
                 break;
             case SkillEffectKind.HealMana:
-                ApplyTargetedHeal(action, false, result.HealAmount);
+                if (ApplyTargetedHeal(state, action, false, result.HealAmount) is { } manaRecipient)
+                {
+                    BroadcastCasterEffectSnapshot(state);
+                    BroadcastManaRecoveryToTarget(manaRecipient);
+                }
                 break;
         }
     }
@@ -964,33 +1107,45 @@ public sealed partial class Zone
         RecomputeStatsAndBroadcastBuffs(state, changedSlots);
     }
 
-    private void ApplyTargetedHeal(ActionInfo action, bool isLife, int rawAmount)
+    private PlayerRuntimeState? ApplyTargetedHeal(PlayerRuntimeState caster, ActionInfo action, bool isLife,
+        int rawAmount)
     {
         if (rawAmount < 1)
-            return;
+            return null;
         if (!_players.TryGetValue(action.TargetObjectIndex, out var target))
-            return;
-        if (target.UniqueNumber != unchecked((uint)action.TargetObjectUniqueNumber))
-            return;
-        if (target.IsDead)
-            return;
+            return null;
+
+        var currentValue = isLife ? target.Life : target.Mana;
+        var maxValue = isLife ? target.Stats?.MaxLife ?? target.MaxLife : target.Stats?.MaxMana ?? target.MaxMana;
+
+        var eligibility = new TargetedHealResolver.Target(
+            target.CharacterId,
+            target.UniqueNumber,
+            target.IsDead,
+            target.IsStunned,
+            IsHiding(target),
+            target.PshopOpen,
+            target.ActionSort,
+            currentValue,
+            maxValue);
+
+        if (!TargetedHealResolver.TryResolveAmount(caster.CharacterId,
+                unchecked((uint)action.TargetObjectUniqueNumber), eligibility, rawAmount, out var appliedAmount))
+            return null;
 
         if (isLife)
-        {
-            var max = target.Stats?.MaxLife ?? target.MaxLife;
-            var amount = Math.Min(rawAmount, max - target.Life);
-            if (amount < 1) return;
-            target.Life += amount;
-        }
+            target.Life += appliedAmount;
         else
-        {
-            var max = target.Stats?.MaxMana ?? target.MaxMana;
-            var amount = Math.Min(rawAmount, max - target.Mana);
-            if (amount < 1) return;
-            target.Mana += amount;
-        }
+            target.Mana += appliedAmount;
 
         target.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
+        return target;
+    }
+
+    private static bool IsHiding(PlayerRuntimeState player)
+    {
+        _ = player;
+        return false;
     }
 
     public void RecomputeStatsAndBroadcastBuffs(PlayerRuntimeState state, int[] changedSlots)
@@ -1008,6 +1163,17 @@ public sealed partial class Zone
         state.Stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
             petContribution, state);
 
+        BroadcastEffectStateSnapshot(state, changedSlots);
+    }
+
+    private void BroadcastCasterEffectSnapshot(PlayerRuntimeState state)
+    {
+        Array.Clear(state.BuffChangeScratch);
+        BroadcastEffectStateSnapshot(state, state.BuffChangeScratch);
+    }
+
+    private void BroadcastEffectStateSnapshot(PlayerRuntimeState state, int[] changedSlots)
+    {
         var response = new AvatarEffectStateResponse
         {
             ServerIndex = state.CharacterId,
@@ -1024,12 +1190,12 @@ public sealed partial class Zone
             var span = rented.AsSpan(0, total);
             FrameWriter.WriteFrame(in response, span);
 
-            SendBuffStateFrame(state.CharacterId, span);
+            SendRawFrameToRecipient(state.CharacterId, span, state.DungeonInstanceId);
             _buffStateNeighborScratch.Clear();
             _grid.NeighborsExcludingSelf(_buffStateNeighborScratch, state.CurrentCell, state.CharacterId,
                 state.PosX, state.PosY, state.PosZ);
             foreach (var neighborId in _buffStateNeighborScratch)
-                SendBuffStateFrame(neighborId, span);
+                SendRawFrameToRecipient(neighborId, span, state.DungeonInstanceId);
         }
         finally
         {
@@ -1037,17 +1203,43 @@ public sealed partial class Zone
         }
     }
 
-    private void SendBuffStateFrame(int recipientId, ReadOnlySpan<byte> frame)
+    private void BroadcastManaRecoveryToTarget(PlayerRuntimeState target)
+    {
+        var response = new AvatarStatUpdateResponse
+            { Sort = CharacterMpStatSort, Value = target.Mana, Value2 = 0 };
+
+        var total = FrameWriter.FrameSizeOf<AvatarStatUpdateResponse>();
+        var rented = ArrayPool<byte>.Shared.Rent(total);
+
+        try
+        {
+            var span = rented.AsSpan(0, total);
+            FrameWriter.WriteFrame(in response, span);
+
+            SendRawFrameToRecipient(target.CharacterId, span, target.DungeonInstanceId);
+            _healTargetNeighborScratch.Clear();
+            _grid.NeighborsExcludingSelf(_healTargetNeighborScratch, target.CurrentCell, target.CharacterId,
+                target.PosX, target.PosY, target.PosZ);
+            foreach (var neighborId in _healTargetNeighborScratch)
+                SendRawFrameToRecipient(neighborId, span, target.DungeonInstanceId);
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(rented);
+        }
+    }
+
+    private void SendRawFrameToRecipient(int recipientId, ReadOnlySpan<byte> frame, int? sourceInstanceId)
     {
         try
         {
-            if (_players.TryGetValue(recipientId, out var recipient) &&
-                recipient.Session is ClientSession clientSession)
+            if (TryGetBroadcastRecipient(recipientId, out var recipient, out var clientSession) &&
+                IsVisibleAcrossDungeonInstance(sourceInstanceId, recipient.DungeonInstanceId))
                 clientSession.SendRaw(frame);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Zone {MapId} buff-state broadcast to character {RecipientId} failed", MapId,
+            logger.LogError(ex, "Zone {MapId} raw-frame send to character {RecipientId} failed", MapId,
                 recipientId);
         }
     }
@@ -1065,7 +1257,9 @@ public sealed partial class Zone
     private void BroadcastAvatarAction(IReadOnlyList<int> recipientCharacterIds, PlayerRuntimeState state,
         ActionInfo? action = null)
     {
-        if (recipientCharacterIds.Count == 0)
+        state.LastAvatarRebroadcastAt = _clock;
+
+        if (recipientCharacterIds.Count == 0 || state.VisibleState == 0)
             return;
 
         var packet = action is null ? BuildAvatarActionRecv(state) : BuildAvatarActionRecv(state, action.Value);
@@ -1080,9 +1274,8 @@ public sealed partial class Zone
             foreach (var id in recipientCharacterIds)
                 try
                 {
-                    if (_players.TryGetValue(id, out var recipient) &&
-                        recipient.Session is ClientSession clientSession &&
-                        !IsReviveHackBroadcastSuppressed(recipient))
+                    if (TryGetBroadcastRecipient(id, out var recipient, out var clientSession) &&
+                        IsVisibleAcrossDungeonInstance(state.DungeonInstanceId, recipient.DungeonInstanceId))
                         clientSession.SendRaw(span);
                 }
                 catch (Exception ex)
@@ -1103,6 +1296,37 @@ public sealed partial class Zone
 
         return recipient.ReviveHackFlag &&
                recipient.TicksSinceDeath >= SimulationClock.DeathBroadcastSuppressionLegacyTicks;
+    }
+
+    private bool TryGetBroadcastRecipient(int characterId, [NotNullWhen(true)] out PlayerRuntimeState? recipient,
+        [NotNullWhen(true)] out ClientSession? clientSession)
+    {
+        if (_players.TryGetValue(characterId, out recipient) &&
+            recipient.Session is ClientSession session &&
+            !recipient.IsMovingZone &&
+            !IsReviveHackBroadcastSuppressed(recipient))
+        {
+            clientSession = session;
+            return true;
+        }
+
+        clientSession = null;
+        return false;
+    }
+
+    private bool TryGetZoneWideBroadcastRecipient(int characterId,
+        [NotNullWhen(true)] out ClientSession? clientSession)
+    {
+        if (_players.TryGetValue(characterId, out var recipient) &&
+            recipient.Session is ClientSession session &&
+            !recipient.IsMovingZone)
+        {
+            clientSession = session;
+            return true;
+        }
+
+        clientSession = null;
+        return false;
     }
 
     private AvatarActionResponse BuildAvatarActionRecv(PlayerRuntimeState state)

@@ -58,8 +58,6 @@ public sealed partial class Zone
 
     public void SpawnMonster(MonsterEntity monster)
     {
-        monster.LastRebroadcastAt = _clock - SimulationClock.RebroadcastStaggerOffset(monster.ServerIndex,
-            SimulationClock.MonsterRebroadcastInterval);
         _monsters[monster.ServerIndex] = monster;
 
         var cell = _grid.CellOf(monster.PosX, monster.PosZ);
@@ -67,6 +65,9 @@ public sealed partial class Zone
         _monsterGrid.Add(monster.ServerIndex, cell, monster.PosX, monster.PosY, monster.PosZ);
 
         BroadcastMonsterAction(monster, 1);
+
+        monster.LastRebroadcastAt = _clock - SimulationClock.RebroadcastStaggerOffset(monster.ServerIndex,
+            SimulationClock.MonsterRebroadcastInterval);
     }
 
     public void DespawnMonsterSilently(int serverIndex)
@@ -224,6 +225,15 @@ public sealed partial class Zone
             }
         };
 
+        if (!outcome.Hit)
+        {
+            target.Session.Send(response);
+            return;
+        }
+
+        target.Life -= outcome.DamageApplied;
+        target.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
+
         _mvpAttackRecipientScratch.Clear();
         _mvpAttackRecipientScratch.Add(target.CharacterId);
 
@@ -232,13 +242,7 @@ public sealed partial class Zone
         foreach (var id in _mvpAttackNeighborScratch)
             _mvpAttackRecipientScratch.Add(id);
 
-        BroadcastAttackResult(_mvpAttackRecipientScratch, response);
-
-        if (!outcome.Hit)
-            return;
-
-        target.Life -= outcome.DamageApplied;
-        target.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
+        BroadcastAttackResult(_mvpAttackRecipientScratch, response, target.DungeonInstanceId);
 
         if (target.Life <= 0)
             ApplyDeath(target.CharacterId, DeathCause.MonsterKill);
@@ -270,17 +274,22 @@ public sealed partial class Zone
     private void SendExistingMonstersTo(PlayerRuntimeState state)
     {
         var cell = state.CurrentCell;
-        if (!_monsterGrid.HasAnyNeighbor(cell))
+        if (!_monsterGrid.HasAnyNeighbor(cell, MonsterBroadcastScale.MaxScale))
             return;
 
         _sendExistingMonstersScratch.Clear();
-        _monsterGrid.Neighbors(_sendExistingMonstersScratch, cell, state.PosX, state.PosY, state.PosZ);
+        _monsterGrid.Neighbors(_sendExistingMonstersScratch, cell, state.PosX, state.PosY, state.PosZ,
+            MonsterBroadcastScale.MaxScale);
         foreach (var serverIndex in _sendExistingMonstersScratch)
         {
             if (!_monsters.TryGetValue(serverIndex, out var monster))
                 continue;
 
             if (!IsVisibleAcrossDungeonInstance(monster.InstanceId, state.DungeonInstanceId))
+                continue;
+
+            var scale = MonsterBroadcastScale.ForMonster(monster.Template.Type, monster.Template.SpecialType);
+            if (!_monsterGrid.IsWithinRadius(serverIndex, state.PosX, state.PosY, state.PosZ, scale))
                 continue;
 
             state.Session.Send(BuildMonsterActionRecv(monster, 2));
@@ -292,6 +301,11 @@ public sealed partial class Zone
         BroadcastMonsterAction(monster, 1);
     }
 
+    public void BroadcastMonsterPathBlocked(MonsterEntity monster)
+    {
+        BroadcastMonsterAction(monster, 1);
+    }
+
     private void RebroadcastMonsters()
     {
         foreach (var monster in _monsters.Values)
@@ -299,13 +313,14 @@ public sealed partial class Zone
             if (_clock - monster.LastRebroadcastAt < SimulationClock.MonsterRebroadcastInterval)
                 continue;
 
-            monster.LastRebroadcastAt = _clock;
             BroadcastMonsterAction(monster, 2);
         }
     }
 
     private void BroadcastMonsterAction(MonsterEntity monster, int checkChangeActionState)
     {
+        monster.LastRebroadcastAt = _clock;
+
         var scale = MonsterBroadcastScale.ForMonster(monster.Template.Type, monster.Template.SpecialType);
         var cell = _grid.CellOf(monster.PosX, monster.PosZ);
         if (!_grid.HasAnyNeighbor(cell, scale))
@@ -325,10 +340,8 @@ public sealed partial class Zone
             foreach (var id in _monsterBroadcastNeighborScratch)
                 try
                 {
-                    if (_players.TryGetValue(id, out var recipient) &&
-                        recipient.Session is ClientSession clientSession &&
-                        IsVisibleAcrossDungeonInstance(monster.InstanceId, recipient.DungeonInstanceId) &&
-                        !IsReviveHackBroadcastSuppressed(recipient))
+                    if (TryGetBroadcastRecipient(id, out var recipient, out var clientSession) &&
+                        IsVisibleAcrossDungeonInstance(monster.InstanceId, recipient.DungeonInstanceId))
                         clientSession.SendRaw(span);
                 }
                 catch (Exception ex)

@@ -43,7 +43,7 @@ public sealed class PendingSocialRequestAutoCancelSystem(
         if (isAsker)
             tradeRegistry.TryCancel(characterId, out _);
         else
-            tradeRegistry.TryAnswer(characterId, false, out _);
+            tradeRegistry.TryAnswer(characterId, false, false, out _, out _);
     }
 
     private void SweepFriend(int characterId)

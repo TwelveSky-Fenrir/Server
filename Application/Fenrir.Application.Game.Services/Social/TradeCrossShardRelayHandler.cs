@@ -35,7 +35,7 @@ public sealed class TradeCrossShardRelayHandler(
             return ValueTask.CompletedTask;
         }
 
-        if (IsExcludedByCommunityWork(target) || target.IsStunned || target.IsDead)
+        if (IsExcludedByCommunityWork(target) || target.IsStunned || target.IsDead || target.IsMovingZone)
         {
             PublishDecline(ask, 5);
             return ValueTask.CompletedTask;

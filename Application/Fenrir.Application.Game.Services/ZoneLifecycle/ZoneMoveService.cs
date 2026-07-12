@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Avatars;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Domain.World.Configuration;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
@@ -26,10 +27,13 @@ public sealed class ZoneMoveService(
     IGameServerDirectoryRepository directory,
     IShardMapAssignmentRepository shardMapAssignments,
     ISessionTicketRepository tickets,
+    IEventLogRepository eventLog,
     IOptions<GameServerOptions> options,
     ILogger<ZoneMoveService> logger) : IZoneMoveService
 {
-    public ValueTask HandleAsync(ZoneMoveRequest packet, ZoneClientSession zoneSession,
+    private const short ZoneDepartureEventCode = 5;
+
+    public async ValueTask HandleAsync(ZoneMoveRequest packet, ZoneClientSession zoneSession,
         CancellationToken cancellationToken)
     {
         var characterId = zoneSession.CharacterId!.Value;
@@ -39,7 +43,7 @@ public sealed class ZoneMoveService(
             logger.LogWarning(
                 "Zone-move rejected for character {CharacterId}: session has no current zone",
                 characterId);
-            return ValueTask.CompletedTask;
+            return;
         }
 
         var targetZoneNumber = (short)packet.ZoneNumber;
@@ -47,14 +51,13 @@ public sealed class ZoneMoveService(
         sourceZone.TryGetPlayer(characterId, out var state);
 
         if (state is not null && state.ReviveHackFlag &&
-            !ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(sourceZone.MapId, targetZoneNumber, state.Tribe,
-                worldState.GetAllyOf))
+            !ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(targetZoneNumber, worldState.GetAllyOf))
         {
             logger.LogWarning(
                 "Zone-move aborted for character {CharacterId}: revive-hack flag set, transfer {SourceMapId} -> {TargetZoneNumber} not allowed while flagged",
                 characterId, sourceZone.MapId, targetZoneNumber);
             zoneSession.Abort(DisconnectReason.StateViolation);
-            return ValueTask.CompletedTask;
+            return;
         }
 
         if (packet.ZoneNumber == sourceZone.MapId)
@@ -62,44 +65,34 @@ public sealed class ZoneMoveService(
             logger.LogDebug(
                 "Zone-move ignored for character {CharacterId}: target zone {TargetZoneNumber} is already the current zone",
                 characterId, packet.ZoneNumber);
-            return ValueTask.CompletedTask;
+            return;
         }
 
-        if (packet.ZoneNumber is < 1 or >= 350 || packet.PresentZoneNumber != sourceZone.MapId)
+        if (!ZoneConfigCatalog.IsValidZoneNumber(packet.ZoneNumber) || packet.PresentZoneNumber != sourceZone.MapId)
         {
             logger.LogWarning(
                 "Zone-move aborted for character {CharacterId}: malformed target zone {TargetZoneNumber} or present-zone mismatch (claimed {ClaimedPresentZone}, actual {ActualPresentZone})",
                 characterId, packet.ZoneNumber, packet.PresentZoneNumber, sourceZone.MapId);
             zoneSession.Abort(DisconnectReason.Faulted);
-            return ValueTask.CompletedTask;
+            return;
         }
 
-        if (packet.Sort == 2 && !zoneSession.IsGm)
+        if (packet.Sort == (int)ZoneMoveActionCategory.GmMove && !zoneSession.IsGm)
         {
             logger.LogWarning(
                 "Zone-move aborted for character {CharacterId}: GM transfer (sort 2) requested without operator rank",
                 characterId);
             zoneSession.Abort(DisconnectReason.Faulted);
-            return ValueTask.CompletedTask;
+            return;
         }
 
-        if (packet.Sort is < 2 or > 12)
+        if (!ZoneMoveActionCategoryGate.IsRecognized(packet.Sort))
         {
             logger.LogWarning(
                 "Zone-move aborted for character {CharacterId}: malformed sort {Sort}",
                 characterId, packet.Sort);
             zoneSession.Abort(DisconnectReason.Faulted);
-            return ValueTask.CompletedTask;
-        }
-
-        if (TribeSymbolBattleZoneLockout.IsLockedOut(sourceZone.MapId, targetZoneNumber,
-                worldState.World.TribeSymbolBattle))
-        {
-            logger.LogWarning(
-                "Zone-move aborted for character {CharacterId}: tribe-symbol-battle zone lockout ({SourceMapId} -> {TargetZoneNumber})",
-                characterId, sourceZone.MapId, targetZoneNumber);
-            zoneSession.Abort(DisconnectReason.StateViolation);
-            return ValueTask.CompletedTask;
+            return;
         }
 
         if (state is null)
@@ -107,7 +100,7 @@ public sealed class ZoneMoveService(
             logger.LogDebug(
                 "Zone-move ignored for character {CharacterId}: no longer present in source zone {SourceMapId} (narrow race)",
                 characterId, sourceZone.MapId);
-            return ValueTask.CompletedTask;
+            return;
         }
 
         if (PortalProximityGate.Evaluate(portalProximityCatalog, sourceZone.MapId, state.PosX, state.PosY,
@@ -117,7 +110,7 @@ public sealed class ZoneMoveService(
                 "Zone-move aborted for character {CharacterId}: portal move requested with no registered portal within range ({SourceMapId} -> {TargetZoneNumber})",
                 characterId, sourceZone.MapId, targetZoneNumber);
             zoneSession.Abort(DisconnectReason.StateViolation);
-            return ValueTask.CompletedTask;
+            return;
         }
 
         if (WarZoneEntryGate.Evaluate(targetZoneNumber, state.CombinedLevel, state.RebirthCount) ==
@@ -127,12 +120,15 @@ public sealed class ZoneMoveService(
                 "Zone-move aborted for character {CharacterId}: combined level {CombinedLevel}/rebirth {RebirthCount} out of range for war zone {TargetZoneNumber}",
                 characterId, state.CombinedLevel, state.RebirthCount, targetZoneNumber);
             zoneSession.Abort(DisconnectReason.StateViolation);
-            return ValueTask.CompletedTask;
+            return;
         }
 
         if (!zones.TryGet(targetZoneNumber, out var targetZone))
-            return HandleCrossShardAsync(targetZoneNumber, characterId, state.Tribe, sourceZone.MapId,
-                state.RebirthCount, zoneSession, cancellationToken);
+        {
+            await HandleCrossShardAsync(targetZoneNumber, characterId, state, sourceZone.MapId, zoneSession,
+                cancellationToken);
+            return;
+        }
 
         if (!worldData.ZonesByNumber.TryGetValue(targetZoneNumber, out var targetDefinition))
         {
@@ -140,7 +136,17 @@ public sealed class ZoneMoveService(
                 "Zone {TargetZoneNumber} is hosted by this shard but absent from WorldDataCache -- refusing transfer for character {CharacterId}",
                 targetZoneNumber, characterId);
             zoneSession.Send(new ZoneMoveResponse { Result = 1, Ip = "", Port = 0 });
-            return ValueTask.CompletedTask;
+            return;
+        }
+
+        if (TribeSymbolBattleZoneLockout.IsLockedOut(sourceZone.MapId, targetZoneNumber,
+                worldState.World.TribeSymbolBattle))
+        {
+            logger.LogWarning(
+                "Zone-move aborted for character {CharacterId}: tribe-symbol-battle zone lockout ({SourceMapId} -> {TargetZoneNumber})",
+                characterId, sourceZone.MapId, targetZoneNumber);
+            zoneSession.Abort(DisconnectReason.StateViolation);
+            return;
         }
 
         var corridorOutcome = WrapCheckSpecialDestinationGate.Evaluate(
@@ -161,7 +167,7 @@ public sealed class ZoneMoveService(
                     "Zone-move aborted for character {CharacterId}: tribe-guard corridor hard-disconnect ({SourceMapId} -> {TargetZoneNumber})",
                     characterId, sourceZone.MapId, targetZoneNumber);
                 zoneSession.Abort(DisconnectReason.StateViolation);
-                return ValueTask.CompletedTask;
+                return;
             case TribeGuardCorridorMoveOutcome.RejectedSoft:
                 logger.LogWarning(
                     "Zone-move redirected to auto-zone for character {CharacterId}: tribe-guard corridor rejected {SourceMapId} -> {TargetZoneNumber}",
@@ -173,8 +179,20 @@ public sealed class ZoneMoveService(
                     Port = options.Value.Port
                 });
                 zoneSession.Send(new ReturnToHomeZoneResponse());
-                return ValueTask.CompletedTask;
+                return;
         }
+
+        if (!sourceZone.Post(ZoneCommand.MarkZoneTransferPending(characterId)))
+        {
+            logger.LogError(
+                "Zone {SourceMapId} inbox full: character {CharacterId}'s pending-transfer marker could not be queued before its handoff to zone {TargetZoneNumber} -- aborting session",
+                sourceZone.MapId, characterId, targetZoneNumber);
+            zoneSession.Abort(DisconnectReason.Faulted);
+            return;
+        }
+
+        await LogZoneDepartureAsync(zoneSession, characterId, sourceZone.MapId, targetZoneNumber,
+            cancellationToken);
 
         var spawnPoint = targetDefinition.FindSpawnPointFrom(sourceZone.MapId);
         var (posX, posY, posZ) = spawnPoint is null
@@ -235,14 +253,21 @@ public sealed class ZoneMoveService(
             logger.LogError(
                 "Zone {SourceMapId} inbox full: dropped transfer Leave for character {CharacterId} to zone {TargetMapId}",
                 sourceZone.MapId, characterId, targetZoneNumber);
-
-        return ValueTask.CompletedTask;
     }
 
-    private async ValueTask HandleCrossShardAsync(short targetZoneNumber, int characterId, byte requesterTribe,
-        short originZoneId, int requesterRebirthCount, ZoneClientSession zoneSession,
-        CancellationToken cancellationToken)
+    private async ValueTask HandleCrossShardAsync(short targetZoneNumber, int characterId, PlayerRuntimeState state,
+        short originZoneId, ZoneClientSession zoneSession, CancellationToken cancellationToken)
     {
+        if (TribeSymbolBattleZoneLockout.IsLockedOut(originZoneId, targetZoneNumber,
+                worldState.World.TribeSymbolBattle))
+        {
+            logger.LogWarning(
+                "Zone-move aborted for character {CharacterId}: tribe-symbol-battle zone lockout ({SourceMapId} -> {TargetZoneNumber}, cross-shard)",
+                characterId, originZoneId, targetZoneNumber);
+            zoneSession.Abort(DisconnectReason.StateViolation);
+            return;
+        }
+
         var shards = await directory.GetDirectoryAsync(cancellationToken);
         foreach (var candidate in shards)
         {
@@ -256,11 +281,11 @@ public sealed class ZoneMoveService(
             var corridorOutcome = WrapCheckSpecialDestinationGate.Evaluate(
                 corridorCatalog,
                 corridorState,
-                requesterTribe,
+                state.Tribe,
                 originZoneId,
                 targetZoneNumber,
                 zoneSession.IsGm,
-                requesterRebirthCount,
+                state.RebirthCount,
                 worldState.World.Zone038WinTribe,
                 worldState.GetAllyOf);
 
@@ -288,6 +313,18 @@ public sealed class ZoneMoveService(
                 return;
             }
 
+            ZoneTransferBuffRules.ClearIfDestinationRequiresIt(state.Buffs, targetZoneNumber);
+
+            if (zoneSession.CurrentZone is not Zone sourceZone ||
+                !sourceZone.Post(ZoneCommand.MarkZoneTransferPending(characterId)))
+            {
+                logger.LogError(
+                    "Character {CharacterId}'s pending-transfer marker could not be queued before its cross-shard handoff to zone {TargetZoneNumber} -- aborting session",
+                    characterId, targetZoneNumber);
+                zoneSession.Abort(DisconnectReason.Faulted);
+                return;
+            }
+
             await tickets.CreateAsync(zoneSession.AccountId!.Value, characterId, candidate.ShardId,
                 options.Value.TicketTtlSeconds, zoneSession.AccountSessionToken!.Value, zoneSession.AccountGrade,
                 cancellationToken);
@@ -298,11 +335,7 @@ public sealed class ZoneMoveService(
                 "Zone {TargetZoneNumber} resolved to shard {ShardId} ({Host}:{Port}) for character {CharacterId} -- cross-shard handoff ticket minted",
                 targetZoneNumber, candidate.ShardId, candidate.Host, candidate.Port, characterId);
 
-            if (zoneSession.CurrentZone is Zone sourceZone &&
-                !sourceZone.Post(ZoneCommand.MarkZoneTransferPending(characterId)))
-                logger.LogWarning(
-                    "Zone {SourceMapId} inbox full: character {CharacterId}'s IsMovingZone flag was not set before its cross-shard handoff to zone {TargetZoneNumber}",
-                    sourceZone.MapId, characterId, targetZoneNumber);
+            await LogZoneDepartureAsync(zoneSession, characterId, originZoneId, targetZoneNumber, cancellationToken);
 
             zoneSession.Send(new ZoneMoveResponse { Result = 0, Ip = candidate.Host, Port = candidate.Port });
             return;
@@ -312,5 +345,22 @@ public sealed class ZoneMoveService(
             "Zone {TargetZoneNumber} is not hosted by any live shard -- refusing transfer for character {CharacterId}",
             targetZoneNumber, characterId);
         zoneSession.Send(new ZoneMoveResponse { Result = 1, Ip = "", Port = 0 });
+    }
+
+    private async ValueTask LogZoneDepartureAsync(ZoneClientSession zoneSession, int characterId, short sourceMapId,
+        short targetMapId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await eventLog.LogAsync(ZoneDepartureEventCode, EventLogCategory.Session, zoneSession.AccountId,
+                characterId, null, null, options.Value.ShardId, null, null, null, null, 1,
+                $"SourceMapId={sourceMapId},TargetMapId={targetMapId}", cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex,
+                "Failed to write game.EventLog row for zone departure (character {CharacterId}, {SourceMapId} -> {TargetMapId})",
+                characterId, sourceMapId, targetMapId);
+        }
     }
 }

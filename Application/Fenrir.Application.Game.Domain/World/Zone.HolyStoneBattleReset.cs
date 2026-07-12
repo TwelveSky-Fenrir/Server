@@ -9,8 +9,6 @@ public sealed partial class Zone
 {
     private const int HolyStoneBattleRankResetInboxCapacity = 4;
 
-    private const int HolyStoneBattleRankResetInboxDrainCapPerTick = HolyStoneBattleRankResetInboxCapacity / 2;
-
     private const int RankPointClearedStatSort = 66;
 
     private const int RankPointDateResetStatSort = 67;
@@ -29,11 +27,8 @@ public sealed partial class Zone
 
     private void DrainHolyStoneBattleRankResetCommands()
     {
-        var processed = 0;
-        while (processed < HolyStoneBattleRankResetInboxDrainCapPerTick &&
-               _holyStoneBattleRankResetInbox.Reader.TryRead(out _))
+        while (_holyStoneBattleRankResetInbox.Reader.TryRead(out _))
         {
-            processed++;
             try
             {
                 ApplyHolyStoneBattleRankReset();
@@ -43,18 +38,10 @@ public sealed partial class Zone
                 logger.LogError(ex, "Zone {MapId} HSB cluster-wide rank reset failed", MapId);
             }
         }
-
-        if (processed >= HolyStoneBattleRankResetInboxDrainCapPerTick)
-            LogDrainCapEngaged(_holyStoneBattleRankResetInbox.Reader, "holy-stone-battle-rank-reset",
-                HolyStoneBattleRankResetInboxDrainCapPerTick);
     }
 
     private void ApplyHolyStoneBattleRankReset()
     {
-        logger.LogDebug(
-            "Zone {MapId} HSB rank reset: HSB-countdown eviction worker (S07_MyGame08.cpp:231) not modeled -- see C15-hsb-reset contract Open Questions",
-            MapId);
-
         var today = GameDate.Today();
 
         foreach (var state in _players.Values)

@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
@@ -5,15 +6,19 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
-public sealed class ZoneTransferCancelHandler(ILogger<ZoneTransferCancelHandler> logger)
-    : IInlinePacketHandler<ZoneTransferCancelRequest>
+public sealed class ZoneTransferCancelHandler(
+    IZoneTransferCancelService service,
+    ILogger<ZoneTransferCancelHandler>? logger = null) : IAsyncPacketHandler<ZoneTransferCancelRequest>
 {
-    public void Handle(in ZoneTransferCancelRequest packet, IPacketSession session)
+    public ValueTask HandleAsync(ZoneTransferCancelRequest packet, IPacketSession session,
+        CancellationToken cancellationToken)
     {
         var zoneSession = (ZoneClientSession)session;
 
-        logger.LogInformation(
-            "Character {CharacterId} sent CZ_FAIL_MOVE_ZONE_2_SEND -- no-op under ADR-0012 (see class remarks)",
-            zoneSession.CharacterId);
+        logger?.LogDebug(
+            "Session {SessionId}: ZoneTransferCancelRequest (op21) received for character {CharacterId}",
+            session.SessionId, zoneSession.CharacterId);
+
+        return service.HandleAsync(zoneSession, cancellationToken);
     }
 }

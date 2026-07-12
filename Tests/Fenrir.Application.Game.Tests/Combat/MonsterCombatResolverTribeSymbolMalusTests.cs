@@ -63,7 +63,7 @@ public class MonsterCombatResolverTribeSymbolMalusTests
     {
         var monster = Monster();
         var outcome = MonsterCombatResolver.ResolvePvmAttack(Attacker(113), monster, MeleeRequest(monster),
-            TimeSpan.Zero, NoVarianceRng(), false, 0,
+            TimeSpan.Zero, null, NoVarianceRng(), false, 0,
             0,
             TribeSymbolCombatModifiers.OwnSymbolLostDamageDownPenalty);
 
@@ -77,7 +77,7 @@ public class MonsterCombatResolverTribeSymbolMalusTests
     {
         var monster = Monster();
         var outcome = MonsterCombatResolver.ResolvePvmAttack(Attacker(MonsterCombatResolver.MalusMinimumAttackerLevel),
-            monster, MeleeRequest(monster), TimeSpan.Zero, NoVarianceRng(), false,
+            monster, MeleeRequest(monster), TimeSpan.Zero, null, NoVarianceRng(), false,
             0, 0,
             TribeSymbolCombatModifiers.OwnSymbolLostDamageDownPenalty);
 
@@ -90,7 +90,7 @@ public class MonsterCombatResolverTribeSymbolMalusTests
     {
         var monster = Monster();
         var outcome = MonsterCombatResolver.ResolvePvmAttack(Attacker(113), monster, MeleeRequest(monster),
-            TimeSpan.Zero, NoVarianceRng(), false, 0,
+            TimeSpan.Zero, null, NoVarianceRng(), false, 0,
             0, 0f);
 
         Assert.True(outcome.Hit);
@@ -102,7 +102,7 @@ public class MonsterCombatResolverTribeSymbolMalusTests
     {
         var monster = Monster();
         var outcome = MonsterCombatResolver.ResolvePvmAttack(Attacker(200), monster, MeleeRequest(monster),
-            TimeSpan.Zero, NoVarianceRng(), false, 0, 0);
+            TimeSpan.Zero, null, NoVarianceRng(), false, 0, 0);
 
         Assert.True(outcome.Hit);
         Assert.Equal(AttackerAttackPower, outcome.DamageApplied);

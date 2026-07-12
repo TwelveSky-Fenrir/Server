@@ -55,4 +55,37 @@ public class AvatarInfoFactoryTests
 
         Assert.Equal(LiveWarPoint, avatarInfo.WarPoint);
     }
+
+    [Theory]
+    [InlineData(19002, 15, 15)]
+    [InlineData(42, 15, 5)]
+    [InlineData(42, 3, 3)]
+    [InlineData(0, 12, 2)]
+    public void CreateForCharacter_WornMountSafetyNet_DemotesOnlyUnrecognizedWornIds(int mountItemId,
+        int mountSlotIndex, int expectedAnimalIndex)
+    {
+        var character = CreateCharacterWithMount(mountItemId, mountSlotIndex);
+
+        var avatarInfo = AvatarInfoFactory.CreateForCharacter(character, []);
+
+        Assert.Equal(expectedAnimalIndex, avatarInfo.AnimalIndex);
+    }
+
+    private static CharacterWorldSnapshotDto CreateCharacterWithMount(int mountItemId, int mountSlotIndex)
+    {
+        return new CharacterWorldSnapshotDto(
+            1, 1, 0, "Hero", 1, 0,
+            1, 1, 10, 1, 0f, 0f, 0f, 0f,
+            30, 30, 21, 21, 1, 0, 0,
+            1, 1, 1, 1, 0, 0, 0,
+            0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0,
+            0, 0, false, [],
+            0, 0, 0, 0, 0,
+            0, 0, 0, 1, mountItemId,
+            0, 0, mountSlotIndex, 0);
+    }
 }

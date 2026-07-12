@@ -51,6 +51,9 @@ public interface IGenericActionService
     public ValueTask<GenericActionResult> TimeExchangeAsync(Zone zone, PlayerRuntimeState state, int accountId,
         int characterId, CancellationToken cancellationToken);
 
+    public ValueTask<GenericActionResult> ExchangeMeritForContributionPointsAsync(int requestedUnits, Zone zone,
+        PlayerRuntimeState state, int characterId, CancellationToken cancellationToken);
+
     public ValueTask<GenericActionResult> TransferStoreItemAsync(int sort, byte[] data, Zone zone,
         PlayerRuntimeState state, int accountId, int characterId, CancellationToken cancellationToken);
 

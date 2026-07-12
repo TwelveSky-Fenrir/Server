@@ -281,7 +281,8 @@ public sealed class Zone335FfaEventCycleSystem(
     {
         var response = new ZoneWar335CountdownResponse { RemainTime = remainingLegacyTicks };
         foreach (var player in zone.Players)
-            player.Session.Send(response);
+            if (!player.IsMovingZone)
+                player.Session.Send(response);
     }
 
     private static void ForceReturnEligiblePlayers(Zone zone)

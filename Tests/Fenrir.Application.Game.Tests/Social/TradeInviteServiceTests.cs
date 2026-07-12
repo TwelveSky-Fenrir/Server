@@ -7,8 +7,10 @@ using Fenrir.Application.Game.Domain.Social.Mentor;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Services.Social;
 using Fenrir.Application.Game.Tests.TestSupport;
+using Fenrir.Application.Game.Tests.World.WorldState;
 using Fenrir.Data.Abstractions.Runtime;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -25,9 +27,11 @@ public class TradeInviteServiceTests
         var trades = new TradeRegistry();
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([mapId]);
+        var worldState = new WorldStateService(new FakeWorldStateRepository(), NullLogger<WorldStateService>.Instance);
         return (new TradeInviteService(zones, trades, duels ?? new DuelRegistry(), friends ?? new FriendRegistry(),
             parties ?? new PartyRegistry(), mentors ?? new MentorRegistry(),
-            guildInvites ?? new GuildInviteRegistry(), directory ?? new FakeCharacterShardLocationRepository(),
+            guildInvites ?? new GuildInviteRegistry(), worldState,
+            directory ?? new FakeCharacterShardLocationRepository(),
             relay ?? new FakeSocialCrossShardRelayQueue(), Options.Create(new GameServerOptions { ShardId = 1 }),
             NullLogger<TradeInviteService>.Instance), zones, trades);
     }

@@ -136,4 +136,10 @@ public static class ZoneTransferBuffRules
             ? new BuffInfo { Buff = new int[70] }
             : new BuffInfo { Buff = (int[])liveBuffs.Buff.Clone() };
     }
+
+    public static void ClearIfDestinationRequiresIt(BuffInfo liveBuffs, short targetMapId)
+    {
+        if (targetMapId == BuffClearDestinationZoneId)
+            Array.Clear(liveBuffs.Buff);
+    }
 }

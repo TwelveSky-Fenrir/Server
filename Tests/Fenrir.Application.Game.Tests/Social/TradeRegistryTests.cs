@@ -10,10 +10,10 @@ public class TradeRegistryTests
         var registry = new TradeRegistry();
 
         Assert.Equal(TradeAskOutcome.Sent, registry.TryAsk(1, 2));
-        Assert.True(registry.TryAnswer(2, true, out var askerId));
+        Assert.True(registry.TryAnswer(2, true, false, out var askerId, out _));
         Assert.Equal(1, askerId);
 
-        Assert.True(registry.TryStart(1, out var session));
+        Assert.True(registry.TryStart(1, 2, false, out var session));
         Assert.Equal(1, session.PlayerAId);
         Assert.Equal(2, session.PlayerBId);
         Assert.Equal(0, session.SideA.Money);
@@ -29,8 +29,8 @@ public class TradeRegistryTests
     {
         var registry = new TradeRegistry();
         registry.TryAsk(1, 2);
-        registry.TryAnswer(2, true, out _);
-        registry.TryStart(1, out _);
+        registry.TryAnswer(2, true, false, out _, out _);
+        registry.TryStart(1, 2, false, out _);
 
         Assert.True(registry.TryEnd(1, out var session));
         Assert.NotNull(session);
@@ -43,8 +43,8 @@ public class TradeRegistryTests
     {
         var registry = new TradeRegistry();
         registry.TryAsk(1, 2);
-        registry.TryAnswer(2, true, out _);
-        registry.TryStart(1, out _);
+        registry.TryAnswer(2, true, false, out _, out _);
+        registry.TryStart(1, 2, false, out _);
 
         Assert.Equal(TradeAskOutcome.AskerBusy, registry.TryAsk(1, 3));
         Assert.Equal(TradeAskOutcome.TargetBusy, registry.TryAsk(4, 2));
@@ -55,8 +55,8 @@ public class TradeRegistryTests
     {
         var registry = new TradeRegistry();
         registry.TryAsk(1, 2);
-        registry.TryAnswer(2, true, out _);
-        registry.TryStart(1, out var session);
+        registry.TryAnswer(2, true, false, out _, out _);
+        registry.TryStart(1, 2, false, out var session);
 
         Assert.Same(session.SideA, session.SideOf(1));
         Assert.Same(session.SideB, session.SideOf(2));

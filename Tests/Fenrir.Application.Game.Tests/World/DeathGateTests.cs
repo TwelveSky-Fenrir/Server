@@ -40,6 +40,14 @@ public class DeathGateTests
     [Theory]
     [InlineData(322)]
     [InlineData(323)]
+    public void Classify_ZonePair322And323_IsDeathClearOnly(short mapId)
+    {
+        var (kind, _) = ReviveEligibilityZones.Classify(mapId);
+
+        Assert.Equal(ReviveZoneKind.DeathClearOnly, kind);
+    }
+
+    [Theory]
     [InlineData(5)]
     [InlineData(10)]
     [InlineData(999)]
@@ -51,27 +59,27 @@ public class DeathGateTests
     }
 
     [Fact]
-    public void IsEligible_FactionTerritory_OwningFactionMatch_IsEligible()
+    public void Resolve_FactionTerritory_OwningFactionMatch_ClearsWindowAndLock()
     {
-        Assert.True(ReviveEligibilityRules.IsEligible(2, 0, null));
+        Assert.Equal(ReviveClearOutcome.ClearDeathWindowAndLock, ReviveEligibilityRules.Resolve(2, 0, null));
     }
 
     [Fact]
-    public void IsEligible_FactionTerritory_AlliedFactionMatch_IsEligible()
+    public void Resolve_FactionTerritory_AlliedFactionMatch_ClearsWindowAndLock()
     {
-        Assert.True(ReviveEligibilityRules.IsEligible(2, 1, 0));
+        Assert.Equal(ReviveClearOutcome.ClearDeathWindowAndLock, ReviveEligibilityRules.Resolve(2, 1, 0));
     }
 
     [Fact]
-    public void IsEligible_FactionTerritory_NoMatchAndNoAlliance_IsNotEligible()
+    public void Resolve_FactionTerritory_NoMatchAndNoAlliance_NoChange()
     {
-        Assert.False(ReviveEligibilityRules.IsEligible(2, 1, null));
+        Assert.Equal(ReviveClearOutcome.NoChange, ReviveEligibilityRules.Resolve(2, 1, null));
     }
 
     [Fact]
-    public void IsEligible_FactionTerritory_AlliedWithADifferentFaction_IsNotEligible()
+    public void Resolve_FactionTerritory_AlliedWithADifferentFaction_NoChange()
     {
-        Assert.False(ReviveEligibilityRules.IsEligible(2, 1, 2));
+        Assert.Equal(ReviveClearOutcome.NoChange, ReviveEligibilityRules.Resolve(2, 1, 2));
     }
 
     [Theory]
@@ -79,71 +87,95 @@ public class DeathGateTests
     [InlineData(1)]
     [InlineData(2)]
     [InlineData(3)]
-    public void IsEligible_AlwaysBlockedZone_IsNeverEligible_RegardlessOfFactionOrAlliance(byte tribe)
+    public void Resolve_AlwaysBlockedZone_NeverChanges_RegardlessOfFactionOrAlliance(byte tribe)
     {
-        Assert.False(ReviveEligibilityRules.IsEligible(200, tribe, tribe));
+        Assert.Equal(ReviveClearOutcome.NoChange, ReviveEligibilityRules.Resolve(200, tribe, tribe));
     }
 
     [Theory]
     [InlineData(322)]
     [InlineData(323)]
-    [InlineData(999)]
-    public void IsEligible_UnconditionalZone_IsAlwaysEligible_RegardlessOfFactionOrAlliance(short mapId)
+    public void Resolve_DeathClearOnlyZone_ClearsWindowButLeavesLockArmed_RegardlessOfFactionOrAlliance(short mapId)
     {
-        Assert.True(ReviveEligibilityRules.IsEligible(mapId, 3, null));
+        Assert.Equal(ReviveClearOutcome.ClearDeathWindowOnly, ReviveEligibilityRules.Resolve(mapId, 3, null));
     }
 
     [Fact]
-    public void ZoneTransfer_DestinationZone38_IsAlwaysAllowed_RegardlessOfCurrentZoneOrFaction()
+    public void Resolve_UnconditionalZone_ClearsWindowAndLock_RegardlessOfFactionOrAlliance()
     {
-        var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(
-            2, 38, 1, _ => null);
+        Assert.Equal(ReviveClearOutcome.ClearDeathWindowAndLock, ReviveEligibilityRules.Resolve(999, 3, null));
+    }
+
+    [Fact]
+    public void ZoneTransfer_DestinationZone38_IsAlwaysAllowed_RegardlessOfCapitalGroupOrAlliance()
+    {
+        var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(38, _ => null);
 
         Assert.True(allowed);
     }
 
     [Fact]
-    public void ZoneTransfer_CurrentZoneNotFactionTerritory_IsAlwaysAllowed()
+    public void ZoneTransfer_DestinationNotACapitalGroup_IsAlwaysAllowed()
     {
-        var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(
-            999, 50, 1, _ => null);
+        var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(50, _ => null);
 
         Assert.True(allowed);
     }
 
     [Fact]
-    public void ZoneTransfer_FactionTerritory_AvatarMatchesOwningFaction_IsAllowed()
+    public void ZoneTransfer_Tribe0CapitalGroup_AllianceCheckCanNeverBeSatisfied_RejectedWithoutTheHub()
     {
-        var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(
-            2, 50, 0, _ => null);
-
-        Assert.True(allowed);
-    }
-
-    [Fact]
-    public void ZoneTransfer_Faction0Block_NeverGrantsAllianceLeniency_EvenWhenOwningFactionHasSomeAlly()
-    {
-        var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(
-            2, 50, 1, owner => owner == 0 ? 2 : null);
+        var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(2, _ => null);
 
         Assert.False(allowed);
     }
 
     [Fact]
-    public void ZoneTransfer_NonFaction0Block_OwningFactionAlliedWithFaction0_SuspendsKick_ForEveryAvatar()
+    public void ZoneTransfer_Tribe0CapitalGroup_EvenAnOwnTribeRequester_IsRejectedWithoutTheHub()
     {
-        var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(
-            7, 50, 3, owner => owner == 1 ? 0 : null);
+        var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(2, _ => null);
+
+        Assert.False(allowed);
+    }
+
+    [Fact]
+    public void ZoneTransfer_Tribe1CapitalGroup_OwningFactionAlliedWithTribe0_AllowsAnyRequester()
+    {
+        var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(7, owner => owner == 1 ? (byte)0 : null);
 
         Assert.True(allowed);
     }
 
     [Fact]
-    public void ZoneTransfer_NonFaction0Block_OwningFactionAlliedWithNonZeroFaction_DoesNotSuspendKick()
+    public void ZoneTransfer_Tribe1CapitalGroup_OwningFactionAlliedWithNonZeroTribe_Rejected()
     {
-        var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(
-            7, 50, 3, owner => owner == 1 ? 2 : null);
+        var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(7, owner => owner == 1 ? (byte)2 : null);
 
         Assert.False(allowed);
+    }
+
+    [Fact]
+    public void ZoneTransfer_Tribe1CapitalGroup_NoAllianceAtAll_Rejected()
+    {
+        var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(7, _ => null);
+
+        Assert.False(allowed);
+    }
+
+    [Fact]
+    public void ZoneTransfer_Tribe2CapitalGroup_OwningFactionAlliedWithTribe0_AllowsAnyRequester()
+    {
+        var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(12, owner => owner == 2 ? (byte)0 : null);
+
+        Assert.True(allowed);
+    }
+
+    [Fact]
+    public void ZoneTransfer_Tribe3CapitalGroup_OwningFactionAlliedWithTribe0_AllowsAnyRequester()
+    {
+        var allowed =
+            ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(141, owner => owner == 3 ? (byte)0 : null);
+
+        Assert.True(allowed);
     }
 }

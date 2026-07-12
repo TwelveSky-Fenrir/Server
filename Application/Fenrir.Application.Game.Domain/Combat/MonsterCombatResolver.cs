@@ -1,4 +1,6 @@
+using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.World.Monsters;
+using Fenrir.Application.Game.GameData;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Domain.Combat;
@@ -20,6 +22,7 @@ public static class MonsterCombatResolver
         MonsterEntity monster,
         AttackForProtocol request,
         TimeSpan zoneClock,
+        SkillDefinition? attackSkill,
         IRandomSource rng,
         bool attackerAttackBudgetEnforced,
         int attackerActionSkillNumber,
@@ -77,7 +80,18 @@ public static class MonsterCombatResolver
                 return AttackOutcome.Miss(chargeConsumed);
         }
 
-        var damage = attacker.Stats.AttackPower - monster.Template.DefensePower;
+        var isSkillHit = request.AttackActionValue1 == 2;
+
+        var attackPower = attacker.Stats.AttackPower;
+        if (isSkillHit && attackSkill is not null)
+        {
+            var powerUpRatio = SkillCatalog.ReturnSkillValue(attackSkill, request.AttackActionValue3,
+                SkillValueKind.AttackPowerRatio);
+            if (powerUpRatio > 0f)
+                attackPower = CombatMath.ApplySkillPowerRatio(attackPower, powerUpRatio);
+        }
+
+        var damage = attackPower - monster.Template.DefensePower;
         if (damage < 1) damage = 1;
 
         if (chargeConsumed)
@@ -87,7 +101,10 @@ public static class MonsterCombatResolver
         if (damage < 1) damage = 1;
 
         var critical = false;
-        if (CombatMath.RollCritical(attacker.Stats.Critical, rng))
+        var criticalEligible = !isSkillHit ||
+                                SkillCriticalEligibility.IsEligibleForSkillHit(request.AttackActionValue2,
+                                    attackSkill);
+        if (criticalEligible && CombatMath.RollCritical(attacker.Stats.Critical, rng))
         {
             damage *= 2;
             critical = true;

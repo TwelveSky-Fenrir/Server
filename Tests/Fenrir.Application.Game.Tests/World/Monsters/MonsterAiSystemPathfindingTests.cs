@@ -45,12 +45,11 @@ public class MonsterAiSystemPathfindingTests
         return WorldDataCacheBuilder.Build(rows).Cache;
     }
 
-    private static Zone CreateZone(WorldDataCache cache, ZoneGeometry? geometry, GameServerOptions? options = null)
+    private static Zone CreateZone(WorldDataCache cache, ZoneGeometry? geometry)
     {
         var scheduler = new MonsterSpawnScheduler(cache, static () => new ZeroScatterRandom());
         var ai = new MonsterAiSystem(new ScriptedRandomSource(0));
-        var opts = options ?? new GameServerOptions { AoiCellSize = 100_000f };
-        opts.AoiCellSize = 100_000f;
+        var opts = new GameServerOptions { AoiCellSize = 100_000f };
         return ZoneTestKit.CreateZone(1, opts, simulationSystems: [scheduler, ai], worldData: cache,
             geometry: geometry);
     }
@@ -167,30 +166,6 @@ public class MonsterAiSystemPathfindingTests
         }
 
         Assert.True(maxZ >= 12f, $"monster never routed up around the obstacle (max z reached {maxZ:F1})");
-    }
-
-    [Fact]
-    public void OverBudgetMonster_OnGeometry_FallsBackToStraightLine_AndKeepsMoving()
-    {
-        var options = new GameServerOptions { AoiCellSize = 100_000f, MonsterPathfindingBudgetPerTick = 0 };
-        var zone = CreateZone(CacheWithRegionAt(0, 0, 2, 1000, 40), FlatGeometry(), options);
-        var (session, _) = ZoneTestKit.CreateSession(1);
-        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Target", 200f, posZ: 0f)));
-
-        var moved = false;
-        var snapped = false;
-        for (var i = 0; i < 20; i++)
-        {
-            zone.Tick(SimulationClock.LegacyTick);
-            Assert.True(zone.TryGetMonster(1, out var monster));
-            if (monster!.PosX > 5f)
-                moved = true;
-            if (moved && MathF.Abs(monster.PosY - GroundY) < 0.001f)
-                snapped = true;
-        }
-
-        Assert.True(moved, "over-budget monster never advanced via the straight-line fallback");
-        Assert.True(snapped, "over-budget straight-line fallback never snapped to ground");
     }
 
     private sealed class ZeroScatterRandom : Random

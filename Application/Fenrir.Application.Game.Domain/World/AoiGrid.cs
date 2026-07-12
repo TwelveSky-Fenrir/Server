@@ -139,6 +139,11 @@ public sealed class AoiGrid(float cellSize)
                         buffer.Add(id);
     }
 
+    public bool IsWithinRadius(int characterId, float originX, float originY, float originZ, int scale)
+    {
+        return WithinExactRadius(characterId, originX, originY, originZ, ExactRadiusSquared(scale));
+    }
+
     private float ExactRadiusSquared(int scale)
     {
         var radius = cellSize * scale;

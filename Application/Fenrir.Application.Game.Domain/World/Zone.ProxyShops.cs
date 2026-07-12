@@ -14,6 +14,8 @@ public sealed partial class Zone
 {
     public const int MaxProxyShopSlots = 500;
 
+    private readonly ConcurrentQueue<ProxyShopBroadcastEntry> _closedProxyShopBroadcasts = new();
+
     private readonly ConcurrentQueue<int> _pendingProxyShopCloses = new();
 
     private readonly List<int> _proxyShopNeighborScratch = [];
@@ -30,7 +32,14 @@ public sealed partial class Zone
 
     public void RemoveProxyShop(int characterId)
     {
-        _proxyShops.TryRemove(characterId, out _);
+        if (_proxyShops.TryRemove(characterId, out var entry))
+            _closedProxyShopBroadcasts.Enqueue(entry);
+    }
+
+    private void DrainClosedProxyShopBroadcasts()
+    {
+        while (_closedProxyShopBroadcasts.TryDequeue(out var entry))
+            BroadcastProxyShopState(entry, 3);
     }
 
     public bool TryUpdateProxyShopExpiration(int characterId, int newShopDate)
@@ -63,6 +72,9 @@ public sealed partial class Zone
 
         foreach (var (characterId, entry) in _proxyShops)
         {
+            if (_clock - entry.LastBroadcastAt < SimulationClock.ProxyShopRebroadcastInterval)
+                continue;
+
             if (entry.ShopDate < today)
             {
                 if (_proxyShops.TryRemove(characterId, out _))
@@ -74,16 +86,14 @@ public sealed partial class Zone
                 continue;
             }
 
-            if (_clock - entry.LastBroadcastAt < SimulationClock.ProxyShopRebroadcastInterval)
-                continue;
-
-            entry.LastBroadcastAt = _clock;
             BroadcastProxyShopState(entry, 0);
         }
     }
 
     private void BroadcastProxyShopState(ProxyShopBroadcastEntry entry, int checkChangeActionState)
     {
+        entry.LastBroadcastAt = _clock;
+
         var cell = _grid.CellOf(entry.PosX, entry.PosZ);
         if (!_grid.HasAnyNeighbor(cell))
             return;
@@ -114,9 +124,7 @@ public sealed partial class Zone
             foreach (var id in _proxyShopNeighborScratch)
                 try
                 {
-                    if (_players.TryGetValue(id, out var recipient) &&
-                        recipient.Session is ClientSession clientSession &&
-                        !IsReviveHackBroadcastSuppressed(recipient))
+                    if (TryGetBroadcastRecipient(id, out _, out var clientSession))
                         clientSession.SendRaw(span);
                 }
                 catch (Exception ex)

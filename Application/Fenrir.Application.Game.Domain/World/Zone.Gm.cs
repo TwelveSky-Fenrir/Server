@@ -9,8 +9,6 @@ public sealed partial class Zone
 {
     private const int GmExperienceInboxCapacity = 64;
 
-    private const int GmExperienceInboxDrainCapPerTick = GmExperienceInboxCapacity / 2;
-
     private const long GmMaxExperience = 2_000_000_000;
 
     private readonly Channel<GmSelfExperienceGrantZoneCommand> _gmExperienceInbox =
@@ -45,10 +43,8 @@ public sealed partial class Zone
 
     private void DrainGmExperienceCommands()
     {
-        var processed = 0;
-        while (processed < GmExperienceInboxDrainCapPerTick && _gmExperienceInbox.Reader.TryRead(out var command))
+        while (_gmExperienceInbox.Reader.TryRead(out var command))
         {
-            processed++;
             try
             {
                 ApplyGmSelfExperienceGrantCommand(in command);
@@ -61,9 +57,6 @@ public sealed partial class Zone
                 command.Applied?.TrySetException(ex);
             }
         }
-
-        if (processed >= GmExperienceInboxDrainCapPerTick)
-            LogDrainCapEngaged(_gmExperienceInbox.Reader, "gm-experience", GmExperienceInboxDrainCapPerTick);
     }
 
     private void ApplyGmSelfExperienceGrantCommand(in GmSelfExperienceGrantZoneCommand command)

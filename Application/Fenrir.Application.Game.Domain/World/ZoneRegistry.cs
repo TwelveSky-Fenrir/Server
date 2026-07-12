@@ -7,6 +7,7 @@ using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Social.Duel;
+using Fenrir.Application.Game.Domain.Social.Friends;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World.WorldState;
@@ -26,6 +27,7 @@ public sealed class ZoneRegistry
     private readonly DuelRegistry? _duelRegistry;
     private readonly IEventLogQueue? _eventLogQueue;
     private readonly IFourGuildKillPointQueue? _fourGuildKillPointQueue;
+    private readonly FriendRegistry? _friendRegistry;
     private readonly HeroRankPointAccumulator? _heroRankPointAccumulator;
     private readonly KillCooldownTracker _killCooldownTracker;
     private readonly MovementRules _movementRules;
@@ -52,6 +54,7 @@ public sealed class ZoneRegistry
         ICharacterShardLocationRepository? characterShardLocations = null,
         RegularWarActiveMapTracker? regularWarActiveMapTracker = null,
         TradeRegistry? tradeRegistry = null,
+        FriendRegistry? friendRegistry = null,
         IEventLogQueue? eventLogQueue = null,
         IFourGuildKillPointQueue? fourGuildKillPointQueue = null,
         TribeSymbolCombatModifiers? tribeSymbolCombatModifiers = null,
@@ -75,6 +78,7 @@ public sealed class ZoneRegistry
 
         _partyRegistry = partyRegistry;
         _duelRegistry = duelRegistry;
+        _friendRegistry = friendRegistry;
 
         _tradeRegistry = tradeRegistry;
 
@@ -117,6 +121,7 @@ public sealed class ZoneRegistry
                 var zone = new Zone(mapId, _options, _movementRules, _dirtyTracker, _systems, _zoneLogger, _worldData,
                     questCatalog: _questCatalog, killCooldownTracker: _killCooldownTracker, towerWar: _towerWar,
                     worldState: _worldState, partyRegistry: _partyRegistry, duelRegistry: _duelRegistry,
+                    friendRegistry: _friendRegistry,
                     tradeRegistry: _tradeRegistry,
                     heroRankPointAccumulator: _heroRankPointAccumulator,
                     characterShardLocations: _characterShardLocations,

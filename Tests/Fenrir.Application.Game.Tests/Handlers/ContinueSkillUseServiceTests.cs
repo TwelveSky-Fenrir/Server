@@ -1,8 +1,12 @@
+using System.Collections.Frozen;
+using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Services.ZoneLifecycle;
 using Fenrir.Application.Game.Tests.TestSupport;
+using Fenrir.Data.Abstractions.World;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 using Fenrir.Network.Framing;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
@@ -120,6 +124,61 @@ public class ContinueSkillUseServiceTests
 
         Assert.Null(session.DisconnectReason);
         Assert.Equal(AutoBuffActivationResolver.ResultKind.Tick, result.Kind);
+        Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
+    }
+
+    [Fact]
+    public void Sort2_AppliesRegisteredSelfBuffUsingFreshlyRecomputedGrade()
+    {
+        var grade0 = new SkillGradeRowDto(82, 0, 30, 0, 0, 0, 0, 0, 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 0, 0,
+            0, 0, 0);
+        var skillDef = new SkillDefinition(
+            new SkillRowDto(82, "Holy Shield", 0, 0, 0, 0, 0, 1, 10, 1, 0),
+            ImmutableArray<SkillDescriptionRowDto>.Empty,
+            [grade0, grade0 with { GradeIndex = 1 }]);
+        var worldData = ZoneTestKit.EmptyWorldData(
+            skillsById: new Dictionary<int, SkillDefinition> { [82] = skillDef }.ToFrozenDictionary());
+        var zone = ZoneTestKit.CreateZone(1, worldData: worldData);
+        var (_, _, state) = Setup(zone, 10);
+
+        state.LearnedSkills = state.LearnedSkills.SetItem(0, new LearnedSkill(82, 10));
+        state.AutoBuffSkill = ImmutableArray.Create(
+            (82, 10), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0));
+
+        var service = new ContinueSkillUseService();
+        var result = service.Activate(zone, 10, state, 2);
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Equal(AutoBuffActivationResolver.ResultKind.Tick, result.Kind);
+        Assert.Equal(168, state.Buffs.Buff[9 * 2]);
+        Assert.Equal(40, state.Buffs.Buff[9 * 2 + 1]);
+    }
+
+    [Fact]
+    public void Sort2_PartyBuffSlotWithoutFullConfirmedParty_IsSilentlySkipped()
+    {
+        var grade0 = new SkillGradeRowDto(76, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 40, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0);
+        var skillDef = new SkillDefinition(
+            new SkillRowDto(76, "Party Buff", 0, 0, 0, 0, 0, 1, 10, 1, 0),
+            ImmutableArray<SkillDescriptionRowDto>.Empty,
+            [grade0, grade0 with { GradeIndex = 1 }]);
+        var worldData = ZoneTestKit.EmptyWorldData(
+            skillsById: new Dictionary<int, SkillDefinition> { [76] = skillDef }.ToFrozenDictionary());
+        var zone = ZoneTestKit.CreateZone(1, worldData: worldData);
+        var (session, pipe, state) = Setup(zone, 10);
+
+        state.LearnedSkills = state.LearnedSkills.SetItem(0, new LearnedSkill(76, 10));
+        state.AutoBuffSkill = ImmutableArray.Create(
+            (76, 10), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0));
+        ZoneTestKit.DrainOutbound(pipe);
+
+        var service = new ContinueSkillUseService();
+        service.Activate(zone, 10, state, 2);
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Null(session.DisconnectReason);
+        Assert.Equal(0, state.Buffs.Buff[2 * 2]);
         Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
     }
 

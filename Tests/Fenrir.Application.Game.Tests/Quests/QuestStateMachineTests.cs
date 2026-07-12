@@ -305,7 +305,7 @@ public class QuestStateMachineTests
 
         Assert.True(result.Success);
         Assert.Equal(1000, result.MoneyReward);
-        Assert.Equal(50, result.ContributionPointsReward);
+        Assert.Equal(50, result.KillOtherTribeCountReward);
         Assert.Equal(200, result.ExperienceReward);
         Assert.Equal(0, result.RewardItemId);
         Assert.Equal(new QuestProgress(3, 0, 0, 0, 0), result.NewProgress);

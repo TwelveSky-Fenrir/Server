@@ -20,6 +20,8 @@ public enum DisconnectReason
 
     ProcessingFault,
 
+    SendBufferOverflow,
+
     TimedZoneExpired,
 
     GmCommandLogout,
@@ -30,5 +32,7 @@ public enum DisconnectReason
 
     WardrobeFull,
 
-    LabyrinthMissionEnded
+    LabyrinthMissionEnded,
+
+    ContributionPointExchangeRetired
 }

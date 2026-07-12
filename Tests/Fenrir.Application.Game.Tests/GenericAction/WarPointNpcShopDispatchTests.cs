@@ -161,7 +161,7 @@ public class WarPointNpcShopDispatchTests
         Assert.Equal(WpItemId, mirrored!.Value.ItemId);
 
         var logged = Assert.Single(eventLog.LoggedEvents);
-        Assert.Equal(3, logged.EventCode);
+        Assert.Equal(4, logged.EventCode);
     }
 
     [Fact]
@@ -206,7 +206,7 @@ public class WarPointNpcShopDispatchTests
     }
 
     [Fact]
-    public async Task Buy_WarPointItem_WrongNpc_ReturnsAborted_DoesNotFallThrough()
+    public async Task Buy_WarPointItem_WrongNpc_IsSoftRejected_DoesNotFallThrough()
     {
         var worldData = BuildWorldData();
         var (zone, state, characters, eventLog) = SetUp(worldData);
@@ -217,7 +217,7 @@ public class WarPointNpcShopDispatchTests
         var result = await service.BuyFromNpcShopAsync(zone, state, AccountId, CharacterId,
             BuyMove(OtherWpNpcId, WpItemId, 1), CancellationToken.None);
 
-        Assert.Equal(GenericActionStatus.Aborted, result.Status);
+        Assert.Equal(GenericActionStatus.Failed, result.Status);
         Assert.Equal(0, warPoints.CallCount);
         Assert.Null(characters.LastAdjustMoneyAndReplaceContainer);
         Assert.Empty(eventLog.LoggedEvents);

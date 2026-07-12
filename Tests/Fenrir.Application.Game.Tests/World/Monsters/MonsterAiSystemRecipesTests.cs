@@ -31,7 +31,48 @@ public class MonsterAiSystemRecipesTests
     public void SpecialSort_TribeSymbolSpecialTypes_DeriveToTribeSymbolStone(byte specialType)
     {
         Assert.Equal(MonsterSpecialSort.TribeSymbolStone, MonsterSpecialSort.Derive(1, specialType));
-        Assert.Equal(MonsterSpecialSort.TribeSymbolStone, MonsterSpecialSort.Derive(2, specialType));
+        Assert.Equal(MonsterSpecialSort.Standard, MonsterSpecialSort.Derive(2, specialType));
+    }
+
+    [Fact]
+    public void SpecialSort_TowerSpecialType_DerivesToTower()
+    {
+        Assert.Equal(MonsterSpecialSort.Tower, MonsterSpecialSort.Derive(1, 10));
+        Assert.Equal(MonsterSpecialSort.Standard, MonsterSpecialSort.Derive(2, 10));
+    }
+
+    [Theory]
+    [InlineData((byte)21)]
+    [InlineData((byte)22)]
+    [InlineData((byte)23)]
+    [InlineData((byte)29)]
+    public void SpecialSort_InertSpecialTypes_DeriveToInert(byte specialType)
+    {
+        Assert.Equal(MonsterSpecialSort.Inert, MonsterSpecialSort.Derive(1, specialType));
+        Assert.Equal(MonsterSpecialSort.Standard, MonsterSpecialSort.Derive(2, specialType));
+    }
+
+    [Theory]
+    [InlineData((byte)31)]
+    [InlineData((byte)32)]
+    [InlineData((byte)33)]
+    [InlineData((byte)34)]
+    public void SpecialSort_AllianceStoneSpecialTypes_DeriveToAllianceStone(byte specialType)
+    {
+        Assert.Equal(MonsterSpecialSort.AllianceStone, MonsterSpecialSort.Derive(1, specialType));
+        Assert.Equal(MonsterSpecialSort.Standard, MonsterSpecialSort.Derive(2, specialType));
+    }
+
+    [Theory]
+    [InlineData((byte)18)]
+    [InlineData((byte)35)]
+    [InlineData((byte)36)]
+    [InlineData((byte)37)]
+    [InlineData((byte)38)]
+    public void SpecialSort_CarThrowerSpecialTypes_DeriveToCarThrower(byte specialType)
+    {
+        Assert.Equal(MonsterSpecialSort.CarThrower, MonsterSpecialSort.Derive(1, specialType));
+        Assert.Equal(MonsterSpecialSort.Standard, MonsterSpecialSort.Derive(2, specialType));
     }
 
     [Theory]
@@ -89,11 +130,78 @@ public class MonsterAiSystemRecipesTests
     public void ThrowCar_WanderTrigger_EntersPatrol()
     {
         var (zone, monster) = CreateZoneWithManualMonster(100, new ScriptedRandomSource(0));
+        EnterPlayerAt(zone, 10, 50, 0);
 
         zone.Tick(SimulationClock.LegacyTick);
         zone.Tick(SimulationClock.LegacyTick);
 
         Assert.Equal(MonsterAiState.Patrol, monster.AiState);
+    }
+
+    [Fact]
+    public void ThrowCar_WanderTrigger_WithoutAnyNearbyReadyPlayer_StaysIdle()
+    {
+        var (zone, monster) = CreateZoneWithManualMonster(100, new ScriptedRandomSource(0));
+
+        zone.Tick(SimulationClock.LegacyTick);
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.Equal(MonsterAiState.Decision, monster.AiState);
+    }
+
+    [Fact]
+    public void ThrowCar_WanderTrigger_WithOnlyANotYetReadyPlayer_StaysIdle()
+    {
+        var (zone, monster) = CreateZoneWithManualMonster(100, new ScriptedRandomSource(0));
+        var (session, _) = ZoneTestKit.CreateSession(10);
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "P10", 50f, 0f, 0f)));
+
+        zone.Tick(SimulationClock.LegacyTick);
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.Equal(MonsterAiState.Decision, monster.AiState);
+    }
+
+    [Fact]
+    public void ThrowCar_WanderTrigger_WithOnlyAMovingZonePlayer_StaysIdle()
+    {
+        var (zone, monster) = CreateZoneWithManualMonster(100, new ScriptedRandomSource(0));
+        EnterPlayerAt(zone, 10, 50, 0);
+
+        zone.Tick(SimulationClock.LegacyTick);
+        Assert.True(zone.TryGetPlayer(10, out var player));
+        player!.IsMovingZone = true;
+
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.Equal(MonsterAiState.Decision, monster.AiState);
+    }
+
+    [Fact]
+    public void ThrowCar_WanderTrigger_WithOnlyAPlayerBeyondTheCoarseCellTolerance_StaysIdle()
+    {
+        var options = new GameServerOptions { AoiCellSize = 100f };
+        var template = WorldDataTestRows.Monster(600) with
+        {
+            Life = 100_000,
+            AttackType = 1,
+            RadiusInfo1 = 100,
+            WalkSpeed = 10,
+            RunSpeed = 100,
+            FrameInfo1 = 1,
+            FrameInfo3 = 2
+        };
+        var monster = MonsterEntity.Create(1, 1, template, 1, 0, 0, 0, 50,
+            specialSort: MonsterSpecialSort.CarThrower);
+
+        var zone = ZoneTestKit.CreateZone(1, options, simulationSystems: [new MonsterAiSystem(new ScriptedRandomSource(0))]);
+        zone.SpawnMonster(monster);
+        EnterPlayerAt(zone, 10, 301f, 0);
+
+        zone.Tick(SimulationClock.LegacyTick);
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.Equal(MonsterAiState.Decision, monster.AiState);
     }
 
 
@@ -240,6 +348,7 @@ public class MonsterAiSystemRecipesTests
     private static void EnterPlayerAt(Zone zone, int characterId, float posX, float posZ)
     {
         var (session, _) = ZoneTestKit.CreateSession(characterId);
+        session.MarkInWorld();
         zone.Post(ZoneCommand.Enter(characterId,
             ZoneTestKit.EnterData(session, 1, $"P{characterId}", posX, 0f, posZ)));
     }

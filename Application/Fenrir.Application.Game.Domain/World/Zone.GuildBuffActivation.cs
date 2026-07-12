@@ -8,8 +8,6 @@ public sealed partial class Zone
 {
     private const int GuildBuffActivationInboxCapacity = 64;
 
-    private const int GuildBuffActivationInboxDrainCapPerTick = GuildBuffActivationInboxCapacity / 2;
-
     private readonly Channel<GuildBuffActivationZoneCommand> _guildBuffActivationInbox =
         Channel.CreateBounded<GuildBuffActivationZoneCommand>(
             new BoundedChannelOptions(GuildBuffActivationInboxCapacity)
@@ -22,11 +20,8 @@ public sealed partial class Zone
 
     private void DrainGuildBuffActivationCommands()
     {
-        var processed = 0;
-        while (processed < GuildBuffActivationInboxDrainCapPerTick &&
-               _guildBuffActivationInbox.Reader.TryRead(out var command))
+        while (_guildBuffActivationInbox.Reader.TryRead(out var command))
         {
-            processed++;
             try
             {
                 ApplyGuildBuffActivationCommand(in command);
@@ -37,10 +32,6 @@ public sealed partial class Zone
                     command.GuildId);
             }
         }
-
-        if (processed >= GuildBuffActivationInboxDrainCapPerTick)
-            LogDrainCapEngaged(_guildBuffActivationInbox.Reader, "guild-buff-activation",
-                GuildBuffActivationInboxDrainCapPerTick);
     }
 
     private void ApplyGuildBuffActivationCommand(in GuildBuffActivationZoneCommand command)

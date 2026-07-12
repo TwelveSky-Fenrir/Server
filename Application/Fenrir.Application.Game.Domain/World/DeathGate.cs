@@ -6,6 +6,8 @@ public enum ReviveZoneKind
 
     AlwaysBlocked,
 
+    DeathClearOnly,
+
     Unconditional
 }
 
@@ -13,9 +15,9 @@ public static class ReviveEligibilityZones
 {
     public const short AlwaysBlockedZoneId = 200;
 
-    public const short UnconditionalZoneIdA = 322;
+    public const short DeathClearOnlyZoneIdA = 322;
 
-    public const short UnconditionalZoneIdB = 323;
+    public const short DeathClearOnlyZoneIdB = 323;
 
     public const short BroadcastSuppressionExemptZoneId = 124;
 
@@ -28,25 +30,38 @@ public static class ReviveEligibilityZones
             >= 11 and <= 14 => (ReviveZoneKind.FactionTerritory, (byte)2),
             >= 140 and <= 143 => (ReviveZoneKind.FactionTerritory, (byte)3),
             AlwaysBlockedZoneId => (ReviveZoneKind.AlwaysBlocked, default),
+            DeathClearOnlyZoneIdA or DeathClearOnlyZoneIdB => (ReviveZoneKind.DeathClearOnly, default),
             _ => (ReviveZoneKind.Unconditional, default)
         };
     }
+}
+
+public enum ReviveClearOutcome
+{
+    NoChange,
+
+    ClearDeathWindowOnly,
+
+    ClearDeathWindowAndLock
 }
 
 public static class ReviveEligibilityRules
 {
     public const int DeathSubCounterBaseline = 0;
 
-    public static bool IsEligible(short mapId, byte avatarTribe, byte? avatarAlliedTribe)
+    public static ReviveClearOutcome Resolve(short mapId, byte avatarTribe, byte? avatarAlliedTribe)
     {
         var (kind, owningFaction) = ReviveEligibilityZones.Classify(mapId);
 
         return kind switch
         {
-            ReviveZoneKind.AlwaysBlocked => false,
-            ReviveZoneKind.Unconditional => true,
-            ReviveZoneKind.FactionTerritory => avatarTribe == owningFaction || avatarAlliedTribe == owningFaction,
-            _ => true
+            ReviveZoneKind.AlwaysBlocked => ReviveClearOutcome.NoChange,
+            ReviveZoneKind.DeathClearOnly => ReviveClearOutcome.ClearDeathWindowOnly,
+            ReviveZoneKind.Unconditional => ReviveClearOutcome.ClearDeathWindowAndLock,
+            ReviveZoneKind.FactionTerritory => avatarTribe == owningFaction || avatarAlliedTribe == owningFaction
+                ? ReviveClearOutcome.ClearDeathWindowAndLock
+                : ReviveClearOutcome.NoChange,
+            _ => ReviveClearOutcome.NoChange
         };
     }
 }
@@ -55,19 +70,16 @@ public static class ZoneTransferAntiAbuseRules
 {
     public const short ExemptDestinationZoneId = 38;
 
-    public static bool AllowsTransferWhileFlagged(short currentMapId, short destinationMapId, byte avatarTribe,
-        Func<byte, byte?> currentZoneOwningFactionAlly)
+    public const byte CapitalGroupAllianceComparandTribe = 0;
+
+    public static bool AllowsTransferWhileFlagged(short destinationMapId, Func<byte, byte?> allyOfOwningFaction)
     {
         if (destinationMapId == ExemptDestinationZoneId)
             return true;
 
-        var (kind, owningFaction) = ReviveEligibilityZones.Classify(currentMapId);
-        if (kind != ReviveZoneKind.FactionTerritory)
-            return true;
+        var (kind, owningFaction) = ReviveEligibilityZones.Classify(destinationMapId);
 
-        if (avatarTribe == owningFaction)
-            return true;
-
-        return currentZoneOwningFactionAlly(owningFaction) == 0;
+        return kind != ReviveZoneKind.FactionTerritory ||
+               allyOfOwningFaction(owningFaction) == CapitalGroupAllianceComparandTribe;
     }
 }

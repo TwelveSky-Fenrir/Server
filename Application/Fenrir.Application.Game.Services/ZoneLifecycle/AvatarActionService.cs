@@ -24,6 +24,9 @@ public sealed class AvatarActionService(ILogger<AvatarActionService> logger) : I
             return;
         }
 
-        zone.Post(ZoneCommand.Move(characterId, in action, isResumeAction));
+        if (!zone.Post(ZoneCommand.Move(characterId, in action, isResumeAction)))
+            logger.LogWarning(
+                "Zone {MapId} inbox full: dropped Move for character {CharacterId}",
+                zone.MapId, characterId);
     }
 }

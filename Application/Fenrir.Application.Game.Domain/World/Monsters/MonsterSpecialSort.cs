@@ -26,7 +26,11 @@ public static class MonsterSpecialSort
 
         return specialType switch
         {
+            10 => Tower,
             11 or 12 or 13 or 28 or 14 or 15 => TribeSymbolStone,
+            21 or 22 or 23 or 29 => Inert,
+            31 or 32 or 33 or 34 => AllianceStone,
+            18 or 35 or 36 or 37 or 38 => CarThrower,
             _ => Standard
         };
     }

@@ -87,6 +87,52 @@ public class ZoneMoveTests
     }
 
     [Fact]
+    public void MoveResume_SkillGradeExceedsServerCap_DropsPacketSilently_NoMutation_NoDisconnect()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var (mover, moverPipe) = ZoneTestKit.CreateSession(1);
+
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(mover, 1, posX: 10f, posZ: 10f)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+        ZoneTestKit.DrainOutbound(moverPipe);
+
+        var action = MoveTo(10.5f, 10f) with { Sort = 2, SkillNumber = 50, SkillGradeNum1 = 1 };
+        zone.Post(ZoneCommand.Move(10, action, true));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(10, out var mover10));
+        Assert.Equal(10f, mover10!.PosX);
+        Assert.Equal(10f, mover10.PosZ);
+        Assert.Equal(0, mover10.ActionSkillNumber);
+
+        Assert.Empty(ZoneTestKit.DrainOutbound(moverPipe));
+        Assert.Null(mover.DisconnectReason);
+    }
+
+    [Fact]
+    public void MoveResume_PartyBuffSkillGradeMismatch_IsExemptFromGradeCap_StillAppliesMutation()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var (mover, moverPipe) = ZoneTestKit.CreateSession(1);
+
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(mover, 1, posX: 10f, posZ: 10f)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+        ZoneTestKit.DrainOutbound(moverPipe);
+
+        var action = MoveTo(10.5f, 10f) with { Sort = 64, SkillNumber = 76, SkillGradeNum1 = 99 };
+        zone.Post(ZoneCommand.Move(10, action, true));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(10, out var mover10));
+        Assert.Equal(10.5f, mover10!.PosX);
+        Assert.Equal(10f, mover10.PosZ);
+        Assert.Equal(76, mover10.ActionSkillNumber);
+
+        Assert.Empty(ZoneTestKit.DrainOutbound(moverPipe));
+        Assert.Null(mover.DisconnectReason);
+    }
+
+    [Fact]
     public void Move_Implausible_RejectsUpdate_AndResyncsMoverToLastKnownGoodState()
     {
         var zone = ZoneTestKit.CreateZone(1);
@@ -116,5 +162,82 @@ public class ZoneMoveTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.False(zone.TryGetPlayer(999, out _));
+    }
+
+    [Fact]
+    public void Move_CasterHiding_SuppressesNeighborBroadcast_ButStillSelfEchoes()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var (mover, moverPipe) = ZoneTestKit.CreateSession(1);
+        var (neighbor, neighborPipe) = ZoneTestKit.CreateSession(2);
+
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(mover, 1, posX: 10f, posZ: 10f)));
+        zone.Post(ZoneCommand.Enter(20, ZoneTestKit.EnterData(neighbor, 1, posX: 12f, posZ: 12f)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+        ZoneTestKit.DrainOutbound(moverPipe);
+        ZoneTestKit.DrainOutbound(neighborPipe);
+
+        Assert.True(zone.TryGetPlayer(10, out var moverState));
+        moverState!.VisibleState = 0;
+
+        zone.Post(ZoneCommand.Move(10, MoveTo(10.5f, 10f)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        var moverInbox = ZoneTestKit.DrainOutbound(moverPipe);
+        Assert.Equal(OneFrame, moverInbox.Length);
+
+        Assert.Empty(ZoneTestKit.DrainOutbound(neighborPipe));
+    }
+
+    [Fact]
+    public void Move_CasterInDifferentDungeonInstanceThanNeighbor_ExcludesNeighborFromBroadcast()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var (mover, moverPipe) = ZoneTestKit.CreateSession(1);
+        var (neighbor, neighborPipe) = ZoneTestKit.CreateSession(2);
+
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(mover, 1, posX: 10f, posZ: 10f)));
+        zone.Post(ZoneCommand.Enter(20, ZoneTestKit.EnterData(neighbor, 1, posX: 12f, posZ: 12f)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+        ZoneTestKit.DrainOutbound(moverPipe);
+        ZoneTestKit.DrainOutbound(neighborPipe);
+
+        Assert.True(zone.TryGetPlayer(10, out var moverState));
+        Assert.True(zone.TryGetPlayer(20, out var neighborState));
+        moverState!.DungeonInstanceId = 1;
+        neighborState!.DungeonInstanceId = 2;
+
+        zone.Post(ZoneCommand.Move(10, MoveTo(10.5f, 10f)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        var moverInbox = ZoneTestKit.DrainOutbound(moverPipe);
+        Assert.Equal(OneFrame, moverInbox.Length);
+
+        Assert.Empty(ZoneTestKit.DrainOutbound(neighborPipe));
+    }
+
+    [Fact]
+    public void Move_CasterAndNeighborInSameDungeonInstance_StillBroadcasts()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var (mover, moverPipe) = ZoneTestKit.CreateSession(1);
+        var (neighbor, neighborPipe) = ZoneTestKit.CreateSession(2);
+
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(mover, 1, posX: 10f, posZ: 10f)));
+        zone.Post(ZoneCommand.Enter(20, ZoneTestKit.EnterData(neighbor, 1, posX: 12f, posZ: 12f)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+        ZoneTestKit.DrainOutbound(moverPipe);
+        ZoneTestKit.DrainOutbound(neighborPipe);
+
+        Assert.True(zone.TryGetPlayer(10, out var moverState));
+        Assert.True(zone.TryGetPlayer(20, out var neighborState));
+        moverState!.DungeonInstanceId = 7;
+        neighborState!.DungeonInstanceId = 7;
+
+        zone.Post(ZoneCommand.Move(10, MoveTo(10.5f, 10f)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        var neighborInbox = ZoneTestKit.DrainOutbound(neighborPipe);
+        Assert.Equal(OneFrame, neighborInbox.Length);
     }
 }

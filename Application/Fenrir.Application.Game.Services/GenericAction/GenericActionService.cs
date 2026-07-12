@@ -37,9 +37,11 @@ public sealed class GenericActionService(
 
     private const byte TimeExchangeOutcome = 1;
 
-    private const short NpcShopSellEventCode = 1;
+    private const short NpcShopSellDefaultEventCode = 1;
 
     private const short NpcShopBuyEventCode = 2;
+
+    private const short NpcShopSellQuantityEventCode = 3;
 
     private const byte NpcShopTradeOutcome = 1;
 
@@ -126,7 +128,8 @@ public sealed class GenericActionService(
                     equipRow.Sort);
             }
 
-            var equipOutcome = EquipItemValidationGate.Evaluate(candidate, 0,
+            var equipOutcome = EquipItemValidationGate.Evaluate(candidate,
+                EquipItemValidationGate.ItemSortClassificationNotComputed,
                 state.PreviousTribe, move.Index2, state.Level + state.Level2, state.RebirthCount);
 
             if (equipOutcome != EquipItemValidationGate.Outcome.Success)
@@ -463,6 +466,14 @@ public sealed class GenericActionService(
             return GenericActionResult.Aborted;
         }
 
+        if (page1 == ContainerMatrix.InventoryPage1 && state.InventoryDate < GameDate.Today())
+        {
+            logger.LogInformation(
+                "Character {CharacterId} NPC-shop-sell aborted: dated-vault last page expired (InventoryDate {InventoryDate})",
+                characterId, state.InventoryDate);
+            return GenericActionResult.Aborted;
+        }
+
         var sourceStack = state.Inventory.GetSlot((byte)page1, (byte)index1);
         if (sourceStack is not { } source || !worldData.ItemsById.TryGetValue(source.ItemId, out var itemDefinition))
         {
@@ -499,7 +510,10 @@ public sealed class GenericActionService(
         }
 
         var soldQuantity = source.Quantity - (resolved.RemainingSourceStack?.Quantity ?? 0);
-        await eventLog.LogAsync(NpcShopSellEventCode, EventLogCategory.NpcShopTrade, accountId, characterId,
+        var sellEventCode = NpcShopPolicy.IsStackableSellSort(itemDefinition.Item.Sort)
+            ? NpcShopSellQuantityEventCode
+            : NpcShopSellDefaultEventCode;
+        await eventLog.LogAsync(sellEventCode, EventLogCategory.NpcShopTrade, accountId, characterId,
             null, null, null, resolved.MoneyGained, null, source.ItemId, soldQuantity, NpcShopTradeOutcome, null,
             cancellationToken);
 
@@ -543,11 +557,20 @@ public sealed class GenericActionService(
         var page2 = move.Page2;
         var index2 = move.Index2;
         if (page2 is not (ContainerMatrix.InventoryPage0 or ContainerMatrix.InventoryPage1) ||
-            !ContainerMatrix.IsValidSlot((byte)page2, index2))
+            !ContainerMatrix.IsValidSlot((byte)page2, index2) ||
+            move.XPost2 is < 0 or > 7 || move.YPost2 is < 0 or > 7)
         {
             logger.LogInformation(
                 "Character {CharacterId} NPC-shop-buy aborted: invalid destination slot ({Page2}:{Index2})",
                 characterId, page2, index2);
+            return GenericActionResult.Aborted;
+        }
+
+        if (page2 == ContainerMatrix.InventoryPage1 && state.InventoryDate < GameDate.Today())
+        {
+            logger.LogInformation(
+                "Character {CharacterId} NPC-shop-buy aborted: dated-vault last page expired (InventoryDate {InventoryDate})",
+                characterId, state.InventoryDate);
             return GenericActionResult.Aborted;
         }
 
@@ -581,7 +604,7 @@ public sealed class GenericActionService(
         }
 
         var resolved = NpcShopPolicy.ResolveBuy(npc, itemDefinition, move.Quantity1, destinationSlot, state.Level,
-            zone.MapId, state.ContributionPoints);
+            state.ContributionPoints);
 
         if (!resolved.Succeeded)
         {
@@ -602,15 +625,12 @@ public sealed class GenericActionService(
         catch (Exception ex)
         {
             logger.LogWarning(ex,
-                "Character {CharacterId} NPC-shop-buy AdjustMoneyAndReplaceContainerAsync failed (treated as insufficient funds)",
+                "Character {CharacterId} NPC-shop-buy aborted: AdjustMoneyAndReplaceContainerAsync failed (insufficient funds)",
                 characterId);
             return GenericActionResult.Aborted;
         }
 
         var purchasedQuantity = resolved.NewDestinationStack!.Value.Quantity - (destinationSlot?.Quantity ?? 0);
-        await eventLog.LogAsync(NpcShopBuyEventCode, EventLogCategory.NpcShopTrade, accountId, characterId,
-            null, null, null, -(long)resolved.MoneyCost, null, itemDefinition.Item.ItemId, purchasedQuantity,
-            NpcShopTradeOutcome, null, cancellationToken);
 
         var containers = ImmutableArray.Create(new InventoryContainerSnapshot((byte)page2, projectedContainer));
         if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
@@ -619,13 +639,21 @@ public sealed class GenericActionService(
                 "Zone {MapId} inventory inbox full: dropped NPC-buy mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
 
+        var contributionPointsAfter = state.ContributionPoints - resolved.CpCost;
         if (resolved.CpCost > 0 &&
             !await zone.PostTribeProgressCommandAndWaitAsync(
-                new TribeProgressZoneCommand(characterId, state.ContributionPoints - resolved.CpCost),
+                new TribeProgressZoneCommand(characterId, contributionPointsAfter),
                 cancellationToken))
             logger.LogError(
                 "Zone {MapId} tribe-progress inbox full: dropped CP mirror for character {CharacterId} after NPC-shop-buy",
                 zone.MapId, characterId);
+
+        var auditPayload = resolved.CpCost > 0
+            ? $"ContributionPointsBefore={state.ContributionPoints};ContributionPointsAfter={contributionPointsAfter}"
+            : null;
+        await eventLog.LogAsync(NpcShopBuyEventCode, EventLogCategory.NpcShopTrade, accountId, characterId,
+            null, null, null, -(long)resolved.MoneyCost, null, itemDefinition.Item.ItemId, purchasedQuantity,
+            NpcShopTradeOutcome, auditPayload, cancellationToken);
 
         logger.LogInformation(
             "Character {CharacterId} NPC-shop-buy applied: item {ItemId} x{PurchasedQuantity}, money -{MoneyCost}, CP -{CpCost}",
@@ -1232,6 +1260,37 @@ public sealed class GenericActionService(
             characterId, accruedMinutes, teacherPointsGranted, grantedPetGrowth);
 
         return new GenericActionResult(GenericActionStatus.Succeeded, GrantedPetExperienceGrowth: grantedPetGrowth);
+    }
+
+    public async ValueTask<GenericActionResult> ExchangeMeritForContributionPointsAsync(int requestedUnits,
+        Zone zone, PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
+    {
+        var outcome = MeritContributionPointExchangeResolver.Evaluate(requestedUnits, state.Level,
+            state.TeacherPoint);
+
+        if (outcome != MeritContributionPointExchangeOutcome.Success)
+        {
+            logger.LogInformation(
+                "Character {CharacterId} Merit-to-CP exchange aborted: {Outcome} (requestedUnits {RequestedUnits}, level {Level}, teacherPoint {TeacherPoint})",
+                characterId, outcome, requestedUnits, state.Level, state.TeacherPoint);
+            return GenericActionResult.Aborted;
+        }
+
+        var teacherPointCost = requestedUnits * MeritContributionPointExchangeResolver.TeacherPointCostPerUnit;
+        var newTeacherPoint = state.TeacherPoint - teacherPointCost;
+        var newContributionPoints = Math.Max(0, state.ContributionPoints + requestedUnits);
+
+        if (!await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
+                TeacherPoint: newTeacherPoint, ContributionPoints: newContributionPoints), cancellationToken))
+            logger.LogError(
+                "Zone {MapId} tribe-progress inbox full: dropped Merit-to-CP exchange mirror for character {CharacterId}",
+                zone.MapId, characterId);
+
+        logger.LogInformation(
+            "Character {CharacterId} Merit-to-CP exchange applied: -{TeacherPointCost} teacher points, +{RequestedUnits} contribution points",
+            characterId, teacherPointCost, requestedUnits);
+
+        return GenericActionResult.Succeeded;
     }
 
     private bool TryTradeDeposit(DefaultPData move, PlayerRuntimeState state, TradeOfferSide side,

@@ -21,6 +21,8 @@ public static class EquipItemValidationGate
 
     public const int SkipSlotCheck = -1;
 
+    public const int ItemSortClassificationNotComputed = 0;
+
     private const int MinSlotIndex = 0;
     private const int MaxSlotIndex = 12;
 

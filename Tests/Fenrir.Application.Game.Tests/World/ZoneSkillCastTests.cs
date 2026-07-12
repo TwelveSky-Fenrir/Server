@@ -9,6 +9,7 @@ using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.Abstractions.World;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
+using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.World;
 
@@ -50,6 +51,16 @@ public class ZoneSkillCastTests
         var grade0 = new SkillGradeRowDto(106, 0, manaUse, healAmount, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 0);
         var grade1 = new SkillGradeRowDto(106, 1, manaUse, healAmount, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0);
+        return new SkillDefinition(row, ImmutableArray<SkillDescriptionRowDto>.Empty, [grade0, grade1]);
+    }
+
+    private static SkillDefinition HealManaSkill(byte maxUpgradePoint, short manaUse, byte healAmount)
+    {
+        var row = new SkillRowDto(107, "Mana Heal", 0, 0, 0, 0, 0, 1, maxUpgradePoint, 1, 0);
+        var grade0 = new SkillGradeRowDto(107, 0, manaUse, 0, healAmount, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0);
+        var grade1 = new SkillGradeRowDto(107, 1, manaUse, 0, healAmount, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 0);
         return new SkillDefinition(row, ImmutableArray<SkillDescriptionRowDto>.Empty, [grade0, grade1]);
     }
@@ -197,7 +208,7 @@ public class ZoneSkillCastTests
     }
 
     [Fact]
-    public void SecondCastWithinSameLegacyTick_IsRejectedByTheAntiFloodGate()
+    public void RepeatedCastWithinSameLegacyTick_ChargesManaIndependentlyEachTime()
     {
         var skillsById = new Dictionary<int, SkillDefinition>
         {
@@ -219,7 +230,35 @@ public class ZoneSkillCastTests
         zone.Post(ZoneCommand.Move(10, SkillCastStartAction(82, 10)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
-        Assert.Equal(manaBefore - 10, state.Mana);
+        Assert.Equal(manaBefore - 20, state.Mana);
+    }
+
+    [Fact]
+    public void RepeatedCastWithinSameLegacyTick_SecondChargeSilentlyDroppedWhenManaExhausted()
+    {
+        var skillsById = new Dictionary<int, SkillDefinition>
+        {
+            [82] = HolyShieldSkill(10, 200, 20, 40)
+        }.ToFrozenDictionary();
+        var worldData = ZoneTestKit.EmptyWorldData(skillsById: skillsById);
+        var zone = ZoneTestKit.CreateZone(1, worldData: worldData);
+        var (session, _) = ZoneTestKit.CreateSession(1);
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(10, out var state));
+        var manaBefore = state!.Mana;
+        SeedSkillHotkey(state, 82, 10);
+
+        zone.Post(ZoneCommand.Move(10, SkillCastStartAction(82, 10)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Equal(manaBefore - 200, state.Mana);
+
+        zone.Post(ZoneCommand.Move(10, SkillCastStartAction(82, 10)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Equal(manaBefore - 200, state.Mana);
     }
 
     [Fact]
@@ -318,6 +357,7 @@ public class ZoneSkillCastTests
 
         Assert.True(zone.TryGetPlayer(20, out var target));
         target!.Life = 700;
+        target.ActionSort = 1;
         Assert.True(zone.TryGetPlayer(10, out var healer));
         SeedSkillHotkey(healer!, 106, 10);
 
@@ -347,6 +387,7 @@ public class ZoneSkillCastTests
 
         Assert.True(zone.TryGetPlayer(20, out var target));
         target!.Life = 800;
+        target.ActionSort = 1;
         Assert.True(zone.TryGetPlayer(10, out var healer));
         SeedSkillHotkey(healer!, 106, 10);
 
@@ -357,5 +398,270 @@ public class ZoneSkillCastTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.Equal(840, target.Life);
+    }
+
+    [Fact]
+    public async Task TargetedHeal_Success_SendsCasterEffectSnapshotButNoTargetPacket()
+    {
+        var skillsById = new Dictionary<int, SkillDefinition>
+        {
+            [106] = HealLifeSkill(10, 5, 100)
+        }.ToFrozenDictionary();
+        var worldData = ZoneTestKit.EmptyWorldData(skillsById: skillsById);
+        var zone = ZoneTestKit.CreateZone(1, worldData: worldData);
+        var (healerSession, healerPipe) = ZoneTestKit.CreateSession(1);
+        var (targetSession, targetPipe) = ZoneTestKit.CreateSession(2);
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(healerSession, 1, "Healer")));
+        zone.Post(ZoneCommand.Enter(20, ZoneTestKit.EnterData(targetSession, 1, "Target")));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(20, out var target));
+        target!.Life = 700;
+        target.ActionSort = 1;
+        Assert.True(zone.TryGetPlayer(10, out var healer));
+        SeedSkillHotkey(healer!, 106, 10);
+
+        zone.Post(ZoneCommand.Move(10, SkillCastStartAction(106, 10)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        ZoneTestKit.DrainOutbound(healerPipe);
+        ZoneTestKit.DrainOutbound(targetPipe);
+
+        zone.Post(ZoneCommand.Move(10, SkillEffectConfirmAction(106, 10, 20), true));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Equal(800, target.Life);
+
+        await PacketAssert.AssertSentAsync(healerPipe, new AvatarEffectStateResponse
+        {
+            ServerIndex = healer!.CharacterId,
+            UniqueNumber = healer.UniqueNumber,
+            EffectValue = healer.Buffs.Buff,
+            EffectValueState = new int[35]
+        });
+
+        PacketAssert.AssertNothingSent(targetPipe);
+    }
+
+    [Fact]
+    public void TargetedHeal_SelfTarget_IsRejected()
+    {
+        var skillsById = new Dictionary<int, SkillDefinition>
+        {
+            [106] = HealLifeSkill(10, 5, 100)
+        }.ToFrozenDictionary();
+        var worldData = ZoneTestKit.EmptyWorldData(skillsById: skillsById);
+        var zone = ZoneTestKit.CreateZone(1, worldData: worldData);
+        var (healerSession, _) = ZoneTestKit.CreateSession(1);
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(healerSession, 1, "Healer")));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(10, out var healer));
+        healer!.Life = 700;
+        healer.ActionSort = 1;
+        SeedSkillHotkey(healer, 106, 10);
+
+        zone.Post(ZoneCommand.Move(10, SkillCastStartAction(106, 10)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        zone.Post(ZoneCommand.Move(10, SkillEffectConfirmAction(106, 10, 10), true));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Equal(700, healer.Life);
+    }
+
+    [Fact]
+    public void TargetedHeal_TargetAlreadyAtMaxLife_IsRejected()
+    {
+        var skillsById = new Dictionary<int, SkillDefinition>
+        {
+            [106] = HealLifeSkill(10, 5, 100)
+        }.ToFrozenDictionary();
+        var worldData = ZoneTestKit.EmptyWorldData(skillsById: skillsById);
+        var zone = ZoneTestKit.CreateZone(1, worldData: worldData);
+        var (healerSession, _) = ZoneTestKit.CreateSession(1);
+        var (targetSession, _) = ZoneTestKit.CreateSession(2);
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(healerSession, 1, "Healer")));
+        zone.Post(ZoneCommand.Enter(20, ZoneTestKit.EnterData(targetSession, 1, "Target")));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(20, out var target));
+        target!.Life = target.MaxLife;
+        target.ActionSort = 1;
+        Assert.True(zone.TryGetPlayer(10, out var healer));
+        SeedSkillHotkey(healer!, 106, 10);
+
+        zone.Post(ZoneCommand.Move(10, SkillCastStartAction(106, 10)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        zone.Post(ZoneCommand.Move(10, SkillEffectConfirmAction(106, 10, 20), true));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Equal(target.MaxLife, target.Life);
+    }
+
+    [Fact]
+    public void TargetedHeal_TargetRunningPersonalShop_IsRejected()
+    {
+        var skillsById = new Dictionary<int, SkillDefinition>
+        {
+            [106] = HealLifeSkill(10, 5, 100)
+        }.ToFrozenDictionary();
+        var worldData = ZoneTestKit.EmptyWorldData(skillsById: skillsById);
+        var zone = ZoneTestKit.CreateZone(1, worldData: worldData);
+        var (healerSession, _) = ZoneTestKit.CreateSession(1);
+        var (targetSession, _) = ZoneTestKit.CreateSession(2);
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(healerSession, 1, "Healer")));
+        zone.Post(ZoneCommand.Enter(20, ZoneTestKit.EnterData(targetSession, 1, "Target")));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(20, out var target));
+        target!.Life = 700;
+        target.ActionSort = 1;
+        target.PshopOpen = true;
+        Assert.True(zone.TryGetPlayer(10, out var healer));
+        SeedSkillHotkey(healer!, 106, 10);
+
+        zone.Post(ZoneCommand.Move(10, SkillCastStartAction(106, 10)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        zone.Post(ZoneCommand.Move(10, SkillEffectConfirmAction(106, 10, 20), true));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Equal(700, target.Life);
+    }
+
+    [Fact]
+    public void TargetedHeal_TargetStunned_IsRejected()
+    {
+        var skillsById = new Dictionary<int, SkillDefinition>
+        {
+            [106] = HealLifeSkill(10, 5, 100)
+        }.ToFrozenDictionary();
+        var worldData = ZoneTestKit.EmptyWorldData(skillsById: skillsById);
+        var zone = ZoneTestKit.CreateZone(1, worldData: worldData);
+        var (healerSession, _) = ZoneTestKit.CreateSession(1);
+        var (targetSession, _) = ZoneTestKit.CreateSession(2);
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(healerSession, 1, "Healer")));
+        zone.Post(ZoneCommand.Enter(20, ZoneTestKit.EnterData(targetSession, 1, "Target")));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(20, out var target));
+        target!.Life = 700;
+        target.ActionSort = 1;
+        target.IsStunned = true;
+        Assert.True(zone.TryGetPlayer(10, out var healer));
+        SeedSkillHotkey(healer!, 106, 10);
+
+        zone.Post(ZoneCommand.Move(10, SkillCastStartAction(106, 10)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        zone.Post(ZoneCommand.Move(10, SkillEffectConfirmAction(106, 10, 20), true));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Equal(700, target.Life);
+    }
+
+    [Fact]
+    public void TargetedHeal_TargetNeverActed_FailsGeneralTargetLegitimacyCheck()
+    {
+        var skillsById = new Dictionary<int, SkillDefinition>
+        {
+            [106] = HealLifeSkill(10, 5, 100)
+        }.ToFrozenDictionary();
+        var worldData = ZoneTestKit.EmptyWorldData(skillsById: skillsById);
+        var zone = ZoneTestKit.CreateZone(1, worldData: worldData);
+        var (healerSession, _) = ZoneTestKit.CreateSession(1);
+        var (targetSession, _) = ZoneTestKit.CreateSession(2);
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(healerSession, 1, "Healer")));
+        zone.Post(ZoneCommand.Enter(20, ZoneTestKit.EnterData(targetSession, 1, "Target")));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(20, out var target));
+        target!.Life = 700;
+        Assert.True(zone.TryGetPlayer(10, out var healer));
+        SeedSkillHotkey(healer!, 106, 10);
+
+        zone.Post(ZoneCommand.Move(10, SkillCastStartAction(106, 10)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        zone.Post(ZoneCommand.Move(10, SkillEffectConfirmAction(106, 10, 20), true));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Equal(700, target.Life);
+    }
+
+    [Fact]
+    public async Task TargetedHealMana_Success_RestoresManaAndBroadcastsToTargetAndCaster()
+    {
+        var skillsById = new Dictionary<int, SkillDefinition>
+        {
+            [107] = HealManaSkill(10, 5, 100)
+        }.ToFrozenDictionary();
+        var worldData = ZoneTestKit.EmptyWorldData(skillsById: skillsById);
+        var zone = ZoneTestKit.CreateZone(1, worldData: worldData);
+        var (healerSession, healerPipe) = ZoneTestKit.CreateSession(1);
+        var (targetSession, targetPipe) = ZoneTestKit.CreateSession(2);
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(healerSession, 1, "Healer")));
+        zone.Post(ZoneCommand.Enter(20, ZoneTestKit.EnterData(targetSession, 1, "Target")));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(20, out var target));
+        target!.Mana = 200;
+        target.ActionSort = 1;
+        Assert.True(zone.TryGetPlayer(10, out var healer));
+        SeedSkillHotkey(healer!, 107, 10);
+
+        zone.Post(ZoneCommand.Move(10, SkillCastStartAction(107, 10)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        ZoneTestKit.DrainOutbound(healerPipe);
+        ZoneTestKit.DrainOutbound(targetPipe);
+
+        zone.Post(ZoneCommand.Move(10, SkillEffectConfirmAction(107, 10, 20), true));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Equal(300, target.Mana);
+
+        await PacketAssert.AssertSentAsync(healerPipe, new AvatarEffectStateResponse
+        {
+            ServerIndex = healer!.CharacterId,
+            UniqueNumber = healer.UniqueNumber,
+            EffectValue = healer.Buffs.Buff,
+            EffectValueState = new int[35]
+        });
+
+        await PacketAssert.AssertSentAsync(targetPipe,
+            new AvatarStatUpdateResponse { Sort = 11, Value = 300, Value2 = 0 });
+    }
+
+    [Fact]
+    public void TargetedHealMana_ClampsToMaxMana()
+    {
+        var skillsById = new Dictionary<int, SkillDefinition>
+        {
+            [107] = HealManaSkill(10, 5, 100)
+        }.ToFrozenDictionary();
+        var worldData = ZoneTestKit.EmptyWorldData(skillsById: skillsById);
+        var zone = ZoneTestKit.CreateZone(1, worldData: worldData);
+        var (healerSession, _) = ZoneTestKit.CreateSession(1);
+        var (targetSession, _) = ZoneTestKit.CreateSession(2);
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(healerSession, 1, "Healer")));
+        zone.Post(ZoneCommand.Enter(20, ZoneTestKit.EnterData(targetSession, 1, "Target")));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(20, out var target));
+        target!.Mana = 300;
+        target.ActionSort = 1;
+        Assert.True(zone.TryGetPlayer(10, out var healer));
+        SeedSkillHotkey(healer!, 107, 10);
+
+        zone.Post(ZoneCommand.Move(10, SkillCastStartAction(107, 10)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        zone.Post(ZoneCommand.Move(10, SkillEffectConfirmAction(107, 10, 20), true));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Equal(320, target.Mana);
     }
 }

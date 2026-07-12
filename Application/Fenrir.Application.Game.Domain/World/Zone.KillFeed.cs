@@ -83,7 +83,7 @@ public sealed partial class Zone
             foreach (var player in _players.Values)
                 try
                 {
-                    if (player.Session is ClientSession clientSession)
+                    if (TryGetZoneWideBroadcastRecipient(player.CharacterId, out var clientSession))
                         clientSession.SendRaw(span);
                 }
                 catch (Exception ex)

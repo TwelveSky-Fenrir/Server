@@ -139,7 +139,7 @@ public sealed class MonsterSpawnScheduler(
         var state = _stateByZone[zone.MapId];
         var region = slot.Region;
         var angle = state.Random.NextDouble() * (Math.PI * 2);
-        var scatter = (float)(state.Random.NextDouble() * region.Radius);
+        var scatter = (float)(state.Random.NextDouble() * Math.Max(0, region.Radius));
         var x = region.LocationX + (float)(Math.Cos(angle) * scatter);
         var z = region.LocationZ + (float)(Math.Sin(angle) * scatter);
         var y = (float)region.LocationY;

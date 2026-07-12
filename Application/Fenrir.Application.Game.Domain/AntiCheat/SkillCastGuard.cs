@@ -17,38 +17,71 @@ public enum SkillCastOffense : byte
     SkillHack1 = 4
 }
 
+public enum SkillCastEnforcement : byte
+{
+    None = 0,
+
+    SilentDrop = 1,
+
+    Disconnect = 2
+}
+
+public readonly record struct SkillCastVerdict(SkillCastOffense Offense, SkillCastEnforcement Enforcement)
+{
+    public static readonly SkillCastVerdict Passed = new(SkillCastOffense.None, SkillCastEnforcement.None);
+}
+
 public static class SkillCastGuard
 {
-    private const int HotkeyMatchCategory = 1;
+    public const int HotkeyBoundCategoryCode = 1;
 
-    private const int SkillEffectCategory = 2;
+    public const int SkillEffectCategoryCode = 2;
 
-    public static SkillCastOffense Evaluate(in SkillCastGuardContext context)
+    public static SkillCastVerdict Evaluate(in SkillCastGuardContext context)
     {
-        if (context.SkillCategoryCode is not (HotkeyMatchCategory or SkillEffectCategory))
-            return SkillCastOffense.None;
+        var preCastVerdict = EvaluatePreCast(context);
+        return preCastVerdict.Offense != SkillCastOffense.None ? preCastVerdict : EvaluatePostCast(context);
+    }
 
-        var isAutoLearnedBranch = context.SkillCategoryCode == SkillEffectCategory && context.IsAutoState;
+    public static SkillCastVerdict EvaluatePreCast(in SkillCastGuardContext context)
+    {
+        if (context.SkillCategoryCode is not (HotkeyBoundCategoryCode or SkillEffectCategoryCode))
+            return SkillCastVerdict.Passed;
+
+        var isAutoLearnedBranch = context.SkillCategoryCode == SkillEffectCategoryCode && context.IsAutoState;
 
         if (isAutoLearnedBranch)
         {
             if (!HasMatchingLearnedSkill(context.LearnedSkills, context.ClaimedSkillNumber))
-                return SkillCastOffense.LearnedSkillMissing;
+                return new SkillCastVerdict(SkillCastOffense.LearnedSkillMissing, SkillCastEnforcement.Disconnect);
         }
         else if (!HasMatchingActiveHotkey(context.Hotkeys, context.ClaimedSkillNumber, context.ClaimedInvestedGrade))
         {
-            return SkillCastOffense.HotkeyMismatch;
+            return new SkillCastVerdict(SkillCastOffense.HotkeyMismatch, SkillCastEnforcement.Disconnect);
         }
 
         if (context.ClaimedBonusGrade != context.ServerBonusGrade)
-            return SkillCastOffense.BonusGradeMismatch;
+        {
+            var enforcement = context.SkillCategoryCode == HotkeyBoundCategoryCode
+                ? SkillCastEnforcement.Disconnect
+                : SkillCastEnforcement.SilentDrop;
+            return new SkillCastVerdict(SkillCastOffense.BonusGradeMismatch, enforcement);
+        }
+
+        return SkillCastVerdict.Passed;
+    }
+
+    public static SkillCastVerdict EvaluatePostCast(in SkillCastGuardContext context)
+    {
+        if (context.SkillCategoryCode is not (HotkeyBoundCategoryCode or SkillEffectCategoryCode))
+            return SkillCastVerdict.Passed;
 
         if (context.IsRealSkillCast &&
             (context.ClaimedInvestedGrade > context.ServerMaxGrade ||
              context.ClaimedBonusGrade > context.ServerBonusGrade))
-            return SkillCastOffense.SkillHack1;
+            return new SkillCastVerdict(SkillCastOffense.SkillHack1, SkillCastEnforcement.Disconnect);
 
-        return SkillCastOffense.None;
+        return SkillCastVerdict.Passed;
     }
 
     private static bool HasMatchingActiveHotkey(ImmutableDictionary<(byte Page, byte Index), HotkeySlot> hotkeys,

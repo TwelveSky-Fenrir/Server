@@ -249,7 +249,7 @@ public sealed class PartyRegistry
             {
                 if (!existing.TryAddMember(inviteeId))
                 {
-                    members = [];
+                    members = existing.Members.ToArray();
                     return PartyJoinOutcome.PartyWasFull;
                 }
 

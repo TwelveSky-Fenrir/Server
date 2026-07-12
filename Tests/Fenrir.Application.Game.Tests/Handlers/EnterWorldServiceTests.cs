@@ -116,7 +116,9 @@ public class EnterWorldServiceTests
         var (session, pipe) = ZoneTestKit.CreateSession(1);
         session.MarkTicketConsumed(AccountId, CharacterId);
 
-        await service.HandleAsync(ValidRequest(EncodeObfuscatedAccountId(AccountId)), session, CancellationToken.None);
+        await service.HandleAsync(
+            ValidRequest(EncodeObfuscatedAccountId(AccountId), PosX, PosY, PosZ),
+            session, CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
 
@@ -146,8 +148,8 @@ public class EnterWorldServiceTests
         var selfSpawnFrameSize = FrameWriter.FrameSizeOf<AvatarActionResponse>();
 
         var allSent = await ReadExactlyAsync(pipe,
-            expectedEnterWorldBytes.Length + expectedWorldSnapshotBytes.Length + towerStatusFrameSize +
-            selfSpawnFrameSize);
+            expectedEnterWorldBytes.Length + expectedWorldSnapshotBytes.Length + selfSpawnFrameSize +
+            towerStatusFrameSize);
 
         var enterWorldActual = allSent.AsSpan(0, expectedEnterWorldBytes.Length).ToArray();
         Assert.Equal(expectedEnterWorldBytes, enterWorldActual);
@@ -156,15 +158,8 @@ public class EnterWorldServiceTests
             .AsSpan(expectedEnterWorldBytes.Length, expectedWorldSnapshotBytes.Length).ToArray();
         Assert.Equal(expectedWorldSnapshotBytes, worldSnapshotActual);
 
-        var towerStatusActual = allSent
-            .AsSpan(expectedEnterWorldBytes.Length + expectedWorldSnapshotBytes.Length, towerStatusFrameSize)
-            .ToArray();
-        Assert.Equal(expectedTowerStatusBytes, towerStatusActual);
-
         var selfSpawnActual = allSent
-            .AsSpan(
-                expectedEnterWorldBytes.Length + expectedWorldSnapshotBytes.Length + towerStatusFrameSize,
-                selfSpawnFrameSize)
+            .AsSpan(expectedEnterWorldBytes.Length + expectedWorldSnapshotBytes.Length, selfSpawnFrameSize)
             .ToArray();
         var selfSpawnPayload = selfSpawnActual.AsSpan(1);
         Assert.True(ObjectForAvatar.TryRead(selfSpawnPayload.Slice(8, ObjectForAvatar.WireSize),
@@ -172,6 +167,13 @@ public class EnterWorldServiceTests
         Assert.Equal(PreviousTribe, selfSpawnData.PreviousTribe);
         Assert.Equal([PosX, PosY, PosZ], selfSpawnData.PetLocation);
         Assert.Equal(ExpectedEffectValueForView(buffs), selfSpawnData.EffectValueForView);
+
+        var towerStatusActual = allSent
+            .AsSpan(
+                expectedEnterWorldBytes.Length + expectedWorldSnapshotBytes.Length + selfSpawnFrameSize,
+                towerStatusFrameSize)
+            .ToArray();
+        Assert.Equal(expectedTowerStatusBytes, towerStatusActual);
     }
 
     [Fact]
@@ -626,7 +628,8 @@ public class EnterWorldServiceTests
         return Encoding.Latin1.GetString(bytes);
     }
 
-    private static EnterWorldRequest ValidRequest(string? id = null)
+    private static EnterWorldRequest ValidRequest(string? id = null, float claimedPosX = 0f, float claimedPosY = 0f,
+        float claimedPosZ = 0f, float claimedFront = 0f)
     {
         return new EnterWorldRequest
         {
@@ -637,10 +640,10 @@ public class EnterWorldServiceTests
                 Type = 0,
                 Sort = 0,
                 Frame = 0,
-                Location = new float[3],
-                TargetLocation = new float[3],
-                Front = 0,
-                TargetFront = 0,
+                Location = [claimedPosX, claimedPosY, claimedPosZ],
+                TargetLocation = [claimedPosX, claimedPosY, claimedPosZ],
+                Front = claimedFront,
+                TargetFront = claimedFront,
                 PetLocation = new float[3],
                 PetTargetLocation = new float[3],
                 PetFront = 0,

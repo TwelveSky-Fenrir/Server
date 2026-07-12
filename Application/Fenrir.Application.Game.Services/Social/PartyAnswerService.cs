@@ -82,7 +82,8 @@ public sealed class PartyAnswerService(
             logger.LogDebug(
                 "Party invite accepted but not joined: inviter {InviterId}'s party was already full when character {InviteeId} answered",
                 inviterId, inviteeId);
-            return new PartyAnswerResult(PartyAnswerResultKind.Answered, inviterId, true, joinOutcome, []);
+            return new PartyAnswerResult(PartyAnswerResultKind.Answered, inviterId, true, joinOutcome,
+                parties.GetMembers(inviterId));
         }
 
         var members = parties.GetMembers(inviterId);

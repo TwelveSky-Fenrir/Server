@@ -41,6 +41,17 @@ public class CombatResolverTests
         };
     }
 
+    private static AttackForProtocol ModeRequest(int attackerId, int defenderId, int attackActionValue1,
+        int attackActionValue2 = 0, int attackActionValue3 = 0)
+    {
+        return MeleeRequest(attackerId, defenderId) with
+        {
+            AttackActionValue1 = attackActionValue1,
+            AttackActionValue2 = attackActionValue2,
+            AttackActionValue3 = attackActionValue3
+        };
+    }
+
     [Fact]
     public void SameCharacter_IsRejected()
     {
@@ -383,6 +394,86 @@ public class CombatResolverTests
         Assert.Equal(160, outcome.ViewDamage);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(3)]
+    [InlineData(99)]
+    public void InvalidAttackModeSelector_IsRejected_RegardlessOfReplayGuard(int attackActionValue1)
+    {
+        var attacker = Combatant(1, 0, 1000);
+        var defender = Combatant(2, 1, defensePower: 200);
+        var request = ModeRequest(1, 2, attackActionValue1);
+        var outcome = CombatResolver.ResolveEnemyTribeAttack(attacker, defender, request, TimeSpan.Zero, null,
+            new ScriptedRandomSource(0, 0));
+        Assert.True(outcome.Rejected);
+        Assert.Equal(AttackRejectReason.InvalidAttackModeSelector, outcome.RejectReason);
+    }
+
+    [Fact]
+    public void SkillAttack_ReplayGuardEnforced_MatchingSkillAndGrade_IsNotRejected()
+    {
+        var attacker = Combatant(1, 0, 1000);
+        var defender = Combatant(2, 1, defensePower: 200);
+        var request = ModeRequest(1, 2, 2, 100, 10);
+        var outcome = CombatResolver.ResolveEnemyTribeAttack(attacker, defender, request, TimeSpan.Zero, null,
+            new ScriptedRandomSource(0, 0), attackerAttackBudgetEnforced: true, attackerActionSkillNumber: 100,
+            attackerActionSkillGradePoints: 10);
+        Assert.False(outcome.Rejected);
+        Assert.True(outcome.Hit);
+    }
+
+    [Fact]
+    public void SkillAttack_ReplayGuardEnforced_SkillNumberMismatch_IsRejected()
+    {
+        var attacker = Combatant(1, 0, 1000);
+        var defender = Combatant(2, 1, defensePower: 200);
+        var request = ModeRequest(1, 2, 2, 101, 10);
+        var outcome = CombatResolver.ResolveEnemyTribeAttack(attacker, defender, request, TimeSpan.Zero, null,
+            new ScriptedRandomSource(0, 0), attackerAttackBudgetEnforced: true, attackerActionSkillNumber: 100,
+            attackerActionSkillGradePoints: 10);
+        Assert.True(outcome.Rejected);
+        Assert.Equal(AttackRejectReason.AntiCheatEchoMismatch, outcome.RejectReason);
+    }
+
+    [Fact]
+    public void SkillAttack_ReplayGuardEnforced_GradeSumMismatch_IsRejected()
+    {
+        var attacker = Combatant(1, 0, 1000);
+        var defender = Combatant(2, 1, defensePower: 200);
+        var request = ModeRequest(1, 2, 2, 100, 11);
+        var outcome = CombatResolver.ResolveEnemyTribeAttack(attacker, defender, request, TimeSpan.Zero, null,
+            new ScriptedRandomSource(0, 0), attackerAttackBudgetEnforced: true, attackerActionSkillNumber: 100,
+            attackerActionSkillGradePoints: 10);
+        Assert.True(outcome.Rejected);
+        Assert.Equal(AttackRejectReason.AntiCheatEchoMismatch, outcome.RejectReason);
+    }
+
+    [Fact]
+    public void SkillAttack_ReplayGuardNotEnforced_MismatchIsIgnored()
+    {
+        var attacker = Combatant(1, 0, 1000);
+        var defender = Combatant(2, 1, defensePower: 200);
+        var request = ModeRequest(1, 2, 2, 999, 999);
+        var outcome = CombatResolver.ResolveEnemyTribeAttack(attacker, defender, request, TimeSpan.Zero, null,
+            new ScriptedRandomSource(0, 0), attackerAttackBudgetEnforced: false, attackerActionSkillNumber: 100,
+            attackerActionSkillGradePoints: 10);
+        Assert.False(outcome.Rejected);
+        Assert.True(outcome.Hit);
+    }
+
+    [Fact]
+    public void PlainHit_ReplayGuardEnforced_SkillFieldsIgnored_NeverRejected()
+    {
+        var attacker = Combatant(1, 0, 1000);
+        var defender = Combatant(2, 1, defensePower: 200);
+        var request = ModeRequest(1, 2, 1, 999, 999);
+        var outcome = CombatResolver.ResolveEnemyTribeAttack(attacker, defender, request, TimeSpan.Zero, null,
+            new ScriptedRandomSource(0, 0), attackerAttackBudgetEnforced: true, attackerActionSkillNumber: 100,
+            attackerActionSkillGradePoints: 10);
+        Assert.False(outcome.Rejected);
+        Assert.True(outcome.Hit);
+    }
+
     private static AttackForProtocol DuelRequest(int attackerId, int defenderId)
     {
         return new AttackForProtocol
@@ -513,5 +604,71 @@ public class CombatResolverTests
             new ScriptedRandomSource(0, 0), true, false, 2);
         Assert.Equal(200_000, outcome.ViewDamage);
         Assert.Equal(50, outcome.DamageApplied);
+    }
+
+    [Fact]
+    public void Duel_SkillAttack_ReplayGuardEnforced_MatchingSkillAndGrade_IsNotRejected()
+    {
+        var attacker = Combatant(1, 0, 1000);
+        var defender = Combatant(2, 0, defensePower: 200);
+        var request = DuelRequest(1, 2) with
+        {
+            AttackActionValue1 = 2, AttackActionValue2 = 100, AttackActionValue3 = 10
+        };
+        var outcome = CombatResolver.ResolveDuelAttack(attacker, defender, request, TimeSpan.Zero, null,
+            new ScriptedRandomSource(0, 0), true, false, 2, attackerAttackBudgetEnforced: true,
+            attackerActionSkillNumber: 100, attackerActionSkillGradePoints: 10);
+        Assert.False(outcome.Rejected);
+        Assert.True(outcome.Hit);
+    }
+
+    [Fact]
+    public void Duel_SkillAttack_ReplayGuardEnforced_Mismatch_IsRejected()
+    {
+        var attacker = Combatant(1, 0, 1000);
+        var defender = Combatant(2, 0, defensePower: 200);
+        var request = DuelRequest(1, 2) with
+        {
+            AttackActionValue1 = 2, AttackActionValue2 = 101, AttackActionValue3 = 10
+        };
+        var outcome = CombatResolver.ResolveDuelAttack(attacker, defender, request, TimeSpan.Zero, null,
+            new ScriptedRandomSource(0, 0), true, false, 2, attackerAttackBudgetEnforced: true,
+            attackerActionSkillNumber: 100, attackerActionSkillGradePoints: 10);
+        Assert.True(outcome.Rejected);
+        Assert.Equal(AttackRejectReason.AntiCheatEchoMismatch, outcome.RejectReason);
+    }
+
+    [Fact]
+    public void Duel_InvalidAttackModeSelector_IsRejected()
+    {
+        var attacker = Combatant(1, 0, 1000);
+        var defender = Combatant(2, 0, defensePower: 200);
+        var request = DuelRequest(1, 2) with { AttackActionValue1 = 7 };
+        var outcome = CombatResolver.ResolveDuelAttack(attacker, defender, request, TimeSpan.Zero, null,
+            new ScriptedRandomSource(0, 0), true, false, 2);
+        Assert.True(outcome.Rejected);
+        Assert.Equal(AttackRejectReason.InvalidAttackModeSelector, outcome.RejectReason);
+    }
+
+    [Fact]
+    public void Duel_Zone124Override_ForcesCriticalAndTriplesDamage_WithNoCriticalRollInvolved()
+    {
+        var attacker = Combatant(1, 0, 1000);
+        var defender = Combatant(2, 0, defensePower: 200);
+        var outcome = CombatResolver.ResolveDuelAttack(attacker, defender, DuelRequest(1, 2), TimeSpan.Zero, null,
+            new ScriptedRandomSource(0, 0), true, false, 2, zone124OverrideActive: true);
+        Assert.True(outcome.Critical);
+        Assert.Equal(480, outcome.DamageApplied);
+    }
+
+    [Fact]
+    public void Duel_Zone124Override_CompoundsWithAnOrdinaryCriticalRoll_ToASixfoldMultiplier()
+    {
+        var attacker = Combatant(1, 0, 1000, critical: 100);
+        var defender = Combatant(2, 0, defensePower: 200, criticalDefence: 0);
+        var outcome = CombatResolver.ResolveDuelAttack(attacker, defender, DuelRequest(1, 2), TimeSpan.Zero, null,
+            new ScriptedRandomSource(0, 0, 50), true, false, 2, zone124OverrideActive: true);
+        Assert.True(outcome.Critical);
+        Assert.Equal(960, outcome.DamageApplied);
     }
 }

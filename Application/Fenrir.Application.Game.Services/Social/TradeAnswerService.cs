@@ -46,9 +46,23 @@ public sealed class TradeAnswerService(
             return new TradeAnswerResult(false, 0);
         }
 
-        if (!trades.TryAnswer(targetId, answer == 0, out var askerId))
+        if (!trades.TryPeekPending(targetId, out var pendingAskerId, out var isAsker) || isAsker)
         {
             logger.LogDebug("Trade answer ignored: character {TargetId} has no pending ask", targetId);
+            return new TradeAnswerResult(false, 0);
+        }
+
+        var askerBusyByZoneTransfer = !zones.TryGetPlayer(pendingAskerId, out var asker) || asker.IsMovingZone;
+
+        if (!trades.TryAnswer(targetId, answer == 0, askerBusyByZoneTransfer, out var askerId, out var guardBlocked))
+        {
+            if (guardBlocked)
+                logger.LogDebug(
+                    "Trade answer: character {TargetId} answered but asker {AskerId} is unreachable or mid zone-transfer -- no notice sent, asker's own record left as-is",
+                    targetId, askerId);
+            else
+                logger.LogDebug("Trade answer ignored: character {TargetId} has no pending ask", targetId);
+
             return new TradeAnswerResult(false, 0);
         }
 

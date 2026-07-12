@@ -13,13 +13,16 @@ public static class CombatResolver
 
     public const int ProtectTickLegacyTicks = 20;
 
-    private const int SkillNumberExcludedFromCritical = 78;
-
     private const int NoActionYetSort = 0;
 
     private const int DeathPoseSort = 12;
 
     public static readonly TimeSpan ProtectDuration = SimulationClock.ToTimeSpan(ProtectTickLegacyTicks);
+
+    public static bool IsTargetableActionState(int actionSort)
+    {
+        return actionSort is not (NoActionYetSort or DeathPoseSort);
+    }
 
     public static AttackOutcome ResolveEnemyTribeAttack(
         CombatantSnapshot attacker,
@@ -35,7 +38,10 @@ public static class CombatResolver
         int defenderActionSort = 1,
         byte? allyOfAttackerTribe = null,
         byte attackerFormationCode = FormationCombatResolver.NoFormation,
-        byte defenderFormationCode = FormationCombatResolver.NoFormation)
+        byte defenderFormationCode = FormationCombatResolver.NoFormation,
+        bool attackerAttackBudgetEnforced = false,
+        int attackerActionSkillNumber = 0,
+        int attackerActionSkillGradePoints = 0)
     {
         if (attacker.CharacterId == defender.CharacterId)
             return AttackOutcome.Reject(AttackRejectReason.SameCharacter);
@@ -45,7 +51,7 @@ public static class CombatResolver
             return AttackOutcome.Reject(AttackRejectReason.DefenderDead);
         if (defenderPshopOpen)
             return AttackOutcome.Reject(AttackRejectReason.DefenderShopOpen);
-        if (defenderActionSort is NoActionYetSort or DeathPoseSort)
+        if (!IsTargetableActionState(defenderActionSort))
             return AttackOutcome.Reject(AttackRejectReason.DefenderActionStateBlocksTargeting);
         if (!zoneAllowsEnemyTribeAttack)
             return AttackOutcome.Reject(AttackRejectReason.ZonePvpDisabled);
@@ -55,7 +61,9 @@ public static class CombatResolver
             return AttackOutcome.Reject(AttackRejectReason.NewbieProtectionLevelGap);
 
         return ResolveDamage(attacker, defender, request, zoneClock, attackSkill, rng, attackerFormationCode,
-            defenderFormationCode);
+            defenderFormationCode, attackerAttackBudgetEnforced: attackerAttackBudgetEnforced,
+            attackerActionSkillNumber: attackerActionSkillNumber,
+            attackerActionSkillGradePoints: attackerActionSkillGradePoints);
     }
 
     public static AttackOutcome ResolveDuelAttack(
@@ -68,7 +76,10 @@ public static class CombatResolver
         bool attackerAndDefenderShareActiveDuel,
         bool defenderPshopOpen,
         int defenderActionSort,
-        bool zone124OverrideActive = false)
+        bool zone124OverrideActive = false,
+        bool attackerAttackBudgetEnforced = false,
+        int attackerActionSkillNumber = 0,
+        int attackerActionSkillGradePoints = 0)
     {
         if (attacker.CharacterId == defender.CharacterId)
             return AttackOutcome.Reject(AttackRejectReason.SameCharacter);
@@ -78,13 +89,16 @@ public static class CombatResolver
             return AttackOutcome.Reject(AttackRejectReason.DefenderDead);
         if (defenderPshopOpen)
             return AttackOutcome.Reject(AttackRejectReason.DefenderShopOpen);
-        if (defenderActionSort is NoActionYetSort or DeathPoseSort)
+        if (!IsTargetableActionState(defenderActionSort))
             return AttackOutcome.Reject(AttackRejectReason.DefenderActionStateBlocksTargeting);
         if (!attackerAndDefenderShareActiveDuel)
             return AttackOutcome.Reject(AttackRejectReason.DuelNotAuthorized);
 
         return ResolveDamage(attacker, defender, request, zoneClock, attackSkill, rng,
-            zone124OverrideActive: zone124OverrideActive);
+            zone124OverrideActive: zone124OverrideActive,
+            attackerAttackBudgetEnforced: attackerAttackBudgetEnforced,
+            attackerActionSkillNumber: attackerActionSkillNumber,
+            attackerActionSkillGradePoints: attackerActionSkillGradePoints);
     }
 
     private static AttackOutcome ResolveDamage(
@@ -96,7 +110,10 @@ public static class CombatResolver
         IRandomSource rng,
         byte attackerFormationCode = FormationCombatResolver.NoFormation,
         byte defenderFormationCode = FormationCombatResolver.NoFormation,
-        bool zone124OverrideActive = false)
+        bool zone124OverrideActive = false,
+        bool attackerAttackBudgetEnforced = false,
+        int attackerActionSkillNumber = 0,
+        int attackerActionSkillGradePoints = 0)
     {
         if (attacker.ZoneEntryAtZoneClock is { } attackerZoneEntry &&
             zoneClock - attackerZoneEntry < ProtectDuration)
@@ -107,6 +124,21 @@ public static class CombatResolver
         if (!CombatMath.IsInRange(attacker.PosX, attacker.PosY, attacker.PosZ, defender.PosX, defender.PosY,
                 defender.PosZ, MaxAttackDistance))
             return AttackOutcome.Reject(AttackRejectReason.OutOfRange);
+
+        var isSkillAttack = request.AttackActionValue1 == 2;
+        switch (request.AttackActionValue1)
+        {
+            case 1:
+                break;
+            case 2:
+                if (attackerAttackBudgetEnforced &&
+                    (request.AttackActionValue2 != attackerActionSkillNumber ||
+                     request.AttackActionValue3 != attackerActionSkillGradePoints))
+                    return AttackOutcome.Reject(AttackRejectReason.AntiCheatEchoMismatch);
+                break;
+            default:
+                return AttackOutcome.Reject(AttackRejectReason.InvalidAttackModeSelector);
+        }
 
         var attackSuccess = attacker.Stats.AttackSuccess;
         if (attackSuccess < 1)
@@ -121,8 +153,6 @@ public static class CombatResolver
             if (!CombatMath.RollHit(hitChance, rng))
                 return AttackOutcome.Miss(chargeConsumed);
         }
-
-        var isSkillAttack = request.AttackActionValue1 == 2;
 
         var attackPower = attacker.Stats.AttackPower;
         if (isSkillAttack && attackSkill != null)
@@ -180,13 +210,11 @@ public static class CombatResolver
 
     private static bool CanRollCritical(AttackForProtocol request, SkillDefinition? attackSkill)
     {
-        if (request.AttackActionValue1 == 1)
-            return true;
-        if (request.AttackActionValue1 != 2)
-            return false;
-        if (request.AttackActionValue2 == SkillNumberExcludedFromCritical)
-            return false;
-
-        return attackSkill is { Skill.AttackType: 2 or 5 };
+        return request.AttackActionValue1 switch
+        {
+            1 => true,
+            2 => SkillCriticalEligibility.IsEligibleForSkillHit(request.AttackActionValue2, attackSkill),
+            _ => false
+        };
     }
 }

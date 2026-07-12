@@ -49,7 +49,8 @@ public sealed partial class Zone
 
         var outcome = CombatResolver.ResolveDuelAttack(attackerSnapshot, defenderSnapshot, command.AttackInfo,
             _clock, attackSkill, _random, sharesActiveDuel, defenderState.PshopOpen, defenderState.ActionSort,
-            zone124OverrideActive);
+            zone124OverrideActive, attackerState.AttackBudgetEnforced, attackerState.ActionSkillNumber,
+            attackerState.ActionSkillGradeNum1 + attackerState.ActionSkillGradeNum2);
 
         if (outcome.Rejected)
             return;
@@ -163,8 +164,7 @@ public sealed partial class Zone
     {
         try
         {
-            if (_players.TryGetValue(recipientId, out var recipient) &&
-                recipient.Session is ClientSession clientSession)
+            if (TryGetBroadcastRecipient(recipientId, out _, out var clientSession))
                 clientSession.SendRaw(frame);
         }
         catch (Exception ex)

@@ -195,7 +195,6 @@ public sealed class HolyStoneWarCycle(
 
         rewardGateway.GrantCaptureReward(capturer);
         GrantTribeWideParticipationRewards(zone, capturer);
-        AdvanceQuestProgressServerWide(capturer.Tribe);
         PostZone038OccupationCredits(zone, capturer.Tribe);
 
         Phase = HolyStoneWarPhase.Cooldown;
@@ -225,28 +224,17 @@ public sealed class HolyStoneWarCycle(
         }
     }
 
-    private void AdvanceQuestProgressServerWide(byte winningTribeId)
-    {
-        foreach (var otherZone in zones.Zones)
-        foreach (var player in otherZone.Players)
-        {
-            if (player.Tribe != winningTribeId)
-                continue;
-            if (player.IsDead)
-                continue;
-
-            rewardGateway.AdvanceQuestProgress(player);
-        }
-    }
-
-    private static void PostZone038OccupationCredits(Zone zone, byte winningTribe)
+    private void PostZone038OccupationCredits(Zone zone, byte winningTribe)
     {
         foreach (var player in zone.Players)
         {
             if (player.Tribe != winningTribe || player.IsDead || player.IsMovingZone)
                 continue;
 
-            zone.Post(ZoneCommand.CreditZone038Occupation(player.CharacterId, winningTribe));
+            if (!zone.Post(ZoneCommand.CreditZone038Occupation(player.CharacterId, winningTribe)))
+                logger.LogWarning(
+                    "Zone {MapId} inbox full: dropped Zone038 occupation credit for character {CharacterId}",
+                    zone.MapId, player.CharacterId);
         }
     }
 

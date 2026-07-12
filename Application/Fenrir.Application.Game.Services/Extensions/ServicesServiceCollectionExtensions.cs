@@ -109,6 +109,7 @@ public static class ServicesServiceCollectionExtensions
         services.AddSingleton<IGuildChatService, GuildChatService>();
         services.AddSingleton<ILocalChatService, LocalChatService>();
         services.AddSingleton<YangGokPvpDropEventState>();
+        services.AddSingleton<LabyrinthOperatorGate>();
         services.AddSingleton<IPartyChatService, PartyChatService>();
         services.AddSingleton<IShoutService, ShoutService>();
         services.AddSingleton<ITribeAnnouncementService, TribeAnnouncementService>();
@@ -231,6 +232,7 @@ public static class ServicesServiceCollectionExtensions
         services.AddSingleton<IUseInventoryItemService, UseInventoryItemService>();
         services.AddSingleton<IZoneHandshakeService, ZoneHandshakeService>();
         services.AddSingleton<IZoneMoveService, ZoneMoveService>();
+        services.AddSingleton<IZoneTransferCancelService, ZoneTransferCancelService>();
         services.AddSingleton<IZoneReadyService, ZoneReadyService>();
         services.AddSingleton<IAttackService, AttackService>();
     }

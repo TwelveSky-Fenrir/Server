@@ -46,6 +46,25 @@ public class ZoneEnterTests
     }
 
     [Fact]
+    public void Enter_PreExistingNeighborTaggedToADifferentDungeonInstance_IsNotLearnedAboutByTheNewArrival()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var (sessionA, _) = ZoneTestKit.CreateSession(1);
+        var (sessionB, pipeB) = ZoneTestKit.CreateSession(2);
+
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(sessionA, 1, posX: 10f, posZ: 10f)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(10, out var stateA));
+        stateA!.DungeonInstanceId = 1;
+
+        zone.Post(ZoneCommand.Enter(20, ZoneTestKit.EnterData(sessionB, 1, posX: 20f, posZ: 20f)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Empty(ZoneTestKit.DrainOutbound(pipeB));
+    }
+
+    [Fact]
     public void Enter_StalePriorSessionForSameCharacter_IsEvictedAndReplacedByTheNewerSession()
     {
         var zone = ZoneTestKit.CreateZone(1);

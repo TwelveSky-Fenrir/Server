@@ -88,4 +88,48 @@ public class TribeSymbolDamageModifierSystemTests
 
         Assert.Equal(TribeSymbolCombatModifiers.OwnSymbolLostDamageDownPenalty, modifiers.GetDamageDownPenalty(1));
     }
+
+    [Fact]
+    public void SlotLostToCurrentAlly_PenaltyIsWaived()
+    {
+        var worldState = ZoneTestKit.CreateWorldState();
+        worldState.SetAllianceOffer(0, 1, true);
+        worldState.ResolveTribeSymbol(0, 1);
+        var modifiers = new TribeSymbolCombatModifiers();
+        var system = new TribeSymbolDamageModifierSystem(worldState, modifiers);
+        var zone = ZoneTestKit.CreateZone(MapId);
+
+        system.Simulate(zone, 1);
+
+        Assert.Equal(0f, modifiers.GetDamageDownPenalty(0));
+    }
+
+    [Fact]
+    public void SlotLostToTribeThatIsNotTheCurrentAlly_FullPenaltyStillApplies()
+    {
+        var worldState = ZoneTestKit.CreateWorldState();
+        worldState.SetAllianceOffer(0, 1, true);
+        worldState.ResolveTribeSymbol(0, 2);
+        var modifiers = new TribeSymbolCombatModifiers();
+        var system = new TribeSymbolDamageModifierSystem(worldState, modifiers);
+        var zone = ZoneTestKit.CreateZone(MapId);
+
+        system.Simulate(zone, 1);
+
+        Assert.Equal(TribeSymbolCombatModifiers.OwnSymbolLostDamageDownPenalty, modifiers.GetDamageDownPenalty(0));
+    }
+
+    [Fact]
+    public void SlotLostWithNoCurrentAlly_FullPenaltyApplies()
+    {
+        var worldState = ZoneTestKit.CreateWorldState();
+        worldState.ResolveTribeSymbol(0, 1);
+        var modifiers = new TribeSymbolCombatModifiers();
+        var system = new TribeSymbolDamageModifierSystem(worldState, modifiers);
+        var zone = ZoneTestKit.CreateZone(MapId);
+
+        system.Simulate(zone, 1);
+
+        Assert.Equal(TribeSymbolCombatModifiers.OwnSymbolLostDamageDownPenalty, modifiers.GetDamageDownPenalty(0));
+    }
 }

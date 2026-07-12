@@ -36,6 +36,7 @@ public class ZoneMoveServiceTests
             new FakeGameServerDirectoryRepository(),
             new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
             new FakeSessionTicketRepository(),
+            new FakeEventLogRepository(),
             Options.Create(new GameServerOptions()), NullLogger<ZoneMoveService>.Instance);
 
         var (session, _) = ZoneTestKit.CreateSession(1);
@@ -77,6 +78,7 @@ public class ZoneMoveServiceTests
             new FakeGameServerDirectoryRepository(),
             new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
             new FakeSessionTicketRepository(),
+            new FakeEventLogRepository(),
             Options.Create(new GameServerOptions()), NullLogger<ZoneMoveService>.Instance);
 
         var (session, _) = ZoneTestKit.CreateSession(1);
@@ -97,17 +99,17 @@ public class ZoneMoveServiceTests
     }
 
     [Fact]
-    public async Task Flagged_FactionTerritoryMismatch_NotZone38_KicksTheSession()
+    public async Task Flagged_DestinationCapitalGroup_NoQualifyingAlliance_KicksTheSession()
     {
-        var (service, session, sourceZone) = CreateService(2, 1, true, 50);
+        var (service, session, sourceZone) = CreateService(2, 1, true, 7);
 
-        await service.HandleAsync(Request(2, 50), session, CancellationToken.None);
+        await service.HandleAsync(Request(2, 7), session, CancellationToken.None);
 
         Assert.Equal(DisconnectReason.StateViolation, session.DisconnectReason);
     }
 
     [Fact]
-    public async Task Flagged_DestinationZone38_IsAlwaysExempt_EvenOnAFactionMismatch()
+    public async Task Flagged_DestinationZone38_IsAlwaysExempt()
     {
         var (service, session, sourceZone) = CreateService(2, 1, true, 38);
 
@@ -117,9 +119,29 @@ public class ZoneMoveServiceTests
     }
 
     [Fact]
-    public async Task Flagged_AvatarTribeMatchesOwningFaction_IsNotKicked()
+    public async Task Flagged_DestinationOwnCapitalGroup_StillKicked_NoOwnTribeBypassExists()
     {
-        var (service, session, sourceZone) = CreateService(2, 0, true, 50);
+        var (service, session, sourceZone) = CreateService(2, 0, true, 3);
+
+        await service.HandleAsync(Request(2, 3), session, CancellationToken.None);
+
+        Assert.Equal(DisconnectReason.StateViolation, session.DisconnectReason);
+    }
+
+    [Fact]
+    public async Task NotFlagged_TransfersNormally_EvenIntoACapitalGroupWithNoQualifyingAlliance()
+    {
+        var (service, session, sourceZone) = CreateService(2, 1, false, 7);
+
+        await service.HandleAsync(Request(2, 7), session, CancellationToken.None);
+
+        Assert.Null(session.DisconnectReason);
+    }
+
+    [Fact]
+    public async Task Flagged_DestinationNotACapitalGroup_IsNeverKicked_RegardlessOfSourceZone()
+    {
+        var (service, session, sourceZone) = CreateService(2, 1, true, 50);
 
         await service.HandleAsync(Request(2, 50), session, CancellationToken.None);
 
@@ -127,34 +149,14 @@ public class ZoneMoveServiceTests
     }
 
     [Fact]
-    public async Task NotFlagged_TransfersNormally_EvenOnAFactionMismatch()
-    {
-        var (service, session, sourceZone) = CreateService(2, 1, false, 50);
-
-        await service.HandleAsync(Request(2, 50), session, CancellationToken.None);
-
-        Assert.Null(session.DisconnectReason);
-    }
-
-    [Fact]
-    public async Task Flagged_CurrentZoneNotFactionTerritory_IsNeverKicked()
-    {
-        var (service, session, sourceZone) = CreateService(999, 1, true, 50);
-
-        await service.HandleAsync(Request(999, 50), session, CancellationToken.None);
-
-        Assert.Null(session.DisconnectReason);
-    }
-
-    [Fact]
-    public async Task Flagged_Faction0Territory_OwningFactionAlliedWithNonZeroFaction_StillKicked()
+    public async Task Flagged_Tribe0CapitalGroupDestination_OwningFactionAlliedWithNonZeroTribe_StillKicked()
     {
         var worldData = ZoneTestKit.EmptyWorldData(zonesByNumber: new Dictionary<short, ZoneDefinition>
         {
-            [50] = new(new ZoneRowDto(50, 0f, 0f, 0f), [], [], [], [])
+            [2] = new(new ZoneRowDto(2, 0f, 0f, 0f), [], [], [], [])
         }.ToFrozenDictionary());
         var zones = ZoneTestKit.CreateRegistry(worldData: worldData);
-        zones.Initialize([2, 50]);
+        zones.Initialize([50, 2]);
 
         var worldState = ZoneTestKit.CreateWorldState();
         worldState.SetAllianceOffer(0, 2, true);
@@ -163,31 +165,32 @@ public class ZoneMoveServiceTests
             new FakeGameServerDirectoryRepository(),
             new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
             new FakeSessionTicketRepository(),
+            new FakeEventLogRepository(),
             Options.Create(new GameServerOptions()), NullLogger<ZoneMoveService>.Instance);
 
         var (session, _) = ZoneTestKit.CreateSession(1);
         session.MarkTicketConsumed(1, CharacterId);
-        var sourceZone = zones[2];
+        var sourceZone = zones[50];
         session.CurrentZone = sourceZone;
-        sourceZone.Post(ZoneCommand.Enter(CharacterId, ZoneTestKit.EnterData(session, 2, tribe: 1)));
+        sourceZone.Post(ZoneCommand.Enter(CharacterId, ZoneTestKit.EnterData(session, 50, tribe: 1)));
         sourceZone.Tick(TimeSpan.FromMilliseconds(50));
         Assert.True(sourceZone.TryGetPlayer(CharacterId, out var state));
         state!.ReviveHackFlag = true;
 
-        await service.HandleAsync(Request(2, 50), session, CancellationToken.None);
+        await service.HandleAsync(Request(50, 2), session, CancellationToken.None);
 
         Assert.Equal(DisconnectReason.StateViolation, session.DisconnectReason);
     }
 
     [Fact]
-    public async Task Flagged_NonFaction0Territory_OwningFactionAlliedWithFaction0_SuspendsKick_ForAnyAvatar()
+    public async Task Flagged_Tribe1CapitalGroupDestination_OwningFactionAlliedWithTribe0_SuspendsKick_ForAnyAvatarTribe()
     {
         var worldData = ZoneTestKit.EmptyWorldData(zonesByNumber: new Dictionary<short, ZoneDefinition>
         {
-            [50] = new(new ZoneRowDto(50, 0f, 0f, 0f), [], [], [], [])
+            [7] = new(new ZoneRowDto(7, 0f, 0f, 0f), [], [], [], [])
         }.ToFrozenDictionary());
         var zones = ZoneTestKit.CreateRegistry(worldData: worldData);
-        zones.Initialize([7, 50]);
+        zones.Initialize([50, 7]);
 
         var worldState = ZoneTestKit.CreateWorldState();
         worldState.SetAllianceOffer(1, 0, true);
@@ -196,22 +199,22 @@ public class ZoneMoveServiceTests
             new FakeGameServerDirectoryRepository(),
             new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
             new FakeSessionTicketRepository(),
+            new FakeEventLogRepository(),
             Options.Create(new GameServerOptions()), NullLogger<ZoneMoveService>.Instance);
 
         var (session, _) = ZoneTestKit.CreateSession(1);
         session.MarkTicketConsumed(1, CharacterId);
-        var sourceZone = zones[7];
+        var sourceZone = zones[50];
         session.CurrentZone = sourceZone;
-        sourceZone.Post(ZoneCommand.Enter(CharacterId, ZoneTestKit.EnterData(session, 7, tribe: 3)));
+        sourceZone.Post(ZoneCommand.Enter(CharacterId, ZoneTestKit.EnterData(session, 50, tribe: 3)));
         sourceZone.Tick(TimeSpan.FromMilliseconds(50));
         Assert.True(sourceZone.TryGetPlayer(CharacterId, out var state));
         state!.ReviveHackFlag = true;
 
-        await service.HandleAsync(Request(7, 50), session, CancellationToken.None);
+        await service.HandleAsync(Request(50, 7), session, CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
     }
-
 
     [Fact]
     public async Task Flagged_SameZoneNoOpRequest_IsStillKicked_NotSilentlyIgnored()
@@ -224,21 +227,11 @@ public class ZoneMoveServiceTests
     }
 
     [Fact]
-    public async Task Flagged_MalformedTargetZoneNumber_IsKickedForReviveHack_NotForMalformedInput()
-    {
-        var (service, session, _) = CreateServiceWithGrade(2, 1, true, 0, []);
-
-        await service.HandleAsync(Request(2, 9999), session, CancellationToken.None);
-
-        Assert.Equal(DisconnectReason.StateViolation, session.DisconnectReason);
-    }
-
-    [Fact]
     public async Task Flagged_PresentZoneMismatch_IsKickedForReviveHack_NotForMalformedInput()
     {
-        var (service, session, _) = CreateServiceWithGrade(2, 1, true, 0, [50]);
+        var (service, session, _) = CreateServiceWithGrade(2, 1, true, 0, [7]);
 
-        await service.HandleAsync(Request(3, 50), session, CancellationToken.None);
+        await service.HandleAsync(Request(3, 7), session, CancellationToken.None);
 
         Assert.Equal(DisconnectReason.StateViolation, session.DisconnectReason);
     }
@@ -246,9 +239,9 @@ public class ZoneMoveServiceTests
     [Fact]
     public async Task Flagged_Sort2WithoutOperatorRank_IsKickedForReviveHack_NotForTheGmSortCheck()
     {
-        var (service, session, _) = CreateServiceWithGrade(2, 1, true, 0, [50]);
+        var (service, session, _) = CreateServiceWithGrade(2, 1, true, 0, [7]);
 
-        await service.HandleAsync(Request(2, 50, 2), session, CancellationToken.None);
+        await service.HandleAsync(Request(2, 7, 2), session, CancellationToken.None);
 
         Assert.Equal(DisconnectReason.StateViolation, session.DisconnectReason);
     }
@@ -256,9 +249,9 @@ public class ZoneMoveServiceTests
     [Fact]
     public async Task Flagged_MalformedSortValue_IsKickedForReviveHack_NotForTheSortRangeCheck()
     {
-        var (service, session, _) = CreateServiceWithGrade(2, 1, true, 0, [50]);
+        var (service, session, _) = CreateServiceWithGrade(2, 1, true, 0, [7]);
 
-        await service.HandleAsync(Request(2, 50, 99), session, CancellationToken.None);
+        await service.HandleAsync(Request(2, 7, 99), session, CancellationToken.None);
 
         Assert.Equal(DisconnectReason.StateViolation, session.DisconnectReason);
     }
@@ -305,5 +298,78 @@ public class ZoneMoveServiceTests
         await service.HandleAsync(Request(2, 50), session, CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(0)]
+    [InlineData(13)]
+    [InlineData(-1)]
+    public async Task UnrecognizedActionCategory_IsRejectedWithFaulted(int sort)
+    {
+        var (service, session, _) = CreateServiceWithGrade(2, 1, false, 0, [50]);
+
+        await service.HandleAsync(Request(2, 50, sort), session, CancellationToken.None);
+
+        Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);
+    }
+
+    [Theory]
+    [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(5)]
+    [InlineData(6)]
+    [InlineData(7)]
+    [InlineData(8)]
+    [InlineData(9)]
+    [InlineData(10)]
+    [InlineData(11)]
+    [InlineData(12)]
+    public async Task RecognizedNonGmActionCategory_IsNotRejectedForItsCategory(int sort)
+    {
+        var (service, session, _) = CreateServiceWithGrade(2, 1, false, 0, [50]);
+
+        await service.HandleAsync(Request(2, 50, sort), session, CancellationToken.None);
+
+        Assert.Null(session.DisconnectReason);
+    }
+
+    [Fact]
+    public async Task DestinationZoneNumberAtUpperBound_IsAccepted_NotTreatedAsOutOfRange()
+    {
+        var (service, session, sourceZone) = CreateServiceWithGrade(2, 1, false, 0, [350]);
+
+        await service.HandleAsync(Request(2, 350), session, CancellationToken.None);
+
+        Assert.Null(session.DisconnectReason);
+
+        sourceZone.Tick(TimeSpan.FromMilliseconds(50));
+        Assert.False(sourceZone.TryGetPlayer(CharacterId, out _));
+    }
+
+    [Fact]
+    public async Task DestinationZoneNumberJustPastUpperBound_IsRejectedAsMalformed()
+    {
+        var (service, session, _) = CreateServiceWithGrade(2, 1, false, 0, []);
+
+        await service.HandleAsync(Request(2, 351), session, CancellationToken.None);
+
+        Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);
+    }
+
+    [Fact]
+    public async Task SuccessfulTransfer_QueuesPendingTransferMarkerAsynchronously_StillCompletesHandoffOnNextTick()
+    {
+        var (service, session, sourceZone) = CreateService(2, 1, false, 50);
+
+        await service.HandleAsync(Request(2, 50), session, CancellationToken.None);
+
+        Assert.Null(session.DisconnectReason);
+        Assert.True(sourceZone.TryGetPlayer(CharacterId, out var state));
+        Assert.False(state!.IsMovingZone);
+
+        sourceZone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.False(sourceZone.TryGetPlayer(CharacterId, out _));
     }
 }

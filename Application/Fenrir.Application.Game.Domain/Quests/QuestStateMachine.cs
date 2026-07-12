@@ -57,8 +57,7 @@ public static class QuestStateMachine
                         return StateInvalid;
                 }
 
-            case 7
-                :
+            case 7:
                 return progress.TargetPhase == (q.Solution1 ?? 0) ? StateInProgress : StateInvalid;
 
             case 8:
@@ -120,7 +119,7 @@ public static class QuestStateMachine
         var q = quest.Quest;
 
         long money = 0;
-        var cp = 0;
+        var killOtherTribeCount = 0;
         var exp = 0;
         var teacherPoint = 0;
         var rewardItemId = 0;
@@ -130,7 +129,7 @@ public static class QuestStateMachine
             switch (reward.RewardType)
             {
                 case 2: money += reward.Amount ?? 0; break;
-                case 3: cp += reward.Amount ?? 0; break;
+                case 3: killOtherTribeCount += reward.Amount ?? 0; break;
                 case 4: exp += reward.Amount ?? 0; break;
                 case 5: teacherPoint += reward.Amount ?? 0; break;
                 case 6:
@@ -152,8 +151,8 @@ public static class QuestStateMachine
         };
 
         var reset = progress with { ActiveFlag = 0, QSort = 0, TargetPhase = 0, KillCounter = 0 };
-        return new CompleteResult(true, reset, money, cp, exp, deleteItemId, rewardItemId, rewardQuantity,
-            teacherPoint);
+        return new CompleteResult(true, reset, money, killOtherTribeCount, exp, deleteItemId, rewardItemId,
+            rewardQuantity, teacherPoint);
     }
 
     public static bool TryReceive(QuestProgress progress, byte tribe, short level, QuestCatalog catalog,
@@ -220,7 +219,7 @@ public static class QuestStateMachine
         bool Success,
         QuestProgress NewProgress,
         long MoneyReward,
-        int ContributionPointsReward,
+        int KillOtherTribeCountReward,
         int ExperienceReward,
         int DeleteItemId,
         int RewardItemId,

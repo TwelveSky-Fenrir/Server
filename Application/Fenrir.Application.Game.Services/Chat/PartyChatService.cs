@@ -21,6 +21,12 @@ public sealed class PartyChatService(ZoneRegistry zones, PartyRegistry parties, 
             return false;
         }
 
+        if (sender.IsMuted)
+        {
+            logger.LogInformation("Character {CharacterId} party chat dropped: caller is muted", sender.CharacterId);
+            return false;
+        }
+
         var response = new PartyChatResponse { AvatarName = sender.Name, Content = content, Link = EmptyLink };
 
         foreach (var memberId in members)

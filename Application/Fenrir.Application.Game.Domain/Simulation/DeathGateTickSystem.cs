@@ -12,13 +12,13 @@ public sealed class DeathGateTickSystem(WorldStateService worldState) : ISimulat
 
         foreach (var state in zone.Players)
         {
-            if (state.IsDead)
-            {
-                state.TicksSinceDeath += legacyTicksElapsed;
+            if (!state.IsDead && !state.ReviveHackFlag)
+                continue;
 
-                if (state.TicksSinceDeath >= SimulationClock.ReviveEligibilityLegacyTicks)
-                    TryGrantReviveEligibility(zone, state);
-            }
+            state.TicksSinceDeath += legacyTicksElapsed;
+
+            if (state.IsDead && state.TicksSinceDeath >= SimulationClock.ReviveEligibilityLegacyTicks)
+                ApplyReviveClear(zone, state);
 
             if (state.ReviveHackFlag && state.TicksSinceDeath >= SimulationClock.AntiAbuseForceQuitLegacyTicks)
                 (toForceQuit ??= []).Add(state);
@@ -32,12 +32,18 @@ public sealed class DeathGateTickSystem(WorldStateService worldState) : ISimulat
                 client.Abort(DisconnectReason.StateViolation);
     }
 
-    private void TryGrantReviveEligibility(Zone zone, PlayerRuntimeState state)
+    private void ApplyReviveClear(Zone zone, PlayerRuntimeState state)
     {
-        var alliedTribe = worldState.GetAllyOf(state.Tribe);
-        if (!ReviveEligibilityRules.IsEligible(zone.MapId, state.Tribe, alliedTribe))
-            return;
+        var outcome = ReviveEligibilityRules.Resolve(zone.MapId, state.Tribe, worldState.GetAllyOf(state.Tribe));
 
-        zone.GrantReviveEligibility(state);
+        switch (outcome)
+        {
+            case ReviveClearOutcome.ClearDeathWindowAndLock:
+                zone.GrantReviveEligibility(state);
+                break;
+            case ReviveClearOutcome.ClearDeathWindowOnly:
+                zone.ClearDeathWindowKeepLockArmed(state);
+                break;
+        }
     }
 }

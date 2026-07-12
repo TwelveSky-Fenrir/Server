@@ -13,8 +13,6 @@ public sealed partial class Zone
 {
     private const int ChatInboxCapacity = 2048;
 
-    private const int ChatInboxDrainCapPerTick = ChatInboxCapacity / 2;
-
     private readonly Channel<ChatZoneCommand> _chatInbox =
         Channel.CreateBounded<ChatZoneCommand>(
             new BoundedChannelOptions(ChatInboxCapacity)
@@ -31,10 +29,8 @@ public sealed partial class Zone
 
     private void DrainChatCommands()
     {
-        var processed = 0;
-        while (processed < ChatInboxDrainCapPerTick && _chatInbox.Reader.TryRead(out var command))
+        while (_chatInbox.Reader.TryRead(out var command))
         {
-            processed++;
             try
             {
                 ApplyChatCommand(in command);
@@ -45,9 +41,6 @@ public sealed partial class Zone
                     command.SenderCharacterId);
             }
         }
-
-        if (processed >= ChatInboxDrainCapPerTick)
-            LogDrainCapEngaged(_chatInbox.Reader, "chat", ChatInboxDrainCapPerTick);
     }
 
     private void ApplyChatCommand(in ChatZoneCommand command)
@@ -69,14 +62,14 @@ public sealed partial class Zone
                     if (_players.TryGetValue(id, out var recipient) &&
                         IsAlliedOrSameTribe(sender.Tribe, recipient.Tribe))
                         _localChatRecipientScratch.Add(id);
-                BroadcastChatFrame(in response, _localChatRecipientScratch);
+                BroadcastChatFrame(in response, _localChatRecipientScratch, requiresPositionalEligibility: true);
                 break;
             }
             case ChatBroadcastKind.Shout:
             {
                 var response = new ShoutResponse
                     { AvatarName = sender.Name, Content = command.Content, Link = command.Link };
-                BroadcastChatFrame(in response, _players.Keys);
+                BroadcastChatFrame(in response, _players.Keys, requiresPositionalEligibility: false);
                 break;
             }
             case ChatBroadcastKind.Tribe:
@@ -87,13 +80,14 @@ public sealed partial class Zone
                 foreach (var recipient in _players.Values)
                     if (IsAlliedOrSameTribe(sender.Tribe, recipient.Tribe))
                         recipientIds.Add(recipient.CharacterId);
-                BroadcastChatFrame(in response, recipientIds);
+                BroadcastChatFrame(in response, recipientIds, requiresPositionalEligibility: false);
                 break;
             }
         }
     }
 
-    private void BroadcastChatFrame<TPacket>(in TPacket response, IEnumerable<int> recipientIds)
+    private void BroadcastChatFrame<TPacket>(in TPacket response, IEnumerable<int> recipientIds,
+        bool requiresPositionalEligibility)
         where TPacket : struct, IOutgoingPacket
     {
         var total = FrameWriter.FrameSizeOf<TPacket>();
@@ -107,9 +101,13 @@ public sealed partial class Zone
             foreach (var id in recipientIds)
                 try
                 {
-                    if (_players.TryGetValue(id, out var recipient) &&
-                        recipient.Session is ClientSession clientSession)
-                        clientSession.SendRaw(span);
+                    ClientSession? clientSession;
+                    var eligible = requiresPositionalEligibility
+                        ? TryGetBroadcastRecipient(id, out _, out clientSession)
+                        : TryGetZoneWideBroadcastRecipient(id, out clientSession);
+
+                    if (eligible)
+                        clientSession!.SendRaw(span);
                 }
                 catch (Exception ex)
                 {

@@ -31,8 +31,8 @@ public class TradeOfferResyncNotifierTests
     private static TradeSession StartSession(TradeRegistry trades, int playerAId, int playerBId)
     {
         trades.TryAsk(playerAId, playerBId);
-        trades.TryAnswer(playerBId, true, out _);
-        trades.TryStart(playerAId, out var session);
+        trades.TryAnswer(playerBId, true, false, out _, out _);
+        trades.TryStart(playerAId, playerBId, false, out var session);
         return session;
     }
 

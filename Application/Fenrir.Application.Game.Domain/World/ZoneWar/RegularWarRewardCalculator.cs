@@ -42,48 +42,38 @@ public static class RegularWarRewardCalculator
         if (outcome == RegularWarOutcome.AbortedEmptyMap || participants.Count == 0)
             return [];
 
+        var isDraw = outcome == RegularWarOutcome.Draw;
+
         var builder = ImmutableArray.CreateBuilder<RegularWarRewardGrant>(participants.Count);
 
         foreach (var participant in participants)
         {
             var leaderboardCp = LeaderboardCpAmount(topKillers, participant.CharacterId);
 
-            if (outcome == RegularWarOutcome.Draw)
-            {
-                builder.Add(new RegularWarRewardGrant(
-                    participant.CharacterId,
-                    null,
-                    0,
-                    0,
-                    0,
-                    LosingOrDrawHeroRankPoints,
-                    leaderboardCp,
-                    false));
-                continue;
-            }
+            var isWinningSide = !isDraw &&
+                                 (participant.Tribe == winningTribe ||
+                                  (allyOfWinningTribe is { } ally && participant.Tribe == ally));
 
-            var isWinningSide = participant.Tribe == winningTribe ||
-                                (allyOfWinningTribe is { } ally && participant.Tribe == ally);
-
-            var baseMoney = rewardValues.GetMoneyReward(participant.RebirthTier);
+            var baseMoney = rewardValues.GetMoneyReward(participant.RebirthTier, participant.Level);
             var baseExperience = rewardValues.GetExperienceReward(participant.Level);
 
             var money = isWinningSide ? baseMoney : baseMoney / 2;
             var experience = isWinningSide ? baseExperience : baseExperience / 2;
 
             var cpBonus = 0;
-            if (config.CpBonusRule is { } rule && rule.IsSatisfiedBy(participant.RebirthTier, participant.RebirthCount))
+            if (!isDraw && config.CpBonusRule is { } rule &&
+                rule.IsSatisfiedBy(participant.RebirthTier, participant.RebirthCount))
                 cpBonus = isWinningSide ? rule.WinningSideAmount : rule.LosingSideAmount;
 
             builder.Add(new RegularWarRewardGrant(
                 participant.CharacterId,
-                isWinningSide,
+                isDraw ? null : isWinningSide,
                 money > 0 ? money : 0,
                 experience > 0 ? experience : 0,
                 cpBonus,
                 isWinningSide ? WinningHeroRankPoints : LosingOrDrawHeroRankPoints,
                 leaderboardCp,
-                true));
+                !isDraw));
         }
 
         return builder.MoveToImmutable();

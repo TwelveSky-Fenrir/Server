@@ -167,11 +167,37 @@ public class PetStatContributionTests
         Assert.Equal(expected, StatCalculator.PetAmuletDefenseBonus(itemId, AmuletSort));
     }
 
+    [Theory]
+    [InlineData(8290, 550)]
+    [InlineData(76000, 3000)]
+    [InlineData(76004, 3000)]
+    [InlineData(76005, 5000)]
+    [InlineData(76006, 7500)]
+    [InlineData(76007, 12500)]
+    public void AmuletLifeBonus_MatchesConfirmedTable(int itemId, int expected)
+    {
+        Assert.Equal(expected, StatCalculator.PetAmuletLifeBonus(itemId, AmuletSort));
+    }
+
+    [Theory]
+    [InlineData(8290, 500)]
+    [InlineData(76000, 3000)]
+    [InlineData(76004, 3000)]
+    [InlineData(76005, 5000)]
+    [InlineData(76006, 7500)]
+    [InlineData(76007, 12500)]
+    public void AmuletManaBonus_MatchesConfirmedTable(int itemId, int expected)
+    {
+        Assert.Equal(expected, StatCalculator.PetAmuletManaBonus(itemId, AmuletSort));
+    }
+
     [Fact]
     public void AmuletFlatTables_ZeroForNonAmuletSort()
     {
         Assert.Equal(0, StatCalculator.PetAmuletAttackBonus(76005, GrowPetSort));
         Assert.Equal(0, StatCalculator.PetAmuletDefenseBonus(76005, GrowPetSort));
+        Assert.Equal(0, StatCalculator.PetAmuletLifeBonus(76005, GrowPetSort));
+        Assert.Equal(0, StatCalculator.PetAmuletManaBonus(76005, GrowPetSort));
     }
 
     [Fact]
@@ -179,6 +205,17 @@ public class PetStatContributionTests
     {
         Assert.Equal(0, StatCalculator.PetAmuletAttackBonus(2200, AmuletSort));
         Assert.Equal(0, StatCalculator.PetAmuletDefenseBonus(2200, AmuletSort));
+        Assert.Equal(0, StatCalculator.PetAmuletLifeBonus(2200, AmuletSort));
+        Assert.Equal(0, StatCalculator.PetAmuletManaBonus(2200, AmuletSort));
+    }
+
+    [Fact]
+    public void AmuletFlatTables_ZeroForGradedFamilyIdsWithoutConfirmedMagnitude()
+    {
+        Assert.Equal(0, StatCalculator.PetAmuletLifeBonus(2151, AmuletSort));
+        Assert.Equal(0, StatCalculator.PetAmuletManaBonus(2151, AmuletSort));
+        Assert.Equal(0, StatCalculator.PetAmuletLifeBonus(2421, AmuletSort));
+        Assert.Equal(0, StatCalculator.PetAmuletManaBonus(2421, AmuletSort));
     }
 
 
@@ -318,5 +355,43 @@ public class PetStatContributionTests
 
         Assert.Equal(baseline.AttackPower + expectedAttackDelta, withAmulet.AttackPower);
         Assert.Equal(baseline.DefensePower + expectedDefenseDelta, withAmulet.DefensePower);
+    }
+
+    [Theory]
+    [InlineData(8290, 550, 500)]
+    [InlineData(76000, 3000, 3000)]
+    [InlineData(76004, 3000, 3000)]
+    public void AmuletLifeManaBonus_NonOverlappingIds_WiredIntoComputeBaseStats(int itemId, int expectedLifeDelta,
+        int expectedManaDelta)
+    {
+        var baseline = StatCalculator.ComputeBaseStats(NeutralAttributes, [], NeutralLevels);
+        var withAmulet = StatCalculator.ComputeBaseStats(NeutralAttributes, AmuletEquipment(itemId), NeutralLevels);
+
+        Assert.Equal(baseline.MaxLife + expectedLifeDelta, withAmulet.MaxLife);
+        Assert.Equal(baseline.MaxMana + expectedManaDelta, withAmulet.MaxMana);
+    }
+
+    [Theory]
+    [InlineData(76005, 7000)]
+    [InlineData(76006, 12000)]
+    [InlineData(76007, 22000)]
+    public void AmuletLifeManaBonus_PhoenixOverlapIds_NotDoubleCountedInComputeBaseStats(int itemId,
+        int expectedDelta)
+    {
+        var baseline = StatCalculator.ComputeBaseStats(NeutralAttributes, [], NeutralLevels);
+        var withAmulet = StatCalculator.ComputeBaseStats(NeutralAttributes, AmuletEquipment(itemId), NeutralLevels);
+
+        Assert.Equal(baseline.MaxLife + expectedDelta, withAmulet.MaxLife);
+        Assert.Equal(baseline.MaxMana + expectedDelta, withAmulet.MaxMana);
+    }
+
+    [Fact]
+    public void AmuletLifeManaBonus_ZeroForGradedFamilyIdWithoutConfirmedMagnitude_WiredIntoComputeBaseStats()
+    {
+        var baseline = StatCalculator.ComputeBaseStats(NeutralAttributes, [], NeutralLevels);
+        var withAmulet = StatCalculator.ComputeBaseStats(NeutralAttributes, AmuletEquipment(2151), NeutralLevels);
+
+        Assert.Equal(baseline.MaxLife, withAmulet.MaxLife);
+        Assert.Equal(baseline.MaxMana, withAmulet.MaxMana);
     }
 }

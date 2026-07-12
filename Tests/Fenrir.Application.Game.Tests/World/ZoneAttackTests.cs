@@ -297,7 +297,7 @@ public class ZoneAttackTests
     }
 
     [Fact]
-    public void SkillAttackManaCharge_UsesInvestedGradeOnly_NotCombinedItemBonusGrade()
+    public void EnemyTribeSkillAttack_NeverChargesMana_AlreadyChargedOnceAtCastRegistration()
     {
         var row = new SkillRowDto(200, "Test Attack Skill", 0, 0, 0, 0, 0, 1, 10, 1, 0);
         var g0 = new SkillGradeRowDto(200, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -321,6 +321,7 @@ public class ZoneAttackTests
         defender!.Stats = WeakDefender;
         defender.ActionSort = 1;
         attacker.AttackSubPacketCeiling = int.MaxValue;
+        attacker.ActionSkillNumber = 200;
         attacker.ActionSkillGradeNum1 = 5;
         attacker.ActionSkillGradeNum2 = 5;
 
@@ -349,7 +350,7 @@ public class ZoneAttackTests
         zone.PostCombatCommand(new CombatCommand { AttackerCharacterId = 1, AttackInfo = skillAttack });
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
-        Assert.Equal(manaBefore - 50, attacker.Mana);
+        Assert.Equal(manaBefore, attacker.Mana);
     }
 
     private static ActionInfo RestOrMoveAction(int sort, float x, float z)

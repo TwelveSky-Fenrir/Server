@@ -7,6 +7,7 @@ using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Social.Duel;
+using Fenrir.Application.Game.Domain.Social.Friends;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World.Geometry;
@@ -37,6 +38,7 @@ public sealed partial class Zone(
     WorldStateService? worldState = null,
     PartyRegistry? partyRegistry = null,
     DuelRegistry? duelRegistry = null,
+    FriendRegistry? friendRegistry = null,
     TradeRegistry? tradeRegistry = null,
     HeroRankPointAccumulator? heroRankPointAccumulator = null,
     ICharacterShardLocationRepository? characterShardLocations = null,
@@ -51,11 +53,11 @@ public sealed partial class Zone(
 {
     private const int InboxCapacity = 8192;
 
-    private const int InboxDrainCapPerTick = InboxCapacity / 2;
-
     private readonly SimulationTickAccumulator _accumulator = new();
 
     private readonly DuelRegistry _duelRegistry = duelRegistry ?? new DuelRegistry();
+
+    private readonly FriendRegistry _friendRegistry = friendRegistry ?? new FriendRegistry();
 
     private readonly AoiGrid _grid = new(options.AoiCellSize);
 
@@ -93,17 +95,14 @@ public sealed partial class Zone(
 
     public IEnumerable<PlayerRuntimeState> Players => _players.Values;
 
+    public float AoiCellSize => options.AoiCellSize;
+
     public ZoneGeometry? Geometry { get; } = geometry ?? TryLoadGeometry(mapId, options, logger);
 
     public MonsterPathfinder? Pathfinder =>
         Geometry is null
             ? null
-            : _pathfinder ??= new MonsterPathfinder(Geometry, options.MonsterPathfindingBudgetPerTick);
-
-    public void ResetPathBudget()
-    {
-        _pathfinder?.ResetBudget();
-    }
+            : _pathfinder ??= new MonsterPathfinder(Geometry);
 
     public bool Post(in ZoneCommand command)
     {
@@ -134,9 +133,32 @@ public sealed partial class Zone(
         using var timer = new PeriodicTimer(tickInterval);
 
         var lastFrame = Stopwatch.GetTimestamp();
+        var timerTick = timer.WaitForNextTickAsync(ct).AsTask();
+        var inboxReady = _inbox.Reader.WaitToReadAsync(ct).AsTask();
 
-        while (await timer.WaitForNextTickAsync(ct).ConfigureAwait(false))
+        while (true)
         {
+            Task<bool> woken;
+            bool keepRunning;
+
+            try
+            {
+                woken = await Task.WhenAny(timerTick, inboxReady).ConfigureAwait(false);
+                keepRunning = await woken.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+
+            if (ReferenceEquals(woken, timerTick))
+                timerTick = timer.WaitForNextTickAsync(ct).AsTask();
+            else
+                inboxReady = _inbox.Reader.WaitToReadAsync(ct).AsTask();
+
+            if (!keepRunning)
+                break;
+
             var now = Stopwatch.GetTimestamp();
             var elapsed = Stopwatch.GetElapsedTime(lastFrame, now);
             lastFrame = now;
@@ -180,6 +202,7 @@ public sealed partial class Zone(
         DrainPetBagCommands();
         DrainHeroRankingQueryCommands();
         DrainHeroRankingRolloverCommands();
+        DrainHolyStoneCountdownEvictionCommands();
         DrainHolyStoneBattleRankResetCommands();
         DrainFishingCommands();
         DrainMountCommands();
@@ -253,6 +276,16 @@ public sealed partial class Zone(
 
         try
         {
+            DrainClosedProxyShopBroadcasts();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Zone {MapId} tick stage {Stage} failed", MapId,
+                nameof(DrainClosedProxyShopBroadcasts));
+        }
+
+        try
+        {
             RebroadcastProxyShops();
         }
         catch (Exception ex)
@@ -293,10 +326,8 @@ public sealed partial class Zone(
 
     private void DrainInbox()
     {
-        var processed = 0;
-        while (processed < InboxDrainCapPerTick && _inbox.Reader.TryRead(out var command))
+        while (_inbox.Reader.TryRead(out var command))
         {
-            processed++;
             try
             {
                 switch (command.Kind)
@@ -317,6 +348,9 @@ public sealed partial class Zone(
                         break;
                     case ZoneCommandKind.MarkZoneTransferPending:
                         HandleMarkZoneTransferPending(command.CharacterId);
+                        break;
+                    case ZoneCommandKind.ClearZoneTransferPending:
+                        HandleClearZoneTransferPending(command.CharacterId);
                         break;
                     case ZoneCommandKind.SetMuted:
                         HandleSetMuted(command.CharacterId, command.Muted);
@@ -348,17 +382,6 @@ public sealed partial class Zone(
                     command.Kind, command.CharacterId);
             }
         }
-
-        if (processed >= InboxDrainCapPerTick)
-            LogDrainCapEngaged(_inbox.Reader, "inbox", InboxDrainCapPerTick);
-    }
-
-    private void LogDrainCapEngaged<T>(ChannelReader<T> reader, string channelName, int cap)
-    {
-        var remaining = reader.CanCount ? reader.Count : -1;
-        logger.LogWarning(
-            "Zone {MapId} {Channel} drain hit its per-tick cap of {Cap} item(s); {Remaining} still queued and will be processed on a following tick",
-            MapId, channelName, cap, remaining);
     }
 
     private void Simulate(int legacyTicksElapsed)

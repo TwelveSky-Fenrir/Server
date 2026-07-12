@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.IO.Pipelines;
+using Fenrir.Network.Dispatch.Login.Sessions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
@@ -130,6 +131,42 @@ public class ClientSessionSendTests
         catch (OperationCanceledException)
         {
         }
+    }
+
+    [Fact]
+    public void SendRaw_AbortsImmediately_WhenQueuedBytesWouldExceedTheSessionsPendingSendCap()
+    {
+        var outboundOptions = new PipeOptions(
+            pauseWriterThreshold: 1,
+            resumeWriterThreshold: 0,
+            useSynchronizationContext: false);
+        var pipe = new FakeDuplexPipe(outboundOptions);
+        var session = new LoginClientSession(1, pipe);
+
+        session.SendRaw([0xAB]);
+
+        Assert.Null(session.DisconnectReason);
+
+        session.SendRaw(new byte[41_000]);
+
+        Assert.Equal(DisconnectReason.SendBufferOverflow, session.DisconnectReason);
+    }
+
+    [Fact]
+    public void SendRaw_DoesNotDisconnect_WhenQueuedBytesStayWithinTheSessionsPendingSendCap()
+    {
+        var outboundOptions = new PipeOptions(
+            pauseWriterThreshold: 1,
+            resumeWriterThreshold: 0,
+            useSynchronizationContext: false);
+        var pipe = new FakeDuplexPipe(outboundOptions);
+        var session = new LoginClientSession(1, pipe);
+
+        session.SendRaw([0xAB]);
+        session.SendRaw(new byte[16_000]);
+        session.SendRaw(new byte[16_000]);
+
+        Assert.Null(session.DisconnectReason);
     }
 
     [Fact]

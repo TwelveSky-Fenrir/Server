@@ -228,6 +228,39 @@ public sealed class GenericActionHandler(
             return;
         }
 
+        if (sort == 235)
+        {
+            var requestedUnits = BinaryPrimitives.ReadInt32LittleEndian(packet.Data.AsSpan(0, 4));
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method} (requestedUnits {RequestedUnits})",
+                    zoneSession.SessionId, characterId, sort,
+                    nameof(IGenericActionService.ExchangeMeritForContributionPointsAsync), requestedUnits);
+            var result = await genericActionService.ExchangeMeritForContributionPointsAsync(requestedUnits, zone,
+                state, characterId, cancellationToken);
+            Respond(session, zoneSession, sort, packet.Data, result);
+            return;
+        }
+
+        if (sort == 236)
+        {
+            logger.LogInformation(
+                "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} disconnects unconditionally",
+                zoneSession.SessionId, characterId, sort);
+            zoneSession.Abort(DisconnectReason.ContributionPointExchangeRetired);
+            return;
+        }
+
+        if (sort == 239)
+        {
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} is a legacy no-op success",
+                    zoneSession.SessionId, characterId, sort);
+            Respond(session, zoneSession, sort, packet.Data, GenericActionResult.Succeeded);
+            return;
+        }
+
         if (sort == 237)
         {
             if (debugEnabled)

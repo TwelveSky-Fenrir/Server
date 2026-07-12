@@ -60,6 +60,32 @@ public static partial class StatCalculator
 
     private static readonly FrozenSet<int> PetAmuletPhoenixOverlapIds = new[] { 76005, 76006, 76007 }.ToFrozenSet();
 
+    private static readonly FrozenDictionary<int, int> PetAmuletLifeTable = new Dictionary<int, int>
+    {
+        [8290] = 550,
+        [76000] = 3000,
+        [76001] = 3000,
+        [76002] = 3000,
+        [76003] = 3000,
+        [76004] = 3000,
+        [76005] = 5000,
+        [76006] = 7500,
+        [76007] = 12500
+    }.ToFrozenDictionary();
+
+    private static readonly FrozenDictionary<int, int> PetAmuletManaTable = new Dictionary<int, int>
+    {
+        [8290] = 500,
+        [76000] = 3000,
+        [76001] = 3000,
+        [76002] = 3000,
+        [76003] = 3000,
+        [76004] = 3000,
+        [76005] = 5000,
+        [76006] = 7500,
+        [76007] = 12500
+    }.ToFrozenDictionary();
+
 
     public static int DecodePetIsByte(int packedValue)
     {
@@ -161,6 +187,16 @@ public static partial class StatCalculator
     public static int PetAmuletDefenseBonus(int petItemId, int petSort)
     {
         return petSort == PetAmuletSort && PetAmuletDefenseTable.TryGetValue(petItemId, out var value) ? value : 0;
+    }
+
+    public static int PetAmuletLifeBonus(int petItemId, int petSort)
+    {
+        return petSort == PetAmuletSort && PetAmuletLifeTable.TryGetValue(petItemId, out var value) ? value : 0;
+    }
+
+    public static int PetAmuletManaBonus(int petItemId, int petSort)
+    {
+        return petSort == PetAmuletSort && PetAmuletManaTable.TryGetValue(petItemId, out var value) ? value : 0;
     }
 
 

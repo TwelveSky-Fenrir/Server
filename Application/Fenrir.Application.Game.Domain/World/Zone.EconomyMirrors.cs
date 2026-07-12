@@ -16,31 +16,17 @@ public sealed partial class Zone
 {
     private const int GuildInboxCapacity = 512;
 
-    private const int GuildInboxDrainCapPerTick = GuildInboxCapacity / 2;
-
     private const int InventoryInboxCapacity = 2048;
-
-    private const int InventoryInboxDrainCapPerTick = InventoryInboxCapacity / 2;
 
     private const int MentorInboxCapacity = 256;
 
-    private const int MentorInboxDrainCapPerTick = MentorInboxCapacity / 2;
-
     private const int MissionInboxCapacity = 256;
-
-    private const int MissionInboxDrainCapPerTick = MissionInboxCapacity / 2;
 
     private const int QuestInboxCapacity = 512;
 
-    private const int QuestInboxDrainCapPerTick = QuestInboxCapacity / 2;
-
     private const int SkillInboxCapacity = 1024;
 
-    private const int SkillInboxDrainCapPerTick = SkillInboxCapacity / 2;
-
     private const int TribeInboxCapacity = 512;
-
-    private const int TribeInboxDrainCapPerTick = TribeInboxCapacity / 2;
 
     private readonly List<int> _gmTeleportNeighborScratch = [];
 
@@ -215,10 +201,8 @@ public sealed partial class Zone
 
     private void DrainInventoryCommands()
     {
-        var processed = 0;
-        while (processed < InventoryInboxDrainCapPerTick && _inventoryInbox.Reader.TryRead(out var command))
+        while (_inventoryInbox.Reader.TryRead(out var command))
         {
-            processed++;
             try
             {
                 ApplyInventoryCommand(in command);
@@ -231,9 +215,6 @@ public sealed partial class Zone
                 command.Applied?.TrySetException(ex);
             }
         }
-
-        if (processed >= InventoryInboxDrainCapPerTick)
-            LogDrainCapEngaged(_inventoryInbox.Reader, "inventory", InventoryInboxDrainCapPerTick);
     }
 
     private void ApplyInventoryCommand(in InventoryZoneCommand command)
@@ -278,10 +259,8 @@ public sealed partial class Zone
 
     private void DrainSkillCommands()
     {
-        var processed = 0;
-        while (processed < SkillInboxDrainCapPerTick && _skillInbox.Reader.TryRead(out var command))
+        while (_skillInbox.Reader.TryRead(out var command))
         {
-            processed++;
             try
             {
                 ApplySkillCommand(in command);
@@ -292,9 +271,6 @@ public sealed partial class Zone
                     command.CharacterId);
             }
         }
-
-        if (processed >= SkillInboxDrainCapPerTick)
-            LogDrainCapEngaged(_skillInbox.Reader, "skill", SkillInboxDrainCapPerTick);
     }
 
     private void ApplySkillCommand(in SkillZoneCommand command)
@@ -309,10 +285,8 @@ public sealed partial class Zone
 
     private void DrainMentorCommands()
     {
-        var processed = 0;
-        while (processed < MentorInboxDrainCapPerTick && _mentorInbox.Reader.TryRead(out var command))
+        while (_mentorInbox.Reader.TryRead(out var command))
         {
-            processed++;
             try
             {
                 ApplyMentorCommand(in command);
@@ -323,9 +297,6 @@ public sealed partial class Zone
                     command.CharacterId);
             }
         }
-
-        if (processed >= MentorInboxDrainCapPerTick)
-            LogDrainCapEngaged(_mentorInbox.Reader, "mentor", MentorInboxDrainCapPerTick);
     }
 
     private void ApplyMentorCommand(in MentorZoneCommand command)
@@ -338,10 +309,8 @@ public sealed partial class Zone
 
     private void DrainGuildCommands()
     {
-        var processed = 0;
-        while (processed < GuildInboxDrainCapPerTick && _guildInbox.Reader.TryRead(out var command))
+        while (_guildInbox.Reader.TryRead(out var command))
         {
-            processed++;
             try
             {
                 ApplyGuildMembershipCommand(in command);
@@ -354,9 +323,6 @@ public sealed partial class Zone
                 command.Applied?.TrySetException(ex);
             }
         }
-
-        if (processed >= GuildInboxDrainCapPerTick)
-            LogDrainCapEngaged(_guildInbox.Reader, "guild", GuildInboxDrainCapPerTick);
     }
 
     private void ApplyGuildMembershipCommand(in GuildMembershipZoneCommand command)
@@ -372,10 +338,8 @@ public sealed partial class Zone
 
     private void DrainTribeProgressCommands()
     {
-        var processed = 0;
-        while (processed < TribeInboxDrainCapPerTick && _tribeInbox.Reader.TryRead(out var command))
+        while (_tribeInbox.Reader.TryRead(out var command))
         {
-            processed++;
             try
             {
                 ApplyTribeProgressCommand(in command);
@@ -388,9 +352,6 @@ public sealed partial class Zone
                 command.Applied?.TrySetException(ex);
             }
         }
-
-        if (processed >= TribeInboxDrainCapPerTick)
-            LogDrainCapEngaged(_tribeInbox.Reader, "tribe-progress", TribeInboxDrainCapPerTick);
     }
 
     private void ApplyTribeProgressCommand(in TribeProgressZoneCommand command)
@@ -784,10 +745,8 @@ public sealed partial class Zone
 
     private void DrainQuestCommands()
     {
-        var processed = 0;
-        while (processed < QuestInboxDrainCapPerTick && _questInbox.Reader.TryRead(out var command))
+        while (_questInbox.Reader.TryRead(out var command))
         {
-            processed++;
             try
             {
                 ApplyQuestCommand(in command);
@@ -800,9 +759,6 @@ public sealed partial class Zone
                 command.Applied?.TrySetException(ex);
             }
         }
-
-        if (processed >= QuestInboxDrainCapPerTick)
-            LogDrainCapEngaged(_questInbox.Reader, "quest", QuestInboxDrainCapPerTick);
     }
 
     private void ApplyQuestCommand(in QuestZoneCommand command)
@@ -819,22 +775,21 @@ public sealed partial class Zone
         foreach (var snapshot in command.Containers)
             state.Inventory.ReplaceContainer(snapshot.Container, snapshot.Slots);
 
-        if (command.ExperienceDelta != 0)
-            state.Experience += command.ExperienceDelta;
-        if (command.ContributionPointsDelta != 0)
-            state.ContributionPoints += command.ContributionPointsDelta;
+        if (command.ExperienceDelta > 0)
+            ApplyCharacterExperienceGain(state, command.ExperienceDelta);
+
+        if (command.KillOtherTribeCountDelta != 0)
+            state.MissionKillOtherTribe += command.KillOtherTribeCountDelta;
         if (command.TeacherPointDelta != 0)
             state.TeacherPoint += command.TeacherPointDelta;
-        if (command.ExperienceDelta != 0 || command.ContributionPointsDelta != 0 || command.TeacherPointDelta != 0)
+        if (command.KillOtherTribeCountDelta != 0 || command.TeacherPointDelta != 0)
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
     }
 
     private void DrainMissionCommands()
     {
-        var processed = 0;
-        while (processed < MissionInboxDrainCapPerTick && _missionInbox.Reader.TryRead(out var command))
+        while (_missionInbox.Reader.TryRead(out var command))
         {
-            processed++;
             try
             {
                 ApplyMissionCommand(in command);
@@ -847,9 +802,6 @@ public sealed partial class Zone
                 command.Applied?.TrySetException(ex);
             }
         }
-
-        if (processed >= MissionInboxDrainCapPerTick)
-            LogDrainCapEngaged(_missionInbox.Reader, "mission", MissionInboxDrainCapPerTick);
     }
 
     private void ApplyMissionCommand(in MissionZoneCommand command)

@@ -36,22 +36,38 @@ public class WarZoneEntryGateTests
             WarZoneEntryGate.Evaluate(164, 157, 7));
     }
 
-    [Theory]
-    [InlineData((short)295)]
-    [InlineData((short)322)]
-    public void LowRebirthTierZones_RebirthSeven_IsRejected(short zoneNumber)
+    [Fact]
+    public void Zone322_RebirthSeven_IsRejected()
     {
         Assert.Equal(WarZoneEntryOutcome.RejectedOutOfRange,
-            WarZoneEntryGate.Evaluate(zoneNumber, 157, 7));
+            WarZoneEntryGate.Evaluate(322, 157, 7));
     }
 
-    [Theory]
-    [InlineData((short)295)]
-    [InlineData((short)322)]
-    public void LowRebirthTierZones_RebirthSix_IsAllowed(short zoneNumber)
+    [Fact]
+    public void Zone322_RebirthSix_IsAllowed()
     {
         Assert.Equal(WarZoneEntryOutcome.Allowed,
-            WarZoneEntryGate.Evaluate(zoneNumber, 157, 6));
+            WarZoneEntryGate.Evaluate(322, 157, 6));
+    }
+
+    [Fact]
+    public void Zone295_RebirthSeven_IsRejectedRegardlessOfLevel()
+    {
+        Assert.Equal(WarZoneEntryOutcome.RejectedOutOfRange,
+            WarZoneEntryGate.Evaluate(295, 157, 7));
+        Assert.Equal(WarZoneEntryOutcome.RejectedOutOfRange,
+            WarZoneEntryGate.Evaluate(295, 1, 7));
+    }
+
+    [Fact]
+    public void Zone295_RebirthSix_IsAllowedRegardlessOfLevel()
+    {
+        Assert.Equal(WarZoneEntryOutcome.Allowed,
+            WarZoneEntryGate.Evaluate(295, 157, 6));
+        Assert.Equal(WarZoneEntryOutcome.Allowed,
+            WarZoneEntryGate.Evaluate(295, 1, 6));
+        Assert.Equal(WarZoneEntryOutcome.Allowed,
+            WarZoneEntryGate.Evaluate(295, 999, 0));
     }
 
     [Theory]

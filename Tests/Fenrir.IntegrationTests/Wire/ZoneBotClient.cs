@@ -76,12 +76,14 @@ public sealed class ZoneBotClient : IAsyncDisposable
         return WireScalars.ReadInt32(frame.AsSpan(1, 4));
     }
 
-    public async Task<EnterWorldResult> EnterWorldAsync(int accountId, string avatarName, CancellationToken ct)
+    public async Task<EnterWorldResult> EnterWorldAsync(int accountId, string avatarName, CancellationToken ct,
+        float claimedPosX = 0f, float claimedPosY = 0f, float claimedPosZ = 0f, float claimedFront = 0f)
     {
         var payload = new byte[EnterWorldRequest.PayloadSize];
         WriteObfuscatedAccountId(payload.AsSpan(0, 255), accountId);
         WireScalars.WriteFixedString(payload.AsSpan(255, 13), avatarName);
-        ZeroedAction().Write(payload.AsSpan(268, ActionInfo.WireSize));
+        ClaimedEntryAction(claimedPosX, claimedPosY, claimedPosZ, claimedFront)
+            .Write(payload.AsSpan(268, ActionInfo.WireSize));
         await SendAsync(EnterWorldRequest.Opcode, payload, ct);
 
         var enterWorldPayload = await ReadCompressedPayloadAsync(Opcodes.Zone.Outgoing.EnterWorld, ct);
@@ -89,11 +91,6 @@ public sealed class ZoneBotClient : IAsyncDisposable
             throw new InvalidOperationException("Failed to decode AvatarInfo from EnterWorldResponse.");
 
         await ReadCompressedPayloadAsync(Opcodes.Zone.Outgoing.WorldSnapshot, ct);
-
-        var towerStatusFrame = await _connection.ReadExactAsync(1 + TowerStatusResponse.PayloadSize, ct);
-        if (towerStatusFrame[0] != TowerStatusResponse.Opcode)
-            throw new InvalidOperationException(
-                $"Expected TowerStatusResponse (op {TowerStatusResponse.Opcode}), got op {towerStatusFrame[0]}.");
 
         var selfSpawnFrame = await _connection.ReadExactAsync(1 + AvatarActionResponse.PayloadSize, ct);
         if (selfSpawnFrame[0] != AvatarActionResponse.Opcode)
@@ -104,6 +101,11 @@ public sealed class ZoneBotClient : IAsyncDisposable
         if (!ObjectForAvatar.TryRead(selfSpawnFrame.AsSpan(9, ObjectForAvatar.WireSize), out var selfObject))
             throw new InvalidOperationException(
                 "Failed to decode ObjectForAvatar from self-spawn AvatarActionResponse.");
+
+        var towerStatusFrame = await _connection.ReadExactAsync(1 + TowerStatusResponse.PayloadSize, ct);
+        if (towerStatusFrame[0] != TowerStatusResponse.Opcode)
+            throw new InvalidOperationException(
+                $"Expected TowerStatusResponse (op {TowerStatusResponse.Opcode}), got op {towerStatusFrame[0]}.");
 
         return new EnterWorldResult(avatarInfo, selfServerIndex, selfUniqueNumber, selfObject);
     }
@@ -354,17 +356,17 @@ public sealed class ZoneBotClient : IAsyncDisposable
         await SendAsync(LocalChatRequest.Opcode, payload, ct);
     }
 
-    private static ActionInfo ZeroedAction()
+    private static ActionInfo ClaimedEntryAction(float posX, float posY, float posZ, float front)
     {
         return new ActionInfo
         {
             Type = 0,
             Sort = 0,
             Frame = 0,
-            Location = new float[3],
-            TargetLocation = new float[3],
-            Front = 0,
-            TargetFront = 0,
+            Location = [posX, posY, posZ],
+            TargetLocation = [posX, posY, posZ],
+            Front = front,
+            TargetFront = front,
             PetLocation = new float[3],
             PetTargetLocation = new float[3],
             PetFront = 0,

@@ -141,6 +141,11 @@ public sealed class EnterWorldService(
 
         async ValueTask CompleteWorldEntryAsync()
         {
+            var claimedPosX = packet.Action.Location[0];
+            var claimedPosY = packet.Action.Location[1];
+            var claimedPosZ = packet.Action.Location[2];
+            var claimedFront = packet.Action.Front;
+
             var equipmentContainer = BuildEquipmentContainer(bundle.Items);
             var attributes = new CharacterBaseAttributes(character.StatVit, character.StatStr, character.StatInt,
                 character.StatDex, character.Level, character.Tribe, character.PreviousTribe, character.Title,
@@ -216,8 +221,6 @@ public sealed class EnterWorldService(
             };
             zoneSession.Send(in broadcastWorldInfo);
 
-            zoneSession.Send(towerWar.BuildStatusSnapshot());
-
             zoneSession.Send(new AvatarActionResponse
             {
                 ServerIndex = characterId,
@@ -251,10 +254,10 @@ public sealed class EnterWorldService(
                         Type = 0,
                         Sort = 0,
                         Frame = 0,
-                        Location = [character.PosX, character.PosY, character.PosZ],
-                        TargetLocation = [character.PosX, character.PosY, character.PosZ],
-                        Front = character.Heading,
-                        TargetFront = character.Heading,
+                        Location = [claimedPosX, claimedPosY, claimedPosZ],
+                        TargetLocation = [claimedPosX, claimedPosY, claimedPosZ],
+                        Front = claimedFront,
+                        TargetFront = claimedFront,
                         PetLocation = new float[3],
                         PetTargetLocation = new float[3],
                         PetFront = 0,
@@ -288,7 +291,7 @@ public sealed class EnterWorldService(
                     AnimalAbsorbState = 0,
                     PetValid = 0,
                     Unk1 = 0,
-                    PetLocation = [character.PosX, character.PosY, character.PosZ],
+                    PetLocation = [claimedPosX, claimedPosY, claimedPosZ],
                     PetFrame = 0,
                     Unk624 = 0,
                     Unk625 = 0,
@@ -309,10 +312,10 @@ public sealed class EnterWorldService(
                 character.FaceType,
                 character.Level,
                 character.MapId,
-                character.PosX,
-                character.PosY,
-                character.PosZ,
-                character.Heading,
+                claimedPosX,
+                claimedPosY,
+                claimedPosZ,
+                claimedFront,
                 character.Life,
                 character.MaxLife,
                 character.Mana,
@@ -399,7 +402,7 @@ public sealed class EnterWorldService(
             try
             {
                 await logoutState.UpsertAsync(characterId, character.MapId,
-                    (int)character.PosX, (int)character.PosY, (int)character.PosZ,
+                    (int)claimedPosX, (int)claimedPosY, (int)claimedPosZ,
                     character.Life, character.Mana, cancellationToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
@@ -409,6 +412,8 @@ public sealed class EnterWorldService(
                     "a successful world entry; the entry itself stands, only the snapshot write is skipped",
                     characterId, character.MapId);
             }
+
+            zoneSession.Send(towerWar.BuildStatusSnapshot());
         }
 
         try

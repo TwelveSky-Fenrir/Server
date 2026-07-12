@@ -80,7 +80,7 @@ public class MonsterPathfinderTests
     [Fact]
     public void OpenGround_StraightLineClear_YieldsDirectPath()
     {
-        var pathfinder = new MonsterPathfinder(OpenGround(), 24);
+        var pathfinder = new MonsterPathfinder(OpenGround());
         var waypoints = new List<Vector2>();
 
         var found = pathfinder.TryFindPath(new Vector3(5, GroundY, 5), new Vector3(25, GroundY, 25), waypoints);
@@ -94,7 +94,7 @@ public class MonsterPathfinderTests
     [Fact]
     public void SameTriangle_YieldsSingleDirectWaypoint()
     {
-        var pathfinder = new MonsterPathfinder(OpenGround(), 24);
+        var pathfinder = new MonsterPathfinder(OpenGround());
         var waypoints = new List<Vector2>();
 
         var found = pathfinder.TryFindPath(new Vector3(7, GroundY, 3), new Vector3(8, GroundY, 4), waypoints);
@@ -108,7 +108,7 @@ public class MonsterPathfinderTests
     [Fact]
     public void ObstacleBetweenEndpoints_RoutesAroundIt()
     {
-        var pathfinder = new MonsterPathfinder(GapWithTopDetour(), 24);
+        var pathfinder = new MonsterPathfinder(GapWithTopDetour());
         var waypoints = new List<Vector2>();
 
         var from = new Vector3(7, GroundY, 3);
@@ -132,7 +132,7 @@ public class MonsterPathfinderTests
     [Fact]
     public void OffMeshStart_ReturnsFalse_AndClearsOutput()
     {
-        var pathfinder = new MonsterPathfinder(OpenGround(), 24);
+        var pathfinder = new MonsterPathfinder(OpenGround());
         var waypoints = new List<Vector2> { new(1f, 2f) };
 
         var found = pathfinder.TryFindPath(new Vector3(5000, GroundY, 5000), new Vector3(5, GroundY, 5), waypoints);
@@ -144,7 +144,7 @@ public class MonsterPathfinderTests
     [Fact]
     public void OffMeshGoal_ReturnsFalse()
     {
-        var pathfinder = new MonsterPathfinder(OpenGround(), 24);
+        var pathfinder = new MonsterPathfinder(OpenGround());
         var waypoints = new List<Vector2>();
 
         var found = pathfinder.TryFindPath(new Vector3(5, GroundY, 5), new Vector3(-5000, GroundY, -5000), waypoints);
@@ -157,7 +157,7 @@ public class MonsterPathfinderTests
     public void DisconnectedIslands_ReturnFalse()
     {
         var geometry = GridGeometry((0, 0), (5, 5));
-        var pathfinder = new MonsterPathfinder(geometry, 24);
+        var pathfinder = new MonsterPathfinder(geometry);
         var waypoints = new List<Vector2>();
 
         var found = pathfinder.TryFindPath(new Vector3(5, GroundY, 5), new Vector3(55, GroundY, 55), waypoints);
@@ -166,32 +166,9 @@ public class MonsterPathfinderTests
     }
 
     [Fact]
-    public void Budget_ExhaustsThenResets()
-    {
-        var pathfinder = new MonsterPathfinder(OpenGround(), 2);
-
-        Assert.True(pathfinder.TryConsumeBudget());
-        Assert.True(pathfinder.TryConsumeBudget());
-        Assert.False(pathfinder.TryConsumeBudget());
-
-        pathfinder.ResetBudget();
-        Assert.True(pathfinder.TryConsumeBudget());
-    }
-
-    [Fact]
-    public void ZeroBudget_NeverGrantsAComputation()
-    {
-        var pathfinder = new MonsterPathfinder(OpenGround(), 0);
-
-        Assert.False(pathfinder.TryConsumeBudget());
-        pathfinder.ResetBudget();
-        Assert.False(pathfinder.TryConsumeBudget());
-    }
-
-    [Fact]
     public void TryFindPath_ReusingBuffers_DoesNotAllocateOnTheHotPath()
     {
-        var pathfinder = new MonsterPathfinder(GapWithTopDetour(), 24);
+        var pathfinder = new MonsterPathfinder(GapWithTopDetour());
         var waypoints = new List<Vector2>();
         var from = new Vector3(7, GroundY, 3);
         var to = new Vector3(27, GroundY, 3);

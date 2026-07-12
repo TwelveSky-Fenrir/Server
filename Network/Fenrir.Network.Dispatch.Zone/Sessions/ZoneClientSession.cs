@@ -77,4 +77,9 @@ public sealed class ZoneClientSession(
     {
         IsCrossShardTransferPending = true;
     }
+
+    public void ClearCrossShardTransferPending()
+    {
+        IsCrossShardTransferPending = false;
+    }
 }

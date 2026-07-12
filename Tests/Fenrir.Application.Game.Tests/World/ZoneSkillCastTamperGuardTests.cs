@@ -26,11 +26,11 @@ public class ZoneSkillCastTamperGuardTests
         return new SkillDefinition(row, [], [grade0, grade1]);
     }
 
-    private static ActionInfo SkillCastStartAction(int skillNumber, int gradeNum1, int gradeNum2 = 0)
+    private static ActionInfo SkillCastStartAction(int skillNumber, int gradeNum1, int gradeNum2 = 0, int sort = 32)
     {
         return new ActionInfo
         {
-            Type = 0, Sort = 32, Frame = 0,
+            Type = 0, Sort = sort, Frame = 0,
             Location = [100, 0, 100], TargetLocation = [100, 0, 100],
             Front = 0, TargetFront = 0,
             PetLocation = new float[3], PetTargetLocation = new float[3], PetFront = 0, PetSort = 0,
@@ -90,12 +90,28 @@ public class ZoneSkillCastTamperGuardTests
     }
 
     [Fact]
-    public void MatchingHotkeyButClaimedBonusGradeMismatch_DisconnectsSession_AndQueuesAnAuditLogRow()
+    public void MatchingHotkeyButClaimedBonusGradeMismatch_SkillEffectCategory_SilentlyDropsPacket_NoDisconnect()
+    {
+        var (zone, session, state, eventLog) = SetUp();
+        var manaBefore = state.Mana;
+        state.Hotkeys = state.Hotkeys.SetItem((0, 0), new HotkeySlot(HotkeyBindingKind.Skill, 82, 10));
+
+        zone.Post(ZoneCommand.Move(10, SkillCastStartAction(82, 10, 5)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Null(session.DisconnectReason);
+        Assert.Equal(manaBefore, state.Mana);
+        var row = Assert.Single(eventLog.Enqueued);
+        Assert.Equal((short)SkillCastOffense.BonusGradeMismatch, row.EventCode);
+    }
+
+    [Fact]
+    public void MatchingHotkeyButClaimedBonusGradeMismatch_HotkeyBoundCategory_DisconnectsSession()
     {
         var (zone, session, state, eventLog) = SetUp();
         state.Hotkeys = state.Hotkeys.SetItem((0, 0), new HotkeySlot(HotkeyBindingKind.Skill, 82, 10));
 
-        zone.Post(ZoneCommand.Move(10, SkillCastStartAction(82, 10, 5)));
+        zone.Post(ZoneCommand.Move(10, SkillCastStartAction(82, 10, 5, sort: 30)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);

@@ -7,6 +7,7 @@ using Fenrir.Application.Game.Domain.Movement;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Social.Duel;
+using Fenrir.Application.Game.Domain.Social.Friends;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Geometry;
@@ -36,7 +37,8 @@ internal static class ZoneTestKit
         WorldDataCache? worldData = null, IRandomSource? randomSource = null,
         KillCooldownTracker? killCooldownTracker = null, TowerWarState? towerWar = null,
         WorldStateService? worldState = null, PartyRegistry? partyRegistry = null,
-        DuelRegistry? duelRegistry = null, ICharacterShardLocationRepository? characterShardLocations = null,
+        DuelRegistry? duelRegistry = null, FriendRegistry? friendRegistry = null,
+        ICharacterShardLocationRepository? characterShardLocations = null,
         TribeBankTaxAccumulator? tribeBankTax = null,
         RegularWarActiveMapTracker? regularWarActiveMapTracker = null,
         ZoneGeometry? geometry = null,
@@ -49,6 +51,7 @@ internal static class ZoneTestKit
             dirtyTracker ?? new DirtyTracker<int>(), simulationSystems ?? [], NullLogger<Zone>.Instance,
             worldData ?? EmptyWorldData(), randomSource, killCooldownTracker: killCooldownTracker,
             towerWar: towerWar, worldState: worldState, partyRegistry: partyRegistry, duelRegistry: duelRegistry,
+            friendRegistry: friendRegistry,
             characterShardLocations: characterShardLocations, tribeBankTax: tribeBankTax,
             regularWarActiveMapTracker: regularWarActiveMapTracker, geometry: geometry,
             eventLogQueue: eventLogQueue, fourGuildKillPointQueue: fourGuildKillPointQueue,

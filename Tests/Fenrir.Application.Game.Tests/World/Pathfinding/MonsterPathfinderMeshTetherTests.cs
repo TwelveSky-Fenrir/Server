@@ -68,7 +68,7 @@ public class MonsterPathfinderMeshTetherTests
     [Fact]
     public void Clamped_DestinationAlreadyOnMesh_BehavesLikeOrdinaryPath()
     {
-        var pathfinder = new MonsterPathfinder(OpenGround(), 24);
+        var pathfinder = new MonsterPathfinder(OpenGround());
         var ordinary = new List<Vector2>();
         var clamped = new List<Vector2>();
 
@@ -84,7 +84,7 @@ public class MonsterPathfinderMeshTetherTests
     [Fact]
     public void Clamped_OffMeshDestination_ClampsToLastWalkablePointAlongApproach()
     {
-        var pathfinder = new MonsterPathfinder(OpenGround(), 24);
+        var pathfinder = new MonsterPathfinder(OpenGround());
         var waypoints = new List<Vector2>();
 
         var from = new Vector3(5, GroundY, 5);
@@ -107,7 +107,7 @@ public class MonsterPathfinderMeshTetherTests
     [Fact]
     public void Clamped_OffMeshStart_ReturnsFalseAndClearsOutput()
     {
-        var pathfinder = new MonsterPathfinder(OpenGround(), 24);
+        var pathfinder = new MonsterPathfinder(OpenGround());
         var waypoints = new List<Vector2> { new(1f, 2f) };
 
         var found = pathfinder.TryFindPathClamped(new Vector3(5000, GroundY, 5000), new Vector3(5, GroundY, 5),
@@ -120,7 +120,7 @@ public class MonsterPathfinderMeshTetherTests
     [Fact]
     public void Clamped_BothEndpointsOnMesh_NoObstacle_StillCollapsesToDirectWaypoint()
     {
-        var pathfinder = new MonsterPathfinder(OpenGround(), 24);
+        var pathfinder = new MonsterPathfinder(OpenGround());
         var waypoints = new List<Vector2>();
 
         var found = pathfinder.TryFindPathClamped(new Vector3(5, GroundY, 5), new Vector3(25, GroundY, 25),
@@ -136,7 +136,7 @@ public class MonsterPathfinderMeshTetherTests
     [Fact]
     public void Pursuit_StartAlreadyWithinTether_ReturnsTrueWithNoWaypoints()
     {
-        var pathfinder = new MonsterPathfinder(OpenGround(), 24);
+        var pathfinder = new MonsterPathfinder(OpenGround());
         var waypoints = new List<Vector2> { new(9f, 9f) };
 
         var from = new Vector3(5, GroundY, 5);
@@ -150,7 +150,7 @@ public class MonsterPathfinderMeshTetherTests
     [Fact]
     public void Pursuit_DirectLine_ClipsAtExactTetherRadiusFromAnchor()
     {
-        var pathfinder = new MonsterPathfinder(OpenGround(), 24);
+        var pathfinder = new MonsterPathfinder(OpenGround());
         var waypoints = new List<Vector2>();
 
         var from = new Vector3(5, GroundY, 5);
@@ -175,7 +175,7 @@ public class MonsterPathfinderMeshTetherTests
     [Fact]
     public void Pursuit_MultiCornerDetour_OnlyClipsTheFinalSegmentReachingTheAnchor()
     {
-        var pathfinder = new MonsterPathfinder(GapWithTopDetour(), 24);
+        var pathfinder = new MonsterPathfinder(GapWithTopDetour());
         var waypoints = new List<Vector2>();
 
         var from = new Vector3(7, GroundY, 3);
@@ -202,7 +202,7 @@ public class MonsterPathfinderMeshTetherTests
     [Fact]
     public void Pursuit_OffMeshGoal_RevertsWhollyAndReportsFailure_NoPartialCredit()
     {
-        var pathfinder = new MonsterPathfinder(OpenGround(), 24);
+        var pathfinder = new MonsterPathfinder(OpenGround());
         var waypoints = new List<Vector2> { new(1f, 2f) };
 
         var from = new Vector3(5, GroundY, 5);
@@ -218,7 +218,7 @@ public class MonsterPathfinderMeshTetherTests
     [Fact]
     public void Pursuit_AnchorNeverEnteredByRoute_ReturnsFullUnclampedRoute()
     {
-        var pathfinder = new MonsterPathfinder(OpenGround(), 24);
+        var pathfinder = new MonsterPathfinder(OpenGround());
         var waypoints = new List<Vector2>();
         var ordinary = new List<Vector2>();
 
@@ -236,7 +236,7 @@ public class MonsterPathfinderMeshTetherTests
     [Fact]
     public void TryFindPursuitPath_ReusingBuffers_DoesNotAllocateOnTheHotPath()
     {
-        var pathfinder = new MonsterPathfinder(GapWithTopDetour(), 24);
+        var pathfinder = new MonsterPathfinder(GapWithTopDetour());
         var waypoints = new List<Vector2>();
         var from = new Vector3(7, GroundY, 3);
         var to = new Vector3(27, GroundY, 3);

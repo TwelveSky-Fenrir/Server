@@ -85,8 +85,8 @@ public class PendingSocialRequestAutoCancelSystemTests
         Enter(zone, 1, "Alice");
 
         trade.TryAsk(1, 2);
-        trade.TryAnswer(2, true, out _);
-        Assert.True(trade.TryStart(1, out _));
+        trade.TryAnswer(2, true, false, out _, out _);
+        Assert.True(trade.TryStart(1, 2, false, out _));
 
         zone.Tick(TimeSpan.FromMilliseconds(500));
 

@@ -21,7 +21,7 @@ public sealed class WarPointShopService(
 
     private const int ContributionPointBalanceUpdateSort = 3;
 
-    private const short WarPointShopBuyEventCode = 3;
+    private const short WarPointShopBuyEventCode = 4;
 
     private const byte NpcShopTradeOutcome = 1;
 
@@ -39,19 +39,21 @@ public sealed class WarPointShopService(
         switch (resolution.Outcome)
         {
             case WarPointShopPolicy.BuyOutcome.NotWarPointItem:
+            case WarPointShopPolicy.BuyOutcome.PriceUnavailable:
                 return WarPointBuyServiceResult.NotHandled;
 
-            case WarPointShopPolicy.BuyOutcome.WrongNpc:
             case WarPointShopPolicy.BuyOutcome.DestinationConflict:
                 logger.LogInformation(
                     "Character {CharacterId} War-Point buy aborted: {Outcome} (NPC {NpcId}, item {ItemId})",
                     characterId, resolution.Outcome, npcId, itemId);
                 return WarPointBuyServiceResult.Aborted;
 
+            case WarPointShopPolicy.BuyOutcome.WrongNpcForItem:
+            case WarPointShopPolicy.BuyOutcome.InvalidQuantity:
             case WarPointShopPolicy.BuyOutcome.InsufficientContributionPoints:
                 logger.LogInformation(
-                    "Character {CharacterId} War-Point buy soft-rejected: insufficient Contribution Points (item {ItemId})",
-                    characterId, itemId);
+                    "Character {CharacterId} War-Point buy soft-rejected: {Outcome} (NPC {NpcId}, item {ItemId})",
+                    characterId, resolution.Outcome, npcId, itemId);
                 return WarPointBuyServiceResult.SoftRejected;
         }
 
@@ -84,11 +86,6 @@ public sealed class WarPointShopService(
         var beforeWarPoint = newWarPoint + resolution.WarPointCost;
         var purchasedQuantity = resolution.NewDestinationStack!.Value.Quantity - (destination?.Quantity ?? 0);
 
-        await eventLog.LogAsync(WarPointShopBuyEventCode, EventLogCategory.NpcShopTrade, accountId, characterId,
-            null, null, null, null, null, itemId, purchasedQuantity, NpcShopTradeOutcome,
-            $"WarPointBefore={beforeWarPoint};WarPointAfter={newWarPoint};WarPointCost={resolution.WarPointCost};CpCost={resolution.ContributionPointCost}",
-            ct);
-
         var containers = ImmutableArray.Create(new InventoryContainerSnapshot(destinationPage, projected));
         if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null), ct))
             logger.LogError(
@@ -112,6 +109,11 @@ public sealed class WarPointShopService(
         if (resolution.ContributionPointCost > 0)
             state.Session.Send(new AvatarStatUpdateResponse
                 { Sort = ContributionPointBalanceUpdateSort, Value = newContributionPoints, Value2 = 0 });
+
+        await eventLog.LogAsync(WarPointShopBuyEventCode, EventLogCategory.NpcShopTrade, accountId, characterId,
+            null, null, null, null, null, itemId, purchasedQuantity, NpcShopTradeOutcome,
+            $"WarPointBefore={beforeWarPoint};WarPointAfter={newWarPoint};WarPointCost={resolution.WarPointCost};CpCost={resolution.ContributionPointCost}",
+            ct);
 
         logger.LogInformation(
             "Character {CharacterId} War-Point buy applied: item {ItemId} x{Quantity}, WP {Before}->{After}, CP -{CpCost}",

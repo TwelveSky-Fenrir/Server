@@ -34,7 +34,7 @@ public class RegularWarRewardCalculatorTests
     }
 
     [Fact]
-    public void Draw_GrantsOnlyTheLosingRateHeroPoints_NoMoneyNoXpNoCpBonusNoItemDrop()
+    public void Draw_GrantsHalvedMoneyAndExperience_NoCpBonusNoItemDrop_LosingRateHeroPoints()
     {
         var participants = new[]
         {
@@ -48,8 +48,8 @@ public class RegularWarRewardCalculatorTests
         Assert.All(grants, grant =>
         {
             Assert.Null(grant.IsWinningSide);
-            Assert.Equal(0, grant.MoneyAmount);
-            Assert.Equal(0, grant.ExperienceAmount);
+            Assert.Equal(500, grant.MoneyAmount);
+            Assert.Equal(50, grant.ExperienceAmount);
             Assert.Equal(0, grant.CpBonusAmount);
             Assert.Equal(RegularWarRewardCalculator.LosingOrDrawHeroRankPoints, grant.HeroRankPoints);
             Assert.False(grant.RequestItemDrop);
@@ -195,9 +195,9 @@ public class RegularWarRewardCalculatorTests
 
     private sealed class FakeRewardValueProvider(long money, int experience) : IRegularWarRewardValueProvider
     {
-        public long GetMoneyReward(short rebirthTier)
+        public long GetMoneyReward(short evolutionTier, short level)
         {
-            return rebirthTier > 0 ? money : 0;
+            return evolutionTier > 0 ? money : 0;
         }
 
         public int GetExperienceReward(short level)

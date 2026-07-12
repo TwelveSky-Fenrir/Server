@@ -16,6 +16,8 @@ public enum ZoneCommandKind : byte
 
     MarkZoneTransferPending,
 
+    ClearZoneTransferPending,
+
     SetMuted,
 
     CreditRegularWarConclusion,
@@ -88,6 +90,11 @@ public readonly struct ZoneCommand
     public static ZoneCommand MarkZoneTransferPending(int characterId)
     {
         return new ZoneCommand { Kind = ZoneCommandKind.MarkZoneTransferPending, CharacterId = characterId };
+    }
+
+    public static ZoneCommand ClearZoneTransferPending(int characterId)
+    {
+        return new ZoneCommand { Kind = ZoneCommandKind.ClearZoneTransferPending, CharacterId = characterId };
     }
 
     public static ZoneCommand SetMuted(int characterId, bool muted)

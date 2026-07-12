@@ -1,3 +1,5 @@
+using Fenrir.Application.Game.Domain.Social.Duel;
+using Fenrir.Application.Game.Domain.Social.Friends;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.WriteBehind;
@@ -427,6 +429,27 @@ public class ZoneHandoffTests
     }
 
     [Fact]
+    public void Leave_WithoutHandoffTarget_WhileMovingZone_DoesNotRemoveFromTheCrossShardLocationDirectory()
+    {
+        var characterShardLocations = new FakeCharacterShardLocationRepository();
+        var options = ZoneTestKit.Options();
+        options.ShardId = 7;
+        var zone = ZoneTestKit.CreateZone(1, options, characterShardLocations: characterShardLocations);
+        var (session, _) = ZoneTestKit.CreateSession(1);
+
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        zone.Post(ZoneCommand.MarkZoneTransferPending(10));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        zone.Post(ZoneCommand.Leave(10));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Empty(characterShardLocations.RemoveCalls);
+    }
+
+    [Fact]
     public void Leave_WithHandoffTarget_NeverTouchesTheCrossShardLocationDirectory()
     {
         var characterShardLocations = new FakeCharacterShardLocationRepository();
@@ -456,5 +479,49 @@ public class ZoneHandoffTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.False(zone.TryGetPlayer(10, out _));
+    }
+
+    [Fact]
+    public void Leave_WithoutHandoffTarget_UnsticksTheAcceptedDuelPartner()
+    {
+        var duelRegistry = new DuelRegistry();
+        var zone = ZoneTestKit.CreateZone(1, duelRegistry: duelRegistry);
+        var (sessionA, _) = ZoneTestKit.CreateSession(1);
+        var (sessionB, _) = ZoneTestKit.CreateSession(2);
+
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(sessionA, 1)));
+        zone.Post(ZoneCommand.Enter(20, ZoneTestKit.EnterData(sessionB, 1)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        duelRegistry.TryAsk(10, 20, false);
+        duelRegistry.TryAnswer(20, true, out _);
+        Assert.True(duelRegistry.IsNegotiating(10));
+
+        zone.Post(ZoneCommand.Leave(20));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.False(duelRegistry.IsNegotiating(10));
+    }
+
+    [Fact]
+    public void Leave_WithoutHandoffTarget_UnsticksTheAcceptedFriendPartner()
+    {
+        var friendRegistry = new FriendRegistry();
+        var zone = ZoneTestKit.CreateZone(1, friendRegistry: friendRegistry);
+        var (sessionA, _) = ZoneTestKit.CreateSession(1);
+        var (sessionB, _) = ZoneTestKit.CreateSession(2);
+
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(sessionA, 1)));
+        zone.Post(ZoneCommand.Enter(20, ZoneTestKit.EnterData(sessionB, 1)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        friendRegistry.TryAsk(10, 20);
+        friendRegistry.TryAnswer(20, true, out _);
+        Assert.True(friendRegistry.IsNegotiating(10));
+
+        zone.Post(ZoneCommand.Leave(20));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.False(friendRegistry.IsNegotiating(10));
     }
 }

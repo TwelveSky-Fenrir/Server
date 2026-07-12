@@ -67,6 +67,14 @@ public sealed class TradeRegistry
         }
     }
 
+    public bool TryPeekAccepted(int characterId, out int counterpartId)
+    {
+        lock (_lock)
+        {
+            return _acceptedPairs.TryGetValue(characterId, out counterpartId);
+        }
+    }
+
     public TradeAskOutcome TryAskCrossShard(int askerId, CrossShardOutboundAsk ask)
     {
         lock (_lock)
@@ -98,10 +106,7 @@ public sealed class TradeRegistry
         lock (_lock)
         {
             if (_pendingByAsker.Remove(askerId, out targetId))
-            {
-                _pendingByTarget.Remove(targetId);
                 return true;
-            }
 
             if (_crossShard.TryConsumeOutbound(askerId, out var crossShardAsk))
             {
@@ -110,6 +115,16 @@ public sealed class TradeRegistry
             }
 
             return false;
+        }
+    }
+
+    public bool ClearTargetAfterCancel(int targetId, int askerId)
+    {
+        lock (_lock)
+        {
+            return _pendingByTarget.TryGetValue(targetId, out var recordedAskerId) &&
+                   recordedAskerId == askerId &&
+                   _pendingByTarget.Remove(targetId);
         }
     }
 
@@ -140,34 +155,51 @@ public sealed class TradeRegistry
         }
     }
 
-    public bool TryAnswer(int targetId, bool accepted, out int askerId)
+    public bool TryAnswer(int targetId, bool accepted, bool askerBusyByZoneTransfer, out int askerId,
+        out bool guardBlocked)
     {
+        guardBlocked = false;
+
         lock (_lock)
         {
             if (!_pendingByTarget.Remove(targetId, out askerId))
                 return false;
 
+            if (accepted)
+                _acceptedPairs[targetId] = askerId;
+
+            if (askerBusyByZoneTransfer)
+            {
+                guardBlocked = true;
+                return false;
+            }
+
             _pendingByAsker.Remove(askerId);
 
             if (accepted)
-            {
                 _acceptedPairs[askerId] = targetId;
-                _acceptedPairs[targetId] = askerId;
-            }
 
             return true;
         }
     }
 
-    public bool TryStart(int callerId, out TradeSession session)
+    public bool TryStart(int callerId, int expectedOpponentId, bool opponentBusyByZoneTransfer,
+        out TradeSession session)
     {
         lock (_lock)
         {
             session = null!;
 
-            if (!_acceptedPairs.Remove(callerId, out var opponentId))
+            if (!_acceptedPairs.TryGetValue(callerId, out var opponentId) || opponentId != expectedOpponentId)
                 return false;
 
+            if (opponentBusyByZoneTransfer)
+            {
+                _acceptedPairs.Remove(callerId);
+                return false;
+            }
+
+            _acceptedPairs.Remove(callerId);
             _acceptedPairs.Remove(opponentId);
 
             session = new TradeSession { PlayerAId = callerId, PlayerBId = opponentId };

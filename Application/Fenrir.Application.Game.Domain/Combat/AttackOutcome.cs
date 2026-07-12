@@ -27,7 +27,9 @@ public enum AttackRejectReason
 
     AntiCheatEchoMismatch,
 
-    OwnerNameLocked
+    OwnerNameLocked,
+
+    TargetCategoryIneligible
 }
 
 public readonly record struct AttackOutcome(
@@ -43,6 +45,11 @@ public readonly record struct AttackOutcome(
     public static AttackOutcome Reject(AttackRejectReason reason)
     {
         return new AttackOutcome(true, reason, false, false, 0, 0, 0, false);
+    }
+
+    public static AttackOutcome Reject(AttackRejectReason reason, bool chargeConsumed)
+    {
+        return new AttackOutcome(true, reason, false, false, 0, 0, 0, chargeConsumed);
     }
 
     public static AttackOutcome Miss(bool chargeConsumed = false)

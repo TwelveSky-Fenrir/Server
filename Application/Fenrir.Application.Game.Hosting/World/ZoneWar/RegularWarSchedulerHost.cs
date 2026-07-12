@@ -105,14 +105,17 @@ public sealed class RegularWarSchedulerHost(
         sink.OnWarConcluded(mapConfig.MapId, outcome, winningTribe, rewards, bossMonstersShouldSpawn);
     }
 
-    private static void CreditDailyMissionAndWaterfallQuest(Zone zone)
+    private void CreditDailyMissionAndWaterfallQuest(Zone zone)
     {
         foreach (var player in zone.Players)
         {
             if (player.IsMovingZone)
                 continue;
 
-            zone.Post(ZoneCommand.CreditRegularWarConclusion(player.CharacterId));
+            if (!zone.Post(ZoneCommand.CreditRegularWarConclusion(player.CharacterId)))
+                logger.LogWarning(
+                    "Zone {MapId} inbox full: dropped RegularWar conclusion credit for character {CharacterId}",
+                    zone.MapId, player.CharacterId);
         }
     }
 

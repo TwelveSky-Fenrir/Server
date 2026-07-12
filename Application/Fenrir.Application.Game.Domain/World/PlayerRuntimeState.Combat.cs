@@ -43,8 +43,6 @@ public partial class PlayerRuntimeState
 
     public TimeSpan? ZoneEntryAtZoneClock { get; set; }
 
-    public TimeSpan? LastSkillCastAtZoneClock { get; set; }
-
     public DateTime LastHolyShieldAppliedUtc { get; set; } = DateTime.MinValue;
 
     public bool IsStunned { get; set; }
@@ -58,6 +56,4 @@ public partial class PlayerRuntimeState
     public int RepeatedStunCount { get; set; }
 
     public bool CanUseConsumables { get; set; } = true;
-
-    public bool VerifyEchoedActionState { get; set; }
 }

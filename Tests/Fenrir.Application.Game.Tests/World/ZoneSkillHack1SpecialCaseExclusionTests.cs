@@ -111,16 +111,17 @@ public class ZoneSkillHack1SpecialCaseExclusionTests
         Assert.False(isRealSkillCastPrimary);
         Assert.True(isRealSkillCastSecondary);
 
-        var primaryOffense = SkillCastGuard.Evaluate(new SkillCastGuardContext(
+        var primaryVerdict = SkillCastGuard.Evaluate(new SkillCastGuardContext(
             2, false, bottleSkillNumber,
             999, 0, 0, -1,
             isRealSkillCastPrimary, hotkeys, learnedSkills));
-        var secondaryOffense = SkillCastGuard.Evaluate(new SkillCastGuardContext(
+        var secondaryVerdict = SkillCastGuard.Evaluate(new SkillCastGuardContext(
             2, false, bottleSkillNumber,
             999, 0, 0, -1,
             isRealSkillCastSecondary, hotkeys, learnedSkills));
 
-        Assert.Equal(SkillCastOffense.None, primaryOffense);
-        Assert.Equal(SkillCastOffense.SkillHack1, secondaryOffense);
+        Assert.Equal(SkillCastVerdict.Passed, primaryVerdict);
+        Assert.Equal(SkillCastOffense.SkillHack1, secondaryVerdict.Offense);
+        Assert.Equal(SkillCastEnforcement.Disconnect, secondaryVerdict.Enforcement);
     }
 }

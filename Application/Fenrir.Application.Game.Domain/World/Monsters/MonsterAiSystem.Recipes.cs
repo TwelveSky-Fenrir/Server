@@ -1,4 +1,6 @@
 using Fenrir.Application.Game.Domain.Simulation;
+using Fenrir.Network.Dispatch.Zone.Sessions;
+using Fenrir.Network.Serialization.Zone.Wire;
 
 namespace Fenrir.Application.Game.Domain.World.Monsters;
 
@@ -8,11 +10,14 @@ public sealed partial class MonsterAiSystem
 
     private const int ThrowerWanderRollSpan = 100;
 
+    private const int ThrowerWanderProximityCellTolerance = 2;
+
     private const int Zone175BossAggroCapacity = 50;
 
     private void RunThrowerDecision(Zone zone, MonsterEntity monster)
     {
-        if (monster.Template.WalkSpeed >= 1 && _random.NextInt32(ThrowerWanderRollSpan) == 0)
+        if (monster.Template.WalkSpeed >= 1 && _random.NextInt32(ThrowerWanderRollSpan) == 0 &&
+            HasNearbyReadyPlayer(zone, monster))
         {
             if (!TryComputeWanderDestination(zone, monster, out var destX, out var destZ))
                 return;
@@ -29,6 +34,39 @@ public sealed partial class MonsterAiSystem
         }
 
         TryThrowCarAcquire(zone, monster);
+    }
+
+    private static bool HasNearbyReadyPlayer(Zone zone, MonsterEntity monster)
+    {
+        var cellSize = zone.AoiCellSize;
+        var monsterCellX = MathF.Floor(monster.PosX / cellSize);
+        var monsterCellY = MathF.Floor(monster.PosY / cellSize);
+        var monsterCellZ = MathF.Floor(monster.PosZ / cellSize);
+
+        foreach (var player in zone.Players)
+        {
+            if (player.Session is not ZoneClientSession { State: ZoneSessionState.InWorld })
+                continue;
+
+            if (player.IsMovingZone || IsHiding(player))
+                continue;
+
+            if (monster.InstanceId is { } requiredInstanceId && player.DungeonInstanceId != requiredInstanceId)
+                continue;
+
+            if (MathF.Abs(MathF.Floor(player.PosX / cellSize) - monsterCellX) > ThrowerWanderProximityCellTolerance)
+                continue;
+
+            if (MathF.Abs(MathF.Floor(player.PosY / cellSize) - monsterCellY) > ThrowerWanderProximityCellTolerance)
+                continue;
+
+            if (MathF.Abs(MathF.Floor(player.PosZ / cellSize) - monsterCellZ) > ThrowerWanderProximityCellTolerance)
+                continue;
+
+            return true;
+        }
+
+        return false;
     }
 
     private void TryThrowCarAcquire(Zone zone, MonsterEntity monster)
@@ -188,7 +226,6 @@ public sealed partial class MonsterAiSystem
         {
             if (!zone.TryGetPlayer(characterId, out var player) || !IsCandidateValid(player))
                 continue;
-
 
             if (DistanceSquared(monster.PosX, monster.PosZ, player.PosX, player.PosZ) > meleeRadiusSq)
                 continue;

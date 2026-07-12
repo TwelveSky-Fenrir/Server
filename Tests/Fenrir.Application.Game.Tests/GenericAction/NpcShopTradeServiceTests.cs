@@ -50,12 +50,13 @@ public class NpcShopTradeServiceTests
         return WorldDataTestRows.Item(itemId) with { Sort = sort, BuyCost = buyCost, CheckNpcShop = 2 };
     }
 
-    private static WorldDataCache BuildWorldData(ItemRowDto[] itemsById, int[]? shopCatalogItemIds = null)
+    private static WorldDataCache BuildWorldData(ItemRowDto[] itemsById, int[]? shopCatalogItemIds = null,
+        byte npcType = 1)
     {
         var catalogIds = shopCatalogItemIds ?? itemsById.Select(row => row.ItemId).ToArray();
 
         var npc = new NpcDefinition(
-            WorldDataTestRows.Npc(NpcId) with { Type = 1 },
+            WorldDataTestRows.Npc(NpcId) with { Type = npcType },
             [new NpcMenuOptionRowDto(NpcId, NpcFunctionGate.NpcShop, 2)],
             catalogIds.Select((id, i) => new NpcShopItemRowDto(NpcId, 0, (byte)i, id)).ToImmutableArray(),
             [], [], []);
@@ -102,12 +103,16 @@ public class NpcShopTradeServiceTests
 
     private static void SeedInventory(Zone zone, params (byte Slot, ItemStack Item)[] slots)
     {
+        SeedInventory(zone, ContainerMatrix.InventoryPage0, slots);
+    }
+
+    private static void SeedInventory(Zone zone, byte page, params (byte Slot, ItemStack Item)[] slots)
+    {
         var content = ImmutableDictionary<byte, ItemStack>.Empty;
         foreach (var (slot, item) in slots)
             content = content.SetItem(slot, item);
 
-        var containers =
-            ImmutableArray.Create(new InventoryContainerSnapshot(ContainerMatrix.InventoryPage0, content));
+        var containers = ImmutableArray.Create(new InventoryContainerSnapshot(page, content));
         zone.PostInventoryCommand(new InventoryZoneCommand(CharacterId, containers, null));
         zone.Tick(TimeSpan.FromMilliseconds(50));
     }
@@ -120,20 +125,21 @@ public class NpcShopTradeServiceTests
             NullLogger<GenericActionService>.Instance);
     }
 
-    private static DefaultPData SellMove(int quantity = 0)
+    private static DefaultPData SellMove(int quantity = 0, byte page = ContainerMatrix.InventoryPage0)
     {
         return new DefaultPData
         {
-            Page1 = ContainerMatrix.InventoryPage0, Index1 = 0, Quantity1 = quantity, Page2 = 0, Index2 = 0,
+            Page1 = page, Index1 = 0, Quantity1 = quantity, Page2 = 0, Index2 = 0,
             XPost2 = 0, YPost2 = 0
         };
     }
 
-    private static DefaultPData BuyMove(int itemId, int quantity, int destinationIndex = 0)
+    private static DefaultPData BuyMove(int itemId, int quantity, int destinationIndex = 0,
+        byte destinationPage = ContainerMatrix.InventoryPage0)
     {
         return new DefaultPData
         {
-            Page1 = NpcId, Index1 = itemId, Quantity1 = quantity, Page2 = ContainerMatrix.InventoryPage0,
+            Page1 = NpcId, Index1 = itemId, Quantity1 = quantity, Page2 = destinationPage,
             Index2 = destinationIndex, XPost2 = 0, YPost2 = 0
         };
     }
@@ -259,5 +265,137 @@ public class NpcShopTradeServiceTests
         Assert.Equal(GenericActionStatus.Aborted, result.Status);
         Assert.Null(characters.LastAdjustMoneyAndReplaceContainer);
         Assert.Empty(eventLog.LoggedEvents);
+    }
+
+    [Theory]
+    [InlineData(-1, 0)]
+    [InlineData(8, 0)]
+    [InlineData(0, -1)]
+    [InlineData(0, 8)]
+    public async Task Buy_DestinationPositionOutOfRange_IsAborted(int xPost2, int yPost2)
+    {
+        var worldData = BuildWorldData([BuyableItem(800, 9, 1000)]);
+        var (zone, state, characters, eventLog) = SetUp(worldData);
+        var service = CreateService(worldData, characters, eventLog);
+        var move = BuyMove(800, 0) with { XPost2 = xPost2, YPost2 = yPost2 };
+
+        var result = await service.BuyFromNpcShopAsync(zone, state, AccountId, CharacterId, move,
+            CancellationToken.None);
+
+        Assert.Equal(GenericActionStatus.Aborted, result.Status);
+        Assert.Null(characters.LastAdjustMoneyAndReplaceContainer);
+        Assert.Empty(eventLog.LoggedEvents);
+    }
+
+    [Fact]
+    public async Task Buy_InsufficientFunds_IsAborted_NotCleanFailure()
+    {
+        var worldData = BuildWorldData([BuyableItem(800, 9, 1000)]);
+        var (zone, state, characters, eventLog) = SetUp(worldData);
+        characters.ThrowOnAdjustMoney = true;
+        var service = CreateService(worldData, characters, eventLog);
+
+        var result = await service.BuyFromNpcShopAsync(zone, state, AccountId, CharacterId, BuyMove(800, 0),
+            CancellationToken.None);
+
+        Assert.Equal(GenericActionStatus.Aborted, result.Status);
+        Assert.Empty(eventLog.LoggedEvents);
+    }
+
+    [Fact]
+    public async Task Buy_NpcNotType13_HasNoMinimumLevelGate()
+    {
+        var worldData = BuildWorldData([BuyableItem(800, 9, 1000)]);
+        var (zone, state, characters, eventLog) = SetUp(worldData);
+        var service = CreateService(worldData, characters, eventLog);
+
+        var result = await RunToCompletionAsync(
+            service.BuyFromNpcShopAsync(zone, state, AccountId, CharacterId, BuyMove(800, 0), CancellationToken.None),
+            zone);
+
+        Assert.Equal(GenericActionStatus.Succeeded, result.Status);
+    }
+
+    [Fact]
+    public async Task Buy_SpecialShopNpcType_BelowMinimumLevel_IsAborted_NotCleanFailure()
+    {
+        var worldData = BuildWorldData([BuyableItem(800, 9, 1000)], npcType: NpcShopPolicy.SpecialShopNpcType);
+        var (zone, state, characters, eventLog) = SetUp(worldData);
+        var service = CreateService(worldData, characters, eventLog);
+
+        var result = await service.BuyFromNpcShopAsync(zone, state, AccountId, CharacterId, BuyMove(800, 0),
+            CancellationToken.None);
+
+        Assert.Equal(GenericActionStatus.Aborted, result.Status);
+        Assert.Null(characters.LastAdjustMoneyAndReplaceContainer);
+        Assert.Empty(eventLog.LoggedEvents);
+    }
+
+    [Fact]
+    public async Task Sell_FromExpiredLastPage_IsAborted()
+    {
+        var worldData = BuildWorldData([SellableItem(700, 9, 500)]);
+        var (zone, state, characters, eventLog) = SetUp(worldData);
+        state.InventoryDate = 20200101;
+        SeedInventory(zone, ContainerMatrix.InventoryPage1,
+            (0, new ItemStack(700, 1, 0, 0, 0, 0, 0, 0, 0, 0, 555)));
+        var service = CreateService(worldData, characters, eventLog);
+
+        var result = await service.SellToNpcShopAsync(zone, state, AccountId, CharacterId,
+            SellMove(page: ContainerMatrix.InventoryPage1), CancellationToken.None);
+
+        Assert.Equal(GenericActionStatus.Aborted, result.Status);
+        Assert.Null(characters.LastAdjustMoneyAndReplaceContainer);
+        Assert.Empty(eventLog.LoggedEvents);
+    }
+
+    [Fact]
+    public async Task Sell_FromStillValidLastPage_Succeeds()
+    {
+        var worldData = BuildWorldData([SellableItem(700, 9, 500)]);
+        var (zone, state, characters, eventLog) = SetUp(worldData);
+        state.InventoryDate = 99991231;
+        SeedInventory(zone, ContainerMatrix.InventoryPage1,
+            (0, new ItemStack(700, 1, 0, 0, 0, 0, 0, 0, 0, 0, 555)));
+        var service = CreateService(worldData, characters, eventLog);
+
+        var result = await RunToCompletionAsync(
+            service.SellToNpcShopAsync(zone, state, AccountId, CharacterId,
+                SellMove(page: ContainerMatrix.InventoryPage1), CancellationToken.None),
+            zone);
+
+        Assert.Equal(GenericActionStatus.Succeeded, result.Status);
+    }
+
+    [Fact]
+    public async Task Buy_IntoExpiredLastPageDestination_IsAborted()
+    {
+        var worldData = BuildWorldData([BuyableItem(800, 9, 1000)]);
+        var (zone, state, characters, eventLog) = SetUp(worldData);
+        state.InventoryDate = 20200101;
+        var service = CreateService(worldData, characters, eventLog);
+
+        var result = await service.BuyFromNpcShopAsync(zone, state, AccountId, CharacterId,
+            BuyMove(800, 0, destinationPage: ContainerMatrix.InventoryPage1), CancellationToken.None);
+
+        Assert.Equal(GenericActionStatus.Aborted, result.Status);
+        Assert.Null(characters.LastAdjustMoneyAndReplaceContainer);
+        Assert.Empty(eventLog.LoggedEvents);
+    }
+
+    [Fact]
+    public async Task Buy_IntoStillValidLastPageDestination_Succeeds()
+    {
+        var worldData = BuildWorldData([BuyableItem(800, 9, 1000)]);
+        var (zone, state, characters, eventLog) = SetUp(worldData);
+        state.InventoryDate = 99991231;
+        var service = CreateService(worldData, characters, eventLog);
+
+        var result = await RunToCompletionAsync(
+            service.BuyFromNpcShopAsync(zone, state, AccountId, CharacterId,
+                BuyMove(800, 0, destinationPage: ContainerMatrix.InventoryPage1), CancellationToken.None),
+            zone);
+
+        Assert.Equal(GenericActionStatus.Succeeded, result.Status);
     }
 }

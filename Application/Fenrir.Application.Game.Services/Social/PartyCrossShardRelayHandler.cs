@@ -70,6 +70,12 @@ public sealed class PartyCrossShardRelayHandler(
             logger.LogDebug(
                 "Cross-shard party invite accepted but not joined: inviter {InviterId}'s party was already full when invitee {InviteeId} answered",
                 inviterId, answer.SourceCharacterId);
+
+            var fullRoster = BuildRosterLocalOnly(2, members);
+            foreach (var memberId in members)
+                if (zones.TryGetPlayer(memberId, out var member))
+                    member.Session.Send(fullRoster);
+
             return ValueTask.CompletedTask;
         }
 

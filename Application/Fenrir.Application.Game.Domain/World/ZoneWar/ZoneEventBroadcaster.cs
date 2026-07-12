@@ -46,6 +46,9 @@ public sealed class ZoneEventBroadcaster(
             foreach (var zone in zones.Zones)
                 guardSpawner.ForceOrdinaryResummon(zone);
 
+        foreach (var zone in zones.Zones)
+            zone.PostHolyStoneCountdownEviction();
+
         EnqueueForOtherShards(39, data);
     }
 
@@ -63,6 +66,9 @@ public sealed class ZoneEventBroadcaster(
         if (guardSpawner is not null)
             foreach (var zone in zones.Zones)
                 guardSpawner.ForceOrdinaryResummon(zone);
+
+        foreach (var zone in zones.Zones)
+            zone.PostHolyStoneCountdownEviction();
 
         foreach (var zone in zones.Zones)
             zone.PostHolyStoneBattleRankReset();
@@ -290,6 +296,9 @@ public sealed class ZoneEventBroadcaster(
                 if (guardSpawner is not null)
                     foreach (var zone in zones.Zones)
                         guardSpawner.ForceOrdinaryResummon(zone);
+
+                foreach (var zone in zones.Zones)
+                    zone.PostHolyStoneCountdownEviction();
                 break;
 
             case 40:
@@ -300,6 +309,9 @@ public sealed class ZoneEventBroadcaster(
                 if (guardSpawner is not null)
                     foreach (var zone in zones.Zones)
                         guardSpawner.ForceOrdinaryResummon(zone);
+
+                foreach (var zone in zones.Zones)
+                    zone.PostHolyStoneCountdownEviction();
 
                 foreach (var zone in zones.Zones)
                     zone.PostHolyStoneBattleRankReset();

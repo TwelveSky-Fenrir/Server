@@ -41,6 +41,9 @@ public static partial class StatCalculator
         {
             hp += PhoenixFlatBonus(petAmulet.Item.ItemId, 5000, 7500, 12500);
             hp += PhoenixFlatBonus(petAmulet.Item.ItemId, 2000, 4500, 9500);
+
+            if (!PetAmuletPhoenixOverlapIds.Contains(petAmulet.Item.ItemId))
+                hp += PetAmuletLifeBonus(petAmulet.Item.ItemId, petAmulet.Item.Sort);
         }
 
         hp += LifeElixirContributionWithOverride(consumable, zone);
@@ -132,6 +135,9 @@ public static partial class StatCalculator
         {
             mp += PhoenixFlatBonus(petAmulet.Item.ItemId, 5000, 7500, 12500);
             mp += PhoenixFlatBonus(petAmulet.Item.ItemId, 2000, 4500, 9500);
+
+            if (!PetAmuletPhoenixOverlapIds.Contains(petAmulet.Item.ItemId))
+                mp += PetAmuletManaBonus(petAmulet.Item.ItemId, petAmulet.Item.Sort);
         }
 
         mp += ManaElixirContributionWithOverride(consumable, zone);

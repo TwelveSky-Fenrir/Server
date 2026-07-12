@@ -48,7 +48,10 @@ public sealed class MuteRefreshPollHost(
             if (isMuted == wasMuted)
                 continue;
 
-            zone.Post(ZoneCommand.SetMuted(characterId, isMuted));
+            if (!zone.Post(ZoneCommand.SetMuted(characterId, isMuted)))
+                logger.LogWarning(
+                    "Zone {MapId} inbox full: dropped mute-state change for character {CharacterId}",
+                    zone.MapId, characterId);
         }
     }
 }

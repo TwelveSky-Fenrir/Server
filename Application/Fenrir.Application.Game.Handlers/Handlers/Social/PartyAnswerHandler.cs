@@ -29,8 +29,18 @@ public sealed class PartyAnswerHandler(
         if (zones.TryGetPlayer(result.InviterId, out var inviter))
             inviter.Session.Send(new PartyAnswerResponse { Answer = packet.Answer });
 
-        if (!result.Accepted || result.JoinOutcome == PartyJoinOutcome.PartyWasFull)
+        if (!result.Accepted)
             return;
+
+        if (result.JoinOutcome == PartyJoinOutcome.PartyWasFull)
+        {
+            var fullRoster = PartyBroadcast.BuildRoster(zones, 2, result.Members);
+            foreach (var memberId in result.Members)
+                if (zones.TryGetPlayer(memberId, out var member))
+                    member.Session.Send(fullRoster);
+
+            return;
+        }
 
         if (!zones.TryGetPlayer(inviteeId, out var invitee))
             return;

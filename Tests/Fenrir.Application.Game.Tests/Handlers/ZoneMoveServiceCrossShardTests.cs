@@ -43,6 +43,7 @@ public class ZoneMoveServiceCrossShardTests
             new FakeGameServerDirectoryRepository(shards),
             new FakeShardMapAssignmentRepository(hostedMapsByShard),
             tickets,
+            new FakeEventLogRepository(),
             Options.Create(options), NullLogger<ZoneMoveService>.Instance);
 
         var (session, _) = ZoneTestKit.CreateSession(1);
@@ -93,12 +94,83 @@ public class ZoneMoveServiceCrossShardTests
     }
 
     [Fact]
+    public async Task LiveDestinationShardFound_DestinationZone124_ClearsTheRuntimeBuffTableBeforeMintingTheTicket()
+    {
+        var (service, session, sourceZone, tickets) = CreateService(
+            new Dictionary<byte, short[]> { [DestinationShardId] = [124] },
+            new ShardDirectoryEntryDto(DestinationShardId, "10.0.0.2", 11001, 0, 100, 5f));
+
+        Assert.True(sourceZone.TryGetPlayer(CharacterId, out var state));
+        state!.Buffs.Buff[4] = 77;
+        state.Buffs.Buff[5] = 999;
+
+        await service.HandleAsync(Request(SourceMapId, 124), session, CancellationToken.None);
+
+        Assert.All(state.Buffs.Buff, value => Assert.Equal(0, value));
+        Assert.Single(tickets.CreatedTickets);
+    }
+
+    [Fact]
+    public async Task LiveDestinationShardFound_DestinationNotZone124_LeavesTheRuntimeBuffTableUntouched()
+    {
+        var (service, session, sourceZone, tickets) = CreateService(
+            new Dictionary<byte, short[]> { [DestinationShardId] = [TargetMapId] },
+            new ShardDirectoryEntryDto(DestinationShardId, "10.0.0.2", 11001, 0, 100, 5f));
+
+        Assert.True(sourceZone.TryGetPlayer(CharacterId, out var state));
+        state!.Buffs.Buff[4] = 77;
+
+        await service.HandleAsync(Request(SourceMapId, TargetMapId), session, CancellationToken.None);
+
+        Assert.Equal(77, state.Buffs.Buff[4]);
+        Assert.Single(tickets.CreatedTickets);
+    }
+
+    [Fact]
     public async Task NoLiveShardClaimsTheTargetZone_NeverMintsATicket_AndLeavesTheFlagUnset()
     {
         var (service, session, _, tickets) = CreateService(new Dictionary<byte, short[]>());
 
         await service.HandleAsync(Request(SourceMapId, TargetMapId), session, CancellationToken.None);
 
+        Assert.False(session.IsCrossShardTransferPending);
+        Assert.Empty(tickets.CreatedTickets);
+    }
+
+    [Fact]
+    public async Task SymbolBattleLockout_FiresEvenWhenNoLiveShardHostsTheDestination()
+    {
+        const short sourceMapId = 40;
+        const short destinationZoneId = TribeSymbolBattleZoneLockout.GuardedDestinationZoneId;
+
+        var worldData = ZoneTestKit.EmptyWorldData();
+        var zones = ZoneTestKit.CreateRegistry(worldData: worldData);
+        zones.Initialize([sourceMapId]);
+
+        var worldState = ZoneTestKit.CreateWorldState();
+        worldState.StartTribeSymbolBattle();
+
+        var tickets = new FakeSessionTicketRepository();
+        var options = new GameServerOptions { ShardId = SourceShardId };
+        var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
+            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(), PortalProximityCatalog.Empty,
+            new FakeGameServerDirectoryRepository(),
+            new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
+            tickets,
+            new FakeEventLogRepository(),
+            Options.Create(options), NullLogger<ZoneMoveService>.Instance);
+
+        var (session, _) = ZoneTestKit.CreateSession(1);
+        session.MarkTicketConsumed(1, CharacterId);
+        var sourceZone = zones[sourceMapId];
+        session.CurrentZone = sourceZone;
+
+        sourceZone.Post(ZoneCommand.Enter(CharacterId, ZoneTestKit.EnterData(session, sourceMapId)));
+        sourceZone.Tick(TimeSpan.FromMilliseconds(50));
+
+        await service.HandleAsync(Request(sourceMapId, destinationZoneId), session, CancellationToken.None);
+
+        Assert.Equal(DisconnectReason.StateViolation, session.DisconnectReason);
         Assert.False(session.IsCrossShardTransferPending);
         Assert.Empty(tickets.CreatedTickets);
     }
@@ -177,6 +249,7 @@ public class ZoneMoveServiceCrossShardTests
             new FakeGameServerDirectoryRepository(shards),
             new FakeShardMapAssignmentRepository(hostedMapsByShard),
             tickets,
+            new FakeEventLogRepository(),
             Options.Create(options), NullLogger<ZoneMoveService>.Instance);
 
         var (session, pipe) = ZoneTestKit.CreateSession(1);

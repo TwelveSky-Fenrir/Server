@@ -129,11 +129,11 @@ public class QuestProgressServiceTests
         Assert.Null(logged.ItemId);
         Assert.Null(logged.Quantity);
         Assert.Equal((byte)1, logged.Outcome);
-        Assert.Equal("ExperienceReward=0;ContributionPointsReward=0;TeacherPointReward=0", logged.Payload);
+        Assert.Equal("ExperienceReward=0;KillOtherTribeCountReward=0;TeacherPointReward=0", logged.Payload);
     }
 
     [Fact]
-    public async Task Complete_ExperienceContributionAndTeacherPointReward_NoItemOrMoney_LogsAuditRow_WithPayload()
+    public async Task Complete_ExperienceKillOtherTribeCountAndTeacherPointReward_NoItemOrMoney_LogsAuditRow_WithPayload()
     {
         var rewards = new[]
         {
@@ -155,7 +155,9 @@ public class QuestProgressServiceTests
         Assert.Null(logged.ItemId);
         Assert.Null(logged.Quantity);
         Assert.Equal((byte)1, logged.Outcome);
-        Assert.Equal("ExperienceReward=200;ContributionPointsReward=50;TeacherPointReward=5", logged.Payload);
+        Assert.Equal("ExperienceReward=200;KillOtherTribeCountReward=50;TeacherPointReward=5", logged.Payload);
+        Assert.Equal(50, state.MissionKillOtherTribe);
+        Assert.Equal(0, state.ContributionPoints);
     }
 
     [Fact]
@@ -178,7 +180,7 @@ public class QuestProgressServiceTests
         Assert.Equal(RewardItemId, logged.ItemId);
         Assert.Equal(1, logged.Quantity);
         Assert.Equal(500, logged.DeltaMoney);
-        Assert.Equal("ExperienceReward=0;ContributionPointsReward=0;TeacherPointReward=0", logged.Payload);
+        Assert.Equal("ExperienceReward=0;KillOtherTribeCountReward=0;TeacherPointReward=0", logged.Payload);
     }
 
     [Fact]

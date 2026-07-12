@@ -22,6 +22,13 @@ public class ZoneMonsterAoiGridTests
             serverIndex, posX, 0f, posZ, 50f);
     }
 
+    private static MonsterEntity WideRadiusMonster(int serverIndex, float posX, float posZ)
+    {
+        var template = WorldDataTestRows.Monster(700) with { SpecialType = 21 };
+        return MonsterEntity.Create(serverIndex, unchecked((uint)serverIndex), template, serverIndex, posX, 0f, posZ,
+            50f);
+    }
+
     [Fact]
     public void SendExistingMonstersTo_SendsAMonsterWithinTheEnteringPlayersAoiNeighborhood()
     {
@@ -40,6 +47,32 @@ public class ZoneMonsterAoiGridTests
     {
         var zone = ZoneTestKit.CreateZone(1, SmallCellOptions());
         zone.SpawnMonster(Monster(1, 350f, 50f));
+
+        var (session, pipe) = ZoneTestKit.CreateSession(1);
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, posX: 50f, posZ: 50f)));
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
+    }
+
+    [Fact]
+    public void SendExistingMonstersTo_SendsAWideRadiusMonster_BeyondTheScale1RadiusButWithinItsOwnScale3Radius()
+    {
+        var zone = ZoneTestKit.CreateZone(1, SmallCellOptions());
+        zone.SpawnMonster(WideRadiusMonster(1, 350f, 50f));
+
+        var (session, pipe) = ZoneTestKit.CreateSession(1);
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, posX: 50f, posZ: 50f)));
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.Equal(FrameWriter.FrameSizeOf<MonsterReplicationResponse>(), ZoneTestKit.DrainOutbound(pipe).Length);
+    }
+
+    [Fact]
+    public void SendExistingMonstersTo_DoesNotSendAWideRadiusMonster_BeyondItsOwnScale3Radius()
+    {
+        var zone = ZoneTestKit.CreateZone(1, SmallCellOptions());
+        zone.SpawnMonster(WideRadiusMonster(1, 450f, 50f));
 
         var (session, pipe) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, posX: 50f, posZ: 50f)));

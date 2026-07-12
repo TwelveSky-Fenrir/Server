@@ -181,6 +181,18 @@ public sealed class DuelRegistry
         }
     }
 
+    public bool TryClearAcceptedForDisconnect(int characterId, out int partnerId)
+    {
+        lock (_lock)
+        {
+            if (!_acceptedPairs.Remove(characterId, out partnerId))
+                return false;
+
+            _acceptedPairs.Remove(partnerId);
+            return true;
+        }
+    }
+
     public void ForceClearOnZoneEntry(int characterId)
     {
         lock (_lock)

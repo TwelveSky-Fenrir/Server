@@ -17,12 +17,21 @@ public abstract class ClientSession(
     : IPacketSession
 {
     private const int SlowConsumerBackpressureStreakLimit = 5;
+    private const int LoginMaxPendingSendBytes = 40_960;
+    private const int ZoneMaxPendingSendBytes = 1_024_000;
 
     private readonly Channel<byte[]> _pendingSends =
         Channel.CreateUnbounded<byte[]>(new UnboundedChannelOptions { SingleReader = true });
 
     private readonly SemaphoreSlim _sendLock = new(1, 1);
 
+    private readonly int _maxPendingSendBytes = server switch
+    {
+        FenrirServer.Zone => ZoneMaxPendingSendBytes,
+        _ => LoginMaxPendingSendBytes
+    };
+
+    private long _pendingSendBytes;
     private int _backpressureStreak;
     private int _completed;
 
@@ -55,6 +64,12 @@ public abstract class ClientSession(
 
         if (!_sendLock.Wait(0))
         {
+            if (!TryReservePendingSendBytes(total))
+            {
+                AbortForPendingSendOverflow(TPacket.Opcode);
+                return;
+            }
+
             var queued = new byte[total];
             FrameWriter.WriteFrame(in packet, queued);
             _pendingSends.Writer.TryWrite(queued);
@@ -93,6 +108,12 @@ public abstract class ClientSession(
 
         if (!_sendLock.Wait(0))
         {
+            if (!TryReservePendingSendBytes(rawFrame.Length))
+            {
+                AbortForPendingSendOverflow(OpcodeOf(rawFrame));
+                return;
+            }
+
             _pendingSends.Writer.TryWrite(rawFrame.ToArray());
             ClaimOwnershipIfNowFreeToAvoidStrandedFrame();
             LogPacketSent(OpcodeOf(rawFrame), rawFrame.Length);
@@ -123,6 +144,23 @@ public abstract class ClientSession(
     private void LogPacketSent(byte opcode, int byteSize)
     {
         logger?.PacketSent(SessionId, opcode, byteSize);
+    }
+
+    private bool TryReservePendingSendBytes(int frameLength)
+    {
+        if (Interlocked.Add(ref _pendingSendBytes, frameLength) <= _maxPendingSendBytes)
+            return true;
+
+        Interlocked.Add(ref _pendingSendBytes, -frameLength);
+        return false;
+    }
+
+    private void AbortForPendingSendOverflow(byte opcode)
+    {
+        logger?.LogWarning(
+            "Session {SessionId} ({Server}, {RemoteEndPoint}): aborting -- pending send bytes for opcode {Opcode} would exceed the {MaxPendingSendBytes}-byte cap",
+            SessionId, Server, RemoteEndPoint, opcode, _maxPendingSendBytes);
+        Abort(Sessions.DisconnectReason.SendBufferOverflow);
     }
 
     protected void LogSessionStateChanged<TState>(TState previousState, TState newState) where TState : struct, Enum
@@ -171,6 +209,10 @@ public abstract class ClientSession(
         {
             _sendLock.Release();
             throw;
+        }
+        finally
+        {
+            Interlocked.Add(ref _pendingSendBytes, -frame.Length);
         }
 
         return true;

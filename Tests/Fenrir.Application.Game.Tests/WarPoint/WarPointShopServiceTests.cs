@@ -102,7 +102,7 @@ public class WarPointShopServiceTests
 
         var logged = Assert.Single(eventLog.LoggedEvents);
         Assert.Equal(EventLogCategory.NpcShopTrade, logged.Category);
-        Assert.Equal(3, logged.EventCode);
+        Assert.Equal(4, logged.EventCode);
         Assert.Equal(AccountId, logged.ActorAccountId);
         Assert.Equal(CharacterId, logged.ActorCharacterId);
         Assert.Equal(WpItemId, logged.ItemId);
@@ -130,7 +130,24 @@ public class WarPointShopServiceTests
     }
 
     [Fact]
-    public async Task Buy_ItemNotInPriceTable_IsNotHandled()
+    public async Task Buy_AtOrdinaryNpc_ItemNotInPriceTable_IsNotHandled()
+    {
+        var worldData = WorldData();
+        var (zone, state) = SetUp(worldData);
+        var warPoints = new FakeWarPointRepository();
+        var eventLog = new FakeEventLogRepository();
+        var service = CreateService(worldData, new WarPointShopCatalog([]), warPoints, eventLog);
+
+        var result = await RunToCompletionAsync(
+            service.TryBuyAsync(zone, state, AccountId, CharacterId, OrdinaryNpc, WpItemId, 1, DestinationPage,
+                DestinationSlot, CancellationToken.None), zone);
+
+        Assert.Equal(WarPointBuyStatus.NotHandled, result.Status);
+        Assert.Equal(0, warPoints.CallCount);
+    }
+
+    [Fact]
+    public async Task Buy_AtWarPointNpc_ItemNotInPriceTable_FallsThrough_RepositoryNotCalled()
     {
         var worldData = WorldData();
         var (zone, state) = SetUp(worldData);
@@ -144,10 +161,11 @@ public class WarPointShopServiceTests
 
         Assert.Equal(WarPointBuyStatus.NotHandled, result.Status);
         Assert.Equal(0, warPoints.CallCount);
+        Assert.Empty(eventLog.LoggedEvents);
     }
 
     [Fact]
-    public async Task Buy_WrongNpcForTribeItem_IsAborted_RepositoryNotCalled()
+    public async Task Buy_WrongNpcForTribeItem_IsSoftRejected_RepositoryNotCalled()
     {
         var worldData = WorldData();
         var (zone, state) = SetUp(worldData);
@@ -159,7 +177,7 @@ public class WarPointShopServiceTests
             service.TryBuyAsync(zone, state, AccountId, CharacterId, OtherWpNpc, WpItemId, 1, DestinationPage,
                 DestinationSlot, CancellationToken.None), zone);
 
-        Assert.Equal(WarPointBuyStatus.Aborted, result.Status);
+        Assert.Equal(WarPointBuyStatus.SoftRejected, result.Status);
         Assert.Equal(0, warPoints.CallCount);
         Assert.Empty(eventLog.LoggedEvents);
     }
@@ -194,6 +212,31 @@ public class WarPointShopServiceTests
 
         var result = await RunToCompletionAsync(
             service.TryBuyAsync(zone, state, AccountId, CharacterId, WpNpc, WpItemId, 1, DestinationPage,
+                DestinationSlot, CancellationToken.None), zone);
+
+        Assert.Equal(WarPointBuyStatus.SoftRejected, result.Status);
+        Assert.Equal(0, warPoints.CallCount);
+        Assert.Empty(eventLog.LoggedEvents);
+    }
+
+    [Fact]
+    public async Task Buy_StackableQuantityAboveCeiling_IsSoftRejected_RepositoryNotCalled()
+    {
+        const int stackableItemId = 90201;
+        const byte stackableSort = 2;
+        var items = new Dictionary<int, ItemDefinition>
+        {
+            [stackableItemId] = new(WorldDataTestRows.Item(stackableItemId) with { Sort = stackableSort }, [])
+        }.ToFrozenDictionary();
+        var worldData = ZoneTestKit.EmptyWorldData(items);
+        var (zone, state) = SetUp(worldData);
+        var warPoints = new FakeWarPointRepository();
+        var eventLog = new FakeEventLogRepository();
+        var catalog = new WarPointShopCatalog([new WarPointPriceEntry(stackableItemId, 20, 0, [WpNpc])]);
+        var service = CreateService(worldData, catalog, warPoints, eventLog);
+
+        var result = await RunToCompletionAsync(
+            service.TryBuyAsync(zone, state, AccountId, CharacterId, WpNpc, stackableItemId, 1000, DestinationPage,
                 DestinationSlot, CancellationToken.None), zone);
 
         Assert.Equal(WarPointBuyStatus.SoftRejected, result.Status);

@@ -11,19 +11,20 @@ public sealed class TribeSymbolDamageModifierSystem(
     {
         for (byte tribeId = 0; tribeId < WorldStateService.TribeCount; tribeId++)
         {
-            var holdsOwnSymbol = worldState.GetTribe(tribeId).HasSymbol;
-            modifiers.SetDamageDownPenalty(tribeId,
-                holdsOwnSymbol ? 0f : TribeSymbolCombatModifiers.OwnSymbolLostDamageDownPenalty);
+            var ally = worldState.GetAllyOf(tribeId);
+            var ownSlotOwner = worldState.GetTribeSymbolOwner(tribeId);
+            var ownsOwnSlot = IsControlledByTribeOrAlly(ownSlotOwner, tribeId, ally);
 
-            modifiers.SetDamageUpBonusIncrementCount(tribeId, ComputeDamageUpBonusIncrementCount(tribeId));
+            modifiers.SetDamageDownPenalty(tribeId,
+                ownsOwnSlot ? 0f : TribeSymbolCombatModifiers.OwnSymbolLostDamageDownPenalty);
+
+            modifiers.SetDamageUpBonusIncrementCount(tribeId,
+                ComputeDamageUpBonusIncrementCount(tribeId, ally, ownsOwnSlot));
         }
     }
 
-    private int ComputeDamageUpBonusIncrementCount(byte tribeId)
+    private int ComputeDamageUpBonusIncrementCount(byte tribeId, byte? ally, bool ownsOwnSlot)
     {
-        var ally = worldState.GetAllyOf(tribeId);
-
-        var ownsOwnSlot = IsControlledByTribeOrAlly(worldState.GetTribeSymbolOwner(tribeId), tribeId, ally);
         if (!ownsOwnSlot)
             return 0;
 

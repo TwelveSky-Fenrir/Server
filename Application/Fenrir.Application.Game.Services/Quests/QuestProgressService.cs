@@ -112,10 +112,10 @@ public sealed class QuestProgressService(
             edits.DeleteFirstMatch(result.DeleteItemId);
 
         await PersistAndMirrorAsync(zone, characterId, result.NewProgress, result.MoneyReward,
-            result.ExperienceReward, result.ContributionPointsReward, result.TeacherPointReward, edits, ct);
+            result.ExperienceReward, result.KillOtherTribeCountReward, result.TeacherPointReward, edits, ct);
 
         var hasNumericReward = result.MoneyReward != 0 || result.ExperienceReward != 0 ||
-                               result.ContributionPointsReward != 0 || result.TeacherPointReward != 0;
+                               result.KillOtherTribeCountReward != 0 || result.TeacherPointReward != 0;
 
         if (itemRewardGranted || hasNumericReward)
             await eventLog.LogAsync(QuestRewardEventCode, EventLogCategory.ItemCreate, accountId, characterId,
@@ -125,7 +125,7 @@ public sealed class QuestProgressService(
                 itemRewardGranted ? result.RewardItemQuantity : null,
                 1,
                 hasNumericReward
-                    ? $"ExperienceReward={result.ExperienceReward};ContributionPointsReward={result.ContributionPointsReward};TeacherPointReward={result.TeacherPointReward}"
+                    ? $"ExperienceReward={result.ExperienceReward};KillOtherTribeCountReward={result.KillOtherTribeCountReward};TeacherPointReward={result.TeacherPointReward}"
                     : null,
                 ct);
 
@@ -240,7 +240,7 @@ public sealed class QuestProgressService(
     }
 
     private async ValueTask PersistAndMirrorAsync(Zone zone, int characterId, QuestProgress newProgress,
-        long deltaMoney, int experienceDelta, int contributionPointsDelta, int teacherPointDelta,
+        long deltaMoney, int experienceDelta, int killOtherTribeCountDelta, int teacherPointDelta,
         ContainerEdits edits, CancellationToken ct)
     {
         var (container1, items1, container2, items2) = edits.ToTvpPairs();
@@ -250,7 +250,7 @@ public sealed class QuestProgressService(
             container1, items1, container2, items2, ct);
 
         if (!await zone.PostQuestCommandAndWaitAsync(
-                new QuestZoneCommand(characterId, newProgress, experienceDelta, contributionPointsDelta,
+                new QuestZoneCommand(characterId, newProgress, experienceDelta, killOtherTribeCountDelta,
                     edits.ToSnapshots(), TeacherPointDelta: teacherPointDelta), ct))
             logger.LogError(
                 "Zone {MapId} quest inbox full: dropped mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",

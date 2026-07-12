@@ -141,6 +141,9 @@ public sealed class GameConnectionHost(
             {
                 await FlushFinalCharacterStateAsync(characterId).ConfigureAwait(false);
 
+                zone.TryGetPlayer(characterId, out var departingState);
+                var wasMovingZone = departingState is not null && departingState.IsMovingZone;
+
                 if (!zone.Post(ZoneCommand.Leave(characterId)))
                     logger.LogError(
                         "Zone {MapId} inbox full: dropped Leave for character {CharacterId} on disconnect -- character remains a phantom in the zone until its next Move/handoff",
@@ -148,7 +151,8 @@ public sealed class GameConnectionHost(
 
                 writeBehindFlusher.RequestImmediateFlush();
 
-                await LogLogoutAsync(zoneSession.AccountId, characterId, zone.MapId).ConfigureAwait(false);
+                if (!wasMovingZone)
+                    await LogLogoutAsync(zoneSession.AccountId, characterId, zone.MapId).ConfigureAwait(false);
 
                 logger.LogInformation(
                     "Zone session {SessionId} for character {CharacterId} left map {MapId}", zoneSession.SessionId,

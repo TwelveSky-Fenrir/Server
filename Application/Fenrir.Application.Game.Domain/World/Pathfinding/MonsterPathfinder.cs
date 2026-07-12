@@ -17,42 +17,24 @@ public sealed class MonsterPathfinder
     private readonly PriorityQueue<int, float> _open = new();
     private readonly List<int> _pathTriangles = [];
 
-    private readonly int _perTickBudget;
     private readonly List<Vector2> _portalLeft = [];
     private readonly List<Vector2> _portalRight = [];
     private readonly int[] _scoreGeneration;
 
     private readonly List<Vector2> _tetherRouteScratch = [];
 
-    private int _budgetRemaining;
     private int _generation;
 
-    public MonsterPathfinder(ZoneGeometry geometry, int perTickBudget)
+    public MonsterPathfinder(ZoneGeometry geometry)
     {
         _geometry = geometry;
         _graph = geometry.Navmesh;
-        _perTickBudget = perTickBudget < 0 ? 0 : perTickBudget;
-        _budgetRemaining = _perTickBudget;
 
         var triangleCount = _graph.TriangleCount;
         _gScore = new float[triangleCount];
         _cameFrom = new int[triangleCount];
         _scoreGeneration = new int[triangleCount];
         _closedGeneration = new int[triangleCount];
-    }
-
-    public void ResetBudget()
-    {
-        _budgetRemaining = _perTickBudget;
-    }
-
-    public bool TryConsumeBudget()
-    {
-        if (_budgetRemaining <= 0)
-            return false;
-
-        _budgetRemaining--;
-        return true;
     }
 
     public bool TryFindPath(Vector3 from, Vector3 to, List<Vector2> waypointsOut)

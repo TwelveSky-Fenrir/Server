@@ -7,7 +7,6 @@ using Fenrir.Application.Game.Domain.Mounts;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Quests;
-using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.World.Monsters;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.Stats;
@@ -40,8 +39,6 @@ public sealed partial class Zone
 
     private const int CombatInboxCapacity = 4096;
 
-    private const int CombatInboxDrainCapPerTick = CombatInboxCapacity / 2;
-
     private readonly Channel<CombatCommand> _combatInbox = Channel.CreateBounded<CombatCommand>(
         new BoundedChannelOptions(CombatInboxCapacity)
             { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
@@ -67,10 +64,8 @@ public sealed partial class Zone
 
     private void DrainCombatCommands()
     {
-        var processed = 0;
-        while (processed < CombatInboxDrainCapPerTick && _combatInbox.Reader.TryRead(out var command))
+        while (_combatInbox.Reader.TryRead(out var command))
         {
-            processed++;
             try
             {
                 ApplyCombatCommand(in command);
@@ -81,9 +76,6 @@ public sealed partial class Zone
                     command.AttackerCharacterId);
             }
         }
-
-        if (processed >= CombatInboxDrainCapPerTick)
-            LogDrainCapEngaged(_combatInbox.Reader, "combat", CombatInboxDrainCapPerTick);
     }
 
     private void ApplySenderLocation(PlayerRuntimeState state, AttackForProtocol attackInfo)
@@ -149,21 +141,6 @@ public sealed partial class Zone
             ? skillDef
             : null;
 
-        if (attackSkill is not null &&
-            (!attackerState.AttackBudgetEnforced || attackerState.AttackSubPacketsUsed == 1))
-        {
-            var manaCost = (int)SkillCatalog.ReturnSkillValue(attackSkill, attackerState.ActionSkillGradeNum1,
-                SkillValueKind.ManaUse);
-            if (manaCost > 0)
-            {
-                if (attackerState.Mana < manaCost)
-                    return;
-
-                attackerState.Mana -= manaCost;
-                attackerState.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
-            }
-        }
-
         var outcome = CombatResolver.ResolveEnemyTribeAttack(attackerSnapshot, defenderSnapshot,
             command.AttackInfo, _clock, attackSkill, _random,
             ZonePvpZoneCatalog.AllowsEnemyTribeAttack(MapId),
@@ -172,7 +149,9 @@ public sealed partial class Zone
             defenderState.PshopOpen, defenderState.ActionSort,
             worldState?.GetAllyOf(attackerSnapshot.Tribe),
             worldState?.GetTribeFormationAbility(attackerSnapshot.Tribe) ?? FormationCombatResolver.NoFormation,
-            worldState?.GetTribeFormationAbility(defenderSnapshot.Tribe) ?? FormationCombatResolver.NoFormation);
+            worldState?.GetTribeFormationAbility(defenderSnapshot.Tribe) ?? FormationCombatResolver.NoFormation,
+            attackerState.AttackBudgetEnforced, attackerState.ActionSkillNumber,
+            attackerState.ActionSkillGradeNum1 + attackerState.ActionSkillGradeNum2);
 
         if (outcome.Rejected)
             return;
@@ -210,10 +189,16 @@ public sealed partial class Zone
             }
         };
 
+        if (!outcome.Hit)
+        {
+            attackerState.Session.Send(response);
+            return;
+        }
+
         var recipients = CombatRecipients(attackerState, defenderState);
         BroadcastAttackResult(recipients, response);
 
-        if (!outcome.Hit || reflectFired)
+        if (reflectFired)
             return;
 
         defenderState.Life -= realDamage;
@@ -448,6 +433,9 @@ public sealed partial class Zone
 
         ApplySenderLocation(attackerState, command.AttackInfo);
 
+        if (!AttackPacketBudget.TryConsume(attackerState, command.AttackInfo.AttackActionValue4))
+            return;
+
         if (!_monsters.TryGetValue(command.AttackInfo.ServerIndex2, out var monster))
             return;
         if (monster.UniqueNumber != command.AttackInfo.UniqueNumber2)
@@ -456,41 +444,55 @@ public sealed partial class Zone
         if (monster.AiState is MonsterAiState.Spawning or MonsterAiState.Dead or MonsterAiState.ReturnToSpawn)
             return;
 
-        if (!AttackPacketBudget.TryConsume(attackerState, command.AttackInfo.AttackActionValue4))
-            return;
-
         var towerIndex = TowerZoneIndexTable.GetTowerIndex(MapId);
         var isTowerGuardian = towerIndex >= 0 && monster.ServerIndex == TowerWarState.GuardianServerIndex(towerIndex);
-
-        if (isTowerGuardian && !CanAttackTowerGuardian(attackerState.Tribe, towerIndex))
-            return;
+        var targetCategoryEligible = !isTowerGuardian || CanAttackTowerGuardian(attackerState.Tribe, towerIndex);
 
         var attackerSnapshot = ToCombatantSnapshot(attackerState);
+
+        var attackSkill = command.AttackInfo.AttackActionValue1 == 2 &&
+                          worldData.SkillsById.TryGetValue(command.AttackInfo.AttackActionValue2,
+                              out var skillDef)
+            ? skillDef
+            : null;
+
         var outcome = MonsterCombatResolver.ResolvePvmAttack(attackerSnapshot, monster, command.AttackInfo, _clock,
-            _random, attackerState.AttackBudgetEnforced, attackerState.ActionSkillNumber,
+            attackSkill, _random, attackerState.AttackBudgetEnforced, attackerState.ActionSkillNumber,
             attackerState.ActionSkillGradeNum1 + attackerState.ActionSkillGradeNum2,
             tribeSymbolCombatModifiers?.GetDamageDownPenalty(attackerSnapshot.Tribe) ?? 0f,
-            tribeSymbolCombatModifiers?.GetDamageUpBonusIncrementCount(attackerSnapshot.Tribe) ?? 0);
+            tribeSymbolCombatModifiers?.GetDamageUpBonusIncrementCount(attackerSnapshot.Tribe) ?? 0,
+            targetCategoryEligible);
+
+        if (outcome.ChargeConsumed)
+            attackerState.Buffs.Buff[8 * 2] = 0;
 
         if (outcome.Rejected)
             return;
 
-        if (outcome.ChargeConsumed)
-            attackerState.Buffs.Buff[8 * 2] =
-                0;
+        if (!outcome.Hit)
+        {
+            attackerState.Session.Send(new AttackResponse
+            {
+                AttackInfo = command.AttackInfo with { AttackResultValue = 0 }
+            });
+            return;
+        }
 
         var attackerWeaponItemId = attackerState.Inventory.GetSlot(ContainerMatrix.Equipment, 7)?.ItemId ?? 0;
         var response = new AttackResponse
         {
             AttackInfo = command.AttackInfo with
             {
-                AttackResultValue = outcome.Hit ? 1 + attackerWeaponItemId : 0,
+                AttackResultValue = 1 + attackerWeaponItemId,
                 AttackCriticalExist = outcome.Critical ? 1 : 0,
                 AttackElementDamage = outcome.ElementDamage,
                 AttackViewDamageValue = outcome.ViewDamage,
                 AttackRealDamageValue = outcome.DamageApplied
             }
         };
+
+        TryDamageMonster(monster.ServerIndex, outcome.DamageApplied, attackerState.CharacterId, out var monsterDied,
+            out _);
 
         _pvmAttackRecipientScratch.Clear();
         _pvmAttackRecipientScratch.Add(attackerState.CharacterId);
@@ -507,19 +509,12 @@ public sealed partial class Zone
         foreach (var id in _combatNeighborScratch)
             _pvmAttackRecipientScratch.Add(id);
 
-        BroadcastAttackResult(_pvmAttackRecipientScratch, response);
-
-        if (!outcome.Hit)
-            return;
-
-        TryDamageMonster(monster.ServerIndex, outcome.DamageApplied, attackerState.CharacterId, out var monsterDied,
-            out _);
+        BroadcastAttackResult(_pvmAttackRecipientScratch, response, attackerState.DungeonInstanceId);
 
         if (monsterDied)
             MonsterDeathSequence.BeginCorpseCountdown(monster, attackerState.PosX, attackerState.PosZ,
                 outcome.Critical, _random);
-
-        if (!monsterDied)
+        else
             TryApplyPvmFlinch(monster, outcome.DamageApplied);
 
         if (isTowerGuardian)
@@ -571,7 +566,7 @@ public sealed partial class Zone
             foreach (var player in _players.Values)
                 try
                 {
-                    if (player.Session is ClientSession clientSession)
+                    if (TryGetZoneWideBroadcastRecipient(player.CharacterId, out var clientSession))
                         clientSession.SendRaw(span);
                 }
                 catch (Exception ex)
@@ -624,7 +619,8 @@ public sealed partial class Zone
         return _combatRecipientScratch;
     }
 
-    private void BroadcastAttackResult(IReadOnlyCollection<int> recipientCharacterIds, in AttackResponse response)
+    private void BroadcastAttackResult(IReadOnlyCollection<int> recipientCharacterIds, in AttackResponse response,
+        int? anchorInstanceId = null)
     {
         if (recipientCharacterIds.Count == 0)
             return;
@@ -640,8 +636,8 @@ public sealed partial class Zone
             foreach (var id in recipientCharacterIds)
                 try
                 {
-                    if (_players.TryGetValue(id, out var recipient) &&
-                        recipient.Session is ClientSession clientSession)
+                    if (TryGetBroadcastRecipient(id, out var recipient, out var clientSession) &&
+                        IsVisibleAcrossDungeonInstance(anchorInstanceId, recipient.DungeonInstanceId))
                         clientSession.SendRaw(span);
                 }
                 catch (Exception ex)

@@ -155,4 +155,16 @@ public sealed class FriendRegistry
             return _acceptedFor.Remove(characterId, out otherId);
         }
     }
+
+    public bool TryClearAcceptedForDisconnect(int characterId, out int partnerId)
+    {
+        lock (_lock)
+        {
+            if (!_acceptedFor.Remove(characterId, out partnerId))
+                return false;
+
+            _acceptedFor.Remove(partnerId);
+            return true;
+        }
+    }
 }

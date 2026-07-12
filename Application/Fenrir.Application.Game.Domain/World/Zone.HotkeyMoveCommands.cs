@@ -8,8 +8,6 @@ public sealed partial class Zone
 {
     private const int HotkeyMoveInboxCapacity = 512;
 
-    private const int HotkeyMoveInboxDrainCapPerTick = HotkeyMoveInboxCapacity / 2;
-
     private readonly Channel<HotkeyMoveZoneCommand> _hotkeyMoveInbox =
         Channel.CreateBounded<HotkeyMoveZoneCommand>(
             new BoundedChannelOptions(HotkeyMoveInboxCapacity)
@@ -42,10 +40,8 @@ public sealed partial class Zone
 
     private void DrainHotkeyMoveCommands()
     {
-        var processed = 0;
-        while (processed < HotkeyMoveInboxDrainCapPerTick && _hotkeyMoveInbox.Reader.TryRead(out var command))
+        while (_hotkeyMoveInbox.Reader.TryRead(out var command))
         {
-            processed++;
             try
             {
                 ApplyHotkeyMoveCommand(in command);
@@ -58,9 +54,6 @@ public sealed partial class Zone
                 command.Applied?.TrySetException(ex);
             }
         }
-
-        if (processed >= HotkeyMoveInboxDrainCapPerTick)
-            LogDrainCapEngaged(_hotkeyMoveInbox.Reader, "hotkey-move", HotkeyMoveInboxDrainCapPerTick);
     }
 
     private void ApplyHotkeyMoveCommand(in HotkeyMoveZoneCommand command)

@@ -22,8 +22,6 @@ public sealed class GameServerOptions
 
     public float MaxPlausibleMoveDistance { get; set; } = 666f;
 
-    public int MonsterPathfindingBudgetPerTick { get; set; } = 24;
-
     public int HeartbeatIntervalSeconds { get; set; } = 5;
 
     public int HeroRankingRolloverCheckIntervalMinutes { get; set; } = 60;

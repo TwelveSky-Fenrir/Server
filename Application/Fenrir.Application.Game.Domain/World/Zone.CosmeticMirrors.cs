@@ -23,51 +23,27 @@ public sealed partial class Zone
 
     private const int AutoBuffInboxCapacity = 256;
 
-    private const int AutoBuffInboxDrainCapPerTick = AutoBuffInboxCapacity / 2;
-
     private const int AvatarBuffInboxCapacity = 256;
-
-    private const int AvatarBuffInboxDrainCapPerTick = AvatarBuffInboxCapacity / 2;
 
     private const int BottleInboxCapacity = 256;
 
-    private const int BottleInboxDrainCapPerTick = BottleInboxCapacity / 2;
-
     private const int HotkeySlotInboxCapacity = 256;
-
-    private const int HotkeySlotInboxDrainCapPerTick = HotkeySlotInboxCapacity / 2;
 
     private const int CostumeInboxCapacity = 256;
 
-    private const int CostumeInboxDrainCapPerTick = CostumeInboxCapacity / 2;
-
     private const int FishingInboxCapacity = 512;
-
-    private const int FishingInboxDrainCapPerTick = FishingInboxCapacity / 2;
 
     private const int HeroRankingInboxCapacity = 256;
 
-    private const int HeroRankingInboxDrainCapPerTick = HeroRankingInboxCapacity / 2;
-
     private const int HeroRankingRolloverInboxCapacity = 4;
-
-    private const int HeroRankingRolloverInboxDrainCapPerTick = HeroRankingRolloverInboxCapacity / 2;
 
     private const int MountInboxCapacity = 256;
 
-    private const int MountInboxDrainCapPerTick = MountInboxCapacity / 2;
-
     private const int PshopInboxCapacity = 256;
-
-    private const int PshopInboxDrainCapPerTick = PshopInboxCapacity / 2;
 
     private const int RuneInboxCapacity = 256;
 
-    private const int RuneInboxDrainCapPerTick = RuneInboxCapacity / 2;
-
     private const int StellarCoreInboxCapacity = 256;
-
-    private const int StellarCoreInboxDrainCapPerTick = StellarCoreInboxCapacity / 2;
 
     private const int CharacterMpStatSort = 11;
 
@@ -283,10 +259,8 @@ public sealed partial class Zone
 
     private void DrainDrinkBottleCommands()
     {
-        var processed = 0;
-        while (processed < BottleInboxDrainCapPerTick && _bottleInbox.Reader.TryRead(out var command))
+        while (_bottleInbox.Reader.TryRead(out var command))
         {
-            processed++;
             try
             {
                 ApplyDrinkBottleCommand(in command);
@@ -299,9 +273,6 @@ public sealed partial class Zone
                 command.Applied?.TrySetException(ex);
             }
         }
-
-        if (processed >= BottleInboxDrainCapPerTick)
-            LogDrainCapEngaged(_bottleInbox.Reader, "drink-bottle", BottleInboxDrainCapPerTick);
     }
 
     private void ApplyDrinkBottleCommand(in DrinkBottleZoneCommand command)
@@ -322,10 +293,8 @@ public sealed partial class Zone
 
     private void DrainHotkeySlotMirrorCommands()
     {
-        var processed = 0;
-        while (processed < HotkeySlotInboxDrainCapPerTick && _hotkeySlotInbox.Reader.TryRead(out var command))
+        while (_hotkeySlotInbox.Reader.TryRead(out var command))
         {
-            processed++;
             try
             {
                 ApplyHotkeySlotMirrorCommand(in command);
@@ -336,9 +305,6 @@ public sealed partial class Zone
                     MapId, command.CharacterId);
             }
         }
-
-        if (processed >= HotkeySlotInboxDrainCapPerTick)
-            LogDrainCapEngaged(_hotkeySlotInbox.Reader, "hotkey-slot", HotkeySlotInboxDrainCapPerTick);
     }
 
     private void ApplyHotkeySlotMirrorCommand(in HotkeySlotMirrorZoneCommand command)
@@ -375,10 +341,8 @@ public sealed partial class Zone
 
     private void DrainHeroRankingQueryCommands()
     {
-        var processed = 0;
-        while (processed < HeroRankingInboxDrainCapPerTick && _heroRankingInbox.Reader.TryRead(out var command))
+        while (_heroRankingInbox.Reader.TryRead(out var command))
         {
-            processed++;
             try
             {
                 ApplyHeroRankingQueryCommand(in command);
@@ -389,9 +353,6 @@ public sealed partial class Zone
                     MapId, command.CharacterId);
             }
         }
-
-        if (processed >= HeroRankingInboxDrainCapPerTick)
-            LogDrainCapEngaged(_heroRankingInbox.Reader, "hero-ranking-query", HeroRankingInboxDrainCapPerTick);
     }
 
     private void ApplyHeroRankingQueryCommand(in HeroRankingQueryZoneCommand command)
@@ -407,11 +368,8 @@ public sealed partial class Zone
 
     private void DrainHeroRankingRolloverCommands()
     {
-        var processed = 0;
-        while (processed < HeroRankingRolloverInboxDrainCapPerTick &&
-               _heroRankingRolloverInbox.Reader.TryRead(out _))
+        while (_heroRankingRolloverInbox.Reader.TryRead(out _))
         {
-            processed++;
             try
             {
                 ApplyHeroRankingRolloverReset();
@@ -421,10 +379,6 @@ public sealed partial class Zone
                 logger.LogError(ex, "Zone {MapId} hero-ranking rollover reset failed", MapId);
             }
         }
-
-        if (processed >= HeroRankingRolloverInboxDrainCapPerTick)
-            LogDrainCapEngaged(_heroRankingRolloverInbox.Reader, "hero-ranking-rollover",
-                HeroRankingRolloverInboxDrainCapPerTick);
     }
 
     private void ApplyHeroRankingRolloverReset()
@@ -441,10 +395,8 @@ public sealed partial class Zone
 
     private void DrainFishingCommands()
     {
-        var processed = 0;
-        while (processed < FishingInboxDrainCapPerTick && _fishingInbox.Reader.TryRead(out var command))
+        while (_fishingInbox.Reader.TryRead(out var command))
         {
-            processed++;
             try
             {
                 ApplyFishingCommand(in command);
@@ -457,9 +409,6 @@ public sealed partial class Zone
                 command.Applied?.TrySetException(ex);
             }
         }
-
-        if (processed >= FishingInboxDrainCapPerTick)
-            LogDrainCapEngaged(_fishingInbox.Reader, "fishing", FishingInboxDrainCapPerTick);
     }
 
     private void ApplyFishingCommand(in FishingZoneCommand command)
@@ -513,10 +462,8 @@ public sealed partial class Zone
 
     private void DrainMountCommands()
     {
-        var processed = 0;
-        while (processed < MountInboxDrainCapPerTick && _mountInbox.Reader.TryRead(out var command))
+        while (_mountInbox.Reader.TryRead(out var command))
         {
-            processed++;
             try
             {
                 ApplyMountCommand(in command);
@@ -529,9 +476,6 @@ public sealed partial class Zone
                 command.Applied?.TrySetException(ex);
             }
         }
-
-        if (processed >= MountInboxDrainCapPerTick)
-            LogDrainCapEngaged(_mountInbox.Reader, "mount", MountInboxDrainCapPerTick);
     }
 
     private void ApplyMountCommand(in MountZoneCommand command)
@@ -646,8 +590,7 @@ public sealed partial class Zone
     {
         try
         {
-            if (_players.TryGetValue(recipientId, out var recipient) &&
-                recipient.Session is ClientSession clientSession)
+            if (TryGetBroadcastRecipient(recipientId, out _, out var clientSession))
                 clientSession.SendRaw(frame);
         }
         catch (Exception ex)
@@ -659,10 +602,8 @@ public sealed partial class Zone
 
     private void DrainCostumeCommands()
     {
-        var processed = 0;
-        while (processed < CostumeInboxDrainCapPerTick && _costumeInbox.Reader.TryRead(out var command))
+        while (_costumeInbox.Reader.TryRead(out var command))
         {
-            processed++;
             try
             {
                 ApplyCostumeCommand(in command);
@@ -675,9 +616,6 @@ public sealed partial class Zone
                 command.Applied?.TrySetException(ex);
             }
         }
-
-        if (processed >= CostumeInboxDrainCapPerTick)
-            LogDrainCapEngaged(_costumeInbox.Reader, "costume", CostumeInboxDrainCapPerTick);
     }
 
     private void ApplyCostumeCommand(in CostumeZoneCommand command)
@@ -748,10 +686,8 @@ public sealed partial class Zone
 
     private void DrainStellarCoreCommands()
     {
-        var processed = 0;
-        while (processed < StellarCoreInboxDrainCapPerTick && _stellarCoreInbox.Reader.TryRead(out var command))
+        while (_stellarCoreInbox.Reader.TryRead(out var command))
         {
-            processed++;
             try
             {
                 ApplyStellarCoreCommand(in command);
@@ -764,9 +700,6 @@ public sealed partial class Zone
                 command.Applied?.TrySetException(ex);
             }
         }
-
-        if (processed >= StellarCoreInboxDrainCapPerTick)
-            LogDrainCapEngaged(_stellarCoreInbox.Reader, "stellar-core", StellarCoreInboxDrainCapPerTick);
     }
 
     private void ApplyStellarCoreCommand(in StellarCoreZoneCommand command)
@@ -835,10 +768,8 @@ public sealed partial class Zone
 
     private void DrainAvatarBuffCommands()
     {
-        var processed = 0;
-        while (processed < AvatarBuffInboxDrainCapPerTick && _avatarBuffInbox.Reader.TryRead(out var command))
+        while (_avatarBuffInbox.Reader.TryRead(out var command))
         {
-            processed++;
             try
             {
                 ApplyAvatarBuffCommand(in command);
@@ -851,9 +782,6 @@ public sealed partial class Zone
                 command.Applied?.TrySetException(ex);
             }
         }
-
-        if (processed >= AvatarBuffInboxDrainCapPerTick)
-            LogDrainCapEngaged(_avatarBuffInbox.Reader, "avatar-buff", AvatarBuffInboxDrainCapPerTick);
     }
 
     private void ApplyAvatarBuffCommand(in AvatarBuffZoneCommand command)
@@ -888,10 +816,8 @@ public sealed partial class Zone
 
     private void DrainRuneSocketCommands()
     {
-        var processed = 0;
-        while (processed < RuneInboxDrainCapPerTick && _runeInbox.Reader.TryRead(out var command))
+        while (_runeInbox.Reader.TryRead(out var command))
         {
-            processed++;
             try
             {
                 ApplyRuneSocketCommand(in command);
@@ -904,9 +830,6 @@ public sealed partial class Zone
                 command.Applied?.TrySetException(ex);
             }
         }
-
-        if (processed >= RuneInboxDrainCapPerTick)
-            LogDrainCapEngaged(_runeInbox.Reader, "rune-socket", RuneInboxDrainCapPerTick);
     }
 
     private void ApplyRuneSocketCommand(in RuneSocketZoneCommand command)
@@ -936,10 +859,8 @@ public sealed partial class Zone
 
     private void DrainAutoBuffCommands()
     {
-        var processed = 0;
-        while (processed < AutoBuffInboxDrainCapPerTick && _autoBuffInbox.Reader.TryRead(out var command))
+        while (_autoBuffInbox.Reader.TryRead(out var command))
         {
-            processed++;
             try
             {
                 ApplyAutoBuffCommand(in command);
@@ -952,9 +873,6 @@ public sealed partial class Zone
                 command.Applied?.TrySetException(ex);
             }
         }
-
-        if (processed >= AutoBuffInboxDrainCapPerTick)
-            LogDrainCapEngaged(_autoBuffInbox.Reader, "auto-buff", AutoBuffInboxDrainCapPerTick);
     }
 
     private void ApplyAutoBuffCommand(in AutoBuffZoneCommand command)
@@ -964,6 +882,9 @@ public sealed partial class Zone
 
         if (command.RegisteredSkills is { } registered)
             state.AutoBuffSkill = registered;
+
+        if (command.ApplyRegisteredBuffs)
+            ApplyRegisteredAutoBuffs(state);
 
         if (command.ActivateAutoBuff)
         {
@@ -1014,10 +935,8 @@ public sealed partial class Zone
 
     private void DrainPshopCommands()
     {
-        var processed = 0;
-        while (processed < PshopInboxDrainCapPerTick && _pshopInbox.Reader.TryRead(out var command))
+        while (_pshopInbox.Reader.TryRead(out var command))
         {
-            processed++;
             try
             {
                 ApplyPshopCommand(in command);
@@ -1030,9 +949,6 @@ public sealed partial class Zone
                 command.Applied?.TrySetException(ex);
             }
         }
-
-        if (processed >= PshopInboxDrainCapPerTick)
-            LogDrainCapEngaged(_pshopInbox.Reader, "pshop", PshopInboxDrainCapPerTick);
     }
 
     private void ApplyPshopCommand(in PshopZoneCommand command)
@@ -1184,6 +1100,7 @@ public readonly record struct AutoBuffZoneCommand(
     int CharacterId,
     ImmutableArray<(int SkillId, int Grade)>? RegisteredSkills = null,
     bool ActivateAutoBuff = false,
+    bool ApplyRegisteredBuffs = false,
     int? ActionSort = null,
     bool Broadcast = false,
     TaskCompletionSource? Applied = null);

@@ -14,7 +14,8 @@ public static class WarZoneEntryGate
         if (!WarZoneEntryCatalog.TryGetRule(zoneNumber, out var rule))
             return WarZoneEntryOutcome.Allowed;
 
-        var levelOk = combinedLevel >= rule.MinCombinedLevel && combinedLevel <= rule.MaxCombinedLevel;
+        var levelOk = !rule.HasCombinedLevelRequirement ||
+                      (combinedLevel >= rule.MinCombinedLevel && combinedLevel <= rule.MaxCombinedLevel);
         var rebirthOk = rebirthCount >= rule.MinRebirthCount && rebirthCount <= rule.MaxRebirthCount;
 
         return levelOk && rebirthOk ? WarZoneEntryOutcome.Allowed : WarZoneEntryOutcome.RejectedOutOfRange;

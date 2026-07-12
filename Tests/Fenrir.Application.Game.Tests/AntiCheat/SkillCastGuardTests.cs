@@ -51,7 +51,7 @@ public class SkillCastGuardTests
     {
         var context = Context(category, claimedSkill: 12345, claimedInvested: 999, claimedBonus: 999,
             serverBonus: 0, serverMax: 0);
-        Assert.Equal(SkillCastOffense.None, SkillCastGuard.Evaluate(context));
+        Assert.Equal(SkillCastVerdict.Passed, SkillCastGuard.Evaluate(context));
     }
 
     [Theory]
@@ -59,30 +59,34 @@ public class SkillCastGuardTests
     [InlineData(2)]
     public void CategoryOneAndTwo_MatchingHotkey_ConsistentBonus_Allowed(int category)
     {
-        Assert.Equal(SkillCastOffense.None, SkillCastGuard.Evaluate(Context(category)));
+        Assert.Equal(SkillCastVerdict.Passed, SkillCastGuard.Evaluate(Context(category)));
     }
 
     [Theory]
     [InlineData(1)]
     [InlineData(2)]
-    public void HotkeyMismatch_Disconnects(int category)
+    public void HotkeyMismatch_DisconnectsRegardlessOfCategory(int category)
     {
         var context = Context(category, hotkeys: HotkeyBoundTo(SkillNumber + 1, InvestedGrade));
-        Assert.Equal(SkillCastOffense.HotkeyMismatch, SkillCastGuard.Evaluate(context));
+        var verdict = SkillCastGuard.Evaluate(context);
+        Assert.Equal(SkillCastOffense.HotkeyMismatch, verdict.Offense);
+        Assert.Equal(SkillCastEnforcement.Disconnect, verdict.Enforcement);
     }
 
     [Fact]
     public void HotkeyMatch_RequiresBothSkillNumberAndGrade()
     {
         var context = Context(1, hotkeys: HotkeyBoundTo(SkillNumber, InvestedGrade + 1));
-        Assert.Equal(SkillCastOffense.HotkeyMismatch, SkillCastGuard.Evaluate(context));
+        var verdict = SkillCastGuard.Evaluate(context);
+        Assert.Equal(SkillCastOffense.HotkeyMismatch, verdict.Offense);
+        Assert.Equal(SkillCastEnforcement.Disconnect, verdict.Enforcement);
     }
 
     [Fact]
     public void CategoryTwoAutoState_UsesLearnedSlots_PresentAllows()
     {
         var context = Context(2, true, hotkeys: ImmutableDictionary<(byte, byte), HotkeySlot>.Empty);
-        Assert.Equal(SkillCastOffense.None, SkillCastGuard.Evaluate(context));
+        Assert.Equal(SkillCastVerdict.Passed, SkillCastGuard.Evaluate(context));
     }
 
     [Fact]
@@ -90,36 +94,53 @@ public class SkillCastGuardTests
     {
         var context = Context(2, true, learned: LearnedWith(SkillNumber + 100),
             hotkeys: ImmutableDictionary<(byte, byte), HotkeySlot>.Empty);
-        Assert.Equal(SkillCastOffense.LearnedSkillMissing, SkillCastGuard.Evaluate(context));
+        var verdict = SkillCastGuard.Evaluate(context);
+        Assert.Equal(SkillCastOffense.LearnedSkillMissing, verdict.Offense);
+        Assert.Equal(SkillCastEnforcement.Disconnect, verdict.Enforcement);
+    }
+
+    [Fact]
+    public void BonusGradeMismatch_HotkeyBoundCategory_Disconnects()
+    {
+        var context = Context(SkillCastGuard.HotkeyBoundCategoryCode, claimedBonus: 1, serverBonus: 2);
+        var verdict = SkillCastGuard.Evaluate(context);
+        Assert.Equal(SkillCastOffense.BonusGradeMismatch, verdict.Offense);
+        Assert.Equal(SkillCastEnforcement.Disconnect, verdict.Enforcement);
     }
 
     [Theory]
-    [InlineData(1)]
-    [InlineData(2)]
-    public void BonusGradeMismatch_UniformlyDisconnects_BothCategories(int category)
+    [InlineData(false)]
+    [InlineData(true)]
+    public void BonusGradeMismatch_SkillEffectCategory_SilentlyDropsRegardlessOfAutoState(bool isAutoState)
     {
-        var context = Context(category, claimedBonus: 1, serverBonus: 2);
-        Assert.Equal(SkillCastOffense.BonusGradeMismatch, SkillCastGuard.Evaluate(context));
+        var hotkeys = isAutoState ? ImmutableDictionary<(byte, byte), HotkeySlot>.Empty : HotkeyBoundTo(SkillNumber, InvestedGrade);
+        var context = Context(SkillCastGuard.SkillEffectCategoryCode, isAutoState, claimedBonus: 1, serverBonus: 2,
+            hotkeys: hotkeys);
+        var verdict = SkillCastGuard.Evaluate(context);
+        Assert.Equal(SkillCastOffense.BonusGradeMismatch, verdict.Offense);
+        Assert.Equal(SkillCastEnforcement.SilentDrop, verdict.Enforcement);
     }
 
     [Fact]
     public void SkillHack1_InvestedGradeOverServerMax_Disconnects()
     {
         var context = Context(1, claimedInvested: 6, serverMax: 5, claimedBonus: 2, serverBonus: 2);
-        Assert.Equal(SkillCastOffense.SkillHack1, SkillCastGuard.Evaluate(context));
+        var verdict = SkillCastGuard.Evaluate(context);
+        Assert.Equal(SkillCastOffense.SkillHack1, verdict.Offense);
+        Assert.Equal(SkillCastEnforcement.Disconnect, verdict.Enforcement);
     }
 
     [Fact]
     public void SkillHack1_NotAppliedToSpecialCaseCast()
     {
         var context = Context(1, claimedInvested: 6, serverMax: 5, isRealSkillCast: false);
-        Assert.Equal(SkillCastOffense.None, SkillCastGuard.Evaluate(context));
+        Assert.Equal(SkillCastVerdict.Passed, SkillCastGuard.Evaluate(context));
     }
 
     [Fact]
     public void InvestedGradeAtServerMax_IsAllowed()
     {
         var context = Context(1, claimedInvested: 5, serverMax: 5);
-        Assert.Equal(SkillCastOffense.None, SkillCastGuard.Evaluate(context));
+        Assert.Equal(SkillCastVerdict.Passed, SkillCastGuard.Evaluate(context));
     }
 }

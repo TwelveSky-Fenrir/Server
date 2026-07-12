@@ -37,6 +37,7 @@ public class ZoneMoveServiceSpawnPointTests
             new FakeGameServerDirectoryRepository(),
             new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
             new FakeSessionTicketRepository(),
+            new FakeEventLogRepository(),
             Options.Create(new GameServerOptions()), NullLogger<ZoneMoveService>.Instance);
 
         var (session, _) = ZoneTestKit.CreateSession(1);

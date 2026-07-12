@@ -137,7 +137,10 @@ public sealed class ValleyWarSystem(
             if (player.Tribe != winningTribe || player.IsMovingZone || player.IsDead)
                 continue;
 
-            zone.Post(ZoneCommand.GrantValleyWarRewardDrop(player.CharacterId));
+            if (!zone.Post(ZoneCommand.GrantValleyWarRewardDrop(player.CharacterId)))
+                logger.LogWarning(
+                    "Zone {MapId} inbox full: dropped valley-war reward drop grant for character {CharacterId}",
+                    zone.MapId, player.CharacterId);
         }
     }
 

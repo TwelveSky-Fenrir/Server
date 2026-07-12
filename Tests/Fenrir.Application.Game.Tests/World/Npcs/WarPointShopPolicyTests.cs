@@ -44,38 +44,46 @@ public class WarPointShopPolicyTests
     }
 
     [Fact]
-    public void WarPointNpc_ItemNotInPriceTable_FallsThroughToOrdinaryPath()
+    public void WarPointNpc_ItemNotInPriceTableAtAll_FallsThrough()
     {
         var catalog = Catalog(Entry(90200, 500, 0, WpNpc));
         var result = WarPointShopPolicy.ResolveBuy(catalog, WpNpc, Item(90999, NonStackableSort), 1, null, 0);
 
-        Assert.Equal(WarPointShopPolicy.BuyOutcome.NotWarPointItem, result.Outcome);
+        Assert.Equal(WarPointShopPolicy.BuyOutcome.PriceUnavailable, result.Outcome);
     }
 
     [Fact]
-    public void EmptyCatalog_EveryRequestFallsThrough()
+    public void EmptyCatalog_AtWarPointNpc_FallsThrough()
     {
         var result = WarPointShopPolicy.ResolveBuy(Catalog(), WpNpc, Item(90200, NonStackableSort), 1, null, 0);
 
+        Assert.Equal(WarPointShopPolicy.BuyOutcome.PriceUnavailable, result.Outcome);
+    }
+
+    [Fact]
+    public void EmptyCatalog_AtOrdinaryNpc_FallsThrough()
+    {
+        var result = WarPointShopPolicy.ResolveBuy(Catalog(), OrdinaryNpc, Item(90200, NonStackableSort), 1, null, 0);
+
         Assert.Equal(WarPointShopPolicy.BuyOutcome.NotWarPointItem, result.Outcome);
     }
 
     [Fact]
-    public void Page2TribeItem_AtWrongNpc_IsHardRejectedBeforeAnyWarPointLogic()
+    public void Page2TribeItem_AtWrongNpc_IsRejectedAsWrongNpcForItem()
     {
         var catalog = Catalog(Entry(90200, 500, 0, WpNpc));
         var result = WarPointShopPolicy.ResolveBuy(catalog, OtherWpNpc, Item(90200, NonStackableSort), 1, null, 0);
 
-        Assert.Equal(WarPointShopPolicy.BuyOutcome.WrongNpc, result.Outcome);
+        Assert.Equal(WarPointShopPolicy.BuyOutcome.WrongNpcForItem, result.Outcome);
     }
 
     [Fact]
-    public void Page2TribeItem_AtNangim_IsHardRejected()
+    public void Page2TribeItem_AtNangim_IsRejectedAsWrongNpcForItem()
     {
         var catalog = Catalog(Entry(90200, 500, 0, WpNpc));
         var result = WarPointShopPolicy.ResolveBuy(catalog, NangimNpc, Item(90200, NonStackableSort), 1, null, 0);
 
-        Assert.Equal(WarPointShopPolicy.BuyOutcome.WrongNpc, result.Outcome);
+        Assert.Equal(WarPointShopPolicy.BuyOutcome.WrongNpcForItem, result.Outcome);
     }
 
     [Fact]
@@ -124,6 +132,15 @@ public class WarPointShopPolicyTests
         Assert.Equal(WarPointShopPolicy.BuyOutcome.Proceed, result.Outcome);
         Assert.Equal(20, result.WarPointCost);
         Assert.Equal(1, result.NewDestinationStack!.Value.Quantity);
+    }
+
+    [Fact]
+    public void Stackable_FreshStackAboveCeiling_IsHardRejected()
+    {
+        var catalog = Catalog(Entry(50, 20, 0, WpNpc));
+        var result = WarPointShopPolicy.ResolveBuy(catalog, WpNpc, Item(50, StackableSort), 1000, null, 0);
+
+        Assert.Equal(WarPointShopPolicy.BuyOutcome.InvalidQuantity, result.Outcome);
     }
 
     [Fact]
@@ -229,7 +246,7 @@ public class WarPointShopPolicyTests
     }
 
     [Fact]
-    public void FixedStateStampBand_86700To86725_IsFlaggedButGrantedPlain()
+    public void FixedStateStampRange_PopulatedId_GrantsEnchant40Combine12Stamp()
     {
         Assert.True(WarPointShopPolicy.IsFixedStateStampItem(86700));
         Assert.True(WarPointShopPolicy.IsFixedStateStampItem(86725));
@@ -238,6 +255,29 @@ public class WarPointShopPolicyTests
 
         var catalog = Catalog(Entry(86700, 500, 0, WpNpc));
         var result = WarPointShopPolicy.ResolveBuy(catalog, WpNpc, Item(86700, NonStackableSort), 1, null, 0);
+
+        Assert.Equal(WarPointShopPolicy.BuyOutcome.Proceed, result.Outcome);
+        var stack = result.NewDestinationStack!.Value;
+        Assert.Equal(40, stack.Enchant);
+        Assert.Equal(12, stack.Combine);
+        Assert.Equal(0, stack.Refine);
+        Assert.Equal(0, stack.Socket);
+    }
+
+    [Fact]
+    public void FixedStateStampRange_IdWithNoPriceTableEntry_FallsThroughBeforeStampIsConsidered()
+    {
+        var catalog = Catalog(Entry(86700, 500, 0, WpNpc));
+        var result = WarPointShopPolicy.ResolveBuy(catalog, WpNpc, Item(86701, NonStackableSort), 1, null, 0);
+
+        Assert.Equal(WarPointShopPolicy.BuyOutcome.PriceUnavailable, result.Outcome);
+    }
+
+    [Fact]
+    public void OutsideFixedStateStampRange_GrantsAllZeroStamp()
+    {
+        var catalog = Catalog(Entry(90200, 500, 0, WpNpc));
+        var result = WarPointShopPolicy.ResolveBuy(catalog, WpNpc, Item(90200, NonStackableSort), 1, null, 0);
 
         Assert.Equal(WarPointShopPolicy.BuyOutcome.Proceed, result.Outcome);
         var stack = result.NewDestinationStack!.Value;

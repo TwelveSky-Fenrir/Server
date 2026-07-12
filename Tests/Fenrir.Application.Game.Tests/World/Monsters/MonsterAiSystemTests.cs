@@ -11,7 +11,8 @@ namespace Fenrir.Application.Game.Tests.World.Monsters;
 public class MonsterAiSystemTests
 {
     private static WorldDataCache CacheWithOneRegion(short frameInfo1, short frameInfo3, short radiusInfo1,
-        short radiusInfo2, short walkSpeed, short runSpeed, float regionRadius, byte attackType = 1)
+        short radiusInfo2, short walkSpeed, short runSpeed, float regionRadius, byte attackType = 1,
+        short frameInfo6 = 1)
     {
         var monster = WorldDataTestRows.Monster(600) with
         {
@@ -22,6 +23,7 @@ public class MonsterAiSystemTests
             SummonTime2 = 9999,
             FrameInfo1 = frameInfo1,
             FrameInfo3 = frameInfo3,
+            FrameInfo6 = frameInfo6,
             RadiusInfo1 = radiusInfo1,
             RadiusInfo2 = radiusInfo2,
             WalkSpeed = walkSpeed,
@@ -50,9 +52,9 @@ public class MonsterAiSystemTests
     }
 
     [Fact]
-    public void Monster_StaysInSpawningState_UntilFrameInfo1TicksElapse()
+    public void Monster_Spawning_ConvertsFrameInfo1AtThirtyUnitsPerSecond_NotOneUnitPerLegacyTick()
     {
-        var zone = CreateZone(CacheWithOneRegion(3, 1, 0, 0,
+        var zone = CreateZone(CacheWithOneRegion(40, 1, 0, 0,
             0, 0, 0));
 
         zone.Tick(SimulationClock.LegacyTick);
@@ -140,7 +142,7 @@ public class MonsterAiSystemTests
     }
 
     [Fact]
-    public void Monster_TargetEscapesDetectionRadiusMidChase_GivesUpToIdleThenEventuallyReturnsHome()
+    public void Monster_TargetEscapesDetectionRadiusMidChase_GivesUpToIdle()
     {
         var zone = CreateZone(CacheWithOneRegion(1, 1, 2, 50,
             10, 1000, 50));
@@ -148,10 +150,6 @@ public class MonsterAiSystemTests
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Target", 20, posZ: 0)));
 
         zone.Tick(SimulationClock.LegacyTick);
-        Assert.True(zone.TryGetMonster(1, out var spawned));
-        var homeX = spawned!.HomeX;
-        var homeZ = spawned.HomeZ;
-
         zone.Tick(SimulationClock
             .LegacyTick);
         zone.Tick(SimulationClock.LegacyTick);
@@ -166,25 +164,35 @@ public class MonsterAiSystemTests
         Assert.True(zone.TryGetMonster(1, out var gaveUp));
         Assert.Equal(MonsterAiState.Decision, gaveUp!.AiState);
         Assert.Null(gaveUp.TargetCharacterId);
+    }
 
-        const float arrivalEpsilon = 1f;
+    [Fact]
+    public void Monster_NoWorldGeometryLoaded_IdleReturnHomeCheckNeverForcesRecall()
+    {
+        var zone = CreateZone(CacheWithOneRegion(1, 1, 2, 50,
+            10, 1000, 50));
+        var (session, _) = ZoneTestKit.CreateSession(1);
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Target", 20, posZ: 0)));
 
-        var monster = gaveUp;
-        var returnedHome = false;
-        for (var i = 0; i < 200 && !returnedHome; i++)
+        zone.Tick(SimulationClock.LegacyTick);
+        zone.Tick(SimulationClock
+            .LegacyTick);
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.True(zone.TryGetPlayer(10, out var target));
+        target!.PosX = 5000f;
+        target.PosZ = 0f;
+
+        zone.Tick(SimulationClock.LegacyTick);
+        Assert.True(zone.TryGetMonster(1, out var gaveUp));
+        Assert.Equal(MonsterAiState.Decision, gaveUp!.AiState);
+
+        for (var i = 0; i < 200; i++)
         {
             zone.Tick(SimulationClock.LegacyTick);
-            Assert.True(zone.TryGetMonster(1, out monster));
-            if (monster!.AiState == MonsterAiState.Spawning &&
-                MathF.Abs(monster.PosX - homeX) <= arrivalEpsilon &&
-                MathF.Abs(monster.PosZ - homeZ) <= arrivalEpsilon)
-                returnedHome = true;
+            Assert.True(zone.TryGetMonster(1, out var monster));
+            Assert.NotEqual(MonsterAiState.ReturnToSpawn, monster!.AiState);
         }
-
-        Assert.True(returnedHome,
-            "monster never gave up chasing a target that escaped its detection radius and returned home");
-        Assert.True(MathF.Abs(monster!.PosX - homeX) <= arrivalEpsilon);
-        Assert.True(MathF.Abs(monster.PosZ - homeZ) <= arrivalEpsilon);
     }
 
     [Fact]
@@ -230,6 +238,30 @@ public class MonsterAiSystemTests
             "monster never re-engaged the still-nearby replacement target during the idle re-detection grace period");
         Assert.True(zone.TryGetMonster(1, out var reengaged));
         Assert.Equal(11, reengaged!.TargetCharacterId);
+    }
+
+    [Fact]
+    public void Monster_ReturnToSpawn_ConvertsFrameInfo6AtThirtyUnitsPerSecond_NotOneUnitPerLegacyTick()
+    {
+        var zone = CreateZone(CacheWithOneRegion(1, 1, 0, 0, 0, 0, 0, frameInfo6: 30));
+
+        zone.Tick(SimulationClock.LegacyTick);
+        Assert.True(zone.TryGetMonster(1, out var monster));
+
+        monster!.AiState = MonsterAiState.ReturnToSpawn;
+        monster.StateTicks = 0;
+        monster.StateFrameAccumulator = 0f;
+        monster.PosX = monster.HomeX + 500f;
+        monster.PosZ = monster.HomeZ + 500f;
+
+        zone.Tick(SimulationClock.LegacyTick);
+        Assert.Equal(MonsterAiState.ReturnToSpawn, monster.AiState);
+        Assert.NotEqual(monster.HomeX, monster.PosX);
+
+        zone.Tick(SimulationClock.LegacyTick);
+        Assert.Equal(MonsterAiState.Spawning, monster.AiState);
+        Assert.Equal(monster.HomeX, monster.PosX);
+        Assert.Equal(monster.HomeZ, monster.PosZ);
     }
 
     private sealed class ZeroScatterRandom : Random

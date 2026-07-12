@@ -39,9 +39,10 @@ public sealed partial class Zone
 
         _groundItems[index] = entity;
 
+        BroadcastGroundItemAction(entity, 1);
+
         _groundItemLastRebroadcast[index] =
             _clock - SimulationClock.RebroadcastStaggerOffset(index, SimulationClock.GroundItemRebroadcastInterval);
-        BroadcastGroundItemAction(entity, 1);
     }
 
     private static string TruncateName(string name)
@@ -102,7 +103,6 @@ public sealed partial class Zone
             if (_clock - last < SimulationClock.GroundItemRebroadcastInterval)
                 continue;
 
-            _groundItemLastRebroadcast[index] = _clock;
             BroadcastGroundItemAction(item, 0);
         }
     }
@@ -120,8 +120,8 @@ public sealed partial class Zone
         foreach (var (index, item) in expired)
             if (_groundItems.TryRemove(index, out _))
             {
-                _groundItemLastRebroadcast.Remove(index);
                 BroadcastGroundItemAction(item, 3);
+                _groundItemLastRebroadcast.Remove(index);
             }
     }
 
@@ -129,13 +129,15 @@ public sealed partial class Zone
     {
         while (_claimedGroundItemDespawns.TryDequeue(out var item))
         {
-            _groundItemLastRebroadcast.Remove(item.ServerIndex);
             BroadcastGroundItemAction(item, 3);
+            _groundItemLastRebroadcast.Remove(item.ServerIndex);
         }
     }
 
     private void BroadcastGroundItemAction(GroundItemEntity item, int checkChangeActionState)
     {
+        _groundItemLastRebroadcast[item.ServerIndex] = _clock;
+
         var cell = _grid.CellOf(item.PosX, item.PosZ);
         if (!_grid.HasAnyNeighbor(cell))
             return;
@@ -154,10 +156,8 @@ public sealed partial class Zone
             foreach (var id in _groundItemBroadcastNeighborScratch)
                 try
                 {
-                    if (_players.TryGetValue(id, out var recipient) &&
-                        recipient.Session is ClientSession clientSession &&
-                        IsVisibleAcrossDungeonInstance(item.InstanceId, recipient.DungeonInstanceId) &&
-                        !IsReviveHackBroadcastSuppressed(recipient))
+                    if (TryGetBroadcastRecipient(id, out var recipient, out var clientSession) &&
+                        IsVisibleAcrossDungeonInstance(item.InstanceId, recipient.DungeonInstanceId))
                         clientSession.SendRaw(span);
                 }
                 catch (Exception ex)

@@ -47,9 +47,13 @@ public sealed class MonsterEntity
 
     public int StateTicks { get; set; }
 
+    public float StateFrameAccumulator { get; set; }
+
     public int? TargetCharacterId { get; private set; }
 
     public uint TargetUniqueNumber { get; private set; }
+
+    public bool AttackPacketConfirmationArmed { get; set; }
 
     public float TargetLocationX { get; set; }
 

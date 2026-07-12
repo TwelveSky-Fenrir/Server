@@ -13,6 +13,7 @@ namespace Fenrir.Application.Game.Services.Chat;
 
 public sealed class LocalChatService(
     YangGokPvpDropEventState yangGokDropEvent,
+    LabyrinthOperatorGate labyrinthGate,
     IWorldNoticeService worldNotice,
     ILogger<LocalChatService> logger) : ILocalChatService
 {
@@ -72,9 +73,7 @@ public sealed class LocalChatService(
                 return;
 
             case LocalChatGmCommandKind.Lab:
-                logger.LogWarning(
-                    "Character {CharacterId} ({Name}) invoked GM 'lab' (argument {Argument}) -- the Labyrinth/ZONE175 center relay is not modeled in Fenrir (shard-local); no effect",
-                    sender.CharacterId, sender.Name, command.Argument ?? "<none>");
+                HandleLab(sender, command.Argument);
                 return;
 
             case LocalChatGmCommandKind.ClearInventory:
@@ -116,6 +115,36 @@ public sealed class LocalChatService(
                 SendSystemChat(sender, "Usage: ygdrop on|off|status");
                 return;
         }
+    }
+
+    private void HandleLab(PlayerRuntimeState sender, string? argument)
+    {
+        switch (argument)
+        {
+            case "on":
+                labyrinthGate.Enable();
+                SendSystemChat(sender, "Labyrinth R0-R12: ON");
+                return;
+
+            case "off":
+                labyrinthGate.Disable();
+                SendSystemChat(sender, "Labyrinth R0-R12: OFF");
+                return;
+
+            case "status":
+                SendSystemChat(sender, FormatLabStatus(labyrinthGate.Enabled));
+                return;
+
+            default:
+                SendSystemChat(sender, "Usage: lab on|off|status");
+                return;
+        }
+    }
+
+    private static string FormatLabStatus(bool enabled)
+    {
+        var cellValue = enabled ? 1 : 0;
+        return $"Labyrinth R0-R12: ND={cellValue} RS={cellValue} GT={cellValue} NG={cellValue}";
     }
 
     private void HandleBoss(Zone zone, PlayerRuntimeState sender, string? argument)

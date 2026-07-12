@@ -184,6 +184,9 @@ public sealed class DuelService(
             EatDrugState = eatDrugState
         });
 
-        requesterZone.Post(ZoneCommand.BroadcastDuelStart(duel.PlayerA, duel.PlayerB, duel.UniqueNumber));
+        if (!requesterZone.Post(ZoneCommand.BroadcastDuelStart(duel.PlayerA, duel.PlayerB, duel.UniqueNumber)))
+            logger.LogWarning(
+                "Zone {MapId} inbox full: dropped duel-start broadcast for duel {UniqueNumber}",
+                requesterZone.MapId, duel.UniqueNumber);
     }
 }

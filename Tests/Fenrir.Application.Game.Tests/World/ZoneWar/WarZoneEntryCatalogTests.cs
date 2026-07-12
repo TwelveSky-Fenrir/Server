@@ -15,14 +15,23 @@ public class WarZoneEntryCatalogTests
         Assert.Equal(6, rule.MaxRebirthCount);
     }
 
-    [Theory]
-    [InlineData((short)295)]
-    [InlineData((short)322)]
-    public void LowRebirthTierZones_RequireExactMaxLevelAndRebirthZeroToSix(short zoneNumber)
+    [Fact]
+    public void Zone322_RequiresExactMaxLevelAndRebirthZeroToSix()
     {
-        Assert.True(WarZoneEntryCatalog.TryGetRule(zoneNumber, out var rule));
+        Assert.True(WarZoneEntryCatalog.TryGetRule(322, out var rule));
         Assert.Equal(RebirthProgression.CombinedLevelCap, rule.MinCombinedLevel);
         Assert.Equal(RebirthProgression.CombinedLevelCap, rule.MaxCombinedLevel);
+        Assert.Equal(0, rule.MinRebirthCount);
+        Assert.Equal(6, rule.MaxRebirthCount);
+    }
+
+    [Fact]
+    public void Zone295_IsRebirthOnlyWithNoCombinedLevelRequirement()
+    {
+        Assert.True(WarZoneEntryCatalog.TryGetRule(295, out var rule));
+        Assert.Null(rule.MinCombinedLevel);
+        Assert.Null(rule.MaxCombinedLevel);
+        Assert.False(rule.HasCombinedLevelRequirement);
         Assert.Equal(0, rule.MinRebirthCount);
         Assert.Equal(6, rule.MaxRebirthCount);
     }

@@ -11,8 +11,6 @@ public sealed partial class Zone
 
     private const int GuildBuffExpiryInboxCapacity = 64;
 
-    private const int GuildBuffExpiryInboxDrainCapPerTick = GuildBuffExpiryInboxCapacity / 2;
-
     private readonly Channel<GuildBuffExpiryZoneCommand> _guildBuffExpiryInbox =
         Channel.CreateBounded<GuildBuffExpiryZoneCommand>(
             new BoundedChannelOptions(GuildBuffExpiryInboxCapacity)
@@ -25,11 +23,8 @@ public sealed partial class Zone
 
     private void DrainGuildBuffExpiryCommands()
     {
-        var processed = 0;
-        while (processed < GuildBuffExpiryInboxDrainCapPerTick &&
-               _guildBuffExpiryInbox.Reader.TryRead(out var command))
+        while (_guildBuffExpiryInbox.Reader.TryRead(out var command))
         {
-            processed++;
             try
             {
                 ApplyGuildBuffExpiryCommand(in command);
@@ -40,10 +35,6 @@ public sealed partial class Zone
                     command.GuildId);
             }
         }
-
-        if (processed >= GuildBuffExpiryInboxDrainCapPerTick)
-            LogDrainCapEngaged(_guildBuffExpiryInbox.Reader, "guild-buff-expiry",
-                GuildBuffExpiryInboxDrainCapPerTick);
     }
 
     private void ApplyGuildBuffExpiryCommand(in GuildBuffExpiryZoneCommand command)

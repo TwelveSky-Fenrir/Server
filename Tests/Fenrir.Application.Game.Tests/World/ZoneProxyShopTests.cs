@@ -157,7 +157,7 @@ public class ZoneProxyShopTests
     }
 
     [Fact]
-    public void RemoveProxyShop_StopsFurtherBroadcasts()
+    public void RemoveProxyShop_ImmediatelyBroadcastsItsClose_ThenStopsFurtherBroadcasts()
     {
         var zone = ZoneTestKit.CreateZone(ProxyShopZonePolicy.ZoneNumber);
         var (session, pipe) = ZoneTestKit.CreateSession(1);
@@ -173,6 +173,12 @@ public class ZoneProxyShopTests
 
         zone.RemoveProxyShop(999);
         Assert.Equal(0, zone.ProxyShopCount);
+
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+        var closeFrame = ZoneTestKit.DrainOutbound(pipe);
+        Assert.Equal(OneFrame, closeFrame.Length);
+        var payload = closeFrame.AsSpan(1);
+        Assert.Equal(3, BinaryPrimitives.ReadInt32LittleEndian(payload[(20 + 13 + 25 + 2)..]));
 
         zone.Tick(SimulationClock.ProxyShopRebroadcastInterval + TimeSpan.FromSeconds(1));
         Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
@@ -194,10 +200,22 @@ public class ZoneProxyShopTests
         var zone = ZoneTestKit.CreateZone(ProxyShopZonePolicy.ZoneNumber);
 
         zone.RegisterProxyShop(Entry(shopDate: GameDate.Today() - 1));
-        zone.Tick(TimeSpan.FromMilliseconds(50));
+        zone.Tick(SimulationClock.ProxyShopRebroadcastInterval);
 
         Assert.Equal(0, zone.ProxyShopCount);
         Assert.Contains(999, zone.DrainPendingProxyShopCloses());
+    }
+
+    [Fact]
+    public void ExpiredShop_IsNotForceClosed_BeforeItsOwnThrottleWindowElapses()
+    {
+        var zone = ZoneTestKit.CreateZone(ProxyShopZonePolicy.ZoneNumber);
+
+        zone.RegisterProxyShop(Entry(shopDate: GameDate.Today() - 1));
+        zone.Tick(SimulationClock.ProxyShopRebroadcastInterval - TimeSpan.FromMilliseconds(100));
+
+        Assert.Equal(1, zone.ProxyShopCount);
+        Assert.Empty(zone.DrainPendingProxyShopCloses());
     }
 
     [Fact]
@@ -219,7 +237,7 @@ public class ZoneProxyShopTests
 
         zone.RegisterProxyShop(Entry(101, shopDate: GameDate.Today() - 1));
         zone.RegisterProxyShop(Entry(102, shopDate: GameDate.Today() - 1));
-        zone.Tick(TimeSpan.FromMilliseconds(50));
+        zone.Tick(SimulationClock.ProxyShopRebroadcastInterval);
 
         var drained = zone.DrainPendingProxyShopCloses();
         Assert.Equal([101, 102], drained.OrderBy(x => x));

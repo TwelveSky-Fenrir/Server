@@ -11,7 +11,7 @@ namespace Fenrir.Application.Game.Tests.World.Monsters;
 public class MonsterSpawnSchedulerTests
 {
     private static WorldDataCache CacheWithOneRegion(int number = 1, int summonTimeSeconds = 2,
-        MonsterDropMoneyRowDto? dropMoney = null)
+        MonsterDropMoneyRowDto? dropMoney = null, int radius = 5)
     {
         var monster = WorldDataTestRows.Monster(500) with
         {
@@ -34,7 +34,7 @@ public class MonsterSpawnSchedulerTests
             LocationX = 100,
             LocationY = 0,
             LocationZ = 100,
-            Radius = 5
+            Radius = radius
         };
 
         var rows = WorldDataTestRows.MinimalRows() with
@@ -74,6 +74,22 @@ public class MonsterSpawnSchedulerTests
         var dx = monster!.PosX - 100;
         var dz = monster.PosZ - 100;
         Assert.True(dx * dx + dz * dz <= 5 * 5 + 0.01f);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-5)]
+    public void SpawnedMonster_WithNonPositiveRegionRadius_IsPlacedExactlyAtTheRegionCenter(int radius)
+    {
+        var zone = CreateZone(CacheWithOneRegion(radius: radius));
+
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.True(zone.TryGetMonster(1, out var monster));
+        Assert.Equal(100f, monster!.PosX);
+        Assert.Equal(100f, monster.PosZ);
+        Assert.Equal(100f, monster.HomeX);
+        Assert.Equal(100f, monster.HomeZ);
     }
 
     [Fact]

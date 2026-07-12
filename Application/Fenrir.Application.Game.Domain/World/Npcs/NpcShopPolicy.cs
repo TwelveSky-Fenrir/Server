@@ -21,7 +21,9 @@ public static class NpcShopPolicy
 
         RentItemNotPurchasable,
 
-        BelowMinimumLevel
+        BelowMinimumLevel,
+
+        CostOverflow
     }
 
     public enum SellOutcome
@@ -47,6 +49,10 @@ public static class NpcShopPolicy
 
     private const int SellExemptRangeEndInclusive = 99756;
 
+    private const byte StackableSellSort = 2;
+
+    private const long MaxTradeableCost = 2_000_000_000;
+
     public static readonly IReadOnlySet<short> TownZoneNumbers = new HashSet<short> { 1, 6, 11, 37, 140 };
 
     private static readonly (int Start, int EndInclusive)[] CostumeItemIdRanges =
@@ -67,6 +73,11 @@ public static class NpcShopPolicy
     private static bool IsRentItem(int itemId)
     {
         return itemId is >= RentItemIdStart and <= RentItemIdEndInclusive;
+    }
+
+    public static bool IsStackableSellSort(byte sort)
+    {
+        return sort == StackableSellSort;
     }
 
     public static bool IsSellExempt(int itemId)
@@ -93,7 +104,7 @@ public static class NpcShopPolicy
         if (IsRentItem(item.ItemId))
             return new SellResult(SellOutcome.Rejected, 0, sourceStack);
 
-        var isStackable = ContainerMatrix.IsStackableSort(item.Sort);
+        var isStackable = IsStackableSellSort(item.Sort);
 
         if (isStackable)
         {
@@ -124,9 +135,12 @@ public static class NpcShopPolicy
     }
 
     public static BuyResult ResolveBuy(NpcDefinition npc, ItemDefinition itemDefinition, int requestedQuantity,
-        ItemStack? destinationSlot, short playerLevel, short currentZoneNumber, int playerContributionPoints)
+        ItemStack? destinationSlot, short playerLevel, int playerContributionPoints)
     {
         var item = itemDefinition.Item;
+
+        if (npc.Npc.Type == SpecialShopNpcType && playerLevel < SpecialShopMinimumLevel)
+            return new BuyResult(BuyOutcome.BelowMinimumLevel, 0, 0, null);
 
         var inCatalog = false;
         foreach (var shopItem in npc.ShopItems)
@@ -138,9 +152,6 @@ public static class NpcShopPolicy
 
         if (!inCatalog)
             return new BuyResult(BuyOutcome.NotInCatalog, 0, 0, null);
-
-        if (npc.Npc.Type == SpecialShopNpcType && playerLevel < SpecialShopMinimumLevel)
-            return new BuyResult(BuyOutcome.BelowMinimumLevel, 0, 0, null);
 
         if (item.CheckNpcShop != 2)
             return new BuyResult(BuyOutcome.NotSellableHere, 0, 0, null);
@@ -164,7 +175,7 @@ public static class NpcShopPolicy
                 if (mergedQuantity > GroundItemPickupPolicy.MaxStackQuantity)
                     return new BuyResult(BuyOutcome.DestinationConflict, 0, 0, null);
 
-                if (!TryResolveCost(item, requestedQuantity, currentZoneNumber, playerContributionPoints,
+                if (!TryResolveCost(item, requestedQuantity, playerContributionPoints,
                         out var moneyCost, out var cpCost, out var costFailure))
                     return new BuyResult(costFailure, 0, 0, null);
 
@@ -172,7 +183,7 @@ public static class NpcShopPolicy
                     existing with { Quantity = mergedQuantity });
             }
 
-            if (!TryResolveCost(item, requestedQuantity, currentZoneNumber, playerContributionPoints,
+            if (!TryResolveCost(item, requestedQuantity, playerContributionPoints,
                     out var newMoneyCost, out var newCpCost, out var newCostFailure))
                 return new BuyResult(newCostFailure, 0, 0, null);
 
@@ -183,7 +194,7 @@ public static class NpcShopPolicy
         if (destinationSlot is not null)
             return new BuyResult(BuyOutcome.DestinationConflict, 0, 0, null);
 
-        if (!TryResolveCost(item, 1, currentZoneNumber, playerContributionPoints, out var singleMoneyCost,
+        if (!TryResolveCost(item, 1, playerContributionPoints, out var singleMoneyCost,
                 out var singleCpCost, out var singleCostFailure))
             return new BuyResult(singleCostFailure, 0, 0, null);
 
@@ -191,11 +202,23 @@ public static class NpcShopPolicy
             new ItemStack(item.ItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
     }
 
-    private static bool TryResolveCost(ItemRowDto item, int quantity, short currentZoneNumber,
-        int playerContributionPoints, out int moneyCost, out int cpCost, out BuyOutcome failureOutcome)
+    private static bool TryResolveCost(ItemRowDto item, int quantity, int playerContributionPoints,
+        out int moneyCost, out int cpCost, out BuyOutcome failureOutcome)
     {
-        moneyCost = ResolveBuyCost(item, quantity, currentZoneNumber);
-        cpCost = ContainerMatrix.IsStackableSort(item.Sort) ? item.BuyCost2 * quantity : item.BuyCost2;
+        var isStackable = ContainerMatrix.IsStackableSort(item.Sort);
+        var rawMoneyCost = isStackable ? (long)item.BuyCost * quantity : item.BuyCost;
+        var rawCpCost = isStackable ? (long)item.BuyCost2 * quantity : item.BuyCost2;
+
+        if (rawMoneyCost > MaxTradeableCost || rawCpCost > MaxTradeableCost)
+        {
+            moneyCost = 0;
+            cpCost = 0;
+            failureOutcome = BuyOutcome.CostOverflow;
+            return false;
+        }
+
+        moneyCost = (int)rawMoneyCost;
+        cpCost = (int)rawCpCost;
 
         if (cpCost > 0 && playerContributionPoints < cpCost)
         {
@@ -205,12 +228,6 @@ public static class NpcShopPolicy
 
         failureOutcome = default;
         return true;
-    }
-
-    private static int ResolveBuyCost(ItemRowDto item, int quantity, short currentZoneNumber)
-    {
-        var unitCost = currentZoneNumber == 291 ? (int)(item.BuyCost * 0.9f) : item.BuyCost;
-        return ContainerMatrix.IsStackableSort(item.Sort) ? unitCost * quantity : unitCost;
     }
 
     public readonly record struct SellResult(

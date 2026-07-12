@@ -5,10 +5,13 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public readonly record struct WarZoneEntryRule(
     short ZoneNumber,
-    int MinCombinedLevel,
-    int MaxCombinedLevel,
+    int? MinCombinedLevel,
+    int? MaxCombinedLevel,
     int MinRebirthCount,
-    int MaxRebirthCount);
+    int MaxRebirthCount)
+{
+    public bool HasCombinedLevelRequirement => MinCombinedLevel.HasValue && MaxCombinedLevel.HasValue;
+}
 
 public static class WarZoneEntryCatalog
 {
@@ -16,7 +19,7 @@ public static class WarZoneEntryCatalog
         new Dictionary<short, WarZoneEntryRule>
         {
             [164] = new(164, RebirthProgression.CombinedLevelCap, RebirthProgression.CombinedLevelCap, 0, 6),
-            [295] = new(295, RebirthProgression.CombinedLevelCap, RebirthProgression.CombinedLevelCap, 0, 6),
+            [295] = new(295, null, null, 0, 6),
             [296] = new(296, RebirthProgression.CombinedLevelCap, RebirthProgression.CombinedLevelCap, 7,
                 RebirthProgression.MaxRebirthGeneration),
             [322] = new(322, RebirthProgression.CombinedLevelCap, RebirthProgression.CombinedLevelCap, 0, 6),

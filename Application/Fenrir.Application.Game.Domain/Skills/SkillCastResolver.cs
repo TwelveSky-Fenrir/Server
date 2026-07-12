@@ -16,12 +16,12 @@ public static class SkillCastResolver
     }
 
     public static Result TryCast(SkillDefinition? skill, int gradePoints, int casterMana, int casterMaxLife,
-        int? equippedWeaponSort, int supportSkillTimeUpRatio)
+        int? equippedWeaponSort, int supportSkillTimeUpRatio, int manaReductionRatioPercent = 0)
     {
         if (skill is not { } skillDef)
             return Result.Fail(FailureReason.UnknownSkill);
 
-        var manaCost = (int)SkillCatalog.ReturnSkillValue(skillDef, gradePoints, SkillValueKind.ManaUse);
+        var manaCost = ComputeManaCost(skillDef, gradePoints, manaReductionRatioPercent);
         if (casterMana < manaCost)
             return Result.Fail(FailureReason.InsufficientMana);
 
@@ -57,6 +57,14 @@ public static class SkillCastResolver
 
         return new Result(true, FailureReason.None, manaCost, writes.ToImmutable(), effect.Kind, 0,
             effect.RequiresFullParty);
+    }
+
+    private static int ComputeManaCost(SkillDefinition skill, int gradePoints, int manaReductionRatioPercent)
+    {
+        var rawCost = (int)SkillCatalog.ReturnSkillValue(skill, gradePoints, SkillValueKind.ManaUse);
+        return manaReductionRatioPercent > 0
+            ? rawCost - rawCost * manaReductionRatioPercent / 100
+            : rawCost;
     }
 
     public readonly record struct BuffWrite(int Slot, int Value, int DurationTicks);

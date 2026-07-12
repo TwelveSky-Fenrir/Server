@@ -102,4 +102,133 @@ public class AoiGridTests
             Assert.Equal(grid.Neighbors(cell).Any(), grid.HasAnyNeighbor(cell));
         }
     }
+
+    [Fact]
+    public void Neighbors_WithBuffer_ReturnsEveryCoOccupantOfTheCell_NoMatterHowManyThereAre()
+    {
+        var grid = new AoiGrid(CellSize);
+        const int occupantCount = 5000;
+        for (var id = 0; id < occupantCount; id++)
+            grid.Add(id, (5, 5), 500f, 0f, 500f);
+
+        var buffer = new List<int>();
+        grid.Neighbors(buffer, (5, 5), 500f, 0f, 500f);
+
+        Assert.Equal(occupantCount, buffer.Count);
+    }
+
+    [Fact]
+    public void NeighborsExcludingSelf_WithBuffer_ReturnsEveryOtherCoOccupant_NoMatterHowManyThereAre()
+    {
+        var grid = new AoiGrid(CellSize);
+        const int occupantCount = 5000;
+        for (var id = 0; id < occupantCount; id++)
+            grid.Add(id, (5, 5), 500f, 0f, 500f);
+
+        var buffer = new List<int>();
+        grid.NeighborsExcludingSelf(buffer, (5, 5), 0, 500f, 0f, 500f);
+
+        Assert.Equal(occupantCount - 1, buffer.Count);
+        Assert.DoesNotContain(0, buffer);
+    }
+
+    [Fact]
+    public void Neighbors_WithOrigin_AcceptsExactlyAtTheScaledRadiusBoundary()
+    {
+        var grid = new AoiGrid(CellSize);
+        grid.Add(1, (1, 0), CellSize, 0f, 0f);
+
+        var buffer = new List<int>();
+        grid.Neighbors(buffer, (0, 0), 0f, 0f, 0f);
+
+        Assert.Contains(1, buffer);
+    }
+
+    [Fact]
+    public void Neighbors_WithOrigin_RejectsJustBeyondTheScaledRadiusBoundary()
+    {
+        var grid = new AoiGrid(CellSize);
+        grid.Add(1, (1, 0), CellSize + 1f, 0f, 0f);
+
+        var buffer = new List<int>();
+        grid.Neighbors(buffer, (0, 0), 0f, 0f, 0f);
+
+        Assert.DoesNotContain(1, buffer);
+    }
+
+    [Fact]
+    public void Neighbors_WithOrigin_HonorsTheYAxisInTheExactDistanceStage()
+    {
+        var grid = new AoiGrid(CellSize);
+        grid.Add(1, (0, 0), 0f, CellSize + 1f, 0f);
+
+        var buffer = new List<int>();
+        grid.Neighbors(buffer, (0, 0), 0f, 0f, 0f);
+
+        Assert.DoesNotContain(1, buffer);
+    }
+
+    [Fact]
+    public void Neighbors_WithOrigin_ScaleWidensBothTheCoarseBoxAndTheExactRadius()
+    {
+        var grid = new AoiGrid(CellSize);
+        grid.Add(1, (2, 0), CellSize * 2, 0f, 0f);
+
+        var unscaled = new List<int>();
+        grid.Neighbors(unscaled, (0, 0), 0f, 0f, 0f);
+        Assert.DoesNotContain(1, unscaled);
+
+        var scaled = new List<int>();
+        grid.Neighbors(scaled, (0, 0), 0f, 0f, 0f, scale: 2);
+        Assert.Contains(1, scaled);
+    }
+
+    [Fact]
+    public void Neighbors_WithOrigin_ExcludesACandidateWithNoTrackedPosition()
+    {
+        var grid = new AoiGrid(CellSize);
+        grid.Add(1, (0, 0));
+
+        var buffer = new List<int>();
+        grid.Neighbors(buffer, (0, 0), 0f, 0f, 0f);
+
+        Assert.DoesNotContain(1, buffer);
+    }
+
+    [Fact]
+    public void IsWithinRadius_AcceptsExactlyAtTheScaledRadiusBoundary()
+    {
+        var grid = new AoiGrid(CellSize);
+        grid.Add(1, (1, 0), CellSize * 3, 0f, 0f);
+
+        Assert.True(grid.IsWithinRadius(1, 0f, 0f, 0f, 3));
+    }
+
+    [Fact]
+    public void IsWithinRadius_RejectsJustBeyondTheScaledRadiusBoundary()
+    {
+        var grid = new AoiGrid(CellSize);
+        grid.Add(1, (1, 0), CellSize * 3 + 1f, 0f, 0f);
+
+        Assert.False(grid.IsWithinRadius(1, 0f, 0f, 0f, 3));
+    }
+
+    [Fact]
+    public void IsWithinRadius_RejectsAnOtherwiseInRangeCandidate_WhenTheSmallerScaleNoLongerCoversIt()
+    {
+        var grid = new AoiGrid(CellSize);
+        grid.Add(1, (1, 0), CellSize * 2, 0f, 0f);
+
+        Assert.True(grid.IsWithinRadius(1, 0f, 0f, 0f, 3));
+        Assert.False(grid.IsWithinRadius(1, 0f, 0f, 0f, 1));
+    }
+
+    [Fact]
+    public void IsWithinRadius_FailsClosed_ForACandidateWithNoTrackedPosition()
+    {
+        var grid = new AoiGrid(CellSize);
+        grid.Add(1, (0, 0));
+
+        Assert.False(grid.IsWithinRadius(1, 0f, 0f, 0f, 3));
+    }
 }

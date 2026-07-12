@@ -13,6 +13,12 @@
 -- specific character attribution is the only part that is allowed to be lost. Unlike Bans/Mutes there is no
 -- AccountId fallback column here -- CharacterId is this table's only actor reference -- so the null-out is
 -- unconditional rather than branching on an account-level record still existing.
+--
+-- Unlike game.CashLog, no game.EventLog row is ever written alongside this table today -- this log is the
+-- sole audit trail for tribe-bank movements, a deliberate scope boundary (see game.EventLog's own header for
+-- the cross-log design decision), not an oversight discovered later. If tribe-bank movements ever need
+-- general-admin-activity-feed visibility, follow usp_Cash_DebitAndGrantItem's optional-nested-EXEC pattern
+-- rather than inventing a new one.
 CREATE TABLE game.TribeBankLog
 (
     TribeBankLogId INT IDENTITY (1,1) NOT NULL,

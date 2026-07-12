@@ -2,6 +2,13 @@
 -- debit/credit (replaces the legacy fire-and-forget UDP GL_001_BUY_CASH line to ts25gamelog).
 -- Delta is signed (credit/debit); BalanceAfter snapshots the post-movement balance. ProductId is an
 -- unenforced reference (not a FK), same reasoning as game.Gifts.ProductId.
+--
+-- Authoritative regardless of game.EventLog: every cash movement lands here unconditionally
+-- (usp_Cash_Credit/usp_Cash_CreditAndConsumeItem/usp_Cash_DebitAndGrantItem all write this table), but only
+-- the debit-and-grant path also optionally nests a game.EventLog CashShopPurchase row into the SAME
+-- transaction via usp_Cash_DebitAndGrantItem's @Audit* params -- see that procedure's own header, and
+-- game.EventLog's own header for the cross-log design decision this generalizes to game.TribeBankLog/
+-- game.GiftLog.
 CREATE TABLE game.CashLog
 (
     CashLogId    INT IDENTITY (1,1) NOT NULL,

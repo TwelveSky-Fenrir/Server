@@ -38,7 +38,7 @@ internal static class ZoneSeedGenerator
         }
 
         WriteSeedFile(
-            Path.Combine(outputDir, "020_zones.sql"),
+            Path.Combine(outputDir, "007_zones.sql"),
             "world.Zones",
             "-- Seeds world.Zones from 002.BIN/003.BIN: one row per zone number with a DATA/WORLD/Z0NN.WM file\n" +
             "-- in this build (117 of the legacy 350-slot array) -- see 30_tables/world/Zones.sql for why.",
@@ -71,7 +71,7 @@ internal static class ZoneSeedGenerator
         }
 
         WriteSeedFile(
-            Path.Combine(outputDir, "021_zone_npc_spawns.sql"),
+            Path.Combine(outputDir, "017_zone_npc_spawns.sql"),
             "world.ZoneNpcSpawns",
             "-- Seeds world.ZoneNpcSpawns from 002.BIN: one row per populated NPC-placement slot (291 of a\n" +
             "-- 11700-slot ceiling across the 117 live zones) -- see 30_tables/world/ZoneNpcSpawns.sql.\n" +
@@ -151,7 +151,7 @@ internal static class ZoneSeedGenerator
         }
 
         WriteSeedFile(
-            Path.Combine(outputDir, "022_zone_portals.sql"),
+            Path.Combine(outputDir, "018_zone_portals.sql"),
             "world.ZonePortals",
             "-- Seeds world.ZonePortals from 003.BIN: one row per populated outbound-portal slot (413 of a\n" +
             "-- 11700-slot ceiling) -- see 30_tables/world/ZonePortals.sql for the TargetZoneNumber NULL rules.\n" +
@@ -163,7 +163,7 @@ internal static class ZoneSeedGenerator
             $"TargetZoneNumber nulled for out-of-live-set reference: {portalTargetsOutsideLiveSet}.");
 
         WriteSeedFile(
-            Path.Combine(outputDir, "023_zone_spawn_points.sql"),
+            Path.Combine(outputDir, "019_zone_spawn_points.sql"),
             "world.ZoneSpawnPoints",
             "-- Seeds world.ZoneSpawnPoints from 003.BIN: one row per populated inbound-landing slot (413 of a\n" +
             "-- 11700-slot ceiling) -- see 30_tables/world/ZoneSpawnPoints.sql for the FromZoneNumber NULL rules.\n" +
@@ -201,7 +201,7 @@ internal static class ZoneSeedGenerator
         }
 
         WriteSeedFile(
-            Path.Combine(outputDir, "024_monster_spawn_regions.sql"),
+            Path.Combine(outputDir, "020_monster_spawn_regions.sql"),
             "world.MonsterSpawnRegions",
             "-- Seeds world.MonsterSpawnRegions from every DATA/SUMMON/*.WREGION.csv row (21960 rows, already\n" +
             "-- one row per source line) -- see 30_tables/world/MonsterSpawnRegions.sql for the ZoneNumber NULL\n" +

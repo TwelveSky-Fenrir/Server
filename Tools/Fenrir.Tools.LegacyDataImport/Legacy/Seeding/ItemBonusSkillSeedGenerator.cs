@@ -30,7 +30,7 @@ public static class ItemBonusSkillSeedGenerator
         sb.Append("END;\n");
 
         File.WriteAllText(outputPath, sb.ToString());
-        Console.WriteLine($"081_item_bonus_skills.sql: {bonusRows.Count} bonus-skill rows -> {outputPath}");
+        Console.WriteLine($"006_item_bonus_skills.sql: {bonusRows.Count} bonus-skill rows -> {outputPath}");
     }
 
     private static string FormatBonusSkillRow(int itemId, int slot, int[] pair)

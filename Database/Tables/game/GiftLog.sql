@@ -2,6 +2,12 @@
 -- not a child table of game.Gifts (no FK back to GiftId): a purged Gifts row must not take its log with it.
 -- See game.Gifts's own header for why this pair models ts25login's dead `GIFT_V2` branch rather than the
 -- live fixed-10-slot `uGiftInfo` mechanism that actually shipped -- confirmed deliberate, not a citation error.
+--
+-- Unlike game.CashLog, no game.EventLog row is ever written alongside this table today -- this log is the
+-- sole audit trail for gift movements, a deliberate scope boundary (see game.EventLog's own header for the
+-- cross-log design decision), not an oversight discovered later. If gift movements ever need
+-- general-admin-activity-feed visibility, follow usp_Cash_DebitAndGrantItem's optional-nested-EXEC pattern
+-- rather than inventing a new one.
 CREATE TABLE game.GiftLog
 (
     GiftLogId    INT IDENTITY (1,1) NOT NULL,

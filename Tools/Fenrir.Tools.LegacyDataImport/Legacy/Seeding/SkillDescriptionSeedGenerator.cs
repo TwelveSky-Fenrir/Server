@@ -29,7 +29,7 @@ public static class SkillDescriptionSeedGenerator
         sb.Append("END;\n");
 
         File.WriteAllText(outputPath, sb.ToString());
-        Console.WriteLine($"071_skill_descriptions.sql: {descriptionRows.Count} description rows -> {outputPath}");
+        Console.WriteLine($"003_skill_descriptions.sql: {descriptionRows.Count} description rows -> {outputPath}");
     }
 
     private static string FormatDescriptionRow(int skillId, int line, string text)

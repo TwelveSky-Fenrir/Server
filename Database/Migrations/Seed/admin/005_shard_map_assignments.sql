@@ -2,7 +2,7 @@
 -- to live in Servers/Fenrir.GameServer/appsettings.json's Game:Maps before that list moved here.
 --
 -- Idempotency fix (seed-audit pass, 2026-07-12): the table-level guard below matches every other bulk
--- reference-data seed under Migrations/Seed/world/** (e.g. 060_levels.sql) -- without it, a replay against
+-- reference-data seed under Migrations/Seed/world/** (e.g. 001_levels.sql) -- without it, a replay against
 -- a database whose admin.SchemaVersions journal was lost/reset would hit PK_ShardMapAssignments/
 -- UQ_ShardMapAssignments_MapId and halt the whole DbMigrator run partway through.
 IF NOT EXISTS (SELECT 1

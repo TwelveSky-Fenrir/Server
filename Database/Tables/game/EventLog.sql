@@ -10,10 +10,23 @@
 -- EventCode is an app-owned numbering scheme, not FK'd to a lookup table -- no legacy catalog of event codes
 -- exists to seed one from (same "unenforced, caller-owned" posture as CashLog.Reason). Outcome is likewise a
 -- caller/EventCode-defined code (success/failure/partial, etc.), not a fixed global enum here.
--- Category's CHECK is intentionally wider (0-63) than the 9 categories in use today (Trade=0/Currency=1/
--- ItemCreate=2/ItemDestroy=3/Enchant=4/GmAction=5/Death=6/Session=7/AccountSecurity=8, see
--- Fenrir.Data.Abstractions.Game.EventLogCategory) -- room for new categories without a schema migration,
--- while still catching an obviously-wrong value.
+-- Category's CHECK is intentionally wider (0-63) than the 27 categories in use today (Trade=0 through
+-- AntiCheat=26, see Fenrir.Data.Abstractions.Game.EventLogCategory) -- room for new categories without a
+-- schema migration, while still catching an obviously-wrong value.
+--
+-- Cross-log design decision (transaction-composition/redundancy audit, severite moyenne, now closed):
+-- game.CashLog, game.TribeBankLog, and game.GiftLog are sibling append-only logs that each cover a slice of
+-- this table's own Category=Currency=1 role with typed domain columns this generic shape can't represent
+-- (BalanceAfter, SlotIndex, Reason, ProductId) -- kept as separate tables by design, not duplicated by
+-- oversight: each is the standalone-authoritative ledger for its own balance regardless of whether a paired
+-- EventLog row also exists for the same movement. Only one of the three currently also lands a paired
+-- EventLog row for the same event: a cash-shop purchase, via usp_Cash_DebitAndGrantItem's optional @Audit*
+-- params nesting usp_EventLog_Insert into the SAME transaction as the game.CashLog write (closing what was
+-- previously a separate, unshared C#-side round trip -- see that procedure's own header). Tribe-bank and
+-- gift movements have no paired EventLog row at all today: game.TribeBankLog/game.GiftLog are each the sole
+-- audit trail for their domain, a deliberate scope boundary (lower admin-activity-feed value for
+-- tribe-internal/gift-mailbox movements than for a player-facing cash purchase) -- if that's ever revisited,
+-- follow usp_Cash_DebitAndGrantItem's exact optional-nested-EXEC pattern rather than inventing a new one.
 --
 -- Indexing: deliberately NOT a clustered columnstore index. This table's write path includes single-row
 -- inserts made INSIDE another mutation's own transaction (the whole point of usp_EventLog_Insert existing

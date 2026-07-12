@@ -17,6 +17,6 @@ CREATE TABLE world.MonsterDropExtraItems
     -- No secondary index on ItemId: verified repo-wide that the only reader of this table
     -- (usp_Monster_GetDrops) scans it unfiltered, ORDER BY MonsterId, SlotIndex -- already covered by the
     -- clustered PK. A reverse "which monsters drop item X" index would only tax the one-time seed insert
-    -- (Migrations/Seed/world/090_monsters.sql) for zero read benefit today; re-add if that GM-tooling query
+    -- (Migrations/Seed/world/015_monsters.sql) for zero read benefit today; re-add if that GM-tooling query
     -- is ever built.
 );

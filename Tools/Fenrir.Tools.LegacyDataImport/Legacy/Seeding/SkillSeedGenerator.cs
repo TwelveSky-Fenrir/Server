@@ -29,7 +29,7 @@ public static class SkillSeedGenerator
         sb.Append("END;\n");
 
         File.WriteAllText(outputPath, sb.ToString());
-        Console.WriteLine($"070_skills.sql: {skillRows.Count} skill rows -> {outputPath}");
+        Console.WriteLine($"002_skills.sql: {skillRows.Count} skill rows -> {outputPath}");
     }
 
     private static string FormatSkillRow(SkillRecord s)

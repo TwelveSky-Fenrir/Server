@@ -11,6 +11,8 @@
 -- disk-based game.Characters and game.TribeBankLog tables. Interop Transact-SQL is allowed to EXEC a natively
 -- compiled procedure (game.usp_TribeBank_Deposit) from within its own explicit transaction; that EXEC enlists
 -- in the ambient transaction instead of committing independently, so the debit/credit/log-write stay atomic.
+-- Deliberately does not also nest a game.EventLog row (unlike usp_Cash_DebitAndGrantItem's optional @Audit*
+-- params) -- see game.TribeBankLog's own header for the cross-log design decision.
 CREATE PROCEDURE game.usp_TribeBank_DepositFromCharacter @TribeId TINYINT,
                                                          @SlotIndex TINYINT,
                                                          @CharacterId INT

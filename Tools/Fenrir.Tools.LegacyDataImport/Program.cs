@@ -13,8 +13,8 @@ var dataDirectory = args[0];
 if (args.Length >= 3 && args[1] == "--regenerate-seed")
 {
     var seedWorldDirectory = args[2];
-    ItemSeedGenerator.Generate(dataDirectory, Path.Combine(seedWorldDirectory, "080_items.sql"));
-    MonsterSeedGenerator.Generate(dataDirectory, Path.Combine(seedWorldDirectory, "090_monsters.sql"));
+    ItemSeedGenerator.Generate(dataDirectory, Path.Combine(seedWorldDirectory, "005_items.sql"));
+    MonsterSeedGenerator.Generate(dataDirectory, Path.Combine(seedWorldDirectory, "015_monsters.sql"));
     return 0;
 }
 

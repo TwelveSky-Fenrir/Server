@@ -27,7 +27,7 @@ public static class LevelSeedGenerator
         sb.Append("END;\n");
 
         File.WriteAllText(outputPath, sb.ToString());
-        Console.WriteLine($"060_levels.sql: {levelRows.Count} level rows -> {outputPath}");
+        Console.WriteLine($"001_levels.sql: {levelRows.Count} level rows -> {outputPath}");
     }
 
     private static string FormatLevelRow(LevelRecord l)

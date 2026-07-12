@@ -575,33 +575,37 @@ Schemas/002_roles.sql
 
 Migrations/Seed/001_dev_account.sql
 
-Migrations/Seed/world/060_levels.sql
-Migrations/Seed/world/070_skills.sql
-Migrations/Seed/world/071_skill_descriptions.sql
-Migrations/Seed/world/072_skill_grades.sql
-Migrations/Seed/world/080_items.sql
-Migrations/Seed/world/081_item_bonus_skills.sql
-Migrations/Seed/world/020_zones.sql
-Migrations/Seed/world/082_starter_kit_equipment.sql
-Migrations/Seed/world/083_starter_kit_inventory.sql
-Migrations/Seed/world/084_starter_kit_skills.sql
-Migrations/Seed/world/085_starter_kit_hotkeys.sql
-Migrations/Seed/world/087_tribe_skill_equivalences.sql
-Migrations/Seed/world/088_tribe_item_equivalences.sql
-Migrations/Seed/world/089_tribe_costume_equivalences.sql
-Migrations/Seed/world/090_monsters.sql
-Migrations/Seed/world/Npcs.sql
-Migrations/Seed/world/021_zone_npc_spawns.sql
-Migrations/Seed/world/022_zone_portals.sql
-Migrations/Seed/world/023_zone_spawn_points.sql
-Migrations/Seed/world/024_monster_spawn_regions.sql
-Migrations/Seed/world/065_gem_sockets.sql
-Migrations/Seed/world/050_quests.sql
-Migrations/Seed/world/051_quest_rewards.sql
-Migrations/Seed/world/052_quest_speeches.sql
-Migrations/Seed/world/010_item_mall_products.sql
-Migrations/Seed/world/011_blood_exchange_catalog.sql
-Migrations/Seed/world/012_reward_bundles.sql
+# Numbering renamed 2026-07-12 (dead-file-sweep-game-world naming-hygiene finding) to be monotonic in
+# actual apply order, matching Migrations/Seed/admin/'s 001-026 convention -- the old numbers (060, 070-072,
+# 080-081, 020, 082-090, an unnumbered Npcs.sql, 021-024, 065, 050-052, 010-013) bore no relation to apply
+# order at all. Content of every file is unchanged; only the file name and this list were touched.
+Migrations/Seed/world/001_levels.sql
+Migrations/Seed/world/002_skills.sql
+Migrations/Seed/world/003_skill_descriptions.sql
+Migrations/Seed/world/004_skill_grades.sql
+Migrations/Seed/world/005_items.sql
+Migrations/Seed/world/006_item_bonus_skills.sql
+Migrations/Seed/world/007_zones.sql
+Migrations/Seed/world/008_starter_kit_equipment.sql
+Migrations/Seed/world/009_starter_kit_inventory.sql
+Migrations/Seed/world/010_starter_kit_skills.sql
+Migrations/Seed/world/011_starter_kit_hotkeys.sql
+Migrations/Seed/world/012_tribe_skill_equivalences.sql
+Migrations/Seed/world/013_tribe_item_equivalences.sql
+Migrations/Seed/world/014_tribe_costume_equivalences.sql
+Migrations/Seed/world/015_monsters.sql
+Migrations/Seed/world/016_npcs.sql
+Migrations/Seed/world/017_zone_npc_spawns.sql
+Migrations/Seed/world/018_zone_portals.sql
+Migrations/Seed/world/019_zone_spawn_points.sql
+Migrations/Seed/world/020_monster_spawn_regions.sql
+Migrations/Seed/world/021_gem_sockets.sql
+Migrations/Seed/world/022_quests.sql
+Migrations/Seed/world/023_quest_rewards.sql
+Migrations/Seed/world/024_quest_speeches.sql
+Migrations/Seed/world/025_item_mall_products.sql
+Migrations/Seed/world/026_blood_exchange_catalog.sql
+Migrations/Seed/world/027_reward_bundles.sql
 
 Migrations/Seed/admin/001_error_catalog_admin.sql
 Migrations/Seed/admin/002_error_catalog_a3.sql

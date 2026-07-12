@@ -4,7 +4,7 @@
 -- CHECK constraints below mirror legacy's load-time field validation (Item_CheckValidElement,
 -- Server/Header/S15_MyShare.cpp:889-1190), which rejects the whole 99999-slot Load_Item call on the first
 -- offending record -- fatal to both ts25sharemem's and every ts25zone process's boot sequence. Every bound
--- was cross-checked against the real seeded data (34,421 rows, Migrations/Seed/world/080_items.sql) before
+-- was cross-checked against the real seeded data (34,421 rows, Migrations/Seed/world/005_items.sql) before
 -- being added -- none of them reject any currently-seeded row. Constants used: MAX_ITEM_TYPE_NUM_CHK=8,
 -- MAX_ITEM_SORT_NUM_CHK=99 (:880-881), MAX_ITEM_STATUS_ATTRIBUTE=10000, MAX_ITEM_STATUS_ATTRIBUTE1=13000,
 -- MAX_ITEM_STATUS_ATTRIBUTE2=20000 (:883-885), MAX_NUMBER_SIZE=2000000000 (Server/Header/Protocol/DEFINE.h:365).

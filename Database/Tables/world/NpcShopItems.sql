@@ -3,7 +3,7 @@
 -- scan; vw_NpcWithShopSummary's GROUP BY NpcId; the deleted-as-dead-code-2026-07-12 usp_Npc_GetById used to
 -- filter WHERE NpcId=@NpcId here too, already covered by the clustered PK's leading column) reads this table
 -- by NpcId, never by ItemId. A reverse "which NPCs
--- sell item X" index would only tax the one-time seed insert (Migrations/Seed/world/Npcs.sql) for zero read
+-- sell item X" index would only tax the one-time seed insert (Migrations/Seed/world/016_npcs.sql) for zero read
 -- benefit today; re-add if that GM-tooling query is ever built.
 CREATE TABLE world.NpcShopItems
 (

@@ -164,5 +164,11 @@ public class ProxyShopExpiryFlushHostTests
         {
             throw new NotSupportedException();
         }
+
+        public ValueTask ExtendRentalAndReplaceContainerAsync(int characterId, int newShopDate, byte container,
+            IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
     }
 }

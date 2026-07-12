@@ -27,7 +27,7 @@ public static class ItemSeedGenerator
         sb.Append("-- One row per ItemRecord where Index != 0 -- retired/deleted slots (per the runtime\n");
         sb.Append("-- patch ItemReader.ReadAll already applies) are skipped, not seeded as empty rows.\n");
         sb.Append("-- GainSkillNumber translates the legacy \"0 = no skill\" sentinel to NULL (world.Skills\n");
-        sb.Append("-- has no SkillId = 0 row -- see 070_skills.sql).\n");
+        sb.Append("-- has no SkillId = 0 row -- see 002_skills.sql).\n");
         sb.Append("IF NOT EXISTS (SELECT 1 FROM world.Items)\n");
         sb.Append("BEGIN\n");
 
@@ -36,7 +36,7 @@ public static class ItemSeedGenerator
         sb.Append("END;\n");
 
         File.WriteAllText(outputPath, sb.ToString());
-        Console.WriteLine($"080_items.sql: {itemRows.Count} item rows -> {outputPath}");
+        Console.WriteLine($"005_items.sql: {itemRows.Count} item rows -> {outputPath}");
     }
 
     private static string FormatItemRow(ItemRecord i)

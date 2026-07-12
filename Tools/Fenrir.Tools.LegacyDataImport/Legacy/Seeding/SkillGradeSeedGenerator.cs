@@ -32,7 +32,7 @@ public static class SkillGradeSeedGenerator
         sb.Append("END;\n");
 
         File.WriteAllText(outputPath, sb.ToString());
-        Console.WriteLine($"072_skill_grades.sql: {gradeRows.Count} grade rows -> {outputPath}");
+        Console.WriteLine($"004_skill_grades.sql: {gradeRows.Count} grade rows -> {outputPath}");
     }
 
     private static string FormatGradeRow(int skillId, int gradeIndex, SkillGradeRecord g)

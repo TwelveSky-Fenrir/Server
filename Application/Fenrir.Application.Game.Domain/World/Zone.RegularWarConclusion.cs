@@ -11,7 +11,7 @@ public sealed partial class Zone
 
     private void HandleRegularWarConclusionCredit(int characterId)
     {
-        if (!_players.TryGetValue(characterId, out var state))
+        if (!_players.TryGetValue(characterId, out var state) || state.IsMovingZone)
             return;
 
         if (state.MissionJoinWar < MissionJoinWarCap)
@@ -20,15 +20,20 @@ public sealed partial class Zone
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
         }
 
-        if (state.QuestActiveFlag == 1 && state.QuestSort == 8 && state.QuestTargetPhase == MapId &&
-            state.QuestKillCounter < 1)
+        CreditWaterfallOccupationQuest(state);
+    }
+
+    private void CreditWaterfallOccupationQuest(PlayerRuntimeState state)
+    {
+        if (state.QuestActiveFlag != 1 || state.QuestSort != 8 || state.QuestTargetPhase != MapId ||
+            state.QuestKillCounter >= 1)
+            return;
+
+        state.QuestKillCounter++;
+        state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+        state.Session.Send(new QuestProgressResponse
         {
-            state.QuestKillCounter++;
-            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
-            state.Session.Send(new QuestProgressResponse
-            {
-                Sort = QuestWaterfallWarConclusionCreditSort, Page = 0, Index = 0, XPost = 0, YPost = 0
-            });
-        }
+            Sort = QuestWaterfallWarConclusionCreditSort, Page = 0, Index = 0, XPost = 0, YPost = 0
+        });
     }
 }

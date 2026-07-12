@@ -15,7 +15,6 @@ public sealed class ProxyShopExpirationRelayHost(
     ILogger<ProxyShopExpirationRelayHost> logger) : BackgroundService, IProxyShopExpirationRelayQueue
 {
     private const int QueueCapacity = 1024;
-    private const int MaxDrainedPerCycle = 512;
 
     private readonly Channel<ProxyShopExpirationRelayEntry> _outbox =
         Channel.CreateBounded<ProxyShopExpirationRelayEntry>(
@@ -42,6 +41,29 @@ public sealed class ProxyShopExpirationRelayHost(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var outboundLoop = RunOutboundFlushLoopAsync(stoppingToken);
+        var inboundLoop = RunInboundDeliveryLoopAsync(stoppingToken);
+        await Task.WhenAll(outboundLoop, inboundLoop).ConfigureAwait(false);
+    }
+
+    private async Task RunOutboundFlushLoopAsync(CancellationToken stoppingToken)
+    {
+        var reader = _outbox.Reader;
+
+        while (await reader.WaitToReadAsync(stoppingToken).ConfigureAwait(false))
+            try
+            {
+                await FlushOutboundAsync(stoppingToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogError(ex, "Proxy-shop expiration relay outbound flush failed for shard {ShardId}",
+                    options.Value.ShardId);
+            }
+    }
+
+    private async Task RunInboundDeliveryLoopAsync(CancellationToken stoppingToken)
+    {
         using var timer =
             new PeriodicTimer(TimeSpan.FromSeconds(options.Value.ProxyShopExpirationRelayPollIntervalSeconds));
 
@@ -49,11 +71,11 @@ public sealed class ProxyShopExpirationRelayHost(
         {
             try
             {
-                await PollOnceAsync(stoppingToken).ConfigureAwait(false);
+                await DeliverInboundAsync(stoppingToken).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                logger.LogError(ex, "Proxy-shop expiration relay poll failed for shard {ShardId}",
+                logger.LogError(ex, "Proxy-shop expiration relay inbound delivery failed for shard {ShardId}",
                     options.Value.ShardId);
             }
         } while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false));
@@ -68,14 +90,11 @@ public sealed class ProxyShopExpirationRelayHost(
     private async ValueTask FlushOutboundAsync(CancellationToken ct)
     {
         var reader = _outbox.Reader;
-        var drained = 0;
 
-        while (drained < MaxDrainedPerCycle && reader.TryRead(out var entry))
-        {
-            drained++;
+        while (reader.TryRead(out var entry))
             try
             {
-                await relay.PublishAsync(entry, ct).ConfigureAwait(false);
+                await CrossShardRelayRetry.RunAsync(() => relay.PublishAsync(entry, ct), ct).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -85,7 +104,6 @@ public sealed class ProxyShopExpirationRelayHost(
                     "already saved)",
                     entry.CharacterId, options.Value.ShardId);
             }
-        }
     }
 
     private async ValueTask DeliverInboundAsync(CancellationToken ct)
@@ -100,7 +118,7 @@ public sealed class ProxyShopExpirationRelayHost(
         foreach (var dto in incoming)
             try
             {
-                DeliverLocally(dto);
+                await CrossShardRelayRetry.RunSync(() => DeliverLocally(dto), ct).ConfigureAwait(false);
             }
             catch (Exception ex)
             {

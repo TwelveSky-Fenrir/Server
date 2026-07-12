@@ -372,6 +372,21 @@ public class QuestStateMachineTests
     }
 
     [Fact]
+    public void Complete_RewardType6_ItemUnresolvableInCatalog_QuantityIsZero_ButRewardItemIdStillReported()
+    {
+        var quest = WorldDataTestRows.Quest(1) with { Category = Category, Step = 2, Sort = 2, Solution1 = 7000 };
+        var rewards = new[] { new QuestRewardRowDto(1, 0, 6, 9999, null) };
+        var catalog = CatalogWithRewards(quest, rewards);
+        var progress = new QuestProgress(2, 1, 2, 7000, 0);
+
+        var result = QuestStateMachine.Complete(progress, Tribe, 10, catalog, id => id == 7000, _ => null);
+
+        Assert.True(result.Success);
+        Assert.Equal(9999, result.RewardItemId);
+        Assert.Equal(0, result.RewardItemQuantity);
+    }
+
+    [Fact]
     public void Complete_EndConditionNotMet_Fails()
     {
         var quest = WorldDataTestRows.Quest(1) with
@@ -444,6 +459,21 @@ public class QuestStateMachineTests
         var progress = new QuestProgress(5, 1, 6, 1, 100);
 
         var result = QuestStateMachine.TryExchange(progress, Tribe, 10, catalog, NoItems);
+
+        Assert.False(result.Success);
+    }
+
+    [Fact]
+    public void TryExchange_WrongQSort_Fails()
+    {
+        var quest = WorldDataTestRows.Quest(1) with
+        {
+            Category = Category, Step = 5, Sort = 1, Solution1 = 100, Solution2 = 200
+        };
+        var catalog = Catalog(quest);
+        var progress = new QuestProgress(5, 1, 1, 100, 0);
+
+        var result = QuestStateMachine.TryExchange(progress, Tribe, 10, catalog, id => id == 100);
 
         Assert.False(result.Success);
     }

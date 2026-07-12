@@ -18,7 +18,7 @@ public class MonsterRebroadcastStaggerTests
     private static MonsterEntity Monster(int serverIndex, float posX, float posZ)
     {
         return MonsterEntity.Create(serverIndex, unchecked((uint)serverIndex), WorldDataTestRows.Monster(700),
-            serverIndex, posX, 0f, posZ, 50f);
+            serverIndex, posX, 0f, posZ);
     }
 
     [Fact]

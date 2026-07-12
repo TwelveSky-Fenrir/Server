@@ -92,13 +92,14 @@ public class EquipItemValidationGateTests
     [Theory]
     [InlineData(13)]
     [InlineData(100)]
-    public void Evaluate_SlotIndexOutOfBounds_WrongSlotTag(int slotIndex)
+    [InlineData(-5)]
+    public void Evaluate_SlotIndexOutOfBounds_SkipsSlotTagCheckEntirely(int slotIndex)
     {
-        var candidate = Candidate();
+        var candidate = Candidate(equipPartTag: 99);
 
         var outcome = EquipItemValidationGate.Evaluate(candidate, 0, 0, slotIndex, 100, 0);
 
-        Assert.Equal(EquipItemValidationGate.Outcome.WrongSlotTag, outcome);
+        Assert.Equal(EquipItemValidationGate.Outcome.Success, outcome);
     }
 
     [Fact]
@@ -219,7 +220,6 @@ public class EquipItemValidationGateTests
     [InlineData(2)]
     [InlineData(4)]
     [InlineData(8)]
-    [InlineData(29)]
     public void Evaluate_ItemSortClassificationGatedCodes_RequireRebirthTwelve(int classification)
     {
         var candidate = Candidate(90000);
@@ -233,12 +233,14 @@ public class EquipItemValidationGateTests
         Assert.Equal(EquipItemValidationGate.Outcome.Success, accepted);
     }
 
-    [Fact]
-    public void Evaluate_ItemSortClassificationUngatedCode_NoRebirthGate()
+    [Theory]
+    [InlineData(3)]
+    [InlineData(29)]
+    public void Evaluate_ItemSortClassificationUngatedCode_NoRebirthGate(int classification)
     {
         var candidate = Candidate(90000);
 
-        var outcome = EquipItemValidationGate.Evaluate(candidate, 3, 0,
+        var outcome = EquipItemValidationGate.Evaluate(candidate, classification, 0,
             EquipItemValidationGate.SkipSlotCheck, 100, 0);
 
         Assert.Equal(EquipItemValidationGate.Outcome.Success, outcome);

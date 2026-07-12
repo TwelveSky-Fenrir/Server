@@ -77,7 +77,7 @@ public class UseInventoryItemTowerServiceTests
     {
         var guardianIndex = TowerWarState.GuardianServerIndex(towerIndex);
         var template = WorldDataTestRows.Monster(Level1GuardianMonsterId) with { Life = 5000 };
-        var guardian = MonsterEntity.Create(guardianIndex, 500u, template, guardianIndex, -1276f, -5f, 1826f, 300f);
+        var guardian = MonsterEntity.Create(guardianIndex, 500u, template, guardianIndex, -1276f, -5f, 1826f);
         if (damaged)
             guardian.TakeDamage(1000, out _);
 
@@ -93,7 +93,7 @@ public class UseInventoryItemTowerServiceTests
     }
 
     private static async Task<UseInventoryItemResponse> RunToCompletionAsync(
-        ValueTask<UseInventoryItemResponse> pending, Zone zone)
+        ValueTask<UseInventoryItemResponse?> pending, Zone zone)
     {
         var task = pending.AsTask();
         var guard = 0;
@@ -105,7 +105,9 @@ public class UseInventoryItemTowerServiceTests
                 throw new TimeoutException("UseInventoryItemService task never completed.");
         }
 
-        return await task;
+        var result = await task;
+        Assert.NotNull(result);
+        return result!.Value;
     }
 
     [Theory]
@@ -148,15 +150,15 @@ public class UseInventoryItemTowerServiceTests
     }
 
     [Fact]
-    public async Task UnrelatedItemId_StillFallsThroughToGenericFailure_TowerStateNeverTouched()
+    public async Task UnrelatedItemId_MatchesNoDispatchBranch_ReturnsNull_TowerStateNeverTouched()
     {
         var (_, _, zone, state, characters, towerWar, service) = SetUp();
         SeedItem(zone, UnrelatedItemId);
 
-        var response = await RunToCompletionAsync(
-            service.ResolveAsync(zone, state, CharacterId, AccountId, Page, Slot, 1, CancellationToken.None), zone);
+        var response = await service.ResolveAsync(zone, state, CharacterId, AccountId, Page, Slot, 1,
+            CancellationToken.None);
 
-        Assert.Equal(1, response.Result);
+        Assert.Null(response);
         Assert.Equal(0, towerWar.GetPendingConstructKind(TowerIndex));
         Assert.False(towerWar.IsGuardianHealPending(TowerIndex));
         Assert.Null(characters.LastReplacedContainer);

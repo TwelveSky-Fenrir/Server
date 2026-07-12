@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Collections.Immutable;
 using System.Threading.Channels;
+using Fenrir.Application.Game.Domain.Consumables;
 using Fenrir.Application.Game.Domain.Hotkeys;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Mounts;
@@ -20,6 +21,8 @@ namespace Fenrir.Application.Game.Domain.World;
 public sealed partial class Zone
 {
     private const int HeroRankPointStatSort = 904;
+
+    private const int DrunkDurationStatSort = 112;
 
     private const int AutoBuffInboxCapacity = 256;
 
@@ -46,6 +49,10 @@ public sealed partial class Zone
     private const int StellarCoreInboxCapacity = 256;
 
     private const int CharacterMpStatSort = 11;
+
+    private const int PetActivityStatSort = 12;
+
+    private const int MountActivityExpStatSort = 71;
 
     private readonly Channel<AutoBuffZoneCommand> _autoBuffInbox =
         Channel.CreateBounded<AutoBuffZoneCommand>(
@@ -288,7 +295,36 @@ public sealed partial class Zone
         if (command.UpdatedStats is { } stats)
             state.Stats = stats;
 
+        if (command.DrunkTicksRemaining is { } ticksRemaining)
+            state.DrunkBottleTicksRemaining = ticksRemaining;
+
+        if (command.DrunkActiveIndex is { } activeIndex)
+            state.DrunkBottleIndex = activeIndex;
+
         state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
+    }
+
+    public void ExpireDrunkBottleEffect(PlayerRuntimeState state)
+    {
+        if (state.DrunkBottleTicksRemaining <= 0)
+            return;
+
+        state.DrunkBottleTicksRemaining = 0;
+
+        var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
+            state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo, state.RebirthCount,
+            state.Level2);
+        var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
+        var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
+            ? petStack.ItemId
+            : 0;
+        var petContribution = PetGrowthCalculator.Compute(petItemId, state.PetGrowth, state.PetActivity,
+            worldData.ItemsById);
+
+        state.Stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
+            petContribution, state);
+
+        state.Session.Send(new AvatarStatUpdateResponse { Sort = DrunkDurationStatSort, Value = 0, Value2 = 0 });
     }
 
     private void DrainHotkeySlotMirrorCommands()
@@ -315,7 +351,36 @@ public sealed partial class Zone
         state.SetHotkeySlot(command.Page, command.Index, command.NewSlot);
 
         if (!command.BuffWrites.IsDefaultOrEmpty)
-            ApplyBuffWrites(state, command.BuffWrites);
+        {
+            ApplyBuffWrites(state, command.BuffWrites, command.RecomputeStats);
+            ApplyHotkeyAntiCheatMarker(state, command.MarkerKind, command.MarkerValue);
+        }
+
+        if (command.PetActivityGain is { } petActivityGain)
+        {
+            state.PetActivity = (byte)Math.Clamp(state.PetActivity + petActivityGain, 0,
+                MountActivityExpCodec.MaxActivity);
+            RecomputeDerivedStats(state);
+            state.Session.Send(new AvatarStatUpdateResponse
+                { Sort = PetActivityStatSort, Value = state.PetActivity, Value2 = 0 });
+            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+        }
+
+        if (command.MountActivityGain is { } mountActivityGain)
+        {
+            var animalInfo = MountAnimalInfo.Resolve(state.AnimalIndex, state.MountActivity,
+                state.MountAccumulatedExp);
+            var newMountActivity = MountActivityExpCodec.FeedActivity(animalInfo.Activity, mountActivityGain);
+            state.MountActivity = state.MountActivity.SetItem(animalInfo.Slot, newMountActivity);
+            RecomputeDerivedStats(state);
+            state.Session.Send(new AvatarStatUpdateResponse
+            {
+                Sort = MountActivityExpStatSort,
+                Value = MountActivityExpCodec.Pack(newMountActivity, animalInfo.Exp),
+                Value2 = 0
+            });
+            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+        }
 
         if (command.LifeGain is null && command.ManaGain is null)
             return;
@@ -337,6 +402,29 @@ public sealed partial class Zone
         }
 
         state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
+    }
+
+    private void ApplyHotkeyAntiCheatMarker(PlayerRuntimeState state,
+        HotkeyItemConsumptionResolver.AntiCheatMarkerKind markerKind, int markerValue)
+    {
+        var currentTick = (int)_clock.TotalMilliseconds;
+
+        switch (markerKind)
+        {
+            case HotkeyItemConsumptionResolver.AntiCheatMarkerKind.DarkAttack:
+                state.DarkAttackKind = markerValue;
+                state.DarkAttackUseTick = currentTick;
+                state.DarkAttackActiveTick = currentTick;
+                break;
+            case HotkeyItemConsumptionResolver.AntiCheatMarkerKind.HitRate:
+                state.HitRateKind = markerValue;
+                state.HitRateTick = currentTick;
+                break;
+            case HotkeyItemConsumptionResolver.AntiCheatMarkerKind.DodgeRate:
+                state.DodgeRateKind = markerValue;
+                state.DodgeRateTick = currentTick;
+                break;
+        }
     }
 
     private void DrainHeroRankingQueryCommands()
@@ -537,6 +625,7 @@ public sealed partial class Zone
         switch (command.Broadcast)
         {
             case MountBroadcastKind.Mount:
+                state.MountExpiryCountdownAccrualTicks = 0;
                 BroadcastAvatarStateFlag(state, 12, state.AnimalNumber, 0, 0);
                 BroadcastAvatarStateFlag(state, 26, 0, 0, 0);
                 break;
@@ -987,6 +1076,8 @@ public readonly record struct DrinkBottleZoneCommand(
     int NewLife,
     int? NewItemId = null,
     EffectiveStats? UpdatedStats = null,
+    int? DrunkTicksRemaining = null,
+    int? DrunkActiveIndex = null,
     TaskCompletionSource? Applied = null);
 
 public readonly record struct HotkeySlotMirrorZoneCommand(
@@ -996,7 +1087,13 @@ public readonly record struct HotkeySlotMirrorZoneCommand(
     HotkeySlot NewSlot,
     int? LifeGain = null,
     int? ManaGain = null,
-    ImmutableArray<SkillCastResolver.BuffWrite> BuffWrites = default);
+    ImmutableArray<SkillCastResolver.BuffWrite> BuffWrites = default,
+    HotkeyItemConsumptionResolver.AntiCheatMarkerKind MarkerKind =
+        HotkeyItemConsumptionResolver.AntiCheatMarkerKind.None,
+    int MarkerValue = 0,
+    bool RecomputeStats = true,
+    int? PetActivityGain = null,
+    int? MountActivityGain = null);
 
 public readonly record struct HeroRankingQueryZoneCommand(int CharacterId, bool Previous, TimeSpan QueriedAtZoneClock);
 

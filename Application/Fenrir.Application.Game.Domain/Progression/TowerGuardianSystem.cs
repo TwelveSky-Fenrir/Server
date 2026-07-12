@@ -11,8 +11,6 @@ public sealed class TowerGuardianSystem(
     WorldDataCache worldData,
     Lazy<ZoneEventBroadcaster>? zoneEventBroadcaster = null) : ISimulationSystem
 {
-    private const float GuardianLeashRadius = 300f;
-
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
         var towerIndex = TowerZoneIndexTable.GetTowerIndex(zone.MapId);
@@ -65,7 +63,7 @@ public sealed class TowerGuardianSystem(
             zone.DespawnMonsterSilently(guardianIndex);
 
         var guardian = MonsterEntity.Create(guardianIndex, zone.NextMonsterUniqueNumber(), definition.Monster,
-            guardianIndex, x, y, z, GuardianLeashRadius);
+            guardianIndex, x, y, z);
         zone.SpawnMonster(guardian);
 
         towerWar.CompleteUpgrade(towerIndex);

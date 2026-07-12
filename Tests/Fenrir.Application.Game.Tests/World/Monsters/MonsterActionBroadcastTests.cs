@@ -80,7 +80,7 @@ public class MonsterActionBroadcastTests
     public void IdleMonster_OnEnterCatchUpFrame_UsesMinusOneTargetIndex_AndKeepAliveState()
     {
         var zone = ZoneTestKit.CreateZone(1, new GameServerOptions { AoiCellSize = 100_000f });
-        zone.SpawnMonster(MonsterEntity.Create(1, 1u, WorldDataTestRows.Monster(700), 1, 0f, 0f, 0f, 50f));
+        zone.SpawnMonster(MonsterEntity.Create(1, 1u, WorldDataTestRows.Monster(700), 1, 0f, 0f, 0f));
 
         var (session, pipe) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Target", 5, posZ: 0)));

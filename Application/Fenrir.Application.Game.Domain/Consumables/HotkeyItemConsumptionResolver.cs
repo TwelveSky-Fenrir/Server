@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Hotkeys;
-using Fenrir.Application.Game.Domain.Simulation;
+using Fenrir.Application.Game.Domain.Mounts;
 using Fenrir.Application.Game.Domain.Skills;
 
 namespace Fenrir.Application.Game.Domain.Consumables;
@@ -15,7 +15,10 @@ public static class HotkeyItemConsumptionResolver
         Mana,
         LifeAndMana,
 
-        Buff
+        Buff,
+
+        PetActivity,
+        MountActivity
     }
 
     public enum Outcome
@@ -25,6 +28,17 @@ public static class HotkeyItemConsumptionResolver
         RejectedClean,
 
         Success
+    }
+
+    public enum AntiCheatMarkerKind
+    {
+        None,
+
+        DarkAttack,
+
+        HitRate,
+
+        DodgeRate
     }
 
     private const int DarkAttackBuffSlot = 15;
@@ -37,21 +51,27 @@ public static class HotkeyItemConsumptionResolver
 
     private const int HitOrDodgeBuffPercent = 25;
 
+    public const int AssassinScrollMarkerValue = 1;
+
+    public const int DepartedSpiritScrollMarkerValue = 2;
+
+    public const int HitOrDodgeBuffMarkerValue = 1;
+
     public const int MaxPotionSortNum = 16;
 
     public const byte ConsumableItemCategory = 2;
 
-    private static readonly int AssassinScrollDurationTicks =
-        SimulationClock.ToWholeLegacyTicks(TimeSpan.FromSeconds(40));
+    private const int AssassinScrollBuffDurationLegacyTicks = 40;
 
-    private static readonly int SixtySecondBuffDurationTicks =
-        SimulationClock.ToWholeLegacyTicks(TimeSpan.FromSeconds(60));
+    private const int StandardScrollOrBookBuffDurationLegacyTicks = 60;
 
     public static Result Resolve(
         int page, int index, HotkeySlot slot,
         bool isStunned, bool isDead, bool canUseConsumables,
         bool itemResolved, byte itemCategory, int potionType1, int potionType2,
-        int life, int effectiveMaxLife, int mana, int effectiveMaxMana)
+        int life, int effectiveMaxLife, int mana, int effectiveMaxMana,
+        bool isDarkAttackScrollZoneAllowed, int currentDarkAttackMarker,
+        bool petFoodEligible, int petActivity, bool mountFoodEligible, int mountActivity)
     {
         if (!HotkeyActionResolver.IsValidPage(page) || !HotkeyActionResolver.IsValidIndex(index))
             return Result.DisconnectResult;
@@ -104,17 +124,49 @@ public static class HotkeyItemConsumptionResolver
                 return Succeed(slot, EffectKind.None, 0, 0);
 
             case 12:
-                return SucceedWithBuff(slot, DarkAttackBuffSlot, DarkAttackBuffPercent, AssassinScrollDurationTicks);
+            {
+                if (!isDarkAttackScrollZoneAllowed || currentDarkAttackMarker == DepartedSpiritScrollMarkerValue)
+                    return Result.RejectedCleanResult;
+                return SucceedWithBuff(slot, DarkAttackBuffSlot, DarkAttackBuffPercent,
+                    AssassinScrollBuffDurationLegacyTicks,
+                    AntiCheatMarkerKind.DarkAttack, AssassinScrollMarkerValue, recomputeStats: false);
+            }
             case 13:
-                return SucceedWithBuff(slot, DarkAttackBuffSlot, DarkAttackBuffPercent, SixtySecondBuffDurationTicks);
+            {
+                if (!isDarkAttackScrollZoneAllowed || currentDarkAttackMarker == AssassinScrollMarkerValue)
+                    return Result.RejectedCleanResult;
+                return SucceedWithBuff(slot, DarkAttackBuffSlot, DarkAttackBuffPercent,
+                    StandardScrollOrBookBuffDurationLegacyTicks,
+                    AntiCheatMarkerKind.DarkAttack, DepartedSpiritScrollMarkerValue, recomputeStats: false);
+            }
             case 14:
-                return SucceedWithBuff(slot, HitRateBuffSlot, HitOrDodgeBuffPercent, SixtySecondBuffDurationTicks);
+                return SucceedWithBuff(slot, HitRateBuffSlot, HitOrDodgeBuffPercent,
+                    StandardScrollOrBookBuffDurationLegacyTicks,
+                    AntiCheatMarkerKind.HitRate, HitOrDodgeBuffMarkerValue, recomputeStats: true);
             case 15:
-                return SucceedWithBuff(slot, DodgeRateBuffSlot, HitOrDodgeBuffPercent, SixtySecondBuffDurationTicks);
+                return SucceedWithBuff(slot, DodgeRateBuffSlot, HitOrDodgeBuffPercent,
+                    StandardScrollOrBookBuffDurationLegacyTicks,
+                    AntiCheatMarkerKind.DodgeRate, HitOrDodgeBuffMarkerValue, recomputeStats: true);
 
             case 6:
+            {
+                if (!petFoodEligible || petActivity >= MountActivityExpCodec.MaxActivity)
+                    return Result.RejectedCleanResult;
+                var gain = ComputeClampedGain(false, potionType2, MountActivityExpCodec.MaxActivity, petActivity);
+                if (gain <= 0)
+                    return Result.RejectedCleanResult;
+                return SucceedWithPetActivityGain(slot, gain);
+            }
+
             case 16:
-                return Result.RejectedCleanResult;
+            {
+                if (!mountFoodEligible)
+                    return Result.RejectedCleanResult;
+                var gain = ComputeClampedGain(false, potionType2, MountActivityExpCodec.MaxActivity, mountActivity);
+                if (gain <= 0)
+                    return Result.RejectedCleanResult;
+                return SucceedWithMountActivityGain(slot, gain);
+            }
 
             default:
                 return Result.DisconnectResult;
@@ -123,18 +175,36 @@ public static class HotkeyItemConsumptionResolver
 
     private static Result Succeed(HotkeySlot slot, EffectKind effect, int lifeGain, int manaGain)
     {
-        var remaining = slot.Value2 - 1;
-        var newSlot = remaining > 0 ? slot with { Value2 = remaining } : HotkeySlot.Empty;
-        return new Result(Outcome.Success, newSlot, effect, lifeGain, manaGain,
-            ImmutableArray<SkillCastResolver.BuffWrite>.Empty);
+        return new Result(Outcome.Success, Decrement(slot), effect, lifeGain, manaGain,
+            ImmutableArray<SkillCastResolver.BuffWrite>.Empty, AntiCheatMarkerKind.None, 0, false);
     }
 
-    private static Result SucceedWithBuff(HotkeySlot slot, int buffSlot, int value, int durationTicks)
+    private static Result SucceedWithBuff(HotkeySlot slot, int buffSlot, int value, int durationTicks,
+        AntiCheatMarkerKind markerKind, int markerValue, bool recomputeStats)
+    {
+        var write = ImmutableArray.Create(new SkillCastResolver.BuffWrite(buffSlot, value, durationTicks));
+        return new Result(Outcome.Success, Decrement(slot), EffectKind.Buff, 0, 0, write, markerKind, markerValue,
+            recomputeStats);
+    }
+
+    private static Result SucceedWithPetActivityGain(HotkeySlot slot, int gain)
+    {
+        return new Result(Outcome.Success, Decrement(slot), EffectKind.PetActivity, 0, 0,
+            ImmutableArray<SkillCastResolver.BuffWrite>.Empty, AntiCheatMarkerKind.None, 0, false,
+            PetActivityGain: gain);
+    }
+
+    private static Result SucceedWithMountActivityGain(HotkeySlot slot, int gain)
+    {
+        return new Result(Outcome.Success, Decrement(slot), EffectKind.MountActivity, 0, 0,
+            ImmutableArray<SkillCastResolver.BuffWrite>.Empty, AntiCheatMarkerKind.None, 0, false,
+            MountActivityGain: gain);
+    }
+
+    private static HotkeySlot Decrement(HotkeySlot slot)
     {
         var remaining = slot.Value2 - 1;
-        var newSlot = remaining > 0 ? slot with { Value2 = remaining } : HotkeySlot.Empty;
-        var write = ImmutableArray.Create(new SkillCastResolver.BuffWrite(buffSlot, value, durationTicks));
-        return new Result(Outcome.Success, newSlot, EffectKind.Buff, 0, 0, write);
+        return remaining > 0 ? slot with { Value2 = remaining } : HotkeySlot.Empty;
     }
 
     private static int ComputeClampedGain(bool isPercent, int potionType2, int effectiveMax, int current)
@@ -150,12 +220,17 @@ public static class HotkeyItemConsumptionResolver
         EffectKind Effect,
         int LifeGain,
         int ManaGain,
-        ImmutableArray<SkillCastResolver.BuffWrite> BuffWrites)
+        ImmutableArray<SkillCastResolver.BuffWrite> BuffWrites,
+        AntiCheatMarkerKind MarkerKind,
+        int MarkerValue,
+        bool RecomputeStats,
+        int PetActivityGain = 0,
+        int MountActivityGain = 0)
     {
         public static readonly Result DisconnectResult = new(Outcome.Disconnect, default, EffectKind.None, 0, 0,
-            ImmutableArray<SkillCastResolver.BuffWrite>.Empty);
+            ImmutableArray<SkillCastResolver.BuffWrite>.Empty, AntiCheatMarkerKind.None, 0, false);
 
         public static readonly Result RejectedCleanResult = new(Outcome.RejectedClean, default, EffectKind.None, 0,
-            0, ImmutableArray<SkillCastResolver.BuffWrite>.Empty);
+            0, ImmutableArray<SkillCastResolver.BuffWrite>.Empty, AntiCheatMarkerKind.None, 0, false);
     }
 }

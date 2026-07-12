@@ -12,6 +12,9 @@ public interface IGmBasicCommandService
     public ValueTask HandleSelfTeleportAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
         Zone zone, CancellationToken cancellationToken);
 
+    public ValueTask HandleMoveToPositionAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
+        Zone zone, CancellationToken cancellationToken);
+
     public ValueTask HandleForceKillMonsterAsync(byte[] data, ZoneClientSession zoneSession, Zone zone,
         CancellationToken cancellationToken);
 
@@ -25,7 +28,7 @@ public interface IGmBasicCommandService
         CancellationToken cancellationToken);
 
     public ValueTask HandleCallAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
-        CancellationToken cancellationToken);
+        Zone zone, CancellationToken cancellationToken);
 
     public ValueTask HandleMoveToTargetAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
         Zone zone, CancellationToken cancellationToken);

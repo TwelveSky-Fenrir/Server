@@ -4,29 +4,25 @@ namespace Fenrir.Application.Game.Domain.Movement;
 
 public static class AvatarActionResumeWhitelist
 {
-    private const byte Type0 = 0b0000_0001;
-    private const byte AllTypes = 0b1111_1111;
-
-    private static readonly FrozenDictionary<int, byte> TypeMasksBySort = new Dictionary<int, byte>
+    private static readonly FrozenSet<int> AcceptedSorts = new HashSet<int>
     {
-        [1] = AllTypes,
-        [2] = AllTypes,
-        [11] = AllTypes,
-        [19] = Type0,
-        [31] = Type0,
-        [32] = AllTypes,
-        [64] = Type0,
-        [90] = AllTypes,
-        [91] = AllTypes,
-        [92] = AllTypes,
-        [93] = AllTypes,
-        [94] = AllTypes,
-        [95] = AllTypes
-    }.ToFrozenDictionary();
+        1, 2, 11, 19, 31, 32, 64, 90, 91, 92, 93, 94, 95
+    }.ToFrozenSet();
+
+    private static readonly FrozenSet<int> SortsRequiringZeroType = new HashSet<int> { 19, 31, 64 }.ToFrozenSet();
+
+    private static readonly FrozenSet<int> SortsClearingFishingProgress = new HashSet<int> { 94, 95 }.ToFrozenSet();
 
     public static bool IsLegal(int sort, int type)
     {
-        return type is >= 0 and <= 7 && TypeMasksBySort.TryGetValue(sort, out var mask) &&
-               (mask & (1 << type)) != 0;
+        if (!AcceptedSorts.Contains(sort))
+            return false;
+
+        return !SortsRequiringZeroType.Contains(sort) || type == 0;
+    }
+
+    public static bool ClearsFishingProgress(int sort)
+    {
+        return SortsClearingFishingProgress.Contains(sort);
     }
 }

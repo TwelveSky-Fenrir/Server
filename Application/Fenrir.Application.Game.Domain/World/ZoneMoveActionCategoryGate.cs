@@ -1,3 +1,5 @@
+using Fenrir.Application.Game.Domain.World.Configuration;
+
 namespace Fenrir.Application.Game.Domain.World;
 
 public enum ZoneMoveActionCategory
@@ -5,7 +7,7 @@ public enum ZoneMoveActionCategory
     GmMove = 2,
     Death = 3,
     Portal = 4,
-    NpcMoneyGated = 5,
+    NpcMoney = 5,
     NpcMove = 6,
     Return = 7,
     ReturnItem = 8,
@@ -21,7 +23,7 @@ public static class ZoneMoveActionCategoryGate
         (int)ZoneMoveActionCategory.GmMove or
         (int)ZoneMoveActionCategory.Death or
         (int)ZoneMoveActionCategory.Portal or
-        (int)ZoneMoveActionCategory.NpcMoneyGated or
+        (int)ZoneMoveActionCategory.NpcMoney or
         (int)ZoneMoveActionCategory.NpcMove or
         (int)ZoneMoveActionCategory.Return or
         (int)ZoneMoveActionCategory.ReturnItem or
@@ -29,4 +31,14 @@ public static class ZoneMoveActionCategoryGate
         (int)ZoneMoveActionCategory.NpcTeleporter or
         (int)ZoneMoveActionCategory.AutoToZone037 or
         (int)ZoneMoveActionCategory.Zone84Transition;
+}
+
+public static class ZoneMoveDestinationZoneGate
+{
+    public const int MinZoneNumber = ZoneConfigCatalog.MinValidZoneNumber;
+
+    public const int MaxZoneNumberExclusive = ZoneConfigCatalog.MaxValidZoneNumber;
+
+    public static bool IsWithinRequestRange(int zoneNumber) =>
+        zoneNumber >= MinZoneNumber && zoneNumber < MaxZoneNumberExclusive;
 }

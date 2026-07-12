@@ -8,7 +8,8 @@ public class StunCountdownSystemTests
 {
     private static (Zone Zone, PlayerRuntimeState State) EnterStunnedPlayer(int durationSeconds)
     {
-        var zone = ZoneTestKit.CreateZone(1, simulationSystems: [new StunCountdownSystem()]);
+        var zone = ZoneTestKit.CreateZone(1,
+            simulationSystems: [new AvatarOneSecondGateSystem(), new StunCountdownSystem()]);
         var (session, _) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -25,13 +26,14 @@ public class StunCountdownSystemTests
     [Fact]
     public void NotStunned_IsNeverTouched()
     {
-        var zone = ZoneTestKit.CreateZone(1, simulationSystems: [new StunCountdownSystem()]);
+        var zone = ZoneTestKit.CreateZone(1,
+            simulationSystems: [new AvatarOneSecondGateSystem(), new StunCountdownSystem()]);
         var (session, _) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.True(zone.TryGetPlayer(10, out var state));
-        zone.Tick(SimulationClock.ToTimeSpan(SimulationClock.StunCountdownLegacyTicks));
+        zone.Tick(SimulationClock.ToTimeSpan(SimulationClock.OneSecondGateLegacyTicks));
 
         Assert.False(state!.IsStunned);
         Assert.Equal(0, state.StunDurationSeconds);
@@ -53,7 +55,7 @@ public class StunCountdownSystemTests
     {
         var (zone, state) = EnterStunnedPlayer(5);
 
-        zone.Tick(SimulationClock.ToTimeSpan(SimulationClock.StunCountdownLegacyTicks));
+        zone.Tick(SimulationClock.ToTimeSpan(SimulationClock.OneSecondGateLegacyTicks));
 
         Assert.True(state.IsStunned);
         Assert.Equal(4, state.StunDurationSeconds);
@@ -75,7 +77,7 @@ public class StunCountdownSystemTests
     {
         var (zone, state) = EnterStunnedPlayer(1);
 
-        zone.Tick(SimulationClock.ToTimeSpan(SimulationClock.StunCountdownLegacyTicks));
+        zone.Tick(SimulationClock.ToTimeSpan(SimulationClock.OneSecondGateLegacyTicks));
 
         Assert.False(state.IsStunned);
         Assert.Equal(0, state.StunDurationSeconds);

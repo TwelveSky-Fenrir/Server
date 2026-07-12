@@ -53,13 +53,12 @@ public static class MonsterAggroListPruner
             return otherPursuers < monster.PursuerCapacity;
         }
 
-        return true;
+        return MathF.Abs(player.PosY - monster.PosY) <= monster.Template.Size2;
     }
 
     private static bool IsHiding(PlayerRuntimeState player)
     {
-        _ = player;
-        return false;
+        return player.VisibleState == 0;
     }
 
     private static int CountOtherPursuers(IEnumerable<MonsterEntity> allMonsters, MonsterEntity monster,

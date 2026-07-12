@@ -99,7 +99,7 @@ public sealed partial class Zone
         defenderState.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
 
         if (defenderState.Life <= 0)
-            ApplyDeath(defenderState.CharacterId, DeathCause.Duel);
+            ApplyDeath(defenderState.CharacterId, DeathCause.Duel, (attackerState.PosX, attackerState.PosZ));
     }
 
     public void EndActiveDuel(PlayerRuntimeState state, DuelEndReason reason)

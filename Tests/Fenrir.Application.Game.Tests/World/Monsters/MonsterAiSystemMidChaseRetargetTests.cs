@@ -126,7 +126,7 @@ public class MonsterAiSystemMidChaseRetargetTests
             FrameInfo1 = 1,
             FrameInfo3 = 2
         };
-        var monster = MonsterEntity.Create(1, 1, template, 1, 0, 0, 0, 50);
+        var monster = MonsterEntity.Create(1, 1, template, 1, 0, 0, 0);
         monster.AiState = MonsterAiState.Chase;
 
         var options = new GameServerOptions { AoiCellSize = 100_000f };

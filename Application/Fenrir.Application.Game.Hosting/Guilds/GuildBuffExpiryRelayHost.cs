@@ -2,6 +2,7 @@ using System.Threading.Channels;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Hosting;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -15,7 +16,6 @@ public sealed class GuildBuffExpiryRelayHost(
     ILogger<GuildBuffExpiryRelayHost> logger) : BackgroundService, IGuildBuffExpiryRelayQueue
 {
     private const int QueueCapacity = 64;
-    private const int MaxDrainedPerCycle = 32;
 
     private readonly Channel<GuildBuffExpiryRelayEntry> _outbox = Channel.CreateBounded<GuildBuffExpiryRelayEntry>(
         new BoundedChannelOptions(QueueCapacity)
@@ -40,6 +40,29 @@ public sealed class GuildBuffExpiryRelayHost(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var outboundLoop = RunOutboundFlushLoopAsync(stoppingToken);
+        var inboundLoop = RunInboundDeliveryLoopAsync(stoppingToken);
+        await Task.WhenAll(outboundLoop, inboundLoop).ConfigureAwait(false);
+    }
+
+    private async Task RunOutboundFlushLoopAsync(CancellationToken stoppingToken)
+    {
+        var reader = _outbox.Reader;
+
+        while (await reader.WaitToReadAsync(stoppingToken).ConfigureAwait(false))
+            try
+            {
+                await FlushOutboundAsync(stoppingToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogError(ex, "Guild-buff-expiry relay outbound flush failed for shard {ShardId}",
+                    options.Value.ShardId);
+            }
+    }
+
+    private async Task RunInboundDeliveryLoopAsync(CancellationToken stoppingToken)
+    {
         using var timer =
             new PeriodicTimer(TimeSpan.FromSeconds(options.Value.GuildBuffExpiryRelayPollIntervalSeconds));
 
@@ -47,11 +70,12 @@ public sealed class GuildBuffExpiryRelayHost(
         {
             try
             {
-                await PollOnceAsync(stoppingToken).ConfigureAwait(false);
+                await DeliverInboundAsync(stoppingToken).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                logger.LogError(ex, "Guild-buff-expiry relay poll failed for shard {ShardId}", options.Value.ShardId);
+                logger.LogError(ex, "Guild-buff-expiry relay inbound delivery failed for shard {ShardId}",
+                    options.Value.ShardId);
             }
         } while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false));
     }
@@ -65,14 +89,11 @@ public sealed class GuildBuffExpiryRelayHost(
     private async ValueTask FlushOutboundAsync(CancellationToken ct)
     {
         var reader = _outbox.Reader;
-        var drained = 0;
 
-        while (drained < MaxDrainedPerCycle && reader.TryRead(out var entry))
-        {
-            drained++;
+        while (reader.TryRead(out var entry))
             try
             {
-                await relay.PublishAsync(entry, ct).ConfigureAwait(false);
+                await CrossShardRelayRetry.RunAsync(() => relay.PublishAsync(entry, ct), ct).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -81,7 +102,6 @@ public sealed class GuildBuffExpiryRelayHost(
                     "from shard {ShardId}; cross-shard fan-out for this one push is lost (same-shard delivery " +
                     "already happened)", entry.GuildId, options.Value.ShardId);
             }
-        }
     }
 
     private async ValueTask DeliverInboundAsync(CancellationToken ct)
@@ -96,9 +116,12 @@ public sealed class GuildBuffExpiryRelayHost(
         foreach (var dto in incoming)
             try
             {
-                var command = new GuildBuffExpiryZoneCommand(dto.GuildId, dto.NewBuffTime);
-                foreach (var zone in zones.Zones)
-                    zone.PostGuildBuffExpiryCommand(in command);
+                await CrossShardRelayRetry.RunSync(() =>
+                {
+                    var command = new GuildBuffExpiryZoneCommand(dto.GuildId, dto.NewBuffTime);
+                    foreach (var zone in zones.Zones)
+                        zone.PostGuildBuffExpiryCommand(in command);
+                }, ct).ConfigureAwait(false);
             }
             catch (Exception ex)
             {

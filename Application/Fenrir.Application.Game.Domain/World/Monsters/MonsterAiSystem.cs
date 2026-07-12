@@ -109,9 +109,9 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
                 if (monster.StateFrameAccumulator >= Math.Max(1, (int)monster.Template.FrameInfo6))
                 {
                     monster.StateFrameAccumulator = 0f;
-                    monster.PosX = monster.HomeX;
-                    monster.PosY = monster.HomeY;
-                    monster.PosZ = monster.HomeZ;
+                    monster.PosX = monster.HomeReturnTargetX;
+                    monster.PosY = monster.HomeReturnTargetY;
+                    monster.PosZ = monster.HomeReturnTargetZ;
                     monster.ReleaseTarget();
                     monster.AiState = MonsterAiState.Spawning;
                     monster.StateTicks = 0;
@@ -205,11 +205,15 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
         IEnumerable<MonsterEntity> allMonsters)
     {
         if (!monster.HasTrackedAttackers())
+        {
             if (!TryAcquireTarget(zone, monster, legacyTicksElapsed, allMonsters, false))
             {
                 RunIdleWanderOrReturnHome(zone, monster, legacyTicksElapsed);
                 return;
             }
+
+            monster.IdleWanderElapsedTicks = 0;
+        }
 
         RunPrunedAttackerEngagement(zone, monster, allMonsters);
     }
@@ -226,10 +230,18 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
             if (DistanceSquared(resolvedX, resolvedY, resolvedZ, monster.HomeX, monster.HomeY, monster.HomeZ) >
                 ArrivalEpsilon * ArrivalEpsilon)
             {
+                monster.IdleWanderElapsedTicks = 0;
+
+                monster.HomeReturnTargetX = resolvedX;
+                monster.HomeReturnTargetY = resolvedY;
+                monster.HomeReturnTargetZ = resolvedZ;
+                monster.TargetLocationX = resolvedX;
+                monster.TargetLocationY = resolvedY;
+                monster.TargetLocationZ = resolvedZ;
+                monster.Heading = MathF.Atan2(resolvedX - monster.PosX, resolvedZ - monster.PosZ);
                 monster.AiState = MonsterAiState.ReturnToSpawn;
                 monster.StateTicks = 0;
                 monster.StateFrameAccumulator = 0f;
-                monster.IdleWanderElapsedTicks = 0;
 
                 zone.BroadcastMonsterActionChange(monster);
                 return;
@@ -363,7 +375,7 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
         }
 
         var chaseSpeed = monster.Template.RunSpeed;
-        if (chaseSpeed <= 0)
+        if (chaseSpeed <= 0 || meleeRadius <= 0)
             return;
 
         ComputeArcApproachPoint(monster, target.PosX, target.PosZ, meleeRadius, out var approachX,
@@ -378,11 +390,19 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
         }
         else
         {
-            monster.AiState = MonsterAiState.ReturnToSpawn;
-            monster.StateTicks = 0;
-            monster.StateFrameAccumulator = 0f;
-            zone.BroadcastMonsterActionChange(monster);
+            AbandonChaseAndReturnHome(zone, monster);
         }
+    }
+
+    private static void AbandonChaseAndReturnHome(Zone zone, MonsterEntity monster)
+    {
+        monster.HomeReturnTargetX = monster.HomeX;
+        monster.HomeReturnTargetY = monster.HomeY;
+        monster.HomeReturnTargetZ = monster.HomeZ;
+        monster.AiState = MonsterAiState.ReturnToSpawn;
+        monster.StateTicks = 0;
+        monster.StateFrameAccumulator = 0f;
+        zone.BroadcastMonsterActionChange(monster);
     }
 
     private void ComputeArcApproachPoint(MonsterEntity monster, float targetX, float targetZ, int meleeRadius,
@@ -399,7 +419,7 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
             return;
         }
 
-        var lateral = _random.NextInt32(meleeRadius + 1);
+        var lateral = _random.NextInt32(meleeRadius);
         var sign = _random.NextInt32(2) == 0 ? -1f : 1f;
         var ratio = Math.Clamp(lateral / distance, -1f, 1f);
         var theta = sign * MathF.Asin(ratio);
@@ -568,8 +588,7 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
 
     private static bool IsHiding(PlayerRuntimeState player)
     {
-        _ = player;
-        return false;
+        return player.VisibleState == 0;
     }
 
     private PlayerRuntimeState TryShortRangeRetarget(Zone zone, MonsterEntity monster, PlayerRuntimeState current,
@@ -578,11 +597,11 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
         if (monster.Template.AttackType is not (1 or 3 or 6))
             return current;
 
-        monster.ShortRangeRetargetThrottleTicks += legacyTicksElapsed;
-        if (monster.ShortRangeRetargetThrottleTicks < SimulationClock.MonsterDetectionThrottleLegacyTicks)
+        monster.DetectionThrottleTicks += legacyTicksElapsed;
+        if (monster.DetectionThrottleTicks < SimulationClock.MonsterDetectionThrottleLegacyTicks)
             return current;
 
-        monster.ShortRangeRetargetThrottleTicks = 0;
+        monster.DetectionThrottleTicks = 0;
 
         var shortRadius = monster.Template.RadiusInfo1;
         if (shortRadius <= 0)
@@ -666,8 +685,12 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
             return;
         }
 
-        _ = MoveToward(zone, monster, target.PosX, target.PosZ, monster.Template.RunSpeed, dt,
-            monster.Template.RadiusInfo1);
+        if (MoveToward(zone, monster, target.PosX, target.PosZ, monster.Template.RunSpeed, dt,
+                monster.Template.RadiusInfo1))
+        {
+            AbandonChaseAndReturnHome(zone, monster);
+            return;
+        }
 
         if (DistanceSquared(monster.PosX, monster.PosZ, target.PosX, target.PosZ) <= attackRadiusSq)
             CommitMeleeEngagementOrGiveUpToHeightMismatch(zone, monster, target);
@@ -687,15 +710,12 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
 
             if (monster.Template.AttackType is 1 or 2)
                 monster.AttackPacketConfirmationArmed = true;
-        }
-        else
-        {
-            monster.AiState = MonsterAiState.ReturnToSpawn;
-            monster.StateTicks = 0;
-            monster.StateFrameAccumulator = 0f;
+
+            zone.BroadcastMonsterActionChange(monster);
+            return;
         }
 
-        zone.BroadcastMonsterActionChange(monster);
+        AbandonChaseAndReturnHome(zone, monster);
     }
 
     private static bool IsZone175TypeBoss(byte specialType)

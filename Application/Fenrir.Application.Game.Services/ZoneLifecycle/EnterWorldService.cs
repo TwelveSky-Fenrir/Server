@@ -48,6 +48,8 @@ public sealed class EnterWorldService(
     IOptions<GameServerOptions> options,
     ILogger<EnterWorldService> logger) : IEnterWorldService
 {
+    private const int Zone241TimeAvatarChangeInfoSort = 14;
+
     public async ValueTask HandleAsync(EnterWorldRequest packet, ZoneClientSession zoneSession,
         CancellationToken cancellationToken)
     {
@@ -137,6 +139,53 @@ public sealed class EnterWorldService(
                 characterId, combinedLevel, character.RebirthCount, character.MapId);
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
+        }
+
+        if (WrapCheckSpecialDestinationCatalog.IsInstancedDestination(character.MapId))
+        {
+            if (character.Zone241Time < 1)
+            {
+                logger.LogWarning(
+                    "Enter-world rejected for character {CharacterId}: no Legends-of-Darkness instance ticket remaining for zone {MapId}",
+                    characterId, character.MapId);
+                zoneSession.Abort(DisconnectReason.Faulted);
+                return;
+            }
+
+            int adjustedZone241Time;
+            try
+            {
+                adjustedZone241Time = await characters.AdjustZone241TimeAsync(characterId, -1, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex,
+                    "Enter-world rejected for character {CharacterId}: Legends-of-Darkness instance-ticket adjustment failed for zone {MapId}",
+                    characterId, character.MapId);
+                zoneSession.Abort(DisconnectReason.Faulted);
+                return;
+            }
+
+            character = character with { Zone241Time = adjustedZone241Time };
+
+            if (!worldData.MonstersById.ContainsKey(PersonalDungeonBossTables.ResolveCatalogD(character.MapId)))
+            {
+                logger.LogWarning(
+                    "Enter-world rejected for character {CharacterId}: Legends-of-Darkness boss template missing for zone {MapId}",
+                    characterId, character.MapId);
+                zoneSession.Abort(DisconnectReason.Faulted);
+                return;
+            }
+
+            zoneSession.Send(new AvatarStateFlagResponse
+            {
+                ServerIndex = characterId,
+                UniqueNumber = unchecked((uint)characterId),
+                Sort = Zone241TimeAvatarChangeInfoSort,
+                Value01 = character.ContributionPoints,
+                Value02 = character.RebirthCount,
+                Value03 = adjustedZone241Time
+            });
         }
 
         async ValueTask CompleteWorldEntryAsync()
@@ -381,7 +430,16 @@ public sealed class EnterWorldService(
                 M15PetLuckyBoxPity: character.M15PetLuckyBoxPity,
                 SourceIp: SessionSourceIp.Normalize(zoneSession.RemoteEndPoint),
                 RuneSystem: runeSystem,
-                RuneSystemStat: runeSystemStat)));
+                RuneSystemStat: runeSystemStat,
+                ActionSort: packet.Action.Sort,
+                ActionSkillNumber: packet.Action.SkillNumber,
+                ActionSkillGradeNum1: packet.Action.SkillGradeNum1,
+                ActionSkillGradeNum2: packet.Action.SkillGradeNum2,
+                PetActionSort: packet.Action.PetSort,
+                PetActionFront: packet.Action.PetFront,
+                PetActionTargetLocationX: packet.Action.PetTargetLocation[0],
+                PetActionTargetLocationY: packet.Action.PetTargetLocation[1],
+                PetActionTargetLocationZ: packet.Action.PetTargetLocation[2])));
 
             if (!entered)
             {

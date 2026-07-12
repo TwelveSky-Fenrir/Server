@@ -28,7 +28,9 @@ public static class MonsterCombatResolver
         int attackerActionSkillNumber,
         int attackerActionSkillGradePoints,
         float attackerSymbolDamageDownPenalty = 0f,
-        int attackerSymbolDamageUpBonusIncrementCount = 0)
+        int attackerSymbolDamageUpBonusIncrementCount = 0,
+        bool targetCategoryEligible = true,
+        int attackerNokSanStoneDamageBonus = 0)
     {
         if (attacker.IsDead)
             return AttackOutcome.Reject(AttackRejectReason.AttackerDead);
@@ -52,6 +54,11 @@ public static class MonsterCombatResolver
                 monster.PosZ, CombatResolver.MaxAttackDistance))
             return AttackOutcome.Reject(AttackRejectReason.OutOfRange);
 
+        var chargeConsumed = attacker.ChargeBuffPercent > 0;
+
+        if (!targetCategoryEligible)
+            return AttackOutcome.Reject(AttackRejectReason.TargetCategoryIneligible, chargeConsumed);
+
         switch (request.AttackActionValue1)
         {
             case 1:
@@ -60,17 +67,15 @@ public static class MonsterCombatResolver
                 if (attackerAttackBudgetEnforced &&
                     (request.AttackActionValue2 != attackerActionSkillNumber ||
                      request.AttackActionValue3 != attackerActionSkillGradePoints))
-                    return AttackOutcome.Reject(AttackRejectReason.AntiCheatEchoMismatch);
+                    return AttackOutcome.Reject(AttackRejectReason.AntiCheatEchoMismatch, chargeConsumed);
                 break;
             default:
-                return AttackOutcome.Reject(AttackRejectReason.InvalidAttackModeSelector);
+                return AttackOutcome.Reject(AttackRejectReason.InvalidAttackModeSelector, chargeConsumed);
         }
 
         var attackSuccess = attacker.Stats.AttackSuccess;
         if (attackSuccess < 1)
-            return AttackOutcome.Reject(AttackRejectReason.AttackerHasNoAttackSuccess);
-
-        var chargeConsumed = attacker.ChargeBuffPercent > 0;
+            return AttackOutcome.Reject(AttackRejectReason.AttackerHasNoAttackSuccess, chargeConsumed);
 
         var attackBlock = monster.Template.AttackBlock;
         if (attackBlock > 0)
@@ -121,6 +126,8 @@ public static class MonsterCombatResolver
         if (attackerSymbolDamageDownPenalty > 0f && attacker.Level > MalusMinimumAttackerLevel)
             damage -= (int)(damage * attackerSymbolDamageDownPenalty);
 
+        damage += attackerNokSanStoneDamageBonus;
+
         var viewDamage = damage;
         if (damage > monster.Life)
             damage = monster.Life;
@@ -133,12 +140,23 @@ public static class MonsterCombatResolver
         MonsterEntity monster,
         CombatantSnapshot defender,
         TimeSpan zoneClock,
-        IRandomSource rng)
+        IRandomSource rng,
+        bool defenderHidden = false,
+        bool defenderPshopOpen = false,
+        bool targetCategoryEligible = true)
     {
         if (monster.Life < 1)
             return AttackOutcome.Reject(AttackRejectReason.AttackerDead);
         if (defender.IsDead)
             return AttackOutcome.Reject(AttackRejectReason.DefenderDead);
+        if (defender.IsMovingZone)
+            return AttackOutcome.Reject(AttackRejectReason.DefenderChangingZone);
+        if (defenderHidden)
+            return AttackOutcome.Reject(AttackRejectReason.DefenderHidden);
+        if (defenderPshopOpen)
+            return AttackOutcome.Reject(AttackRejectReason.DefenderShopOpen);
+        if (!targetCategoryEligible)
+            return AttackOutcome.Reject(AttackRejectReason.TargetCategoryIneligible);
         if (defender.ZoneEntryAtZoneClock is { } defenderZoneEntry &&
             zoneClock - defenderZoneEntry < CombatResolver.ProtectDuration)
             return AttackOutcome.Reject(AttackRejectReason.DefenderProtected);

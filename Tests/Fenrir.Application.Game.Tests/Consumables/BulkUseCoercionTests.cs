@@ -38,4 +38,12 @@ public class BulkUseCoercionTests
     {
         Assert.Equal(7, BulkUseCoercion.Coerce(7, 10));
     }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-3)]
+    public void Coerce_StockIsZeroOrNegative_IsRaisedBackToOne(int stackQuantity)
+    {
+        Assert.Equal(1, BulkUseCoercion.Coerce(5, stackQuantity));
+    }
 }

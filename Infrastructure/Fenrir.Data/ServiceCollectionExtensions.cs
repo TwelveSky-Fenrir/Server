@@ -30,6 +30,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using BigMoneyRepository = Fenrir.Data.Inventory.BigMoneyRepository;
 using IBigMoneyRepository = Fenrir.Data.Abstractions.Inventory.IBigMoneyRepository;
+using CharacterBigMoneyRepository = Fenrir.Data.Characters.BigMoneyRepository;
+using ICharacterBigMoneyRepository = Fenrir.Data.Abstractions.Characters.IBigMoneyRepository;
 
 namespace Fenrir.Data;
 
@@ -58,6 +60,7 @@ public static class FenrirDataServiceCollectionExtensions
 
         builder.Services
             .AddSingleton<IBigMoneyRepository, BigMoneyRepository>();
+        builder.Services.AddSingleton<ICharacterBigMoneyRepository, CharacterBigMoneyRepository>();
 
         builder.Services.AddSingleton<IRuneRepository, RuneRepository>();
 

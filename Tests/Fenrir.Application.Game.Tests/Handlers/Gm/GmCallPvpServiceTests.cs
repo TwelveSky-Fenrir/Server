@@ -194,6 +194,42 @@ public class GmCallPvpServiceTests
     }
 
     [Fact]
+    public async Task HandleAsync_CandidateMidZoneTransfer_IsSkipped_NotRelocated()
+    {
+        var (registry, zone) = GmBasicTestSupport.CreateWorld();
+        var (session, _, _) = GmBasicTestSupport.Enter(zone, CallerId, "TheGm", 1);
+        var (_, _, targetState) = GmBasicTestSupport.Enter(zone, TargetId, "Transferring", accountId: TargetAccountId);
+        targetState.IsMovingZone = true;
+        var eventLog = new FakeEventLogRepository();
+        var service = new GmCallPvpService(registry, eventLog, NullLogger<GmCallPvpService>.Instance);
+
+        await GmBasicTestSupport.RunToCompletionAsync(
+            service.HandleAsync(new GmCallPvpPayload { DuelSlot = 1, TargetName = "Transferring" },
+                GmBasicTestSupport.RequestData(), session, CancellationToken.None), zone);
+
+        Assert.Equal(100f, targetState.PosX);
+        Assert.Empty(eventLog.LoggedEvents);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ExactMatch_RelocatedCandidateHasAfkTickResetToZero()
+    {
+        var (registry, zone) = GmBasicTestSupport.CreateWorld();
+        var (session, _, _) = GmBasicTestSupport.Enter(zone, CallerId, "TheGm", 1);
+        var (_, _, targetState) =
+            GmBasicTestSupport.Enter(zone, TargetId, "Wanderer", accountId: TargetAccountId);
+        targetState.AfkTick = 42;
+        var eventLog = new FakeEventLogRepository();
+        var service = new GmCallPvpService(registry, eventLog, NullLogger<GmCallPvpService>.Instance);
+
+        await GmBasicTestSupport.RunToCompletionAsync(
+            service.HandleAsync(new GmCallPvpPayload { DuelSlot = 1, TargetName = "Wanderer" },
+                GmBasicTestSupport.RequestData(), session, CancellationToken.None), zone);
+
+        Assert.Equal(0, targetState.AfkTick);
+    }
+
+    [Fact]
     public async Task HandleAsync_CallerNameExactlyMatchesOwnRequestedTarget_NoSelfExclusion_CallerIsRelocatedToo()
     {
         var (registry, zone) = GmBasicTestSupport.CreateWorld();

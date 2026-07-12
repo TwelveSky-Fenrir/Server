@@ -6,5 +6,5 @@ public sealed partial class Zone
 
     public bool IsZone039TypeZone => options.Zone039TypeMapIds.Contains(MapId);
 
-    public bool IsDungeonServerZone => options.DungeonServerMapIds.Contains(MapId);
+    public bool IsDungeonServerZone => DungeonServerZoneCatalog.IsDungeonServer(MapId);
 }

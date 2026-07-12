@@ -112,11 +112,7 @@ public sealed partial class MonsterAiSystem
 
         monster.DetectionThrottleTicks = 0;
 
-        var wideRadius = monster.Template.RadiusInfo2;
-        if (wideRadius <= 0)
-            return;
-
-        var wideRadiusSq = (float)wideRadius * wideRadius;
+        var wideRadiusSq = (float)monster.Template.RadiusInfo2 * monster.Template.RadiusInfo2;
         var meleeRadiusSq = (float)monster.Template.RadiusInfo1 * monster.Template.RadiusInfo1;
 
         var aggro = AcquireZone175BossCandidates(zone, monster, wideRadiusSq);

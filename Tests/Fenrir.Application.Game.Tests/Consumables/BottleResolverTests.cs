@@ -109,4 +109,28 @@ public class BottleResolverTests
         Assert.Equal(BottleResolver.DrinkOutcome.Success, result.Outcome);
         Assert.Equal(4, result.NewCount);
     }
+
+    [Fact]
+    public void Drink_PetBlocksDrinking_IsRejected_EvenWithAChargedSlot()
+    {
+        var result = BottleResolver.ResolveDrink(Slots((500, 5)), 0, 0, petBlocksDrinking: true);
+
+        Assert.Equal(BottleResolver.DrinkOutcome.Rejected, result.Outcome);
+    }
+
+    [Fact]
+    public void Drink_PetBlocksDrinking_TakesPrecedenceOverAnEmptySlot()
+    {
+        var result = BottleResolver.ResolveDrink(Slots(), 0, 0, petBlocksDrinking: true);
+
+        Assert.Equal(BottleResolver.DrinkOutcome.Rejected, result.Outcome);
+    }
+
+    [Fact]
+    public void Drink_NoPetBlocking_StillSucceeds()
+    {
+        var result = BottleResolver.ResolveDrink(Slots((500, 5)), 0, 0, petBlocksDrinking: false);
+
+        Assert.Equal(BottleResolver.DrinkOutcome.Success, result.Outcome);
+    }
 }

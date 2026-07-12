@@ -206,14 +206,27 @@ public class SkillGradeAuthorityTests
     }
 
     [Fact]
-    public void GetBonusSkillValue_Term5_AmuletSort_NeverContributes_EvenWithMatchingIuCode()
+    public void GetBonusSkillValue_Term5_AppliesUnconditionally_EvenOnAmuletSort()
     {
         var packed = Pack(0, 11);
         var petItem = ItemWith(9100, 28);
 
         var result = SkillGradeAuthority.GetBonusSkillValue(1234, EquipWithPet(petItem), packed, null, 0, false);
 
-        Assert.Equal(0, result);
+        Assert.Equal(1, result);
+    }
+
+    [Fact]
+    public void GetBonusSkillValue_Terms4And5_StackAdditively_WhenIuByteSatisfiesBoth()
+    {
+        var packed = Pack(0, 11);
+        var petItem = ItemWith(8500, 28);
+
+        var result = SkillGradeAuthority.GetBonusSkillValue(103, EquipWithPet(petItem), packed, null, 0, false);
+
+        var term4 = StatCalculator.PetGradedIuBonus(8500, 28, packed, 1);
+        Assert.Equal(1, term4);
+        Assert.Equal(term4 + 1, result);
     }
 
     [Fact]

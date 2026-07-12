@@ -34,12 +34,12 @@ public static class EquipItemValidationGate
     private static readonly ImmutableArray<byte> EquipPartTagBySlot =
         [2, 3, 4, 5, 6, 7, 0, 9, 10, 11, 12, 13, 14];
 
-    private static readonly ImmutableHashSet<int> Rebirth12ClassificationCodes = [1, 2, 4, 8, 29];
+    private static readonly ImmutableHashSet<int> Rebirth12ClassificationCodes = [1, 2, 4, 8];
 
     public static Outcome Evaluate(
         EquipCandidate? item,
         int itemSortClassification,
-        byte characterTribe,
+        byte characterPreviousTribe,
         int targetEquipSlotIndex,
         int characterCombinedLevel,
         int characterRebirthCount)
@@ -48,16 +48,12 @@ public static class EquipItemValidationGate
             return Outcome.ItemNotFound;
 
         if (resolved.TribeRestriction != AnyTribeSentinel &&
-            resolved.TribeRestriction - TribeRestrictionOffset != characterTribe)
+            resolved.TribeRestriction - TribeRestrictionOffset != characterPreviousTribe)
             return Outcome.WrongTribe;
 
-        if (targetEquipSlotIndex != SkipSlotCheck)
-        {
-            if (targetEquipSlotIndex is < MinSlotIndex or > MaxSlotIndex)
-                return Outcome.WrongSlotTag;
-            if (resolved.EquipPartTag != EquipPartTagBySlot[targetEquipSlotIndex])
-                return Outcome.WrongSlotTag;
-        }
+        if (targetEquipSlotIndex is >= MinSlotIndex and <= MaxSlotIndex &&
+            resolved.EquipPartTag != EquipPartTagBySlot[targetEquipSlotIndex])
+            return Outcome.WrongSlotTag;
 
         if (resolved.LevelLimit + resolved.MartialLevelLimit > characterCombinedLevel)
             return Outcome.LevelTooLow;

@@ -8,7 +8,7 @@ public class MonsterEntityHealTests
     private static MonsterEntity CreateEntity(int life, int maxLife)
     {
         var template = WorldDataTestRows.Monster(500) with { Life = maxLife };
-        var monster = MonsterEntity.Create(1, 1u, template, 1, 0, 0, 0, 50);
+        var monster = MonsterEntity.Create(1, 1u, template, 1, 0, 0, 0);
 
         if (life != maxLife)
             monster.TakeDamage(maxLife - life, out _);

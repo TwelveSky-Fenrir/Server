@@ -70,7 +70,7 @@ public static class NpcShopPolicy
         (93385, 93405)
     ];
 
-    private static bool IsRentItem(int itemId)
+    public static bool IsRentItem(int itemId)
     {
         return itemId is >= RentItemIdStart and <= RentItemIdEndInclusive;
     }

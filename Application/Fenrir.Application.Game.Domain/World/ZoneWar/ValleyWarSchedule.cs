@@ -185,13 +185,15 @@ public sealed class ValleyWarSchedule
             allSessionsShouldDisconnect);
     }
 
-    public void RegisterMonsterKill(byte tribeId)
+    public bool RegisterMonsterKill(byte tribeId)
     {
         if (Phase != ValleyWarPhase.KillRace || tribeId >= TribeCount)
-            return;
+            return false;
 
         if (_killRaceQuota[tribeId] > 0)
             _killRaceQuota[tribeId]--;
+
+        return true;
     }
 
     public void ForceZeroTribeQuota(byte tribeId)

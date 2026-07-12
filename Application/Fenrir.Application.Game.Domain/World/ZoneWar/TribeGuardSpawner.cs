@@ -37,8 +37,6 @@ public sealed class TribeGuardSpawner(
 
     private const int FullEvaluationCadenceLegacyTicks = 20;
 
-    private const float GuardLeashRadius = 15f;
-
     private const int OrdinaryPoolServerIndexBase = 1_000_000;
     private const int Zone038WinnerPoolServerIndexBase = 1_001_000;
 
@@ -193,7 +191,7 @@ public sealed class TribeGuardSpawner(
     private static void SpawnGuard(Zone zone, int serverIndex, GuardSlotCoordinate slot, MonsterRowDto template)
     {
         var entity = MonsterEntity.Create(serverIndex, zone.NextMonsterUniqueNumber(), template, serverIndex,
-            slot.X, slot.Y, slot.Z, GuardLeashRadius);
+            slot.X, slot.Y, slot.Z);
         zone.SpawnMonster(entity);
     }
 }

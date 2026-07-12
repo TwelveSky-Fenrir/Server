@@ -37,6 +37,19 @@ public sealed class UseInventoryItemHandler(IUseInventoryItemService service, IL
         var page = packet.Page;
         var index = packet.Index;
 
+        var now = DateTime.UtcNow;
+        if (now - state.LastItemUseUtc < SimulationClock.LegacyTick)
+        {
+            logger.LogDebug(
+                "Session {SessionId} character {CharacterId}: UseInventoryItemRequest rejected, anti-flood gate ({Page}:{Index})",
+                zoneSession.SessionId, characterId, page, index);
+            session.Send(new UseInventoryItemResponse
+                { Result = 1, Page = page, Index = index, Value = packet.Value, Value2 = 0 });
+            return;
+        }
+
+        state.LastItemUseUtc = now;
+
         if (page is not (ContainerMatrix.InventoryPage0 or ContainerMatrix.InventoryPage1) ||
             !ContainerMatrix.IsValidSlot((byte)page, index))
         {
@@ -47,25 +60,27 @@ public sealed class UseInventoryItemHandler(IUseInventoryItemService service, IL
             return;
         }
 
-        var now = DateTime.UtcNow;
-        if (now - state.LastItemUseUtc < SimulationClock.LegacyTick)
+        if (page == ContainerMatrix.InventoryPage1 && state.InventoryDate < GameDate.Today())
         {
-            logger.LogDebug(
-                "Session {SessionId} character {CharacterId}: UseInventoryItemRequest rejected, anti-flood gate ({Page}:{Index})",
-                zoneSession.SessionId, characterId, page, index);
-            session.Send(new UseInventoryItemResponse
-                { Result = 1, Page = page, Index = index, Value = 0, Value2 = 0 });
+            logger.LogInformation(
+                "Session {SessionId} character {CharacterId}: UseInventoryItemRequest aborted, dated-vault page expired (InventoryDate {InventoryDate})",
+                zoneSession.SessionId, characterId, state.InventoryDate);
+            zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
-
-        state.LastItemUseUtc = now;
 
         await state.EconomyActionLock.WaitAsync(cancellationToken);
         try
         {
             var response = await service.ResolveAsync(zone, state, characterId, accountId, (byte)page, (byte)index,
                 packet.Value, cancellationToken);
-            session.Send(response);
+            if (response is null)
+            {
+                zoneSession.Abort(DisconnectReason.Faulted);
+                return;
+            }
+
+            session.Send(response.Value);
         }
         finally
         {

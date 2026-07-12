@@ -171,15 +171,14 @@ public class TribeSymbolSpawnerTests
     }
 
     [Fact]
-    public void SmallestTribe_SpawningItsOwnSymbol_GetsDoubleHealth()
+    public void SmallestTribeByPersistentPoints_SpawningItsOwnSymbol_GetsDoubleHealth()
     {
         var cache = CacheWithAllFiveSymbols();
         var catalog = CatalogWith(0, 0, 5);
         var worldState = CreateWorldState();
+        SetTribePoints(worldState, tribe0: 0, tribe1: 100, tribe2: 100, tribe3: 100);
         var spawner = new TribeSymbolSpawner(cache, catalog, worldState);
         var zone = CreateZone(5, cache);
-
-        EnterPlayers(zone, [1, 2, 2, 2]);
 
         spawner.EvaluateNow(zone);
 
@@ -188,20 +187,45 @@ public class TribeSymbolSpawnerTests
     }
 
     [Fact]
-    public void NotTheSmallestTribe_SpawningItsOwnSymbol_GetsNormalHealth()
+    public void NotTheSmallestTribeByPersistentPoints_SpawningItsOwnSymbol_GetsNormalHealth()
     {
         var cache = CacheWithAllFiveSymbols();
         var catalog = CatalogWith(0, 0, 5);
         var worldState = CreateWorldState();
+        SetTribePoints(worldState, tribe0: 100, tribe1: 10, tribe2: 50, tribe3: 50);
         var spawner = new TribeSymbolSpawner(cache, catalog, worldState);
         var zone = CreateZone(5, cache);
-
-        EnterPlayers(zone, [2, 1, 2, 2]);
 
         spawner.EvaluateNow(zone);
 
         Assert.Equal(1, zone.MonsterCount);
         Assert.Equal(100, zone.MonstersSnapshot.Single().MaxLife);
+    }
+
+    [Fact]
+    public void SmallestTribeByPersistentPoints_IsUnaffectedByLiveZonePopulation()
+    {
+        var cache = CacheWithAllFiveSymbols();
+        var catalog = CatalogWith(0, 0, 5);
+        var worldState = CreateWorldState();
+        SetTribePoints(worldState, tribe0: 999, tribe1: 10, tribe2: 50, tribe3: 50);
+        var spawner = new TribeSymbolSpawner(cache, catalog, worldState);
+        var zone = CreateZone(5, cache);
+
+        EnterPlayers(zone, [0, 5, 5, 5]);
+
+        spawner.EvaluateNow(zone);
+
+        Assert.Equal(1, zone.MonsterCount);
+        Assert.Equal(100, zone.MonstersSnapshot.Single().MaxLife);
+    }
+
+    private static void SetTribePoints(WorldStateService worldState, int tribe0, int tribe1, int tribe2, int tribe3)
+    {
+        worldState.SetTribePoints(0, tribe0);
+        worldState.SetTribePoints(1, tribe1);
+        worldState.SetTribePoints(2, tribe2);
+        worldState.SetTribePoints(3, tribe3);
     }
 
     private static void EnterPlayers(Zone zone, int[] tribeCounts)

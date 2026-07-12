@@ -57,6 +57,8 @@ public class ZoneTransferCancelServiceTests
     public async Task Pending_ClearsTheFlag_ClearsTheSessionCrossShardFlag_AndRefreshesTheShardLocation()
     {
         var (service, session, zone, shardLocations) = CreateService(markPending: true);
+        Assert.True(zone.TryGetPlayer(CharacterId, out var pendingState));
+        var registeredAtBeforeCancel = pendingState!.ZoneTransferRegisteredAtUtc;
 
         await service.HandleAsync(session, CancellationToken.None);
 
@@ -68,13 +70,16 @@ public class ZoneTransferCancelServiceTests
         Assert.False(state!.IsMovingZone);
         Assert.Single(shardLocations.UpsertCalls);
         Assert.Equal((CharacterId, ShardId, MapId, "Hero", (byte)1), shardLocations.UpsertCalls[0]);
+        Assert.True(state.ZoneTransferRegisteredAtUtc >= registeredAtBeforeCancel);
     }
 
     [Fact]
-    public async Task Pending_BrokerRefreshThrows_AbortsSessionWithProcessingFault()
+    public async Task Pending_BrokerRefreshThrows_AbortsSessionWithProcessingFault_AndNeverRefreshesTheTimestamp()
     {
         var (service, session, zone, shardLocations) = CreateService(markPending: true);
         shardLocations.ThrowOnUpsert = true;
+        Assert.True(zone.TryGetPlayer(CharacterId, out var pendingState));
+        var registeredAtBeforeCancel = pendingState!.ZoneTransferRegisteredAtUtc;
 
         await service.HandleAsync(session, CancellationToken.None);
 
@@ -83,5 +88,6 @@ public class ZoneTransferCancelServiceTests
         Assert.Equal(DisconnectReason.ProcessingFault, session.DisconnectReason);
         Assert.True(zone.TryGetPlayer(CharacterId, out var state));
         Assert.False(state!.IsMovingZone);
+        Assert.Equal(registeredAtBeforeCancel, state.ZoneTransferRegisteredAtUtc);
     }
 }

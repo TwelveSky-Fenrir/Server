@@ -66,6 +66,7 @@ public readonly record struct TribeProgressZoneCommand(
     byte? PreviousTribe = null,
     (float X, float Y, float Z)? TeleportTo = null,
     bool NeighborActionBroadcast = false,
+    bool ResetAfkTick = false,
     short? Level = null,
     short? Level2 = null,
     long? Experience = null,

@@ -20,7 +20,7 @@ public class TribeGuardForceResetSweepTests
     {
         var template = WorldDataTestRows.Monster(900) with { Type = 5, SpecialType = 7, Life = 100 };
         var entity = MonsterEntity.Create(serverIndex, zone.NextMonsterUniqueNumber(), template, serverIndex,
-            10f, 0f, 20f, 15f);
+            10f, 0f, 20f);
         zone.SpawnMonster(entity);
     }
 

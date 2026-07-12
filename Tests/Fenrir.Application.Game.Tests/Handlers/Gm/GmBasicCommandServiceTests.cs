@@ -1,6 +1,8 @@
 using System.Buffers.Binary;
 using System.Collections.Frozen;
 using Fenrir.Application.Game.Domain.Progression;
+using Fenrir.Application.Game.Domain.Social.Duel;
+using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Monsters;
 using Fenrir.Application.Game.GameData;
@@ -8,6 +10,7 @@ using Fenrir.Application.Game.Services.Gm;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.Abstractions.Game;
+using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Data.Abstractions.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
@@ -128,7 +131,7 @@ public class GmBasicVisibilityServiceTests
         var (registry, zone) = GmBasicTestSupport.CreateWorld();
         var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CharacterId, "NotAGm");
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData();
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -145,7 +148,7 @@ public class GmBasicVisibilityServiceTests
         var (registry, zone) = GmBasicTestSupport.CreateWorld();
         var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CharacterId, "TheGm", 1);
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData();
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -165,7 +168,7 @@ public class GmBasicVisibilityServiceTests
         var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CharacterId, "TheGm", 1);
         state.VisibleState = 0;
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData();
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -190,7 +193,7 @@ public class GmBasicSelfTeleportServiceTests
         var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CharacterId, "NotAGm");
         var originalX = state.PosX;
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d =>
             new GmMoveCoordinatePayload { Location = [500f, 1f, 500f] }.Write(d));
 
@@ -208,7 +211,7 @@ public class GmBasicSelfTeleportServiceTests
         var (registry, zone) = GmBasicTestSupport.CreateWorld();
         var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CharacterId, "TheGm", 1);
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d =>
             new GmMoveCoordinatePayload { Location = [500f, 1f, 700f] }.Write(d));
 
@@ -224,6 +227,54 @@ public class GmBasicSelfTeleportServiceTests
     }
 }
 
+public class GmBasicMoveToPositionServiceTests
+{
+    private const int CharacterId = 10;
+    private const int GmDataTag = 2;
+
+    [Fact]
+    public async Task HandleMoveToPositionAsync_CallerNotBasicTier_AbortsWithNoReply_AndLeavesPositionUnchanged()
+    {
+        var (registry, zone) = GmBasicTestSupport.CreateWorld();
+        var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CharacterId, "NotAGm");
+        var originalX = state.PosX;
+        var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
+        var data = GmBasicTestSupport.RequestData(d =>
+            new GmMoveCoordinatePayload { Location = [500f, 1f, 500f] }.Write(d));
+
+        await GmBasicTestSupport.RunToCompletionAsync(
+            service.HandleMoveToPositionAsync(data, session, state, zone, CancellationToken.None), zone);
+
+        Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);
+        PacketAssert.AssertNothingSent(pipe);
+        Assert.Equal(originalX, state.PosX);
+    }
+
+    [Fact]
+    public async Task
+        HandleMoveToPositionAsync_BasicTier_OverwritesPositionUnconditionally_AndEchoesCoordinateAsSoleReply()
+    {
+        var (registry, zone) = GmBasicTestSupport.CreateWorld();
+        var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CharacterId, "TheGm", 1);
+        var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
+        var data = GmBasicTestSupport.RequestData(d =>
+            new GmMoveCoordinatePayload { Location = [500f, 1f, 700f] }.Write(d));
+
+        await GmBasicTestSupport.RunToCompletionAsync(
+            service.HandleMoveToPositionAsync(data, session, state, zone, CancellationToken.None), zone);
+
+        Assert.Null(session.DisconnectReason);
+        Assert.Equal(500f, state.PosX);
+        Assert.Equal(1f, state.PosY);
+        Assert.Equal(700f, state.PosZ);
+        await PacketAssert.AssertSentAsync(pipe,
+            new GmCommandResponse
+                { Sort = GmDataTag, GmData = GmBasicTestSupport.PackedCoordinateGmData(500f, 1f, 700f) });
+    }
+}
+
 public class GmBasicForceKillMonsterServiceTests
 {
     private const int SessionId = 10;
@@ -233,7 +284,7 @@ public class GmBasicForceKillMonsterServiceTests
     private static MonsterEntity SpawnMonster(Zone zone, int serverIndex, int life)
     {
         var template = WorldDataTestRows.Monster(900) with { Life = life };
-        var monster = MonsterEntity.Create(serverIndex, 1u, template, serverIndex, 0f, 0f, 0f, 100f);
+        var monster = MonsterEntity.Create(serverIndex, 1u, template, serverIndex, 0f, 0f, 0f);
         zone.SpawnMonster(monster);
         return monster;
     }
@@ -254,7 +305,7 @@ public class GmBasicForceKillMonsterServiceTests
         var (session, pipe) = CreateSession(0);
         var eventLog = new FakeEventLogRepository();
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), eventLog,
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d =>
             new GmMonsterInstanceIndexPayload { MonsterIndex = MonsterServerIndex }.Write(d));
 
@@ -274,7 +325,7 @@ public class GmBasicForceKillMonsterServiceTests
         var (session, pipe) = CreateSession(1);
         var eventLog = new FakeEventLogRepository();
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), eventLog,
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d =>
             new GmMonsterInstanceIndexPayload { MonsterIndex = 3000 }.Write(d));
 
@@ -293,7 +344,7 @@ public class GmBasicForceKillMonsterServiceTests
         var (session, pipe) = CreateSession(1);
         var eventLog = new FakeEventLogRepository();
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), eventLog,
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d =>
             new GmMonsterInstanceIndexPayload { MonsterIndex = MonsterServerIndex }.Write(d));
 
@@ -312,7 +363,7 @@ public class GmBasicForceKillMonsterServiceTests
         var (session, pipe) = CreateSession(1);
         var eventLog = new FakeEventLogRepository();
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), eventLog,
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d =>
             new GmMonsterInstanceIndexPayload { MonsterIndex = MonsterServerIndex }.Write(d));
 
@@ -353,7 +404,7 @@ public class GmBasicTribeChangeServiceTests
     {
         var (registry, zone, session, pipe, state) = SetUp(0);
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d => new GmTribeChangePayload { Tribe = 2 }.Write(d));
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -372,7 +423,7 @@ public class GmBasicTribeChangeServiceTests
     {
         var (registry, zone, session, pipe, state) = SetUp(1);
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d => new GmTribeChangePayload { Tribe = selector }.Write(d));
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -388,7 +439,7 @@ public class GmBasicTribeChangeServiceTests
     {
         var (registry, zone, session, pipe, state) = SetUp(1);
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d => new GmTribeChangePayload { Tribe = 2 }.Write(d));
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -406,7 +457,7 @@ public class GmBasicTribeChangeServiceTests
         var (registry, zone, session, pipe, state) = SetUp(1);
         Assert.Equal((byte)0, state.PreviousTribe);
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d => new GmTribeChangePayload { Tribe = 3 }.Write(d));
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -431,7 +482,7 @@ public class GmBasicSelfSpecialStateServiceTests
         var (registry, zone) = GmBasicTestSupport.CreateWorld();
         var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CharacterId, "NotAGm");
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData();
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -448,7 +499,7 @@ public class GmBasicSelfSpecialStateServiceTests
         var (registry, zone) = GmBasicTestSupport.CreateWorld();
         var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CharacterId, "TheGm", 1);
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData();
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -466,7 +517,7 @@ public class GmBasicSelfSpecialStateServiceTests
         var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CharacterId, "TheGm", 1);
         state.SpecialState = 1;
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData();
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -492,7 +543,7 @@ public class GmBasicFindServiceTests
         var (registry, zone) = GmBasicTestSupport.CreateWorld();
         var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CallerId, "NotAGm");
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d => new GmTargetNamePayload { TargetName = "Anyone" }.Write(d));
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -512,7 +563,7 @@ public class GmBasicFindServiceTests
         var (session, pipe, state) = GmBasicTestSupport.Enter(callerZone, CallerId, "TheGm", 1);
         GmBasicTestSupport.Enter(targetZone, TargetId, "Wanderer");
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d => new GmTargetNamePayload { TargetName = "Wanderer" }.Write(d));
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -524,17 +575,15 @@ public class GmBasicFindServiceTests
             new GenericActionResponse { Result = 0, Sort = Sort, Data = data, RuneValue = 0 });
     }
 
-    [Theory]
-    [InlineData("NobodyHome")]
-    [InlineData("TheGm")]
-    public async Task HandleFindAsync_TargetNotFoundOrSelf_ReportsZeroFilledGmData_ButStillAcksSuccess(
-        string targetName)
+    [Fact]
+    public async Task HandleFindAsync_TargetNotFoundAnywhere_ReportsZeroFilledGmData_ButStillAcksSuccess()
     {
         var (registry, zone) = GmBasicTestSupport.CreateWorld();
         var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CallerId, "TheGm", 1);
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
-            NullLogger<GmBasicCommandService>.Instance);
-        var data = GmBasicTestSupport.RequestData(d => new GmTargetNamePayload { TargetName = targetName }.Write(d));
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
+        var data =
+            GmBasicTestSupport.RequestData(d => new GmTargetNamePayload { TargetName = "NobodyHome" }.Write(d));
 
         await GmBasicTestSupport.RunToCompletionAsync(
             service.HandleFindAsync(data, session, state, CancellationToken.None), zone);
@@ -542,6 +591,67 @@ public class GmBasicFindServiceTests
         Assert.Null(session.DisconnectReason);
         await GmBasicTestSupport.AssertExactSequenceAsync(pipe,
             new GmCommandResponse { Sort = GmDataTag, GmData = GmBasicTestSupport.ZeroGmData() },
+            new GenericActionResponse { Result = 0, Sort = Sort, Data = data, RuneValue = 0 });
+    }
+
+    [Fact]
+    public async Task HandleFindAsync_TargetIsSelf_HasNoSelfExclusion_ReportsOwnCurrentZone()
+    {
+        var (registry, zone) = GmBasicTestSupport.CreateWorld();
+        var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CallerId, "TheGm", 1);
+        var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
+        var data = GmBasicTestSupport.RequestData(d => new GmTargetNamePayload { TargetName = "TheGm" }.Write(d));
+
+        await GmBasicTestSupport.RunToCompletionAsync(
+            service.HandleFindAsync(data, session, state, CancellationToken.None), zone);
+
+        Assert.Null(session.DisconnectReason);
+        await GmBasicTestSupport.AssertExactSequenceAsync(pipe,
+            new GmCommandResponse
+                { Sort = GmDataTag, GmData = GmBasicTestSupport.MapIdGmData(GmBasicTestSupport.MapId) },
+            new GenericActionResponse { Result = 0, Sort = Sort, Data = data, RuneValue = 0 });
+    }
+
+    [Fact]
+    public async Task HandleFindAsync_TargetNotOnThisShard_FallsBackToCharacterShardLocationRepository_ReportsRemoteMapId()
+    {
+        var (registry, zone) = GmBasicTestSupport.CreateWorld();
+        var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CallerId, "TheGm", 1);
+        var shardLocations = new FakeCharacterShardLocationRepository();
+        shardLocations.Seed(new CharacterShardLocationDto(TargetId, 2, 77, "Roamer", 1, DateTime.UtcNow));
+        var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
+            shardLocations, new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
+        var data = GmBasicTestSupport.RequestData(d => new GmTargetNamePayload { TargetName = "Roamer" }.Write(d));
+
+        await GmBasicTestSupport.RunToCompletionAsync(
+            service.HandleFindAsync(data, session, state, CancellationToken.None), zone);
+
+        Assert.Null(session.DisconnectReason);
+        await GmBasicTestSupport.AssertExactSequenceAsync(pipe,
+            new GmCommandResponse { Sort = GmDataTag, GmData = GmBasicTestSupport.MapIdGmData(77) },
+            new GenericActionResponse { Result = 0, Sort = Sort, Data = data, RuneValue = 0 });
+    }
+
+    [Fact]
+    public async Task HandleFindAsync_LocalMatchTakesPriorityOverCharacterShardLocationRepository()
+    {
+        var (registry, zone) = GmBasicTestSupport.CreateWorld();
+        var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CallerId, "TheGm", 1);
+        GmBasicTestSupport.Enter(zone, TargetId, "Wanderer");
+        var shardLocations = new FakeCharacterShardLocationRepository();
+        shardLocations.Seed(new CharacterShardLocationDto(TargetId, 9, 999, "Wanderer", 1, DateTime.UtcNow));
+        var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
+            shardLocations, new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
+        var data = GmBasicTestSupport.RequestData(d => new GmTargetNamePayload { TargetName = "Wanderer" }.Write(d));
+
+        await GmBasicTestSupport.RunToCompletionAsync(
+            service.HandleFindAsync(data, session, state, CancellationToken.None), zone);
+
+        Assert.Null(session.DisconnectReason);
+        await GmBasicTestSupport.AssertExactSequenceAsync(pipe,
+            new GmCommandResponse
+                { Sort = GmDataTag, GmData = GmBasicTestSupport.MapIdGmData(GmBasicTestSupport.MapId) },
             new GenericActionResponse { Result = 0, Sort = Sort, Data = data, RuneValue = 0 });
     }
 
@@ -555,7 +665,7 @@ public class GmBasicFindServiceTests
         var (session, pipe, state) = GmBasicTestSupport.Enter(callerZone, CallerId, "TheGm", 1);
         GmBasicTestSupport.Enter(targetZone, TargetId, "Wanderer");
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d => new GmTargetNamePayload { TargetName = "Wanderer" }.Write(d));
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -583,11 +693,11 @@ public class GmBasicCallServiceTests
         var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CallerId, "NotAGm");
         var eventLog = new FakeEventLogRepository();
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), eventLog,
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d => new GmTargetNamePayload { TargetName = "Anyone" }.Write(d));
 
         await GmBasicTestSupport.RunToCompletionAsync(
-            service.HandleCallAsync(data, session, state, CancellationToken.None), zone);
+            service.HandleCallAsync(data, session, state, zone, CancellationToken.None), zone);
 
         Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);
         PacketAssert.AssertNothingSent(pipe);
@@ -603,11 +713,11 @@ public class GmBasicCallServiceTests
         var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CallerId, "TheGm", 1);
         var eventLog = new FakeEventLogRepository();
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), eventLog,
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d => new GmTargetNamePayload { TargetName = targetName }.Write(d));
 
         await GmBasicTestSupport.RunToCompletionAsync(
-            service.HandleCallAsync(data, session, state, CancellationToken.None), zone);
+            service.HandleCallAsync(data, session, state, zone, CancellationToken.None), zone);
 
         Assert.Empty(eventLog.LoggedEvents);
         await PacketAssert.AssertSentAsync(pipe,
@@ -629,11 +739,11 @@ public class GmBasicCallServiceTests
         ZoneTestKit.DrainOutbound(targetPipe);
         var eventLog = new FakeEventLogRepository();
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), eventLog,
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d => new GmTargetNamePayload { TargetName = "Wanderer" }.Write(d));
 
         await GmBasicTestSupport.RunToCompletionAsync(
-            service.HandleCallAsync(data, caller, callerState, CancellationToken.None), zone);
+            service.HandleCallAsync(data, caller, callerState, zone, CancellationToken.None), zone);
 
         Assert.Equal(555f, targetState.PosX);
         Assert.Equal(2f, targetState.PosY);
@@ -657,6 +767,167 @@ public class GmBasicCallServiceTests
     }
 }
 
+public class GmBasicCallZone124PartyPullServiceTests
+{
+    private const short Zone124MapId = 124;
+    private const int CallerId = 10;
+    private const int LeaderId = 20;
+    private const int LeaderAccountId = 200;
+    private const int MemberId = 21;
+    private const int Sort = 514;
+    private const int GmDataTag = 2;
+
+    private static (ZoneRegistry Registry, Zone Zone, PartyRegistry Parties, DuelRegistry Duels) CreateZone124World()
+    {
+        var parties = new PartyRegistry();
+        var duels = new DuelRegistry();
+        var registry = ZoneTestKit.CreateRegistry(worldData: ZoneTestKit.EmptyWorldData(), partyRegistry: parties,
+            duelRegistry: duels);
+        registry.Initialize([Zone124MapId]);
+        return (registry, registry[Zone124MapId], parties, duels);
+    }
+
+    [Fact]
+    public async Task
+        HandleCallAsync_Zone124_SoloTarget_PullsOnlyTarget_ClearsDuelState_ResetsConsumables_NoBroadcastToBystander()
+    {
+        var (registry, zone, parties, duels) = CreateZone124World();
+        var (caller, callerPipe, callerState) = GmBasicTestSupport.Enter(zone, CallerId, "TheGm", 1);
+        callerState.PosX = 555f;
+        callerState.PosY = 2f;
+        callerState.PosZ = 777f;
+        var (_, targetPipe, targetState) =
+            GmBasicTestSupport.Enter(zone, LeaderId, "Wanderer", accountId: LeaderAccountId);
+        var (_, bystanderPipe, _) = GmBasicTestSupport.Enter(zone, MemberId, "Idle");
+        targetState.CanUseConsumables = false;
+
+        Assert.Equal(DuelAskOutcome.Sent, duels.TryAsk(LeaderId, 999, true));
+        Assert.True(duels.TryAnswer(999, true, out _));
+        Assert.True(duels.TryStart(LeaderId, out _));
+        Assert.True(duels.IsActivelyDueling(LeaderId));
+
+        ZoneTestKit.DrainOutbound(callerPipe);
+        ZoneTestKit.DrainOutbound(targetPipe);
+        ZoneTestKit.DrainOutbound(bystanderPipe);
+
+        var eventLog = new FakeEventLogRepository();
+        var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), eventLog,
+            new FakeCharacterShardLocationRepository(), parties, NullLogger<GmBasicCommandService>.Instance);
+        var data = GmBasicTestSupport.RequestData(d => new GmTargetNamePayload { TargetName = "Wanderer" }.Write(d));
+
+        await GmBasicTestSupport.RunToCompletionAsync(
+            service.HandleCallAsync(data, caller, callerState, zone, CancellationToken.None), zone);
+
+        Assert.Equal(555f, targetState.PosX);
+        Assert.Equal(2f, targetState.PosY);
+        Assert.Equal(777f, targetState.PosZ);
+        Assert.True(targetState.CanUseConsumables);
+        Assert.False(duels.IsActivelyDueling(LeaderId));
+
+        await PacketAssert.AssertSentAsync(targetPipe,
+            new GmCommandResponse
+                { Sort = GmDataTag, GmData = GmBasicTestSupport.PackedCoordinateGmData(555f, 2f, 777f) });
+        await GmBasicTestSupport.AssertTailFrameAsync(callerPipe,
+            new GenericActionResponse { Result = 0, Sort = Sort, Data = data, RuneValue = 0 });
+        PacketAssert.AssertNothingSent(bystanderPipe);
+
+        var logged = Assert.Single(eventLog.LoggedEvents);
+        Assert.Equal((short)8, logged.EventCode);
+        Assert.Equal(EventLogCategory.GmAction, logged.Category);
+        Assert.Equal(LeaderAccountId, logged.TargetAccountId);
+        Assert.Equal(LeaderId, logged.TargetCharacterId);
+    }
+
+    [Fact]
+    public async Task HandleCallAsync_Zone124_PartiedTarget_PullsEveryMatchingPartyMember_ExcludesBystander()
+    {
+        var (registry, zone, parties, _) = CreateZone124World();
+        var (caller, callerPipe, callerState) = GmBasicTestSupport.Enter(zone, CallerId, "TheGm", 1);
+        callerState.PosX = 300f;
+        callerState.PosY = 5f;
+        callerState.PosZ = 400f;
+        var (_, leaderPipe, leaderState) = GmBasicTestSupport.Enter(zone, LeaderId, "Leader");
+        var (_, memberPipe, memberState) = GmBasicTestSupport.Enter(zone, MemberId, "Wanderer");
+        const int bystanderId = 30;
+        var (_, bystanderPipe, bystanderState) = GmBasicTestSupport.Enter(zone, bystanderId, "Idle");
+
+        Assert.Equal(PartyInviteOutcome.Sent, parties.TryInvite(LeaderId, 1, 1, MemberId, 1, 1));
+        Assert.True(parties.TryAnswer(MemberId, true, false, out _, out _, out _));
+
+        ZoneTestKit.DrainOutbound(callerPipe);
+        ZoneTestKit.DrainOutbound(leaderPipe);
+        ZoneTestKit.DrainOutbound(memberPipe);
+        ZoneTestKit.DrainOutbound(bystanderPipe);
+
+        var eventLog = new FakeEventLogRepository();
+        var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), eventLog,
+            new FakeCharacterShardLocationRepository(), parties, NullLogger<GmBasicCommandService>.Instance);
+        var data = GmBasicTestSupport.RequestData(d => new GmTargetNamePayload { TargetName = "Wanderer" }.Write(d));
+
+        await GmBasicTestSupport.RunToCompletionAsync(
+            service.HandleCallAsync(data, caller, callerState, zone, CancellationToken.None), zone);
+
+        Assert.Equal(300f, leaderState.PosX);
+        Assert.Equal(400f, leaderState.PosZ);
+        Assert.Equal(300f, memberState.PosX);
+        Assert.Equal(400f, memberState.PosZ);
+        Assert.Equal(100f, bystanderState.PosX);
+
+        await PacketAssert.AssertSentAsync(leaderPipe,
+            new GmCommandResponse
+                { Sort = GmDataTag, GmData = GmBasicTestSupport.PackedCoordinateGmData(300f, 5f, 400f) });
+        await PacketAssert.AssertSentAsync(memberPipe,
+            new GmCommandResponse
+                { Sort = GmDataTag, GmData = GmBasicTestSupport.PackedCoordinateGmData(300f, 5f, 400f) });
+        PacketAssert.AssertNothingSent(bystanderPipe);
+        await GmBasicTestSupport.AssertTailFrameAsync(callerPipe,
+            new GenericActionResponse { Result = 0, Sort = Sort, Data = data, RuneValue = 0 });
+
+        Assert.Equal(2, eventLog.LoggedEvents.Count);
+        Assert.Contains(eventLog.LoggedEvents, e => e.TargetCharacterId == LeaderId);
+        Assert.Contains(eventLog.LoggedEvents, e => e.TargetCharacterId == MemberId);
+    }
+
+    [Fact]
+    public async Task HandleCallAsync_Zone124_ResolvedTargetItselfMidZoneTransfer_IsSkippedButOtherMemberStillPulled()
+    {
+        var (registry, zone, parties, _) = CreateZone124World();
+        var (caller, callerPipe, callerState) = GmBasicTestSupport.Enter(zone, CallerId, "TheGm", 1);
+        callerState.PosX = 300f;
+        callerState.PosY = 5f;
+        callerState.PosZ = 400f;
+        var (_, leaderPipe, leaderState) = GmBasicTestSupport.Enter(zone, LeaderId, "Leader");
+        var (_, memberPipe, memberState) = GmBasicTestSupport.Enter(zone, MemberId, "Wanderer");
+        var originalMemberX = memberState.PosX;
+
+        Assert.Equal(PartyInviteOutcome.Sent, parties.TryInvite(LeaderId, 1, 1, MemberId, 1, 1));
+        Assert.True(parties.TryAnswer(MemberId, true, false, out _, out _, out _));
+        memberState.IsMovingZone = true;
+
+        ZoneTestKit.DrainOutbound(callerPipe);
+        ZoneTestKit.DrainOutbound(leaderPipe);
+        ZoneTestKit.DrainOutbound(memberPipe);
+
+        var eventLog = new FakeEventLogRepository();
+        var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), eventLog,
+            new FakeCharacterShardLocationRepository(), parties, NullLogger<GmBasicCommandService>.Instance);
+        var data = GmBasicTestSupport.RequestData(d => new GmTargetNamePayload { TargetName = "Wanderer" }.Write(d));
+
+        await GmBasicTestSupport.RunToCompletionAsync(
+            service.HandleCallAsync(data, caller, callerState, zone, CancellationToken.None), zone);
+
+        Assert.Equal(300f, leaderState.PosX);
+        Assert.Equal(originalMemberX, memberState.PosX);
+        PacketAssert.AssertNothingSent(memberPipe);
+        await PacketAssert.AssertSentAsync(leaderPipe,
+            new GmCommandResponse
+                { Sort = GmDataTag, GmData = GmBasicTestSupport.PackedCoordinateGmData(300f, 5f, 400f) });
+
+        var logged = Assert.Single(eventLog.LoggedEvents);
+        Assert.Equal(LeaderId, logged.TargetCharacterId);
+    }
+}
+
 public class GmBasicMoveToTargetServiceTests
 {
     private const int CallerId = 10;
@@ -671,7 +942,7 @@ public class GmBasicMoveToTargetServiceTests
         var (registry, zone) = GmBasicTestSupport.CreateWorld();
         var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CallerId, "NotAGm");
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d => new GmTargetNamePayload { TargetName = "Anyone" }.Write(d));
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -684,22 +955,21 @@ public class GmBasicMoveToTargetServiceTests
     [Theory]
     [InlineData("NobodyHome")]
     [InlineData("TheGm")]
-    public async Task HandleMoveToTargetAsync_TargetNotFoundOrSelf_AcksFailure_AndLeavesPositionUnchanged(
+    public async Task HandleMoveToTargetAsync_TargetNotFoundOrSelf_SilentlyDropsAndLeavesPositionUnchanged(
         string targetName)
     {
         var (registry, zone) = GmBasicTestSupport.CreateWorld();
         var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CallerId, "TheGm", 1);
         var originalX = state.PosX;
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d => new GmTargetNamePayload { TargetName = targetName }.Write(d));
 
         await GmBasicTestSupport.RunToCompletionAsync(
             service.HandleMoveToTargetAsync(data, session, state, zone, CancellationToken.None), zone);
 
         Assert.Equal(originalX, state.PosX);
-        await PacketAssert.AssertSentAsync(pipe,
-            new GenericActionResponse { Result = 1, Sort = Sort, Data = data, RuneValue = 0 });
+        PacketAssert.AssertNothingSent(pipe);
     }
 
     [Fact]
@@ -715,7 +985,7 @@ public class GmBasicMoveToTargetServiceTests
         ZoneTestKit.DrainOutbound(callerPipe);
         ZoneTestKit.DrainOutbound(targetPipe);
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d => new GmTargetNamePayload { TargetName = "Wanderer" }.Write(d));
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -748,7 +1018,7 @@ public class GmBasicTargetSpecialStateServiceTests
         var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CallerId, "NotAGm");
         var eventLog = new FakeEventLogRepository();
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), eventLog,
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d => new GmTargetNamePayload { TargetName = "Anyone" }.Write(d));
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -768,7 +1038,7 @@ public class GmBasicTargetSpecialStateServiceTests
         var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CallerId, "TheGm", 1);
         var eventLog = new FakeEventLogRepository();
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), eventLog,
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d => new GmTargetNamePayload { TargetName = targetName }.Write(d));
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -789,7 +1059,7 @@ public class GmBasicTargetSpecialStateServiceTests
         var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CallerId, "TheGm", 1);
         var eventLog = new FakeEventLogRepository();
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), eventLog,
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d => new GmTargetNamePayload { TargetName = targetName }.Write(d));
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -812,7 +1082,7 @@ public class GmBasicTargetSpecialStateServiceTests
         ZoneTestKit.DrainOutbound(targetPipe);
         var eventLog = new FakeEventLogRepository();
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), eventLog,
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d => new GmTargetNamePayload { TargetName = "Wanderer" }.Write(d));
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -843,7 +1113,7 @@ public class GmBasicTargetSpecialStateServiceTests
         ZoneTestKit.DrainOutbound(targetPipe);
         var eventLog = new FakeEventLogRepository();
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), eventLog,
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d => new GmTargetNamePayload { TargetName = "Wanderer" }.Write(d));
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -875,7 +1145,7 @@ public class GmBasicKickServiceTests
         ZoneTestKit.DrainOutbound(targetPipe);
         var eventLog = new FakeEventLogRepository();
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), eventLog,
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d => new GmTargetNamePayload { TargetName = "Wanderer" }.Write(d));
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -896,7 +1166,7 @@ public class GmBasicKickServiceTests
         var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CallerId, "TheGm", 1);
         var eventLog = new FakeEventLogRepository();
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), eventLog,
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d => new GmTargetNamePayload { TargetName = targetName }.Write(d));
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -917,7 +1187,7 @@ public class GmBasicKickServiceTests
         ZoneTestKit.DrainOutbound(targetPipe);
         var eventLog = new FakeEventLogRepository();
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), eventLog,
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d => new GmTargetNamePayload { TargetName = "Wanderer" }.Write(d));
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -949,7 +1219,7 @@ public class GmBasicTribeBankServiceTests
         var (registry, zone) = GmBasicTestSupport.CreateWorld();
         var (session, pipe, _) = GmBasicTestSupport.Enter(zone, CharacterId, "NotAGm");
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData();
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -965,7 +1235,7 @@ public class GmBasicTribeBankServiceTests
         var (registry, zone) = GmBasicTestSupport.CreateWorld();
         var (session, pipe, _) = GmBasicTestSupport.Enter(zone, CharacterId, "TheGm", 1);
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData();
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -1002,7 +1272,7 @@ public class GmBasicLevelSetServiceTests
         var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CharacterId, "NotAGm");
         var originalLevel = state.Level;
         var service = new GmBasicCommandService(registry, worldData, new FakeEventLogRepository(),
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d => new GmLevelSetPayload { Level = BaseLevelRow }.Write(d));
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -1020,7 +1290,7 @@ public class GmBasicLevelSetServiceTests
         var (registry, zone) = GmBasicTestSupport.CreateWorld(worldData);
         var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CharacterId, "TheGm", 1);
         var service = new GmBasicCommandService(registry, worldData, new FakeEventLogRepository(),
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d => new GmLevelSetPayload { Level = BaseLevelRow }.Write(d));
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -1044,7 +1314,7 @@ public class GmBasicLevelSetServiceTests
         var (registry, zone) = GmBasicTestSupport.CreateWorld(worldData);
         var (session, _, state) = GmBasicTestSupport.Enter(zone, CharacterId, "TheGm", 1);
         var service = new GmBasicCommandService(registry, worldData, new FakeEventLogRepository(),
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d => new GmLevelSetPayload { Level = 150 }.Write(d));
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -1064,7 +1334,7 @@ public class GmBasicLevelSetServiceTests
         var (registry, zone) = GmBasicTestSupport.CreateWorld(worldData);
         var (session, _, state) = GmBasicTestSupport.Enter(zone, CharacterId, "TheGm", 1);
         var service = new GmBasicCommandService(registry, worldData, new FakeEventLogRepository(),
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d => new GmLevelSetPayload { Level = 165 }.Write(d));
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -1085,7 +1355,7 @@ public class GmBasicLevelSetServiceTests
         var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CharacterId, "TheGm", 1);
         var originalLevel = state.Level;
         var service = new GmBasicCommandService(registry, worldData, new FakeEventLogRepository(),
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData(d => new GmLevelSetPayload { Level = 170 }.Write(d));
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -1108,7 +1378,7 @@ public class GmBasicStatEditServiceTests
         var (registry, zone) = GmBasicTestSupport.CreateWorld();
         var (session, pipe, _) = GmBasicTestSupport.Enter(zone, CharacterId, "NotAGm");
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData();
 
         await GmBasicTestSupport.RunToCompletionAsync(
@@ -1124,7 +1394,7 @@ public class GmBasicStatEditServiceTests
         var (registry, zone) = GmBasicTestSupport.CreateWorld();
         var (session, pipe, _) = GmBasicTestSupport.Enter(zone, CharacterId, "TheGm", 1);
         var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
-            NullLogger<GmBasicCommandService>.Instance);
+            new FakeCharacterShardLocationRepository(), new PartyRegistry(), NullLogger<GmBasicCommandService>.Instance);
         var data = GmBasicTestSupport.RequestData();
 
         await GmBasicTestSupport.RunToCompletionAsync(

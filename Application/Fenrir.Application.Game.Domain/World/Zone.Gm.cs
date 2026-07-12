@@ -1,6 +1,10 @@
 using System.Threading.Channels;
 using Fenrir.Application.Game.Domain.Gm;
+using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Stats;
+using Fenrir.Data.WriteBehind;
+using Fenrir.Network.Serialization.Shared.Packets.Shared;
+using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.World;
@@ -11,9 +15,20 @@ public sealed partial class Zone
 
     private const long GmMaxExperience = 2_000_000_000;
 
+    private const int GmZone124PartyPullInboxCapacity = 16;
+
+    private const int GmMoveCoordinateDataTag = 2;
+
+    private const int GmMoveCoordinateDataSize = 100;
+
     private readonly Channel<GmSelfExperienceGrantZoneCommand> _gmExperienceInbox =
         Channel.CreateBounded<GmSelfExperienceGrantZoneCommand>(
             new BoundedChannelOptions(GmExperienceInboxCapacity)
+                { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+
+    private readonly Channel<GmZone124PartyPullZoneCommand> _gmZone124PartyPullInbox =
+        Channel.CreateBounded<GmZone124PartyPullZoneCommand>(
+            new BoundedChannelOptions(GmZone124PartyPullInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
     public bool PostGmSelfExperienceGrantCommand(in GmSelfExperienceGrantZoneCommand command)
@@ -106,5 +121,95 @@ public sealed partial class Zone
         var remainingCapacity = GmMaxExperience - state.Experience;
         var clampedGain = magnitude < remainingCapacity ? magnitude : (int)remainingCapacity;
         ApplyCharacterExperienceGain(state, clampedGain);
+    }
+
+    public bool PostGmZone124PartyPullCommand(in GmZone124PartyPullZoneCommand command)
+    {
+        return _gmZone124PartyPullInbox.Writer.TryWrite(command);
+    }
+
+    public async Task<IReadOnlyList<PlayerRuntimeState>> PostGmZone124PartyPullCommandAndWaitAsync(
+        GmZone124PartyPullZoneCommand command, CancellationToken ct, TimeSpan? timeout = null)
+    {
+        var applied =
+            new TaskCompletionSource<IReadOnlyList<PlayerRuntimeState>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var withSignal = command with { Applied = applied };
+
+        if (!PostGmZone124PartyPullCommand(in withSignal))
+            return [];
+
+        try
+        {
+            return await applied.Task.WaitAsync(timeout ?? TimeSpan.FromSeconds(2), ct).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            return [];
+        }
+    }
+
+    private void DrainGmZone124PartyPullCommands()
+    {
+        while (_gmZone124PartyPullInbox.Reader.TryRead(out var command))
+        {
+            try
+            {
+                var pulled = ApplyGmZone124PartyPullCommand(in command);
+                command.Applied?.TrySetResult(pulled);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Zone {MapId} GM zone-124 party pull command failed", MapId);
+                command.Applied?.TrySetException(ex);
+            }
+        }
+    }
+
+    private List<PlayerRuntimeState> ApplyGmZone124PartyPullCommand(in GmZone124PartyPullZoneCommand command)
+    {
+        var pulled = new List<PlayerRuntimeState>();
+
+        foreach (var candidate in _players.Values)
+        {
+            if (candidate.IsMovingZone)
+                continue;
+
+            var isSelectedMember = command.TargetPartyName.Length == 0
+                ? candidate.CharacterId == command.TargetCharacterId
+                : string.Equals(ResolveGmZone124CandidatePartyName(candidate), command.TargetPartyName,
+                    StringComparison.Ordinal);
+
+            if (!isSelectedMember)
+                continue;
+
+            _duelRegistry.ForceClearOnZoneEntry(candidate.CharacterId);
+            candidate.CanUseConsumables = true;
+
+            candidate.PosX = command.DestinationX;
+            candidate.PosY = command.DestinationY;
+            candidate.PosZ = command.DestinationZ;
+
+            var newCell = _grid.CellOf(candidate.PosX, candidate.PosZ);
+            _grid.Move(candidate.CharacterId, candidate.CurrentCell, newCell, candidate.PosX, candidate.PosY,
+                candidate.PosZ);
+            candidate.CurrentCell = newCell;
+
+            dirtyTracker.MarkDirty(candidate.CharacterId, DirtyFlags.Position);
+
+            var gmData = new byte[GmMoveCoordinateDataSize];
+            new GmMoveCoordinatePayload { Location = [candidate.PosX, candidate.PosY, candidate.PosZ] }
+                .Write(gmData);
+            candidate.Session.Send(new GmCommandResponse { Sort = GmMoveCoordinateDataTag, GmData = gmData });
+
+            pulled.Add(candidate);
+        }
+
+        return pulled;
+    }
+
+    private string ResolveGmZone124CandidatePartyName(PlayerRuntimeState candidate)
+    {
+        return PartyIdentityResolver.ResolveCurrentPartyName(_partyRegistry, candidate.CharacterId, candidate.Name,
+            memberId => _players.TryGetValue(memberId, out var member) ? member?.Name : null);
     }
 }

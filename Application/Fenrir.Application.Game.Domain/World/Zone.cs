@@ -49,6 +49,7 @@ public sealed partial class Zone(
     IEventLogQueue? eventLogQueue = null,
     IFourGuildKillPointQueue? fourGuildKillPointQueue = null,
     TribeSymbolCombatModifiers? tribeSymbolCombatModifiers = null,
+    Zone195NokSanState? zone195NokSanState = null,
     Lazy<IPartyResyncRelayQueue>? partyResyncRelayQueue = null) : IZoneActor
 {
     private const int InboxCapacity = 8192;
@@ -89,11 +90,15 @@ public sealed partial class Zone(
 
     private MonsterPathfinder? _pathfinder;
 
+    private long _rawLogicTick;
+
     public short MapId { get; } = mapId;
 
     public int PlayerCount => _players.Count;
 
     public IEnumerable<PlayerRuntimeState> Players => _players.Values;
+
+    public long RawLogicTick => _rawLogicTick;
 
     public float AoiCellSize => options.AoiCellSize;
 
@@ -119,6 +124,11 @@ public sealed partial class Zone(
         _monsterAiNeighborScratch.Clear();
         _grid.Neighbors(_monsterAiNeighborScratch, _grid.CellOf(x, z));
         return _monsterAiNeighborScratch;
+    }
+
+    public long AdvanceRawLogicTick()
+    {
+        return ++_rawLogicTick;
     }
 
     public List<MonsterAggroCandidate> BorrowBossAggroScratch()
@@ -194,6 +204,7 @@ public sealed partial class Zone(
         DrainGuildCommands();
         DrainTribeProgressCommands();
         DrainGmExperienceCommands();
+        DrainGmZone124PartyPullCommands();
         DrainPshopCommands();
         DrainMissionCommands();
         DrainDrinkBottleCommands();
@@ -352,6 +363,9 @@ public sealed partial class Zone(
                     case ZoneCommandKind.ClearZoneTransferPending:
                         HandleClearZoneTransferPending(command.CharacterId);
                         break;
+                    case ZoneCommandKind.RefreshZoneTransferRegistrationTimestamp:
+                        HandleRefreshZoneTransferRegistrationTimestamp(command.CharacterId);
+                        break;
                     case ZoneCommandKind.SetMuted:
                         HandleSetMuted(command.CharacterId, command.Muted);
                         break;
@@ -412,10 +426,11 @@ public sealed partial class Zone(
         {
             zoneLogger.LogWarning(
                 "No world geometry found at {Path} for MapId {MapId} -- monster pathing (MonsterAiSystem.MoveToward) " +
-                "will not be constrained by terrain/obstacles and will not snap to ground height, and player-movement " +
-                "validation (MovementRules.IsPlausible) will skip its walkability/ground-height sub-checks (the " +
-                "independent per-move distance backstop still applies). Expected until real .WM navmesh assets are deployed " +
-                "for this map -- see GameServerOptionsValidator's remarks for why this is not a startup-blocking check",
+                "will not be constrained by terrain/obstacles and will not snap to ground height, and the " +
+                "player-movement diagnostic (MovementRules.IsPlausible) will skip its walkability/ground-height " +
+                "sub-checks (the independent per-move distance signal still logs, non-blocking). Expected until real " +
+                ".WM navmesh assets are deployed for this map -- see GameServerOptionsValidator's remarks for why " +
+                "this is not a startup-blocking check",
                 wmPath, mapId);
             return null;
         }

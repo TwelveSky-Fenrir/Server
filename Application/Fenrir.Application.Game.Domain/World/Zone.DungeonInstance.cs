@@ -1,4 +1,5 @@
 using Fenrir.Application.Game.Domain.World.Monsters;
+using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Domain.World;
@@ -18,12 +19,11 @@ public sealed partial class Zone
 {
     private const int PersonalDungeonBattleBroadcastCadenceTicks = 20;
 
-    private const float PersonalDungeonBossLeashRadius = 200f;
-
     public IPersonalDungeonBossCatalog PersonalDungeonBossCatalog { get; set; } =
         NullPersonalDungeonBossCatalog.Instance;
 
-    public bool IsZone241TypeZone => options.Zone241DungeonMapIds.Contains(MapId);
+    public bool IsZone241TypeZone =>
+        options.Zone241DungeonMapIds.Contains(MapId) || WrapCheckSpecialDestinationCatalog.IsInstancedDestination(MapId);
 
     public DungeonInstanceEntryOutcome TryEnterZone241PersonalInstance(int characterId)
     {
@@ -47,14 +47,43 @@ public sealed partial class Zone
             return DungeonInstanceEntryOutcome.SummonFailed;
         }
 
-        SummonPersonalBoss(state, monsterDefinition.Monster);
+        SummonPersonalBoss(state, monsterDefinition.Monster, PersonalDungeonBossTables.CatalogAAndESummonPosition);
 
         state.DungeonInstanceRoundsRemaining--;
         state.DungeonInstanceLifecycleState = DungeonInstanceLifecycle.BattleInProgress;
         return DungeonInstanceEntryOutcome.Entered;
     }
 
-    private void SummonPersonalBoss(PlayerRuntimeState state, MonsterRowDto template)
+    public DungeonInstanceEntryOutcome TryEnterLegendsOfDarknessInstance(int characterId)
+    {
+        if (!WrapCheckSpecialDestinationCatalog.IsInstancedDestination(MapId))
+            return DungeonInstanceEntryOutcome.NotZone241Type;
+
+        if (!_players.TryGetValue(characterId, out var state) || state is null)
+            return DungeonInstanceEntryOutcome.NotZone241Type;
+
+        state.DungeonInstanceId = characterId;
+        state.DungeonInstanceLifecycleState = DungeonInstanceLifecycle.Summoning;
+        state.DungeonInstanceTick = 0;
+
+        if (!_monsters.TryGetValue(characterId, out var occupant) || occupant is null)
+        {
+            var bossMonsterId = PersonalDungeonBossTables.ResolveCatalogD(MapId);
+            if (!worldData.MonstersById.TryGetValue(bossMonsterId, out var monsterDefinition))
+            {
+                TearDownFailedEntry(state);
+                return DungeonInstanceEntryOutcome.SummonFailed;
+            }
+
+            SummonPersonalBoss(state, monsterDefinition.Monster, PersonalDungeonBossTables.CatalogDSummonPosition);
+        }
+
+        state.DungeonInstanceLifecycleState = DungeonInstanceLifecycle.BattleInProgress;
+        return DungeonInstanceEntryOutcome.Entered;
+    }
+
+    private void SummonPersonalBoss(PlayerRuntimeState state, MonsterRowDto template,
+        (float X, float Y, float Z) spawnPosition)
     {
         var serverIndex = state.CharacterId;
 
@@ -62,7 +91,7 @@ public sealed partial class Zone
             RemoveMonsterFromGrid(displaced);
 
         var boss = MonsterEntity.Create(serverIndex, NextMonsterUniqueNumber(), template, serverIndex,
-            state.PosX, state.PosY, state.PosZ, PersonalDungeonBossLeashRadius, serverIndex);
+            spawnPosition.X, spawnPosition.Y, spawnPosition.Z, serverIndex);
 
         SpawnMonster(boss);
     }

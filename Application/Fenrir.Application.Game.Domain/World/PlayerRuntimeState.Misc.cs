@@ -32,6 +32,10 @@ public partial class PlayerRuntimeState
 
     public ImmutableArray<(int ItemId, int Count)> BottleSlots { get; set; } = DefaultBottleSlots;
 
+    public int DrunkBottleIndex { get; set; } = -1;
+
+    public int DrunkBottleTicksRemaining { get; set; }
+
     public bool PshopOpen { get; set; }
 
     public PshopInfo? PshopListing { get; set; }

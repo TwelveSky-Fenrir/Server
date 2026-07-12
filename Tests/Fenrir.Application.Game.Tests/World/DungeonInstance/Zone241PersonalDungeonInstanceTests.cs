@@ -41,6 +41,13 @@ public class Zone241PersonalDungeonInstanceTests
         return WorldDataCacheBuilder.Build(rows).Cache;
     }
 
+    private static WorldDataCache LegendsOfDarknessWorldData(int monsterId, int life = 1)
+    {
+        var monster = WorldDataTestRows.Monster(monsterId) with { Life = life };
+        var rows = WorldDataTestRows.MinimalRows() with { Monsters = [monster] };
+        return WorldDataCacheBuilder.Build(rows).Cache;
+    }
+
     [Fact]
     public void IsZone241TypeZone_ReflectsConfiguredMapIds()
     {
@@ -124,6 +131,25 @@ public class Zone241PersonalDungeonInstanceTests
     }
 
     [Fact]
+    public void TryEnterZone241PersonalInstance_Success_SpawnsBossAtFixedCatalogPosition_NotThePlayersOwnPosition()
+    {
+        var zone = ZoneTestKit.CreateZone(Zone241MapId, Zone241Options(), worldData: BossWorldData());
+        zone.PersonalDungeonBossCatalog = new FakeBossCatalog(BossMonsterId);
+
+        var (session, _) = ZoneTestKit.CreateSession(1);
+        const int characterId = 21;
+        zone.Post(ZoneCommand.Enter(characterId,
+            EnterData(session, Zone241MapId, 777, 777, 1)));
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.True(zone.TryGetMonster(characterId, out var boss));
+        var (expectedX, expectedY, expectedZ) = PersonalDungeonBossTables.CatalogAAndESummonPosition;
+        Assert.Equal(expectedX, boss!.PosX);
+        Assert.Equal(expectedY, boss.PosY);
+        Assert.Equal(expectedZ, boss.PosZ);
+    }
+
+    [Fact]
     public void TryEnterZone241PersonalInstance_ForciblyDiscardsWhateverOccupiedTheReusedSlot()
     {
         var zone = ZoneTestKit.CreateZone(Zone241MapId, Zone241Options(), worldData: BossWorldData());
@@ -131,7 +157,7 @@ public class Zone241PersonalDungeonInstanceTests
 
         const int characterId = 42;
         var collidingMonster = MonsterEntity.Create(characterId, 1u, WorldDataTestRows.Monster(500) with { Life = 999 },
-            characterId, 0, 0, 0, 50);
+            characterId, 0, 0, 0);
         zone.SpawnMonster(collidingMonster);
         Assert.True(zone.TryGetMonster(characterId, out _));
 
@@ -225,7 +251,7 @@ public class Zone241PersonalDungeonInstanceTests
         {
             Life = 999, AttackType = 1, RadiusInfo2 = 50
         };
-        var boss = MonsterEntity.Create(ownerId, 1u, template, ownerId, 100, 0, 100, 200f, ownerId);
+        var boss = MonsterEntity.Create(ownerId, 1u, template, ownerId, 100, 0, 100, ownerId);
         boss.AiState = MonsterAiState.Decision;
         zone.SpawnMonster(boss);
 
@@ -312,7 +338,7 @@ public class Zone241PersonalDungeonInstanceTests
         state.DungeonInstanceId = characterId;
 
         var taggedMonster = MonsterEntity.Create(characterId, 1u,
-            WorldDataTestRows.Monster(BossMonsterId) with { Life = 999 }, characterId, 100, 0, 100, 200f,
+            WorldDataTestRows.Monster(BossMonsterId) with { Life = 999 }, characterId, 100, 0, 100,
             characterId);
         zone.SpawnMonster(taggedMonster);
         zone.SpawnGroundItem(8001, 1, 100, 0, 100, "Hero", "", GroundItemEntity.MonsterKillDropSort, characterId);
@@ -342,7 +368,7 @@ public class Zone241PersonalDungeonInstanceTests
         firstState.DungeonInstanceId = characterId;
 
         var staleMonster = MonsterEntity.Create(characterId, 1u,
-            WorldDataTestRows.Monster(BossMonsterId) with { Life = 999 }, characterId, 100, 0, 100, 200f,
+            WorldDataTestRows.Monster(BossMonsterId) with { Life = 999 }, characterId, 100, 0, 100,
             characterId);
         zone.SpawnMonster(staleMonster);
         zone.SpawnGroundItem(8001, 1, 100, 0, 100, "Hero", "", GroundItemEntity.MonsterKillDropSort, characterId);
@@ -388,6 +414,92 @@ public class Zone241PersonalDungeonInstanceTests
         Assert.False(zone.TryGetPlayer(characterId, out _));
         Assert.True(zone.TryGetMonster(characterId, out var survivingBoss));
         Assert.Equal(BossMonsterId, survivingBoss!.Template.MonsterId);
+    }
+
+    [Fact]
+    public void TryEnterLegendsOfDarknessInstance_OutsideInstancedDestinationSet_ReturnsNotZone241Type()
+    {
+        var zone = ZoneTestKit.CreateZone(Zone241MapId, Zone241Options());
+        var (session, _) = ZoneTestKit.CreateSession(1);
+        zone.Post(ZoneCommand.Enter(1, EnterData(session, Zone241MapId, 100, 100)));
+        zone.Tick(SimulationClock.LegacyTick);
+
+        var outcome = zone.TryEnterLegendsOfDarknessInstance(1);
+
+        Assert.Equal(DungeonInstanceEntryOutcome.NotZone241Type, outcome);
+    }
+
+    [Theory]
+    [InlineData((short)325, 725)]
+    [InlineData((short)326, 726)]
+    [InlineData((short)330, 730)]
+    public void TryEnterLegendsOfDarknessInstance_Success_ResolvesBossByExactZoneNumber_IgnoringRebirthCount(
+        short mapId, int expectedBossMonsterId)
+    {
+        var zone = ZoneTestKit.CreateZone(mapId, new GameServerOptions(),
+            worldData: LegendsOfDarknessWorldData(expectedBossMonsterId));
+
+        var (session, _) = ZoneTestKit.CreateSession(1);
+        const int characterId = 9;
+        zone.Post(ZoneCommand.Enter(characterId, EnterData(session, mapId, 100, 100, rebirthCount: 11)));
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.True(zone.TryGetPlayer(characterId, out var state));
+        Assert.Equal(DungeonInstanceLifecycle.BattleInProgress, state!.DungeonInstanceLifecycleState);
+        Assert.Equal(characterId, state.DungeonInstanceId);
+
+        Assert.True(zone.TryGetMonster(characterId, out var boss));
+        Assert.Equal(expectedBossMonsterId, boss!.Template.MonsterId);
+
+        var (expectedX, expectedY, expectedZ) = PersonalDungeonBossTables.CatalogDSummonPosition;
+        Assert.Equal(expectedX, boss.PosX);
+        Assert.Equal(expectedY, boss.PosY);
+        Assert.Equal(expectedZ, boss.PosZ);
+    }
+
+    [Fact]
+    public void TryEnterLegendsOfDarknessInstance_BossTemplateMissing_TearsDownAndReturnsSummonFailed()
+    {
+        const short mapId = 327;
+        var zone = ZoneTestKit.CreateZone(mapId, new GameServerOptions(), worldData: ZoneTestKit.EmptyWorldData());
+
+        var (session, _) = ZoneTestKit.CreateSession(1);
+        const int characterId = 14;
+        zone.Post(ZoneCommand.Enter(characterId, EnterData(session, mapId, 100, 100)));
+        zone.Tick(SimulationClock.LegacyTick);
+
+        var outcome = zone.TryEnterLegendsOfDarknessInstance(characterId);
+
+        Assert.Equal(DungeonInstanceEntryOutcome.SummonFailed, outcome);
+        Assert.True(zone.TryGetPlayer(characterId, out var state));
+        Assert.Equal(DungeonInstanceLifecycle.Idle, state!.DungeonInstanceLifecycleState);
+        Assert.Null(state.DungeonInstanceId);
+    }
+
+    [Fact]
+    public void TryEnterLegendsOfDarknessInstance_SlotAlreadyOccupied_ReusesExistingMonster_DoesNotReplaceIt()
+    {
+        const short mapId = 328;
+        const int expectedBossMonsterId = 728;
+        var zone = ZoneTestKit.CreateZone(mapId, new GameServerOptions(),
+            worldData: LegendsOfDarknessWorldData(expectedBossMonsterId));
+
+        const int characterId = 22;
+        var occupant = MonsterEntity.Create(characterId, 1u,
+            WorldDataTestRows.Monster(expectedBossMonsterId) with { Life = 777 }, characterId, 0, 21, 0,
+            characterId);
+        zone.SpawnMonster(occupant);
+
+        var (session, _) = ZoneTestKit.CreateSession(1);
+        zone.Post(ZoneCommand.Enter(characterId, EnterData(session, mapId, 100, 100)));
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.True(zone.TryGetPlayer(characterId, out var state));
+        Assert.Equal(DungeonInstanceLifecycle.BattleInProgress, state!.DungeonInstanceLifecycleState);
+
+        Assert.True(zone.TryGetMonster(characterId, out var stillThere));
+        Assert.Same(occupant, stillThere);
+        Assert.Equal(777, stillThere!.Life);
     }
 
     private sealed class FakeBossCatalog(int monsterId) : IPersonalDungeonBossCatalog

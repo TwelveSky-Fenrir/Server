@@ -39,8 +39,6 @@ public sealed class MonsterEntity
     public required float HomeY { get; init; }
     public required float HomeZ { get; init; }
 
-    public required float LeashRadius { get; init; }
-
     public int MaxLife { get; init; }
 
     public MonsterAiState AiState { get; set; } = MonsterAiState.Spawning;
@@ -73,8 +71,6 @@ public sealed class MonsterEntity
 
     public int DetectionThrottleTicks { get; set; }
 
-    public int ShortRangeRetargetThrottleTicks { get; set; }
-
     public int IdleReturnElapsedTicks { get; set; }
 
     public int IdleWanderElapsedTicks { get; set; }
@@ -82,6 +78,12 @@ public sealed class MonsterEntity
     public float WanderTargetX { get; set; }
 
     public float WanderTargetZ { get; set; }
+
+    public float HomeReturnTargetX { get; set; }
+
+    public float HomeReturnTargetY { get; set; }
+
+    public float HomeReturnTargetZ { get; set; }
 
     public int PursuerCapacity { get; init; }
 
@@ -109,7 +111,7 @@ public sealed class MonsterEntity
     }
 
     public static MonsterEntity Create(int serverIndex, uint uniqueNumber, MonsterRowDto template, int spawnSlotId,
-        float homeX, float homeY, float homeZ, float leashRadius, int? instanceId = null,
+        float homeX, float homeY, float homeZ, int? instanceId = null,
         IRandomSource? random = null, byte? specialSort = null)
     {
         var rng = random ?? SystemRandomSource.Instance;
@@ -129,7 +131,6 @@ public sealed class MonsterEntity
             HomeX = homeX,
             HomeY = homeY,
             HomeZ = homeZ,
-            LeashRadius = leashRadius,
             MaxLife = template.Life,
             PosX = homeX,
             PosY = homeY,
@@ -137,6 +138,9 @@ public sealed class MonsterEntity
             TargetLocationX = homeX,
             TargetLocationY = homeY,
             TargetLocationZ = homeZ,
+            HomeReturnTargetX = homeX,
+            HomeReturnTargetY = homeY,
+            HomeReturnTargetZ = homeZ,
             InstanceId = instanceId,
             PursuerCapacity = pursuerCapacity,
             SpecialSort = specialSort ?? MonsterSpecialSort.Derive(template.Type, template.SpecialType)

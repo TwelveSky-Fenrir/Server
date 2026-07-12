@@ -61,4 +61,20 @@ public class ZoneTypeClassificationTests
         Assert.False(zone.IsZone126TypeZone);
         Assert.False(zone.IsZone039TypeZone);
     }
+
+    [Fact]
+    public void IsDungeonServerZone_KnownDungeonServerNumber_IsTrue_WithNoConfigurationNeeded()
+    {
+        var zone = ZoneTestKit.CreateZone(46);
+
+        Assert.True(zone.IsDungeonServerZone);
+    }
+
+    [Fact]
+    public void IsDungeonServerZone_OrdinaryMapId_IsFalse()
+    {
+        var zone = ZoneTestKit.CreateZone(OrdinaryMapId);
+
+        Assert.False(zone.IsDungeonServerZone);
+    }
 }

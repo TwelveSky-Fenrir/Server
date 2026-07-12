@@ -72,14 +72,16 @@ public static class ZoneTransferAntiAbuseRules
 
     public const byte CapitalGroupAllianceComparandTribe = 0;
 
-    public static bool AllowsTransferWhileFlagged(short destinationMapId, Func<byte, byte?> allyOfOwningFaction)
+    public static bool AllowsTransferWhileFlagged(short currentMapId, short destinationMapId, byte avatarTribe,
+        Func<byte, byte?> allyOfOwningFaction)
     {
         if (destinationMapId == ExemptDestinationZoneId)
             return true;
 
-        var (kind, owningFaction) = ReviveEligibilityZones.Classify(destinationMapId);
+        var (kind, owningFaction) = ReviveEligibilityZones.Classify(currentMapId);
 
         return kind != ReviveZoneKind.FactionTerritory ||
+               avatarTribe == owningFaction ||
                allyOfOwningFaction(owningFaction) == CapitalGroupAllianceComparandTribe;
     }
 }

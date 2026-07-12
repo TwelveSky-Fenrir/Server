@@ -450,6 +450,28 @@ public class ZoneHandoffTests
     }
 
     [Fact]
+    public void MarkZoneTransferPending_SetsIsMovingZoneAndStampsTheRegistrationTimestamp()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var (session, _) = ZoneTestKit.CreateSession(1);
+
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(10, out var before));
+        Assert.False(before!.IsMovingZone);
+        Assert.Equal(default, before.ZoneTransferRegisteredAtUtc);
+
+        var beforeStamp = DateTime.UtcNow;
+        zone.Post(ZoneCommand.MarkZoneTransferPending(10));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(10, out var after));
+        Assert.True(after!.IsMovingZone);
+        Assert.True(after.ZoneTransferRegisteredAtUtc >= beforeStamp);
+    }
+
+    [Fact]
     public void Leave_WithHandoffTarget_NeverTouchesTheCrossShardLocationDirectory()
     {
         var characterShardLocations = new FakeCharacterShardLocationRepository();

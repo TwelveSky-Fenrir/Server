@@ -12,6 +12,13 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         private set;
     }
 
+    public (int CharacterId, byte ContainerA, IReadOnlyList<CharacterItemSlotTvp> ItemsA, byte ContainerB,
+        IReadOnlyList<CharacterItemSlotTvp> ItemsB)? LastReplacedTwoContainers
+    {
+        get;
+        private set;
+    }
+
     public (int CharacterId, long DeltaMoney, byte Container, IReadOnlyList<CharacterItemSlotTvp> Items)?
         LastAdjustMoneyAndReplaceContainer { get; private set; }
 
@@ -128,7 +135,11 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         IReadOnlyList<CharacterItemSlotTvp> itemsA, byte containerB, IReadOnlyList<CharacterItemSlotTvp> itemsB,
         CancellationToken ct)
     {
-        throw new NotImplementedException();
+        if (ThrowOnReplaceContainer)
+            throw new InvalidOperationException("Simulated SQL failure");
+
+        LastReplacedTwoContainers = (characterId, containerA, itemsA, containerB, itemsB);
+        return ValueTask.CompletedTask;
     }
 
     public ValueTask PersistProgressAsync(IReadOnlyList<CharacterProgressTvp> rows, CancellationToken ct)

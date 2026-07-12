@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Linq;
 using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Data.Abstractions.World;
@@ -10,15 +11,18 @@ public class SkillCastResolverTests
     private static SkillDefinition BuildSkill(int skillId, byte maxUpgradePoint,
         (int Grade0, int Grade1) manaUse, (int Grade0, int Grade1) runTime, (int Grade0, int Grade1) chargingUp,
         (int Grade0, int Grade1) attackPowerUp = default, (int Grade0, int Grade1) shieldLifeUp = default,
-        (int Grade0, int Grade1) recoverLife = default, (int Grade0, int Grade1) recoverMana = default)
+        (int Grade0, int Grade1) recoverLife = default, (int Grade0, int Grade1) recoverMana = default,
+        (int Grade0, int Grade1) attackBlockUp = default, (int Grade0, int Grade1) runSpeedUp = default)
     {
         var row = new SkillRowDto(skillId, "Test", 0, 0, 0, 0, 0, 1, maxUpgradePoint, 1, 0);
         var grade0 = new SkillGradeRowDto(skillId, 0, (short)manaUse.Grade0, (byte)recoverLife.Grade0,
             (byte)recoverMana.Grade0, 0, 0, 0, 0, 0, 0, (short)runTime.Grade0, (byte)chargingUp.Grade0,
-            (byte)attackPowerUp.Grade0, 0, 0, 0, 0, 0, 0, 0, (byte)shieldLifeUp.Grade0, 0, 0, 0, 0, 0);
+            (byte)attackPowerUp.Grade0, 0, 0, (byte)attackBlockUp.Grade0, 0, 0, 0, (byte)runSpeedUp.Grade0,
+            (byte)shieldLifeUp.Grade0, 0, 0, 0, 0, 0);
         var grade1 = new SkillGradeRowDto(skillId, 1, (short)manaUse.Grade1, (byte)recoverLife.Grade1,
             (byte)recoverMana.Grade1, 0, 0, 0, 0, 0, 0, (short)runTime.Grade1, (byte)chargingUp.Grade1,
-            (byte)attackPowerUp.Grade1, 0, 0, 0, 0, 0, 0, 0, (byte)shieldLifeUp.Grade1, 0, 0, 0, 0, 0);
+            (byte)attackPowerUp.Grade1, 0, 0, (byte)attackBlockUp.Grade1, 0, 0, 0, (byte)runSpeedUp.Grade1,
+            (byte)shieldLifeUp.Grade1, 0, 0, 0, 0, 0);
         return new SkillDefinition(row, ImmutableArray<SkillDescriptionRowDto>.Empty, [grade0, grade1]);
     }
 
@@ -151,5 +155,34 @@ public class SkillCastResolverTests
         var write = Assert.Single(result.BuffWrites);
         Assert.Equal(1000, write.Value);
         Assert.Equal(5, write.DurationTicks);
+    }
+
+    [Fact]
+    public void Skill19RunSpeedBuff_WrongWeaponClass_RejectsBothSlotsTogether()
+    {
+        var skill = BuildSkill(19, 10, (10, 10), (5, 5), default, attackBlockUp: (10, 40),
+            runSpeedUp: (10, 30));
+        var result = SkillCastResolver.TryCast(skill, 10, 100, 1000, 7, 1);
+        Assert.False(result.Success);
+        Assert.Equal(SkillCastResolver.FailureReason.WrongWeaponClass, result.Failure);
+        Assert.Empty(result.BuffWrites);
+    }
+
+    [Fact]
+    public void Skill19RunSpeedBuff_WithGatingWeapon_WritesBlockRateAndRunSpeedTogether()
+    {
+        var skill = BuildSkill(19, 10, (10, 10), (20, 20), default, attackBlockUp: (10, 40),
+            runSpeedUp: (10, 30));
+        var result = SkillCastResolver.TryCast(skill, 10, 100, 1000, 18, 3);
+        Assert.True(result.Success);
+        Assert.Equal(2, result.BuffWrites.Length);
+
+        var blockRateWrite = result.BuffWrites.Single(w => w.Slot == 3);
+        Assert.Equal(40, blockRateWrite.Value);
+        Assert.Equal(60, blockRateWrite.DurationTicks);
+
+        var runSpeedWrite = result.BuffWrites.Single(w => w.Slot == 7);
+        Assert.Equal(30, runSpeedWrite.Value);
+        Assert.Equal(60, runSpeedWrite.DurationTicks);
     }
 }

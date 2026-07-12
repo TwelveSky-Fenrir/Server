@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.Quests;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Quests;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Npcs;
 using Fenrir.Application.Game.GameData;
@@ -47,7 +48,7 @@ public sealed class QuestProgressService(
 
         if (result.DepositItemId is { } depositItemId)
         {
-            if (!TryValidateDepositSlot(packet.Page1, packet.Index1, packet.XPost, packet.YPost, edits,
+            if (!TryValidateDepositSlot(state, packet.Page1, packet.Index1, packet.XPost, packet.YPost, edits,
                     out var container, out var slot))
                 return new QuestActionResult(false);
 
@@ -92,20 +93,16 @@ public sealed class QuestProgressService(
             return new QuestActionResult(false);
         }
 
-        var itemRewardGranted = false;
+        var itemRewardDeclared = packet.Page1 != -1;
 
-        if (packet.Page1 != -1)
+        if (itemRewardDeclared)
         {
-            if (!TryValidateDepositSlot(packet.Page1, packet.Index1, packet.XPost, packet.YPost, edits,
+            if (!TryValidateDepositSlot(state, packet.Page1, packet.Index1, packet.XPost, packet.YPost, edits,
                     out var container, out var slot))
                 return new QuestActionResult(false);
 
-            if (result.RewardItemId > 0)
-            {
-                edits.Deposit(container, slot,
-                    new ItemStack(result.RewardItemId, result.RewardItemQuantity, 0, 0, 0, 0, 0, 0, 0, 0, 0));
-                itemRewardGranted = true;
-            }
+            edits.Deposit(container, slot,
+                new ItemStack(result.RewardItemId, result.RewardItemQuantity, 0, 0, 0, 0, 0, 0, 0, 0, 0));
         }
 
         if (result.DeleteItemId > 0)
@@ -117,12 +114,12 @@ public sealed class QuestProgressService(
         var hasNumericReward = result.MoneyReward != 0 || result.ExperienceReward != 0 ||
                                result.KillOtherTribeCountReward != 0 || result.TeacherPointReward != 0;
 
-        if (itemRewardGranted || hasNumericReward)
+        if (itemRewardDeclared || hasNumericReward)
             await eventLog.LogAsync(QuestRewardEventCode, EventLogCategory.ItemCreate, accountId, characterId,
                 null, null, null,
                 result.MoneyReward != 0 ? result.MoneyReward : null, null,
-                itemRewardGranted ? result.RewardItemId : null,
-                itemRewardGranted ? result.RewardItemQuantity : null,
+                itemRewardDeclared ? result.RewardItemId : null,
+                itemRewardDeclared ? result.RewardItemQuantity : null,
                 1,
                 hasNumericReward
                     ? $"ExperienceReward={result.ExperienceReward};KillOtherTribeCountReward={result.KillOtherTribeCountReward};TeacherPointReward={result.TeacherPointReward}"
@@ -130,9 +127,9 @@ public sealed class QuestProgressService(
                 ct);
 
         logger.LogInformation(
-            "Character {CharacterId} completed quest step {StepPermanent}: money {MoneyReward}, experience {ExperienceReward}, item {RewardItemId}x{RewardItemQuantity} granted={ItemRewardGranted}",
+            "Character {CharacterId} completed quest step {StepPermanent}: money {MoneyReward}, experience {ExperienceReward}, item {RewardItemId}x{RewardItemQuantity} declared={ItemRewardDeclared}",
             characterId, result.NewProgress.StepPermanent, result.MoneyReward, result.ExperienceReward,
-            result.RewardItemId, result.RewardItemQuantity, itemRewardGranted);
+            result.RewardItemId, result.RewardItemQuantity, itemRewardDeclared);
 
         return new QuestActionResult(true);
     }
@@ -154,7 +151,7 @@ public sealed class QuestProgressService(
                 out var depositItemId))
             return new QuestActionResult(false);
 
-        if (!TryValidateDepositSlot(packet.Page1, packet.Index1, packet.XPost, packet.YPost, edits,
+        if (!TryValidateDepositSlot(state, packet.Page1, packet.Index1, packet.XPost, packet.YPost, edits,
                 out var container, out var slot))
             return new QuestActionResult(false);
 
@@ -280,8 +277,8 @@ public sealed class QuestProgressService(
             state.PosZ) != NpcProximity.Far;
     }
 
-    private static bool TryValidateDepositSlot(int page, int index, int xPost, int yPost, ContainerEdits edits,
-        out byte container, out byte slot)
+    private static bool TryValidateDepositSlot(PlayerRuntimeState state, int page, int index, int xPost, int yPost,
+        ContainerEdits edits, out byte container, out byte slot)
     {
         container = 0;
         slot = 0;
@@ -289,6 +286,9 @@ public sealed class QuestProgressService(
         if (page is not (ContainerMatrix.InventoryPage0 or ContainerMatrix.InventoryPage1) ||
             !ContainerMatrix.IsValidSlot((byte)page, index) ||
             xPost is < 0 or > 7 || yPost is < 0 or > 7)
+            return false;
+
+        if (page == ContainerMatrix.InventoryPage1 && state.InventoryDate < GameDate.Today())
             return false;
 
         container = (byte)page;

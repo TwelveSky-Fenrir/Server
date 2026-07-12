@@ -9,7 +9,7 @@ namespace Fenrir.Application.Game.Tests.World.Monsters;
 public class MonsterAggroListPrunerTests
 {
     private static Zone CreateZoneWithMonster(short meleeRadius, short leashRadius, short pursuerCapacity,
-        out MonsterEntity monster)
+        out MonsterEntity monster, short heightTolerance = 1)
     {
         var zone = ZoneTestKit.CreateZone(1);
         var template = WorldDataTestRows.Monster(600) with
@@ -17,19 +17,20 @@ public class MonsterAggroListPrunerTests
             RadiusInfo1 = meleeRadius,
             RadiusInfo2 = leashRadius,
             FollowInfo1 = pursuerCapacity,
-            FollowInfo2 = pursuerCapacity
+            FollowInfo2 = pursuerCapacity,
+            Size2 = heightTolerance
         };
-        monster = MonsterEntity.Create(1, 1, template, 1, 0, 0, 0, 50);
+        monster = MonsterEntity.Create(1, 1, template, 1, 0, 0, 0);
         zone.SpawnMonster(monster);
         return zone;
     }
 
     private static PlayerRuntimeState EnterCharacter(Zone zone, int characterId, string name, float posX = 0f,
-        float posZ = 0f)
+        float posZ = 0f, float posY = 0f)
     {
         var (session, _) = ZoneTestKit.CreateSession(characterId);
         zone.Post(ZoneCommand.Enter(characterId,
-            ZoneTestKit.EnterData(session, 1, name, posX, posZ: posZ)));
+            ZoneTestKit.EnterData(session, 1, name, posX, posY, posZ)));
         zone.Tick(SimulationClock.LegacyTick);
         Assert.True(zone.TryGetPlayer(characterId, out var player));
         return player!;
@@ -176,7 +177,7 @@ public class MonsterAggroListPrunerTests
         EnterCharacter(zone, 10, "A", 50, 0);
         RecordDamage(zone, monster, 10, 5);
 
-        var otherPursuer = MonsterEntity.Create(2, 2, WorldDataTestRows.Monster(601), 1, 0, 0, 0, 50);
+        var otherPursuer = MonsterEntity.Create(2, 2, WorldDataTestRows.Monster(601), 1, 0, 0, 0);
         otherPursuer.AiState = MonsterAiState.Chase;
         otherPursuer.AssignTarget(10, 10u, 50, 0, 0);
 
@@ -193,7 +194,7 @@ public class MonsterAggroListPrunerTests
         EnterCharacter(zone, 10, "A", 50, 0);
         RecordDamage(zone, monster, 10, 5);
 
-        var otherPursuer = MonsterEntity.Create(2, 2, WorldDataTestRows.Monster(601), 1, 0, 0, 0, 50);
+        var otherPursuer = MonsterEntity.Create(2, 2, WorldDataTestRows.Monster(601), 1, 0, 0, 0);
         otherPursuer.AiState = MonsterAiState.Chase;
         otherPursuer.AssignTarget(10, 10u, 50, 0, 0);
 
@@ -211,7 +212,7 @@ public class MonsterAggroListPrunerTests
         EnterCharacter(zone, 10, "A", 50, 0);
         RecordDamage(zone, monster, 10, 5);
 
-        var idleMonster = MonsterEntity.Create(2, 2, WorldDataTestRows.Monster(601), 1, 0, 0, 0, 50);
+        var idleMonster = MonsterEntity.Create(2, 2, WorldDataTestRows.Monster(601), 1, 0, 0, 0);
         idleMonster.AiState = MonsterAiState.Decision;
         idleMonster.AssignTarget(10, 10u, 50, 0, 0);
 
@@ -239,6 +240,58 @@ public class MonsterAggroListPrunerTests
         Assert.Equal(2, result.Survivors.Count);
         Assert.Equal(10, result.Survivors[0].CharacterId);
         Assert.Equal(12, result.Survivors[1].CharacterId);
+    }
+
+    [Fact]
+    public void Prune_MeleeRangeAttacker_DroppedWhenVerticalSeparationExceedsTemplateTolerance()
+    {
+        var zone = CreateZoneWithMonster(100, 200, 5, out var monster, heightTolerance: 5);
+        EnterCharacter(zone, 10, "A", 5, 0, posY: 100);
+        RecordDamage(zone, monster, 10, 5);
+
+        var result = MonsterAggroListPruner.Prune(zone, monster, [monster]);
+
+        Assert.Empty(result.Survivors);
+        Assert.False(result.HasValidAttackers);
+    }
+
+    [Fact]
+    public void Prune_MeleeRangeAttacker_SurvivesWhenVerticalSeparationWithinTemplateTolerance()
+    {
+        var zone = CreateZoneWithMonster(100, 200, 5, out var monster, heightTolerance: 5);
+        EnterCharacter(zone, 10, "A", 5, 0, posY: 3);
+        RecordDamage(zone, monster, 10, 5);
+
+        var result = MonsterAggroListPruner.Prune(zone, monster, [monster]);
+
+        Assert.True(result.HasValidAttackers);
+        Assert.Single(result.Survivors);
+    }
+
+    [Fact]
+    public void Prune_MeleeRangeAttacker_VerticalSeparationExactlyAtTolerance_StillSurvives()
+    {
+        var zone = CreateZoneWithMonster(100, 200, 5, out var monster, heightTolerance: 5);
+        EnterCharacter(zone, 10, "A", 5, 0, posY: 5);
+        RecordDamage(zone, monster, 10, 5);
+
+        var result = MonsterAggroListPruner.Prune(zone, monster, [monster]);
+
+        Assert.True(result.HasValidAttackers);
+        Assert.Single(result.Survivors);
+    }
+
+    [Fact]
+    public void Prune_MidRangeAttacker_VerticalSeparationIsIgnoredByThePursuerCapacityGate()
+    {
+        var zone = CreateZoneWithMonster(10, 200, 1, out var monster, heightTolerance: 1);
+        EnterCharacter(zone, 10, "A", 50, 0, posY: 999);
+        RecordDamage(zone, monster, 10, 5);
+
+        var result = MonsterAggroListPruner.Prune(zone, monster, [monster]);
+
+        Assert.True(result.HasValidAttackers);
+        Assert.Single(result.Survivors);
     }
 
     [Fact]

@@ -20,7 +20,7 @@ public class UseHotkeyItemServiceBuffTests
     private const byte ConsumableSort = HotkeyItemConsumptionResolver.ConsumableItemCategory;
 
     private static (Zone Zone, PlayerRuntimeState State, FakeCharacterRepository Characters,
-        UseHotkeyItemService Service) SetUp(int itemId, int potionType1, int quantity)
+        UseHotkeyItemService Service) SetUp(int itemId, int potionType1, int quantity, short mapId = 1)
     {
         var itemsById = new Dictionary<int, ItemDefinition>
         {
@@ -33,9 +33,9 @@ public class UseHotkeyItemServiceBuffTests
         }.ToFrozenDictionary();
         var worldData = ZoneTestKit.EmptyWorldData(itemsById);
 
-        var zone = ZoneTestKit.CreateZone(1, worldData: worldData);
+        var zone = ZoneTestKit.CreateZone(mapId, worldData: worldData);
         var (session, _) = ZoneTestKit.CreateSession(1);
-        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, mapId)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.True(zone.TryGetPlayer(10, out var state));
@@ -56,7 +56,7 @@ public class UseHotkeyItemServiceBuffTests
 
         Assert.Equal(UseHotkeyItemOutcome.Success, outcome);
         Assert.Equal(3, state.Buffs.Buff[15 * 2]);
-        Assert.Equal(80, state.Buffs.Buff[15 * 2 + 1]);
+        Assert.Equal(40, state.Buffs.Buff[15 * 2 + 1]);
 
         var upsert = Assert.NotNull(characters.LastUpsertHotkeySlot);
         Assert.Equal(10, upsert.CharacterId);
@@ -66,7 +66,7 @@ public class UseHotkeyItemServiceBuffTests
     }
 
     [Fact]
-    public async Task DepartedSpiritScroll_WritesBuffSlot15_Duration60Seconds()
+    public async Task DepartedSpiritScroll_WritesBuffSlot15_Duration60LegacyTicks()
     {
         var (zone, state, characters, service) = SetUp(DepartedSpiritScrollItemId, 13, 1);
 
@@ -75,7 +75,7 @@ public class UseHotkeyItemServiceBuffTests
 
         Assert.Equal(UseHotkeyItemOutcome.Success, outcome);
         Assert.Equal(3, state.Buffs.Buff[15 * 2]);
-        Assert.Equal(120, state.Buffs.Buff[15 * 2 + 1]);
+        Assert.Equal(60, state.Buffs.Buff[15 * 2 + 1]);
 
         var upsert = Assert.NotNull(characters.LastUpsertHotkeySlot);
         Assert.Equal(0, upsert.Sort);
@@ -93,7 +93,7 @@ public class UseHotkeyItemServiceBuffTests
 
         Assert.Equal(UseHotkeyItemOutcome.Success, outcome);
         Assert.Equal(25, state.Buffs.Buff[17 * 2]);
-        Assert.Equal(120, state.Buffs.Buff[17 * 2 + 1]);
+        Assert.Equal(60, state.Buffs.Buff[17 * 2 + 1]);
         Assert.NotNull(characters.LastUpsertHotkeySlot);
     }
 
@@ -107,7 +107,95 @@ public class UseHotkeyItemServiceBuffTests
 
         Assert.Equal(UseHotkeyItemOutcome.Success, outcome);
         Assert.Equal(25, state.Buffs.Buff[18 * 2]);
-        Assert.Equal(120, state.Buffs.Buff[18 * 2 + 1]);
+        Assert.Equal(60, state.Buffs.Buff[18 * 2 + 1]);
+        Assert.NotNull(characters.LastUpsertHotkeySlot);
+    }
+
+    [Fact]
+    public async Task AssassinScroll_SetsTheDarkAttackMarker()
+    {
+        var (zone, state, _, service) = SetUp(AssassinScrollItemId, 12, 1);
+
+        await service.UseAsync(zone, state, 10, 0, 0, CancellationToken.None);
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Equal(HotkeyItemConsumptionResolver.AssassinScrollMarkerValue, state.DarkAttackKind);
+    }
+
+    [Fact]
+    public async Task DepartedSpiritScroll_SetsTheDarkAttackMarker()
+    {
+        var (zone, state, _, service) = SetUp(DepartedSpiritScrollItemId, 13, 1);
+
+        await service.UseAsync(zone, state, 10, 0, 0, CancellationToken.None);
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Equal(HotkeyItemConsumptionResolver.DepartedSpiritScrollMarkerValue, state.DarkAttackKind);
+    }
+
+    [Fact]
+    public async Task AttackIncreaseBook_SetsTheHitRateMarker_NotTheDarkAttackMarker()
+    {
+        var (zone, state, _, service) = SetUp(AttackIncreaseBookItemId, 14, 1);
+
+        await service.UseAsync(zone, state, 10, 0, 0, CancellationToken.None);
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Equal(HotkeyItemConsumptionResolver.HitOrDodgeBuffMarkerValue, state.HitRateKind);
+        Assert.Equal(0, state.DarkAttackKind);
+    }
+
+    [Fact]
+    public async Task DodgeIncreaseBook_SetsTheDodgeRateMarker_NotTheDarkAttackMarker()
+    {
+        var (zone, state, _, service) = SetUp(DodgeIncreaseBookItemId, 15, 1);
+
+        await service.UseAsync(zone, state, 10, 0, 0, CancellationToken.None);
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Equal(HotkeyItemConsumptionResolver.HitOrDodgeBuffMarkerValue, state.DodgeRateKind);
+        Assert.Equal(0, state.DarkAttackKind);
+    }
+
+    [Fact]
+    public async Task AssassinScroll_OutsideAllowlistedZone_RejectedCleanly_SlotUntouched()
+    {
+        var (zone, state, characters, service) = SetUp(AssassinScrollItemId, 12, 2, mapId: 5);
+
+        var outcome = await service.UseAsync(zone, state, 10, 0, 0, CancellationToken.None);
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Equal(UseHotkeyItemOutcome.RejectedClean, outcome);
+        Assert.Equal(0, state.Buffs.Buff[15 * 2]);
+        Assert.Null(characters.LastUpsertHotkeySlot);
+        Assert.Equal(2, state.GetHotkeySlot(0, 0).Value2);
+    }
+
+    [Fact]
+    public async Task DepartedSpiritScroll_WhileAssassinScrollActive_RejectedCleanly_SlotUntouched()
+    {
+        var (zone, state, characters, service) = SetUp(DepartedSpiritScrollItemId, 13, 1);
+        state.DarkAttackKind = HotkeyItemConsumptionResolver.AssassinScrollMarkerValue;
+
+        var outcome = await service.UseAsync(zone, state, 10, 0, 0, CancellationToken.None);
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Equal(UseHotkeyItemOutcome.RejectedClean, outcome);
+        Assert.Equal(HotkeyItemConsumptionResolver.AssassinScrollMarkerValue, state.DarkAttackKind);
+        Assert.Null(characters.LastUpsertHotkeySlot);
+    }
+
+    [Fact]
+    public async Task AssassinScroll_WhileAssassinScrollAlreadyActive_RefreshesTheBuff_NotRejected()
+    {
+        var (zone, state, characters, service) = SetUp(AssassinScrollItemId, 12, 2);
+        state.DarkAttackKind = HotkeyItemConsumptionResolver.AssassinScrollMarkerValue;
+
+        var outcome = await service.UseAsync(zone, state, 10, 0, 0, CancellationToken.None);
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Equal(UseHotkeyItemOutcome.Success, outcome);
+        Assert.Equal(3, state.Buffs.Buff[15 * 2]);
         Assert.NotNull(characters.LastUpsertHotkeySlot);
     }
 }

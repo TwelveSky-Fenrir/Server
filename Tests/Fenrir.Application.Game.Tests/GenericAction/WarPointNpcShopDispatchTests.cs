@@ -73,7 +73,7 @@ public class WarPointNpcShopDispatchTests
             WorldDataTestRows.Zone(ZoneNumber),
             [], [],
             [new ZoneNpcSpawnRowDto(ZoneNumber, 0, ShopNpcId, 100f, 0f, 100f, 0f)],
-            []);
+            [], []);
 
         return new WorldDataCache
         {

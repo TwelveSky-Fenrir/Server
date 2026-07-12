@@ -18,6 +18,8 @@ public enum ZoneCommandKind : byte
 
     ClearZoneTransferPending,
 
+    RefreshZoneTransferRegistrationTimestamp,
+
     SetMuted,
 
     CreditRegularWarConclusion,
@@ -95,6 +97,14 @@ public readonly struct ZoneCommand
     public static ZoneCommand ClearZoneTransferPending(int characterId)
     {
         return new ZoneCommand { Kind = ZoneCommandKind.ClearZoneTransferPending, CharacterId = characterId };
+    }
+
+    public static ZoneCommand RefreshZoneTransferRegistrationTimestamp(int characterId)
+    {
+        return new ZoneCommand
+        {
+            Kind = ZoneCommandKind.RefreshZoneTransferRegistrationTimestamp, CharacterId = characterId
+        };
     }
 
     public static ZoneCommand SetMuted(int characterId, bool muted)
@@ -230,4 +240,16 @@ public sealed record PlayerEnterData(
     string? SourceIp = null,
     ImmutableArray<int>? RuneSystem = null,
     ImmutableArray<int>? RuneSystemStat = null,
-    int M15PetLuckyBoxPity = 0);
+    int M15PetLuckyBoxPity = 0,
+    int ActionSort = 0,
+    int ActionSkillNumber = 0,
+    int ActionSkillGradeNum1 = 0,
+    int ActionSkillGradeNum2 = 0,
+    int PetActionSort = 0,
+    float PetActionFront = 0,
+    float PetActionTargetLocationX = 0,
+    float PetActionTargetLocationY = 0,
+    float PetActionTargetLocationZ = 0,
+    ImmutableArray<(int ItemId, int Count)>? BottleSlots = null,
+    int? DrunkBottleIndex = null,
+    int? DrunkBottleTicksRemaining = null);

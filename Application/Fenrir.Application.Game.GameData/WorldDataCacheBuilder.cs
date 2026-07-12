@@ -21,6 +21,8 @@ public static class WorldDataCacheBuilder
 
     private const int MaxQuestRewardAmount = 100_000_000;
 
+    private const int MaxQuestSpeechLength = 50;
+
     private const int MaxItemCheckDateItem = 365;
 
     private const int MaxItemDataNumber3D = 10000;
@@ -135,7 +137,7 @@ public static class WorldDataCacheBuilder
         EnsureCriticalDatasetNotEmpty(rows.Skills.Count, "world.Skills");
 
         ValidateLevels(rows.Levels);
-        ValidateQuests(rows.Quests, rows.QuestRewards);
+        ValidateQuests(rows.Quests, rows.QuestRewards, rows.QuestSpeeches);
         ValidateItems(rows.Items);
         ValidateMonsters(rows.Monsters, rows.MonsterDropMoney, rows.MonsterDropPotions, rows.MonsterDropCategoryRates,
             rows.MonsterDropExtraItems, rows.MonsterDropQuestItems);
@@ -227,7 +229,10 @@ public static class WorldDataCacheBuilder
         }
     }
 
-    private static void ValidateQuests(IReadOnlyList<QuestRowDto> quests, IReadOnlyList<QuestRewardRowDto> rewards)
+    private static void ValidateQuests(
+        IReadOnlyList<QuestRowDto> quests,
+        IReadOnlyList<QuestRewardRowDto> rewards,
+        IReadOnlyList<QuestSpeechRowDto> speeches)
     {
         foreach (var quest in quests.OrderBy(static quest => quest.QuestId))
             if (quest.Step is < MinQuestStep or > MaxQuestStep)
@@ -241,6 +246,14 @@ public static class WorldDataCacheBuilder
                 throw new InvalidOperationException(
                     $"world.QuestRewards row QuestId={reward.QuestId} SlotIndex={reward.SlotIndex} has " +
                     $"Amount={amount} outside the legacy {MinQuestRewardAmount}-{MaxQuestRewardAmount} bound.");
+
+        foreach (var speech in speeches.OrderBy(static speech => speech.QuestId)
+                     .ThenBy(static speech => speech.SpeechKind)
+                     .ThenBy(static speech => speech.LineIndex))
+            if (speech.Text.Length > MaxQuestSpeechLength)
+                throw new InvalidOperationException(
+                    $"world.QuestSpeeches row QuestId={speech.QuestId} SpeechKind={speech.SpeechKind} " +
+                    $"LineIndex={speech.LineIndex} has Text longer than {MaxQuestSpeechLength} characters.");
     }
 
     private static void ValidateItems(IReadOnlyList<ItemRowDto> items)
@@ -902,7 +915,8 @@ public static class WorldDataCacheBuilder
 
         var spawnRegionsWithoutZone = 0;
         var spawnRegionsWithoutMonster = 0;
-        var spawnRegionsByZone = new Dictionary<short, List<MonsterSpawnRegionRowDto>>();
+        var fieldSpawnRegionsByZone = new Dictionary<short, List<MonsterSpawnRegionRowDto>>();
+        var bossSpawnRegionsByZone = new Dictionary<short, List<MonsterSpawnRegionRowDto>>();
         foreach (var region in spawnRegions)
         {
             if (region.ZoneNumber is not { } zoneNumber)
@@ -917,18 +931,24 @@ public static class WorldDataCacheBuilder
                 continue;
             }
 
-            AddToGroup(spawnRegionsByZone, zoneNumber, region);
+            var targetGroup = IsBossMonsterSpawnRegionFile(region.SourceFileName)
+                ? bossSpawnRegionsByZone
+                : fieldSpawnRegionsByZone;
+            AddToGroup(targetGroup, zoneNumber, region);
         }
 
         var result = new Dictionary<short, ZoneDefinition>(zones.Count);
         foreach (var zone in zones)
+        {
+            var canonicalSpawnZoneId = ZoneCanonicalSpawnRegionMap.ResolveCanonicalSpawnZoneId(zone.ZoneNumber);
             result.Add(zone.ZoneNumber, new ZoneDefinition(
                 zone,
                 TakeGroup(portalsByZone, zone.ZoneNumber),
                 TakeGroup(spawnPointsByZone, zone.ZoneNumber),
                 TakeGroup(npcSpawnsByZone, zone.ZoneNumber),
-                TakeGroup(spawnRegionsByZone,
-                    ZoneCanonicalSpawnRegionMap.ResolveCanonicalSpawnZoneId(zone.ZoneNumber))));
+                TakeGroup(fieldSpawnRegionsByZone, canonicalSpawnZoneId),
+                TakeGroup(bossSpawnRegionsByZone, canonicalSpawnZoneId)));
+        }
 
         var stats = new WorldDataFilterStats(
             portalsWithoutDestination,
@@ -950,6 +970,11 @@ public static class WorldDataCacheBuilder
             result.Add(bundle.RewardBundleId, TakeGroup(itemsByBundle, bundle.RewardBundleId));
 
         return result.ToFrozenDictionary();
+    }
+
+    private static bool IsBossMonsterSpawnRegionFile(string sourceFileName)
+    {
+        return sourceFileName.Contains("SUMMONBOSSMONSTER", StringComparison.OrdinalIgnoreCase);
     }
 
     private static void EnsureCriticalDatasetNotEmpty(int rowCount, string datasetName)

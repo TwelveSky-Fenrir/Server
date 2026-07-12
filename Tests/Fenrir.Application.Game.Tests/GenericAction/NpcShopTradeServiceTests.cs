@@ -65,7 +65,7 @@ public class NpcShopTradeServiceTests
             WorldDataTestRows.Zone(ZoneNumber),
             [], [],
             [new ZoneNpcSpawnRowDto(ZoneNumber, 0, NpcId, 100f, 0f, 100f, 0f)],
-            []);
+            [], []);
 
         return new WorldDataCache
         {

@@ -50,6 +50,11 @@ public sealed class ZoneTransferCancelService(
             return;
         }
 
+        if (!zone.Post(ZoneCommand.RefreshZoneTransferRegistrationTimestamp(characterId)))
+            logger.LogError(
+                "Zone {MapId} inbox full: dropped RefreshZoneTransferRegistrationTimestamp for character {CharacterId}",
+                zone.MapId, characterId);
+
         logger.LogInformation(
             "Character {CharacterId} cancelled its pending cross-shard zone move and resumed on map {MapId}",
             characterId, zone.MapId);

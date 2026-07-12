@@ -9,7 +9,7 @@ public class SimulationTickAccumulatorTests
     {
         var accumulator = new SimulationTickAccumulator();
 
-        Assert.Equal(0, accumulator.Advance(TimeSpan.FromMilliseconds(499)));
+        Assert.Equal(0, accumulator.Advance(TimeSpan.FromMilliseconds(SimulationClock.LegacyTickMilliseconds - 1)));
     }
 
     [Fact]

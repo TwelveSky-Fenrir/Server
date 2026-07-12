@@ -27,7 +27,7 @@ public class MonsterAiSystemReturnHomeTriggerTests
             FrameInfo1 = 1,
             FrameInfo6 = 1
         };
-        var monster = MonsterEntity.Create(1, 1, template, 1, homeX, homeY, homeZ, 500);
+        var monster = MonsterEntity.Create(1, 1, template, 1, homeX, homeY, homeZ);
         monster.AiState = MonsterAiState.Decision;
 
         var options = new GameServerOptions { AoiCellSize = 100_000f };
@@ -109,6 +109,42 @@ public class MonsterAiSystemReturnHomeTriggerTests
     }
 
     [Fact]
+    public void UnobstructedHomePath_SixtySecondCheck_AlreadyHome_FallsThroughToWanderCheckSameTick()
+    {
+        var (zone, monster) = CreateIdleZone(FlatGeometry(), 0f, 10f, 0f);
+        monster.PosX = 300f;
+        monster.PosY = 10f;
+        monster.PosZ = 0f;
+        monster.IdleReturnElapsedTicks = SimulationClock.MonsterIdleReturnHomeLegacyTicks;
+        monster.IdleWanderElapsedTicks = SimulationClock.MonsterIdleWanderLegacyTicks - 1;
+
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.True(zone.TryGetMonster(1, out var live));
+        Assert.Equal(MonsterAiState.Patrol, live!.AiState);
+        Assert.Equal(0, live.IdleReturnElapsedTicks);
+        Assert.Equal(0, live.IdleWanderElapsedTicks);
+    }
+
+    [Fact]
+    public void UnobstructedHomePath_SixtySecondCheck_AlreadyHome_WanderNotYetDue_StaysIdleWithoutForcedReset()
+    {
+        var (zone, monster) = CreateIdleZone(FlatGeometry(), 0f, 10f, 0f);
+        monster.PosX = 300f;
+        monster.PosY = 10f;
+        monster.PosZ = 0f;
+        monster.IdleReturnElapsedTicks = SimulationClock.MonsterIdleReturnHomeLegacyTicks;
+        monster.IdleWanderElapsedTicks = 5;
+
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.True(zone.TryGetMonster(1, out var live));
+        Assert.Equal(MonsterAiState.Decision, live!.AiState);
+        Assert.Equal(0, live.IdleReturnElapsedTicks);
+        Assert.Equal(6, live.IdleWanderElapsedTicks);
+    }
+
+    [Fact]
     public void XzObstructedHomePath_SixtySecondCheck_EntersReturnToSpawn_WithoutImmediatelyTeleporting()
     {
         var (zone, monster) = CreateIdleZone(TwoIslandGeometry(), 0f, 10f, 0f);
@@ -116,6 +152,7 @@ public class MonsterAiSystemReturnHomeTriggerTests
         monster.PosY = 10f;
         monster.PosZ = 100f;
         monster.IdleReturnElapsedTicks = SimulationClock.MonsterIdleReturnHomeLegacyTicks;
+        monster.IdleWanderElapsedTicks = 7;
 
         zone.Tick(SimulationClock.LegacyTick);
 

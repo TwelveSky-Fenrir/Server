@@ -37,6 +37,7 @@ public class ZoneMoveServiceSpawnPointTests
             new FakeGameServerDirectoryRepository(),
             new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
             new FakeSessionTicketRepository(),
+            new FakeCharacterShardLocationRepository(),
             new FakeEventLogRepository(),
             Options.Create(new GameServerOptions()), NullLogger<ZoneMoveService>.Instance);
 
@@ -65,6 +66,7 @@ public class ZoneMoveServiceSpawnPointTests
             [],
             [new ZoneSpawnPointRowDto(TargetMapId, 0, SourceMapId, 111f, 22f, 333f)],
             [],
+            [],
             []);
         var (service, session, sourceZone, targetZone) = CreateService(targetDefinition);
 
@@ -87,6 +89,7 @@ public class ZoneMoveServiceSpawnPointTests
             [],
             [new ZoneSpawnPointRowDto(TargetMapId, 0, SourceMapId + 1, 111f, 22f, 333f)],
             [],
+            [],
             []);
         var (service, session, sourceZone, targetZone) = CreateService(targetDefinition);
 
@@ -104,7 +107,7 @@ public class ZoneMoveServiceSpawnPointTests
     public async Task TargetZoneHasNoSpawnPointsAtAll_CharacterArrivesAtDefaultSpawn()
     {
         var targetDefinition = new ZoneDefinition(
-            new ZoneRowDto(TargetMapId, 1f, 2f, 3f), [], [], [], []);
+            new ZoneRowDto(TargetMapId, 1f, 2f, 3f), [], [], [], [], []);
         var (service, session, sourceZone, targetZone) = CreateService(targetDefinition);
 
         await service.HandleAsync(Request(SourceMapId, TargetMapId), session, CancellationToken.None);

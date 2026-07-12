@@ -14,7 +14,7 @@ public class MonsterKillCreditClassRestrictionTests
         var zone = ZoneTestKit.CreateZone(1);
         var template = WorldDataTestRows.Monster(monsterId) with { Life = life };
         monster = MonsterEntity.Create(serverIndex, (uint)serverIndex, template, 1,
-            0, 0, 0, 50, specialSort: specialSort);
+            0, 0, 0, specialSort: specialSort);
         zone.SpawnMonster(monster);
         return zone;
     }

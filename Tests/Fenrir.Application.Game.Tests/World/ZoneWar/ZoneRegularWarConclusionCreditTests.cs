@@ -57,6 +57,22 @@ public class ZoneRegularWarConclusionCreditTests
     }
 
     [Fact]
+    public void MidZoneTransferCharacter_IsNotCredited_MissionOrQuest()
+    {
+        var progress = new QuestProgress(3, 1, 8, 49, 0);
+        var (zone, state, pipe) = SetUp(49, progress);
+        state.IsMovingZone = true;
+        ZoneTestKit.DrainOutbound(pipe);
+
+        zone.Post(ZoneCommand.CreditRegularWarConclusion(1));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Equal(0, state.MissionJoinWar);
+        Assert.Equal(0, state.QuestKillCounter);
+        Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
+    }
+
+    [Fact]
     public void Archetype8QuestHolder_WithMatchingZoneTarget_AdvancesKillCounter_AndPushesMarkerNine()
     {
         var progress = new QuestProgress(3, 1, 8, 49, 0);

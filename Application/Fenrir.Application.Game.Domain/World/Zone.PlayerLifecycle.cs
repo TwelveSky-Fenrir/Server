@@ -13,6 +13,7 @@ using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.Tribes;
+using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Data.Abstractions.Game;
@@ -133,6 +134,15 @@ public sealed partial class Zone
             PetActionLocationX = data.PosX,
             PetActionLocationY = data.PosY,
             PetActionLocationZ = data.PosZ,
+            ActionSort = data.ActionSort,
+            ActionSkillNumber = data.ActionSkillNumber,
+            ActionSkillGradeNum1 = data.ActionSkillGradeNum1,
+            ActionSkillGradeNum2 = data.ActionSkillGradeNum2,
+            PetActionSort = data.PetActionSort,
+            PetActionFront = data.PetActionFront,
+            PetActionTargetLocationX = data.PetActionTargetLocationX,
+            PetActionTargetLocationY = data.PetActionTargetLocationY,
+            PetActionTargetLocationZ = data.PetActionTargetLocationZ,
             Life = data.Life,
             MaxLife = data.MaxLife,
             Mana = data.Mana,
@@ -250,6 +260,13 @@ public sealed partial class Zone
         if (data.RuneSystemStat is { } runeSystemStat)
             state.RuneSystemStat = runeSystemStat;
 
+        if (data.BottleSlots is { } bottleSlots)
+            state.BottleSlots = bottleSlots;
+        if (data.DrunkBottleIndex is { } drunkBottleIndex)
+            state.DrunkBottleIndex = drunkBottleIndex;
+        if (data.DrunkBottleTicksRemaining is { } drunkBottleTicksRemaining)
+            state.DrunkBottleTicksRemaining = drunkBottleTicksRemaining;
+
         var cell = _grid.CellOf(state.PosX, state.PosZ);
         state.CurrentCell = cell;
 
@@ -292,6 +309,7 @@ public sealed partial class Zone
 
         foreach (var otherId in _enterNeighborScratch)
             if (_players.TryGetValue(otherId, out var other) &&
+                other.VisibleState != 0 &&
                 IsVisibleAcrossDungeonInstance(other.DungeonInstanceId, state.DungeonInstanceId))
                 SendAvatarAction(state.Session, other);
 
@@ -299,7 +317,9 @@ public sealed partial class Zone
 
         SendExistingMonstersTo(state);
 
-        if (IsZone241TypeZone)
+        if (WrapCheckSpecialDestinationCatalog.IsInstancedDestination(MapId))
+            TryEnterLegendsOfDarknessInstance(characterId);
+        else if (IsZone241TypeZone)
             TryEnterZone241PersonalInstance(characterId);
 
         TryPublishPartyResyncRequest(characterId, state.Name);
@@ -484,14 +504,23 @@ public sealed partial class Zone
 
     private void HandleMarkZoneTransferPending(int characterId)
     {
-        if (_players.TryGetValue(characterId, out var state))
-            state.IsMovingZone = true;
+        if (!_players.TryGetValue(characterId, out var state))
+            return;
+
+        state.IsMovingZone = true;
+        state.ZoneTransferRegisteredAtUtc = DateTime.UtcNow;
     }
 
     private void HandleClearZoneTransferPending(int characterId)
     {
         if (_players.TryGetValue(characterId, out var state))
             state.IsMovingZone = false;
+    }
+
+    private void HandleRefreshZoneTransferRegistrationTimestamp(int characterId)
+    {
+        if (_players.TryGetValue(characterId, out var state))
+            state.ZoneTransferRegisteredAtUtc = DateTime.UtcNow;
     }
 
     private void HandleSetMuted(int characterId, bool muted)
@@ -515,7 +544,8 @@ public sealed partial class Zone
         }
     }
 
-    public void ApplyDeath(int characterId, DeathCause cause = DeathCause.Unknown)
+    public void ApplyDeath(int characterId, DeathCause cause = DeathCause.Unknown,
+        (float X, float Z)? deathSourcePosition = null)
     {
         if (!_players.TryGetValue(characterId, out var state))
         {
@@ -547,12 +577,17 @@ public sealed partial class Zone
         {
             state.IsStunned = false;
             state.StunDurationSeconds = 0;
-            state.StunCountdownAccumulatorTicks = 0;
         }
 
         ClearAllBuffs(state);
 
+        ExpireDrunkBottleEffect(state);
+
         ResetPartyBuffMarker(state);
+
+        var deathDirection = deathSourcePosition is { } source
+            ? AvatarDeathDirection.FromPositions(state.PosX, state.PosZ, source.X, source.Z)
+            : (AvatarDeathDirection?)null;
 
         var deathPet = PetActionFieldsOf(state);
         var deathAction = new ActionInfo
@@ -561,9 +596,11 @@ public sealed partial class Zone
             Sort = 12,
             Frame = 0,
             Location = [state.PosX, state.PosY, state.PosZ],
-            TargetLocation = [state.PosX, state.PosY, state.PosZ],
-            Front = state.Heading,
-            TargetFront = state.Heading,
+            TargetLocation = deathDirection is { } direction
+                ? [direction.DirectionX, 0f, direction.DirectionZ]
+                : [state.PosX, state.PosY, state.PosZ],
+            Front = deathDirection?.FacingAngle ?? state.Heading,
+            TargetFront = deathDirection?.FacingAngle ?? state.Heading,
             PetLocation = deathPet.PetLocation,
             PetTargetLocation = deathPet.PetTargetLocation,
             PetFront = deathPet.PetFront,
@@ -604,6 +641,17 @@ public sealed partial class Zone
 
             changedSlots[slot] = 1;
         }
+
+        state.DarkAttackKind = 0;
+        state.DarkAttackUseTick = 0;
+        state.DarkAttackActiveTick = 0;
+        state.HitRateKind = 0;
+        state.HitRateTick = 0;
+        state.DodgeRateKind = 0;
+        state.DodgeRateTick = 0;
+
+        state.IsUnderDarkAttackPotionDebuff = false;
+        state.DarkAttackDebuffAccumulatorTicks = 0;
 
         if (anyChanged)
             RecomputeStatsAndBroadcastBuffs(state, changedSlots);
@@ -684,6 +732,9 @@ public sealed partial class Zone
             return;
         }
 
+        if (IsFormationSkillZoneLocked(action.SkillNumber))
+            return;
+
         var motion = default(CharacterMotionEvaluation);
         if (isResumeAction)
         {
@@ -697,6 +748,15 @@ public sealed partial class Zone
                     client.Abort(DisconnectReason.Faulted);
                 return;
             }
+
+            state.DefenseHackPreviousPosX = state.PosX;
+            state.DefenseHackPreviousPosY = state.PosY;
+            state.DefenseHackPreviousPosZ = state.PosZ;
+
+            if (action.Sort == StunActionSort)
+                state.AfkTick = 0;
+            else if (AvatarActionResumeWhitelist.ClearsFishingProgress(action.Sort))
+                state.FishingState = 0;
         }
         else if (!CharacterMotionWhitelist.TryEvaluate(action.Sort, action.Type, out motion))
         {
@@ -711,28 +771,21 @@ public sealed partial class Zone
 
         var now = DateTime.UtcNow;
 
-        if (!movementRules.IsPlausible(state, in action, Geometry))
-        {
+        if (!isResumeAction && !movementRules.IsPlausible(state, in action, Geometry))
             logger.LogWarning(
-                "Zone {MapId}: MOVE REJECTED for character {CharacterId} -- Sort={Sort} Type={Type} " +
-                "From=({FromX},{FromY},{FromZ}) To=({ToX},{ToY},{ToZ}) GeometryLoaded={GeometryLoaded}",
+                "Zone {MapId}: character {CharacterId} claimed an implausible position, accepting unconditionally " +
+                "-- Sort={Sort} Type={Type} From=({FromX},{FromY},{FromZ}) To=({ToX},{ToY},{ToZ}) " +
+                "GeometryLoaded={GeometryLoaded}",
                 MapId, characterId, action.Sort, action.Type,
                 state.PosX, state.PosY, state.PosZ,
                 action.Location[0], action.Location[1], action.Location[2],
                 Geometry is not null);
-
-            SendAvatarAction(state.Session, state);
-            return;
-        }
 
         logger.LogDebug(
             "Zone {MapId}: move ACCEPTED for character {CharacterId} -- Sort={Sort} Type={Type} Frame={Frame} " +
             "To=({ToX},{ToY},{ToZ}) Front={Front}",
             MapId, characterId, action.Sort, action.Type, action.Frame,
             action.Location[0], action.Location[1], action.Location[2], action.Front);
-
-        if (IsFormationSkillZoneLocked(action.SkillNumber))
-            return;
 
         if (isResumeAction && !EvaluateResumeActionSkillGradeGuard(state, in action))
             return;
@@ -958,9 +1011,10 @@ public sealed partial class Zone
             ? (int?)weaponDef.Item.Sort
             : null;
         var maxLife = state.Stats?.MaxLife ?? state.MaxLife;
+        var reductionRatioPercent = ManaCostReduction.GetRatioPercent(BuildEquipSlotItems(state));
 
         var result = SkillCastResolver.TryCast(skillDef, manaGradePoints, state.Mana, maxLife, weaponSort,
-            state.SupportSkillTimeUpRatio, manaReductionRatioPercent: 0);
+            state.SupportSkillTimeUpRatio, reductionRatioPercent);
 
         if (result.Failure == SkillCastResolver.FailureReason.InsufficientMana)
             return false;
@@ -1089,7 +1143,8 @@ public sealed partial class Zone
         return presentCount == PartyRegistry.MaxMembers;
     }
 
-    internal void ApplyBuffWrites(PlayerRuntimeState state, ImmutableArray<SkillCastResolver.BuffWrite> writes)
+    internal void ApplyBuffWrites(PlayerRuntimeState state, ImmutableArray<SkillCastResolver.BuffWrite> writes,
+        bool recomputeStats = true)
     {
         if (writes.IsEmpty)
             return;
@@ -1104,7 +1159,10 @@ public sealed partial class Zone
             changedSlots[write.Slot] = 1;
         }
 
-        RecomputeStatsAndBroadcastBuffs(state, changedSlots);
+        if (recomputeStats)
+            RecomputeStatsAndBroadcastBuffs(state, changedSlots);
+        else
+            BroadcastEffectStateSnapshot(state, changedSlots);
     }
 
     private PlayerRuntimeState? ApplyTargetedHeal(PlayerRuntimeState caster, ActionInfo action, bool isLife,
@@ -1144,11 +1202,16 @@ public sealed partial class Zone
 
     private static bool IsHiding(PlayerRuntimeState player)
     {
-        _ = player;
-        return false;
+        return player.VisibleState == 0;
     }
 
     public void RecomputeStatsAndBroadcastBuffs(PlayerRuntimeState state, int[] changedSlots)
+    {
+        RecomputeDerivedStats(state);
+        BroadcastEffectStateSnapshot(state, changedSlots);
+    }
+
+    private void RecomputeDerivedStats(PlayerRuntimeState state)
     {
         var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
             state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo, state.RebirthCount, state.Level2);
@@ -1162,8 +1225,6 @@ public sealed partial class Zone
 
         state.Stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
             petContribution, state);
-
-        BroadcastEffectStateSnapshot(state, changedSlots);
     }
 
     private void BroadcastCasterEffectSnapshot(PlayerRuntimeState state)
@@ -1437,6 +1498,8 @@ public sealed partial class Zone
         var view = new int[35];
         for (var slot = 0; slot < 35; slot++)
             view[slot] = state.Buffs.Buff[slot * 2];
+
+        view[DarkAttackPotionDefenderEffectSlot] = state.IsUnderDarkAttackPotionDebuff ? 1 : 0;
 
         return view;
     }

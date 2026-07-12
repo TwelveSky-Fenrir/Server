@@ -14,8 +14,6 @@ public static class SkillGradeAuthority
 
     public const int PetSlotIndex = PetSlots.EquipmentSlot;
 
-    private const int PetAmuletSort = 28;
-
     private const int GuildBuffFlatBonusType = 3;
 
     private const int GuildBuffFlatBonusAmount = 1;
@@ -64,8 +62,7 @@ public static class SkillGradeAuthority
                 total += StatCalculator.PetGradedIuBonus(petItem.Item.ItemId, petItem.Item.Sort, petPackedValue,
                     amuletStatType);
 
-            if (petItem.Item.Sort != PetAmuletSort)
-                total += StatCalculator.PetGrowthValueBonusSkillGrade(petPackedValue);
+            total += StatCalculator.PetGrowthValueBonusSkillGrade(petPackedValue);
         }
 
         if (guildBuffActive && guildBuffType == GuildBuffFlatBonusType && IsBuffCategorySkill(skillDefinition))

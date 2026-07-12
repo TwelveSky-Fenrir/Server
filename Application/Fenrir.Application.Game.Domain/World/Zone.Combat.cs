@@ -174,6 +174,8 @@ public sealed partial class Zone
             {
                 (viewDamage, realDamage) = ApplyHolyShieldAbsorption(defenderState, outcome);
             }
+
+            TryApplyDarkAttackPotionProc(attackerState, defenderState);
         }
 
         var attackerWeaponItemId = attackerState.Inventory.GetSlot(ContainerMatrix.Equipment, 7)?.ItemId ?? 0;
@@ -211,7 +213,8 @@ public sealed partial class Zone
             RecordEnemyKillForFeed(attackerState, defenderState, killType == KillCpType.Stun,
                 regularWarActiveMapTracker?.IsBattleInProgress(MapId) == true ||
                 MapId == KillFeedZoneCatalog.FfaMapNumber);
-            ApplyDeath(defenderState.CharacterId, DeathCause.PlayerKill);
+            ApplyDeath(defenderState.CharacterId, DeathCause.PlayerKill,
+                (attackerState.PosX, attackerState.PosZ));
         }
     }
 
@@ -461,7 +464,8 @@ public sealed partial class Zone
             attackerState.ActionSkillGradeNum1 + attackerState.ActionSkillGradeNum2,
             tribeSymbolCombatModifiers?.GetDamageDownPenalty(attackerSnapshot.Tribe) ?? 0f,
             tribeSymbolCombatModifiers?.GetDamageUpBonusIncrementCount(attackerSnapshot.Tribe) ?? 0,
-            targetCategoryEligible);
+            targetCategoryEligible,
+            zone195NokSanState?.GetMonsterDamageBonus(attackerSnapshot.Tribe) ?? 0);
 
         if (outcome.ChargeConsumed)
             attackerState.Buffs.Buff[8 * 2] = 0;
@@ -819,7 +823,7 @@ public sealed partial class Zone
             if (memberId == killerCharacterId)
                 continue;
             if (!_players.TryGetValue(memberId, out var memberState) || memberState.IsMovingZone ||
-                memberState.IsDead)
+                memberState.IsDead || memberState.VisibleState == 0)
                 continue;
 
             ApplyQuestKillProgressToOne(memberState, monsterId, true);

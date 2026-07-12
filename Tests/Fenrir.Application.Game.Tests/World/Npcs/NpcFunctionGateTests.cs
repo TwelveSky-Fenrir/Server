@@ -22,7 +22,7 @@ public class NpcFunctionGateTests
         var rows = spawns.Select((s, i) =>
                 new ZoneNpcSpawnRowDto(1, (short)i, s.NpcId, s.X, s.Y, s.Z, 0f))
             .ToImmutableArray();
-        return new ZoneDefinition(WorldDataTestRows.Zone(1), [], [], rows, []);
+        return new ZoneDefinition(WorldDataTestRows.Zone(1), [], [], rows, [], []);
     }
 
     private static WorldDataCache WorldWithNpcs(params NpcDefinition[] npcs)

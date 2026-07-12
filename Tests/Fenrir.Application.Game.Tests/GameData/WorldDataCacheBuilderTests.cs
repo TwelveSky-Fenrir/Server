@@ -49,6 +49,23 @@ public class WorldDataCacheBuilderTests
     }
 
     [Fact]
+    public void BuildZones_SeparatesBossSpawnRegionsFromFieldSpawnRegions_ByFileName()
+    {
+        var (zones, _) = WorldDataCacheBuilder.BuildZones(
+            [Zone(1)],
+            [],
+            [],
+            [],
+            [
+                SpawnRegion(20, 1, 100),
+                BossSpawnRegion(21, 1, 500)
+            ]);
+
+        Assert.Equal(new[] { 20 }, zones[1].MonsterSpawnRegions.Select(r => r.MonsterSpawnRegionId));
+        Assert.Equal(new[] { 21 }, zones[1].BossMonsterSpawnRegions.Select(r => r.MonsterSpawnRegionId));
+    }
+
+    [Fact]
     public void BuildZones_FiltersNpcPlacementsWithoutNpc()
     {
         var (zones, stats) = WorldDataCacheBuilder.BuildZones(
@@ -250,6 +267,35 @@ public class WorldDataCacheBuilderTests
 
         Assert.Contains("world.QuestRewards", exception.Message);
         Assert.Contains("QuestId=1", exception.Message);
+    }
+
+    [Fact]
+    public void Build_Throws_WhenQuestSpeechExceedsMaxLength()
+    {
+        var rows = MinimalRows() with
+        {
+            Quests = [Quest(1)],
+            QuestSpeeches = [new QuestSpeechRowDto(1, 0, 0, new string('S', 51), 0)]
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() => WorldDataCacheBuilder.Build(rows));
+
+        Assert.Contains("world.QuestSpeeches", exception.Message);
+        Assert.Contains("QuestId=1", exception.Message);
+    }
+
+    [Fact]
+    public void Build_Accepts_QuestSpeechAtMaxLength()
+    {
+        var rows = MinimalRows() with
+        {
+            Quests = [Quest(1)],
+            QuestSpeeches = [new QuestSpeechRowDto(1, 0, 0, new string('S', 50), 0)]
+        };
+
+        var (cache, _) = WorldDataCacheBuilder.Build(rows);
+
+        Assert.Single(cache.QuestsById[1].Speeches);
     }
 
     [Fact]

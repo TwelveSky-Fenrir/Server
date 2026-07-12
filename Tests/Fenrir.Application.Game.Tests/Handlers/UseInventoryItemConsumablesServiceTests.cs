@@ -30,7 +30,7 @@ public class UseInventoryItemConsumablesServiceTests
     private const int TaiyanKeyItemId = 1049;
 
     private static async Task<UseInventoryItemResponse> RunToCompletionAsync(
-        ValueTask<UseInventoryItemResponse> pending, Zone zone)
+        ValueTask<UseInventoryItemResponse?> pending, Zone zone)
     {
         var task = pending.AsTask();
         var guard = 0;
@@ -42,7 +42,9 @@ public class UseInventoryItemConsumablesServiceTests
                 throw new TimeoutException("UseInventoryItemService task never completed.");
         }
 
-        return await task;
+        var result = await task;
+        Assert.NotNull(result);
+        return result!.Value;
     }
 
     private static (ZoneClientSession Session, FakeDuplexPipe Pipe, Zone Zone, PlayerRuntimeState State,
@@ -130,7 +132,8 @@ public class UseInventoryItemConsumablesServiceTests
             CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
-        Assert.Equal(1, response.Result);
+        Assert.NotNull(response);
+        Assert.Equal(1, response!.Value.Result);
         Assert.Null(characters.LastReplacedContainer);
         Assert.Equal(0, state.LodRounds);
     }
@@ -179,7 +182,8 @@ public class UseInventoryItemConsumablesServiceTests
             CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
-        Assert.Equal(1, response.Result);
+        Assert.NotNull(response);
+        Assert.Equal(1, response!.Value.Result);
         Assert.Equal(10, state.StatVit);
         Assert.Null(characters.LastReplacedContainer);
     }
@@ -220,7 +224,8 @@ public class UseInventoryItemConsumablesServiceTests
         var response = await service.ResolveAsync(zone, state, 10, AccountId, ContainerMatrix.InventoryPage0, 0, 5,
             CancellationToken.None);
 
-        Assert.Equal(1, response.Result);
+        Assert.NotNull(response);
+        Assert.Equal(1, response!.Value.Result);
         Assert.Equal(20, state.StatStr);
         Assert.Null(characters.LastReplacedContainer);
     }
@@ -237,7 +242,8 @@ public class UseInventoryItemConsumablesServiceTests
         var response = await service.ResolveAsync(zone, state, 10, AccountId, ContainerMatrix.InventoryPage0, 0, 1,
             CancellationToken.None);
 
-        Assert.Equal(1, response.Result);
+        Assert.NotNull(response);
+        Assert.Equal(1, response!.Value.Result);
         Assert.Null(characters.LastReplacedContainer);
     }
 
@@ -351,7 +357,8 @@ public class UseInventoryItemConsumablesServiceTests
             CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
-        Assert.Equal(1, response.Result);
+        Assert.NotNull(response);
+        Assert.Equal(1, response!.Value.Result);
         Assert.Equal(0, state.TaiyanKeyTimer);
         Assert.Null(characters.LastReplacedContainer);
     }

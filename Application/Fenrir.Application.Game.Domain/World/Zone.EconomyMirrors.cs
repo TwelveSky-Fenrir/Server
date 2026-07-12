@@ -222,6 +222,8 @@ public sealed partial class Zone
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
 
+        var hadWeaponEquipped = state.Inventory.GetSlot(ContainerMatrix.Equipment, EquipmentSlots.WeaponSlot) is not null;
+
         foreach (var snapshot in command.Containers)
         {
             state.Inventory.ReplaceContainer(snapshot.Container, snapshot.Slots);
@@ -255,6 +257,22 @@ public sealed partial class Zone
 
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
         }
+
+        if (hadWeaponEquipped && state.Inventory.GetSlot(ContainerMatrix.Equipment, EquipmentSlots.WeaponSlot) is null)
+            ClearEffectsOnWeaponUnequip(state);
+
+        if (command.RecomputeCombatPoseAfterEquip)
+            BroadcastIdleActionState(state);
+    }
+
+    private void ClearEffectsOnWeaponUnequip(PlayerRuntimeState state)
+    {
+        ClearAllBuffs(state);
+        ResetPartyBuffMarker(state);
+        state.NoManaCount = 0;
+
+        if (state.AutoHuntConfig is { } autoHuntConfig)
+            Array.Clear(autoHuntConfig.BuffStore);
     }
 
     private void DrainSkillCommands()
@@ -699,6 +717,9 @@ public sealed partial class Zone
 
         if (changed)
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+
+        if (command.ResetAfkTick)
+            state.AfkTick = 0;
 
         if (command.TeleportTo is { } teleportTo)
         {

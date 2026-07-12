@@ -43,6 +43,7 @@ public class ZoneMoveServiceCrossShardTests
             new FakeGameServerDirectoryRepository(shards),
             new FakeShardMapAssignmentRepository(hostedMapsByShard),
             tickets,
+            new FakeCharacterShardLocationRepository(),
             new FakeEventLogRepository(),
             Options.Create(options), NullLogger<ZoneMoveService>.Instance);
 
@@ -78,6 +79,42 @@ public class ZoneMoveServiceCrossShardTests
         Assert.Single(tickets.CreatedTickets);
         Assert.Equal(DestinationShardId, tickets.CreatedTickets[0].ShardId);
         Assert.Equal(session.AccountSessionToken, tickets.CreatedTickets[0].SessionToken);
+    }
+
+    [Fact]
+    public async Task LiveDestinationShardFound_StampsTheZoneTransferRegistrationTimestamp()
+    {
+        var (service, session, sourceZone, tickets) = CreateService(
+            new Dictionary<byte, short[]> { [DestinationShardId] = [TargetMapId] },
+            new ShardDirectoryEntryDto(DestinationShardId, "10.0.0.2", 11001, 0, 100, 5f));
+
+        var before = DateTime.UtcNow;
+
+        await service.HandleAsync(Request(SourceMapId, TargetMapId), session, CancellationToken.None);
+
+        Assert.Single(tickets.CreatedTickets);
+        Assert.True(sourceZone.TryGetPlayer(CharacterId, out var state));
+        Assert.True(state!.IsMovingZone);
+        Assert.True(state.ZoneTransferRegisteredAtUtc >= before);
+    }
+
+    [Fact]
+    public async Task TicketCreationFails_NeverPostsTheInTransitMarkerOrTheRegistrationTimestamp()
+    {
+        var (service, session, sourceZone, tickets) = CreateService(
+            new Dictionary<byte, short[]> { [DestinationShardId] = [TargetMapId] },
+            new ShardDirectoryEntryDto(DestinationShardId, "10.0.0.2", 11001, 0, 100, 5f));
+        tickets.ShouldThrowOnCreate = true;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.HandleAsync(Request(SourceMapId, TargetMapId), session, CancellationToken.None).AsTask());
+
+        sourceZone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(sourceZone.TryGetPlayer(CharacterId, out var state));
+        Assert.False(state!.IsMovingZone);
+        Assert.Equal(default, state.ZoneTransferRegisteredAtUtc);
+        Assert.False(session.IsCrossShardTransferPending);
     }
 
     [Fact]
@@ -157,6 +194,7 @@ public class ZoneMoveServiceCrossShardTests
             new FakeGameServerDirectoryRepository(),
             new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
             tickets,
+            new FakeCharacterShardLocationRepository(),
             new FakeEventLogRepository(),
             Options.Create(options), NullLogger<ZoneMoveService>.Instance);
 
@@ -249,6 +287,7 @@ public class ZoneMoveServiceCrossShardTests
             new FakeGameServerDirectoryRepository(shards),
             new FakeShardMapAssignmentRepository(hostedMapsByShard),
             tickets,
+            new FakeCharacterShardLocationRepository(),
             new FakeEventLogRepository(),
             Options.Create(options), NullLogger<ZoneMoveService>.Instance);
 
@@ -388,5 +427,65 @@ public class ZoneMoveServiceCrossShardTests
         Assert.Null(session.DisconnectReason);
         Assert.False(session.IsCrossShardTransferPending);
         Assert.Empty(tickets.CreatedTickets);
+    }
+
+    private static (ZoneMoveService Service, ZoneClientSession Session,
+        FakeCharacterShardLocationRepository ShardLocations) CreateServiceWithShardLocations(
+            IReadOnlyDictionary<byte, short[]> hostedMapsByShard, params ShardDirectoryEntryDto[] shards)
+    {
+        var worldData = ZoneTestKit.EmptyWorldData();
+        var zones = ZoneTestKit.CreateRegistry(worldData: worldData);
+        zones.Initialize([SourceMapId]);
+
+        var worldState = ZoneTestKit.CreateWorldState();
+        var shardLocations = new FakeCharacterShardLocationRepository();
+        var options = new GameServerOptions { ShardId = SourceShardId };
+        var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
+            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(), PortalProximityCatalog.Empty,
+            new FakeGameServerDirectoryRepository(shards),
+            new FakeShardMapAssignmentRepository(hostedMapsByShard),
+            new FakeSessionTicketRepository(),
+            shardLocations,
+            new FakeEventLogRepository(),
+            Options.Create(options), NullLogger<ZoneMoveService>.Instance);
+
+        var (session, _) = ZoneTestKit.CreateSession(1);
+        session.MarkTicketConsumed(1, CharacterId, Guid.NewGuid());
+        var sourceZone = zones[SourceMapId];
+        session.CurrentZone = sourceZone;
+
+        sourceZone.Post(ZoneCommand.Enter(CharacterId, ZoneTestKit.EnterData(session, SourceMapId, tribe: 1)));
+        sourceZone.Tick(TimeSpan.FromMilliseconds(50));
+
+        return (service, session, shardLocations);
+    }
+
+    [Fact]
+    public async Task LiveDestinationShardFound_RegistersTheCharacterAtTheDestinationShard_BeforeTheReplyIsSent()
+    {
+        var (service, session, shardLocations) = CreateServiceWithShardLocations(
+            new Dictionary<byte, short[]> { [DestinationShardId] = [TargetMapId] },
+            new ShardDirectoryEntryDto(DestinationShardId, "10.0.0.2", 11001, 0, 100, 5f));
+
+        await service.HandleAsync(Request(SourceMapId, TargetMapId), session, CancellationToken.None);
+
+        Assert.Null(session.DisconnectReason);
+        var call = Assert.Single(shardLocations.UpsertCalls);
+        Assert.Equal(CharacterId, call.CharacterId);
+        Assert.Equal(DestinationShardId, call.ShardId);
+        Assert.Equal(TargetMapId, call.MapId);
+        Assert.Equal((byte)1, call.Tribe);
+    }
+
+    [Fact]
+    public async Task LocationDirectoryRegistrationFails_PropagatesWithoutSendingAReply()
+    {
+        var (service, session, shardLocations) = CreateServiceWithShardLocations(
+            new Dictionary<byte, short[]> { [DestinationShardId] = [TargetMapId] },
+            new ShardDirectoryEntryDto(DestinationShardId, "10.0.0.2", 11001, 0, 100, 5f));
+        shardLocations.ThrowOnUpsert = true;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.HandleAsync(Request(SourceMapId, TargetMapId), session, CancellationToken.None).AsTask());
     }
 }

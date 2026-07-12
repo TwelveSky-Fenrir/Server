@@ -1,6 +1,10 @@
 using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
+using Fenrir.Application.Game.Domain.AntiCheat;
 using Fenrir.Application.Game.Domain.Consumables;
 using Fenrir.Application.Game.Domain.Hotkeys;
+using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Mounts;
+using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
 using Microsoft.Extensions.Logging;
@@ -12,6 +16,8 @@ public sealed class UseHotkeyItemService(
     WorldDataCache worldData,
     ILogger<UseHotkeyItemService> logger) : IUseHotkeyItemService
 {
+    private const byte PetFoodEquippedItemSort = 22;
+
     public async ValueTask<UseHotkeyItemOutcome> UseAsync(Zone zone, PlayerRuntimeState state, int characterId,
         int page, int index, CancellationToken cancellationToken)
     {
@@ -43,9 +49,25 @@ public sealed class UseHotkeyItemService(
         var maxLife = state.Stats?.MaxLife ?? state.MaxLife;
         var maxMana = state.Stats?.MaxMana ?? state.MaxMana;
 
+        var isDarkAttackScrollZoneAllowed = PotionWhileAttackingZoneWhitelist.IsListed(zone.MapId);
+
+        var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
+        var petFoodEligible = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack) &&
+            petStack.ItemId != 0 &&
+            worldData.ItemsById.TryGetValue(petStack.ItemId, out var petDefinition) &&
+            petDefinition.Item.Sort == PetFoodEquippedItemSort;
+
+        var mountFoodEligible =
+            MountAnimalSortClassifier.Classify(state.AnimalNumber, worldData.ItemsById) ==
+            MountAnimalSortClassifier.GenericMount;
+        var mountAnimalInfo = MountAnimalInfo.Resolve(state.AnimalIndex, state.MountActivity,
+            state.MountAccumulatedExp);
+
         var resolved = HotkeyItemConsumptionResolver.Resolve(page, index, slot, state.IsStunned, state.IsDead,
             state.CanUseConsumables, itemResolved, itemCategory, potionType1, potionType2,
-            state.Life, maxLife, state.Mana, maxMana);
+            state.Life, maxLife, state.Mana, maxMana,
+            isDarkAttackScrollZoneAllowed, state.DarkAttackKind,
+            petFoodEligible, state.PetActivity, mountFoodEligible, mountAnimalInfo.Activity);
 
         switch (resolved.Outcome)
         {
@@ -66,24 +88,22 @@ public sealed class UseHotkeyItemService(
         await characters.UpsertHotkeySlotAsync(characterId, pageByte, indexByte, newSlot.Value1, newSlot.Value2,
             (byte)newSlot.Kind, cancellationToken);
 
-        int? lifeGain = resolved.Effect is HotkeyItemConsumptionResolver.EffectKind.Life or
-            HotkeyItemConsumptionResolver.EffectKind.LifeAndMana
-            ? resolved.LifeGain
-            : null;
-        int? manaGain = resolved.Effect is HotkeyItemConsumptionResolver.EffectKind.Mana or
-            HotkeyItemConsumptionResolver.EffectKind.LifeAndMana
-            ? resolved.ManaGain
-            : null;
+        int? lifeGain = resolved.LifeGain > 0 ? resolved.LifeGain : null;
+        int? manaGain = resolved.ManaGain > 0 ? resolved.ManaGain : null;
+        int? petActivityGain = resolved.PetActivityGain > 0 ? resolved.PetActivityGain : null;
+        int? mountActivityGain = resolved.MountActivityGain > 0 ? resolved.MountActivityGain : null;
 
         if (!zone.PostHotkeySlotMirrorCommand(new HotkeySlotMirrorZoneCommand(characterId, pageByte, indexByte,
-                newSlot, lifeGain, manaGain, resolved.BuffWrites)))
+                newSlot, lifeGain, manaGain, resolved.BuffWrites, resolved.MarkerKind, resolved.MarkerValue,
+                resolved.RecomputeStats, petActivityGain, mountActivityGain)))
             logger.LogError(
                 "Zone {MapId} hotkey-slot inbox full: dropped hotkey-item-use mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
 
         logger.LogInformation(
-            "Character {CharacterId} use-hotkey-item applied: slot ({Page}:{Index}) effect {Effect}, life+{LifeGain} mana+{ManaGain}",
-            characterId, page, index, resolved.Effect, lifeGain ?? 0, manaGain ?? 0);
+            "Character {CharacterId} use-hotkey-item applied: slot ({Page}:{Index}) effect {Effect}, life+{LifeGain} mana+{ManaGain} petActivity+{PetActivityGain} mountActivity+{MountActivityGain}",
+            characterId, page, index, resolved.Effect, lifeGain ?? 0, manaGain ?? 0, petActivityGain ?? 0,
+            mountActivityGain ?? 0);
 
         return UseHotkeyItemOutcome.Success;
     }

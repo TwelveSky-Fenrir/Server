@@ -20,8 +20,6 @@ public sealed class TribeSymbolSpawner(
 {
     private const int FullEvaluationCadenceLegacyTicks = 20;
 
-    private const float SymbolLeashRadius = 15f;
-
     private const int SymbolPoolServerIndexBase = 1_002_000;
     private const int SymbolPoolSize = 100;
     private const byte NeutralSymbolIndex = 4;
@@ -50,11 +48,34 @@ public sealed class TribeSymbolSpawner(
 
     public void EvaluateNow(Zone zone)
     {
+        var smallestTribeByPoints = ResolveSmallestTribeByPoints();
+
         for (byte symbolIndex = 0; symbolIndex < SpecialTypeBySymbolIndex.Length; symbolIndex++)
-            EvaluateSymbol(zone, symbolIndex, SpecialTypeBySymbolIndex[symbolIndex]);
+            EvaluateSymbol(zone, symbolIndex, SpecialTypeBySymbolIndex[symbolIndex], smallestTribeByPoints);
     }
 
-    private void EvaluateSymbol(Zone zone, byte symbolIndex, byte specialType)
+    private byte? ResolveSmallestTribeByPoints()
+    {
+        if (worldState is null)
+            return null;
+
+        byte smallest = 0;
+        var lowestPoints = worldState.GetTribe(smallest).Points;
+
+        for (byte tribeId = 1; tribeId < WorldStateService.TribeCount; tribeId++)
+        {
+            var points = worldState.GetTribe(tribeId).Points;
+            if (points >= lowestPoints)
+                continue;
+
+            smallest = tribeId;
+            lowestPoints = points;
+        }
+
+        return smallest;
+    }
+
+    private void EvaluateSymbol(Zone zone, byte symbolIndex, byte specialType, byte? smallestTribeByPoints)
     {
         if (!TryFindTemplateBySpecialType(specialType, out var template))
             return;
@@ -95,11 +116,11 @@ public sealed class TribeSymbolSpawner(
             return;
 
         var doubleHp = symbolIndex < NeutralSymbolIndex && ownerState.Value == symbolIndex &&
-                       IsSmallestTribe(zone, symbolIndex);
+                       smallestTribeByPoints == symbolIndex;
         var spawnTemplate = doubleHp ? template with { Life = template.Life * 2 } : template;
 
         var entity = MonsterEntity.Create(freeServerIndex, zone.NextMonsterUniqueNumber(), spawnTemplate,
-            freeServerIndex, placement.X, placement.Y, placement.Z, SymbolLeashRadius);
+            freeServerIndex, placement.X, placement.Y, placement.Z);
         zone.SpawnMonster(entity);
     }
 
@@ -112,21 +133,6 @@ public sealed class TribeSymbolSpawner(
             return worldState.World.MonsterSymbol ?? TribeSymbolCatalog.NeutralUnclaimedOwnerState;
 
         return worldState.GetTribe(symbolIndex).HasSymbol ? symbolIndex : null;
-    }
-
-    private static bool IsSmallestTribe(Zone zone, byte tribeId)
-    {
-        var counts = new int[WorldStateService.TribeCount];
-        foreach (var player in zone.Players)
-            if (player.Tribe < WorldStateService.TribeCount)
-                counts[player.Tribe]++;
-
-        byte smallest = 0;
-        for (byte i = 1; i < WorldStateService.TribeCount; i++)
-            if (counts[i] < counts[smallest])
-                smallest = i;
-
-        return smallest == tribeId;
     }
 
     private static bool TryFindFreeSlot(Zone zone, out int serverIndex)

@@ -62,8 +62,6 @@ public sealed class GameServerOptions
 
     public ISet<short> Zone039TypeMapIds { get; set; } = new HashSet<short>();
 
-    public ISet<short> DungeonServerMapIds { get; set; } = new HashSet<short>();
-
     public bool HolyStoneBattleEnabled { get; set; }
 
     public short TribeSymbolBattleMapId { get; set; }
@@ -128,7 +126,7 @@ public sealed class GameServerOptions
 
     public int GuildBuffExpiryRelayRetentionSeconds { get; set; } = 30;
 
-    public int PartyResyncRelayPollIntervalSeconds { get; set; } = 2;
+    public int PartyResyncRelayPollIntervalSeconds { get; set; } = 1;
 
     public int PartyResyncRelayRetentionSeconds { get; set; } = 30;
 

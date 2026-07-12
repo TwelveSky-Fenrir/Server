@@ -3,7 +3,9 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Application.Game.Tests.TestSupport;
+using Fenrir.Network.Framing;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
+using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.World;
 
@@ -41,29 +43,44 @@ public class ZoneCombatDepthTests
         };
     }
 
-    private static Zone TwoPlayerZone(int[] rng, out PlayerRuntimeState attacker, out PlayerRuntimeState defender,
-        short mapId = 1, RegularWarActiveMapTracker? tracker = null)
+    private readonly record struct TwoPlayerSetup(
+        Zone Zone,
+        PlayerRuntimeState Attacker,
+        PlayerRuntimeState Defender,
+        FakeDuplexPipe AttackerPipe,
+        FakeDuplexPipe DefenderPipe);
+
+    private static TwoPlayerSetup CreateTwoPlayerZone(int[] rng, short mapId = 1,
+        RegularWarActiveMapTracker? tracker = null)
     {
         var zone = ZoneTestKit.CreateZone(mapId, randomSource: new ScriptedRandomSource(rng),
             regularWarActiveMapTracker: tracker);
-        var (attackerSession, _) = ZoneTestKit.CreateSession(1);
-        var (defenderSession, _) = ZoneTestKit.CreateSession(2);
+        var (attackerSession, attackerPipe) = ZoneTestKit.CreateSession(1);
+        var (defenderSession, defenderPipe) = ZoneTestKit.CreateSession(2);
 
         zone.Post(ZoneCommand.Enter(1, ZoneTestKit.EnterData(attackerSession, mapId, "Attacker", tribe: 0)));
         zone.Post(ZoneCommand.Enter(2, ZoneTestKit.EnterData(defenderSession, mapId, "Defender", tribe: 1)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
-        Assert.True(zone.TryGetPlayer(1, out var a));
-        Assert.True(zone.TryGetPlayer(2, out var d));
-        attacker = a!;
-        defender = d!;
-        attacker.Stats = StrongAttacker;
-        defender.Stats = WeakDefender;
+        Assert.True(zone.TryGetPlayer(1, out var attacker));
+        Assert.True(zone.TryGetPlayer(2, out var defender));
+        attacker!.Stats = StrongAttacker;
+        defender!.Stats = WeakDefender;
         defender.ActionSort = 1;
         attacker.AttackSubPacketCeiling = int.MaxValue;
 
         zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1));
-        return zone;
+
+        return new TwoPlayerSetup(zone, attacker, defender, attackerPipe, defenderPipe);
+    }
+
+    private static Zone TwoPlayerZone(int[] rng, out PlayerRuntimeState attacker, out PlayerRuntimeState defender,
+        short mapId = 1, RegularWarActiveMapTracker? tracker = null)
+    {
+        var setup = CreateTwoPlayerZone(rng, mapId, tracker);
+        attacker = setup.Attacker;
+        defender = setup.Defender;
+        return setup.Zone;
     }
 
     private static void Attack(Zone zone)
@@ -113,6 +130,40 @@ public class ZoneCombatDepthTests
         Assert.Equal(60, defenderLifeBefore - defender.Life);
         Assert.Equal(0, defender.Buffs.Buff[ShieldBuffSlot * 2]);
         Assert.Equal(0, defender.Buffs.Buff[ShieldBuffSlot * 2 + 1]);
+    }
+
+    [Fact]
+    public async Task HolyShieldConsumedBroadcast_ReachesTheDefenderItselfAndTheAttackerNeighbor()
+    {
+        var setup = CreateTwoPlayerZone([0, 0]);
+        setup.Defender.Buffs.Buff[ShieldBuffSlot * 2] = 100;
+        setup.Defender.Buffs.Buff[ShieldBuffSlot * 2 + 1] = 42;
+
+        ZoneTestKit.DrainOutbound(setup.AttackerPipe);
+        ZoneTestKit.DrainOutbound(setup.DefenderPipe);
+
+        Attack(setup.Zone);
+
+        var expectedChangedSlots = new int[35];
+        expectedChangedSlots[HolyShieldResolver.BaseSlot] = 1;
+        foreach (var slot in HolyShieldResolver.TieredSlots)
+            expectedChangedSlots[slot] = 1;
+
+        var expected = new AvatarEffectStateResponse
+        {
+            ServerIndex = setup.Defender.CharacterId,
+            UniqueNumber = setup.Defender.UniqueNumber,
+            EffectValue = setup.Defender.Buffs.Buff,
+            EffectValueState = expectedChangedSlots
+        };
+        var expectedBytes = new byte[FrameWriter.FrameSizeOf<AvatarEffectStateResponse>()];
+        FrameWriter.WriteFrame(in expected, expectedBytes);
+
+        var defenderBytes = await PacketAssert.ReadSentBytesAsync(setup.DefenderPipe);
+        var attackerBytes = await PacketAssert.ReadSentBytesAsync(setup.AttackerPipe);
+
+        Assert.Equal(expectedBytes, defenderBytes[..expectedBytes.Length]);
+        Assert.Equal(expectedBytes, attackerBytes[..expectedBytes.Length]);
     }
 
     [Fact]

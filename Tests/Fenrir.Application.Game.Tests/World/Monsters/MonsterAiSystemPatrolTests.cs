@@ -117,7 +117,7 @@ public class MonsterAiSystemPatrolTests
             RunSpeed = 10,
             FrameInfo1 = 1
         };
-        var monster = MonsterEntity.Create(1, 1, template, 1, 0, 0, 0, 500);
+        var monster = MonsterEntity.Create(1, 1, template, 1, 0, 0, 0);
         monster.AiState = MonsterAiState.Decision;
         monster.IdleWanderElapsedTicks = SimulationClock.MonsterIdleWanderLegacyTicks;
 
@@ -136,6 +136,103 @@ public class MonsterAiSystemPatrolTests
         Assert.Equal(expectedHeading, live.Heading, 4);
     }
 
+    [Fact]
+    public void IdleWander_UnobstructedRolledPath_CommitsExactCandidateDestination()
+    {
+        var (zone, monster) = CreateIdleWanderReadyMonster(walkSpeed: 300,
+            geometry: FlatGroundRectangle(-10f, 150f, -50f, 50f));
+
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.True(zone.TryGetMonster(monster.ServerIndex, out var live));
+        Assert.Equal(MonsterAiState.Patrol, live!.AiState);
+        Assert.Equal(100f, live.WanderTargetX, 3);
+        Assert.Equal(0f, live.WanderTargetZ, 3);
+    }
+
+    [Fact]
+    public void IdleWander_ObstructionPartwayAlongRolledPath_ClampsToLastWalkablePointButStillCommits()
+    {
+        var (zone, monster) = CreateIdleWanderReadyMonster(walkSpeed: 300,
+            geometry: FlatGroundRectangle(-10f, 70f, -50f, 50f));
+
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.True(zone.TryGetMonster(monster.ServerIndex, out var live));
+        Assert.Equal(MonsterAiState.Patrol, live!.AiState);
+        Assert.InRange(live.WanderTargetX, 65f, 70f);
+        Assert.Equal(0f, live.WanderTargetZ, 3);
+    }
+
+    [Fact]
+    public void IdleWander_ObstructionAtTheVeryFirstStep_ClampsAllTheWayBackAndStaysIdle()
+    {
+        var (zone, monster) = CreateIdleWanderReadyMonster(walkSpeed: 300,
+            geometry: FlatGroundRectangle(-10f, 5f, -50f, 50f));
+
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.True(zone.TryGetMonster(monster.ServerIndex, out var live));
+        Assert.Equal(MonsterAiState.Decision, live!.AiState);
+        Assert.Equal(0f, live.PosX);
+        Assert.Equal(0f, live.PosZ);
+        Assert.Equal(0, live.IdleWanderElapsedTicks);
+    }
+
+    [Fact]
+    public void IdleWander_ObstructionWithinMinimumDisplacement_ClampsShortOfThresholdAndStaysIdle()
+    {
+        var (zone, monster) = CreateIdleWanderReadyMonster(walkSpeed: 100,
+            geometry: FlatGroundRectangle(-10f, 10f, -50f, 50f));
+
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.True(zone.TryGetMonster(monster.ServerIndex, out var live));
+        Assert.Equal(MonsterAiState.Decision, live!.AiState);
+        Assert.Equal(0f, live.PosX);
+        Assert.Equal(0f, live.PosZ);
+        Assert.Equal(0, live.IdleWanderElapsedTicks);
+    }
+
+    private static (Zone Zone, MonsterEntity Monster) CreateIdleWanderReadyMonster(short walkSpeed,
+        ZoneGeometry geometry)
+    {
+        var template = WorldDataTestRows.Monster(600) with
+        {
+            Life = 1000,
+            AttackType = 0,
+            WalkSpeed = walkSpeed,
+            RunSpeed = walkSpeed,
+            FrameInfo1 = 1
+        };
+        var monster = MonsterEntity.Create(1, 1, template, 1, 0, 0, 0);
+        monster.AiState = MonsterAiState.Decision;
+        monster.IdleWanderElapsedTicks = SimulationClock.MonsterIdleWanderLegacyTicks;
+
+        var options = new GameServerOptions { AoiCellSize = 100_000f };
+        var zone = ZoneTestKit.CreateZone(1, options,
+            simulationSystems: [new MonsterAiSystem(new ScriptedRandomSource(200, 100, 50))],
+            geometry: geometry);
+        zone.SpawnMonster(monster);
+        return (zone, monster);
+    }
+
+    private static ZoneGeometry FlatGroundRectangle(float minX, float maxX, float minZ, float maxZ)
+    {
+        const float groundY = 10f;
+        var plane = new Vector4(0f, 1f, 0f, groundY);
+
+        var lowerHalf = new WorldTriangle(new Vector3(minX, groundY, minZ), new Vector3(maxX, groundY, minZ),
+            new Vector3(maxX, groundY, maxZ), plane);
+        var upperHalf = new WorldTriangle(new Vector3(minX, groundY, minZ), new Vector3(maxX, groundY, maxZ),
+            new Vector3(minX, groundY, maxZ), plane);
+
+        var triangles = new[] { lowerHalf, upperHalf };
+        var root = new QuadtreeNode(new Vector3(minX - 1f, 0f, minZ - 1f), new Vector3(maxX + 1f, groundY, maxZ + 1f),
+            [0, 1], [-1, -1, -1, -1]);
+        return new ZoneGeometry(triangles, [root]);
+    }
+
     private static (Zone Zone, MonsterEntity Monster) CreatePatrollingZone(
         byte specialSort = MonsterSpecialSort.Standard, ZoneGeometry? geometry = null)
     {
@@ -149,7 +246,7 @@ public class MonsterAiSystemPatrolTests
             RunSpeed = 10,
             FrameInfo1 = 1
         };
-        var monster = MonsterEntity.Create(1, 1, template, 1, 0, 0, 0, 500, specialSort: specialSort);
+        var monster = MonsterEntity.Create(1, 1, template, 1, 0, 0, 0, specialSort: specialSort);
         monster.AiState = MonsterAiState.Patrol;
         monster.WanderTargetX = 500f;
         monster.WanderTargetZ = 0f;

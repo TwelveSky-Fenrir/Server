@@ -3,10 +3,10 @@ using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Avatars;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Domain.World.Configuration;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
+using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
@@ -27,6 +27,7 @@ public sealed class ZoneMoveService(
     IGameServerDirectoryRepository directory,
     IShardMapAssignmentRepository shardMapAssignments,
     ISessionTicketRepository tickets,
+    ICharacterShardLocationRepository characterShardLocations,
     IEventLogRepository eventLog,
     IOptions<GameServerOptions> options,
     ILogger<ZoneMoveService> logger) : IZoneMoveService
@@ -51,7 +52,8 @@ public sealed class ZoneMoveService(
         sourceZone.TryGetPlayer(characterId, out var state);
 
         if (state is not null && state.ReviveHackFlag &&
-            !ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(targetZoneNumber, worldState.GetAllyOf))
+            !ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(sourceZone.MapId, targetZoneNumber, state.Tribe,
+                worldState.GetAllyOf))
         {
             logger.LogWarning(
                 "Zone-move aborted for character {CharacterId}: revive-hack flag set, transfer {SourceMapId} -> {TargetZoneNumber} not allowed while flagged",
@@ -68,7 +70,8 @@ public sealed class ZoneMoveService(
             return;
         }
 
-        if (!ZoneConfigCatalog.IsValidZoneNumber(packet.ZoneNumber) || packet.PresentZoneNumber != sourceZone.MapId)
+        if (!ZoneMoveDestinationZoneGate.IsWithinRequestRange(packet.ZoneNumber) ||
+            packet.PresentZoneNumber != sourceZone.MapId)
         {
             logger.LogWarning(
                 "Zone-move aborted for character {CharacterId}: malformed target zone {TargetZoneNumber} or present-zone mismatch (claimed {ClaimedPresentZone}, actual {ActualPresentZone})",
@@ -100,6 +103,16 @@ public sealed class ZoneMoveService(
             logger.LogDebug(
                 "Zone-move ignored for character {CharacterId}: no longer present in source zone {SourceMapId} (narrow race)",
                 characterId, sourceZone.MapId);
+            return;
+        }
+
+        if (TribeSymbolBattleZoneLockout.IsLockedOut(sourceZone.MapId, targetZoneNumber,
+                worldState.World.TribeSymbolBattle))
+        {
+            logger.LogWarning(
+                "Zone-move aborted for character {CharacterId}: tribe-symbol-battle zone lockout ({SourceMapId} -> {TargetZoneNumber})",
+                characterId, sourceZone.MapId, targetZoneNumber);
+            zoneSession.Abort(DisconnectReason.StateViolation);
             return;
         }
 
@@ -136,16 +149,6 @@ public sealed class ZoneMoveService(
                 "Zone {TargetZoneNumber} is hosted by this shard but absent from WorldDataCache -- refusing transfer for character {CharacterId}",
                 targetZoneNumber, characterId);
             zoneSession.Send(new ZoneMoveResponse { Result = 1, Ip = "", Port = 0 });
-            return;
-        }
-
-        if (TribeSymbolBattleZoneLockout.IsLockedOut(sourceZone.MapId, targetZoneNumber,
-                worldState.World.TribeSymbolBattle))
-        {
-            logger.LogWarning(
-                "Zone-move aborted for character {CharacterId}: tribe-symbol-battle zone lockout ({SourceMapId} -> {TargetZoneNumber})",
-                characterId, sourceZone.MapId, targetZoneNumber);
-            zoneSession.Abort(DisconnectReason.StateViolation);
             return;
         }
 
@@ -204,6 +207,9 @@ public sealed class ZoneMoveService(
             "Character {CharacterId} transferring same-shard: {SourceMapId} -> {TargetMapId} (sort {Sort})",
             characterId, sourceZone.MapId, targetZoneNumber, packet.Sort);
 
+        await characterShardLocations.UpsertAsync(characterId, options.Value.ShardId, targetZoneNumber, state.Name,
+            state.Tribe, cancellationToken);
+
         zoneSession.Send(new ZoneMoveResponse
         {
             Result = 0,
@@ -258,16 +264,6 @@ public sealed class ZoneMoveService(
     private async ValueTask HandleCrossShardAsync(short targetZoneNumber, int characterId, PlayerRuntimeState state,
         short originZoneId, ZoneClientSession zoneSession, CancellationToken cancellationToken)
     {
-        if (TribeSymbolBattleZoneLockout.IsLockedOut(originZoneId, targetZoneNumber,
-                worldState.World.TribeSymbolBattle))
-        {
-            logger.LogWarning(
-                "Zone-move aborted for character {CharacterId}: tribe-symbol-battle zone lockout ({SourceMapId} -> {TargetZoneNumber}, cross-shard)",
-                characterId, originZoneId, targetZoneNumber);
-            zoneSession.Abort(DisconnectReason.StateViolation);
-            return;
-        }
-
         var shards = await directory.GetDirectoryAsync(cancellationToken);
         foreach (var candidate in shards)
         {
@@ -315,11 +311,10 @@ public sealed class ZoneMoveService(
 
             ZoneTransferBuffRules.ClearIfDestinationRequiresIt(state.Buffs, targetZoneNumber);
 
-            if (zoneSession.CurrentZone is not Zone sourceZone ||
-                !sourceZone.Post(ZoneCommand.MarkZoneTransferPending(characterId)))
+            if (zoneSession.CurrentZone is not Zone sourceZone)
             {
                 logger.LogError(
-                    "Character {CharacterId}'s pending-transfer marker could not be queued before its cross-shard handoff to zone {TargetZoneNumber} -- aborting session",
+                    "Character {CharacterId}'s cross-shard handoff to zone {TargetZoneNumber} aborted: session has no current zone",
                     characterId, targetZoneNumber);
                 zoneSession.Abort(DisconnectReason.Faulted);
                 return;
@@ -329,6 +324,15 @@ public sealed class ZoneMoveService(
                 options.Value.TicketTtlSeconds, zoneSession.AccountSessionToken!.Value, zoneSession.AccountGrade,
                 cancellationToken);
 
+            if (!sourceZone.Post(ZoneCommand.MarkZoneTransferPending(characterId)))
+            {
+                logger.LogError(
+                    "Zone {SourceMapId} inbox full: character {CharacterId}'s pending-transfer marker could not be queued after its cross-shard handoff ticket was minted for zone {TargetZoneNumber} -- aborting session",
+                    sourceZone.MapId, characterId, targetZoneNumber);
+                zoneSession.Abort(DisconnectReason.Faulted);
+                return;
+            }
+
             zoneSession.MarkCrossShardTransferPending();
 
             logger.LogInformation(
@@ -336,6 +340,9 @@ public sealed class ZoneMoveService(
                 targetZoneNumber, candidate.ShardId, candidate.Host, candidate.Port, characterId);
 
             await LogZoneDepartureAsync(zoneSession, characterId, originZoneId, targetZoneNumber, cancellationToken);
+
+            await characterShardLocations.UpsertAsync(characterId, candidate.ShardId, targetZoneNumber, state.Name,
+                state.Tribe, cancellationToken);
 
             zoneSession.Send(new ZoneMoveResponse { Result = 0, Ip = candidate.Host, Port = candidate.Port });
             return;

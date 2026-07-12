@@ -184,6 +184,77 @@ public class ZoneDeathTests
     }
 
     [Fact]
+    public void ApplyDeath_ClearsHotkeyBuffAntiCheatMarkersAndTheirTimestamps()
+    {
+        var zone = ZoneTestKit.CreateZone(999);
+        var (session, _) = ZoneTestKit.CreateSession(1);
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 999)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(10, out var state));
+        state!.DarkAttackKind = 1;
+        state.DarkAttackUseTick = 123;
+        state.DarkAttackActiveTick = 123;
+        state.HitRateKind = 1;
+        state.HitRateTick = 123;
+        state.DodgeRateKind = 1;
+        state.DodgeRateTick = 123;
+        state.Buffs.Buff[16 * 2] = 1;
+        state.IsUnderDarkAttackPotionDebuff = true;
+        state.DarkAttackDebuffAccumulatorTicks = 3;
+
+        zone.ApplyDeath(10);
+
+        Assert.Equal(0, state.DarkAttackKind);
+        Assert.Equal(0, state.DarkAttackUseTick);
+        Assert.Equal(0, state.DarkAttackActiveTick);
+        Assert.Equal(0, state.HitRateKind);
+        Assert.Equal(0, state.HitRateTick);
+        Assert.Equal(0, state.DodgeRateKind);
+        Assert.Equal(0, state.DodgeRateTick);
+        Assert.Equal(0, state.Buffs.Buff[16 * 2]);
+        Assert.False(state.IsUnderDarkAttackPotionDebuff);
+        Assert.Equal(0, state.DarkAttackDebuffAccumulatorTicks);
+    }
+
+    [Fact]
+    public void ApplyDeath_ExpiresAnActiveDrunkBottleEffect_AndNotifiesTheClient()
+    {
+        var zone = ZoneTestKit.CreateZone(999);
+        var (session, pipe) = ZoneTestKit.CreateSession(1);
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 999)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+        ZoneTestKit.DrainOutbound(pipe);
+
+        Assert.True(zone.TryGetPlayer(10, out var state));
+        state!.DrunkBottleTicksRemaining = 60;
+        state.DrunkBottleIndex = 4;
+
+        zone.ApplyDeath(10);
+
+        Assert.Equal(0, state.DrunkBottleTicksRemaining);
+        Assert.Equal(4, state.DrunkBottleIndex);
+        Assert.NotEmpty(ZoneTestKit.DrainOutbound(pipe));
+    }
+
+    [Fact]
+    public void ApplyDeath_NoActiveDrunkBottleEffect_SendsNoExtraNotification()
+    {
+        var zone = ZoneTestKit.CreateZone(999);
+        var (session, pipe) = ZoneTestKit.CreateSession(1);
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 999)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+        ZoneTestKit.DrainOutbound(pipe);
+
+        Assert.True(zone.TryGetPlayer(10, out var state));
+
+        zone.ApplyDeath(10);
+
+        Assert.Equal(0, state!.DrunkBottleTicksRemaining);
+        Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
+    }
+
+    [Fact]
     public void BroadcastSuppression_FlaggedRecipientPast30Ticks_ReceivesNothingFromTheKeepAliveRebroadcast()
     {
         var worldState = ZoneTestKit.CreateWorldState();

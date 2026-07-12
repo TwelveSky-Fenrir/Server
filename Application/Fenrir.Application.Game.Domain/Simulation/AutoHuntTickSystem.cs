@@ -18,8 +18,6 @@ public sealed class AutoHuntTickSystem(
     DirtyTracker<int> dirtyTracker,
     IOptions<GameServerOptions> options) : ISimulationSystem
 {
-    private const byte WeaponSlot = 7;
-
     private const int NoManaRelocateThreshold = 1000;
 
     private static readonly FrozenDictionary<int, ImmutableArray<int>> AutoCastGateSlots =
@@ -64,7 +62,7 @@ public sealed class AutoHuntTickSystem(
     {
         var slotCount = state.AutoBuffTime >= GameDate.Today() ? 8 : 2;
 
-        var weaponItemId = state.Inventory.GetSlot(ContainerMatrix.Equipment, WeaponSlot)?.ItemId;
+        var weaponItemId = state.Inventory.GetSlot(ContainerMatrix.Equipment, EquipmentSlots.WeaponSlot)?.ItemId;
         var weaponSort = weaponItemId is { } itemId && worldData.ItemsById.TryGetValue(itemId, out var weaponDef)
             ? (int?)weaponDef.Item.Sort
             : null;

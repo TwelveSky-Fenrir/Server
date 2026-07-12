@@ -3,7 +3,10 @@ using Fenrir.Application.Game.Abstractions.BuffsMountsCosmetics;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Mounts;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Services.BuffsMountsCosmetics;
+using Fenrir.Application.Game.Stats;
+using Fenrir.Application.Game.Stats.Context;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.Abstractions.Game;
 using Fenrir.Network.Dispatch.Zone.Sessions;
@@ -48,10 +51,11 @@ public class MountStateServiceTests
     }
 
     private static MountStateService CreateService(FakeCharacterRepository? characters = null,
-        FakeEventLogRepository? eventLog = null)
+        FakeEventLogRepository? eventLog = null, WorldDataCache? worldData = null)
     {
         return new MountStateService(characters ?? new FakeCharacterRepository(),
-            eventLog ?? new FakeEventLogRepository(), NullLogger<MountStateService>.Instance);
+            eventLog ?? new FakeEventLogRepository(), worldData ?? ZoneTestKit.EmptyWorldData(),
+            NullLogger<MountStateService>.Instance);
     }
 
     [Fact]
@@ -89,22 +93,33 @@ public class MountStateServiceTests
     }
 
     [Fact]
-    public async Task Mount_ValidPreconditions_HealsAndBroadcastsMountThenAbsorbReset()
+    public async Task Mount_ValidPreconditions_RecomputesStatsAndClampsLifeManaDownToNewMax()
     {
-        var zone = ZoneTestKit.CreateZone(1);
+        var worldData = ZoneTestKit.EmptyWorldData();
+        var zone = ZoneTestKit.CreateZone(1, worldData: worldData);
         var (session, pipe, state) = Setup(zone, 10);
         var (_, neighborPipe, _) = Setup(zone, 20, 12f, 12f);
         ZoneTestKit.DrainOutbound(pipe);
+        state.StatVit = 50;
+        state.StatInt = 20;
         state.AnimalIndex = 2;
         state.AnimalTime = 5;
         state.ActionSort = 1;
         state.AnimalAbsorbState = 1;
         state.MountGarage = ImmutableArray.Create(0, 0, 1006, 0, 0, 0, 0, 0, 0, 0);
-        state.MaxLife = 800;
-        state.MaxMana = 300;
-        state.Life = 1;
-        state.Mana = 1;
-        var service = CreateService();
+        state.MountExpiryCountdownAccrualTicks = 40;
+        state.Life = 999_999;
+        state.Mana = 999_999;
+
+        var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
+            state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo, state.RebirthCount,
+            state.Level2);
+        var mountOverride = new MountContext(1006, AbsorbActive: true, RuntimeAttributes: state.MountRolledAttributes);
+        var expectedStats = EquipmentService.RecomputeStats(attributes,
+            state.Inventory.GetContainer(ContainerMatrix.Equipment), worldData, state.Buffs, default, state,
+            mountOverride: mountOverride);
+
+        var service = CreateService(worldData: worldData);
 
         var result = await RunToCompletionAsync(
             service.ApplyAsync(zone, state, 10, 1, 3, 0, CancellationToken.None), zone);
@@ -116,8 +131,39 @@ public class MountStateServiceTests
         Assert.Equal(12, mover!.AnimalIndex);
         Assert.Equal(1006, mover.AnimalNumber);
         Assert.Equal(0, mover.AnimalAbsorbState);
-        Assert.Equal(800, mover.Life);
-        Assert.Equal(300, mover.Mana);
+        Assert.Equal(0, mover.MountExpiryCountdownAccrualTicks);
+        Assert.NotNull(mover.Stats);
+        Assert.Equal(expectedStats, mover.Stats!.Value);
+        Assert.Equal(expectedStats.MaxLife, mover.Life);
+        Assert.Equal(expectedStats.MaxMana, mover.Mana);
+    }
+
+    [Fact]
+    public async Task Mount_ValidPreconditions_DoesNotHealLifeManaAlreadyBelowNewMax()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var (session, pipe, state) = Setup(zone, 10);
+        ZoneTestKit.DrainOutbound(pipe);
+        state.StatVit = 50;
+        state.StatInt = 20;
+        state.AnimalIndex = 2;
+        state.AnimalTime = 5;
+        state.ActionSort = 1;
+        state.MountGarage = ImmutableArray.Create(0, 0, 1006, 0, 0, 0, 0, 0, 0, 0);
+        state.Life = 1;
+        state.Mana = 1;
+        var service = CreateService();
+
+        var result = await RunToCompletionAsync(
+            service.ApplyAsync(zone, state, 10, 1, 3, 0, CancellationToken.None), zone);
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Null(session.DisconnectReason);
+        Assert.Equal(MountStateOutcome.Mount, result.Outcome);
+        Assert.True(zone.TryGetPlayer(10, out var mover));
+        Assert.True(mover!.Stats!.Value.MaxLife > 1);
+        Assert.Equal(1, mover.Life);
+        Assert.Equal(1, mover.Mana);
     }
 
     [Fact]

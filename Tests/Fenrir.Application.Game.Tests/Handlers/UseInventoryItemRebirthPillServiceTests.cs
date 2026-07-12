@@ -28,7 +28,7 @@ public class UseInventoryItemRebirthPillServiceTests
     private const int MaxHighLevelExp = 1_481_117_817;
 
     private static async Task<UseInventoryItemResponse> RunToCompletionAsync(
-        ValueTask<UseInventoryItemResponse> pending, Zone zone)
+        ValueTask<UseInventoryItemResponse?> pending, Zone zone)
     {
         var task = pending.AsTask();
         var guard = 0;
@@ -40,7 +40,9 @@ public class UseInventoryItemRebirthPillServiceTests
                 throw new TimeoutException("UseInventoryItemService task never completed.");
         }
 
-        return await task;
+        var result = await task;
+        Assert.NotNull(result);
+        return result!.Value;
     }
 
     private static (ZoneClientSession Session, FakeDuplexPipe Pipe, Zone Zone, PlayerRuntimeState State,

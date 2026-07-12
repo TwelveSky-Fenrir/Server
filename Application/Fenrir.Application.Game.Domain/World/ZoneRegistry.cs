@@ -42,6 +42,7 @@ public sealed class ZoneRegistry
     private readonly TribeSymbolCombatModifiers? _tribeSymbolCombatModifiers;
     private readonly WorldDataCache _worldData;
     private readonly WorldStateService? _worldState;
+    private readonly Zone195NokSanState? _zone195NokSanState;
     private readonly ILogger<Zone> _zoneLogger;
     private FrozenDictionary<short, Zone> _zones = FrozenDictionary<short, Zone>.Empty;
 
@@ -58,6 +59,7 @@ public sealed class ZoneRegistry
         IEventLogQueue? eventLogQueue = null,
         IFourGuildKillPointQueue? fourGuildKillPointQueue = null,
         TribeSymbolCombatModifiers? tribeSymbolCombatModifiers = null,
+        Zone195NokSanState? zone195NokSanState = null,
         Lazy<IPartyResyncRelayQueue>? partyResyncRelayQueue = null)
     {
         _options = options.Value;
@@ -93,6 +95,8 @@ public sealed class ZoneRegistry
         _fourGuildKillPointQueue = fourGuildKillPointQueue;
 
         _tribeSymbolCombatModifiers = tribeSymbolCombatModifiers;
+
+        _zone195NokSanState = zone195NokSanState;
 
         _partyResyncRelayQueue = partyResyncRelayQueue;
     }
@@ -130,6 +134,7 @@ public sealed class ZoneRegistry
                     eventLogQueue: _eventLogQueue,
                     fourGuildKillPointQueue: _fourGuildKillPointQueue,
                     tribeSymbolCombatModifiers: _tribeSymbolCombatModifiers,
+                    zone195NokSanState: _zone195NokSanState,
                     partyResyncRelayQueue: _partyResyncRelayQueue);
 
                 zone.PersonalDungeonBossCatalog = Zone241RebirthTierBossCatalog.Instance;

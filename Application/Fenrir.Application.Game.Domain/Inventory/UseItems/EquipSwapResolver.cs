@@ -17,16 +17,16 @@ public static class EquipSwapResolver
 
     private const int IdleActionSort = 1;
 
-    private const int EquipCategoryLow = 6;
-
-    private const int EquipCategoryHigh = 33;
-
     private static readonly ImmutableArray<byte> EquipPartTagBySlot = [2, 3, 4, 5, 6, 7, 0, 9, 10, 11, 12, 13, 14];
 
     public static bool ClaimsItem(ItemRowDto item)
     {
-        return item.Sort is >= EquipCategoryLow and <= EquipCategoryHigh &&
-               TryDeriveEquipSlot(item.EquipInfo2, out _);
+        return IsEligibleSort(item.Sort) && TryDeriveEquipSlot(item.EquipInfo2, out _);
+    }
+
+    private static bool IsEligibleSort(byte sort)
+    {
+        return sort is (>= 6 and <= 22) or 28 or 29 or 31 or 32 or 33;
     }
 
     public static bool TryDeriveEquipSlot(byte equipPartTag, out byte slot)
@@ -48,7 +48,7 @@ public static class EquipSwapResolver
         EquipItemValidationGate.EquipCandidate? candidate,
         ImmutableDictionary<byte, ItemStack> equipmentContainer,
         int actionSort,
-        byte characterTribe,
+        byte characterPreviousTribe,
         int combinedLevel,
         int rebirthCount)
     {
@@ -56,7 +56,7 @@ public static class EquipSwapResolver
             return new Result(Outcome.NotIdle, 0, default, null);
 
         var gate = EquipItemValidationGate.Evaluate(candidate,
-            EquipItemValidationGate.ItemSortClassificationNotComputed, characterTribe,
+            EquipItemValidationGate.ItemSortClassificationNotComputed, characterPreviousTribe,
             EquipItemValidationGate.SkipSlotCheck, combinedLevel, rebirthCount);
         if (gate != EquipItemValidationGate.Outcome.Success)
             return new Result(Outcome.NotEquippable, 0, default, null);

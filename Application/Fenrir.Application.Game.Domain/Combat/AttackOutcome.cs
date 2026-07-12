@@ -29,7 +29,11 @@ public enum AttackRejectReason
 
     OwnerNameLocked,
 
-    TargetCategoryIneligible
+    TargetCategoryIneligible,
+
+    DefenderChangingZone,
+
+    DefenderHidden
 }
 
 public readonly record struct AttackOutcome(

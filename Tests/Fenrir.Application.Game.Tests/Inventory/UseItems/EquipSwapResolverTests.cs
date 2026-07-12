@@ -63,6 +63,32 @@ public class EquipSwapResolverTests
         Assert.False(EquipSwapResolver.ClaimsItem(item));
     }
 
+    [Theory]
+    [InlineData(23)]
+    [InlineData(24)]
+    [InlineData(25)]
+    [InlineData(26)]
+    [InlineData(27)]
+    [InlineData(30)]
+    public void ClaimsItem_SortsInGapBetweenActiveRanges_AreNeverClaimed_EvenWithARealEquipTag(byte sort)
+    {
+        var item = WorldDataTestRows.Item(1000) with { Sort = sort, EquipInfo2 = 2 };
+        Assert.False(EquipSwapResolver.ClaimsItem(item));
+    }
+
+    [Theory]
+    [InlineData(22)]
+    [InlineData(28)]
+    [InlineData(29)]
+    [InlineData(31)]
+    [InlineData(32)]
+    [InlineData(33)]
+    public void ClaimsItem_SortsInBothActiveRanges_AreClaimed_WhenTagResolvesToARealSlot(byte sort)
+    {
+        var item = WorldDataTestRows.Item(1000) with { Sort = sort, EquipInfo2 = 2 };
+        Assert.True(EquipSwapResolver.ClaimsItem(item));
+    }
+
     [Fact]
     public void Resolve_IntoEmptyEquipSlot_Succeeds_WithNoItemComingBack()
     {

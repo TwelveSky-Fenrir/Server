@@ -24,10 +24,17 @@ public sealed class PartyResyncRelayHandler(
                 return ValueTask.CompletedTask;
 
             case PartyResyncRelaySort.PartyInfoReply:
-                logger.LogDebug(
-                    "Relayed party-resync reply {RelayId} confirms character {SourceCharacterId} is still " +
-                    "partied (party {PartyName}); no local UI change needed on shard {ShardId}",
-                    row.RelayId, row.SourceCharacterId, row.PartyName, options.Value.ShardId);
+                DeliverIfLocal(row.SourceCharacterId,
+                    new PartyRosterResponse
+                    {
+                        Sort = 3,
+                        AvatarName01 = row.PartyName,
+                        AvatarName02 = "",
+                        AvatarName03 = "",
+                        AvatarName04 = "",
+                        AvatarName05 = ""
+                    },
+                    row.RelayId, "party-info-reply");
                 return ValueTask.CompletedTask;
 
             case PartyResyncRelaySort.PartyBreak:
@@ -59,37 +66,39 @@ public sealed class PartyResyncRelayHandler(
 
     private void HandleRequest(PartyResyncRelayDto row)
     {
-        if (!zones.TryGetPlayerByName(row.PartyName, out var leaderCandidate) ||
-            !parties.IsLeader(leaderCandidate.CharacterId))
+        if (!parties.IsInParty(row.SourceCharacterId))
         {
             logger.LogDebug(
-                "Relayed party-resync request {RelayId} for party {PartyName} (subject {SourceCharacterId}) " +
-                "is not hosted on shard {ShardId}",
-                row.RelayId, row.PartyName, row.SourceCharacterId, options.Value.ShardId);
+                "Relayed party-resync request {RelayId} for character {SourceCharacterId} has no matching " +
+                "party on shard {ShardId}",
+                row.RelayId, row.SourceCharacterId, options.Value.ShardId);
             return;
         }
 
-        var roster = parties.GetMembers(leaderCandidate.CharacterId);
+        var roster = parties.GetMembers(row.SourceCharacterId);
         if (roster.Count == 0)
         {
             logger.LogDebug(
-                "Relayed party-resync request {RelayId} for party {PartyName} raced a disband on shard " +
-                "{ShardId} between the leader check and the roster fetch; treated as not hosted",
-                row.RelayId, row.PartyName, options.Value.ShardId);
+                "Relayed party-resync request {RelayId} for character {SourceCharacterId} raced a disband on " +
+                "shard {ShardId} between the membership check and the roster fetch",
+                row.RelayId, row.SourceCharacterId, options.Value.ShardId);
             return;
         }
+
+        var leaderId = roster[0];
+        var leaderName = zones.TryGetPlayer(leaderId, out var leader) ? leader.Name : "";
 
         relay.Value.Enqueue(new PartyResyncRelayEntry(
             (byte)PartyResyncRelaySort.PartyInfoReply,
             options.Value.ShardId,
             row.SourceCharacterId,
-            row.PartyName,
+            leaderName,
             row.AvatarName));
 
         logger.LogDebug(
-            "Relayed party-resync request {RelayId} for party {PartyName} confirmed on shard {ShardId} " +
-            "({MemberCount} members); result republished for subject {SourceCharacterId}",
-            row.RelayId, row.PartyName, options.Value.ShardId, roster.Count, row.SourceCharacterId);
+            "Relayed party-resync request {RelayId} for character {SourceCharacterId} confirmed on shard " +
+            "{ShardId} ({MemberCount} members); leader {LeaderName} republished",
+            row.RelayId, row.SourceCharacterId, options.Value.ShardId, roster.Count, leaderName);
     }
 
     private void DeliverIfLocal<TPacket>(int characterId, in TPacket packet, long relayId, string kind)

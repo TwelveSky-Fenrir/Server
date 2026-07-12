@@ -113,4 +113,30 @@ public class WarZoneEntryGateTests
         Assert.Equal(WarZoneEntryOutcome.RejectedOutOfRange,
             WarZoneEntryGate.Evaluate(335, 150, 13));
     }
+
+    [Theory]
+    [InlineData((short)251)]
+    [InlineData((short)258)]
+    [InlineData((short)266)]
+    public void OdawaCaveZones_LevelBandEndpoints_AreInclusiveAndAllowed(short zoneNumber)
+    {
+        Assert.Equal(WarZoneEntryOutcome.Allowed, WarZoneEntryGate.Evaluate(zoneNumber, 146, 0));
+        Assert.Equal(WarZoneEntryOutcome.Allowed, WarZoneEntryGate.Evaluate(zoneNumber, 157, 12));
+    }
+
+    [Theory]
+    [InlineData((short)251)]
+    [InlineData((short)266)]
+    public void OdawaCaveZones_OutsideLevelBand_IsRejected(short zoneNumber)
+    {
+        Assert.Equal(WarZoneEntryOutcome.RejectedOutOfRange, WarZoneEntryGate.Evaluate(zoneNumber, 145, 0));
+        Assert.Equal(WarZoneEntryOutcome.RejectedOutOfRange, WarZoneEntryGate.Evaluate(zoneNumber, 158, 0));
+    }
+
+    [Fact]
+    public void OdawaCaveZones_AnyRebirthCountWithinValidLevelBand_IsAllowed()
+    {
+        Assert.Equal(WarZoneEntryOutcome.Allowed, WarZoneEntryGate.Evaluate(260, 150, 0));
+        Assert.Equal(WarZoneEntryOutcome.Allowed, WarZoneEntryGate.Evaluate(260, 150, 12));
+    }
 }

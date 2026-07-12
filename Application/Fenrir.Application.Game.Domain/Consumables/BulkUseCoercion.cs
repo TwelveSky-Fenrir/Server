@@ -11,14 +11,8 @@ public static class BulkUseCoercion
 
     public static int Coerce(int requestedCount, int stackQuantity)
     {
-        var count = requestedCount < 1 ? 1 : requestedCount;
-
-        if (count > MaxStackQuantity)
-            count = MaxStackQuantity;
-
-        if (count > stackQuantity)
-            count = stackQuantity;
-
-        return count;
+        var floored = Math.Max(requestedCount, 1);
+        var bounded = Math.Min(Math.Min(floored, stackQuantity), MaxStackQuantity);
+        return Math.Max(bounded, 1);
     }
 }

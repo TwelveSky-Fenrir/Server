@@ -58,7 +58,8 @@ public class MeditationRegenSystemTests
         var worldData = ZoneTestKit.EmptyWorldData(skillsById: skillsById);
         var dirtyTracker = new DirtyTracker<int>();
         var zone = ZoneTestKit.CreateZone(1, dirtyTracker: dirtyTracker,
-            simulationSystems: [new MeditationRegenSystem(worldData, dirtyTracker)], worldData: worldData);
+            simulationSystems: [new AvatarOneSecondGateSystem(), new MeditationRegenSystem(worldData, dirtyTracker)],
+            worldData: worldData);
 
         var (session, pipe) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
@@ -169,6 +170,23 @@ public class MeditationRegenSystemTests
     }
 
     [Fact]
+    public void MidZoneTransfer_NeverRegeneratesEvenWhileSitting()
+    {
+        var (zone, state, pipe) = SetUp(84, 32);
+        var startLife = state.Life;
+        var startMana = state.Mana;
+
+        zone.Post(ZoneCommand.Move(10, SitAction(7, 5), true));
+        zone.Tick(SimulationClock.LegacyTick);
+        state.IsMovingZone = true;
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.Equal(startLife, state.Life);
+        Assert.Equal(startMana, state.Mana);
+        Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
+    }
+
+    [Fact]
     public void Regen_BurstOfMultipleLegacyTicks_CatchesUpWholePeriodsAndKeepsRemainder()
     {
         var (zone, state, _) = SetUp(255, 255);
@@ -179,6 +197,6 @@ public class MeditationRegenSystemTests
         zone.Tick(TimeSpan.FromMilliseconds(2500));
 
         Assert.Equal(startLife + 6, state.Life);
-        Assert.Equal(1, state.MeditationRegenAccumulatorTicks);
+        Assert.Equal(4, state.LastOneSecondGateTick);
     }
 }

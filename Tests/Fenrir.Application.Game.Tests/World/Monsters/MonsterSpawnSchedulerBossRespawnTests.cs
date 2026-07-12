@@ -9,7 +9,10 @@ namespace Fenrir.Application.Game.Tests.World.Monsters;
 
 public class MonsterSpawnSchedulerBossRespawnTests
 {
-    private static WorldDataCache CacheWithOneRegion(int monsterId, int regionId, int summonTimeSeconds)
+    private const short YangGokNormalBossZoneId = 38;
+
+    private static WorldDataCache CacheWithOneRegion(short zoneNumber, int monsterId, int regionId,
+        int summonTimeSeconds)
     {
         var monster = WorldDataTestRows.Monster(monsterId) with
         {
@@ -19,7 +22,7 @@ public class MonsterSpawnSchedulerBossRespawnTests
             SummonTime1 = summonTimeSeconds,
             SummonTime2 = summonTimeSeconds
         };
-        var region = WorldDataTestRows.SpawnRegion(regionId, 1, monsterId) with
+        var region = WorldDataTestRows.SpawnRegion(regionId, zoneNumber, monsterId) with
         {
             Number = 1,
             LocationX = 0,
@@ -28,7 +31,13 @@ public class MonsterSpawnSchedulerBossRespawnTests
             Radius = 0
         };
 
-        var rows = WorldDataTestRows.MinimalRows() with { Monsters = [monster], MonsterSpawnRegions = [region] };
+        var rows = WorldDataTestRows.MinimalRows() with
+        {
+            Monsters = [monster],
+            Zones = [WorldDataTestRows.Zone(zoneNumber)],
+            ZonePortals = [WorldDataTestRows.Portal(zoneNumber, 0, zoneNumber)],
+            MonsterSpawnRegions = [region]
+        };
         return WorldDataCacheBuilder.Build(rows).Cache;
     }
 
@@ -43,7 +52,7 @@ public class MonsterSpawnSchedulerBossRespawnTests
     [Fact]
     public void Monster746_RespawnsAfterItsFixed240SecondOverride_NotTheCatalogedSummonTime()
     {
-        var cache = CacheWithOneRegion(746, 1, 9999);
+        var cache = CacheWithOneRegion(1, 746, 1, 9999);
         var scheduler = new MonsterSpawnScheduler(cache);
         var zone = ZoneTestKit.CreateZone(1, simulationSystems: [scheduler], worldData: cache);
 
@@ -61,16 +70,30 @@ public class MonsterSpawnSchedulerBossRespawnTests
     }
 
     [Fact]
-    public void KillingAPersistedBossMonster_ArmsTheTracker_WithTheRolledDeadline()
+    public void SpawningAPersistedBossMonster_ArmsTheTracker_WithTheAliveSentinel()
     {
-        var cache = CacheWithOneRegion(564, 77, 100);
+        var cache = CacheWithOneRegion(YangGokNormalBossZoneId, 564, 77, 100);
         var repository = new FakeMonsterBossRespawnTimerRepository();
         var tracker = CreateTracker(repository);
         var scheduler = new MonsterSpawnScheduler(cache, bossRespawnTracker: tracker);
-        var zone = ZoneTestKit.CreateZone(1, simulationSystems: [scheduler], worldData: cache);
+        var zone = ZoneTestKit.CreateZone(YangGokNormalBossZoneId, simulationSystems: [scheduler], worldData: cache);
 
         zone.Tick(SimulationClock.LegacyTick);
-        Assert.False(tracker.TryGetNextSpawnUtc(77, out _));
+
+        Assert.True(tracker.TryGetNextSpawnUtc(77, out var deadline));
+        Assert.Equal(DateTime.MinValue, deadline);
+    }
+
+    [Fact]
+    public void KillingAPersistedBossMonster_ArmsTheTracker_WithTheRolledDeadline()
+    {
+        var cache = CacheWithOneRegion(YangGokNormalBossZoneId, 564, 77, 100);
+        var repository = new FakeMonsterBossRespawnTimerRepository();
+        var tracker = CreateTracker(repository);
+        var scheduler = new MonsterSpawnScheduler(cache, bossRespawnTracker: tracker);
+        var zone = ZoneTestKit.CreateZone(YangGokNormalBossZoneId, simulationSystems: [scheduler], worldData: cache);
+
+        zone.Tick(SimulationClock.LegacyTick);
 
         var beforeKill = DateTime.UtcNow;
         zone.TryDamageMonster(1, 10_000, null, out _, out _);
@@ -86,14 +109,14 @@ public class MonsterSpawnSchedulerBossRespawnTests
     public void Restart_WithAStillPendingPersistedDeadline_DoesNotPopTheSlot_UntilItElapses()
     {
         const int regionId = 9;
-        var cache = CacheWithOneRegion(565, regionId, 5);
+        var cache = CacheWithOneRegion(YangGokNormalBossZoneId, 565, regionId, 5);
         var repository = new FakeMonsterBossRespawnTimerRepository
         {
             Rows = { [regionId] = DateTime.UtcNow.AddSeconds(3) }
         };
         var tracker = CreateTracker(repository);
         var scheduler = new MonsterSpawnScheduler(cache, bossRespawnTracker: tracker);
-        var zone = ZoneTestKit.CreateZone(1, simulationSystems: [scheduler], worldData: cache);
+        var zone = ZoneTestKit.CreateZone(YangGokNormalBossZoneId, simulationSystems: [scheduler], worldData: cache);
 
         zone.Tick(SimulationClock.LegacyTick);
         Assert.Equal(0, zone.MonsterCount);
@@ -108,14 +131,14 @@ public class MonsterSpawnSchedulerBossRespawnTests
     public void Restart_WithAnAlreadyDuePersistedDeadline_PopsOnTheFirstTick()
     {
         const int regionId = 11;
-        var cache = CacheWithOneRegion(566, regionId, 5);
+        var cache = CacheWithOneRegion(YangGokNormalBossZoneId, 566, regionId, 5);
         var repository = new FakeMonsterBossRespawnTimerRepository
         {
             Rows = { [regionId] = DateTime.UtcNow.AddSeconds(-30) }
         };
         var tracker = CreateTracker(repository);
         var scheduler = new MonsterSpawnScheduler(cache, bossRespawnTracker: tracker);
-        var zone = ZoneTestKit.CreateZone(1, simulationSystems: [scheduler], worldData: cache);
+        var zone = ZoneTestKit.CreateZone(YangGokNormalBossZoneId, simulationSystems: [scheduler], worldData: cache);
 
         zone.Tick(SimulationClock.LegacyTick);
 
@@ -125,9 +148,9 @@ public class MonsterSpawnSchedulerBossRespawnTests
     [Fact]
     public void OrdinaryMonsterInThePersistedIdRange_WithNoTrackerWired_BehavesLikeAnyOtherMonster()
     {
-        var cache = CacheWithOneRegion(567, 1, 2);
+        var cache = CacheWithOneRegion(YangGokNormalBossZoneId, 567, 1, 2);
         var scheduler = new MonsterSpawnScheduler(cache);
-        var zone = ZoneTestKit.CreateZone(1, simulationSystems: [scheduler], worldData: cache);
+        var zone = ZoneTestKit.CreateZone(YangGokNormalBossZoneId, simulationSystems: [scheduler], worldData: cache);
 
         zone.Tick(SimulationClock.LegacyTick);
         Assert.Equal(1, zone.MonsterCount);
@@ -139,5 +162,26 @@ public class MonsterSpawnSchedulerBossRespawnTests
             zone.Tick(SimulationClock.LegacyTick);
 
         Assert.Equal(1, zone.MonsterCount);
+    }
+
+    [Fact]
+    public void SamePersistedIdRange_OutsideZone38_NeverTouchesTheTracker()
+    {
+        const short otherZoneNumber = 196;
+        const int regionId = 13;
+        var cache = CacheWithOneRegion(otherZoneNumber, 568, regionId, 100);
+        var repository = new FakeMonsterBossRespawnTimerRepository();
+        var tracker = CreateTracker(repository);
+        var scheduler = new MonsterSpawnScheduler(cache, bossRespawnTracker: tracker);
+        var zone = ZoneTestKit.CreateZone(otherZoneNumber, simulationSystems: [scheduler], worldData: cache);
+
+        zone.Tick(SimulationClock.LegacyTick);
+        Assert.Equal(1, zone.MonsterCount);
+        Assert.False(tracker.TryGetNextSpawnUtc(regionId, out _));
+
+        zone.TryDamageMonster(1, 10_000, null, out _, out _);
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.False(tracker.TryGetNextSpawnUtc(regionId, out _));
     }
 }

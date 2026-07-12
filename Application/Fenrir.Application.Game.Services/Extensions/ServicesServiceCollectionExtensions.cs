@@ -261,5 +261,6 @@ public static class ServicesServiceCollectionExtensions
         services.AddSingleton<IInventoryToWorldDropService, InventoryToWorldDropService>();
 
         services.AddSingleton<IBigMoneyTransferService, BigMoneyTransferService>();
+        services.AddSingleton<IBigMoneyUnitConversionService, BigMoneyUnitConversionService>();
     }
 }

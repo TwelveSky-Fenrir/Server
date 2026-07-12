@@ -18,6 +18,7 @@ using Fenrir.Application.Game.Domain.World.Loot;
 using Fenrir.Application.Game.Domain.World.Monsters;
 using Fenrir.Application.Game.Domain.World.Npcs;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
+using Fenrir.Application.Game.GameData;
 using Fenrir.Data.WriteBehind;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -45,14 +46,17 @@ public static class DomainServiceCollectionExtensions
         services.AddSingleton(AntiCampingGuardPointCatalog.Default);
         services.AddSingleton<ISimulationSystem, AntiCampingForcedReturnSystem>();
 
+        services.AddSingleton<ISimulationSystem, AvatarOneSecondGateSystem>();
         services.AddSingleton<ISimulationSystem, BuffExpirySystem>();
         services.AddSingleton<ISimulationSystem, StunCountdownSystem>();
+        services.AddSingleton<ISimulationSystem, DarkAttackPotionDebuffExpirySystem>();
         services.AddSingleton<ISimulationSystem, AutoHuntTickSystem>();
         services.AddSingleton<ISimulationSystem, MeditationRegenSystem>();
         services.AddSingleton<ISimulationSystem, MonsterAiSystem>();
         services.AddSingleton<ISimulationSystem, MonsterSpawnScheduler>();
 
-        services.AddSingleton(MonsterBossSummonCatalog.Empty);
+        services.AddSingleton(static provider =>
+            MonsterBossSummonCatalog.BuildFrom(provider.GetRequiredService<WorldDataCache>()));
         services.AddSingleton<ISimulationSystem, MonsterBossSpawnSystem>();
 
         services.AddSingleton<ValleyWarKillRegistry>();
@@ -74,6 +78,8 @@ public static class DomainServiceCollectionExtensions
         services.AddSingleton<ISimulationSystem, SupportSkillTimeUpRatioMaintenanceSystem>();
 
         services.AddSingleton<ISimulationSystem, PetExpBoostCountdownSystem>();
+
+        services.AddSingleton<ISimulationSystem, BottleDrunkExpirySystem>();
 
         services.AddSingleton<ISimulationSystem, MountExpiryCountdownSystem>();
 

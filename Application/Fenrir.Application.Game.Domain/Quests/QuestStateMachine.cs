@@ -136,8 +136,12 @@ public static class QuestStateMachine
                     if (rewardItemId == 0 && reward.ItemId is { } id)
                     {
                         rewardItemId = id;
-                        var sort = itemSort(id);
-                        rewardQuantity = sort is >= 7 and <= 29 ? 0 : 1;
+                        rewardQuantity = itemSort(id) switch
+                        {
+                            null => 0,
+                            >= 7 and <= 29 => 0,
+                            _ => 1
+                        };
                     }
 
                     break;

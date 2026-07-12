@@ -31,7 +31,7 @@ public class UseItemFamiliesServiceTests
     private const int MountBoxItemId = 635;
 
     private static async Task<UseInventoryItemResponse> RunToCompletionAsync(
-        ValueTask<UseInventoryItemResponse> pending, Zone zone)
+        ValueTask<UseInventoryItemResponse?> pending, Zone zone)
     {
         var task = pending.AsTask();
         var guard = 0;
@@ -43,7 +43,9 @@ public class UseItemFamiliesServiceTests
                 throw new TimeoutException("UseInventoryItemService task never completed.");
         }
 
-        return await task;
+        var result = await task;
+        Assert.NotNull(result);
+        return result!.Value;
     }
 
     private static (ZoneClientSession Session, Zone Zone, PlayerRuntimeState State, FakeCharacterRepository Characters)
@@ -157,7 +159,8 @@ public class UseItemFamiliesServiceTests
             ContainerMatrix.InventoryPage0, 0, 0, CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
-        Assert.Equal(1, response.Result);
+        Assert.NotNull(response);
+        Assert.Equal(1, response!.Value.Result);
         Assert.Equal(111, state.Title);
         Assert.Equal(15000, state.ContributionPoints);
         Assert.Null(characters.LastReplacedContainer);
@@ -176,7 +179,8 @@ public class UseItemFamiliesServiceTests
             ContainerMatrix.InventoryPage0, 0, 0, CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
-        Assert.Equal(1, response.Result);
+        Assert.NotNull(response);
+        Assert.Equal(1, response!.Value.Result);
         Assert.Equal(112, state.Title);
         Assert.Equal(9999, state.ContributionPoints);
         Assert.Null(characters.LastReplacedContainer);
@@ -215,7 +219,8 @@ public class UseItemFamiliesServiceTests
             ContainerMatrix.InventoryPage0, 0, 0, CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
-        Assert.Equal(1, response.Result);
+        Assert.NotNull(response);
+        Assert.Equal(1, response!.Value.Result);
         Assert.Equal(96, state.Halo);
         Assert.Null(characters.LastReplacedContainer);
     }
@@ -232,30 +237,12 @@ public class UseItemFamiliesServiceTests
             ContainerMatrix.InventoryPage0, 0, 0, CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
-        Assert.Equal(1, response.Result);
+        Assert.NotNull(response);
+        Assert.Equal(1, response!.Value.Result);
         Assert.Null(characters.LastReplacedContainer);
         Assert.NotNull(state.Inventory.GetSlot(ContainerMatrix.InventoryPage0, 0));
     }
 
-
-    [Fact]
-    public async Task DatedVaultGate_LastPageExpired_FailsCleanly_BeforeAnyFamilyDispatch()
-    {
-        var (session, zone, state, characters) = SetUp();
-        state.InventoryDate = 0;
-        state.Title = 112;
-        state.ContributionPoints = 15000;
-        SeedInventory(zone, ContainerMatrix.InventoryPage1, Ticket(TitleTicketItemId));
-        var service = CreateService(characters);
-
-        var response = await service.ResolveAsync(zone, state, CharacterId, AccountId,
-            ContainerMatrix.InventoryPage1, 0, 0, CancellationToken.None);
-
-        Assert.Null(session.DisconnectReason);
-        Assert.Equal(1, response.Result);
-        Assert.Equal(112, state.Title);
-        Assert.Null(characters.LastReplacedContainer);
-    }
 
     [Fact]
     public async Task DatedVaultGate_LastPageStillValid_LetsDispatchProceed()

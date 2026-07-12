@@ -2,8 +2,12 @@ using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.BuffsMountsCosmetics;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Mounts;
+using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.GameData;
+using Fenrir.Application.Game.Stats;
+using Fenrir.Application.Game.Stats.Context;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.BuffsMountsCosmetics;
@@ -11,6 +15,7 @@ namespace Fenrir.Application.Game.Services.BuffsMountsCosmetics;
 public sealed class MountStateService(
     ICharacterRepository characters,
     IEventLogRepository eventLog,
+    WorldDataCache worldData,
     ILogger<MountStateService> logger)
     : IMountStateService
 {
@@ -72,10 +77,21 @@ public sealed class MountStateService(
 
             case MountStateResolver.ResultKind.Mount:
             {
-                var maxLife = state.Stats?.MaxLife ?? state.MaxLife;
-                var maxMana = state.Stats?.MaxMana ?? state.MaxMana;
+                var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
+                var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt,
+                    state.StatDex, state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo,
+                    state.RebirthCount, state.Level2);
+                var mountOverride = new MountContext(result.NewAnimalNumber,
+                    AbsorbActive: state.AnimalAbsorbState != 0, RuntimeAttributes: state.MountRolledAttributes);
+                var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
+                    state.Buffs, ComputePetContribution(state, equipmentContainer), state,
+                    mountOverride: mountOverride);
+
+                var newLife = Math.Min(state.Life, updatedStats.MaxLife);
+                var newMana = Math.Min(state.Mana, updatedStats.MaxMana);
+
                 zone.PostMountCommand(new MountZoneCommand(characterId, result.NewAnimalIndex,
-                    result.NewAnimalNumber, 0, maxLife, maxMana,
+                    result.NewAnimalNumber, 0, newLife, newMana, updatedStats,
                     Broadcast: MountBroadcastKind.Mount));
                 return new MountStateResult(MountStateOutcome.Mount);
             }
@@ -184,6 +200,16 @@ public sealed class MountStateService(
         page = 0;
         slot = 0;
         return false;
+    }
+
+    private PetStatContribution ComputePetContribution(PlayerRuntimeState state,
+        IReadOnlyDictionary<byte, ItemStack> equipmentContainer)
+    {
+        var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
+            ? petStack.ItemId
+            : 0;
+
+        return PetGrowthCalculator.Compute(petItemId, state.PetGrowth, state.PetActivity, worldData.ItemsById);
     }
 
     private static ImmutableDictionary<byte, ItemStack> ConsumeOne(ImmutableDictionary<byte, ItemStack> container,

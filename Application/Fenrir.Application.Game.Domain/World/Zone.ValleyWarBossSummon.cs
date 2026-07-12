@@ -9,8 +9,6 @@ public sealed partial class Zone
 
     private const int ValleyWarBossPoolSize = 10;
 
-    private const float ValleyWarBossLeashRadius = 200f;
-
     internal void HandleSummonValleyWarBoss()
     {
         if (!worldData.MonstersById.TryGetValue(Zone200GateBreachBossCatalog.BossMonsterId, out var definition))
@@ -24,7 +22,7 @@ public sealed partial class Zone
 
         var monster = MonsterEntity.Create(serverIndex, NextMonsterUniqueNumber(), definition.Monster, serverIndex,
             Zone200GateBreachBossCatalog.SummonX, Zone200GateBreachBossCatalog.SummonY,
-            Zone200GateBreachBossCatalog.SummonZ, ValleyWarBossLeashRadius);
+            Zone200GateBreachBossCatalog.SummonZ);
 
         SpawnMonster(monster);
     }

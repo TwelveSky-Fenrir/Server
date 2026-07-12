@@ -36,6 +36,7 @@ public sealed class GenericActionHandler(
     IHotkeyActionService hotkeyActionService,
     IPetBagActionService petBagActionService,
     IBigMoneyTransferService bigMoneyTransferService,
+    IBigMoneyUnitConversionService bigMoneyUnitConversionService,
     ILogger<GenericActionHandler> logger)
     : IAsyncPacketHandler<GenericActionRequest>
 {
@@ -428,6 +429,19 @@ public sealed class GenericActionHandler(
             return;
         }
 
+        if (sort is 246 or 247)
+        {
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort, nameof(IBigMoneyUnitConversionService.ConvertAsync));
+
+            var conversionResult = await bigMoneyUnitConversionService.ConvertAsync(sort, packet.Data, zone, state,
+                zoneSession.AccountId!.Value, characterId, cancellationToken);
+            Respond(session, zoneSession, sort, packet.Data, conversionResult);
+            return;
+        }
+
         if (sort == 519)
         {
             if (!GmBlockAvatarPayload.TryRead(packet.Data, out var gmBlockPayload))
@@ -520,7 +534,7 @@ public sealed class GenericActionHandler(
                 logger.LogDebug(
                     "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
                     zoneSession.SessionId, characterId, sort, nameof(IGmBasicCommandService.HandleCallAsync));
-            await gmBasicCommandService.HandleCallAsync(packet.Data, zoneSession, state, cancellationToken);
+            await gmBasicCommandService.HandleCallAsync(packet.Data, zoneSession, state, zone, cancellationToken);
             return;
         }
 
@@ -531,6 +545,18 @@ public sealed class GenericActionHandler(
                     "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
                     zoneSession.SessionId, characterId, sort, nameof(IGmBasicCommandService.HandleMoveToTargetAsync));
             await gmBasicCommandService.HandleMoveToTargetAsync(packet.Data, zoneSession, state, zone,
+                cancellationToken);
+            return;
+        }
+
+        if (sort == 528)
+        {
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort,
+                    nameof(IGmBasicCommandService.HandleMoveToPositionAsync));
+            await gmBasicCommandService.HandleMoveToPositionAsync(packet.Data, zoneSession, state, zone,
                 cancellationToken);
             return;
         }

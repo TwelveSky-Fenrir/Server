@@ -17,6 +17,7 @@ internal sealed class MonsterSpawnSlot
     public required int ServerIndex { get; init; }
     public bool Alive { get; set; }
     public int RespawnTicksRemaining { get; set; }
+    public bool HasPersistedDeadline { get; set; }
 }
 
 internal sealed class MonsterZoneSpawnState
@@ -41,6 +42,10 @@ public sealed class MonsterSpawnScheduler(
 {
     private const int RegularMonsterTableCapacity = 3400;
 
+    private const short YangGokNormalBossZoneId = 38;
+
+    private static readonly DateTime YangGokNormalBossAliveSentinelUtc = DateTime.MinValue;
+
     private readonly BossDropCatalog _bossDropCatalog = bossDropCatalog ?? BossDropCatalog.Default;
 
     private readonly Func<Random> _randomFactory = randomFactory ?? (static () => new Random());
@@ -57,7 +62,7 @@ public sealed class MonsterSpawnScheduler(
         {
             state.InitialPopDone = true;
             foreach (var slot in state.Slots)
-                if (slot.RespawnTicksRemaining <= 0)
+                if (!slot.Alive && (!slot.HasPersistedDeadline || slot.RespawnTicksRemaining <= 0))
                     Spawn(zone, slot);
         }
 
@@ -102,6 +107,7 @@ public sealed class MonsterSpawnScheduler(
             totalRequested += spawnCount;
         }
 
+        var random = _randomFactory();
         var slots = new List<MonsterSpawnSlot>();
         var nextServerIndex = 1;
         var now = DateTime.UtcNow;
@@ -118,14 +124,20 @@ public sealed class MonsterSpawnScheduler(
                         ServerIndex = nextServerIndex++
                     };
 
-                    if (IsPersistedBossMonster(monster.MonsterId) && bossRespawnTracker is { } tracker &&
+                    if (IsPersistedBossMonster(mapId, monster.MonsterId) && bossRespawnTracker is { } tracker &&
                         tracker.TryGetNextSpawnUtc(region.MonsterSpawnRegionId, out var dueAtUtc))
+                    {
+                        slot.HasPersistedDeadline = true;
                         slot.RespawnTicksRemaining = SimulationClock.ToWholeLegacyTicks(dueAtUtc - now);
+                    }
+                    else
+                    {
+                        slot.RespawnTicksRemaining = RollUniformRespawnTicks(monster, random);
+                    }
 
                     slots.Add(slot);
                 }
 
-        var random = _randomFactory();
         return new MonsterZoneSpawnState
         {
             Slots = slots,
@@ -151,12 +163,14 @@ public sealed class MonsterSpawnScheduler(
             y = groundY;
         }
 
-        var leash = MathF.Max(region.Radius, 1f);
         var entity = MonsterEntity.Create(slot.ServerIndex, zone.NextMonsterUniqueNumber(), slot.Monster,
-            slot.ServerIndex, x, y, z, leash);
+            slot.ServerIndex, x, y, z);
 
         zone.SpawnMonster(entity);
         slot.Alive = true;
+
+        if (IsPersistedBossMonster(zone.MapId, slot.Monster.MonsterId) && bossRespawnTracker is { } tracker)
+            tracker.SetNextSpawnUtc(slot.Region.MonsterSpawnRegionId, YangGokNormalBossAliveSentinelUtc);
     }
 
     private void DrainDeaths(Zone zone, MonsterZoneSpawnState state)
@@ -172,7 +186,7 @@ public sealed class MonsterSpawnScheduler(
                 var respawnTicks = RollRespawnTicks(slot.Monster, state.Random);
                 slot.RespawnTicksRemaining = respawnTicks;
 
-                if (IsPersistedBossMonster(slot.Monster.MonsterId) && bossRespawnTracker is { } tracker)
+                if (IsPersistedBossMonster(zone.MapId, slot.Monster.MonsterId) && bossRespawnTracker is { } tracker)
                     tracker.SetNextSpawnUtc(slot.Region.MonsterSpawnRegionId,
                         DateTime.UtcNow + SimulationClock.ToTimeSpan(respawnTicks));
             }
@@ -183,18 +197,22 @@ public sealed class MonsterSpawnScheduler(
 
     private static int RollRespawnTicks(MonsterRowDto monster, Random random)
     {
-        if (monster.MonsterId == 746)
-            return SimulationClock.ToWholeLegacyTicks(TimeSpan.FromSeconds(240));
+        return monster.MonsterId == 746
+            ? SimulationClock.ToWholeLegacyTicks(TimeSpan.FromSeconds(240))
+            : RollUniformRespawnTicks(monster, random);
+    }
 
+    private static int RollUniformRespawnTicks(MonsterRowDto monster, Random random)
+    {
         var minSeconds = monster.SummonTime1;
         var maxSeconds = monster.SummonTime2;
         var seconds = maxSeconds > minSeconds ? minSeconds + random.Next(maxSeconds - minSeconds + 1) : minSeconds;
         return SimulationClock.ToWholeLegacyTicks(TimeSpan.FromSeconds(Math.Max(0, seconds)));
     }
 
-    private static bool IsPersistedBossMonster(int monsterId)
+    private static bool IsPersistedBossMonster(short mapId, int monsterId)
     {
-        return monsterId is >= 564 and <= 568;
+        return mapId == YangGokNormalBossZoneId && monsterId is >= 564 and <= 568;
     }
 
     private void ProcessDeath(Zone zone, MonsterZoneSpawnState state, DeadMonsterEvent death)
@@ -203,8 +221,6 @@ public sealed class MonsterSpawnScheduler(
         if (!worldData.MonstersById.TryGetValue(monster.Template.MonsterId, out var monsterDefinition))
             return;
 
-        zone.BroadcastMonsterDeath(monster);
-
         PlayerRuntimeState? killer = null;
         if (death.KillerCharacterId is { } killerId)
             zone.TryGetPlayer(killerId, out killer);
@@ -212,22 +228,37 @@ public sealed class MonsterSpawnScheduler(
         if (killer is not null && TribeSymbolIndexOf(monster.Template.SpecialType) is { } symbolIndex)
             zoneEventBroadcaster?.Value.AnnounceSymbolResolved(symbolIndex, killer.Tribe);
 
+        IReadOnlyList<int>? partyMemberIds = null;
+        var killRaceInterceptsExperienceGrant = false;
+        if (killer is not null)
+            partyMemberIds = GrantKillLoot(zone, state, monster, monsterDefinition, killer,
+                out killRaceInterceptsExperienceGrant);
+
+        zone.BroadcastMonsterDeath(monster);
+
         if (killer is null)
             return;
 
-        var dropEligible = MonsterDropRoller.IsEligible(monsterDefinition.Monster, killer.Level);
-        zone.NotifyPopupEventMonsterKill(killer, dropEligible);
-
-        valleyWarKillRegistry?.RegisterMonsterKill(zone.MapId, killer.Tribe);
-
-        var partyMemberIds = partyRegistry?.GetMembers(killer.CharacterId);
-        zone.GrantMonsterKillExperience(killer.CharacterId, monster.Template.RealLevel,
-            monster.Template.GeneralExperience, partyMemberIds,
-            monster.Template.PatExperience, monster.Template.Life);
+        if (!killRaceInterceptsExperienceGrant)
+            zone.GrantMonsterKillExperience(killer.CharacterId, monster.Template.RealLevel,
+                monster.Template.GeneralExperience, partyMemberIds,
+                monster.Template.PatExperience, monster.Template.Life);
 
         zone.ApplyQuestKillProgress(killer.CharacterId, monster.Template.MonsterId, partyMemberIds);
 
         ApplyTowerCpForPvmMilestone(zone, killer, monster.Template.RealLevel);
+    }
+
+    private IReadOnlyList<int>? GrantKillLoot(Zone zone, MonsterZoneSpawnState state, MonsterEntity monster,
+        MonsterDefinition monsterDefinition, PlayerRuntimeState killer, out bool killRaceInterceptsExperienceGrant)
+    {
+        var dropEligible = MonsterDropRoller.IsEligible(monsterDefinition.Monster, killer.Level);
+        zone.NotifyPopupEventMonsterKill(killer, dropEligible);
+
+        killRaceInterceptsExperienceGrant =
+            valleyWarKillRegistry?.RegisterMonsterKill(zone.MapId, killer.Tribe) ?? false;
+
+        var partyMemberIds = partyRegistry?.GetMembers(killer.CharacterId);
 
         bool KillerHasItem(int itemId)
         {
@@ -278,14 +309,16 @@ public sealed class MonsterSpawnScheduler(
             zone.SpawnGroundItem(publicItem.ItemId, publicItem.Quantity, monster.PosX, monster.PosY, monster.PosZ,
                 "", "", 0, monster.InstanceId);
 
-        if (bossOutcome.Items.Count == 0 && genericItems.Count == 0)
-            return;
+        if (bossOutcome.Items.Count > 0 || genericItems.Count > 0)
+        {
+            var (partyName, dropSort) = ResolvePartyDrop(zone, killer, partyMemberIds);
 
-        var (partyName, dropSort) = ResolvePartyDrop(zone, killer, partyMemberIds);
+            foreach (var item in bossOutcome.Items.Concat(genericItems))
+                zone.SpawnGroundItem(item.ItemId, item.Quantity, monster.PosX, monster.PosY, monster.PosZ,
+                    killer.Name, partyName, dropSort, monster.InstanceId);
+        }
 
-        foreach (var item in bossOutcome.Items.Concat(genericItems))
-            zone.SpawnGroundItem(item.ItemId, item.Quantity, monster.PosX, monster.PosY, monster.PosZ,
-                killer.Name, partyName, dropSort, monster.InstanceId);
+        return partyMemberIds;
     }
 
     private static void ApplyBossDropSideEffects(Zone zone, PlayerRuntimeState killer, BossDropOutcome outcome)

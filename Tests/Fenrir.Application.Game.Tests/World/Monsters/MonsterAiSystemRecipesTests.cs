@@ -90,10 +90,10 @@ public class MonsterAiSystemRecipesTests
     public void SpecialSort_IsSeededOntoTheEntityAtSpawn()
     {
         var template = WorldDataTestRows.Monster(600) with { Type = 1, SpecialType = 12 };
-        var entity = MonsterEntity.Create(1, 1, template, 1, 0, 0, 0, 50);
+        var entity = MonsterEntity.Create(1, 1, template, 1, 0, 0, 0);
         Assert.Equal(MonsterSpecialSort.TribeSymbolStone, entity.SpecialSort);
 
-        var overridden = MonsterEntity.Create(2, 2, template, 1, 0, 0, 0, 50,
+        var overridden = MonsterEntity.Create(2, 2, template, 1, 0, 0, 0,
             specialSort: MonsterSpecialSort.CarThrower);
         Assert.Equal(MonsterSpecialSort.CarThrower, overridden.SpecialSort);
     }
@@ -191,7 +191,7 @@ public class MonsterAiSystemRecipesTests
             FrameInfo1 = 1,
             FrameInfo3 = 2
         };
-        var monster = MonsterEntity.Create(1, 1, template, 1, 0, 0, 0, 50,
+        var monster = MonsterEntity.Create(1, 1, template, 1, 0, 0, 0,
             specialSort: MonsterSpecialSort.CarThrower);
 
         var zone = ZoneTestKit.CreateZone(1, options, simulationSystems: [new MonsterAiSystem(new ScriptedRandomSource(0))]);
@@ -243,6 +243,37 @@ public class MonsterAiSystemRecipesTests
         Assert.Null(boss.TargetCharacterId);
     }
 
+    [Fact]
+    public void Zone175Boss_ZeroDetectionRadius_StillAcquiresACoLocatedPlayer()
+    {
+        var zone = CreateBossZone(wideRadius: 0, meleeRadius: 0);
+        EnterPlayerAt(zone, 10, 0, 0);
+
+        var boss = AcquireBossTarget(zone);
+
+        Assert.Equal(10, boss.TargetCharacterId);
+    }
+
+
+    [Fact]
+    public void Chase_ShortRangeRetarget_SharesThrottleClockWithIdleAcquisitionScan()
+    {
+        var zone = CreateStandardChaseZone();
+        EnterPlayerAt(zone, 10, 500, 0);
+        EnterPlayerAt(zone, 11, 1, 0);
+
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.True(zone.TryGetMonster(1, out var monster));
+        monster!.AssignTarget(10, 0, 500f, 0f, 0f);
+        monster.AiState = MonsterAiState.Chase;
+        monster.DetectionThrottleTicks = SimulationClock.MonsterDetectionThrottleLegacyTicks - 1;
+
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.True(zone.TryGetMonster(1, out var updated));
+        Assert.Equal(11, updated!.TargetCharacterId);
+    }
 
     [Fact]
     public void AdjustValidAttackTarget_DropsAMidCrossShardTransferTarget()
@@ -275,7 +306,7 @@ public class MonsterAiSystemRecipesTests
             FrameInfo1 = 1,
             FrameInfo3 = 2
         };
-        var monster = MonsterEntity.Create(1, 1, template, 1, 0, 0, 0, 50,
+        var monster = MonsterEntity.Create(1, 1, template, 1, 0, 0, 0,
             specialSort: MonsterSpecialSort.CarThrower);
 
         var options = new GameServerOptions { AoiCellSize = 100_000f };
@@ -284,7 +315,7 @@ public class MonsterAiSystemRecipesTests
         return (zone, monster);
     }
 
-    private static Zone CreateBossZone()
+    private static Zone CreateBossZone(short wideRadius = 1000, short meleeRadius = 2)
     {
         var monster = WorldDataTestRows.Monster(600) with
         {
@@ -296,8 +327,8 @@ public class MonsterAiSystemRecipesTests
             SummonTime2 = 9999,
             FrameInfo1 = 1,
             FrameInfo4 = 2,
-            RadiusInfo1 = 2,
-            RadiusInfo2 = 1000,
+            RadiusInfo1 = meleeRadius,
+            RadiusInfo2 = wideRadius,
             WalkSpeed = 10,
             RunSpeed = 100,
             AttackType = 1

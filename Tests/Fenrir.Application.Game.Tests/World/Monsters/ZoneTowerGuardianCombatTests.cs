@@ -26,7 +26,7 @@ public class ZoneTowerGuardianCombatTests
     {
         var template = WorldDataTestRows.Monster(9000) with { Life = life, DefensePower = monsterDefensePower };
         var guardianIndex = TowerWarState.GuardianServerIndex(towerIndex);
-        var guardian = MonsterEntity.Create(guardianIndex, 777u, template, guardianIndex, 100, 0, 100, 300f);
+        var guardian = MonsterEntity.Create(guardianIndex, 777u, template, guardianIndex, 100, 0, 100);
 
         guardian.AiState = MonsterAiState.Decision;
         return guardian;
@@ -163,7 +163,7 @@ public class ZoneTowerGuardianCombatTests
         var zone = ZoneTestKit.CreateZone(39, randomSource: new ScriptedAlwaysHitRandomSource(), towerWar: towerWar);
         var guardianIndex = TowerWarState.GuardianServerIndex(TowerIndex);
         var monster = MonsterEntity.Create(guardianIndex, 1u, WorldDataTestRows.Monster(9001) with { Life = 1000 },
-            guardianIndex, 100, 0, 100, 300f);
+            guardianIndex, 100, 0, 100);
         monster.AiState = MonsterAiState.Decision;
         zone.SpawnMonster(monster);
 

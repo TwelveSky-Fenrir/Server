@@ -11,7 +11,7 @@ public class ZoneIdlePacingTests
     private static MonsterEntity CreateMonster(int serverIndex, float posX, float posZ)
     {
         return MonsterEntity.Create(serverIndex, 1u, WorldDataTestRows.Monster(9001) with { Life = 100 },
-            serverIndex, posX, 0, posZ, 300f);
+            serverIndex, posX, 0, posZ);
     }
 
     [Fact]

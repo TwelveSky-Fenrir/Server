@@ -1,9 +1,12 @@
 using System.Buffers.Binary;
 using Fenrir.Application.Game.Abstractions.Gm;
+using Fenrir.Application.Game.Domain.Combat;
+using Fenrir.Application.Game.Domain.Gm;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Quests;
+using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
@@ -20,6 +23,8 @@ public sealed class GmBasicCommandService(
     ZoneRegistry zones,
     WorldDataCache worldData,
     IEventLogRepository eventLog,
+    ICharacterShardLocationRepository characterShardLocations,
+    PartyRegistry partyRegistry,
     ILogger<GmBasicCommandService> logger) : IGmBasicCommandService
 {
     private const int FailureResult = 1;
@@ -28,6 +33,7 @@ public sealed class GmBasicCommandService(
 
     private const int ShowSort = 502;
     private const int MoveSelfSort = 507;
+    private const int MoveToPositionSort = 528;
     private const int DieSort = 508;
     private const int TribeSort = 510;
     private const int EquipSort = 511;
@@ -86,10 +92,18 @@ public sealed class GmBasicCommandService(
         SendAck(zoneSession, sort, data, SuccessResult);
     }
 
-    public async ValueTask HandleSelfTeleportAsync(byte[] data, ZoneClientSession zoneSession,
+    public ValueTask HandleSelfTeleportAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
+        Zone zone, CancellationToken cancellationToken)
+        => TeleportToRawPositionAsync(MoveSelfSort, data, zoneSession, state, zone, cancellationToken);
+
+    public ValueTask HandleMoveToPositionAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
+        Zone zone, CancellationToken cancellationToken)
+        => TeleportToRawPositionAsync(MoveToPositionSort, data, zoneSession, state, zone, cancellationToken);
+
+    private async ValueTask TeleportToRawPositionAsync(int sort, byte[] data, ZoneClientSession zoneSession,
         PlayerRuntimeState state, Zone zone, CancellationToken cancellationToken)
     {
-        if (!MeetsTierOrAbort(zoneSession, MoveSelfSort))
+        if (!MeetsTierOrAbort(zoneSession, sort))
             return;
 
         if (!GmMoveCoordinatePayload.TryRead(data, out var payload))
@@ -103,10 +117,18 @@ public sealed class GmBasicCommandService(
                     TeleportTo: (payload.Location[0], payload.Location[1], payload.Location[2])),
                 cancellationToken))
             logger.LogError(
-                "Zone {MapId} tribe-progress inbox full: dropped self-teleport mirror for character {CharacterId}",
-                zone.MapId, state.CharacterId);
+                "Zone {MapId} tribe-progress inbox full: dropped teleport-to-raw-position mirror for character {CharacterId} (sort {Sort})",
+                zone.MapId, state.CharacterId, sort);
 
-        SendAck(zoneSession, MoveSelfSort, data, SuccessResult);
+        if (sort == MoveToPositionSort)
+        {
+            var gmData = new byte[GmDataSize];
+            payload.Write(gmData);
+            zoneSession.Send(new GmCommandResponse { Sort = CallMoveGmDataTag, GmData = gmData });
+            return;
+        }
+
+        SendAck(zoneSession, sort, data, SuccessResult);
     }
 
     public async ValueTask HandleForceKillMonsterAsync(byte[] data, ZoneClientSession zoneSession, Zone zone,
@@ -186,30 +208,36 @@ public sealed class GmBasicCommandService(
         SendAck(zoneSession, sort, data, SuccessResult);
     }
 
-    public ValueTask HandleFindAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
+    public async ValueTask HandleFindAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
         CancellationToken cancellationToken)
     {
         if (!MeetsTierOrAbort(zoneSession, FindSort))
-            return ValueTask.CompletedTask;
+            return;
 
         if (!GmTargetNamePayload.TryRead(data, out var payload))
         {
             zoneSession.Abort(DisconnectReason.Malformed);
-            return ValueTask.CompletedTask;
+            return;
         }
 
         var gmData = new byte[GmDataSize];
-        if (zones.TryGetPlayerAndZoneByName(payload.TargetName, out var found, out var targetZone) &&
-            found!.CharacterId != state.CharacterId)
-            BinaryPrimitives.WriteInt32LittleEndian(gmData, targetZone!.MapId);
+        if (zones.TryGetPlayerAndZoneByName(payload.TargetName, out _, out var localZone))
+        {
+            BinaryPrimitives.WriteInt32LittleEndian(gmData, localZone!.MapId);
+        }
+        else
+        {
+            var remote = await characterShardLocations.FindByNameAsync(payload.TargetName, cancellationToken);
+            if (remote is not null)
+                BinaryPrimitives.WriteInt32LittleEndian(gmData, remote.MapId);
+        }
 
         zoneSession.Send(new GmCommandResponse { Sort = FindGmDataTag, GmData = gmData });
         SendAck(zoneSession, FindSort, data, SuccessResult);
-        return ValueTask.CompletedTask;
     }
 
     public async ValueTask HandleCallAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
-        CancellationToken cancellationToken)
+        Zone zone, CancellationToken cancellationToken)
     {
         if (!MeetsTierOrAbort(zoneSession, CallSort))
             return;
@@ -224,6 +252,13 @@ public sealed class GmBasicCommandService(
         if (!found || target!.CharacterId == state.CharacterId)
         {
             SendAck(zoneSession, CallSort, data, FailureResult);
+            return;
+        }
+
+        if (zone.MapId == Zone124DuelOverrideResolver.Zone124MapId)
+        {
+            await HandleZone124PartyPullAsync(data, zoneSession, state, zone, target, targetZone!,
+                cancellationToken);
             return;
         }
 
@@ -248,6 +283,25 @@ public sealed class GmBasicCommandService(
         SendAck(zoneSession, CallSort, data, SuccessResult);
     }
 
+    private async ValueTask HandleZone124PartyPullAsync(byte[] data, ZoneClientSession zoneSession,
+        PlayerRuntimeState state, Zone zone, PlayerRuntimeState target, Zone targetZone,
+        CancellationToken cancellationToken)
+    {
+        var targetPartyName = PartyIdentityResolver.ResolveCurrentPartyName(partyRegistry, target.CharacterId,
+            target.Name, memberId => targetZone.TryGetPlayer(memberId, out var member) ? member?.Name : null);
+
+        var pulled = await zone.PostGmZone124PartyPullCommandAndWaitAsync(
+            new GmZone124PartyPullZoneCommand(target.CharacterId, targetPartyName, state.PosX, state.PosY,
+                state.PosZ), cancellationToken);
+
+        foreach (var member in pulled)
+            await eventLog.LogAsync(GmActionEventCodes.Call, EventLogCategory.GmAction, zoneSession.AccountId,
+                zoneSession.CharacterId, ((ZoneClientSession)member.Session).AccountId, member.CharacterId, null,
+                null, null, null, null, 1, $"TargetName={member.Name}", cancellationToken);
+
+        SendAck(zoneSession, CallSort, data, SuccessResult);
+    }
+
     public async ValueTask HandleMoveToTargetAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
         Zone zone, CancellationToken cancellationToken)
     {
@@ -262,10 +316,7 @@ public sealed class GmBasicCommandService(
 
         var found = zones.TryGetPlayerAndZoneByName(payload.TargetName, out var target, out _);
         if (!found || target!.CharacterId == state.CharacterId)
-        {
-            SendAck(zoneSession, MoveToTargetSort, data, FailureResult);
             return;
-        }
 
         var destination = (target.PosX, target.PosY, target.PosZ);
         if (!await zone.PostTribeProgressCommandAndWaitAsync(

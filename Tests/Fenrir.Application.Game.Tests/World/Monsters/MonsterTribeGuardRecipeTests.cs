@@ -20,7 +20,7 @@ public class MonsterTribeGuardRecipeTests
             FollowInfo1 = 5,
             FollowInfo2 = 5
         };
-        var monster = MonsterEntity.Create(1, 1, template, 1, 0, 0, 0, 50);
+        var monster = MonsterEntity.Create(1, 1, template, 1, 0, 0, 0);
         Assert.Equal(MonsterSpecialSort.TribeGuard, monster.SpecialSort);
         monster.AiState = MonsterAiState.Decision;
 
@@ -89,8 +89,8 @@ public class MonsterTribeGuardRecipeTests
         {
             Type = 6, Life = 100_000, RadiusInfo1 = 50, FollowInfo1 = 1, FollowInfo2 = 1
         };
-        var guardA = MonsterEntity.Create(1, 1, template, 1, 0, 0, 0, 50);
-        var guardB = MonsterEntity.Create(2, 2, template, 2, 0, 0, 0, 50);
+        var guardA = MonsterEntity.Create(1, 1, template, 1, 0, 0, 0);
+        var guardB = MonsterEntity.Create(2, 2, template, 2, 0, 0, 0);
         guardA.AiState = MonsterAiState.Decision;
         guardB.AiState = MonsterAiState.Decision;
 

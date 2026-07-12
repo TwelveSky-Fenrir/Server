@@ -15,7 +15,7 @@ public class MonsterAttackDamageTableTests
         var zone = ZoneTestKit.CreateZone(1);
         var template = WorldDataTestRows.Monster(600) with { Life = life };
         monster = MonsterEntity.Create(serverIndex, (uint)serverIndex, template, 1,
-            0, 0, 0, 50);
+            0, 0, 0);
         zone.SpawnMonster(monster);
         return zone;
     }

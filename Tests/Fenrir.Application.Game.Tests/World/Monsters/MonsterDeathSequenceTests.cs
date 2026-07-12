@@ -15,7 +15,7 @@ public class MonsterDeathSequenceTests
     private static MonsterEntity CreateEntity(byte damageType = 2, short frameInfo5 = 1)
     {
         var template = WorldDataTestRows.Monster(900) with { DamageType = damageType, FrameInfo5 = frameInfo5 };
-        return MonsterEntity.Create(1, 1u, template, 1, 100f, 0f, 100f, 50f);
+        return MonsterEntity.Create(1, 1u, template, 1, 100f, 0f, 100f);
     }
 
 

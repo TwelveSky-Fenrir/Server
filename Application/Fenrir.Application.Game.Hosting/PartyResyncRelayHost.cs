@@ -13,7 +13,6 @@ public sealed class PartyResyncRelayHost(
     ILogger<PartyResyncRelayHost> logger) : BackgroundService, IPartyResyncRelayQueue
 {
     private const int QueueCapacity = 1024;
-    private const int MaxDrainedPerCycle = 512;
 
     private readonly IReadOnlyList<IPartyResyncRelayHandler> _handlers = handlers.ToArray();
 
@@ -42,6 +41,29 @@ public sealed class PartyResyncRelayHost(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var outboundLoop = RunOutboundFlushLoopAsync(stoppingToken);
+        var inboundLoop = RunInboundDeliveryLoopAsync(stoppingToken);
+        await Task.WhenAll(outboundLoop, inboundLoop).ConfigureAwait(false);
+    }
+
+    private async Task RunOutboundFlushLoopAsync(CancellationToken stoppingToken)
+    {
+        var reader = _outbox.Reader;
+
+        while (await reader.WaitToReadAsync(stoppingToken).ConfigureAwait(false))
+            try
+            {
+                await FlushOutboundAsync(stoppingToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogError(ex, "Party-resync relay outbound flush failed for shard {ShardId}",
+                    options.Value.ShardId);
+            }
+    }
+
+    private async Task RunInboundDeliveryLoopAsync(CancellationToken stoppingToken)
+    {
         using var timer =
             new PeriodicTimer(TimeSpan.FromSeconds(options.Value.PartyResyncRelayPollIntervalSeconds));
 
@@ -49,11 +71,12 @@ public sealed class PartyResyncRelayHost(
         {
             try
             {
-                await PollOnceAsync(stoppingToken).ConfigureAwait(false);
+                await DeliverInboundAsync(stoppingToken).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                logger.LogError(ex, "Party-resync relay poll failed for shard {ShardId}", options.Value.ShardId);
+                logger.LogError(ex, "Party-resync relay inbound delivery failed for shard {ShardId}",
+                    options.Value.ShardId);
             }
         } while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false));
     }
@@ -67,14 +90,11 @@ public sealed class PartyResyncRelayHost(
     private async ValueTask FlushOutboundAsync(CancellationToken ct)
     {
         var reader = _outbox.Reader;
-        var drained = 0;
 
-        while (drained < MaxDrainedPerCycle && reader.TryRead(out var entry))
-        {
-            drained++;
+        while (reader.TryRead(out var entry))
             try
             {
-                await relay.PublishAsync(entry, ct).ConfigureAwait(false);
+                await CrossShardRelayRetry.RunAsync(() => relay.PublishAsync(entry, ct), ct).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -83,7 +103,6 @@ public sealed class PartyResyncRelayHost(
                     "{SourceCharacterId}) from shard {ShardId}; this one resync is lost",
                     entry.Sort, entry.PartyName, entry.SourceCharacterId, options.Value.ShardId);
             }
-        }
     }
 
     private async ValueTask DeliverInboundAsync(CancellationToken ct)
@@ -98,7 +117,7 @@ public sealed class PartyResyncRelayHost(
         foreach (var dto in incoming)
             try
             {
-                await DeliverLocallyAsync(dto, ct).ConfigureAwait(false);
+                await CrossShardRelayRetry.RunAsync(() => DeliverLocallyAsync(dto, ct), ct).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {

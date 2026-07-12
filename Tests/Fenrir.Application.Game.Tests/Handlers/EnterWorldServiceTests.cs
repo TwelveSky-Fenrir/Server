@@ -11,7 +11,9 @@ using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
+using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Services.ZoneLifecycle;
+using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.Handlers.Tribes;
 using Fenrir.Application.Game.Tests.Progression;
 using Fenrir.Application.Game.Tests.TestSupport;
@@ -476,6 +478,70 @@ public class EnterWorldServiceTests
         Assert.Null(session.DisconnectReason);
     }
 
+    [Fact]
+    public async Task HandleAsync_LegendsOfDarknessZone_NoTicketRemaining_AbortsWithoutAdjustingZone241Time()
+    {
+        const short mapId = 325;
+        var bundle = HappyPathBundle(mapId, 1, 1, 0f, 0f, 0f, [], zone241Time: 0);
+        var characters = new FakeCharacterRepository();
+        var (service, session) = CreateWorkingService(bundle, characterRepository: characters);
+
+        await service.HandleAsync(ValidRequest(EncodeObfuscatedAccountId(AccountId)), session, CancellationToken.None);
+
+        Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);
+        Assert.Null(characters.LastAdjustZone241Time);
+    }
+
+    [Fact]
+    public async Task HandleAsync_LegendsOfDarknessZone_TicketAvailable_DecrementsDurablyByExactlyOne()
+    {
+        const short mapId = 326;
+        var bossMonsterId = PersonalDungeonBossTables.ResolveCatalogD(mapId);
+        var bundle = HappyPathBundle(mapId, 1, 1, 0f, 0f, 0f, [], zone241Time: 3);
+        var characters = new FakeCharacterRepository();
+        var worldData = LegendsOfDarknessWorldData(bossMonsterId);
+        var (service, session) = CreateWorkingService(bundle, worldData, characters);
+
+        await service.HandleAsync(ValidRequest(EncodeObfuscatedAccountId(AccountId)), session, CancellationToken.None);
+
+        Assert.Null(session.DisconnectReason);
+        Assert.Equal((CharacterId, -1), characters.LastAdjustZone241Time);
+    }
+
+    [Fact]
+    public async Task HandleAsync_LegendsOfDarknessZone_BossTemplateMissing_AbortsButStillConsumesTheTicket()
+    {
+        const short mapId = 329;
+        var bundle = HappyPathBundle(mapId, 1, 1, 0f, 0f, 0f, [], zone241Time: 5);
+        var characters = new FakeCharacterRepository();
+        var (service, session) = CreateWorkingService(bundle, ZoneTestKit.EmptyWorldData(), characters);
+
+        await service.HandleAsync(ValidRequest(EncodeObfuscatedAccountId(AccountId)), session, CancellationToken.None);
+
+        Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);
+        Assert.Equal((CharacterId, -1), characters.LastAdjustZone241Time);
+    }
+
+    [Fact]
+    public async Task HandleAsync_OrdinaryZone_NeverTouchesZone241Time()
+    {
+        var bundle = HappyPathBundle(7, 1, 1, 0f, 0f, 0f, [], zone241Time: 3);
+        var characters = new FakeCharacterRepository();
+        var (service, session) = CreateWorkingService(bundle, characterRepository: characters);
+
+        await service.HandleAsync(ValidRequest(EncodeObfuscatedAccountId(AccountId)), session, CancellationToken.None);
+
+        Assert.Null(session.DisconnectReason);
+        Assert.Null(characters.LastAdjustZone241Time);
+    }
+
+    private static WorldDataCache LegendsOfDarknessWorldData(int bossMonsterId)
+    {
+        var monster = WorldDataTestRows.Monster(bossMonsterId);
+        var rows = WorldDataTestRows.MinimalRows() with { Monsters = [monster] };
+        return WorldDataCacheBuilder.Build(rows).Cache;
+    }
+
     private static async Task<byte[]> ReadExactlyAsync(FakeDuplexPipe pipe, int totalLength)
     {
         var collected = new byte[totalLength];
@@ -496,7 +562,7 @@ public class EnterWorldServiceTests
 
     private static CharacterWorldEntryBundle HappyPathBundle(short mapId, byte tribe, byte previousTribe,
         float posX, float posY, float posZ, IReadOnlyList<CharacterBuffDto> buffs, int petBagDate = 0,
-        int dropItemTime = 0, int warPoint = 0)
+        int dropItemTime = 0, int warPoint = 0, int zone241Time = 0)
     {
         var character = new CharacterWorldSnapshotDto(
             CharacterId, AccountId, 0, "Hero", tribe, 0,
@@ -511,7 +577,7 @@ public class EnterWorldServiceTests
             false, [], 0, 0, 0,
             0, 0, 0, 0, 0,
             previousTribe, 0, 0, 0, 0,
-            0, PetBagDate: petBagDate, WarPoint: warPoint);
+            0, Zone241Time: zone241Time, PetBagDate: petBagDate, WarPoint: warPoint);
 
         return new CharacterWorldEntryBundle(
             character,
@@ -585,10 +651,12 @@ public class EnterWorldServiceTests
     }
 
     private static (EnterWorldService Service, ZoneClientSession Session) CreateWorkingService(
-        CharacterWorldEntryBundle bundle)
+        CharacterWorldEntryBundle bundle, WorldDataCache? worldDataOverride = null,
+        FakeCharacterRepository? characterRepository = null)
     {
-        var characters = new FakeCharacterRepository { WorldEntryBundleToReturn = bundle };
-        var worldData = ZoneTestKit.EmptyWorldData();
+        var characters = characterRepository ?? new FakeCharacterRepository();
+        characters.WorldEntryBundleToReturn = bundle;
+        var worldData = worldDataOverride ?? ZoneTestKit.EmptyWorldData();
         var zones = ZoneTestKit.CreateRegistry(worldData: worldData);
         zones.Initialize([bundle.Character.MapId]);
 

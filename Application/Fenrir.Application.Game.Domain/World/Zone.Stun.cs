@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Combat;
+using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
@@ -64,7 +65,6 @@ public sealed partial class Zone
 
         defenderState.IsStunned = true;
         defenderState.StunDurationSeconds = outcome.ResolvedDurationSeconds;
-        defenderState.StunCountdownAccumulatorTicks = 0;
         defenderState.CanUseConsumables = false;
 
         BroadcastStunActionState(defenderState, outcome.ResolvedDurationSeconds);
@@ -118,7 +118,6 @@ public sealed partial class Zone
 
         state.IsStunned = false;
         state.StunDurationSeconds = 0;
-        state.StunCountdownAccumulatorTicks = 0;
         state.CanUseConsumables = true;
         state.RepeatedStunCount = 0;
 
@@ -185,6 +184,7 @@ public sealed partial class Zone
     private void BroadcastStunActionState(PlayerRuntimeState state, int durationSeconds)
     {
         state.ActionSort = StunActionSort;
+        state.ActionType = 0;
         state.ActionSkillNumber = 0;
         state.ActionSkillGradeNum1 = 0;
         state.ActionSkillGradeNum2 = 0;
@@ -201,6 +201,7 @@ public sealed partial class Zone
     private void BroadcastIdleActionState(PlayerRuntimeState state)
     {
         state.ActionSort = IdleActionSort;
+        state.ActionType = ResolveEquippedWeaponActionType(state);
 
         var action = BuildActionForPose(state, IdleActionSort, 0);
         state.Session.Send(BuildAvatarActionRecv(state, action));
@@ -211,13 +212,24 @@ public sealed partial class Zone
         BroadcastAvatarAction(_idleNeighborScratch, state, action);
     }
 
+    private int ResolveEquippedWeaponActionType(PlayerRuntimeState state)
+    {
+        var equippedWeapon = state.Inventory.GetSlot(ContainerMatrix.Equipment, EquipmentSlots.WeaponSlot);
+        var weaponSort = equippedWeapon is { } weapon &&
+                         worldData.ItemsById.TryGetValue(weapon.ItemId, out var weaponDefinition)
+            ? weaponDefinition.Item.Sort
+            : (byte?)null;
+
+        return WeaponClassResolver.GetActionType(weaponSort);
+    }
+
     private static ActionInfo BuildActionForPose(PlayerRuntimeState state, int sort, int skillValue)
     {
         var pet = PetActionFieldsOf(state);
 
         return new ActionInfo
         {
-            Type = 0,
+            Type = state.ActionType,
             Sort = sort,
             Frame = 0,
             Location = [state.PosX, state.PosY, state.PosZ],

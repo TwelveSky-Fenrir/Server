@@ -38,7 +38,7 @@ public class UseInventoryItemServiceTests
     private const byte ShardId = 1;
 
     private static async Task<UseInventoryItemResponse> RunToCompletionAsync(
-        ValueTask<UseInventoryItemResponse> pending, Zone zone)
+        ValueTask<UseInventoryItemResponse?> pending, Zone zone)
     {
         var task = pending.AsTask();
         var guard = 0;
@@ -50,7 +50,9 @@ public class UseInventoryItemServiceTests
                 throw new TimeoutException("UseInventoryItemService task never completed.");
         }
 
-        return await task;
+        var result = await task;
+        Assert.NotNull(result);
+        return result!.Value;
     }
 
     private static (ZoneClientSession Session, FakeDuplexPipe Pipe, Zone Zone, PlayerRuntimeState State,
@@ -180,7 +182,8 @@ public class UseInventoryItemServiceTests
             CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
-        Assert.Equal(1, response.Result);
+        Assert.NotNull(response);
+        Assert.Equal(1, response!.Value.Result);
         Assert.Null(characters.LastReplacedContainer);
         Assert.Null(guilds.LastSetBuff);
     }
@@ -199,23 +202,23 @@ public class UseInventoryItemServiceTests
             CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
-        Assert.Equal(1, response.Result);
+        Assert.NotNull(response);
+        Assert.Equal(1, response!.Value.Result);
         Assert.Null(characters.LastReplacedContainer);
     }
 
 
     [Fact]
-    public async Task UnhandledItemFamily_RepliesResultOne_AndLeavesTheItemUntouched()
+    public async Task UnhandledItemFamily_MatchesNoDispatchBranch_ReturnsNull_ForHandlerToDisconnect()
     {
-        var (session, _, zone, state, characters, guilds, cash, eventLog) = SetUp();
+        var (_, _, zone, state, characters, guilds, cash, eventLog) = SetUp();
         SeedInventory(zone, new ItemStack(UnhandledItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1));
         var service = CreateService(characters, guilds, cash, eventLog);
 
         var response = await service.ResolveAsync(zone, state, 10, AccountId, ContainerMatrix.InventoryPage0, 0, 0,
             CancellationToken.None);
 
-        Assert.Null(session.DisconnectReason);
-        Assert.Equal(1, response.Result);
+        Assert.Null(response);
         Assert.Null(characters.LastReplacedContainer);
     }
 
@@ -299,7 +302,8 @@ public class UseInventoryItemServiceTests
             CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
-        Assert.Equal(1, response.Result);
+        Assert.NotNull(response);
+        Assert.Equal(1, response!.Value.Result);
         Assert.Null(characters.LastReplacedContainer);
         Assert.Empty(eventLog.LoggedEvents);
         Assert.Equal(0, await cash.GetBalanceAsync(AccountId, CancellationToken.None));
@@ -418,9 +422,10 @@ public class UseInventoryItemServiceTests
             CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
-        Assert.Equal(1, response.Result);
-        Assert.Equal(expected, response.Value);
-        Assert.Equal(0, response.Value2);
+        Assert.NotNull(response);
+        Assert.Equal(1, response!.Value.Result);
+        Assert.Equal(expected, response.Value.Value);
+        Assert.Equal(0, response.Value.Value2);
         Assert.Null(characters.LastReplacedContainer);
         Assert.Empty(eventLog.LoggedEvents);
         Assert.Empty(relay.Enqueued);
@@ -441,9 +446,10 @@ public class UseInventoryItemServiceTests
             CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
-        Assert.Equal(1, response.Result);
-        Assert.Equal(GameDate.Invalid, response.Value);
-        Assert.Equal(0, response.Value2);
+        Assert.NotNull(response);
+        Assert.Equal(1, response!.Value.Result);
+        Assert.Equal(GameDate.Invalid, response.Value.Value);
+        Assert.Equal(0, response.Value.Value2);
         Assert.Null(offlineShops.LastExtendRentalNewShopDate);
         Assert.Null(characters.LastReplacedContainer);
         Assert.Empty(eventLog.LoggedEvents);

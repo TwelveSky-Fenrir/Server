@@ -122,6 +122,14 @@ internal static class WorldDataTestRows
             0, monsterId, 0, 1, 0, 0, 0, 10);
     }
 
+    internal static MonsterSpawnRegionRowDto BossSpawnRegion(int regionId, short? zoneNumber, int? monsterId,
+        int locationX = 0, int locationY = 0, int locationZ = 0, int radius = 10, int number = 1)
+    {
+        return new MonsterSpawnRegionRowDto(regionId, zoneNumber,
+            $"Z{zoneNumber ?? 0:000}_SUMMONBOSSMONSTER.WREGION.csv", 0, monsterId, 0, number, locationX, locationY,
+            locationZ, radius);
+    }
+
     internal static WorldDataRows MinimalRows()
     {
         return new WorldDataRows

@@ -74,12 +74,31 @@ public sealed class GenericActionService(
             return GenericActionResult.Aborted;
         }
 
+        var dragDropOutcome = InventoryEquipDragDropTransferGate.Evaluate(sort, move, state.InventoryDate);
+        if (dragDropOutcome != InventoryEquipDragDropTransferGate.Outcome.Valid)
+        {
+            logger.LogInformation(
+                "Character {CharacterId} container-move aborted: {DragDropOutcome} (sort {Sort}, {Page1}:{Index1} -> {Page2}:{Index2})",
+                characterId, dragDropOutcome, sort, move.Page1, move.Index1, move.Page2, move.Index2);
+            return GenericActionResult.Aborted;
+        }
+
+        var isInventoryToEquip = sort == 210;
+
         if (!ContainerMatrix.TryResolveContainers(sort, move.Page1, move.Page2, out var fromContainer,
                 out var toContainer))
         {
             logger.LogDebug(
                 "Character {CharacterId} container-move rejected: unresolvable containers (sort {Sort}, page1 {Page1}, page2 {Page2})",
                 characterId, sort, move.Page1, move.Page2);
+            return isInventoryToEquip ? GenericActionResult.Aborted : GenericActionResult.Failed;
+        }
+
+        if (isInventoryToEquip && state.ActionSort != IdleActionSort)
+        {
+            logger.LogInformation(
+                "Character {CharacterId} equip rejected: not in idle pose (ActionSort {ActionSort})",
+                characterId, state.ActionSort);
             return GenericActionResult.Failed;
         }
 
@@ -90,26 +109,16 @@ public sealed class GenericActionService(
             ? state.Inventory.GetSlot(toContainer, (byte)move.Index2)
             : null;
 
-        var sourceIsStackable = sourceStack is { } source &&
-                                worldData.ItemsById.TryGetValue(source.ItemId, out var sourceDefinition) &&
-                                ContainerMatrix.IsStackableSort(sourceDefinition.Item.Sort);
-
-        var resolved = ContainerMatrix.ResolveMove(fromContainer, move.Index1, move.Quantity1, toContainer,
-            move.Index2, sourceStack, destinationStack, sourceIsStackable);
-
-        if (!resolved.Succeeded)
+        if (sourceStack is not { } sourceItem)
         {
             logger.LogInformation(
-                "Character {CharacterId} container-move rejected by policy (sort {Sort}, {FromContainer}:{Index1} -> {ToContainer}:{Index2})",
-                characterId, sort, fromContainer, move.Index1, toContainer, move.Index2);
-            return GenericActionResult.Failed;
+                "Character {CharacterId} container-move rejected: source slot empty ({FromContainer}:{Index1})",
+                characterId, fromContainer, move.Index1);
+            return isInventoryToEquip ? GenericActionResult.Aborted : GenericActionResult.Failed;
         }
 
-        if (resolved.Outcome == ContainerMatrix.MoveOutcome.NoOp)
-            return GenericActionResult.Succeeded;
-
-        if ((toContainer == ContainerMatrix.Equipment || fromContainer == ContainerMatrix.Equipment) &&
-            state.ActionSort != IdleActionSort)
+        var touchesEquipment = toContainer == ContainerMatrix.Equipment || fromContainer == ContainerMatrix.Equipment;
+        if (touchesEquipment && state.ActionSort != IdleActionSort)
         {
             logger.LogInformation(
                 "Character {CharacterId} equip/unequip rejected: not in idle pose (ActionSort {ActionSort})",
@@ -120,7 +129,7 @@ public sealed class GenericActionService(
         if (toContainer == ContainerMatrix.Equipment)
         {
             EquipItemValidationGate.EquipCandidate? candidate = null;
-            if (worldData.ItemsById.TryGetValue(sourceStack!.Value.ItemId, out var equipDefinition))
+            if (worldData.ItemsById.TryGetValue(sourceItem.ItemId, out var equipDefinition))
             {
                 var equipRow = equipDefinition.Item;
                 candidate = new EquipItemValidationGate.EquipCandidate(equipRow.ItemId, equipRow.EquipInfo1,
@@ -136,9 +145,34 @@ public sealed class GenericActionService(
             {
                 logger.LogInformation(
                     "Character {CharacterId} equip rejected by validation gate: outcome {EquipOutcome}, item {ItemId}",
-                    characterId, equipOutcome, sourceStack!.Value.ItemId);
+                    characterId, equipOutcome, sourceItem.ItemId);
                 return GenericActionResult.Aborted;
             }
+        }
+
+        var sourceIsStackable = worldData.ItemsById.TryGetValue(sourceItem.ItemId, out var sourceDefinition) &&
+                                 ContainerMatrix.IsStackableSort(sourceDefinition.Item.Sort);
+
+        var requestedQuantity = touchesEquipment ? 0 : move.Quantity1;
+
+        var resolved = ContainerMatrix.ResolveMove(fromContainer, move.Index1, requestedQuantity, toContainer,
+            move.Index2, sourceStack, destinationStack, sourceIsStackable);
+
+        if (!resolved.Succeeded)
+        {
+            logger.LogInformation(
+                "Character {CharacterId} container-move rejected by policy (sort {Sort}, {FromContainer}:{Index1} -> {ToContainer}:{Index2})",
+                characterId, sort, fromContainer, move.Index1, toContainer, move.Index2);
+            return isInventoryToEquip ? GenericActionResult.Aborted : GenericActionResult.Failed;
+        }
+
+        if (resolved.Outcome == ContainerMatrix.MoveOutcome.NoOp)
+            return GenericActionResult.Succeeded;
+
+        if (isInventoryToEquip && resolved.NewDestination is { } equippedStack)
+        {
+            var expireDate = NpcShopPolicy.IsRentItem(equippedStack.ItemId) ? equippedStack.ExpireDate : 0;
+            resolved = resolved with { NewDestination = equippedStack with { ExpireDate = expireDate } };
         }
 
         var projected = ContainerMatrix.ApplyMove(resolved, fromContainer, move.Index1,
@@ -177,7 +211,8 @@ public sealed class GenericActionService(
                 new InventoryContainerSnapshot(toContainer, projected.To));
 
         if (!await zone.PostInventoryCommandAndWaitAsync(
-                new InventoryZoneCommand(characterId, containers, updatedStats),
+                new InventoryZoneCommand(characterId, containers, updatedStats,
+                    RecomputeCombatPoseAfterEquip: touchesEquipment),
                 cancellationToken))
             logger.LogError(
                 "Zone {MapId} inventory inbox full: dropped container-move mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",

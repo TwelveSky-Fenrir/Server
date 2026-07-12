@@ -2,7 +2,7 @@ namespace Fenrir.Application.Game.Domain.Simulation;
 
 public static class SimulationClock
 {
-    public const int LegacyTickMilliseconds = 500;
+    public const int LegacyTickMilliseconds = 499;
 
     public const int MonsterRespawnScanLegacyTicks = 20;
 
@@ -16,15 +16,15 @@ public static class SimulationClock
 
     public const int PlayTimeAccrualLegacyTicks = 120;
 
-    public const int StunCountdownLegacyTicks = 2;
-
-    public const int MeditationRegenLegacyTicks = 2;
+    public const int OneSecondGateLegacyTicks = 2;
 
     public const int ReviveEligibilityLegacyTicks = 10;
 
     public const int DeathBroadcastSuppressionLegacyTicks = 30;
 
     public const int AntiAbuseForceQuitLegacyTicks = 50;
+
+    public const int DarkAttackPotionDebuffLegacyTicks = 4;
 
     public static readonly TimeSpan LegacyTick = TimeSpan.FromMilliseconds(LegacyTickMilliseconds);
 

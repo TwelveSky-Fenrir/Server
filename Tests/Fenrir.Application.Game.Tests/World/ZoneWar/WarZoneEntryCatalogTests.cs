@@ -72,8 +72,8 @@ public class WarZoneEntryCatalogTests
     [InlineData((short)1)]
     [InlineData((short)38)]
     [InlineData((short)124)]
-    [InlineData((short)251)]
-    [InlineData((short)266)]
+    [InlineData((short)250)]
+    [InlineData((short)267)]
     [InlineData((short)319)]
     public void ZonesOutsideTheCitedSet_HaveNoRule(short zoneNumber)
     {
@@ -81,12 +81,40 @@ public class WarZoneEntryCatalogTests
     }
 
     [Fact]
-    public void Rules_ContainsExactlyTheSixCitedZonesAndNothingElse()
+    public void Rules_ContainsExactlyTheCitedZonesAndNothingElse()
     {
-        short[] expected = [164, 295, 296, 322, 323, 335];
+        short[] expected =
+        [
+            164, 295, 296, 322, 323, 335,
+            251, 252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266
+        ];
 
         Assert.Equal(expected.Length, WarZoneEntryCatalog.Rules.Count);
         foreach (var zoneNumber in expected)
             Assert.True(WarZoneEntryCatalog.Rules.ContainsKey(zoneNumber));
+    }
+
+    [Theory]
+    [InlineData((short)251)]
+    [InlineData((short)258)]
+    [InlineData((short)266)]
+    public void OdawaCaveZones_RequireCombinedLevel146To157WithNoRebirthRestriction(short zoneNumber)
+    {
+        Assert.True(WarZoneEntryCatalog.TryGetRule(zoneNumber, out var rule));
+        Assert.Equal(146, rule.MinCombinedLevel);
+        Assert.Equal(157, rule.MaxCombinedLevel);
+        Assert.Equal(0, rule.MinRebirthCount);
+        Assert.Equal(RebirthProgression.MaxRebirthGeneration, rule.MaxRebirthCount);
+    }
+
+    [Fact]
+    public void OdawaCaveRange_Covers251Through266Inclusive_WithUniformBounds()
+    {
+        for (short zoneNumber = 251; zoneNumber <= 266; zoneNumber++)
+        {
+            Assert.True(WarZoneEntryCatalog.TryGetRule(zoneNumber, out var rule));
+            Assert.Equal(146, rule.MinCombinedLevel);
+            Assert.Equal(157, rule.MaxCombinedLevel);
+        }
     }
 }

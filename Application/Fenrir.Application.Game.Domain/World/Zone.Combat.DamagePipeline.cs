@@ -39,10 +39,11 @@ public sealed partial class Zone
                     RecordEnemyKillForFeed(defenderState, attackerState, false,
                         regularWarActiveMapTracker?.IsBattleInProgress(MapId) == true ||
                         MapId == KillFeedZoneCatalog.FfaMapNumber);
-                    ApplyDeath(attackerState.CharacterId, DeathCause.PlayerKill);
+                    ApplyDeath(attackerState.CharacterId, DeathCause.PlayerKill,
+                        (defenderState.PosX, defenderState.PosZ));
                     break;
                 case CrossAvatarAttackKind.Duel:
-                    ApplyDeath(attackerState.CharacterId, DeathCause.Duel);
+                    ApplyDeath(attackerState.CharacterId, DeathCause.Duel, (defenderState.PosX, defenderState.PosZ));
                     break;
             }
 

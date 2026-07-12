@@ -122,7 +122,10 @@ public static class ZoneTransfer
             M15PetLuckyBoxPity: state.M15PetLuckyBoxPity,
             SourceIp: state.SourceIp,
             RuneSystem: state.RuneSystem,
-            RuneSystemStat: state.RuneSystemStat);
+            RuneSystemStat: state.RuneSystemStat,
+            BottleSlots: state.BottleSlots,
+            DrunkBottleIndex: state.DrunkBottleIndex,
+            DrunkBottleTicksRemaining: state.DrunkBottleTicksRemaining);
     }
 }
 

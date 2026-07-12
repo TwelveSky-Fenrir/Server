@@ -8,7 +8,7 @@ public class MonsterEntityTests
     private static MonsterEntity CreateEntity(int life = 100)
     {
         var template = WorldDataTestRows.Monster(500) with { Life = life };
-        return MonsterEntity.Create(1, 1u, template, 1, 0, 0, 0, 50);
+        return MonsterEntity.Create(1, 1u, template, 1, 0, 0, 0);
     }
 
     [Fact]

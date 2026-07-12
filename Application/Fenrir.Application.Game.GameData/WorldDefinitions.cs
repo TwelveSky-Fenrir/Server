@@ -37,7 +37,8 @@ public sealed record ZoneDefinition(
     ImmutableArray<ZonePortalRowDto> Portals,
     ImmutableArray<ZoneSpawnPointRowDto> SpawnPoints,
     ImmutableArray<ZoneNpcSpawnRowDto> NpcSpawns,
-    ImmutableArray<MonsterSpawnRegionRowDto> MonsterSpawnRegions)
+    ImmutableArray<MonsterSpawnRegionRowDto> MonsterSpawnRegions,
+    ImmutableArray<MonsterSpawnRegionRowDto> BossMonsterSpawnRegions)
 {
     public ZoneSpawnPointRowDto? FindSpawnPointFrom(short fromZoneNumber)
     {

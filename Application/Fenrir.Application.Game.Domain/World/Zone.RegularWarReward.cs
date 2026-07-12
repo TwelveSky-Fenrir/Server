@@ -76,5 +76,8 @@ public sealed partial class Zone
             SpawnGroundItem(RegularWarRewardItemCostumeStone30Percent, 1, state.PosX, state.PosY, state.PosZ,
                 state.Name, "", 0);
         }
+
+        if (state.VisibleState != 0)
+            CreditWaterfallOccupationQuest(state);
     }
 }

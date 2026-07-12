@@ -563,6 +563,37 @@ public class ZoneSkillCastTests
     }
 
     [Fact]
+    public void TargetedHeal_TargetHidden_IsRejected()
+    {
+        var skillsById = new Dictionary<int, SkillDefinition>
+        {
+            [106] = HealLifeSkill(10, 5, 100)
+        }.ToFrozenDictionary();
+        var worldData = ZoneTestKit.EmptyWorldData(skillsById: skillsById);
+        var zone = ZoneTestKit.CreateZone(1, worldData: worldData);
+        var (healerSession, _) = ZoneTestKit.CreateSession(1);
+        var (targetSession, _) = ZoneTestKit.CreateSession(2);
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(healerSession, 1, "Healer")));
+        zone.Post(ZoneCommand.Enter(20, ZoneTestKit.EnterData(targetSession, 1, "Target")));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(20, out var target));
+        target!.Life = 700;
+        target.ActionSort = 1;
+        target.VisibleState = 0;
+        Assert.True(zone.TryGetPlayer(10, out var healer));
+        SeedSkillHotkey(healer!, 106, 10);
+
+        zone.Post(ZoneCommand.Move(10, SkillCastStartAction(106, 10)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        zone.Post(ZoneCommand.Move(10, SkillEffectConfirmAction(106, 10, 20), true));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Equal(700, target.Life);
+    }
+
+    [Fact]
     public void TargetedHeal_TargetNeverActed_FailsGeneralTargetLegitimacyCheck()
     {
         var skillsById = new Dictionary<int, SkillDefinition>

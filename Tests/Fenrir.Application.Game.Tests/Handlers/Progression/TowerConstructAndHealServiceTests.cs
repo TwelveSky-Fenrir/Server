@@ -60,7 +60,7 @@ public class TowerConstructAndHealServiceTests
     {
         var guardianIndex = TowerWarState.GuardianServerIndex(towerIndex);
         var template = WorldDataTestRows.Monster(Level1GuardianMonsterId) with { Life = 5000 };
-        var guardian = MonsterEntity.Create(guardianIndex, 500u, template, guardianIndex, -1276f, -5f, 1826f, 300f);
+        var guardian = MonsterEntity.Create(guardianIndex, 500u, template, guardianIndex, -1276f, -5f, 1826f);
         if (damaged)
             guardian.TakeDamage(1000, out _);
 

@@ -20,8 +20,6 @@ public sealed partial class Zone
 
     private const int GmSummonPoolSize = 1_000;
 
-    private const float GmSummonLeashRadius = 200f;
-
     private readonly ConcurrentQueue<DeadMonsterEvent> _deadMonsters = new();
 
     private readonly SemaphoreSlim _moneyGrantSignal = new(0, int.MaxValue);
@@ -199,7 +197,8 @@ public sealed partial class Zone
             return;
 
         var defenderSnapshot = ToCombatantSnapshot(target);
-        var outcome = MonsterCombatResolver.ResolveMvpAttack(monster, defenderSnapshot, _clock, _random);
+        var outcome = MonsterCombatResolver.ResolveMvpAttack(monster, defenderSnapshot, _clock, _random,
+            target.VisibleState == 0, target.PshopOpen);
         if (outcome.Rejected)
             return;
 
@@ -365,7 +364,7 @@ public sealed partial class Zone
             return;
 
         var monster = MonsterEntity.Create(serverIndex, NextMonsterUniqueNumber(), definition.Monster, serverIndex,
-            state.PosX, state.PosY, state.PosZ, GmSummonLeashRadius);
+            state.PosX, state.PosY, state.PosZ);
 
         SpawnMonster(monster);
     }

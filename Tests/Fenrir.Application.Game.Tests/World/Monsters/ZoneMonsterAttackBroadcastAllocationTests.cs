@@ -71,7 +71,7 @@ public class ZoneMonsterAttackBroadcastAllocationTests
         pipes.Add(attackerPipe);
         zone.Post(ZoneCommand.Enter(1, ZoneTestKit.EnterData(attackerSession, 1, "Attacker")));
 
-        var monster = MonsterEntity.Create(1, 1u, PvmMonsterTemplate(), 1, 100f, 0f, 100f, 50f);
+        var monster = MonsterEntity.Create(1, 1u, PvmMonsterTemplate(), 1, 100f, 0f, 100f);
         zone.SpawnMonster(monster);
 
         for (var i = 0; i < bystanderCount; i++)
@@ -176,7 +176,7 @@ public class ZoneMonsterAttackBroadcastAllocationTests
         zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1));
         foreach (var pipe in pipes) ZoneTestKit.DrainOutbound(pipe);
 
-        var monster = MonsterEntity.Create(1, 1u, MvpMonsterTemplate(), 1, 100f, 0f, 100f, 50f);
+        var monster = MonsterEntity.Create(1, 1u, MvpMonsterTemplate(), 1, 100f, 0f, 100f);
         return (zone, monster, pipes);
     }
 

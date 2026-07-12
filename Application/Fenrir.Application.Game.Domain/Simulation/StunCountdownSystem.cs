@@ -8,19 +8,18 @@ public sealed class StunCountdownSystem : ISimulationSystem
     {
         foreach (var state in zone.Players)
         {
-            if (!state.IsStunned)
+            if (!state.IsStunned || state.OneSecondGateOpenCount <= 0)
                 continue;
 
-            state.StunCountdownAccumulatorTicks += legacyTicksElapsed;
-            var secondsElapsed = state.StunCountdownAccumulatorTicks / SimulationClock.StunCountdownLegacyTicks;
-            if (secondsElapsed <= 0)
-                continue;
-
-            state.StunCountdownAccumulatorTicks -= secondsElapsed * SimulationClock.StunCountdownLegacyTicks;
-            state.StunDurationSeconds -= secondsElapsed;
+            state.StunDurationSeconds -= state.OneSecondGateOpenCount;
 
             if (state.StunDurationSeconds <= 0)
+            {
                 zone.ClearStun(state);
+                continue;
+            }
+
+            state.CanUseConsumables = false;
         }
     }
 }

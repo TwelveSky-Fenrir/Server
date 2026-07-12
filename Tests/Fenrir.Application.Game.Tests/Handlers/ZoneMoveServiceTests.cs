@@ -24,7 +24,7 @@ public class ZoneMoveServiceTests
     {
         var worldData = ZoneTestKit.EmptyWorldData(zonesByNumber: destinationMapIds
             .ToDictionary(mapId => mapId,
-                mapId => new ZoneDefinition(new ZoneRowDto(mapId, 0f, 0f, 0f), [], [], [], []))
+                mapId => new ZoneDefinition(new ZoneRowDto(mapId, 0f, 0f, 0f), [], [], [], [], []))
             .ToFrozenDictionary());
 
         var zones = ZoneTestKit.CreateRegistry(worldData: worldData);
@@ -36,6 +36,7 @@ public class ZoneMoveServiceTests
             new FakeGameServerDirectoryRepository(),
             new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
             new FakeSessionTicketRepository(),
+            new FakeCharacterShardLocationRepository(),
             new FakeEventLogRepository(),
             Options.Create(new GameServerOptions()), NullLogger<ZoneMoveService>.Instance);
 
@@ -66,7 +67,7 @@ public class ZoneMoveServiceTests
     {
         var worldData = ZoneTestKit.EmptyWorldData(zonesByNumber: destinationMapIds
             .ToDictionary(mapId => mapId,
-                mapId => new ZoneDefinition(new ZoneRowDto(mapId, 0f, 0f, 0f), [], [], [], []))
+                mapId => new ZoneDefinition(new ZoneRowDto(mapId, 0f, 0f, 0f), [], [], [], [], []))
             .ToFrozenDictionary());
 
         var zones = ZoneTestKit.CreateRegistry(worldData: worldData);
@@ -78,6 +79,7 @@ public class ZoneMoveServiceTests
             new FakeGameServerDirectoryRepository(),
             new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
             new FakeSessionTicketRepository(),
+            new FakeCharacterShardLocationRepository(),
             new FakeEventLogRepository(),
             Options.Create(new GameServerOptions()), NullLogger<ZoneMoveService>.Instance);
 
@@ -165,6 +167,7 @@ public class ZoneMoveServiceTests
             new FakeGameServerDirectoryRepository(),
             new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
             new FakeSessionTicketRepository(),
+            new FakeCharacterShardLocationRepository(),
             new FakeEventLogRepository(),
             Options.Create(new GameServerOptions()), NullLogger<ZoneMoveService>.Instance);
 
@@ -199,6 +202,7 @@ public class ZoneMoveServiceTests
             new FakeGameServerDirectoryRepository(),
             new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
             new FakeSessionTicketRepository(),
+            new FakeCharacterShardLocationRepository(),
             new FakeEventLogRepository(),
             Options.Create(new GameServerOptions()), NullLogger<ZoneMoveService>.Instance);
 
@@ -335,16 +339,26 @@ public class ZoneMoveServiceTests
     }
 
     [Fact]
-    public async Task DestinationZoneNumberAtUpperBound_IsAccepted_NotTreatedAsOutOfRange()
+    public async Task DestinationZoneNumberJustBelowExclusiveUpperBound_IsAccepted()
     {
-        var (service, session, sourceZone) = CreateServiceWithGrade(2, 1, false, 0, [350]);
+        var (service, session, sourceZone) = CreateServiceWithGrade(2, 1, false, 0, [349]);
 
-        await service.HandleAsync(Request(2, 350), session, CancellationToken.None);
+        await service.HandleAsync(Request(2, 349), session, CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
 
         sourceZone.Tick(TimeSpan.FromMilliseconds(50));
         Assert.False(sourceZone.TryGetPlayer(CharacterId, out _));
+    }
+
+    [Fact]
+    public async Task DestinationZoneNumberAtExclusiveUpperBound_IsRejectedAsMalformed()
+    {
+        var (service, session, _) = CreateServiceWithGrade(2, 1, false, 0, []);
+
+        await service.HandleAsync(Request(2, 350), session, CancellationToken.None);
+
+        Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);
     }
 
     [Fact]
@@ -371,5 +385,157 @@ public class ZoneMoveServiceTests
         sourceZone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.False(sourceZone.TryGetPlayer(CharacterId, out _));
+    }
+
+    private static (ZoneMoveService Service, ZoneClientSession Session, Zone SourceZone, FakeDuplexPipe Pipe)
+        CreateServiceWithSymbolBattle(short sourceMapId, bool battleActive, params short[] destinationMapIds)
+    {
+        var worldData = ZoneTestKit.EmptyWorldData(zonesByNumber: destinationMapIds
+            .ToDictionary(mapId => mapId,
+                mapId => new ZoneDefinition(new ZoneRowDto(mapId, 0f, 0f, 0f), [], [], [], [], []))
+            .ToFrozenDictionary());
+
+        var zones = ZoneTestKit.CreateRegistry(worldData: worldData);
+        zones.Initialize([sourceMapId, .. destinationMapIds]);
+
+        var worldState = ZoneTestKit.CreateWorldState();
+        if (battleActive)
+            worldState.StartTribeSymbolBattle();
+
+        var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
+            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(), PortalProximityCatalog.Empty,
+            new FakeGameServerDirectoryRepository(),
+            new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
+            new FakeSessionTicketRepository(),
+            new FakeCharacterShardLocationRepository(),
+            new FakeEventLogRepository(),
+            Options.Create(new GameServerOptions()), NullLogger<ZoneMoveService>.Instance);
+
+        var (session, pipe) = ZoneTestKit.CreateSession(1);
+        session.MarkTicketConsumed(1, CharacterId);
+        var sourceZone = zones[sourceMapId];
+        session.CurrentZone = sourceZone;
+
+        sourceZone.Post(ZoneCommand.Enter(CharacterId, ZoneTestKit.EnterData(session, sourceMapId)));
+        sourceZone.Tick(TimeSpan.FromMilliseconds(50));
+        ZoneTestKit.DrainOutbound(pipe);
+
+        return (service, session, sourceZone, pipe);
+    }
+
+    [Theory]
+    [InlineData((short)40)]
+    [InlineData((short)41)]
+    [InlineData((short)42)]
+    public async Task SymbolBattleActive_GuardedSourceZone_DestinationZone38_DisconnectsWithNothingSent(
+        short sourceZoneId)
+    {
+        var (service, session, _, pipe) = CreateServiceWithSymbolBattle(sourceZoneId, true, 38);
+
+        await service.HandleAsync(Request(sourceZoneId, 38), session, CancellationToken.None);
+
+        Assert.Equal(DisconnectReason.StateViolation, session.DisconnectReason);
+        Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
+    }
+
+    [Fact]
+    public async Task SymbolBattleActive_ReverseDirection_OutOfZone38_TransfersNormally()
+    {
+        var (service, session, _, _) = CreateServiceWithSymbolBattle(38, true, 40);
+
+        await service.HandleAsync(Request(38, 40), session, CancellationToken.None);
+
+        Assert.Null(session.DisconnectReason);
+    }
+
+    [Fact]
+    public async Task SymbolBattleActive_BetweenGuardedZonesThemselves_TransfersNormally()
+    {
+        var (service, session, _, _) = CreateServiceWithSymbolBattle(40, true, 41);
+
+        await service.HandleAsync(Request(40, 41), session, CancellationToken.None);
+
+        Assert.Null(session.DisconnectReason);
+    }
+
+    [Fact]
+    public async Task SymbolBattleActive_GuardedSourceZone_NonZone38Destination_TransfersNormally()
+    {
+        var (service, session, _, _) = CreateServiceWithSymbolBattle(40, true, 50);
+
+        await service.HandleAsync(Request(40, 50), session, CancellationToken.None);
+
+        Assert.Null(session.DisconnectReason);
+    }
+
+    [Fact]
+    public async Task SymbolBattleNotActive_GuardedSourceZone_DestinationZone38_TransfersNormally()
+    {
+        var (service, session, _, _) = CreateServiceWithSymbolBattle(40, false, 38);
+
+        await service.HandleAsync(Request(40, 38), session, CancellationToken.None);
+
+        Assert.Null(session.DisconnectReason);
+    }
+
+    private static (ZoneMoveService Service, ZoneClientSession Session,
+        FakeCharacterShardLocationRepository ShardLocations) CreateServiceWithShardLocations(
+            short sourceMapId, byte tribe, params short[] destinationMapIds)
+    {
+        var worldData = ZoneTestKit.EmptyWorldData(zonesByNumber: destinationMapIds
+            .ToDictionary(mapId => mapId,
+                mapId => new ZoneDefinition(new ZoneRowDto(mapId, 0f, 0f, 0f), [], [], [], [], []))
+            .ToFrozenDictionary());
+
+        var zones = ZoneTestKit.CreateRegistry(worldData: worldData);
+        zones.Initialize([sourceMapId, .. destinationMapIds]);
+
+        var worldState = ZoneTestKit.CreateWorldState();
+        var shardLocations = new FakeCharacterShardLocationRepository();
+        var options = new GameServerOptions { ShardId = 9 };
+        var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
+            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(), PortalProximityCatalog.Empty,
+            new FakeGameServerDirectoryRepository(),
+            new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
+            new FakeSessionTicketRepository(),
+            shardLocations,
+            new FakeEventLogRepository(),
+            Options.Create(options), NullLogger<ZoneMoveService>.Instance);
+
+        var (session, _) = ZoneTestKit.CreateSession(1);
+        session.MarkTicketConsumed(1, CharacterId);
+        var sourceZone = zones[sourceMapId];
+        session.CurrentZone = sourceZone;
+
+        sourceZone.Post(ZoneCommand.Enter(CharacterId, ZoneTestKit.EnterData(session, sourceMapId, tribe: tribe)));
+        sourceZone.Tick(TimeSpan.FromMilliseconds(50));
+
+        return (service, session, shardLocations);
+    }
+
+    [Fact]
+    public async Task SuccessfulTransfer_RegistersTheCharacterWithTheSharedLocationDirectory_BeforeTheReplyIsSent()
+    {
+        var (service, session, shardLocations) = CreateServiceWithShardLocations(2, 1, 50);
+
+        await service.HandleAsync(Request(2, 50), session, CancellationToken.None);
+
+        Assert.Null(session.DisconnectReason);
+        var call = Assert.Single(shardLocations.UpsertCalls);
+        Assert.Equal(CharacterId, call.CharacterId);
+        Assert.Equal((byte)9, call.ShardId);
+        Assert.Equal((short)50, call.MapId);
+        Assert.Equal("Hero", call.AvatarName);
+        Assert.Equal((byte)1, call.Tribe);
+    }
+
+    [Fact]
+    public async Task LocationDirectoryRegistrationFails_PropagatesWithoutSendingAReply()
+    {
+        var (service, session, shardLocations) = CreateServiceWithShardLocations(2, 1, 50);
+        shardLocations.ThrowOnUpsert = true;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.HandleAsync(Request(2, 50), session, CancellationToken.None).AsTask());
     }
 }

@@ -107,74 +107,85 @@ public class DeathGateTests
     }
 
     [Fact]
-    public void ZoneTransfer_DestinationZone38_IsAlwaysAllowed_RegardlessOfCapitalGroupOrAlliance()
+    public void ZoneTransfer_DestinationZone38_IsAlwaysAllowed_RegardlessOfCurrentCapitalGroupOrAlliance()
     {
-        var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(38, _ => null);
+        var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(2, 38, 1, _ => null);
 
         Assert.True(allowed);
     }
 
     [Fact]
-    public void ZoneTransfer_DestinationNotACapitalGroup_IsAlwaysAllowed()
+    public void ZoneTransfer_CurrentZoneNotACapitalGroup_IsAlwaysAllowed()
     {
-        var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(50, _ => null);
+        var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(50, 999, 1, _ => null);
 
         Assert.True(allowed);
     }
 
     [Fact]
-    public void ZoneTransfer_Tribe0CapitalGroup_AllianceCheckCanNeverBeSatisfied_RejectedWithoutTheHub()
+    public void ZoneTransfer_Tribe0CapitalGroup_ForeignRequester_AllianceCheckCanNeverBeSatisfied_Rejected()
     {
-        var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(2, _ => null);
+        var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(2, 999, 1, _ => null);
 
         Assert.False(allowed);
     }
 
     [Fact]
-    public void ZoneTransfer_Tribe0CapitalGroup_EvenAnOwnTribeRequester_IsRejectedWithoutTheHub()
+    public void ZoneTransfer_Tribe0CapitalGroup_OwnTribeRequester_IsAllowed()
     {
-        var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(2, _ => null);
-
-        Assert.False(allowed);
-    }
-
-    [Fact]
-    public void ZoneTransfer_Tribe1CapitalGroup_OwningFactionAlliedWithTribe0_AllowsAnyRequester()
-    {
-        var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(7, owner => owner == 1 ? (byte)0 : null);
+        var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(2, 999, 0, _ => null);
 
         Assert.True(allowed);
     }
 
     [Fact]
-    public void ZoneTransfer_Tribe1CapitalGroup_OwningFactionAlliedWithNonZeroTribe_Rejected()
-    {
-        var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(7, owner => owner == 1 ? (byte)2 : null);
-
-        Assert.False(allowed);
-    }
-
-    [Fact]
-    public void ZoneTransfer_Tribe1CapitalGroup_NoAllianceAtAll_Rejected()
-    {
-        var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(7, _ => null);
-
-        Assert.False(allowed);
-    }
-
-    [Fact]
-    public void ZoneTransfer_Tribe2CapitalGroup_OwningFactionAlliedWithTribe0_AllowsAnyRequester()
-    {
-        var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(12, owner => owner == 2 ? (byte)0 : null);
-
-        Assert.True(allowed);
-    }
-
-    [Fact]
-    public void ZoneTransfer_Tribe3CapitalGroup_OwningFactionAlliedWithTribe0_AllowsAnyRequester()
+    public void ZoneTransfer_Tribe1CapitalGroup_OwningFactionAlliedWithTribe0_AllowsForeignRequester()
     {
         var allowed =
-            ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(141, owner => owner == 3 ? (byte)0 : null);
+            ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(7, 999, 2, owner => owner == 1 ? (byte)0 : null);
+
+        Assert.True(allowed);
+    }
+
+    [Fact]
+    public void ZoneTransfer_Tribe1CapitalGroup_OwningFactionAlliedWithNonZeroTribe_ForeignRequester_Rejected()
+    {
+        var allowed =
+            ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(7, 999, 2, owner => owner == 1 ? (byte)2 : null);
+
+        Assert.False(allowed);
+    }
+
+    [Fact]
+    public void ZoneTransfer_Tribe1CapitalGroup_NoAllianceAtAll_ForeignRequester_Rejected()
+    {
+        var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(7, 999, 2, _ => null);
+
+        Assert.False(allowed);
+    }
+
+    [Fact]
+    public void ZoneTransfer_Tribe1CapitalGroup_OwnTribeRequester_AllowedEvenWithNoAlliance()
+    {
+        var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(7, 999, 1, _ => null);
+
+        Assert.True(allowed);
+    }
+
+    [Fact]
+    public void ZoneTransfer_Tribe2CapitalGroup_OwningFactionAlliedWithTribe0_AllowsForeignRequester()
+    {
+        var allowed =
+            ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(12, 999, 1, owner => owner == 2 ? (byte)0 : null);
+
+        Assert.True(allowed);
+    }
+
+    [Fact]
+    public void ZoneTransfer_Tribe3CapitalGroup_OwningFactionAlliedWithTribe0_AllowsForeignRequester()
+    {
+        var allowed =
+            ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(141, 999, 1, owner => owner == 3 ? (byte)0 : null);
 
         Assert.True(allowed);
     }

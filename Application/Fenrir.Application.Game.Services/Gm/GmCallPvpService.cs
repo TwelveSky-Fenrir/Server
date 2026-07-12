@@ -60,6 +60,15 @@ public sealed class GmCallPvpService(
             if (!string.Equals(candidate.Name, packet.TargetName, StringComparison.Ordinal))
                 continue;
 
+            if (candidate.IsMovingZone)
+            {
+                if (logger.IsEnabled(LogLevel.Debug))
+                    logger.LogDebug(
+                        "GM-CALLPVP: candidate character {CandidateCharacterId} ({CandidateName}) skipped -- mid zone-transfer",
+                        candidate.CharacterId, candidate.Name);
+                continue;
+            }
+
             if (duelRegistry is not null &&
                 (duelRegistry.IsNegotiating(candidate.CharacterId) ||
                  duelRegistry.TryGetActiveDuel(candidate.CharacterId, out _)))
@@ -73,7 +82,7 @@ public sealed class GmCallPvpService(
 
             if (!await zone.PostTribeProgressCommandAndWaitAsync(
                     new TribeProgressZoneCommand(candidate.CharacterId, TeleportTo: destination,
-                        NeighborActionBroadcast: true), cancellationToken))
+                        NeighborActionBroadcast: true, ResetAfkTick: true), cancellationToken))
                 logger.LogError(
                     "Zone {MapId} tribe-progress inbox full: dropped GM-CALLPVP relocation mirror for character {CharacterId}",
                     zone.MapId, candidate.CharacterId);

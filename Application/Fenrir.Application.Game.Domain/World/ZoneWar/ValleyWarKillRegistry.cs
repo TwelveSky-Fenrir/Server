@@ -11,11 +11,8 @@ public sealed class ValleyWarKillRegistry
         return _schedules.GetOrAdd(mapId, static _ => new ValleyWarSchedule());
     }
 
-    public void RegisterMonsterKill(short mapId, byte tribeId)
+    public bool RegisterMonsterKill(short mapId, byte tribeId)
     {
-        if (!ValleyWarMapCatalog.Contains(mapId))
-            return;
-
-        GetOrCreate(mapId).RegisterMonsterKill(tribeId);
+        return ValleyWarMapCatalog.Contains(mapId) && GetOrCreate(mapId).RegisterMonsterKill(tribeId);
     }
 }

@@ -20,9 +20,13 @@ public partial class PlayerRuntimeState
 
     public bool IsMovingZone { get; set; }
 
+    public DateTime ZoneTransferRegisteredAtUtc { get; set; }
+
     public int DeathSubCounter { get; set; }
 
     public int ActionSort { get; set; }
+
+    public int ActionType { get; set; }
 
     public int ActionSkillNumber { get; set; }
 
@@ -49,11 +53,15 @@ public partial class PlayerRuntimeState
 
     public int StunDurationSeconds { get; set; }
 
-    public int StunCountdownAccumulatorTicks { get; set; }
+    public long LastOneSecondGateTick { get; set; }
 
-    public int MeditationRegenAccumulatorTicks { get; set; }
+    public int OneSecondGateOpenCount { get; set; }
 
     public int RepeatedStunCount { get; set; }
 
     public bool CanUseConsumables { get; set; } = true;
+
+    public bool IsUnderDarkAttackPotionDebuff { get; set; }
+
+    public int DarkAttackDebuffAccumulatorTicks { get; set; }
 }

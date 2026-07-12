@@ -74,20 +74,12 @@ public sealed class UseInventoryItemService(
     private static readonly ImmutableHashSet<int> TribeConversionBookItemIds =
         ImmutableHashSet.Create(99014, 99015, 99016);
 
-    public async ValueTask<UseInventoryItemResponse> ResolveAsync(Zone zone, PlayerRuntimeState state,
+    public async ValueTask<UseInventoryItemResponse?> ResolveAsync(Zone zone, PlayerRuntimeState state,
         int characterId, int accountId, byte page, byte index, int value, CancellationToken cancellationToken)
     {
-        if (page == ContainerMatrix.InventoryPage1 && state.InventoryDate < GameDate.Today())
-        {
-            logger.LogDebug(
-                "Character {CharacterId} use-inventory-item rejected: dated-vault last page {Page} expired (InventoryDate {InventoryDate})",
-                characterId, page, state.InventoryDate);
-            return new UseInventoryItemResponse { Result = 1, Page = page, Index = index, Value = 0, Value2 = 0 };
-        }
-
         var itemStack = state.Inventory.GetSlot(page, index);
         if (itemStack is not { } item || !worldData.ItemsById.TryGetValue(item.ItemId, out var itemDefinition))
-            return Fail(characterId, itemStack, page, index);
+            return Fail(characterId, itemStack, page, index, value);
 
         if (itemDefinition.Item.Sort == BottleSort)
             return await ResolveBottleAsync(zone, state, characterId, page, index, item, cancellationToken);
@@ -161,7 +153,16 @@ public sealed class UseInventoryItemService(
                 new UseItemContext(zone, state, characterId, accountId, page, index, item, itemDefinition, value),
                 cancellationToken);
 
-        return Fail(characterId, item, page, index);
+        return Unrecognized(state, characterId, accountId, item);
+    }
+
+    private UseInventoryItemResponse? Unrecognized(PlayerRuntimeState state, int characterId, int accountId,
+        ItemStack item)
+    {
+        logger.LogError(
+            "Character {CharacterId} ({CharacterName}, account {AccountId}, shard {ShardId}) use-inventory-item disconnect: item {ItemId} matched no recognized dispatch branch",
+            characterId, state.Name, accountId, options.Value.ShardId, item.ItemId);
+        return null;
     }
 
     private static short StatPotionSubTypeEventCode(StatPotionKind kind, StatPotionTier tier)
@@ -1004,14 +1005,14 @@ public sealed class UseInventoryItemService(
         return itemId is 632 or 1241 or 2462;
     }
 
-    private UseInventoryItemResponse Fail(int characterId, ItemStack? item, byte page, byte index,
+    private UseInventoryItemResponse Fail(int characterId, ItemStack? item, byte page, byte index, int value = 0,
         [CallerMemberName] string resolver = "")
     {
         if (logger.IsEnabled(LogLevel.Debug))
             logger.LogDebug(
                 "Character {CharacterId} use-inventory-item rejected in {Resolver} (item {ItemId}, slot {Page}:{Index})",
                 characterId, resolver, item?.ItemId, page, index);
-        return new UseInventoryItemResponse { Result = 1, Page = page, Index = index, Value = 0, Value2 = 0 };
+        return new UseInventoryItemResponse { Result = 1, Page = page, Index = index, Value = value, Value2 = 0 };
     }
 
     private static List<CharacterItemSlotTvp> ToTvps(ImmutableDictionary<byte, ItemStack> container)

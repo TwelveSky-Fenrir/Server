@@ -36,7 +36,8 @@ public static class EquipmentService
         PetStatContribution pet = default,
         PlayerRuntimeState? runtimeState = null,
         ConsumableContext? consumableOverride = null,
-        ZoneContext? zoneOverride = null)
+        ZoneContext? zoneOverride = null,
+        MountContext? mountOverride = null)
     {
         var equipped = BuildEquippedSlots(equipmentContainer, worldData.ItemsById);
         var (cosmetic, zone, consumable, mount) = AssembleStatContexts(runtimeState, worldData);
@@ -44,6 +45,8 @@ public static class EquipmentService
             consumable = overrideConsumable;
         if (zoneOverride is { } overrideZone)
             zone = overrideZone;
+        if (mountOverride is { } overrideMount)
+            mount = overrideMount;
         var legacySetNumber = StatCalculator.DetectLegacySetNumber(equipped);
         return StatCalculator.ComputeEffectiveStats(attributes, equipped, worldData.LevelsByLevel, buffs,
             legacySetNumber, pet,
@@ -77,6 +80,7 @@ public static class EquipmentService
             state.UseOrnament,
             RankBuffType: state.RankBuffType,
             TribeRole: state.TribeRole,
+            DrunkStateId: ResolveDrunkStateId(state),
             GuildBuffActive: state.GuildBuffActive,
             GuildId: state.GuildId ?? 0);
 
@@ -93,5 +97,13 @@ public static class EquipmentService
             RuntimeAttributes: state.MountRolledAttributes);
 
         return (cosmetic, zone, consumable, mount);
+    }
+
+    private static int ResolveDrunkStateId(PlayerRuntimeState state)
+    {
+        return state.DrunkBottleTicksRemaining > 0 && state.DrunkBottleIndex >= 0 &&
+               state.DrunkBottleIndex < state.BottleSlots.Length
+            ? state.BottleSlots[state.DrunkBottleIndex].ItemId
+            : 0;
     }
 }

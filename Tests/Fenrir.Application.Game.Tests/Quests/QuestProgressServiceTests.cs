@@ -1,4 +1,5 @@
 using Fenrir.Application.Game.Abstractions.Quests;
+using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
@@ -110,7 +111,7 @@ public class QuestProgressServiceTests
     }
 
     [Fact]
-    public async Task Complete_MoneyOnlyReward_NoItemGranted_LogsAnAuditRow_WithDeltaMoney_ButNoItemId()
+    public async Task Complete_MoneyOnlyReward_DepositTargetDeclared_LogsAnAuditRow_WithDeltaMoney_AndZeroItemId()
     {
         var moneyReward = new QuestRewardRowDto(QuestId, 0, 2, null, 1000);
         var (_, zone, state, _, eventLog, service) = SetUp(KillQuestAtStep3(), [moneyReward], 1);
@@ -126,14 +127,15 @@ public class QuestProgressServiceTests
         Assert.Equal(AccountId, logged.ActorAccountId);
         Assert.Equal(CharacterId, logged.ActorCharacterId);
         Assert.Equal(1000, logged.DeltaMoney);
-        Assert.Null(logged.ItemId);
-        Assert.Null(logged.Quantity);
+        Assert.Equal(0, logged.ItemId);
+        Assert.Equal(0, logged.Quantity);
         Assert.Equal((byte)1, logged.Outcome);
         Assert.Equal("ExperienceReward=0;KillOtherTribeCountReward=0;TeacherPointReward=0", logged.Payload);
+        Assert.Equal(0, state.Inventory.GetSlot(ContainerMatrix.InventoryPage0, 0)!.Value.ItemId);
     }
 
     [Fact]
-    public async Task Complete_ExperienceKillOtherTribeCountAndTeacherPointReward_NoItemOrMoney_LogsAuditRow_WithPayload()
+    public async Task Complete_ExperienceKillOtherTribeCountAndTeacherPointReward_DepositTargetDeclared_LogsAuditRow_WithZeroItemIdAndPayload()
     {
         var rewards = new[]
         {
@@ -152,12 +154,30 @@ public class QuestProgressServiceTests
         var logged = Assert.Single(eventLog.LoggedEvents);
         Assert.Equal(EventLogCategory.ItemCreate, logged.Category);
         Assert.Null(logged.DeltaMoney);
-        Assert.Null(logged.ItemId);
-        Assert.Null(logged.Quantity);
+        Assert.Equal(0, logged.ItemId);
+        Assert.Equal(0, logged.Quantity);
         Assert.Equal((byte)1, logged.Outcome);
         Assert.Equal("ExperienceReward=200;KillOtherTribeCountReward=50;TeacherPointReward=5", logged.Payload);
         Assert.Equal(50, state.MissionKillOtherTribe);
         Assert.Equal(0, state.ContributionPoints);
+    }
+
+    [Fact]
+    public async Task Complete_NoDepositTargetDeclared_MoneyOnlyReward_LogsAnAuditRow_WithNoItemId()
+    {
+        var moneyReward = new QuestRewardRowDto(QuestId, 0, 2, null, 1000);
+        var (_, zone, state, _, eventLog, service) = SetUp(KillQuestAtStep3(), [moneyReward], 1);
+        var packet = new QuestProgressRequest { Sort = 2, Page1 = -1, Index1 = -1, XPost = 0, YPost = 0 };
+
+        var result = await RunToCompletionAsync(
+            service.CompleteAsync(packet, state, zone, CharacterId, AccountId, CancellationToken.None), zone);
+
+        Assert.True(result.Success);
+
+        var logged = Assert.Single(eventLog.LoggedEvents);
+        Assert.Equal(1000, logged.DeltaMoney);
+        Assert.Null(logged.ItemId);
+        Assert.Null(logged.Quantity);
     }
 
     [Fact]
@@ -195,6 +215,41 @@ public class QuestProgressServiceTests
 
         Assert.True(result.Success);
         Assert.Empty(eventLog.LoggedEvents);
+    }
+
+    [Fact]
+    public async Task Complete_RewardItem_ToExpiredSecondInventoryPage_Fails_NoStateChange()
+    {
+        var reward = new QuestRewardRowDto(QuestId, 0, 6, RewardItemId, null);
+        var (_, zone, state, characters, eventLog, service) = SetUp(KillQuestAtStep3(), [reward], 1);
+        var packet = new QuestProgressRequest
+        {
+            Sort = 2, Page1 = ContainerMatrix.InventoryPage1, Index1 = 0, XPost = 0, YPost = 0
+        };
+
+        var result = await service.CompleteAsync(packet, state, zone, CharacterId, AccountId, CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Empty(characters.QuestTransitions);
+        Assert.Empty(eventLog.LoggedEvents);
+    }
+
+    [Fact]
+    public async Task Complete_RewardItem_ToUnexpiredSecondInventoryPage_Succeeds()
+    {
+        var reward = new QuestRewardRowDto(QuestId, 0, 6, RewardItemId, null);
+        var (_, zone, state, _, eventLog, service) = SetUp(KillQuestAtStep3(), [reward], 1);
+        state.InventoryDate = 99991231;
+        var packet = new QuestProgressRequest
+        {
+            Sort = 2, Page1 = ContainerMatrix.InventoryPage1, Index1 = 0, XPost = 0, YPost = 0
+        };
+
+        var result = await RunToCompletionAsync(
+            service.CompleteAsync(packet, state, zone, CharacterId, AccountId, CancellationToken.None), zone);
+
+        Assert.True(result.Success);
+        Assert.Single(eventLog.LoggedEvents);
     }
 
     [Fact]

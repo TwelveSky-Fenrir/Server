@@ -27,7 +27,7 @@ public class MonsterStandardAggroEngagementTests
             FollowInfo2 = 5,
             FrameInfo1 = 100
         };
-        var monster = MonsterEntity.Create(1, 1, template, 1, 0, 0, 0, 50);
+        var monster = MonsterEntity.Create(1, 1, template, 1, 0, 0, 0);
         if (!startInSpawning)
             monster.AiState = MonsterAiState.Decision;
 
@@ -103,6 +103,21 @@ public class MonsterStandardAggroEngagementTests
     }
 
     [Fact]
+    public void FreshAcquisitionFromIdle_ResetsWanderTimerImmediately_IndependentlyOfTheIdleRoutinesOwnReset()
+    {
+        var (zone, monster) = CreateStandardZone(1000, 1000, 100, new ScriptedRandomSource(0));
+        monster.IdleWanderElapsedTicks = 42;
+        EnterPlayerAt(zone, 10, 5, 0);
+
+        zone.Tick(SimulationClock.LegacyTick);
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.True(zone.TryGetMonster(1, out var live));
+        Assert.Equal(10, live!.TargetCharacterId);
+        Assert.Equal(0, live.IdleWanderElapsedTicks);
+    }
+
+    [Fact]
     public void EmptyTableAndFailedScan_NeverReachesEngagementStep_StaysIdle()
     {
         var (zone, _) = CreateStandardZone(10, 50, 100,
@@ -152,6 +167,21 @@ public class MonsterStandardAggroEngagementTests
     }
 
     [Fact]
+    public void BeyondMeleeRangeSurvivor_NonPositiveMeleeRadius_NoTransitionAtAll()
+    {
+        var (zone, _) = CreateStandardZone(0, 1000, 100,
+            new ScriptedRandomSource(0));
+        EnterPlayerAt(zone, 10, 100, 0);
+        zone.Tick(SimulationClock.LegacyTick);
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.True(zone.TryGetMonster(1, out var live));
+        Assert.Equal(MonsterAiState.Decision, live!.AiState);
+        Assert.Equal(0f, live.PosX);
+        Assert.Equal(0f, live.PosZ);
+    }
+
+    [Fact]
     public void BeyondMeleeRangeSurvivor_ReachableApproachPoint_ChasesTowardAnArcOffsetPoint()
     {
         var (zone, _) = CreateStandardZone(10, 1000, 100,
@@ -186,5 +216,45 @@ public class MonsterStandardAggroEngagementTests
 
         Assert.True(zone.TryGetMonster(1, out var live));
         Assert.Equal(MonsterAiState.ReturnToSpawn, live!.AiState);
+    }
+
+    [Fact]
+    public void AlreadyChasing_MidChaseApproachBlockedByGeometry_AbandonsChaseToReturnToSpawn()
+    {
+        var (zone, monster) = CreateStandardZone(5, 200, 100,
+            new ScriptedRandomSource(0), TwoIslandGeometry());
+        EnterPlayerAt(zone, 10, 100, 100);
+
+        monster.AiState = MonsterAiState.Chase;
+        monster.AssignTarget(10, 0, 100, 0, 100);
+
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.True(zone.TryGetMonster(1, out var live));
+        Assert.Equal(MonsterAiState.ReturnToSpawn, live!.AiState);
+    }
+
+    [Fact]
+    public void ArcApproachLateralOffsetDraw_UsesExclusiveMeleeRadiusBound_NotRadiusPlusOne()
+    {
+        var recorder = new RecordingRandomSource();
+        var (zone, _) = CreateStandardZone(10, 1000, 100, recorder, FlatGeometry());
+        EnterPlayerAt(zone, 10, 100, 0);
+        zone.Tick(SimulationClock.LegacyTick);
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.Contains(10, recorder.ExclusiveUpperBounds);
+        Assert.DoesNotContain(11, recorder.ExclusiveUpperBounds);
+    }
+
+    private sealed class RecordingRandomSource : IRandomSource
+    {
+        public List<int> ExclusiveUpperBounds { get; } = [];
+
+        public int NextInt32(int exclusiveUpperBound)
+        {
+            ExclusiveUpperBounds.Add(exclusiveUpperBound);
+            return 0;
+        }
     }
 }

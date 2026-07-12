@@ -40,7 +40,8 @@ public sealed class UseItemInventoryWriter(ICharacterRepository characters, ILog
             new InventoryContainerSnapshot(pageContainer, pageProjected),
             new InventoryContainerSnapshot(equipmentContainer, equipmentProjected));
 
-        if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, stats),
+        if (!await zone.PostInventoryCommandAndWaitAsync(
+                new InventoryZoneCommand(characterId, containers, stats, RecomputeCombatPoseAfterEquip: true),
                 cancellationToken))
             logger.LogError(
                 "Zone {MapId} inventory inbox full: dropped op23 equip-swap mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",

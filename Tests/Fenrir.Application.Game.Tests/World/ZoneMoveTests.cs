@@ -133,7 +133,151 @@ public class ZoneMoveTests
     }
 
     [Fact]
-    public void Move_Implausible_RejectsUpdate_AndResyncsMoverToLastKnownGoodState()
+    public void MoveResume_ImplausibleDistance_StillAppliesMutationSilently_NoCorrectionSent()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var (mover, moverPipe) = ZoneTestKit.CreateSession(1);
+
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(mover, 1, posX: 10f, posZ: 10f)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+        ZoneTestKit.DrainOutbound(moverPipe);
+
+        zone.Post(ZoneCommand.Move(10, MoveTo(999_999f, 999_999f), true));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(10, out var mover10));
+        Assert.Equal(999_999f, mover10!.PosX);
+        Assert.Equal(999_999f, mover10.PosZ);
+
+        Assert.Empty(ZoneTestKit.DrainOutbound(moverPipe));
+        Assert.Null(mover.DisconnectReason);
+    }
+
+    [Fact]
+    public void MoveResume_Accepted_RecordsDefenseHackPreviousPositionFromPriorState()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var (mover, moverPipe) = ZoneTestKit.CreateSession(1);
+
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(mover, 1, posX: 10f, posZ: 20f)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+        ZoneTestKit.DrainOutbound(moverPipe);
+
+        zone.Post(ZoneCommand.Move(10, MoveTo(50f, 60f), true));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(10, out var mover10));
+        Assert.Equal(10f, mover10!.DefenseHackPreviousPosX);
+        Assert.Equal(20f, mover10.DefenseHackPreviousPosZ);
+        Assert.Equal(50f, mover10.PosX);
+        Assert.Equal(60f, mover10.PosZ);
+    }
+
+    [Fact]
+    public void MoveResume_SkillGradeExceedsServerCap_StillRecordsDefenseHackPreviousPosition()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var (mover, moverPipe) = ZoneTestKit.CreateSession(1);
+
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(mover, 1, posX: 10f, posZ: 20f)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+        ZoneTestKit.DrainOutbound(moverPipe);
+
+        var action = MoveTo(50f, 60f) with { Sort = 2, SkillNumber = 50, SkillGradeNum1 = 1 };
+        zone.Post(ZoneCommand.Move(10, action, true));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(10, out var mover10));
+        Assert.Equal(10f, mover10!.DefenseHackPreviousPosX);
+        Assert.Equal(20f, mover10.DefenseHackPreviousPosZ);
+        Assert.Equal(10f, mover10.PosX);
+        Assert.Equal(20f, mover10.PosZ);
+    }
+
+    [Fact]
+    public void MoveResume_StunActionSort_ResetsAfkTick()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var (mover, moverPipe) = ZoneTestKit.CreateSession(1);
+
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(mover, 1, posX: 10f, posZ: 10f)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+        ZoneTestKit.DrainOutbound(moverPipe);
+
+        Assert.True(zone.TryGetPlayer(10, out var moverState));
+        moverState!.AfkTick = 42;
+
+        var action = MoveTo(10f, 10f) with { Sort = 11 };
+        zone.Post(ZoneCommand.Move(10, action, true));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Equal(0, moverState.AfkTick);
+    }
+
+    [Theory]
+    [InlineData(94)]
+    [InlineData(95)]
+    public void MoveResume_FishingResultActionSort_ClearsFishingProgressFlag(int sort)
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var (mover, moverPipe) = ZoneTestKit.CreateSession(1);
+
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(mover, 1, posX: 10f, posZ: 10f)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+        ZoneTestKit.DrainOutbound(moverPipe);
+
+        Assert.True(zone.TryGetPlayer(10, out var moverState));
+        moverState!.FishingState = 1;
+
+        var action = MoveTo(10f, 10f) with { Sort = sort };
+        zone.Post(ZoneCommand.Move(10, action, true));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Equal(0, moverState.FishingState);
+    }
+
+    [Fact]
+    public void MoveResume_FishingBiteActionSort93_DoesNotClearFishingProgressFlag()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var (mover, moverPipe) = ZoneTestKit.CreateSession(1);
+
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(mover, 1, posX: 10f, posZ: 10f)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+        ZoneTestKit.DrainOutbound(moverPipe);
+
+        Assert.True(zone.TryGetPlayer(10, out var moverState));
+        moverState!.FishingState = 1;
+
+        var action = MoveTo(10f, 10f) with { Sort = 93 };
+        zone.Post(ZoneCommand.Move(10, action, true));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Equal(1, moverState.FishingState);
+    }
+
+    [Fact]
+    public void MoveResume_TypeOutsideLegacyByteRange_IsStillAcceptedNotDisconnected()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var (mover, moverPipe) = ZoneTestKit.CreateSession(1);
+
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(mover, 1, posX: 10f, posZ: 10f)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+        ZoneTestKit.DrainOutbound(moverPipe);
+
+        var action = MoveTo(15f, 15f) with { Sort = 2, Type = 8 };
+        zone.Post(ZoneCommand.Move(10, action, true));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(10, out var mover10));
+        Assert.Equal(15f, mover10!.PosX);
+        Assert.Equal(15f, mover10.PosZ);
+        Assert.Null(mover.DisconnectReason);
+    }
+
+    [Fact]
+    public void Move_Implausible_CommitsUnconditionally_NoRejectionNoResync()
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (mover, moverPipe) = ZoneTestKit.CreateSession(1);
@@ -146,11 +290,12 @@ public class ZoneMoveTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.True(zone.TryGetPlayer(10, out var mover10));
-        Assert.Equal(10f, mover10!.PosX);
-        Assert.Equal(10f, mover10.PosZ);
+        Assert.Equal(999_999f, mover10!.PosX);
+        Assert.Equal(999_999f, mover10.PosZ);
 
         var moverInbox = ZoneTestKit.DrainOutbound(moverPipe);
         Assert.Equal(OneFrame, moverInbox.Length);
+        Assert.Null(mover.DisconnectReason);
     }
 
     [Fact]

@@ -22,7 +22,7 @@ public class MonsterCombatResolverTribeSymbolMalusTests
             ElementDefensePower = 0
         };
 
-        return MonsterEntity.Create(1, 1u, template, 1, 0f, 0f, 0f, 100f);
+        return MonsterEntity.Create(1, 1u, template, 1, 0f, 0f, 0f);
     }
 
     private static CombatantSnapshot Attacker(short level)

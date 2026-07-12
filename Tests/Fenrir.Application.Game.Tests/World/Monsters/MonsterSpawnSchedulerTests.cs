@@ -64,6 +64,40 @@ public class MonsterSpawnSchedulerTests
     }
 
     [Fact]
+    public void FirstTick_PopsEveryConfiguredSlot_Immediately_EvenWithAWideRolledRespawnRange()
+    {
+        var monster = WorldDataTestRows.Monster(500) with
+        {
+            Life = 100,
+            ItemLevel = 1,
+            RealLevel = 1,
+            GeneralExperience = 40,
+            SummonTime1 = 1,
+            SummonTime2 = 9999,
+            FrameInfo1 = 1,
+            FrameInfo3 = 1,
+            RadiusInfo1 = 50,
+            RadiusInfo2 = 1000,
+            WalkSpeed = 10,
+            RunSpeed = 50
+        };
+        var region = WorldDataTestRows.SpawnRegion(1, 1, 500) with
+        {
+            Number = 5,
+            LocationX = 100,
+            LocationY = 0,
+            LocationZ = 100,
+            Radius = 5
+        };
+        var rows = WorldDataTestRows.MinimalRows() with { Monsters = [monster], MonsterSpawnRegions = [region] };
+        var zone = CreateZone(WorldDataCacheBuilder.Build(rows).Cache);
+
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.Equal(5, zone.MonsterCount);
+    }
+
+    [Fact]
     public void SpawnedMonster_IsPositionedWithinTheRegionRadiusOfItsHome()
     {
         var zone = CreateZone(CacheWithOneRegion());

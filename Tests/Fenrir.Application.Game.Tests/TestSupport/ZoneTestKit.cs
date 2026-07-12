@@ -72,12 +72,14 @@ internal static class ZoneTestKit
         return service;
     }
 
-    public static ZoneRegistry CreateRegistry(GameServerOptions? options = null, WorldDataCache? worldData = null)
+    public static ZoneRegistry CreateRegistry(GameServerOptions? options = null, WorldDataCache? worldData = null,
+        PartyRegistry? partyRegistry = null, DuelRegistry? duelRegistry = null)
     {
         var opts = options ?? Options();
         var optionsWrapper = Microsoft.Extensions.Options.Options.Create(opts);
         return new ZoneRegistry(optionsWrapper, new MovementRules(optionsWrapper), new DirtyTracker<int>(),
-            NullLogger<Zone>.Instance, worldData ?? EmptyWorldData(), []);
+            NullLogger<Zone>.Instance, worldData ?? EmptyWorldData(), [], partyRegistry: partyRegistry,
+            duelRegistry: duelRegistry);
     }
 
     public static PlayerEnterData EnterData(ZoneClientSession session, short mapId, string name = "Hero",

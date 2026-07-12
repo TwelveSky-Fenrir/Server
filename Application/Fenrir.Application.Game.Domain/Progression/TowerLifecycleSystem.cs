@@ -15,8 +15,6 @@ public sealed class TowerLifecycleSystem(
 {
     private const int Level1LevelCode = 2;
 
-    private const float GuardianLeashRadius = 300f;
-
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
         var towerIndex = TowerZoneIndexTable.GetTowerIndex(zone.MapId);
@@ -73,7 +71,7 @@ public sealed class TowerLifecycleSystem(
             zone.DespawnMonsterSilently(guardianIndex);
 
         var guardian = MonsterEntity.Create(guardianIndex, zone.NextMonsterUniqueNumber(), definition.Monster,
-            guardianIndex, x, y, z, GuardianLeashRadius);
+            guardianIndex, x, y, z);
         zone.SpawnMonster(guardian);
 
         towerWar.CompleteConstructionSpawn(towerIndex, now);

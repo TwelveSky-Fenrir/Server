@@ -76,9 +76,8 @@ public sealed class MonsterBossSpawnSystem(
             if (template is null)
                 return;
 
-            var leash = MathF.Max(candidate.Radius, 1f);
             var entity = MonsterEntity.Create(serverIndex, zone.NextMonsterUniqueNumber(), template, serverIndex,
-                candidate.X, candidate.Y, candidate.Z, leash);
+                candidate.X, candidate.Y, candidate.Z);
 
             entity.Heading = (float)(random.NextDouble() * (Math.PI * 2));
 

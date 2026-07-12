@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
+using Fenrir.Application.Game.GameData;
 
 namespace Fenrir.Application.Game.Domain.World.Monsters;
 
@@ -14,6 +15,33 @@ public sealed class MonsterBossSummonCatalog
 
     public static MonsterBossSummonCatalog Empty { get; } =
         new(FrozenDictionary<short, ImmutableArray<MonsterBossSummonCandidate>>.Empty);
+
+    public static MonsterBossSummonCatalog BuildFrom(WorldDataCache worldData)
+    {
+        var byMapId = new Dictionary<short, ImmutableArray<MonsterBossSummonCandidate>>();
+
+        foreach (var (mapId, zoneDef) in worldData.ZonesByNumber)
+        {
+            if (zoneDef.BossMonsterSpawnRegions.Length < 1)
+                continue;
+
+            var candidates = new List<MonsterBossSummonCandidate>(zoneDef.BossMonsterSpawnRegions.Length);
+            foreach (var region in zoneDef.BossMonsterSpawnRegions)
+            {
+                if (region.MonsterId is not { } monsterId)
+                    continue;
+
+                candidates.Add(new MonsterBossSummonCandidate(monsterId, region.LocationX, region.LocationY,
+                    region.LocationZ, region.Radius, region.Number));
+            }
+
+            var normalized = NormalizeBossRows(candidates);
+            if (normalized.Length > 0)
+                byMapId[mapId] = normalized;
+        }
+
+        return new MonsterBossSummonCatalog(byMapId);
+    }
 
     public ImmutableArray<MonsterBossSummonCandidate> CandidatesFor(short mapId)
     {

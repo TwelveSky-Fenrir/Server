@@ -39,7 +39,7 @@ public class TribeGuardCorridorStateDerivationSystemTests
     {
         var template = WorldDataTestRows.Monster(900) with { Life = 100 };
         var entity = MonsterEntity.Create(serverIndex, zone.NextMonsterUniqueNumber(), template, serverIndex,
-            0f, 0f, 0f, 15f);
+            0f, 0f, 0f);
         zone.SpawnMonster(entity);
     }
 

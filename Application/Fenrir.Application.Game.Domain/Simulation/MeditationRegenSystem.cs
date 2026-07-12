@@ -19,15 +19,11 @@ public sealed class MeditationRegenSystem(WorldDataCache worldData, DirtyTracker
     {
         foreach (var state in zone.Players)
         {
-            if (state.ActionSort != MeditationActionSort || state.IsDead)
+            if (state.IsMovingZone || state.ActionSort != MeditationActionSort || state.IsDead ||
+                state.OneSecondGateOpenCount <= 0)
                 continue;
 
-            state.MeditationRegenAccumulatorTicks += legacyTicksElapsed;
-            var periodsElapsed = state.MeditationRegenAccumulatorTicks / SimulationClock.MeditationRegenLegacyTicks;
-            if (periodsElapsed <= 0)
-                continue;
-
-            state.MeditationRegenAccumulatorTicks -= periodsElapsed * SimulationClock.MeditationRegenLegacyTicks;
+            var periodsElapsed = state.OneSecondGateOpenCount;
 
             if (!worldData.SkillsById.TryGetValue(state.ActionSkillNumber, out var skill))
                 continue;

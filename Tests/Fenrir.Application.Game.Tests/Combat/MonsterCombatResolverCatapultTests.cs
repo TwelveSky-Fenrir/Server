@@ -25,7 +25,7 @@ public class MonsterCombatResolverCatapultTests
             RadiusInfo2 = 100
         };
 
-        return MonsterEntity.Create(1, 1u, template, 1, 0f, 0f, 0f, 100f, random: new ScriptedRandomSource(0),
+        return MonsterEntity.Create(1, 1u, template, 1, 0f, 0f, 0f, random: new ScriptedRandomSource(0),
             specialSort: specialSort);
     }
 

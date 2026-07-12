@@ -33,7 +33,7 @@ public sealed class Zone175LabyrinthSystemTests
     {
         var template = WorldDataTestRows.Monster(600 + serverIndex) with { SpecialType = specialType };
         zone.SpawnMonster(MonsterEntity.Create(serverIndex, zone.NextMonsterUniqueNumber(), template, serverIndex,
-            100f, 0f, 100f, 50f));
+            100f, 0f, 100f));
     }
 
     private static PlayerRuntimeState EnterPlayer(Zone zone, int characterId)

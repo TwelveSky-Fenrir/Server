@@ -43,8 +43,6 @@ if (args.Length > 0)
         return LegacyImportCommand.Run(commandArgs);
 }
 
-// No recognized subcommand: the default, Aspire-launched behavior -- read the manifest and every script it
-// references, then apply the SQL migration against the target database.
 var options = MigratorOptions.FromEnvironment(args);
 
 if (options is null)

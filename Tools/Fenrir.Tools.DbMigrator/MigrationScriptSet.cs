@@ -7,11 +7,8 @@ public sealed record LoadedScript(string RelativePath, string Content, byte[] Ha
 
 public static class MigrationScriptSet
 {
-    /// <summary>
-    /// Reads and hashes every script the manifest references, fully, before anything touches the database.
-    /// A missing file fails the whole run here -- never partway through applying earlier scripts.
-    /// </summary>
-    public static async Task<IReadOnlyList<LoadedScript>?> LoadAsync(string databaseDirectory,
+
+        public static async Task<IReadOnlyList<LoadedScript>?> LoadAsync(string databaseDirectory,
         IReadOnlyList<string> relativePaths)
     {
         var loaded = new List<LoadedScript>(relativePaths.Count);

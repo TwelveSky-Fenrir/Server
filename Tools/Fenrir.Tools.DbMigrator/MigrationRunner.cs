@@ -14,9 +14,6 @@ public static class MigrationRunner
 
         var scriptPaths = await ManifestReader.ReadScriptPathsAsync(options.ManifestPath);
 
-        // Read and hash every manifest-referenced script up front, before opening a database connection or
-        // provisioning anything -- a missing file fails fast here instead of surfacing after some scripts
-        // have already been applied.
         var scripts = await MigrationScriptSet.LoadAsync(options.DatabaseDirectory, scriptPaths);
         if (scripts is null)
             return 1;

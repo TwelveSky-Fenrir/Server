@@ -67,6 +67,11 @@ internal sealed class FakeTribeRepository : ITribeRepository
         return ValueTask.FromResult(new ReadOnlyCollection<TribeBankSlotDto>(slots));
     }
 
+    public ValueTask<ReadOnlyCollection<TribeBankTotalDto>> GetBankTotalsAsync(CancellationToken ct)
+    {
+        throw new NotSupportedException();
+    }
+
     public ValueTask<long> WithdrawBankAsync(byte tribeId, byte slotIndex, int characterId, CancellationToken ct)
     {
         LastWithdrawCall = (tribeId, slotIndex, characterId);

@@ -88,6 +88,11 @@ internal sealed class FakeGuildRepository : IGuildRepository
         return ValueTask.FromResult(new ReadOnlyCollection<GuildRosterRowDto>(rows));
     }
 
+    public ValueTask<ReadOnlyCollection<GuildRankingDetailDto>> GetRankingAsync(int count, CancellationToken ct)
+    {
+        throw new NotImplementedException();
+    }
+
     public ValueTask<ReadOnlyCollection<GuildNoticeRowDto>> GetNoticesAsync(int guildId, CancellationToken ct)
     {
         var rows = _notices.TryGetValue(guildId, out var existing) ? existing : [];

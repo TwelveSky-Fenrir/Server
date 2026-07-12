@@ -833,6 +833,11 @@ public class EnterWorldServiceTests
             throw new NotSupportedException();
         }
 
+        public ValueTask<ReadOnlyCollection<GuildRankingDetailDto>> GetRankingAsync(int count, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
         public ValueTask<ReadOnlyCollection<GuildNoticeRowDto>> GetNoticesAsync(
             int guildId, CancellationToken ct)
         {
@@ -1105,6 +1110,11 @@ public class EnterWorldServiceTests
         }
 
         public ValueTask<ReadOnlyCollection<TribeSubMasterDto>> GetSubMastersAsync(byte tribeId, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<ReadOnlyCollection<TribeBankTotalDto>> GetBankTotalsAsync(CancellationToken ct)
         {
             throw new NotSupportedException();
         }

@@ -11,7 +11,6 @@ using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Services.GenericAction;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Data.Abstractions.Game;
 using Fenrir.Data.Abstractions.World;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -161,7 +160,7 @@ public class NpcShopTradeServiceTests
         var call = characters.LastAdjustMoneyAndReplaceContainer!.Value;
         Assert.Equal(500, call.DeltaMoney);
 
-        Assert.Equal(1, call.AuditEventCode);
+        Assert.Equal((short?)1, call.AuditEventCode);
         Assert.Equal(AccountId, call.AuditAccountId);
         Assert.Equal(700, call.AuditItemId);
         Assert.Equal(1, call.AuditQuantity);
@@ -220,7 +219,7 @@ public class NpcShopTradeServiceTests
         var call = characters.LastAdjustMoneyAndReplaceContainer!.Value;
         Assert.Equal(-1000, call.DeltaMoney);
 
-        Assert.Equal(2, call.AuditEventCode);
+        Assert.Equal((short?)2, call.AuditEventCode);
         Assert.Equal(AccountId, call.AuditAccountId);
         Assert.Equal(800, call.AuditItemId);
         Assert.Equal(1, call.AuditQuantity);

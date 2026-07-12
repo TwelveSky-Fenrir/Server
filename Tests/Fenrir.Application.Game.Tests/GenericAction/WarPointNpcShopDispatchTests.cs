@@ -183,7 +183,7 @@ public class WarPointNpcShopDispatchTests
         var call = characters.LastAdjustMoneyAndReplaceContainer!.Value;
         Assert.Equal(-OrdinaryItemBuyCost, call.DeltaMoney);
 
-        Assert.Equal(2, call.AuditEventCode);
+        Assert.Equal((short?)2, call.AuditEventCode);
         Assert.Empty(eventLog.LoggedEvents);
     }
 

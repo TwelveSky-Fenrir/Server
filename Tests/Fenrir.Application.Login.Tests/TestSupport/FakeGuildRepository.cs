@@ -36,6 +36,11 @@ internal sealed class FakeGuildRepository : IGuildRepository
         throw new NotSupportedException();
     }
 
+    public ValueTask<ReadOnlyCollection<GuildRankingDetailDto>> GetRankingAsync(int count, CancellationToken ct)
+    {
+        throw new NotSupportedException();
+    }
+
     public ValueTask<ReadOnlyCollection<GuildNoticeRowDto>> GetNoticesAsync(int guildId, CancellationToken ct)
     {
         throw new NotSupportedException();

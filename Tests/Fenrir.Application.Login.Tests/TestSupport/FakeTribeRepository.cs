@@ -44,6 +44,11 @@ internal sealed class FakeTribeRepository : ITribeRepository
         throw new NotSupportedException();
     }
 
+    public ValueTask<ReadOnlyCollection<TribeBankTotalDto>> GetBankTotalsAsync(CancellationToken ct)
+    {
+        throw new NotSupportedException();
+    }
+
     public ValueTask<long> WithdrawBankAsync(byte tribeId, byte slotIndex, int characterId, CancellationToken ct)
     {
         throw new NotSupportedException();

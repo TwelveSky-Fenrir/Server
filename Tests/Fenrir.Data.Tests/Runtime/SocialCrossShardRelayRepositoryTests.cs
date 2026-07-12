@@ -175,7 +175,7 @@ public sealed class SocialCrossShardRelayRepositoryTests : IDisposable
     [Fact]
     public async Task PublishAsync_CalledTwiceWithTheSameEntryInstance_OnlyInsertsOneRow()
     {
-        const byte targetShardId = 260;
+        const byte targetShardId = 200;
         var entry = MakeAsk(7, 200, "RetriedAsker", targetShardId, 100);
 
         await _repository.PublishAsync(entry, CancellationToken.None);

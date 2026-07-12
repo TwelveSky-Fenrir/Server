@@ -179,6 +179,11 @@ public class GuildBuffDecayHostTests
             throw new NotSupportedException();
         }
 
+        public ValueTask<ReadOnlyCollection<GuildRankingDetailDto>> GetRankingAsync(int count, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
         public ValueTask<ReadOnlyCollection<GuildNoticeRowDto>> GetNoticesAsync(
             int guildId, CancellationToken ct)
         {
@@ -283,6 +288,11 @@ public class GuildBuffDecayHostTests
         }
 
         public ValueTask<ReadOnlyCollection<GuildRosterRowDto>> GetRosterAsync(int guildId, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<ReadOnlyCollection<GuildRankingDetailDto>> GetRankingAsync(int count, CancellationToken ct)
         {
             throw new NotSupportedException();
         }

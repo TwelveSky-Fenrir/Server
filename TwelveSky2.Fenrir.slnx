@@ -56,16 +56,14 @@
     <Project Path="Tests/Fenrir.LoginServer.Tests/Fenrir.LoginServer.Tests.csproj"/>
     <Project Path="Tests/Fenrir.Network.Serialization.Tests/Fenrir.Network.Serialization.Tests.csproj"/>
     <Project Path="Tests/Fenrir.Network.Tests/Fenrir.Network.Tests.csproj"/>
-    <Project Path="Tests/Fenrir.Tools.LegacyDataImport.Tests/Fenrir.Tools.LegacyDataImport.Tests.csproj"/>
+    <Project Path="Tests/Fenrir.Tools.DbMigrator.Tests/Fenrir.Tools.DbMigrator.Tests.csproj"/>
   </Folder>
   <Folder Name="/Tests/EndToEndTests/"/>
   <Folder Name="/Tests/IntegrationTests/"/>
   <Folder Name="/Tests/UnitaryTests/"/>
 
   <Folder Name="/Tools/">
-    <Project Path="Tools/Fenrir.Tools.AccountProvisioning/Fenrir.Tools.AccountProvisioning.csproj"/>
     <Project Path="Tools/Fenrir.Tools.DbMigrator/Fenrir.Tools.DbMigrator.csproj"/>
-    <Project Path="Tools/Fenrir.Tools.LegacyDataImport/Fenrir.Tools.LegacyDataImport.csproj"/>
   </Folder>
 
 </Solution>

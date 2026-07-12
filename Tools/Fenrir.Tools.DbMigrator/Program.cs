@@ -1,252 +1,57 @@
-using System.Data;
-using System.Security.Cryptography;
-using System.Text;
-using Microsoft.Data.SqlClient;
+using Fenrir.Tools.DbMigrator;
+using Fenrir.Tools.DbMigrator.Accounts;
 
-var connectionString =
-    Environment.GetEnvironmentVariable("ConnectionStrings__FenrirDb") ??
-    Environment.GetEnvironmentVariable("FENRIR_DB_CONNECTION_STRING") ??
-    args.FirstOrDefault();
+if (args.Length > 0)
+{
+    var command = args[0];
+    var commandArgs = args[1..];
 
-if (string.IsNullOrWhiteSpace(connectionString))
+    if (command == AccountCommands.CreateKeyword)
+    {
+        if (commandArgs.Length != 2)
+        {
+            AccountCommands.PrintUsage();
+            return 1;
+        }
+
+        return await AccountCommands.CreateAsync(commandArgs[0], commandArgs[1]);
+    }
+
+    if (command == AccountCommands.GrantGmKeyword)
+    {
+        if (commandArgs.Length != 2)
+        {
+            AccountCommands.PrintUsage();
+            return 1;
+        }
+
+        return await AccountCommands.GrantGmAsync(commandArgs[0], commandArgs[1]);
+    }
+
+    if (command == AccountCommands.AllowGmIpKeyword)
+    {
+        if (commandArgs.Length != 1)
+        {
+            AccountCommands.PrintUsage();
+            return 1;
+        }
+
+        return await AccountCommands.AllowGmIpAsync(commandArgs[0]);
+    }
+
+    if (command == LegacyImportCommand.Keyword)
+        return LegacyImportCommand.Run(commandArgs);
+}
+
+// No recognized subcommand: the default, Aspire-launched behavior -- read the manifest and every script it
+// references, then apply the SQL migration against the target database.
+var options = MigratorOptions.FromEnvironment(args);
+
+if (options is null)
 {
     Console.Error.WriteLine(
         "No connection string. Set ConnectionStrings__FenrirDb (Aspire convention), FENRIR_DB_CONNECTION_STRING, or pass one as the first argument.");
     return 1;
 }
 
-var environmentName =
-    Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") ??
-    Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ??
-    "Production";
-var isDevelopmentEnvironment = string.Equals(environmentName, "Development", StringComparison.OrdinalIgnoreCase);
-const string devOnlySeedScriptPath = "Migrations/Seed/001_dev_account.sql";
-
-var databaseDir = Path.Combine(AppContext.BaseDirectory, "Database");
-var manifestPath = Path.Combine(databaseDir, "_manifest.txt");
-
-if (!File.Exists(manifestPath))
-{
-    Console.Error.WriteLine($"Manifest not found: {manifestPath}");
-    return 1;
-}
-
-var scriptPaths = (await File.ReadAllLinesAsync(manifestPath))
-    .Select(line => line.Trim())
-    .Where(line => line.Length > 0 && !line.StartsWith('#'))
-    .ToArray();
-
-const int maxAttempts = 10;
-
-var targetBuilder = new SqlConnectionStringBuilder(connectionString);
-var databaseName = targetBuilder.InitialCatalog;
-
-if (!string.IsNullOrEmpty(databaseName))
-{
-    var masterBuilder = new SqlConnectionStringBuilder(connectionString) { InitialCatalog = "master" };
-    await using var masterConnection = new SqlConnection(masterBuilder.ConnectionString);
-
-    for (var attempt = 1;; attempt++)
-        try
-        {
-            await masterConnection.OpenAsync();
-            break;
-        }
-        catch (SqlException ex) when (attempt < maxAttempts)
-        {
-            Console.WriteLine($"Connection attempt {attempt}/{maxAttempts} failed: {ex.Message}. Retrying in 3s...");
-            await Task.Delay(TimeSpan.FromSeconds(3));
-        }
-        catch (SqlException ex)
-        {
-            Console.Error.WriteLine($"Could not connect after {maxAttempts} attempts: {ex.Message}");
-            return 1;
-        }
-
-    var quotedName = databaseName.Replace("]", "]]");
-    await using var createDbCommand = new SqlCommand(
-        $"IF DB_ID(N'{databaseName.Replace("'", "''")}') IS NULL CREATE DATABASE [{quotedName}];", masterConnection);
-    await createDbCommand.ExecuteNonQueryAsync();
-    Console.WriteLine($"Database '{databaseName}' ready.");
-}
-
-await using var connection = new SqlConnection(connectionString);
-
-for (var attempt = 1;; attempt++)
-    try
-    {
-        await connection.OpenAsync();
-        break;
-    }
-    catch (SqlException ex) when (attempt < maxAttempts)
-    {
-        Console.WriteLine($"Connection attempt {attempt}/{maxAttempts} failed: {ex.Message}. Retrying in 3s...");
-        await Task.Delay(TimeSpan.FromSeconds(3));
-    }
-    catch (SqlException ex)
-    {
-        Console.Error.WriteLine($"Could not connect after {maxAttempts} attempts: {ex.Message}");
-        return 1;
-    }
-
-var journalReady = await JournalTableExistsAsync(connection);
-var applied = journalReady
-    ? await LoadAppliedScriptsAsync(connection)
-    : new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
-
-var pendingJournal = new List<(string RelativePath, byte[] Hash)>();
-
-foreach (var relativePath in scriptPaths)
-{
-    var scriptPath = Path.Combine(databaseDir, relativePath.Replace('/', Path.DirectorySeparatorChar));
-
-    if (!File.Exists(scriptPath))
-    {
-        Console.Error.WriteLine($"Manifest references a missing script: {relativePath}");
-        return 1;
-    }
-
-    var content = await File.ReadAllTextAsync(scriptPath);
-    var hash = SHA256.HashData(Encoding.UTF8.GetBytes(content));
-
-    if (applied.TryGetValue(relativePath, out var appliedHash))
-    {
-        if (!appliedHash.AsSpan().SequenceEqual(hash))
-        {
-            Console.Error.WriteLine(
-                $"'{relativePath}' was already applied with a different hash. History must never be rewritten -- add a new corrective script instead of editing this one.");
-            return 1;
-        }
-
-        Console.WriteLine($"skip   {relativePath} (already applied)");
-        continue;
-    }
-
-    if (relativePath.Equals(devOnlySeedScriptPath, StringComparison.OrdinalIgnoreCase) && !isDevelopmentEnvironment)
-    {
-        Console.WriteLine($"skip   {relativePath} (dev-only fixture; environment '{environmentName}' is not Development)");
-        continue;
-    }
-
-    Console.WriteLine($"apply  {relativePath}");
-
-    foreach (var batch in SplitBatches(content))
-    {
-        if (batch.Length == 0)
-            continue;
-
-        try
-        {
-            await using var command = new SqlCommand(batch, connection) { CommandTimeout = 120 };
-            await command.ExecuteNonQueryAsync();
-        }
-        catch (SqlException ex)
-        {
-            Console.Error.WriteLine($"'{relativePath}' failed: {ex.Message}");
-            return 1;
-        }
-    }
-
-    if (journalReady)
-    {
-        await JournalAsync(connection, relativePath, hash);
-    }
-    else
-    {
-        pendingJournal.Add((relativePath, hash));
-        journalReady = await JournalTableExistsAsync(connection);
-
-        if (journalReady)
-        {
-            foreach (var (pendingPath, pendingHash) in pendingJournal)
-                await JournalAsync(connection, pendingPath, pendingHash);
-            pendingJournal.Clear();
-        }
-    }
-
-    applied[relativePath] = hash;
-}
-
-if (pendingJournal.Count > 0)
-    Console.Error.WriteLine(
-        "Warning: admin.SchemaVersions was never created by any script in the manifest -- nothing could be journaled, so every script above will be re-applied next run.");
-
-await ReportIndexedViewArithabortStatusAsync(connection);
-
-Console.WriteLine($"Migration complete: {scriptPaths.Length} script(s) checked.");
-return 0;
-
-static async Task<bool> JournalTableExistsAsync(SqlConnection connection)
-{
-    await using var command =
-        new SqlCommand("SELECT CASE WHEN OBJECT_ID(N'admin.SchemaVersions') IS NOT NULL THEN 1 ELSE 0 END;",
-            connection);
-    return (int)(await command.ExecuteScalarAsync())! == 1;
-}
-
-static async Task<Dictionary<string, byte[]>> LoadAppliedScriptsAsync(SqlConnection connection)
-{
-    var result = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
-
-    await using var command = new SqlCommand("SELECT ScriptName, Sha256 FROM admin.SchemaVersions;", connection);
-    await using var reader = await command.ExecuteReaderAsync();
-
-    while (await reader.ReadAsync())
-        result[reader.GetString(0)] = (byte[])reader[1];
-
-    return result;
-}
-
-static async Task JournalAsync(SqlConnection connection, string scriptName, byte[] hash)
-{
-    await using var command = new SqlCommand(
-        "INSERT INTO admin.SchemaVersions (ScriptName, Sha256, AppliedAtUtc) VALUES (@ScriptName, @Sha256, SYSUTCDATETIME());",
-        connection);
-    command.Parameters.AddWithValue("@ScriptName", scriptName);
-    command.Parameters.Add("@Sha256", SqlDbType.Binary, 32).Value = hash;
-    await command.ExecuteNonQueryAsync();
-}
-
-static async Task ReportIndexedViewArithabortStatusAsync(SqlConnection connection)
-{
-    try
-    {
-        await using var command = new SqlCommand(
-            "SELECT CASE WHEN (64 & @@OPTIONS) = 64 THEN 1 ELSE 0 END, " +
-            "(SELECT compatibility_level FROM sys.databases WHERE database_id = DB_ID());", connection);
-        await using var reader = await command.ExecuteReaderAsync();
-
-        if (!await reader.ReadAsync())
-            return;
-
-        var arithabortOn = reader.GetInt32(0) == 1;
-        var compatibilityLevel = reader.GetByte(1);
-
-        Console.WriteLine(arithabortOn
-            ? $"ARITHABORT effectively ON (compatibility level {compatibilityLevel}) -- world.vw_ItemMallCatalog / game.vw_OfflineShopListing's indexes are eligible for optimizer use on this connection type."
-            : $"WARNING: ARITHABORT effectively OFF (compatibility level {compatibilityLevel}). For read-only queries this only degrades performance (the optimizer falls back to querying world.vw_ItemMallCatalog / game.vw_OfflineShopListing's base tables directly). For writes against game.OfflineShops/game.OfflineShopItems (actively written by live gameplay procedures), this setting makes the write fail outright with an error instead. Expected ON via the OLE DB/ODBC ANSI_WARNINGS default plus compatibility level >= 90; check whether COMPATIBILITY_LEVEL was explicitly lowered below 90.");
-    }
-    catch (SqlException ex)
-    {
-        Console.WriteLine($"Could not verify ARITHABORT/compatibility level (non-fatal, diagnostic only): {ex.Message}");
-    }
-}
-
-static IEnumerable<string> SplitBatches(string script)
-{
-    var batch = new StringBuilder();
-
-    foreach (var line in script.Replace("\r\n", "\n").Split('\n'))
-        if (line.Trim().Equals("GO", StringComparison.OrdinalIgnoreCase))
-        {
-            yield return batch.ToString().Trim();
-            batch.Clear();
-        }
-        else
-        {
-            batch.AppendLine(line);
-        }
-
-    if (batch.Length > 0)
-        yield return batch.ToString().Trim();
-}
+return await MigrationRunner.RunAsync(options);

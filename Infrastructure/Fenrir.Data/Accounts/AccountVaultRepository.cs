@@ -24,13 +24,15 @@ public sealed record AccountVaultRepository(ICaeriusNetDbContext Db) : IAccountV
     }
 
     public async ValueTask TransferMoneyWithCharacterAsync(int characterId, long deltaCharacterMoney, int accountId,
-        long deltaVaultMoney, CancellationToken ct)
+        long deltaVaultMoney, CancellationToken ct, short? auditEventCode = null, int? auditQuantity = null)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_AccountVault_TransferMoneyWithCharacter", 0)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
             .AddParameter("DeltaCharacterMoney", deltaCharacterMoney, SqlDbType.BigInt)
             .AddParameter("AccountId", accountId, SqlDbType.Int)
             .AddParameter("DeltaVaultMoney", deltaVaultMoney, SqlDbType.BigInt)
+            .AddParameter("AuditEventCode", (object?)auditEventCode ?? DBNull.Value, SqlDbType.SmallInt)
+            .AddParameter("AuditQuantity", (object?)auditQuantity ?? DBNull.Value, SqlDbType.Int)
             .Build();
 
         await Db.ExecuteAsync(sp, ct);

@@ -45,24 +45,26 @@ public class ShardMapAssignmentProcTests
     [Fact]
     public async Task GetHostedMaps_MultipleMapsForOneShard_ReturnsAllAscending()
     {
-        await InsertAssignmentAsync(77, 310);
-        await InsertAssignmentAsync(77, 305);
+        // 297/298 are real world.Zones rows (FK_ShardMapAssignments_World_Zone) not otherwise used by this fixture's seed.
+        await InsertAssignmentAsync(77, 298);
+        await InsertAssignmentAsync(77, 297);
 
         var maps = await _repository.GetHostedMapsAsync(77, CancellationToken.None);
 
-        Assert.Equal([305, 310], maps);
+        Assert.Equal([297, 298], maps);
     }
 
     [Fact]
     public async Task GetAllAssignments_IncludesEveryShardRegardlessOfLiveness()
     {
-        await InsertAssignmentAsync(78, 320);
-        await InsertAssignmentAsync(79, 321);
+        // 324/325 are real world.Zones rows (FK_ShardMapAssignments_World_Zone) not otherwise used by this fixture's seed.
+        await InsertAssignmentAsync(78, 324);
+        await InsertAssignmentAsync(79, 325);
 
         var rows = await _repository.GetAllAssignmentsAsync(CancellationToken.None);
 
-        Assert.Contains(rows, row => row.ShardId == 78 && row.MapId == 320);
-        Assert.Contains(rows, row => row.ShardId == 79 && row.MapId == 321);
+        Assert.Contains(rows, row => row.ShardId == 78 && row.MapId == 324);
+        Assert.Contains(rows, row => row.ShardId == 79 && row.MapId == 325);
     }
 
     private async Task InsertAssignmentAsync(byte shardId, short mapId)

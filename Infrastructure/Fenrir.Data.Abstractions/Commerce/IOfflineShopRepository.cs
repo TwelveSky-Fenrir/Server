@@ -35,4 +35,7 @@ public interface IOfflineShopRepository
     public ValueTask SetProxyShopNameAsync(int characterId, string shopName, CancellationToken ct);
 
     public ValueTask ExtendRentalAsync(int characterId, int newShopDate, CancellationToken ct);
+
+    public ValueTask ExtendRentalAndReplaceContainerAsync(int characterId, int newShopDate, byte container,
+        IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct);
 }

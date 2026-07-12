@@ -11,7 +11,7 @@ namespace Fenrir.Application.Login.Tests.Services;
 
 public class ZoneTransferServiceTests
 {
-    private const short HostedMapId = 42;
+    private const short HostedMapId = 8;
     private const int AccountId = 7;
 
     private static readonly CharacterSummaryDto Summary = new(501, 0, "Hero", 1, 0, 1, 1, 10);
@@ -80,13 +80,27 @@ public class ZoneTransferServiceTests
     }
 
     [Fact]
-    public async Task RequestZoneTransferAsync_CharacterVanishedBeforeClamp_ReturnsCharacterNotFoundWithoutThrowing()
+    public async Task RequestZoneTransferAsync_RequestedSlotHoldsNoCharacter_ReturnsSlotEmptyWithoutThrowing()
     {
         var characters = FakeCharacterRepository.With(Summary,
             WorldEntryWith(0, 0));
         var service = CreateService(characters);
 
         var result = await service.RequestZoneTransferAsync(AccountId, 2, Guid.NewGuid(),
+            0, CancellationToken.None);
+
+        Assert.Equal(ZoneTransferOutcome.SlotEmpty, result.Outcome);
+        Assert.Null(characters.LastClampVitalsFloor);
+    }
+
+    [Fact]
+    public async Task
+        RequestZoneTransferAsync_CharacterVanishedBetweenRosterAndWorldEntryReads_ReturnsCharacterNotFoundWithoutThrowing()
+    {
+        var characters = FakeCharacterRepository.WithSummaries(Summary);
+        var service = CreateService(characters);
+
+        var result = await service.RequestZoneTransferAsync(AccountId, Summary.Slot, Guid.NewGuid(),
             0, CancellationToken.None);
 
         Assert.Equal(ZoneTransferOutcome.CharacterNotFound, result.Outcome);
@@ -179,6 +193,37 @@ public class ZoneTransferServiceTests
         Assert.Equal(ZoneTransferOutcome.Success, result.Outcome);
         Assert.NotNull(tickets.LastCreatedTicket);
         Assert.Empty(directory.MarkedUnreachableShardIds);
+    }
+
+    [Fact]
+    public async Task
+        RequestZoneTransferAsync_PersistedZoneNotOwnedByOwnTribe_RoutesToTheShardHostingTheHometownInstead()
+    {
+        const short HometownMapId = 1;
+        var mismatchedSummary = new CharacterSummaryDto(501, 0, "Hero", 0, 0, 1, 1, 10);
+        var worldEntry = new CharacterWorldEntryDto(
+            mismatchedSummary.CharacterId, AccountId, mismatchedSummary.Slot, mismatchedSummary.Name,
+            mismatchedSummary.Tribe, mismatchedSummary.Gender, mismatchedSummary.HeadType,
+            mismatchedSummary.FaceType, mismatchedSummary.Level, HostedMapId, 0, 0, 0, 0,
+            850, 1000, 320, 400, 99L);
+        var characters = FakeCharacterRepository.With(mismatchedSummary, worldEntry);
+
+        var hometownShard = new ShardDirectoryEntryDto(2, "10.0.0.2", 30002, 0, 100, 0f);
+        var (service, tickets, _, _) = CreateServiceWithDirectory(characters, [Shard, hometownShard],
+            new Dictionary<byte, short[]>
+            {
+                [Shard.ShardId] = [HostedMapId],
+                [hometownShard.ShardId] = [HometownMapId]
+            });
+
+        var result = await service.RequestZoneTransferAsync(AccountId, mismatchedSummary.Slot, Guid.NewGuid(), 0,
+            CancellationToken.None);
+
+        Assert.Equal(ZoneTransferOutcome.Success, result.Outcome);
+        Assert.Equal(HometownMapId, result.Zone);
+        Assert.Equal(hometownShard.Host, result.Ip);
+        Assert.Equal(hometownShard.Port, result.Port);
+        Assert.NotNull(tickets.LastCreatedTicket);
     }
 
     private static CharacterWorldEntryDto WorldEntryWith(int life, int mana)

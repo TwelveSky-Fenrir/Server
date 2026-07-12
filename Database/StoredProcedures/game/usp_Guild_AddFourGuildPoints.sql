@@ -26,7 +26,8 @@ BEGIN
         XACT_ABORT ON;
 
     UPDATE game.Guilds
-    SET Points = Points + @Delta
+    SET Points       = Points + @Delta,
+        UpdatedAtUtc = SYSUTCDATETIME()
     WHERE GuildId = @GuildId
       AND Points + @Delta >= 0;
 END;

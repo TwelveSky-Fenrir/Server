@@ -26,6 +26,11 @@
 -- the reconnecting client's party UI staying/going empty, never as duped or lost durable state: no party
 -- membership is persisted on this path at all -- the party-name anchor lives on the avatar record, and live
 -- membership is in-process on each shard).
+--
+-- CorrelationId is a client-generated idempotency token, same shape and purpose as
+-- runtime.GuildTribeBroadcastRelay's own CorrelationId column -- see that table's header for the full
+-- rationale (PartyResyncRelayEntry.CorrelationId is minted once per row and stays stable across
+-- CrossShardRelayRetry's retries of that same instance).
 CREATE TABLE runtime.PartyResyncRelay
 (
     RelayId           BIGINT IDENTITY (1,1) NOT NULL,
@@ -34,7 +39,12 @@ CREATE TABLE runtime.PartyResyncRelay
     SourceCharacterId INT                   NOT NULL, -- the reconnecting/subject character
     PartyName         NVARCHAR(13)          NOT NULL,
     AvatarName        NVARCHAR(13)          NOT NULL,
+    CorrelationId     UNIQUEIDENTIFIER      NOT NULL,
     CreatedAtUtc      DATETIME2(3)          NOT NULL,
-    CONSTRAINT PK_PartyResyncRelay PRIMARY KEY NONCLUSTERED (RelayId)
+    CONSTRAINT PK_PartyResyncRelay PRIMARY KEY NONCLUSTERED (RelayId),
+    CONSTRAINT UQ_PartyResyncRelay_CorrelationId UNIQUE NONCLUSTERED (CorrelationId),
+    -- Supports usp_PartyResyncRelay_Poll's own time-based reap DELETE -- see
+    -- GuildTribeBroadcastRelay's own index comment for the shared rationale.
+    INDEX IX_PartyResyncRelay_CreatedAtUtc NONCLUSTERED (CreatedAtUtc)
 )
     WITH (MEMORY_OPTIMIZED = ON, DURABILITY = SCHEMA_ONLY);

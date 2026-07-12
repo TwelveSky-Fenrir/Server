@@ -30,6 +30,9 @@ public static class AvatarInfoFactory
     private const int HotkeyPageCount = 3;
     private const int HotkeyKeysPerPage = 14;
     private const int HotkeyWireIntsPerSlot = 3;
+
+    private static bool IsLoginRosterBlacklistedItemId(int itemId) => itemId is 1451 or 2268;
+
     public static AvatarInfo Zeroed => AvatarInfoTemplates.Zeroed;
 
     public static AvatarInfo CreateForCharacter(CharacterWorldEntryDto character)
@@ -127,6 +130,9 @@ public static class AvatarInfoFactory
             if (item.Container != ContainerEquipment || item.Slot >= EquipSlotCount)
                 continue;
 
+            if (IsLoginRosterBlacklistedItemId(item.ItemId))
+                continue;
+
             var baseIndex = item.Slot * EquipWireIntsPerSlot;
             equip[baseIndex] = item.ItemId;
 
@@ -161,6 +167,9 @@ public static class AvatarInfoFactory
             if (page < 0 || item.Slot >= InventorySlotsPerPage)
                 continue;
 
+            if (IsLoginRosterBlacklistedItemId(item.ItemId))
+                continue;
+
             var baseIndex = (page * InventorySlotsPerPage + item.Slot) * InventoryWireIntsPerSlot;
             inventory[baseIndex] = item.ItemId;
             inventory[baseIndex + 3] = item.Quantity;
@@ -184,6 +193,9 @@ public static class AvatarInfoFactory
             };
 
             if (page < 0 || item.Slot >= StoreSlotsPerPage)
+                continue;
+
+            if (IsLoginRosterBlacklistedItemId(item.ItemId))
                 continue;
 
             var baseIndex = (page * StoreSlotsPerPage + item.Slot) * StoreWireIntsPerSlot;

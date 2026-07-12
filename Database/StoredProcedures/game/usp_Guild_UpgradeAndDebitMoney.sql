@@ -36,7 +36,8 @@ BEGIN
     BEGIN TRANSACTION;
 
     UPDATE game.Guilds
-    SET Grade = @Grade
+    SET Grade        = @Grade,
+        UpdatedAtUtc = SYSUTCDATETIME()
     WHERE GuildId = @GuildId;
 
     IF @@ROWCOUNT = 0

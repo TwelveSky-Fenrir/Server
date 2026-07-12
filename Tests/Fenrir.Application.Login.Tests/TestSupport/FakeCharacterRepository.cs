@@ -144,19 +144,27 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         throw new NotSupportedException();
     }
 
+    public ValueTask PersistFinalFlushAsync(CharacterProgressTvp progress, CharacterPositionTvp position,
+        CancellationToken ct)
+    {
+        throw new NotSupportedException();
+    }
+
     public ValueTask AdjustMoneyAsync(int characterId, long deltaMoney, int deltaBigMoney, CancellationToken ct)
     {
         throw new NotSupportedException();
     }
 
     public ValueTask AdjustStoreMoneyAsync(int characterId, long deltaMoney, long deltaStoreMoney,
-        CancellationToken ct)
+        CancellationToken ct, int? auditAccountId = null, short? auditEventCode = null, int? auditQuantity = null)
     {
         throw new NotSupportedException();
     }
 
     public ValueTask AdjustMoneyAndReplaceContainerAsync(int characterId, long deltaMoney, int deltaBigMoney,
-        byte container, IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
+        byte container, IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct,
+        int? auditAccountId = null, short? auditEventCode = null, int? auditItemId = null,
+        int? auditQuantity = null, string? auditPayload = null)
     {
         throw new NotSupportedException();
     }
@@ -209,7 +217,8 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
     }
 
     public ValueTask ApplyTribeFourConversionAsync(int characterId, byte newTribe, int stepPermanent,
-        int activeQuestId, int qSort, int targetPhase, int killCounter, CancellationToken ct)
+        int activeQuestId, int qSort, int targetPhase, int killCounter, bool consumeSharedQuota,
+        CancellationToken ct)
     {
         throw new NotSupportedException();
     }
@@ -241,6 +250,12 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
     }
 
     public ValueTask SetPetGrowthAsync(int characterId, int petGrowth, byte petActivity, CancellationToken ct)
+    {
+        throw new NotSupportedException();
+    }
+
+    public ValueTask SetMountProgressionAsync(int characterId, int mountItemId, int mountExpActivity,
+        int mountPower, int mountSlotIndex, int mountTime, CancellationToken ct)
     {
         throw new NotSupportedException();
     }

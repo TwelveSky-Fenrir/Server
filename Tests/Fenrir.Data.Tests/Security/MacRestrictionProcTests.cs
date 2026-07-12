@@ -71,6 +71,26 @@ public class MacRestrictionProcTests
     }
 
     [Fact]
+    public async Task GetConfiguredAccountLimitAsync_UnknownMac_IsNull()
+    {
+        var mac = UniqueMac();
+
+        Assert.Null(await _restrictions.GetConfiguredAccountLimitAsync(mac, "some-adapter-guid",
+            CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task GetConfiguredAccountLimitAsync_MatchedRow_ReturnsItsAccountLimit()
+    {
+        var mac = UniqueMac();
+        await AddAsync(mac, "trusted-adapter", 5);
+        await Task.Delay(CacheBypassDelay);
+
+        Assert.Equal(5, await _restrictions.GetConfiguredAccountLimitAsync(mac, "trusted-adapter",
+            CancellationToken.None));
+    }
+
+    [Fact]
     public async Task MacRestriction_Add_RejectsADuplicateMacAndMachineGuidPair()
     {
         var mac = UniqueMac();

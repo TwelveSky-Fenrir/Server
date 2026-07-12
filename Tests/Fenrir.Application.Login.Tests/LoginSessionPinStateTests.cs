@@ -99,4 +99,15 @@ public class LoginSessionPinStateTests
 
         Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.ZoneTransferFailure));
     }
+
+    [Fact]
+    public void HandoverIssued_StillAllowsLoginKeepAlive()
+    {
+        var session = new LoginClientSession(1, new FakeDuplexPipe());
+        session.MarkAuthenticated(1);
+        session.MarkCharSelect();
+        session.MarkHandoverIssued();
+
+        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.LoginKeepAlive));
+    }
 }

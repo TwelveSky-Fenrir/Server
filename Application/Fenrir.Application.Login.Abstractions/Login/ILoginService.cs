@@ -7,7 +7,6 @@ namespace Fenrir.Application.Login.Abstractions.Login;
 
 public enum LoginOutcome
 {
-    RateLimited,
     Failure,
     Success,
 
@@ -26,9 +25,6 @@ public sealed record LoginResult(
     Guid? SessionToken = null,
     short AccountGrade = 0)
 {
-    public static LoginResult RateLimitedResult { get; } =
-        new(LoginOutcome.RateLimited, 0, "", false, 0, false, "", []);
-
     public static LoginResult SilentDropResult { get; } =
         new(LoginOutcome.DuplicateSessionEvicted, 0, "", false, 0, false, "", []);
 }

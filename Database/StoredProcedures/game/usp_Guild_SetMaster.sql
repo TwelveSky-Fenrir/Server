@@ -24,18 +24,21 @@ BEGIN
         TRANSACTION;
 
     UPDATE game.GuildMembers
-    SET Role = 0 -- demote whoever currently holds master
+    SET Role         = 0, -- demote whoever currently holds master
+        UpdatedAtUtc = SYSUTCDATETIME()
     WHERE GuildId = @GuildId
       AND Role = 2
       AND CharacterId <> @NewMasterCharacterId;
 
     UPDATE game.GuildMembers
-    SET Role = 2
+    SET Role         = 2,
+        UpdatedAtUtc = SYSUTCDATETIME()
     WHERE GuildId = @GuildId
       AND CharacterId = @NewMasterCharacterId;
 
     UPDATE game.Guilds
-    SET MasterCharacterId = @NewMasterCharacterId
+    SET MasterCharacterId = @NewMasterCharacterId,
+        UpdatedAtUtc      = SYSUTCDATETIME()
     WHERE GuildId = @GuildId;
 
     COMMIT TRANSACTION;

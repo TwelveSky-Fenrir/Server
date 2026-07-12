@@ -16,7 +16,8 @@ BEGIN
     SET BuffType        = @BuffType,
         BuffState       = @BuffState,
         BuffTime        = @BuffTime,
-        BuffTimeForDiff = @BuffTimeForDiff
+        BuffTimeForDiff = @BuffTimeForDiff,
+        UpdatedAtUtc    = SYSUTCDATETIME()
     WHERE GuildId = @GuildId;
 
     IF

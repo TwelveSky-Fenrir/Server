@@ -1,6 +1,9 @@
 -- Tooling/debugging view. Child-table counts are pre-aggregated in derived tables before joining to
 -- world.Zones so one child table's row multiplication can't inflate another's count. TotalMonsterSpawnCount
 -- sums Number (monsters per region), not a row count.
+-- Not an indexed-view candidate as written: LEFT OUTER JOIN and derived-table (subquery-in-FROM) expressions
+-- are both disallowed in indexed views (Microsoft Learn, "Create indexed views" -- Additional requirements),
+-- and this view needs both to show a zero, not a missing row, for a zone with no rows in a given child table.
 CREATE VIEW world.vw_ZoneOverview
 AS
 SELECT z.ZoneNumber,

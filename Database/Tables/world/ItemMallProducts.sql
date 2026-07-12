@@ -3,7 +3,12 @@
 CREATE TABLE world.ItemMallProducts
 (
     ItemMallProductId INT     NOT NULL,
-    ProductType       TINYINT NOT NULL, -- legacy `Type`: which cash-shop tab/page lists this product (values observed: 1-5)
+    -- legacy `Type`: 1-4 = MAX_CASH_TYPE cash-shop tabs (Server/Header/Protocol/DEFINE.h:551,
+    -- Server/ts25extra/S08_MyDB.cpp:152-154 loads WHERE Type=1..4); 5 is reserved exclusively for the
+    -- version/CRC "ghost row" sentinels (Number=100000/100001, S08_MyDB.cpp:241,257), documented in
+    -- ServerDocs/14_ts25extra/01_CashShop_ProxyShop_Gifts.md:29-31,76-99. CashCatalogBuilder.cs also
+    -- resolves a third sentinel, ItemMallProductId=100002, under the same ProductType=5 convention.
+    ProductType       TINYINT NOT NULL,
     ItemId            INT     NULL,
     Quantity          INT     NOT NULL
         CONSTRAINT DF_ItemMallProducts_Quantity DEFAULT 0,
@@ -12,5 +17,6 @@ CREATE TABLE world.ItemMallProducts
     IsActive          BIT     NOT NULL
         CONSTRAINT DF_ItemMallProducts_IsActive DEFAULT 0,
     CONSTRAINT PK_ItemMallProducts PRIMARY KEY CLUSTERED (ItemMallProductId),
-    CONSTRAINT FK_ItemMallProducts_Items FOREIGN KEY (ItemId) REFERENCES world.Items (ItemId)
+    CONSTRAINT FK_ItemMallProducts_Items FOREIGN KEY (ItemId) REFERENCES world.Items (ItemId),
+    CONSTRAINT CK_ItemMallProducts_ProductType CHECK (ProductType BETWEEN 1 AND 5)
 );

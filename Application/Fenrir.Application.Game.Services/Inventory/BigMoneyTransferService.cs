@@ -40,10 +40,21 @@ public sealed class BigMoneyTransferService(
         var deltaInventoryBigMoney = isDeposit ? -move.Quantity1 : move.Quantity1;
         var deltaStoreBigMoney = isDeposit ? move.Quantity1 : -move.Quantity1;
 
+        var storeEventCode = isDeposit
+            ? EventLogEmitters.BigMoneyConversionEventCode5
+            : EventLogEmitters.BigMoneyConversionEventCode6;
+        var (storeFromDelta, storeToDelta) = isDeposit
+            ? (deltaInventoryBigMoney, deltaStoreBigMoney)
+            : (deltaStoreBigMoney, deltaInventoryBigMoney);
+
         try
         {
+            // The BigMoneyConversion audit row is nested into usp_Character_AdjustBigStoreMoney's own
+            // transaction (transaction-composition-audit finding) instead of a second, unshared round trip to
+            // eventLog.LogBigMoneyConversionAsync after this call commits.
             await bigMoney.AdjustInventoryStoreAsync(characterId, deltaInventoryBigMoney, deltaStoreBigMoney,
-                cancellationToken);
+                cancellationToken, auditEventCode: storeEventCode, auditFromDelta: storeFromDelta,
+                auditToDelta: storeToDelta);
         }
         catch (Exception ex)
         {
@@ -56,15 +67,6 @@ public sealed class BigMoneyTransferService(
         logger.LogInformation(
             "Character {CharacterId} BigMoney-Store-transfer applied: isDeposit={IsDeposit}, amount {Quantity1}",
             characterId, isDeposit, move.Quantity1);
-
-        var storeEventCode = isDeposit
-            ? EventLogEmitters.BigMoneyConversionEventCode5
-            : EventLogEmitters.BigMoneyConversionEventCode6;
-        var (storeFromDelta, storeToDelta) = isDeposit
-            ? (deltaInventoryBigMoney, deltaStoreBigMoney)
-            : (deltaStoreBigMoney, deltaInventoryBigMoney);
-        await eventLog.LogBigMoneyConversionAsync(storeEventCode, null, characterId, storeFromDelta,
-            storeToDelta, cancellationToken);
 
         return GenericActionResult.Succeeded;
     }
@@ -92,10 +94,21 @@ public sealed class BigMoneyTransferService(
         var deltaInventoryBigMoney = isDeposit ? -move.Quantity1 : move.Quantity1;
         var deltaVaultBigMoney = isDeposit ? move.Quantity1 : -move.Quantity1;
 
+        var saveEventCode = isDeposit
+            ? EventLogEmitters.BigMoneyConversionEventCode7
+            : EventLogEmitters.BigMoneyConversionEventCode8;
+        var (saveFromDelta, saveToDelta) = isDeposit
+            ? (deltaInventoryBigMoney, deltaVaultBigMoney)
+            : (deltaVaultBigMoney, deltaInventoryBigMoney);
+
         try
         {
+            // The BigMoneyConversion audit row is nested into usp_AccountVault_TransferBigMoneyWithCharacter's
+            // own transaction (transaction-composition-audit finding) instead of a second, unshared round trip
+            // to eventLog.LogBigMoneyConversionAsync after this call commits.
             await bigMoney.AdjustInventorySaveAsync(characterId, deltaInventoryBigMoney, accountId,
-                deltaVaultBigMoney, cancellationToken);
+                deltaVaultBigMoney, cancellationToken, auditEventCode: saveEventCode, auditFromDelta: saveFromDelta,
+                auditToDelta: saveToDelta);
         }
         catch (Exception ex)
         {
@@ -108,15 +121,6 @@ public sealed class BigMoneyTransferService(
         logger.LogInformation(
             "Character {CharacterId} BigMoney-Save-transfer applied: isDeposit={IsDeposit}, amount {Quantity1}",
             characterId, isDeposit, move.Quantity1);
-
-        var saveEventCode = isDeposit
-            ? EventLogEmitters.BigMoneyConversionEventCode7
-            : EventLogEmitters.BigMoneyConversionEventCode8;
-        var (saveFromDelta, saveToDelta) = isDeposit
-            ? (deltaInventoryBigMoney, deltaVaultBigMoney)
-            : (deltaVaultBigMoney, deltaInventoryBigMoney);
-        await eventLog.LogBigMoneyConversionAsync(saveEventCode, accountId, characterId, saveFromDelta, saveToDelta,
-            cancellationToken);
 
         return GenericActionResult.Succeeded;
     }

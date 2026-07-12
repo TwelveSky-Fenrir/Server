@@ -9,6 +9,8 @@ CREATE TABLE game.MonsterBossRespawnTimers
     MonsterSpawnRegionId INT          NOT NULL,
     NextSpawnUtc         DATETIME2(3) NOT NULL,
     CONSTRAINT PK_MonsterBossRespawnTimers PRIMARY KEY CLUSTERED (MonsterSpawnRegionId),
-    CONSTRAINT FK_MonsterBossRespawnTimers_Region FOREIGN KEY (MonsterSpawnRegionId)
+    -- Cross-schema FK naming: see admin.Bans' own header comment for the FK_<ChildTable>_<TargetSchema>_<Role>
+    -- convention.
+    CONSTRAINT FK_MonsterBossRespawnTimers_World_Region FOREIGN KEY (MonsterSpawnRegionId)
         REFERENCES world.MonsterSpawnRegions (MonsterSpawnRegionId)
 );

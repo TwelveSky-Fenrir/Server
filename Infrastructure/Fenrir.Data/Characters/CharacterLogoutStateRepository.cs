@@ -13,7 +13,7 @@ public sealed record CharacterLogoutStateRepository(ICaeriusNetDbContext Db) : I
     public async ValueTask UpsertAsync(int characterId, int lastZone, int posX, int posY, int posZ, int life,
         int mana, CancellationToken ct)
     {
-        var sp = new StoredProcedureParametersBuilder("game", "usp_CharacterLogoutState_Upsert")
+        var sp = new StoredProcedureParametersBuilder("game", "usp_CharacterLogoutState_Upsert", 0)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
             .AddParameter("LastZone", lastZone, SqlDbType.Int)
             .AddParameter("PosX", posX, SqlDbType.Int)
@@ -21,6 +21,18 @@ public sealed record CharacterLogoutStateRepository(ICaeriusNetDbContext Db) : I
             .AddParameter("PosZ", posZ, SqlDbType.Int)
             .AddParameter("Life", life, SqlDbType.Int)
             .AddParameter("Mana", mana, SqlDbType.Int)
+            .Build();
+
+        await Db.ExecuteAsync(sp, ct);
+    }
+
+    public async ValueTask PersistBatchAsync(IReadOnlyList<CharacterLogoutStateTvp> rows, CancellationToken ct)
+    {
+        if (rows.Count == 0)
+            return;
+
+        var sp = new StoredProcedureParametersBuilder("game", "usp_CharacterLogoutState_PersistBatch", 0)
+            .AddTvpParameter("Snapshots", rows)
             .Build();
 
         await Db.ExecuteAsync(sp, ct);

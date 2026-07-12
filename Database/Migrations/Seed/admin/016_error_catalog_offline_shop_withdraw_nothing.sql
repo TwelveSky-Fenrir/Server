@@ -6,7 +6,7 @@ IF NOT EXISTS (SELECT 1
                FROM admin.ErrorCatalog
                WHERE ErrorNumber = 50340)
     INSERT INTO admin.ErrorCatalog (ErrorNumber, SchemaName, Description)
-    VALUES (50340, N'game',
+    VALUES (50340, 'game',
             N'usp_OfflineShop_WithdrawMoney: nothing to withdraw (both Money and BigMoney pending amounts are zero).');
 
 -- 50276 no longer covers the zero-balance case (see 50340 above); refreshes its catalog description to

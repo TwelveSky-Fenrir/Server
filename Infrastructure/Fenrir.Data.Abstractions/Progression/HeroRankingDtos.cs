@@ -8,7 +8,7 @@ public sealed partial record HeroRankingRowDto(
     string CharacterName,
     byte? TribeId,
     int Points,
-    int? Level,
+    short? Level,
     bool? RewardClaimed,
     string? Description,
     DateTime RecordedAtUtc);

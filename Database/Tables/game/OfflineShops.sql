@@ -25,6 +25,8 @@ CREATE TABLE game.OfflineShops
         CONSTRAINT DF_OfflineShops_ShopName DEFAULT N'',
     CONSTRAINT PK_OfflineShops PRIMARY KEY CLUSTERED (CharacterId),
     CONSTRAINT FK_OfflineShops_Character FOREIGN KEY (CharacterId) REFERENCES game.Characters (CharacterId),
-    CONSTRAINT FK_OfflineShops_Zone FOREIGN KEY (ZoneNumber) REFERENCES world.Zones (ZoneNumber),
+    -- Cross-schema FK naming: see admin.Bans' own header comment for the FK_<ChildTable>_<TargetSchema>_<Role>
+    -- convention -- the FK above stays bare (same-schema, game -> game).
+    CONSTRAINT FK_OfflineShops_World_Zone FOREIGN KEY (ZoneNumber) REFERENCES world.Zones (ZoneNumber),
     INDEX IX_OfflineShops_Zone NONCLUSTERED (ZoneNumber)
 );

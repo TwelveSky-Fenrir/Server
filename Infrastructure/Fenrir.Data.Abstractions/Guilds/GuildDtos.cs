@@ -46,3 +46,11 @@ public sealed partial record GuildRankingRowDto(
     int GuildId,
     string Name,
     int Points);
+
+[GenerateDto]
+public sealed partial record GuildRankingDetailDto(
+    int GuildId,
+    string Name,
+    int Points,
+    int MemberCount,
+    int RankNo);

@@ -10,7 +10,9 @@ public enum DeleteAvatarOutcome
 
     ProxyShopRefusal,
 
-    SqlError
+    SqlError,
+
+    SlotEmpty
 }
 
 public readonly record struct DeleteAvatarResult(DeleteAvatarOutcome Outcome);

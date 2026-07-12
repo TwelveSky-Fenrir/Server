@@ -10,9 +10,13 @@
 -- into PlayerRuntimeState.DropItemTime (Zone.EconomyMirrors' ApplyTribeProgressCommand), but never previously
 -- flushed back -- without it here the write-behind flush would silently revert a live counter back to its
 -- last-persisted value on the next flush cycle, same gap the Eat*Potion counters closed above.
--- M15PetLuckyBoxPity (Migrations/048, confirmation-pass follow-up): the M15 Pet Lucky Box (world.Items 8111)
+-- M15PetLuckyBoxPity (confirmation-pass follow-up, folded into game.Characters' own CREATE TABLE): the M15
+-- Pet Lucky Box (world.Items 8111)
 -- pity counter -- box-open consumption increments/resets this in PlayerRuntimeState.M15PetLuckyBoxPity, same
 -- "without it here the flush would silently revert it" reasoning as DropItemTime/Eat*Potion above.
+-- RebirthCount/M15PetLuckyBoxPity/Eat*Potion stay INT here even though game.Characters narrowed them to
+-- TINYINT/SMALLINT (buffer-pool page-density fix) -- this TVP is a transient client-side shape, not a
+-- stored row, and SQL Server converts the wider value into the narrower destination column on write.
 CREATE TYPE game.tvp_CharacterProgress AS TABLE
 (
     CharacterId        INT      NOT NULL,

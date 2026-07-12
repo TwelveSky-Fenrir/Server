@@ -16,8 +16,9 @@ public sealed class ServerQuotaRefreshHost(
 
     public async ValueTask InitializeAsync(CancellationToken ct)
     {
-        var maxPlayers = await quota.GetMaxPlayersAsync(ct).ConfigureAwait(false);
-        state.SetMaxPlayers(maxPlayers);
+        var row = await quota.GetAsync(ct).ConfigureAwait(false);
+        state.SetMaxPlayers(row.MaxPlayers);
+        state.SetGagePlayers(row.GagePlayerNum);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -34,14 +35,15 @@ public sealed class ServerQuotaRefreshHost(
     {
         try
         {
-            var maxPlayers = await quota.GetMaxPlayersAsync(ct).ConfigureAwait(false);
-            state.SetMaxPlayers(maxPlayers);
+            var row = await quota.GetAsync(ct).ConfigureAwait(false);
+            state.SetMaxPlayers(row.MaxPlayers);
+            state.SetGagePlayers(row.GagePlayerNum);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning(ex,
-                "Failed to refresh admin.ServerQuota.MaxPlayers; keeping the previous value ({MaxPlayers})",
-                state.MaxPlayers);
+                "Failed to refresh admin.ServerQuota; keeping the previous values (MaxPlayers {MaxPlayers}, GagePlayerNum {GagePlayerNum})",
+                state.MaxPlayers, state.GagePlayers);
         }
 
         if (state.MaxPlayers == 0)

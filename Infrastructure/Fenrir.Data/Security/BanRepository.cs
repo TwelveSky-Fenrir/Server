@@ -13,6 +13,7 @@ public sealed record BanRepository(ICaeriusNetDbContext Db) : IBanRepository
     {
         var sp = new StoredProcedureParametersBuilder("admin", "usp_Ban_GetActiveForAccount", 1)
             .AddParameter("AccountId", accountId, SqlDbType.Int)
+            .AddInMemoryCache($"admin:ban-active-account:{accountId}", TimeSpan.FromSeconds(2))
             .Build();
 
         var rows = await Db.QueryAsReadOnlyCollectionAsync<BanRowDto>(sp, ct);
@@ -23,6 +24,7 @@ public sealed record BanRepository(ICaeriusNetDbContext Db) : IBanRepository
     {
         var sp = new StoredProcedureParametersBuilder("admin", "usp_Ban_GetActiveForCharacter", 1)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
+            .AddInMemoryCache($"admin:ban-active-character:{characterId}", TimeSpan.FromSeconds(2))
             .Build();
 
         var rows = await Db.QueryAsReadOnlyCollectionAsync<BanRowDto>(sp, ct);
@@ -32,7 +34,7 @@ public sealed record BanRepository(ICaeriusNetDbContext Db) : IBanRepository
     public async ValueTask<int> CreateAsync(int? accountId, int? characterId, BanReason reason,
         DateTime? expiresAtUtc, CancellationToken ct, int? actorAccountId = null, int? actorCharacterId = null)
     {
-        var sp = new StoredProcedureParametersBuilder("admin", "usp_Ban_Create", 4)
+        var sp = new StoredProcedureParametersBuilder("admin", "usp_Ban_Create", 1)
             .AddParameter("AccountId", (object?)accountId ?? DBNull.Value, SqlDbType.Int)
             .AddParameter("CharacterId", (object?)characterId ?? DBNull.Value, SqlDbType.Int)
             .AddParameter("Reason", (byte)reason, SqlDbType.TinyInt)

@@ -28,19 +28,19 @@
 -- those joins in this procedure too would create a second, divergent source of truth for the exact same
 -- data those repositories already resolve live.
 --
--- Also NOT sourced here, because nothing in this schema persists them yet (see
--- Fenrir.Application.Login.Domain.LoginTrain.EmptyAvatarSlot's own CostumeIndex remarks for the fullest
--- existing citation of this gap): VisibleState, SpecialState, CostumeIndex, PetBag, Costume. The caller must
--- keep sending these at their wire-zero/-1 template values until a future migration adds real storage and a
--- real write path for them -- inventing a value here would be worse than the current all-zero gap.
+-- VisibleState/SpecialState/CostumeIndex (game.Characters) and PetBag/Costume (game.CharacterPetBag/
+-- game.CharacterCostumes, RS2/RS3 below) close the account-login avatar roster reconstruction gap this
+-- procedure's header used to flag as unsourced -- see game.Characters.sql's own column comments for
+-- VisibleState/SpecialState/CostumeIndex and each child table's own header for PetBag/Costume.
 --
 -- Also NOT applied here (in-memory transformations the contract documents as happening on top of a raw read,
 -- not as part of it -- see that contract's own "Side effects" section): the logout-position tribe-consistency
 -- correction (LogoutInfo[0..3] replaced with a tribe-specific town-spawn set when the persisted MapId isn't
--- the character's own tribe's) and the two hardcoded blacklisted-item-id resets. Both are call-site business
--- logic, not a data-access concern; the blacklist's exact item ids were never established in the session that
--- produced the contract, so guessing them here would violate the "never invent legacy formulas from memory"
--- rule -- MapId/PosX/PosY/PosZ/Life/Mana are returned raw in RS0 for the caller to apply both transforms to.
+-- the character's own tribe's) and the item ids 1451/2268 blacklist purge (Fenrir.Application.Login.Domain.
+-- Avatars.AvatarInfoFactory.IsLoginRosterBlacklistedItemId, applied in BuildEquipArrayFromRosterItems/
+-- BuildInventoryArrayFromRosterItems/BuildStoreItemArrayFromRosterItems). Both are call-site business logic,
+-- not a data-access concern -- MapId/PosX/PosY/PosZ/Life/Mana and every raw ItemId are returned unfiltered in
+-- RS0/RS1 for the caller to apply both transforms to.
 CREATE PROCEDURE game.usp_Character_GetAccountRoster @AccountId INT
 AS
 BEGIN
@@ -72,7 +72,10 @@ BEGIN
            PosY,
            PosZ,
            Life,
-           Mana
+           Mana,
+           VisibleState,
+           SpecialState,
+           CostumeIndex
     FROM game.Characters
     WHERE AccountId = @AccountId
     ORDER BY Slot;
@@ -81,10 +84,10 @@ BEGIN
            ci.Container,
            ci.Slot,
            ci.ItemId,
-           ci.Quantity,
-           ci.Enchant,
-           ci.Combine,
-           ci.Refine,
+           CAST(ci.Quantity AS INT) AS Quantity, -- ci.Quantity is SMALLINT; widen back to INT here so
+           ci.Enchant,                           -- CharacterRosterItemDto's existing int-typed ctor param
+           ci.Combine,                           -- keeps reading it via SqlDataReader.GetInt32 without an
+           ci.Refine,                            -- InvalidCastException (see CharacterItems.sql's own comment)
            ci.Socket,
            ci.SocketGem1,
            ci.SocketGem2,
@@ -95,4 +98,20 @@ BEGIN
              JOIN game.Characters AS c ON c.CharacterId = ci.CharacterId
     WHERE c.AccountId = @AccountId
     ORDER BY ci.CharacterId, ci.Container, ci.Slot;
+
+    SELECT pb.CharacterId,
+           pb.Slot,
+           pb.ItemId
+    FROM game.CharacterPetBag AS pb
+             JOIN game.Characters AS c ON c.CharacterId = pb.CharacterId
+    WHERE c.AccountId = @AccountId
+    ORDER BY pb.CharacterId, pb.Slot;
+
+    SELECT cc.CharacterId,
+           cc.Slot,
+           cc.ItemId
+    FROM game.CharacterCostumes AS cc
+             JOIN game.Characters AS c ON c.CharacterId = cc.CharacterId
+    WHERE c.AccountId = @AccountId
+    ORDER BY cc.CharacterId, cc.Slot;
 END;

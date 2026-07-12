@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using Microsoft.Extensions.Logging;
 
@@ -68,7 +69,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
             foreach (var tribe in tribes)
                 if (tribe.TribeId < TribeCount)
                     _tribes[tribe.TribeId] =
-                        new TribeRvrState(tribe.TribeId, tribe.SymbolDate, tribe.HasSymbol, tribe.Points,
+                        new TribeRvrState(tribe.TribeId, tribe.SymbolDateUtc, tribe.HasSymbol, tribe.Points,
                             tribe.IsClosed);
 
             for (byte i = 0; i < TribeCount; i++)
@@ -84,7 +85,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
 
         logger.LogInformation(
             "WorldState loaded: Zone038WinTribe={Zone038WinTribe} TribeSymbolBattle={TribeSymbolBattle} MonsterSymbol={MonsterSymbol} AllianceOffers={AllianceOfferCount}",
-            row.Zone038WinTribe, row.TribeSymbolBattle, row.MonsterSymbol, allianceOffers.Count);
+            row.Zone038WinTribe, row.TribeSymbolBattle, row.MonsterSymbol, allianceOffers.Length);
     }
 
     public TribeRvrState GetTribe(byte tribeId)
@@ -536,8 +537,8 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
 
         WorldStateRowDto? row;
-        ReadOnlyCollection<WorldStateTribeDto> tribes;
-        ReadOnlyCollection<WorldStateAllianceOfferDto> allianceOffers;
+        ImmutableArray<WorldStateTribeDto> tribes;
+        ImmutableArray<WorldStateAllianceOfferDto> allianceOffers;
 
         try
         {
@@ -570,7 +571,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
                     ? _tribes[tribe.TribeId] with
                     {
                         TribeId = tribe.TribeId,
-                        SymbolDate = tribe.SymbolDate,
+                        SymbolDate = tribe.SymbolDateUtc,
                         HasSymbol = tribe.HasSymbol,
                         IsClosed = tribe.IsClosed,
                         Points = mergedPoints

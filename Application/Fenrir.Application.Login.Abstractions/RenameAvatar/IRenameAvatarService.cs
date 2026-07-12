@@ -20,7 +20,9 @@ public enum RenameAvatarOutcome
 
     SlotMissing,
 
-    SqlError
+    SqlError,
+
+    SlotEmpty
 }
 
 public readonly record struct RenameAvatarResult(RenameAvatarOutcome Outcome);

@@ -1,5 +1,9 @@
 -- Creates the account's AccountVault row if missing (a gift claim must not require the vault panel to
 -- have been opened first). On a full vault (50274), the transaction rolls back and the gift stays Pending.
+-- This is the live-mechanism-faithful claim path: legacy always delivers a claimed gift into the 28-slot
+-- account holding pen (Server/Header/Protocol/DEFINE.h:313, MAX_SAVE_ITEM_SLOT_NUM=28) in the same
+-- transaction as the slot clear, with the same 28-slot scan-for-a-free-slot semantics
+-- (Server/ts25login/S04_MyWork02.cpp:1448-1480) -- see game.Gifts's header for the schema-modeling caveat.
 CREATE PROCEDURE game.usp_Gift_ClaimIntoVault @GiftId INT,
                                               @AccountId INT
 AS

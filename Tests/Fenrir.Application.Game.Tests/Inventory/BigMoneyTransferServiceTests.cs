@@ -33,13 +33,13 @@ public class BigMoneyTransferServiceTests
         Assert.Equal(-5, call.DeltaInventoryBigMoney);
         Assert.Equal(5, call.DeltaStoreBigMoney);
 
-        var logged = Assert.Single(eventLog.LoggedEvents);
-        Assert.Equal(EventLogEmitters.BigMoneyConversionEventCode5, logged.EventCode);
-        Assert.Equal(EventLogCategory.BigMoneyConversion, logged.Category);
-        Assert.Null(logged.ActorAccountId);
-        Assert.Equal(10, logged.ActorCharacterId);
-        Assert.Equal(-5, logged.DeltaMoney);
-        Assert.Equal(5, logged.DeltaBigMoney);
+        // The BigMoneyConversion audit row is nested into usp_Character_AdjustBigStoreMoney's own transaction
+        // (transaction-composition-audit finding), so it's now observed as audit* parameters on this same
+        // repository call rather than a separate eventLog.LoggedEvents entry.
+        Assert.Equal(EventLogEmitters.BigMoneyConversionEventCode5, call.AuditEventCode);
+        Assert.Equal(-5, call.AuditFromDelta);
+        Assert.Equal(5, call.AuditToDelta);
+        Assert.Empty(eventLog.LoggedEvents);
     }
 
     [Fact]
@@ -57,11 +57,10 @@ public class BigMoneyTransferServiceTests
         Assert.Equal(3, call.DeltaInventoryBigMoney);
         Assert.Equal(-3, call.DeltaStoreBigMoney);
 
-        var logged = Assert.Single(eventLog.LoggedEvents);
-        Assert.Equal(EventLogEmitters.BigMoneyConversionEventCode6, logged.EventCode);
-        Assert.Equal(EventLogCategory.BigMoneyConversion, logged.Category);
-        Assert.Equal(-3, logged.DeltaMoney);
-        Assert.Equal(3, logged.DeltaBigMoney);
+        Assert.Equal(EventLogEmitters.BigMoneyConversionEventCode6, call.AuditEventCode);
+        Assert.Equal(-3, call.AuditFromDelta);
+        Assert.Equal(3, call.AuditToDelta);
+        Assert.Empty(eventLog.LoggedEvents);
     }
 
     [Fact]
@@ -110,13 +109,13 @@ public class BigMoneyTransferServiceTests
         Assert.Equal(99, call.AccountId);
         Assert.Equal(7, call.DeltaVaultBigMoney);
 
-        var logged = Assert.Single(eventLog.LoggedEvents);
-        Assert.Equal(EventLogEmitters.BigMoneyConversionEventCode7, logged.EventCode);
-        Assert.Equal(EventLogCategory.BigMoneyConversion, logged.Category);
-        Assert.Equal(99, logged.ActorAccountId);
-        Assert.Equal(10, logged.ActorCharacterId);
-        Assert.Equal(-7, logged.DeltaMoney);
-        Assert.Equal(7, logged.DeltaBigMoney);
+        // The BigMoneyConversion audit row is nested into usp_AccountVault_TransferBigMoneyWithCharacter's own
+        // transaction (transaction-composition-audit finding), so it's now observed as audit* parameters on
+        // this same repository call rather than a separate eventLog.LoggedEvents entry.
+        Assert.Equal(EventLogEmitters.BigMoneyConversionEventCode7, call.AuditEventCode);
+        Assert.Equal(-7, call.AuditFromDelta);
+        Assert.Equal(7, call.AuditToDelta);
+        Assert.Empty(eventLog.LoggedEvents);
     }
 
     [Fact]
@@ -134,11 +133,10 @@ public class BigMoneyTransferServiceTests
         Assert.Equal(2, call.DeltaInventoryBigMoney);
         Assert.Equal(-2, call.DeltaVaultBigMoney);
 
-        var logged = Assert.Single(eventLog.LoggedEvents);
-        Assert.Equal(EventLogEmitters.BigMoneyConversionEventCode8, logged.EventCode);
-        Assert.Equal(EventLogCategory.BigMoneyConversion, logged.Category);
-        Assert.Equal(99, logged.ActorAccountId);
-        Assert.Equal(-2, logged.DeltaMoney);
-        Assert.Equal(2, logged.DeltaBigMoney);
+        Assert.Equal(EventLogEmitters.BigMoneyConversionEventCode8, call.AuditEventCode);
+        Assert.Equal(99, call.AccountId);
+        Assert.Equal(-2, call.AuditFromDelta);
+        Assert.Equal(2, call.AuditToDelta);
+        Assert.Empty(eventLog.LoggedEvents);
     }
 }

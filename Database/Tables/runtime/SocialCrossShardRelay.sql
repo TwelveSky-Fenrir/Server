@@ -35,6 +35,11 @@
 -- result without a second round trip back to the source shard for a display name; there is no
 -- TargetAvatarName because the target shard always already knows its own local character's name from its
 -- own ZoneRegistry.
+--
+-- CorrelationId is a client-generated idempotency token, same shape and purpose as
+-- runtime.GuildTribeBroadcastRelay's own CorrelationId column -- see that table's header for the full
+-- rationale (SocialCrossShardRelayEntry.CorrelationId is minted once per Ask/Answer entry and stays stable
+-- across CrossShardRelayRetry's retries of that same instance).
 CREATE TABLE runtime.SocialCrossShardRelay
 (
     RelayId           BIGINT IDENTITY (1,1) NOT NULL,
@@ -48,8 +53,15 @@ CREATE TABLE runtime.SocialCrossShardRelay
     TargetShardId     TINYINT               NOT NULL,
     TargetCharacterId INT                   NOT NULL,
     AskRelayId        BIGINT                NULL,     -- Answer rows only: RelayId of the Ask being answered
+    CorrelationId     UNIQUEIDENTIFIER      NOT NULL,
     CreatedAtUtc      DATETIME2(3)          NOT NULL,
     CONSTRAINT PK_SocialCrossShardRelay PRIMARY KEY NONCLUSTERED (RelayId),
-    INDEX IX_SocialCrossShardRelay_Target NONCLUSTERED (TargetShardId, RelayId)
+    CONSTRAINT UQ_SocialCrossShardRelay_CorrelationId UNIQUE NONCLUSTERED (CorrelationId),
+    INDEX IX_SocialCrossShardRelay_Target NONCLUSTERED (TargetShardId, RelayId),
+    -- Supports usp_SocialCrossShardRelay_Poll's own time-based reap DELETE (WHERE CreatedAtUtc <= retention
+    -- cutoff) -- see GuildTribeBroadcastRelay's own index comment for why this is free at write time
+    -- (CreatedAtUtc is set once at INSERT, never updated) and necessary at poll time (every shard, every
+    -- cycle, currently a full scan with no supporting index).
+    INDEX IX_SocialCrossShardRelay_CreatedAtUtc NONCLUSTERED (CreatedAtUtc)
 )
     WITH (MEMORY_OPTIMIZED = ON, DURABILITY = SCHEMA_ONLY);

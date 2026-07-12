@@ -2,7 +2,8 @@
 -- CZ_PSHOP_ITEM_INFO_SEND's proxy-shop half (Server/ts25zone/S04_MyWork02.cpp:6523-6558): one row per
 -- for-sale slot across every currently open (ShopState=1) proxy shop, cluster-wide -- the shared database
 -- is already the one store every shard's proxy shops persist through, so this deliberately carries no
--- @ZoneNumber filter (unlike the distinct, currently-unconsumed usp_OfflineShop_GetByZone).
+-- @ZoneNumber filter. A @ZoneNumber-filtered sibling (usp_OfflineShop_GetByZone) used to exist but had zero
+-- callers anywhere -- removed as dead code in the 2026-07-12 Database/ cleanup pass.
 CREATE PROCEDURE game.usp_OfflineShop_GetAllOpen
 AS
 BEGIN

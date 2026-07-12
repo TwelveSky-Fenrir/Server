@@ -47,7 +47,7 @@ public sealed record WorldDataRepository(ICaeriusNetDbContext Db) : IWorldDataRe
             ReadOnlyCollection<SkillGradeRowDto> Grades)>
         GetSkillsAsync(CancellationToken ct)
     {
-        var sp = new StoredProcedureParametersBuilder("world", "usp_Skill_GetAll", 1_071).Build();
+        var sp = new StoredProcedureParametersBuilder("world", "usp_Skill_GetAll", 594).Build();
 
         return await Db.QueryMultipleReadOnlyCollectionAsync<SkillRowDto, SkillDescriptionRowDto, SkillGradeRowDto>(sp,
             ct);
@@ -183,7 +183,7 @@ public sealed record WorldDataRepository(ICaeriusNetDbContext Db) : IWorldDataRe
 
     public async ValueTask<ReadOnlyCollection<ItemMallProductRowDto>> GetItemMallProductsAsync(CancellationToken ct)
     {
-        var sp = new StoredProcedureParametersBuilder("world", "usp_ItemMallProduct_GetAll", 512).Build();
+        var sp = new StoredProcedureParametersBuilder("world", "usp_ItemMallProduct_GetAll", 159).Build();
 
         return await Db.QueryAsReadOnlyCollectionAsync<ItemMallProductRowDto>(sp, ct);
     }
@@ -208,7 +208,7 @@ public sealed record WorldDataRepository(ICaeriusNetDbContext Db) : IWorldDataRe
             ReadOnlyCollection<TribeCostumeEquivalenceRowDto> CostumeEquivalences)>
         GetTribeConversionCatalogAsync(CancellationToken ct)
     {
-        var sp = new StoredProcedureParametersBuilder("world", "usp_TribeConversionCatalog_GetAll", 594).Build();
+        var sp = new StoredProcedureParametersBuilder("world", "usp_TribeConversionCatalog_GetAll", 393).Build();
 
         return await Db.QueryMultipleReadOnlyCollectionAsync<
             TribeSkillEquivalenceRowDto, TribeItemEquivalenceRowDto, TribeCostumeEquivalenceRowDto>(sp, ct);

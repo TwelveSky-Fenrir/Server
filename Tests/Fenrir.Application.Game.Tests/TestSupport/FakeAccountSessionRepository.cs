@@ -64,4 +64,16 @@ internal sealed class FakeAccountSessionRepository : IAccountSessionRepository
     {
         throw new NotSupportedException("Not exercised by the Game-side test suites in this project.");
     }
+
+    public ValueTask<int> GetConcurrentDeviceSessionCountAsync(int excludingAccountId, string adapterIdentifier,
+        string localIp, string remoteIp, CancellationToken ct)
+    {
+        throw new NotSupportedException("Not exercised by the Game-side test suites in this project.");
+    }
+
+    public ValueTask RecordDeviceSignatureAsync(int accountId, string adapterIdentifier, string localIp,
+        string remoteIp, CancellationToken ct)
+    {
+        throw new NotSupportedException("Not exercised by the Game-side test suites in this project.");
+    }
 }

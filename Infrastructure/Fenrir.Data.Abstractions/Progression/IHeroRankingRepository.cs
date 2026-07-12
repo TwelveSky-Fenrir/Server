@@ -9,6 +9,9 @@ public interface IHeroRankingRepository
     public ValueTask MarkRewardClaimedAsync(int characterId, byte periodKind, int points, byte? tribeId, int? level,
         CancellationToken ct);
 
+    public ValueTask ClaimRewardAsync(int characterId, byte periodKind, int contributionPointsDelta,
+        CancellationToken ct);
+
     public ValueTask<int> AddPointsAsync(int characterId, byte periodKind, int delta, byte? tribeId, int? level,
         CancellationToken ct);
 

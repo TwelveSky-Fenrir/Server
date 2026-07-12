@@ -8,15 +8,16 @@ namespace Fenrir.Application.Login.Tests;
 public class ServerQuotaRefreshHostTests
 {
     [Fact]
-    public async Task InitializeAsync_PopulatesMaxPlayersFromTheDurableStore()
+    public async Task InitializeAsync_PopulatesMaxPlayersAndGagePlayersFromTheDurableStore()
     {
         var state = new LoginCapacityState();
-        var quota = new FakeServerQuotaRepository { MaxPlayers = 500 };
+        var quota = new FakeServerQuotaRepository { MaxPlayers = 500, GagePlayerNum = 3 };
         var host = CreateHost(state, quota, new FakeAccountSessionRepository());
 
         await host.InitializeAsync(CancellationToken.None);
 
         Assert.Equal(500, state.MaxPlayers);
+        Assert.Equal(3, state.GagePlayers);
         Assert.Equal(1, quota.CallCount);
     }
 
@@ -32,40 +33,43 @@ public class ServerQuotaRefreshHostTests
     }
 
     [Fact]
-    public async Task RefreshOnceAsync_MaxPlayersPositive_RefreshesBothMaxAndCurrentPlayers()
+    public async Task RefreshOnceAsync_MaxPlayersPositive_RefreshesMaxGageAndCurrentPlayers()
     {
         var state = new LoginCapacityState();
-        var quota = new FakeServerQuotaRepository { MaxPlayers = 1000 };
+        var quota = new FakeServerQuotaRepository { MaxPlayers = 1000, GagePlayerNum = 17 };
         var accountSessions = new FakeAccountSessionRepository { ActiveSessionCount = 42 };
         var host = CreateHost(state, quota, accountSessions);
 
         await host.RefreshOnceAsync(CancellationToken.None);
 
         Assert.Equal(1000, state.MaxPlayers);
+        Assert.Equal(17, state.GagePlayers);
         Assert.Equal(42, state.CurrentPlayers);
         Assert.Equal(1, accountSessions.ActiveSessionCountCallCount);
     }
 
     [Fact]
-    public async Task RefreshOnceAsync_MaxPlayersIsZero_SkipsTheCurrentCountRefreshEntirely()
+    public async Task RefreshOnceAsync_MaxPlayersIsZero_StillRefreshesGagePlayers_ButSkipsTheCurrentCountRefreshEntirely()
     {
         var state = new LoginCapacityState();
-        var quota = new FakeServerQuotaRepository { MaxPlayers = 0 };
+        var quota = new FakeServerQuotaRepository { MaxPlayers = 0, GagePlayerNum = 55 };
         var accountSessions = new FakeAccountSessionRepository { ActiveSessionCount = 42 };
         var host = CreateHost(state, quota, accountSessions);
 
         await host.RefreshOnceAsync(CancellationToken.None);
 
         Assert.Equal(0, state.MaxPlayers);
+        Assert.Equal(55, state.GagePlayers);
         Assert.Equal(0, state.CurrentPlayers);
         Assert.Equal(0, accountSessions.ActiveSessionCountCallCount);
     }
 
     [Fact]
-    public async Task RefreshOnceAsync_MaxPlayersReadFails_KeepsThePreviousMaxPlayers_AndDoesNotThrow()
+    public async Task RefreshOnceAsync_QuotaReadFails_KeepsThePreviousMaxPlayersAndGagePlayers_AndDoesNotThrow()
     {
         var state = new LoginCapacityState();
         state.SetMaxPlayers(750);
+        state.SetGagePlayers(9);
         var quota = new FakeServerQuotaRepository { Exception = new InvalidOperationException("boom") };
         var accountSessions = new FakeAccountSessionRepository { ActiveSessionCount = 42 };
         var host = CreateHost(state, quota, accountSessions);
@@ -73,6 +77,7 @@ public class ServerQuotaRefreshHostTests
         await host.RefreshOnceAsync(CancellationToken.None);
 
         Assert.Equal(750, state.MaxPlayers);
+        Assert.Equal(9, state.GagePlayers);
         Assert.Equal(1, accountSessions.ActiveSessionCountCallCount);
         Assert.Equal(42, state.CurrentPlayers);
     }

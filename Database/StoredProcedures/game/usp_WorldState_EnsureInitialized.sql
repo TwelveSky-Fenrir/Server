@@ -43,7 +43,7 @@ BEGIN
 
     IF NOT EXISTS (SELECT 1 FROM game.WorldStateTribes)
         BEGIN
-            INSERT INTO game.WorldStateTribes (TribeId, SymbolDate, HasSymbol, Points, IsClosed)
+            INSERT INTO game.WorldStateTribes (TribeId, SymbolDateUtc, HasSymbol, Points, IsClosed)
             VALUES (0, NULL, 1, 0, 0),
                    (1, NULL, 1, 0, 0),
                    (2, NULL, 1, 0, 0),

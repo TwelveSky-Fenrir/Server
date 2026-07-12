@@ -7,4 +7,6 @@ public interface IFirewallRuleRepository
     public ValueTask BlockAsync(string ipAddress, CancellationToken ct);
 
     public ValueTask ReconcileAllowlistAsync(CancellationToken ct);
+
+    public ValueTask<int> AddAsync(string ipAddress, byte ruleType, CancellationToken ct);
 }

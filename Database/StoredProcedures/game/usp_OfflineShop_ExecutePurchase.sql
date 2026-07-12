@@ -13,15 +13,29 @@
 -- usp_OfflineShop_RetrieveItemAndReplaceContainer is untouched. Evaluated across the whole shop (all 25
 -- slots), not just the slot that was just sold, and inside this procedure's single transaction so there is no
 -- new cross-call TOCTOU window.
-CREATE PROCEDURE game.usp_OfflineShop_ExecutePurchase @SellerCharacterId INT,
-                                                      @SlotIndex SMALLINT,
-                                                      @ExpectedItemId INT,
-                                                      @ExpectedQuantity INT,
-                                                      @ExpectedValue INT,
-                                                      @Price INT,
-                                                      @BuyerCharacterId INT,
-                                                      @BuyerContainer TINYINT,
-                                                      @BuyerItems game.tvp_CharacterItemSlot READONLY
+--
+-- Isolation-level note (procs-game-economy-inventory audit, basse severite): the slot-sale compare-and-swap
+-- below -- DELETE ... WHERE SlotIndex = @SlotIndex AND ItemId = @ExpectedItemId AND Quantity = @ExpectedQuantity
+-- AND Value = @ExpectedValue AND Price = @Price AND EXISTS (shop still ShopState = 1) -- is already race-safe
+-- under this database's default READ COMMITTED SNAPSHOT + OPTIMIZED_LOCKING
+-- (Database/Migrations/000_init/001_database_options.sql) with no stricter isolation level required. RCSI only
+-- removes reader-vs-writer blocking; it does not change writer-vs-writer locking, so the DELETE still takes a
+-- genuine row lock the instant it matches a row. Two concurrent buyers racing the same
+-- (@SellerCharacterId, @SlotIndex) pair therefore serialize on that lock: the second DELETE blocks until the
+-- first transaction commits (removing the row), then re-evaluates its own WHERE predicate under READ
+-- COMMITTED and finds zero matching rows -- falling into the @@ROWCOUNT = 0 branch below and throwing 50272
+-- rather than double-selling the same listing. Do not reach for SERIALIZABLE/REPEATABLE READ or an
+-- application-level lock here out of unwarranted caution -- the guarded DELETE's own WHERE clause already is
+-- the entire CAS and it is sufficient on its own.
+CREATE OR ALTER PROCEDURE game.usp_OfflineShop_ExecutePurchase @SellerCharacterId INT,
+                                                               @SlotIndex SMALLINT,
+                                                               @ExpectedItemId INT,
+                                                               @ExpectedQuantity INT,
+                                                               @ExpectedValue INT,
+                                                               @Price INT,
+                                                               @BuyerCharacterId INT,
+                                                               @BuyerContainer TINYINT,
+                                                               @BuyerItems game.tvp_CharacterItemSlot READONLY
 AS
 BEGIN
     SET NOCOUNT ON;

@@ -26,7 +26,7 @@ public sealed record FirewallRuleRepository(ICaeriusNetDbContext Db) : IFirewall
 
     public async ValueTask BlockAsync(string ipAddress, CancellationToken ct)
     {
-        var sp = new StoredProcedureParametersBuilder("admin", "usp_FirewallRule_Upsert", 2)
+        var sp = new StoredProcedureParametersBuilder("admin", "usp_FirewallRule_Upsert", 0)
             .AddParameter("IpAddress", ipAddress, SqlDbType.VarChar)
             .AddParameter("RuleType", RuleTypeAnyBlock, SqlDbType.TinyInt)
             .Build();
@@ -36,8 +36,18 @@ public sealed record FirewallRuleRepository(ICaeriusNetDbContext Db) : IFirewall
 
     public async ValueTask ReconcileAllowlistAsync(CancellationToken ct)
     {
-        var sp = new StoredProcedureParametersBuilder("admin", "usp_FirewallRule_ReconcileAllowlist").Build();
+        var sp = new StoredProcedureParametersBuilder("admin", "usp_FirewallRule_ReconcileAllowlist", 0).Build();
         await Db.ExecuteAsync(sp, ct).ConfigureAwait(false);
+    }
+
+    public async ValueTask<int> AddAsync(string ipAddress, byte ruleType, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("admin", "usp_FirewallRule_Add", 1)
+            .AddParameter("IpAddress", ipAddress, SqlDbType.VarChar)
+            .AddParameter("RuleType", ruleType, SqlDbType.TinyInt)
+            .Build();
+
+        return await Db.ExecuteScalarAsync<int>(sp, ct);
     }
 
     private ValueTask<ImmutableArray<FirewallRuleRowDto>> GetAllAsync(CancellationToken ct)

@@ -16,13 +16,24 @@
 -- RelayId is an ever-increasing IDENTITY sequence every shard's own cursor (runtime.GuildBuffExpiryCursor) is
 -- expressed against, not CreatedAtUtc -- see GuildTribeBroadcastRelay's own header for why wall-clock time is
 -- not a safe "give me everything after X" predicate across concurrent inserts from different shard processes.
+--
+-- CorrelationId is a client-generated idempotency token, same shape and purpose as
+-- runtime.GuildTribeBroadcastRelay's own CorrelationId column -- see that table's header for the full
+-- rationale (GuildBuffExpiryRelayEntry.CorrelationId is minted once per push and stays stable across
+-- CrossShardRelayRetry's retries of that same instance).
 CREATE TABLE runtime.GuildBuffExpiryRelay
 (
     RelayId       BIGINT IDENTITY (1,1) NOT NULL,
     SourceShardId TINYINT               NOT NULL, -- never re-delivered back to this shard; it already delivered locally
     GuildId       INT                   NOT NULL,
     NewBuffTime   INT                   NOT NULL, -- always < 1 (typically exactly zero, floored) whenever a row exists
+    CorrelationId UNIQUEIDENTIFIER      NOT NULL,
     CreatedAtUtc  DATETIME2(3)          NOT NULL,
-    CONSTRAINT PK_GuildBuffExpiryRelay PRIMARY KEY NONCLUSTERED (RelayId)
+    CONSTRAINT PK_GuildBuffExpiryRelay PRIMARY KEY NONCLUSTERED (RelayId),
+    CONSTRAINT UQ_GuildBuffExpiryRelay_CorrelationId UNIQUE NONCLUSTERED (CorrelationId),
+    -- Supports usp_GuildBuffExpiryRelay_Poll's own time-based reap DELETE -- see
+    -- GuildTribeBroadcastRelay's own index comment for the shared rationale (write-once column, hot
+    -- per-shard-per-cycle DELETE with no other usable predicate index).
+    INDEX IX_GuildBuffExpiryRelay_CreatedAtUtc NONCLUSTERED (CreatedAtUtc)
 )
     WITH (MEMORY_OPTIMIZED = ON, DURABILITY = SCHEMA_ONLY);

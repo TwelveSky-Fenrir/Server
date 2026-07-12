@@ -8,4 +8,9 @@ internal sealed class FakeBlockedIpRepository(bool blocked = false) : IBlockedIp
     {
         return ValueTask.FromResult(blocked);
     }
+
+    public ValueTask<int> AddAsync(string ipAddress, CancellationToken ct)
+    {
+        throw new NotSupportedException();
+    }
 }

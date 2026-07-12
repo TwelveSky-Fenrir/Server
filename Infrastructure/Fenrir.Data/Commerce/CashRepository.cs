@@ -19,7 +19,8 @@ public sealed record CashRepository(ICaeriusNetDbContext Db) : ICashRepository
     }
 
     public async ValueTask<int> DebitAndGrantItemAsync(int accountId, int amount, byte reason, int productId,
-        int characterId, byte container, IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
+        int characterId, byte container, IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct,
+        int? auditItemId = null, int? auditQuantity = null, int? auditSerial = null)
     {
         var builder = new StoredProcedureParametersBuilder("game", "usp_Cash_DebitAndGrantItem", 1)
             .AddParameter("AccountId", accountId, SqlDbType.Int)
@@ -30,6 +31,10 @@ public sealed record CashRepository(ICaeriusNetDbContext Db) : ICashRepository
             .AddParameter("Container", container, SqlDbType.TinyInt);
 
         if (items.Count > 0) builder.AddTvpParameter("Items", items);
+
+        builder.AddParameter("AuditItemId", (object?)auditItemId ?? DBNull.Value, SqlDbType.Int)
+            .AddParameter("AuditQuantity", (object?)auditQuantity ?? DBNull.Value, SqlDbType.Int)
+            .AddParameter("AuditSerial", (object?)auditSerial ?? DBNull.Value, SqlDbType.Int);
 
         return await Db.ExecuteScalarAsync<int>(builder.Build(), ct);
     }
@@ -44,5 +49,21 @@ public sealed record CashRepository(ICaeriusNetDbContext Db) : ICashRepository
             .Build();
 
         await Db.ExecuteAsync(sp, ct);
+    }
+
+    public async ValueTask<int> CreditAndConsumeItemAsync(int accountId, int amount, byte reason, int? productId,
+        int characterId, byte container, IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
+    {
+        var builder = new StoredProcedureParametersBuilder("game", "usp_Cash_CreditAndConsumeItem", 1)
+            .AddParameter("AccountId", accountId, SqlDbType.Int)
+            .AddParameter("Amount", amount, SqlDbType.Int)
+            .AddParameter("Reason", reason, SqlDbType.TinyInt)
+            .AddParameter("ProductId", (object?)productId ?? DBNull.Value, SqlDbType.Int)
+            .AddParameter("CharacterId", characterId, SqlDbType.Int)
+            .AddParameter("Container", container, SqlDbType.TinyInt);
+
+        if (items.Count > 0) builder.AddTvpParameter("Items", items);
+
+        return await Db.ExecuteScalarAsync<int>(builder.Build(), ct);
     }
 }

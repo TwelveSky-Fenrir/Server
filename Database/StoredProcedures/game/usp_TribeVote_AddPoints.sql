@@ -9,6 +9,8 @@ AS
 BEGIN
     SET
         NOCOUNT ON;
+    SET
+        XACT_ABORT ON;
 
     UPDATE game.TribeVotes
     SET VotePoint = VotePoint + @Points

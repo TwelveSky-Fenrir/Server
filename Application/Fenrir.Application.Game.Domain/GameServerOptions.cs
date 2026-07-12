@@ -28,7 +28,7 @@ public sealed class GameServerOptions
 
     public int Capacity { get; set; } = 300;
 
-    public int AccountSessionPollIntervalSeconds { get; set; } = 20;
+    public int AccountSessionPollIntervalSeconds { get; set; } = 2;
 
     public int MutePollIntervalSeconds { get; set; } = 15;
 

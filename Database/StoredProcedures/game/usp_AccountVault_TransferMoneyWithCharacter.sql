@@ -5,10 +5,16 @@
 -- vault panel to have been opened first.
 -- Réf. C++ : Server/ts25zone/S04_MyWork05.cpp:3275-3341 (ProcessForInventoryMoneyToSaveMoney/
 -- ProcessForSaveMoneyToInventoryMoney) ; Server/Header/Protocol/DEFINE.h:365 (MAX_NUMBER_SIZE = 2,000,000,000).
+--
+-- @AuditEventCode optionally nests the SaveSlotMoney audit row (EventLogCategory.SaveSlotMoney = 20) into
+-- this same already-open transaction, following usp_CharacterTrade_Execute's own precedent
+-- (transaction-composition-audit finding). Caller omits @AuditEventCode (stays NULL) to skip logging.
 CREATE PROCEDURE game.usp_AccountVault_TransferMoneyWithCharacter @CharacterId INT,
                                                                   @DeltaCharacterMoney BIGINT,
                                                                   @AccountId INT,
-                                                                  @DeltaVaultMoney BIGINT
+                                                                  @DeltaVaultMoney BIGINT,
+                                                                  @AuditEventCode SMALLINT = NULL,
+                                                                  @AuditQuantity INT = NULL
 AS
 BEGIN
     SET
@@ -42,6 +48,16 @@ BEGIN
     IF
         @@ROWCOUNT = 0
         THROW 50339, N'Insufficient account vault balance for this transfer.', 1;
+
+    IF @AuditEventCode IS NOT NULL
+        EXEC game.usp_EventLog_Insert
+             @EventCode = @AuditEventCode,
+             @Category = 20, -- EventLogCategory.SaveSlotMoney
+             @ActorAccountId = @AccountId,
+             @ActorCharacterId = @CharacterId,
+             @DeltaMoney = @DeltaCharacterMoney,
+             @Quantity = @AuditQuantity,
+             @Outcome = 1;
 
     COMMIT TRANSACTION;
 END;

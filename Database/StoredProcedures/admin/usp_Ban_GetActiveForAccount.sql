@@ -1,5 +1,6 @@
--- Called on the login path to catch an active ban that predates or overrides auth.Accounts.IsBanned.
--- Bans are a log, so more than one row can theoretically come back; caller treats any row as banned.
+-- Called on the login path to catch an active ban; auth.Accounts.IsBanned is never written by anything
+-- today (dead column, see Accounts.sql), so in practice this proc is the sole live source of the ban
+-- verdict. Bans are a log, so more than one row can theoretically come back; caller treats any row as banned.
 CREATE PROCEDURE admin.usp_Ban_GetActiveForAccount @AccountId INT
 AS
 BEGIN

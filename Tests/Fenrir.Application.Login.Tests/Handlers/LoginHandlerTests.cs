@@ -33,6 +33,26 @@ public class LoginHandlerTests
     private static readonly byte[] DefaultPhysicalAddress = ParseMac("11-22-33-44-55-66");
 
     [Fact]
+    public async Task HandleAsync_IpExceedsRateLimitBudget_SendsCustomMessageResult_InsteadOfSilentlyDropping()
+    {
+        var accounts = FakeAccountRepository.WithNoAccount();
+        var handler = CreateHandler(out var session, out var pipe, accounts);
+
+        for (var i = 0; i < 5; i++)
+        {
+            await handler.HandleAsync(ValidLoginRequest(), session, CancellationToken.None);
+            await PacketAssert.ReadSentBytesAsync(pipe);
+        }
+
+        await handler.HandleAsync(ValidLoginRequest(), session, CancellationToken.None);
+
+        await AssertFirstResponseAsync(pipe,
+            LoginTrain.BuildLoginRecv(10000, "someuser", 0, LoginTrain.FailurePinMask,
+                "Too many login attempts from your IP. Please try again later."));
+        Assert.Null(session.AccountId);
+    }
+
+    [Fact]
     public async Task HandleAsync_MaintenanceMode_SendsMaintenanceResult_AndNeverAuthenticates()
     {
         var accounts = FakeAccountRepository.WithNoAccount();
@@ -91,7 +111,23 @@ public class LoginHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_IpIsBlocked_SendsIpBlockedResult_AndNeverAuthenticates()
+    public async Task HandleAsync_ValidCredentials_IpIsBlocked_SendsIpBlockedResult_AfterAuthenticating()
+    {
+        var (hash, salt) = PasswordHasher.Hash("correct-password");
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false);
+        var accounts = FakeAccountRepository.WithAccount(account);
+        var handler = CreateHandler(out var session, out var pipe, accounts,
+            true);
+
+        await handler.HandleAsync(ValidLoginRequest(password: "correct-password"), session, CancellationToken.None);
+
+        await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(2, "someuser", 0, LoginTrain.FailurePinMask));
+        Assert.Equal(1, accounts.AuthenticateCallCount);
+        Assert.Null(session.AccountId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_UnknownAccount_IpIsBlocked_SendsUnknownAccountResult_NotIpBlockedResult()
     {
         var accounts = FakeAccountRepository.WithNoAccount();
         var handler = CreateHandler(out var session, out var pipe, accounts,
@@ -99,8 +135,23 @@ public class LoginHandlerTests
 
         await handler.HandleAsync(ValidLoginRequest(), session, CancellationToken.None);
 
-        await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(2, "someuser", 0, LoginTrain.FailurePinMask));
-        Assert.Equal(0, accounts.AuthenticateCallCount);
+        await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(6, "someuser", 0, LoginTrain.FailurePinMask));
+        Assert.Equal(1, accounts.AuthenticateCallCount);
+    }
+
+    [Fact]
+    public async Task HandleAsync_WrongPassword_IpIsBlocked_SendsWrongPasswordResult_NotIpBlockedResult()
+    {
+        var (hash, salt) = PasswordHasher.Hash("correct-password");
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false);
+        var accounts = FakeAccountRepository.WithAccount(account);
+        var handler = CreateHandler(out var session, out var pipe, accounts,
+            true);
+
+        await handler.HandleAsync(ValidLoginRequest(password: "totally-wrong-password"), session,
+            CancellationToken.None);
+
+        await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(7, "someuser", 0, LoginTrain.FailurePinMask));
     }
 
     [Fact]
@@ -117,19 +168,39 @@ public class LoginHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_MacAddressIsBanned_SendsCustomMessageResult_AndNeverAuthenticates()
+    public async Task HandleAsync_MacAddressIsBanned_SendsCustomMessageResult()
     {
         const string bannedMac = "00-11-22-33-44-55";
-        var accounts = FakeAccountRepository.WithNoAccount();
+        var (hash, salt) = PasswordHasher.Hash("correct-password");
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false);
+        var accounts = FakeAccountRepository.WithAccount(account);
         var handler = CreateHandler(out var session, out var pipe, accounts,
             bannedMacAddresses: [bannedMac]);
 
-        await handler.HandleAsync(ValidLoginRequest(physicalAddress: ParseMac(bannedMac)), session,
+        await handler.HandleAsync(
+            ValidLoginRequest(password: "correct-password", physicalAddress: ParseMac(bannedMac)), session,
             CancellationToken.None);
 
         await AssertFirstResponseAsync(pipe,
             LoginTrain.BuildLoginRecv(10000, "someuser", 0, LoginTrain.FailurePinMask, "Your PC has been banned."));
-        Assert.Equal(0, accounts.AuthenticateCallCount);
+        Assert.Null(session.AccountId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_GmAccount_MacAddressIsBanned_StillSucceeds()
+    {
+        const string bannedMac = "00-11-22-33-44-55";
+        var (hash, salt) = PasswordHasher.Hash("correct-password");
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false, 1);
+        var accounts = FakeAccountRepository.WithAccount(account);
+        var handler = CreateHandler(out var session, out var pipe, accounts, gmAllowlisted: true,
+            bannedMacAddresses: [bannedMac]);
+
+        await handler.HandleAsync(
+            ValidLoginRequest(password: "correct-password", physicalAddress: ParseMac(bannedMac)), session,
+            CancellationToken.None);
+
+        await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(0, "MG7", 1, ""));
     }
 
     [Fact]
@@ -143,6 +214,23 @@ public class LoginHandlerTests
         await handler.HandleAsync(ValidLoginRequest(password: "correct-password"), session, CancellationToken.None);
 
         await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(9, "someuser", 0, LoginTrain.FailurePinMask));
+    }
+
+    [Fact]
+    public async Task
+        HandleAsync_AccountUnderAutoLockoutTimer_SendsCustomMessageResult_NotTheAdminBanResultCode()
+    {
+        var (hash, salt) = PasswordHasher.Hash("correct-password");
+        var account = new AuthenticateAccountDto(1, hash, salt, 10, DateTime.UtcNow.AddMinutes(15), false);
+        var accounts = FakeAccountRepository.WithAccount(account);
+        var handler = CreateHandler(out var session, out var pipe, accounts);
+
+        await handler.HandleAsync(ValidLoginRequest(password: "correct-password"), session, CancellationToken.None);
+
+        await AssertFirstResponseAsync(pipe,
+            LoginTrain.BuildLoginRecv(10000, "someuser", 0, LoginTrain.FailurePinMask,
+                "Too many failed login attempts. Please try again later."));
+        Assert.Null(session.AccountId);
     }
 
     [Fact]
@@ -452,6 +540,107 @@ public class LoginHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_NonGmAccount_ConfiguredAdapterLimitOfExactlyOne_SendsConnectionLimitExceededResult()
+    {
+        var (hash, salt) = PasswordHasher.Hash("correct-password");
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false);
+        var accounts = FakeAccountRepository.WithAccount(account);
+        var mac = MacAddressFormatter.Format(DefaultPhysicalAddress, (uint)DefaultPhysicalAddress.Length);
+        var handler = CreateHandler(out var session, out var pipe, accounts,
+            configuredAccountLimits: new Dictionary<string, int> { [mac] = 1 });
+
+        await handler.HandleAsync(ValidLoginRequest(password: "correct-password"), session, CancellationToken.None);
+
+        await AssertFirstResponseAsync(pipe,
+            LoginTrain.BuildLoginRecv(10000, "someuser", 0, LoginTrain.FailurePinMask,
+                "The connection limit from your PC has been exceeded."));
+        Assert.Null(session.AccountId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_NonGmAccount_ConfiguredAdapterLimitOfTwoOrMore_StillSucceeds()
+    {
+        var (hash, salt) = PasswordHasher.Hash("correct-password");
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false);
+        var accounts = FakeAccountRepository.WithAccount(account);
+        var mac = MacAddressFormatter.Format(DefaultPhysicalAddress, (uint)DefaultPhysicalAddress.Length);
+        var handler = CreateHandler(out var session, out var pipe, accounts,
+            configuredAccountLimits: new Dictionary<string, int> { [mac] = 2 });
+
+        await handler.HandleAsync(ValidLoginRequest(password: "correct-password"), session, CancellationToken.None);
+
+        await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(0, "MG7", 1, ""));
+    }
+
+    [Fact]
+    public async Task HandleAsync_GmAccount_ConfiguredAdapterLimitOfExactlyOne_StillSucceeds()
+    {
+        var (hash, salt) = PasswordHasher.Hash("correct-password");
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false, 1);
+        var accounts = FakeAccountRepository.WithAccount(account);
+        var mac = MacAddressFormatter.Format(DefaultPhysicalAddress, (uint)DefaultPhysicalAddress.Length);
+        var handler = CreateHandler(out var session, out var pipe, accounts, gmAllowlisted: true,
+            configuredAccountLimits: new Dictionary<string, int> { [mac] = 1 });
+
+        await handler.HandleAsync(ValidLoginRequest(password: "correct-password"), session, CancellationToken.None);
+
+        await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(0, "MG7", 1, ""));
+    }
+
+    [Fact]
+    public async Task
+        HandleAsync_NonGmAccount_NoConfiguredRestriction_TwoConcurrentDeviceSessions_SendsConnectionLimitExceededResult()
+    {
+        var (hash, salt) = PasswordHasher.Hash("correct-password");
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false);
+        var accounts = FakeAccountRepository.WithAccount(account);
+        var accountSessions = new FakeAccountSessionRepository { ConcurrentDeviceSessionCount = 2 };
+        var handler = CreateHandler(out var session, out var pipe, accounts, accountSessions: accountSessions);
+
+        await handler.HandleAsync(ValidLoginRequest(password: "correct-password"), session, CancellationToken.None);
+
+        await AssertFirstResponseAsync(pipe,
+            LoginTrain.BuildLoginRecv(10000, "someuser", 0, LoginTrain.FailurePinMask,
+                "The connection limit from your PC has been exceeded."));
+        Assert.Null(session.AccountId);
+        Assert.Equal((7, "{real-adapter-guid}", "", "203.0.113.50"), accountSessions.LastConcurrentDeviceSessionQuery);
+        Assert.Null(accountSessions.LastRecordedDeviceSignature);
+    }
+
+    [Fact]
+    public async Task
+        HandleAsync_NonGmAccount_NoConfiguredRestriction_OneConcurrentDeviceSession_Succeeds_AndRecordsTheRealDeviceSignature()
+    {
+        var (hash, salt) = PasswordHasher.Hash("correct-password");
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false);
+        var accounts = FakeAccountRepository.WithAccount(account);
+        var accountSessions = new FakeAccountSessionRepository { ConcurrentDeviceSessionCount = 1 };
+        var handler = CreateHandler(out var session, out var pipe, accounts, accountSessions: accountSessions);
+
+        await handler.HandleAsync(ValidLoginRequest(password: "correct-password"), session, CancellationToken.None);
+
+        await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(0, "MG7", 1, ""));
+        Assert.Equal((7, "{real-adapter-guid}", "", "203.0.113.50"), accountSessions.LastRecordedDeviceSignature);
+    }
+
+    [Fact]
+    public async Task HandleAsync_GmAccount_NoConfiguredRestriction_TwoConcurrentDeviceSessions_StillSucceeds()
+    {
+        var (hash, salt) = PasswordHasher.Hash("correct-password");
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false, 1);
+        var accounts = FakeAccountRepository.WithAccount(account);
+        var accountSessions = new FakeAccountSessionRepository { ConcurrentDeviceSessionCount = 2 };
+        var handler = CreateHandler(out var session, out var pipe, accounts, gmAllowlisted: true,
+            accountSessions: accountSessions);
+
+        await handler.HandleAsync(ValidLoginRequest(password: "correct-password"), session, CancellationToken.None);
+
+        await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(0, "MG7", 1, ""));
+        Assert.Null(accountSessions.LastConcurrentDeviceSessionQuery);
+        Assert.Equal((7, "{0-0-0-0-0}", "127.0.0.1", "127.0.0.1"), accountSessions.LastRecordedDeviceSignature);
+    }
+
+    [Fact]
     public async Task HandleAsync_Success_PopulatesGuildNameForGuildedCharacter_AndLeavesGuildlessCharacterEmpty()
     {
         var (hash, salt) = PasswordHasher.Hash("correct-password");
@@ -544,6 +733,7 @@ public class LoginHandlerTests
     private static LoginHandler CreateHandler(out LoginClientSession session, out FakeDuplexPipe pipe,
         FakeAccountRepository accounts, bool blockedIp = false, bool firewallRuleBlocked = false,
         bool gmAllowlisted = false, bool accountBanned = false, string[]? bannedMacAddresses = null,
+        IReadOnlyDictionary<string, int>? configuredAccountLimits = null,
         SessionRegistry? registry = null, FakeAccountSessionRepository? accountSessions = null,
         IPEndPoint? remoteEndPoint = null, LoginCapacityState? capacity = null,
         FakeEventLogRepository? eventLog = null, bool onlyAdminCanLogin = false,
@@ -569,7 +759,7 @@ public class LoginHandlerTests
                 firewall,
                 gmAllowlistRepository,
                 new FakeBanRepository(accountBanned),
-                new FakeMacRestrictionRepository(bannedMacAddresses ?? []),
+                new FakeMacRestrictionRepository(bannedMacAddresses, configuredAccountLimits),
                 Options.Create(new LoginServerOptions
                     { ExpectedClientVersion = ClientVersion, OnlyAdminCanLogin = onlyAdminCanLogin }),
                 registry ?? new SessionRegistry(),

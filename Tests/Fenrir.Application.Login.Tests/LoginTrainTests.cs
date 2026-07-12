@@ -267,14 +267,14 @@ public class LoginTrainTests
         public byte PreviousTribe { get; init; }
         public short Level2 { get; init; }
         public int Halo { get; init; }
-        public int RebirthCount { get; init; }
+        public byte RebirthCount { get; init; }
         public int ContributionPoints { get; init; }
         public int SkillPoints { get; init; }
-        public int EatLifePotion { get; init; }
-        public int EatManaPotion { get; init; }
-        public int EatStrPotion { get; init; }
-        public int EatDexPotion { get; init; }
-        public int EatElePotion { get; init; }
+        public short EatLifePotion { get; init; }
+        public short EatManaPotion { get; init; }
+        public short EatStrPotion { get; init; }
+        public short EatDexPotion { get; init; }
+        public short EatElePotion { get; init; }
         public int PetGrowth { get; init; }
         public byte PetActivity { get; init; }
         public short MapId { get; init; }

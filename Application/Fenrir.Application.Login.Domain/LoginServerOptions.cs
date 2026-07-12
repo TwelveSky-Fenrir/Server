@@ -20,7 +20,5 @@ public sealed class LoginServerOptions
 
     public int IdleSweepIntervalSeconds { get; set; } = 1;
 
-    public bool EnableFourthFaction { get; set; }
-
     public bool OnlyAdminCanLogin { get; set; }
 }

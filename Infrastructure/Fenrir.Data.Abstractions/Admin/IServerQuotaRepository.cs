@@ -2,5 +2,5 @@ namespace Fenrir.Data.Abstractions.Admin;
 
 public interface IServerQuotaRepository
 {
-    public ValueTask<int> GetMaxPlayersAsync(CancellationToken ct);
+    public ValueTask<ServerQuotaDto> GetAsync(CancellationToken ct);
 }

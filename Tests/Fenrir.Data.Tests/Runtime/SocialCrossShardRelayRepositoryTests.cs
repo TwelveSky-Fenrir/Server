@@ -171,4 +171,20 @@ public sealed class SocialCrossShardRelayRepositoryTests : IDisposable
         var rows = await _repository.PollAsync(252, 999_999, CancellationToken.None);
         Assert.Empty(rows);
     }
+
+    [Fact]
+    public async Task PublishAsync_CalledTwiceWithTheSameEntryInstance_OnlyInsertsOneRow()
+    {
+        // Models CrossShardRelayRetry.RunAsync retrying the same entry after a lost acknowledgement: the
+        // CorrelationId is generated once when the entry is constructed and stays identical across both calls,
+        // so the second PublishAsync must be a no-op rather than a duplicate row.
+        const byte targetShardId = 260;
+        var entry = MakeAsk(7, 200, "RetriedAsker", targetShardId, 100);
+
+        await _repository.PublishAsync(entry, CancellationToken.None);
+        await _repository.PublishAsync(entry, CancellationToken.None);
+
+        var rows = await _repository.PollAsync(targetShardId, 999_999, CancellationToken.None);
+        Assert.Single(rows);
+    }
 }

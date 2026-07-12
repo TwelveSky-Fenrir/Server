@@ -212,7 +212,7 @@ public sealed class LoginConnectionHost(
         {
             RandomNumber = randomNumber,
             MaxPlayerNum = capacity.MaxPlayers,
-            GagePlayerNum = 0,
+            GagePlayerNum = capacity.GagePlayers,
             PresentPlayerNum = capacity.CurrentPlayers
         };
     }

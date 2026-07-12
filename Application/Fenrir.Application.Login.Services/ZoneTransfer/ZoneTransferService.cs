@@ -24,12 +24,12 @@ public sealed class ZoneTransferService(
 
         var summaries = await characters.GetByAccountAsync(accountId, cancellationToken);
         var summary = summaries.FirstOrDefault(c => c.Slot == avatarPost);
-        if (summary is null)
+        if (summary is null || summary.Name.Length == 0)
         {
             logger.LogWarning(
                 "Zone transfer rejected: account {AccountId} slot {AvatarPost} holds no character", accountId,
                 avatarPost);
-            return new ZoneTransferResult(ZoneTransferOutcome.CharacterNotFound, "", 0, 0);
+            return new ZoneTransferResult(ZoneTransferOutcome.SlotEmpty, "", 0, 0);
         }
 
         var character = await characters.GetForWorldEntryAsync(summary.CharacterId, cancellationToken);
@@ -43,13 +43,16 @@ public sealed class ZoneTransferService(
 
         await ClampVitalsFloorIfNeededAsync(character, cancellationToken);
 
+        var (healedMapId, _, _, _) = LogoutZoneSelfHeal.Apply(character.Tribe, character.MapId, character.PosX,
+            character.PosY, character.PosZ);
+
         var shards = await directory.GetDirectoryAsync(cancellationToken);
-        var shard = await ResolveShardForMapAsync(shards, character.MapId, character.CharacterId, cancellationToken);
+        var shard = await ResolveShardForMapAsync(shards, healedMapId, character.CharacterId, cancellationToken);
         if (shard is null)
         {
             logger.LogWarning(
                 "Zone transfer rejected: no shard available for character {CharacterId} (account {AccountId}, MapId {MapId})",
-                character.CharacterId, accountId, character.MapId);
+                character.CharacterId, accountId, healedMapId);
             return new ZoneTransferResult(ZoneTransferOutcome.ShardUnavailable, "", 0, 0);
         }
 
@@ -57,7 +60,7 @@ public sealed class ZoneTransferService(
         {
             logger.LogWarning(
                 "Zone transfer rejected: shard {ShardId} ({Host}:{Port}) failed a reachability probe for character {CharacterId} (account {AccountId}, MapId {MapId}); likely crashed within the directory staleness window -- evicting its row",
-                shard.ShardId, shard.Host, shard.Port, character.CharacterId, accountId, character.MapId);
+                shard.ShardId, shard.Host, shard.Port, character.CharacterId, accountId, healedMapId);
             await directory.MarkUnreachableAsync(shard.ShardId, cancellationToken);
             return new ZoneTransferResult(ZoneTransferOutcome.ShardUnavailable, "", 0, 0);
         }
@@ -67,9 +70,9 @@ public sealed class ZoneTransferService(
 
         logger.LogInformation(
             "Zone transfer ticket minted: account {AccountId} character {CharacterId} -> shard {ShardId} ({Host}:{Port}, MapId {MapId})",
-            accountId, character.CharacterId, shard.ShardId, shard.Host, shard.Port, character.MapId);
+            accountId, character.CharacterId, shard.ShardId, shard.Host, shard.Port, healedMapId);
 
-        return new ZoneTransferResult(ZoneTransferOutcome.Success, shard.Host, shard.Port, character.MapId);
+        return new ZoneTransferResult(ZoneTransferOutcome.Success, shard.Host, shard.Port, healedMapId);
     }
 
     private async ValueTask ClampVitalsFloorIfNeededAsync(CharacterWorldEntryDto character,

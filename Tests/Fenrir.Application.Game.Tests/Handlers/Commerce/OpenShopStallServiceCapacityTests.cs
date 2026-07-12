@@ -247,6 +247,12 @@ public class OpenShopStallServiceCapacityTests
         {
             throw new NotImplementedException();
         }
+
+        public ValueTask ExtendRentalAndReplaceContainerAsync(int characterId, int newShopDate, byte container,
+            IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
+        {
+            throw new NotImplementedException();
+        }
     }
 
     private sealed class FixedGameSettingsRepository(byte proxyShopDurationDays) : IGameSettingsRepository

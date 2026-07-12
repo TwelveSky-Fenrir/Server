@@ -5,6 +5,7 @@ using Fenrir.Application.Login.Tests.TestSupport;
 using Fenrir.Data.Abstractions.Characters;
 using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Network.Dispatch.Login.Sessions;
+using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Login.Packets.Login;
 using Fenrir.Network.Serialization.Login.Wire;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -115,10 +116,46 @@ public class ClDemandZoneServerInfoSendHandlerTests
         });
     }
 
-    private static ZoneTransferHandler CreateHandler(FakeGameServerDirectoryRepository directory,
-        FakeShardMapAssignmentRepository shardMaps, FakeSessionTicketRepository tickets)
+    [Fact]
+    public async Task HandleAsync_SlotAlreadyEmpty_AbortsWithoutReplying()
     {
-        var characters = FakeCharacterRepository.With(Summary, WorldEntry);
+        var directory = new FakeGameServerDirectoryRepository(Shard1, Shard2);
+        var shardMaps = new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]> { [1] = [HostedMapId] });
+        var tickets = new FakeSessionTicketRepository();
+        var handler = CreateHandler(directory, shardMaps, tickets, FakeCharacterRepository.WithNone());
+        var (session, pipe) = CreateSessionInCharSelect(out _);
+
+        await handler.HandleAsync(new ZoneTransferRequest { AvatarPost = 0 }, session, CancellationToken.None);
+
+        Assert.Equal(DisconnectReason.Malformed, session.DisconnectReason);
+        Assert.Null(tickets.LastCreatedTicket);
+        PacketAssert.AssertNothingSent(pipe);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(3)]
+    public async Task HandleAsync_AvatarPostOutOfRange_AbortsWithoutReplying(int avatarPost)
+    {
+        var directory = new FakeGameServerDirectoryRepository(Shard1, Shard2);
+        var shardMaps = new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]> { [1] = [HostedMapId] });
+        var tickets = new FakeSessionTicketRepository();
+        var handler = CreateHandler(directory, shardMaps, tickets);
+        var (session, pipe) = CreateSessionInCharSelect(out _);
+
+        await handler.HandleAsync(new ZoneTransferRequest { AvatarPost = avatarPost }, session,
+            CancellationToken.None);
+
+        Assert.Equal(DisconnectReason.Malformed, session.DisconnectReason);
+        Assert.Null(tickets.LastCreatedTicket);
+        PacketAssert.AssertNothingSent(pipe);
+    }
+
+    private static ZoneTransferHandler CreateHandler(FakeGameServerDirectoryRepository directory,
+        FakeShardMapAssignmentRepository shardMaps, FakeSessionTicketRepository tickets,
+        FakeCharacterRepository? characters = null)
+    {
+        characters ??= FakeCharacterRepository.With(Summary, WorldEntry);
         var reachability = new FakeShardReachabilityProbe();
         var options = Options.Create(new LoginServerOptions());
         return new ZoneTransferHandler(

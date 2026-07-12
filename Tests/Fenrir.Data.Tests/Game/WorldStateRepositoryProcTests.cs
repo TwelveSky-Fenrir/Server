@@ -62,7 +62,7 @@ public class WorldStateRepositoryProcTests
         Assert.NotNull(row);
         Assert.Equal((byte?)1, row.Zone038WinTribe);
         Assert.Equal(101, row.Zone038WinTribeTime);
-        Assert.Equal(4, tribes.Count);
+        Assert.Equal(4, tribes.Length);
         Assert.Contains(tribes, t => t is { TribeId: 0, Points: 999, IsClosed: true, HasSymbol: false });
     }
 
@@ -77,7 +77,7 @@ public class WorldStateRepositoryProcTests
         var (row, tribes, _) = await _repository.GetAsync(CancellationToken.None);
 
         Assert.NotNull(row);
-        Assert.Equal(4, tribes.Count);
+        Assert.Equal(4, tribes.Length);
         Assert.Equal(new byte[] { 0, 1, 2, 3 }, tribes.Select(t => t.TribeId).OrderBy(id => id));
     }
 
@@ -115,7 +115,7 @@ public class WorldStateRepositoryProcTests
         var (_, after, _) = await _repository.GetAsync(CancellationToken.None);
 
         var updated = Assert.Single(after, t => t.TribeId == 2);
-        Assert.Equal(symbolDate, updated.SymbolDate);
+        Assert.Equal(symbolDate, updated.SymbolDateUtc);
         Assert.False(updated.HasSymbol);
         Assert.Equal(77, updated.Points);
         Assert.True(updated.IsClosed);
@@ -138,7 +138,7 @@ public class WorldStateRepositoryProcTests
         var (_, after, _) = await _repository.GetAsync(CancellationToken.None);
         var updated = Assert.Single(after, t => t.TribeId == 3);
 
-        Assert.Equal(symbolDate, updated.SymbolDate);
+        Assert.Equal(symbolDate, updated.SymbolDateUtc);
         Assert.False(updated.HasSymbol);
         Assert.True(updated.IsClosed);
         Assert.Equal(pointsBefore, updated.Points);
@@ -161,7 +161,7 @@ public class WorldStateRepositoryProcTests
         var updated = Assert.Single(after, t => t.TribeId == 1);
 
         Assert.Equal(pointsBefore + 15 - 3, updated.Points);
-        Assert.Equal(symbolDate, updated.SymbolDate);
+        Assert.Equal(symbolDate, updated.SymbolDateUtc);
         Assert.True(updated.HasSymbol);
         Assert.False(updated.IsClosed);
     }

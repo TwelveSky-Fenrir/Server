@@ -62,6 +62,8 @@ public static class LoginTrain
             UserSort = 0,
             GoodFellow = 0,
             LoginPlace = 0,
+            // Always 0: legacy's own B_LOGIN_RECV never derives this from account/character state either
+            // (Server/ts25login/S05_MyTransfer.cpp:65-102) -- confirmed dead-by-design, not a Fenrir gap.
             LoginPremium = 0,
             SecondLoginSort = secondLoginSort,
             MousePassword = mousePassword,
@@ -122,12 +124,15 @@ public static class LoginTrain
     private static int[] BuildLogoutInfoArray(CharacterRosterDto character)
     {
         var (life, mana) = AvatarVitalsFloor.Clamp(character.Life, character.Mana);
+        var (mapId, posX, posY, posZ) = LogoutZoneSelfHeal.Apply(character.Tribe, character.MapId, character.PosX,
+            character.PosY, character.PosZ);
+
         return
         [
-            character.MapId,
-            (int)character.PosX,
-            (int)character.PosY,
-            (int)character.PosZ,
+            mapId,
+            (int)posX,
+            (int)posY,
+            (int)posZ,
             life,
             mana
         ];

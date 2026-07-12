@@ -1,13 +1,18 @@
--- RS4 (persisted buffs) must be ignored by fresh world-entry callers (legacy wipes buff state on every
--- login) -- it exists for crash/restart recovery only. AutoHuntConfig NULL means "never configured".
+-- RS4 (persisted buffs, game.CharacterBuffs) is currently read and reapplied by
+-- EnterWorldService.BuildBuffInfo/BuildEffectValueForView on every normal world-entry via
+-- GetWorldEntryBundleAsync -- see game.CharacterBuffs's own header comment for the legacy citation this
+-- appears to contradict (legacy zeroes BUFF_INFO on every login) and why this schema doesn't unilaterally
+-- gate the result set out. AutoHuntConfig NULL means "never configured".
 --
 -- RS0 (the first result set) is deliberately append-only at the tail: PreviousTribe/Mount*/AutoTime2/
--- Zone241Time/PetBagDate/WarPoint/M15PetLuckyBoxPity are appended after Exp2, never inserted mid-list, so
--- CharacterWorldEntryDto (the narrow,
--- stable prefix used by CreateAvatarService/ZoneTransferService, ordinally mapped onto this same result set)
--- keeps reading the exact same first 19 columns it always has and needs no change. Only
+-- Zone241Time/PetBagDate/WarPoint/M15PetLuckyBoxPity are appended after Exp2, never inserted mid-list.
 -- CharacterWorldSnapshotDto (RS0's full projection, used by GetWorldEntryBundleAsync/EnterWorldService)
--- gains the new trailing fields.
+-- gains the new trailing fields; any new column goes after M15PetLuckyBoxPity.
+--
+-- CharacterWorldEntryDto (the narrow, stable 19-column prefix used by CreateAvatarService/ZoneTransferService/
+-- ZoneHandshakeService) no longer reads this procedure at all -- it reads the single-result-set companion
+-- usp_Character_GetForWorldEntrySummary.sql instead, which projects the identical 19 columns in the same
+-- order. Both procedures must keep that 19-column prefix in sync if it ever changes.
 CREATE PROCEDURE game.usp_Character_GetForWorldEntry @CharacterId INT
 AS
 BEGIN
@@ -98,10 +103,10 @@ BEGIN
     SELECT Container,
            Slot,
            ItemId,
-           Quantity,
-           Enchant,
-           Combine,
-           Refine,
+           CAST(Quantity AS INT) AS Quantity, -- game.CharacterItems.Quantity is SMALLINT; widen back to INT
+           Enchant,                           -- here so CharacterItemSlotDto's existing int-typed ctor param
+           Combine,                           -- keeps reading it via SqlDataReader.GetInt32 without an
+           Refine,                            -- InvalidCastException (see CharacterItems.sql's own comment)
            Socket,
            SocketGem1,
            SocketGem2,

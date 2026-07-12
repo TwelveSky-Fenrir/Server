@@ -11,6 +11,21 @@ public class LoginCapacityStateTests
 
         Assert.Equal(-1, state.MaxPlayers);
         Assert.Equal(0, state.CurrentPlayers);
+        Assert.Equal(0, state.GagePlayers);
+    }
+
+    [Fact]
+    public void SetGagePlayers_UpdatesGagePlayers_LeavesMaxAndCurrentPlayersUntouched()
+    {
+        var state = new LoginCapacityState();
+        state.SetMaxPlayers(1000);
+        state.SetCurrentPlayers(7);
+
+        state.SetGagePlayers(42);
+
+        Assert.Equal(42, state.GagePlayers);
+        Assert.Equal(1000, state.MaxPlayers);
+        Assert.Equal(7, state.CurrentPlayers);
     }
 
     [Fact]

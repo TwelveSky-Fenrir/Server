@@ -37,6 +37,13 @@ CREATE TABLE game.CharacterLogoutState
         CONSTRAINT DF_CharacterLogoutState_Life DEFAULT 0,
     Mana          INT          NOT NULL
         CONSTRAINT DF_CharacterLogoutState_Mana DEFAULT 0,
+    -- Self-referential write-behind guard for usp_CharacterLogoutState_PersistBatch (compares against this
+    -- table's own prior value) -- deliberately NOT borrowed from game.Characters.FlushSequence, which
+    -- advances independently on usp_Character_PersistBatch/usp_Character_PersistProgressBatch's own cadence;
+    -- comparing against that column here would make a legitimate LogoutState capture silently lose the
+    -- idempotence race against whichever of those two batches for the same tick happens to land first.
+    FlushSequence BIGINT       NOT NULL
+        CONSTRAINT DF_CharacterLogoutState_FlushSequence DEFAULT 0,
     CapturedAtUtc DATETIME2(3) NOT NULL,
     CONSTRAINT PK_CharacterLogoutState PRIMARY KEY CLUSTERED (CharacterId),
     -- ON DELETE CASCADE, deliberately UNLIKE the other game.Character* child tables (CharacterQuests et al.,

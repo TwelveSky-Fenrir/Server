@@ -19,3 +19,9 @@ public sealed partial record TribeBankSlotDto(
     byte TribeId,
     byte SlotIndex,
     int Amount);
+
+[GenerateDto]
+public sealed partial record TribeBankTotalDto(
+    byte TribeId,
+    long TotalAmount,
+    int OccupiedSlotCount);

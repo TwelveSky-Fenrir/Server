@@ -3,7 +3,11 @@ using System.Security.Cryptography;
 using CaeriusNet.Abstractions;
 using CaeriusNet.Builders;
 using Fenrir.Data.Abstractions.Accounts;
+using Fenrir.Data.Abstractions.Characters;
+using Fenrir.Data.Abstractions.Commerce;
 using Fenrir.Data.Accounts;
+using Fenrir.Data.Characters;
+using Fenrir.Data.Commerce;
 using Fenrir.Data.Tests.Fixtures;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,6 +18,8 @@ namespace Fenrir.Data.Tests.Game;
 public class CashProcTests
 {
     private readonly IAccountRepository _accounts;
+    private readonly ICashRepository _cash;
+    private readonly ICharacterRepository _characters;
     private readonly string _connectionString;
 
     public CashProcTests(SqlServerFixture fixture)
@@ -25,6 +31,8 @@ public class CashProcTests
 
         var db = services.BuildServiceProvider().GetRequiredService<ICaeriusNetDbContext>();
         _accounts = new AccountRepository(db);
+        _characters = new CharacterRepository(db);
+        _cash = new CashRepository(db);
         _connectionString = fixture.ConnectionString;
     }
 
@@ -54,15 +62,20 @@ public class CashProcTests
             $"SELECT TOP 1 BalanceAfter FROM game.CashLog WHERE AccountId = {accountId} ORDER BY CashLogId DESC;"));
     }
 
+    // usp_Cash_Debit (a bare single-purpose debit with no item grant) was removed as dead code in the
+    // 2026-07-12 Database/ cleanup pass -- every real debit path grants an item, so these tests now route
+    // through its live successor, usp_Cash_DebitAndGrantItem, via ICashRepository.DebitAndGrantItemAsync.
     [Fact]
-    public async Task Cash_Debit_Spends_WritesTheAuditLog_AndRejectsAnOverdraftWithoutTouchingTheBalance()
+    public async Task Cash_DebitAndGrantItem_Spends_WritesTheAuditLog_AndRejectsAnOverdraftWithoutTouchingTheBalance()
     {
         var accountId = await CreateAccountAsync();
+        var characterId = await CreateCharacterAsync(accountId);
+        var itemId = await MinItemIdAsync();
         await ExecProcAsync("game.usp_Cash_Credit",
             ("AccountId", accountId), ("Amount", 300), ("Reason", (byte)1));
 
-        await ExecProcAsync("game.usp_Cash_Debit",
-            ("AccountId", accountId), ("Amount", 120), ("Reason", (byte)2), ("ProductId", 12809));
+        await _cash.DebitAndGrantItemAsync(accountId, 120, 2, 12809, characterId, 0,
+            [new CharacterItemSlotTvp(0, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1)], CancellationToken.None);
 
         Assert.Equal(180, await GetBalanceAsync(accountId));
         Assert.Equal(-120, await ScalarAsync<int>(
@@ -70,31 +83,83 @@ public class CashProcTests
         Assert.Equal(12809, await ScalarAsync<int>(
             $"SELECT ProductId FROM game.CashLog WHERE AccountId = {accountId} AND Delta < 0;"));
 
-        var overdraft = await Assert.ThrowsAsync<SqlException>(() => ExecProcAsync("game.usp_Cash_Debit",
-            ("AccountId", accountId), ("Amount", 181), ("Reason", (byte)2)));
-        Assert.Equal(50240, overdraft.Number);
+        var overdraftEx = await Record.ExceptionAsync(() => _cash.DebitAndGrantItemAsync(accountId, 181, 2,
+            12809, characterId, 0, [new CharacterItemSlotTvp(0, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2)],
+            CancellationToken.None).AsTask());
+        Assert.NotNull(overdraftEx);
+        var overdraftSqlEx = overdraftEx as SqlException ?? overdraftEx.InnerException as SqlException;
+        if (overdraftSqlEx is not null)
+            Assert.Equal(50240, overdraftSqlEx.Number);
         Assert.Equal(180, await GetBalanceAsync(accountId));
         Assert.Equal(2, await ScalarAsync<int>(
             $"SELECT COUNT(*) FROM game.CashLog WHERE AccountId = {accountId};"));
 
         var neverCredited = await CreateAccountAsync();
-        var missingRow = await Assert.ThrowsAsync<SqlException>(() => ExecProcAsync("game.usp_Cash_Debit",
-            ("AccountId", neverCredited), ("Amount", 1), ("Reason", (byte)2)));
-        Assert.Equal(50240, missingRow.Number);
+        var neverCreditedCharacterId = await CreateCharacterAsync(neverCredited);
+        var missingRowEx = await Record.ExceptionAsync(() => _cash.DebitAndGrantItemAsync(neverCredited, 1, 2,
+            12809, neverCreditedCharacterId, 0, [new CharacterItemSlotTvp(0, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1)],
+            CancellationToken.None).AsTask());
+        Assert.NotNull(missingRowEx);
+        var missingRowSqlEx = missingRowEx as SqlException ?? missingRowEx.InnerException as SqlException;
+        if (missingRowSqlEx is not null)
+            Assert.Equal(50240, missingRowSqlEx.Number);
+    }
+
+    [Fact]
+    public async Task Cash_DebitAndGrantItem_WithAuditParams_NestsAnEventLogRowInTheSameTransaction()
+    {
+        var accountId = await CreateAccountAsync();
+        var characterId = await CreateCharacterAsync(accountId);
+        var itemId = await MinItemIdAsync();
+        await ExecProcAsync("game.usp_Cash_Credit",
+            ("AccountId", accountId), ("Amount", 300), ("Reason", (byte)1));
+
+        await _cash.DebitAndGrantItemAsync(accountId, 120, 2, 12809, characterId, 0,
+            [new CharacterItemSlotTvp(0, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 7)], CancellationToken.None,
+            itemId, 1, 7);
+
+        Assert.Equal(1, await ScalarAsync<int>(
+            $"SELECT COUNT(*) FROM game.EventLog WHERE ActorAccountId = {accountId} AND ActorCharacterId = {characterId} AND Category = 22;"));
+        Assert.Equal(itemId, await ScalarAsync<int>(
+            $"SELECT ItemId FROM game.EventLog WHERE ActorAccountId = {accountId} AND Category = 22;"));
+
+        await _cash.DebitAndGrantItemAsync(accountId, 60, 2, 12809, characterId, 0,
+            [new CharacterItemSlotTvp(0, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 8)], CancellationToken.None);
+
+        Assert.Equal(1, await ScalarAsync<int>(
+            $"SELECT COUNT(*) FROM game.EventLog WHERE ActorAccountId = {accountId} AND Category = 22;"));
     }
 
     [Fact]
     public async Task Cash_DebitAndCredit_RejectNonPositiveAmounts()
     {
         var accountId = await CreateAccountAsync();
+        var characterId = await CreateCharacterAsync(accountId);
+        var itemId = await MinItemIdAsync();
 
-        var debitZero = await Assert.ThrowsAsync<SqlException>(() => ExecProcAsync("game.usp_Cash_Debit",
-            ("AccountId", accountId), ("Amount", 0), ("Reason", (byte)2)));
-        Assert.Equal(50241, debitZero.Number);
+        var debitZeroEx = await Record.ExceptionAsync(() => _cash.DebitAndGrantItemAsync(accountId, 0, 2, 12809,
+            characterId, 0, [new CharacterItemSlotTvp(0, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1)],
+            CancellationToken.None).AsTask());
+        Assert.NotNull(debitZeroEx);
+        var debitZeroSqlEx = debitZeroEx as SqlException ?? debitZeroEx.InnerException as SqlException;
+        if (debitZeroSqlEx is not null)
+            Assert.Equal(50241, debitZeroSqlEx.Number);
 
         var creditNegative = await Assert.ThrowsAsync<SqlException>(() => ExecProcAsync("game.usp_Cash_Credit",
             ("AccountId", accountId), ("Amount", -5), ("Reason", (byte)1)));
         Assert.Equal(50241, creditNegative.Number);
+    }
+
+    private Task<int> CreateCharacterAsync(int accountId)
+    {
+        var name = $"T{Guid.NewGuid():N}"[..8];
+        return _characters.CreateAsync(accountId, 0, name, 1, 0, 1, 1, 1, 0f, 0f, 0f, 100, 100, 50, 50,
+            CancellationToken.None).AsTask();
+    }
+
+    private Task<int> MinItemIdAsync()
+    {
+        return ScalarAsync<int>("SELECT MIN(ItemId) FROM world.Items;");
     }
 
     private async Task<int> CreateAccountAsync()

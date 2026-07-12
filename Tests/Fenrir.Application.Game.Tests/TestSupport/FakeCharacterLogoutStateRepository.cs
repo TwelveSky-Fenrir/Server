@@ -9,10 +9,18 @@ internal sealed class FakeCharacterLogoutStateRepository : ICharacterLogoutState
 
     public List<CharacterLogoutStateDto> ByAccount { get; set; } = [];
 
+    public List<CharacterLogoutStateTvp> PersistedBatches { get; } = [];
+
     public ValueTask UpsertAsync(int characterId, int lastZone, int posX, int posY, int posZ, int life, int mana,
         CancellationToken ct)
     {
         Captured.Add(new CharacterLogoutStateSnapshot(characterId, lastZone, posX, posY, posZ, life, mana));
+        return ValueTask.CompletedTask;
+    }
+
+    public ValueTask PersistBatchAsync(IReadOnlyList<CharacterLogoutStateTvp> rows, CancellationToken ct)
+    {
+        PersistedBatches.AddRange(rows);
         return ValueTask.CompletedTask;
     }
 

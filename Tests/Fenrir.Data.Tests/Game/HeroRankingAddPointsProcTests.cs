@@ -26,10 +26,11 @@ public sealed class HeroRankingAddPointsProcTests
             .WithSqlServer(fixture.ConnectionString)
             .Build();
 
-        var db = services.BuildServiceProvider().GetRequiredService<ICaeriusNetDbContext>();
+        var provider = services.BuildServiceProvider();
+        var db = provider.GetRequiredService<ICaeriusNetDbContext>();
         _accounts = new AccountRepository(db);
         _characters = new CharacterRepository(db);
-        _heroRankings = new HeroRankingRepository(db);
+        _heroRankings = new HeroRankingRepository(db, provider.GetRequiredService<ICaeriusNetCache>());
     }
 
     [Fact]
@@ -46,7 +47,7 @@ public sealed class HeroRankingAddPointsProcTests
         var row = Assert.Single(rows, r => r.CharacterId == characterId);
         Assert.Equal(7, row.Points);
         Assert.Equal((byte)1, row.TribeId);
-        Assert.Equal(42, row.Level);
+        Assert.Equal((short)42, row.Level);
     }
 
     [Fact]
@@ -88,7 +89,7 @@ public sealed class HeroRankingAddPointsProcTests
         var rows = await _heroRankings.GetByPeriodAsync(0, CancellationToken.None);
         var row = Assert.Single(rows, r => r.CharacterId == characterId);
         Assert.Equal((byte)2, row.TribeId);
-        Assert.Equal(55, row.Level);
+        Assert.Equal((short)55, row.Level);
         Assert.Equal(2, row.Points);
     }
 

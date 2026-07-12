@@ -14,6 +14,15 @@ CREATE TABLE game.CashLog
     CreatedAtUtc DATETIME2(3)       NOT NULL
         CONSTRAINT DF_CashLog_CreatedAtUtc DEFAULT SYSUTCDATETIME(),
     CONSTRAINT PK_CashLog PRIMARY KEY CLUSTERED (CashLogId),
-    CONSTRAINT FK_CashLog_Account FOREIGN KEY (AccountId) REFERENCES auth.Accounts (AccountId),
-    INDEX IX_CashLog_Account NONCLUSTERED (AccountId)
+    -- Cross-schema FK naming: see admin.Bans' own header comment for the FK_<ChildTable>_<TargetSchema>_<Role>
+    -- convention.
+    CONSTRAINT FK_CashLog_Auth_Account FOREIGN KEY (AccountId) REFERENCES auth.Accounts (AccountId),
+    -- Preemptively shaped as the covering index a future usp_CashLog_GetByAccount will need -- same shape as
+    -- game.GiftLog's own IX_GiftLog_Account (CreatedAtUtc DESC in the key satisfies an ORDER BY, INCLUDE
+    -- carries every remaining column so the seek never key-lookups back to the clustered index). No such
+    -- procedure exists yet: this table is currently write-only, one INSERT per cash movement inside
+    -- usp_Cash_Credit/usp_Cash_CreditAndConsumeItem/usp_Cash_DebitAndGrantItem. Building the covering shape
+    -- now costs nothing (no reader depends on the old bare-AccountId shape) and avoids shipping the same
+    -- key-lookup-plus-sort gap a second time when that reader is eventually added.
+    INDEX IX_CashLog_Account NONCLUSTERED (AccountId, CreatedAtUtc DESC) INCLUDE (Delta, BalanceAfter, Reason, ProductId)
 );

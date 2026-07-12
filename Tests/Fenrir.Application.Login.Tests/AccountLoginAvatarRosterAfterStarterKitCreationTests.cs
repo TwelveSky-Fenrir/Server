@@ -28,6 +28,8 @@ public class AccountLoginAvatarRosterAfterStarterKitCreationTests
             7;
 
     private const byte ArmorEquipSlot = 2;
+    private const byte PetEquipSlot = 8;
+    private const byte CapeEquipSlot = 1;
     private const byte EquipmentContainer = 2;
 
     [Fact]
@@ -38,7 +40,7 @@ public class AccountLoginAvatarRosterAfterStarterKitCreationTests
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var createAvatarHandler = new CreateAvatarHandler(
             new CreateAvatarService(creationRepository, starterKits, FakeTribeRepository.Empty(),
-                Options.Create(new LoginServerOptions()), NullLogger<CreateAvatarService>.Instance),
+                NullLogger<CreateAvatarService>.Instance),
             NullLogger<CreateAvatarHandler>.Instance);
 
         var creationPipe = new FakeDuplexPipe();
@@ -62,11 +64,15 @@ public class AccountLoginAvatarRosterAfterStarterKitCreationTests
         var creationCall = creationRepository.LastCreateWithStarterKit;
         Assert.NotNull(creationCall);
 
-        Assert.Equal(2, creationCall!.Equipment.Count);
+        Assert.Equal(4, creationCall!.Equipment.Count);
         var weaponRow = Assert.Single(creationCall.Equipment, i => i.Slot == WeaponEquipSlot);
         var torsoRow = Assert.Single(creationCall.Equipment, i => i.Slot == ArmorEquipSlot);
+        var petRow = Assert.Single(creationCall.Equipment, i => i.Slot == PetEquipSlot);
+        var capeRow = Assert.Single(creationCall.Equipment, i => i.Slot == CapeEquipSlot);
         Assert.Equal(84527, weaponRow.ItemId);
         Assert.Equal(84575, torsoRow.ItemId);
+        Assert.Equal(2300, petRow.ItemId);
+        Assert.Equal(1407, capeRow.ItemId);
 
         var createdCharacter = await creationRepository.GetForWorldEntryAsync(1000, CancellationToken.None);
         Assert.NotNull(createdCharacter);

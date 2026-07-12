@@ -38,4 +38,10 @@ public interface IAccountSessionRepository
     public ValueTask<ImmutableArray<ReapedAccountSessionDto>> ReapStaleAsync(CancellationToken ct);
 
     public ValueTask<int> GetActiveSessionCountAsync(CancellationToken ct);
+
+    public ValueTask<int> GetConcurrentDeviceSessionCountAsync(int excludingAccountId, string adapterIdentifier,
+        string localIp, string remoteIp, CancellationToken ct);
+
+    public ValueTask RecordDeviceSignatureAsync(int accountId, string adapterIdentifier, string localIp,
+        string remoteIp, CancellationToken ct);
 }

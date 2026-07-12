@@ -9,13 +9,33 @@ public class LoginTrainLogoutInfoTests
     [Fact]
     public void OccupiedSlot_PopulatesLogoutInfoFromPersistedPlacement_ZonePositionLifeMana()
     {
-        var entry = EntryFor(RosterCharacter(101, 1500f, -200f, 30f, 850,
+        var entry = EntryFor(RosterCharacter(2, 1500f, -200f, 30f, 850,
             320));
 
         var slots = LoginTrain.BuildAvatarSlots([entry]);
 
         Assert.Equal(6, slots[0].LogoutInfo.Length);
-        Assert.Equal(new[] { 101, 1500, -200, 30, 850, 320 }, slots[0].LogoutInfo);
+        Assert.Equal(new[] { 2, 1500, -200, 30, 850, 320 }, slots[0].LogoutInfo);
+    }
+
+    [Fact]
+    public void OccupiedSlot_PersistedZoneNotOwnedByOwnTribe_SelfHealsToHometown()
+    {
+        var entry = EntryFor(RosterCharacter(101, 1500f, -200f, 30f, 850, 320));
+
+        var slots = LoginTrain.BuildAvatarSlots([entry]);
+
+        Assert.Equal(new[] { 1, 6, 0, -7, 850, 320 }, slots[0].LogoutInfo);
+    }
+
+    [Fact]
+    public void OccupiedSlot_PersistedZoneOutOfRange_SelfHealsToHometown()
+    {
+        var entry = EntryFor(RosterCharacter(500, 1500f, -200f, 30f, 850, 320));
+
+        var slots = LoginTrain.BuildAvatarSlots([entry]);
+
+        Assert.Equal(new[] { 1, 6, 0, -7, 850, 320 }, slots[0].LogoutInfo);
     }
 
     [Fact]

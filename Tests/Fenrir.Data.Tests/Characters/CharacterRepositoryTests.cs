@@ -317,9 +317,9 @@ public class CharacterRepositoryTests
             [new CharacterItemSlotTvp(0, 1026, 999, 0, 0, 0, 0, 0, 0, 0, 0, 0)],
             CancellationToken.None);
 
-        var atCap = await ScalarAsync<int>(
+        var atCap = await ScalarAsync<short>(
             $"SELECT Quantity FROM game.CharacterItems WHERE CharacterId = {characterId} AND Container = 0 AND Slot = 0;");
-        Assert.Equal(999, atCap);
+        Assert.Equal((short)999, atCap);
 
         var overCap = await Record.ExceptionAsync(() =>
             _characters.ReplaceContainerAsync(characterId, 1,
@@ -365,6 +365,9 @@ public class CharacterRepositoryTests
         Assert.Equal((byte)2, character.HeadType);
         Assert.Equal((byte)1, character.FaceType);
         Assert.Equal(1, character.Level);
+        Assert.Equal((byte)1, character.VisibleState);
+        Assert.Equal((byte)0, character.SpecialState);
+        Assert.Equal(-1, character.CostumeIndex);
 
         Assert.Equal(2, roster.Items.Count);
         var weaponRow = Assert.Single(roster.Items, i => i.Slot == 7);
@@ -375,6 +378,42 @@ public class CharacterRepositoryTests
         Assert.Equal(characterId, torsoRow.CharacterId);
         Assert.Equal((byte)2, torsoRow.Container);
         Assert.Equal(torsoItemId, torsoRow.ItemId);
+
+        Assert.Empty(roster.PetBagSlots!);
+        Assert.Empty(roster.CostumeSlots!);
+    }
+
+    [Fact]
+    public async Task
+        GetAccountRosterAsync_WithPersistedVisibleStateSpecialStateCostumeIndexPetBagAndCostume_ReturnsThemVerbatim()
+    {
+        var accountId = await CreateTestAccountAsync();
+        var name = NewCharacterName();
+        var characterId = await CreateCharacterAsync(accountId, 0, name);
+
+        await ExecAsync(
+            $"UPDATE game.Characters SET VisibleState = 0, SpecialState = 3, CostumeIndex = 4 WHERE CharacterId = {characterId};");
+        await ExecAsync(
+            $"INSERT INTO game.CharacterPetBag (CharacterId, Slot, ItemId) VALUES ({characterId}, 5, 9001);");
+        await ExecAsync(
+            $"INSERT INTO game.CharacterCostumes (CharacterId, Slot, ItemId) VALUES ({characterId}, 4, 9101);");
+
+        var roster = await _characters.GetAccountRosterAsync(accountId, CancellationToken.None);
+
+        var character = Assert.Single(roster.Characters);
+        Assert.Equal((byte)0, character.VisibleState);
+        Assert.Equal((byte)3, character.SpecialState);
+        Assert.Equal(4, character.CostumeIndex);
+
+        var petBagRow = Assert.Single(roster.PetBagSlots!);
+        Assert.Equal(characterId, petBagRow.CharacterId);
+        Assert.Equal((byte)5, petBagRow.Slot);
+        Assert.Equal(9001, petBagRow.ItemId);
+
+        var costumeRow = Assert.Single(roster.CostumeSlots!);
+        Assert.Equal(characterId, costumeRow.CharacterId);
+        Assert.Equal((byte)4, costumeRow.Slot);
+        Assert.Equal(9101, costumeRow.ItemId);
     }
 
     [Fact]
@@ -386,6 +425,8 @@ public class CharacterRepositoryTests
 
         Assert.Empty(roster.Characters);
         Assert.Empty(roster.Items);
+        Assert.Empty(roster.PetBagSlots!);
+        Assert.Empty(roster.CostumeSlots!);
     }
 
     private async Task<int> CreateTestAccountAsync()

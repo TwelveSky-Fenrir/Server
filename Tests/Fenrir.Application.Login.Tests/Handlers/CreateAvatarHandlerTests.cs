@@ -1,4 +1,3 @@
-using Fenrir.Application.Login.Domain;
 using Fenrir.Application.Login.Domain.Avatars;
 using Fenrir.Application.Login.Handlers.Handlers;
 using Fenrir.Application.Login.Services.CreateAvatar;
@@ -7,8 +6,8 @@ using Fenrir.Data.Abstractions.Characters;
 using Fenrir.Network.Dispatch.Login.Sessions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Login.Packets.Login;
+using Fenrir.Network.Serialization.Shared.Packets.Shared;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
@@ -37,7 +36,7 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(),
                 NullLogger<CreateAvatarService>.Instance),
             NullLogger<CreateAvatarHandler>.Instance);
         var (session, _) = CreateSessionInCharSelect();
@@ -67,15 +66,15 @@ public class CreateAvatarHandlerTests
         Assert.Equal(50, call.MaxMana);
         Assert.Equal((byte)0, call.PreviousTribe);
 
-        Assert.Equal(2, call.Equipment.Count);
+        Assert.Equal(4, call.Equipment.Count);
         Assert.Contains(call.Equipment, i => i is { Slot: 2, ItemId: 84575, Enchant: 0, Combine: 0 });
         Assert.Contains(call.Equipment, i => i is { Slot: 7, ItemId: 84527, Enchant: 0, Combine: 0 });
+        Assert.Contains(call.Equipment, i => i is { Slot: 1, ItemId: 1407 });
+        Assert.Contains(call.Equipment, i => i is { Slot: 8, ItemId: 2300 });
         Assert.DoesNotContain(call.Equipment, i => i.Slot == 0);
         Assert.DoesNotContain(call.Equipment, i => i.Slot == 3);
         Assert.DoesNotContain(call.Equipment, i => i.Slot == 4);
         Assert.DoesNotContain(call.Equipment, i => i.Slot == 5);
-        Assert.DoesNotContain(call.Equipment, i => i.Slot == 1);
-        Assert.DoesNotContain(call.Equipment, i => i.Slot == 8);
         Assert.DoesNotContain(call.Equipment, i => i is { Slot: 7, ItemId: 84503 });
         Assert.DoesNotContain(call.Equipment, i => i is { Slot: 7, ItemId: 84551 });
 
@@ -103,7 +102,7 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(),
                 NullLogger<CreateAvatarService>.Instance),
             NullLogger<CreateAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
@@ -126,10 +125,14 @@ public class CreateAvatarHandlerTests
             StatPoint = 50,
             SkillPoint = 0,
             PreviousTribe = 0,
-            Equip = AvatarInfoFactory.BuildEquipArray(call.Equipment),
+            Equip = AvatarInfoFactory.BuildEquipArray(call.Equipment, 640_000_000, 100),
             Inventory = AvatarInfoFactory.BuildInventoryArray(call.Inventory),
             Skill = AvatarInfoFactory.BuildSkillArray(call.Skills),
             HotKey = AvatarInfoFactory.BuildHotKeyArray(call.Hotkeys),
+            Animal = [1301, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            AnimalIndex = 0,
+            AnimalTime = 99999999,
+            AnimalPower = [5, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             AutoBuffTime = call.WelcomeBuffUntilDate
         };
 
@@ -146,7 +149,7 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(),
                 NullLogger<CreateAvatarService>.Instance),
             NullLogger<CreateAvatarHandler>.Instance);
         var (session, _) = CreateSessionInCharSelect();
@@ -164,7 +167,7 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.RoyalSerpentKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(),
                 NullLogger<CreateAvatarService>.Instance),
             NullLogger<CreateAvatarHandler>.Instance);
         var (session, _) = CreateSessionInCharSelect();
@@ -182,7 +185,7 @@ public class CreateAvatarHandlerTests
         Assert.Equal((byte)1, call!.Tribe);
         Assert.Equal((short)6, call.MapId);
         Assert.Equal((byte)1, call.PreviousTribe);
-        Assert.Equal(2, call.Equipment.Count);
+        Assert.Equal(4, call.Equipment.Count);
         Assert.Contains(call.Equipment, i => i is { Slot: 2, ItemId: 85575, Enchant: 0, Combine: 0 });
         Assert.Contains(call.Equipment, i => i is { Slot: 7, ItemId: 85527, Enchant: 0, Combine: 0 });
         Assert.DoesNotContain(call.Equipment, i => i is { Slot: 7, ItemId: 85503 });
@@ -197,7 +200,7 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.RoyalSerpentKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(),
                 NullLogger<CreateAvatarService>.Instance),
             NullLogger<CreateAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
@@ -217,7 +220,7 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.GrandTigerKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(),
                 NullLogger<CreateAvatarService>.Instance),
             NullLogger<CreateAvatarHandler>.Instance);
         var (session, _) = CreateSessionInCharSelect();
@@ -234,7 +237,7 @@ public class CreateAvatarHandlerTests
         Assert.Equal((byte)2, call!.Tribe);
         Assert.Equal((short)11, call.MapId);
         Assert.Equal((byte)2, call.PreviousTribe);
-        Assert.Equal(2, call.Equipment.Count);
+        Assert.Equal(4, call.Equipment.Count);
         Assert.Contains(call.Equipment, i => i is { Slot: 2, ItemId: 86575, Enchant: 0, Combine: 0 });
         Assert.Contains(call.Equipment, i => i is { Slot: 7, ItemId: 86527, Enchant: 0, Combine: 0 });
         Assert.DoesNotContain(call.Equipment, i => i is { Slot: 7, ItemId: 86503 });
@@ -249,7 +252,7 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.GrandTigerKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(),
                 NullLogger<CreateAvatarService>.Instance),
             NullLogger<CreateAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
@@ -270,7 +273,7 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.RoyalSerpentKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(),
                 NullLogger<CreateAvatarService>.Instance),
             NullLogger<CreateAvatarHandler>.Instance);
         var (session, _) = CreateSessionInCharSelect();
@@ -296,7 +299,7 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(),
                 NullLogger<CreateAvatarService>.Instance),
             NullLogger<CreateAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
@@ -325,7 +328,7 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(),
                 NullLogger<CreateAvatarService>.Instance),
             NullLogger<CreateAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
@@ -359,7 +362,7 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(),
                 NullLogger<CreateAvatarService>.Instance),
             NullLogger<CreateAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
@@ -383,7 +386,7 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(),
                 NullLogger<CreateAvatarService>.Instance),
             NullLogger<CreateAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
@@ -406,7 +409,7 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(),
                 NullLogger<CreateAvatarService>.Instance),
             NullLogger<CreateAvatarHandler>.Instance);
         var (session, _) = CreateSessionInCharSelect();
@@ -428,7 +431,7 @@ public class CreateAvatarHandlerTests
             new CharacterSummaryDto(1000, 0, "Existing", 0, 0, 0, 0, 1));
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(),
                 NullLogger<CreateAvatarService>.Instance),
             NullLogger<CreateAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
@@ -442,13 +445,13 @@ public class CreateAvatarHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_RepositoryThrows_RepliesResult1WithZeroedAvatarInfo()
+    public async Task HandleAsync_RepositoryThrowsGenericError_RepliesResult1WithFullyPopulatedUnpersistedAvatarInfo()
     {
         var characters = FakeCharacterRepository.WithNone();
-        characters.CreateWithStarterKitException = new InvalidOperationException("50202: name already taken");
+        characters.CreateWithStarterKitException = new InvalidOperationException("simulated failure");
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(),
                 NullLogger<CreateAvatarService>.Instance),
             NullLogger<CreateAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
@@ -456,8 +459,77 @@ public class CreateAvatarHandlerTests
         await handler.HandleAsync(ValidRequest(), session, CancellationToken.None);
 
         await PacketAssert.AssertSentAsync(pipe,
-            new CreateAvatarResponse { Result = 1, AvatarInfo = AvatarInfoFactory.Zeroed });
+            new CreateAvatarResponse { Result = 1, AvatarInfo = ExpectedUnpersistedCandidateAvatarInfo(characters) });
         Assert.Null(session.DisconnectReason);
+    }
+
+    [Fact]
+    public async Task HandleAsync_RepositoryThrowsNameAlreadyTakenSqlError_RepliesResult2WithFullyPopulatedUnpersistedAvatarInfo()
+    {
+        var characters = FakeCharacterRepository.WithNone();
+        characters.CreateWithStarterKitException = SqlExceptionTestFactory.WithNumber(50202);
+        var starterKits = FakeStarterKitRepository.NobleDragonKit();
+        var handler = new CreateAvatarHandler(
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(),
+                NullLogger<CreateAvatarService>.Instance),
+            NullLogger<CreateAvatarHandler>.Instance);
+        var (session, pipe) = CreateSessionInCharSelect();
+
+        await handler.HandleAsync(ValidRequest(), session, CancellationToken.None);
+
+        await PacketAssert.AssertSentAsync(pipe,
+            new CreateAvatarResponse { Result = 2, AvatarInfo = ExpectedUnpersistedCandidateAvatarInfo(characters) });
+        Assert.Null(session.DisconnectReason);
+    }
+
+    [Fact]
+    public async Task HandleAsync_RepositoryThrowsUnrelatedSqlError_StillRepliesResult1NotResult2()
+    {
+        var characters = FakeCharacterRepository.WithNone();
+        characters.CreateWithStarterKitException = SqlExceptionTestFactory.WithNumber(50201);
+        var starterKits = FakeStarterKitRepository.NobleDragonKit();
+        var handler = new CreateAvatarHandler(
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(),
+                NullLogger<CreateAvatarService>.Instance),
+            NullLogger<CreateAvatarHandler>.Instance);
+        var (session, pipe) = CreateSessionInCharSelect();
+
+        await handler.HandleAsync(ValidRequest(), session, CancellationToken.None);
+
+        await PacketAssert.AssertSentAsync(pipe,
+            new CreateAvatarResponse { Result = 1, AvatarInfo = ExpectedUnpersistedCandidateAvatarInfo(characters) });
+        Assert.Null(session.DisconnectReason);
+    }
+
+    private static AvatarInfo ExpectedUnpersistedCandidateAvatarInfo(FakeCharacterRepository characters)
+    {
+        var call = characters.LastCreateWithStarterKit!;
+
+        return AvatarInfoFactory.Zeroed with
+        {
+            Name = "Hero",
+            Tribe = 0,
+            Gender = 1,
+            HeadType = 2,
+            FaceType = 1,
+            Level1 = 1,
+            LogoutInfo = [1, 6, 0, -7, 30, 21],
+            Vit = 1,
+            Str = 1,
+            Int = 1,
+            Dex = 1,
+            Level2 = 0,
+            Exp1 = 0,
+            Exp2 = 0,
+            StatPoint = 50,
+            SkillPoint = 0,
+            PreviousTribe = 0,
+            Equip = AvatarInfoFactory.BuildEquipArray(call.Equipment, 640_000_000, 100),
+            Inventory = AvatarInfoFactory.BuildInventoryArray(call.Inventory),
+            Skill = AvatarInfoFactory.BuildSkillArray(call.Skills),
+            HotKey = AvatarInfoFactory.BuildHotKeyArray(call.Hotkeys),
+            AutoBuffTime = call.WelcomeBuffUntilDate
+        };
     }
 
     [Fact]
@@ -466,7 +538,7 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(),
                 NullLogger<CreateAvatarService>.Instance),
             NullLogger<CreateAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
@@ -492,7 +564,7 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(),
                 NullLogger<CreateAvatarService>.Instance),
             NullLogger<CreateAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
@@ -516,7 +588,7 @@ public class CreateAvatarHandlerTests
         var tribes = FakeTribeRepository.WithPoints((0, 100), (1, 0), (2, 0), (3, 0));
         var handler =
             new CreateAvatarHandler(
-                new CreateAvatarService(characters, starterKits, tribes, DefaultOptions(),
+                new CreateAvatarService(characters, starterKits, tribes,
                     NullLogger<CreateAvatarService>.Instance),
                 NullLogger<CreateAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
@@ -538,7 +610,7 @@ public class CreateAvatarHandlerTests
         var tribes = FakeTribeRepository.WithPoints((0, 10), (1, 150), (2, 0), (3, 0));
         var handler =
             new CreateAvatarHandler(
-                new CreateAvatarService(characters, starterKits, tribes, DefaultOptions(),
+                new CreateAvatarService(characters, starterKits, tribes,
                     NullLogger<CreateAvatarService>.Instance),
                 NullLogger<CreateAvatarHandler>.Instance);
         var (session, _) = CreateSessionInCharSelect();
@@ -557,7 +629,7 @@ public class CreateAvatarHandlerTests
         var tribes = FakeTribeRepository.WithPoints((0, 99), (1, 0), (2, 0), (3, 0));
         var handler =
             new CreateAvatarHandler(
-                new CreateAvatarService(characters, starterKits, tribes, DefaultOptions(),
+                new CreateAvatarService(characters, starterKits, tribes,
                     NullLogger<CreateAvatarService>.Instance),
                 NullLogger<CreateAvatarHandler>.Instance);
         var (session, _) = CreateSessionInCharSelect();
@@ -568,12 +640,12 @@ public class CreateAvatarHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_TribeThree_ToggleInDefaultDisabledState_AbortsWithoutCreating()
+    public async Task HandleAsync_TribeThree_UnconditionallyAbortsWithoutCreating()
     {
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(),
                 NullLogger<CreateAvatarService>.Instance),
             NullLogger<CreateAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
@@ -586,97 +658,6 @@ public class CreateAvatarHandlerTests
         Assert.Null(characters.LastCreateWithStarterKit);
         Assert.Equal(DisconnectReason.Malformed, session.DisconnectReason);
         PacketAssert.AssertNothingSent(pipe);
-    }
-
-    [Fact]
-    public async Task HandleAsync_TribeThree_ToggleOperatorEnabled_CreatesNormally()
-    {
-        var characters = FakeCharacterRepository.WithNone();
-        var starterKits = FakeStarterKitRepository.NobleDragonKit();
-        var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(),
-                Options.Create(new LoginServerOptions { EnableFourthFaction = true }),
-                NullLogger<CreateAvatarService>.Instance),
-            NullLogger<CreateAvatarHandler>.Instance);
-        var (session, pipe) = CreateSessionInCharSelect();
-
-        var request = ValidRequest() with { Tribe = 3 };
-
-        await handler.HandleAsync(request, session, CancellationToken.None);
-
-        Assert.Equal(((byte)0, (short)140), starterKits.LastCall);
-
-        var call = characters.LastCreateWithStarterKit;
-        Assert.NotNull(call);
-        Assert.Equal((byte)3, call!.Tribe);
-        Assert.Equal((short)140, call.MapId);
-        Assert.Equal((byte)0, call.PreviousTribe);
-        Assert.Null(session.DisconnectReason);
-
-        var createdCharacter = await characters.GetForWorldEntryAsync(1000, CancellationToken.None);
-        Assert.NotNull(createdCharacter);
-        var expectedAvatarInfo = AvatarInfoFactory.CreateForCharacter(createdCharacter!) with
-        {
-            Vit = 1,
-            Str = 1,
-            Int = 1,
-            Dex = 1,
-            Level2 = 0,
-            Exp1 = 0,
-            Exp2 = 0,
-            StatPoint = 50,
-            SkillPoint = 0,
-            PreviousTribe = 0,
-            Equip = AvatarInfoFactory.BuildEquipArray(call.Equipment),
-            Inventory = AvatarInfoFactory.BuildInventoryArray(call.Inventory),
-            Skill = AvatarInfoFactory.BuildSkillArray(call.Skills),
-            HotKey = AvatarInfoFactory.BuildHotKeyArray(call.Hotkeys),
-            AutoBuffTime = call.WelcomeBuffUntilDate
-        };
-        await PacketAssert.AssertSentAsync(pipe,
-            new CreateAvatarResponse { Result = 0, AvatarInfo = expectedAvatarInfo });
-    }
-
-    [Theory]
-    [InlineData((byte)0, 6, 84527)]
-    [InlineData((byte)1, 12, 85527)]
-    [InlineData((byte)2, 18, 86527)]
-    public async Task HandleAsync_TribeThree_EachPreviousTribeOrigin_CreatesNormallyUsingThatOriginsStarterKit(
-        byte previousTribe, int weapon, int expectedWeaponItemId)
-    {
-        var characters = FakeCharacterRepository.WithNone();
-        var starterKits = previousTribe switch
-        {
-            0 => FakeStarterKitRepository.NobleDragonKit(),
-            1 => FakeStarterKitRepository.RoyalSerpentKit(),
-            _ => FakeStarterKitRepository.GrandTigerKit()
-        };
-        var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(),
-                Options.Create(new LoginServerOptions { EnableFourthFaction = true }),
-                NullLogger<CreateAvatarService>.Instance),
-            NullLogger<CreateAvatarHandler>.Instance);
-        var (session, _) = CreateSessionInCharSelect();
-
-        var request = ValidRequest(weapon) with { Tribe = 3, PreviousTribe = previousTribe };
-
-        await handler.HandleAsync(request, session, CancellationToken.None);
-
-        Assert.Null(session.DisconnectReason);
-        Assert.Equal((previousTribe, (short)140), starterKits.LastCall);
-
-        var call = characters.LastCreateWithStarterKit;
-        Assert.NotNull(call);
-        Assert.Equal((byte)3, call!.Tribe);
-        Assert.Equal((short)140, call.MapId);
-        Assert.Equal(previousTribe, call.PreviousTribe);
-        Assert.Contains(call.Equipment,
-            i => i is { Slot: 7, Enchant: 0, Combine: 0 } && i.ItemId == expectedWeaponItemId);
-    }
-
-    private static IOptions<LoginServerOptions> DefaultOptions()
-    {
-        return Options.Create(new LoginServerOptions());
     }
 
     private static (LoginClientSession Session, FakeDuplexPipe Pipe) CreateSessionInCharSelect()

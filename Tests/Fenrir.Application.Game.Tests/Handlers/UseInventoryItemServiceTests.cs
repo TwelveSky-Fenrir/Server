@@ -238,10 +238,10 @@ public class UseInventoryItemServiceTests
         Assert.Equal(0, response.Value);
         Assert.Equal(0, response.Value2);
 
-        Assert.NotNull(cash.LastCredit);
-        Assert.Equal(AccountId, cash.LastCredit!.Value.AccountId);
-        Assert.Equal(500, cash.LastCredit.Value.Amount);
-        Assert.Equal(Ticket500ItemId, cash.LastCredit.Value.ProductId);
+        Assert.NotNull(cash.LastCreditAndConsumeItem);
+        Assert.Equal(AccountId, cash.LastCreditAndConsumeItem!.Value.AccountId);
+        Assert.Equal(500, cash.LastCreditAndConsumeItem.Value.Amount);
+        Assert.Equal(Ticket500ItemId, cash.LastCreditAndConsumeItem.Value.ProductId);
         Assert.Equal(500, await cash.GetBalanceAsync(AccountId, CancellationToken.None));
 
         var logged = Assert.Single(eventLog.LoggedEvents);
@@ -250,8 +250,8 @@ public class UseInventoryItemServiceTests
         Assert.Equal(500L, logged.DeltaMoney);
         Assert.Equal(Ticket500ItemId, logged.ItemId);
 
-        Assert.NotNull(characters.LastReplacedContainer);
-        Assert.DoesNotContain(characters.LastReplacedContainer!.Value.Items, i => i.Slot == 0);
+        Assert.Null(characters.LastReplacedContainer);
+        Assert.DoesNotContain(cash.LastCreditAndConsumeItem.Value.Items, i => i.Slot == 0);
     }
 
     [Fact]
@@ -267,7 +267,7 @@ public class UseInventoryItemServiceTests
 
         Assert.Null(session.DisconnectReason);
         Assert.Equal(0, response.Result);
-        Assert.Equal(100, cash.LastCredit!.Value.Amount);
+        Assert.Equal(100, cash.LastCreditAndConsumeItem!.Value.Amount);
         Assert.Equal(100, await cash.GetBalanceAsync(AccountId, CancellationToken.None));
     }
 
@@ -283,8 +283,8 @@ public class UseInventoryItemServiceTests
                 CancellationToken.None), zone);
 
         Assert.Equal(500, await cash.GetBalanceAsync(AccountId, CancellationToken.None));
-        Assert.NotNull(characters.LastReplacedContainer);
-        Assert.DoesNotContain(characters.LastReplacedContainer!.Value.Items, i => i.Slot == 0);
+        Assert.NotNull(cash.LastCreditAndConsumeItem);
+        Assert.DoesNotContain(cash.LastCreditAndConsumeItem!.Value.Items, i => i.Slot == 0);
 
         Assert.True(zone.TryGetPlayer(10, out var refreshed));
         Assert.Null(refreshed!.Inventory.GetSlot(ContainerMatrix.InventoryPage0, 0));
@@ -294,7 +294,7 @@ public class UseInventoryItemServiceTests
     public async Task GpTicket_CreditCallFails_RepliesResultOne_AndLeavesTheItemAndBalanceUntouched()
     {
         var (session, _, zone, state, characters, guilds, cash, eventLog) = SetUp();
-        cash.ThrowOnCredit = true;
+        cash.ThrowOnCreditAndConsumeItem = true;
         SeedInventory(zone, new ItemStack(Ticket500ItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1));
         var service = CreateService(characters, guilds, cash, eventLog);
 

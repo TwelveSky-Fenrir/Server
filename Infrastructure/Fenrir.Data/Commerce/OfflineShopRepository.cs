@@ -23,6 +23,12 @@ public sealed record OfflineShopRepository(ICaeriusNetDbContext Db) : IOfflineSh
         return (shops.Count > 0 ? shops[0] : null, items);
     }
 
+    // Deliberately uncached (caching-opportunities-audit, basse): SearchShopListingsService calls this on
+    // every SearchShopListingsRequest with no client-side throttle (unlike HeroRankingService's 2.5s one),
+    // so real invocation frequency is unconfirmed -- check sys.query_store_runtime_stats' execution_count
+    // for usp_OfflineShop_GetAllOpen before adding AddInMemoryCache here. A cached "still for sale" row also
+    // outlives an already-sold item until TTL expiry, a worse staleness cost than a security-gate false
+    // negative, so this is not a reflexive 2s-TTL candidate like Ban/GmAllowlist/FirewallRule/MacRestriction.
     public async ValueTask<ReadOnlyCollection<OfflineShopOpenListingRowDto>> GetAllOpenAsync(CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_OfflineShop_GetAllOpen", 64).Build();
@@ -137,5 +143,20 @@ public sealed record OfflineShopRepository(ICaeriusNetDbContext Db) : IOfflineSh
             .Build();
 
         await Db.ExecuteAsync(sp, ct);
+    }
+
+    public async ValueTask ExtendRentalAndReplaceContainerAsync(int characterId, int newShopDate, byte container,
+        IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
+    {
+        var builder =
+            new StoredProcedureParametersBuilder("game", "usp_OfflineShop_ExtendRentalAndReplaceContainer", 0)
+                .AddParameter("CharacterId", characterId, SqlDbType.Int)
+                .AddParameter("ShopDate", newShopDate, SqlDbType.Int)
+                .AddParameter("Container", container, SqlDbType.TinyInt);
+
+        if (items.Count > 0)
+            builder.AddTvpParameter("Items", items);
+
+        await Db.ExecuteAsync(builder.Build(), ct);
     }
 }

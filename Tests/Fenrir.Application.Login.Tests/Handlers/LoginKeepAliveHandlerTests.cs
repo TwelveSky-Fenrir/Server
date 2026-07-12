@@ -55,4 +55,21 @@ public class LoginKeepAliveHandlerTests
         Assert.Null(session.DisconnectReason);
         PacketAssert.AssertNothingSent(pipe);
     }
+
+    [Fact]
+    public void Handle_LeavesHandoverIssuedSessionUntouched()
+    {
+        var handler = new LoginKeepAliveHandler(NullLogger<LoginKeepAliveHandler>.Instance);
+        var pipe = new FakeDuplexPipe();
+        var session = new LoginClientSession(1, pipe);
+        session.MarkAuthenticated(1);
+        session.MarkCharSelect();
+        session.MarkHandoverIssued();
+
+        handler.Handle(new LoginKeepAliveRequest(), session);
+
+        Assert.Equal(LoginSessionState.HandoverIssued, session.State);
+        Assert.Null(session.DisconnectReason);
+        PacketAssert.AssertNothingSent(pipe);
+    }
 }

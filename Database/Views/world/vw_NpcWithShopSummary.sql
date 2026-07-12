@@ -1,5 +1,8 @@
 -- Tooling/debugging view. Each child table's counts are pre-aggregated in derived tables before joining
 -- to world.Npcs so one child table's row multiplication can't inflate another's count.
+-- Not an indexed-view candidate as written: LEFT OUTER JOIN and derived-table (subquery-in-FROM) expressions
+-- are both disallowed in indexed views (Microsoft Learn, "Create indexed views" -- Additional requirements),
+-- and this view needs both to show a zero, not a missing row, for an NPC with no rows in a given child table.
 CREATE VIEW world.vw_NpcWithShopSummary
 AS
 SELECT n.NpcId,

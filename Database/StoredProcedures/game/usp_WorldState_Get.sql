@@ -18,7 +18,7 @@ BEGIN
            UpdatedAtUtc
     FROM game.WorldState;
 
-    SELECT TribeId, SymbolDate, HasSymbol, Points, IsClosed
+    SELECT TribeId, SymbolDateUtc, HasSymbol, Points, IsClosed
     FROM game.WorldStateTribes
     ORDER BY TribeId;
 

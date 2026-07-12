@@ -24,11 +24,11 @@ BEGIN
 
     IF
         EXISTS (SELECT 1 FROM game.Characters WHERE AccountId = @AccountId AND Slot = @Slot)
-        THROW 50201, 'Character slot already occupied for this account.', 1;
+        THROW 50201, N'Character slot already occupied for this account.', 1;
 
     IF
         EXISTS (SELECT 1 FROM game.Characters WHERE Name = @Name)
-        THROW 50202, 'Character name already taken.', 1;
+        THROW 50202, N'Character name already taken.', 1;
 
     INSERT INTO game.Characters
     (AccountId, Slot, Name, Tribe, Gender, HeadType, FaceType,

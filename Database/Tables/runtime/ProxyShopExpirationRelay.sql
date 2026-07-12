@@ -28,13 +28,23 @@
 -- RelayId is an ever-increasing IDENTITY sequence every shard's own cursor (runtime.ProxyShopExpirationRelayCursor)
 -- is expressed against, not CreatedAtUtc -- same "wall-clock time is not monotonic enough across concurrent
 -- inserts from different shard processes" reasoning as runtime.GuildTribeBroadcastRelay's own header.
+--
+-- CorrelationId is a client-generated idempotency token, same shape and purpose as
+-- runtime.GuildTribeBroadcastRelay's own CorrelationId column -- see that table's header for the full
+-- rationale (ProxyShopExpirationRelayEntry.CorrelationId is minted once per mirror update and stays stable
+-- across CrossShardRelayRetry's retries of that same instance).
 CREATE TABLE runtime.ProxyShopExpirationRelay
 (
     RelayId           BIGINT IDENTITY (1,1) NOT NULL,
     SourceShardId     TINYINT               NOT NULL, -- never re-delivered back to this shard; it already attempted local delivery
     CharacterId       INT                   NOT NULL,
     NewExpirationDate INT                   NOT NULL, -- compact whole-number calendar date, GameDate.ToDayNumber shape
+    CorrelationId     UNIQUEIDENTIFIER      NOT NULL,
     CreatedAtUtc      DATETIME2(3)          NOT NULL,
-    CONSTRAINT PK_ProxyShopExpirationRelay PRIMARY KEY NONCLUSTERED (RelayId)
+    CONSTRAINT PK_ProxyShopExpirationRelay PRIMARY KEY NONCLUSTERED (RelayId),
+    CONSTRAINT UQ_ProxyShopExpirationRelay_CorrelationId UNIQUE NONCLUSTERED (CorrelationId),
+    -- Supports usp_ProxyShopExpirationRelay_Poll's own time-based reap DELETE -- see
+    -- GuildTribeBroadcastRelay's own index comment for the shared rationale.
+    INDEX IX_ProxyShopExpirationRelay_CreatedAtUtc NONCLUSTERED (CreatedAtUtc)
 )
     WITH (MEMORY_OPTIMIZED = ON, DURABILITY = SCHEMA_ONLY);

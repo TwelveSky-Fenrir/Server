@@ -8,8 +8,8 @@ public sealed class SqlTribePointRosterGateway(ITribeRosterRepository roster) : 
     {
         var rows = await roster.GetForTribePointAsync(ct).ConfigureAwait(false);
 
-        var snapshots = new TribeRosterCharacterSnapshot[rows.Count];
-        for (var i = 0; i < rows.Count; i++)
+        var snapshots = new TribeRosterCharacterSnapshot[rows.Length];
+        for (var i = 0; i < rows.Length; i++)
         {
             var row = rows[i];
             snapshots[i] = new TribeRosterCharacterSnapshot(row.TribeId, row.Level1, row.Level2, row.RebirthCount);

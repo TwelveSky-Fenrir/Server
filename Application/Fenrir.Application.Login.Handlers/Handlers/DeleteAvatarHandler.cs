@@ -32,6 +32,12 @@ public sealed class DeleteAvatarHandler(IDeleteAvatarService deleteAvatarService
 
         switch (result.Outcome)
         {
+            case DeleteAvatarOutcome.SlotEmpty:
+                logger.LogWarning(
+                    "Delete-avatar rejected: malformed request from account {AccountId} (slot {Slot} is empty)",
+                    accountId, packet.AvatarPost);
+                loginSession.Abort(DisconnectReason.Malformed);
+                return;
             case DeleteAvatarOutcome.Success:
                 logger.LogInformation("Avatar deleted: account {AccountId} slot {Slot}", accountId,
                     packet.AvatarPost);

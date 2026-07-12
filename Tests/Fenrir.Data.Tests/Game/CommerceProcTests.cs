@@ -72,6 +72,33 @@ public class CommerceProcTests
     }
 
     [Fact]
+    public async Task
+        Cash_CreditAndConsumeItem_CreditsAndReplacesContainerAtomically_AndRejectsANonPositiveAmountWithoutChangingEitherSide()
+    {
+        var accountId = await CreateAccountAsync();
+        var characterId = await CreateCharacterAsync(accountId);
+        var itemId = await MinItemIdAsync();
+
+        var newBalance = await _cash.CreditAndConsumeItemAsync(accountId, 500, 2, itemId,
+            characterId, 0, [new CharacterItemSlotTvp(0, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1)],
+            CancellationToken.None);
+
+        Assert.Equal(500, newBalance);
+        Assert.Equal(500, await _cash.GetBalanceAsync(accountId, CancellationToken.None));
+        Assert.Single(await GetItemsAsync(characterId, 0));
+
+        var ex = await Record.ExceptionAsync(() => _cash.CreditAndConsumeItemAsync(accountId, 0, 2, itemId,
+            characterId, 0, [], CancellationToken.None).AsTask());
+
+        Assert.NotNull(ex);
+        var sqlException = ex as SqlException ?? ex!.InnerException as SqlException;
+        if (sqlException is not null)
+            Assert.Equal(50241, sqlException.Number);
+        Assert.Equal(500, await _cash.GetBalanceAsync(accountId, CancellationToken.None));
+        Assert.Single(await GetItemsAsync(characterId, 0));
+    }
+
+    [Fact]
     public async Task Character_SpendBloodCoinAndReplaceContainer_SpendsAtomically_AndRejectsInsufficientBalance()
     {
         var accountId = await CreateAccountAsync();

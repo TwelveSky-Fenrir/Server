@@ -14,7 +14,6 @@ public sealed class BuyCashItemService(
     ICashRepository cash,
     WorldDataCache worldData,
     CommerceCatalogCache catalog,
-    IEventLogRepository eventLog,
     ILogger<BuyCashItemService> logger) : IBuyCashItemService
 {
     private const int ShopSpecificError = 60704;
@@ -134,7 +133,8 @@ public sealed class BuyCashItemService(
         try
         {
             newBalance = await cash.DebitAndGrantItemAsync(accountId, chargeAmount, 1,
-                entry.ItemMallProductId, characterId, (byte)page, ToTvps(projectedContainer), cancellationToken);
+                entry.ItemMallProductId, characterId, (byte)page, ToTvps(projectedContainer), cancellationToken,
+                entry.ItemId, grantQuantity, newStack.Serial);
         }
         catch (Exception ex)
         {
@@ -144,9 +144,6 @@ public sealed class BuyCashItemService(
             return new BuyCashItemResponse
                 { Result = 2, CashSize = 0, Page = page, Index = slot, Value = packet.Value };
         }
-
-        await eventLog.LogCashShopPurchaseAsync(accountId, characterId, entry.ItemId, grantQuantity,
-            newStack.Serial, cancellationToken);
 
         state.LastCashItemPurchaseAtUtc = DateTime.UtcNow;
 

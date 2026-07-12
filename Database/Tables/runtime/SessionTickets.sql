@@ -11,6 +11,11 @@ CREATE TABLE runtime.SessionTickets
     SessionToken UNIQUEIDENTIFIER NOT NULL, -- minted by usp_AccountSession_ClaimOrSignalKick at Login-claim time; proves a Game-side world-entry claim is for the same login epoch as the one that minted this ticket
     AccountGrade SMALLINT         NOT NULL, -- carries auth.Accounts.AccountGrade across the Login->Game process boundary (GameServer never re-queries auth.Accounts)
     CONSTRAINT PK_SessionTickets PRIMARY KEY NONCLUSTERED HASH (AccountId)
-        WITH (BUCKET_COUNT = 1024)
+        WITH (BUCKET_COUNT = 1024),
+    -- Supports usp_SessionTicket_Purge's own WHERE ExpiresAtUtc <= SYSUTCDATETIME() sweep. Row count here
+    -- stays trivially small (bounded by concurrently in-flight Login->Game hand-offs, TTL 15s) so this is a
+    -- minor/free consistency improvement rather than a load-bearing fix the way the same shape is for the
+    -- higher-volume runtime.*Relay tables -- see GuildTribeBroadcastRelay's own index comment.
+    INDEX IX_SessionTickets_ExpiresAtUtc NONCLUSTERED (ExpiresAtUtc)
 )
     WITH (MEMORY_OPTIMIZED = ON, DURABILITY = SCHEMA_ONLY);

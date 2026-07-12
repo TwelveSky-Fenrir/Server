@@ -52,6 +52,11 @@ public static class EventLogEmitters
 
     public const short BigMoneyConversionEventCode8 = 8;
 
+    // Superseded as a production call path: BuyCashItemService no longer calls this directly (2026-07-12
+    // transaction-composition-audit fix) -- the CashShopPurchase row is now nested inside
+    // usp_Cash_DebitAndGrantItem's own transaction via its optional @AuditItemId/@AuditQuantity/@AuditSerial
+    // params, so a crash between the debit and the audit write can no longer happen. Left in place as the
+    // canonical description of this event's shape (event code, category, payload format).
     public static ValueTask LogCashShopPurchaseAsync(this IEventLogRepository eventLog, int accountId,
         int characterId, int itemId, int quantity, int serial, CancellationToken ct)
     {

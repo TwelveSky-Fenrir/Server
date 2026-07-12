@@ -23,6 +23,8 @@ CREATE TABLE game.Guilds
         CONSTRAINT DF_Guilds_Logo DEFAULT 0,            -- gLogo
     CreatedAtUtc      DATETIME2(3)       NOT NULL
         CONSTRAINT DF_Guilds_CreatedAtUtc DEFAULT SYSUTCDATETIME(),
+    UpdatedAtUtc      DATETIME2(3)       NOT NULL
+        CONSTRAINT DF_Guilds_UpdatedAtUtc DEFAULT SYSUTCDATETIME(), -- bumped by every Grade/Points/Buff*/Logo mutation, matching Characters/AccountVault/AccountCash/WorldState/GuildNotices
     CONSTRAINT PK_Guilds PRIMARY KEY CLUSTERED (GuildId),
     CONSTRAINT UQ_Guilds_Name UNIQUE (Name),
     CONSTRAINT FK_Guilds_MasterCharacter FOREIGN KEY (MasterCharacterId) REFERENCES game.Characters (CharacterId),

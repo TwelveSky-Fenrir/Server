@@ -34,6 +34,11 @@
 -- name cross-check, though delivery matches on TargetCharacterId (resolved from the directory), not name.
 -- SenderAuthType is the sender's GM/premium auth flag, forwarded verbatim to the delivered ZC_SECRET_CHAT_RECV
 -- (Result=3) so a GM whisper still renders with elevated status on the recipient's client.
+--
+-- CorrelationId is a client-generated idempotency token, same shape and purpose as
+-- runtime.GuildTribeBroadcastRelay's own CorrelationId column -- see that table's header for the full
+-- rationale (ChatCrossShardWhisperEntry.CorrelationId is minted once per whisper and stays stable across
+-- CrossShardRelayRetry's retries of that same instance).
 CREATE TABLE runtime.ChatCrossShardRelay
 (
     RelayId           BIGINT IDENTITY (1,1) NOT NULL,
@@ -45,8 +50,13 @@ CREATE TABLE runtime.ChatCrossShardRelay
     TargetAvatarName  NVARCHAR(13)          NOT NULL,
     Content           NVARCHAR(61)          NOT NULL,
     SenderAuthType    TINYINT               NOT NULL,
+    CorrelationId     UNIQUEIDENTIFIER      NOT NULL,
     CreatedAtUtc      DATETIME2(3)          NOT NULL,
     CONSTRAINT PK_ChatCrossShardRelay PRIMARY KEY NONCLUSTERED (RelayId),
-    INDEX IX_ChatCrossShardRelay_Target NONCLUSTERED (TargetShardId, RelayId)
+    CONSTRAINT UQ_ChatCrossShardRelay_CorrelationId UNIQUE NONCLUSTERED (CorrelationId),
+    INDEX IX_ChatCrossShardRelay_Target NONCLUSTERED (TargetShardId, RelayId),
+    -- Supports usp_ChatCrossShardRelay_Poll's own time-based reap DELETE -- see
+    -- GuildTribeBroadcastRelay's own index comment for the shared rationale.
+    INDEX IX_ChatCrossShardRelay_CreatedAtUtc NONCLUSTERED (CreatedAtUtc)
 )
     WITH (MEMORY_OPTIMIZED = ON, DURABILITY = SCHEMA_ONLY);

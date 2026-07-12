@@ -13,6 +13,8 @@ CREATE TABLE game.GuildMembers
         CONSTRAINT DF_GuildMembers_CallName DEFAULT N'',
     JoinedAtUtc DATETIME2(3) NOT NULL
         CONSTRAINT DF_GuildMembers_JoinedAtUtc DEFAULT SYSUTCDATETIME(),
+    UpdatedAtUtc DATETIME2(3) NOT NULL
+        CONSTRAINT DF_GuildMembers_UpdatedAtUtc DEFAULT SYSUTCDATETIME(), -- bumped on Role/CallName mutation, never on JoinedAtUtc itself
     CONSTRAINT PK_GuildMembers PRIMARY KEY CLUSTERED (GuildId, CharacterId),
     CONSTRAINT UQ_GuildMembers_CharacterId UNIQUE (CharacterId),
     CONSTRAINT CK_GuildMembers_Role CHECK (Role BETWEEN 0 AND 2),

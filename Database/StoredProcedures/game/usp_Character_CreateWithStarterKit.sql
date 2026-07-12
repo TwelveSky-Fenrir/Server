@@ -6,28 +6,44 @@
 --
 -- CONFIRMED PRODUCT DECISION (character-creation-level1-redesign, NOT a legacy-parity fix): a freshly created
 -- character starts at genuine Level 1 with only a basic weapon + torso/chest armor piece equipped, NOT the
--- EU33/USE_CUSTOME_CREATE instant-elite grant (Level 145, 6-slot Enchant45/Combine6 gear, starter mount/pet/
--- cape, one premium day, ProtectForDeath/AutoTime2/DoubleExpTime1-2 instant-boost counters) that the original
+-- EU33/USE_CUSTOME_CREATE instant-elite grant (Level 145, 6-slot Enchant45/Combine6 gear) that the original
 -- EU33-parity version of this procedure used -- see Tables/world/StarterKitEquipment.sql's own header for the
--- full USE_CUSTOME_CREATE citation this deliberately departs from.
---   * StatVit/StatStr/StatInt/StatDex = 1 (the Level-1 floor); PetGrowth/PetActivity = 0/0 (no pet is ever
---     granted by the redesigned equipment set, see CreateAvatarService.BuildEquipmentRows); Level/Level2/
---     RebirthCount/Experience/Exp2 = 1/0/0/0/0 (genuine Level 1, zero rebirths, no post-cap ladder progress).
+-- full USE_CUSTOME_CREATE citation this deliberately departs from. The starter pet/cape/wing/mount grant and
+-- the welcome-buff counters/premium day below are NOT part of that rejected block (see their own bullets).
+--   * StatVit/StatStr/StatInt/StatDex = 1 (the Level-1 floor); Level/Level2/RebirthCount/Experience/Exp2 =
+--     1/0/0/0/0 (genuine Level 1, zero rebirths, no post-cap ladder progress).
 --   * StatPoints/SkillPoints = 50/0: Fenrir product defaults, NOT legacy-cited (no compiled non-
 --     USE_CUSTOME_CREATE branch exists anywhere in the reviewed Server/ts25login source to draw a level-1
 --     starting pool from -- see CreateAvatarService.StartingStatPoint's own remarks). SkillPoints starts at 0
 --     since the starter kit already grants every starting skill directly via game.CharacterSkills
 --     (BuildSkillRows/world.StarterKitSkills).
---   * MountItemId/MountExpActivity/MountPower/MountSlotIndex/MountTime = 0/0/0/-1/0 (column DEFAULTs, no
---     starter mount); ProtectForDeath/AutoTime2 = 0/0 and DoubleExpTime1/DoubleExpTime2 = 0/0 (column
---     DEFAULTs, no "instant boost" grants).
+--   * PetGrowth/PetActivity and the Mount* columns ARE granted here, independently of the level/rebirth/
+--     stat-pool rejection above: Server/ts25login/S04_MyWork02.cpp:1131-1179 (pet/cape/wing/mount) carries no
+--     USE_CUSTOME_CREATE gate of its own -- it sits right after that macro's own closing #endif at :1123.
+--     PetActivity=100 (MAX_PAT_ACTIVITY_SIZE, DEFINE.h:612); PetGrowth=640000000 (`tAvatarInfo.aEquip[EPET][2]
+--     = 640000000; // 200%`, Server/ts25login/S04_MyWork02.cpp:1134, matching the 640_000_000 top-tier cap
+--     PetGrowthCaps.Values already lists). MountItemId=1301 (ANIMAL_NUM_TIGER1, DEFINE.h:157);
+--     MountSlotIndex=0 overwrites the -1 "none active" sentinel so the character starts already mounted;
+--     MountTime=99999999 (no practically reachable expiry, S04_MyWork02.cpp:1174-1179).
+--     game.CharacterItems also gains Slot 8 (EPET)/ItemId 2300 and Slot 1 (ECAPE)/ItemId 1407 via the same
+--     @Equipment TVP the weapon/armor rows already use -- see CreateAvatarService.BuildUnconditionalStarterGrantRows.
+--     The source additionally stamps a raw "stat" value onto the Cape slot (40, "120%" tier) and onto an
+--     itemless wing/"Deco2" slot (item id always 0 in every branch) -- neither has a home in game.CharacterItems
+--     here: Enchant/Combine on item 1407 specifically don't drive any bonus formula (StatCalculator's cape-
+--     defense bonus needs CheckSetItem=2 or Sort=29, neither true for 1407), so both are left unset rather
+--     than guessed, and the itemless wing/"Deco1" slots get no row at all (row absence = empty slot here;
+--     an ItemId=0 row would also violate FK_CharacterItems_World_Item).
+--   * ProtectForDeath/AutoTime2/DoubleExpTime1/DoubleExpTime2 = 5/1440/300/300: unlike the instant-elite
+--     gear/level-cap/mount block above, these four welcome-grant counters are gated only by the LNW33 macro
+--     (confirmed live in both ReleaseM33 and the shipped ReleaseEU33, not a single-variant override --
+--     Server/ts25login/S04_MyWork02.cpp:885-893), never by USE_CUSTOME_CREATE -- so they are applied here
+--     rather than rejected alongside it.
 --   * AutoBuffTime/InventoryDate/StoreDate stay @WelcomeBuffUntilDate (today + 7 days): the welcome-buff/
 --     second-inventory-page/second-store-page rental grant is independent of the old EU33 instant-elite block
 --     and survives the redesign.
---   * PremiumExpireUtc = 0 (column DEFAULT, "0 = none"): no premium-day grant. @PremiumUntilUnixSeconds stays a
---     declared parameter (signature parity with every existing caller of
---     CharacterRepository.CreateWithStarterKitAsync) but is DELIBERATELY UNUSED in the INSERT -- CreateAvatarService.cs
---     passes a fixed 0 for it.
+--   * PremiumExpireUtc = @PremiumUntilUnixSeconds (CreateAvatarService.cs computes creation time + 1 day):
+--     this one-day extension carries no macro guard at all in legacy (Server/ts25login/S04_MyWork02.cpp:
+--     895-905, unconditional) -- also applied here rather than rejected.
 --
 -- Errors: 50201 slot already occupied, 50202 name already taken -- both pre-checked; the table's unique
 -- constraints are the race backstop. All 5 write statements (Characters/CharacterItems x2/CharacterSkills/
@@ -62,10 +78,10 @@ BEGIN
     SET XACT_ABORT ON;
 
     IF EXISTS (SELECT 1 FROM game.Characters WHERE AccountId = @AccountId AND Slot = @Slot)
-        THROW 50201, 'Character slot already occupied for this account.', 1;
+        THROW 50201, N'Character slot already occupied for this account.', 1;
 
     IF EXISTS (SELECT 1 FROM game.Characters WHERE Name = @Name)
-        THROW 50202, 'Character name already taken.', 1;
+        THROW 50202, N'Character name already taken.', 1;
 
     DECLARE @CharacterId TABLE
                          (
@@ -86,9 +102,9 @@ BEGIN
      DoubleExpTime1, DoubleExpTime2, AutoBuffTime, InventoryDate, StoreDate, PremiumExpireUtc)
     OUTPUT INSERTED.CharacterId INTO @CharacterId
     VALUES (@AccountId, @Slot, @Name, @Tribe, @PreviousTribe, @Gender, @HeadType, @FaceType, @MapId, @PosX, @PosY,
-            @PosZ, @Life, @MaxLife, @Mana, @MaxMana, 1, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0, 50, 0,
-            0, 0, 0, -1, 0, 0, 0, 0, 0, @WelcomeBuffUntilDate, @WelcomeBuffUntilDate,
-            @WelcomeBuffUntilDate, 0);
+            @PosZ, @Life, @MaxLife, @Mana, @MaxMana, 1, 1, 1, 1, 640000000, 100, 1, 0, 0, 0, 0, 50, 0,
+            1301, 0, 5, 0, 99999999, 5, 1440, 300, 300, @WelcomeBuffUntilDate, @WelcomeBuffUntilDate,
+            @WelcomeBuffUntilDate, @PremiumUntilUnixSeconds);
 
     DECLARE @NewCharacterId INT = (SELECT CharacterId FROM @CharacterId);
 

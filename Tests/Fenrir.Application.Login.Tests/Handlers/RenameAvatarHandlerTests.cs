@@ -133,7 +133,7 @@ public class ClChangeAvatarNameSendHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_NoCharacterAtSlot_RepliesResult102WithoutCallingRenameRepository()
+    public async Task HandleAsync_NoCharacterAtSlot_AbortsWithoutCallingRenameRepository()
     {
         var characters = FakeCharacterRepository.WithNone();
         var renames = FakeCharacterRenameRepository.ReturningResult(0);
@@ -142,9 +142,9 @@ public class ClChangeAvatarNameSendHandlerTests
 
         await handler.HandleAsync(Request(), session, CancellationToken.None);
 
-        await PacketAssert.AssertSentAsync(pipe, new RenameAvatarResponse { Result = 102 });
+        Assert.Equal(DisconnectReason.Malformed, session.DisconnectReason);
         Assert.Null(renames.LastCall);
-        Assert.Null(session.DisconnectReason);
+        PacketAssert.AssertNothingSent(pipe);
     }
 
     [Theory]

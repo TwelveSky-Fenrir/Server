@@ -158,19 +158,17 @@ public class NpcShopTradeServiceTests
 
         Assert.Equal(GenericActionStatus.Succeeded, result.Status);
         Assert.NotNull(characters.LastAdjustMoneyAndReplaceContainer);
-        Assert.Equal(500, characters.LastAdjustMoneyAndReplaceContainer!.Value.DeltaMoney);
+        var call = characters.LastAdjustMoneyAndReplaceContainer!.Value;
+        Assert.Equal(500, call.DeltaMoney);
 
-        var logged = Assert.Single(eventLog.LoggedEvents);
-        Assert.Equal(EventLogCategory.NpcShopTrade, logged.Category);
-        Assert.Equal(1, logged.EventCode);
-        Assert.Equal(AccountId, logged.ActorAccountId);
-        Assert.Equal(CharacterId, logged.ActorCharacterId);
-        Assert.Null(logged.TargetAccountId);
-        Assert.Null(logged.TargetCharacterId);
-        Assert.Equal(500, logged.DeltaMoney);
-        Assert.Equal(700, logged.ItemId);
-        Assert.Equal(1, logged.Quantity);
-        Assert.Equal((byte)1, logged.Outcome);
+        // The NpcShopTrade audit row is nested into usp_Character_AdjustMoneyAndReplaceContainer's own
+        // transaction (transaction-composition-audit finding), so it's now observed as audit* parameters on
+        // this same repository call rather than a separate eventLog.LoggedEvents entry.
+        Assert.Equal(1, call.AuditEventCode);
+        Assert.Equal(AccountId, call.AuditAccountId);
+        Assert.Equal(700, call.AuditItemId);
+        Assert.Equal(1, call.AuditQuantity);
+        Assert.Empty(eventLog.LoggedEvents);
     }
 
     [Fact]
@@ -186,10 +184,11 @@ public class NpcShopTradeServiceTests
             zone);
 
         Assert.Equal(GenericActionStatus.Succeeded, result.Status);
-        var logged = Assert.Single(eventLog.LoggedEvents);
-        Assert.Equal(50, logged.DeltaMoney);
-        Assert.Equal(5, logged.Quantity);
-        Assert.Equal(50, logged.ItemId);
+        var call = characters.LastAdjustMoneyAndReplaceContainer!.Value;
+        Assert.Equal(50, call.DeltaMoney);
+        Assert.Equal(5, call.AuditQuantity);
+        Assert.Equal(50, call.AuditItemId);
+        Assert.Empty(eventLog.LoggedEvents);
     }
 
     [Fact]
@@ -221,17 +220,17 @@ public class NpcShopTradeServiceTests
 
         Assert.Equal(GenericActionStatus.Succeeded, result.Status);
         Assert.NotNull(characters.LastAdjustMoneyAndReplaceContainer);
-        Assert.Equal(-1000, characters.LastAdjustMoneyAndReplaceContainer!.Value.DeltaMoney);
+        var call = characters.LastAdjustMoneyAndReplaceContainer!.Value;
+        Assert.Equal(-1000, call.DeltaMoney);
 
-        var logged = Assert.Single(eventLog.LoggedEvents);
-        Assert.Equal(EventLogCategory.NpcShopTrade, logged.Category);
-        Assert.Equal(2, logged.EventCode);
-        Assert.Equal(AccountId, logged.ActorAccountId);
-        Assert.Equal(CharacterId, logged.ActorCharacterId);
-        Assert.Equal(-1000, logged.DeltaMoney);
-        Assert.Equal(800, logged.ItemId);
-        Assert.Equal(1, logged.Quantity);
-        Assert.Equal((byte)1, logged.Outcome);
+        // The NpcShopTrade audit row is nested into usp_Character_AdjustMoneyAndReplaceContainer's own
+        // transaction (transaction-composition-audit finding), so it's now observed as audit* parameters on
+        // this same repository call rather than a separate eventLog.LoggedEvents entry.
+        Assert.Equal(2, call.AuditEventCode);
+        Assert.Equal(AccountId, call.AuditAccountId);
+        Assert.Equal(800, call.AuditItemId);
+        Assert.Equal(1, call.AuditQuantity);
+        Assert.Empty(eventLog.LoggedEvents);
     }
 
     [Fact]
@@ -247,9 +246,10 @@ public class NpcShopTradeServiceTests
             zone);
 
         Assert.Equal(GenericActionStatus.Succeeded, result.Status);
-        var logged = Assert.Single(eventLog.LoggedEvents);
-        Assert.Equal(-500, logged.DeltaMoney);
-        Assert.Equal(5, logged.Quantity);
+        var call = characters.LastAdjustMoneyAndReplaceContainer!.Value;
+        Assert.Equal(-500, call.DeltaMoney);
+        Assert.Equal(5, call.AuditQuantity);
+        Assert.Empty(eventLog.LoggedEvents);
     }
 
     [Fact]

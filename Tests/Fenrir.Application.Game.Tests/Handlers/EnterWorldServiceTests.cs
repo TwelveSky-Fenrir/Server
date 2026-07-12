@@ -66,7 +66,7 @@ public class EnterWorldServiceTests
     [Fact]
     public async Task HandleAsync_ReturningCharacter_PopulatesBuffsWorldStateAndPreviousTribe_InsteadOfZeros()
     {
-        const short MapId = 7;
+        const short MapId = 141;
         const byte Tribe = 3;
         const byte PreviousTribe = 2;
         const float PosX = 111f, PosY = 5f, PosZ = 222f;
@@ -233,7 +233,7 @@ public class EnterWorldServiceTests
     [Fact]
     public async Task HandleAsync_ReturningCharacterWithPersistedPetBagDate_SeedsThePlayerRuntimeStateMirror()
     {
-        const short MapId = 13;
+        const short MapId = 8;
         const int PersistedPetBagDate = 20991231;
 
         var bundle = HappyPathBundle(MapId, 1, 1, 0f, 0f, 0f, [], PersistedPetBagDate);
@@ -282,7 +282,7 @@ public class EnterWorldServiceTests
     [Fact]
     public async Task HandleAsync_ReturningCharacterWithPersistedDropItemTime_SeedsThePlayerRuntimeStateMirror()
     {
-        const short MapId = 15;
+        const short MapId = 22;
         const int PersistedDropItemTime = 42;
 
         var bundle = HappyPathBundle(MapId, 1, 1, 0f, 0f, 0f, [], dropItemTime: PersistedDropItemTime);
@@ -331,7 +331,7 @@ public class EnterWorldServiceTests
     [Fact]
     public async Task HandleAsync_ReturningCharacterWithPersistedWarPoint_SeedsThePlayerRuntimeStateMirror()
     {
-        const short MapId = 17;
+        const short MapId = 23;
         const int PersistedWarPoint = 1234;
 
         var bundle = HappyPathBundle(MapId, 1, 1, 0f, 0f, 0f, [], warPoint: PersistedWarPoint);
@@ -380,7 +380,7 @@ public class EnterWorldServiceTests
     [Fact]
     public async Task HandleAsync_ReturningCharacterWithPersistedRunes_SeedsThePlayerRuntimeStateRuneArrays()
     {
-        const short MapId = 11;
+        const short MapId = 24;
 
         var bundle = HappyPathBundle(MapId, 1, 1, 0f, 0f, 0f, []);
         var characters = new FakeCharacterRepository { WorldEntryBundleToReturn = bundle };
@@ -470,12 +470,63 @@ public class EnterWorldServiceTests
     public async Task HandleAsync_TribeAndPreviousTribeInternallyConsistent_DoesNotAbort(byte tribe,
         byte previousTribe)
     {
-        var bundle = HappyPathBundle(7, tribe, previousTribe, 0f, 0f, 0f, []);
+        var ownTribeMapId = tribe switch { 0 => (short)1, 1 => (short)7, 2 => (short)11, _ => (short)140 };
+        var bundle = HappyPathBundle(ownTribeMapId, tribe, previousTribe, 0f, 0f, 0f, []);
         var (service, session) = CreateWorkingService(bundle);
 
         await service.HandleAsync(ValidRequest(EncodeObfuscatedAccountId(AccountId)), session, CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
+    }
+
+    [Fact]
+    public async Task HandleAsync_PersistedZoneNotOwnedByOwnTribe_SelfHealsToHometownBeforeResolvingTheZone()
+    {
+        const short PersistedMapId = 8;
+        const short HometownMapId = 1;
+        const byte Tribe = 0;
+
+        var bundle = HappyPathBundle(PersistedMapId, Tribe, Tribe, 999f, 999f, 999f, []);
+        var characters = new FakeCharacterRepository { WorldEntryBundleToReturn = bundle };
+        var worldData = ZoneTestKit.EmptyWorldData();
+        var zones = ZoneTestKit.CreateRegistry(worldData: worldData);
+        zones.Initialize([HometownMapId]);
+
+        var service = new EnterWorldService(
+            characters,
+            worldData,
+            zones,
+            new NoOpMuteRepository(),
+            new FakeBanRepository(),
+            new ApplicationFirewall(new FakeBlockedIpRepository(), new FakeFirewallRuleRepository(),
+                new FakeGmAllowlistRepository()),
+            new FakeGuildRepository(),
+            new GuildRankingCache(),
+            new RoleOnlyTribeRepository(0),
+            new EmptyFriendRepository(),
+            new NoMentorRepository(),
+            new FakeHeroRankingRepository(),
+            new FakeRuneRepository(),
+            new FakeCharacterShardLocationRepository(),
+            new FakeCharacterLogoutStateRepository(),
+            ZoneTestKit.CreateWorldState(),
+            new TowerWarState(),
+            new ZoneCenterSiegeState(),
+            new TribeGuardCorridorState(),
+            Options.Create(ZoneTestKit.Options()),
+            NullLogger<EnterWorldService>.Instance);
+
+        var (session, _) = ZoneTestKit.CreateSession(1);
+        session.MarkTicketConsumed(AccountId, CharacterId);
+
+        await service.HandleAsync(ValidRequest(EncodeObfuscatedAccountId(AccountId)), session, CancellationToken.None);
+
+        Assert.Null(session.DisconnectReason);
+        Assert.True(zones.TryGet(HometownMapId, out var zone));
+        zone!.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(CharacterId, out var state));
+        Assert.Equal(HometownMapId, state!.MapId);
     }
 
     [Fact]
@@ -739,6 +790,17 @@ public class EnterWorldServiceTests
         {
             throw new InvalidOperationException("Must not be reached once world-entry is already rejected.");
         }
+
+        public ValueTask<int> CreateAsync(int? accountId, int? characterId, byte reason, DateTime? expiresAtUtc,
+            CancellationToken ct, int? actorAccountId = null, int? actorCharacterId = null)
+        {
+            throw new InvalidOperationException("Must not be reached once world-entry is already rejected.");
+        }
+
+        public ValueTask LiftAsync(int muteId, CancellationToken ct)
+        {
+            throw new InvalidOperationException("Must not be reached once world-entry is already rejected.");
+        }
     }
 
     private sealed class ThrowingGuildRepository : IGuildRepository
@@ -753,7 +815,7 @@ public class EnterWorldServiceTests
             throw new NotSupportedException();
         }
 
-        public ValueTask<ReadOnlyCollection<GuildSummaryDto>> GetAllAsync(
+        public ValueTask<ImmutableArray<GuildSummaryDto>> GetAllAsync(
             CancellationToken ct)
         {
             throw new NotSupportedException();
@@ -906,6 +968,12 @@ public class EnterWorldServiceTests
             throw new NotSupportedException();
         }
 
+        public ValueTask ClaimRewardAsync(int characterId, byte periodKind, int contributionPointsDelta,
+            CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
         public ValueTask<int> AddPointsAsync(int characterId, byte periodKind, int delta, byte? tribeId, int? level,
             CancellationToken ct)
         {
@@ -968,6 +1036,17 @@ public class EnterWorldServiceTests
             CancellationToken ct)
         {
             return ValueTask.FromResult(ImmutableArray<int>.Empty);
+        }
+
+        public ValueTask<int> CreateAsync(int? accountId, int? characterId, byte reason, DateTime? expiresAtUtc,
+            CancellationToken ct, int? actorAccountId = null, int? actorCharacterId = null)
+        {
+            return ValueTask.FromResult(0);
+        }
+
+        public ValueTask LiftAsync(int muteId, CancellationToken ct)
+        {
+            return ValueTask.CompletedTask;
         }
     }
 

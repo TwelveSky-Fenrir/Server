@@ -75,6 +75,12 @@ internal sealed class FakeOfflineShopRepository : IOfflineShopRepository
         return ValueTask.CompletedTask;
     }
 
+    public ValueTask ExtendRentalAndReplaceContainerAsync(int characterId, int newShopDate, byte container,
+        IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
+    {
+        throw new NotImplementedException();
+    }
+
     public void SeedShop(OfflineShopRowDto shop)
     {
         _shop = shop;

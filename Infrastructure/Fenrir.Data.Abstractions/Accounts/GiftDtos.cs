@@ -4,6 +4,3 @@ namespace Fenrir.Data.Abstractions.Accounts;
 
 [GenerateDto]
 public sealed partial record PendingGiftDto(int GiftId, int? ProductId, int Quantity, int Value, DateTime CreatedAtUtc);
-
-[GenerateDto]
-public sealed partial record GiftClaimResultDto(short SlotIndex);

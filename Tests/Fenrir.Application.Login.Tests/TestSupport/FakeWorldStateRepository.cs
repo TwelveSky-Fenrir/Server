@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using Fenrir.Data.Abstractions.World;
 
@@ -18,8 +19,8 @@ internal sealed class FakeWorldStateRepository : IWorldStateRepository
         throw new NotSupportedException();
     }
 
-    public ValueTask<(WorldStateRowDto? Row, ReadOnlyCollection<WorldStateTribeDto> Tribes,
-        ReadOnlyCollection<WorldStateAllianceOfferDto> AllianceOffers)> GetAsync(CancellationToken ct)
+    public ValueTask<(WorldStateRowDto? Row, ImmutableArray<WorldStateTribeDto> Tribes,
+        ImmutableArray<WorldStateAllianceOfferDto> AllianceOffers)> GetAsync(CancellationToken ct)
     {
         throw new NotSupportedException();
     }

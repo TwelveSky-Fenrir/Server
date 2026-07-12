@@ -10,7 +10,8 @@ BEGIN
         XACT_ABORT ON;
 
     UPDATE game.GuildMembers
-    SET CallName = @CallName
+    SET CallName     = @CallName,
+        UpdatedAtUtc = SYSUTCDATETIME()
     WHERE GuildId = @GuildId
       AND CharacterId = @CharacterId;
 

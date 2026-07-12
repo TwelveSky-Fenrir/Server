@@ -105,6 +105,24 @@ public class DeleteAvatarHandlerTests
         Assert.Null(session.DisconnectReason);
     }
 
+    [Fact]
+    public async Task HandleAsync_SlotAlreadyEmpty_AbortsWithoutReplyingOrDeleting()
+    {
+        var characters = FakeCharacterRepository.WithNone();
+        var handler = new DeleteAvatarHandler(
+            new DeleteAvatarService(characters, FakeTribeRepository.Empty(),
+                FakeWorldStateRepository.Empty(), FakeGuildRepository.Empty(), FakeOfflineShopRepository.Empty(),
+                NullLogger<DeleteAvatarService>.Instance),
+            NullLogger<DeleteAvatarHandler>.Instance);
+        var (session, pipe) = CreateSessionInCharSelect();
+
+        await handler.HandleAsync(Request(), session, CancellationToken.None);
+
+        Assert.Equal(DisconnectReason.Malformed, session.DisconnectReason);
+        Assert.Empty(characters.DeleteCalls);
+        PacketAssert.AssertNothingSent(pipe);
+    }
+
     [Theory]
     [InlineData(-1)]
     [InlineData(3)]

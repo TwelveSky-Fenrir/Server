@@ -111,7 +111,7 @@ public class RenameAvatarServiceTests
     }
 
     [Fact]
-    public async Task RenameAvatarAsync_EmptySlot_ReturnsSlotMissingWithoutQueryingAnything()
+    public async Task RenameAvatarAsync_EmptySlot_ReturnsSlotEmptyWithoutQueryingAnything()
     {
         var characters = FakeCharacterRepository.WithNone();
         var renames = FakeCharacterRenameRepository.ReturningResult(0);
@@ -120,7 +120,7 @@ public class RenameAvatarServiceTests
         var result = await service.RenameAvatarAsync(AccountId, Slot, "NewName", ItemContainer, ItemSlot,
             CancellationToken.None);
 
-        Assert.Equal(RenameAvatarOutcome.SlotMissing, result.Outcome);
+        Assert.Equal(RenameAvatarOutcome.SlotEmpty, result.Outcome);
         Assert.Null(renames.LastCall);
         Assert.Empty(characters.QueriedItemSlots);
     }

@@ -17,13 +17,12 @@ public sealed class DeleteAvatarService(
     {
         var roster = await characters.GetByAccountAsync(accountId, cancellationToken);
         var character = roster.FirstOrDefault(c => c.Slot == avatarPost);
+        if (character is null)
+            return new DeleteAvatarResult(DeleteAvatarOutcome.SlotEmpty);
 
-        if (character is not null)
-        {
-            var outcome = await CheckBusinessRulesAsync(character, cancellationToken);
-            if (outcome != DeleteAvatarOutcome.Success)
-                return new DeleteAvatarResult(outcome);
-        }
+        var outcome = await CheckBusinessRulesAsync(character, cancellationToken);
+        if (outcome != DeleteAvatarOutcome.Success)
+            return new DeleteAvatarResult(outcome);
 
         try
         {
@@ -39,7 +38,7 @@ public sealed class DeleteAvatarService(
         return new DeleteAvatarResult(DeleteAvatarOutcome.Success);
     }
 
-    private async ValueTask<DeleteAvatarOutcome> CheckBusinessRulesAsync(CharacterSummaryDto character,
+        private async ValueTask<DeleteAvatarOutcome> CheckBusinessRulesAsync(CharacterSummaryDto character,
         CancellationToken ct)
     {
         var tribeRole = await tribes.GetRoleForCharacterAsync(character.CharacterId, ct);

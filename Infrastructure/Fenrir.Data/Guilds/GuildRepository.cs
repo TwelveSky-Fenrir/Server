@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using System.Data;
 using CaeriusNet.Abstractions;
@@ -28,11 +29,13 @@ public sealed record GuildRepository(ICaeriusNetDbContext Db) : IGuildRepository
         return await Db.FirstQueryAsync<GuildSummaryDto>(sp, ct);
     }
 
-    public async ValueTask<ReadOnlyCollection<GuildSummaryDto>> GetAllAsync(CancellationToken ct)
+    // Polled every 30s by GuildBuffDecayHost -- QueryAsImmutableArrayAsync is the polled/hot-path terminal
+    // call, not QueryAsReadOnlyCollectionAsync (request/response shape).
+    public async ValueTask<ImmutableArray<GuildSummaryDto>> GetAllAsync(CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Guild_GetAll", 64).Build();
 
-        return await Db.QueryAsReadOnlyCollectionAsync<GuildSummaryDto>(sp, ct);
+        return await Db.QueryAsImmutableArrayAsync<GuildSummaryDto>(sp, ct);
     }
 
     public async ValueTask<ReadOnlyCollection<GuildRankingRowDto>> GetTopByPointsAsync(int count, CancellationToken ct)
@@ -42,6 +45,15 @@ public sealed record GuildRepository(ICaeriusNetDbContext Db) : IGuildRepository
             .Build();
 
         return await Db.QueryAsReadOnlyCollectionAsync<GuildRankingRowDto>(sp, ct);
+    }
+
+    public async ValueTask<ReadOnlyCollection<GuildRankingDetailDto>> GetRankingAsync(int count, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_Guild_GetRanking", count)
+            .AddParameter("Count", count, SqlDbType.Int)
+            .Build();
+
+        return await Db.QueryAsReadOnlyCollectionAsync<GuildRankingDetailDto>(sp, ct);
     }
 
     public async ValueTask AdjustPointsAsync(int guildId, int delta, CancellationToken ct)

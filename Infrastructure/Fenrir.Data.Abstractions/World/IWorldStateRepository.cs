@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 
 namespace Fenrir.Data.Abstractions.World;
@@ -6,16 +7,18 @@ public interface IWorldStateRepository
 {
     public ValueTask EnsureInitializedAsync(CancellationToken ct);
 
-    public ValueTask<(WorldStateRowDto? Row, ReadOnlyCollection<WorldStateTribeDto> Tribes,
-        ReadOnlyCollection<WorldStateAllianceOfferDto> AllianceOffers)> GetAsync(CancellationToken ct);
+    // Polled every 5s for the process lifetime by WorldStateWriteBehindHost -> WorldStateService.ReconcileAsync,
+    // so this is the polled/hot-path read shape (ImmutableArray), not the request/response shape.
+    public ValueTask<(WorldStateRowDto? Row, ImmutableArray<WorldStateTribeDto> Tribes,
+        ImmutableArray<WorldStateAllianceOfferDto> AllianceOffers)> GetAsync(CancellationToken ct);
 
     public ValueTask UpdateAsync(byte? zone038WinTribe, int? zone038WinTribeTime, bool tribeSymbolBattle,
         byte? monsterSymbol, int? monsterSymbolEndTime, byte? highTribe, short updateTribePoint, CancellationToken ct);
 
-    public ValueTask UpdateTribeAsync(byte tribeId, DateTime? symbolDate, bool hasSymbol, int points, bool isClosed,
+    public ValueTask UpdateTribeAsync(byte tribeId, DateTime? symbolDateUtc, bool hasSymbol, int points, bool isClosed,
         CancellationToken ct);
 
-    public ValueTask UpdateTribeSymbolStateAsync(byte tribeId, DateTime? symbolDate, bool hasSymbol, bool isClosed,
+    public ValueTask UpdateTribeSymbolStateAsync(byte tribeId, DateTime? symbolDateUtc, bool hasSymbol, bool isClosed,
         CancellationToken ct);
 
     public ValueTask AddTribePointsAsync(byte tribeId, int delta, CancellationToken ct);

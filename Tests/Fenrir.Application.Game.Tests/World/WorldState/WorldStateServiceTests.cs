@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Tests.TestSupport;
@@ -538,8 +539,8 @@ public class WorldStateServiceTests
             return _inner.EnsureInitializedAsync(ct);
         }
 
-        public async ValueTask<(WorldStateRowDto? Row, ReadOnlyCollection<WorldStateTribeDto> Tribes,
-                ReadOnlyCollection<WorldStateAllianceOfferDto> AllianceOffers)>
+        public async ValueTask<(WorldStateRowDto? Row, ImmutableArray<WorldStateTribeDto> Tribes,
+                ImmutableArray<WorldStateAllianceOfferDto> AllianceOffers)>
             GetAsync(CancellationToken ct)
         {
             ServiceUnderTest?.SetZone038Winner(3);
@@ -607,14 +608,13 @@ public class WorldStateServiceTests
             return ValueTask.CompletedTask;
         }
 
-        public ValueTask<(WorldStateRowDto? Row, ReadOnlyCollection<WorldStateTribeDto> Tribes,
-                ReadOnlyCollection<WorldStateAllianceOfferDto> AllianceOffers)>
+        public ValueTask<(WorldStateRowDto? Row, ImmutableArray<WorldStateTribeDto> Tribes,
+                ImmutableArray<WorldStateAllianceOfferDto> AllianceOffers)>
             GetAsync(CancellationToken ct)
         {
-            return ValueTask.FromResult<(WorldStateRowDto?, ReadOnlyCollection<WorldStateTribeDto>,
-                ReadOnlyCollection<WorldStateAllianceOfferDto>)>(
-                (null, new ReadOnlyCollection<WorldStateTribeDto>([]),
-                    new ReadOnlyCollection<WorldStateAllianceOfferDto>([])));
+            return ValueTask.FromResult<(WorldStateRowDto?, ImmutableArray<WorldStateTribeDto>,
+                ImmutableArray<WorldStateAllianceOfferDto>)>(
+                (null, [], []));
         }
 
         public ValueTask UpdateAsync(byte? zone038WinTribe, int? zone038WinTribeTime, bool tribeSymbolBattle,

@@ -1,5 +1,6 @@
 -- NULL @ExpiresAtUtc = permanent ban. Not idempotent: every call inserts a new row, even a repeat ban
--- of the same target -- bans are a log, not a single-row-per-target flag (that's IsBanned's job).
+-- of the same target -- bans are a log, not a single-row-per-target flag. auth.Accounts.IsBanned was
+-- meant to be that flag, but nothing writes it here or anywhere else today (dead column, see Accounts.sql).
 -- THROW 50301 if neither @AccountId nor @CharacterId is given (CK_Bans_AccountOrCharacter is the
 -- last-resort backstop under a race).
 --

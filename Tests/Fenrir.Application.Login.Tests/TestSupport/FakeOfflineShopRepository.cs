@@ -76,6 +76,12 @@ internal sealed class FakeOfflineShopRepository : IOfflineShopRepository
         throw new NotSupportedException();
     }
 
+    public ValueTask ExtendRentalAndReplaceContainerAsync(int characterId, int newShopDate, byte container,
+        IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
+    {
+        throw new NotSupportedException();
+    }
+
     public static FakeOfflineShopRepository Empty()
     {
         return new FakeOfflineShopRepository();

@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Services.Tribes;
 using Fenrir.Data.Abstractions.Tribes;
@@ -77,12 +77,12 @@ public class SqlTribePointRosterGatewayTests
         public List<TribeRosterCharacterDto> Rows { get; init; } = [];
         public Exception? Throw { get; init; }
 
-        public ValueTask<ReadOnlyCollection<TribeRosterCharacterDto>> GetForTribePointAsync(CancellationToken ct)
+        public ValueTask<ImmutableArray<TribeRosterCharacterDto>> GetForTribePointAsync(CancellationToken ct)
         {
             if (Throw is { } ex)
                 throw ex;
 
-            return ValueTask.FromResult(new ReadOnlyCollection<TribeRosterCharacterDto>(Rows));
+            return ValueTask.FromResult(Rows.ToImmutableArray());
         }
     }
 }

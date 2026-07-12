@@ -16,22 +16,35 @@ public sealed record SessionTicketRepository(ICaeriusNetDbContext Db) : ISession
     private const int ErrorDependencyFailure = 41305;
     private const int ErrorCommitDependencyAborted = 41325;
 
-    private const int MaxConsumeAttempts = 3;
+    private const int MaxWriteConflictAttempts = 3;
 
-    public ValueTask CreateAsync(int accountId, int characterId, byte shardId, int ttlSeconds, Guid sessionToken,
-        short accountGrade, CancellationToken ct)
+    public async ValueTask CreateAsync(int accountId, int characterId, byte shardId, int ttlSeconds,
+        Guid sessionToken, short accountGrade, CancellationToken ct)
     {
-        var parameters =
-            new StoredProcedureParametersBuilder("runtime", "usp_SessionTicket_Create", 0, CommandTimeoutSeconds)
-                .AddParameter("AccountId", accountId, SqlDbType.Int)
-                .AddParameter("CharacterId", characterId, SqlDbType.Int)
-                .AddParameter("ShardId", shardId, SqlDbType.TinyInt)
-                .AddParameter("TtlSeconds", ttlSeconds, SqlDbType.Int)
-                .AddParameter("SessionToken", sessionToken, SqlDbType.UniqueIdentifier)
-                .AddParameter("AccountGrade", accountGrade, SqlDbType.SmallInt)
-                .Build();
+        // DELETE-then-INSERT for the same AccountId can race a second, near-simultaneous zone-transfer/
+        // world-entry offer for that same account (e.g. a duplicate-click transfer request) -- retry rather
+        // than surface a transient 41302/41305/41325 from runtime.SessionTickets' own memory-optimized table.
+        for (var attempt = 1;; attempt++)
+        {
+            var parameters =
+                new StoredProcedureParametersBuilder("runtime", "usp_SessionTicket_Create", 0, CommandTimeoutSeconds)
+                    .AddParameter("AccountId", accountId, SqlDbType.Int)
+                    .AddParameter("CharacterId", characterId, SqlDbType.Int)
+                    .AddParameter("ShardId", shardId, SqlDbType.TinyInt)
+                    .AddParameter("TtlSeconds", ttlSeconds, SqlDbType.Int)
+                    .AddParameter("SessionToken", sessionToken, SqlDbType.UniqueIdentifier)
+                    .AddParameter("AccountGrade", accountGrade, SqlDbType.SmallInt)
+                    .Build();
 
-        return Db.ExecuteAsync(parameters, ct);
+            try
+            {
+                await Db.ExecuteAsync(parameters, ct);
+                return;
+            }
+            catch (SqlException ex) when (attempt < MaxWriteConflictAttempts && IsWriteConflict(ex.Number))
+            {
+            }
+        }
     }
 
     public async ValueTask<ConsumedTicketDto?> ConsumeAsync(int accountId, CancellationToken ct)
@@ -47,7 +60,7 @@ public sealed record SessionTicketRepository(ICaeriusNetDbContext Db) : ISession
             {
                 return await Db.FirstQueryAsync<ConsumedTicketDto>(parameters, ct);
             }
-            catch (SqlException ex) when (attempt < MaxConsumeAttempts && IsConsumeWriteConflict(ex.Number))
+            catch (SqlException ex) when (attempt < MaxWriteConflictAttempts && IsWriteConflict(ex.Number))
             {
             }
         }
@@ -62,7 +75,7 @@ public sealed record SessionTicketRepository(ICaeriusNetDbContext Db) : ISession
         return Db.ExecuteAsync(parameters, ct);
     }
 
-    private static bool IsConsumeWriteConflict(int errorNumber)
+    private static bool IsWriteConflict(int errorNumber)
     {
         return errorNumber is ErrorWriteConflict or ErrorDependencyFailure or ErrorCommitDependencyAborted;
     }

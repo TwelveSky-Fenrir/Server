@@ -10,9 +10,10 @@
 -- no error, exactly matching the legacy's own best-effort fire-and-forget sweep (a lost sweep destroys that
 -- window's tax with no retry -- see TribeBankTaxAccumulator.TrySweep / TribeBankTaxSweepFlushHost).
 --
--- This is why game.usp_TribeBank_Deposit (native, single-slot, no ceiling check, no scan-for-room) cannot
--- implement the contract as written -- see ITribeBankTaxSweepGateway's own remarks. This procedure is the
--- scan-for-room / cap-fallback merge that proc always lacked.
+-- This is why game.usp_TribeBank_Deposit (native, single-slot, no ceiling check, no scan-for-room -- EXEC'd
+-- internally by usp_TribeBank_DepositFromCharacter for the player-driven leg, no direct C# caller of its own)
+-- cannot implement the contract as written -- see ITribeBankTaxSweepGateway's own remarks. This procedure is
+-- the scan-for-room / cap-fallback merge that proc always lacked.
 --
 -- Disk-based (interop), NOT natively compiled: it needs a recursive CTE to enumerate the 50 slots (including
 -- slots with no materialized row, which are implicitly 0), which native compilation does not support. It

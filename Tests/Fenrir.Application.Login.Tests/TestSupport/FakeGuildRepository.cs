@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using Fenrir.Data.Abstractions.Guilds;
 
@@ -20,7 +21,7 @@ internal sealed class FakeGuildRepository : IGuildRepository
         throw new NotSupportedException();
     }
 
-    public ValueTask<ReadOnlyCollection<GuildSummaryDto>> GetAllAsync(CancellationToken ct)
+    public ValueTask<ImmutableArray<GuildSummaryDto>> GetAllAsync(CancellationToken ct)
     {
         throw new NotSupportedException();
     }

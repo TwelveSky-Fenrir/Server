@@ -22,8 +22,6 @@ public sealed class LoginHandler(ILoginService loginService, ILogger<LoginHandle
 
         switch (result.Outcome)
         {
-            case LoginOutcome.RateLimited:
-                return;
             case LoginOutcome.DuplicateSessionEvicted:
                 return;
             case LoginOutcome.Failure:

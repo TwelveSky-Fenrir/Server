@@ -13,4 +13,8 @@ internal static class AccountSecurityEventCodes
     public const short MousePinChangeLockout = 5;
 
     public const short MousePinAttemptRejectedLocked = 6;
+
+    public const short LoginPasswordMismatch = 7;
+
+    public const short LoginPasswordAttemptRejectedLocked = 8;
 }

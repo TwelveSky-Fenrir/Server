@@ -8,7 +8,6 @@ using Fenrir.Application.Game.Services.Tribes;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.Tests.World.WorldState;
-using Fenrir.Data.Abstractions.Admin;
 using Fenrir.Data.Abstractions.World;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -77,10 +76,10 @@ public class TribeMigrationServiceTests
     }
 
     private static TribeMigrationService CreateService(FakeCharacterRepository characters,
-        FakeTribeFourQuotaRepository quota, WorldStateService worldState, GameServerOptions options,
-        QuestCatalog? catalog = null, TimeProvider? timeProvider = null)
+        WorldStateService worldState, GameServerOptions options, QuestCatalog? catalog = null,
+        TimeProvider? timeProvider = null)
     {
-        return new TribeMigrationService(characters, quota, worldState, catalog ?? CatalogWith(),
+        return new TribeMigrationService(characters, worldState, catalog ?? CatalogWith(),
             Options.Create(options), timeProvider ?? SaturdayWithinWindow,
             NullLogger<TribeMigrationService>.Instance);
     }
@@ -103,8 +102,7 @@ public class TribeMigrationServiceTests
             state.Experience);
 
         var characters = new FakeCharacterRepository();
-        var quota = new FakeTribeFourQuotaRepository();
-        var service = CreateService(characters, quota, worldState, options);
+        var service = CreateService(characters, worldState, options);
 
         var outcome = await RunToCompletionAsync(service.ConvertAsync(zone, state, CharacterId, CancellationToken.None),
             zone);
@@ -119,7 +117,7 @@ public class TribeMigrationServiceTests
 
         var persisted = Assert.Single(characters.TribeFourConversions);
         Assert.Equal((CharacterId, (byte)3, 0, 0, 0, 0, 0), persisted);
-        Assert.Equal(1, quota.ConsumeCallCount);
+        Assert.True(characters.LastConsumeSharedQuota);
 
         Assert.Equal(experience, state.Experience);
         Assert.Equal(statPoints, state.StatPoints);
@@ -140,8 +138,7 @@ public class TribeMigrationServiceTests
         var catalog = CatalogWith(stepOne, stepTwo);
 
         var characters = new FakeCharacterRepository();
-        var quota = new FakeTribeFourQuotaRepository();
-        var service = CreateService(characters, quota, worldState, options, catalog);
+        var service = CreateService(characters, worldState, options, catalog);
 
         var outcome = await RunToCompletionAsync(service.ConvertAsync(zone, state, CharacterId, CancellationToken.None),
             zone);
@@ -154,6 +151,7 @@ public class TribeMigrationServiceTests
 
         var persisted = Assert.Single(characters.TribeFourConversions);
         Assert.Equal((CharacterId, (byte)1, 2, 0, 0, 0, 0), persisted);
+        Assert.True(characters.LastConsumeSharedQuota);
     }
 
     [Fact]
@@ -161,9 +159,8 @@ public class TribeMigrationServiceTests
     {
         var options = new GameServerOptions { TribeFourConversionEnabled = true };
         var (zone, state, worldState) = SetUp(options, WithTribePoints(200, 50, 100, 0), 0);
-        var characters = new FakeCharacterRepository();
-        var quota = new FakeTribeFourQuotaRepository { RemainingGrants = 0 };
-        var service = CreateService(characters, quota, worldState, options);
+        var characters = new FakeCharacterRepository { ThrowQuotaExhausted = true };
+        var service = CreateService(characters, worldState, options);
 
         var outcome = await RunToCompletionAsync(service.ConvertAsync(zone, state, CharacterId, CancellationToken.None),
             zone);
@@ -179,15 +176,13 @@ public class TribeMigrationServiceTests
         var options = new GameServerOptions { TribeFourConversionEnabled = true };
         var (zone, state, worldState) = SetUp(options, WithTribePoints(200, 50, 100, 0), 0, 1);
         var characters = new FakeCharacterRepository();
-        var quota = new FakeTribeFourQuotaRepository { RemainingGrants = 1 };
-        var service = CreateService(characters, quota, worldState, options);
+        var service = CreateService(characters, worldState, options);
 
         var outcome = await RunToCompletionAsync(service.ConvertAsync(zone, state, CharacterId, CancellationToken.None),
             zone);
 
         Assert.Equal(TribeMigrationOutcome.LevelTooLow, outcome);
-        Assert.Equal(0, quota.ConsumeCallCount);
-        Assert.Equal(1, quota.RemainingGrants);
+        Assert.Null(characters.LastConsumeSharedQuota);
         Assert.Empty(characters.TribeFourConversions);
     }
 
@@ -197,14 +192,13 @@ public class TribeMigrationServiceTests
         var options = new GameServerOptions { TribeFourConversionEnabled = false };
         var (zone, state, worldState) = SetUp(options, WithTribePoints(200, 50, 100, 0), 0);
         var characters = new FakeCharacterRepository();
-        var quota = new FakeTribeFourQuotaRepository();
-        var service = CreateService(characters, quota, worldState, options);
+        var service = CreateService(characters, worldState, options);
 
         var outcome = await RunToCompletionAsync(service.ConvertAsync(zone, state, CharacterId, CancellationToken.None),
             zone);
 
         Assert.Equal(TribeMigrationOutcome.FeatureDisabled, outcome);
-        Assert.Equal(0, quota.ConsumeCallCount);
+        Assert.Null(characters.LastConsumeSharedQuota);
         Assert.Empty(characters.TribeFourConversions);
     }
 
@@ -215,22 +209,6 @@ public class TribeMigrationServiceTests
         public override DateTimeOffset GetUtcNow()
         {
             return utcNow;
-        }
-    }
-
-    private sealed class FakeTribeFourQuotaRepository : ITribeFourQuotaRepository
-    {
-        public int RemainingGrants { get; set; } = int.MaxValue;
-        public int ConsumeCallCount { get; private set; }
-
-        public ValueTask<bool> TryConsumeAsync(CancellationToken ct)
-        {
-            ConsumeCallCount++;
-            if (RemainingGrants <= 0)
-                return ValueTask.FromResult(false);
-
-            RemainingGrants--;
-            return ValueTask.FromResult(true);
         }
     }
 }

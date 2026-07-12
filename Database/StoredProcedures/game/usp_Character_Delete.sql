@@ -9,8 +9,10 @@
 -- OTHER character row may still hold pointing at this one, reproduces legacy DeleteCharacter's steps 3-5
 -- (unchecked fire-and-forget cleanup of game.HeroRankings/game.OfflineShops -- the HeroRankCur/ProxyInfo
 -- analogues), and additionally cleans up admin.Bans/admin.Mutes (character-only rows carry a live FK on
--- CharacterId, both independently nullable alongside AccountId) and game.TribeBankLog (permanent per-movement
--- audit trail, CharacterId NOT NULL) -- none of which AvatarDeletionGate's own preconditions ever check for.
+-- CharacterId, both independently nullable alongside AccountId) and preserves game.TribeBankLog's permanent
+-- per-movement audit trail by nulling out its own now-nullable CharacterId column rather than deleting the
+-- row (TribeBankLog carries no AccountId fallback, so unlike Bans/Mutes this null-out is unconditional) --
+-- none of which AvatarDeletionGate's own preconditions ever check for.
 --
 -- Deliberately NOT cleaned up here: game.GuildMembers, game.Tribes.MasterCharacterId, game.TribeSubMasters,
 -- and game.TribeVotes. Login's DeleteAvatarService (Fenrir.Application.Login.Domain.Avatars.
@@ -62,6 +64,15 @@ BEGIN
     FROM game.CharacterFriends
     WHERE CharacterId = @CharacterId
        OR FriendCharacterId = @CharacterId;
+    DELETE
+    FROM game.CharacterPetBag
+    WHERE CharacterId = @CharacterId;
+    DELETE
+    FROM game.CharacterRunes
+    WHERE CharacterId = @CharacterId;
+    DELETE
+    FROM game.CharacterCostumes
+    WHERE CharacterId = @CharacterId;
 
     -- Legacy DeleteCharacter steps 3-5 (RankInfo/HeroRankCur/ProxyInfo): unchecked, fire-and-forget cleanup.
     DELETE
@@ -91,10 +102,12 @@ BEGIN
     WHERE CharacterId = @CharacterId
       AND AccountId IS NULL;
 
-    -- game.TribeBankLog: CharacterId is NOT NULL, no account-level fallback exists -- unchecked cleanup,
-    -- same posture as HeroRankings/OfflineShops above.
-    DELETE
-    FROM game.TribeBankLog
+    -- game.TribeBankLog: append-only audit trail per its own header comment -- must survive character
+    -- deletion, same posture as admin.Bans/admin.Mutes above. Unlike those two, TribeBankLog carries no
+    -- separate AccountId fallback column (CharacterId is its only actor reference), so the row is always
+    -- preserved with CharacterId nulled out rather than branching on an account-level record still existing.
+    UPDATE game.TribeBankLog
+    SET CharacterId = NULL
     WHERE CharacterId = @CharacterId;
 
     DELETE

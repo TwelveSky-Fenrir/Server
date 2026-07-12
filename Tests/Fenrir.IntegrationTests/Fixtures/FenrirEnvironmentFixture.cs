@@ -228,7 +228,7 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync();
         await using var command = new SqlCommand(
-            "INSERT INTO admin.GmAllowlist (IpAddress) VALUES (@IpAddress);", connection);
+            "INSERT INTO admin.GmAllowlists (IpAddress) VALUES (@IpAddress);", connection);
         command.Parameters.AddWithValue("@IpAddress", IPAddress.Loopback.ToString());
         await command.ExecuteNonQueryAsync();
     }

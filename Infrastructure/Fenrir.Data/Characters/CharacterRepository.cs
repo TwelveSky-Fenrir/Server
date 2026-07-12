@@ -25,14 +25,19 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
 
     public async ValueTask<CharacterAccountRosterBundle> GetAccountRosterAsync(int accountId, CancellationToken ct)
     {
-        var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetAccountRoster", 3)
+        // QueryMultipleReadOnlyCollectionAsync reuses this one capacity across all 4 result sets -- RS0 (characters)
+        // is bounded at 3 (MAX_USER_AVATAR_NUM), but RS1 (items) can carry up to 3 characters' worth of
+        // equipment/inventory/store rows. 192 mirrors GetWorldEntryBundleAsync's own 64-row per-character budget
+        // multiplied by the 3-character roster bound, rather than sizing for RS0 alone.
+        var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetAccountRoster", 192)
             .AddParameter("AccountId", accountId, SqlDbType.Int)
             .Build();
 
-        var (characters, items) = await Db
-            .QueryMultipleReadOnlyCollectionAsync<CharacterRosterDto, CharacterRosterItemDto>(sp, ct);
+        var (characters, items, petBagSlots, costumeSlots) = await Db
+            .QueryMultipleReadOnlyCollectionAsync<CharacterRosterDto, CharacterRosterItemDto,
+                CharacterRosterPetBagSlotDto, CharacterRosterCostumeSlotDto>(sp, ct);
 
-        return new CharacterAccountRosterBundle(characters, items);
+        return new CharacterAccountRosterBundle(characters, items, petBagSlots, costumeSlots);
     }
 
     public async ValueTask<int> CreateAsync(
@@ -145,9 +150,13 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
+    // CharacterWorldEntryDto reads only a 19-column prefix by design -- see its own doc comment in
+    // CharacterDtos.cs. Calls the single-result-set usp_Character_GetForWorldEntrySummary companion rather
+    // than the 5-result-set usp_Character_GetForWorldEntry that GetWorldEntryBundleAsync below uses, so SQL
+    // Server never computes/transmits the item/skill/hotkey/buff result sets this method discards anyway.
     public async ValueTask<CharacterWorldEntryDto?> GetForWorldEntryAsync(int characterId, CancellationToken ct)
     {
-        var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetForWorldEntry", 1)
+        var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetForWorldEntrySummary", 1)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
             .Build();
 
@@ -238,6 +247,20 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
+    public async ValueTask PersistFinalFlushAsync(CharacterProgressTvp progress, CharacterPositionTvp position,
+        CancellationToken ct)
+    {
+        IReadOnlyList<CharacterProgressTvp> progressRows = [progress];
+        IReadOnlyList<CharacterPositionTvp> positionRows = [position];
+
+        var sp = new StoredProcedureParametersBuilder("game", "usp_Character_PersistFinalFlush", 0)
+            .AddTvpParameter("Progress", progressRows)
+            .AddTvpParameter("Position", positionRows)
+            .Build();
+
+        await Db.ExecuteAsync(sp, ct);
+    }
+
     public async ValueTask AdjustMoneyAsync(int characterId, long deltaMoney, int deltaBigMoney, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_AdjustMoney", 0)
@@ -250,19 +273,24 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
     }
 
     public async ValueTask AdjustStoreMoneyAsync(int characterId, long deltaMoney, long deltaStoreMoney,
-        CancellationToken ct)
+        CancellationToken ct, int? auditAccountId = null, short? auditEventCode = null, int? auditQuantity = null)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_AdjustStoreMoney", 0)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
             .AddParameter("DeltaMoney", deltaMoney, SqlDbType.BigInt)
             .AddParameter("DeltaStoreMoney", deltaStoreMoney, SqlDbType.BigInt)
+            .AddParameter("AuditAccountId", (object?)auditAccountId ?? DBNull.Value, SqlDbType.Int)
+            .AddParameter("AuditEventCode", (object?)auditEventCode ?? DBNull.Value, SqlDbType.SmallInt)
+            .AddParameter("AuditQuantity", (object?)auditQuantity ?? DBNull.Value, SqlDbType.Int)
             .Build();
 
         await Db.ExecuteAsync(sp, ct);
     }
 
     public async ValueTask AdjustMoneyAndReplaceContainerAsync(int characterId, long deltaMoney, int deltaBigMoney,
-        byte container, IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
+        byte container, IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct,
+        int? auditAccountId = null, short? auditEventCode = null, int? auditItemId = null,
+        int? auditQuantity = null, string? auditPayload = null)
     {
         var builder = new StoredProcedureParametersBuilder("game", "usp_Character_AdjustMoneyAndReplaceContainer", 0)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
@@ -272,6 +300,12 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
 
         if (items.Count > 0)
             builder.AddTvpParameter("Items", items);
+
+        builder.AddParameter("AuditAccountId", (object?)auditAccountId ?? DBNull.Value, SqlDbType.Int)
+            .AddParameter("AuditEventCode", (object?)auditEventCode ?? DBNull.Value, SqlDbType.SmallInt)
+            .AddParameter("AuditItemId", (object?)auditItemId ?? DBNull.Value, SqlDbType.Int)
+            .AddParameter("AuditQuantity", (object?)auditQuantity ?? DBNull.Value, SqlDbType.Int)
+            .AddParameter("AuditPayload", (object?)auditPayload ?? DBNull.Value, SqlDbType.NVarChar);
 
         await Db.ExecuteAsync(builder.Build(), ct);
     }
@@ -443,6 +477,21 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
+    public async ValueTask SetMountProgressionAsync(int characterId, int mountItemId, int mountExpActivity,
+        int mountPower, int mountSlotIndex, int mountTime, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_Character_SetMountProgression", 0)
+            .AddParameter("CharacterId", characterId, SqlDbType.Int)
+            .AddParameter("MountItemId", mountItemId, SqlDbType.Int)
+            .AddParameter("MountExpActivity", mountExpActivity, SqlDbType.Int)
+            .AddParameter("MountPower", mountPower, SqlDbType.Int)
+            .AddParameter("MountSlotIndex", mountSlotIndex, SqlDbType.Int)
+            .AddParameter("MountTime", mountTime, SqlDbType.Int)
+            .Build();
+
+        await Db.ExecuteAsync(sp, ct);
+    }
+
     public async ValueTask<int?> GetIdByNameAsync(string name, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetIdByName", 1)
@@ -569,7 +618,8 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
     }
 
     public async ValueTask ApplyTribeFourConversionAsync(int characterId, byte newTribe, int stepPermanent,
-        int activeQuestId, int qSort, int targetPhase, int killCounter, CancellationToken ct)
+        int activeQuestId, int qSort, int targetPhase, int killCounter, bool consumeSharedQuota,
+        CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_ApplyTribeFourConversion", 0)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
@@ -579,6 +629,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
             .AddParameter("QSort", qSort, SqlDbType.Int)
             .AddParameter("TargetPhase", targetPhase, SqlDbType.Int)
             .AddParameter("KillCounter", killCounter, SqlDbType.Int)
+            .AddParameter("ConsumeQuota", consumeSharedQuota, SqlDbType.Bit)
             .Build();
 
         await Db.ExecuteAsync(sp, ct);

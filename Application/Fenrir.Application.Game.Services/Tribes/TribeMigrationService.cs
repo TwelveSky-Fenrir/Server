@@ -1,9 +1,9 @@
-using Fenrir.Application.Game.Abstractions.Tribes;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.WorldState;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -11,13 +11,17 @@ namespace Fenrir.Application.Game.Services.Tribes;
 
 public sealed class TribeMigrationService(
     ICharacterRepository characters,
-    ITribeFourQuotaRepository quota,
     WorldStateService worldState,
     QuestCatalog questCatalog,
     IOptions<GameServerOptions> options,
     TimeProvider timeProvider,
     ILogger<TribeMigrationService> logger) : ITribeMigrationService
 {
+    // admin.TribeFourQuota exhausted -- thrown by usp_Character_ApplyTribeFourConversion's own
+    // @ConsumeQuota=1 branch (transaction-composition-audit fix: quota consumption and character conversion
+    // now commit atomically in that single procedure call instead of two separate, uncoordinated round trips).
+    private const int QuotaExhaustedErrorNumber = 50355;
+
     public async ValueTask<TribeMigrationOutcome> ConvertAsync(Zone zone, PlayerRuntimeState state, int characterId,
         CancellationToken ct)
     {
@@ -51,20 +55,23 @@ public sealed class TribeMigrationService(
             return outcome;
         }
 
-        if (!await quota.TryConsumeAsync(ct).ConfigureAwait(false))
+        var result = TribeMigrationConversion.Resolve(oldTribe, state.PreviousTribe, questCatalog);
+        var isReturnBranch = oldTribe == TribeMigrationGate.TribeFour;
+
+        try
+        {
+            await characters.ApplyTribeFourConversionAsync(characterId, result.NewTribe,
+                result.NewQuestProgress.StepPermanent, result.NewQuestProgress.ActiveFlag,
+                result.NewQuestProgress.QSort, result.NewQuestProgress.TargetPhase,
+                result.NewQuestProgress.KillCounter, consumeSharedQuota: true, ct).ConfigureAwait(false);
+        }
+        catch (SqlException ex) when (ex.Number == QuotaExhaustedErrorNumber)
         {
             logger.LogInformation(
                 "Character {CharacterId} fourth-tribe conversion rejected: shared daily quota exhausted",
                 characterId);
             return TribeMigrationOutcome.QuotaExhausted;
         }
-
-        var result = TribeMigrationConversion.Resolve(oldTribe, state.PreviousTribe, questCatalog);
-        var isReturnBranch = oldTribe == TribeMigrationGate.TribeFour;
-
-        await characters.ApplyTribeFourConversionAsync(characterId, result.NewTribe,
-            result.NewQuestProgress.StepPermanent, result.NewQuestProgress.ActiveFlag, result.NewQuestProgress.QSort,
-            result.NewQuestProgress.TargetPhase, result.NewQuestProgress.KillCounter, ct).ConfigureAwait(false);
 
         var command = new TribeProgressZoneCommand(characterId,
             Tribe: result.NewTribe,

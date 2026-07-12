@@ -12,7 +12,9 @@ public enum CreateAvatarOutcome
 
     FourthFactionDisabled,
 
-    SlotOccupied
+    SlotOccupied,
+
+    NameTaken
 }
 
 public readonly record struct CreateAvatarResult(CreateAvatarOutcome Outcome, AvatarInfo AvatarInfo);

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using Fenrir.Application.Game.Hosting.Guilds;
 using Fenrir.Application.Game.Tests.TestSupport;
@@ -160,7 +161,7 @@ public class GuildBuffDecayHostTests
             throw new NotSupportedException();
         }
 
-        public ValueTask<ReadOnlyCollection<GuildSummaryDto>> GetAllAsync(
+        public ValueTask<ImmutableArray<GuildSummaryDto>> GetAllAsync(
             CancellationToken ct)
         {
             throw new InvalidOperationException("Simulated SQL failure");
@@ -270,10 +271,10 @@ public class GuildBuffDecayHostTests
             throw new NotSupportedException();
         }
 
-        public ValueTask<ReadOnlyCollection<GuildSummaryDto>> GetAllAsync(CancellationToken ct)
+        public ValueTask<ImmutableArray<GuildSummaryDto>> GetAllAsync(CancellationToken ct)
         {
-            return ValueTask.FromResult(new ReadOnlyCollection<GuildSummaryDto>(
-                [Guild(1, 1, 5, DateTime.UtcNow.AddMinutes(-10).Ticks)]));
+            return ValueTask.FromResult(ImmutableArray.Create(
+                Guild(1, 1, 5, DateTime.UtcNow.AddMinutes(-10).Ticks)));
         }
 
         public ValueTask<ReadOnlyCollection<GuildRankingRowDto>> GetTopByPointsAsync(int count, CancellationToken ct)

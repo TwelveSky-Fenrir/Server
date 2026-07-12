@@ -8,7 +8,6 @@ namespace Fenrir.Application.Game.Services.Tribes;
 public sealed class TribeBankService(ITribeRepository tribes, ILogger<TribeBankService> logger) : ITribeBankService
 {
     private const int SlotCount = 50;
-    private const int RequiredSubMasterCount = 3;
 
     public async ValueTask<TribeBankResult> ViewAsync(ZoneClientSession zoneSession, PlayerRuntimeState state,
         CancellationToken ct)
@@ -22,47 +21,6 @@ public sealed class TribeBankService(ITribeRepository tribes, ILogger<TribeBankS
 
         var slots = await tribes.GetBankAsync(state.Tribe, ct);
         return new TribeBankResult(true, 1, BuildBankArray(slots), 0);
-    }
-
-    public async ValueTask<TribeBankResult> DepositAsync(int slotValue, PlayerRuntimeState state, int characterId,
-        CancellationToken ct)
-    {
-        if (slotValue < 0 || slotValue >= SlotCount || state.TribeRole != 1)
-        {
-            logger.LogWarning(
-                "Character {CharacterId} tribe-bank deposit rejected: slot {Slot} out of range or caller is not Force Leader",
-                characterId, slotValue);
-            return TribeBankResult.Aborted;
-        }
-
-        var subMasters = await tribes.GetSubMastersAsync(state.Tribe, ct);
-        if (subMasters.Count < RequiredSubMasterCount)
-        {
-            logger.LogWarning(
-                "Character {CharacterId} tribe-bank deposit rejected: tribe {Tribe} has only {SubMasterCount}/{RequiredSubMasterCount} sub-masters",
-                characterId, state.Tribe, subMasters.Count, RequiredSubMasterCount);
-            return TribeBankResult.Aborted;
-        }
-
-        long newMoney;
-        try
-        {
-            newMoney = await tribes.DepositBankAsync(state.Tribe, (byte)slotValue, characterId, ct);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex,
-                "Character {CharacterId} tribe-bank deposit (tribe {Tribe} slot {Slot}) failed", characterId,
-                state.Tribe, slotValue);
-            return TribeBankResult.Aborted;
-        }
-
-        logger.LogInformation(
-            "Character {CharacterId} deposited into tribe {Tribe} bank slot {Slot} (new balance {NewMoney})",
-            characterId, state.Tribe, slotValue, newMoney);
-
-        var slots = await tribes.GetBankAsync(state.Tribe, ct);
-        return new TribeBankResult(true, 2, BuildBankArray(slots), (int)newMoney);
     }
 
     private static int[] BuildBankArray(IReadOnlyCollection<TribeBankSlotDto> slots)

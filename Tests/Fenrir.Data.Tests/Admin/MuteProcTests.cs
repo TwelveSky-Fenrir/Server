@@ -81,6 +81,31 @@ public class MuteProcTests
         Assert.Equal(50306, targetless.Number);
     }
 
+    [Fact]
+    public async Task Mute_Create_WithActorIds_PersistsThemIndependentlyOfTheTargetPair()
+    {
+        var (_, targetCharacterId) = await CreateCharacterAsync();
+        var (gmAccountId, gmCharacterId) = await CreateCharacterAsync();
+
+        var muteId = await CreateMuteAsync(null, targetCharacterId, 1, null, gmAccountId, gmCharacterId);
+
+        Assert.Equal(gmAccountId,
+            await ScalarAsync<int>($"SELECT ActorAccountId FROM admin.Mutes WHERE MuteId = {muteId};"));
+        Assert.Equal(gmCharacterId,
+            await ScalarAsync<int>($"SELECT ActorCharacterId FROM admin.Mutes WHERE MuteId = {muteId};"));
+    }
+
+    [Fact]
+    public async Task Mute_Create_WithoutActorIds_PersistsNullActorColumns()
+    {
+        var (_, characterId) = await CreateCharacterAsync();
+
+        var muteId = await CreateMuteAsync(null, characterId, 1, null);
+
+        Assert.Equal(1, await ScalarAsync<int>(
+            $"SELECT COUNT(*) FROM admin.Mutes WHERE MuteId = {muteId} AND ActorAccountId IS NULL AND ActorCharacterId IS NULL;"));
+    }
+
     private async Task<(int AccountId, int CharacterId)> CreateCharacterAsync()
     {
         var accountId = await _accounts.CreateAsync($"mutetest-{Guid.NewGuid():N}",
@@ -96,7 +121,8 @@ public class MuteProcTests
         return (accountId, characterId);
     }
 
-    private async Task<int> CreateMuteAsync(int? accountId, int? characterId, byte reason, DateTime? expiresAtUtc)
+    private async Task<int> CreateMuteAsync(int? accountId, int? characterId, byte reason, DateTime? expiresAtUtc,
+        int? actorAccountId = null, int? actorCharacterId = null)
     {
         await using var connection = new SqlConnection(_connectionString);
         await connection.OpenAsync();
@@ -108,6 +134,8 @@ public class MuteProcTests
         command.Parameters.AddWithValue("CharacterId", (object?)characterId ?? DBNull.Value);
         command.Parameters.AddWithValue("Reason", reason);
         command.Parameters.AddWithValue("ExpiresAtUtc", (object?)expiresAtUtc ?? DBNull.Value);
+        command.Parameters.AddWithValue("ActorAccountId", (object?)actorAccountId ?? DBNull.Value);
+        command.Parameters.AddWithValue("ActorCharacterId", (object?)actorCharacterId ?? DBNull.Value);
         return (int)(await command.ExecuteScalarAsync())!;
     }
 

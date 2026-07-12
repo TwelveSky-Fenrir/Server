@@ -55,7 +55,8 @@ public sealed class PositionWriteBehindHostTests
 
         var characters = new FakeCharacterRepository();
         var progress = new ProgressWriteBehindHost(registry, characters);
-        await using var host = new PositionWriteBehindHost(registry, dirtyTracker, characters, progress,
+        var logoutState = new FakeCharacterLogoutStateRepository();
+        await using var host = new PositionWriteBehindHost(registry, dirtyTracker, characters, logoutState, progress,
             NullLogger<PositionWriteBehindHost>.Instance);
 
         await host.StartAsync(CancellationToken.None);
@@ -84,7 +85,8 @@ public sealed class PositionWriteBehindHostTests
 
         var characters = new FakeCharacterRepository();
         var progress = new ProgressWriteBehindHost(registry, characters);
-        await using var host = new PositionWriteBehindHost(registry, dirtyTracker, characters, progress,
+        var logoutState = new FakeCharacterLogoutStateRepository();
+        await using var host = new PositionWriteBehindHost(registry, dirtyTracker, characters, logoutState, progress,
             NullLogger<PositionWriteBehindHost>.Instance);
 
         await host.StartAsync(CancellationToken.None);
@@ -115,7 +117,8 @@ public sealed class PositionWriteBehindHostTests
 
         var characters = new FakeCharacterRepository();
         var progress = new ProgressWriteBehindHost(registry, characters);
-        await using var host = new PositionWriteBehindHost(registry, dirtyTracker, characters, progress,
+        var logoutState = new FakeCharacterLogoutStateRepository();
+        await using var host = new PositionWriteBehindHost(registry, dirtyTracker, characters, logoutState, progress,
             NullLogger<PositionWriteBehindHost>.Instance);
 
         await host.FlushCharacterNowAsync(characterId, CancellationToken.None);
@@ -129,7 +132,7 @@ public sealed class PositionWriteBehindHostTests
         Assert.Equal(characterId, positionRow.CharacterId);
         Assert.Equal(123f, positionRow.PosX);
 
-        Assert.Equal(originalFlushSequence + 1, positionRow.FlushSequence);
+        Assert.Equal(originalFlushSequence, positionRow.FlushSequence);
     }
 
     [Fact]
@@ -139,7 +142,8 @@ public sealed class PositionWriteBehindHostTests
 
         var characters = new FakeCharacterRepository();
         var progress = new ProgressWriteBehindHost(registry, characters);
-        await using var host = new PositionWriteBehindHost(registry, dirtyTracker, characters, progress,
+        var logoutState = new FakeCharacterLogoutStateRepository();
+        await using var host = new PositionWriteBehindHost(registry, dirtyTracker, characters, logoutState, progress,
             NullLogger<PositionWriteBehindHost>.Instance);
 
         const int missingCharacterId = 999;
@@ -147,5 +151,78 @@ public sealed class PositionWriteBehindHostTests
 
         Assert.Empty(characters.PersistedProgressRows);
         Assert.Empty(characters.PersistedPositionRows);
+    }
+
+    [Fact]
+    public async Task FlushCharacterNowAsync_PersistFails_QueuesForRetry_AndPersistsOnceStorageRecovers()
+    {
+        const int characterId = 50;
+        var (registry, dirtyTracker) = CreateRegistryWithOnePlayer(1, characterId, out var state);
+        state.PosX = 321f;
+        state.Life = 640;
+
+        var characters = new FakeCharacterRepository { ThrowOnPersistFinalFlush = true };
+        var progress = new ProgressWriteBehindHost(registry, characters);
+        var logoutState = new FakeCharacterLogoutStateRepository();
+        await using var host = new PositionWriteBehindHost(registry, dirtyTracker, characters, logoutState, progress,
+            NullLogger<PositionWriteBehindHost>.Instance);
+
+        await host.StartAsync(CancellationToken.None);
+
+        await host.FlushCharacterNowAsync(characterId, CancellationToken.None);
+
+        Assert.Empty(characters.PersistedProgressRows);
+        Assert.Empty(characters.PersistedPositionRows);
+
+        characters.ThrowOnPersistFinalFlush = false;
+        host.RequestImmediateFlush();
+
+        Assert.True(await WaitUntilAsync(() => characters.PersistedProgressRows.Count == 1, BoundedWait));
+        Assert.Equal(640, characters.PersistedProgressRows[0].Life);
+
+        var positionRow = Assert.Single(characters.PersistedPositionRows);
+        Assert.Equal(321f, positionRow.PosX);
+
+        await host.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task FlushCharacterNowAsync_PersistFails_ThenCharacterReconnectsWithNewSession_DiscardsStaleRetryWithoutOverwritingTheNewSession()
+    {
+        const int characterId = 51;
+        var (registry, dirtyTracker) = CreateRegistryWithOnePlayer(1, characterId, out var state);
+        state.PosX = 111f;
+
+        var characters = new FakeCharacterRepository { ThrowOnPersistFinalFlush = true };
+        var progress = new ProgressWriteBehindHost(registry, characters);
+        var logoutState = new FakeCharacterLogoutStateRepository();
+        await using var host = new PositionWriteBehindHost(registry, dirtyTracker, characters, logoutState, progress,
+            NullLogger<PositionWriteBehindHost>.Instance);
+
+        await host.StartAsync(CancellationToken.None);
+
+        await host.FlushCharacterNowAsync(characterId, CancellationToken.None);
+        Assert.Empty(characters.PersistedPositionRows);
+
+        registry[1].Post(ZoneCommand.Leave(characterId));
+        registry[1].Tick(TimeSpan.FromMilliseconds(50));
+
+        var (session, _) = ZoneTestKit.CreateSession(characterId);
+        registry[1].Post(ZoneCommand.Enter(characterId, ZoneTestKit.EnterData(session, 1)));
+        registry[1].Tick(TimeSpan.FromMilliseconds(50));
+
+        if (!registry.TryGetPlayer(characterId, out var newState))
+            throw new InvalidOperationException("Test setup failed to re-register the player.");
+        newState.PosX = 777f;
+
+        characters.ThrowOnPersistFinalFlush = false;
+        host.RequestImmediateFlush();
+
+        await Task.Delay(TimeSpan.FromMilliseconds(200));
+
+        Assert.Empty(characters.PersistedPositionRows);
+        Assert.Empty(characters.PersistedProgressRows);
+
+        await host.StopAsync(CancellationToken.None);
     }
 }

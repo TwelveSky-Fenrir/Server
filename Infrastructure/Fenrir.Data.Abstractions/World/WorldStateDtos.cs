@@ -17,7 +17,7 @@ public sealed partial record WorldStateRowDto(
 [GenerateDto]
 public sealed partial record WorldStateTribeDto(
     byte TribeId,
-    DateTime? SymbolDate,
+    DateTime? SymbolDateUtc,
     bool HasSymbol,
     int Points,
     bool IsClosed);

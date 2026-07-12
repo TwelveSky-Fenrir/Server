@@ -34,6 +34,17 @@ internal sealed class FakeAccountSessionRepository : IAccountSessionRepository
     public int ActiveSessionCountCallCount { get; private set; }
     public Exception? ActiveSessionCountException { get; set; }
 
+    public int ConcurrentDeviceSessionCount { get; set; }
+
+    public (int ExcludingAccountId, string AdapterIdentifier, string LocalIp, string RemoteIp)?
+        LastConcurrentDeviceSessionQuery { get; private set; }
+
+    public (int AccountId, string AdapterIdentifier, string LocalIp, string RemoteIp)? LastRecordedDeviceSignature
+    {
+        get;
+        private set;
+    }
+
     public ValueTask<AccountSessionClaimDto> ClaimOrSignalKickAsync(int accountId, Guid newSessionToken,
         CancellationToken ct)
     {
@@ -82,5 +93,19 @@ internal sealed class FakeAccountSessionRepository : IAccountSessionRepository
         return ActiveSessionCountException is null
             ? ValueTask.FromResult(ActiveSessionCount)
             : throw ActiveSessionCountException;
+    }
+
+    public ValueTask<int> GetConcurrentDeviceSessionCountAsync(int excludingAccountId, string adapterIdentifier,
+        string localIp, string remoteIp, CancellationToken ct)
+    {
+        LastConcurrentDeviceSessionQuery = (excludingAccountId, adapterIdentifier, localIp, remoteIp);
+        return ValueTask.FromResult(ConcurrentDeviceSessionCount);
+    }
+
+    public ValueTask RecordDeviceSignatureAsync(int accountId, string adapterIdentifier, string localIp,
+        string remoteIp, CancellationToken ct)
+    {
+        LastRecordedDeviceSignature = (accountId, adapterIdentifier, localIp, remoteIp);
+        return ValueTask.CompletedTask;
     }
 }

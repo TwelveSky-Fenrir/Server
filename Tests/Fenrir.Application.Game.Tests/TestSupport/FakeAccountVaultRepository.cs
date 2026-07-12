@@ -11,7 +11,8 @@ internal sealed class FakeAccountVaultRepository : IAccountVaultRepository
     public (int CharacterId, byte Container, IReadOnlyList<CharacterItemSlotTvp> Items, int AccountId,
         IReadOnlyList<AccountVaultItemSlotTvp> VaultItems)? LastItemTransfer { get; private set; }
 
-    public (int CharacterId, long DeltaCharacterMoney, int AccountId, long DeltaVaultMoney)? LastMoneyTransfer
+    public (int CharacterId, long DeltaCharacterMoney, int AccountId, long DeltaVaultMoney, short? AuditEventCode,
+        int? AuditQuantity)? LastMoneyTransfer
     {
         get;
         private set;
@@ -33,12 +34,13 @@ internal sealed class FakeAccountVaultRepository : IAccountVaultRepository
     }
 
     public ValueTask TransferMoneyWithCharacterAsync(int characterId, long deltaCharacterMoney, int accountId,
-        long deltaVaultMoney, CancellationToken ct)
+        long deltaVaultMoney, CancellationToken ct, short? auditEventCode = null, int? auditQuantity = null)
     {
         if (ThrowOnMoneyTransfer is { } ex)
             throw ex;
 
-        LastMoneyTransfer = (characterId, deltaCharacterMoney, accountId, deltaVaultMoney);
+        LastMoneyTransfer = (characterId, deltaCharacterMoney, accountId, deltaVaultMoney, auditEventCode,
+            auditQuantity);
 
         if (!_byAccount.TryGetValue(accountId, out var vault))
             vault = (0, 0, new Dictionary<short, AccountVaultItemSlotDto>());

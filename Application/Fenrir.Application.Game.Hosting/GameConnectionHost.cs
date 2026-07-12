@@ -179,7 +179,7 @@ public sealed class GameConnectionHost(
         catch (Exception ex)
         {
             logger.LogError(ex,
-                "Failed to flush final Position/Vitals/Progression state for character {CharacterId} on disconnect -- falling back to the periodic write-behind drain",
+                "Unexpected failure attempting the final Position/Vitals/Progression flush for character {CharacterId} on disconnect",
                 characterId);
         }
     }

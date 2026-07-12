@@ -9,13 +9,20 @@
 -- TribeTransferPermitCount: no legacy source available here documents the actual tribe-change mechanic a
 -- Faction Transfer Scroll (world.Items 8153/8154) unlocks -- only the permit-banking half is implemented
 -- (usp_Character_GrantTribeTransferPermit), the mirror image of BloodCoin's "spend but no grant" gap above.
+-- RebirthCount/M15PetLuckyBoxPity (TINYINT) and the 5 Eat*Potion counters (SMALLINT) are sized to their own
+-- CHECK bounds, not INT -- this is the busiest table in the schema (one row/character, read+written on
+-- nearly every hot path), so per-row width matters for buffer-pool page density. game.tvp_CharacterProgress
+-- and CharacterProgressTvp keep these columns as INT regardless (a TVP is transient client-side shape, not
+-- a stored row -- SQL Server converts the wider TVP value into the narrower destination column on write,
+-- same as any other parameter/column assignment).
 CREATE TABLE game.Characters
 (
     CharacterId              INT IDENTITY (1,1) NOT NULL,
     AccountId                INT                NOT NULL,
     Slot                     TINYINT            NOT NULL,
-    Name                     NVARCHAR(13)       NOT NULL,                                         -- MAX_AVATAR_NAME_LENGTH=13, a real wire truncation limit
-    Tribe                    TINYINT            NOT NULL,
+    Name                     NVARCHAR(13) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,           -- MAX_AVATAR_NAME_LENGTH=13, a real wire truncation limit. Collation pinned explicitly rather than inheriting the database's default (SQL_Latin1_General_CP1_CI_AS is SQL Server's own documented en-US default, so this changes no observable behavior today) -- stops usp_Character_Rename/usp_Character_GetIdByName's global name-uniqueness check from silently depending on that default continuing to hold; legacy pinned the equivalent column to utf8_unicode_ci explicitly (Server/BuildEU33/DB/nxtserver.sql:34).
+    Tribe                    TINYINT            NOT NULL
+        CONSTRAINT CK_Characters_Tribe CHECK (Tribe BETWEEN 0 AND 3),                                 -- 0-3, MAX_TRIBE_NUM=4 (matches game.Tribes.TribeId's own CK_Tribes_TribeId). Deliberately CHECK-only, no FK to game.Tribes: game.Tribes is populated by usp_WorldState_EnsureInitialized on first GameServer-shard boot (game.Tribes has no seed script of its own), while character creation runs on LoginServer, which can legitimately run before any GameServer shard has ever booted in a fresh environment -- an FK here would introduce a cross-server boot-ordering hazard the CHECK does not.
     Gender                   TINYINT            NOT NULL,
     HeadType                 TINYINT            NOT NULL,
     FaceType                 TINYINT            NOT NULL,
@@ -63,7 +70,7 @@ CREATE TABLE game.Characters
     BigStoreMoney            INT                NOT NULL
         CONSTRAINT DF_Characters_BigStoreMoney DEFAULT 0
         CONSTRAINT CK_Characters_BigStoreMoney CHECK (BigStoreMoney >= 0),
-    RebirthCount             INT                NOT NULL
+    RebirthCount             TINYINT            NOT NULL
         CONSTRAINT DF_Characters_RebirthCount DEFAULT 0
         CONSTRAINT CK_Characters_RebirthCount CHECK (RebirthCount BETWEEN 0 AND 12),              -- aRebirthNum; MAX_REBIRTH_LIMIT=12 (G1-G12) IS live in ReleaseEU33 via the Rebirth-Pill item path (WUSE_ITEM_632 unconditionally #define'd) -- see Application/Fenrir.Application.Game.Domain/Progression/RebirthProgression.cs. Path B (TribeActionService.RebirthAsync, CZ_TRIBE_WORK_SEND tSort 11) is separately app-capped at generation 6; only Path A (UseInventoryItemService's Rebirth-Pill branch) reaches 7-12. CHECK bound is defense-in-depth: both trigger paths already app-cap before writing (RebirthProgression.MaxRebirthGeneration), but this closes the gap for a future writer that doesn't re-validate.
     Title                    INT                NOT NULL
@@ -75,19 +82,19 @@ CREATE TABLE game.Characters
     TeacherPoint             INT                NOT NULL
         CONSTRAINT DF_Characters_TeacherPoint DEFAULT 0
         CONSTRAINT CK_Characters_TeacherPoint CHECK (TeacherPoint >= 0),                          -- quest reward type 5
-    EatLifePotion            INT                NOT NULL
+    EatLifePotion            SMALLINT           NOT NULL
         CONSTRAINT DF_Characters_EatLifePotion DEFAULT 0
         CONSTRAINT CK_Characters_EatLifePotion CHECK (EatLifePotion BETWEEN 0 AND 400),
-    EatManaPotion            INT                NOT NULL
+    EatManaPotion            SMALLINT           NOT NULL
         CONSTRAINT DF_Characters_EatManaPotion DEFAULT 0
         CONSTRAINT CK_Characters_EatManaPotion CHECK (EatManaPotion BETWEEN 0 AND 400),
-    EatStrPotion             INT                NOT NULL
+    EatStrPotion             SMALLINT           NOT NULL
         CONSTRAINT DF_Characters_EatStrPotion DEFAULT 0
         CONSTRAINT CK_Characters_EatStrPotion CHECK (EatStrPotion BETWEEN 0 AND 400),
-    EatDexPotion             INT                NOT NULL
+    EatDexPotion             SMALLINT           NOT NULL
         CONSTRAINT DF_Characters_EatDexPotion DEFAULT 0
         CONSTRAINT CK_Characters_EatDexPotion CHECK (EatDexPotion BETWEEN 0 AND 400),
-    EatElePotion             INT                NOT NULL
+    EatElePotion             SMALLINT           NOT NULL
         CONSTRAINT DF_Characters_EatElePotion DEFAULT 0
         CONSTRAINT CK_Characters_EatElePotion CHECK (EatElePotion BETWEEN 0 AND 400),
     ProtectForDeath          INT                NOT NULL
@@ -175,9 +182,16 @@ CREATE TABLE game.Characters
         CONSTRAINT CK_Characters_WarPoint CHECK (WarPoint >= 0),                                  -- aWarPoint (USE_WAR_POINT_SYSTEM, Server/Header/Protocol/STRUCT.h:554): spendable War-Point balance, deliberately kept OUT of usp_Character_PersistProgressBatch (same posture as Money/BloodCoin) -- it only moves through the dedicated atomic usp_Character_BuyWarPointItem so a last-write-wins flush can never clobber it.
     PetBagDate               INT                NOT NULL
         CONSTRAINT DF_Characters_PetBagDate DEFAULT 0,                                            -- aPetBagDate (Server/Header/Protocol/STRUCT.h:520-521): pet-bag upper-half (slots 10-19) rental-entitlement expiry date, same shape as InventoryDate/StoreDate above. DEFAULT 0 matches legacy's own confirmed baseline (ServerDocs/11_ts25login/01_Flux_Authentification_Redirection.md:381-383: creation never sets aPetBagDate) -- unlike InventoryDate/StoreDate, usp_Character_CreateWithStarterKit does NOT grant this at creation; no citation establishes what, if anything, ever grants it a non-zero value.
-    M15PetLuckyBoxPity       INT                NOT NULL
+    M15PetLuckyBoxPity       TINYINT            NOT NULL
         CONSTRAINT DF_Characters_M15PetLuckyBoxPity DEFAULT 0
         CONSTRAINT CK_Characters_M15PetLuckyBoxPity CHECK (M15PetLuckyBoxPity BETWEEN 0 AND 200), -- M15 Pet Lucky Box (world.Items 8111) pity counter (legacy gBox8111, Server/Header/Protocol/STRUCT.h:568-571); ceiling 200 matches M15PetLuckyBox8111RewardTable.PityCeiling (Server/ts25zone/S04_MyWork03.cpp:1615-1621,7729-7735).
+    VisibleState             TINYINT            NOT NULL
+        CONSTRAINT DF_Characters_VisibleState DEFAULT 1,                                          -- account-login avatar roster reconstruction (usp_Character_GetAccountRoster)
+    SpecialState             TINYINT            NOT NULL
+        CONSTRAINT DF_Characters_SpecialState DEFAULT 0,
+    CostumeIndex             INT                NOT NULL
+        CONSTRAINT DF_Characters_CostumeIndex DEFAULT -1
+        CONSTRAINT CK_Characters_CostumeIndex CHECK (CostumeIndex BETWEEN -1 AND 9),              -- -1 = no costume equipped
     FlushSequence            BIGINT             NOT NULL
         CONSTRAINT DF_Characters_FlushSequence DEFAULT 0,                                         -- idempotent write-behind
     CreatedAtUtc             DATETIME2(3)       NOT NULL
@@ -188,7 +202,9 @@ CREATE TABLE game.Characters
     CONSTRAINT UQ_Characters_Name UNIQUE (Name),
     CONSTRAINT UQ_Characters_Account_Slot UNIQUE (AccountId, Slot),
     CONSTRAINT CK_Characters_Slot CHECK (Slot BETWEEN 0 AND 2),
-    CONSTRAINT FK_Characters_Account FOREIGN KEY (AccountId) REFERENCES auth.Accounts (AccountId),
+    -- Cross-schema FK naming: see admin.Bans' own header comment for the FK_<ChildTable>_<TargetSchema>_<Role>
+    -- convention -- the two self-referencing FKs immediately below stay bare (same-schema, game -> game).
+    CONSTRAINT FK_Characters_Auth_Account FOREIGN KEY (AccountId) REFERENCES auth.Accounts (AccountId),
     CONSTRAINT FK_Characters_TeacherCharacter FOREIGN KEY (TeacherCharacterId) REFERENCES game.Characters (CharacterId),
     CONSTRAINT FK_Characters_StudentCharacter FOREIGN KEY (StudentCharacterId) REFERENCES game.Characters (CharacterId),
     CONSTRAINT CK_Characters_TeacherNotSelf CHECK (TeacherCharacterId IS NULL OR TeacherCharacterId <> CharacterId),

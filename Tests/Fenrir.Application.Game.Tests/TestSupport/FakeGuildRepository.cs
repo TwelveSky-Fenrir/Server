@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using Fenrir.Data.Abstractions.Guilds;
 
@@ -42,9 +43,9 @@ internal sealed class FakeGuildRepository : IGuildRepository
         return ValueTask.FromResult(_guilds.GetValueOrDefault(guildId));
     }
 
-    public ValueTask<ReadOnlyCollection<GuildSummaryDto>> GetAllAsync(CancellationToken ct)
+    public ValueTask<ImmutableArray<GuildSummaryDto>> GetAllAsync(CancellationToken ct)
     {
-        return ValueTask.FromResult(new ReadOnlyCollection<GuildSummaryDto>(_guilds.Values.ToList()));
+        return ValueTask.FromResult(_guilds.Values.ToImmutableArray());
     }
 
     public ValueTask<ReadOnlyCollection<GuildRankingRowDto>> GetTopByPointsAsync(int count, CancellationToken ct)

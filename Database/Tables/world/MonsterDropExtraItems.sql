@@ -13,6 +13,10 @@ CREATE TABLE world.MonsterDropExtraItems
     -- Server/Header/S15_MyShare.cpp:1819-1830). ItemId stays nullable-aware (rate-only slots are real seeded
     -- data -- see the table's own header comment).
     CONSTRAINT CK_MonsterDropExtraItems_DropRate CHECK (DropRate BETWEEN 0 AND 1000000),             -- :1819-1825
-    CONSTRAINT CK_MonsterDropExtraItems_ItemId CHECK (ItemId IS NULL OR ItemId BETWEEN 0 AND 99999), -- :1826-1830
-    INDEX IX_MonsterDropExtraItems_ItemId NONCLUSTERED (ItemId)
+    CONSTRAINT CK_MonsterDropExtraItems_ItemId CHECK (ItemId IS NULL OR ItemId BETWEEN 0 AND 99999)  -- :1826-1830
+    -- No secondary index on ItemId: verified repo-wide that the only reader of this table
+    -- (usp_Monster_GetDrops) scans it unfiltered, ORDER BY MonsterId, SlotIndex -- already covered by the
+    -- clustered PK. A reverse "which monsters drop item X" index would only tax the one-time seed insert
+    -- (Migrations/Seed/world/090_monsters.sql) for zero read benefit today; re-add if that GM-tooling query
+    -- is ever built.
 );

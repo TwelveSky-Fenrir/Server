@@ -131,6 +131,18 @@ public sealed class LoginConnectionHostShutdownDrainTests
         {
             throw new NotSupportedException();
         }
+
+        public ValueTask<int> GetConcurrentDeviceSessionCountAsync(int excludingAccountId, string adapterIdentifier,
+            string localIp, string remoteIp, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask RecordDeviceSignatureAsync(int accountId, string adapterIdentifier, string localIp,
+            string remoteIp, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
     }
 
     private sealed class DelayedEventLogRepository : IEventLogRepository

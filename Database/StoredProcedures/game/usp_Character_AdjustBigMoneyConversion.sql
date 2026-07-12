@@ -20,6 +20,17 @@
 -- 246) ; :3547-3580 (ProcessFor1BInventoryMoneyToInventoryMoney, tSort 247) ; Server/Header/function.h:132-150
 -- (CheckOverMaximum vs. CheckOverBigMoneyMaximum) ; Server/Header/Protocol/DEFINE.h:365-367 (MAX_NUMBER_SIZE =
 -- 2,000,000,000 ; MAX_NUMBER_SIZE1 = 1,000,000,000 ; MAX_NUMBER_SIZE2 = 999).
+--
+-- economy-hardening pass (2026-07-12): this file existed and was already the sole live implementation behind
+-- Fenrir.Application.Game.Services.Inventory.BigMoneyUnitConversionService (via
+-- Fenrir.Data.Characters.BigMoneyRepository.AdjustBigMoneyConversionAsync, resolved through
+-- Fenrir.Data.Abstractions.Characters.IBigMoneyRepository) but had never been appended to
+-- Database/_manifest.txt -- so it had never actually been created in any database, and every call to
+-- BigMoneyUnitConversionService.ConvertAsync (tSort 246/247) would have thrown "Could not find stored
+-- procedure 'game.usp_Character_AdjustBigMoneyConversion'" the moment a player tried it. Fixed by appending it
+-- to the manifest's C8 BigMoney group and registering error 50352 in
+-- Migrations/Seed/admin/019_error_catalog_bigmoney_conversion.sql. No change to this procedure's own body was
+-- needed -- it was already correctly written, just never deployed.
 CREATE PROCEDURE game.usp_Character_AdjustBigMoneyConversion @CharacterId INT,
                                                              @DeltaMoney BIGINT,
                                                              @DeltaBigMoney INT

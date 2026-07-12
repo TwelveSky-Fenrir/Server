@@ -62,6 +62,11 @@ public class ApplicationFirewallTests
         {
             return ValueTask.FromResult(blocked);
         }
+
+        public ValueTask<int> AddAsync(string ipAddress, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
     }
 
     private sealed class FakeFirewallRuleRepository(bool blocked) : IFirewallRuleRepository
@@ -79,6 +84,11 @@ public class ApplicationFirewallTests
         public ValueTask ReconcileAllowlistAsync(CancellationToken ct)
         {
             return ValueTask.CompletedTask;
+        }
+
+        public ValueTask<int> AddAsync(string ipAddress, byte ruleType, CancellationToken ct)
+        {
+            throw new NotSupportedException();
         }
     }
 

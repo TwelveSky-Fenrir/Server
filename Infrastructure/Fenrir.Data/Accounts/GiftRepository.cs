@@ -27,8 +27,7 @@ public sealed record GiftRepository(ICaeriusNetDbContext Db) : IGiftRepository
             .AddParameter("AccountId", accountId, SqlDbType.Int)
             .Build();
 
-        var result = await Db.FirstQueryAsync<GiftClaimResultDto>(sp, ct);
-        return result!.SlotIndex;
+        return await Db.ExecuteScalarAsync<short>(sp, ct);
     }
 
     public async ValueTask<int> EnqueueAsync(int accountId, int? productId, int quantity, int value,

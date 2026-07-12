@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using System.Data;
 using CaeriusNet.Abstractions;
@@ -16,17 +17,20 @@ public sealed record WorldStateRepository(ICaeriusNetDbContext Db) : IWorldState
         await Db.ExecuteAsync(sp, ct);
     }
 
-    public async ValueTask<(WorldStateRowDto? Row, ReadOnlyCollection<WorldStateTribeDto> Tribes,
-            ReadOnlyCollection<WorldStateAllianceOfferDto> AllianceOffers)>
+    // Polled every 5s for the process lifetime by WorldStateWriteBehindHost -> WorldStateService.ReconcileAsync
+    // -- QueryMultipleImmutableArrayAsync is the polled/hot-path terminal call, not
+    // QueryMultipleReadOnlyCollectionAsync (request/response shape).
+    public async ValueTask<(WorldStateRowDto? Row, ImmutableArray<WorldStateTribeDto> Tribes,
+            ImmutableArray<WorldStateAllianceOfferDto> AllianceOffers)>
         GetAsync(CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_WorldState_Get", 17).Build();
 
         var (rows, tribes, allianceOffers) = await Db
-            .QueryMultipleReadOnlyCollectionAsync<WorldStateRowDto, WorldStateTribeDto, WorldStateAllianceOfferDto>(
+            .QueryMultipleImmutableArrayAsync<WorldStateRowDto, WorldStateTribeDto, WorldStateAllianceOfferDto>(
                 sp, ct);
 
-        return (rows.Count > 0 ? rows[0] : null, tribes, allianceOffers);
+        return (rows.Length > 0 ? rows[0] : null, tribes, allianceOffers);
     }
 
     public async ValueTask UpdateAsync(byte? zone038WinTribe, int? zone038WinTribeTime, bool tribeSymbolBattle,
@@ -45,12 +49,12 @@ public sealed record WorldStateRepository(ICaeriusNetDbContext Db) : IWorldState
         await Db.ExecuteAsync(sp, ct);
     }
 
-    public async ValueTask UpdateTribeAsync(byte tribeId, DateTime? symbolDate, bool hasSymbol, int points,
+    public async ValueTask UpdateTribeAsync(byte tribeId, DateTime? symbolDateUtc, bool hasSymbol, int points,
         bool isClosed, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_WorldStateTribe_Update", 0)
             .AddParameter("TribeId", tribeId, SqlDbType.TinyInt)
-            .AddParameter("SymbolDate", (object?)symbolDate ?? DBNull.Value, SqlDbType.DateTime2)
+            .AddParameter("SymbolDateUtc", (object?)symbolDateUtc ?? DBNull.Value, SqlDbType.DateTime2)
             .AddParameter("HasSymbol", hasSymbol, SqlDbType.Bit)
             .AddParameter("Points", points, SqlDbType.Int)
             .AddParameter("IsClosed", isClosed, SqlDbType.Bit)
@@ -59,12 +63,12 @@ public sealed record WorldStateRepository(ICaeriusNetDbContext Db) : IWorldState
         await Db.ExecuteAsync(sp, ct);
     }
 
-    public async ValueTask UpdateTribeSymbolStateAsync(byte tribeId, DateTime? symbolDate, bool hasSymbol,
+    public async ValueTask UpdateTribeSymbolStateAsync(byte tribeId, DateTime? symbolDateUtc, bool hasSymbol,
         bool isClosed, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_WorldStateTribe_UpdateSymbolState", 0)
             .AddParameter("TribeId", tribeId, SqlDbType.TinyInt)
-            .AddParameter("SymbolDate", (object?)symbolDate ?? DBNull.Value, SqlDbType.DateTime2)
+            .AddParameter("SymbolDateUtc", (object?)symbolDateUtc ?? DBNull.Value, SqlDbType.DateTime2)
             .AddParameter("HasSymbol", hasSymbol, SqlDbType.Bit)
             .AddParameter("IsClosed", isClosed, SqlDbType.Bit)
             .Build();

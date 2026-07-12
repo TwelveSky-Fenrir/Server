@@ -15,5 +15,7 @@ CREATE TABLE game.AccountVault
     CONSTRAINT PK_AccountVault PRIMARY KEY CLUSTERED (AccountId),
     CONSTRAINT CK_AccountVault_Money CHECK (Money >= 0),
     CONSTRAINT CK_AccountVault_Money2 CHECK (Money2 >= 0),
-    CONSTRAINT FK_AccountVault_Account FOREIGN KEY (AccountId) REFERENCES auth.Accounts (AccountId)
+    -- Cross-schema FK naming: see admin.Bans' own header comment for the FK_<ChildTable>_<TargetSchema>_<Role>
+    -- convention.
+    CONSTRAINT FK_AccountVault_Auth_Account FOREIGN KEY (AccountId) REFERENCES auth.Accounts (AccountId)
 );

@@ -11,8 +11,20 @@
 -- codebase's other natively-compiled procs stick to, same reasoning as usp_GuildTribeBroadcastRelay_Poll's
 -- own header. WITH (SNAPSHOT) table hints make the required isolation level explicit regardless of the
 -- caller's ambient transaction/autocommit state.
-CREATE PROCEDURE runtime.usp_RvrSiegeEventRelay_Poll @ShardId TINYINT,
-                                                     @RetentionSeconds INT
+--
+-- Transaction-wrapping note (procs-runtime audit, basse severite): the cursor upsert and the reap DELETE below
+-- are two separate autocommit statements, deliberately NOT wrapped in an explicit BEGIN TRANSACTION despite
+-- this codebase's own "more than one write statement wraps in BEGIN TRAN/COMMIT TRAN" convention. Evaluated
+-- and confirmed this is not a correctness gap: the cursor upsert only ever advances forward and the reap
+-- DELETE re-evaluates the same flat CreatedAtUtc predicate on every call, so both are independently idempotent
+-- -- a mid-batch failure just means the next poll cycle naturally catches up, with no invariant spanning the
+-- two writes. Left un-wrapped on purpose: it interacts BETTER with the caller's retry-on-conflict handling
+-- (41302/41305/41325 under SNAPSHOT) than wrapping would -- if only the DELETE conflicts, retrying just
+-- re-runs the DELETE without redoing an already-committed cursor advance, whereas one explicit transaction
+-- would roll back and redo both writes on any conflict. Do not add a BEGIN TRANSACTION here without
+-- re-deriving this reasoning first.
+CREATE OR ALTER PROCEDURE runtime.usp_RvrSiegeEventRelay_Poll @ShardId TINYINT,
+                                                              @RetentionSeconds INT
 AS
 BEGIN
     SET

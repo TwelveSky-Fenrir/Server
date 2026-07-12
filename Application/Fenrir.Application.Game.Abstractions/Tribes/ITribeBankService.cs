@@ -12,7 +12,4 @@ public interface ITribeBankService
 {
     public ValueTask<TribeBankResult> ViewAsync(ZoneClientSession zoneSession, PlayerRuntimeState state,
         CancellationToken ct);
-
-    public ValueTask<TribeBankResult> DepositAsync(int slotValue, PlayerRuntimeState state, int characterId,
-        CancellationToken ct);
 }

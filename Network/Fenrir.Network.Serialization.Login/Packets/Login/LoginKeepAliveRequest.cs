@@ -8,7 +8,8 @@ namespace Fenrir.Network.Serialization.Login.Packets.Login;
     ExpectedSize = 9,
     AllowedStates =
     [
-        (byte)LoginSessionState.Authenticated, (byte)LoginSessionState.PinRequired, (byte)LoginSessionState.CharSelect
+        (byte)LoginSessionState.Authenticated, (byte)LoginSessionState.PinRequired,
+        (byte)LoginSessionState.CharSelect, (byte)LoginSessionState.HandoverIssued
     ])]
 public readonly partial record struct LoginKeepAliveRequest : IIncomingPacket<LoginKeepAliveRequest>
 {

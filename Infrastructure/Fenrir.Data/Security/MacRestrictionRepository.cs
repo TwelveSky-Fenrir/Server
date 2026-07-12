@@ -1,7 +1,9 @@
 using System.Collections.Immutable;
+using System.Data;
 using CaeriusNet.Abstractions;
 using CaeriusNet.Builders;
 using CaeriusNet.Commands.Reads;
+using CaeriusNet.Commands.Writes;
 using Fenrir.Data.Abstractions.Security;
 
 namespace Fenrir.Data.Security;
@@ -10,12 +12,18 @@ public sealed record MacRestrictionRepository(ICaeriusNetDbContext Db) : IMacRes
 {
     public async ValueTask<bool> IsBannedAsync(string macAddress, string? machineGuid, CancellationToken ct)
     {
+        var limit = await GetConfiguredAccountLimitAsync(macAddress, machineGuid, ct);
+        return limit is <= 0;
+    }
+
+    public async ValueTask<int?> GetConfiguredAccountLimitAsync(string macAddress, string? machineGuid,
+        CancellationToken ct)
+    {
         if (macAddress.Length == 0)
-            return false;
+            return null;
 
         var rows = await GetAllAsync(ct);
-        var match = SelectRestriction(rows, macAddress, machineGuid);
-        return match is not null && match.AccountLimit <= 0;
+        return SelectRestriction(rows, macAddress, machineGuid)?.AccountLimit;
     }
 
     internal static MacRestrictionRowDto? SelectRestriction(ImmutableArray<MacRestrictionRowDto> rows,
@@ -42,5 +50,17 @@ public sealed record MacRestrictionRepository(ICaeriusNetDbContext Db) : IMacRes
             .Build();
 
         return Db.QueryAsImmutableArrayAsync<MacRestrictionRowDto>(sp, ct);
+    }
+
+    public async ValueTask<int> AddAsync(string macAddress, string? machineGuid, int accountLimit,
+        CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("admin", "usp_MacRestriction_Add", 1)
+            .AddParameter("MacAddress", macAddress, SqlDbType.VarChar)
+            .AddParameter("MachineGuid", (object?)machineGuid ?? DBNull.Value, SqlDbType.VarChar)
+            .AddParameter("AccountLimit", accountLimit, SqlDbType.Int)
+            .Build();
+
+        return await Db.ExecuteScalarAsync<int>(sp, ct);
     }
 }

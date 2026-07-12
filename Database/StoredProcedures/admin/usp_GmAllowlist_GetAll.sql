@@ -6,5 +6,5 @@ BEGIN
         NOCOUNT ON;
 
     SELECT GmAllowlistId, IpAddress, CreatedAtUtc
-    FROM admin.GmAllowlist;
+    FROM admin.GmAllowlists;
 END;

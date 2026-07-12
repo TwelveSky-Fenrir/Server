@@ -28,10 +28,11 @@ public sealed class HeroRankingRolloverProcTests
             .WithSqlServer(fixture.ConnectionString)
             .Build();
 
-        var db = services.BuildServiceProvider().GetRequiredService<ICaeriusNetDbContext>();
+        var provider = services.BuildServiceProvider();
+        var db = provider.GetRequiredService<ICaeriusNetDbContext>();
         _accounts = new AccountRepository(db);
         _characters = new CharacterRepository(db);
-        _heroRankings = new HeroRankingRepository(db);
+        _heroRankings = new HeroRankingRepository(db, provider.GetRequiredService<ICaeriusNetCache>());
         _connectionString = fixture.ConnectionString;
     }
 

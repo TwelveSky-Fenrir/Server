@@ -1,5 +1,8 @@
 -- Tooling/debugging view. Reward figures are SUMmed per-quest in a derived table before joining, since
 -- RewardType is not unique per quest (up to 3 reward slots) and a naive join would duplicate quest rows.
+-- Not an indexed-view candidate as written: LEFT OUTER JOIN and derived-table (subquery-in-FROM) expressions
+-- are both disallowed in indexed views (Microsoft Learn, "Create indexed views" -- Additional requirements),
+-- and this view needs both to show a zero, not a missing row, for a quest with no rewards/speeches.
 CREATE VIEW world.vw_QuestOverview
 AS
 SELECT q.QuestId,

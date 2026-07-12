@@ -52,7 +52,16 @@ public sealed class ChangeMousePinService(
             return new ChangeMousePinResult(ChangeMousePinOutcome.StorageFailure);
         }
 
-        await pins.RecordAttemptAsync(accountId, true, cancellationToken);
+        try
+        {
+            await pins.RecordAttemptAsync(accountId, true, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "PIN for account {AccountId} was successfully changed but resetting its durable lockout counter failed -- counter left stale",
+                accountId);
+        }
 
         return new ChangeMousePinResult(ChangeMousePinOutcome.Success);
     }

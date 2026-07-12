@@ -260,25 +260,28 @@ public sealed class UseInventoryItemService(
         int characterId, int accountId, byte page, byte index, ItemStack item, int creditAmount,
         CancellationToken cancellationToken)
     {
+        var projected = state.Inventory.GetContainer(page).Remove(index);
+
         try
         {
-            await cash.CreditAsync(accountId, creditAmount, GpTicketCashCreditReason, item.ItemId,
-                cancellationToken);
+            // Cash credit and ticket consumption commit atomically in usp_Cash_CreditAndConsumeItem -- a
+            // failure here (including a transient one) leaves cash uncredited AND the ticket untouched, so
+            // a client retry of this same request can never dupe the credit against a physically-present
+            // ticket. See that procedure's own header comment for the transaction-composition-audit finding
+            // this closes.
+            await cash.CreditAndConsumeItemAsync(accountId, creditAmount, GpTicketCashCreditReason, item.ItemId,
+                characterId, page, ToTvps(projected), cancellationToken);
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex,
-                "Account {AccountId} GP ticket credit failed for item {ItemId} (character {CharacterId}); item left untouched",
+                "Account {AccountId} GP ticket credit-and-consume failed for item {ItemId} (character {CharacterId}); no cash credited and item left untouched",
                 accountId, item.ItemId, characterId);
             return Fail(characterId, item, page, index);
         }
 
         await eventLog.LogAsync(GpTicketRedeemedEventCode, EventLogCategory.Currency, accountId, characterId,
             null, null, null, creditAmount, null, item.ItemId, item.Quantity, 1, null, cancellationToken);
-
-        var projected = state.Inventory.GetContainer(page).Remove(index);
-
-        await characters.ReplaceContainerAsync(characterId, page, ToTvps(projected), cancellationToken);
 
         var response = new UseInventoryItemResponse { Result = 0, Page = page, Index = index, Value = 0, Value2 = 0 };
 

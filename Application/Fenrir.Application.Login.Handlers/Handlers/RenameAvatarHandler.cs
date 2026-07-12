@@ -44,6 +44,12 @@ public sealed class RenameAvatarHandler(IRenameAvatarService renameAvatarService
 
         switch (result.Outcome)
         {
+            case RenameAvatarOutcome.SlotEmpty:
+                logger.LogWarning(
+                    "Avatar rename rejected: malformed request from account {AccountId} (slot {Slot} is empty)",
+                    accountId, packet.AvatarPost);
+                loginSession.Abort(DisconnectReason.Malformed);
+                return;
             case RenameAvatarOutcome.Success:
                 logger.LogInformation("Avatar renamed: account {AccountId} slot {Slot} -> {NewName}", accountId,
                     packet.AvatarPost, packet.ChangeAvatarName);
@@ -71,8 +77,9 @@ public sealed class RenameAvatarHandler(IRenameAvatarService renameAvatarService
                 session.Send(new RenameAvatarResponse { Result = 101 });
                 return;
             case RenameAvatarOutcome.SlotMissing:
-                logger.LogWarning("Avatar rename rejected: account {AccountId} slot {Slot} holds no character",
-                    accountId, packet.AvatarPost);
+                logger.LogWarning(
+                    "Avatar rename rejected: account {AccountId} slot {Slot} vanished mid-transaction", accountId,
+                    packet.AvatarPost);
                 session.Send(new RenameAvatarResponse { Result = 102 });
                 return;
             case RenameAvatarOutcome.ItemMismatch:

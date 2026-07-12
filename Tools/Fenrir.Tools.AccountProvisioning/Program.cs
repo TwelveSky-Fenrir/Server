@@ -75,7 +75,7 @@ async Task<int> RunGrantGmAsync(string loginName, string gradeText)
         Console.WriteLine($"AccountGrade for '{loginName}' set to {grade}.");
         if (grade >= 1)
             Console.WriteLine(
-                "Note: any grade>=1 account can only log in from an IP on admin.GmAllowlist -- run " +
+                "Note: any grade>=1 account can only log in from an IP on admin.GmAllowlists -- run " +
                 "'allow-gm-ip <yourIp>' now, or this account will be rejected at login.");
         return 0;
     }

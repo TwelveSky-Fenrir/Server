@@ -5,6 +5,7 @@ using Fenrir.Application.Login.Domain;
 using Fenrir.Application.Login.Domain.Avatars;
 using Fenrir.Application.Login.Domain.RateLimiting;
 using Fenrir.Application.Login.Domain.Security;
+using Fenrir.Application.Login.Services.AccountSecurity;
 using Fenrir.Data.Security;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Login.Packets.Login;
@@ -55,10 +56,22 @@ public sealed class LoginService(
     private const string MacBannedMessage = "Your PC has been banned.";
     private const string InvalidDevicesMessage = "Invalid devices!";
     private const string OnlyAdminMessage = "Only Admin can login";
+    private const string ConnectionLimitExceededMessage = "The connection limit from your PC has been exceeded.";
 
     private const string AdapterNameEmptyMessage = "IP address not specified. Please update to the latest client.";
+    private const string AccountLockedOutMessage = "Too many failed login attempts. Please try again later.";
+    private const string RateLimitedMessage = "Too many login attempts from your IP. Please try again later.";
 
     private const short LoginSucceededEventCode = 1;
+
+    private enum AuthenticationOutcome
+    {
+        Success,
+        UnknownAccount,
+        WrongPassword,
+        AdminBanned,
+        AutoLockedOut
+    }
 
     private static readonly (byte[] Hash, byte[] Salt) DummyCredential =
         PasswordHasher.Hash("dummy-unused-reference-password");
@@ -69,7 +82,13 @@ public sealed class LoginService(
         if (!ipRateLimiter.TryConsume(remoteEndPoint))
         {
             logger.LogWarning("Login rejected: IP {RemoteIp} exceeded its rate-limit budget", remoteEndPoint);
-            return LoginResult.RateLimitedResult;
+            return Failure(ResultCustomMessage, RateLimitedMessage, false);
+        }
+
+        if (!await firewall.IsAllowedAsync(remoteEndPoint, cancellationToken))
+        {
+            logger.LogWarning("Login rejected: IP {RemoteIp} is blocked by the application firewall", remoteEndPoint);
+            return Failure(ResultIpBlocked, "", true);
         }
 
         switch (LoginCapacityGate.Evaluate(capacity.MaxPlayers, capacity.CurrentPlayers))
@@ -82,12 +101,6 @@ public sealed class LoginService(
                 return Failure(ResultServerFull, "", false);
         }
 
-        if (!await firewall.IsAllowedAsync(remoteEndPoint, cancellationToken))
-        {
-            logger.LogWarning("Login rejected: IP {RemoteIp} is blocked by the application firewall", remoteEndPoint);
-            return Failure(ResultIpBlocked, "", false);
-        }
-
         if (packet.Version != options.Value.ExpectedClientVersion)
         {
             logger.LogWarning("Login rejected: client version mismatch (login {Id}, version {Version})", packet.Id,
@@ -97,12 +110,6 @@ public sealed class LoginService(
 
         var macAddress =
             MacAddressFormatter.Format(packet.Adapter.PhysicalAddress, packet.Adapter.PhysicalAddressLength);
-        if (macAddress.Length > 0 &&
-            await macRestrictions.IsBannedAsync(macAddress, packet.Adapter.AdapterName, cancellationToken))
-        {
-            logger.LogWarning("Login rejected: MAC {MacAddress} is banned (login {Id})", macAddress, packet.Id);
-            return Failure(ResultCustomMessage, MacBannedMessage, false);
-        }
 
         var account = await accounts.AuthenticateAsync(packet.Id, cancellationToken);
         var remoteIp = remoteEndPoint?.Address.ToString();
@@ -117,12 +124,25 @@ public sealed class LoginService(
             return Failure(ResultIpBlocked, "", true);
         }
 
-        var result = await AuthenticateConstantTimeAsync(account, packet.Password, cancellationToken);
-
-        if (result != ResultSuccess)
+        switch (await AuthenticateConstantTimeAsync(account, packet.Password, remoteIp, cancellationToken))
         {
-            logger.LogWarning("Login failed: login {Id} rejected with result code {ResultCode}", packet.Id, result);
-            return Failure(result, "", true);
+            case AuthenticationOutcome.UnknownAccount:
+                logger.LogWarning("Login failed: login {Id} rejected with result code {ResultCode}", packet.Id,
+                    ResultUnknownAccount);
+                return Failure(ResultUnknownAccount, "", true);
+            case AuthenticationOutcome.WrongPassword:
+                logger.LogWarning("Login failed: login {Id} rejected with result code {ResultCode}", packet.Id,
+                    ResultWrongPassword);
+                return Failure(ResultWrongPassword, "", true);
+            case AuthenticationOutcome.AdminBanned:
+                logger.LogWarning("Login failed: login {Id} rejected with result code {ResultCode}", packet.Id,
+                    ResultBlocked);
+                return Failure(ResultBlocked, "", true);
+            case AuthenticationOutcome.AutoLockedOut:
+                logger.LogWarning(
+                    "Login rejected: login {Id} is under the auto-lockout timer from repeated failed attempts",
+                    packet.Id);
+                return Failure(ResultCustomMessage, AccountLockedOutMessage, true);
         }
 
         var accountId = account!.AccountId;
@@ -139,6 +159,33 @@ public sealed class LoginService(
             logger.LogWarning("Login rejected: empty adapter name/GUID (login {Id}, account {AccountId})",
                 packet.Id, accountId);
             return Failure(ResultCustomMessage, AdapterNameEmptyMessage, true);
+        }
+
+        var quotaGateApplies = macAddress.Length > 0 && account.AccountGrade < DeviceSpoofingGuard.GmGradeThreshold;
+
+        if (quotaGateApplies)
+        {
+            var configuredAccountLimit = await macRestrictions.GetConfiguredAccountLimitAsync(macAddress,
+                packet.Adapter.AdapterName, cancellationToken);
+
+            var concurrentDeviceSessionCount = configuredAccountLimit is null
+                ? await accountSessions.GetConcurrentDeviceSessionCountAsync(accountId, packet.Adapter.AdapterName,
+                    packet.Adapter.IPAddress, remoteIp ?? "", cancellationToken)
+                : 0;
+
+            switch (PerAdapterLoginCapGate.Evaluate(account.AccountGrade, macAddress, configuredAccountLimit,
+                        concurrentDeviceSessionCount))
+            {
+                case PerAdapterLoginCapOutcome.OutrightBanned:
+                    logger.LogWarning("Login rejected: MAC {MacAddress} is banned (login {Id}, account {AccountId})",
+                        macAddress, packet.Id, accountId);
+                    return Failure(ResultCustomMessage, MacBannedMessage, true);
+                case PerAdapterLoginCapOutcome.ConnectionLimitExceeded:
+                    logger.LogWarning(
+                        "Login rejected: per-adapter connection limit exceeded (login {Id}, account {AccountId})",
+                        packet.Id, accountId);
+                    return Failure(ResultCustomMessage, ConnectionLimitExceededMessage, true);
+            }
         }
 
         if (DeviceSpoofingGuard.IsSpoofedDeviceTuple(account.AccountGrade, macAddress, packet.Adapter.AdapterName,
@@ -195,6 +242,11 @@ public sealed class LoginService(
                 break;
         }
 
+        await accountSessions.RecordDeviceSignatureAsync(accountId,
+            quotaGateApplies ? packet.Adapter.AdapterName : DeviceSpoofingGuard.PlaceholderAdapterGuid,
+            quotaGateApplies ? packet.Adapter.IPAddress : DeviceSpoofingGuard.PlaceholderRemoteIp,
+            quotaGateApplies ? remoteIp ?? "" : DeviceSpoofingGuard.PlaceholderRemoteIp, cancellationToken);
+
         registry.AssociateAccount(sessionId, accountId);
 
         var roster = await characters.GetAccountRosterAsync(accountId, cancellationToken);
@@ -248,26 +300,43 @@ public sealed class LoginService(
         return entries.ToImmutable();
     }
 
-    private async ValueTask<int> AuthenticateConstantTimeAsync(AuthenticateAccountDto? account, string password,
-        CancellationToken ct)
+    private async ValueTask<AuthenticationOutcome> AuthenticateConstantTimeAsync(AuthenticateAccountDto? account,
+        string password, string? remoteIp, CancellationToken ct)
     {
         if (account is null)
         {
             _ = PasswordHasher.Verify(password, DummyCredential.Hash, DummyCredential.Salt);
-            return ResultUnknownAccount;
-        }
-
-        var loggedBan = await bans.IsActiveForAccountAsync(account.AccountId, ct);
-        if (account.IsBanned || loggedBan || account.LockoutUntilUtc > DateTime.UtcNow)
-        {
-            _ = PasswordHasher.Verify(password, account.PasswordHash, account.PasswordSalt);
-            return ResultBlocked;
+            return AuthenticationOutcome.UnknownAccount;
         }
 
         var passwordOk = PasswordHasher.Verify(password, account.PasswordHash, account.PasswordSalt);
 
-        await accounts.RecordLoginAttemptAsync(account.AccountId, passwordOk, ct);
-        return passwordOk ? ResultSuccess : ResultWrongPassword;
+        if (!passwordOk)
+        {
+            await accounts.RecordLoginAttemptAsync(account.AccountId, false, ct);
+            var failureCount = (byte)Math.Min(account.FailedLoginCount + 1, byte.MaxValue);
+            await eventLog.LogAsync(AccountSecurityEventCodes.LoginPasswordMismatch, EventLogCategory.AccountSecurity,
+                account.AccountId, null, null, null, null, null, null, null, null, failureCount,
+                remoteIp is null ? null : $"RemoteIp={remoteIp}", ct);
+            return AuthenticationOutcome.WrongPassword;
+        }
+
+        var loggedBan = await bans.IsActiveForAccountAsync(account.AccountId, ct);
+
+        switch (AccountBlockGate.Evaluate(account.IsBanned, loggedBan, account.LockoutUntilUtc, DateTime.UtcNow))
+        {
+            case AccountBlockOutcome.AdminBanned:
+                return AuthenticationOutcome.AdminBanned;
+            case AccountBlockOutcome.AutoLockedOut:
+                await eventLog.LogAsync(AccountSecurityEventCodes.LoginPasswordAttemptRejectedLocked,
+                    EventLogCategory.AccountSecurity, account.AccountId, null, null, null, null, null, null, null,
+                    null, (byte)Math.Min(account.FailedLoginCount, byte.MaxValue),
+                    remoteIp is null ? null : $"RemoteIp={remoteIp}", ct);
+                return AuthenticationOutcome.AutoLockedOut;
+        }
+
+        await accounts.RecordLoginAttemptAsync(account.AccountId, true, ct);
+        return AuthenticationOutcome.Success;
     }
 
     private static LoginResult Failure(int resultCode, string resultString, bool reArmVersionOk)

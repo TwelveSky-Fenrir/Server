@@ -1,11 +1,27 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using Fenrir.Data.Abstractions.Characters;
 using Fenrir.Data.Abstractions.Commerce;
+using Microsoft.Data.SqlClient;
 
 namespace Fenrir.Application.Game.Tests.TestSupport;
 
+[UnconditionalSuppressMessage("Trimming", "IL2026",
+    Justification = "Test-only helper, never published/trimmed -- reflects into SqlClient's own internal " +
+                    "SqlError/SqlErrorCollection/SqlException.CreateException plumbing to build a real SqlException.")]
+[UnconditionalSuppressMessage("Trimming", "IL2072",
+    Justification = "Same as IL2026 above -- SqlClient ships these internal types undecorated, this test " +
+                    "helper cannot add DynamicallyAccessedMembers annotations to a third-party assembly.")]
+[UnconditionalSuppressMessage("Trimming", "IL2075",
+    Justification = "Same as IL2026 above -- SqlClient ships these internal types undecorated, this test " +
+                    "helper cannot add DynamicallyAccessedMembers annotations to a third-party assembly.")]
 internal sealed class FakeCharacterRepository : ICharacterRepository
 {
+    // admin.TribeFourQuota exhausted -- matches usp_Character_ApplyTribeFourConversion's own
+    // @ConsumeQuota=1 THROW number (transaction-composition-audit fix).
+    private const int QuotaExhaustedErrorNumber = 50355;
+
     public (int CharacterId, byte Container, IReadOnlyList<CharacterItemSlotTvp> Items)? LastReplacedContainer
     {
         get;
@@ -19,7 +35,8 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         private set;
     }
 
-    public (int CharacterId, long DeltaMoney, byte Container, IReadOnlyList<CharacterItemSlotTvp> Items)?
+    public (int CharacterId, long DeltaMoney, byte Container, IReadOnlyList<CharacterItemSlotTvp> Items,
+        int? AuditAccountId, short? AuditEventCode, int? AuditItemId, int? AuditQuantity, string? AuditPayload)?
         LastAdjustMoneyAndReplaceContainer { get; private set; }
 
     public (int CharacterId, long DeltaMoney, byte ContainerA, IReadOnlyList<CharacterItemSlotTvp> ItemsA,
@@ -54,7 +71,8 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         private set;
     }
 
-    public (int CharacterId, long DeltaMoney, long DeltaStoreMoney)? LastAdjustStoreMoney { get; private set; }
+    public (int CharacterId, long DeltaMoney, long DeltaStoreMoney, int? AuditAccountId, short? AuditEventCode,
+        int? AuditQuantity)? LastAdjustStoreMoney { get; private set; }
 
     public (int CharacterId, long DeltaMoney, int DeltaBigMoney)? LastAdjustMoney { get; private set; }
 
@@ -66,6 +84,10 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
 
     public List<(int CharacterId, byte NewTribe, int StepPermanent, int ActiveQuestId, int QSort, int TargetPhase,
         int KillCounter)> TribeFourConversions { get; } = [];
+
+    public bool ThrowQuotaExhausted { get; set; }
+
+    public bool? LastConsumeSharedQuota { get; private set; }
 
     public ValueTask ReplaceContainerAsync(int characterId, byte container,
         IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
@@ -148,6 +170,19 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         return ValueTask.CompletedTask;
     }
 
+    public bool ThrowOnPersistFinalFlush { get; set; }
+
+    public ValueTask PersistFinalFlushAsync(CharacterProgressTvp progress, CharacterPositionTvp position,
+        CancellationToken ct)
+    {
+        if (ThrowOnPersistFinalFlush)
+            throw new InvalidOperationException("Simulated SQL failure");
+
+        PersistedProgressRows.Add(progress);
+        PersistedPositionRows.Add(position);
+        return ValueTask.CompletedTask;
+    }
+
     public ValueTask AdjustMoneyAsync(int characterId, long deltaMoney, int deltaBigMoney, CancellationToken ct)
     {
         if (ThrowOnAdjustMoney)
@@ -158,22 +193,26 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
     }
 
     public ValueTask AdjustStoreMoneyAsync(int characterId, long deltaMoney, long deltaStoreMoney,
-        CancellationToken ct)
+        CancellationToken ct, int? auditAccountId = null, short? auditEventCode = null, int? auditQuantity = null)
     {
         if (ThrowOnAdjustMoney)
             throw new InvalidOperationException("Simulated SQL failure");
 
-        LastAdjustStoreMoney = (characterId, deltaMoney, deltaStoreMoney);
+        LastAdjustStoreMoney = (characterId, deltaMoney, deltaStoreMoney, auditAccountId, auditEventCode,
+            auditQuantity);
         return ValueTask.CompletedTask;
     }
 
     public ValueTask AdjustMoneyAndReplaceContainerAsync(int characterId, long deltaMoney, int deltaBigMoney,
-        byte container, IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
+        byte container, IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct,
+        int? auditAccountId = null, short? auditEventCode = null, int? auditItemId = null,
+        int? auditQuantity = null, string? auditPayload = null)
     {
         if (ThrowOnAdjustMoney)
             throw new InvalidOperationException("Simulated SQL failure");
 
-        LastAdjustMoneyAndReplaceContainer = (characterId, deltaMoney, container, items);
+        LastAdjustMoneyAndReplaceContainer = (characterId, deltaMoney, container, items, auditAccountId,
+            auditEventCode, auditItemId, auditQuantity, auditPayload);
         return ValueTask.CompletedTask;
     }
 
@@ -235,11 +274,46 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
     }
 
     public ValueTask ApplyTribeFourConversionAsync(int characterId, byte newTribe, int stepPermanent,
-        int activeQuestId, int qSort, int targetPhase, int killCounter, CancellationToken ct)
+        int activeQuestId, int qSort, int targetPhase, int killCounter, bool consumeSharedQuota,
+        CancellationToken ct)
     {
+        LastConsumeSharedQuota = consumeSharedQuota;
+
+        if (consumeSharedQuota && ThrowQuotaExhausted)
+            throw BuildSqlException(QuotaExhaustedErrorNumber);
+
         TribeFourConversions.Add((characterId, newTribe, stepPermanent, activeQuestId, qSort, targetPhase,
             killCounter));
         return ValueTask.CompletedTask;
+    }
+
+    private static SqlException BuildSqlException(int number, string message = "Simulated SQL error")
+    {
+        var sqlClientAssembly = typeof(SqlException).Assembly;
+        var sqlErrorType = sqlClientAssembly.GetType("Microsoft.Data.SqlClient.SqlError", true)!;
+        var sqlErrorCollectionType =
+            sqlClientAssembly.GetType("Microsoft.Data.SqlClient.SqlErrorCollection", true)!;
+
+        var errorCtor = sqlErrorType.GetConstructor(
+            BindingFlags.NonPublic | BindingFlags.Instance,
+            [
+                typeof(int), typeof(byte), typeof(byte), typeof(string), typeof(string), typeof(string),
+                typeof(int), typeof(Exception)
+            ])!;
+        var sqlError = errorCtor.Invoke([
+            number, (byte)1, (byte)16, "fenrir-test-server", message,
+            "usp_Character_ApplyTribeFourConversion", 0, null
+        ]);
+
+        var errors = Activator.CreateInstance(sqlErrorCollectionType, true)!;
+        var addMethod = sqlErrorCollectionType.GetMethod("Add", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        addMethod.Invoke(errors, [sqlError]);
+
+        var createException = typeof(SqlException).GetMethod("CreateException",
+            BindingFlags.NonPublic | BindingFlags.Static,
+            [sqlErrorCollectionType, typeof(string)])!;
+
+        return (SqlException)createException.Invoke(null, [errors, "7.0"])!;
     }
 
     public ValueTask ApplyQuestTransitionAsync(int characterId, int stepPermanent, int activeQuestId, int qSort,
@@ -270,6 +344,12 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
     }
 
     public ValueTask SetPetGrowthAsync(int characterId, int petGrowth, byte petActivity, CancellationToken ct)
+    {
+        throw new NotImplementedException();
+    }
+
+    public ValueTask SetMountProgressionAsync(int characterId, int mountItemId, int mountExpActivity,
+        int mountPower, int mountSlotIndex, int mountTime, CancellationToken ct)
     {
         throw new NotImplementedException();
     }

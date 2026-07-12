@@ -15,6 +15,7 @@ public class GreetingCapacityPacketTests
     {
         var capacity = new LoginCapacityState();
         capacity.SetMaxPlayers(250);
+        capacity.SetGagePlayers(77);
         capacity.SetCurrentPlayers(37);
         var host = CreateHost(capacity);
 
@@ -22,8 +23,8 @@ public class GreetingCapacityPacketTests
 
         Assert.Equal(12345, packet.RandomNumber);
         Assert.Equal(250, packet.MaxPlayerNum);
+        Assert.Equal(77, packet.GagePlayerNum);
         Assert.Equal(37, packet.PresentPlayerNum);
-        Assert.Equal(0, packet.GagePlayerNum);
     }
 
     [Fact]

@@ -43,8 +43,6 @@ public sealed class GenericActionService(
 
     private const short NpcShopSellQuantityEventCode = 3;
 
-    private const byte NpcShopTradeOutcome = 1;
-
     private const short VaultTransferDepositEventCode = 1;
 
     private const short VaultTransferWithdrawEventCode = 2;
@@ -531,10 +529,20 @@ public sealed class GenericActionService(
             ? currentContainer.SetItem((byte)index1, remaining)
             : currentContainer.Remove((byte)index1);
 
+        var soldQuantity = source.Quantity - (resolved.RemainingSourceStack?.Quantity ?? 0);
+        var sellEventCode = NpcShopPolicy.IsStackableSellSort(itemDefinition.Item.Sort)
+            ? NpcShopSellQuantityEventCode
+            : NpcShopSellDefaultEventCode;
+
         try
         {
+            // The NpcShopTrade audit row is nested into usp_Character_AdjustMoneyAndReplaceContainer's own
+            // transaction (transaction-composition-audit finding) instead of a second, unshared round trip to
+            // eventLog.LogAsync after this call commits.
             await characters.AdjustMoneyAndReplaceContainerAsync(characterId, resolved.MoneyGained, 0, (byte)page1,
-                ToTvps(projectedContainer), cancellationToken);
+                ToTvps(projectedContainer), cancellationToken,
+                auditAccountId: accountId, auditEventCode: sellEventCode, auditItemId: source.ItemId,
+                auditQuantity: soldQuantity);
         }
         catch (Exception ex)
         {
@@ -543,14 +551,6 @@ public sealed class GenericActionService(
                 characterId);
             return GenericActionResult.Aborted;
         }
-
-        var soldQuantity = source.Quantity - (resolved.RemainingSourceStack?.Quantity ?? 0);
-        var sellEventCode = NpcShopPolicy.IsStackableSellSort(itemDefinition.Item.Sort)
-            ? NpcShopSellQuantityEventCode
-            : NpcShopSellDefaultEventCode;
-        await eventLog.LogAsync(sellEventCode, EventLogCategory.NpcShopTrade, accountId, characterId,
-            null, null, null, resolved.MoneyGained, null, source.ItemId, soldQuantity, NpcShopTradeOutcome, null,
-            cancellationToken);
 
         var containers = ImmutableArray.Create(new InventoryContainerSnapshot((byte)page1, projectedContainer));
         if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
@@ -652,10 +652,22 @@ public sealed class GenericActionService(
         var projectedContainer = state.Inventory.GetContainer((byte)page2)
             .SetItem((byte)index2, resolved.NewDestinationStack!.Value);
 
+        var purchasedQuantity = resolved.NewDestinationStack!.Value.Quantity - (destinationSlot?.Quantity ?? 0);
+        var contributionPointsAfter = state.ContributionPoints - resolved.CpCost;
+        var auditPayload = resolved.CpCost > 0
+            ? $"ContributionPointsBefore={state.ContributionPoints};ContributionPointsAfter={contributionPointsAfter}"
+            : null;
+
         try
         {
+            // The NpcShopTrade audit row is nested into usp_Character_AdjustMoneyAndReplaceContainer's own
+            // transaction (transaction-composition-audit finding) instead of a second, unshared round trip to
+            // eventLog.LogAsync after this call commits.
             await characters.AdjustMoneyAndReplaceContainerAsync(characterId, -resolved.MoneyCost, 0, (byte)page2,
-                ToTvps(projectedContainer), cancellationToken);
+                ToTvps(projectedContainer), cancellationToken,
+                auditAccountId: accountId, auditEventCode: NpcShopBuyEventCode,
+                auditItemId: itemDefinition.Item.ItemId, auditQuantity: purchasedQuantity,
+                auditPayload: auditPayload);
         }
         catch (Exception ex)
         {
@@ -665,8 +677,6 @@ public sealed class GenericActionService(
             return GenericActionResult.Aborted;
         }
 
-        var purchasedQuantity = resolved.NewDestinationStack!.Value.Quantity - (destinationSlot?.Quantity ?? 0);
-
         var containers = ImmutableArray.Create(new InventoryContainerSnapshot((byte)page2, projectedContainer));
         if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
                 cancellationToken))
@@ -674,7 +684,6 @@ public sealed class GenericActionService(
                 "Zone {MapId} inventory inbox full: dropped NPC-buy mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
 
-        var contributionPointsAfter = state.ContributionPoints - resolved.CpCost;
         if (resolved.CpCost > 0 &&
             !await zone.PostTribeProgressCommandAndWaitAsync(
                 new TribeProgressZoneCommand(characterId, contributionPointsAfter),
@@ -682,13 +691,6 @@ public sealed class GenericActionService(
             logger.LogError(
                 "Zone {MapId} tribe-progress inbox full: dropped CP mirror for character {CharacterId} after NPC-shop-buy",
                 zone.MapId, characterId);
-
-        var auditPayload = resolved.CpCost > 0
-            ? $"ContributionPointsBefore={state.ContributionPoints};ContributionPointsAfter={contributionPointsAfter}"
-            : null;
-        await eventLog.LogAsync(NpcShopBuyEventCode, EventLogCategory.NpcShopTrade, accountId, characterId,
-            null, null, null, -(long)resolved.MoneyCost, null, itemDefinition.Item.ItemId, purchasedQuantity,
-            NpcShopTradeOutcome, auditPayload, cancellationToken);
 
         logger.LogInformation(
             "Character {CharacterId} NPC-shop-buy applied: item {ItemId} x{PurchasedQuantity}, money -{MoneyCost}, CP -{CpCost}",
@@ -865,10 +867,15 @@ public sealed class GenericActionService(
         var isDeposit = sort == 226;
         var deltaMoney = isDeposit ? -(long)move.Quantity1 : move.Quantity1;
         var deltaStoreMoney = isDeposit ? move.Quantity1 : -(long)move.Quantity1;
+        var storeMoneyEventCode = isDeposit ? VaultTransferDepositEventCode : VaultTransferWithdrawEventCode;
 
         try
         {
-            await characters.AdjustStoreMoneyAsync(characterId, deltaMoney, deltaStoreMoney, cancellationToken);
+            // The StoreSlotMoney audit row is nested into usp_Character_AdjustStoreMoney's own transaction
+            // (transaction-composition-audit finding) instead of a second, unshared round trip to
+            // eventLog.LogAsync after this call commits.
+            await characters.AdjustStoreMoneyAsync(characterId, deltaMoney, deltaStoreMoney, cancellationToken,
+                auditAccountId: accountId, auditEventCode: storeMoneyEventCode, auditQuantity: move.Quantity1);
         }
         catch (Exception ex)
         {
@@ -877,10 +884,6 @@ public sealed class GenericActionService(
                 characterId);
             return GenericActionResult.Aborted;
         }
-
-        await eventLog.LogAsync(isDeposit ? VaultTransferDepositEventCode : VaultTransferWithdrawEventCode,
-            EventLogCategory.StoreSlotMoney, accountId, characterId, null, null, null, deltaMoney, null, null,
-            move.Quantity1, VaultTransferOutcome, null, cancellationToken);
 
         var newStoreMoney = state.StoreMoney + deltaStoreMoney;
         if (!await zone.PostTribeProgressCommandAndWaitAsync(
@@ -1070,11 +1073,16 @@ public sealed class GenericActionService(
         var isDeposit = sort == 231;
         var deltaCharacterMoney = isDeposit ? -(long)move.Quantity1 : move.Quantity1;
         var deltaVaultMoney = isDeposit ? move.Quantity1 : -(long)move.Quantity1;
+        var saveMoneyEventCode = isDeposit ? VaultTransferDepositEventCode : VaultTransferWithdrawEventCode;
 
         try
         {
+            // The SaveSlotMoney audit row is nested into usp_AccountVault_TransferMoneyWithCharacter's own
+            // transaction (transaction-composition-audit finding) instead of a second, unshared round trip to
+            // eventLog.LogAsync after this call commits.
             await accountVault.TransferMoneyWithCharacterAsync(characterId, deltaCharacterMoney, accountId,
-                deltaVaultMoney, cancellationToken);
+                deltaVaultMoney, cancellationToken, auditEventCode: saveMoneyEventCode,
+                auditQuantity: move.Quantity1);
         }
         catch (Exception ex)
         {
@@ -1083,10 +1091,6 @@ public sealed class GenericActionService(
                 characterId);
             return GenericActionResult.Aborted;
         }
-
-        await eventLog.LogAsync(isDeposit ? VaultTransferDepositEventCode : VaultTransferWithdrawEventCode,
-            EventLogCategory.SaveSlotMoney, accountId, characterId, null, null, null, deltaCharacterMoney, null,
-            null, move.Quantity1, VaultTransferOutcome, null, cancellationToken);
 
         logger.LogInformation(
             "Character {CharacterId} Save-money transfer applied: isDeposit={IsDeposit}, amount {Quantity1}",

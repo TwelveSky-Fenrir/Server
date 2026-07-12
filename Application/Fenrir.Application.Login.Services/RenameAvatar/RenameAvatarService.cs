@@ -21,8 +21,8 @@ public sealed class RenameAvatarService(
     {
         var roster = await characters.GetByAccountAsync(accountId, cancellationToken);
         var character = roster.FirstOrDefault(c => c.Slot == avatarPost);
-        if (character is null)
-            return new RenameAvatarResult(RenameAvatarOutcome.SlotMissing);
+        if (character is null || character.Name.Length == 0)
+            return new RenameAvatarResult(RenameAvatarOutcome.SlotEmpty);
 
         if (string.Equals(changeAvatarName, character.Name, StringComparison.OrdinalIgnoreCase))
             return new RenameAvatarResult(RenameAvatarOutcome.NameTaken);

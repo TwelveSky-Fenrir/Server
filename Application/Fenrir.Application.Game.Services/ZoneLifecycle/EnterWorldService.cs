@@ -103,6 +103,18 @@ public sealed class EnterWorldService(
 
         var character = bundle.Character;
 
+        if (!WrapCheckSpecialDestinationCatalog.IsInstancedDestination(character.MapId))
+        {
+            var (healedMapId, healedPosX, healedPosY, healedPosZ) = ZoneTribeSelfHeal.Apply(character.Tribe,
+                character.MapId, character.PosX, character.PosY, character.PosZ);
+
+            if (healedMapId != character.MapId)
+                character = character with
+                {
+                    MapId = healedMapId, PosX = healedPosX, PosY = healedPosY, PosZ = healedPosZ
+                };
+        }
+
         if (packet.AvatarName != character.Name)
         {
             logger.LogWarning(

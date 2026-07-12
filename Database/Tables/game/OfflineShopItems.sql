@@ -20,6 +20,14 @@ CREATE TABLE game.OfflineShopItems
     CONSTRAINT PK_OfflineShopItems PRIMARY KEY CLUSTERED (CharacterId, SlotIndex),
     CONSTRAINT CK_OfflineShopItems_SlotIndex CHECK (SlotIndex BETWEEN 0 AND 24),
     CONSTRAINT FK_OfflineShopItems_Shop FOREIGN KEY (CharacterId) REFERENCES game.OfflineShops (CharacterId) ON DELETE CASCADE,
-    CONSTRAINT FK_OfflineShopItems_Item FOREIGN KEY (ItemId) REFERENCES world.Items (ItemId),
-    INDEX IX_OfflineShopItems_ItemId NONCLUSTERED (ItemId)
+    -- Cross-schema FK naming: see admin.Bans' own header comment for the FK_<ChildTable>_<TargetSchema>_<Role>
+    -- convention -- the FK above stays bare (same-schema, game -> game).
+    CONSTRAINT FK_OfflineShopItems_World_Item FOREIGN KEY (ItemId) REFERENCES world.Items (ItemId)
+    -- No secondary index on ItemId: verified repo-wide that every reader drives its seek from CharacterId (the
+    -- leading clustered-PK column) or a CAS-style guarded DELETE where ItemId is an extra WHERE predicate
+    -- evaluated after the PK already narrowed to <=1 row (usp_OfflineShop_ExecutePurchase,
+    -- usp_OfflineShop_RetrieveItemAndReplaceContainer); vw_OfflineShopListing.sql's own join drives from
+    -- world.Items (already PK'd), not from this table, so it doesn't exercise an ItemId index either. Meanwhile
+    -- this table gets a full container DELETE-then-INSERT on essentially every listing change, so an unused
+    -- index here is pure per-write maintenance cost with zero read benefit.
 );

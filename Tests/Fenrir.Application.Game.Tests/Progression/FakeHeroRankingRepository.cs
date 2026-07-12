@@ -20,6 +20,12 @@ internal sealed class FakeHeroRankingRepository : IHeroRankingRepository
         return ValueTask.CompletedTask;
     }
 
+    public ValueTask ClaimRewardAsync(int characterId, byte periodKind, int contributionPointsDelta,
+        CancellationToken ct)
+    {
+        return ValueTask.CompletedTask;
+    }
+
     public ValueTask<bool> RolloverIfDueAsync(CancellationToken ct)
     {
         return ValueTask.FromResult(false);

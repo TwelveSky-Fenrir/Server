@@ -28,6 +28,14 @@
 -- wire-field quirk TribeAnnouncementScrollResponse.TribeRole's own docstring already flags -- ProcessForRelay
 -- substitutes the tribe id here, not the sender's hardcoded placeholder, Server/ts25zone/S04_MyWork04.cpp:
 -- 265-286); unused (0) for GuildAnnouncement/GuildChat (Kind 0/1).
+--
+-- CorrelationId is a client-generated idempotency token (GuildTribeBroadcastRelayEntry.CorrelationId, minted
+-- once when the entry is constructed and stable across every retry attempt CrossShardRelayRetry.RunAsync
+-- makes for that SAME entry instance). usp_GuildTribeBroadcastRelay_Publish looks this up before inserting so
+-- a retry after a lost acknowledgement (the commit actually succeeded, only the ack didn't arrive) finds its
+-- own already-committed row and skips the re-insert, instead of duplicating a user-visible chat/announcement
+-- message. The UNIQUE constraint is the backstop against a genuine concurrent double-publish of the same
+-- token racing the lookup itself, not the primary dedup mechanism.
 CREATE TABLE runtime.GuildTribeBroadcastRelay
 (
     RelayId          BIGINT IDENTITY (1,1) NOT NULL,
@@ -45,7 +53,15 @@ CREATE TABLE runtime.GuildTribeBroadcastRelay
     ItemLinkSocket0  INT                   NULL,
     ItemLinkSocket1  INT                   NULL,
     ItemLinkSocket2  INT                   NULL,
+    CorrelationId    UNIQUEIDENTIFIER      NOT NULL,
     CreatedAtUtc     DATETIME2(3)          NOT NULL,
-    CONSTRAINT PK_GuildTribeBroadcastRelay PRIMARY KEY NONCLUSTERED (RelayId)
+    CONSTRAINT PK_GuildTribeBroadcastRelay PRIMARY KEY NONCLUSTERED (RelayId),
+    CONSTRAINT UQ_GuildTribeBroadcastRelay_CorrelationId UNIQUE NONCLUSTERED (CorrelationId),
+    -- Supports usp_GuildTribeBroadcastRelay_Poll's own time-based reap DELETE (WHERE CreatedAtUtc <=
+    -- retention cutoff), issued once per shard per poll cycle (every 2s by default, N shards) -- without
+    -- this, that DELETE has no usable predicate index and falls back to a full index-order scan on every
+    -- single poll. CreatedAtUtc is write-once at INSERT and never updated afterward, so this index costs
+    -- nothing on the hot insert/publish path, unlike an index on a column that gets touched repeatedly.
+    INDEX IX_GuildTribeBroadcastRelay_CreatedAtUtc NONCLUSTERED (CreatedAtUtc)
 )
     WITH (MEMORY_OPTIMIZED = ON, DURABILITY = SCHEMA_ONLY);

@@ -18,4 +18,9 @@ internal sealed class FakeFirewallRuleRepository(bool blocked = false) : IFirewa
     {
         return ValueTask.CompletedTask;
     }
+
+    public ValueTask<int> AddAsync(string ipAddress, byte ruleType, CancellationToken ct)
+    {
+        throw new NotSupportedException();
+    }
 }

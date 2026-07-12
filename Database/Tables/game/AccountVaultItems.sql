@@ -18,6 +18,11 @@ CREATE TABLE game.AccountVaultItems
     CONSTRAINT PK_AccountVaultItems PRIMARY KEY CLUSTERED (AccountId, SlotIndex),
     CONSTRAINT CK_AccountVaultItems_SlotIndex CHECK (SlotIndex BETWEEN 0 AND 27),
     CONSTRAINT FK_AccountVaultItems_Vault FOREIGN KEY (AccountId) REFERENCES game.AccountVault (AccountId) ON DELETE CASCADE,
-    CONSTRAINT FK_AccountVaultItems_Item FOREIGN KEY (ItemId) REFERENCES world.Items (ItemId),
-    INDEX IX_AccountVaultItems_ItemId NONCLUSTERED (ItemId)
+    -- Cross-schema FK naming: see admin.Bans' own header comment for the FK_<ChildTable>_<TargetSchema>_<Role>
+    -- convention -- the FK above stays bare (same-schema, game -> game).
+    CONSTRAINT FK_AccountVaultItems_World_Item FOREIGN KEY (ItemId) REFERENCES world.Items (ItemId)
+    -- No secondary index on ItemId: verified repo-wide that every reader drives its seek from AccountId (the
+    -- leading clustered-PK column); nothing ever seeks this table BY ItemId. usp_AccountVault_SetItems does a
+    -- full container DELETE-then-INSERT on essentially every vault transfer, so an unused index here is pure
+    -- per-write maintenance cost with zero read benefit.
 );

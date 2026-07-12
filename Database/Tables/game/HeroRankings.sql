@@ -8,7 +8,7 @@ CREATE TABLE game.HeroRankings
     Points        INT           NOT NULL
         CONSTRAINT DF_HeroRankings_Points DEFAULT 0,
     TribeId       TINYINT       NULL,
-    Level         INT           NULL,
+    Level         SMALLINT      NULL, -- sourced from game.Characters.Level (SMALLINT); widened to INT here was an unjustified type drift, aligned to match
     RewardClaimed BIT           NULL,
     Description   NVARCHAR(255) NULL,
     RecordedAtUtc DATETIME2(3)  NOT NULL

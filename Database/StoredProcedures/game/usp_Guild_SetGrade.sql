@@ -8,7 +8,8 @@ BEGIN
         XACT_ABORT ON;
 
     UPDATE game.Guilds
-    SET Grade = @Grade
+    SET Grade        = @Grade,
+        UpdatedAtUtc = SYSUTCDATETIME()
     WHERE GuildId = @GuildId;
 
     IF

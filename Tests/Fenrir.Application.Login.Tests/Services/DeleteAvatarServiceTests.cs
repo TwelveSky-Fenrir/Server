@@ -34,7 +34,7 @@ public class DeleteAvatarServiceTests
     }
 
     [Fact]
-    public async Task DeleteAvatarAsync_EmptySlot_SkipsBusinessRulesAndDeletesIdempotently()
+    public async Task DeleteAvatarAsync_EmptySlot_ReturnsSlotEmptyWithoutQueryingOrDeleting()
     {
         var characters = FakeCharacterRepository.WithNone();
         var guilds = FakeGuildRepository.Empty();
@@ -44,8 +44,8 @@ public class DeleteAvatarServiceTests
 
         var result = await service.DeleteAvatarAsync(AccountId, Slot, CancellationToken.None);
 
-        Assert.Equal(DeleteAvatarOutcome.Success, result.Outcome);
-        Assert.Single(characters.DeleteCalls);
+        Assert.Equal(DeleteAvatarOutcome.SlotEmpty, result.Outcome);
+        Assert.Empty(characters.DeleteCalls);
         Assert.Empty(guilds.QueriedCharacterIds);
         Assert.Empty(shops.QueriedCharacterIds);
     }

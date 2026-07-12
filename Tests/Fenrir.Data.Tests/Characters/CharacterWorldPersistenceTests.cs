@@ -317,7 +317,7 @@ public class CharacterWorldPersistenceTests
     }
 
     [Fact]
-    public async Task GetForWorldEntryAsync_TheM1PrefixRead_StillWorksAgainstTheExtendedProc()
+    public async Task GetForWorldEntryAsync_TheNarrowPrefixRead_WorksAgainstTheSummaryProc()
     {
         var characterId = await CreateCharacterAsync();
 

@@ -8,7 +8,8 @@ BEGIN
         XACT_ABORT ON;
 
     UPDATE game.Guilds
-    SET Logo = @Logo
+    SET Logo         = @Logo,
+        UpdatedAtUtc = SYSUTCDATETIME()
     WHERE GuildId = @GuildId;
 
     IF

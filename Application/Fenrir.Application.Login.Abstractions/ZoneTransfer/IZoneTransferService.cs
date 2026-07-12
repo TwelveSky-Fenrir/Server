@@ -4,7 +4,8 @@ public enum ZoneTransferOutcome
 {
     CharacterNotFound,
     ShardUnavailable,
-    Success
+    Success,
+    SlotEmpty
 }
 
 public readonly record struct ZoneTransferResult(ZoneTransferOutcome Outcome, string Ip, int Port, short Zone);

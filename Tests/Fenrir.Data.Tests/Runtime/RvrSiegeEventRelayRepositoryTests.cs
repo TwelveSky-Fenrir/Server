@@ -138,4 +138,22 @@ public sealed class RvrSiegeEventRelayRepositoryTests : IDisposable
             await _repository.PollAsync(firstSourceShardId, 999_999, CancellationToken.None);
         Assert.Empty(laterPollFromAnotherShard);
     }
+
+    [Fact]
+    public async Task PublishAsync_CalledTwiceWithTheSameEntryInstance_OnlyInsertsOneRow()
+    {
+        // Models CrossShardRelayRetry.RunAsync retrying the same entry after a lost acknowledgement: the
+        // CorrelationId is generated once when the entry is constructed and stays identical across both calls,
+        // so the second PublishAsync must be a no-op rather than a duplicate row.
+        const byte sourceShardId = 12;
+        const byte otherShardId = 13;
+        await DrainAsync(otherShardId);
+
+        var entry = new RvrSiegeEventRelayEntry(sourceShardId, 47, Payload(5));
+        await _repository.PublishAsync(entry, CancellationToken.None);
+        await _repository.PublishAsync(entry, CancellationToken.None);
+
+        var rows = await _repository.PollAsync(otherShardId, 999_999, CancellationToken.None);
+        Assert.Single(rows);
+    }
 }

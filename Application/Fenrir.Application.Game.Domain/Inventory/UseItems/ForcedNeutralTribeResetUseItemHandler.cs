@@ -45,7 +45,7 @@ public sealed class ForcedNeutralTribeResetUseItemHandler(
 
         await characters.ApplyTribeFourConversionAsync(context.CharacterId, ForcedNeutralTribeResetGate.NeutralTribe,
             state.QuestStepPermanent, state.QuestActiveFlag, state.QuestSort, state.QuestTargetPhase,
-            state.QuestKillCounter, cancellationToken);
+            state.QuestKillCounter, consumeSharedQuota: false, cancellationToken);
 
         if (!await context.Zone.PostTribeProgressCommandAndWaitAsync(
                 new TribeProgressZoneCommand(context.CharacterId, Tribe: ForcedNeutralTribeResetGate.NeutralTribe),

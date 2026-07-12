@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using Fenrir.Data.Abstractions.World;
 
@@ -51,17 +52,16 @@ internal sealed class FakeWorldStateRepository : IWorldStateRepository
         return ValueTask.CompletedTask;
     }
 
-    public ValueTask<(WorldStateRowDto? Row, ReadOnlyCollection<WorldStateTribeDto> Tribes,
-            ReadOnlyCollection<WorldStateAllianceOfferDto> AllianceOffers)>
+    public ValueTask<(WorldStateRowDto? Row, ImmutableArray<WorldStateTribeDto> Tribes,
+            ImmutableArray<WorldStateAllianceOfferDto> AllianceOffers)>
         GetAsync(CancellationToken ct)
     {
         if (ThrowOnGet)
             throw new InvalidOperationException("Simulated reconcile-read failure.");
 
-        return ValueTask.FromResult<(WorldStateRowDto?, ReadOnlyCollection<WorldStateTribeDto>,
-            ReadOnlyCollection<WorldStateAllianceOfferDto>)>(
-            (Row, new ReadOnlyCollection<WorldStateTribeDto>(Tribes),
-                new ReadOnlyCollection<WorldStateAllianceOfferDto>(AllianceOffers)));
+        return ValueTask.FromResult<(WorldStateRowDto?, ImmutableArray<WorldStateTribeDto>,
+            ImmutableArray<WorldStateAllianceOfferDto>)>(
+            (Row, [..Tribes], [..AllianceOffers]));
     }
 
     public ValueTask UpdateAsync(byte? zone038WinTribe, int? zone038WinTribeTime, bool tribeSymbolBattle,

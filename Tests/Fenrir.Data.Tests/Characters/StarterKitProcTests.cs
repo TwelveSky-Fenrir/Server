@@ -156,12 +156,12 @@ public class StarterKitProcTests
         Assert.Equal(1, bundle.Character.StatStr);
         Assert.Equal(1, bundle.Character.StatInt);
         Assert.Equal(1, bundle.Character.StatDex);
-        Assert.Equal(0, bundle.Character.PetGrowth);
-        Assert.Equal((byte)0, bundle.Character.PetActivity);
-        Assert.Equal(0, bundle.Character.DoubleExpTime1);
-        Assert.Equal(0, bundle.Character.DoubleExpTime2);
+        Assert.Equal(640_000_000, bundle.Character.PetGrowth);
+        Assert.Equal((byte)100, bundle.Character.PetActivity);
+        Assert.Equal(300, bundle.Character.DoubleExpTime1);
+        Assert.Equal(300, bundle.Character.DoubleExpTime2);
         Assert.Equal(welcomeBuffUntilDate, bundle.Character.AutoBuffTime);
-        Assert.Equal(0L, bundle.Character.PremiumExpireUtc);
+        Assert.Equal(premiumUntilUnixSeconds, bundle.Character.PremiumExpireUtc);
 
         Assert.Equal(1, bundle.Character.Level);
         Assert.Equal(0, bundle.Character.Level2);
@@ -184,14 +184,14 @@ public class StarterKitProcTests
         Assert.Single(bundle.Hotkeys);
         Assert.Contains(bundle.Hotkeys, h => h is { Page: 0, KeyIndex: 0, Sort: 1 });
 
-        Assert.Equal(0, bundle.Character.MountItemId);
+        Assert.Equal(1301, bundle.Character.MountItemId);
         Assert.Equal(0, bundle.Character.MountExpActivity);
-        Assert.Equal(0, bundle.Character.MountPower);
-        Assert.Equal(-1, bundle.Character.MountSlotIndex);
-        Assert.Equal(0, bundle.Character.MountTime);
+        Assert.Equal(5, bundle.Character.MountPower);
+        Assert.Equal(0, bundle.Character.MountSlotIndex);
+        Assert.Equal(99999999, bundle.Character.MountTime);
 
-        Assert.Equal(0, bundle.Character.ProtectForDeath);
-        Assert.Equal(0, bundle.Character.AutoTime2);
+        Assert.Equal(5, bundle.Character.ProtectForDeath);
+        Assert.Equal(1440, bundle.Character.AutoTime2);
     }
 
     [Fact]

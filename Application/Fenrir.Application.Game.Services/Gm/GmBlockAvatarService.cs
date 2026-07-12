@@ -45,12 +45,12 @@ public sealed class GmBlockAvatarService(
 
         var targetAccountId = ((ZoneClientSession)target.Session).AccountId;
 
-        await bans.CreateAsync(targetAccountId, target.CharacterId, BanReason.GmManualBlock,
-            DateTime.UtcNow.Add(BlockDuration), cancellationToken);
-
         await eventLog.LogAsync(GmActionEventCodes.Block, EventLogCategory.GmAction, zoneSession.AccountId,
             callerCharacterId, targetAccountId, target.CharacterId, null, null, null, null, null, 1,
             $"TargetName={target.Name}", cancellationToken);
+
+        await bans.CreateAsync(targetAccountId, target.CharacterId, BanReason.GmManualBlock,
+            DateTime.UtcNow.Add(BlockDuration), cancellationToken);
 
         logger.LogWarning(
             "GM character {GmCharacterId} blocked avatar {TargetCharacterId} ({TargetName})",

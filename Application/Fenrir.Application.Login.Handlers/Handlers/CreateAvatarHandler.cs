@@ -75,11 +75,17 @@ public sealed class CreateAvatarHandler(ICreateAvatarService createAvatarService
                     packet.Tribe, accountId);
                 session.Send(new CreateAvatarResponse { Result = 3, AvatarInfo = AvatarInfoFactory.Zeroed });
                 return;
+            case CreateAvatarOutcome.NameTaken:
+                logger.LogWarning(
+                    "Create-avatar rejected: name {AvatarName} already claimed (account {AccountId} slot {Slot})",
+                    packet.AvatarName, accountId, packet.AvatarPost);
+                session.Send(new CreateAvatarResponse { Result = 2, AvatarInfo = result.AvatarInfo });
+                return;
             default:
                 logger.LogWarning(
                     "Create-avatar failed: account {AccountId} slot {Slot} (generic failure, see CreateAvatarService logs)",
                     accountId, packet.AvatarPost);
-                session.Send(new CreateAvatarResponse { Result = 1, AvatarInfo = AvatarInfoFactory.Zeroed });
+                session.Send(new CreateAvatarResponse { Result = 1, AvatarInfo = result.AvatarInfo });
                 return;
         }
     }

@@ -142,9 +142,6 @@ public sealed class RvrSiegeEventRelayRepositoryTests : IDisposable
     [Fact]
     public async Task PublishAsync_CalledTwiceWithTheSameEntryInstance_OnlyInsertsOneRow()
     {
-        // Models CrossShardRelayRetry.RunAsync retrying the same entry after a lost acknowledgement: the
-        // CorrelationId is generated once when the entry is constructed and stays identical across both calls,
-        // so the second PublishAsync must be a no-op rather than a duplicate row.
         const byte sourceShardId = 12;
         const byte otherShardId = 13;
         await DrainAsync(otherShardId);

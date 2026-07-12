@@ -3,8 +3,6 @@ using Fenrir.Network.Serialization.Wire.Attributes;
 
 namespace Fenrir.Network.Serialization.Login.Packets.Login;
 
-// No premium/VIP field: legacy's own LC_USER_AVATAR_RECV2 field-copy sequence never carries one either
-// (Server/ts25login/S05_MyTransfer.cpp:133-169) -- confirmed dead-by-design, not a Fenrir gap.
 [FenrirPacket(FenrirServer.Login, FenrirDirection.Outgoing, Opcodes.Login.Outgoing.AvatarRoster,
     Obfuscation = WireObfuscationMode.XorFieldAvatar, ExpectedSize = 4579)]
 public readonly partial record struct AvatarRosterResponse : IOutgoingPacket

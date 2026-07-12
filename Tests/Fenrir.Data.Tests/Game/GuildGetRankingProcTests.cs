@@ -13,10 +13,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Game;
 
-// game.Guilds is a shared, cross-test table (usp_Guild_AdjustPoints has no other caller anywhere in the
-// codebase, so only test code ever writes Points), so every assertion here is deliberately RELATIVE to
-// guilds created within the same test rather than an assumed absolute RankNo -- a hardcoded "this guild is
-// rank 1" would silently break the moment any other test in the suite creates a higher-scoring guild.
 [Collection("SqlServer")]
 public class GuildGetRankingProcTests
 {
@@ -62,15 +58,8 @@ public class GuildGetRankingProcTests
         var tied = ranking.Single(r => r.GuildId == tiedId);
         var low = ranking.Single(r => r.GuildId == lowId);
 
-        // Two guilds with EQUAL Points always share the same RankNo -- what distinguishes RANK() from
-        // ROW_NUMBER(); true no matter what else is in the shared table, since both guilds have identically
-        // many strictly-higher-scoring rows above them.
         Assert.Equal(high.RankNo, tied.RankNo);
-        // A guild with strictly fewer points always ranks strictly worse (a numerically larger RankNo).
         Assert.True(low.RankNo > high.RankNo);
-        // RANK() (not DENSE_RANK()) leaves a gap sized by how many rows shared the rank above it -- verified
-        // against a live COUNT oracle instead of a hardcoded gap, so this holds regardless of any other
-        // guild's points anywhere else in the shared table.
         var guildsAbove10 = await CountGuildsWithPointsGreaterThanAsync(10);
         Assert.Equal(1 + guildsAbove10, low.RankNo);
 
@@ -94,9 +83,6 @@ public class GuildGetRankingProcTests
         var thirdId = await _guilds.CreateAsync(NewGuildName(), thirdMaster, CancellationToken.None);
         await _guilds.AdjustPointsAsync(thirdId, 300_000, CancellationToken.None);
 
-        // 500_000/400_000/300_000 sit comfortably above every other Points value this test suite ever
-        // creates (max observed elsewhere is in the low thousands), so firstId/secondId are guaranteed to be
-        // the two top-ranked rows across the whole shared table.
         var top2 = await _guilds.GetRankingAsync(2, CancellationToken.None);
 
         Assert.Equal(2, top2.Count);

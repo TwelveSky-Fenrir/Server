@@ -29,8 +29,6 @@ public sealed record GuildRepository(ICaeriusNetDbContext Db) : IGuildRepository
         return await Db.FirstQueryAsync<GuildSummaryDto>(sp, ct);
     }
 
-    // Polled every 30s by GuildBuffDecayHost -- QueryAsImmutableArrayAsync is the polled/hot-path terminal
-    // call, not QueryAsReadOnlyCollectionAsync (request/response shape).
     public async ValueTask<ImmutableArray<GuildSummaryDto>> GetAllAsync(CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Guild_GetAll", 64).Build();

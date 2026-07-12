@@ -536,9 +536,6 @@ public sealed class GenericActionService(
 
         try
         {
-            // The NpcShopTrade audit row is nested into usp_Character_AdjustMoneyAndReplaceContainer's own
-            // transaction (transaction-composition-audit finding) instead of a second, unshared round trip to
-            // eventLog.LogAsync after this call commits.
             await characters.AdjustMoneyAndReplaceContainerAsync(characterId, resolved.MoneyGained, 0, (byte)page1,
                 ToTvps(projectedContainer), cancellationToken,
                 auditAccountId: accountId, auditEventCode: sellEventCode, auditItemId: source.ItemId,
@@ -660,9 +657,6 @@ public sealed class GenericActionService(
 
         try
         {
-            // The NpcShopTrade audit row is nested into usp_Character_AdjustMoneyAndReplaceContainer's own
-            // transaction (transaction-composition-audit finding) instead of a second, unshared round trip to
-            // eventLog.LogAsync after this call commits.
             await characters.AdjustMoneyAndReplaceContainerAsync(characterId, -resolved.MoneyCost, 0, (byte)page2,
                 ToTvps(projectedContainer), cancellationToken,
                 auditAccountId: accountId, auditEventCode: NpcShopBuyEventCode,
@@ -871,9 +865,6 @@ public sealed class GenericActionService(
 
         try
         {
-            // The StoreSlotMoney audit row is nested into usp_Character_AdjustStoreMoney's own transaction
-            // (transaction-composition-audit finding) instead of a second, unshared round trip to
-            // eventLog.LogAsync after this call commits.
             await characters.AdjustStoreMoneyAsync(characterId, deltaMoney, deltaStoreMoney, cancellationToken,
                 auditAccountId: accountId, auditEventCode: storeMoneyEventCode, auditQuantity: move.Quantity1);
         }
@@ -1077,9 +1068,6 @@ public sealed class GenericActionService(
 
         try
         {
-            // The SaveSlotMoney audit row is nested into usp_AccountVault_TransferMoneyWithCharacter's own
-            // transaction (transaction-composition-audit finding) instead of a second, unshared round trip to
-            // eventLog.LogAsync after this call commits.
             await accountVault.TransferMoneyWithCharacterAsync(characterId, deltaCharacterMoney, accountId,
                 deltaVaultMoney, cancellationToken, auditEventCode: saveMoneyEventCode,
                 auditQuantity: move.Quantity1);

@@ -61,9 +61,6 @@ public sealed class AccountSessionKickPollHost(
 
                 var notice = new AvatarStatUpdateResponse { Sort = LoginFromAnotherSort, Value = 0, Value2 = 0 };
 
-                // Server/ts25zone/S01_MainApplication.cpp:125-126 sends this notice twice back-to-back before
-                // closing the socket (B_AVATAR_CHANGE_INFO_2 already USENDs it, then the caller USENDs it again) --
-                // mirrored here as two independent attempts rather than "cleaned up" to a single send.
                 SendDuplicateLoginNotice(zoneSession, notice, target.AccountId, shardId);
                 SendDuplicateLoginNotice(zoneSession, notice, target.AccountId, shardId);
 

@@ -62,8 +62,6 @@ public static class LoginTrain
             UserSort = 0,
             GoodFellow = 0,
             LoginPlace = 0,
-            // Always 0: legacy's own B_LOGIN_RECV never derives this from account/character state either
-            // (Server/ts25login/S05_MyTransfer.cpp:65-102) -- confirmed dead-by-design, not a Fenrir gap.
             LoginPremium = 0,
             SecondLoginSort = secondLoginSort,
             MousePassword = mousePassword,

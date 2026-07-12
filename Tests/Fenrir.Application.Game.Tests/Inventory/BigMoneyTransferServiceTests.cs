@@ -33,9 +33,6 @@ public class BigMoneyTransferServiceTests
         Assert.Equal(-5, call.DeltaInventoryBigMoney);
         Assert.Equal(5, call.DeltaStoreBigMoney);
 
-        // The BigMoneyConversion audit row is nested into usp_Character_AdjustBigStoreMoney's own transaction
-        // (transaction-composition-audit finding), so it's now observed as audit* parameters on this same
-        // repository call rather than a separate eventLog.LoggedEvents entry.
         Assert.Equal(EventLogEmitters.BigMoneyConversionEventCode5, call.AuditEventCode);
         Assert.Equal(-5, call.AuditFromDelta);
         Assert.Equal(5, call.AuditToDelta);
@@ -109,9 +106,6 @@ public class BigMoneyTransferServiceTests
         Assert.Equal(99, call.AccountId);
         Assert.Equal(7, call.DeltaVaultBigMoney);
 
-        // The BigMoneyConversion audit row is nested into usp_AccountVault_TransferBigMoneyWithCharacter's own
-        // transaction (transaction-composition-audit finding), so it's now observed as audit* parameters on
-        // this same repository call rather than a separate eventLog.LoggedEvents entry.
         Assert.Equal(EventLogEmitters.BigMoneyConversionEventCode7, call.AuditEventCode);
         Assert.Equal(-7, call.AuditFromDelta);
         Assert.Equal(7, call.AuditToDelta);

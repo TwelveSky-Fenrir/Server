@@ -264,11 +264,6 @@ public sealed class UseInventoryItemService(
 
         try
         {
-            // Cash credit and ticket consumption commit atomically in usp_Cash_CreditAndConsumeItem -- a
-            // failure here (including a transient one) leaves cash uncredited AND the ticket untouched, so
-            // a client retry of this same request can never dupe the credit against a physically-present
-            // ticket. See that procedure's own header comment for the transaction-composition-audit finding
-            // this closes.
             await cash.CreditAndConsumeItemAsync(accountId, creditAmount, GpTicketCashCreditReason, item.ItemId,
                 characterId, page, ToTvps(projected), cancellationToken);
         }

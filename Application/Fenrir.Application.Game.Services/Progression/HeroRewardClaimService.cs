@@ -22,11 +22,6 @@ public sealed class HeroRewardClaimService(IHeroRankingRepository heroRankings, 
 
         var points = HeroRewardResolver.PointsByRank[resolved.Rank];
 
-        // Bundles the durable RewardClaimed flag with the contribution-points grant into one atomic
-        // usp_HeroRanking_ClaimReward transaction (mirroring ClaimDailyRewardService's claim-plus-grant
-        // shape), so the reward is already durably applied to game.Characters.ContributionPoints before the
-        // best-effort in-memory mirror below even runs -- a dropped mirror only delays the live session
-        // reflecting it until the next write-behind flush, it can no longer lose the reward outright.
         await heroRankings.ClaimRewardAsync(characterId, 1, points, cancellationToken);
 
         if (!await zone.PostTribeProgressCommandAndWaitAsync(

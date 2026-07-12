@@ -21,9 +21,6 @@ public sealed record SessionTicketRepository(ICaeriusNetDbContext Db) : ISession
     public async ValueTask CreateAsync(int accountId, int characterId, byte shardId, int ttlSeconds,
         Guid sessionToken, short accountGrade, CancellationToken ct)
     {
-        // DELETE-then-INSERT for the same AccountId can race a second, near-simultaneous zone-transfer/
-        // world-entry offer for that same account (e.g. a duplicate-click transfer request) -- retry rather
-        // than surface a transient 41302/41305/41325 from runtime.SessionTickets' own memory-optimized table.
         for (var attempt = 1;; attempt++)
         {
             var parameters =

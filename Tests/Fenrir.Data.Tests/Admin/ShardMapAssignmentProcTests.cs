@@ -45,7 +45,6 @@ public class ShardMapAssignmentProcTests
     [Fact]
     public async Task GetHostedMaps_MultipleMapsForOneShard_ReturnsAllAscending()
     {
-        // 297/298 are real world.Zones rows (FK_ShardMapAssignments_World_Zone) not otherwise used by this fixture's seed.
         await InsertAssignmentAsync(77, 298);
         await InsertAssignmentAsync(77, 297);
 
@@ -57,7 +56,6 @@ public class ShardMapAssignmentProcTests
     [Fact]
     public async Task GetAllAssignments_IncludesEveryShardRegardlessOfLiveness()
     {
-        // 324/325 are real world.Zones rows (FK_ShardMapAssignments_World_Zone) not otherwise used by this fixture's seed.
         await InsertAssignmentAsync(78, 324);
         await InsertAssignmentAsync(79, 325);
 

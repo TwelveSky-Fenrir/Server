@@ -7,8 +7,6 @@ public interface IWorldStateRepository
 {
     public ValueTask EnsureInitializedAsync(CancellationToken ct);
 
-    // Polled every 5s for the process lifetime by WorldStateWriteBehindHost -> WorldStateService.ReconcileAsync,
-    // so this is the polled/hot-path read shape (ImmutableArray), not the request/response shape.
     public ValueTask<(WorldStateRowDto? Row, ImmutableArray<WorldStateTribeDto> Tribes,
         ImmutableArray<WorldStateAllianceOfferDto> AllianceOffers)> GetAsync(CancellationToken ct);
 

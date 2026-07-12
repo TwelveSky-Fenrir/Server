@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Abstractions.Tribes;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.Tribes;
@@ -17,9 +18,6 @@ public sealed class TribeMigrationService(
     TimeProvider timeProvider,
     ILogger<TribeMigrationService> logger) : ITribeMigrationService
 {
-    // admin.TribeFourQuota exhausted -- thrown by usp_Character_ApplyTribeFourConversion's own
-    // @ConsumeQuota=1 branch (transaction-composition-audit fix: quota consumption and character conversion
-    // now commit atomically in that single procedure call instead of two separate, uncoordinated round trips).
     private const int QuotaExhaustedErrorNumber = 50355;
 
     public async ValueTask<TribeMigrationOutcome> ConvertAsync(Zone zone, PlayerRuntimeState state, int characterId,

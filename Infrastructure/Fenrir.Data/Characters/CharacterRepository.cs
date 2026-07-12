@@ -25,10 +25,6 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
 
     public async ValueTask<CharacterAccountRosterBundle> GetAccountRosterAsync(int accountId, CancellationToken ct)
     {
-        // QueryMultipleReadOnlyCollectionAsync reuses this one capacity across all 4 result sets -- RS0 (characters)
-        // is bounded at 3 (MAX_USER_AVATAR_NUM), but RS1 (items) can carry up to 3 characters' worth of
-        // equipment/inventory/store rows. 192 mirrors GetWorldEntryBundleAsync's own 64-row per-character budget
-        // multiplied by the 3-character roster bound, rather than sizing for RS0 alone.
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetAccountRoster", 192)
             .AddParameter("AccountId", accountId, SqlDbType.Int)
             .Build();
@@ -150,10 +146,6 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-    // CharacterWorldEntryDto reads only a 19-column prefix by design -- see its own doc comment in
-    // CharacterDtos.cs. Calls the single-result-set usp_Character_GetForWorldEntrySummary companion rather
-    // than the 5-result-set usp_Character_GetForWorldEntry that GetWorldEntryBundleAsync below uses, so SQL
-    // Server never computes/transmits the item/skill/hotkey/buff result sets this method discards anyway.
     public async ValueTask<CharacterWorldEntryDto?> GetForWorldEntryAsync(int characterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetForWorldEntrySummary", 1)

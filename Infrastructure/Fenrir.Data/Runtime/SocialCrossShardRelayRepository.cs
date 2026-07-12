@@ -17,10 +17,6 @@ public sealed record SocialCrossShardRelayRepository(ICaeriusNetDbContext Db) : 
     private const int ErrorDependencyFailure = 41305;
     private const int ErrorCommitDependencyAborted = 41325;
 
-    // usp_SocialCrossShardRelay_Poll's own reap-delete sweeps runtime.SocialCrossShardRelay by a flat
-    // CreatedAtUtc-cutoff predicate shared by every shard's own independent poll cycle -- see
-    // ChatCrossShardRelayRepository's own remarks for why two shards' concurrent reaps can race the same
-    // expiring row and why that's worth retrying rather than dropping a whole poll cycle over.
     private const int MaxWriteConflictAttempts = 3;
 
     public async ValueTask PublishAsync(SocialCrossShardRelayEntry entry, CancellationToken ct)

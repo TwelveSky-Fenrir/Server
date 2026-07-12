@@ -183,9 +183,6 @@ public class WarPointNpcShopDispatchTests
         var call = characters.LastAdjustMoneyAndReplaceContainer!.Value;
         Assert.Equal(-OrdinaryItemBuyCost, call.DeltaMoney);
 
-        // The NpcShopTrade audit row is nested into usp_Character_AdjustMoneyAndReplaceContainer's own
-        // transaction (transaction-composition-audit finding), so it's now observed as audit* parameters on
-        // this same repository call rather than a separate eventLog.LoggedEvents entry.
         Assert.Equal(2, call.AuditEventCode);
         Assert.Empty(eventLog.LoggedEvents);
     }

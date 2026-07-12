@@ -15,16 +15,6 @@ if (string.IsNullOrWhiteSpace(connectionString))
     return 1;
 }
 
-// Fail-closed dev-only-fixture gate (seed-data-review finding: 001_dev_account.sql had zero environment
-// gating anywhere in the pipeline). Mirrors ASP.NET Core's own DOTNET_ENVIRONMENT/ASPNETCORE_ENVIRONMENT
-// precedence and "Production" default (Microsoft Learn, "ASP.NET Core runtime environments"), so an
-// unset environment -- the only thing a real non-dev deployment is guaranteed not to override to
-// "Development" -- skips the seed rather than applying it. Local Aspire runs keep working because
-// Orchestration/Fenrir.AppHost/Properties/launchSettings.json's own profiles set DOTNET_ENVIRONMENT=
-// Development, which child project resources inherit via standard OS process-environment inheritance.
-// If Aspire's project-resource process spawning is ever confirmed to NOT inherit the AppHost's ambient
-// environment, AppHost.cs needs an explicit .WithEnvironment("DOTNET_ENVIRONMENT", ...) on db-migrator --
-// that wiring is fenrir-aspire-hosting-engineer's call, not this tool's.
 var environmentName =
     Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") ??
     Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ??
@@ -219,25 +209,6 @@ static async Task JournalAsync(SqlConnection connection, string scriptName, byte
 
 static async Task ReportIndexedViewArithabortStatusAsync(SqlConnection connection)
 {
-    // world.vw_ItemMallCatalog / game.vw_OfflineShopListing are WITH SCHEMABINDING indexed views. The query
-    // optimizer only substitutes an indexed view's materialized index for a session with ARITHABORT
-    // effectively ON (Microsoft Learn, "Create indexed views" -- required SET options table).
-    // Microsoft.Data.SqlClient/CaeriusNet negotiates OLE DB/ODBC-style session defaults, which set
-    // ANSI_WARNINGS ON but leave the explicit ARITHABORT bit OFF. Per Microsoft Learn's "SET ARITHABORT
-    // (Transact-SQL)" Remarks, though: "When ANSI_WARNINGS has a value of ON and the database compatibility
-    // level is set to 90 or higher then ARITHABORT is implicitly ON regardless of its value setting." Fenrir
-    // never sets an explicit COMPATIBILITY_LEVEL override anywhere under Database/, so this database inherits
-    // the SQL Server 2025 instance's own native compat level (well above the 90 floor) -- meaning every
-    // CaeriusNet connection should already satisfy the requirement without any server-wide sp_configure
-    // change. This check reports the actual, observed values from the exact driver/connection type CaeriusNet
-    // itself uses, on every real db-migrator run, instead of leaving that "should" as a one-off manual step
-    // nobody ever gets around to running against a live instance. A wrong ARITHABORT setting on a READING
-    // connection only degrades performance (the optimizer silently falls back to the base tables) -- but per
-    // Microsoft Learn ("SET ARITHABORT (Transact-SQL)"), ARITHABORT OFF on a WRITING connection makes any
-    // INSERT/UPDATE/DELETE against game.OfflineShops/game.OfflineShopItems (actively written by live gameplay
-    // procedures) fail outright with an error, not merely degrade. This check itself only ever reports a
-    // diagnostic, never fails the migration, since it cannot distinguish read-only from write-capable
-    // connections from here.
     try
     {
         await using var command = new SqlCommand(

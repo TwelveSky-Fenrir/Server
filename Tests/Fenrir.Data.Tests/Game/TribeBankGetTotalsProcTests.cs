@@ -35,7 +35,6 @@ public class TribeBankGetTotalsProcTests
         await SeedSlotAsync(0, 0, 50_000);
         await SeedSlotAsync(0, 1, 25_000);
         await SeedSlotAsync(1, 3, 10);
-        // Tribes 2 and 3 deliberately receive no rows at all.
 
         var totals = await _tribes.GetBankTotalsAsync(CancellationToken.None);
 

@@ -17,9 +17,6 @@ public sealed record WorldStateRepository(ICaeriusNetDbContext Db) : IWorldState
         await Db.ExecuteAsync(sp, ct);
     }
 
-    // Polled every 5s for the process lifetime by WorldStateWriteBehindHost -> WorldStateService.ReconcileAsync
-    // -- QueryMultipleImmutableArrayAsync is the polled/hot-path terminal call, not
-    // QueryMultipleReadOnlyCollectionAsync (request/response shape).
     public async ValueTask<(WorldStateRowDto? Row, ImmutableArray<WorldStateTribeDto> Tribes,
             ImmutableArray<WorldStateAllianceOfferDto> AllianceOffers)>
         GetAsync(CancellationToken ct)

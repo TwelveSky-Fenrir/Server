@@ -62,9 +62,6 @@ public class CashProcTests
             $"SELECT TOP 1 BalanceAfter FROM game.CashLog WHERE AccountId = {accountId} ORDER BY CashLogId DESC;"));
     }
 
-    // usp_Cash_Debit (a bare single-purpose debit with no item grant) was removed as dead code in the
-    // 2026-07-12 Database/ cleanup pass -- every real debit path grants an item, so these tests now route
-    // through its live successor, usp_Cash_DebitAndGrantItem, via ICashRepository.DebitAndGrantItemAsync.
     [Fact]
     public async Task Cash_DebitAndGrantItem_Spends_WritesTheAuditLog_AndRejectsAnOverdraftWithoutTouchingTheBalance()
     {

@@ -18,11 +18,6 @@ public sealed record GameServerDirectoryRepository(ICaeriusNetDbContext Db, ICae
     private const int ErrorDependencyFailure = 41305;
     private const int ErrorCommitDependencyAborted = 41325;
 
-    // runtime.GameServerDirectory is MEMORY_OPTIMIZED = ON: a shard's own periodic Heartbeat can race the
-    // Login side's TcpShardReachabilityProbe-driven MarkUnreachable for the exact same ShardId row (a shard
-    // "resurrecting" at the same instant it's being evicted for a stale probe) -- UPDLOCK/ROWLOCK aren't an
-    // option against a memory-optimized table, so retry-on-conflict is the correct mechanism here too, same
-    // shape as AccountSessionRepository/CharacterShardLocationRepository.
     private const int MaxWriteConflictAttempts = 3;
 
     public async ValueTask HeartbeatAsync(byte shardId, string host, int port, int ccu, int capacity,

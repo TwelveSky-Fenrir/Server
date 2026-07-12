@@ -18,8 +18,6 @@ namespace Fenrir.Application.Game.Tests.TestSupport;
                     "helper cannot add DynamicallyAccessedMembers annotations to a third-party assembly.")]
 internal sealed class FakeCharacterRepository : ICharacterRepository
 {
-    // admin.TribeFourQuota exhausted -- matches usp_Character_ApplyTribeFourConversion's own
-    // @ConsumeQuota=1 THROW number (transaction-composition-audit fix).
     private const int QuotaExhaustedErrorNumber = 50355;
 
     public (int CharacterId, byte Container, IReadOnlyList<CharacterItemSlotTvp> Items)? LastReplacedContainer

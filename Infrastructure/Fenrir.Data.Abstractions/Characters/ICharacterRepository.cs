@@ -77,23 +77,10 @@ public interface ICharacterRepository
 
     public ValueTask AdjustMoneyAsync(int characterId, long deltaMoney, int deltaBigMoney, CancellationToken ct);
 
-    /// <summary>
-    ///     Optional trailing <c>audit*</c> parameters nest a StoreSlotMoney audit row into this same procedure
-    ///     call (see usp_Character_AdjustStoreMoney.sql) instead of the caller making a second, unshared round
-    ///     trip to <c>IEventLogRepository.LogAsync</c> afterward (transaction-composition-audit finding). Omit
-    ///     <paramref name="auditEventCode" /> to skip logging.
-    /// </summary>
-    public ValueTask AdjustStoreMoneyAsync(int characterId, long deltaMoney, long deltaStoreMoney,
+        public ValueTask AdjustStoreMoneyAsync(int characterId, long deltaMoney, long deltaStoreMoney,
         CancellationToken ct, int? auditAccountId = null, short? auditEventCode = null, int? auditQuantity = null);
 
-    /// <summary>
-    ///     Optional trailing <c>audit*</c> parameters nest an NpcShopTrade audit row into this same procedure call
-    ///     (see usp_Character_AdjustMoneyAndReplaceContainer.sql) instead of the caller making a second, unshared
-    ///     round trip to <c>IEventLogRepository.LogAsync</c> afterward (transaction-composition-audit finding).
-    ///     Omit <paramref name="auditEventCode" /> to skip logging -- every ItemModification-service caller that
-    ///     spends money via this same procedure does exactly that.
-    /// </summary>
-    public ValueTask AdjustMoneyAndReplaceContainerAsync(int characterId, long deltaMoney, int deltaBigMoney,
+        public ValueTask AdjustMoneyAndReplaceContainerAsync(int characterId, long deltaMoney, int deltaBigMoney,
         byte container, IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct,
         int? auditAccountId = null, short? auditEventCode = null, int? auditItemId = null,
         int? auditQuantity = null, string? auditPayload = null);
@@ -165,16 +152,7 @@ public interface ICharacterRepository
     public ValueTask ApplyTribeConversionAsync(int characterId, int itemId, byte container,
         IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct);
 
-    /// <summary>
-    ///     <paramref name="consumeSharedQuota" /> = true additionally consumes one slot of the shared, server-wide
-    ///     daily <c>admin.TribeFourQuota</c> inside this same procedure call (see
-    ///     usp_Character_ApplyTribeFourConversion.sql) instead of the caller making a separate, unshared round trip
-    ///     to <c>ITribeFourQuotaRepository.TryConsumeAsync</c> beforehand (transaction-composition-audit finding: a
-    ///     crash/timeout between two separate calls could silently burn a scarce daily slot without ever converting
-    ///     the character). Pass false for callers that reuse this same procedure for an effect the shared quota was
-    ///     never meant to gate (see <c>ForcedNeutralTribeResetUseItemHandler</c>).
-    /// </summary>
-    public ValueTask ApplyTribeFourConversionAsync(int characterId, byte newTribe, int stepPermanent,
+        public ValueTask ApplyTribeFourConversionAsync(int characterId, byte newTribe, int stepPermanent,
         int activeQuestId, int qSort, int targetPhase, int killCounter, bool consumeSharedQuota,
         CancellationToken ct);
 }

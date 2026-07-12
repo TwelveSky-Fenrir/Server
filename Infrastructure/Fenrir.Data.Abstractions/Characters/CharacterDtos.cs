@@ -82,14 +82,6 @@ public sealed record CharacterAccountRosterBundle(
     ReadOnlyCollection<CharacterRosterPetBagSlotDto>? PetBagSlots = null,
     ReadOnlyCollection<CharacterRosterCostumeSlotDto>? CostumeSlots = null);
 
-// Deliberately a narrow, 19-column projection matching the first 19 ordinals of
-// usp_Character_GetForWorldEntry's 77-column RS0 (CharacterId..FlushSequence), not a bug: [GenerateDto] maps
-// ctor parameters onto result-set columns by ordinal. Used by GetForWorldEntryAsync
-// (CreateAvatarService/ZoneTransferService/ZoneHandshakeService), which never needs anything past
-// FlushSequence and calls the dedicated single-result-set usp_Character_GetForWorldEntrySummary.sql instead
-// of the 5-result-set usp_Character_GetForWorldEntry (builder-capacity-timeout-consistency finding) --
-// GetWorldEntryBundleAsync/CharacterWorldSnapshotDto below still reads the full RS0 from the original
-// procedure. Both procedures' 19-column prefix must be kept in sync if it ever changes.
 [GenerateDto]
 public sealed partial record CharacterWorldEntryDto(
     int CharacterId,
@@ -112,10 +104,6 @@ public sealed partial record CharacterWorldEntryDto(
     int MaxMana,
     long FlushSequence);
 
-// Full 77-column positional projection of usp_Character_GetForWorldEntry's RS0, used by
-// GetWorldEntryBundleAsync (EnterWorldService). Mirrors CharacterWorldEntryDto's first 19 parameters
-// exactly, then continues through every column the procedure appends at the tail. Any new RS0 column goes
-// after M15PetLuckyBoxPity here too, in the same order the procedure's SELECT appends it.
 [GenerateDto]
 public sealed partial record CharacterWorldSnapshotDto(
     int CharacterId,

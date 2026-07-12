@@ -123,10 +123,6 @@ public class BigMoneyRepositoryTests
 
         Assert.NotNull(ex);
         var sqlException = ex as SqlException ?? ex!.InnerException as SqlException;
-        // usp_AccountVault_TransferBigMoneyWithCharacter's character-side guard throws 50353, not 50350 --
-        // 50350/50351 were reassigned to the pet-bag procedures during the Wave-7/Wave-8 BigMoney
-        // implementation collision (see Migrations/Seed/admin/018_error_catalog_bigmoney_store_and_vault.sql);
-        // this assertion was stale until the economy-hardening pass (2026-07-12) corrected it.
         if (sqlException is not null)
             Assert.Equal(50353, sqlException.Number);
 
@@ -155,7 +151,6 @@ public class BigMoneyRepositoryTests
 
         Assert.NotNull(ex);
         var sqlException = ex as SqlException ?? ex!.InnerException as SqlException;
-        // Same 50350->50353 renumbering as above; this is the vault-side guard, which throws 50354 not 50351.
         if (sqlException is not null)
             Assert.Equal(50354, sqlException.Number);
 

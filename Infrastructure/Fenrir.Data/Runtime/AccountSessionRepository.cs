@@ -17,12 +17,6 @@ public sealed record AccountSessionRepository(ICaeriusNetDbContext Db) : IAccoun
     private const int ErrorDependencyFailure = 41305;
     private const int ErrorCommitDependencyAborted = 41325;
 
-    // Every table this repository writes (runtime.AccountSessions) is MEMORY_OPTIMIZED = ON: lock hints
-    // (UPDLOCK/ROWLOCK/HOLDLOCK/XLOCK) are rejected outright against memory-optimized tables (Microsoft Learn,
-    // "Accessing Memory-Optimized Tables Using Interpreted Transact-SQL" -- table hints section), so the only
-    // correct concurrency-safety mechanism when two shard/connection-host processes can touch the SAME
-    // AccountId row concurrently is optimistic conflict detection (41302/41305/41325) plus a bounded,
-    // no-backoff client-side retry -- a conflict resolves in microseconds, there's nothing to wait out.
     private const int MaxWriteConflictAttempts = 3;
 
     public async ValueTask<AccountSessionClaimDto> ClaimOrSignalKickAsync(int accountId, Guid newSessionToken,
@@ -52,10 +46,6 @@ public sealed record AccountSessionRepository(ICaeriusNetDbContext Db) : IAccoun
     public async ValueTask<bool> TransitionToGameAsync(int accountId, Guid expectedSessionToken, byte shardId,
         CancellationToken ct)
     {
-        // Can race a concurrent usp_AccountSession_RefreshAndGetKicked batch touching the same AccountId (e.g.
-        // the Login-side liveness poll still refreshing this row's LastRefreshedUtc the instant world-entry
-        // flips it to ServerKind = 1) or a concurrent second ClaimOrSignalKick for the same account -- both
-        // legitimate, not a precondition failure, so retry the transient conflict rather than surfacing it.
         for (var attempt = 1;; attempt++)
         {
             var sp = new StoredProcedureParametersBuilder("runtime", "usp_AccountSession_TransitionToGame", 1,
@@ -131,9 +121,6 @@ public sealed record AccountSessionRepository(ICaeriusNetDbContext Db) : IAccoun
 
         var rows = accountIds.Select(id => new AccountIdTvp(id)).ToArray();
 
-        // A single conflicting row anywhere in the batch (e.g. one account mid-TransitionToGame at the exact
-        // poll instant) fails the whole UPDATE statement, not just that row -- retry the whole batch rather
-        // than dropping every other account's refresh/kick-check for one transient collision.
         for (var attempt = 1;; attempt++)
         {
             var sp = new StoredProcedureParametersBuilder("runtime", "usp_AccountSession_RefreshAndGetKicked",

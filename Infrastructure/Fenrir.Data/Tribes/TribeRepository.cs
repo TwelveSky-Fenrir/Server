@@ -11,19 +11,6 @@ namespace Fenrir.Data.Tribes;
 
 public sealed record TribeRepository(ICaeriusNetDbContext Db) : ITribeRepository
 {
-    // game.TribeBank is MEMORY_OPTIMIZED = ON: two characters depositing into the exact same never-used
-    // (TribeId, SlotIndex) slot at the same instant can both see usp_TribeBank_Deposit's own UPDATE find zero
-    // rows and both attempt the INSERT -- a natively compiled procedure can't take a table hint
-    // (UPDLOCK/HOLDLOCK) to close this the way a disk-based upsert would, so the only correct remedy is a
-    // bounded, no-backoff retry of the whole call. The loser surfaces either an immediate duplicate-key error
-    // (2627/2601) or one of the SNAPSHOT-isolation conflict codes (41302/41305/41325 -- Microsoft Learn,
-    // "Transactions with memory-optimized tables": a PRIMARY KEY/UNIQUE violation caused by a concurrent
-    // transaction can itself surface as 41325, not only the immediate 2627), and the whole ambient
-    // usp_TribeBank_DepositFromCharacter transaction rolls back under its own XACT_ABORT ON -- the character's
-    // debited Money rolls back along with it, so retrying the whole call from scratch loses nothing. Mirrors
-    // AccountSessionRepository's ClaimOrSignalKick-family retry for the SNAPSHOT codes, plus
-    // usp_Character_ApplyTribeFourConversion's 2627/2601 catch for the same never-used-composite-key-race
-    // shape -- see usp_TribeBank_Deposit.sql's own header comment.
     private const int MaxSlotInsertRaceAttempts = 3;
 
     private static bool IsTransientSlotInsertRaceConflict(int errorNumber)

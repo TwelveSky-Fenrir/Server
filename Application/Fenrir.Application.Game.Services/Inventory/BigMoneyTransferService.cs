@@ -49,9 +49,6 @@ public sealed class BigMoneyTransferService(
 
         try
         {
-            // The BigMoneyConversion audit row is nested into usp_Character_AdjustBigStoreMoney's own
-            // transaction (transaction-composition-audit finding) instead of a second, unshared round trip to
-            // eventLog.LogBigMoneyConversionAsync after this call commits.
             await bigMoney.AdjustInventoryStoreAsync(characterId, deltaInventoryBigMoney, deltaStoreBigMoney,
                 cancellationToken, auditEventCode: storeEventCode, auditFromDelta: storeFromDelta,
                 auditToDelta: storeToDelta);
@@ -103,9 +100,6 @@ public sealed class BigMoneyTransferService(
 
         try
         {
-            // The BigMoneyConversion audit row is nested into usp_AccountVault_TransferBigMoneyWithCharacter's
-            // own transaction (transaction-composition-audit finding) instead of a second, unshared round trip
-            // to eventLog.LogBigMoneyConversionAsync after this call commits.
             await bigMoney.AdjustInventorySaveAsync(characterId, deltaInventoryBigMoney, accountId,
                 deltaVaultBigMoney, cancellationToken, auditEventCode: saveEventCode, auditFromDelta: saveFromDelta,
                 auditToDelta: saveToDelta);

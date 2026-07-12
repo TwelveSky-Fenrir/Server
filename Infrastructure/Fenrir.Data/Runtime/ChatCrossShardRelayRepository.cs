@@ -17,12 +17,6 @@ public sealed record ChatCrossShardRelayRepository(ICaeriusNetDbContext Db) : IC
     private const int ErrorDependencyFailure = 41305;
     private const int ErrorCommitDependencyAborted = 41325;
 
-    // usp_ChatCrossShardRelay_Poll's own reap-delete sweeps runtime.ChatCrossShardRelay by a flat
-    // CreatedAtUtc <= retention-cutoff predicate shared by EVERY shard's own independent poll cycle -- two
-    // shards whose poll cycles happen to overlap in wall-clock time while both see the same expired row as a
-    // delete candidate provably race on that row (a write-write conflict, not a bug in either shard's own
-    // inbound data). Retry rather than let one shard's whole poll cycle -- and every legitimate message it
-    // would have delivered -- fail just because of that incidental, unrelated janitorial collision.
     private const int MaxWriteConflictAttempts = 3;
 
     public async ValueTask PublishAsync(ChatCrossShardWhisperEntry entry, CancellationToken ct)

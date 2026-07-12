@@ -161,9 +161,6 @@ public class NpcShopTradeServiceTests
         var call = characters.LastAdjustMoneyAndReplaceContainer!.Value;
         Assert.Equal(500, call.DeltaMoney);
 
-        // The NpcShopTrade audit row is nested into usp_Character_AdjustMoneyAndReplaceContainer's own
-        // transaction (transaction-composition-audit finding), so it's now observed as audit* parameters on
-        // this same repository call rather than a separate eventLog.LoggedEvents entry.
         Assert.Equal(1, call.AuditEventCode);
         Assert.Equal(AccountId, call.AuditAccountId);
         Assert.Equal(700, call.AuditItemId);
@@ -223,9 +220,6 @@ public class NpcShopTradeServiceTests
         var call = characters.LastAdjustMoneyAndReplaceContainer!.Value;
         Assert.Equal(-1000, call.DeltaMoney);
 
-        // The NpcShopTrade audit row is nested into usp_Character_AdjustMoneyAndReplaceContainer's own
-        // transaction (transaction-composition-audit finding), so it's now observed as audit* parameters on
-        // this same repository call rather than a separate eventLog.LoggedEvents entry.
         Assert.Equal(2, call.AuditEventCode);
         Assert.Equal(AccountId, call.AuditAccountId);
         Assert.Equal(800, call.AuditItemId);

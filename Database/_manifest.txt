@@ -592,6 +592,14 @@ Schemas/002_roles.sql
 # rationale (why a new script vs. editing base files, why DROP+recreate vs. ALTER, why grants are unaffected).
 Migrations/001_sessiontickets_targetmapid.sql
 
+# Lot 2 (mount attribute write-behind): folds the persisted mount block (game.Characters.MountItemId/
+# MountExpActivity/MountPower/MountSlotIndex/MountTime, already base columns) into the write-behind progress
+# flush. Adds 5 trailing columns to game.tvp_CharacterProgress and the matching SET clauses to
+# usp_Character_PersistProgressBatch + usp_Character_PersistFinalFlush. A TABLE type can't be ALTERed to add
+# columns and can't be dropped while a proc references it, so this drops both dependent procs, drops+recreates
+# the type, and recreates the procs -- see the script's own header for the SHA-journal / grant-safety rationale.
+Migrations/002_character_progress_mount_writeback.sql
+
 Migrations/Seed/001_dev_account.sql
 
 # Numbering renamed 2026-07-12 (dead-file-sweep-game-world naming-hygiene finding) to be monotonic in

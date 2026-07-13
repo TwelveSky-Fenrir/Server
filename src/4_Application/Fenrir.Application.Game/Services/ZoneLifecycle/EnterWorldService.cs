@@ -462,7 +462,15 @@ public sealed class EnterWorldService(
                 PetActionFront: packet.Action.PetFront,
                 PetActionTargetLocationX: packet.Action.PetTargetLocation[0],
                 PetActionTargetLocationY: packet.Action.PetTargetLocation[1],
-                PetActionTargetLocationZ: packet.Action.PetTargetLocation[2])));
+                PetActionTargetLocationZ: packet.Action.PetTargetLocation[2],
+                // Mount attribute hydration: carry the persisted packed mount block through so HandleEnter can
+                // decode the rolled attributes / accumulated exp / activity for the mounted slot (bundle.Character
+                // already projects these columns via usp_Character_GetForWorldEntry RS0).
+                MountItemId: character.MountItemId,
+                MountExpActivity: character.MountExpActivity,
+                MountPower: character.MountPower,
+                MountSlotIndex: character.MountSlotIndex,
+                MountTime: character.MountTime)));
 
             if (!entered)
             {

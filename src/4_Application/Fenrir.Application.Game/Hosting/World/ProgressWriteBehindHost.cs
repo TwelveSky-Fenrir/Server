@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Domain.Mounts;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Data.WriteBehind;
 
@@ -26,7 +27,11 @@ public sealed class ProgressWriteBehindHost(ZoneRegistry zones, ICharacterReposi
                 state.StatStr, state.StatInt, state.StatDex, state.StatPoints, state.SkillPoints,
                 state.ContributionPoints, state.Exp2, state.RebirthCount, state.EatLifePotion, state.EatManaPotion,
                 state.EatStrPotion, state.EatDexPotion, state.EatElePotion, state.DropItemTime,
-                state.M15PetLuckyBoxPity));
+                state.M15PetLuckyBoxPity,
+                state.MountGarage[MountPersistenceCodec.PersistedGarageSlot],
+                MountPersistenceCodec.EncodeExpActivity(state.MountActivity, state.MountAccumulatedExp),
+                MountPersistenceCodec.EncodePower(state.MountRolledAttributes),
+                state.AnimalIndex, state.AnimalTime));
 
             claimed.Add(characterId);
         }

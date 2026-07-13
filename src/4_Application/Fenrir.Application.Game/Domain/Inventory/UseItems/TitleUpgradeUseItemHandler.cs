@@ -45,7 +45,8 @@ public sealed class TitleUpgradeUseItemHandler(
             context.CharacterId, null, null, null, -RequiredContributionPoints, null, context.Item.ItemId,
             context.Item.Quantity, SuccessOutcome, $"Title={state.Title}->{newTitle}", cancellationToken);
 
-        var remaining = CashItemStackConsumption.RemainingQuantity(context.Item.ItemId, context.Item.Quantity);
+        var remaining =
+            CashItemStackConsumption.RemainingQuantity(context.Definition.Item.Sort, context.Item.Quantity);
         await inventoryWriter.ConsumeAndMirrorAsync(context.Zone, state, context.CharacterId, context.Page,
             context.Index, context.Item, remaining, null, cancellationToken);
 

@@ -40,7 +40,8 @@ public sealed class PalaceRankUpgradeUseItemHandler(
             context.CharacterId, null, null, null, null, null, context.Item.ItemId, context.Item.Quantity,
             SuccessOutcome, $"Rank={state.Halo}->{newRank}", cancellationToken);
 
-        var remaining = CashItemStackConsumption.RemainingQuantity(context.Item.ItemId, context.Item.Quantity);
+        var remaining =
+            CashItemStackConsumption.RemainingQuantity(context.Definition.Item.Sort, context.Item.Quantity);
         await inventoryWriter.ConsumeAndMirrorAsync(context.Zone, state, context.CharacterId, context.Page,
             context.Index, context.Item, remaining, null, cancellationToken);
 

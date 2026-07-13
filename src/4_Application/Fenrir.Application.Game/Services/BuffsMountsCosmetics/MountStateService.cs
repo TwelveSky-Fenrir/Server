@@ -125,9 +125,8 @@ public sealed class MountStateService(
                 return new MountStateResult(MountStateOutcome.DeleteMount);
 
             case MountStateResolver.ResultKind.DeleteAttribute:
-                await ApplyDeleteAttributeAsync(zone, state, characterId, accountId, result.GarageSlot,
-                    result.StatSlotIndex, materialPage, materialSlot, cancellationToken);
-                return new MountStateResult(MountStateOutcome.DeleteAttribute);
+                return await ApplyDeleteAttributeAsync(zone, state, characterId, accountId, sort,
+                    result.GarageSlot, result.StatSlotIndex, materialPage, materialSlot, cancellationToken);
 
             case MountStateResolver.ResultKind.Convert:
                 return await ApplyConvertAsync(zone, state, characterId, accountId, sort, result.GarageSlot,
@@ -168,17 +167,37 @@ public sealed class MountStateService(
             garageSlot, DeleteMountContributionPointsGrant);
     }
 
-    private async ValueTask ApplyDeleteAttributeAsync(Zone zone, PlayerRuntimeState state, int characterId,
-        int accountId, int garageSlot, int statSlotIndex, byte materialPage, byte materialSlot,
-        CancellationToken cancellationToken)
+    private async ValueTask<MountStateResult> ApplyDeleteAttributeAsync(Zone zone, PlayerRuntimeState state,
+        int characterId, int accountId, int sort, int garageSlot, int statSlotIndex, byte materialPage,
+        byte materialSlot, CancellationToken cancellationToken)
     {
-        var container = state.Inventory.GetContainer(materialPage);
-        var projected = ConsumeOne(container, materialSlot);
+        var power = MountPowerCodec.EncodeSlot(state.MountRolledAttributes, garageSlot);
 
-        await characters.ReplaceContainerAsync(characterId, materialPage, ToTvps(projected), cancellationToken);
+        // Deterministic (no RNG): decrement the targeted attribute digit by exactly 1, floored at 0, leaving
+        // the other seven untouched. The roller takes the 1-based client attribute slot, so statSlotIndex + 1
+        // (same convention as Transfer). Unlike Transfer there is deliberately no empty-slot / zero-result
+        // guard: deleting an already-0 digit, or reducing the whole slot to a packed power of 0, is still a
+        // legitimate success -- it stores the (possibly unchanged) power, acks it, and still consumes material.
+        var newPower = MountAttributeRoller.Delete(power, statSlotIndex + 1);
+
+        // Apply as one unit: the digit decrement (off-tick mirror, same as Convert/Transfer), the change log,
+        // then the durable material consumption. The tick decrement command is intentionally NOT posted here
+        // any more -- doing so alongside this mirror would decrement twice.
+        ApplyRolledPower(state, garageSlot, newPower);
 
         await eventLog.LogAsync(MountAttributeDeleteEventCode, EventLogCategory.MountAttribute, accountId,
             characterId, null, null, null, null, null, AttributeDeleteItemId, 1, 1, null, cancellationToken);
+
+        var container = state.Inventory.GetContainer(materialPage);
+        var projected = ConsumeOne(container, materialSlot);
+        await characters.ReplaceContainerAsync(characterId, materialPage, ToTvps(projected), cancellationToken);
+
+        // Client order (matches Convert/Transfer): acknowledge with the freshly stored packed power, recompute
+        // derived stats, then the consumed-material inventory notice. Acking the post-decrement value is the
+        // whole point of this unit -- the previous path posted the decrement to the tick and returned an ack
+        // that echoed the stale (pre-decrement) power.
+        state.Session.Send(new MountStateResponse { Sort = sort, Value = newPower });
+        await RecomputeAndPostVitalsAsync(zone, state, characterId, cancellationToken);
 
         var containers = ImmutableArray.Create(new InventoryContainerSnapshot(materialPage, projected));
         if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
@@ -187,16 +206,10 @@ public sealed class MountStateService(
                 "Zone {MapId} inventory inbox full: dropped mount-attribute-delete item mirror for character {CharacterId}",
                 zone.MapId, characterId);
 
-        if (!await zone.PostMountCommandAndWaitAsync(
-                new MountZoneCommand(characterId, AttributeDeleteGarageSlot: garageSlot,
-                    AttributeDeleteStatSlotIndex: statSlotIndex), cancellationToken))
-            logger.LogError(
-                "Zone {MapId} mount inbox full: dropped attribute-slot clear mirror for character {CharacterId}",
-                zone.MapId, characterId);
-
         logger.LogInformation(
-            "Character {CharacterId} deleted rolled mount attribute (garage slot {GarageSlot}, stat slot {StatSlot})",
-            characterId, garageSlot, statSlotIndex + 1);
+            "Character {CharacterId} deleted rolled mount attribute (garage slot {GarageSlot}, stat slot {StatSlot}), new power {Power}",
+            characterId, garageSlot, statSlotIndex + 1, newPower);
+        return new MountStateResult(MountStateOutcome.NoReply);
     }
 
     private async ValueTask<MountStateResult> ApplyConvertAsync(Zone zone, PlayerRuntimeState state, int characterId,

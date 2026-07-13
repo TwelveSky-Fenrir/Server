@@ -61,6 +61,8 @@ public sealed class UseInventoryItemService(
 
     private const short PetExpBoostPillUsedEventCode = 3;
 
+    private const short PetFoodUsedEventCode = 4;
+
     private const int LodTicketItemId = 1434;
     private const int FactionNoticeItemId = 566;
     private const int TaiyanKeyItemId = 1049;
@@ -126,7 +128,7 @@ public sealed class UseInventoryItemService(
 
         if (ProxyShopRentalExtensionResolver.ExtensionDaysFor(item.ItemId) is not null)
             return await ResolveProxyShopRentalExtensionAsync(zone, state, characterId, page, index, item,
-                cancellationToken);
+                itemDefinition.Item.Sort, cancellationToken);
 
         if (IsTeleportRecallScroll(item.ItemId))
             return await ResolveTeleportRecallScrollAsync(characterId, accountId, page, index, item, value,
@@ -138,6 +140,10 @@ public sealed class UseInventoryItemService(
 
         if (IsPetExpBoostPill(item.ItemId))
             return await ResolvePetExpBoostPillAsync(zone, state, characterId, accountId, page, index, item, value,
+                cancellationToken);
+
+        if (PetFoodFeedResolver.IsPetFood(item.ItemId))
+            return await ResolvePetFoodAsync(zone, state, characterId, accountId, page, index, item, value,
                 cancellationToken);
 
         if (IsRebirthPill(item.ItemId))
@@ -324,7 +330,7 @@ public sealed class UseInventoryItemService(
     }
 
     private async ValueTask<UseInventoryItemResponse> ResolveProxyShopRentalExtensionAsync(Zone zone,
-        PlayerRuntimeState state, int characterId, byte page, byte index, ItemStack item,
+        PlayerRuntimeState state, int characterId, byte page, byte index, ItemStack item, byte itemSort,
         CancellationToken cancellationToken)
     {
         var today = GameDate.Today();
@@ -357,7 +363,7 @@ public sealed class UseInventoryItemService(
             null, null, null, null, null, item.ItemId, item.Quantity, 0,
             $"Serial={item.Serial};ExpireDate={item.ExpireDate}", cancellationToken);
 
-        var remaining = CashItemStackConsumption.RemainingQuantity(item.ItemId, item.Quantity);
+        var remaining = CashItemStackConsumption.RemainingQuantity(itemSort, item.Quantity);
         var container = state.Inventory.GetContainer(page);
         var projected = remaining > 0
             ? container.SetItem(index, item with { Quantity = remaining })
@@ -889,6 +895,89 @@ public sealed class UseInventoryItemService(
         {
             Result = 0, Page = page, Index = index, Value = charged.NewCounterValue, Value2 = bulkCount
         };
+    }
+
+    private async ValueTask<UseInventoryItemResponse> ResolvePetFoodAsync(Zone zone, PlayerRuntimeState state,
+        int characterId, int accountId, byte page, byte index, ItemStack item, int requestedValue,
+        CancellationToken cancellationToken)
+    {
+        // Precondition: a pet must be equipped AND active (activity flag >= 1). The legacy pet-food case
+        // rejects before any growth when the equipped-pet slot's activity sub-field is below 1, and the
+        // internal "reactivate an inactive pet" branch is unreachable from the pet-food path -- so an already
+        // active pet is required here, never activated as a side effect of feeding.
+        var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
+        var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
+            ? petStack.ItemId
+            : 0;
+
+        if (petItemId == 0 || state.PetActivity < 1)
+            return Fail(characterId, item, page, index);
+
+        var bulkCount = BulkUseCoercion.Coerce(requestedValue, item.Quantity);
+
+        var feed = PetFoodFeedResolver.Resolve(petItemId, state.PetGrowth, state.PetActivity, item.ItemId,
+            bulkCount, worldData.ItemsById);
+
+        // Zero units credited (pet already at its growth ceiling, uncategorised pet id, or the pet slot is not
+        // a pet-sort item): nothing consumed, generic use-failure indicator -- the client cannot distinguish
+        // these reasons from each other or from the inactive-pet / rate-limited rejections.
+        if (feed.UnitsCredited < 1)
+            return Fail(characterId, item, page, index);
+
+        // A growth-step tier crossing changes the pet's derived abilities: recompute stats against the new
+        // grow value and full-action-rebroadcast so the caster and AOI neighbours see the change. When no tier
+        // was crossed only the accumulated grow value moved, so no stat recompute / rebroadcast is needed.
+        EffectiveStats? updatedStats = null;
+        if (feed.TierIncreased)
+            updatedStats = RecomputePetStats(state, petItemId, feed.NewGrowth, state.PetActivity);
+
+        if (!await zone.PostTribeProgressCommandAndWaitAsync(
+                new TribeProgressZoneCommand(characterId, PetGrowth: feed.NewGrowth, UpdatedStats: updatedStats,
+                    FullActionRebroadcast: feed.TierIncreased), cancellationToken))
+            logger.LogError(
+                "Zone {MapId} tribe-progress inbox full: dropped pet-food growth mirror for character {CharacterId}",
+                zone.MapId, characterId);
+
+        // GL_605_USE_CASH_ITEM: one cash-item-use log per successful feed, sized to the units actually credited.
+        var remaining = item.Quantity - feed.UnitsCredited;
+        var packedValue = ItemValueCodec.Encode(item.Enchant, item.Combine, item.Refine, item.Socket);
+        await eventLog.LogAsync(PetFoodUsedEventCode, EventLogCategory.CashItemUse, accountId, characterId,
+            null, null, null, null, null, item.ItemId, feed.UnitsCredited, 0,
+            $"Value={packedValue};Serial={item.Serial};NewGrowth={feed.NewGrowth}", cancellationToken);
+
+        // Consume exactly the number of units that produced a positive credit -- units credited == units
+        // consumed, never more, never fewer.
+        var container = state.Inventory.GetContainer(page);
+        var projected = remaining > 0
+            ? container.SetItem(index, item with { Quantity = remaining })
+            : container.Remove(index);
+
+        await characters.ReplaceContainerAsync(characterId, page, ToTvps(projected), cancellationToken);
+
+        var containers = ImmutableArray.Create(new InventoryContainerSnapshot(page, projected));
+        if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
+                cancellationToken))
+            logger.LogError(
+                "Zone {MapId} inventory inbox full: dropped pet-food mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
+                zone.MapId, characterId);
+
+        logger.LogInformation(
+            "Character {CharacterId} use-inventory-item (pet food) applied: item {ItemId}, {UnitsCredited} unit(s) consumed, new pet growth {NewGrowth} (tier increased {TierIncreased})",
+            characterId, item.ItemId, feed.UnitsCredited, feed.NewGrowth, feed.TierIncreased);
+
+        return new UseInventoryItemResponse { Result = 0, Page = page, Index = index, Value = 0, Value2 = 0 };
+    }
+
+    private EffectiveStats RecomputePetStats(PlayerRuntimeState state, int petItemId, int newPetGrowth,
+        int petActivity)
+    {
+        var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
+            state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo, state.RebirthCount,
+            state.Level2);
+        var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
+        var petContribution = PetGrowthCalculator.Compute(petItemId, newPetGrowth, petActivity, worldData.ItemsById);
+        return EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
+            petContribution, state);
     }
 
     private async ValueTask<UseInventoryItemResponse> ResolveRebirthPillAsync(Zone zone, PlayerRuntimeState state,

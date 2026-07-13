@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Domain.Mounts;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Data.WriteBehind;
 using Microsoft.Extensions.Hosting;
@@ -102,7 +103,11 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
                 state.Experience, state.Life, state.MaxLife, state.Mana, state.MaxMana, state.StatVit, state.StatStr,
                 state.StatInt, state.StatDex, state.StatPoints, state.SkillPoints, state.ContributionPoints,
                 state.Exp2, state.RebirthCount, state.EatLifePotion, state.EatManaPotion, state.EatStrPotion,
-                state.EatDexPotion, state.EatElePotion, state.DropItemTime, state.M15PetLuckyBoxPity);
+                state.EatDexPotion, state.EatElePotion, state.DropItemTime, state.M15PetLuckyBoxPity,
+                state.MountGarage[MountPersistenceCodec.PersistedGarageSlot],
+                MountPersistenceCodec.EncodeExpActivity(state.MountActivity, state.MountAccumulatedExp),
+                MountPersistenceCodec.EncodePower(state.MountRolledAttributes),
+                state.AnimalIndex, state.AnimalTime);
 
             var positionRow = new CharacterPositionTvp(characterId, state.FlushSequence, state.MapId, state.PosX,
                 state.PosY, state.PosZ, state.Heading);

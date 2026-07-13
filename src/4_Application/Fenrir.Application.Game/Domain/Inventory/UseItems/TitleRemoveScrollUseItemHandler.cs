@@ -62,7 +62,8 @@ public sealed class TitleRemoveScrollUseItemHandler(
             context.CharacterId, null, null, null, refund, null, context.Item.ItemId, context.Item.Quantity,
             SuccessOutcome, $"Title={oldTitle}->0", cancellationToken);
 
-        var remaining = CashItemStackConsumption.RemainingQuantity(context.Item.ItemId, context.Item.Quantity);
+        var remaining =
+            CashItemStackConsumption.RemainingQuantity(context.Definition.Item.Sort, context.Item.Quantity);
         await inventoryWriter.ConsumeAndMirrorAsync(context.Zone, state, context.CharacterId, context.Page,
             context.Index, context.Item, remaining, null, cancellationToken);
 

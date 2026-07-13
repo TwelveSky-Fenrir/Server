@@ -6,6 +6,7 @@ using Fenrir.Application.Game.Domain.AntiCheat;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Hotkeys;
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Mounts;
 using Fenrir.Application.Game.Domain.Movement;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Simulation;
@@ -266,6 +267,8 @@ public sealed partial class Zone
         if (data.DrunkBottleTicksRemaining is { } drunkBottleTicksRemaining)
             state.DrunkBottleTicksRemaining = drunkBottleTicksRemaining;
 
+        HydrateMountState(state, data);
+
         var cell = _grid.CellOf(state.PosX, state.PosZ);
         state.CurrentCell = cell;
 
@@ -322,6 +325,30 @@ public sealed partial class Zone
             TryEnterZone241PersonalInstance(characterId);
 
         TryPublishPartyResyncRequest(characterId, state.Name);
+    }
+
+    // Mount attribute hydration: decode the persisted packed mount block (single-mount schema -> garage slot 0)
+    // into the 10-slot runtime arrays so the flat rolled-attribute bonus (applied at stat recompute via
+    // StatCalculator.DecodeMountPowerDigits) and the Convert/Transfer/Delete preconditions (which read
+    // MountAccumulatedExp/MountRolledAttributeTotal) have live data instead of stale zeros. The rolled digits
+    // are stored unconditionally; the activity>0 gate is re-applied downstream at stat-computation time, so a
+    // later activity gain re-exposes them without needing a reload. AnimalNumber is restored only when the
+    // pointer says the character was mounted (10..19), keeping BuildMountContext self-consistent.
+    private static void HydrateMountState(PlayerRuntimeState state, PlayerEnterData data)
+    {
+        const int slot = MountPersistenceCodec.PersistedGarageSlot;
+
+        state.MountGarage = state.MountGarage.SetItem(slot, data.MountItemId);
+        state.MountActivity = state.MountActivity.SetItem(slot, MountActivityExpCodec.Activity(data.MountExpActivity));
+        state.MountAccumulatedExp =
+            state.MountAccumulatedExp.SetItem(slot, MountActivityExpCodec.Exp(data.MountExpActivity));
+        state.MountRolledAttributes = MountPowerCodec.WithSlotDigits(state.MountRolledAttributes, slot, data.MountPower);
+        state.MountRolledAttributeTotal =
+            state.MountRolledAttributeTotal.SetItem(slot, MountPowerCodec.DigitSum(data.MountPower));
+
+        state.AnimalIndex = data.MountSlotIndex;
+        state.AnimalTime = data.MountTime;
+        state.AnimalNumber = MountPersistenceCodec.IsMounted(data.MountSlotIndex) ? data.MountItemId : 0;
     }
 
     private void TryPublishPartyResyncRequest(int characterId, string avatarName)

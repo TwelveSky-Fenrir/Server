@@ -60,4 +60,22 @@ public static class MountPowerCodec
             power += rolledAttributes[baseIndex + statSlotIndex] * PlaceValue[DigitCount - 1 - statSlotIndex];
         return power;
     }
+
+    /// <summary>
+    ///     Exact inverse of <see cref="EncodeSlot" />: writes the eight decoded stat-slot digits of
+    ///     <paramref name="power" /> into one garage slot of <paramref name="rolledAttributes" /> (indexed
+    ///     <c>slot * DigitCount + statSlotIndex</c>). Stat-slot index 0 (Attack) reads the most-significant
+    ///     place (10^7), index 7 (Element-Defense) the units place (10^0). The digits are stored unconditionally
+    ///     (not activity-gated) so a later activity gain re-exposes them; the activity gate is applied at stat
+    ///     computation via <c>StatCalculator.DecodeMountPowerDigits</c>. Matches
+    ///     <c>MountStateService.ApplyRolledPower</c>'s digit layout so hydrate/roll/encode all round-trip.
+    /// </summary>
+    public static ImmutableArray<int> WithSlotDigits(ImmutableArray<int> rolledAttributes, int slot, int power)
+    {
+        var baseIndex = slot * DigitCount;
+        var result = rolledAttributes;
+        for (var statSlotIndex = 0; statSlotIndex < DigitCount; statSlotIndex++)
+            result = result.SetItem(baseIndex + statSlotIndex, DigitAtPlace(power, DigitCount - 1 - statSlotIndex));
+        return result;
+    }
 }

@@ -424,7 +424,11 @@ public sealed partial class Zone(
             }
     }
 
-    private static ZoneGeometry? TryLoadGeometry(short mapId, GameServerOptions gameServerOptions,
+    // internal (pas private) pour que ZoneRegistry.Initialize puisse pré-charger les .WM EN PARALLÈLE avant de
+    // construire les zones -- sinon chaque ctor Zone parse son navmesh en série sur le thread de boot (fenêtre où
+    // le GameServer n'écoute ni ne s'inscrit). Passer le résultat via le paramètre 'geometry' du ctor court-circuite
+    // cet appel.
+    internal static ZoneGeometry? TryLoadGeometry(short mapId, GameServerOptions gameServerOptions,
         ILogger<Zone> zoneLogger)
     {
         var canonicalMapId = ZoneCanonicalGeometryMap.ResolveCanonicalMapId(mapId);

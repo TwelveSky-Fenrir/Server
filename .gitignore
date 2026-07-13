@@ -6,6 +6,9 @@
 ## Dev-only NTFS junction to Server/BuildEU33/DATA (created locally, not a symlink Git can portably store --
 ## it's machine-specific and points at the already-gitignored /Server/ tree anyway).
 /Servers/Fenrir.GameServer/GameData/
+## Assets monde (.WM navmesh, etc.) déployés localement depuis le Server/ legacy gitignoré — déploiement
+## opérateur one-shot, jamais versionné (dérivés du Server/ qui porte un credential DB en clair).
+/src/5_Servers/Fenrir.GameServer/GameData/
 .idea/
 Roadmap/
 ## Notes de travail éphémères (plans/rapports d'agents) — jamais versionnées.

@@ -1,6 +1,9 @@
+using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using Fenrir.Application.Game.Domain.World.Geometry;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Movement;
 using Fenrir.Application.Game.Domain.Progression;
@@ -117,10 +120,21 @@ public sealed class ZoneRegistry
 
     public void Initialize(IReadOnlyCollection<short> maps)
     {
+        // Pré-charge les navmesh (.WM) EN PARALLÈLE avant de construire les zones. Le chargement séquentiel dans le
+        // ctor de Zone (via ToFrozenDictionary) bloquait le thread de boot AVANT host.RunAsync() le temps de parser
+        // ~135 Mo sur 117 maps -- fenêtre pendant laquelle le GameServer n'écoute pas et ne s'inscrit pas à
+        // l'annuaire (le client voit alors « zones fermées »). Le parse d'un .WM est indépendant par fichier, donc
+        // parallélisable sans état partagé ; le résultat est passé au ctor via 'geometry' (court-circuite l'appel
+        // synchrone à Zone.TryLoadGeometry).
+        var sw = Stopwatch.StartNew();
+        var geometries = new ConcurrentDictionary<short, ZoneGeometry?>();
+        Parallel.ForEach(maps, mapId => geometries[mapId] = Zone.TryLoadGeometry(mapId, _options, _zoneLogger));
+
         _zones = maps.ToFrozenDictionary(
             mapId => mapId,
             mapId =>
             {
+                geometries.TryGetValue(mapId, out var geometry);
                 var zone = new Zone(mapId, _options, _movementRules, _dirtyTracker, _systems, _zoneLogger, _worldData,
                     questCatalog: _questCatalog, killCooldownTracker: _killCooldownTracker, towerWar: _towerWar,
                     worldState: _worldState, partyRegistry: _partyRegistry, duelRegistry: _duelRegistry,
@@ -130,6 +144,7 @@ public sealed class ZoneRegistry
                     characterShardLocations: _characterShardLocations,
                     regularWarActiveMapTracker: _regularWarActiveMapTracker,
                     zoneRegistry: this,
+                    geometry: geometry,
                     eventLogQueue: _eventLogQueue,
                     fourGuildKillPointQueue: _fourGuildKillPointQueue,
                     tribeSymbolCombatModifiers: _tribeSymbolCombatModifiers,
@@ -140,6 +155,16 @@ public sealed class ZoneRegistry
 
                 return zone;
             });
+
+        var loaded = 0;
+        foreach (var geometry in geometries.Values)
+            if (geometry is not null)
+                loaded++;
+
+        _zoneLogger.LogInformation(
+            "ZoneRegistry ready: {ZoneCount} zone(s) built; navmesh (.WM) parsed for {Loaded}/{Total} map(s) in " +
+            "{ElapsedMs} ms (parallel pre-load, off the boot critical path)", _zones.Count, loaded, maps.Count,
+            sw.ElapsedMilliseconds);
     }
 
     public bool TryGet(short mapId, [NotNullWhen(true)] out Zone? zone)

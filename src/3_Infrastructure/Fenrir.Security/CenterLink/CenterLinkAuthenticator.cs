@@ -10,22 +10,13 @@ public sealed class CenterLinkAuthenticator : ICenterLinkAuthenticator
 
         public CenterLinkAuthenticator(string? sharedSecret)
     {
-        if (string.IsNullOrEmpty(sharedSecret))
-        {
-            // Fail-closed : aucun secret => lien désactivé, aucun handshake authentifiable (IsEnabled == false).
-            _key = null;
-            return;
-        }
-
-        // Fail-fast : un secret NON vide mais trop court affaiblirait la clé HMAC — on refuse une config faible
-        // au démarrage plutôt que de servir un lien faiblement authentifié.
-        if (sharedSecret.Length < CenterLinkAuth.MinSecretLength)
-            throw new ArgumentException(
-                $"CenterLink shared secret is too weak: {sharedSecret.Length} chars, minimum " +
-                $"{CenterLinkAuth.MinSecretLength} required. (The secret itself is never logged.)",
-                nameof(sharedSecret));
-
-        _key = Encoding.UTF8.GetBytes(sharedSecret);
+        // Fail-closed SANS crasher le boot : un secret vide OU trop court (affaiblirait la clé HMAC) => lien
+        // DÉSACTIVÉ (IsEnabled == false, aucun handshake authentifiable). Le secret faible n'est jamais utilisé,
+        // mais les serveurs démarrent quand même — le lien S2S reste simplement inactif (dormant en mode Shard).
+        // Le CenterServerHost logue déjà l'état DISABLED au démarrage.
+        _key = string.IsNullOrEmpty(sharedSecret) || sharedSecret.Length < CenterLinkAuth.MinSecretLength
+            ? null
+            : Encoding.UTF8.GetBytes(sharedSecret);
     }
 
         public bool IsEnabled => _key is not null;

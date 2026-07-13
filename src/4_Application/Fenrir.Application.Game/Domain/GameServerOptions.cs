@@ -9,6 +9,14 @@ public sealed class GameServerOptions
 {
     public int Port { get; set; } = 1100;
 
+    /// <summary>
+    ///     Base d'adressage des zones (legacy <c>1100 + N</c>, <c>ts25zone/S02_MyServer.cpp:15-16</c>). Chaque map
+    ///     hébergée expose son PROPRE listener TCP sur <c>ZoneBasePort + mapId</c> ; le client (re)connecte par zone
+    ///     (Décision A / doc <c>03_Topologie_TCP_et_Aspire.md</c> §1.2). DOIT correspondre à
+    ///     <c>LoginServerOptions.ZoneBasePort</c> (le Login dérive le même port pour router le client).
+    /// </summary>
+    public int ZoneBasePort { get; set; } = 1100;
+
     public byte ShardId { get; set; } = 1;
 
     public string GameDataDirectory { get; set; } = "GameData";

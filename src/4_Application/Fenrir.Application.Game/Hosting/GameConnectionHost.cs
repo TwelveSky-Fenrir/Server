@@ -1,6 +1,7 @@
 using Fenrir.Network.Dispatch;
 using System.Collections.Concurrent;
 using System.Net;
+using System.Net.Sockets;
 using System.Security.Cryptography;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.World;
@@ -37,27 +38,62 @@ public sealed class GameConnectionHost(
 
     private readonly ConcurrentDictionary<Task, byte> _inFlightConnections = new();
 
-    private TcpServer<ZoneClientSession>? _server;
+    private readonly List<TcpServer<ZoneClientSession>> _servers = [];
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var opts = options.Value;
-        _server = new TcpServer<ZoneClientSession>(
-            new IPEndPoint(IPAddress.Any, opts.Port),
-            (sessionId, transport, remoteEndPoint) =>
-                new ZoneClientSession(sessionId, transport, remoteEndPoint, logger),
-            dispatcher,
-            opcodeRegistry,
-            rateLimiter,
-            ipFloodGuard,
-            logger);
+        var hostedMaps = zones.Zones.Select(z => z.MapId).Order().ToArray();
 
-        logger.LogInformation("GameServer listening on port {Port} (shard {ShardId}, maps [{Maps}])", opts.Port,
-            opts.ShardId, string.Join(", ", zones.Zones.Select(z => z.MapId).Order()));
+        // Modèle « zone = endpoint TCP par map » (Décision A / doc 03_Topologie_TCP_et_Aspire.md §1.2, legacy
+        // 1100 + N -- ts25zone/S02_MyServer.cpp:15-16) : chaque map hébergée reçoit son PROPRE listener sur
+        // ZoneBasePort + mapId. Le client (re)connecte par zone -- le Login lui renvoie exactement ce port. Un port
+        // qui échoue à se binder n'abat PAS les autres zones : seule cette map devient injoignable (la sonde du
+        // Login le détectera). Toutes les zones partagent le même dispatcher/rate-limiter/flood-guard.
+        var acceptLoops = new List<Task>(hostedMaps.Length);
+        foreach (var mapId in hostedMaps)
+        {
+            var port = opts.ZoneBasePort + mapId;
+
+            TcpServer<ZoneClientSession> server;
+            try
+            {
+                server = new TcpServer<ZoneClientSession>(
+                    new IPEndPoint(IPAddress.Any, port),
+                    (sessionId, transport, remoteEndPoint) =>
+                        new ZoneClientSession(sessionId, transport, remoteEndPoint, logger),
+                    dispatcher,
+                    opcodeRegistry,
+                    rateLimiter,
+                    ipFloodGuard,
+                    logger);
+            }
+            catch (SocketException ex)
+            {
+                logger.LogError(ex,
+                    "GameServer could not bind the zone listener for map {MapId} on port {Port} (shard {ShardId}); " +
+                    "that zone stays unreachable until the port frees up", mapId, port, opts.ShardId);
+                continue;
+            }
+
+            _servers.Add(server);
+
+            var accepting = server;
+            acceptLoops.Add(accepting.AcceptLoopAsync(
+                (session, connection, ct) => TrackInFlightAsync(accepting, session, connection, ct), stoppingToken));
+
+            logger.LogInformation("GameServer zone listener up: map {MapId} on port {Port} (shard {ShardId})", mapId,
+                port, opts.ShardId);
+        }
+
+        logger.LogInformation(
+            "GameServer listening: {ListenerCount} of {MapCount} zone listener(s) armed on ZoneBasePort {BasePort} + " +
+            "mapId (shard {ShardId}); a client entering map N connects to {BasePort}+N. Maps [{Maps}]", _servers.Count,
+            hostedMaps.Length, opts.ZoneBasePort, opts.ShardId, opts.ZoneBasePort, string.Join(", ", hostedMaps));
 
         try
         {
-            await _server.AcceptLoopAsync(TrackInFlightAsync, stoppingToken).ConfigureAwait(false);
+            await Task.WhenAll(acceptLoops).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -88,9 +124,10 @@ public sealed class GameConnectionHost(
         }
     }
 
-    private Task TrackInFlightAsync(ZoneClientSession zoneSession, SocketConnection connection, CancellationToken ct)
+    private Task TrackInFlightAsync(TcpServer<ZoneClientSession> server, ZoneClientSession zoneSession,
+        SocketConnection connection, CancellationToken ct)
     {
-        var task = OnAcceptedAsync(zoneSession, connection, ct);
+        var task = OnAcceptedAsync(server, zoneSession, connection, ct);
 
         _inFlightConnections[task] = 0;
         _ = task.ContinueWith(t => _inFlightConnections.TryRemove(t, out _), TaskScheduler.Default);
@@ -98,7 +135,8 @@ public sealed class GameConnectionHost(
         return task;
     }
 
-    private async Task OnAcceptedAsync(ZoneClientSession zoneSession, SocketConnection connection, CancellationToken ct)
+    private async Task OnAcceptedAsync(TcpServer<ZoneClientSession> server, ZoneClientSession zoneSession,
+        SocketConnection connection, CancellationToken ct)
     {
         registry.Register(zoneSession);
 
@@ -119,7 +157,7 @@ public sealed class GameConnectionHost(
 
             Greet(zoneSession, connection);
 
-            await _server!.RunSessionAsync(connection, zoneSession, ct).ConfigureAwait(false);
+            await server.RunSessionAsync(connection, zoneSession, ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -230,7 +268,8 @@ public sealed class GameConnectionHost(
 
     public override void Dispose()
     {
-        _server?.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        foreach (var server in _servers)
+            server.DisposeAsync().AsTask().GetAwaiter().GetResult();
         base.Dispose();
     }
 }

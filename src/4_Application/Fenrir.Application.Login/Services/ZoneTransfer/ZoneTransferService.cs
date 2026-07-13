@@ -56,12 +56,19 @@ public sealed class ZoneTransferService(
             return new ZoneTransferResult(ZoneTransferOutcome.ShardUnavailable, "", 0, 0);
         }
 
-        if (!await reachabilityProbe.IsReachableAsync(shard.Host, shard.Port, cancellationToken))
+        // Modèle « zone = endpoint » (Décision A / doc 03 §3) : le port renvoyé au client est celui de SA zone
+        // (legacy 1100 + N), pas le port du shard. Le GameServer binde un listener par map sur exactement ce port.
+        var zonePort = options.Value.ZoneBasePort + healedMapId;
+
+        if (!await reachabilityProbe.IsReachableAsync(shard.Host, zonePort, cancellationToken))
         {
+            // Une zone injoignable n'implique PLUS que tout le shard est mort (il héberge N zones sur N ports) :
+            // on refuse cette entrée sans évincer la ligne d'annuaire. Un shard réellement mort est purgé par la
+            // fenêtre de fraîcheur du heartbeat (StalenessCutoffSeconds), pas par une sonde d'une seule zone.
             logger.LogWarning(
-                "Zone transfer rejected: shard {ShardId} ({Host}:{Port}) failed a reachability probe for character {CharacterId} (account {AccountId}, MapId {MapId}); likely crashed within the directory staleness window -- evicting its row",
-                shard.ShardId, shard.Host, shard.Port, character.CharacterId, accountId, healedMapId);
-            await directory.MarkUnreachableAsync(shard.ShardId, cancellationToken);
+                "Zone transfer rejected: zone endpoint {Host}:{Port} (MapId {MapId}) failed a reachability probe for " +
+                "character {CharacterId} (account {AccountId}); that zone's listener is not accepting on shard {ShardId}",
+                shard.Host, zonePort, healedMapId, character.CharacterId, accountId, shard.ShardId);
             return new ZoneTransferResult(ZoneTransferOutcome.ShardUnavailable, "", 0, 0);
         }
 
@@ -69,10 +76,10 @@ public sealed class ZoneTransferService(
             sessionToken, accountGrade, healedMapId, cancellationToken);
 
         logger.LogInformation(
-            "Zone transfer ticket minted: account {AccountId} character {CharacterId} -> shard {ShardId} ({Host}:{Port}, MapId {MapId})",
-            accountId, character.CharacterId, shard.ShardId, shard.Host, shard.Port, healedMapId);
+            "Zone transfer ticket minted: account {AccountId} character {CharacterId} -> zone {MapId} at {Host}:{Port} (shard {ShardId})",
+            accountId, character.CharacterId, healedMapId, shard.Host, zonePort, shard.ShardId);
 
-        return new ZoneTransferResult(ZoneTransferOutcome.Success, shard.Host, shard.Port, healedMapId);
+        return new ZoneTransferResult(ZoneTransferOutcome.Success, shard.Host, zonePort, healedMapId);
     }
 
     private async ValueTask ClampVitalsFloorIfNeededAsync(CharacterWorldEntryDto character,
@@ -98,12 +105,17 @@ public sealed class ZoneTransferService(
 
         if (shards.IsEmpty)
             logger.LogWarning(
-                "No live shard is currently registered in runtime.GameServerDirectory; cannot route character {CharacterId} to MapId {MapId}",
+                "No live shard is currently registered in runtime.GameServerDirectory; cannot route character {CharacterId} " +
+                "to MapId {MapId}. => Aucun GameServer n'a heartbeaté dans la DB que LIT ce LoginServer : soit le " +
+                "GameServer ne tourne pas, soit il pointe une AUTRE base (connection string), soit son heartbeat échoue " +
+                "(voir son log). Le GameServer confirme son inscription par 'registered in runtime.GameServerDirectory as shard N'.",
                 characterId, mapId);
         else
             logger.LogWarning(
-                "Live shards exist but none of them claims MapId {MapId} in admin.ShardMapAssignments; cannot route character {CharacterId}",
-                mapId, characterId);
+                "Live shards exist ([{Shards}]) but none of them claims MapId {MapId} in admin.ShardMapAssignments; " +
+                "cannot route character {CharacterId}. => La map cible n'est assignée à aucun shard vivant (seed " +
+                "admin.ShardMapAssignments / migration 027).",
+                string.Join(", ", shards.Select(s => $"shard{s.ShardId}@{s.Host}:{s.Port}")), mapId, characterId);
         return null;
     }
 }

@@ -9,6 +9,9 @@ public sealed class GameServerOptionsValidator : IValidateOptions<GameServerOpti
         var errors = new List<string>();
 
         if (options.Port is <= 0 or > 65535) errors.Add($"Game:Port must be between 1 and 65535 (was {options.Port}).");
+        if (options.ZoneBasePort is <= 0 or > 65000)
+            errors.Add(
+                $"Game:ZoneBasePort must be between 1 and 65000 (leaving headroom for ZoneBasePort + mapId; was {options.ZoneBasePort}).");
         if (options.ShardId == 0) errors.Add("Game:ShardId must be non-zero.");
         if (string.IsNullOrWhiteSpace(options.PublicHost)) errors.Add("Game:PublicHost must not be empty.");
         if (options.TicketTtlSeconds <= 0)

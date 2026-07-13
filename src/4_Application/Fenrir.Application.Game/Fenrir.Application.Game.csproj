@@ -1,27 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
-  <!-- Slice serveur Game : paquets Zone (ex-Serialization.Zone, 246 paquets) + ZoneFrameDispatcher
-       (ex-Dispatch.Zone) + handlers + services + ACTEUR DE ZONE (tick, channel mono-consommateur, AoI ;
-       doc 04, pièce maîtresse). Absorbe ts25extra (cash/proxy/guilde). Déclare des paquets ⇒ référence les
-       générateurs en Analyzer. Frontière compilateur : un paquet Zone ne compile pas dans le LoginServer.
-       Dépend de Core, Domain.Game, Network, Data, Security, Cluster, Observability (matrice doc 02 §5.2). -->
-
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions"/>
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Split de l'ancien global using Fenrir.Network.Abstractions : les paquets Zone référencent les
-         interfaces (IIncoming/IOutgoingPacket) et la table Opcodes sans using par fichier. FenrirServer/
-         FenrirDirection/WireObfuscationMode viennent du using per-file Fenrir.Core.Wire, ZoneSessionState
-         du using per-file Fenrir.Application.Game.Zone. -->
     <Using Include="Fenrir.Core.Abstractions"/>
     <Using Include="Fenrir.Core.Opcodes"/>
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Reportés de l'ancien Game.Domain (F6 T4, fold-into-Application) : les règles/acteur foldés injectent des
-         interfaces repo + DTO Data via ces global usings (Option A : Domain-in-Application → Data). -->
     <Using Include="Fenrir.Data.Abstractions.Accounts"/>
     <Using Include="Fenrir.Data.Abstractions.Admin"/>
     <Using Include="Fenrir.Data.Abstractions.Characters"/>

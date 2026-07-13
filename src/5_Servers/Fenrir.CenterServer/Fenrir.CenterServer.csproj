@@ -1,8 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk.Worker">
 
   <PropertyGroup>
-    <!-- NOUVEAU serveur (fidèle à ts25center) : coordination cross-zone, porte le module Fenrir.Cluster.
-         Exe AOT : Directory.Build.targets bascule PublishAot + InvariantGlobalization=false (ADR-0006). -->
     <FenrirExecutable>true</FenrirExecutable>
   </PropertyGroup>
 
@@ -10,7 +8,6 @@
     <PackageReference Include="Microsoft.Extensions.Hosting"/>
   </ItemGroup>
 
-  <!-- Lean : ni Application.Login ni Application.Game (la vérité durable est en base). Matrice doc 02 §5.2. -->
   <ItemGroup>
     <ProjectReference Include="..\..\2_Core\Fenrir.Core\Fenrir.Core.csproj"/>
     <ProjectReference Include="..\..\3_Infrastructure\Fenrir.Network\Fenrir.Network.csproj"/>

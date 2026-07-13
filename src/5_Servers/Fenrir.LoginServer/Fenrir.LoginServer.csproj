@@ -1,7 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk.Worker">
 
   <PropertyGroup>
-    <!-- Exe AOT : Directory.Build.targets bascule PublishAot + InvariantGlobalization=false (ADR-0006). -->
     <FenrirExecutable>true</FenrirExecutable>
   </PropertyGroup>
 
@@ -9,8 +8,6 @@
     <PackageReference Include="Microsoft.Extensions.Hosting"/>
   </ItemGroup>
 
-  <!-- Frontière compilateur : NE référence NI Fenrir.Application.Game NI Fenrir.Domain.Game
-       (un paquet Zone est physiquement absent de la compilation du LoginServer). Matrice doc 02 §5.2. -->
   <ItemGroup>
     <ProjectReference Include="..\..\2_Core\Fenrir.Core\Fenrir.Core.csproj"/>
     <ProjectReference Include="..\..\2_Core\Fenrir.Domain.Login\Fenrir.Domain.Login.csproj"/>

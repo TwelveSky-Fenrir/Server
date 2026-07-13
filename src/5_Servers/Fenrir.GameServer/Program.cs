@@ -1,3 +1,4 @@
+using Fenrir.Cluster.Link;
 using Fenrir.Security;
 using Fenrir.Security.RateLimiting;
 using Fenrir.Application.Game.Domain;
@@ -43,6 +44,15 @@ builder.Services.AddGameHandlers();
 
 builder.Services.AddSingleton<SessionRegistry>();
 builder.Services.AddSingleton<ISessionRateLimiter, SessionRateLimiter>();
+
+// Lien S2S sortant vers le CenterServer (le shard devient un pair authentifié : substrat du push d'events
+// monde op33 et de la réception du fan-out — la bascule effective shard->center est le Lot 5). Boot LAZY :
+// reconnexion backoff, l'absence du Center ne bloque jamais l'acceptation des clients de zone.
+builder.Services.AddCenterLinkClient(o =>
+{
+    o.Endpoint = builder.Configuration["Center:Endpoint"];
+    o.SharedSecret = builder.Configuration["Center:SharedSecret"];
+});
 
 var host = builder.Build();
 

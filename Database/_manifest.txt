@@ -536,6 +536,16 @@ StoredProcedures/game/usp_TribeRoster_GetForTribePoint.sql
 StoredProcedures/game/usp_Guild_AddFourGuildPoints.sql
 StoredProcedures/game/usp_Guild_GetTopFourGuild.sql
 
+# Lot 3 CenterServer world-state authority persistence seams (Fenrir.Cluster.WorldState). Both aggregate/mutate
+# game.Characters for the Center authority. usp_WorldState_RecomputeTribeScores (ICenterTribeScoreSource, Bug 3
+# fix) SUMs the per-tribe level/rebirth stat server-side over the level-145+ subset via
+# IX_Characters_MaxLevel_TribePoint; baseline 1000 + tribe-3 +800 stay C#-side (TribeScoreRecompute).
+# usp_Character_ResetDailyRewardClaims (ICenterDailyRewardReset, Bug 4 fix) resets the daily reward-claim state
+# (RewardClaimDate) for all members and, on the @ClearWeeklyDayCounter=1 Monday variant, also zeroes the weekly
+# RewardClaimDay counter -- routed through a proc rather than a hard-coded member table name.
+StoredProcedures/game/usp_WorldState_RecomputeTribeScores.sql
+StoredProcedures/game/usp_Character_ResetDailyRewardClaims.sql
+
 StoredProcedures/admin/usp_Ban_Create.sql
 StoredProcedures/admin/usp_Ban_GetActiveForAccount.sql
 StoredProcedures/admin/usp_Ban_GetActiveForCharacter.sql

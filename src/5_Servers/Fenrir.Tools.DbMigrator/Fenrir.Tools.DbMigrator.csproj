@@ -2,7 +2,6 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <!-- Exe AOT : Directory.Build.targets bascule PublishAot + InvariantGlobalization=false (ADR-0006). -->
     <FenrirExecutable>true</FenrirExecutable>
   </PropertyGroup>
 
@@ -18,8 +17,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Scripts SQL copiés à côté de l'exe (Path.Combine(AppContext.BaseDirectory, "Database")) — même
-         résolution en dev et en AOT publié, aucune heuristique de remontée de repo. -->
     <None Include="..\..\..\Database\**\*.*" CopyToOutputDirectory="PreserveNewest" LinkBase="Database"/>
   </ItemGroup>
 

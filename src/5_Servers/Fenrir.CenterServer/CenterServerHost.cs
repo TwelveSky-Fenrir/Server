@@ -18,7 +18,8 @@ internal sealed class CenterServerHost(
     ILogger<CenterServerHost> logger,
     IOptions<CenterServerOptions> options,
     ICenterLinkAuthenticator authenticator,
-    IFrameDispatcher dispatcher)
+    IFrameDispatcher dispatcher,
+    CenterLinkRegistry linkRegistry)
     : BackgroundService
 {
     private readonly ConcurrentDictionary<Task, byte> _inFlightLinks = new();
@@ -95,7 +96,10 @@ internal sealed class CenterServerHost(
         try
         {
             if (await TryAuthenticateAsync(session, connection, ct).ConfigureAwait(false))
+            {
+                linkRegistry.Register(session, DateTimeOffset.UtcNow);
                 await DispatchLoopAsync(session, connection, ct).ConfigureAwait(false);
+            }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -108,6 +112,7 @@ internal sealed class CenterServerHost(
         }
         finally
         {
+            linkRegistry.Unregister(session.SessionId);
             connection.Abort();
             await ioTask.ConfigureAwait(false);
             await connection.DisposeAsync().ConfigureAwait(false);
@@ -158,6 +163,8 @@ internal sealed class CenterServerHost(
                 var result = await reader.ReadAsync(ct).ConfigureAwait(false);
                 if (result.IsCanceled)
                     break;
+
+                linkRegistry.RefreshActivity(session.SessionId, DateTimeOffset.UtcNow);
 
                 var buffer = result.Buffer;
 

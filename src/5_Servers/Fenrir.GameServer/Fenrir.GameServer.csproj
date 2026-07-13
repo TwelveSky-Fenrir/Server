@@ -1,8 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk.Worker">
 
   <PropertyGroup>
-    <!-- Serveur TCP shardé hébergeant des Zones (pièce maîtresse, doc 04) ; absorbe ts25extra.
-         Exe AOT : Directory.Build.targets bascule PublishAot + InvariantGlobalization=false (ADR-0006). -->
     <FenrirExecutable>true</FenrirExecutable>
   </PropertyGroup>
 
@@ -10,8 +8,6 @@
     <PackageReference Include="Microsoft.Extensions.Hosting"/>
   </ItemGroup>
 
-  <!-- Frontière compilateur : NE référence NI Fenrir.Application.Login NI Fenrir.Domain.Login.
-       Matrice doc 02 §5.2. -->
   <ItemGroup>
     <ProjectReference Include="..\..\2_Core\Fenrir.Core\Fenrir.Core.csproj"/>
     <ProjectReference Include="..\..\2_Core\Fenrir.Domain.Game\Fenrir.Domain.Game.csproj"/>

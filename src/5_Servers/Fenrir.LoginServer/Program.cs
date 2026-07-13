@@ -1,3 +1,4 @@
+using Fenrir.Cluster.Link;
 using Fenrir.Security;
 using Fenrir.Security.RateLimiting;
 using Fenrir.Domain.Login;
@@ -24,6 +25,15 @@ builder.Services.AddLoginHandlers();
 
 builder.Services.AddSingleton<SessionRegistry>();
 builder.Services.AddSingleton<ISessionRateLimiter, SessionRateLimiter>();
+
+// Lien S2S sortant vers le CenterServer (boucle la boucle : Login devient un pair authentifié du cluster).
+// Boot LAZY : le lien monte en arrière-plan avec reconnexion backoff ; l'absence du Center ne bloque JAMAIS
+// l'acceptation des clients Login. Endpoint + secret injectés par l'AppHost (env Center__Endpoint/SharedSecret).
+builder.Services.AddCenterLinkClient(o =>
+{
+    o.Endpoint = builder.Configuration["Center:Endpoint"];
+    o.SharedSecret = builder.Configuration["Center:SharedSecret"];
+});
 
 var host = builder.Build();
 

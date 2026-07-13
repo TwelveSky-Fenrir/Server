@@ -1,9 +1,5 @@
 namespace Fenrir.Core.Opcodes;
 
-/// <summary>
-/// Constantes d'opcode par (serveur, sens). Un même octet est réutilisé entre serveurs/sens (legacy) : la
-/// nature d'un opcode n'a de sens qu'avec (serveur, sens). Tables complètes portées à l'identique du prouvé.
-/// </summary>
 public static class Opcodes
 {
     public static class Login
@@ -324,13 +320,7 @@ public static class Opcodes
         }
     }
 
-    /// <summary>
-    /// Opcodes du lien serveur-à-serveur du CenterServer (coordination cross-zone, ex-<c>ts25center</c>). Cadre
-    /// S2S = en-tête d'opcode 1 octet, sans length-prefix. <c>WorldEvent</c> (33) = l'enveloppe de bus d'events
-    /// monde <c>{tProtocol; int tSort; byte tData[130]}</c> (135 o) : une Zone la POUSSE au Center (Incoming),
-    /// le Center la relaie en fan-out aux Zones (Outgoing) — même layout dans les deux sens.
-    /// </summary>
-    public static class Center
+        public static class Center
     {
         public static class Incoming
         {

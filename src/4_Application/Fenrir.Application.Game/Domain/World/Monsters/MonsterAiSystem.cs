@@ -127,10 +127,6 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null, WorldS
                 {
                     monster.StateFrameAccumulator = 0f;
 
-                    // A020 final pose: snap EXACTLY onto the spawn point (mFirstLocation equivalent =
-                    // HomeX/Y/Z, frozen at creation), unconditionally — legacy performs no walkability
-                    // check on this final placement, so the monster always reaches its exact spawn even
-                    // when the straight line home was obstructed (S07_MyGame05.cpp:1666-1670).
                     monster.PosX = monster.HomeX;
                     monster.PosY = monster.HomeY;
                     monster.PosZ = monster.HomeZ;
@@ -249,10 +245,6 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null, WorldS
 
             ResolveHomeReturnPath(zone, monster, out var resolvedX, out var resolvedY, out var resolvedZ);
 
-            // A002 decision only: the raycast/reachable point toward home decides *whether* to arm the
-            // return (the monster returns when that point is still more than 1 unit² short of the exact
-            // spawn). It is NOT the return destination — A020's final pose always snaps to the exact
-            // spawn (see the ReturnToSpawn case), obstacle or not (S07_MyGame05.cpp:1021-1030).
             if (DistanceSquared(resolvedX, resolvedY, resolvedZ, monster.HomeX, monster.HomeY, monster.HomeZ) >
                 ArrivalEpsilon * ArrivalEpsilon)
             {
@@ -557,8 +549,6 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null, WorldS
             if (!zone.TryGetPlayer(characterId, out var player) || !IsCandidateValid(player))
                 continue;
 
-            // Legacy SelectAvatarIndexForPossibleAttack skips players at rest (action-sort 0) or in
-            // action-sort 33 — the monster leaves them alone (S07_MyGame05.cpp:156-159).
             if (player.ActionSort is 0 or 33)
                 continue;
 
@@ -646,8 +636,6 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null, WorldS
             if (!zone.TryGetPlayer(characterId, out var candidate) || !IsCandidateValid(candidate))
                 continue;
 
-            // Legacy SelectAvatarIndexForAttackAction skips players at rest (action-sort 0) or in
-            // action-sort 33 (S07_MyGame05.cpp:558-561).
             if (candidate.ActionSort is 0 or 33)
                 continue;
 

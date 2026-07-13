@@ -8,8 +8,6 @@ namespace Fenrir.Data.Admin;
 
 public sealed record ShardMapAssignmentRepository(ICaeriusNetDbContext Db) : IShardMapAssignmentRepository
 {
-    // Un seul shard peut désormais héberger l'intégralité du catalogue de zones (seed 027 assigne toute
-    // world.Zones à shard 1) : dimensionner les hints de pré-allocation au-delà des ~117 maps.
     private const int AllAssignmentsCapacity = 256;
     private const int HostedMapsPerShardCapacity = 256;
 

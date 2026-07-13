@@ -397,13 +397,6 @@ public sealed class TribeActionService(
             return TribeActionOutcome.Abort;
         }
 
-        // Legacy MyWork::MaxRebirth runs against the counter AFTER the increment
-        // (S04_MyWork05.cpp:4828-4865): at generation exactly 6 it drops one previous-tribe milestone item
-        // on the ground at the character's position (quantity 0, drop-source DP_LV_TO_WD = 40). This path
-        // caps at 6 so gen-12 is unreachable, hence ClusterNotice is always false here and no cluster notice
-        // is ever emitted. Fold the drop into the same awaited progress command -- as the sibling
-        // rebirth-pill path does -- so it materialises on the tick thread (single-writer) at the character's
-        // position. Only reward.Drops is consumed; the notice half of the shared rule is intentionally unused.
         var reward = RebirthMilestoneRewards.Resolve(newRebirthCount, state.PreviousTribe);
 
         await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,

@@ -4,10 +4,6 @@ namespace Fenrir.Application.Game.Domain.Pets;
 
 public static class PetExperienceCreditCalculator
 {
-    // Pet id -> growth category (0-7), mirroring the ReturnExperience switch. Categories 0-3 are the older
-    // pets; categories 4-7 are the newer pets (doubled caps + doubled degree). The GIFT_EVENT gift ids
-    // 8202-8216 are live in the shipped ReleaseEU33 build and bucket into the same category as their
-    // same-tier base pet: 8202-8205 -> 4, 8206-8211 -> 5, 8212-8215 -> 6, 8216 -> 7.
     private static readonly FrozenDictionary<int, int> CategoryByItemId = new Dictionary<int, int>
     {
         [541] = 0, [542] = 0, [547] = 0, [560] = 0,
@@ -30,16 +26,7 @@ public static class PetExperienceCreditCalculator
         return CategoryByItemId.TryGetValue(petItemId, out categoryIndex);
     }
 
-    /// <summary>
-    ///     Growth credited for one pet feed event, matching legacy <c>PETSYSTEM::ReturnExperience</c>.
-    ///     Two distinct feed paths reach this routine:
-    ///     the monster-kill / experience-distribution path passes a zero <paramref name="growUpValue" /> and
-    ///     credits the raw <paramref name="seedExperience" /> directly; the pet-food / GM-fill path passes a
-    ///     positive <paramref name="growUpValue" /> (1 / 3 / 40 / 200), discards the seed, and credits a
-    ///     per-category multiplier times that grow-up value. Both are clamped to the remaining room below the
-    ///     category cap.
-    /// </summary>
-    public static int ComputeCreditedAmount(int petItemId, int currentGrowth, int seedExperience,
+        public static int ComputeCreditedAmount(int petItemId, int currentGrowth, int seedExperience,
         float growUpValue = 0f)
     {
         if (!TryResolveCategory(petItemId, out var categoryIndex))
@@ -52,19 +39,12 @@ public static class PetExperienceCreditCalculator
         int rawCredit;
         if (growUpValue > 0f)
         {
-            // Positive grow-up (food / GM) path: the seed is ignored; the credit is the category multiplier
-            // times the grow-up value. Reproduce the legacy operation order in single-precision float to stay
-            // byte-faithful (cap x100 -> / degree -> truncate -> /100 -> ceiling), then truncate the product.
-            // Degree is 100 for the old pets (categories 0-3) and 200 for the new pets (categories 4-7); with
-            // the doubled new-pet caps this yields the same multiplier as the same-tier old-pet category.
             var degree = categoryIndex <= 3 ? 100 : 200;
             var multiplier = MathF.Ceiling(MathF.Truncate(cap * 100f / degree) / 100f);
             rawCredit = (int)(multiplier * growUpValue);
         }
         else
         {
-            // Zero / non-positive grow-up (kill / distribution) path: the seed is credited directly, no
-            // category multiplier.
             rawCredit = seedExperience;
         }
 

@@ -175,11 +175,6 @@ public sealed class ZoneMoveService(
         await LogZoneDepartureAsync(zoneSession, characterId, sourceZone.MapId, targetZoneNumber,
             cancellationToken);
 
-        // Mint un ticket de handover scopé ZONE (map cible = targetZoneNumber) et rends au client l'endpoint de CE
-        // shard : l'intra-shard suit désormais EXACTEMENT le même chemin « ferme le socket -> reconnecte op11 ->
-        // consume ticket -> EnterWorld » que le cross-shard (corrige la divergence V2.2). Plus d'entrée-monde
-        // inline, plus de migration d'entité en RAM : la sortie de la zone source se fait au disconnect (teardown),
-        // avec IsMovingZone (skip cleanup) et le flag de session transfer-pending (skip self-kick).
         await tickets.CreateAsync(zoneSession.AccountId!.Value, characterId, options.Value.ShardId,
             options.Value.TicketTtlSeconds, zoneSession.AccountSessionToken!.Value, zoneSession.AccountGrade,
             targetZoneNumber, cancellationToken);

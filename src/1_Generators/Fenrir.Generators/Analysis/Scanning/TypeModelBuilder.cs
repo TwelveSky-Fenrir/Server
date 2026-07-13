@@ -39,9 +39,6 @@ internal static class TypeModelBuilder
             out var fieldsSize);
         diagnostics.AddRange(fieldDiagnostics);
 
-        // Center S2S incoming packets carry only the 1-byte opcode header (ex-SV_DEFAULT_PACKET), not the
-        // 9-byte client header — so ExpectedSize/FEN013 must be computed against that. Guarded on
-        // server == Center so Login/Zone ExpectedSize validation is byte-identical.
         var incomingHeaderSize = server == FenrirServer.Center
             ? WireHeaderSizes.DefaultPacketSize
             : WireHeaderSizes.ClientPacketSize;

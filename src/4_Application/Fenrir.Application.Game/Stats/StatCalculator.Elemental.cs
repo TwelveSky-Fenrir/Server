@@ -41,7 +41,6 @@ public static partial class StatCalculator
 
         eatk += levelRow.ElementAttack;
 
-        // Ridden-mount grade multiplier (three-tier, element-damage marker); flat rolled bonus added at the end.
         eatk = MountGradeElementAttack(eatk, mount);
 
         eatk += ElementAttackElixirContribution(consumable, zone);
@@ -86,7 +85,6 @@ public static partial class StatCalculator
             edef += (int)(deco2.Enchant * (isWing ? 7.8f : 3.9f));
         }
 
-        // Ridden-mount grade multiplier (three-tier, element-defense marker); flat rolled bonus added at the end.
         edef = MountGradeElementDefense(edef, mount);
 
         edef += ElementDefenseElixirContribution(consumable, zone);

@@ -45,14 +45,7 @@ public static class MountPowerCodec
         return sum;
     }
 
-    /// <summary>
-    ///     Reassembles the raw encoded rolled-attribute power for one garage slot from its eight decoded
-    ///     stat-slot digits held in <paramref name="rolledAttributes" /> (indexed
-    ///     <c>slot * DigitCount + statSlotIndex</c>). Stat-slot index 0 (Attack) maps to the most-significant
-    ///     place (10^7), index 7 (Element-Defense) to the units place (10^0), matching the
-    ///     <c>StatCalculator.DecodeMountPowerDigits</c> digit layout.
-    /// </summary>
-    public static int EncodeSlot(ImmutableArray<int> rolledAttributes, int slot)
+        public static int EncodeSlot(ImmutableArray<int> rolledAttributes, int slot)
     {
         var baseIndex = slot * DigitCount;
         var power = 0;
@@ -61,16 +54,7 @@ public static class MountPowerCodec
         return power;
     }
 
-    /// <summary>
-    ///     Exact inverse of <see cref="EncodeSlot" />: writes the eight decoded stat-slot digits of
-    ///     <paramref name="power" /> into one garage slot of <paramref name="rolledAttributes" /> (indexed
-    ///     <c>slot * DigitCount + statSlotIndex</c>). Stat-slot index 0 (Attack) reads the most-significant
-    ///     place (10^7), index 7 (Element-Defense) the units place (10^0). The digits are stored unconditionally
-    ///     (not activity-gated) so a later activity gain re-exposes them; the activity gate is applied at stat
-    ///     computation via <c>StatCalculator.DecodeMountPowerDigits</c>. Matches
-    ///     <c>MountStateService.ApplyRolledPower</c>'s digit layout so hydrate/roll/encode all round-trip.
-    /// </summary>
-    public static ImmutableArray<int> WithSlotDigits(ImmutableArray<int> rolledAttributes, int slot, int power)
+        public static ImmutableArray<int> WithSlotDigits(ImmutableArray<int> rolledAttributes, int slot, int power)
     {
         var baseIndex = slot * DigitCount;
         var result = rolledAttributes;

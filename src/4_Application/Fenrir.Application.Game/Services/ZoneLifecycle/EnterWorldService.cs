@@ -103,10 +103,6 @@ public sealed class EnterWorldService(
 
         var character = bundle.Character;
 
-        // Transfert piloté par ticket (l'op11 a porté une map cible) : le ticket est l'autorité de la map de
-        // destination et prime sur le MapId relu de SQL (encore la map SOURCE pour un joueur en cours de move ;
-        // ni intra ni cross ne le persiste avant l'entrée). Le spawn est SERVEUR-autoritaire (le client ne connaît
-        // jamais le point d'entrée de la zone cible), calé sur le point d'entrée depuis la map source.
         var ticketTargetMapId = zoneSession.TargetMapId;
         var isTicketTransfer = ticketTargetMapId is { } tmid && tmid != character.MapId;
         if (isTicketTransfer &&
@@ -211,8 +207,6 @@ public sealed class EnterWorldService(
 
         async ValueTask CompleteWorldEntryAsync()
         {
-            // Sur un transfert par ticket, la position d'entrée est le spawn serveur-autoritaire (déjà posé dans
-            // character.Pos* ci-dessus) ; sinon on honore la position revendiquée par le client (entrée normale).
             var (claimedPosX, claimedPosY, claimedPosZ) = isTicketTransfer
                 ? (character.PosX, character.PosY, character.PosZ)
                 : (packet.Action.Location[0], packet.Action.Location[1], packet.Action.Location[2]);
@@ -463,9 +457,6 @@ public sealed class EnterWorldService(
                 PetActionTargetLocationX: packet.Action.PetTargetLocation[0],
                 PetActionTargetLocationY: packet.Action.PetTargetLocation[1],
                 PetActionTargetLocationZ: packet.Action.PetTargetLocation[2],
-                // Mount attribute hydration: carry the persisted packed mount block through so HandleEnter can
-                // decode the rolled attributes / accumulated exp / activity for the mounted slot (bundle.Character
-                // already projects these columns via usp_Character_GetForWorldEntry RS0).
                 MountItemId: character.MountItemId,
                 MountExpActivity: character.MountExpActivity,
                 MountPower: character.MountPower,

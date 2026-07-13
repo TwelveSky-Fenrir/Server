@@ -27,8 +27,6 @@ public static partial class StatCalculator
                     slot.SocketGem3, gemSocketsByTypeAndValue);
         }
 
-        // Ridden-mount grade multiplier (four-tier, damage marker) on the level/attribute/equipment subtotal;
-        // the flat rolled bonus is added at the end (after the multiply).
         atk = MountGradeAttack(atk, mount);
 
         if (bySlot[1] is { } capeSlot)
@@ -57,9 +55,6 @@ public static partial class StatCalculator
 
         atk += StrengthElixirAttackContributionWithOverride(consumable, zone);
 
-        // Boost-potion / warrior-pill attack multiplier (x1.1): applied immediately after the damage elixir,
-        // suppressed in zone 124. OR-logic across the damage-boost potion and warrior pill, applied once (never
-        // additive). MyFactor.cpp:2610-2612.
         atk = ApplyAttackBoostMultiplier(atk, consumable, zone);
 
         atk += StellarCoreAttackPowerContribution(cosmetic);
@@ -144,9 +139,6 @@ public static partial class StatCalculator
 
     private const float AttackBoostMultiplier = 1.1f;
 
-    // Attack boost multiplier: x1.1 when active (damage-boost potion OR warrior pill) and outside the excluded
-    // zone (BoostExcludedZoneNumber, shared with the life boost). OR-logic, applied exactly once. The single-
-    // precision multiply then truncate-toward-zero matches the legacy (int)((float)value * 1.1f).
     private static int ApplyAttackBoostMultiplier(int atk, ConsumableContext consumable, ZoneContext zone)
     {
         return zone.ZoneNumber != BoostExcludedZoneNumber &&

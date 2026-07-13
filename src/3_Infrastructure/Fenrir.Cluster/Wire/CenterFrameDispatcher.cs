@@ -6,12 +6,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Cluster.Wire;
 
-/// <summary>
-/// Route une trame S2S décodée (opcode + payload) du CenterServer vers son handler, via le
-/// <c>MessageDispatcher</c> généré (émis dans le namespace <c>Fenrir.Cluster</c> à partir des
-/// <c>[FenrirPacket(FenrirServer.Center,…)]</c> découverts). Miroir de <c>ZoneFrameDispatcher</c>, sans la
-/// logique de gel « changement de zone » (hors sujet pour un lien serveur-à-serveur).
-/// </summary>
 public sealed class CenterFrameDispatcher(ILogger<CenterFrameDispatcher> logger) : IFrameDispatcher
 {
     public async ValueTask DispatchAsync(FenrirServer server, byte opcode, ReadOnlySequence<byte> payload,

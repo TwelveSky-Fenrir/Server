@@ -28,7 +28,5 @@ internal static class WellKnownNames
     public const string LoginSessionStateEnum = "global::Fenrir.Application.Login.LoginSessionState";
     public const string ZoneSessionStateEnum = "global::Fenrir.Application.Game.ZoneRuntime.ZoneSessionState";
 
-    // Center S2S session-state enum. Declared here only so CenterSessionStateGate can reference it; the type
-    // itself is owned by a separate workstream (Fenrir.Cluster.Wire).
     public const string CenterSessionStateEnum = "global::Fenrir.Cluster.Wire.CenterSessionState";
 }

@@ -40,8 +40,6 @@ internal static class OpcodeRegistryEmitter
         writer.OpenBrace();
         foreach (var packet in ordered)
         {
-            // Center S2S incoming frames carry only the 1-byte opcode header (ex-SV_DEFAULT_PACKET), not the
-            // 9-byte client header. Guarded on Server == Center so Login/Zone framing is byte-identical.
             var incomingHeaderSize = packet.Server == FenrirServer.Center
                 ? WireHeaderSizes.DefaultPacketSize
                 : WireHeaderSizes.ClientPacketSize;
@@ -92,8 +90,6 @@ internal static class OpcodeRegistryEmitter
         writer.OpenBrace();
         foreach (var packet in entries)
         {
-            // entries are Incoming-only; Center uses the 1-byte opcode header, Login/Zone the 9-byte client
-            // header. Guarded so Login/Zone Provider output is byte-identical. (op33 world-event: 134 + 1 = 135.)
             var headerSize = packet.Server == FenrirServer.Center
                 ? WireHeaderSizes.DefaultPacketSize
                 : WireHeaderSizes.ClientPacketSize;

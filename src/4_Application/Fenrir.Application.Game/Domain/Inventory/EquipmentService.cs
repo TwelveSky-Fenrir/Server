@@ -100,14 +100,7 @@ public static class EquipmentService
         return (cosmetic, zone, consumable, mount);
     }
 
-    /// <summary>
-    ///     Resolves the ridden-mount contribution snapshot: the mount's absorb value and per-stat grade markers
-    ///     are keyed by mount id (via the base row inside the stat pass), while the ridden slot's raw rolled
-    ///     power and activity feed the flat rolled bonus. Only an actively-ridden mount contributes -- the mount
-    ///     pointer must sit in the mounted range (10..19); anything else (selected-only, unmounted) yields a
-    ///     default (no-op) context.
-    /// </summary>
-    public static MountContext BuildMountContext(PlayerRuntimeState state)
+        public static MountContext BuildMountContext(PlayerRuntimeState state)
     {
         var mountedSlot = state.AnimalIndex >= MountAnimalInfo.ActiveCompanionSlotBase &&
                           state.AnimalIndex <

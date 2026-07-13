@@ -51,8 +51,7 @@ public sealed class SessionRegistry(ILogger<SessionRegistry>? logger = null) : I
         return builder.ToImmutable();
     }
 
-    /// <summary>Port <see cref="IFloodKickSink"/> : abat toutes les sessions d'une IP (déclenché par l'anti-flood).</summary>
-    public int KickByRemoteAddress(string ipAddress)
+        public int KickByRemoteAddress(string ipAddress)
     {
         var kicked = SnapshotByRemoteAddress(ipAddress);
 

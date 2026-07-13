@@ -20,7 +20,6 @@ public static partial class StatCalculator
                              SetBonusTables.GetCoefficients(setNumber, i, IsLegendary(slot.Item)).AttackSuccess);
         }
 
-        // Ridden-mount grade multiplier (three-tier, hit marker); flat rolled bonus added at the end.
         hit = MountGradeHit(hit, mount);
 
         hit += ComputeGlovesAttackSuccessBonus(bySlot[3]);
@@ -84,7 +83,6 @@ public static partial class StatCalculator
                                SetBonusTables.GetCoefficients(setNumber, i, IsLegendary(slot.Item)).AttackBlock);
         }
 
-        // Ridden-mount grade multiplier (three-tier, dodge marker); flat rolled bonus added at the end.
         dodge = MountGradeDodge(dodge, mount);
 
         dodge += ComputeArmorAttackBlockBonus(bySlot[2]);

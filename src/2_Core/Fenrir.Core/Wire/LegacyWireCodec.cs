@@ -3,10 +3,6 @@ using System.Text;
 
 namespace Fenrir.Core.Wire;
 
-/// <summary>
-/// Primitives de (dé)sérialisation legacy partagées par <see cref="MessageReader"/>/<see cref="MessageWriter"/> :
-/// chaînes à largeur fixe Latin1 coupées au NUL, tableaux d'entiers/flottants little-endian, lignes à largeur fixe.
-/// </summary>
 public static class LegacyWireCodec
 {
     public static string ReadFixedString(ReadOnlySpan<byte> source)

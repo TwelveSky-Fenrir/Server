@@ -195,18 +195,6 @@ public static class CombatResolver
 
         damage /= MinimumDamageAgainstAvatar;
 
-        // Elemental contribution (legacy S07_MyGame02.cpp:1339-1359, AttackPlayer PvP path).
-        // Uses the attacker's RAW ElementAttackPower on purpose: the per-skill kind-8 elemental
-        // ratio (SkillValueKind.ElementAttackPowerRatio, ReturnSkillValue factor 8) is applied only
-        // under legacy case 3 (mAttackActionValue1 == 3), and the upstream mode switch above rejects
-        // every value other than 1 and 2 via its default arm (legacy default: return,
-        // S07_MyGame02.cpp:1001-1017) -- so case 3 is unreachable vestigial code in the shipped
-        // ReleaseEU33 build and NEVER majorates elemental power for any player attack, including a
-        // kind-7 skill attack (value1 == 2). Do NOT wire ElementAttackPowerRatio onto value1 == 2:
-        // that would DIVERGE from legacy, not match it. The genuine parity requirement here is that
-        // this raw (attacker - defender) elemental difference is added AFTER the /5 PvP reduction and
-        // is itself NOT divided by 5 (the add sits outside the mode switch, so it also runs for a
-        // normal value1 == 1 attack).
         var elementDamage = 0;
         if (attacker.Stats.ElementAttackPower > defender.Stats.ElementDefensePower)
             elementDamage = attacker.Stats.ElementAttackPower - defender.Stats.ElementDefensePower;

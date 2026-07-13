@@ -64,13 +64,9 @@ public sealed class IpFloodGuard(
         }
         catch (Exception ex)
         {
-            // Contrat F5 §2.4 : un échec de persistance est TOUJOURS avalé sans empêcher le kick — y compris
-            // pendant l'arrêt gracieux (ct annulé). Un filtre `when (!ct.IsCancellationRequested)` sauterait
-            // le kick sous annulation, ce que l'invariant interdit.
             logger?.IpBlockPersistFailed(ex, ipAddress);
         }
 
-        // Éjection via le port (la boucle snapshot+Abort vit dans SessionRegistry, côté Network).
         var kicked = kickSink.KickByRemoteAddress(ipAddress);
         logger?.IpBlocked(ipAddress, kicked);
     }

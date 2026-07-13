@@ -1,10 +1,5 @@
 namespace Fenrir.Core.Wire;
 
-/// <summary>
-/// XOR legacy (obfuscation, <b>pas</b> de la cryptographie) : premier octet ^ <c>0x10</c>, octets suivants
-/// ^ <c>0xFE</c> (saturant), dernier octet non touché ; involutif. Sert au XOR de paquet entier
-/// (<c>XorPacketGlobal</c>), au XOR de champ avatar, à l'UID obfusqué et au XOR de flux au handshake.
-/// </summary>
 public static class WireXor
 {
     private const byte FirstKey = 0x10;

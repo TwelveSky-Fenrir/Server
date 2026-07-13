@@ -57,9 +57,6 @@ public sealed partial class Zone
 
     private readonly KillCooldownTracker _regularWarCpOverrideCooldown = new();
 
-    // Per-killer regular-war kill streak driving the type-049 drop cadence. Legacy stores this persistently
-    // on the avatar (mDATA.warKillCount); here it is zone-local (single-writer on the tick thread) and resets
-    // when the character leaves the zone — see the return summary for the persistent-field follow-up.
     private readonly Dictionary<int, int> _regularWarKillDropStreak = new();
 
     public bool PostCombatCommand(in CombatCommand command)
@@ -263,9 +260,6 @@ public sealed partial class Zone
         ApplyPvpKillHeroPoints(attackerState, profile, attackerCombinedLevel);
         ApplyPvpKillExperience(attackerState, profile, attackerCombinedLevel, defenderCombinedLevel);
 
-        // profile.GrantDrop is the C# equivalent of legacy tCanDrop (the precondition for calling
-        // DropItemForKillOtherTribe). For the DTM zone-38 profile it is set only when the YangGok drop event
-        // is enabled, so gating here keeps that pool dormant-until-enabled without extra plumbing.
         if (profile.GrantDrop)
             DropItemsForKillOtherTribe(attackerState, defenderState, attackerCombinedLevel, defenderCombinedLevel);
     }
@@ -402,22 +396,14 @@ public sealed partial class Zone
         attackerState.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
     }
 
-    // ---- Inter-tribe kill loot (legacy MyUtil::DropItemForKillOtherTribe) --------------------------------
-    // Réf. C++ : Server/ts25zone/S07_MyGame03.cpp:3866-4069. Combined-level guard (>= 145 both sides), then
-    // three sequential, zone-gated pools: the YangGok zone-38 event pool (which short-circuits the rest), the
-    // regular-war streak pool (type-049 maps), and the city minority-tribe pool (maps 1/6/11/140). Every drop
-    // lands at the victim's position, attributed to the killer's name, using legacy drop policy DP_PVP_TO_WD.
-    // Intentionally NOT wired here (see the return summary): the karakol server-160 pool (a legacy null-deref
-    // crash, and covered by the regular-war pool since 160 is a type-049 map) and the FFA zone-335 sub-branch
-    // of the regular-war pool (its mZoneFFATypeState==3 gate is flagged unresolved by the behavior contract).
 
-    private const int PvpKillDropSort = 11; // legacy DP_PVP_TO_WD (DEFINE.h:518)
+    private const int PvpKillDropSort = 11;
 
     private const int PvpKillDropMinimumCombinedLevel = 145;
 
     private const int YangGokPvpDropRatePercent = 35;
 
-    private const int RegularWarDropStreakRequirementFast = 3; // maps 164 / 335
+    private const int RegularWarDropStreakRequirementFast = 3;
 
     private const int RegularWarDropStreakRequirement = 10;
 
@@ -464,14 +450,10 @@ public sealed partial class Zone
     private void DropItemsForKillOtherTribe(PlayerRuntimeState attackerState, PlayerRuntimeState defenderState,
         int attackerCombinedLevel, int defenderCombinedLevel)
     {
-        // Level guard: both killer and victim must be at combined level >= 145 (G12 R0).
         if (attackerCombinedLevel < PvpKillDropMinimumCombinedLevel ||
             defenderCombinedLevel < PvpKillDropMinimumCombinedLevel)
             return;
 
-        // Pool 1 — YangGok event (zone 38). Reaching here already implies the event is enabled, since the
-        // DTM zone-38 reward profile only sets GrantDrop when the drop event is active. Short-circuits the
-        // remaining pools unconditionally, matching legacy.
         if (MapId == PvpKillExtendedRewardZones.DtmZoneId)
         {
             if (_random.NextInt32(100) < YangGokPvpDropRatePercent)
@@ -480,7 +462,6 @@ public sealed partial class Zone
             return;
         }
 
-        // Pool 2 — regular-war streak (type-049 maps): drops one item every N eligible kills.
         if (RegularWarMapCatalog.TryGet(MapId, out _))
         {
             var streak = _regularWarKillDropStreak.GetValueOrDefault(attackerState.CharacterId) + 1;
@@ -500,8 +481,6 @@ public sealed partial class Zone
             }
         }
 
-        // Pool 3 — city / minority tribe (maps 1/6/11/140): fires on every eligible kill where the killer is
-        // not the city's owning tribe.
         if (TryGetCityOwningTribe(MapId, out var cityOwningTribe) && attackerState.Tribe != cityOwningTribe)
         {
             var itemId = ResolveKillDropItemId(PickKillDropTierMember(
@@ -513,7 +492,6 @@ public sealed partial class Zone
     private KillDropEntry PickKillDropTierMember(KillDropEntry[] tierA, KillDropEntry[] tierB,
         KillDropEntry[] tierC, KillDropEntry[] tierD)
     {
-        // Legacy tier boundaries over a %1000 roll: 2.5% / 7.5% / 30% / 60%.
         var tier = _random.NextInt32(1000) switch
         {
             < 25 => tierA,
@@ -539,8 +517,6 @@ public sealed partial class Zone
 
     private void TrySpawnPvpKillDrop(int itemId, PlayerRuntimeState killer, PlayerRuntimeState victim)
     {
-        // Silent no-op if the id resolves to nothing or is absent from the item catalog (legacy mITEM.Search
-        // null path). Master = killer name governs pickup priority; no party sharing (empty party name).
         if (itemId <= 0 || !worldData.ItemsById.ContainsKey(itemId))
             return;
 
@@ -570,10 +546,6 @@ public sealed partial class Zone
         Animal10
     }
 
-    // A single pool member: either a fixed item id, a 50/50 binary choice between two ids, or a marker that
-    // expands to a nested uniform draw from the elixir / animal-tier tables. Resolving the chosen member only
-    // (rather than pre-evaluating every slot the way the legacy array literal does) yields the same marginal
-    // distribution for the dropped item.
     private readonly record struct KillDropEntry(KillDropEntryKind Kind, int First, int Second)
     {
         public static readonly KillDropEntry Elixir = new(KillDropEntryKind.Elixir, 0, 0);
@@ -732,8 +704,6 @@ public sealed partial class Zone
         var owningTribe = TowerZoneIndexTable.GetOwningTribe(MapId);
         var towerActivelyBuilt = towerWar?.GetPhase(towerIndex) == TowerSiegePhase.Active;
 
-        // Legacy parity: only the owning tribe is blocked from its own built tower; an ally of the owner is
-        // allowed to strike it (the legacy ally-block condition is an inert bug). See TowerFriendlyFireGate.
         return TowerFriendlyFireGate.CanAttackGuardian(attackerTribe, owningTribe, towerActivelyBuilt);
     }
 

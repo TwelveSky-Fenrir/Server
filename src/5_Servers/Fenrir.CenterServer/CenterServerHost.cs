@@ -14,23 +14,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.CenterServer;
 
-/// <summary>
-/// Cycle de vie du CenterServer : un serveur TCP <b>interne et passif</b> (fidèle à <c>ts25center</c> <c>:12003</c>)
-/// qui accepte des liens serveur-à-serveur entrants (Zones, LoginServer) et n'ouvre <b>aucun</b> TCP sortant de
-/// jeu. Boot <b>paresseux</b> : l'accept-loop est armée d'abord, la découverte des pairs est paresseuse, aucun
-/// <c>connect()</c> bloquant au démarrage (Topologie <c>03_</c> §2.4). Réutilise la pile <c>Fenrir.Network</c>
-/// (<see cref="FenrirTcpListener{TSession}"/> + <see cref="SocketConnection"/>).
-/// </summary>
-/// <remarks>
-/// <para><b>Chaque lien accepté</b> passe par un handshake d'authentification HMAC (défi-réponse à secret partagé,
-/// <see cref="ICenterLinkAuthenticator"/> — durcit la faille legacy #8 « seul un pair saurait » ≠ auth) : le Center
-/// émet un nonce, le pair renvoie <c>HMAC(secret, nonce)</c>, le Center recompute et compare en temps constant. Un
-/// lien qui échoue (ou si aucun secret n'est configuré, fail-closed) est fermé sans jamais être dispatché.</para>
-/// <para><b>Une fois authentifié</b>, le flux entrant est décodé en trames S2S (<see cref="S2SFrameReader"/> :
-/// en-tête d'opcode 1 octet, taille par opcode via <c>CenterOpcodeRegistry.Provider</c> généré, sans length-prefix)
-/// et routé par <see cref="IFrameDispatcher"/> après la garde d'état <c>CenterSessionStateGate</c>. Le lien
-/// n'applique pas le XOR client (clé à 0).</para>
-/// </remarks>
 internal sealed class CenterServerHost(
     ILogger<CenterServerHost> logger,
     IOptions<CenterServerOptions> options,
@@ -125,8 +108,6 @@ internal sealed class CenterServerHost(
         }
         finally
         {
-            // Unblocks SendLoopAsync still parked on the TX pipe so RunIoAsync can complete, mirroring
-            // SessionLoop.RunConnectionAsync's own teardown ordering.
             connection.Abort();
             await ioTask.ConfigureAwait(false);
             await connection.DisposeAsync().ConfigureAwait(false);
@@ -134,12 +115,7 @@ internal sealed class CenterServerHost(
         }
     }
 
-    /// <summary>
-    /// Handshake d'authentification : émet un défi (nonce), lit la réponse HMAC du pair, la vérifie en temps
-    /// constant. Fail-closed si aucun secret n'est configuré. Retourne <c>true</c> et bascule la session en
-    /// <c>Authenticated</c> uniquement si la preuve est valide ; sinon ferme le lien (le pair est refusé).
-    /// </summary>
-    private async Task<bool> TryAuthenticateAsync(CenterLinkSession session, SocketConnection connection,
+        private async Task<bool> TryAuthenticateAsync(CenterLinkSession session, SocketConnection connection,
         CancellationToken ct)
     {
         if (!authenticator.IsEnabled)
@@ -171,11 +147,7 @@ internal sealed class CenterServerHost(
         return true;
     }
 
-    /// <summary>
-    /// Boucle de dispatch S2S post-auth : décode les trames à en-tête 1 octet et les route (garde d'état puis
-    /// dispatcher). Miroir de <c>SessionLoop.ProcessBufferAsync</c> côté client, adapté au cadre S2S.
-    /// </summary>
-    private async Task DispatchLoopAsync(CenterLinkSession session, SocketConnection connection, CancellationToken ct)
+        private async Task DispatchLoopAsync(CenterLinkSession session, SocketConnection connection, CancellationToken ct)
     {
         var reader = connection.Input;
 
@@ -194,7 +166,6 @@ internal sealed class CenterServerHost(
                     while (S2SFrameReader.TryReadFrame(ref buffer, CenterOpcodeRegistry.Provider, FenrirServer.Center,
                                out var frame))
                     {
-                        // Frame est un ref struct : matérialiser opcode + payload en locaux avant tout await.
                         var opcode = frame.Opcode;
                         var payload = frame.Payload;
 
@@ -230,8 +201,7 @@ internal sealed class CenterServerHost(
         }
     }
 
-    /// <summary>Lit exactement <paramref name="count"/> octets du flux entrant ; <c>null</c> si le pair ferme avant.</summary>
-    private static async Task<byte[]?> ReadExactAsync(PipeReader reader, int count, CancellationToken ct)
+        private static async Task<byte[]?> ReadExactAsync(PipeReader reader, int count, CancellationToken ct)
     {
         while (true)
         {

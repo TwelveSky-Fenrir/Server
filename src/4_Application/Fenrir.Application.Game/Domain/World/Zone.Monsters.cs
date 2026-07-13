@@ -202,11 +202,6 @@ public sealed partial class Zone
         if (outcome.Rejected)
             return;
 
-        // Contract behavior B (holy shield vs monster, ProcessAttack04): on a landed monster hit, a catapult
-        // may first strip the holy shield entirely (step 2), then the shield absorbs the physical portion of
-        // the damage (step 3) — reusing the exact PvP pipeline (RemoveDefenderHolyShields / ApplyHolyShieldAbsorption)
-        // so absorption slots between physical+critical and the element addition, then the result is clamped to
-        // life. A miss carries no damage and touches no shield.
         var viewDamage = outcome.ViewDamage;
         var realDamage = outcome.DamageApplied;
         if (outcome.Hit)

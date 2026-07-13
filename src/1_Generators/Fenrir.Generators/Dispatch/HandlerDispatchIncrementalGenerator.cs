@@ -72,8 +72,6 @@ public sealed class HandlerDispatchIncrementalGenerator : IIncrementalGenerator
 
     private static void Emit(SourceProductionContext context, ImmutableArray<HandlerModel> handlers)
     {
-        // Guard: a compilation with no handlers (e.g. Fenrir.Core, which declares wire-types but no
-        // IInline/IAsyncPacketHandler) must NOT emit an empty MessageDispatcher/PacketHandlerHub into itself.
         if (handlers.IsEmpty)
             return;
 

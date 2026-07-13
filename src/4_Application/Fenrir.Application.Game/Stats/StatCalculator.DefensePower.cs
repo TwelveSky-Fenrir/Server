@@ -19,8 +19,6 @@ public static partial class StatCalculator
                              SetBonusTables.GetCoefficients(setNumber, i, IsLegendary(slot.Item)).DefensePower);
         }
 
-        // Ridden-mount grade multiplier (four-tier, def marker) on the level/attribute/equipment subtotal;
-        // the flat rolled bonus is added at the end (after the multiply).
         def = MountGradeDefense(def, mount);
 
         def += ComputeCapeDefensePowerBonus(bySlot[1]);

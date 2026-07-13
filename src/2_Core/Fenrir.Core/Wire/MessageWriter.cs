@@ -2,10 +2,6 @@ using System.Buffers.Binary;
 
 namespace Fenrir.Core.Wire;
 
-/// <summary>
-/// Écrivain séquentiel zéro-allocation (<c>ref struct</c>). <b>Chaque <c>Write*</c>/<c>Reserve</c> retourne le
-/// <see cref="Span{T}"/> du champ écrit</b> — indispensable au XOR de champ en place (UID/avatar). Little-endian.
-/// </summary>
 public ref struct MessageWriter(Span<byte> destination)
 {
     private readonly Span<byte> _destination = destination;

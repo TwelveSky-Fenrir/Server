@@ -617,11 +617,6 @@ public sealed partial class Zone
         if (command.AttributeDeleteGarageSlot is { } attributeGarageSlot &&
             command.AttributeDeleteStatSlotIndex is { } attributeStatSlotIndex)
         {
-            // Legacy DeleteAnimalStat decrements the targeted attribute slot's packed digit by exactly 1
-            // (floor 0), leaving the other seven digits untouched -- it does NOT zero the slot. Operate on the
-            // shared packed encoding via MountAttributeRoller.Delete (the fidelity-preserving primitive), then
-            // decode back into the flat rolled-attribute mirror and recompute this slot's point total, matching
-            // the ApplyRolledPower shape used by the Convert / Transfer paths.
             var power = MountPowerCodec.EncodeSlot(state.MountRolledAttributes, attributeGarageSlot);
             var newPower = MountAttributeRoller.Delete(power, attributeStatSlotIndex + 1);
             var baseIndex = attributeGarageSlot * MountStateResolver.StatSlotCount;

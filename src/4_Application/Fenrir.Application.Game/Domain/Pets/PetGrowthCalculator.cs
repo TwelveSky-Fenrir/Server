@@ -8,10 +8,6 @@ public static class PetGrowthCalculator
 {
     private static readonly int[] MaxRangeValue = [40_000_000, 80_000_000, 160_000_000, 320_000_000];
 
-    // GIFT_EVENT gift pet ids 8202-8216 are live in the shipped ReleaseEU33 build and are bucketed into the
-    // same family index as their base-pet counterpart in each stat function. The per-function id -> family
-    // mapping differs between Attack / Defense / Life / Mana (matching the legacy ReturnAttackPower /
-    // ReturnDefensePower / ReturnLifeValue / ReturnManaValue switches), so each gift id is placed per function.
     private static readonly FrozenDictionary<int, int> LifeFamily = BuildFamily(
         [1004, 8204],
         [544, 1007, 1009, 1011, 8207, 8209, 8211],

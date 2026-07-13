@@ -6,20 +6,12 @@ using OpenTelemetry.Metrics;
 
 namespace Fenrir.ServiceDefaults;
 
-/// <summary>
-/// Câblage transverse tiré <b>uniquement par les exécutables</b> (Login/Center/Game/Migrator) : OpenTelemetry
-/// (logs + métriques + traces), service discovery, export OTLP conditionnel. Aspire = plan de contrôle ;
-/// l'export OTLP sort <b>hors-bande</b> (jamais sur le port de jeu). Voir <c>Roadmap/FONDATIONS/03</c> et <c>08</c>.
-/// </summary>
 public static class Extensions
 {
     extension<TBuilder>(TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
-        /// <summary>
-        /// Point d'entrée unique des serveurs Fenrir : OpenTelemetry + service discovery.
-        /// (Ex-<c>AddServiceDefaults</c> ; renommé <c>AddFenrirDefaults</c> — décision D-F1.)
-        /// </summary>
-        public TBuilder AddFenrirDefaults()
+
+                public TBuilder AddFenrirDefaults()
         {
             builder.ConfigureOpenTelemetry();
 
@@ -28,8 +20,7 @@ public static class Extensions
             return builder;
         }
 
-        /// <summary>OpenTelemetry : logs formatés + scopes, métriques runtime, trace source = nom d'application.</summary>
-        public TBuilder ConfigureOpenTelemetry()
+                public TBuilder ConfigureOpenTelemetry()
         {
             builder.Logging.AddOpenTelemetry(logging =>
             {

@@ -38,9 +38,6 @@ public sealed class ForcedNeutralTribeResetUseItemHandler(
 
         var oldTribe = state.Tribe;
 
-        // Legacy tribe-reset / faction-transfer scrolls consume via RemoveItem (S04_MyWork03.cpp:2824,4847):
-        // the whole slot is wiped unconditionally, regardless of iSort -- never the iSort-aware unit
-        // decrement of DecreaseQunatity, so this path always consumes the full stack.
         const int remaining = 0;
         await inventoryWriter.ConsumeAndMirrorAsync(context.Zone, state, context.CharacterId, context.Page,
             context.Index, context.Item, remaining, null, cancellationToken);

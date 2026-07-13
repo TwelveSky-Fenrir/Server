@@ -327,13 +327,6 @@ public sealed partial class Zone
         TryPublishPartyResyncRequest(characterId, state.Name);
     }
 
-    // Mount attribute hydration: decode the persisted packed mount block (single-mount schema -> garage slot 0)
-    // into the 10-slot runtime arrays so the flat rolled-attribute bonus (applied at stat recompute via
-    // StatCalculator.DecodeMountPowerDigits) and the Convert/Transfer/Delete preconditions (which read
-    // MountAccumulatedExp/MountRolledAttributeTotal) have live data instead of stale zeros. The rolled digits
-    // are stored unconditionally; the activity>0 gate is re-applied downstream at stat-computation time, so a
-    // later activity gain re-exposes them without needing a reload. AnimalNumber is restored only when the
-    // pointer says the character was mounted (10..19), keeping BuildMountContext self-consistent.
     private static void HydrateMountState(PlayerRuntimeState state, PlayerEnterData data)
     {
         const int slot = MountPersistenceCodec.PersistedGarageSlot;
@@ -360,10 +353,6 @@ public sealed partial class Zone
             (byte)PartyResyncRelaySort.Request, options.ShardId, characterId, avatarName, avatarName));
     }
 
-    // Sortie de zone = TOUJOURS un retrait simple (chemin unifié V2.2). Un changement de zone (intra ou cross)
-    // ne migre plus l'entité en mémoire : le client se déconnecte, la zone source retire le joueur ici, puis il
-    // se reconnecte via ticket+op11+EnterWorld. Si IsMovingZone, on préserve l'état cross-connexion (skip
-    // party-break/cleanup) — la nouvelle connexion réhydrate depuis SQL, la map cible venant du ticket.
     private void HandleLeave(int characterId)
     {
         if (!_players.TryRemove(characterId, out var state))

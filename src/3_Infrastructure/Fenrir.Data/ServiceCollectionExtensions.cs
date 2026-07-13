@@ -100,8 +100,6 @@ public static class FenrirDataServiceCollectionExtensions
         builder.Services.AddSingleton<IFirewallRuleRepository, FirewallRuleRepository>();
         builder.Services.AddSingleton<IGmAllowlistRepository, GmAllowlistRepository>();
         builder.Services.AddSingleton<IMacRestrictionRepository, MacRestrictionRepository>();
-        // ApplicationFirewall migré vers Fenrir.Security (F5) : enregistré par AddFenrirSecurity() (Data isolé
-        // ne peut référencer un type Security). Les 3 repos qu'il compose restent ici, consommés via interfaces.
         builder.Services.AddSingleton<IGuildRepository, GuildRepository>();
         builder.Services.AddSingleton<ITribeRepository, TribeRepository>();
         builder.Services.AddSingleton<ITribeRosterRepository, TribeRosterRepository>();

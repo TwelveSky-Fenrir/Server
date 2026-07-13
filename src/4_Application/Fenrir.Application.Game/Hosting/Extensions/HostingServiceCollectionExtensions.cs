@@ -131,8 +131,6 @@ public static class HostingServiceCollectionExtensions
 
     private static void AddWorldState(IServiceCollection services)
     {
-        // IWorldStateRepository est enregistré de façon canonique par AddFenrirData (Data isolé, source de
-        // vérité des repos) ; ne pas le redéclarer ici (doublon supprimé — validation F6).
         services.AddSingleton<WorldStateService>();
         services.AddSingleton<WorldStateWriteBehindHost>();
         services.AddHostedService(static provider => provider.GetRequiredService<WorldStateWriteBehindHost>());

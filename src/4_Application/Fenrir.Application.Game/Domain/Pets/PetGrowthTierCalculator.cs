@@ -4,9 +4,6 @@ namespace Fenrir.Application.Game.Domain.Pets;
 
 public static class PetGrowthTierCalculator
 {
-    // GIFT_EVENT gift pet ids 8202-8216 (live in ReleaseEU33) bucket into the same growth tier as their
-    // same-tier base pet, matching the ReturnGrowValue switch and PetSteppedAttackPowerCategoryTable:
-    // 8202-8205 -> 0, 8206-8211 -> 1, 8212-8215 -> 2, 8216 -> 3.
     private static readonly FrozenDictionary<int, int> CategoryByItemId = new Dictionary<int, int>
     {
         [541] = 0, [542] = 0, [547] = 0, [560] = 0, [1002] = 0, [1003] = 0, [2140] = 0, [1004] = 0, [1005] = 0,

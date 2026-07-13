@@ -32,7 +32,6 @@ public sealed class MountStateService(
     private const short MountDeleteEventCode = 1;
     private const short MountAttributeDeleteEventCode = 2;
 
-    // Legacy ChangeAnimalStat game-log operation codes: 1 = convert (+1 point), 3 = transfer (1-point move).
     private const short MountAttributeConvertEventCode = 1;
     private const short MountAttributeTransferEventCode = 3;
 
@@ -173,16 +172,8 @@ public sealed class MountStateService(
     {
         var power = MountPowerCodec.EncodeSlot(state.MountRolledAttributes, garageSlot);
 
-        // Deterministic (no RNG): decrement the targeted attribute digit by exactly 1, floored at 0, leaving
-        // the other seven untouched. The roller takes the 1-based client attribute slot, so statSlotIndex + 1
-        // (same convention as Transfer). Unlike Transfer there is deliberately no empty-slot / zero-result
-        // guard: deleting an already-0 digit, or reducing the whole slot to a packed power of 0, is still a
-        // legitimate success -- it stores the (possibly unchanged) power, acks it, and still consumes material.
         var newPower = MountAttributeRoller.Delete(power, statSlotIndex + 1);
 
-        // Apply as one unit: the digit decrement (off-tick mirror, same as Convert/Transfer), the change log,
-        // then the durable material consumption. The tick decrement command is intentionally NOT posted here
-        // any more -- doing so alongside this mirror would decrement twice.
         ApplyRolledPower(state, garageSlot, newPower);
 
         await eventLog.LogAsync(MountAttributeDeleteEventCode, EventLogCategory.MountAttribute, accountId,
@@ -192,10 +183,6 @@ public sealed class MountStateService(
         var projected = ConsumeOne(container, materialSlot);
         await characters.ReplaceContainerAsync(characterId, materialPage, ToTvps(projected), cancellationToken);
 
-        // Client order (matches Convert/Transfer): acknowledge with the freshly stored packed power, recompute
-        // derived stats, then the consumed-material inventory notice. Acking the post-decrement value is the
-        // whole point of this unit -- the previous path posted the decrement to the tick and returned an ack
-        // that echoed the stale (pre-decrement) power.
         state.Session.Send(new MountStateResponse { Sort = sort, Value = newPower });
         await RecomputeAndPostVitalsAsync(zone, state, characterId, cancellationToken);
 
@@ -220,14 +207,12 @@ public sealed class MountStateService(
         if (!roll.Applied)
             return new MountStateResult(MountStateOutcome.Disconnect);
 
-        // Apply as one unit: grant the rolled point, spend the maxed experience (activity preserved), log.
         ApplyRolledPower(state, garageSlot, roll.NewPower);
         state.MountAccumulatedExp = state.MountAccumulatedExp.SetItem(garageSlot, 0);
 
         await eventLog.LogAsync(MountAttributeConvertEventCode, EventLogCategory.MountAttribute, accountId, characterId,
             null, null, null, null, null, null, null, 1, null, cancellationToken);
 
-        // Acknowledge with the new rolled power, then recompute so the freshly-gained point takes effect.
         state.Session.Send(new MountStateResponse { Sort = sort, Value = roll.NewPower });
         await RecomputeAndPostVitalsAsync(zone, state, characterId, cancellationToken);
 
@@ -243,13 +228,10 @@ public sealed class MountStateService(
     {
         var power = MountPowerCodec.EncodeSlot(state.MountRolledAttributes, garageSlot);
 
-        // Roller attribute index is the 1..8 client slot number (source digit); a zero source digit or an
-        // unchanged roll leaves the pre-operation power intact and disconnects (nothing has been mutated yet).
         var roll = MountAttributeRoller.Transfer(power, statSlotIndex + 1, SystemRandomSource.Instance);
         if (!roll.Applied)
             return new MountStateResult(MountStateOutcome.Disconnect);
 
-        // Apply as one unit: the 1-point move, log, material consumption (durable).
         ApplyRolledPower(state, garageSlot, roll.NewPower);
 
         await eventLog.LogAsync(MountAttributeTransferEventCode, EventLogCategory.MountAttribute, accountId,
@@ -259,7 +241,6 @@ public sealed class MountStateService(
         var projected = ConsumeOne(container, materialSlot);
         await characters.ReplaceContainerAsync(characterId, materialPage, ToTvps(projected), cancellationToken);
 
-        // Client order: acknowledge with the new power, recompute, then the consumed-material inventory notice.
         state.Session.Send(new MountStateResponse { Sort = sort, Value = roll.NewPower });
         await RecomputeAndPostVitalsAsync(zone, state, characterId, cancellationToken);
 
@@ -276,11 +257,6 @@ public sealed class MountStateService(
         return new MountStateResult(MountStateOutcome.NoReply);
     }
 
-    // Writes one garage slot's rolled-attribute digits (decoded from the new raw power) plus its point total.
-    // NOTE: PlayerRuntimeState is tick-owned; this write happens off-tick under the caller's EconomyActionLock.
-    // It is memory-safe (each ImmutableArray field is swapped atomically) but not single-writer-pure -- the
-    // clean fix is a dedicated MountZoneCommand carrying the new power, drained on the zone tick (out of scope
-    // here; see report).
     private static void ApplyRolledPower(PlayerRuntimeState state, int garageSlot, int newPower)
     {
         var baseIndex = garageSlot * MountStateResolver.StatSlotCount;

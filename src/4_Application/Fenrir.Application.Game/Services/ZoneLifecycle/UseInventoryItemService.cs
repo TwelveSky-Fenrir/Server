@@ -901,10 +901,6 @@ public sealed class UseInventoryItemService(
         int characterId, int accountId, byte page, byte index, ItemStack item, int requestedValue,
         CancellationToken cancellationToken)
     {
-        // Precondition: a pet must be equipped AND active (activity flag >= 1). The legacy pet-food case
-        // rejects before any growth when the equipped-pet slot's activity sub-field is below 1, and the
-        // internal "reactivate an inactive pet" branch is unreachable from the pet-food path -- so an already
-        // active pet is required here, never activated as a side effect of feeding.
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
         var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
             ? petStack.ItemId
@@ -918,15 +914,9 @@ public sealed class UseInventoryItemService(
         var feed = PetFoodFeedResolver.Resolve(petItemId, state.PetGrowth, state.PetActivity, item.ItemId,
             bulkCount, worldData.ItemsById);
 
-        // Zero units credited (pet already at its growth ceiling, uncategorised pet id, or the pet slot is not
-        // a pet-sort item): nothing consumed, generic use-failure indicator -- the client cannot distinguish
-        // these reasons from each other or from the inactive-pet / rate-limited rejections.
         if (feed.UnitsCredited < 1)
             return Fail(characterId, item, page, index);
 
-        // A growth-step tier crossing changes the pet's derived abilities: recompute stats against the new
-        // grow value and full-action-rebroadcast so the caster and AOI neighbours see the change. When no tier
-        // was crossed only the accumulated grow value moved, so no stat recompute / rebroadcast is needed.
         EffectiveStats? updatedStats = null;
         if (feed.TierIncreased)
             updatedStats = RecomputePetStats(state, petItemId, feed.NewGrowth, state.PetActivity);
@@ -938,15 +928,12 @@ public sealed class UseInventoryItemService(
                 "Zone {MapId} tribe-progress inbox full: dropped pet-food growth mirror for character {CharacterId}",
                 zone.MapId, characterId);
 
-        // GL_605_USE_CASH_ITEM: one cash-item-use log per successful feed, sized to the units actually credited.
         var remaining = item.Quantity - feed.UnitsCredited;
         var packedValue = ItemValueCodec.Encode(item.Enchant, item.Combine, item.Refine, item.Socket);
         await eventLog.LogAsync(PetFoodUsedEventCode, EventLogCategory.CashItemUse, accountId, characterId,
             null, null, null, null, null, item.ItemId, feed.UnitsCredited, 0,
             $"Value={packedValue};Serial={item.Serial};NewGrowth={feed.NewGrowth}", cancellationToken);
 
-        // Consume exactly the number of units that produced a positive credit -- units credited == units
-        // consumed, never more, never fewer.
         var container = state.Inventory.GetContainer(page);
         var projected = remaining > 0
             ? container.SetItem(index, item with { Quantity = remaining })
@@ -999,11 +986,6 @@ public sealed class UseInventoryItemService(
         var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
             petContribution, state);
 
-        // Legacy MyWork::MaxRebirth runs against the counter AFTER the increment: it drops a milestone
-        // reward item on the ground at generations 6 and 12, and broadcasts a cluster notice at 12. The
-        // drop is folded into the same awaited progress command below so it materialises on the tick
-        // thread (single-writer) at the character's position before the notice fires -- preserving the
-        // legacy drop-first/notice-after order.
         var milestone = RebirthMilestoneRewards.Resolve(newRebirthCount, state.PreviousTribe);
 
         var response = await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);

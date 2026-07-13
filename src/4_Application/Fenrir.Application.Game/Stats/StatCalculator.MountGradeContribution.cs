@@ -257,11 +257,6 @@ public static partial class StatCalculator
     }
 
 
-    // Per-stat mount contributions folded into the stat pipeline: (1) the grade multiplier -- a per-stat vector
-    // read from the ridden mount's base row (never a scalar), four-tier (5/10/15/20) for Life/Mana/Attack/Defense
-    // and three-tier (5/10/15) for Hit/Dodge/Critical/Element-Attack/Element-Defense -- and (2) the flat
-    // rolled-point bonus decoded from the ridden slot's rolled-attribute power (activity-gated). Every wrapper
-    // no-ops when no mount is ridden (AnimalNumber == 0). Critical has a grade multiplier but no rolled bonus.
 
     private static bool TryGetRiddenMountRow(in MountContext mount, out MountBaseRow row)
     {

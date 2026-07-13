@@ -2,10 +2,6 @@ using System.Buffers.Binary;
 
 namespace Fenrir.Core.Wire;
 
-/// <summary>
-/// Lecteur séquentiel zéro-allocation (<c>ref struct</c>) d'un payload déjà déchiffré/décompressé. Little-endian.
-/// Consommé par le <c>TryRead</c> généré des paquets.
-/// </summary>
 public ref struct MessageReader(ReadOnlySpan<byte> source)
 {
     private readonly ReadOnlySpan<byte> _source = source;

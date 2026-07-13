@@ -244,10 +244,6 @@ public sealed record PlayerEnterData(
     ImmutableArray<(int ItemId, int Count)>? BottleSlots = null,
     int? DrunkBottleIndex = null,
     int? DrunkBottleTicksRemaining = null,
-    // Persisted mount block (single-mount Fenrir schema, garage slot 0): raw packed values straight from the
-    // character row -- decoded into the 10-slot runtime mount arrays in Zone.HandleEnter. MountExpActivity packs
-    // activity*1e6 + accumulated exp; MountPower packs the 8 rolled-attribute digits; MountSlotIndex is the
-    // aAnimalIndex pointer (-1/below-10 = not mounted, 10..19 = mounted on slot value-10).
     int MountItemId = 0,
     int MountExpActivity = 0,
     int MountPower = 0,

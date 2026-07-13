@@ -70,11 +70,6 @@ public static class MonsterCombatResolver
                     return AttackOutcome.Reject(AttackRejectReason.AntiCheatEchoMismatch, chargeConsumed);
                 break;
             default:
-                // Contract behavior C: attack-mode selector 3 (and any value != {1,2}) is NOT a divergence
-                // to "fix". Legacy ProcessAttack03 rejects it via an early `default: return`
-                // (S07_MyGame02.cpp:2171-2189); its later `case 3:` elemental block (:2293-2303) is logically
-                // unreachable. So rejecting here is legacy-faithful — the reachable elemental path does not
-                // exist. The rejection must remain a silent no-op at the consumer (no response, no disconnect).
                 return AttackOutcome.Reject(AttackRejectReason.InvalidAttackModeSelector, chargeConsumed);
         }
 
@@ -133,13 +128,6 @@ public static class MonsterCombatResolver
 
         damage += attackerNokSanStoneDamageBonus;
 
-        // Contract behavior A: the legacy per-tribe PvM damage multiplier (`mServerPVM[tribe] > 1.0f`,
-        // S07_MyGame02.cpp:2332-2334) is intentionally NOT applied. Its whole feed — the 20-tick setter that
-        // would raise the smallest tribe's factor to 1.1 (S07_MyGame01.cpp:1915-1923) — is gated by
-        // `#ifdef USE_PVM`, and USE_PVM lives only in the non-M33 (dead) branch of DEFINE.h:49 that never
-        // compiles in the ReleaseEU33 production build. In production the factor stays at its 1.0 init, so the
-        // `> 1.0f` guard is always false and the multiply never runs. Absence here is legacy parity, not a gap;
-        // only revisit if a product decision activates USE_PVM (then: 1.1x on the single smallest tribe).
 
         var viewDamage = damage;
         if (damage > monster.Life)
@@ -222,16 +210,7 @@ public static class MonsterCombatResolver
             false);
     }
 
-    /// <summary>
-    ///     Contract behavior B (holy shield vs monster, ProcessAttack04): rolls whether a catapult monster
-    ///     forcibly strips the target's holy shield before absorption. Keyed on the monster's raw
-    ///     <c>mSpecialType</c> (not the coarser derived <see cref="MonsterSpecialSort" />, which collapses
-    ///     types 35-38 and does not cover 40-44) and on the incoming attack sub-mode
-    ///     (<c>mAttackActionValue4</c>). A uniform 0-99 roll strictly below the per-type threshold triggers the
-    ///     removal. Non-catapult types and any sub-mode other than 0/1 yield a zero threshold ⇒ never remove.
-    ///     Refs C++: S07_MyGame02.cpp:3323-3368 (sub-mode 0) / :3369-3413 (sub-mode 1).
-    /// </summary>
-    public static bool RollHolyShieldRemoval(int monsterSpecialType, int attackSubMode, IRandomSource rng)
+        public static bool RollHolyShieldRemoval(int monsterSpecialType, int attackSubMode, IRandomSource rng)
     {
         var threshold = HolyShieldRemovalThreshold(monsterSpecialType, attackSubMode);
         return threshold > 0 && rng.NextInt32(100) < threshold;

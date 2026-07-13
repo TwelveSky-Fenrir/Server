@@ -22,8 +22,6 @@ public static class PetExperienceCreditResolver
         var reactivationApplied = currentActivity < 1;
         var newActivity = reactivationApplied ? 1 : currentActivity;
 
-        // growUpValue defaults to 0 (kill / experience-distribution path: seed credited directly). A pet-food
-        // or GM-fill caller passes the item's positive grow-up step (1 / 3 / 40 / 200) to scale by category.
         var creditedAmount =
             PetExperienceCreditCalculator.ComputeCreditedAmount(petItemId, currentGrowth, requestedPetExperience,
                 growUpValue);

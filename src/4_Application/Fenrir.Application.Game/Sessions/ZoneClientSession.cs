@@ -32,18 +32,13 @@ public sealed class ZoneClientSession(
 
     public short AccountGrade { get; private set; }
 
-    /// <summary>Map de zone cible portée par le ticket de handover consommé à l'op11 ; <c>null</c> hors transfert.
-    /// Prime sur le <c>MapId</c> relu de SQL à l'entrée-monde (le ticket est l'autorité de la map cible).</summary>
-    public short? TargetMapId { get; private set; }
+        public short? TargetMapId { get; private set; }
 
     public bool IsGm => MeetsGmTier(GmCommandTier.Basic);
 
     public IZoneActor? CurrentZone { get; set; }
 
-    /// <summary>Vrai entre l'émission d'un <c>ZoneMoveResponse</c> (le client va fermer/rouvrir son socket) et la
-    /// reconnexion : signale au teardown de connexion de <b>sauter</b> le self-kick de session de compte. S'applique
-    /// aux transferts intra ET cross-zone (chemin unifié V2.2), d'où le nom neutre.</summary>
-    public bool IsZoneTransferPending { get; private set; }
+        public bool IsZoneTransferPending { get; private set; }
 
     public bool MeetsGmTier(GmCommandTier tier)
     {

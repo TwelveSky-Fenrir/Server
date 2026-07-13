@@ -12,16 +12,9 @@ public static class LevelProgressionCalculator
 {
     public const short MaxLevel = 145;
 
-    // Flat one-shot skill-point milestone bonuses — LNW33 / production ReleaseEU33 branch.
-    // Ref. C++: Server/ts25zone/S07_MyGame03.cpp:266-276. Each is granted once per level-up
-    // event, tested against the PRE-GAIN level (never per level crossed, never the destination
-    // level), the two are mutually exclusive, and both add to the same skill-point accumulator
-    // that receives the per-level ReturnLevelFactor3 gains — with no cap applied here. The
-    // #ifndef LNW33 variant (S07_MyGame03.cpp:256-262: +1000 at the max-level milestone and no
-    // level-32 bonus) is dead code in ReleaseEU33 and is deliberately NOT reproduced.
-    private const int MaxLevelMilestoneSkillBonus = 2000; // pre-gain level 144 (present + 1 == MaxLevel)
-    private const int IntermediateMilestoneSkillBonus = 1000; // pre-gain level 32 (present + LvM1 == MaxLevel)
-    private const short LvM1 = 113; // LV_M1 (DEFINE.h:451); MaxLevel - LvM1 == 32
+    private const int MaxLevelMilestoneSkillBonus = 2000;
+    private const int IntermediateMilestoneSkillBonus = 1000;
+    private const short LvM1 = 113;
 
     public static LevelUpResult ResolveLevelUp(long currentExperience, long experienceGain,
         FrozenDictionary<short, LevelRowDto> levels)
@@ -48,9 +41,6 @@ public static class LevelProgressionCalculator
             skillPoints += levels.TryGetValue((short)level, out var row) ? row.RangeInfo3 : 0;
         }
 
-        // Flat one-shot skill-point milestones: evaluated once against the pre-gain level and
-        // mutually exclusive. The milestone levels (144 and 32) are derived from the cited
-        // legacy relationships present+1==MaxLevel and present+LvM1==MaxLevel.
         skillPoints += presentLevel switch
         {
             MaxLevel - 1 => MaxLevelMilestoneSkillBonus,

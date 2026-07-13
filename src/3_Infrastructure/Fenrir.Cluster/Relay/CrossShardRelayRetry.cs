@@ -1,4 +1,4 @@
-namespace Fenrir.Application.Game.Hosting;
+namespace Fenrir.Cluster.Relay;
 
 internal static class CrossShardRelayRetry
 {

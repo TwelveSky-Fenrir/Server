@@ -10,13 +10,6 @@ public static class ZoneTransferBuffRules
 {
     public const short BuffClearDestinationZoneId = 124;
 
-    public static BuffInfo Resolve(BuffInfo liveBuffs, short targetMapId)
-    {
-        return targetMapId == BuffClearDestinationZoneId
-            ? new BuffInfo { Buff = new int[70] }
-            : new BuffInfo { Buff = (int[])liveBuffs.Buff.Clone() };
-    }
-
     public static void ClearIfDestinationRequiresIt(BuffInfo liveBuffs, short targetMapId)
     {
         if (targetMapId == BuffClearDestinationZoneId)

@@ -123,9 +123,6 @@ public interface ICharacterRepository
 
     public ValueTask SetPetGrowthAsync(int characterId, int petGrowth, byte petActivity, CancellationToken ct);
 
-    public ValueTask SetMountProgressionAsync(int characterId, int mountItemId, int mountExpActivity,
-        int mountPower, int mountSlotIndex, int mountTime, CancellationToken ct);
-
     public ValueTask<int?> GetIdByNameAsync(string name, CancellationToken ct);
 
     public ValueTask<int?> GetItemIdAtSlotAsync(int characterId, byte container, byte slot, CancellationToken ct);

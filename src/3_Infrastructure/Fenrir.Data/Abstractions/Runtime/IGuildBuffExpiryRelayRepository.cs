@@ -1,11 +1,11 @@
-using System.Collections.Immutable;
-
 namespace Fenrir.Data.Abstractions.Runtime;
 
+/// <summary>
+/// Dépôt de relais des expirations de buff de guilde cross-shard. Publish/Poll sont hérités tels quels de
+/// <see cref="IClusterRelayBackend{TEntry,TDto}"/> (consolidation des 7 relais outbox, WS-C) ; le corps du dépôt
+/// et ses procédures <c>runtime.usp_GuildBuffExpiryRelay_Publish/_Poll</c> restent inchangés.
+/// </summary>
 public interface IGuildBuffExpiryRelayRepository
+    : IClusterRelayBackend<GuildBuffExpiryRelayEntry, GuildBuffExpiryRelayDto>
 {
-    public ValueTask PublishAsync(GuildBuffExpiryRelayEntry entry, CancellationToken ct);
-
-    public ValueTask<ImmutableArray<GuildBuffExpiryRelayDto>> PollAsync(byte shardId, int retentionSeconds,
-        CancellationToken ct);
 }

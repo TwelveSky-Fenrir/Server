@@ -15,7 +15,7 @@ public static class ClusterServiceCollectionExtensions
     public static IServiceCollection AddFenrirCluster(this IServiceCollection services)
     {
         services.AddSingleton<IZoneDirectory, ZoneDirectory>();
-        // TODO(F4) : <IHandoverTicketService, ...>, relais consolidés (Publish/Poll + push TCP), coordination
+        // TODO(F4) : sessions/tickets de handover, relais consolidés (Publish/Poll + push TCP), coordination
         //            du world-state (hero-rank/tribu/tour/party).
         return services;
     }

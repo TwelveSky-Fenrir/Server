@@ -1,6 +1,5 @@
-using System.Threading.Channels;
 using Fenrir.Application.Game.Domain;
-using Microsoft.Extensions.Hosting;
+using Fenrir.Cluster.Relay;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -10,125 +9,20 @@ public sealed class PartyResyncRelayHost(
     IEnumerable<IPartyResyncRelayHandler> handlers,
     IPartyResyncRelayRepository relay,
     IOptions<GameServerOptions> options,
-    ILogger<PartyResyncRelayHost> logger) : BackgroundService, IPartyResyncRelayQueue
+    ILogger<PartyResyncRelayHost> logger)
+    : ClusterRelayPumpBase<PartyResyncRelayEntry, PartyResyncRelayDto>(
+            relay,
+            options.Value.ShardId,
+            QueueCapacity,
+            TimeSpan.FromSeconds(options.Value.PartyResyncRelayPollIntervalSeconds),
+            options.Value.PartyResyncRelayRetentionSeconds),
+        IPartyResyncRelayQueue
 {
     private const int QueueCapacity = 1024;
 
     private readonly IReadOnlyList<IPartyResyncRelayHandler> _handlers = handlers.ToArray();
 
-    private readonly Channel<PartyResyncRelayEntry> _outbox =
-        Channel.CreateBounded<PartyResyncRelayEntry>(
-            new BoundedChannelOptions(QueueCapacity)
-            {
-                SingleReader = true,
-                SingleWriter = false,
-                AllowSynchronousContinuations = false,
-                FullMode = BoundedChannelFullMode.Wait
-            });
-
-    public bool Enqueue(PartyResyncRelayEntry entry)
-    {
-        if (_outbox.Writer.TryWrite(entry))
-            return true;
-
-        logger.LogWarning(
-            "Cross-shard party-resync relay outbox full on shard {ShardId}; dropping one sort-{Sort} row for " +
-            "party {PartyName} (character {SourceCharacterId}) -- a missed resync only leaves the reconnecting " +
-            "client's party UI unchanged, no durable state is lost",
-            options.Value.ShardId, entry.Sort, entry.PartyName, entry.SourceCharacterId);
-        return false;
-    }
-
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        var outboundLoop = RunOutboundFlushLoopAsync(stoppingToken);
-        var inboundLoop = RunInboundDeliveryLoopAsync(stoppingToken);
-        await Task.WhenAll(outboundLoop, inboundLoop).ConfigureAwait(false);
-    }
-
-    private async Task RunOutboundFlushLoopAsync(CancellationToken stoppingToken)
-    {
-        var reader = _outbox.Reader;
-
-        while (await reader.WaitToReadAsync(stoppingToken).ConfigureAwait(false))
-            try
-            {
-                await FlushOutboundAsync(stoppingToken).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                logger.LogError(ex, "Party-resync relay outbound flush failed for shard {ShardId}",
-                    options.Value.ShardId);
-            }
-    }
-
-    private async Task RunInboundDeliveryLoopAsync(CancellationToken stoppingToken)
-    {
-        using var timer =
-            new PeriodicTimer(TimeSpan.FromSeconds(options.Value.PartyResyncRelayPollIntervalSeconds));
-
-        do
-        {
-            try
-            {
-                await DeliverInboundAsync(stoppingToken).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                logger.LogError(ex, "Party-resync relay inbound delivery failed for shard {ShardId}",
-                    options.Value.ShardId);
-            }
-        } while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false));
-    }
-
-    public async ValueTask PollOnceAsync(CancellationToken ct)
-    {
-        await FlushOutboundAsync(ct).ConfigureAwait(false);
-        await DeliverInboundAsync(ct).ConfigureAwait(false);
-    }
-
-    private async ValueTask FlushOutboundAsync(CancellationToken ct)
-    {
-        var reader = _outbox.Reader;
-
-        while (reader.TryRead(out var entry))
-            try
-            {
-                await CrossShardRelayRetry.RunAsync(() => relay.PublishAsync(entry, ct), ct).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                logger.LogError(ex,
-                    "Failed to publish a sort-{Sort} party-resync row for party {PartyName} (character " +
-                    "{SourceCharacterId}) from shard {ShardId}; this one resync is lost",
-                    entry.Sort, entry.PartyName, entry.SourceCharacterId, options.Value.ShardId);
-            }
-    }
-
-    private async ValueTask DeliverInboundAsync(CancellationToken ct)
-    {
-        var shardId = options.Value.ShardId;
-        var retentionSeconds = options.Value.PartyResyncRelayRetentionSeconds;
-
-        var incoming = await relay.PollAsync(shardId, retentionSeconds, ct).ConfigureAwait(false);
-        if (incoming.IsEmpty)
-            return;
-
-        foreach (var dto in incoming)
-            try
-            {
-                await CrossShardRelayRetry.RunAsync(() => DeliverLocallyAsync(dto, ct), ct).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                logger.LogError(ex,
-                    "Failed to reconcile relayed party-resync row {RelayId} (sort {Sort}, party {PartyName}) on " +
-                    "shard {ShardId}",
-                    dto.RelayId, dto.Sort, dto.PartyName, shardId);
-            }
-    }
-
-    private async ValueTask DeliverLocallyAsync(PartyResyncRelayDto dto, CancellationToken ct)
+    protected override async ValueTask DeliverAsync(PartyResyncRelayDto dto, CancellationToken ct)
     {
         if (_handlers.Count == 0)
         {
@@ -142,4 +36,29 @@ public sealed class PartyResyncRelayHost(
         foreach (var handler in _handlers)
             await handler.HandleAsync(dto, ct).ConfigureAwait(false);
     }
+
+    protected override void OnOutboxFull(PartyResyncRelayEntry entry) =>
+        logger.LogWarning(
+            "Cross-shard party-resync relay outbox full on shard {ShardId}; dropping one sort-{Sort} row for " +
+            "party {PartyName} (character {SourceCharacterId}) -- a missed resync only leaves the reconnecting " +
+            "client's party UI unchanged, no durable state is lost",
+            options.Value.ShardId, entry.Sort, entry.PartyName, entry.SourceCharacterId);
+
+    protected override void OnOutboundFlushFailed(Exception ex) =>
+        logger.LogError(ex, "Party-resync relay outbound flush failed for shard {ShardId}", options.Value.ShardId);
+
+    protected override void OnInboundDeliveryFailed(Exception ex) =>
+        logger.LogError(ex, "Party-resync relay inbound delivery failed for shard {ShardId}", options.Value.ShardId);
+
+    protected override void OnPublishFailed(PartyResyncRelayEntry entry, Exception ex) =>
+        logger.LogError(ex,
+            "Failed to publish a sort-{Sort} party-resync row for party {PartyName} (character " +
+            "{SourceCharacterId}) from shard {ShardId}; this one resync is lost",
+            entry.Sort, entry.PartyName, entry.SourceCharacterId, options.Value.ShardId);
+
+    protected override void OnDeliveryFailed(PartyResyncRelayDto dto, Exception ex) =>
+        logger.LogError(ex,
+            "Failed to reconcile relayed party-resync row {RelayId} (sort {Sort}, party {PartyName}) on " +
+            "shard {ShardId}",
+            dto.RelayId, dto.Sort, dto.PartyName, options.Value.ShardId);
 }

@@ -1,9 +1,8 @@
-using System.Threading.Channels;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Cluster.Relay;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Application.Game.Packets.Zone;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -13,118 +12,21 @@ public sealed class GuildTribeBroadcastRelayHost(
     ZoneRegistry zones,
     IGuildTribeBroadcastRelayRepository relay,
     IOptions<GameServerOptions> options,
-    ILogger<GuildTribeBroadcastRelayHost> logger) : BackgroundService, IGuildTribeBroadcastRelayQueue
+    ILogger<GuildTribeBroadcastRelayHost> logger)
+    : ClusterRelayPumpBase<GuildTribeBroadcastRelayEntry, GuildTribeBroadcastRelayDto>(
+            relay,
+            options.Value.ShardId,
+            QueueCapacity,
+            TimeSpan.FromSeconds(options.Value.GuildTribeBroadcastPollIntervalSeconds),
+            options.Value.GuildTribeBroadcastRetentionSeconds),
+        IGuildTribeBroadcastRelayQueue
 {
     private const int QueueCapacity = 1024;
 
-    private readonly Channel<GuildTribeBroadcastRelayEntry> _outbox =
-        Channel.CreateBounded<GuildTribeBroadcastRelayEntry>(
-            new BoundedChannelOptions(QueueCapacity)
-            {
-                SingleReader = true,
-                SingleWriter = false,
-                AllowSynchronousContinuations = false,
-                FullMode = BoundedChannelFullMode.Wait
-            });
-
-    public bool Enqueue(GuildTribeBroadcastRelayEntry entry)
+    protected override ValueTask DeliverAsync(GuildTribeBroadcastRelayDto dto, CancellationToken ct)
     {
-        if (_outbox.Writer.TryWrite(entry))
-            return true;
-
-        logger.LogWarning(
-            "Cross-shard guild/tribe broadcast relay outbox full on shard {ShardId}; dropping one {Kind} " +
-            "broadcast (same-shard delivery already happened, only the cross-shard fan-out is lost)",
-            options.Value.ShardId, entry.Kind);
-        return false;
-    }
-
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        var outboundLoop = RunOutboundFlushLoopAsync(stoppingToken);
-        var inboundLoop = RunInboundDeliveryLoopAsync(stoppingToken);
-        await Task.WhenAll(outboundLoop, inboundLoop).ConfigureAwait(false);
-    }
-
-    private async Task RunOutboundFlushLoopAsync(CancellationToken stoppingToken)
-    {
-        var reader = _outbox.Reader;
-
-        while (await reader.WaitToReadAsync(stoppingToken).ConfigureAwait(false))
-            try
-            {
-                await FlushOutboundAsync(stoppingToken).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                logger.LogError(ex, "Guild/tribe broadcast outbound flush failed for shard {ShardId}",
-                    options.Value.ShardId);
-            }
-    }
-
-    private async Task RunInboundDeliveryLoopAsync(CancellationToken stoppingToken)
-    {
-        using var timer =
-            new PeriodicTimer(TimeSpan.FromSeconds(options.Value.GuildTribeBroadcastPollIntervalSeconds));
-
-        do
-        {
-            try
-            {
-                await DeliverInboundAsync(stoppingToken).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                logger.LogError(ex, "Guild/tribe broadcast inbound delivery failed for shard {ShardId}",
-                    options.Value.ShardId);
-            }
-        } while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false));
-    }
-
-    public async ValueTask PollOnceAsync(CancellationToken ct)
-    {
-        await FlushOutboundAsync(ct).ConfigureAwait(false);
-        await DeliverInboundAsync(ct).ConfigureAwait(false);
-    }
-
-    private async ValueTask FlushOutboundAsync(CancellationToken ct)
-    {
-        var reader = _outbox.Reader;
-
-        while (reader.TryRead(out var entry))
-            try
-            {
-                await CrossShardRelayRetry.RunAsync(() => relay.PublishAsync(entry, ct), ct).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                logger.LogError(ex,
-                    "Failed to publish a {Kind} broadcast to the cross-shard relay from shard {ShardId}; " +
-                    "cross-shard fan-out for this one message is lost (same-shard delivery already happened)",
-                    entry.Kind, options.Value.ShardId);
-            }
-    }
-
-    private async ValueTask DeliverInboundAsync(CancellationToken ct)
-    {
-        var shardId = options.Value.ShardId;
-        var retentionSeconds = options.Value.GuildTribeBroadcastRetentionSeconds;
-
-        var incoming = await relay.PollAsync(shardId, retentionSeconds, ct).ConfigureAwait(false);
-        if (incoming.IsEmpty)
-            return;
-
-        foreach (var dto in incoming)
-            try
-            {
-                await CrossShardRelayRetry.RunSync(() => DeliverLocally(dto), ct).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex,
-                    "Failed to locally deliver relayed broadcast {RelayId} (kind {Kind}) on shard {ShardId}",
-                    dto.RelayId, dto.Kind, shardId);
-            }
+        DeliverLocally(dto);
+        return ValueTask.CompletedTask;
     }
 
     private void DeliverLocally(GuildTribeBroadcastRelayDto dto)
@@ -208,4 +110,29 @@ public sealed class GuildTribeBroadcastRelayHost(
             if (recipient.Tribe == t)
                 recipient.Session.Send(response);
     }
+
+    protected override void OnOutboxFull(GuildTribeBroadcastRelayEntry entry) =>
+        logger.LogWarning(
+            "Cross-shard guild/tribe broadcast relay outbox full on shard {ShardId}; dropping one {Kind} " +
+            "broadcast (same-shard delivery already happened, only the cross-shard fan-out is lost)",
+            options.Value.ShardId, entry.Kind);
+
+    protected override void OnOutboundFlushFailed(Exception ex) =>
+        logger.LogError(ex, "Guild/tribe broadcast outbound flush failed for shard {ShardId}",
+            options.Value.ShardId);
+
+    protected override void OnInboundDeliveryFailed(Exception ex) =>
+        logger.LogError(ex, "Guild/tribe broadcast inbound delivery failed for shard {ShardId}",
+            options.Value.ShardId);
+
+    protected override void OnPublishFailed(GuildTribeBroadcastRelayEntry entry, Exception ex) =>
+        logger.LogError(ex,
+            "Failed to publish a {Kind} broadcast to the cross-shard relay from shard {ShardId}; " +
+            "cross-shard fan-out for this one message is lost (same-shard delivery already happened)",
+            entry.Kind, options.Value.ShardId);
+
+    protected override void OnDeliveryFailed(GuildTribeBroadcastRelayDto dto, Exception ex) =>
+        logger.LogError(ex,
+            "Failed to locally deliver relayed broadcast {RelayId} (kind {Kind}) on shard {ShardId}",
+            dto.RelayId, dto.Kind, options.Value.ShardId);
 }

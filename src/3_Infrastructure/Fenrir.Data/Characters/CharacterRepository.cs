@@ -469,21 +469,6 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-    public async ValueTask SetMountProgressionAsync(int characterId, int mountItemId, int mountExpActivity,
-        int mountPower, int mountSlotIndex, int mountTime, CancellationToken ct)
-    {
-        var sp = new StoredProcedureParametersBuilder("game", "usp_Character_SetMountProgression", 0)
-            .AddParameter("CharacterId", characterId, SqlDbType.Int)
-            .AddParameter("MountItemId", mountItemId, SqlDbType.Int)
-            .AddParameter("MountExpActivity", mountExpActivity, SqlDbType.Int)
-            .AddParameter("MountPower", mountPower, SqlDbType.Int)
-            .AddParameter("MountSlotIndex", mountSlotIndex, SqlDbType.Int)
-            .AddParameter("MountTime", mountTime, SqlDbType.Int)
-            .Build();
-
-        await Db.ExecuteAsync(sp, ct);
-    }
-
     public async ValueTask<int?> GetIdByNameAsync(string name, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetIdByName", 1)

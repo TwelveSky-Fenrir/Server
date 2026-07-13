@@ -1,5 +1,6 @@
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Domain.World.WorldState;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -15,6 +16,15 @@ public sealed class HeroRankingRolloverHost(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var opts = options.Value;
+
+        if (opts.WorldStateAuthority == WorldStateAuthorityMode.Center)
+        {
+            // Le CenterServer possède le rollover hero-rank (write) ; la notification client du reset devra
+            // arriver par fan-out Center (dépendance §4c du Lot 5). Host inerte côté shard.
+            logger.LogInformation("HeroRankingRolloverHost inert: WorldStateAuthority=Center");
+            return;
+        }
+
         using var timer = new PeriodicTimer(TimeSpan.FromMinutes(opts.HeroRankingRolloverCheckIntervalMinutes));
 
         do

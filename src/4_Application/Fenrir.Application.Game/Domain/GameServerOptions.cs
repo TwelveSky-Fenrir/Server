@@ -1,5 +1,6 @@
 using Fenrir.Application.Game.Domain.Mounts;
 using Fenrir.Application.Game.Domain.World.Configuration;
+using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 
 namespace Fenrir.Application.Game.Domain;
@@ -138,4 +139,10 @@ public sealed class GameServerOptions
     public int CrossTribeCpAddValue { get; set; } = 3;
 
     public int CrossTribeXpRatio { get; set; } = 2;
+
+    /// <summary>Écrivain autoritaire de l'état monde cross-zone (World/Tribe + HeroRank). Défaut
+    /// <see cref="WorldStateAuthorityMode.Shard"/> = comportement historique (shard-autoritaire, DB-outbox). En
+    /// <see cref="WorldStateAuthorityMode.Center"/>, la bascule est atomique : push op33 au Center + réception du
+    /// fan-out + arrêt des écritures DB shard de ces agrégats (Tower exclu). Voir Lot 5 / ADR-0005.</summary>
+    public WorldStateAuthorityMode WorldStateAuthority { get; set; } = WorldStateAuthorityMode.Shard;
 }

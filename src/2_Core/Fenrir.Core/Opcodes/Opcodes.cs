@@ -325,11 +325,13 @@ public static class Opcodes
         public static class Incoming
         {
             public const byte WorldEvent = 33;
+            public const byte Party = 57;
         }
 
         public static class Outgoing
         {
             public const byte WorldEvent = 33;
+            public const byte Party = 57;
         }
     }
 }

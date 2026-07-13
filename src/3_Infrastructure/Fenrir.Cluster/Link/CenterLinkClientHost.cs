@@ -28,7 +28,7 @@ internal sealed class CenterLinkClientHost(
     ILogger<CenterLinkClientHost> logger,
     IOptions<CenterLinkClientOptions> options,
     ICenterLinkAuthenticator authenticator,
-    IFrameDispatcher? inboundDispatcher)
+    ICenterFanOutSink? inboundSink)
     : BackgroundService, ICenterLink
 {
     private volatile CenterUplinkSession? _session;
@@ -241,17 +241,22 @@ internal sealed class CenterLinkClientHost(
                 while (S2SFrameReader.TryReadFrame(ref buffer, CenterOpcodeRegistry.Provider, FenrirServer.Center,
                            out var frame))
                 {
-                    // Pull the ref-struct Frame's fields into ordinary locals before any await.
                     var opcode = frame.Opcode;
-                    var payload = frame.Payload;
+                    var seq = frame.Payload;
 
-                    if (inboundDispatcher is not null)
-                        await inboundDispatcher.DispatchAsync(FenrirServer.Center, opcode, payload, session, ct)
-                            .ConfigureAwait(false);
+                    if (inboundSink is not null)
+                    {
+                        // Application synchrone, span-based : le fan-out est un effet in-memory broadcast-vers-zones,
+                        // pas du dispatch par-session. Pas d'await => la copie de sécurité ref-struct est inutile.
+                        var span = seq.IsSingleSegment ? seq.FirstSpan : System.Buffers.BuffersExtensions.ToArray(in seq);
+                        inboundSink.Receive(opcode, span);
+                    }
                     else
+                    {
                         logger.LogDebug(
                             "CenterLink received Center fan-out opcode {Opcode} ({Length} bytes) but no inbound " +
-                            "IFrameDispatcher is wired -- dropping", opcode, payload.Length);
+                            "sink is wired -- dropping", opcode, seq.Length);
+                    }
                 }
             }
             catch (Fenrir.Network.Framing.ProtocolViolationException ex)

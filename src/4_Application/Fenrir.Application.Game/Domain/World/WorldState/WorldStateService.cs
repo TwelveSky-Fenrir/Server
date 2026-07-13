@@ -1,12 +1,22 @@
 using System.Collections.Immutable;
 using System.Collections.ObjectModel;
+using Fenrir.Application.Game.Domain;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Domain.World.WorldState;
 
-public sealed class WorldStateService(IWorldStateRepository repository, ILogger<WorldStateService> logger)
+public sealed class WorldStateService(
+    IWorldStateRepository repository,
+    ILogger<WorldStateService> logger,
+    IOptions<GameServerOptions>? gameOptions = null)
 {
     public const int TribeCount = 4;
+
+    // En mode Center, le CenterServer est l'écrivain autoritaire : le shard cesse d'écrire ces agrégats en DB
+    // (les lecteurs/miroirs in-memory + ReconcileAsync restent actifs). Défaut Shard = écriture historique.
+    private bool IsCenterAuthoritative =>
+        gameOptions?.Value.WorldStateAuthority == WorldStateAuthorityMode.Center;
 
     private readonly Dictionary<(byte From, byte To), AllianceOfferState> _allianceOffers = new();
     private readonly Lock _lock = new();
@@ -316,6 +326,9 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
     public async ValueTask<bool> TryConsumeUpdateTribePointFlagAsync(short expectedPendingValue, short consumedValue,
         CancellationToken ct)
     {
+        if (IsCenterAuthoritative)
+            return false;
+
         WorldRvrState snapshot;
         lock (_lock)
         {
@@ -354,6 +367,9 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
     {
         if (totals.Count != TribeCount)
             throw new ArgumentException($"Expected exactly {TribeCount} totals.", nameof(totals));
+
+        if (IsCenterAuthoritative)
+            return false;
 
         TribeRvrState[] updated;
         lock (_lock)
@@ -453,6 +469,9 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
 
     public async ValueTask FlushIfDirtyAsync(CancellationToken ct)
     {
+        if (IsCenterAuthoritative)
+            return;
+
         WorldRvrState world;
         TribeRvrState[] tribes;
         AllianceOfferState[] allianceOffers;

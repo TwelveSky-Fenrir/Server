@@ -1,5 +1,8 @@
 using System.Buffers;
 using System.Buffers.Binary;
+using Fenrir.Application.Game.Domain.World.WorldState;
+using Fenrir.Cluster.Link;
+using Fenrir.Cluster.Wire.Packets;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Framing;
@@ -16,7 +19,8 @@ public sealed class ZoneCenterBroadcastIngestor(
     IRvrSiegeEventRelayQueue? relayQueue = null,
     IOptions<GameServerOptions>? gameOptions = null,
     Zone051Zone053SiegeState? zone051Zone053State = null,
-    AllianceProposalCenterState? allianceState = null)
+    AllianceProposalCenterState? allianceState = null,
+    ICenterLink? centerLink = null)
 {
     public const int PayloadSize = 130;
 
@@ -73,6 +77,14 @@ public sealed class ZoneCenterBroadcastIngestor(
 
     private void EnqueueForOtherShards(int eventCode, ReadOnlySpan<byte> data)
     {
+        // Atomicité push↔DB-relay (cf. ZoneEventBroadcaster) : en Center, POUSSE op33 au CenterServer ; sinon
+        // (défaut Shard) DB-outbox historique. Un seul ToArray() pour la charge de sortie.
+        if (gameOptions?.Value.WorldStateAuthority == WorldStateAuthorityMode.Center)
+        {
+            centerLink?.Send(new WorldEventOutbound { Sort = eventCode, Data = data.ToArray() });
+            return;
+        }
+
         if (relayQueue is null)
             return;
 

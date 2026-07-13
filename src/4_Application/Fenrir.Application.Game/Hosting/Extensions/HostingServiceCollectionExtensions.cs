@@ -14,6 +14,7 @@ using Fenrir.Application.Game.Hosting.World;
 using Fenrir.Application.Game.Hosting.World.Monsters;
 using Fenrir.Application.Game.Hosting.World.WorldState;
 using Fenrir.Application.Game.Hosting.World.ZoneWar;
+using Fenrir.Cluster.Link;
 using Fenrir.Data.Abstractions.Security;
 using Fenrir.Data.World;
 using Fenrir.Data.WriteBehind;
@@ -154,6 +155,10 @@ public static class HostingServiceCollectionExtensions
         services.AddSingleton<Zone051Zone053SiegeState>();
         services.AddSingleton<AllianceProposalCenterState>();
         services.AddSingleton<ZoneCenterBroadcastIngestor>();
+
+        // Point d'application du fan-out Center reçu par le lien sortant (ICenterLink) : inconditionnel (le gate
+        // vit dans le sink, inerte au défaut Shard). Consommé optionnellement par CenterLinkClientHost.
+        services.AddSingleton<ICenterFanOutSink, ZoneCenterFanOutSink>();
 
         services.TryAddSingleton<IZone039MonsterSummonResetGateway, LoggingOnlyZone039MonsterSummonResetGateway>();
         services.AddSingleton<Zone039ArmingReactor>();

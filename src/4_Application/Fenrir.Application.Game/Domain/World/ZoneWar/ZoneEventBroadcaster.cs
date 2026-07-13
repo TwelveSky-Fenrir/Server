@@ -2,6 +2,8 @@ using System.Buffers;
 using System.Buffers.Binary;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.World.WorldState;
+using Fenrir.Cluster.Link;
+using Fenrir.Cluster.Wire.Packets;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Framing;
@@ -20,7 +22,8 @@ public sealed class ZoneEventBroadcaster(
     ZoneCenterSiegeState? siegeState = null,
     IRvrSiegeEventRelayQueue? relayQueue = null,
     IOptions<GameServerOptions>? gameOptions = null,
-    Zone039ArmingReactor? zone039Reactor = null)
+    Zone039ArmingReactor? zone039Reactor = null,
+    ICenterLink? centerLink = null)
 {
     private const int DataSize = 130;
 
@@ -234,6 +237,15 @@ public sealed class ZoneEventBroadcaster(
 
     private void EnqueueForOtherShards(int sort, byte[] data)
     {
+        // Atomicité push↔DB-relay sous le flag d'autorité : en Center, on POUSSE op33 au CenterServer (qui applique
+        // l'effet monde puis fan-out à toutes les zones) ; sinon (défaut Shard) on emprunte le DB-outbox historique.
+        // best-effort : centerLink.Send est no-op si le lien est down, ne throw/bloque jamais (sûr sur un thread tick).
+        if (gameOptions?.Value.WorldStateAuthority == WorldStateAuthorityMode.Center)
+        {
+            centerLink?.Send(new WorldEventOutbound { Sort = sort, Data = data });
+            return;
+        }
+
         if (relayQueue is null)
             return;
 

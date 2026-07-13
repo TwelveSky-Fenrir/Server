@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- Exe AOT : Directory.Build.targets bascule PublishAot + InvariantGlobalization=false (ADR-0006). -->
+    <FenrirExecutable>true</FenrirExecutable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient"/>
+    <PackageReference Include="CaeriusNet"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\3_Infrastructure\Fenrir.Data\Fenrir.Data.csproj"/>
+    <ProjectReference Include="..\..\3_Infrastructure\Fenrir.Observability\Fenrir.Observability.csproj"/>
+    <ProjectReference Include="..\..\0_Orchestration\Fenrir.ServiceDefaults\Fenrir.ServiceDefaults.csproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Scripts SQL copiés à côté de l'exe (Path.Combine(AppContext.BaseDirectory, "Database")) — même
+         résolution en dev et en AOT publié, aucune heuristique de remontée de repo. -->
+    <None Include="..\..\..\Database\**\*.*" CopyToOutputDirectory="PreserveNewest" LinkBase="Database"/>
+  </ItemGroup>
+
+</Project>

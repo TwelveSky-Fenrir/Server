@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Règles pures du domaine Login. Dépend de Core + Fenrir.Data (Option A ÉTENDUE à Login : 5 gates —
+       AvatarInfoFactory/AvatarRosterEntry/AvatarDeletionGate/AvatarRenameGate/TribeDominanceGate — consomment
+       des DTO Data résolus via les global usings Data.Abstractions.*). Les orchestrateurs non-purs (LoginTrain,
+       LoginSessionLivenessSweep, DomainServiceCollectionExtensions) et le rate-limit IP (LoginIpRateLimiter)
+       restent hors Domaine : migration T5 / Security F5. -->
+
+  <ItemGroup>
+    <!-- Tire transitivement Options + Logging.Abstractions + DI.Abstractions (comme l'ancien Login.Domain). -->
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Fenrir.Core\Fenrir.Core.csproj"/>
+    <ProjectReference Include="..\..\3_Infrastructure\Fenrir.Data\Fenrir.Data.csproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Reportés verbatim de l'ancien Login.Domain : les DTO Data sont résolus par ces global usings
+         (dépendance réelle et vivante, invisible au grep per-fichier). Tous résolvent vers Fenrir.Data. -->
+    <Using Include="Fenrir.Data.Abstractions.Accounts"/>
+    <Using Include="Fenrir.Data.Abstractions.Admin"/>
+    <Using Include="Fenrir.Data.Abstractions.Characters"/>
+    <Using Include="Fenrir.Data.Abstractions.Commerce"/>
+    <Using Include="Fenrir.Data.Abstractions.Guilds"/>
+    <Using Include="Fenrir.Data.Abstractions.Progression"/>
+    <Using Include="Fenrir.Data.Abstractions.Runtime"/>
+    <Using Include="Fenrir.Data.Abstractions.Security"/>
+    <Using Include="Fenrir.Data.Abstractions.Social"/>
+    <Using Include="Fenrir.Data.Abstractions.Tribes"/>
+    <Using Include="Fenrir.Data.Abstractions.World"/>
+  </ItemGroup>
+
+</Project>

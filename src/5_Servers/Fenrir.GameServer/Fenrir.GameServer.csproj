@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <!-- Serveur TCP shardé hébergeant des Zones (pièce maîtresse, doc 04) ; absorbe ts25extra.
+         Exe AOT : Directory.Build.targets bascule PublishAot + InvariantGlobalization=false (ADR-0006). -->
+    <FenrirExecutable>true</FenrirExecutable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting"/>
+  </ItemGroup>
+
+  <!-- Frontière compilateur : NE référence NI Fenrir.Application.Login NI Fenrir.Domain.Login.
+       Matrice doc 02 §5.2. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\2_Core\Fenrir.Core\Fenrir.Core.csproj"/>
+    <ProjectReference Include="..\..\2_Core\Fenrir.Domain.Game\Fenrir.Domain.Game.csproj"/>
+    <ProjectReference Include="..\..\3_Infrastructure\Fenrir.Network\Fenrir.Network.csproj"/>
+    <ProjectReference Include="..\..\3_Infrastructure\Fenrir.Data\Fenrir.Data.csproj"/>
+    <ProjectReference Include="..\..\3_Infrastructure\Fenrir.Security\Fenrir.Security.csproj"/>
+    <ProjectReference Include="..\..\3_Infrastructure\Fenrir.Cluster\Fenrir.Cluster.csproj"/>
+    <ProjectReference Include="..\..\3_Infrastructure\Fenrir.Observability\Fenrir.Observability.csproj"/>
+    <ProjectReference Include="..\..\4_Application\Fenrir.Application.Game\Fenrir.Application.Game.csproj"/>
+    <ProjectReference Include="..\..\0_Orchestration\Fenrir.ServiceDefaults\Fenrir.ServiceDefaults.csproj"/>
+  </ItemGroup>
+
+</Project>

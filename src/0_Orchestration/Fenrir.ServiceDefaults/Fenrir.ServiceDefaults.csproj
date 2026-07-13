@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsAspireSharedProject>true</IsAspireSharedProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- PAS de FrameworkReference Microsoft.AspNetCore.App : les serveurs Fenrir sont TCP-only (ADR-0008).
+         Une FrameworkReference ici se propagerait transitivement au runtimeconfig.json des binaires même
+         sans code ASP.NET Core. AddFenrirDefaults() (export OTLP + service discovery) est câblé au Lot F2. -->
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks"/>
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience"/>
+    <PackageReference Include="Microsoft.Extensions.ServiceDiscovery"/>
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol"/>
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting"/>
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http"/>
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime"/>
+  </ItemGroup>
+
+</Project>

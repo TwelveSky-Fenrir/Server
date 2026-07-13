@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Slice serveur Login : paquets Login (ex-Serialization.Login) + LoginFrameDispatcher
+       (ex-Dispatch.Login) + handlers + services d'orchestration. Déclare des paquets ⇒ référence les
+       générateurs en Analyzer. Frontière compilateur : un paquet Login ne compile pas dans le GameServer.
+       Dépend de Core, Domain.Login, Network, Data, Security, Cluster, Observability (matrice doc 02 §5.2). -->
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Split de l'ancien global using Fenrir.Network.Abstractions : les paquets Login référencent les
+         interfaces (IIncoming/IOutgoingPacket) et la table Opcodes sans using par fichier. FenrirServer/
+         FenrirDirection/WireObfuscationMode viennent du using per-file Fenrir.Core.Wire. -->
+    <Using Include="Fenrir.Core.Abstractions"/>
+    <Using Include="Fenrir.Core.Opcodes"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Reportés de l'ancien Login.{Services,Handlers} (F6 T5, fold-into-Application) : les services Login
+         injectent interfaces repo + DTO Data via ces global usings (Option A). -->
+    <Using Include="Fenrir.Data.Abstractions.Accounts"/>
+    <Using Include="Fenrir.Data.Abstractions.Admin"/>
+    <Using Include="Fenrir.Data.Abstractions.Characters"/>
+    <Using Include="Fenrir.Data.Abstractions.Commerce"/>
+    <Using Include="Fenrir.Data.Abstractions.Game"/>
+    <Using Include="Fenrir.Data.Abstractions.Guilds"/>
+    <Using Include="Fenrir.Data.Abstractions.Progression"/>
+    <Using Include="Fenrir.Data.Abstractions.Runtime"/>
+    <Using Include="Fenrir.Data.Abstractions.Security"/>
+    <Using Include="Fenrir.Data.Abstractions.Social"/>
+    <Using Include="Fenrir.Data.Abstractions.Tribes"/>
+    <Using Include="Fenrir.Data.Abstractions.World"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\2_Core\Fenrir.Core\Fenrir.Core.csproj"/>
+    <ProjectReference Include="..\..\2_Core\Fenrir.Domain.Login\Fenrir.Domain.Login.csproj"/>
+    <ProjectReference Include="..\..\3_Infrastructure\Fenrir.Network\Fenrir.Network.csproj"/>
+    <ProjectReference Include="..\..\3_Infrastructure\Fenrir.Data\Fenrir.Data.csproj"/>
+    <ProjectReference Include="..\..\3_Infrastructure\Fenrir.Security\Fenrir.Security.csproj"/>
+    <ProjectReference Include="..\..\3_Infrastructure\Fenrir.Cluster\Fenrir.Cluster.csproj"/>
+    <ProjectReference Include="..\..\3_Infrastructure\Fenrir.Observability\Fenrir.Observability.csproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\1_Generators\Fenrir.Generators\Fenrir.Generators.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"/>
+  </ItemGroup>
+
+</Project>

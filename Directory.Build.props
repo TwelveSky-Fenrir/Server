@@ -9,5 +9,9 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <ServerGarbageCollection>true</ServerGarbageCollection>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <!-- Défense en profondeur (F6/validation) : le fold Domain-in-Application a fait cohabiter plusieurs
+         projets dans un même arbre source ; exclure explicitement obj/bin du glob `**/*.cs` par défaut
+         évite qu'un AssemblyInfo.cs généré en design-time soit compilé deux fois (CS0579). -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);**/obj/**;**/bin/**</DefaultItemExcludes>
   </PropertyGroup>
 </Project>

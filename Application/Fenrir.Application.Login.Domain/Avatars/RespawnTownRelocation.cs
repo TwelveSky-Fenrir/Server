@@ -1,9 +1,0 @@
-namespace Fenrir.Application.Login.Domain.Avatars;
-
-public static class RespawnTownRelocation
-{
-    public static bool RequiresRelocation(byte avatarTribe, byte owningTribeOfLoggedOutZone)
-    {
-        return owningTribeOfLoggedOutZone != avatarTribe;
-    }
-}

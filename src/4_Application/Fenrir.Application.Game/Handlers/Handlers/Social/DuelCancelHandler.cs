@@ -1,0 +1,22 @@
+using Fenrir.Application.Game.Abstractions.Social;
+using Fenrir.Network.Abstractions;
+using Fenrir.Application.Game;
+using Fenrir.Application.Game.Packets.Zone;
+using Microsoft.Extensions.Logging;
+
+namespace Fenrir.Application.Game.Handlers.Handlers.Social;
+
+public sealed class DuelCancelHandler(IDuelService duelService, ILogger<DuelCancelHandler>? logger = null)
+    : IInlinePacketHandler<DuelCancelRequest>
+{
+    public void Handle(in DuelCancelRequest packet, IPacketSession session)
+    {
+        var zoneSession = (ZoneClientSession)session;
+        var challengerId = zoneSession.CharacterId!.Value;
+
+        logger?.LogDebug("Duel cancel received: session {SessionId} character {CharacterId}", session.SessionId,
+            challengerId);
+
+        duelService.Cancel(challengerId);
+    }
+}

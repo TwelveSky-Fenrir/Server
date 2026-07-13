@@ -1,0 +1,15 @@
+using Fenrir.Core.Attributes;
+
+namespace Fenrir.Core.Packets.Shared;
+
+[FenrirWireType(1232)]
+public readonly partial record struct PshopInfo : IFenrirWireType<PshopInfo>
+{
+    public required uint UniqueNumber { get; init; }
+
+    [FixedString(25)] public required string Name { get; init; }
+
+    [Reserved(3)] [FixedArray(225)] public required int[] ItemInfo { get; init; }
+
+    [FixedArray(75)] public required int[] SocketInfo { get; init; }
+}

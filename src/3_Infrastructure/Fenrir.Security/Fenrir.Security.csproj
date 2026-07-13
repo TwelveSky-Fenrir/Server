@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Anti-flood / rate-limit / blocklist unifiés, IN-PROCESS (ex-ts25firewall, natif). Correctifs F5
+       (rate-limit en 2 endroits) + F6 (firewall dispersé sur 3 projets). Home de IpFloodGuard,
+       SessionRateLimiter (token-bucket par session/opcode), blocklist unifiée (FirewallRules + BlockedIps),
+       allowlist GM. La garde IP est consultée AU SOCKET ACCEPT. Dépend de Core, Data, Observability. -->
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\2_Core\Fenrir.Core\Fenrir.Core.csproj"/>
+    <ProjectReference Include="..\Fenrir.Data\Fenrir.Data.csproj"/>
+    <ProjectReference Include="..\Fenrir.Observability\Fenrir.Observability.csproj"/>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Instrumentation réutilisable (ex-ts25gamelog, natif) : ActivitySource / Meter / [LoggerMessage],
+       game.EventLog durable, health-check TCP-probe. Correctif F7 (pas de home de logging aujourd'hui).
+       Ne dépend que de Core. -->
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions"/>
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\2_Core\Fenrir.Core\Fenrir.Core.csproj"/>
+  </ItemGroup>
+
+</Project>

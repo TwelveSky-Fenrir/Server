@@ -333,52 +333,32 @@ public sealed partial class Zone
             (byte)PartyResyncRelaySort.Request, options.ShardId, characterId, avatarName, avatarName));
     }
 
-    private void HandleLeave(int characterId, Zone? handoffTarget, (float X, float Y, float Z)? handoffPosition = null)
+    // Sortie de zone = TOUJOURS un retrait simple (chemin unifié V2.2). Un changement de zone (intra ou cross)
+    // ne migre plus l'entité en mémoire : le client se déconnecte, la zone source retire le joueur ici, puis il
+    // se reconnecte via ticket+op11+EnterWorld. Si IsMovingZone, on préserve l'état cross-connexion (skip
+    // party-break/cleanup) — la nouvelle connexion réhydrate depuis SQL, la map cible venant du ticket.
+    private void HandleLeave(int characterId)
     {
         if (!_players.TryRemove(characterId, out var state))
             return;
 
         _grid.Remove(characterId, state.CurrentCell);
 
-        if (handoffTarget is null)
+        logger.LogInformation("Character {CharacterId} left zone {MapId}", characterId, MapId);
+
+        if (!state.IsMovingZone)
         {
-            logger.LogInformation("Character {CharacterId} left zone {MapId}", characterId, MapId);
+            BreakPartyOnDisconnect(characterId, state.Name);
 
-            if (!state.IsMovingZone)
-            {
-                BreakPartyOnDisconnect(characterId, state.Name);
-
-                if (characterShardLocations is not null)
-                    _ = CleanupShardLocationAsync(characterId);
-            }
-
-            ClearTradeOnDisconnect(characterId);
-
-            ClearAcceptedNegotiationsOnDisconnect(characterId);
-
-            ClearDungeonInstanceOnDisconnect(state);
-
-            return;
+            if (characterShardLocations is not null)
+                _ = CleanupShardLocationAsync(characterId);
         }
 
-        var enterData = ZoneTransfer.CreateEnterData(state, handoffTarget.MapId, handoffPosition);
+        ClearTradeOnDisconnect(characterId);
 
-        if (!handoffTarget.Post(ZoneCommand.Enter(characterId, enterData)))
-        {
-            logger.LogError(
-                "Zone {TargetMapId} inbox full: dropped handoff Enter for character {CharacterId} from zone {MapId} -- aborting session",
-                handoffTarget.MapId, characterId, MapId);
+        ClearAcceptedNegotiationsOnDisconnect(characterId);
 
-            if (state.Session is ClientSession client)
-                client.Abort(DisconnectReason.Faulted);
-            return;
-        }
-
-        if (state.Session is ZoneClientSession zoneSession)
-            zoneSession.CurrentZone = handoffTarget;
-
-        logger.LogInformation("Character {CharacterId} handed off from zone {MapId} to zone {TargetMapId}",
-            characterId, MapId, handoffTarget.MapId);
+        ClearDungeonInstanceOnDisconnect(state);
     }
 
     private void BreakPartyOnDisconnect(int characterId, string disconnectingName)

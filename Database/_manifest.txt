@@ -573,6 +573,25 @@ StoredProcedures/admin/usp_TribeFourQuota_TryConsume.sql
 # game.usp_* procedures; SQL Server requires the target object to already exist for an object-level GRANT.
 Schemas/002_roles.sql
 
+# ---------------------------------------------------------------------------
+# Schema migrations (post-base-DDL, pre-seed). A change to a Tables/*.sql,
+# Schemas/Types/*.sql, or StoredProcedures/*.sql script already listed above
+# cannot be made by editing that base file -- DbMigrator SHA-256-journals every
+# applied script and refuses to re-apply one whose content changed, so an
+# in-place edit hard-fails the next run on any already-provisioned database.
+# Additive schema evolution therefore lands here as a new, never-edited script
+# that converts the base-created state to the target state: a fresh database
+# applies base-then-migration, a persistent one skips the already-journaled
+# base scripts and applies only the new migration -- both converge.
+# ---------------------------------------------------------------------------
+
+# Lot 1 (rescope the session ticket to the ZONE): adds runtime.SessionTickets.TargetMapId. The table is
+# MEMORY_OPTIMIZED + DURABILITY=SCHEMA_ONLY and its Create/Consume/Purge procs are WITH NATIVE_COMPILATION,
+# SCHEMABINDING, so this drops the three schema-bound native procs, drops+recreates the (ephemeral, 15s-TTL)
+# SCHEMA_ONLY table with the new column, and recreates the procs -- see the script's own header for the full
+# rationale (why a new script vs. editing base files, why DROP+recreate vs. ALTER, why grants are unaffected).
+Migrations/001_sessiontickets_targetmapid.sql
+
 Migrations/Seed/001_dev_account.sql
 
 # Numbering renamed 2026-07-12 (dead-file-sweep-game-world naming-hygiene finding) to be monotonic in

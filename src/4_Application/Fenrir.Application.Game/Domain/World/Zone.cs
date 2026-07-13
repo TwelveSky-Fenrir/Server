@@ -356,7 +356,7 @@ public sealed partial class Zone(
                         HandleEnter(command.CharacterId, command.EnterData!);
                         break;
                     case ZoneCommandKind.Leave:
-                        HandleLeave(command.CharacterId, command.HandoffTarget, command.HandoffPosition);
+                        HandleLeave(command.CharacterId);
                         break;
                     case ZoneCommandKind.Move:
                         var action = command.Action;

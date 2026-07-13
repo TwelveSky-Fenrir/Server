@@ -32,7 +32,7 @@ public sealed class ZoneTransferCancelService(
                 "Zone {MapId} inbox full: dropped ClearZoneTransferPending for character {CharacterId}",
                 zone.MapId, characterId);
 
-        zoneSession.ClearCrossShardTransferPending();
+        zoneSession.ClearZoneTransferPending();
 
         try
         {

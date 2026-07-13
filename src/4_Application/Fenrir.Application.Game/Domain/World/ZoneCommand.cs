@@ -46,10 +46,6 @@ public readonly struct ZoneCommand
 
     public PlayerEnterData? EnterData { get; init; }
 
-    public Zone? HandoffTarget { get; init; }
-
-    public (float X, float Y, float Z)? HandoffPosition { get; init; }
-
     public bool Muted { get; init; }
 
     public byte WinningTribe { get; init; }
@@ -65,14 +61,9 @@ public readonly struct ZoneCommand
         return new ZoneCommand { Kind = ZoneCommandKind.Enter, CharacterId = characterId, EnterData = data };
     }
 
-    public static ZoneCommand Leave(int characterId, Zone? handoffTarget = null,
-        (float X, float Y, float Z)? handoffPosition = null)
+    public static ZoneCommand Leave(int characterId)
     {
-        return new ZoneCommand
-        {
-            Kind = ZoneCommandKind.Leave, CharacterId = characterId, HandoffTarget = handoffTarget,
-            HandoffPosition = handoffPosition
-        };
+        return new ZoneCommand { Kind = ZoneCommandKind.Leave, CharacterId = characterId };
     }
 
     public static ZoneCommand Move(int characterId, in ActionInfo action, bool isResumeAction = false)

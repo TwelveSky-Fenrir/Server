@@ -1,19 +1,22 @@
+using Fenrir.Cluster.Directory;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Cluster;
 
 /// <summary>
 /// Enregistrement DI du module <c>Fenrir.Cluster</c> (backbone de coordination cross-zone, ex-<c>ts25center</c>).
-/// Squelette : les implémentations concrètes (annuaire de zones, tickets, relais consolidés, coordination
-/// world-state autoritaire) sont ajoutées au Lot F4.
+/// À appeler <b>après</b> <c>AddFenrirData()</c> : <see cref="ZoneDirectory"/> compose les repos d'annuaire runtime
+/// (<c>IGameServerDirectoryRepository</c> + <c>IShardMapAssignmentRepository</c>) enregistrés par <c>AddFenrirData</c>.
 /// </summary>
 public static class ClusterServiceCollectionExtensions
 {
-    /// <summary>Enregistre les services du module Cluster (annuaire, sessions/tickets, relais).</summary>
+    /// <summary>Enregistre les services du module Cluster (annuaire de zones ; sessions/tickets, relais consolidés,
+    /// world-state autoritaire = Lots F4 ultérieurs).</summary>
     public static IServiceCollection AddFenrirCluster(this IServiceCollection services)
     {
-        // TODO(F4) : AddSingleton<IZoneDirectory, ...>, <IHandoverTicketService, ...>, relais consolidés
-        //            (Publish/Poll + push TCP), coordination du world-state (hero-rank/tribu/tour/party).
+        services.AddSingleton<IZoneDirectory, ZoneDirectory>();
+        // TODO(F4) : <IHandoverTicketService, ...>, relais consolidés (Publish/Poll + push TCP), coordination
+        //            du world-state (hero-rank/tribu/tour/party).
         return services;
     }
 }

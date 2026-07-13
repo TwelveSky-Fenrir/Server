@@ -15,6 +15,10 @@
     <ProjectReference Include="..\..\2_Core\Fenrir.Core\Fenrir.Core.csproj"/>
     <ProjectReference Include="..\Fenrir.Network\Fenrir.Network.csproj"/>
     <ProjectReference Include="..\Fenrir.Data\Fenrir.Data.csproj"/>
+    <!-- §5.2 : Security référencé pour l'auth du lien S2S (handshake à secret partagé, durcissement faille #8).
+         Data.Abstractions (IGameServerDirectoryRepository/IShardMapAssignmentRepository) est compilé dans
+         l'assembly Fenrir.Data ci-dessus — pas de projet Data.Abstractions séparé à référencer. -->
+    <ProjectReference Include="..\Fenrir.Security\Fenrir.Security.csproj"/>
     <ProjectReference Include="..\Fenrir.Observability\Fenrir.Observability.csproj"/>
   </ItemGroup>
 

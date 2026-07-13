@@ -49,7 +49,7 @@ public sealed class ZoneHandshakeHandler(
         }
 
         zoneSession.MarkTicketConsumed(result.AccountId, result.CharacterId, result.SessionToken,
-            result.AccountGrade);
+            result.AccountGrade, result.TargetMapId);
         registry.AssociateAccount(session.SessionId, result.AccountId);
         session.Send(new ZoneHandshakeResponse { Result = 0 });
 

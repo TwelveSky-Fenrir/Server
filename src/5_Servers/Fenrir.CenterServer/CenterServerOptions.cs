@@ -11,4 +11,12 @@ public sealed class CenterServerOptions
 
     /// <summary>Port TCP interne d'écoute (fidélité legacy : 12003).</summary>
     public int Port { get; set; } = 12003;
+
+    /// <summary>
+    /// Secret partagé du lien S2S (env <c>Center__SharedSecret</c>, injecté par l'AppHost). Réserve la clé de
+    /// configuration du futur handshake authentifié (durcissement de la faille legacy #8 : lien zone↔center en
+    /// clair, confiance loopback). <b>TODO(F4)</b> : sa vérification n'est pas encore branchée — voir
+    /// <c>CenterServerHost</c>. <c>null</c>/vide = mode confiance-loopback en attendant.
+    /// </summary>
+    public string? SharedSecret { get; set; }
 }

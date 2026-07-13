@@ -103,6 +103,26 @@ public sealed class EnterWorldService(
 
         var character = bundle.Character;
 
+        // Transfert piloté par ticket (l'op11 a porté une map cible) : le ticket est l'autorité de la map de
+        // destination et prime sur le MapId relu de SQL (encore la map SOURCE pour un joueur en cours de move ;
+        // ni intra ni cross ne le persiste avant l'entrée). Le spawn est SERVEUR-autoritaire (le client ne connaît
+        // jamais le point d'entrée de la zone cible), calé sur le point d'entrée depuis la map source.
+        var ticketTargetMapId = zoneSession.TargetMapId;
+        var isTicketTransfer = ticketTargetMapId is { } tmid && tmid != character.MapId;
+        if (isTicketTransfer &&
+            worldData.ZonesByNumber.TryGetValue(ticketTargetMapId!.Value, out var transferTargetDefinition))
+        {
+            var transferSpawn = transferTargetDefinition.FindSpawnPointFrom(character.MapId);
+            var (spawnX, spawnY, spawnZ) = transferSpawn is null
+                ? (transferTargetDefinition.Zone.DefaultSpawnX, transferTargetDefinition.Zone.DefaultSpawnY,
+                    transferTargetDefinition.Zone.DefaultSpawnZ)
+                : (transferSpawn.PosX, transferSpawn.PosY, transferSpawn.PosZ);
+            character = character with
+            {
+                MapId = ticketTargetMapId.Value, PosX = spawnX, PosY = spawnY, PosZ = spawnZ
+            };
+        }
+
         if (!WrapCheckSpecialDestinationCatalog.IsInstancedDestination(character.MapId))
         {
             var (healedMapId, healedPosX, healedPosY, healedPosZ) = ZoneTribeSelfHeal.Apply(character.Tribe,
@@ -191,9 +211,11 @@ public sealed class EnterWorldService(
 
         async ValueTask CompleteWorldEntryAsync()
         {
-            var claimedPosX = packet.Action.Location[0];
-            var claimedPosY = packet.Action.Location[1];
-            var claimedPosZ = packet.Action.Location[2];
+            // Sur un transfert par ticket, la position d'entrée est le spawn serveur-autoritaire (déjà posé dans
+            // character.Pos* ci-dessus) ; sinon on honore la position revendiquée par le client (entrée normale).
+            var (claimedPosX, claimedPosY, claimedPosZ) = isTicketTransfer
+                ? (character.PosX, character.PosY, character.PosZ)
+                : (packet.Action.Location[0], packet.Action.Location[1], packet.Action.Location[2]);
             var claimedFront = packet.Action.Front;
 
             var equipmentContainer = BuildEquipmentContainer(bundle.Items);

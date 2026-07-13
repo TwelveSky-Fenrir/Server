@@ -19,7 +19,7 @@ public sealed record SessionTicketRepository(ICaeriusNetDbContext Db) : ISession
     private const int MaxWriteConflictAttempts = 3;
 
     public async ValueTask CreateAsync(int accountId, int characterId, byte shardId, int ttlSeconds,
-        Guid sessionToken, short accountGrade, CancellationToken ct)
+        Guid sessionToken, short accountGrade, short targetMapId, CancellationToken ct)
     {
         for (var attempt = 1;; attempt++)
         {
@@ -31,6 +31,7 @@ public sealed record SessionTicketRepository(ICaeriusNetDbContext Db) : ISession
                     .AddParameter("TtlSeconds", ttlSeconds, SqlDbType.Int)
                     .AddParameter("SessionToken", sessionToken, SqlDbType.UniqueIdentifier)
                     .AddParameter("AccountGrade", accountGrade, SqlDbType.SmallInt)
+                    .AddParameter("TargetMapId", targetMapId, SqlDbType.SmallInt)
                     .Build();
 
             try

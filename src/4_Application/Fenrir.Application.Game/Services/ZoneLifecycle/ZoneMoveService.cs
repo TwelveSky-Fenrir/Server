@@ -19,7 +19,6 @@ namespace Fenrir.Application.Game.Services.ZoneLifecycle;
 public sealed class ZoneMoveService(
     ZoneRegistry zones,
     WorldDataCache worldData,
-    GuildRankingCache guildRanking,
     WorldStateService worldState,
     TribeGuardCorridorCatalog corridorCatalog,
     TribeGuardCorridorState corridorState,
@@ -115,14 +114,14 @@ public sealed class ZoneMoveService(
             return;
         }
 
-        if (!zones.TryGet(targetZoneNumber, out var targetZone))
+        if (!zones.TryGet(targetZoneNumber, out _))
         {
             await HandleCrossShardAsync(targetZoneNumber, characterId, state, sourceZone.MapId, zoneSession,
                 cancellationToken);
             return;
         }
 
-        if (!worldData.ZonesByNumber.TryGetValue(targetZoneNumber, out var targetDefinition))
+        if (!worldData.ZonesByNumber.ContainsKey(targetZoneNumber))
         {
             logger.LogError(
                 "Zone {TargetZoneNumber} is hosted by this shard but absent from WorldDataCache -- refusing transfer for character {CharacterId}",
@@ -176,14 +175,19 @@ public sealed class ZoneMoveService(
         await LogZoneDepartureAsync(zoneSession, characterId, sourceZone.MapId, targetZoneNumber,
             cancellationToken);
 
-        var spawnPoint = targetDefinition.FindSpawnPointFrom(sourceZone.MapId);
-        var (posX, posY, posZ) = spawnPoint is null
-            ? (targetDefinition.Zone.DefaultSpawnX, targetDefinition.Zone.DefaultSpawnY,
-                targetDefinition.Zone.DefaultSpawnZ)
-            : (spawnPoint.PosX, spawnPoint.PosY, spawnPoint.PosZ);
+        // Mint un ticket de handover scopé ZONE (map cible = targetZoneNumber) et rends au client l'endpoint de CE
+        // shard : l'intra-shard suit désormais EXACTEMENT le même chemin « ferme le socket -> reconnecte op11 ->
+        // consume ticket -> EnterWorld » que le cross-shard (corrige la divergence V2.2). Plus d'entrée-monde
+        // inline, plus de migration d'entité en RAM : la sortie de la zone source se fait au disconnect (teardown),
+        // avec IsMovingZone (skip cleanup) et le flag de session transfer-pending (skip self-kick).
+        await tickets.CreateAsync(zoneSession.AccountId!.Value, characterId, options.Value.ShardId,
+            options.Value.TicketTtlSeconds, zoneSession.AccountSessionToken!.Value, zoneSession.AccountGrade,
+            targetZoneNumber, cancellationToken);
+
+        zoneSession.MarkZoneTransferPending();
 
         logger.LogInformation(
-            "Character {CharacterId} transferring same-shard: {SourceMapId} -> {TargetMapId} (sort {Sort})",
+            "Character {CharacterId} transferring same-shard: {SourceMapId} -> {TargetMapId} (sort {Sort}) -- handoff ticket minted, awaiting reconnection",
             characterId, sourceZone.MapId, targetZoneNumber, packet.Sort);
 
         await characterShardLocations.UpsertAsync(characterId, options.Value.ShardId, targetZoneNumber, state.Name,
@@ -195,49 +199,6 @@ public sealed class ZoneMoveService(
             Ip = options.Value.PublicHost,
             Port = options.Value.Port
         });
-
-        var registerRecv = new EnterWorldResponse
-        {
-            AvatarInfo = AvatarInfoFactory.CreateForRuntimeState(state, targetZoneNumber, posX, posY, posZ),
-            BuffInfo = ZoneTransferBuffRules.Resolve(state.Buffs, targetZoneNumber)
-        };
-        zoneSession.Send(in registerRecv);
-
-        var broadcastWorldInfo = new WorldSnapshotResponse
-        {
-            WorldInfo = GuildRankingProjection.Apply(WorldStateTemplates.ZeroedWorldInfo, guildRanking.Top),
-            TribeInfo = WorldStateTemplates.ZeroedTribeInfo
-        };
-        zoneSession.Send(in broadcastWorldInfo);
-
-        var selfSpawnAction = new ActionInfo
-        {
-            Type = 0,
-            Sort = 0,
-            Frame = 0,
-            Location = [posX, posY, posZ],
-            TargetLocation = [posX, posY, posZ],
-            Front = state.Heading,
-            TargetFront = state.Heading,
-            PetLocation = [state.PetActionLocationX, state.PetActionLocationY, state.PetActionLocationZ],
-            PetTargetLocation =
-                [state.PetActionTargetLocationX, state.PetActionTargetLocationY, state.PetActionTargetLocationZ],
-            PetFront = state.PetActionFront,
-            PetSort = state.PetActionSort,
-            TargetObjectSort = 0,
-            TargetObjectIndex = 0,
-            TargetObjectUniqueNumber = 0,
-            SkillNumber = 0,
-            SkillGradeNum1 = 0,
-            SkillGradeNum2 = 0,
-            SkillValue = 0
-        };
-        zoneSession.Send(sourceZone.BuildAvatarActionRecv(state, selfSpawnAction));
-
-        if (!sourceZone.Post(ZoneCommand.Leave(characterId, targetZone, (posX, posY, posZ))))
-            logger.LogError(
-                "Zone {SourceMapId} inbox full: dropped transfer Leave for character {CharacterId} to zone {TargetMapId}",
-                sourceZone.MapId, characterId, targetZoneNumber);
     }
 
     private async ValueTask HandleCrossShardAsync(short targetZoneNumber, int characterId, PlayerRuntimeState state,
@@ -301,7 +262,7 @@ public sealed class ZoneMoveService(
 
             await tickets.CreateAsync(zoneSession.AccountId!.Value, characterId, candidate.ShardId,
                 options.Value.TicketTtlSeconds, zoneSession.AccountSessionToken!.Value, zoneSession.AccountGrade,
-                cancellationToken);
+                targetZoneNumber, cancellationToken);
 
             if (!sourceZone.Post(ZoneCommand.MarkZoneTransferPending(characterId)))
             {
@@ -312,7 +273,7 @@ public sealed class ZoneMoveService(
                 return;
             }
 
-            zoneSession.MarkCrossShardTransferPending();
+            zoneSession.MarkZoneTransferPending();
 
             logger.LogInformation(
                 "Zone {TargetZoneNumber} resolved to shard {ShardId} ({Host}:{Port}) for character {CharacterId} -- cross-shard handoff ticket minted",

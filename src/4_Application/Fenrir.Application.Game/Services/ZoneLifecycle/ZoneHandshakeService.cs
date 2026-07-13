@@ -85,6 +85,6 @@ public sealed class ZoneHandshakeService(
         tribeQuota.Record(session, recordedTribe, accountId, consumed.CharacterId, DateTimeOffset.UtcNow);
 
         return new ZoneHandshakeResult(ZoneHandshakeOutcome.Accepted, accountId, consumed.CharacterId,
-            consumed.SessionToken, consumed.AccountGrade);
+            consumed.SessionToken, consumed.AccountGrade, consumed.TargetMapId);
     }
 }

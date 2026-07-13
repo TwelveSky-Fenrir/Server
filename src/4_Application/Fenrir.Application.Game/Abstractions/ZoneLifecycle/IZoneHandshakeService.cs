@@ -20,7 +20,8 @@ public readonly record struct ZoneHandshakeResult(
     int AccountId = 0,
     int CharacterId = 0,
     Guid SessionToken = default,
-    short AccountGrade = 0);
+    short AccountGrade = 0,
+    short TargetMapId = 0);
 
 public interface IZoneHandshakeService
 {

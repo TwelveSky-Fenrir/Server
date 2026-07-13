@@ -21,9 +21,12 @@ var sql = builder.AddSqlServer("sqlserver", sqlPassword)
 
 var fenrirDb = sql.AddDatabase("FenrirDb");
 
-// Les ressources TCP n'exposent aucun endpoint HTTP à sonder : on retire les health-checks HTTP par défaut.
-RemoveBrokenHealthCheck(sql.Resource);
-RemoveBrokenHealthCheck(fenrirDb.Resource);
+// On retire le health-check par défaut que `AddSqlServer` attache aux ressources SQL (sonde de connexion) :
+// l'ordonnancement de readiness est porté explicitement par `WaitForStart(fenrirDb)` (migrator) puis
+// `WaitForCompletion(migrator)` (serveurs), et la robustesse de connexion par le retry SqlClient/CaeriusNet.
+// Laisser la sonde par défaut la ferait apparaître "unhealthy" pendant le warm-up du conteneur sans valeur ajoutée.
+RemoveDefaultHealthCheck(sql.Resource);
+RemoveDefaultHealthCheck(fenrirDb.Resource);
 
 // ── Migrateur Data-First : applique _manifest.txt puis SE TERMINE (jamais résident) ──────────────────
 var migrator = builder.AddProject<Fenrir_Tools_DbMigrator>("db-migrator")
@@ -68,8 +71,8 @@ foreach (var shardId in shardIds)
 builder.Build().Run();
 return;
 
-// Retire les HealthCheckAnnotation HTTP par défaut d'une ressource TCP (pas d'endpoint HTTP à sonder).
-static void RemoveBrokenHealthCheck(IResource resource)
+// Retire les HealthCheckAnnotation par défaut d'une ressource SQL (readiness portée par WaitFor* + retry SqlClient).
+static void RemoveDefaultHealthCheck(IResource resource)
 {
     foreach (var annotation in resource.Annotations.OfType<HealthCheckAnnotation>().ToArray())
         resource.Annotations.Remove(annotation);

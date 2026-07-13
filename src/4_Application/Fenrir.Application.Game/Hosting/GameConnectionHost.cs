@@ -158,7 +158,7 @@ public sealed class GameConnectionHost(
                     characterId, zone.MapId);
             }
 
-            if (zoneSession is { AccountId: { } accountId, IsCrossShardTransferPending: false })
+            if (zoneSession is { AccountId: { } accountId, IsZoneTransferPending: false })
                 await TearDownAccountSessionAsync(accountId, zoneSession.AccountSessionToken).ConfigureAwait(false);
 
             tribeQuota.Release(zoneSession.SessionId);

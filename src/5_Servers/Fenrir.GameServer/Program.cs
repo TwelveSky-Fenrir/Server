@@ -28,12 +28,19 @@ using Fenrir.Application.Game;
 using Fenrir.Security.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.ServiceDefaults;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.AddFenrirDefaults();
 builder.AddFenrirData();
 builder.Services.AddFenrirSecurity();
+
+// Filet anti-hang au démarrage : host.RunAsync() n'a AUCUN timeout (contrairement au préchargement borné par
+// bootCts plus bas). Si un IHostedService.StartAsync -- ou un ctor de singleton résolu lors de la matérialisation
+// de IEnumerable<IHostedService> par le host -- bloque host.StartAsync, on préfère une exception explicite après
+// 45 s à un hang silencieux et infini qui laisse le shard absent de runtime.GameServerDirectory.
+builder.Services.Configure<HostOptions>(o => o.StartupTimeout = TimeSpan.FromSeconds(45));
 
 builder.Services.Configure<GameServerOptions>(builder.Configuration.GetSection("Game"));
 builder.Services.AddGameDomain();
@@ -53,6 +60,12 @@ builder.Services.AddCenterLinkClient(o =>
     o.Endpoint = builder.Configuration["Center:Endpoint"];
     o.SharedSecret = builder.Configuration["Center:SharedSecret"];
 });
+
+// Capturé AVANT Build : le host matérialise tous les IHostedService d'un bloc (un IEnumerable), masquant lequel
+// bloque. On garde la liste ordonnée des descripteurs pour les sonder UN PAR UN plus bas.
+var hostedServiceDescriptors = builder.Services
+    .Where(d => d.ServiceType == typeof(IHostedService))
+    .ToArray();
 
 var host = builder.Build();
 
@@ -166,4 +179,56 @@ if (mapsMissingGeometry.Count > 0)
         "Zone.TryLoadGeometry for each map's specific cause (missing file vs. parse failure).",
         mapsMissingGeometry.Count, hostedMaps.Count, string.Join(", ", mapsMissingGeometry));
 
-await host.RunAsync();
+// SONDE DE CONSTRUCTION : le host fige pendant la matérialisation de IEnumerable<IHostedService> (exécution des
+// constructeurs) -- étape NON bornée par HostOptions.StartupTimeout et NON validée en Production (ValidateOnBuild
+// off). On construit ici chaque hosted-service INDIVIDUELLEMENT : la dernière ligne « probing [i] X » SANS
+// « constructed OK » qui suit nomme le service (ou une de ses dépendances) dont le constructeur bloque.
+bootLogger.LogInformation(
+    "Probing {Count} hosted-service constructions one by one to pinpoint any blocking constructor (the last " +
+    "'probing [i] ...' with no following 'constructed OK' is the culprit)...", hostedServiceDescriptors.Length);
+for (var i = 0; i < hostedServiceDescriptors.Length; i++)
+{
+    var descriptor = hostedServiceDescriptors[i];
+    var label = descriptor.ImplementationType?.FullName
+                ?? descriptor.ImplementationInstance?.GetType().FullName
+                ?? descriptor.ImplementationFactory?.Method.DeclaringType?.FullName
+                ?? "(factory)";
+    bootLogger.LogInformation("  probing [{Index}]: {Label}", i, label);
+    try
+    {
+        var instance = descriptor.ImplementationInstance
+                       ?? (descriptor.ImplementationFactory is not null
+                           ? descriptor.ImplementationFactory(host.Services)
+                           : ActivatorUtilities.CreateInstance(host.Services, descriptor.ImplementationType!));
+        bootLogger.LogInformation("    constructed OK [{Index}]: {Type}", i, instance.GetType().Name);
+    }
+    catch (Exception probeEx)
+    {
+        bootLogger.LogWarning(probeEx,
+            "    construction of [{Index}] {Label} threw (a throw is not the hang -- keep going)", i, label);
+    }
+}
+
+bootLogger.LogInformation(
+    "All {Count} hosted-service constructions probed OK -- the startup hang is NOT a blocking constructor; it is in " +
+    "StartAsync or the host pipeline (re-examine with that in mind).", hostedServiceDescriptors.Length);
+
+bootLogger.LogInformation(
+    "GameServer preload complete; entering host.RunAsync() now -- zone listeners, the directory heartbeat and the " +
+    "Center uplink start HERE. Expect next: 'Application started', then 'GameServerDirectory heartbeat host started' " +
+    "then 'registered in runtime.GameServerDirectory'. If NONE of these appear, host startup is hanging and the 45s " +
+    "StartupTimeout will surface it as a CRITICAL with the blocking stack.");
+
+try
+{
+    await host.RunAsync();
+}
+catch (Exception ex) when (ex is not OperationCanceledException)
+{
+    bootLogger.LogCritical(ex,
+        "GameServer host.RunAsync() failed to complete startup -- a hosted-service StartAsync or a singleton ctor " +
+        "resolved during IHostedService materialization blocked host start (no 'Application started' reached), so the " +
+        "directory heartbeat never ran and the shard stayed absent from runtime.GameServerDirectory. The exception " +
+        "above names the exact blocking call.");
+    throw;
+}

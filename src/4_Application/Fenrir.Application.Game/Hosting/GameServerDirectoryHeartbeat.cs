@@ -15,6 +15,16 @@ public sealed class GameServerDirectoryHeartbeat(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var opts = options.Value;
+
+        // Trace de démarrage load-bearing : si CETTE ligne apparaît, host.RunAsync() a bien démarré les hosted
+        // services (le hang de startup est écarté) et le seul problème possible restant est l'ÉCRITURE du heartbeat
+        // (voir le catch plus bas). Si elle n'apparaît PAS alors que « Application started » oui, un service démarré
+        // AVANT celui-ci ne rend pas la main.
+        logger.LogInformation(
+            "GameServerDirectory heartbeat host started for shard {ShardId}; first registration attempt to " +
+            "runtime.GameServerDirectory as {Host}:{Port} follows (every {IntervalSeconds}s)", opts.ShardId,
+            opts.PublicHost, opts.Port, opts.HeartbeatIntervalSeconds);
+
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(opts.HeartbeatIntervalSeconds));
 
         var registered = false;

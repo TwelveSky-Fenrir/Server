@@ -16,7 +16,11 @@ public static class MountStateResolver
 
         DeleteMount,
 
-        DeleteAttribute
+        DeleteAttribute,
+
+        Convert,
+
+        Transfer
     }
 
     public const int SlotCount = 10;
@@ -111,7 +115,9 @@ public static class MountStateResolver
         if (ctx.RolledAttributeTotal[slot] >= MaxRolledAttributeTotal)
             return new Result(ResultKind.Disconnect);
 
-        return new Result(ResultKind.Disconnect);
+        // Success: the actual attribute roll (RNG) + exp reset are applied by the service. A roll helper that
+        // reports no increment still results in a disconnect there, per legacy.
+        return new Result(ResultKind.Convert, GarageSlot: slot);
     }
 
     private static Result ResolveDeleteAttribute(int value, in Context ctx)
@@ -140,7 +146,10 @@ public static class MountStateResolver
         if (!ctx.HasAttributeTransferMaterial)
             return new Result(ResultKind.Disconnect);
 
-        return new Result(ResultKind.Disconnect);
+        // Success: the service performs the 1-point move (source digit -1, random non-full/non-source digit +1)
+        // and consumes the material. A zero source digit or an unchanged roll disconnects there, per legacy.
+        var slot = GarageSlotOf(ctx.AnimalIndex);
+        return new Result(ResultKind.Transfer, GarageSlot: slot, StatSlotIndex: value - 1);
     }
 
     public readonly record struct Result(

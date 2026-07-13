@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace Fenrir.Application.Game.Domain.Mounts;
 
 public static class MountPowerCodec
@@ -41,5 +43,21 @@ public static class MountPowerCodec
         for (var placeIndex = 0; placeIndex < DigitCount; placeIndex++)
             sum += DigitAtPlace(power, placeIndex);
         return sum;
+    }
+
+    /// <summary>
+    ///     Reassembles the raw encoded rolled-attribute power for one garage slot from its eight decoded
+    ///     stat-slot digits held in <paramref name="rolledAttributes" /> (indexed
+    ///     <c>slot * DigitCount + statSlotIndex</c>). Stat-slot index 0 (Attack) maps to the most-significant
+    ///     place (10^7), index 7 (Element-Defense) to the units place (10^0), matching the
+    ///     <c>StatCalculator.DecodeMountPowerDigits</c> digit layout.
+    /// </summary>
+    public static int EncodeSlot(ImmutableArray<int> rolledAttributes, int slot)
+    {
+        var baseIndex = slot * DigitCount;
+        var power = 0;
+        for (var statSlotIndex = 0; statSlotIndex < DigitCount; statSlotIndex++)
+            power += rolledAttributes[baseIndex + statSlotIndex] * PlaceValue[DigitCount - 1 - statSlotIndex];
+        return power;
     }
 }

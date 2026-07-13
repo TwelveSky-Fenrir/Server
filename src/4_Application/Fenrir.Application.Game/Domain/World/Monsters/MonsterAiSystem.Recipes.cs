@@ -14,6 +14,8 @@ public sealed partial class MonsterAiSystem
 
     private const int Zone175BossAggroCapacity = 50;
 
+    private const int GuardDetectionCellTolerance = 2;
+
     private void RunThrowerDecision(Zone zone, MonsterEntity monster)
     {
         if (monster.Template.WalkSpeed >= 1 && _random.NextInt32(ThrowerWanderRollSpan) == 0 &&
@@ -85,6 +87,11 @@ public sealed partial class MonsterAiSystem
             if (!zone.TryGetPlayer(characterId, out var player) || !IsCandidateValid(player))
                 continue;
 
+            // Resting (action-sort 0) / action-sort-33 players are excluded from acquisition, the same
+            // "leave them alone" rule the three cited acquisition routines apply (S07_MyGame05.cpp:156-159).
+            if (player.ActionSort is 0 or 33)
+                continue;
+
             if (monster.InstanceId is { } requiredInstanceId && player.DungeonInstanceId != requiredInstanceId)
                 continue;
 
@@ -142,6 +149,11 @@ public sealed partial class MonsterAiSystem
         foreach (var characterId in zone.NeighborsOfPosition(monster.PosX, monster.PosZ))
         {
             if (!zone.TryGetPlayer(characterId, out var player) || !IsCandidateValid(player))
+                continue;
+
+            // Resting (action-sort 0) / action-sort-33 players are excluded from acquisition, the same
+            // "leave them alone" rule the three cited acquisition routines apply (S07_MyGame05.cpp:156-159).
+            if (player.ActionSort is 0 or 33)
                 continue;
 
             if (monster.InstanceId is { } requiredInstanceId && player.DungeonInstanceId != requiredInstanceId)
@@ -216,11 +228,48 @@ public sealed partial class MonsterAiSystem
         if (meleeRadius <= 0)
             return;
 
+        // A guard has no tribe field of its own: its tribe is derived solely from its monster type
+        // (6/7/8/9 -> tribe 0/1/2/3); any other type is not a guard and aborts selection.
+        var guardTribe = monster.Template.Type switch
+        {
+            6 => (byte)0,
+            7 => (byte)1,
+            8 => (byte)2,
+            9 => (byte)3,
+            _ => (byte?)null
+        };
+        if (guardTribe is not { } tribe)
+            return;
+
+        // The allied tribe is resolved live from the RvR alliance table each call; an unallied guard
+        // yields no ally (the legacy -1 sentinel), so only the own-tribe exclusion then applies.
+        var alliedTribe = _worldState?.GetAllyOf(tribe);
+
         var meleeRadiusSq = (float)meleeRadius * meleeRadius;
+
+        var cellSize = zone.AoiCellSize;
+        var monsterCellX = MathF.Floor(monster.PosX / cellSize);
+        var monsterCellY = MathF.Floor(monster.PosY / cellSize);
+        var monsterCellZ = MathF.Floor(monster.PosZ / cellSize);
 
         foreach (var characterId in zone.NeighborsOfPosition(monster.PosX, monster.PosZ))
         {
             if (!zone.TryGetPlayer(characterId, out var player) || !IsCandidateValid(player))
+                continue;
+
+            // A guard never targets its own tribe or its currently-allied tribe.
+            if (player.Tribe == tribe || (alliedTribe is { } ally && player.Tribe == ally))
+                continue;
+
+            // Player action-states 0 and 33 are excluded as non-targetable.
+            if (player.ActionSort is 0 or 33)
+                continue;
+
+            // Coarse ±2 grid-cell pre-filter on all three axes (cell size = AoiCellSize, the legacy
+            // MAX_RADIUS_FOR_NETWORK grid). Reproduced together with the cell size, never tightened.
+            if (MathF.Abs(MathF.Floor(player.PosX / cellSize) - monsterCellX) > GuardDetectionCellTolerance ||
+                MathF.Abs(MathF.Floor(player.PosY / cellSize) - monsterCellY) > GuardDetectionCellTolerance ||
+                MathF.Abs(MathF.Floor(player.PosZ / cellSize) - monsterCellZ) > GuardDetectionCellTolerance)
                 continue;
 
             if (DistanceSquared(monster.PosX, monster.PosZ, player.PosX, player.PosZ) > meleeRadiusSq)

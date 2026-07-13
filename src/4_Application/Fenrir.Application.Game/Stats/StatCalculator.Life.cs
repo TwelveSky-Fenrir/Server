@@ -10,6 +10,11 @@ public static partial class StatCalculator
 
     private const int ElementElixirRate = 10;
 
+    // Boost-potion / warrior-pill derived-stat multipliers, and the single zone in which they are suppressed
+    // for both life and attack. MyFactor.cpp:1941-1943 (life x1.2), :2610-2612 (attack x1.1).
+    private const short BoostExcludedZoneNumber = 124;
+    private const float LifeBoostMultiplier = 1.2f;
+
     private static int ComputeMaxLife(int vitality, LevelRowDto levelRow, int setNumber, bool isLegendarySet,
         byte previousTribe, EquippedItemSlot?[] bySlot, int petLife,
         ZoneContext zone = default, ConsumableContext consumable = default, MountContext mount = default,
@@ -17,6 +22,25 @@ public static partial class StatCalculator
     {
         var hp = (int)(vitality * 20.0f);
         hp += levelRow.Life;
+
+        // Legacy folds ornament + sort-2 decoration + zone elixir into the base+level subtotal BEFORE the boost
+        // multiplier and the pet-doubling cliff, since any of them can push the subtotal across the pet-life
+        // threshold -- this is the load-bearing accumulation order the cliff depends on. MyFactor.cpp:1922-1943.
+        hp += OrnamentLifeContribution(zone, bySlot);
+        hp += DecorationStatContribution(DecorationStatKind.MaxLife, bySlot);
+        hp += LifeElixirContributionWithOverride(consumable, zone);
+
+        // Boost-potion / warrior-pill life multiplier (x1.2): after the level factor, before the mount-grade
+        // multiplier, suppressed in zone 124. OR-logic across the two sources, applied exactly once.
+        // MyFactor.cpp:1941-1943.
+        hp = ApplyLifeBoostMultiplier(hp, consumable, zone);
+
+        // Ridden-mount grade multiplier (four-tier, HP marker) applied to the level/attribute subtotal, before
+        // the later equipment/set additions; the flat rolled bonus is added at the end (after the multiply).
+        hp = MountGradeMaxLife(hp, mount);
+
+        // Pet-doubling cliff, evaluated on the fully-accumulated subtotal (base + level + ornament + deco +
+        // elixir + x1.2 boost + mount grade) so the ">= tPetLife" threshold matches legacy. MyFactor.cpp:1973-1977.
         hp = ApplyPetDoubleRule(hp, petLife);
 
         hp += SetBonusTables.GetFlatLifeBonus(setNumber);
@@ -46,16 +70,25 @@ public static partial class StatCalculator
                 hp += PetAmuletLifeBonus(petAmulet.Item.ItemId, petAmulet.Item.Sort);
         }
 
-        hp += LifeElixirContributionWithOverride(consumable, zone);
         hp += StellarCoreMaxLifeContribution(cosmetic);
-        hp += OrnamentLifeContribution(zone, bySlot);
         hp += RankBuffMaxLifeBonus(zone);
 
         hp = ApplyDrunkMaxLife(hp, zone);
 
-        hp += DecorationStatContribution(DecorationStatKind.MaxLife, bySlot);
+        hp += MountFlatMaxLife(mount);
 
         return ApplyFreeForAllMaxLife(hp, zone.ZoneNumber);
+    }
+
+    // Life boost multiplier: x1.2 when active (HP-boost potion OR warrior pill) and outside the excluded zone.
+    // OR-logic, never additive -- two active sources still yield a single x1.2, never x1.2 squared. The single-
+    // precision multiply then truncate-toward-zero matches the legacy (int)((float)value * 1.2f).
+    private static int ApplyLifeBoostMultiplier(int hp, ConsumableContext consumable, ZoneContext zone)
+    {
+        return zone.ZoneNumber != BoostExcludedZoneNumber &&
+               (consumable.HpBoostActive || consumable.WarriorPillActive)
+            ? (int)(hp * LifeBoostMultiplier)
+            : hp;
     }
 
     private static int ComputeG12CustomSetBonus(byte previousTribe, EquippedItemSlot?[] bySlot)
@@ -123,6 +156,19 @@ public static partial class StatCalculator
     {
         var mp = (int)(ki * 15.3100004196167f);
         mp += levelRow.Mana;
+
+        // Mana receives NO boost multiplier, but the same accumulation-then-cliff ordering as life applies:
+        // ornament + sort-2 decoration + zone elixir fold into the base+level subtotal before the mount-grade
+        // multiplier and the pet-doubling cliff. MyFactor.cpp:2242-2284.
+        mp += OrnamentManaContribution(zone, bySlot);
+        mp += DecorationStatContribution(DecorationStatKind.MaxMana, bySlot);
+        mp += ManaElixirContributionWithOverride(consumable, zone);
+
+        // Ridden-mount grade multiplier (four-tier, MP marker), flat rolled bonus added at the end.
+        mp = MountGradeMaxMana(mp, mount);
+
+        // Pet-doubling cliff on the fully-accumulated subtotal (base + level + ornament + deco + elixir +
+        // mount grade) so the ">= tPetMana" threshold matches legacy. MyFactor.cpp:2280-2284.
         mp = ApplyPetDoubleRule(mp, petMana);
 
         mp += SetBonusTables.GetFlatManaBonus(setNumber);
@@ -140,10 +186,7 @@ public static partial class StatCalculator
                 mp += PetAmuletManaBonus(petAmulet.Item.ItemId, petAmulet.Item.Sort);
         }
 
-        mp += ManaElixirContributionWithOverride(consumable, zone);
-        mp += OrnamentManaContribution(zone, bySlot);
-
-        mp += DecorationStatContribution(DecorationStatKind.MaxMana, bySlot);
+        mp += MountFlatMaxMana(mount);
 
         return ApplyFreeForAllMaxMana(mp, zone.ZoneNumber);
     }

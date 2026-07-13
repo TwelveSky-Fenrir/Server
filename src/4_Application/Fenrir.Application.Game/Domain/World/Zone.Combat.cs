@@ -57,6 +57,11 @@ public sealed partial class Zone
 
     private readonly KillCooldownTracker _regularWarCpOverrideCooldown = new();
 
+    // Per-killer regular-war kill streak driving the type-049 drop cadence. Legacy stores this persistently
+    // on the avatar (mDATA.warKillCount); here it is zone-local (single-writer on the tick thread) and resets
+    // when the character leaves the zone — see the return summary for the persistent-field follow-up.
+    private readonly Dictionary<int, int> _regularWarKillDropStreak = new();
+
     public bool PostCombatCommand(in CombatCommand command)
     {
         return _combatInbox.Writer.TryWrite(command);
@@ -257,6 +262,12 @@ public sealed partial class Zone
         ApplyPvpKillContributionPointFormula(attackerState, defenderState, profile);
         ApplyPvpKillHeroPoints(attackerState, profile, attackerCombinedLevel);
         ApplyPvpKillExperience(attackerState, profile, attackerCombinedLevel, defenderCombinedLevel);
+
+        // profile.GrantDrop is the C# equivalent of legacy tCanDrop (the precondition for calling
+        // DropItemForKillOtherTribe). For the DTM zone-38 profile it is set only when the YangGok drop event
+        // is enabled, so gating here keeps that pool dormant-until-enabled without extra plumbing.
+        if (profile.GrantDrop)
+            DropItemsForKillOtherTribe(attackerState, defenderState, attackerCombinedLevel, defenderCombinedLevel);
     }
 
     private void ApplyTowerCpForPvpBonus(PlayerRuntimeState attackerState)
@@ -389,6 +400,197 @@ public sealed partial class Zone
         attackerState.MountAccumulatedExp = attackerState.MountAccumulatedExp.SetItem(slot,
             MountActivityExpCodec.ClampExp(mountExperience + gain));
         attackerState.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+    }
+
+    // ---- Inter-tribe kill loot (legacy MyUtil::DropItemForKillOtherTribe) --------------------------------
+    // Réf. C++ : Server/ts25zone/S07_MyGame03.cpp:3866-4069. Combined-level guard (>= 145 both sides), then
+    // three sequential, zone-gated pools: the YangGok zone-38 event pool (which short-circuits the rest), the
+    // regular-war streak pool (type-049 maps), and the city minority-tribe pool (maps 1/6/11/140). Every drop
+    // lands at the victim's position, attributed to the killer's name, using legacy drop policy DP_PVP_TO_WD.
+    // Intentionally NOT wired here (see the return summary): the karakol server-160 pool (a legacy null-deref
+    // crash, and covered by the regular-war pool since 160 is a type-049 map) and the FFA zone-335 sub-branch
+    // of the regular-war pool (its mZoneFFATypeState==3 gate is flagged unresolved by the behavior contract).
+
+    private const int PvpKillDropSort = 11; // legacy DP_PVP_TO_WD (DEFINE.h:518)
+
+    private const int PvpKillDropMinimumCombinedLevel = 145;
+
+    private const int YangGokPvpDropRatePercent = 35;
+
+    private const int RegularWarDropStreakRequirementFast = 3; // maps 164 / 335
+
+    private const int RegularWarDropStreakRequirement = 10;
+
+    private static readonly int[] YangGokPvpDropBoxes = [602, 601, 2249, 8005, 8112];
+
+    private static readonly int[] KillDropElixirs = [506, 507, 508, 509, 578, 579];
+
+    private static readonly int[] KillDropAnimalTier5 = [1301, 1302, 1303, 1313, 1317, 1320, 1323, 1326];
+
+    private static readonly int[] KillDropAnimalTier10 = [1304, 1305, 1306, 1314, 1318, 1321, 1324, 1327];
+
+    private static readonly KillDropEntry[] RegularWarDropTierA =
+        [KillDropEntry.Item(1379), KillDropEntry.Item(1378)];
+
+    private static readonly KillDropEntry[] RegularWarDropTierB =
+    [
+        KillDropEntry.Item(721), KillDropEntry.Item(724), KillDropEntry.Animal5,
+        KillDropEntry.Item(722), KillDropEntry.Item(1449)
+    ];
+
+    private static readonly KillDropEntry[] RegularWarDropTierC =
+    [
+        KillDropEntry.Item(1237), KillDropEntry.Item(694), KillDropEntry.Item(1103), KillDropEntry.Item(1124),
+        KillDropEntry.Item(1166), KillDropEntry.Item(8102), KillDropEntry.Item(1371)
+    ];
+
+    private static readonly KillDropEntry[] RegularWarDropTierD =
+        [KillDropEntry.Elixir, KillDropEntry.Item(695), KillDropEntry.Item(696)];
+
+    private static readonly KillDropEntry[] CityDropTierA =
+        [KillDropEntry.Animal10, KillDropEntry.Item(724), KillDropEntry.Item(721)];
+
+    private static readonly KillDropEntry[] CityDropTierB =
+        [KillDropEntry.Animal5, KillDropEntry.Item(8102), KillDropEntry.Item(720), KillDropEntry.Item(1166)];
+
+    private static readonly KillDropEntry[] CityDropTierC =
+    [
+        KillDropEntry.Binary(694, 1449), KillDropEntry.Item(1103), KillDropEntry.Item(1124), KillDropEntry.Item(722)
+    ];
+
+    private static readonly KillDropEntry[] CityDropTierD =
+        [KillDropEntry.Elixir, KillDropEntry.Binary(695, 696)];
+
+    private void DropItemsForKillOtherTribe(PlayerRuntimeState attackerState, PlayerRuntimeState defenderState,
+        int attackerCombinedLevel, int defenderCombinedLevel)
+    {
+        // Level guard: both killer and victim must be at combined level >= 145 (G12 R0).
+        if (attackerCombinedLevel < PvpKillDropMinimumCombinedLevel ||
+            defenderCombinedLevel < PvpKillDropMinimumCombinedLevel)
+            return;
+
+        // Pool 1 — YangGok event (zone 38). Reaching here already implies the event is enabled, since the
+        // DTM zone-38 reward profile only sets GrantDrop when the drop event is active. Short-circuits the
+        // remaining pools unconditionally, matching legacy.
+        if (MapId == PvpKillExtendedRewardZones.DtmZoneId)
+        {
+            if (_random.NextInt32(100) < YangGokPvpDropRatePercent)
+                TrySpawnPvpKillDrop(YangGokPvpDropBoxes[_random.NextInt32(YangGokPvpDropBoxes.Length)],
+                    attackerState, defenderState);
+            return;
+        }
+
+        // Pool 2 — regular-war streak (type-049 maps): drops one item every N eligible kills.
+        if (RegularWarMapCatalog.TryGet(MapId, out _))
+        {
+            var streak = _regularWarKillDropStreak.GetValueOrDefault(attackerState.CharacterId) + 1;
+            var requirement = MapId is 164 or PvpKillRewardZoneCatalog.FfaMapNumber
+                ? RegularWarDropStreakRequirementFast
+                : RegularWarDropStreakRequirement;
+            if (streak >= requirement)
+            {
+                _regularWarKillDropStreak[attackerState.CharacterId] = 0;
+                var itemId = ResolveKillDropItemId(PickKillDropTierMember(
+                    RegularWarDropTierA, RegularWarDropTierB, RegularWarDropTierC, RegularWarDropTierD));
+                TrySpawnPvpKillDrop(itemId, attackerState, defenderState);
+            }
+            else
+            {
+                _regularWarKillDropStreak[attackerState.CharacterId] = streak;
+            }
+        }
+
+        // Pool 3 — city / minority tribe (maps 1/6/11/140): fires on every eligible kill where the killer is
+        // not the city's owning tribe.
+        if (TryGetCityOwningTribe(MapId, out var cityOwningTribe) && attackerState.Tribe != cityOwningTribe)
+        {
+            var itemId = ResolveKillDropItemId(PickKillDropTierMember(
+                CityDropTierA, CityDropTierB, CityDropTierC, CityDropTierD));
+            TrySpawnPvpKillDrop(itemId, attackerState, defenderState);
+        }
+    }
+
+    private KillDropEntry PickKillDropTierMember(KillDropEntry[] tierA, KillDropEntry[] tierB,
+        KillDropEntry[] tierC, KillDropEntry[] tierD)
+    {
+        // Legacy tier boundaries over a %1000 roll: 2.5% / 7.5% / 30% / 60%.
+        var tier = _random.NextInt32(1000) switch
+        {
+            < 25 => tierA,
+            < 100 => tierB,
+            < 400 => tierC,
+            _ => tierD
+        };
+        return tier[_random.NextInt32(tier.Length)];
+    }
+
+    private int ResolveKillDropItemId(KillDropEntry entry)
+    {
+        return entry.Kind switch
+        {
+            KillDropEntryKind.Item => entry.First,
+            KillDropEntryKind.Binary => _random.NextInt32(2) == 0 ? entry.First : entry.Second,
+            KillDropEntryKind.Elixir => KillDropElixirs[_random.NextInt32(KillDropElixirs.Length)],
+            KillDropEntryKind.Animal5 => KillDropAnimalTier5[_random.NextInt32(KillDropAnimalTier5.Length)],
+            KillDropEntryKind.Animal10 => KillDropAnimalTier10[_random.NextInt32(KillDropAnimalTier10.Length)],
+            _ => 0
+        };
+    }
+
+    private void TrySpawnPvpKillDrop(int itemId, PlayerRuntimeState killer, PlayerRuntimeState victim)
+    {
+        // Silent no-op if the id resolves to nothing or is absent from the item catalog (legacy mITEM.Search
+        // null path). Master = killer name governs pickup priority; no party sharing (empty party name).
+        if (itemId <= 0 || !worldData.ItemsById.ContainsKey(itemId))
+            return;
+
+        SpawnGroundItem(itemId, 1, victim.PosX, victim.PosY, victim.PosZ, killer.Name, "", PvpKillDropSort,
+            victim.DungeonInstanceId);
+    }
+
+    private static bool TryGetCityOwningTribe(short mapId, out byte owningTribe)
+    {
+        owningTribe = mapId switch
+        {
+            1 => 0,
+            6 => 1,
+            11 => 2,
+            140 => 3,
+            _ => byte.MaxValue
+        };
+        return owningTribe != byte.MaxValue;
+    }
+
+    private enum KillDropEntryKind : byte
+    {
+        Item,
+        Binary,
+        Elixir,
+        Animal5,
+        Animal10
+    }
+
+    // A single pool member: either a fixed item id, a 50/50 binary choice between two ids, or a marker that
+    // expands to a nested uniform draw from the elixir / animal-tier tables. Resolving the chosen member only
+    // (rather than pre-evaluating every slot the way the legacy array literal does) yields the same marginal
+    // distribution for the dropped item.
+    private readonly record struct KillDropEntry(KillDropEntryKind Kind, int First, int Second)
+    {
+        public static readonly KillDropEntry Elixir = new(KillDropEntryKind.Elixir, 0, 0);
+
+        public static readonly KillDropEntry Animal5 = new(KillDropEntryKind.Animal5, 0, 0);
+
+        public static readonly KillDropEntry Animal10 = new(KillDropEntryKind.Animal10, 0, 0);
+
+        public static KillDropEntry Item(int id)
+        {
+            return new KillDropEntry(KillDropEntryKind.Item, id, 0);
+        }
+
+        public static KillDropEntry Binary(int first, int second)
+        {
+            return new KillDropEntry(KillDropEntryKind.Binary, first, second);
+        }
     }
 
     public void GrantContributionPoints(int characterId, int amount)
@@ -529,10 +731,10 @@ public sealed partial class Zone
     {
         var owningTribe = TowerZoneIndexTable.GetOwningTribe(MapId);
         var towerActivelyBuilt = towerWar?.GetPhase(towerIndex) == TowerSiegePhase.Active;
-        var allyOfOwningTribe = owningTribe is { } owner ? worldState?.GetAllyOf(owner) : null;
 
-        return TowerFriendlyFireGate.CanAttackGuardian(attackerTribe, owningTribe, towerActivelyBuilt,
-            allyOfOwningTribe);
+        // Legacy parity: only the owning tribe is blocked from its own built tower; an ally of the owner is
+        // allowed to strike it (the legacy ally-block condition is an inert bug). See TowerFriendlyFireGate.
+        return TowerFriendlyFireGate.CanAttackGuardian(attackerTribe, owningTribe, towerActivelyBuilt);
     }
 
     private void ApplyTowerGuardianHitSideEffects(int towerIndex, PlayerRuntimeState attackerState)

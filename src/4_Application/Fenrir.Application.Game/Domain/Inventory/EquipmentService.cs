@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
+using Fenrir.Application.Game.Domain.Mounts;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Stats;
@@ -89,14 +90,42 @@ public static class EquipmentService
             state.EatManaPotion,
             state.EatStrPotion,
             state.EatDexPotion,
-            state.EatElePotion);
+            state.EatElePotion,
+            HpBoostActive: state.HPBoost > 0,
+            WarriorPillActive: state.WarriorPill > 0,
+            DmgBoostActive: state.DmgBoost > 0);
 
-        var mount = new MountContext(
-            state.AnimalNumber,
-            AbsorbActive: state.AnimalAbsorbState != 0,
-            RuntimeAttributes: state.MountRolledAttributes);
+        var mount = BuildMountContext(state);
 
         return (cosmetic, zone, consumable, mount);
+    }
+
+    /// <summary>
+    ///     Resolves the ridden-mount contribution snapshot: the mount's absorb value and per-stat grade markers
+    ///     are keyed by mount id (via the base row inside the stat pass), while the ridden slot's raw rolled
+    ///     power and activity feed the flat rolled bonus. Only an actively-ridden mount contributes -- the mount
+    ///     pointer must sit in the mounted range (10..19); anything else (selected-only, unmounted) yields a
+    ///     default (no-op) context.
+    /// </summary>
+    public static MountContext BuildMountContext(PlayerRuntimeState state)
+    {
+        var mountedSlot = state.AnimalIndex >= MountAnimalInfo.ActiveCompanionSlotBase &&
+                          state.AnimalIndex <
+                          MountAnimalInfo.ActiveCompanionSlotBase + MountAnimalInfo.ActiveCompanionSlotCount
+            ? state.AnimalIndex - MountAnimalInfo.ActiveCompanionSlotBase
+            : -1;
+
+        if (mountedSlot < 0 || state.AnimalNumber == 0)
+            return default;
+
+        var absorbValue = StatCalculator.TryGetMountBaseRow(state.AnimalNumber, out var row) ? row.AbsorbValue : 0;
+
+        return new MountContext(
+            state.AnimalNumber,
+            AbsorbActive: state.AnimalAbsorbState != 0,
+            AbsorbValue: absorbValue,
+            RolledPower: MountPowerCodec.EncodeSlot(state.MountRolledAttributes, mountedSlot),
+            Activity: state.MountActivity[mountedSlot]);
     }
 
     private static int ResolveDrunkStateId(PlayerRuntimeState state)

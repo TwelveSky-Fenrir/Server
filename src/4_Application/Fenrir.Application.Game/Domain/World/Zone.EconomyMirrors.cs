@@ -799,8 +799,16 @@ public sealed partial class Zone
         if (command.ExperienceDelta > 0)
             ApplyCharacterExperienceGain(state, command.ExperienceDelta);
 
+        // Quest reward type 3 credits the PERSISTENT contribution total (legacy aKillOtherTribe -> C#
+        // ContributionPoints): the durable counter that drives warlord/tribe-vote election and is spendable on
+        // halo/war-point purchases. It must NOT touch the DAILY mission counter (legacy aMissionDate.aKillOtherTribe
+        // -> state.MissionKillOtherTribe), which is bumped +1 and capped at 10 only by an actual cross-tribe PvP
+        // kill (a separate Zone.Combat path), never by a PvE quest reward. Raw additive with no cap and no
+        // zero-floor here, faithful to the legacy quest-reward branch that bypasses the canonical ProcessForCP
+        // mutator and emits no S003CONTRIBUTION_POINT broadcast. The DirtyFlags.Progression flush persists
+        // ContributionPoints via CharacterProgressTvp, the same write-behind path every other CP mutation uses.
         if (command.KillOtherTribeCountDelta != 0)
-            state.MissionKillOtherTribe += command.KillOtherTribeCountDelta;
+            state.ContributionPoints += command.KillOtherTribeCountDelta;
         if (command.TeacherPointDelta != 0)
             state.TeacherPoint += command.TeacherPointDelta;
         if (command.KillOtherTribeCountDelta != 0 || command.TeacherPointDelta != 0)

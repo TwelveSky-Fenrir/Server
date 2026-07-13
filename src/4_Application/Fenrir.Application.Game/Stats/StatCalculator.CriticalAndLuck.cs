@@ -17,6 +17,10 @@ public static partial class StatCalculator
                               SetBonusTables.GetCoefficients(setNumber, i, IsLegendary(slot.Item)).Critical);
         }
 
+        // Ridden-mount grade multiplier (three-tier, critical marker). Critical is the one stat with a grade
+        // multiplier but no flat rolled bonus (the rolled system has eight attributes and Critical is not one).
+        crit = MountGradeCritical(crit, mount);
+
         if (bySlot[4] is { } ring && !IsLegendary(ring.Item))
             crit += ring.Enchant / 4;
 

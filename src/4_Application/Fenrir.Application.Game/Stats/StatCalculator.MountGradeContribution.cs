@@ -257,6 +257,124 @@ public static partial class StatCalculator
     }
 
 
+    // Per-stat mount contributions folded into the stat pipeline: (1) the grade multiplier -- a per-stat vector
+    // read from the ridden mount's base row (never a scalar), four-tier (5/10/15/20) for Life/Mana/Attack/Defense
+    // and three-tier (5/10/15) for Hit/Dodge/Critical/Element-Attack/Element-Defense -- and (2) the flat
+    // rolled-point bonus decoded from the ridden slot's rolled-attribute power (activity-gated). Every wrapper
+    // no-ops when no mount is ridden (AnimalNumber == 0). Critical has a grade multiplier but no rolled bonus.
+
+    private static bool TryGetRiddenMountRow(in MountContext mount, out MountBaseRow row)
+    {
+        if (mount.AnimalNumber != 0)
+            return TryGetMountBaseRow(mount.AnimalNumber, out row);
+        row = default;
+        return false;
+    }
+
+    private static int MountGradeMaxLife(int total, in MountContext mount)
+    {
+        return TryGetRiddenMountRow(mount, out var row)
+            ? ApplyMountGradeMultiplierFourTier(total, row.MaxLifeColumn)
+            : total;
+    }
+
+    private static int MountGradeMaxMana(int total, in MountContext mount)
+    {
+        return TryGetRiddenMountRow(mount, out var row)
+            ? ApplyMountGradeMultiplierFourTier(total, row.MaxManaColumn)
+            : total;
+    }
+
+    private static int MountGradeAttack(int total, in MountContext mount)
+    {
+        return TryGetRiddenMountRow(mount, out var row)
+            ? ApplyMountGradeMultiplierFourTier(total, row.AttackColumn)
+            : total;
+    }
+
+    private static int MountGradeDefense(int total, in MountContext mount)
+    {
+        return TryGetRiddenMountRow(mount, out var row)
+            ? ApplyMountGradeMultiplierFourTier(total, row.DefenseColumn)
+            : total;
+    }
+
+    private static int MountGradeHit(int total, in MountContext mount)
+    {
+        return TryGetRiddenMountRow(mount, out var row)
+            ? ApplyMountGradeMultiplierThreeTier(total, row.HitColumn)
+            : total;
+    }
+
+    private static int MountGradeDodge(int total, in MountContext mount)
+    {
+        return TryGetRiddenMountRow(mount, out var row)
+            ? ApplyMountGradeMultiplierThreeTier(total, row.DodgeColumn)
+            : total;
+    }
+
+    private static int MountGradeCritical(int total, in MountContext mount)
+    {
+        return TryGetRiddenMountRow(mount, out var row)
+            ? ApplyMountGradeMultiplierThreeTier(total, row.CriticalColumn)
+            : total;
+    }
+
+    private static int MountGradeElementAttack(int total, in MountContext mount)
+    {
+        return TryGetRiddenMountRow(mount, out var row)
+            ? ApplyMountGradeMultiplierThreeTier(total, row.ElementAttackColumn)
+            : total;
+    }
+
+    private static int MountGradeElementDefense(int total, in MountContext mount)
+    {
+        return TryGetRiddenMountRow(mount, out var row)
+            ? ApplyMountGradeMultiplierThreeTier(total, row.ElementDefenseColumn)
+            : total;
+    }
+
+    private static int MountFlatMaxLife(in MountContext mount)
+    {
+        return mount.AnimalNumber != 0 ? ComputeMountFlatBonuses(mount.RolledPower, mount.Activity).MaxLife : 0;
+    }
+
+    private static int MountFlatMaxMana(in MountContext mount)
+    {
+        return mount.AnimalNumber != 0 ? ComputeMountFlatBonuses(mount.RolledPower, mount.Activity).MaxMana : 0;
+    }
+
+    private static int MountFlatAttack(in MountContext mount)
+    {
+        return mount.AnimalNumber != 0 ? ComputeMountFlatBonuses(mount.RolledPower, mount.Activity).Attack : 0;
+    }
+
+    private static int MountFlatDefense(in MountContext mount)
+    {
+        return mount.AnimalNumber != 0 ? ComputeMountFlatBonuses(mount.RolledPower, mount.Activity).Defense : 0;
+    }
+
+    private static int MountFlatHit(in MountContext mount)
+    {
+        return mount.AnimalNumber != 0 ? ComputeMountFlatBonuses(mount.RolledPower, mount.Activity).Hit : 0;
+    }
+
+    private static int MountFlatDodge(in MountContext mount)
+    {
+        return mount.AnimalNumber != 0 ? ComputeMountFlatBonuses(mount.RolledPower, mount.Activity).Dodge : 0;
+    }
+
+    private static int MountFlatElementAttack(in MountContext mount)
+    {
+        return mount.AnimalNumber != 0 ? ComputeMountFlatBonuses(mount.RolledPower, mount.Activity).ElementAttack : 0;
+    }
+
+    private static int MountFlatElementDefense(in MountContext mount)
+    {
+        return mount.AnimalNumber != 0 ? ComputeMountFlatBonuses(mount.RolledPower, mount.Activity).ElementDefense : 0;
+    }
+
+
     public readonly record struct MountBaseRow(
         int MaxLifeColumn,
         int MaxManaColumn,

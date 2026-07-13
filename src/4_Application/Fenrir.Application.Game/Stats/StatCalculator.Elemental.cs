@@ -41,11 +41,16 @@ public static partial class StatCalculator
 
         eatk += levelRow.ElementAttack;
 
+        // Ridden-mount grade multiplier (three-tier, element-damage marker); flat rolled bonus added at the end.
+        eatk = MountGradeElementAttack(eatk, mount);
+
         eatk += ElementAttackElixirContribution(consumable, zone);
         eatk += StellarCoreElementAttackContribution(cosmetic);
 
         if (bySlot[4] is { } ringIu5)
             eatk += IUEffectSlotContribution(5, ringIu5.Item.Sort, ringIu5.Item.Level, ringIu5.Combine);
+
+        eatk += MountFlatElementAttack(mount);
 
         return eatk;
     }
@@ -81,6 +86,9 @@ public static partial class StatCalculator
             edef += (int)(deco2.Enchant * (isWing ? 7.8f : 3.9f));
         }
 
+        // Ridden-mount grade multiplier (three-tier, element-defense marker); flat rolled bonus added at the end.
+        edef = MountGradeElementDefense(edef, mount);
+
         edef += ElementDefenseElixirContribution(consumable, zone);
         edef += StellarCoreElementDefenseContribution(cosmetic);
 
@@ -88,6 +96,8 @@ public static partial class StatCalculator
             edef += IUEffectSlotContribution(6, amuletIu6.Item.Sort, amuletIu6.Item.Level, amuletIu6.Combine);
 
         edef += DecorationStatContribution(DecorationStatKind.ElementDefensePower, bySlot);
+
+        edef += MountFlatElementDefense(mount);
 
         return edef;
     }

@@ -191,7 +191,7 @@ public sealed partial class Zone
             killerTribe, killerName, MapId);
     }
 
-    public void ResolveMonsterAttack(MonsterEntity monster, int targetCharacterId)
+    public void ResolveMonsterAttack(MonsterEntity monster, int targetCharacterId, int attackSubMode = 0)
     {
         if (!_players.TryGetValue(targetCharacterId, out var target) || target is null)
             return;
@@ -201,6 +201,21 @@ public sealed partial class Zone
             target.VisibleState == 0, target.PshopOpen);
         if (outcome.Rejected)
             return;
+
+        // Contract behavior B (holy shield vs monster, ProcessAttack04): on a landed monster hit, a catapult
+        // may first strip the holy shield entirely (step 2), then the shield absorbs the physical portion of
+        // the damage (step 3) — reusing the exact PvP pipeline (RemoveDefenderHolyShields / ApplyHolyShieldAbsorption)
+        // so absorption slots between physical+critical and the element addition, then the result is clamped to
+        // life. A miss carries no damage and touches no shield.
+        var viewDamage = outcome.ViewDamage;
+        var realDamage = outcome.DamageApplied;
+        if (outcome.Hit)
+        {
+            if (MonsterCombatResolver.RollHolyShieldRemoval(monster.Template.SpecialType, attackSubMode, _random))
+                RemoveDefenderHolyShields(target);
+
+            (viewDamage, realDamage) = ApplyHolyShieldAbsorption(target, outcome);
+        }
 
         var response = new AttackResponse
         {
@@ -219,8 +234,8 @@ public sealed partial class Zone
                 AttackResultValue = outcome.Hit ? 1 : 0,
                 AttackCriticalExist = outcome.Critical ? 1 : 0,
                 AttackElementDamage = outcome.ElementDamage,
-                AttackViewDamageValue = outcome.ViewDamage,
-                AttackRealDamageValue = outcome.DamageApplied
+                AttackViewDamageValue = viewDamage,
+                AttackRealDamageValue = realDamage
             }
         };
 
@@ -230,7 +245,7 @@ public sealed partial class Zone
             return;
         }
 
-        target.Life -= outcome.DamageApplied;
+        target.Life -= realDamage;
         target.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
 
         _mvpAttackRecipientScratch.Clear();

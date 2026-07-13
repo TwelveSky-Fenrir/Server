@@ -20,6 +20,9 @@ public static partial class StatCalculator
                              SetBonusTables.GetCoefficients(setNumber, i, IsLegendary(slot.Item)).AttackSuccess);
         }
 
+        // Ridden-mount grade multiplier (three-tier, hit marker); flat rolled bonus added at the end.
+        hit = MountGradeHit(hit, mount);
+
         hit += ComputeGlovesAttackSuccessBonus(bySlot[3]);
         hit += ComputeWeaponAttackSuccessBonus(bySlot[7]);
 
@@ -27,6 +30,8 @@ public static partial class StatCalculator
 
         if (bySlot[7] is { } weaponIu3)
             hit += IUEffectSlotContribution(3, weaponIu3.Item.Sort, weaponIu3.Item.Level, weaponIu3.Combine);
+
+        hit += MountFlatHit(mount);
 
         return hit;
     }
@@ -79,6 +84,9 @@ public static partial class StatCalculator
                                SetBonusTables.GetCoefficients(setNumber, i, IsLegendary(slot.Item)).AttackBlock);
         }
 
+        // Ridden-mount grade multiplier (three-tier, dodge marker); flat rolled bonus added at the end.
+        dodge = MountGradeDodge(dodge, mount);
+
         dodge += ComputeArmorAttackBlockBonus(bySlot[2]);
         dodge += ComputeBootsAttackBlockBonus(bySlot[5]);
 
@@ -90,6 +98,8 @@ public static partial class StatCalculator
         dodge += DecorationStatContribution(DecorationStatKind.AttackBlock, bySlot);
 
         dodge += BlockElixirContributionWithOverride(consumable, zone);
+
+        dodge += MountFlatDodge(mount);
 
         return dodge;
     }

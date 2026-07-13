@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
+using Fenrir.Application.Game.Abstractions.Chat;
 using Fenrir.Application.Game.Abstractions.Progression;
 using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 using Fenrir.Application.Game.Domain;
@@ -35,6 +36,7 @@ public sealed class UseInventoryItemService(
     WorldDataCache worldData,
     ILogger<UseInventoryItemService> logger,
     ITowerUpgradeService towerUpgrade,
+    IWorldNoticeService worldNotice,
     UseItemHandlerRegistry? useItemRegistry = null) : IUseInventoryItemService
 {
     private const byte BottleSort = 26;
@@ -499,7 +501,10 @@ public sealed class UseInventoryItemService(
         var newRawCounter = ResolvedStatPotionRawCounter(state, kind, newSubValue);
 
         var baseConsumable = new ConsumableContext(state.EatLifePotion, state.EatManaPotion, state.EatStrPotion,
-            state.EatDexPotion, state.EatElePotion);
+            state.EatDexPotion, state.EatElePotion,
+            HpBoostActive: state.HPBoost > 0,
+            WarriorPillActive: state.WarriorPill > 0,
+            DmgBoostActive: state.DmgBoost > 0);
         var consumableOverride = kind switch
         {
             StatPotionKind.Life => baseConsumable with { EatLifePotion = newRawCounter },
@@ -905,14 +910,25 @@ public sealed class UseInventoryItemService(
         var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
             petContribution, state);
 
+        // Legacy MyWork::MaxRebirth runs against the counter AFTER the increment: it drops a milestone
+        // reward item on the ground at generations 6 and 12, and broadcasts a cluster notice at 12. The
+        // drop is folded into the same awaited progress command below so it materialises on the tick
+        // thread (single-writer) at the character's position before the notice fires -- preserving the
+        // legacy drop-first/notice-after order.
+        var milestone = RebirthMilestoneRewards.Resolve(newRebirthCount, state.PreviousTribe);
+
         var response = await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
 
         if (!await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
-                    RebirthCount: newRebirthCount, Exp2: 0, UpdatedStats: updatedStats, RebirthBroadcast: true),
+                    RebirthCount: newRebirthCount, Exp2: 0, UpdatedStats: updatedStats, RebirthBroadcast: true,
+                    DropItems: milestone.Drops),
                 cancellationToken))
             logger.LogError(
                 "Zone {MapId} tribe-progress inbox full: dropped Rebirth-Pill mirror for character {CharacterId}",
                 zone.MapId, characterId);
+
+        if (milestone.ClusterNotice)
+            worldNotice.Broadcast(RebirthMilestoneRewards.FormatTwelfthRebirthNotice(state.Name));
 
         logger.LogInformation(
             "Character {CharacterId} rebirth advanced to generation {NewRebirthCount} via item {ItemId}",

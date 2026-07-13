@@ -272,6 +272,16 @@ public sealed partial class Zone(
                     logger.LogError(ex, "Zone {MapId} tick stage {Stage} failed", MapId,
                         nameof(RebroadcastGroundItems));
                 }
+
+                try
+                {
+                    SummonPersonalQuestBossesForTick();
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Zone {MapId} tick stage {Stage} failed", MapId,
+                        nameof(SummonPersonalQuestBossesForTick));
+                }
             }
 
             try

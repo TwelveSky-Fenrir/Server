@@ -4,10 +4,12 @@ using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World.Geometry;
 using Fenrir.Application.Game.Domain.World.Pathfinding;
+using Fenrir.Application.Game.Domain.World.WorldState;
 
 namespace Fenrir.Application.Game.Domain.World.Monsters;
 
-public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISimulationSystem
+public sealed partial class MonsterAiSystem(IRandomSource? random = null, WorldStateService? worldState = null)
+    : ISimulationSystem
 {
     private const float TickSeconds = SimulationClock.LegacyTickMilliseconds / 1000f;
 
@@ -32,6 +34,8 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
     private const float LegacyFrameUnitsPerSecond = 30f;
 
     private readonly IRandomSource _random = random ?? SystemRandomSource.Instance;
+
+    private readonly WorldStateService? _worldState = worldState;
 
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
@@ -72,12 +76,17 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
                 break;
 
             case MonsterAiState.AttackWindup:
-                monster.StateTicks++;
-                if (monster.StateTicks == 1 && monster.TargetCharacterId is { } attackTargetId)
-                    zone.ResolveMonsterAttack(monster, attackTargetId);
-
-                if (monster.StateTicks >= Math.Max(1, (int)monster.Template.FrameInfo3))
+                if (monster.StateTicks++ == 0)
                 {
+                    monster.StateFrameAccumulator = 0f;
+                    if (monster.TargetCharacterId is { } attackTargetId)
+                        zone.ResolveMonsterAttack(monster, attackTargetId);
+                }
+
+                monster.StateFrameAccumulator += dt * LegacyFrameUnitsPerSecond;
+                if (monster.StateFrameAccumulator >= Math.Max(1, (int)monster.Template.FrameInfo3))
+                {
+                    monster.StateFrameAccumulator = 0f;
                     monster.AiState = MonsterAiState.Decision;
                     monster.StateTicks = 0;
                 }
@@ -85,9 +94,13 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
                 break;
 
             case MonsterAiState.RangedAttackWindup:
-                monster.StateTicks++;
-                if (monster.StateTicks >= Math.Max(1, (int)monster.Template.FrameInfo4))
+                if (monster.StateTicks++ == 0)
+                    monster.StateFrameAccumulator = 0f;
+
+                monster.StateFrameAccumulator += dt * LegacyFrameUnitsPerSecond;
+                if (monster.StateFrameAccumulator >= Math.Max(1, (int)monster.Template.FrameInfo4))
                 {
+                    monster.StateFrameAccumulator = 0f;
                     monster.AiState = MonsterAiState.Decision;
                     monster.StateTicks = 0;
                 }
@@ -95,9 +108,13 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
                 break;
 
             case MonsterAiState.Flinch:
-                monster.StateTicks++;
-                if (monster.StateTicks >= Math.Max(1, (int)monster.Template.FrameInfo2))
+                if (monster.StateTicks++ == 0)
+                    monster.StateFrameAccumulator = 0f;
+
+                monster.StateFrameAccumulator += dt * LegacyFrameUnitsPerSecond;
+                if (monster.StateFrameAccumulator >= Math.Max(1, (int)monster.Template.FrameInfo2))
                 {
+                    monster.StateFrameAccumulator = 0f;
                     monster.AiState = MonsterAiState.Decision;
                     monster.StateTicks = 0;
                 }
@@ -109,9 +126,14 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
                 if (monster.StateFrameAccumulator >= Math.Max(1, (int)monster.Template.FrameInfo6))
                 {
                     monster.StateFrameAccumulator = 0f;
-                    monster.PosX = monster.HomeReturnTargetX;
-                    monster.PosY = monster.HomeReturnTargetY;
-                    monster.PosZ = monster.HomeReturnTargetZ;
+
+                    // A020 final pose: snap EXACTLY onto the spawn point (mFirstLocation equivalent =
+                    // HomeX/Y/Z, frozen at creation), unconditionally — legacy performs no walkability
+                    // check on this final placement, so the monster always reaches its exact spawn even
+                    // when the straight line home was obstructed (S07_MyGame05.cpp:1666-1670).
+                    monster.PosX = monster.HomeX;
+                    monster.PosY = monster.HomeY;
+                    monster.PosZ = monster.HomeZ;
                     monster.ReleaseTarget();
                     monster.AiState = MonsterAiState.Spawning;
                     monster.StateTicks = 0;
@@ -227,18 +249,22 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
 
             ResolveHomeReturnPath(zone, monster, out var resolvedX, out var resolvedY, out var resolvedZ);
 
+            // A002 decision only: the raycast/reachable point toward home decides *whether* to arm the
+            // return (the monster returns when that point is still more than 1 unit² short of the exact
+            // spawn). It is NOT the return destination — A020's final pose always snaps to the exact
+            // spawn (see the ReturnToSpawn case), obstacle or not (S07_MyGame05.cpp:1021-1030).
             if (DistanceSquared(resolvedX, resolvedY, resolvedZ, monster.HomeX, monster.HomeY, monster.HomeZ) >
                 ArrivalEpsilon * ArrivalEpsilon)
             {
                 monster.IdleWanderElapsedTicks = 0;
 
-                monster.HomeReturnTargetX = resolvedX;
-                monster.HomeReturnTargetY = resolvedY;
-                monster.HomeReturnTargetZ = resolvedZ;
-                monster.TargetLocationX = resolvedX;
-                monster.TargetLocationY = resolvedY;
-                monster.TargetLocationZ = resolvedZ;
-                monster.Heading = MathF.Atan2(resolvedX - monster.PosX, resolvedZ - monster.PosZ);
+                monster.HomeReturnTargetX = monster.HomeX;
+                monster.HomeReturnTargetY = monster.HomeY;
+                monster.HomeReturnTargetZ = monster.HomeZ;
+                monster.TargetLocationX = monster.HomeX;
+                monster.TargetLocationY = monster.HomeY;
+                monster.TargetLocationZ = monster.HomeZ;
+                monster.Heading = MathF.Atan2(monster.HomeX - monster.PosX, monster.HomeZ - monster.PosZ);
                 monster.AiState = MonsterAiState.ReturnToSpawn;
                 monster.StateTicks = 0;
                 monster.StateFrameAccumulator = 0f;
@@ -531,6 +557,11 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
             if (!zone.TryGetPlayer(characterId, out var player) || !IsCandidateValid(player))
                 continue;
 
+            // Legacy SelectAvatarIndexForPossibleAttack skips players at rest (action-sort 0) or in
+            // action-sort 33 — the monster leaves them alone (S07_MyGame05.cpp:156-159).
+            if (player.ActionSort is 0 or 33)
+                continue;
+
             if (monster.InstanceId is { } requiredInstanceId && player.DungeonInstanceId != requiredInstanceId)
                 continue;
 
@@ -613,6 +644,11 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
         foreach (var characterId in zone.NeighborsOfPosition(monster.PosX, monster.PosZ))
         {
             if (!zone.TryGetPlayer(characterId, out var candidate) || !IsCandidateValid(candidate))
+                continue;
+
+            // Legacy SelectAvatarIndexForAttackAction skips players at rest (action-sort 0) or in
+            // action-sort 33 (S07_MyGame05.cpp:558-561).
+            if (candidate.ActionSort is 0 or 33)
                 continue;
 
             if (monster.InstanceId is { } requiredInstanceId && candidate.DungeonInstanceId != requiredInstanceId)

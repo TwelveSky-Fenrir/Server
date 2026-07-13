@@ -10,7 +10,22 @@ public sealed class CenterLinkAuthenticator : ICenterLinkAuthenticator
 
         public CenterLinkAuthenticator(string? sharedSecret)
     {
-        _key = string.IsNullOrEmpty(sharedSecret) ? null : Encoding.UTF8.GetBytes(sharedSecret);
+        if (string.IsNullOrEmpty(sharedSecret))
+        {
+            // Fail-closed : aucun secret => lien désactivé, aucun handshake authentifiable (IsEnabled == false).
+            _key = null;
+            return;
+        }
+
+        // Fail-fast : un secret NON vide mais trop court affaiblirait la clé HMAC — on refuse une config faible
+        // au démarrage plutôt que de servir un lien faiblement authentifié.
+        if (sharedSecret.Length < CenterLinkAuth.MinSecretLength)
+            throw new ArgumentException(
+                $"CenterLink shared secret is too weak: {sharedSecret.Length} chars, minimum " +
+                $"{CenterLinkAuth.MinSecretLength} required. (The secret itself is never logged.)",
+                nameof(sharedSecret));
+
+        _key = Encoding.UTF8.GetBytes(sharedSecret);
     }
 
         public bool IsEnabled => _key is not null;

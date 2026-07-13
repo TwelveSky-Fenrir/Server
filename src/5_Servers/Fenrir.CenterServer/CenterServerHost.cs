@@ -1,6 +1,13 @@
+using System.Buffers;
 using System.Collections.Concurrent;
+using System.IO.Pipelines;
 using System.Net;
+using Fenrir.Cluster;
+using Fenrir.Core.Wire;
+using Fenrir.Network.Abstractions;
+using Fenrir.Network.Framing;
 using Fenrir.Network.Transport;
+using Fenrir.Security.Abstractions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -12,22 +19,23 @@ namespace Fenrir.CenterServer;
 /// qui accepte des liens serveur-à-serveur entrants (Zones, LoginServer) et n'ouvre <b>aucun</b> TCP sortant de
 /// jeu. Boot <b>paresseux</b> : l'accept-loop est armée d'abord, la découverte des pairs est paresseuse, aucun
 /// <c>connect()</c> bloquant au démarrage (Topologie <c>03_</c> §2.4). Réutilise la pile <c>Fenrir.Network</c>
-/// (<see cref="FenrirTcpListener{TSession}"/> + <see cref="SocketConnection"/>) — socket + pipes + teardown
-/// gracieux — plutôt que de réécrire une pile socket.
+/// (<see cref="FenrirTcpListener{TSession}"/> + <see cref="SocketConnection"/>).
 /// </summary>
 /// <remarks>
-/// <para><b>Périmètre de CE lot (substrat S2S minimal-viable) :</b> listener + cycle de vie de connexion + drain
-/// gracieux à l'arrêt. Le dispatch S2S par opcode et le handshake authentifié sont des TODO explicites (voir
-/// <see cref="RunLinkAsync"/>), bloqués en amont sur deux livrables d'autres domaines : (1) les paquets
-/// <c>[FenrirPacket]</c> <c>FenrirServer.Center</c> + le <c>CenterOpcodeRegistry.Provider</c> +
-/// <c>CenterFrameDispatcher</c> générés (wire-protocol/source-generator), et (2) un vérificateur de secret partagé
-/// dans <c>Fenrir.Security</c>. Tant qu'ils n'existent pas, un lien accepté est tenu ouvert et drainé proprement,
-/// sans interprétation de trame.</para>
-/// <para><b>Cadre S2S = en-tête d'opcode 1 octet, sans length-prefix</b> (taille par opcode via registre généré) —
-/// c'est pourquoi ce substrat ne passe pas par le <c>SessionLoop</c> client, dont le <c>FrameReader</c> est câblé
-/// sur l'en-tête client 9 octets. Le lien n'applique pas le XOR client (clé à 0).</para>
+/// <para><b>Chaque lien accepté</b> passe par un handshake d'authentification HMAC (défi-réponse à secret partagé,
+/// <see cref="ICenterLinkAuthenticator"/> — durcit la faille legacy #8 « seul un pair saurait » ≠ auth) : le Center
+/// émet un nonce, le pair renvoie <c>HMAC(secret, nonce)</c>, le Center recompute et compare en temps constant. Un
+/// lien qui échoue (ou si aucun secret n'est configuré, fail-closed) est fermé sans jamais être dispatché.</para>
+/// <para><b>Une fois authentifié</b>, le flux entrant est décodé en trames S2S (<see cref="S2SFrameReader"/> :
+/// en-tête d'opcode 1 octet, taille par opcode via <c>CenterOpcodeRegistry.Provider</c> généré, sans length-prefix)
+/// et routé par <see cref="IFrameDispatcher"/> après la garde d'état <c>CenterSessionStateGate</c>. Le lien
+/// n'applique pas le XOR client (clé à 0).</para>
 /// </remarks>
-internal sealed class CenterServerHost(ILogger<CenterServerHost> logger, IOptions<CenterServerOptions> options)
+internal sealed class CenterServerHost(
+    ILogger<CenterServerHost> logger,
+    IOptions<CenterServerOptions> options,
+    ICenterLinkAuthenticator authenticator,
+    IFrameDispatcher dispatcher)
     : BackgroundService
 {
     private readonly ConcurrentDictionary<Task, byte> _inFlightLinks = new();
@@ -48,9 +56,9 @@ internal sealed class CenterServerHost(ILogger<CenterServerHost> logger, IOption
             "Fenrir.CenterServer listening on :{Port} (internal S2S, passive; accepts Zone/Login links, opens no " +
             "outbound game TCP). S2S auth: {AuthState}.",
             opts.Port,
-            string.IsNullOrEmpty(opts.SharedSecret)
-                ? "NOT configured -- loopback-trust; authenticated handshake pending (TODO F4, hardens legacy flaw #8)"
-                : "shared secret configured (verification handshake pending, TODO F4)");
+            authenticator.IsEnabled
+                ? "HMAC shared-secret handshake ENABLED (hardens legacy flaw #8)"
+                : "DISABLED -- no shared secret configured; every link is refused (fail-closed)");
 
         try
         {
@@ -103,12 +111,8 @@ internal sealed class CenterServerHost(ILogger<CenterServerHost> logger, IOption
 
         try
         {
-            // TODO(F4): authenticated handshake (shared secret via Fenrir.Security) then per-opcode S2S dispatch.
-            //   The dispatch belongs here once Center [FenrirPacket]s + CenterOpcodeRegistry.Provider +
-            //   CenterFrameDispatcher exist (wire-protocol/source-generator). It cannot reuse the client SessionLoop
-            //   as-is: that path frames a 9-byte client header, whereas S2S frames a 1-byte opcode header.
-            //   Until then, hold the link open and observe the peer's FIN / faults so shutdown drains cleanly.
-            await AwaitLinkClosureAsync(session, ct).ConfigureAwait(false);
+            if (await TryAuthenticateAsync(session, connection, ct).ConfigureAwait(false))
+                await DispatchLoopAsync(session, connection, ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -121,7 +125,7 @@ internal sealed class CenterServerHost(ILogger<CenterServerHost> logger, IOption
         }
         finally
         {
-            // Unblocks SendLoopAsync still parked on the (empty) TX pipe so RunIoAsync can complete, mirroring
+            // Unblocks SendLoopAsync still parked on the TX pipe so RunIoAsync can complete, mirroring
             // SessionLoop.RunConnectionAsync's own teardown ordering.
             connection.Abort();
             await ioTask.ConfigureAwait(false);
@@ -131,39 +135,124 @@ internal sealed class CenterServerHost(ILogger<CenterServerHost> logger, IOption
     }
 
     /// <summary>
-    /// Substrat sans dispatch : lit le flux entrant uniquement pour détecter la fermeture (FIN du pair) ou une
-    /// annulation, en n'examinant les octets que pour repartir en attente — aucune trame n'est consommée tant que
-    /// le codec S2S Center n'est pas câblé (voir le TODO de <see cref="RunLinkAsync"/>). Remplacer ce corps par le
-    /// décodage/dispatch S2S 1 octet dès que le registre/dispatcher Center généré est disponible.
+    /// Handshake d'authentification : émet un défi (nonce), lit la réponse HMAC du pair, la vérifie en temps
+    /// constant. Fail-closed si aucun secret n'est configuré. Retourne <c>true</c> et bascule la session en
+    /// <c>Authenticated</c> uniquement si la preuve est valide ; sinon ferme le lien (le pair est refusé).
     /// </summary>
-    private static async Task AwaitLinkClosureAsync(CenterLinkSession session, CancellationToken ct)
+    private async Task<bool> TryAuthenticateAsync(CenterLinkSession session, SocketConnection connection,
+        CancellationToken ct)
     {
-        var reader = session.Transport.Input;
+        if (!authenticator.IsEnabled)
+        {
+            logger.LogError(
+                "S2S link {SessionId} refused: CenterServer shared secret not configured (fail-closed handshake)",
+                session.SessionId);
+            return false;
+        }
+
+        var challenge = authenticator.IssueChallenge();
+        session.SendRaw(challenge.Nonce);
+
+        var response = await ReadExactAsync(connection.Input, CenterLinkAuth.MacSize, ct).ConfigureAwait(false);
+        if (response is null)
+        {
+            logger.LogWarning("S2S link {SessionId} closed before completing the HMAC handshake", session.SessionId);
+            return false;
+        }
+
+        if (!authenticator.VerifyHelloMac(in challenge, ReadOnlySpan<byte>.Empty, response))
+        {
+            logger.LogWarning("S2S link {SessionId} failed the HMAC handshake -- refusing the peer", session.SessionId);
+            return false;
+        }
+
+        session.MarkAuthenticated();
+        logger.LogInformation("S2S link {SessionId} authenticated", session.SessionId);
+        return true;
+    }
+
+    /// <summary>
+    /// Boucle de dispatch S2S post-auth : décode les trames à en-tête 1 octet et les route (garde d'état puis
+    /// dispatcher). Miroir de <c>SessionLoop.ProcessBufferAsync</c> côté client, adapté au cadre S2S.
+    /// </summary>
+    private async Task DispatchLoopAsync(CenterLinkSession session, SocketConnection connection, CancellationToken ct)
+    {
+        var reader = connection.Input;
 
         try
         {
             while (true)
             {
                 var result = await reader.ReadAsync(ct).ConfigureAwait(false);
-
                 if (result.IsCanceled)
                     break;
 
-                // Nothing is framed/consumed yet: examine everything (park until more bytes arrive) but consume
-                // nothing. A transport fault (peer reset) surfaces here as a SocketException/IOException and is left
-                // to propagate to RunLinkAsync's classifier; only cancellation (shutdown) is a clean stop.
-                reader.AdvanceTo(result.Buffer.Start, result.Buffer.End);
+                var buffer = result.Buffer;
+
+                try
+                {
+                    while (S2SFrameReader.TryReadFrame(ref buffer, CenterOpcodeRegistry.Provider, FenrirServer.Center,
+                               out var frame))
+                    {
+                        // Frame est un ref struct : matérialiser opcode + payload en locaux avant tout await.
+                        var opcode = frame.Opcode;
+                        var payload = frame.Payload;
+
+                        if (!session.IsOpcodeAllowed(opcode))
+                        {
+                            logger.LogWarning(
+                                "S2S link {SessionId}: opcode {Opcode} not allowed in state {State} -- closing",
+                                session.SessionId, opcode, session.State);
+                            return;
+                        }
+
+                        await dispatcher.DispatchAsync(FenrirServer.Center, opcode, payload, session, ct)
+                            .ConfigureAwait(false);
+                    }
+                }
+                catch (Fenrir.Network.Framing.ProtocolViolationException ex)
+                {
+                    logger.LogWarning(
+                        "S2S link {SessionId}: unknown opcode {Opcode} for {Server} -- closing",
+                        session.SessionId, ex.Opcode, ex.Server);
+                    return;
+                }
+
+                reader.AdvanceTo(buffer.Start, buffer.End);
 
                 if (result.IsCompleted)
                     break;
             }
         }
-        catch (OperationCanceledException)
-        {
-        }
         finally
         {
             await reader.CompleteAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Lit exactement <paramref name="count"/> octets du flux entrant ; <c>null</c> si le pair ferme avant.</summary>
+    private static async Task<byte[]?> ReadExactAsync(PipeReader reader, int count, CancellationToken ct)
+    {
+        while (true)
+        {
+            var result = await reader.ReadAsync(ct).ConfigureAwait(false);
+            var buffer = result.Buffer;
+
+            if (buffer.Length >= count)
+            {
+                var slice = buffer.Slice(0, count);
+                var bytes = slice.ToArray();
+                reader.AdvanceTo(slice.End);
+                return bytes;
+            }
+
+            if (result.IsCompleted || result.IsCanceled)
+            {
+                reader.AdvanceTo(buffer.Start, buffer.End);
+                return null;
+            }
+
+            reader.AdvanceTo(buffer.Start, buffer.End);
         }
     }
 

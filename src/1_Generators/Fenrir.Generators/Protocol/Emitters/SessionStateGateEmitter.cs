@@ -12,12 +12,14 @@ internal static class SessionStateGateEmitter
     public static string Emit(ImmutableArray<TypeModel> packets)
     {
         var server = packets[0].Server;
-        var (className, stateEnum) = server == FenrirServer.Login
-            ? ("LoginSessionStateGate", WellKnownNames.LoginSessionStateEnum)
-            : ("ZoneSessionStateGate", WellKnownNames.ZoneSessionStateEnum);
-        var namespaceName = server == FenrirServer.Login
-            ? "Fenrir.Application.Login"
-            : "Fenrir.Application.Game";
+        var (className, stateEnum, namespaceName) = server switch
+        {
+            FenrirServer.Login => ("LoginSessionStateGate", WellKnownNames.LoginSessionStateEnum,
+                "Fenrir.Application.Login"),
+            FenrirServer.Zone => ("ZoneSessionStateGate", WellKnownNames.ZoneSessionStateEnum,
+                "Fenrir.Application.Game"),
+            _ => ("CenterSessionStateGate", WellKnownNames.CenterSessionStateEnum, "Fenrir.Cluster")
+        };
 
         var entries = packets
             .Where(p => p is { Direction: FenrirDirection.Incoming, AllowedStates.Length: > 0 })

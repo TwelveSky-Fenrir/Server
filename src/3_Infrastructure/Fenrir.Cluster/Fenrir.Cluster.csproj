@@ -11,6 +11,14 @@
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions"/>
   </ItemGroup>
 
+  <!-- Usings de projet pour les paquets/handlers S2S Center : Abstractions (IIncomingPacket/IAsyncPacketHandler)
+       + Opcodes. FenrirServer/FenrirDirection/FixedArray viennent du using per-file Fenrir.Core.Wire/.Attributes,
+       comme côté Application. -->
+  <ItemGroup>
+    <Using Include="Fenrir.Core.Abstractions"/>
+    <Using Include="Fenrir.Core.Opcodes"/>
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\2_Core\Fenrir.Core\Fenrir.Core.csproj"/>
     <ProjectReference Include="..\Fenrir.Network\Fenrir.Network.csproj"/>
@@ -20,6 +28,12 @@
          l'assembly Fenrir.Data ci-dessus — pas de projet Data.Abstractions séparé à référencer. -->
     <ProjectReference Include="..\Fenrir.Security\Fenrir.Security.csproj"/>
     <ProjectReference Include="..\Fenrir.Observability\Fenrir.Observability.csproj"/>
+    <!-- Générateurs en Analyzer : émettent CenterOpcodeRegistry / CenterSessionStateGate / MessageDispatcher /
+         PacketHandlerHub pour les [FenrirPacket(FenrirServer.Center,…)] de ce projet (frontière compilateur :
+         paquets Center compilés uniquement ici). -->
+    <ProjectReference Include="..\..\1_Generators\Fenrir.Generators\Fenrir.Generators.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"/>
   </ItemGroup>
 
 </Project>

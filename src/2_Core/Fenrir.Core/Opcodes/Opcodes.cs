@@ -323,4 +323,23 @@ public static class Opcodes
             public const byte ZoneWar335Countdown = 200;
         }
     }
+
+    /// <summary>
+    /// Opcodes du lien serveur-à-serveur du CenterServer (coordination cross-zone, ex-<c>ts25center</c>). Cadre
+    /// S2S = en-tête d'opcode 1 octet, sans length-prefix. <c>WorldEvent</c> (33) = l'enveloppe de bus d'events
+    /// monde <c>{tProtocol; int tSort; byte tData[130]}</c> (135 o) : une Zone la POUSSE au Center (Incoming),
+    /// le Center la relaie en fan-out aux Zones (Outgoing) — même layout dans les deux sens.
+    /// </summary>
+    public static class Center
+    {
+        public static class Incoming
+        {
+            public const byte WorldEvent = 33;
+        }
+
+        public static class Outgoing
+        {
+            public const byte WorldEvent = 33;
+        }
+    }
 }

@@ -1,5 +1,7 @@
 using System.IO.Pipelines;
 using System.Net;
+using Fenrir.Cluster;
+using Fenrir.Cluster.Wire;
 using Fenrir.Core.Wire;
 using Fenrir.Network.Dispatch.Sessions;
 using Microsoft.Extensions.Logging;
@@ -21,14 +23,20 @@ internal sealed class CenterLinkSession(
     ILogger? logger = null)
     : ClientSession(sessionId, transport, FenrirServer.Center, remoteEndPoint, logger)
 {
-    /// <summary>
-    /// Portillon d'opcode par état de session S2S. <b>TODO(F4)</b> : à adosser à un <c>CenterSessionStateGate</c>
-    /// source-généré (pré-handshake : seul l'op « hello » ; post-handshake : enregistrement/relais/op33/op57).
-    /// Fail-closed en attendant : ce substrat ne fait pas encore tourner le <c>SessionLoop</c> (pas de codec S2S
-    /// Center généré), donc cette surface n'est pas encore consultée — elle refuse tout par défaut.
-    /// </summary>
+    /// <summary>État du lien : <c>Connected</c> jusqu'au handshake, puis <c>Authenticated</c>. Interdit qu'un pair
+    /// non authentifié émette des events monde (le gate généré n'admet que le handshake avant transition).</summary>
+    public CenterSessionState State { get; private set; } = CenterSessionState.Connected;
+
+    /// <summary>Portillon d'opcode par état S2S, adossé au <c>CenterSessionStateGate</c> source-généré à partir des
+    /// <c>AllowedStates</c> des paquets Center — appliqué avant le dispatch, élimine les paquets hors séquence.</summary>
     public override bool IsOpcodeAllowed(byte opcode)
     {
-        return false;
+        return CenterSessionStateGate.Allows(State, opcode);
+    }
+
+    /// <summary>Bascule le lien en <c>Authenticated</c> après un handshake HMAC réussi (transition unique).</summary>
+    public void MarkAuthenticated()
+    {
+        State = CenterSessionState.Authenticated;
     }
 }

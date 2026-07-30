@@ -25,8 +25,16 @@ BEGIN
     WHERE s.FlushSequence > ls.FlushSequence;
 
     INSERT INTO game.CharacterLogoutState (CharacterId, LastZone, PosX, PosY, PosZ, Life, Mana, FlushSequence,
-                                            CapturedAtUtc)
-    SELECT s.CharacterId, s.LastZone, s.PosX, s.PosY, s.PosZ, s.Life, s.Mana, s.FlushSequence, SYSUTCDATETIME()
+                                           CapturedAtUtc)
+    SELECT s.CharacterId,
+           s.LastZone,
+           s.PosX,
+           s.PosY,
+           s.PosZ,
+           s.Life,
+           s.Mana,
+           s.FlushSequence,
+           SYSUTCDATETIME()
     FROM @Snapshots AS s
              LEFT JOIN game.CharacterLogoutState AS ls ON ls.CharacterId = s.CharacterId
     WHERE ls.CharacterId IS NULL;

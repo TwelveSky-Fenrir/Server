@@ -1,9 +1,9 @@
 using System.Buffers;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Core.Packets.Shared;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Framing;
-using Fenrir.Core.Packets.Shared;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 
 namespace Fenrir.Application.Game.Domain.Guilds;
 

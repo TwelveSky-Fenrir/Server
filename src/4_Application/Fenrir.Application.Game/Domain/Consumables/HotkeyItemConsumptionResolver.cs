@@ -7,6 +7,17 @@ namespace Fenrir.Application.Game.Domain.Consumables;
 
 public static class HotkeyItemConsumptionResolver
 {
+    public enum AntiCheatMarkerKind
+    {
+        None,
+
+        DarkAttack,
+
+        HitRate,
+
+        DodgeRate
+    }
+
     public enum EffectKind
     {
         None,
@@ -28,17 +39,6 @@ public static class HotkeyItemConsumptionResolver
         RejectedClean,
 
         Success
-    }
-
-    public enum AntiCheatMarkerKind
-    {
-        None,
-
-        DarkAttack,
-
-        HitRate,
-
-        DodgeRate
     }
 
     private const int DarkAttackBuffSlot = 15;
@@ -129,7 +129,7 @@ public static class HotkeyItemConsumptionResolver
                     return Result.RejectedCleanResult;
                 return SucceedWithBuff(slot, DarkAttackBuffSlot, DarkAttackBuffPercent,
                     AssassinScrollBuffDurationLegacyTicks,
-                    AntiCheatMarkerKind.DarkAttack, AssassinScrollMarkerValue, recomputeStats: false);
+                    AntiCheatMarkerKind.DarkAttack, AssassinScrollMarkerValue, false);
             }
             case 13:
             {
@@ -137,16 +137,16 @@ public static class HotkeyItemConsumptionResolver
                     return Result.RejectedCleanResult;
                 return SucceedWithBuff(slot, DarkAttackBuffSlot, DarkAttackBuffPercent,
                     StandardScrollOrBookBuffDurationLegacyTicks,
-                    AntiCheatMarkerKind.DarkAttack, DepartedSpiritScrollMarkerValue, recomputeStats: false);
+                    AntiCheatMarkerKind.DarkAttack, DepartedSpiritScrollMarkerValue, false);
             }
             case 14:
                 return SucceedWithBuff(slot, HitRateBuffSlot, HitOrDodgeBuffPercent,
                     StandardScrollOrBookBuffDurationLegacyTicks,
-                    AntiCheatMarkerKind.HitRate, HitOrDodgeBuffMarkerValue, recomputeStats: true);
+                    AntiCheatMarkerKind.HitRate, HitOrDodgeBuffMarkerValue, true);
             case 15:
                 return SucceedWithBuff(slot, DodgeRateBuffSlot, HitOrDodgeBuffPercent,
                     StandardScrollOrBookBuffDurationLegacyTicks,
-                    AntiCheatMarkerKind.DodgeRate, HitOrDodgeBuffMarkerValue, recomputeStats: true);
+                    AntiCheatMarkerKind.DodgeRate, HitOrDodgeBuffMarkerValue, true);
 
             case 6:
             {
@@ -191,7 +191,7 @@ public static class HotkeyItemConsumptionResolver
     {
         return new Result(Outcome.Success, Decrement(slot), EffectKind.PetActivity, 0, 0,
             ImmutableArray<SkillCastResolver.BuffWrite>.Empty, AntiCheatMarkerKind.None, 0, false,
-            PetActivityGain: gain);
+            gain);
     }
 
     private static Result SucceedWithMountActivityGain(HotkeySlot slot, int gain)

@@ -86,22 +86,22 @@ BEGIN
     FROM @Items;
 
     IF @AuditItemId IS NOT NULL
-    BEGIN
-        DECLARE @AuditPayload NVARCHAR(MAX) = CASE
-                                                   WHEN @AuditSerial IS NULL OR @AuditSerial = 0 THEN NULL
-                                                   ELSE N'Serial=' + CAST(@AuditSerial AS NVARCHAR(20))
-            END;
+        BEGIN
+            DECLARE @AuditPayload NVARCHAR(MAX) = CASE
+                                                      WHEN @AuditSerial IS NULL OR @AuditSerial = 0 THEN NULL
+                                                      ELSE N'Serial=' + CAST(@AuditSerial AS NVARCHAR(20))
+                END;
 
-        EXEC game.usp_EventLog_Insert
-             @EventCode = 1, -- EventLogEmitters.CashShopPurchaseEventCode
-             @Category = 22, -- EventLogCategory.CashShopPurchase
-             @ActorAccountId = @AccountId,
-             @ActorCharacterId = @CharacterId,
-             @ItemId = @AuditItemId,
-             @Quantity = @AuditQuantity,
-             @Outcome = 1,
-             @Payload = @AuditPayload;
-    END;
+            EXEC game.usp_EventLog_Insert
+                 @EventCode = 1, -- EventLogEmitters.CashShopPurchaseEventCode
+                 @Category = 22, -- EventLogCategory.CashShopPurchase
+                 @ActorAccountId = @AccountId,
+                 @ActorCharacterId = @CharacterId,
+                 @ItemId = @AuditItemId,
+                 @Quantity = @AuditQuantity,
+                 @Outcome = 1,
+                 @Payload = @AuditPayload;
+        END;
 
     SELECT BalanceAfter AS NewBalance
     FROM @Debited;

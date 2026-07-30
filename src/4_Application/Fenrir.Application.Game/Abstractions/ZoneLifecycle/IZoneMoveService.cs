@@ -1,5 +1,5 @@
-using Fenrir.Application.Game;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Application.Game.Sessions;
+using Fenrir.Protocol.Game;
 
 namespace Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 

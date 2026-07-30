@@ -1,5 +1,5 @@
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game;
+using Fenrir.Application.Game.Sessions;
 using Fenrir.Core.Packets.Shared;
 
 namespace Fenrir.Application.Game.Abstractions.Chat;

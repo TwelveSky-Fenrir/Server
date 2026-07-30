@@ -19,17 +19,17 @@
 -- HASH) secondary index despite being an equality-only lookup.
 CREATE TABLE runtime.AccountSessions
 (
-    AccountId          INT              NOT NULL,
-    ServerKind         TINYINT          NOT NULL, -- 0 = Login, 1 = Game
-    ShardId            TINYINT          NULL,     -- meaningful only when ServerKind = 1
-    SessionToken       UNIQUEIDENTIFIER NOT NULL, -- minted once at Login-claim time, carried through runtime.SessionTickets
-    SessionState       TINYINT          NOT NULL, -- 0 = Active, 1 = TearingDown
-    KickRequested      BIT              NOT NULL,
-    ConnectedAtUtc     DATETIME2(3)     NOT NULL,
-    LastRefreshedUtc   DATETIME2(3)     NOT NULL, -- bumped by the owning process's own periodic poll (every 2s/shard); 6-min sweep reads this
-    AdapterIdentifier  VARCHAR(128)     NULL,     -- device-fingerprint half of the per-adapter connection quota
-    LocalIp            VARCHAR(45)      NULL,
-    RemoteIp           VARCHAR(45)      NULL,
+    AccountId         INT              NOT NULL,
+    ServerKind        TINYINT          NOT NULL, -- 0 = Login, 1 = Game
+    ShardId           TINYINT          NULL,     -- meaningful only when ServerKind = 1
+    SessionToken      UNIQUEIDENTIFIER NOT NULL, -- minted once at Login-claim time, carried through runtime.SessionTickets
+    SessionState      TINYINT          NOT NULL, -- 0 = Active, 1 = TearingDown
+    KickRequested     BIT              NOT NULL,
+    ConnectedAtUtc    DATETIME2(3)     NOT NULL,
+    LastRefreshedUtc  DATETIME2(3)     NOT NULL, -- bumped by the owning process's own periodic poll (every 2s/shard); 6-min sweep reads this
+    AdapterIdentifier VARCHAR(128)     NULL,     -- device-fingerprint half of the per-adapter connection quota
+    LocalIp           VARCHAR(45)      NULL,
+    RemoteIp          VARCHAR(45)      NULL,
     CONSTRAINT PK_AccountSessions PRIMARY KEY NONCLUSTERED HASH (AccountId)
         WITH (BUCKET_COUNT = 1024),
     -- Supports usp_AccountSession_GetConcurrentDeviceCount's per-login equality lookup on all three columns

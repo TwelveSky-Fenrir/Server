@@ -11,16 +11,18 @@
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions"/>
   </ItemGroup>
 
-  <!-- Usings de projet pour les paquets/handlers S2S Center : Abstractions (IIncomingPacket/IAsyncPacketHandler)
-       + Opcodes. FenrirServer/FenrirDirection/FixedArray viennent du using per-file Fenrir.Core.Wire/.Attributes,
-       comme côté Application. -->
+  <!-- Usings de projet pour les handlers S2S Center : Abstractions (IAsyncPacketHandler/IPacketSession/
+       IOutgoingPacket). Fenrir.Core.Opcodes a été retiré avec les paquets (T8) : les seuls sites qui le
+       citaient étaient WorldEventInbound/Outbound, partis dans Fenrir.Protocol.Center. -->
   <ItemGroup>
     <Using Include="Fenrir.Core.Abstractions"/>
-    <Using Include="Fenrir.Core.Opcodes"/>
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\2_Core\Fenrir.Core\Fenrir.Core.csproj"/>
+    <!-- T8 : les paquets Center (op33/op57), CenterSessionState et les offsets du payload op57 vivent
+         désormais dans un projet-protocole dédié. Cet assembly n'en garde que les HANDLERS. -->
+    <ProjectReference Include="..\..\2_Core\Fenrir.Protocol.Center\Fenrir.Protocol.Center.csproj"/>
     <ProjectReference Include="..\Fenrir.Network\Fenrir.Network.csproj"/>
     <ProjectReference Include="..\Fenrir.Data\Fenrir.Data.csproj"/>
     <!-- §5.2 : Security référencé pour l'auth du lien S2S (handshake à secret partagé, durcissement faille #8).
@@ -28,9 +30,15 @@
          l'assembly Fenrir.Data ci-dessus — pas de projet Data.Abstractions séparé à référencer. -->
     <ProjectReference Include="..\Fenrir.Security\Fenrir.Security.csproj"/>
     <ProjectReference Include="..\Fenrir.Observability\Fenrir.Observability.csproj"/>
-    <!-- Générateurs en Analyzer : émettent CenterOpcodeRegistry / CenterSessionStateGate / MessageDispatcher /
-         PacketHandlerHub pour les [FenrirPacket(FenrirServer.Center,…)] de ce projet (frontière compilateur :
-         paquets Center compilés uniquement ici). -->
+    <!-- NE PAS RETIRER malgré le départ des paquets en T8. Cet assembly porte encore les deux handlers
+         Center (EventBus/WorldEventCenterHandler, Party/PartyEventCenterHandler), donc le générateur de
+         dispatch y émet toujours CenterMessageDispatcher (lu par Wire/CenterFrameDispatcher),
+         CenterPacketHandlerHub (initialisé par Fenrir.CenterServer/Program.cs) et CenterHandlerRegistration
+         (AddCenterPacketHandlers, appelé par ClusterServiceCollectionExtensions). Le supprimer casserait
+         ces trois sites d'appel.
+         En revanche CenterOpcodeRegistry / CenterSessionStateGate ne sont PLUS émis ici : le générateur de
+         protocole ne produit rien sans [FenrirPacket] dans la compilation, ils viennent de
+         Fenrir.Protocol.Center. -->
     <ProjectReference Include="..\..\1_Generators\Fenrir.Generators\Fenrir.Generators.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false"/>

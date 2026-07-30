@@ -7,9 +7,9 @@ using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
-using Fenrir.Application.Game.Packets.Zone;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Application.Game.Stats.Context;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.BuffsMountsCosmetics;
@@ -89,12 +89,14 @@ public sealed class MountStateService(
                 var mountedSlot = result.NewAnimalIndex - MountStateResolver.SlotCount;
                 var inRange = mountedSlot is >= 0 and < MountStateResolver.SlotCount;
                 var absorbValue =
-                    StatCalculator.TryGetMountBaseRow(result.NewAnimalNumber, out var baseRow) ? baseRow.AbsorbValue : 0;
+                    StatCalculator.TryGetMountBaseRow(result.NewAnimalNumber, out var baseRow)
+                        ? baseRow.AbsorbValue
+                        : 0;
                 var mountOverride = new MountContext(result.NewAnimalNumber,
-                    AbsorbActive: state.AnimalAbsorbState != 0,
-                    AbsorbValue: absorbValue,
-                    RolledPower: inRange ? MountPowerCodec.EncodeSlot(state.MountRolledAttributes, mountedSlot) : 0,
-                    Activity: inRange ? state.MountActivity[mountedSlot] : 0);
+                    state.AnimalAbsorbState != 0,
+                    absorbValue,
+                    inRange ? MountPowerCodec.EncodeSlot(state.MountRolledAttributes, mountedSlot) : 0,
+                    inRange ? state.MountActivity[mountedSlot] : 0);
                 var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
                     state.Buffs, ComputePetContribution(state, equipmentContainer), state,
                     mountOverride: mountOverride);
@@ -104,7 +106,7 @@ public sealed class MountStateService(
 
                 zone.PostMountCommand(new MountZoneCommand(characterId, result.NewAnimalIndex,
                     result.NewAnimalNumber, 0, newLife, newMana, updatedStats,
-                    Broadcast: MountBroadcastKind.Mount));
+                    MountBroadcastKind.Mount));
                 return new MountStateResult(MountStateOutcome.Mount);
             }
 

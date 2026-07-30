@@ -18,6 +18,9 @@
 
   <Folder Name="/src/2_Core/">
     <Project Path="src/2_Core/Fenrir.Core/Fenrir.Core.csproj"/>
+    <Project Path="src/2_Core/Fenrir.Protocol.Center/Fenrir.Protocol.Center.csproj"/>
+    <Project Path="src/2_Core/Fenrir.Protocol.Login/Fenrir.Protocol.Login.csproj"/>
+    <Project Path="src/2_Core/Fenrir.Protocol.Game/Fenrir.Protocol.Game.csproj"/>
     <Project Path="src/2_Core/Fenrir.Domain.Login/Fenrir.Domain.Login.csproj"/>
     <Project Path="src/2_Core/Fenrir.Domain.Game/Fenrir.Domain.Game.csproj"/>
   </Folder>

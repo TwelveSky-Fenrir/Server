@@ -4,17 +4,6 @@ namespace Fenrir.Application.Game.Domain.Skills;
 
 public static class TargetedHealResolver
 {
-    public readonly record struct Target(
-        int CharacterId,
-        uint UniqueNumber,
-        bool IsDead,
-        bool IsStunned,
-        bool IsHidden,
-        bool ShopOpen,
-        int ActionSort,
-        int CurrentValue,
-        int MaxValue);
-
     public static bool TryResolveAmount(int casterCharacterId, uint expectedUniqueNumber, in Target target,
         int rawAmount, out int appliedAmount)
     {
@@ -38,4 +27,15 @@ public static class TargetedHealResolver
         appliedAmount = amount;
         return true;
     }
+
+    public readonly record struct Target(
+        int CharacterId,
+        uint UniqueNumber,
+        bool IsDead,
+        bool IsStunned,
+        bool IsHidden,
+        bool ShopOpen,
+        int ActionSort,
+        int CurrentValue,
+        int MaxValue);
 }

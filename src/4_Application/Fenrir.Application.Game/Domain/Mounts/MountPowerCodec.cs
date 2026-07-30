@@ -45,7 +45,7 @@ public static class MountPowerCodec
         return sum;
     }
 
-        public static int EncodeSlot(ImmutableArray<int> rolledAttributes, int slot)
+    public static int EncodeSlot(ImmutableArray<int> rolledAttributes, int slot)
     {
         var baseIndex = slot * DigitCount;
         var power = 0;
@@ -54,7 +54,7 @@ public static class MountPowerCodec
         return power;
     }
 
-        public static ImmutableArray<int> WithSlotDigits(ImmutableArray<int> rolledAttributes, int slot, int power)
+    public static ImmutableArray<int> WithSlotDigits(ImmutableArray<int> rolledAttributes, int slot, int power)
     {
         var baseIndex = slot * DigitCount;
         var result = rolledAttributes;

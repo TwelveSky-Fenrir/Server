@@ -1,6 +1,6 @@
 using System.Threading.Channels;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.World;
@@ -22,7 +22,6 @@ public sealed partial class Zone
     private void DrainHolyStoneCountdownEvictionCommands()
     {
         while (_holyStoneCountdownEvictionInbox.Reader.TryRead(out _))
-        {
             try
             {
                 ApplyHolyStoneCountdownEviction();
@@ -31,7 +30,6 @@ public sealed partial class Zone
             {
                 logger.LogError(ex, "Zone {MapId} HSB countdown eviction sweep failed", MapId);
             }
-        }
     }
 
     private void ApplyHolyStoneCountdownEviction()

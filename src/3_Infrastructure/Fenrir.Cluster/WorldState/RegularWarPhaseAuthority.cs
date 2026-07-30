@@ -3,35 +3,15 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Cluster.WorldState;
 
-/// <summary>
-/// Center-side authoritative state machine for the 11 Regular War (Zone049) instances. Advances each
-/// instance through its phase cycle on a real wall-clock schedule and publishes the discrete phase value to
-/// shards via <see cref="IWorldStateAuthority.SetZone049State"/>. The Center WRITES these phases; every
-/// shard READS them as a fact (through its own <c>ZoneCenterBroadcastIngestor</c>, untouched by this unit).
-/// </summary>
-/// <remarks>
-/// DELIBERATE DIVERGENCE FROM LEGACY (defensible, documented — not parity). In legacy <c>ts25center</c>, the
-/// Center is purely reactive: it writes <c>mZone049TypeState[]</c> only when the owning shard notifies a
-/// transition (<c>ZONE_BROADCAST_FOR_CENTER</c>, <c>tSort</c> 1..9); all timing/decision/scoring lives in the
-/// shard's <c>Process_Zone_049_TYPE</c>. Fenrir moves the phase-timing authority into the Center (this class,
-/// driven by <see cref="RegularWarPhaseHost"/>) for a cleaner single-writer world-state model — the target of
-/// the shard→center authority switch (Lot 5). This lot the machine is DORMANT: it runs Center-side but shards
-/// still author world state; nothing shard-side is removed.
-/// <para>
-/// THREADING. Single-writer. Every mutation happens inside <see cref="Advance"/> / <see cref="Initialize"/>,
-/// which the host invokes serially from one loop. No locking is required or present; do not call
-/// <see cref="Advance"/> from more than one thread.
-/// </para>
-/// </remarks>
 public sealed class RegularWarPhaseAuthority
 {
     private const int NoAnnouncement = -1;
 
     private static readonly int[] CountdownAnnounceMinutes = [10, 5, 1];
+    private readonly Instance[] _instances;
+    private readonly ILogger<RegularWarPhaseAuthority> _logger;
 
     private readonly IWorldStateAuthority _worldState;
-    private readonly ILogger<RegularWarPhaseAuthority> _logger;
-    private readonly Instance[] _instances;
 
     public RegularWarPhaseAuthority(
         IWorldStateAuthority worldState,
@@ -44,10 +24,6 @@ public sealed class RegularWarPhaseAuthority
         var clock = timeProvider ?? TimeProvider.System;
         var baseline = clock.GetUtcNow();
 
-        // Deterministic per-instance stagger so the 11 wars do NOT all fire in lockstep (a thundering herd of
-        // 11 simultaneous RW maps). Legacy staggered implicitly via independent shard schedules; the contract
-        // gives phase DURATIONS, not absolute time-of-day schedule points, so a free-running cycle with a
-        // stagger is the honest reading. Absolute wall-clock schedule times remain a product decision.
         var stagger = RegularWarPhasePlan.DurationOf(RegularWarStage.Cooldown) / RegularWarInstanceMap.Count;
 
         _instances = new Instance[RegularWarInstanceMap.Count];
@@ -63,16 +39,6 @@ public sealed class RegularWarPhaseAuthority
             };
     }
 
-    /// <summary>
-    /// Publishes the baseline phase value for every instance once, establishing the authoritative starting
-    /// point downstream. Call before the first <see cref="Advance"/>.
-    /// </summary>
-    /// <remarks>
-    /// Persistence/preload seam: today every instance starts at <see cref="RegularWarStage.Cooldown"/>. When
-    /// the <c>worldstate-aggregates</c> unit wires <c>WORLD_INFO</c> persistence, a hydrated
-    /// (<see cref="RegularWarPhaseSnapshot.Stage"/> + absolute <see cref="RegularWarPhaseSnapshot.StageEnteredAt"/>)
-    /// per instance should replace the fresh-cooldown default here so a mid-cycle restart resumes correctly.
-    /// </remarks>
     public void Initialize()
     {
         foreach (var instance in _instances)
@@ -84,13 +50,6 @@ public sealed class RegularWarPhaseAuthority
             _instances.Length);
     }
 
-    /// <summary>
-    /// Advances every instance to the phase its wall-clock schedule dictates at <paramref name="now"/>,
-    /// publishing each discrete phase change to shards. Catch-up safe (applies multiple transitions if the
-    /// host stalled) and clock-hiccup safe (a zero/negative span advances nothing). Fault-isolated per
-    /// instance — one instance faulting never skips the rest.
-    /// </summary>
-    /// <param name="now">The current monotonic wall-clock instant, supplied by the host's clock.</param>
     public void Advance(DateTimeOffset now)
     {
         foreach (var instance in _instances)
@@ -108,7 +67,6 @@ public sealed class RegularWarPhaseAuthority
             }
     }
 
-    /// <summary>An immutable snapshot of every instance's current phase, for observability/tests/persistence.</summary>
     public ImmutableArray<RegularWarPhaseSnapshot> Snapshot()
     {
         var builder = ImmutableArray.CreateBuilder<RegularWarPhaseSnapshot>(_instances.Length);
@@ -128,7 +86,6 @@ public sealed class RegularWarPhaseAuthority
             var duration = RegularWarPhasePlan.DurationOf(instance.Stage);
             var elapsed = now - instance.StageEnteredAt;
 
-            // Not yet due (also covers a backwards clock hiccup: a negative span advances nothing).
             if (elapsed < duration)
                 break;
 
@@ -145,7 +102,7 @@ public sealed class RegularWarPhaseAuthority
             var nextStage = RegularWarPhasePlan.NextOf(instance.Stage);
 
             instance.Stage = nextStage;
-            instance.StageEnteredAt += duration; // carry the sub-duration remainder forward, no drift
+            instance.StageEnteredAt += duration;
             instance.LastAnnouncedRemainingMinute = NoAnnouncement;
             transitions++;
 
@@ -186,7 +143,8 @@ public sealed class RegularWarPhaseAuthority
 
     private void EmitCountdownAnnouncements(Instance instance, DateTimeOffset now)
     {
-        var remaining = RegularWarPhasePlan.DurationOf(RegularWarStage.AnnounceCountdown) - (now - instance.StageEnteredAt);
+        var remaining = RegularWarPhasePlan.DurationOf(RegularWarStage.AnnounceCountdown) -
+                        (now - instance.StageEnteredAt);
         if (remaining <= TimeSpan.Zero)
             return;
 

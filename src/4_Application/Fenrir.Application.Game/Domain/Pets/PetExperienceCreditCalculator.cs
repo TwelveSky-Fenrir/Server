@@ -26,7 +26,7 @@ public static class PetExperienceCreditCalculator
         return CategoryByItemId.TryGetValue(petItemId, out categoryIndex);
     }
 
-        public static int ComputeCreditedAmount(int petItemId, int currentGrowth, int seedExperience,
+    public static int ComputeCreditedAmount(int petItemId, int currentGrowth, int seedExperience,
         float growUpValue = 0f)
     {
         if (!TryResolveCategory(petItemId, out var categoryIndex))

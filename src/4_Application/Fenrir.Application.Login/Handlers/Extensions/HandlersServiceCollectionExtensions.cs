@@ -1,4 +1,4 @@
-using Fenrir.Network.Abstractions;
+using Fenrir.Application.Login.Handlers.Dispatching;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Application.Login.Handlers.Extensions;
@@ -9,6 +9,6 @@ public static class HandlersServiceCollectionExtensions
     {
         services.AddSingleton<IFrameDispatcher, LoginFrameDispatcher>();
 
-        return services.AddGeneratedPacketHandlers();
+        return services.AddLoginPacketHandlers();
     }
 }

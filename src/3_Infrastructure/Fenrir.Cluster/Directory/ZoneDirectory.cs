@@ -10,6 +10,8 @@ public sealed class ZoneDirectory(
     IShardMapAssignmentRepository shardMapAssignments,
     ILogger<ZoneDirectory> logger) : IZoneDirectory
 {
+    private const int LegacyZoneBasePort = 1100;
+
     public async ValueTask<ZoneEndpoint?> ResolveAsync(short zoneId, CancellationToken cancellationToken)
     {
         var shards = await directory.GetDirectoryAsync(cancellationToken).ConfigureAwait(false);
@@ -28,18 +30,10 @@ public sealed class ZoneDirectory(
             return null;
         }
 
-        // Modèle « zone = endpoint » (Décision A) : le port de la zone est DÉRIVÉ de son numéro de map (legacy
-        // 1100 + N, ts25zone/S02_MyServer.cpp:15-16), PAS le port unique du shard. shard.Host reste l'hôte public
-        // annoncé par le GameServer ; shard.Port n'est plus un port de jeu (informationnel).
         return new ZoneEndpoint(zoneId, shard.Host, LegacyZoneBasePort + zoneId);
     }
 
-    // Base d'adressage legacy des zones (1100 + N). Cette amorce Cluster est dormante (le Login route via ses repos
-    // + LoginServerOptions.ZoneBasePort) ; la constante garde le seam correct pour F4 quand le Center portera le
-    // registre zone -> (host, port).
-    private const int LegacyZoneBasePort = 1100;
-
-        public ValueTask HeartbeatAsync(ZoneEndpoint endpoint, int currentPlayers, CancellationToken cancellationToken)
+    public ValueTask HeartbeatAsync(ZoneEndpoint endpoint, int currentPlayers, CancellationToken cancellationToken)
     {
         logger.LogDebug(
             "ZoneDirectory.HeartbeatAsync ignored for zone {ZoneId} ({Host}:{Port}, {CurrentPlayers} players): shard " +

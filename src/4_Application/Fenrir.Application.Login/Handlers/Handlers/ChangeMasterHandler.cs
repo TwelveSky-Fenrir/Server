@@ -1,5 +1,4 @@
-using Fenrir.Network.Abstractions;
-using Fenrir.Application.Login.Packets;
+using Fenrir.Protocol.Login;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Login.Handlers.Handlers;

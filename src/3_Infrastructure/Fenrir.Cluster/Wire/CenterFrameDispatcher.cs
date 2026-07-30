@@ -1,7 +1,5 @@
 using System.Buffers;
-using Fenrir.Core.Abstractions;
 using Fenrir.Core.Wire;
-using Fenrir.Network.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Cluster.Wire;
@@ -13,10 +11,10 @@ public sealed class CenterFrameDispatcher(ILogger<CenterFrameDispatcher> logger)
     {
         var memory = payload.IsSingleSegment ? payload.First : payload.ToArray();
 
-        if (MessageDispatcher.TryHandleInline(server, opcode, memory.Span, session))
+        if (CenterMessageDispatcher.TryHandleInline(server, opcode, memory.Span, session))
             return;
 
-        if (await MessageDispatcher.TryHandleAsync(server, opcode, memory, session, cancellationToken)
+        if (await CenterMessageDispatcher.TryHandleAsync(server, opcode, memory, session, cancellationToken)
                 .ConfigureAwait(false))
             return;
 

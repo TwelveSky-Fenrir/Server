@@ -1,12 +1,8 @@
-using System.Threading;
-using System.Threading.Tasks;
-
 namespace Fenrir.Cluster.Directory;
 
 public interface IZoneDirectory
 {
+    public ValueTask<ZoneEndpoint?> ResolveAsync(short zoneId, CancellationToken cancellationToken);
 
-        ValueTask<ZoneEndpoint?> ResolveAsync(short zoneId, CancellationToken cancellationToken);
-
-        ValueTask HeartbeatAsync(ZoneEndpoint endpoint, int currentPlayers, CancellationToken cancellationToken);
+    public ValueTask HeartbeatAsync(ZoneEndpoint endpoint, int currentPlayers, CancellationToken cancellationToken);
 }

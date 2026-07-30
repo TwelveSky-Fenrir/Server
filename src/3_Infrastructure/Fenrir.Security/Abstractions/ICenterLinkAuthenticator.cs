@@ -2,12 +2,12 @@ namespace Fenrir.Security.Abstractions;
 
 public interface ICenterLinkAuthenticator
 {
+    public bool IsEnabled { get; }
 
-        bool IsEnabled { get; }
+    public CenterLinkChallenge IssueChallenge();
 
-        CenterLinkChallenge IssueChallenge();
+    public bool VerifyHelloMac(in CenterLinkChallenge challenge, ReadOnlySpan<byte> context,
+        ReadOnlySpan<byte> clientMac);
 
-        bool VerifyHelloMac(in CenterLinkChallenge challenge, ReadOnlySpan<byte> context, ReadOnlySpan<byte> clientMac);
-
-        int ComputeHelloMac(ReadOnlySpan<byte> nonce, ReadOnlySpan<byte> context, Span<byte> destination);
+    public int ComputeHelloMac(ReadOnlySpan<byte> nonce, ReadOnlySpan<byte> context, Span<byte> destination);
 }

@@ -10,11 +10,10 @@ namespace Fenrir.Data.Progression;
 
 public sealed record HeroRankingRepository(ICaeriusNetDbContext Db, ICaeriusNetCache Cache) : IHeroRankingRepository
 {
-    private static readonly TimeSpan CurrentPeriodTtl = TimeSpan.FromSeconds(2);
-    private static readonly TimeSpan PreviousPeriodTtl = TimeSpan.FromMinutes(5);
-
     private const int CurrentPeriodResultSetCapacity = 64;
     private const int PreviousPeriodResultSetCapacity = 40;
+    private static readonly TimeSpan CurrentPeriodTtl = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan PreviousPeriodTtl = TimeSpan.FromMinutes(5);
 
     public async ValueTask<ReadOnlyCollection<HeroRankingRowDto>> GetByPeriodAsync(byte periodKind,
         CancellationToken ct)
@@ -71,11 +70,6 @@ public sealed record HeroRankingRepository(ICaeriusNetDbContext Db, ICaeriusNetC
         return rolledOver;
     }
 
-    private static string CacheKey(byte periodKind)
-    {
-        return $"game:hero-ranking:{periodKind}";
-    }
-
     public async ValueTask<int> AddPointsAsync(int characterId, byte periodKind, int delta, byte? tribeId,
         int? level, CancellationToken ct)
     {
@@ -99,5 +93,10 @@ public sealed record HeroRankingRepository(ICaeriusNetDbContext Db, ICaeriusNetC
 
         var row = await Db.FirstQueryAsync<HeroRankingPointsDto>(sp, ct);
         return row?.Points;
+    }
+
+    private static string CacheKey(byte periodKind)
+    {
+        return $"game:hero-ranking:{periodKind}";
     }
 }

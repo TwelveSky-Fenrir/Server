@@ -17,8 +17,6 @@ public enum PortalTransitionRouteKind
 
 public static class PortalTransitionRoutes
 {
-    public static readonly IReadOnlySet<short> TownOriginZoneIds = new HashSet<short> { 1, 6, 11, 140 };
-
     public const short DistantZoneRangeStart = 251;
 
     public const short DistantZoneRangeEnd = 266;
@@ -26,6 +24,7 @@ public static class PortalTransitionRoutes
     public const short HubZoneId = 74;
 
     public const short InstancedZoneId = 303;
+    public static readonly IReadOnlySet<short> TownOriginZoneIds = new HashSet<short> { 1, 6, 11, 140 };
 
     public static PortalTransitionRouteKind Classify(short originZoneNumber, short destinationZoneNumber,
         bool tribeSymbolBattleActive)

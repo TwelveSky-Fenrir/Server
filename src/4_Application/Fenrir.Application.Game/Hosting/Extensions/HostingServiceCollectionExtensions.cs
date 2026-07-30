@@ -15,13 +15,10 @@ using Fenrir.Application.Game.Hosting.World.Monsters;
 using Fenrir.Application.Game.Hosting.World.WorldState;
 using Fenrir.Application.Game.Hosting.World.ZoneWar;
 using Fenrir.Cluster.Link;
-using Fenrir.Data.Abstractions.Security;
 using Fenrir.Data.World;
 using Fenrir.Data.WriteBehind;
-using Fenrir.Network.Abstractions;
-using Fenrir.Security.FloodProtection;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Core.Wire;
+using Fenrir.Security.FloodProtection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
@@ -33,7 +30,7 @@ public static class HostingServiceCollectionExtensions
 {
     public static IServiceCollection AddGameHosting(this IServiceCollection services)
     {
-        services.AddSingleton<IOpcodeFrameSizeProvider>(ZoneOpcodeRegistry.Provider);
+        services.AddSingleton<IOpcodeFrameSizeProvider>(global::Fenrir.Protocol.Game.ZoneOpcodeRegistry.Provider);
 
         services.AddSingleton(sp =>
             new ZoneConfigCatalog(sp.GetRequiredService<IOptions<GameServerOptions>>().Value.Zones));
@@ -156,8 +153,6 @@ public static class HostingServiceCollectionExtensions
         services.AddSingleton<AllianceProposalCenterState>();
         services.AddSingleton<ZoneCenterBroadcastIngestor>();
 
-        // Point d'application du fan-out Center reçu par le lien sortant (ICenterLink) : inconditionnel (le gate
-        // vit dans le sink, inerte au défaut Shard). Consommé optionnellement par CenterLinkClientHost.
         services.AddSingleton<ICenterFanOutSink, ZoneCenterFanOutSink>();
 
         services.TryAddSingleton<IZone039MonsterSummonResetGateway, LoggingOnlyZone039MonsterSummonResetGateway>();

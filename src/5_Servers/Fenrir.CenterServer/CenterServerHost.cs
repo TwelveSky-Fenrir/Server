@@ -1,16 +1,15 @@
+using Fenrir.Core.Abstractions;
+using Fenrir.Core.Wire;
+using Fenrir.Network.Framing;
+using Fenrir.Network.Transport;
+using Fenrir.Protocol.Center;
+using Fenrir.Security.Abstractions;
+using Microsoft.Extensions.Options;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.IO.Pipelines;
 using System.Net;
-using Fenrir.Cluster;
-using Fenrir.Core.Wire;
-using Fenrir.Network.Abstractions;
-using Fenrir.Network.Framing;
-using Fenrir.Network.Transport;
-using Fenrir.Security.Abstractions;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
+using ProtocolViolationException = Fenrir.Network.Framing.ProtocolViolationException;
 
 namespace Fenrir.CenterServer;
 
@@ -31,7 +30,7 @@ internal sealed class CenterServerHost(
         var opts = options.Value;
 
         _listener = new FenrirTcpListener<CenterLinkSession>(
-            new IPEndPoint(IPAddress.Any, opts.Port),
+            new IPEndPoint(IPAddress.Parse(opts.BindAddress), opts.Port),
             (sessionId, transport, remoteEndPoint) =>
                 new CenterLinkSession(sessionId, transport, remoteEndPoint, logger),
             logger);
@@ -68,7 +67,8 @@ internal sealed class CenterServerHost(
         catch (OperationCanceledException)
         {
             logger.LogWarning(
-                "CenterServer shutdown proceeding with {Count} S2S link teardown(s) still in flight", outstanding.Length);
+                "CenterServer shutdown proceeding with {Count} S2S link teardown(s) still in flight",
+                outstanding.Length);
         }
         catch (Exception ex)
         {
@@ -120,7 +120,7 @@ internal sealed class CenterServerHost(
         }
     }
 
-        private async Task<bool> TryAuthenticateAsync(CenterLinkSession session, SocketConnection connection,
+    private async Task<bool> TryAuthenticateAsync(CenterLinkSession session, SocketConnection connection,
         CancellationToken ct)
     {
         if (!authenticator.IsEnabled)
@@ -152,7 +152,7 @@ internal sealed class CenterServerHost(
         return true;
     }
 
-        private async Task DispatchLoopAsync(CenterLinkSession session, SocketConnection connection, CancellationToken ct)
+    private async Task DispatchLoopAsync(CenterLinkSession session, SocketConnection connection, CancellationToken ct)
     {
         var reader = connection.Input;
 
@@ -188,7 +188,7 @@ internal sealed class CenterServerHost(
                             .ConfigureAwait(false);
                     }
                 }
-                catch (Fenrir.Network.Framing.ProtocolViolationException ex)
+                catch (ProtocolViolationException ex)
                 {
                     logger.LogWarning(
                         "S2S link {SessionId}: unknown opcode {Opcode} for {Server} -- closing",
@@ -208,7 +208,7 @@ internal sealed class CenterServerHost(
         }
     }
 
-        private static async Task<byte[]?> ReadExactAsync(PipeReader reader, int count, CancellationToken ct)
+    private static async Task<byte[]?> ReadExactAsync(PipeReader reader, int count, CancellationToken ct)
     {
         while (true)
         {

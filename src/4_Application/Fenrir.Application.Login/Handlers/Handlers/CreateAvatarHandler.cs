@@ -1,8 +1,8 @@
 using Fenrir.Application.Login.Abstractions.CreateAvatar;
+using Fenrir.Application.Login.Sessions;
 using Fenrir.Domain.Login.Avatars;
-using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Application.Login.Packets;
+using Fenrir.Protocol.Login;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Login.Handlers.Handlers;

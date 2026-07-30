@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
 using System.Net;
 using Fenrir.Domain.Login.Avatars;
-using Fenrir.Application.Login.Packets;
+using Fenrir.Protocol.Login;
 
 namespace Fenrir.Application.Login.Abstractions.Login;
 

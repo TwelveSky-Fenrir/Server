@@ -257,7 +257,6 @@ public static partial class StatCalculator
     }
 
 
-
     private static bool TryGetRiddenMountRow(in MountContext mount, out MountBaseRow row)
     {
         if (mount.AnimalNumber != 0)

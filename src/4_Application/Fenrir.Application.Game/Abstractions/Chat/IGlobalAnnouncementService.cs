@@ -1,4 +1,4 @@
-using Fenrir.Application.Game;
+using Fenrir.Application.Game.Sessions;
 
 namespace Fenrir.Application.Game.Abstractions.Chat;
 

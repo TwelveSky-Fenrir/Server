@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 

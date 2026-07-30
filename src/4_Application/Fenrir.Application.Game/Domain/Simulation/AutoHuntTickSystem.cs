@@ -5,10 +5,10 @@ using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
+using Fenrir.Core.Packets.Shared;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Core.Packets.Shared;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Domain.Simulation;

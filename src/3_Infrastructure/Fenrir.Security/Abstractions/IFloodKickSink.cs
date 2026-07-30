@@ -2,6 +2,5 @@ namespace Fenrir.Security.Abstractions;
 
 public interface IFloodKickSink
 {
-
-        int KickByRemoteAddress(string ipAddress);
+    public int KickByRemoteAddress(string ipAddress);
 }

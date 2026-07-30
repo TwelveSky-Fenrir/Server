@@ -1,20 +1,22 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Slice serveur Login : paquets Login (ex-Serialization.Login) + LoginFrameDispatcher
-       (ex-Dispatch.Login) + handlers + services d'orchestration. Déclare des paquets ⇒ référence les
-       générateurs en Analyzer. Frontière compilateur : un paquet Login ne compile pas dans le GameServer.
-       Dépend de Core, Domain.Login, Network, Data, Security, Cluster, Observability (matrice doc 02 §5.2). -->
+  <!-- Slice serveur Login : LoginFrameDispatcher (ex-Dispatch.Login) + handlers + services
+       d'orchestration. Les paquets sont partis dans Fenrir.Protocol.Login (T9) ; ce projet reste porteur
+       des générateurs en Analyzer pour ses 13 handlers. Dépend de Core, Protocol.Login, Domain.Login,
+       Network, Data, Security, Cluster, Observability (matrice doc 02 §5.2). -->
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions"/>
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Split de l'ancien global using Fenrir.Network.Abstractions : les paquets Login référencent les
-         interfaces (IIncoming/IOutgoingPacket) et la table Opcodes sans using par fichier. FenrirServer/
-         FenrirDirection/WireObfuscationMode viennent du using per-file Fenrir.Core.Wire. -->
+    <!-- Split de l'ancien global using Fenrir.Network.Abstractions : handlers, dispatcher et LoginTrain
+         référencent les interfaces (IAsyncPacketHandler/IInlinePacketHandler, IPacketSession) sans using
+         par fichier. FenrirServer/FenrirDirection/WireObfuscationMode viennent du using per-file
+         Fenrir.Core.Wire.
+         Fenrir.Core.Opcodes est parti avec les paquets (T9) : la table Opcodes.Login.* n'était citée que
+         par les 27 attributs [FenrirPacket], désormais dans Fenrir.Protocol.Login. -->
     <Using Include="Fenrir.Core.Abstractions"/>
-    <Using Include="Fenrir.Core.Opcodes"/>
   </ItemGroup>
 
   <ItemGroup>
@@ -36,6 +38,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\2_Core\Fenrir.Core\Fenrir.Core.csproj"/>
+    <ProjectReference Include="..\..\2_Core\Fenrir.Protocol.Login\Fenrir.Protocol.Login.csproj"/>
     <ProjectReference Include="..\..\2_Core\Fenrir.Domain.Login\Fenrir.Domain.Login.csproj"/>
     <ProjectReference Include="..\..\3_Infrastructure\Fenrir.Network\Fenrir.Network.csproj"/>
     <ProjectReference Include="..\..\3_Infrastructure\Fenrir.Data\Fenrir.Data.csproj"/>
@@ -45,6 +48,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- NE PAS RETIRER malgré le départ des paquets vers Fenrir.Protocol.Login (T9) : ce sont les 13
+         handlers de ce projet qui font émettre LoginMessageDispatcher / LoginPacketHandlerHub /
+         LoginHandlerRegistration. Sans cette référence Analyzer, LoginFrameDispatcher et Program.cs ne
+         compilent plus. -->
     <ProjectReference Include="..\..\1_Generators\Fenrir.Generators\Fenrir.Generators.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false"/>

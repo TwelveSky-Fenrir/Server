@@ -1,5 +1,5 @@
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game;
+using Fenrir.Application.Game.Sessions;
 
 namespace Fenrir.Application.Game.Abstractions.Gm;
 

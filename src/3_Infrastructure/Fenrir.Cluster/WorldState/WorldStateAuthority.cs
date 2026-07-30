@@ -3,60 +3,37 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Cluster.WorldState;
 
-/// <summary>
-///     The CenterServer's single authoritative writer of cross-zone RvR world state. Holds the persisted subset
-///     (world row, four tribe rows, alliance offers) plus the transient RvR mirror the op33 ingester mutates,
-///     preloads them at boot, and flushes the persisted subset on the ~6s cadence and on stop.
-/// </summary>
-/// <remarks>
-///     Mirrors the shard-side <c>Fenrir.Application.Game.Domain.World.WorldState.WorldStateService</c> but as the
-///     ONE cluster writer. Thread-safe via a single lock: the op33 ingester (dispatch-loop threads) writes and
-///     the flush host (timer thread) reads/persists -- low-frequency RvR events, not a per-tick hot path, so a
-///     lock is the right tool (same choice the shard-side service makes).
-///     <para>
-///         The transient RvR arrays (zone type-states, guard matrix, symbols, vote states, ratios, DTM) are NOT
-///         persisted -- legacy defaults them at boot and they live only in SHM (WORLD_INFO transient fields).
-///         The persisted subset reuses the existing <see cref="IWorldStateRepository" /> procedures; no new
-///         schema is introduced. Wholesale-replace flush from the single authoritative writer is inherently
-///         idempotent, so the per-entity <c>_flushSequence</c> is a monotonic marker, not a DB-side guard.
-///     </para>
-/// </remarks>
 public sealed class WorldStateAuthority(IWorldStateRepository repository, ILogger<WorldStateAuthority> logger)
     : IWorldStateAuthority
 {
     private const int TribeCount = FavoredTribeRankLadder.TribeCount;
 
-    // MAX_ZONE_NUMBER_NUM (DEFINE.h:373). Exact per-array sizes (STRUCT.h:590-650) were not in the contract, so
-    // this documented cluster-wide upper bound is used as the bounds-check ceiling -- it never rejects a valid
-    // index and closes the legacy unchecked-index write.
     private const int ZoneStateSlots = 350;
     private const int VoteSlotMax = 32;
 
-    private readonly Lock _lock = new();
-
-    // --- Persisted subset ---
     private readonly Dictionary<(byte From, byte To), CenterAllianceOffer> _allianceOffers = new();
-    private readonly CenterTribeRow[] _tribes = new CenterTribeRow[TribeCount];
-    private CenterWorldRow _world = new(null, null, false, null, null, null, 0);
+    private readonly float[] _generalExperienceUpRatio = new float[TribeCount];
+    private readonly float[] _itemDropUpForMyoungRatio = new float[TribeCount];
+    private readonly float[] _itemDropUpRatio = new float[TribeCount];
+    private readonly int[] _killOtherTribeAddValue = new int[TribeCount];
 
-    // --- Transient RvR mirror (not persisted) ---
+    private readonly Lock _lock = new();
+    private readonly int[] _tribeDtmValue = new int[TribeCount];
+    private readonly byte[,] _tribeGuard = new byte[TribeCount, TribeCount];
+    private readonly int[] _tribeMasterCallAbility = new int[TribeCount];
+    private readonly CenterTribeRow[] _tribes = new CenterTribeRow[TribeCount];
+    private readonly Dictionary<(byte Tribe, byte Slot), string> _tribeSubMaster = new();
+    private readonly byte[] _tribeSymbol = new byte[TribeCount];
+    private readonly byte[] _tribeVoteState = new byte[TribeCount];
+    private readonly Dictionary<(int I1, int I2), byte> _zone175 = new();
+
     private readonly Dictionary<WorldZoneStateKind, byte[]> _zoneStates = new();
     private readonly Dictionary<WorldZoneStateKind, int[]> _zoneStateTimes = new();
-    private readonly Dictionary<(int I1, int I2), byte> _zone175 = new();
-    private readonly byte[,] _tribeGuard = new byte[TribeCount, TribeCount];
-    private readonly byte[] _tribeSymbol = new byte[TribeCount];
-    private readonly int[] _tribeMasterCallAbility = new int[TribeCount];
-    private readonly byte[] _tribeVoteState = new byte[TribeCount];
-    private readonly Dictionary<(byte Tribe, byte Slot), string> _tribeSubMaster = new();
-    private readonly float[] _generalExperienceUpRatio = new float[TribeCount];
-    private readonly float[] _itemDropUpRatio = new float[TribeCount];
-    private readonly float[] _itemDropUpForMyoungRatio = new float[TribeCount];
-    private readonly int[] _killOtherTribeAddValue = new int[TribeCount];
-    private readonly int[] _tribeDtmValue = new int[TribeCount];
 
     private bool _dirty;
-    private bool _initialized;
     private long _flushSequence;
+    private bool _initialized;
+    private CenterWorldRow _world = new(null, null, false, null, null, null, 0);
 
     public byte? HighTribe
     {
@@ -124,14 +101,10 @@ public sealed class WorldStateAuthority(IWorldStateRepository repository, ILogge
             row.Zone038WinTribe, row.TribeSymbolBattle, row.HighTribe, allianceOffers.Length);
     }
 
-    // ---------------------------------------------------------------------------------------------------------
-    // Zone type-state routing
-    // ---------------------------------------------------------------------------------------------------------
 
     public void SetZone049State(int index, int state)
     {
-        // RegularWarPhaseAuthority convenience alias: void, no time stamp, out-of-range dropped + logged.
-        if (!SetZoneTypeState(WorldZoneStateKind.Zone049, index, (byte)state, stampTime: false))
+        if (!SetZoneTypeState(WorldZoneStateKind.Zone049, index, (byte)state, false))
             logger.LogWarning("SetZone049State dropped: index {Index} out of bounds [0,{Bound})", index,
                 ZoneStateSlots);
     }
@@ -174,9 +147,6 @@ public sealed class WorldStateAuthority(IWorldStateRepository repository, ILogge
         }
     }
 
-    // ---------------------------------------------------------------------------------------------------------
-    // Symbol battle (Zone038)
-    // ---------------------------------------------------------------------------------------------------------
 
     public bool SetSymbolWinTribe(byte tribe)
     {
@@ -250,9 +220,6 @@ public sealed class WorldStateAuthority(IWorldStateRepository repository, ILogge
         }
     }
 
-    // ---------------------------------------------------------------------------------------------------------
-    // Alliance (persisted through the alliance-offer table)
-    // ---------------------------------------------------------------------------------------------------------
 
     public bool SetAllianceState(byte tribe1, byte tribe2)
     {
@@ -273,9 +240,6 @@ public sealed class WorldStateAuthority(IWorldStateRepository repository, ILogge
         if (tribe1 >= TribeCount || tribe2 >= TribeCount || tribe1 == tribe2)
             return false;
 
-        // date1/date2 are legacy possible-alliance stamps carried only in the transient SHM mirror (not
-        // persisted by the existing alliance-offer proc); the persisted record captures the pending
-        // (not-yet-accepted) intent both directions.
         lock (_lock)
         {
             _allianceOffers[(tribe1, tribe2)] = new CenterAllianceOffer(tribe1, tribe2, false);
@@ -286,9 +250,6 @@ public sealed class WorldStateAuthority(IWorldStateRepository repository, ILogge
         return true;
     }
 
-    // ---------------------------------------------------------------------------------------------------------
-    // Tribe vote
-    // ---------------------------------------------------------------------------------------------------------
 
     public bool SetTribeVoteState(int tribe, byte state)
     {
@@ -318,7 +279,6 @@ public sealed class WorldStateAuthority(IWorldStateRepository repository, ILogge
         if (tribe >= TribeCount)
             return ValueTask.CompletedTask;
 
-        // No per-slot clear proc exists; a slot clear re-registers an empty candidate to zero it out.
         return repository.RegisterTribeVoteCandidateAsync(tribe, slotIndex, 0, 0, 0, ct);
     }
 
@@ -364,9 +324,6 @@ public sealed class WorldStateAuthority(IWorldStateRepository repository, ILogge
         return true;
     }
 
-    // ---------------------------------------------------------------------------------------------------------
-    // Zone194 ratio bonuses + master call ability + DTM
-    // ---------------------------------------------------------------------------------------------------------
 
     public bool SetTribeRatioBonus(TribeRatioBonusKind kind, byte tribe, int rawValue)
     {
@@ -435,9 +392,6 @@ public sealed class WorldStateAuthority(IWorldStateRepository repository, ILogge
         return true;
     }
 
-    // ---------------------------------------------------------------------------------------------------------
-    // Tribe-point recompute plumbing (Bugs 2 & 3) + manual flag
-    // ---------------------------------------------------------------------------------------------------------
 
     public void SetUpdateTribePointFlag(short value)
     {
@@ -497,9 +451,6 @@ public sealed class WorldStateAuthority(IWorldStateRepository repository, ILogge
         }
     }
 
-    // ---------------------------------------------------------------------------------------------------------
-    // Flush
-    // ---------------------------------------------------------------------------------------------------------
 
     public async ValueTask FlushIfDirtyAsync(CancellationToken ct)
     {
@@ -520,7 +471,7 @@ public sealed class WorldStateAuthority(IWorldStateRepository repository, ILogge
         try
         {
             await repository.UpdateAsync(world.Zone038WinTribe, world.Zone038WinTribeTime, world.TribeSymbolBattle,
-                world.MonsterSymbol, world.MonsterSymbolEndTime, world.HighTribe, world.UpdateTribePoint, ct)
+                    world.MonsterSymbol, world.MonsterSymbolEndTime, world.HighTribe, world.UpdateTribePoint, ct)
                 .ConfigureAwait(false);
 
             foreach (var tribe in tribes)

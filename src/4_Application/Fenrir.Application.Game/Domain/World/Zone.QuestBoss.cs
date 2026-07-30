@@ -9,7 +9,7 @@ public sealed partial class Zone
 
     private const int QuestBossPoolSize = 100;
 
-        internal void SummonPersonalQuestBossesForTick()
+    internal void SummonPersonalQuestBossesForTick()
     {
         foreach (var (_, state) in _players)
             TrySummonPersonalQuestBoss(state);

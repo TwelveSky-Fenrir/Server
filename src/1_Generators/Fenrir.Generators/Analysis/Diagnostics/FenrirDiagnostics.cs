@@ -40,6 +40,43 @@ internal static class FenrirDiagnostics
         DiagnosticSeverity.Error,
         true);
 
+        public static readonly DiagnosticDescriptor WireTypeMissingExpectedSize = new(
+        "FEN005",
+        "Wire type without an explicit size",
+        "Type '{0}' carries [FenrirWireType] without an explicit size; declare [FenrirWireType(<octets>)] " +
+        "so the layout stays computable when the type is nested from another assembly",
+        Category,
+        DiagnosticSeverity.Error,
+        true);
+
+        public static readonly DiagnosticDescriptor MultipleServersInCompilation = new(
+        "FEN006",
+        "Packets of several servers in one assembly",
+        "Assembly '{0}' declares packets for several FenrirServer values ({1}); the emitted aggregates are " +
+        "per-assembly and would silently cover only '{2}'",
+        Category,
+        DiagnosticSeverity.Error,
+        true);
+
+        public static readonly DiagnosticDescriptor UnresolvableNestedSize = new(
+        "FEN007",
+        "Nested wire type size cannot be resolved",
+        "Field '{1}.{2}' nests '{0}', which comes from another assembly's metadata and declares no explicit " +
+        "[FenrirWireType(<octets>)]; its size cannot be computed and would silently be 0",
+        Category,
+        DiagnosticSeverity.Error,
+        true);
+
+        public static readonly DiagnosticDescriptor MultipleHandlerServersInCompilation = new(
+        "FEN008",
+        "Handlers of several servers in one assembly",
+        "Assembly '{0}' declares packet handlers for several FenrirServer values ({1}); a single dispatcher " +
+        "is emitted per assembly, named after the first handler collected ('{2}' here), an order that is not " +
+        "guaranteed stable across compilations",
+        Category,
+        DiagnosticSeverity.Error,
+        true);
+
     public static readonly DiagnosticDescriptor ExpectedSizeMismatch = new(
         "FEN013",
         "Expected size mismatch",

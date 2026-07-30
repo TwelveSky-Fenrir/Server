@@ -1,10 +1,9 @@
 using System.IO.Pipelines;
 using System.Net;
-using Fenrir.Network.Abstractions;
-using Fenrir.Security.FloodProtection;
-using Fenrir.Security.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Transport;
+using Fenrir.Security.Abstractions;
+using Fenrir.Security.FloodProtection;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Network.Dispatch;
@@ -16,10 +15,11 @@ public sealed class TcpServer<TSession>(
     IOpcodeFrameSizeProvider registry,
     ISessionRateLimiter? rateLimiter = null,
     IpFloodGuard? ipFloodGuard = null,
-    ILogger? logger = null) : IAsyncDisposable
+    ILogger? logger = null,
+    SessionIdAllocator? sessionIds = null) : IAsyncDisposable
     where TSession : ClientSession
 {
-    private readonly FenrirTcpListener<TSession> _listener = new(endpoint, sessionFactory, logger);
+    private readonly FenrirTcpListener<TSession> _listener = new(endpoint, sessionFactory, logger, sessionIds);
 
     public ValueTask DisposeAsync()
     {

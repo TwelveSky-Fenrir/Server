@@ -1,4 +1,4 @@
-using Fenrir.Network.Abstractions;
+using Fenrir.Application.Game.Handlers.Handlers.Dispatching;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Application.Game.Handlers.Extensions;
@@ -9,6 +9,6 @@ public static class HandlersServiceCollectionExtensions
     {
         services.AddSingleton<IFrameDispatcher, ZoneFrameDispatcher>();
 
-        return services.AddGeneratedPacketHandlers();
+        return services.AddZonePacketHandlers();
     }
 }

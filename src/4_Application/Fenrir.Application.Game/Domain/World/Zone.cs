@@ -16,8 +16,8 @@ using Fenrir.Application.Game.Domain.World.Pathfinding;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
+using Fenrir.Application.Game.Sessions;
 using Fenrir.Data.WriteBehind;
-using Fenrir.Application.Game;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.World;
@@ -89,15 +89,13 @@ public sealed partial class Zone(
 
     private MonsterPathfinder? _pathfinder;
 
-    private long _rawLogicTick;
-
     public short MapId { get; } = mapId;
 
     public int PlayerCount => _players.Count;
 
     public IEnumerable<PlayerRuntimeState> Players => _players.Values;
 
-    public long RawLogicTick => _rawLogicTick;
+    public long RawLogicTick { get; private set; }
 
     public float AoiCellSize => options.AoiCellSize;
 
@@ -127,7 +125,7 @@ public sealed partial class Zone(
 
     public long AdvanceRawLogicTick()
     {
-        return ++_rawLogicTick;
+        return ++RawLogicTick;
     }
 
     public List<MonsterAggroCandidate> BorrowBossAggroScratch()
@@ -347,7 +345,6 @@ public sealed partial class Zone(
     private void DrainInbox()
     {
         while (_inbox.Reader.TryRead(out var command))
-        {
             try
             {
                 switch (command.Kind)
@@ -404,7 +401,6 @@ public sealed partial class Zone(
                 logger.LogError(ex, "Zone {MapId} command {Kind} for character {CharacterId} failed", MapId,
                     command.Kind, command.CharacterId);
             }
-        }
     }
 
     private void Simulate(int legacyTicksElapsed)
@@ -424,10 +420,6 @@ public sealed partial class Zone(
             }
     }
 
-    // internal (pas private) pour que ZoneRegistry.Initialize puisse pré-charger les .WM EN PARALLÈLE avant de
-    // construire les zones -- sinon chaque ctor Zone parse son navmesh en série sur le thread de boot (fenêtre où
-    // le GameServer n'écoute ni ne s'inscrit). Passer le résultat via le paramètre 'geometry' du ctor court-circuite
-    // cet appel.
     internal static ZoneGeometry? TryLoadGeometry(short mapId, GameServerOptions gameServerOptions,
         ILogger<Zone> zoneLogger)
     {

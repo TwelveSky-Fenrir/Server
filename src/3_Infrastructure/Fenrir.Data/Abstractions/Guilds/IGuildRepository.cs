@@ -13,7 +13,7 @@ public interface IGuildRepository
 
     public ValueTask<ReadOnlyCollection<GuildRankingRowDto>> GetTopByPointsAsync(int count, CancellationToken ct);
 
-        public ValueTask<ReadOnlyCollection<GuildRankingDetailDto>> GetRankingAsync(int count, CancellationToken ct);
+    public ValueTask<ReadOnlyCollection<GuildRankingDetailDto>> GetRankingAsync(int count, CancellationToken ct);
 
     public ValueTask AdjustPointsAsync(int guildId, int delta, CancellationToken ct);
 

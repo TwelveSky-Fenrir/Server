@@ -22,6 +22,6 @@ BEGIN
 
     IF @ExistingRelayId IS NULL
         INSERT INTO runtime.ProxyShopExpirationRelay
-            (SourceShardId, CharacterId, NewExpirationDate, CorrelationId, CreatedAtUtc)
+        (SourceShardId, CharacterId, NewExpirationDate, CorrelationId, CreatedAtUtc)
         VALUES (@SourceShardId, @CharacterId, @NewExpirationDate, @CorrelationId, SYSUTCDATETIME());
 END;

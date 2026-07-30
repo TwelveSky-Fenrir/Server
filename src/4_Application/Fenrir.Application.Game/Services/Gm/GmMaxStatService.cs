@@ -1,8 +1,8 @@
 using Fenrir.Application.Game.Abstractions.Gm;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Sessions;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Application.Game;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Gm;

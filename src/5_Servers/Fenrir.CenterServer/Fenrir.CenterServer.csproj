@@ -10,6 +10,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\2_Core\Fenrir.Core\Fenrir.Core.csproj"/>
+    <!-- Arête EXPLICITE bien que transitive via Fenrir.Cluster : CenterServerHost/CenterLinkSession/
+         CenterLinkRegistry consomment directement CenterOpcodeRegistry, CenterSessionStateGate,
+         CenterSessionState et WorldEventOutbound. Compter sur la transitivité casserait à distance le jour
+         où Cluster perdrait cette référence. -->
+    <ProjectReference Include="..\..\2_Core\Fenrir.Protocol.Center\Fenrir.Protocol.Center.csproj"/>
     <ProjectReference Include="..\..\3_Infrastructure\Fenrir.Network\Fenrir.Network.csproj"/>
     <ProjectReference Include="..\..\3_Infrastructure\Fenrir.Data\Fenrir.Data.csproj"/>
     <ProjectReference Include="..\..\3_Infrastructure\Fenrir.Security\Fenrir.Security.csproj"/>

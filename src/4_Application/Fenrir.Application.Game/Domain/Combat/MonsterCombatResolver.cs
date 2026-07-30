@@ -107,8 +107,8 @@ public static class MonsterCombatResolver
 
         var critical = false;
         var criticalEligible = !isSkillHit ||
-                                SkillCriticalEligibility.IsEligibleForSkillHit(request.AttackActionValue2,
-                                    attackSkill);
+                               SkillCriticalEligibility.IsEligibleForSkillHit(request.AttackActionValue2,
+                                   attackSkill);
         if (criticalEligible && CombatMath.RollCritical(attacker.Stats.Critical, rng))
         {
             damage *= 2;
@@ -210,7 +210,7 @@ public static class MonsterCombatResolver
             false);
     }
 
-        public static bool RollHolyShieldRemoval(int monsterSpecialType, int attackSubMode, IRandomSource rng)
+    public static bool RollHolyShieldRemoval(int monsterSpecialType, int attackSubMode, IRandomSource rng)
     {
         var threshold = HolyShieldRemovalThreshold(monsterSpecialType, attackSubMode);
         return threshold > 0 && rng.NextInt32(100) < threshold;

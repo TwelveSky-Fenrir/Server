@@ -51,7 +51,8 @@ IF NOT EXISTS (SELECT 1
                FROM admin.ErrorCatalog
                WHERE ErrorNumber = 50212)
     INSERT INTO admin.ErrorCatalog (ErrorNumber, SchemaName, Description)
-    VALUES (50212, 'game', N'usp_TribeBank_DepositFromCharacter: character has no money to deposit into the tribe bank.');
+    VALUES (50212, 'game',
+            N'usp_TribeBank_DepositFromCharacter: character has no money to deposit into the tribe bank.');
 
 IF NOT EXISTS (SELECT 1
                FROM admin.ErrorCatalog

@@ -1,6 +1,6 @@
 using System.Threading.Channels;
 using Fenrir.Application.Game.Domain.Guilds;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.World;
@@ -24,7 +24,6 @@ public sealed partial class Zone
     private void DrainGuildBuffExpiryCommands()
     {
         while (_guildBuffExpiryInbox.Reader.TryRead(out var command))
-        {
             try
             {
                 ApplyGuildBuffExpiryCommand(in command);
@@ -34,7 +33,6 @@ public sealed partial class Zone
                 logger.LogError(ex, "Zone {MapId} guild-buff-expiry command for guild {GuildId} failed", MapId,
                     command.GuildId);
             }
-        }
     }
 
     private void ApplyGuildBuffExpiryCommand(in GuildBuffExpiryZoneCommand command)

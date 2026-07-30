@@ -1,9 +1,8 @@
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Sessions;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Application.Game;
-using Fenrir.Application.Game.Packets.Zone;
-using Fenrir.Application.Game.ZoneRuntime;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -51,7 +50,10 @@ public sealed class AccountSessionKickPollHost(
         foreach (var target in kicked)
         {
             if (registry.TryGetByAccount(target.AccountId, out var session) &&
-                session is ZoneClientSession { State: ZoneSessionState.InWorld, CharacterId: { } characterId } zoneSession &&
+                session is ZoneClientSession
+                {
+                    State: ZoneSessionState.InWorld, CharacterId: { } characterId
+                } zoneSession &&
                 zones.TryGetPlayer(characterId, out var runtimeState) &&
                 !runtimeState.IsMovingZone)
             {

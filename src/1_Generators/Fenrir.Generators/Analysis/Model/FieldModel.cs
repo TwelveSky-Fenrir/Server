@@ -22,7 +22,5 @@ internal sealed record FieldModel
 
     public int AvatarXorRowLength { get; init; }
 
-    public int Offset { get; set; }
-
     public int OwnSize { get; init; }
 }

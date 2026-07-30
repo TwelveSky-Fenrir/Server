@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using System.Collections.ObjectModel;
-using Fenrir.Application.Game.Domain;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -12,11 +11,6 @@ public sealed class WorldStateService(
     IOptions<GameServerOptions>? gameOptions = null)
 {
     public const int TribeCount = 4;
-
-    // En mode Center, le CenterServer est l'écrivain autoritaire : le shard cesse d'écrire ces agrégats en DB
-    // (les lecteurs/miroirs in-memory + ReconcileAsync restent actifs). Défaut Shard = écriture historique.
-    private bool IsCenterAuthoritative =>
-        gameOptions?.Value.WorldStateAuthority == WorldStateAuthorityMode.Center;
 
     private readonly Dictionary<(byte From, byte To), AllianceOfferState> _allianceOffers = new();
     private readonly Lock _lock = new();
@@ -35,6 +29,9 @@ public sealed class WorldStateService(
     private int _scalarVersion;
 
     private WorldRvrState _world;
+
+    private bool IsCenterAuthoritative =>
+        gameOptions?.Value.WorldStateAuthority == WorldStateAuthorityMode.Center;
 
     public bool IsDirty
     {

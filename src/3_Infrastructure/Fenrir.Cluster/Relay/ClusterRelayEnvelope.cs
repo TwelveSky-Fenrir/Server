@@ -1,5 +1,3 @@
-using System;
-
 namespace Fenrir.Cluster.Relay;
 
 public readonly record struct ClusterRelayEnvelope<TEvent>(

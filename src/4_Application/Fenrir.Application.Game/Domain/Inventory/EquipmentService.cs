@@ -91,16 +91,16 @@ public static class EquipmentService
             state.EatStrPotion,
             state.EatDexPotion,
             state.EatElePotion,
-            HpBoostActive: state.HPBoost > 0,
-            WarriorPillActive: state.WarriorPill > 0,
-            DmgBoostActive: state.DmgBoost > 0);
+            state.HPBoost > 0,
+            state.WarriorPill > 0,
+            state.DmgBoost > 0);
 
         var mount = BuildMountContext(state);
 
         return (cosmetic, zone, consumable, mount);
     }
 
-        public static MountContext BuildMountContext(PlayerRuntimeState state)
+    public static MountContext BuildMountContext(PlayerRuntimeState state)
     {
         var mountedSlot = state.AnimalIndex >= MountAnimalInfo.ActiveCompanionSlotBase &&
                           state.AnimalIndex <
@@ -115,10 +115,10 @@ public static class EquipmentService
 
         return new MountContext(
             state.AnimalNumber,
-            AbsorbActive: state.AnimalAbsorbState != 0,
-            AbsorbValue: absorbValue,
-            RolledPower: MountPowerCodec.EncodeSlot(state.MountRolledAttributes, mountedSlot),
-            Activity: state.MountActivity[mountedSlot]);
+            state.AnimalAbsorbState != 0,
+            absorbValue,
+            MountPowerCodec.EncodeSlot(state.MountRolledAttributes, mountedSlot),
+            state.MountActivity[mountedSlot]);
     }
 
     private static int ResolveDrunkStateId(PlayerRuntimeState state)

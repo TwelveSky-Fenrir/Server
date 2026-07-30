@@ -3,7 +3,7 @@ using Fenrir.Application.Game.Abstractions.Progression;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Progression;

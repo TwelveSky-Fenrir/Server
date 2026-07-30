@@ -1,5 +1,5 @@
-using Fenrir.Security.RateLimiting;
 using Fenrir.Domain.Login;
+using Fenrir.Security.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 

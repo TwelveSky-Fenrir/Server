@@ -7,7 +7,7 @@ public interface IAccountVaultRepository
     public ValueTask<(AccountVaultBalanceDto? Balance, IReadOnlyList<AccountVaultItemSlotDto> Items)> GetAsync(
         int accountId, CancellationToken ct);
 
-        public ValueTask TransferMoneyWithCharacterAsync(int characterId, long deltaCharacterMoney, int accountId,
+    public ValueTask TransferMoneyWithCharacterAsync(int characterId, long deltaCharacterMoney, int accountId,
         long deltaVaultMoney, CancellationToken ct, short? auditEventCode = null, int? auditQuantity = null);
 
     public ValueTask TransferItemWithCharacterAsync(int characterId, byte container,

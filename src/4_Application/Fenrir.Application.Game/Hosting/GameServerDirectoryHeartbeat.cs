@@ -16,10 +16,6 @@ public sealed class GameServerDirectoryHeartbeat(
     {
         var opts = options.Value;
 
-        // Trace de démarrage load-bearing : si CETTE ligne apparaît, host.RunAsync() a bien démarré les hosted
-        // services (le hang de startup est écarté) et le seul problème possible restant est l'ÉCRITURE du heartbeat
-        // (voir le catch plus bas). Si elle n'apparaît PAS alors que « Application started » oui, un service démarré
-        // AVANT celui-ci ne rend pas la main.
         logger.LogInformation(
             "GameServerDirectory heartbeat host started for shard {ShardId}; first registration attempt to " +
             "runtime.GameServerDirectory as {Host}:{Port} follows (every {IntervalSeconds}s)", opts.ShardId,
@@ -38,10 +34,6 @@ public sealed class GameServerDirectoryHeartbeat(
 
                 if (!registered)
                 {
-                    // Trace load-bearing pour le diagnostic « zones not open » : confirme que ce shard s'est bien
-                    // inscrit dans runtime.GameServerDirectory (la table que le LoginServer lit pour router l'entrée
-                    // en zone) et SUR QUEL host:port. Un LoginServer qui ne voit pas ce shard lit une autre base, ou
-                    // le host/port ici ne correspond pas à ce que la sonde de joignabilité peut atteindre.
                     logger.LogInformation(
                         "GameServer registered in runtime.GameServerDirectory as shard {ShardId} at {Host}:{Port} " +
                         "(capacity {Capacity}) -- this is the address the LoginServer offers clients and probes",

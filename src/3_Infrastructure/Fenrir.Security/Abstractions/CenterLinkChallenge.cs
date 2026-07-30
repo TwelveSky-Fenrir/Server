@@ -7,15 +7,14 @@ public readonly struct CenterLinkChallenge
 {
     private readonly NonceBuffer _nonce;
 
-        internal CenterLinkChallenge(scoped ReadOnlySpan<byte> nonce)
+    internal CenterLinkChallenge(scoped ReadOnlySpan<byte> nonce)
     {
         NonceBuffer buffer = default;
         nonce[..CenterLinkAuth.NonceSize].CopyTo(buffer);
         _nonce = buffer;
     }
 
-        [UnscopedRef]
-    public ReadOnlySpan<byte> Nonce => _nonce;
+    [UnscopedRef] public ReadOnlySpan<byte> Nonce => _nonce;
 }
 
 [InlineArray(CenterLinkAuth.NonceSize)]

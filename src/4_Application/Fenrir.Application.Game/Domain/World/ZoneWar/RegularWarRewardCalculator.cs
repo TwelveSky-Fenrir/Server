@@ -51,8 +51,8 @@ public static class RegularWarRewardCalculator
             var leaderboardCp = LeaderboardCpAmount(topKillers, participant.CharacterId);
 
             var isWinningSide = !isDraw &&
-                                 (participant.Tribe == winningTribe ||
-                                  (allyOfWinningTribe is { } ally && participant.Tribe == ally));
+                                (participant.Tribe == winningTribe ||
+                                 (allyOfWinningTribe is { } ally && participant.Tribe == ally));
 
             var baseMoney = rewardValues.GetMoneyReward(participant.RebirthTier, participant.Level);
             var baseExperience = rewardValues.GetExperienceReward(participant.Level);

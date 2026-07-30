@@ -5,6 +5,8 @@ namespace Fenrir.Application.Game.Stats;
 
 public static partial class StatCalculator
 {
+    private const float AttackBoostMultiplier = 1.1f;
+
     private static int ComputeAttackPower(int strength, int ki, LevelRowDto levelRow, int setNumber,
         EquippedItemSlot?[] bySlot, CosmeticContext cosmetic = default, ZoneContext zone = default,
         MountContext mount = default, ConsumableContext consumable = default,
@@ -136,8 +138,6 @@ public static partial class StatCalculator
             deco2.Item.ItemId is 213 or 214 or 215 or 217 or 218 or 2303 or 2304 or 2305;
         return (int)(deco2.Enchant * (isWing ? 23.4f : 11.7f));
     }
-
-    private const float AttackBoostMultiplier = 1.1f;
 
     private static int ApplyAttackBoostMultiplier(int atk, ConsumableContext consumable, ZoneContext zone)
     {

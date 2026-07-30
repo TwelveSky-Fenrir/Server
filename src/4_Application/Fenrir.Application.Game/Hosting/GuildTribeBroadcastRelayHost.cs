@@ -2,7 +2,7 @@ using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Cluster.Relay;
 using Fenrir.Core.Packets.Shared;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -111,28 +111,38 @@ public sealed class GuildTribeBroadcastRelayHost(
                 recipient.Session.Send(response);
     }
 
-    protected override void OnOutboxFull(GuildTribeBroadcastRelayEntry entry) =>
+    protected override void OnOutboxFull(GuildTribeBroadcastRelayEntry entry)
+    {
         logger.LogWarning(
             "Cross-shard guild/tribe broadcast relay outbox full on shard {ShardId}; dropping one {Kind} " +
             "broadcast (same-shard delivery already happened, only the cross-shard fan-out is lost)",
             options.Value.ShardId, entry.Kind);
+    }
 
-    protected override void OnOutboundFlushFailed(Exception ex) =>
+    protected override void OnOutboundFlushFailed(Exception ex)
+    {
         logger.LogError(ex, "Guild/tribe broadcast outbound flush failed for shard {ShardId}",
             options.Value.ShardId);
+    }
 
-    protected override void OnInboundDeliveryFailed(Exception ex) =>
+    protected override void OnInboundDeliveryFailed(Exception ex)
+    {
         logger.LogError(ex, "Guild/tribe broadcast inbound delivery failed for shard {ShardId}",
             options.Value.ShardId);
+    }
 
-    protected override void OnPublishFailed(GuildTribeBroadcastRelayEntry entry, Exception ex) =>
+    protected override void OnPublishFailed(GuildTribeBroadcastRelayEntry entry, Exception ex)
+    {
         logger.LogError(ex,
             "Failed to publish a {Kind} broadcast to the cross-shard relay from shard {ShardId}; " +
             "cross-shard fan-out for this one message is lost (same-shard delivery already happened)",
             entry.Kind, options.Value.ShardId);
+    }
 
-    protected override void OnDeliveryFailed(GuildTribeBroadcastRelayDto dto, Exception ex) =>
+    protected override void OnDeliveryFailed(GuildTribeBroadcastRelayDto dto, Exception ex)
+    {
         logger.LogError(ex,
             "Failed to locally deliver relayed broadcast {RelayId} (kind {Kind}) on shard {ShardId}",
             dto.RelayId, dto.Kind, options.Value.ShardId);
+    }
 }

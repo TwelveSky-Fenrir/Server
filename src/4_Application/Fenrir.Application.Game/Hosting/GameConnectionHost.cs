@@ -1,4 +1,3 @@
-using Fenrir.Network.Dispatch;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
@@ -7,13 +6,13 @@ using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.Hosting.World;
-using Fenrir.Network.Abstractions;
-using Fenrir.Security.FloodProtection;
-using Fenrir.Security.Abstractions;
+using Fenrir.Application.Game.Sessions;
+using Fenrir.Network.Dispatch;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Application.Game;
-using Fenrir.Application.Game.Packets.Zone;
 using Fenrir.Network.Transport;
+using Fenrir.Protocol.Game;
+using Fenrir.Security.Abstractions;
+using Fenrir.Security.FloodProtection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -38,27 +37,22 @@ public sealed class GameConnectionHost(
 
     private readonly ConcurrentDictionary<Task, byte> _inFlightConnections = new();
 
-    private readonly List<TcpServer<ZoneClientSession>> _servers = [];
+    private readonly List<(short MapId, int Port, TcpServer<ZoneClientSession> Server)> _servers = [];
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var opts = options.Value;
         var hostedMaps = zones.Zones.Select(z => z.MapId).Order().ToArray();
 
-        // Modèle « zone = endpoint TCP par map » (Décision A / doc 03_Topologie_TCP_et_Aspire.md §1.2, legacy
-        // 1100 + N -- ts25zone/S02_MyServer.cpp:15-16) : chaque map hébergée reçoit son PROPRE listener sur
-        // ZoneBasePort + mapId. Le client (re)connecte par zone -- le Login lui renvoie exactement ce port. Un port
-        // qui échoue à se binder n'abat PAS les autres zones : seule cette map devient injoignable (la sonde du
-        // Login le détectera). Toutes les zones partagent le même dispatcher/rate-limiter/flood-guard.
-        var acceptLoops = new List<Task>(hostedMaps.Length);
+        var failedBinds = new List<(short MapId, int Port, SocketException Error)>();
+
         foreach (var mapId in hostedMaps)
         {
             var port = opts.ZoneBasePort + mapId;
 
-            TcpServer<ZoneClientSession> server;
             try
             {
-                server = new TcpServer<ZoneClientSession>(
+                _servers.Add((mapId, port, new TcpServer<ZoneClientSession>(
                     new IPEndPoint(IPAddress.Any, port),
                     (sessionId, transport, remoteEndPoint) =>
                         new ZoneClientSession(sessionId, transport, remoteEndPoint, logger),
@@ -66,30 +60,42 @@ public sealed class GameConnectionHost(
                     opcodeRegistry,
                     rateLimiter,
                     ipFloodGuard,
-                    logger);
+                    logger)));
+
+                logger.LogInformation("GameServer zone listener bound: map {MapId} on port {Port} (shard {ShardId})",
+                    mapId, port, opts.ShardId);
             }
             catch (SocketException ex)
             {
+                failedBinds.Add((mapId, port, ex));
+
                 logger.LogError(ex,
-                    "GameServer could not bind the zone listener for map {MapId} on port {Port} (shard {ShardId}); " +
-                    "that zone stays unreachable until the port frees up", mapId, port, opts.ShardId);
-                continue;
+                    "GameServer could not bind the zone listener for map {MapId} on port {Port} (shard {ShardId}): " +
+                    "{SocketError}", mapId, port, opts.ShardId, ex.SocketErrorCode);
             }
-
-            _servers.Add(server);
-
-            var accepting = server;
-            acceptLoops.Add(accepting.AcceptLoopAsync(
-                (session, connection, ct) => TrackInFlightAsync(accepting, session, connection, ct), stoppingToken));
-
-            logger.LogInformation("GameServer zone listener up: map {MapId} on port {Port} (shard {ShardId})", mapId,
-                port, opts.ShardId);
         }
 
+        var armedCount = _servers.Count;
+
         logger.LogInformation(
-            "GameServer listening: {ListenerCount} of {MapCount} zone listener(s) armed on ZoneBasePort {BasePort} + " +
-            "mapId (shard {ShardId}); a client entering map N connects to {BasePort}+N. Maps [{Maps}]", _servers.Count,
-            hostedMaps.Length, opts.ZoneBasePort, opts.ShardId, opts.ZoneBasePort, string.Join(", ", hostedMaps));
+            "GameServer zone listeners: {ArmedCount} armed / {HostedCount} hosted, on ZoneBasePort {BasePort} + " +
+            "mapId (shard {ShardId}); a client entering map N connects to {BasePort}+N. Maps [{Maps}]",
+            armedCount, hostedMaps.Length, opts.ZoneBasePort, opts.ShardId, opts.ZoneBasePort,
+            string.Join(", ", hostedMaps));
+
+        if (failedBinds.Count > 0)
+        {
+            ReleaseArmedListeners();
+            throw BuildIncompleteBindFailure(opts.ShardId, armedCount, hostedMaps.Length, failedBinds);
+        }
+
+        var acceptLoops = new List<Task>(_servers.Count);
+        foreach (var entry in _servers)
+        {
+            var accepting = entry.Server;
+            acceptLoops.Add(accepting.AcceptLoopAsync(
+                (session, connection, ct) => TrackInFlightAsync(accepting, session, connection, ct), stoppingToken));
+        }
 
         try
         {
@@ -98,6 +104,35 @@ public sealed class GameConnectionHost(
         catch (OperationCanceledException)
         {
         }
+    }
+
+    private static InvalidOperationException BuildIncompleteBindFailure(byte shardId, int armedCount, int hostedCount,
+        List<(short MapId, int Port, SocketException Error)> failedBinds)
+    {
+        var scope = armedCount == 0
+            ? $"none of the {hostedCount} hosted zone listener(s) could be bound"
+            : $"only {armedCount} of {hostedCount} zone listener(s) could be bound";
+
+        var detail = string.Join("; ",
+            failedBinds.Select(failure => $"map {failure.MapId} on port {failure.Port} ({failure.Error.SocketErrorCode})"));
+
+        return new InvalidOperationException(
+            $"Shard {shardId} cannot start: {scope} -- {detail}. LoginServer's zone transfer and ZoneMoveService " +
+            "both hand clients ZoneBasePort + mapId computed from configuration, never from an observed listener, " +
+            "and nothing anywhere retries a failed bind, so an unbound map is permanently unreachable (and ejects " +
+            "any player transferring into it) while ZoneTickHost keeps simulating it. A busy port also means some " +
+            "other process already owns this map, i.e. the same ADR-0012 disjointness violation ShardPartitionGuard " +
+            "refuses at boot -- a partially armed shard is a split-brain risk, not degraded availability. Free the " +
+            "port (usually a stale shard process) and restart the shard.",
+            failedBinds[0].Error);
+    }
+
+    private void ReleaseArmedListeners()
+    {
+        foreach (var entry in _servers)
+            entry.Server.DisposeAsync().AsTask().GetAwaiter().GetResult();
+
+        _servers.Clear();
     }
 
     public override async Task StopAsync(CancellationToken cancellationToken)
@@ -268,8 +303,7 @@ public sealed class GameConnectionHost(
 
     public override void Dispose()
     {
-        foreach (var server in _servers)
-            server.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        ReleaseArmedListeners();
         base.Dispose();
     }
 }

@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 
 namespace Fenrir.Application.Game.Domain.Social.Trade;
 

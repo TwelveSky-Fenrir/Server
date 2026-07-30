@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Domain.Simulation;
-using Fenrir.Application.Game;
-using Fenrir.Application.Game.ZoneRuntime;
+using Fenrir.Application.Game.Sessions;
+using Fenrir.Protocol.Game;
 
 namespace Fenrir.Application.Game.Domain.World.Monsters;
 

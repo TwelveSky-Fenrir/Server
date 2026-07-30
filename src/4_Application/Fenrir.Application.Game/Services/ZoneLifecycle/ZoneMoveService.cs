@@ -1,16 +1,13 @@
 using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 using Fenrir.Application.Game.Domain;
-using Fenrir.Application.Game.Domain.Avatars;
-using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
-using Fenrir.Data.Abstractions.Runtime;
+using Fenrir.Application.Game.Hosting.World;
+using Fenrir.Application.Game.Sessions;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Application.Game;
-using Fenrir.Core.Packets.Shared;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -28,6 +25,7 @@ public sealed class ZoneMoveService(
     ICharacterShardLocationRepository characterShardLocations,
     IEventLogRepository eventLog,
     IOptions<GameServerOptions> options,
+    ICharacterWriteBehindFlusher writeBehindFlusher,
     ILogger<ZoneMoveService> logger) : IZoneMoveService
 {
     private const short ZoneDepartureEventCode = 5;
@@ -172,6 +170,8 @@ public sealed class ZoneMoveService(
             return;
         }
 
+        await writeBehindFlusher.FlushCharacterNowAsync(characterId, cancellationToken);
+
         await LogZoneDepartureAsync(zoneSession, characterId, sourceZone.MapId, targetZoneNumber,
             cancellationToken);
 
@@ -192,7 +192,7 @@ public sealed class ZoneMoveService(
         {
             Result = 0,
             Ip = options.Value.PublicHost,
-            Port = options.Value.Port
+            Port = options.Value.ZoneBasePort + targetZoneNumber
         });
     }
 
@@ -255,6 +255,8 @@ public sealed class ZoneMoveService(
                 return;
             }
 
+            await writeBehindFlusher.FlushCharacterNowAsync(characterId, cancellationToken);
+
             await tickets.CreateAsync(zoneSession.AccountId!.Value, characterId, candidate.ShardId,
                 options.Value.TicketTtlSeconds, zoneSession.AccountSessionToken!.Value, zoneSession.AccountGrade,
                 targetZoneNumber, cancellationToken);
@@ -279,7 +281,8 @@ public sealed class ZoneMoveService(
             await characterShardLocations.UpsertAsync(characterId, candidate.ShardId, targetZoneNumber, state.Name,
                 state.Tribe, cancellationToken);
 
-            zoneSession.Send(new ZoneMoveResponse { Result = 0, Ip = candidate.Host, Port = candidate.Port });
+            zoneSession.Send(new ZoneMoveResponse
+                { Result = 0, Ip = candidate.Host, Port = options.Value.ZoneBasePort + targetZoneNumber });
             return;
         }
 

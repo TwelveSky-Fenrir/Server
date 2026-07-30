@@ -2,7 +2,7 @@ using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Cluster.Relay;
 using Fenrir.Core.Packets.Shared;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -54,30 +54,40 @@ public sealed class ChatCrossShardRelayHost(
         });
     }
 
-    protected override void OnOutboxFull(ChatCrossShardWhisperEntry entry) =>
+    protected override void OnOutboxFull(ChatCrossShardWhisperEntry entry)
+    {
         logger.LogWarning(
             "Cross-shard whisper relay outbox full on shard {ShardId}; dropping one whisper from {SourceName} " +
             "to {TargetName} (character {TargetCharacterId} on shard {TargetShardId}) -- the sender already saw " +
             "the accepted acknowledgement, only this one cross-shard delivery is lost",
             options.Value.ShardId, entry.SourceAvatarName, entry.TargetAvatarName, entry.TargetCharacterId,
             entry.TargetShardId);
+    }
 
-    protected override void OnOutboundFlushFailed(Exception ex) =>
+    protected override void OnOutboundFlushFailed(Exception ex)
+    {
         logger.LogError(ex, "Cross-shard whisper outbound flush failed for shard {ShardId}", options.Value.ShardId);
+    }
 
-    protected override void OnInboundDeliveryFailed(Exception ex) =>
+    protected override void OnInboundDeliveryFailed(Exception ex)
+    {
         logger.LogError(ex, "Cross-shard whisper inbound delivery failed for shard {ShardId}", options.Value.ShardId);
+    }
 
-    protected override void OnPublishFailed(ChatCrossShardWhisperEntry entry, Exception ex) =>
+    protected override void OnPublishFailed(ChatCrossShardWhisperEntry entry, Exception ex)
+    {
         logger.LogError(ex,
             "Failed to publish a cross-shard whisper from {SourceName} to {TargetName} (character " +
             "{TargetCharacterId} on shard {TargetShardId}) from shard {ShardId}; this one whisper is lost",
             entry.SourceAvatarName, entry.TargetAvatarName, entry.TargetCharacterId, entry.TargetShardId,
             options.Value.ShardId);
+    }
 
-    protected override void OnDeliveryFailed(ChatCrossShardWhisperDto dto, Exception ex) =>
+    protected override void OnDeliveryFailed(ChatCrossShardWhisperDto dto, Exception ex)
+    {
         logger.LogError(ex,
             "Failed to locally deliver relayed whisper {RelayId} (from {SourceName} to {TargetName}) on " +
             "shard {ShardId}",
             dto.RelayId, dto.SourceAvatarName, dto.TargetAvatarName, options.Value.ShardId);
+    }
 }

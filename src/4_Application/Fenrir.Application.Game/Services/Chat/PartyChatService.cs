@@ -2,7 +2,7 @@ using Fenrir.Application.Game.Abstractions.Chat;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Core.Packets.Shared;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Chat;

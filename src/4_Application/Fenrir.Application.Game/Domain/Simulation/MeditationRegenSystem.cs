@@ -2,7 +2,7 @@ using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Data.WriteBehind;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 
 namespace Fenrir.Application.Game.Domain.Simulation;
 

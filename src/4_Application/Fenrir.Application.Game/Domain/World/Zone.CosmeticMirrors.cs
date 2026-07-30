@@ -9,11 +9,10 @@ using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Social.Pshop;
 using Fenrir.Application.Game.Stats;
-using Fenrir.Data.WriteBehind;
-using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Network.Framing;
 using Fenrir.Core.Packets.Shared;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Data.WriteBehind;
+using Fenrir.Network.Framing;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.World;
@@ -267,7 +266,6 @@ public sealed partial class Zone
     private void DrainDrinkBottleCommands()
     {
         while (_bottleInbox.Reader.TryRead(out var command))
-        {
             try
             {
                 ApplyDrinkBottleCommand(in command);
@@ -279,7 +277,6 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
-        }
     }
 
     private void ApplyDrinkBottleCommand(in DrinkBottleZoneCommand command)
@@ -330,7 +327,6 @@ public sealed partial class Zone
     private void DrainHotkeySlotMirrorCommands()
     {
         while (_hotkeySlotInbox.Reader.TryRead(out var command))
-        {
             try
             {
                 ApplyHotkeySlotMirrorCommand(in command);
@@ -340,7 +336,6 @@ public sealed partial class Zone
                 logger.LogError(ex, "Zone {MapId} hotkey-slot mirror command for character {CharacterId} failed",
                     MapId, command.CharacterId);
             }
-        }
     }
 
     private void ApplyHotkeySlotMirrorCommand(in HotkeySlotMirrorZoneCommand command)
@@ -430,7 +425,6 @@ public sealed partial class Zone
     private void DrainHeroRankingQueryCommands()
     {
         while (_heroRankingInbox.Reader.TryRead(out var command))
-        {
             try
             {
                 ApplyHeroRankingQueryCommand(in command);
@@ -440,7 +434,6 @@ public sealed partial class Zone
                 logger.LogError(ex, "Zone {MapId} hero-ranking query command for character {CharacterId} failed",
                     MapId, command.CharacterId);
             }
-        }
     }
 
     private void ApplyHeroRankingQueryCommand(in HeroRankingQueryZoneCommand command)
@@ -457,7 +450,6 @@ public sealed partial class Zone
     private void DrainHeroRankingRolloverCommands()
     {
         while (_heroRankingRolloverInbox.Reader.TryRead(out _))
-        {
             try
             {
                 ApplyHeroRankingRolloverReset();
@@ -466,7 +458,6 @@ public sealed partial class Zone
             {
                 logger.LogError(ex, "Zone {MapId} hero-ranking rollover reset failed", MapId);
             }
-        }
     }
 
     private void ApplyHeroRankingRolloverReset()
@@ -484,7 +475,6 @@ public sealed partial class Zone
     private void DrainFishingCommands()
     {
         while (_fishingInbox.Reader.TryRead(out var command))
-        {
             try
             {
                 ApplyFishingCommand(in command);
@@ -496,7 +486,6 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
-        }
     }
 
     private void ApplyFishingCommand(in FishingZoneCommand command)
@@ -551,7 +540,6 @@ public sealed partial class Zone
     private void DrainMountCommands()
     {
         while (_mountInbox.Reader.TryRead(out var command))
-        {
             try
             {
                 ApplyMountCommand(in command);
@@ -563,7 +551,6 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
-        }
     }
 
     private void ApplyMountCommand(in MountZoneCommand command)
@@ -702,7 +689,6 @@ public sealed partial class Zone
     private void DrainCostumeCommands()
     {
         while (_costumeInbox.Reader.TryRead(out var command))
-        {
             try
             {
                 ApplyCostumeCommand(in command);
@@ -714,7 +700,6 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
-        }
     }
 
     private void ApplyCostumeCommand(in CostumeZoneCommand command)
@@ -786,7 +771,6 @@ public sealed partial class Zone
     private void DrainStellarCoreCommands()
     {
         while (_stellarCoreInbox.Reader.TryRead(out var command))
-        {
             try
             {
                 ApplyStellarCoreCommand(in command);
@@ -798,7 +782,6 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
-        }
     }
 
     private void ApplyStellarCoreCommand(in StellarCoreZoneCommand command)
@@ -868,7 +851,6 @@ public sealed partial class Zone
     private void DrainAvatarBuffCommands()
     {
         while (_avatarBuffInbox.Reader.TryRead(out var command))
-        {
             try
             {
                 ApplyAvatarBuffCommand(in command);
@@ -880,7 +862,6 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
-        }
     }
 
     private void ApplyAvatarBuffCommand(in AvatarBuffZoneCommand command)
@@ -916,7 +897,6 @@ public sealed partial class Zone
     private void DrainRuneSocketCommands()
     {
         while (_runeInbox.Reader.TryRead(out var command))
-        {
             try
             {
                 ApplyRuneSocketCommand(in command);
@@ -928,7 +908,6 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
-        }
     }
 
     private void ApplyRuneSocketCommand(in RuneSocketZoneCommand command)
@@ -959,7 +938,6 @@ public sealed partial class Zone
     private void DrainAutoBuffCommands()
     {
         while (_autoBuffInbox.Reader.TryRead(out var command))
-        {
             try
             {
                 ApplyAutoBuffCommand(in command);
@@ -971,7 +949,6 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
-        }
     }
 
     private void ApplyAutoBuffCommand(in AutoBuffZoneCommand command)
@@ -1035,7 +1012,6 @@ public sealed partial class Zone
     private void DrainPshopCommands()
     {
         while (_pshopInbox.Reader.TryRead(out var command))
-        {
             try
             {
                 ApplyPshopCommand(in command);
@@ -1047,7 +1023,6 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
-        }
     }
 
     private void ApplyPshopCommand(in PshopZoneCommand command)

@@ -61,7 +61,7 @@ public sealed class TribeMigrationService(
             await characters.ApplyTribeFourConversionAsync(characterId, result.NewTribe,
                 result.NewQuestProgress.StepPermanent, result.NewQuestProgress.ActiveFlag,
                 result.NewQuestProgress.QSort, result.NewQuestProgress.TargetPhase,
-                result.NewQuestProgress.KillCounter, consumeSharedQuota: true, ct).ConfigureAwait(false);
+                result.NewQuestProgress.KillCounter, true, ct).ConfigureAwait(false);
         }
         catch (SqlException ex) when (ex.Number == QuotaExhaustedErrorNumber)
         {

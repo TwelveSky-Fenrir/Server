@@ -101,52 +101,53 @@ BEGIN
     WHERE CharacterId = @CharacterId;
 
     IF @@ROWCOUNT = 0
-    BEGIN
-        BEGIN TRY
-            INSERT INTO game.CharacterQuests (CharacterId, StepPermanent, ActiveQuestId, QSort, TargetPhase, KillCounter)
-            VALUES (@CharacterId, @StepPermanent, @ActiveQuestId, @QSort, @TargetPhase, @KillCounter);
-        END TRY
-        BEGIN CATCH
-            IF ERROR_NUMBER() NOT IN (2627, 2601)
-                THROW;
+        BEGIN
+            BEGIN TRY
+                INSERT INTO game.CharacterQuests (CharacterId, StepPermanent, ActiveQuestId, QSort, TargetPhase,
+                                                  KillCounter)
+                VALUES (@CharacterId, @StepPermanent, @ActiveQuestId, @QSort, @TargetPhase, @KillCounter);
+            END TRY
+            BEGIN CATCH
+                IF ERROR_NUMBER() NOT IN (2627, 2601)
+                    THROW;
 
-            ROLLBACK TRANSACTION;
+                ROLLBACK TRANSACTION;
 
-            BEGIN TRANSACTION;
+                BEGIN TRANSACTION;
 
-            IF @ConsumeQuota = 1
-                BEGIN
-                    UPDATE admin.TribeFourQuota
-                    SET CurrentCount = CurrentCount + 1
-                    WHERE Id = 1
-                      AND CurrentCount < MaxCount;
+                IF @ConsumeQuota = 1
+                    BEGIN
+                        UPDATE admin.TribeFourQuota
+                        SET CurrentCount = CurrentCount + 1
+                        WHERE Id = 1
+                          AND CurrentCount < MaxCount;
 
-                    IF @@ROWCOUNT = 0
-                        BEGIN
-                            ROLLBACK TRANSACTION;
-                            THROW 50355,
-                                N'usp_Character_ApplyTribeFourConversion: shared daily fourth-tribe quota exhausted (retry).', 1;
-                        END;
-                END;
+                        IF @@ROWCOUNT = 0
+                            BEGIN
+                                ROLLBACK TRANSACTION;
+                                THROW 50355,
+                                    N'usp_Character_ApplyTribeFourConversion: shared daily fourth-tribe quota exhausted (retry).', 1;
+                            END;
+                    END;
 
-            UPDATE game.Characters
-            SET Tribe        = @NewTribe,
-                UpdatedAtUtc = SYSUTCDATETIME()
-            WHERE CharacterId = @CharacterId;
+                UPDATE game.Characters
+                SET Tribe        = @NewTribe,
+                    UpdatedAtUtc = SYSUTCDATETIME()
+                WHERE CharacterId = @CharacterId;
 
-            UPDATE game.CharacterQuests
-            SET StepPermanent = @StepPermanent,
-                ActiveQuestId = @ActiveQuestId,
-                QSort         = @QSort,
-                TargetPhase   = @TargetPhase,
-                KillCounter   = @KillCounter
-            WHERE CharacterId = @CharacterId;
+                UPDATE game.CharacterQuests
+                SET StepPermanent = @StepPermanent,
+                    ActiveQuestId = @ActiveQuestId,
+                    QSort         = @QSort,
+                    TargetPhase   = @TargetPhase,
+                    KillCounter   = @KillCounter
+                WHERE CharacterId = @CharacterId;
 
-            COMMIT TRANSACTION;
+                COMMIT TRANSACTION;
 
-            RETURN;
-        END CATCH;
-    END;
+                RETURN;
+            END CATCH;
+        END;
 
     COMMIT TRANSACTION;
 END;

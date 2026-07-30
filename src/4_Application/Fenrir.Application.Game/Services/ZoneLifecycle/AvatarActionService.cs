@@ -1,7 +1,7 @@
 using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Core.Packets.Shared;
+using Fenrir.Network.Dispatch.Sessions;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.ZoneLifecycle;

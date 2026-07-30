@@ -13,5 +13,17 @@
          projets dans un même arbre source ; exclure explicitement obj/bin du glob `**/*.cs` par défaut
          évite qu'un AssemblyInfo.cs généré en design-time soit compilé deux fois (CS0579). -->
     <DefaultItemExcludes>$(DefaultItemExcludes);**/obj/**;**/bin/**</DefaultItemExcludes>
+
+    <!-- Écrit le code émis par les générateurs sur disque (sous obj/, donc gitignoré) afin de
+         permettre un byte-diff des .g.cs d'une tranche de migration à l'autre. Le dépôt n'ayant
+         AUCUN test, ce diff est le principal signal de non-régression de la réorganisation :
+         le protocole n'a pas de length-prefix, donc une table d'opcodes ou un SessionStateGate
+         silencieusement vidé ne se manifesterait qu'en désynchronisant une session réelle.
+
+         Le chemin est en dur sous obj\ : $(BaseIntermediateOutputPath) n'est pas encore défini ici
+         (Directory.Build.props est importé PAR Microsoft.Common.props, donc avant son initialisation),
+         et une sortie hors obj\ serait reprise par le glob **/*.cs -> CS0102/CS0111 en masse. -->
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <CompilerGeneratedFilesOutputPath>obj\generated</CompilerGeneratedFilesOutputPath>
   </PropertyGroup>
 </Project>

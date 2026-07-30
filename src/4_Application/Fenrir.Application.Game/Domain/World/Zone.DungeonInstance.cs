@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Domain.World.Monsters;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 
 namespace Fenrir.Application.Game.Domain.World;
 
@@ -23,7 +23,8 @@ public sealed partial class Zone
         NullPersonalDungeonBossCatalog.Instance;
 
     public bool IsZone241TypeZone =>
-        options.Zone241DungeonMapIds.Contains(MapId) || WrapCheckSpecialDestinationCatalog.IsInstancedDestination(MapId);
+        options.Zone241DungeonMapIds.Contains(MapId) ||
+        WrapCheckSpecialDestinationCatalog.IsInstancedDestination(MapId);
 
     public DungeonInstanceEntryOutcome TryEnterZone241PersonalInstance(int characterId)
     {

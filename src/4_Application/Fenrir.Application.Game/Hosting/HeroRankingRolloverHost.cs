@@ -19,8 +19,6 @@ public sealed class HeroRankingRolloverHost(
 
         if (opts.WorldStateAuthority == WorldStateAuthorityMode.Center)
         {
-            // Le CenterServer possède le rollover hero-rank (write) ; la notification client du reset devra
-            // arriver par fan-out Center (dépendance §4c du Lot 5). Host inerte côté shard.
             logger.LogInformation("HeroRankingRolloverHost inert: WorldStateAuthority=Center");
             return;
         }

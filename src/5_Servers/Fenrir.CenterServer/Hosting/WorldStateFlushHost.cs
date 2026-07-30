@@ -1,24 +1,8 @@
 using System.Buffers.Binary;
 using Fenrir.Cluster.WorldState;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 namespace Fenrir.CenterServer.Hosting;
 
-/// <summary>
-///     The ~6s real-time aggregate-flush cadence for the Center authoritative world state. Runs, in the legacy
-///     order: flush world/tribe/alliance, recompute the four tribe scores from the character population (Bug 3),
-///     flush hero-rank accrual and the tower store, then poll the operator-driven tribe-point recompute flag and
-///     broadcast the 1234 sync when consumed. Also performs the mandatory final flush on stop.
-/// </summary>
-/// <remarks>
-///     Reimplemented from the 6-beat block (Server/ts25center/S07_MyGame01.cpp:240-267). The cadence is derived
-///     from wall-clock time via <see cref="PeriodicTimer" />, never a loop counter. Ordering nuance preserved:
-///     the world/tribe flush runs BEFORE the tribe-score recompute, so a freshly recomputed score is held in
-///     memory and only written on the next cycle (the legacy one-cycle lag). NOTE: Fenrir's tribe points live on
-///     the normalised <c>game.WorldStateTribes</c> table (flushed by the world flush), not on a monolithic world
-///     row, so the lag is preserved by ordering the recompute after the flush rather than by table layout.
-/// </remarks>
 public sealed class WorldStateFlushHost(
     IWorldStateAuthority worldState,
     IHeroRankAuthority heroRank,
@@ -27,11 +11,10 @@ public sealed class WorldStateFlushHost(
     ICenterLinkBroadcaster broadcaster,
     ILogger<WorldStateFlushHost> logger) : BackgroundService
 {
-    private static readonly TimeSpan FlushInterval = TimeSpan.FromSeconds(6);
-    private static readonly TimeSpan FinalFlushBudget = TimeSpan.FromSeconds(15);
-
     private const short PendingFlag = 1;
     private const short ConsumedFlag = 2;
+    private static readonly TimeSpan FlushInterval = TimeSpan.FromSeconds(6);
+    private static readonly TimeSpan FinalFlushBudget = TimeSpan.FromSeconds(15);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -77,7 +60,6 @@ public sealed class WorldStateFlushHost(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            // Legacy swallowed this silently (S07_MyGame01.cpp:244); surfaced here. Previous scores are kept.
             logger.LogError(ex,
                 "Center tribe-score recompute failed -- keeping previous tribe scores this cycle (Bug 3 source)");
         }

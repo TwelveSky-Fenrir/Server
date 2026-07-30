@@ -8,10 +8,6 @@ var sqlPassword = builder.AddParameter("sql-password", true);
 
 var centerSharedSecret = builder.AddParameter("center-shared-secret", true);
 
-// Hôte public annoncé aux clients pour joindre les zones. Le client (game) se connecte à CET host:port pour entrer
-// en zone ; il DOIT être joignable DEPUIS LA MACHINE DU CLIENT. 127.0.0.1 ne marche que si le client tourne en
-// loopback sur la même machine ; un client vu « from 192.168.x.x » côté Login a besoin de l'IP LAN du serveur.
-// Override explicite via la variable d'env FENRIR_PUBLIC_HOST, sinon auto-détection de l'IPv4 LAN primaire.
 var gamePublicHost = Environment.GetEnvironmentVariable("FENRIR_PUBLIC_HOST") is { Length: > 0 } configuredHost
     ? configuredHost
     : ResolvePrimaryLanIPv4();
@@ -19,10 +15,6 @@ Console.WriteLine(
     $"[Fenrir.AppHost] Game__PublicHost = {gamePublicHost} (override with the FENRIR_PUBLIC_HOST env var). " +
     "Clients receive this host to reach zones; it MUST be reachable from the client machine.");
 
-// Base d'adressage legacy des zones (1100 + numéroDeMap). Le GameServer binde un listener par map hébergée sur
-// ZoneBasePort + mapId ; le LoginServer dérive le MÊME port pour router le client (modèle « zone = endpoint »,
-// Décision A / doc 03_Topologie_TCP_et_Aspire.md). Injecté aux deux depuis cette source unique pour éviter tout
-// désaccord Login/Game.
 const int zoneBasePort = 1100;
 
 var sql = builder.AddSqlServer("sqlserver", sqlPassword)
@@ -64,9 +56,6 @@ byte[] shardIds = [1];
 
 foreach (var shardId in shardIds)
 {
-    // Endpoint « ancre » pour le dashboard : le port de la 1re map du shard (1100 + shardId). Le GameServer ouvre
-    // en réalité UN listener par map hébergée (ZoneBasePort + mapId) -- isProxied:false, donc le process binde
-    // lui-même tous ces ports et le client les atteint en direct (Aspire n'est pas sur le chemin des paquets).
     var anchorZonePort = zoneBasePort + shardId;
 
     builder.AddProject<Fenrir_GameServer>($"game-shard-{shardId:00}")
@@ -92,9 +81,6 @@ static void RemoveDefaultHealthCheck(IResource resource)
         resource.Annotations.Remove(annotation);
 }
 
-// IPv4 LAN primaire = l'adresse locale de la NIC qui sortirait vers l'extérieur. Le « Connect » UDP n'émet
-// AUCUN paquet (datagramme sans handshake) : il ne fait que résoudre l'interface de sortie, donc pas besoin que
-// 8.8.8.8 soit joignable. Repli sur 127.0.0.1 si l'hôte n'a aucune route (machine isolée).
 static string ResolvePrimaryLanIPv4()
 {
     try

@@ -149,7 +149,7 @@ public sealed class GenericActionService(
         }
 
         var sourceIsStackable = worldData.ItemsById.TryGetValue(sourceItem.ItemId, out var sourceDefinition) &&
-                                 ContainerMatrix.IsStackableSort(sourceDefinition.Item.Sort);
+                                ContainerMatrix.IsStackableSort(sourceDefinition.Item.Sort);
 
         var requestedQuantity = touchesEquipment ? 0 : move.Quantity1;
 
@@ -538,8 +538,8 @@ public sealed class GenericActionService(
         {
             await characters.AdjustMoneyAndReplaceContainerAsync(characterId, resolved.MoneyGained, 0, (byte)page1,
                 ToTvps(projectedContainer), cancellationToken,
-                auditAccountId: accountId, auditEventCode: sellEventCode, auditItemId: source.ItemId,
-                auditQuantity: soldQuantity);
+                accountId, sellEventCode, source.ItemId,
+                soldQuantity);
         }
         catch (Exception ex)
         {
@@ -659,9 +659,9 @@ public sealed class GenericActionService(
         {
             await characters.AdjustMoneyAndReplaceContainerAsync(characterId, -resolved.MoneyCost, 0, (byte)page2,
                 ToTvps(projectedContainer), cancellationToken,
-                auditAccountId: accountId, auditEventCode: NpcShopBuyEventCode,
-                auditItemId: itemDefinition.Item.ItemId, auditQuantity: purchasedQuantity,
-                auditPayload: auditPayload);
+                accountId, NpcShopBuyEventCode,
+                itemDefinition.Item.ItemId, purchasedQuantity,
+                auditPayload);
         }
         catch (Exception ex)
         {
@@ -866,7 +866,7 @@ public sealed class GenericActionService(
         try
         {
             await characters.AdjustStoreMoneyAsync(characterId, deltaMoney, deltaStoreMoney, cancellationToken,
-                auditAccountId: accountId, auditEventCode: storeMoneyEventCode, auditQuantity: move.Quantity1);
+                accountId, storeMoneyEventCode, move.Quantity1);
         }
         catch (Exception ex)
         {
@@ -1069,8 +1069,8 @@ public sealed class GenericActionService(
         try
         {
             await accountVault.TransferMoneyWithCharacterAsync(characterId, deltaCharacterMoney, accountId,
-                deltaVaultMoney, cancellationToken, auditEventCode: saveMoneyEventCode,
-                auditQuantity: move.Quantity1);
+                deltaVaultMoney, cancellationToken, saveMoneyEventCode,
+                move.Quantity1);
         }
         catch (Exception ex)
         {

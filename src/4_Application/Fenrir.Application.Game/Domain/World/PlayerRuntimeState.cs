@@ -3,7 +3,6 @@ using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Data.WriteBehind;
-using Fenrir.Network.Abstractions;
 
 namespace Fenrir.Application.Game.Domain.World;
 

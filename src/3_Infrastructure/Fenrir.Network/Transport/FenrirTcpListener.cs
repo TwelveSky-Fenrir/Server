@@ -12,14 +12,16 @@ public sealed class FenrirTcpListener<TSession> : IAsyncDisposable
     private readonly Socket _listenSocket;
 
     private readonly ILogger? _logger;
+    private readonly SessionIdAllocator _sessionIds;
     private readonly Func<long, IDuplexPipe, IPEndPoint?, TSession> _sessionFactory;
-    private long _nextSessionId;
 
     public FenrirTcpListener(IPEndPoint endpoint, Func<long, IDuplexPipe, IPEndPoint?, TSession> sessionFactory,
-        ILogger? logger = null)
+        ILogger? logger = null, SessionIdAllocator? sessionIds = null)
     {
         _sessionFactory = sessionFactory;
         _logger = logger;
+
+        _sessionIds = sessionIds ?? SessionIdAllocator.Shared;
 
         _listenSocket = new Socket(endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
         _listenSocket.Bind(endpoint);
@@ -57,7 +59,7 @@ public sealed class FenrirTcpListener<TSession> : IAsyncDisposable
             try
             {
                 connection = new SocketConnection(accepted, _logger);
-                var sessionId = Interlocked.Increment(ref _nextSessionId);
+                var sessionId = _sessionIds.Next();
                 var session = _sessionFactory(sessionId, connection, connection.RemoteEndPoint);
 
                 _ = RunAcceptedAsync(session, connection, onAccepted, cancellationToken);

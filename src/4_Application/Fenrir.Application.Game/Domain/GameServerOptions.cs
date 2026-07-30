@@ -9,12 +9,6 @@ public sealed class GameServerOptions
 {
     public int Port { get; set; } = 1100;
 
-    /// <summary>
-    ///     Base d'adressage des zones (legacy <c>1100 + N</c>, <c>ts25zone/S02_MyServer.cpp:15-16</c>). Chaque map
-    ///     hébergée expose son PROPRE listener TCP sur <c>ZoneBasePort + mapId</c> ; le client (re)connecte par zone
-    ///     (Décision A / doc <c>03_Topologie_TCP_et_Aspire.md</c> §1.2). DOIT correspondre à
-    ///     <c>LoginServerOptions.ZoneBasePort</c> (le Login dérive le même port pour router le client).
-    /// </summary>
     public int ZoneBasePort { get; set; } = 1100;
 
     public byte ShardId { get; set; } = 1;
@@ -148,9 +142,5 @@ public sealed class GameServerOptions
 
     public int CrossTribeXpRatio { get; set; } = 2;
 
-    /// <summary>Écrivain autoritaire de l'état monde cross-zone (World/Tribe + HeroRank). Défaut
-    /// <see cref="WorldStateAuthorityMode.Shard"/> = comportement historique (shard-autoritaire, DB-outbox). En
-    /// <see cref="WorldStateAuthorityMode.Center"/>, la bascule est atomique : push op33 au Center + réception du
-    /// fan-out + arrêt des écritures DB shard de ces agrégats (Tower exclu). Voir Lot 5 / ADR-0005.</summary>
     public WorldStateAuthorityMode WorldStateAuthority { get; set; } = WorldStateAuthorityMode.Shard;
 }

@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Commerce;
 using Fenrir.Application.Game.Domain.Simulation;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 

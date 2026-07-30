@@ -26,6 +26,18 @@ public sealed record MacRestrictionRepository(ICaeriusNetDbContext Db) : IMacRes
         return SelectRestriction(rows, macAddress, machineGuid)?.AccountLimit;
     }
 
+    public async ValueTask<int> AddAsync(string macAddress, string? machineGuid, int accountLimit,
+        CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("admin", "usp_MacRestriction_Add", 1)
+            .AddParameter("MacAddress", macAddress, SqlDbType.VarChar)
+            .AddParameter("MachineGuid", (object?)machineGuid ?? DBNull.Value, SqlDbType.VarChar)
+            .AddParameter("AccountLimit", accountLimit, SqlDbType.Int)
+            .Build();
+
+        return await Db.ExecuteScalarAsync<int>(sp, ct);
+    }
+
     internal static MacRestrictionRowDto? SelectRestriction(ImmutableArray<MacRestrictionRowDto> rows,
         string macAddress, string? machineGuid)
     {
@@ -50,17 +62,5 @@ public sealed record MacRestrictionRepository(ICaeriusNetDbContext Db) : IMacRes
             .Build();
 
         return Db.QueryAsImmutableArrayAsync<MacRestrictionRowDto>(sp, ct);
-    }
-
-    public async ValueTask<int> AddAsync(string macAddress, string? machineGuid, int accountLimit,
-        CancellationToken ct)
-    {
-        var sp = new StoredProcedureParametersBuilder("admin", "usp_MacRestriction_Add", 1)
-            .AddParameter("MacAddress", macAddress, SqlDbType.VarChar)
-            .AddParameter("MachineGuid", (object?)machineGuid ?? DBNull.Value, SqlDbType.VarChar)
-            .AddParameter("AccountLimit", accountLimit, SqlDbType.Int)
-            .Build();
-
-        return await Db.ExecuteScalarAsync<int>(sp, ct);
     }
 }

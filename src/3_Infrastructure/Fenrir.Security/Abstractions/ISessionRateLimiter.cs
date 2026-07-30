@@ -4,8 +4,7 @@ namespace Fenrir.Security.Abstractions;
 
 public interface ISessionRateLimiter
 {
+    public bool TryConsume(long sessionId, FenrirServer server, byte opcode);
 
-        bool TryConsume(long sessionId, FenrirServer server, byte opcode);
-
-        void Remove(long sessionId);
+    public void Remove(long sessionId);
 }

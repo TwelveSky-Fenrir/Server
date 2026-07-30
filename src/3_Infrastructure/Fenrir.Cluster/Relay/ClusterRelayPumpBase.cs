@@ -7,10 +7,10 @@ namespace Fenrir.Cluster.Relay;
 public abstract class ClusterRelayPumpBase<TEntry, TDto> : BackgroundService
 {
     private readonly IClusterRelayBackend<TEntry, TDto> _backend;
-    private readonly byte _shardId;
+    private readonly Channel<TEntry> _outbox;
     private readonly TimeSpan _pollInterval;
     private readonly int _retentionSeconds;
-    private readonly Channel<TEntry> _outbox;
+    private readonly byte _shardId;
 
     protected ClusterRelayPumpBase(
         IClusterRelayBackend<TEntry, TDto> backend,
@@ -32,7 +32,7 @@ public abstract class ClusterRelayPumpBase<TEntry, TDto> : BackgroundService
         });
     }
 
-        public bool Enqueue(TEntry entry)
+    public bool Enqueue(TEntry entry)
     {
         if (_outbox.Writer.TryWrite(entry))
             return true;
@@ -80,7 +80,7 @@ public abstract class ClusterRelayPumpBase<TEntry, TDto> : BackgroundService
         } while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false));
     }
 
-        public async ValueTask PollOnceAsync(CancellationToken ct)
+    public async ValueTask PollOnceAsync(CancellationToken ct)
     {
         await FlushOutboundAsync(ct).ConfigureAwait(false);
         await DeliverInboundAsync(ct).ConfigureAwait(false);
@@ -119,15 +119,15 @@ public abstract class ClusterRelayPumpBase<TEntry, TDto> : BackgroundService
             }
     }
 
-        protected abstract ValueTask DeliverAsync(TDto dto, CancellationToken ct);
+    protected abstract ValueTask DeliverAsync(TDto dto, CancellationToken ct);
 
-        protected abstract void OnOutboxFull(TEntry entry);
+    protected abstract void OnOutboxFull(TEntry entry);
 
-        protected abstract void OnOutboundFlushFailed(Exception ex);
+    protected abstract void OnOutboundFlushFailed(Exception ex);
 
-        protected abstract void OnInboundDeliveryFailed(Exception ex);
+    protected abstract void OnInboundDeliveryFailed(Exception ex);
 
-        protected abstract void OnPublishFailed(TEntry entry, Exception ex);
+    protected abstract void OnPublishFailed(TEntry entry, Exception ex);
 
-        protected abstract void OnDeliveryFailed(TDto dto, Exception ex);
+    protected abstract void OnDeliveryFailed(TDto dto, Exception ex);
 }

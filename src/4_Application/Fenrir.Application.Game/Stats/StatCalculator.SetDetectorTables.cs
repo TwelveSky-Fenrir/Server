@@ -105,14 +105,14 @@ public static partial class StatCalculator
     {
         var combinations = new List<int[]>(groups.Length * 4);
         foreach (var (weapons, fixedPieces) in groups)
-            foreach (var weapon in weapons)
-            {
-                var combination = new int[fixedPieces.Length + 1];
-                combination[0] = weapon;
-                Array.Copy(fixedPieces, 0, combination, 1, fixedPieces.Length);
-                Array.Sort(combination);
-                combinations.Add(combination);
-            }
+        foreach (var weapon in weapons)
+        {
+            var combination = new int[fixedPieces.Length + 1];
+            combination[0] = weapon;
+            Array.Copy(fixedPieces, 0, combination, 1, fixedPieces.Length);
+            Array.Sort(combination);
+            combinations.Add(combination);
+        }
 
         return [.. combinations];
     }

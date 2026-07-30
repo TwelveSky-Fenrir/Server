@@ -16,14 +16,13 @@ using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
+using Fenrir.Application.Game.Sessions;
 using Fenrir.Application.Game.Stats;
-using Fenrir.Data.WriteBehind;
-using Fenrir.Network.Abstractions;
-using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Application.Game;
-using Fenrir.Network.Framing;
 using Fenrir.Core.Packets.Shared;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Data.WriteBehind;
+using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Framing;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.World;
@@ -335,7 +334,8 @@ public sealed partial class Zone
         state.MountActivity = state.MountActivity.SetItem(slot, MountActivityExpCodec.Activity(data.MountExpActivity));
         state.MountAccumulatedExp =
             state.MountAccumulatedExp.SetItem(slot, MountActivityExpCodec.Exp(data.MountExpActivity));
-        state.MountRolledAttributes = MountPowerCodec.WithSlotDigits(state.MountRolledAttributes, slot, data.MountPower);
+        state.MountRolledAttributes =
+            MountPowerCodec.WithSlotDigits(state.MountRolledAttributes, slot, data.MountPower);
         state.MountRolledAttributeTotal =
             state.MountRolledAttributeTotal.SetItem(slot, MountPowerCodec.DigitSum(data.MountPower));
 
@@ -682,12 +682,12 @@ public sealed partial class Zone
 
     public void GrantReviveEligibility(PlayerRuntimeState state)
     {
-        ClearDeathWindow(state, clearLock: true);
+        ClearDeathWindow(state, true);
     }
 
     public void ClearDeathWindowKeepLockArmed(PlayerRuntimeState state)
     {
-        ClearDeathWindow(state, clearLock: false);
+        ClearDeathWindow(state, false);
     }
 
     private void ClearDeathWindow(PlayerRuntimeState state, bool clearLock)
@@ -829,7 +829,8 @@ public sealed partial class Zone
 
         if (!isResumeAction)
         {
-            if (motion.SkillCategoryCode is SkillCastGuard.HotkeyBoundCategoryCode or SkillCastGuard.SkillEffectCategoryCode)
+            if (motion.SkillCategoryCode is SkillCastGuard.HotkeyBoundCategoryCode
+                or SkillCastGuard.SkillEffectCategoryCode)
             {
                 if (!EvaluateSkillCastPreCastGuard(state, action, motion.SkillCategoryCode, out var guardContext))
                     return;
@@ -1075,8 +1076,8 @@ public sealed partial class Zone
 
             worldData.SkillsById.TryGetValue(skillId, out var skillDef);
             var gradePoints = SkillGradeAuthority.GetMaxSkillGradeNum(skillId, state.LearnedSkills) +
-                               SkillGradeAuthority.GetBonusSkillValue(skillId, equipSlotItems, 0, skillDef,
-                                   state.GuildBuffType, state.GuildBuffActive);
+                              SkillGradeAuthority.GetBonusSkillValue(skillId, equipSlotItems, 0, skillDef,
+                                  state.GuildBuffType, state.GuildBuffActive);
 
             var result = SkillCastResolver.TryCast(skillDef, gradePoints, int.MaxValue, maxLife, weaponSort,
                 state.SupportSkillTimeUpRatio);
@@ -1121,6 +1122,7 @@ public sealed partial class Zone
                     BroadcastCasterEffectSnapshot(state);
                     BroadcastManaRecoveryToTarget(manaRecipient);
                 }
+
                 break;
         }
     }

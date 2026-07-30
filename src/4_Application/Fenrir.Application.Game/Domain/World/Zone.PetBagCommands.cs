@@ -41,7 +41,6 @@ public sealed partial class Zone
     private void DrainPetBagCommands()
     {
         while (_petBagInbox.Reader.TryRead(out var command))
-        {
             try
             {
                 ApplyPetBagCommand(in command);
@@ -53,7 +52,6 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
-        }
     }
 
     private void ApplyPetBagCommand(in PetBagZoneCommand command)

@@ -41,5 +41,5 @@ IF
             (2, 5, 86599, NULL), -- Boots - Four Cardinal Striders
             (2, 7, 86503, 17),   -- Light Blade - Baihu's Fang
             (2, 7, 86527, 18),   -- Spear - Qing Long's Grace
-            (2, 7, 86551, 19);   -- Scepter - Zhu Que's Spirit
+            (2, 7, 86551, 19); -- Scepter - Zhu Que's Spirit
     END;

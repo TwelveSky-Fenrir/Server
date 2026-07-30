@@ -19,18 +19,21 @@ public enum ZoneMoveActionCategory
 
 public static class ZoneMoveActionCategoryGate
 {
-    public static bool IsRecognized(int sort) => sort is
-        (int)ZoneMoveActionCategory.GmMove or
-        (int)ZoneMoveActionCategory.Death or
-        (int)ZoneMoveActionCategory.Portal or
-        (int)ZoneMoveActionCategory.NpcMoney or
-        (int)ZoneMoveActionCategory.NpcMove or
-        (int)ZoneMoveActionCategory.Return or
-        (int)ZoneMoveActionCategory.ReturnItem or
-        (int)ZoneMoveActionCategory.MoveItem or
-        (int)ZoneMoveActionCategory.NpcTeleporter or
-        (int)ZoneMoveActionCategory.AutoToZone037 or
-        (int)ZoneMoveActionCategory.Zone84Transition;
+    public static bool IsRecognized(int sort)
+    {
+        return sort is
+            (int)ZoneMoveActionCategory.GmMove or
+            (int)ZoneMoveActionCategory.Death or
+            (int)ZoneMoveActionCategory.Portal or
+            (int)ZoneMoveActionCategory.NpcMoney or
+            (int)ZoneMoveActionCategory.NpcMove or
+            (int)ZoneMoveActionCategory.Return or
+            (int)ZoneMoveActionCategory.ReturnItem or
+            (int)ZoneMoveActionCategory.MoveItem or
+            (int)ZoneMoveActionCategory.NpcTeleporter or
+            (int)ZoneMoveActionCategory.AutoToZone037 or
+            (int)ZoneMoveActionCategory.Zone84Transition;
+    }
 }
 
 public static class ZoneMoveDestinationZoneGate
@@ -39,6 +42,8 @@ public static class ZoneMoveDestinationZoneGate
 
     public const int MaxZoneNumberExclusive = ZoneConfigCatalog.MaxValidZoneNumber;
 
-    public static bool IsWithinRequestRange(int zoneNumber) =>
-        zoneNumber >= MinZoneNumber && zoneNumber < MaxZoneNumberExclusive;
+    public static bool IsWithinRequestRange(int zoneNumber)
+    {
+        return zoneNumber >= MinZoneNumber && zoneNumber < MaxZoneNumberExclusive;
+    }
 }

@@ -1,15 +1,15 @@
-using Fenrir.Security;
-using Fenrir.Security.RateLimiting;
 using System.Collections.Immutable;
 using System.Net;
 using Fenrir.Application.Login.Abstractions.Login;
+using Fenrir.Application.Login.Services.AccountSecurity;
+using Fenrir.Data.Security;
 using Fenrir.Domain.Login;
 using Fenrir.Domain.Login.Avatars;
 using Fenrir.Domain.Login.Security;
-using Fenrir.Application.Login.Services.AccountSecurity;
-using Fenrir.Data.Security;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Application.Login.Packets;
+using Fenrir.Protocol.Login;
+using Fenrir.Security;
+using Fenrir.Security.RateLimiting;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -64,15 +64,6 @@ public sealed class LoginService(
     private const string RateLimitedMessage = "Too many login attempts from your IP. Please try again later.";
 
     private const short LoginSucceededEventCode = 1;
-
-    private enum AuthenticationOutcome
-    {
-        Success,
-        UnknownAccount,
-        WrongPassword,
-        AdminBanned,
-        AutoLockedOut
-    }
 
     private static readonly (byte[] Hash, byte[] Salt) DummyCredential =
         PasswordHasher.Hash("dummy-unused-reference-password");
@@ -343,5 +334,14 @@ public sealed class LoginService(
     private static LoginResult Failure(int resultCode, string resultString, bool reArmVersionOk)
     {
         return new LoginResult(LoginOutcome.Failure, resultCode, resultString, reArmVersionOk, 0, false, "", []);
+    }
+
+    private enum AuthenticationOutcome
+    {
+        Success,
+        UnknownAccount,
+        WrongPassword,
+        AdminBanned,
+        AutoLockedOut
     }
 }

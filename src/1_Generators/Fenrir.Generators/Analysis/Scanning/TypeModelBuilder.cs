@@ -96,6 +96,12 @@ internal static class TypeModelBuilder
         var attribute = context.Attributes[0];
         var expectedSize = attribute.GetCtorInt32(0);
 
+        if (expectedSize < 0)
+            diagnostics.Add(Diagnostic.Create(
+                FenrirDiagnostics.WireTypeMissingExpectedSize,
+                typeSymbol.Locations.FirstOrDefault(),
+                typeSymbol.Name));
+
         var fieldDiagnostics = new List<Diagnostic>();
         var fields = FieldScanner.Scan(typeSymbol, context.SemanticModel.Compilation, fieldDiagnostics,
             out var fieldsSize);

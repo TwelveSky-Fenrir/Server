@@ -28,7 +28,7 @@ BEGIN
     SET
         NOCOUNT ON;
 
-    SELECT c.Tribe                                                                    AS TribeId,
+    SELECT c.Tribe                                                                      AS TribeId,
            SUM(CAST((c.Level - 112) + (c.Level2 * 3) + (c.RebirthCount * 3) AS BIGINT)) AS StatSum
     FROM game.Characters c
     WHERE c.Level >= 145

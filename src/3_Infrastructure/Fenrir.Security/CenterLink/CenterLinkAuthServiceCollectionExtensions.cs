@@ -1,13 +1,11 @@
 using Fenrir.Security.Abstractions;
-using Fenrir.Security.CenterLink;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Fenrir.Security;
+namespace Fenrir.Security.CenterLink;
 
 public static class CenterLinkAuthServiceCollectionExtensions
 {
-
-        public static IServiceCollection AddFenrirCenterLinkAuth(
+    public static IServiceCollection AddFenrirCenterLinkAuth(
         this IServiceCollection services,
         Func<IServiceProvider, string?> sharedSecretAccessor)
     {
@@ -17,7 +15,7 @@ public static class CenterLinkAuthServiceCollectionExtensions
         return services;
     }
 
-        public static IServiceCollection AddFenrirCenterLinkAuth(this IServiceCollection services, string? sharedSecret)
+    public static IServiceCollection AddFenrirCenterLinkAuth(this IServiceCollection services, string? sharedSecret)
     {
         services.AddSingleton<ICenterLinkAuthenticator>(new CenterLinkAuthenticator(sharedSecret));
         return services;

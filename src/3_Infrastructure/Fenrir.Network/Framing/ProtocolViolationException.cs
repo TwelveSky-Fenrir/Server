@@ -1,5 +1,3 @@
-using Fenrir.Network.Abstractions;
-
 namespace Fenrir.Network.Framing;
 
 public sealed class ProtocolViolationException(FenrirServer server, byte opcode)

@@ -5,28 +5,27 @@ namespace Fenrir.Application.Game.Domain.Progression;
 
 public static class RebirthMilestoneRewards
 {
+    public const int FirstMilestoneGeneration = 6;
 
-        public const int FirstMilestoneGeneration = 6;
+    public const int SecondMilestoneGeneration = 12;
 
-        public const int SecondMilestoneGeneration = 12;
+    public const int LevelToWorldDropSort = 40;
 
-        public const int LevelToWorldDropSort = 40;
+    private const int RewardQuantity = 0;
 
-        private const int RewardQuantity = 0;
-
-        public static RebirthMilestoneReward Resolve(int postIncrementRebirthCount, byte previousTribe)
+    public static RebirthMilestoneReward Resolve(int postIncrementRebirthCount, byte previousTribe)
     {
         return postIncrementRebirthCount switch
         {
             FirstMilestoneGeneration => new RebirthMilestoneReward(
-                BuildRewardDrop(RewardItemIdAtSixthRebirth(previousTribe)), ClusterNotice: false),
+                BuildRewardDrop(RewardItemIdAtSixthRebirth(previousTribe)), false),
             SecondMilestoneGeneration => new RebirthMilestoneReward(
-                BuildRewardDrop(RewardItemIdAtTwelfthRebirth(previousTribe)), ClusterNotice: true),
-            _ => new RebirthMilestoneReward(ImmutableArray<TribeGroundItemDrop>.Empty, ClusterNotice: false)
+                BuildRewardDrop(RewardItemIdAtTwelfthRebirth(previousTribe)), true),
+            _ => new RebirthMilestoneReward(ImmutableArray<TribeGroundItemDrop>.Empty, false)
         };
     }
 
-        public static string FormatTwelfthRebirthNotice(string characterName)
+    public static string FormatTwelfthRebirthNotice(string characterName)
     {
         return $"{characterName} reached 12 rebirth!";
     }

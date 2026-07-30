@@ -1,0 +1,66 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Paquets du protocole client Zone (246 [FenrirPacket(FenrirServer.Zone, ...)] : 110 Incoming,
+       136 Outgoing) + leur énumération d'état de session, extraits de Fenrir.Application.Game (T10).
+       Un projet-paquets est une FRONTIÈRE DE COMPILATION : c'est l'assembly qui déclare les
+       [FenrirPacket] qui décide où les générateurs émettent leurs agrégats.
+
+       Namespace PLAT (Fenrir.Protocol.Game, aucun sous-namespace) : le générateur émet dans
+       Compilation.AssemblyName, donc un SEUL `using Fenrir.Protocol.Game;` donne accès aux
+       246 paquets ET à ZoneOpcodeRegistry / ZoneSessionStateGate. Ni <AssemblyName> ni
+       <RootNamespace> ne sont déclarés : les redéfinir désynchroniserait silencieusement le
+       namespace d'émission des `namespace Fenrir.Protocol.Game;` écrits en tête des 247 fichiers.
+
+       Asymétrie assumée nom-de-projet / nom-de-types : le projet s'appelle .Game (aligné sur
+       Fenrir.Domain.Game / Fenrir.Application.Game) mais les agrégats émis sont préfixés Zone*,
+       parce que EmittedNames.PrefixOf dérive du FenrirServer et non de l'assembly.
+
+       INVARIANT — aucun type de ce projet ne doit implémenter IAsyncPacketHandler<T> ni
+       IInlinePacketHandler<T>. Les 110 handlers Zone restent dans Fenrir.Application.Game, seul
+       assembly à faire émettre ZoneMessageDispatcher / ZonePacketHandlerHub / ZoneHandlerRegistration.
+       Un handler déposé ici ferait émettre un SECOND jeu d'agrégats de dispatch, concurrent du
+       premier : mêmes noms de types, namespaces différents, et rien ne le signalerait tant qu'un
+       site d'appel n'aurait pas les deux `using` en vue.
+       Signal opérationnel : le répertoire
+       obj/generated/Fenrir.Generators/Fenrir.Generators.Dispatch.HandlerDispatchIncrementalGenerator/
+       ne doit JAMAIS exister sous ce projet.
+
+       ZoneSessionState vit ici et NON dans Fenrir.Application.Game : 110 paquets le citent dans leur
+       AllowedStates = [(byte)ZoneSessionState.X] (218 occurrences) — le laisser derrière créerait un
+       cycle Protocol.Game -> Application.Game -> Protocol.Game. -->
+
+  <ItemGroup>
+    <!-- IIncomingPacket<T> (110 paquets) / IOutgoingPacket (136 paquets) : aucun des 246 fichiers ne
+         porte de using explicite vers ce namespace, tous dépendent de ce global using. DUPLIQUÉ et
+         non migré : Fenrir.Application.Game en garde besoin (IPacketSession, IAsyncPacketHandler,
+         IInlinePacketHandler, IFrameDispatcher, IOpcodeFrameSizeProvider). -->
+    <Using Include="Fenrir.Core.Abstractions"/>
+
+    <!-- DUPLIQUÉ ET NON MIGRÉ — divergence assumée avec T8/T9, où ce global using avait pu partir en
+         totalité. Les 246 attributs [FenrirPacket] citent Opcodes.Zone.*, mais 3 sites de
+         Fenrir.Application.Game HORS Packets/Zone citent encore Opcodes.*, sans using par fichier :
+           Handlers/Handlers/Dispatching/ZoneFrameDispatcher.cs (Opcodes.Zone.Incoming.ZoneTransferCancel)
+           Hosting/World/ZoneWar/ZoneCenterFanOutSink.cs        (Opcodes.Center.Outgoing.WorldEvent, .Party)
+         Deux d'entre eux visent des opcodes CENTER depuis le projet Game : le lien avec « le protocole
+         Zone part » est contre-intuitif. Le retirer de Fenrir.Application.Game = 3 CS0103. -->
+    <Using Include="Fenrir.Core.Opcodes"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Ne référence QUE Core : ni Network, ni Data, ni Domain.Game, ni Application. Prouvé, pas
+         supposé : les 246 fichiers ne portent au total que 4 lignes `using` distinctes, zéro nom
+         pleinement qualifié `Fenrir.*`, et les 18 seuls types non primitifs de leurs propriétés sont
+         tous déclarés dans Fenrir.Core/Packets/Shared/. Aucun PackageReference : rien ici ne consomme
+         Microsoft.Extensions.*, et `Compressed = true` n'émet qu'un bool statique, pas une
+         dépendance LZ4. -->
+    <ProjectReference Include="..\Fenrir.Core\Fenrir.Core.csproj"/>
+
+    <!-- Les analyseurs ne sont PAS transitifs : tout assembly déclarant des [FenrirPacket] doit porter
+         cette référence lui-même, sinon les 246 TryRead/Write/PayloadSize ne sont jamais émis et les
+         `partial record struct` restent sans implémentation. -->
+    <ProjectReference Include="..\..\1_Generators\Fenrir.Generators\Fenrir.Generators.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"/>
+  </ItemGroup>
+
+</Project>

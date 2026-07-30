@@ -21,7 +21,6 @@ public sealed partial class Zone
     private void DrainGuildBuffActivationCommands()
     {
         while (_guildBuffActivationInbox.Reader.TryRead(out var command))
-        {
             try
             {
                 ApplyGuildBuffActivationCommand(in command);
@@ -31,7 +30,6 @@ public sealed partial class Zone
                 logger.LogError(ex, "Zone {MapId} guild-buff-activation command for guild {GuildId} failed", MapId,
                     command.GuildId);
             }
-        }
     }
 
     private void ApplyGuildBuffActivationCommand(in GuildBuffActivationZoneCommand command)

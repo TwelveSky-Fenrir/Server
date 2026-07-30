@@ -1,7 +1,7 @@
 using Fenrir.Application.Login.Abstractions.ChangeMousePin;
-using Fenrir.Network.Abstractions;
+using Fenrir.Application.Login.Sessions;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Application.Login.Packets;
+using Fenrir.Protocol.Login;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Login.Handlers.Handlers;

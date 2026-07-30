@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Paquets S2S Center (op33 world-event, op57 party) + leur énumération d'état de session et les
+       offsets du payload op57, extraits de Fenrir.Cluster. Un projet-paquets est une FRONTIÈRE DE
+       COMPILATION : c'est l'assembly qui déclare les [FenrirPacket] qui décide où les générateurs
+       émettent leurs agrégats.
+
+       Namespace PLAT (Fenrir.Protocol.Center, aucun sous-namespace) : le générateur émet dans
+       Compilation.AssemblyName, donc ce choix fait qu'un SEUL `using Fenrir.Protocol.Center;` donne
+       accès aux paquets ET à CenterOpcodeRegistry / CenterSessionStateGate.
+
+       INVARIANT — aucun type de ce projet ne doit implémenter IAsyncPacketHandler<T> ni
+       IInlinePacketHandler<T>. Les handlers Center restent dans Fenrir.Cluster, seul assembly à faire
+       émettre CenterMessageDispatcher / CenterPacketHandlerHub / CenterHandlerRegistration. Un handler
+       déposé ici ferait émettre un SECOND jeu d'agrégats de dispatch, concurrent du premier : mêmes
+       noms de types, namespaces différents, et le compilateur ne signalerait rien tant qu'un site
+       d'appel n'aurait pas les deux `using` en vue. -->
+
+  <!-- CenterSessionState vit ici et NON dans Fenrir.Cluster : les paquets le citent dans leur
+       AllowedStates = [(byte)CenterSessionState.Authenticated], le laisser derrière créerait un cycle
+       Protocol.Center -> Cluster -> Protocol.Center. -->
+
+  <ItemGroup>
+    <Using Include="Fenrir.Core.Abstractions"/>
+    <Using Include="Fenrir.Core.Opcodes"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Ne référence QUE Core : ni Network, ni Data, ni Cluster. C'est la propriété qui rend ce projet
+         réutilisable par n'importe quel assembly parlant le protocole Center sans traîner la pile TCP. -->
+    <ProjectReference Include="..\Fenrir.Core\Fenrir.Core.csproj"/>
+    <ProjectReference Include="..\..\1_Generators\Fenrir.Generators\Fenrir.Generators.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"/>
+  </ItemGroup>
+
+</Project>

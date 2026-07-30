@@ -77,10 +77,10 @@ public interface ICharacterRepository
 
     public ValueTask AdjustMoneyAsync(int characterId, long deltaMoney, int deltaBigMoney, CancellationToken ct);
 
-        public ValueTask AdjustStoreMoneyAsync(int characterId, long deltaMoney, long deltaStoreMoney,
+    public ValueTask AdjustStoreMoneyAsync(int characterId, long deltaMoney, long deltaStoreMoney,
         CancellationToken ct, int? auditAccountId = null, short? auditEventCode = null, int? auditQuantity = null);
 
-        public ValueTask AdjustMoneyAndReplaceContainerAsync(int characterId, long deltaMoney, int deltaBigMoney,
+    public ValueTask AdjustMoneyAndReplaceContainerAsync(int characterId, long deltaMoney, int deltaBigMoney,
         byte container, IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct,
         int? auditAccountId = null, short? auditEventCode = null, int? auditItemId = null,
         int? auditQuantity = null, string? auditPayload = null);
@@ -149,7 +149,7 @@ public interface ICharacterRepository
     public ValueTask ApplyTribeConversionAsync(int characterId, int itemId, byte container,
         IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct);
 
-        public ValueTask ApplyTribeFourConversionAsync(int characterId, byte newTribe, int stepPermanent,
+    public ValueTask ApplyTribeFourConversionAsync(int characterId, byte newTribe, int stepPermanent,
         int activeQuestId, int qSort, int targetPhase, int killCounter, bool consumeSharedQuota,
         CancellationToken ct);
 }

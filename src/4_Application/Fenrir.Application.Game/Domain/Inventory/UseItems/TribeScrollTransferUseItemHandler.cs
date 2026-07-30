@@ -5,7 +5,7 @@ using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.Inventory.UseItems;

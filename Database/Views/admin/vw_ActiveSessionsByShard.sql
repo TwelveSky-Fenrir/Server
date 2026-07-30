@@ -42,13 +42,11 @@ SELECT d.ShardId,
        ISNULL(s.TearingDownSessions, 0) AS TearingDownSessions,
        s.MostRecentSessionRefreshUtc
 FROM runtime.GameServerDirectory AS d WITH (SNAPSHOT)
-    LEFT JOIN (
-        SELECT ShardId,
-               COUNT(*)                                          AS TotalSessions,
-               SUM(CASE WHEN SessionState = 0 THEN 1 ELSE 0 END) AS ActiveSessions,
-               SUM(CASE WHEN SessionState = 1 THEN 1 ELSE 0 END) AS TearingDownSessions,
-               MAX(LastRefreshedUtc)                             AS MostRecentSessionRefreshUtc
-        FROM runtime.AccountSessions WITH (SNAPSHOT)
-        WHERE ServerKind = 1
-        GROUP BY ShardId
-    ) AS s ON s.ShardId = d.ShardId;
+         LEFT JOIN (SELECT ShardId,
+                           COUNT(*)                                          AS TotalSessions,
+                           SUM(CASE WHEN SessionState = 0 THEN 1 ELSE 0 END) AS ActiveSessions,
+                           SUM(CASE WHEN SessionState = 1 THEN 1 ELSE 0 END) AS TearingDownSessions,
+                           MAX(LastRefreshedUtc)                             AS MostRecentSessionRefreshUtc
+                    FROM runtime.AccountSessions WITH (SNAPSHOT)
+                    WHERE ServerKind = 1
+                    GROUP BY ShardId) AS s ON s.ShardId = d.ShardId;

@@ -2,25 +2,13 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Cluster.WorldState;
 
-/// <summary>
-///     The CenterServer's single authoritative writer of hero-rank point accrual. Holds each character's
-///     current-period running total in memory (single writer), accumulates on every reported gain, and flushes
-///     the changed entries on the ~6s cadence. CORRECTS legacy Bug 1: the reported level is tracked
-///     monotonically instead of being frozen at the first gain of the cycle.
-/// </summary>
-/// <remarks>
-///     Reimplemented from <c>AddOrUpdateHeroRank</c> (Server/ts25center/S08_MyDB.cpp:213-216). The legacy upsert
-///     accumulates points (<c>hPoint += delta</c>) but omits <c>hLevel</c> from the duplicate-key update, so the
-///     stored level freezes forever. Here the authoritative total lives in memory and the flush wholesale-writes
-///     it, so a re-flush is idempotent and the level always reflects the highest level seen.
-/// </remarks>
 public sealed class HeroRankAuthority(ICenterHeroRankStore store, ILogger<HeroRankAuthority> logger)
     : IHeroRankAuthority
 {
     private const int TribeCount = FavoredTribeRankLadder.TribeCount;
+    private readonly Dictionary<int, Accrual> _accruals = new();
 
     private readonly Lock _lock = new();
-    private readonly Dictionary<int, Accrual> _accruals = new();
 
     private bool _initialized;
 
@@ -52,7 +40,8 @@ public sealed class HeroRankAuthority(ICenterHeroRankStore store, ILogger<HeroRa
     {
         if (hTribe >= TribeCount)
         {
-            logger.LogWarning("HeroRank AddOrUpdate dropped: character {CharacterId} reported tribe {Tribe} out of range",
+            logger.LogWarning(
+                "HeroRank AddOrUpdate dropped: character {CharacterId} reported tribe {Tribe} out of range",
                 uCharIdx, hTribe);
             return;
         }
@@ -63,7 +52,7 @@ public sealed class HeroRankAuthority(ICenterHeroRankStore store, ILogger<HeroRa
             {
                 accrual.Points += hPoint;
                 accrual.Tribe = hTribe;
-                accrual.Level = Math.Max(accrual.Level, hLevel); // Bug 1 fix: monotonic level, never regresses.
+                accrual.Level = Math.Max(accrual.Level, hLevel);
                 accrual.Dirty = true;
             }
             else
@@ -105,7 +94,6 @@ public sealed class HeroRankAuthority(ICenterHeroRankStore store, ILogger<HeroRa
 
                 lock (_lock)
                 {
-                    // Only clear dirty if no newer gain landed while we were flushing (points still match).
                     if (_accruals.TryGetValue(characterId, out var current) && current.Points == snapshot.Points &&
                         current.Level == snapshot.Level)
                         current.Dirty = false;

@@ -1,5 +1,4 @@
 using System.Buffers;
-using Fenrir.Network.Abstractions;
 using Fenrir.Network.Compression;
 
 namespace Fenrir.Network.Framing;

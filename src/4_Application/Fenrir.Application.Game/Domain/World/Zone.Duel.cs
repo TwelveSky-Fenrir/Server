@@ -3,9 +3,8 @@ using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Data.WriteBehind;
-using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Framing;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.World;

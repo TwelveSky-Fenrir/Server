@@ -61,7 +61,8 @@ public static class AccountCommands
     {
         if (!short.TryParse(gradeText, out var grade) || grade < 0)
         {
-            Console.Error.WriteLine("Grade must be a non-negative integer (0=revoke, 1=Basic, 10=Elevated, 100=Admin).");
+            Console.Error.WriteLine(
+                "Grade must be a non-negative integer (0=revoke, 1=Basic, 10=Elevated, 100=Admin).");
             return 1;
         }
 

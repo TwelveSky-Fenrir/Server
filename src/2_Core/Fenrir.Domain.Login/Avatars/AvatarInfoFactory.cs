@@ -31,9 +31,12 @@ public static class AvatarInfoFactory
     private const int HotkeyKeysPerPage = 14;
     private const int HotkeyWireIntsPerSlot = 3;
 
-    private static bool IsLoginRosterBlacklistedItemId(int itemId) => itemId is 1451 or 2268;
-
     public static AvatarInfo Zeroed => AvatarInfoTemplates.Zeroed;
+
+    private static bool IsLoginRosterBlacklistedItemId(int itemId)
+    {
+        return itemId is 1451 or 2268;
+    }
 
     public static AvatarInfo CreateForCharacter(CharacterWorldEntryDto character)
     {

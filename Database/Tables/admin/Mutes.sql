@@ -7,16 +7,16 @@
 -- trailing optional parameters; a system-imposed/legacy-import mute legitimately has neither.
 CREATE TABLE admin.Mutes
 (
-    MuteId            INT IDENTITY (1,1) NOT NULL,
-    AccountId         INT                NULL,
-    CharacterId       INT                NULL,
-    Reason            TINYINT            NOT NULL,
-    ExpiresAtUtc      DATETIME2(3)       NULL,
-    LiftedAtUtc       DATETIME2(3)       NULL,
-    CreatedAtUtc      DATETIME2(3)       NOT NULL
+    MuteId           INT IDENTITY (1,1) NOT NULL,
+    AccountId        INT                NULL,
+    CharacterId      INT                NULL,
+    Reason           TINYINT            NOT NULL,
+    ExpiresAtUtc     DATETIME2(3)       NULL,
+    LiftedAtUtc      DATETIME2(3)       NULL,
+    CreatedAtUtc     DATETIME2(3)       NOT NULL
         CONSTRAINT DF_Mutes_CreatedAtUtc DEFAULT SYSUTCDATETIME(),
-    ActorAccountId    INT                NULL, -- the GM who issued this mute (independently nullable like the target columns -- a system-imposed/legacy-import mute legitimately has no GM actor); deliberately NO FK, must survive deletion of the actor's own account/character
-    ActorCharacterId  INT                NULL,
+    ActorAccountId   INT                NULL, -- the GM who issued this mute (independently nullable like the target columns -- a system-imposed/legacy-import mute legitimately has no GM actor); deliberately NO FK, must survive deletion of the actor's own account/character
+    ActorCharacterId INT                NULL,
     CONSTRAINT PK_Mutes PRIMARY KEY CLUSTERED (MuteId),
     CONSTRAINT CK_Mutes_AccountOrCharacter CHECK (AccountId IS NOT NULL OR CharacterId IS NOT NULL),
     -- Cross-schema FK naming: see admin.Bans' own header comment for the FK_<ChildTable>_<TargetSchema>_<Role>

@@ -35,7 +35,7 @@ internal static class PacketEmitter
         {
             writer.Line();
             writer.Line(
-                $"public static global::Fenrir.Core.Wire.WireObfuscationMode Obfuscation => global::Fenrir.Core.Wire.WireObfuscationMode.{model.Obfuscation};");
+                $"public static {WellKnownNames.WireObfuscationModeEnum} Obfuscation => {WellKnownNames.WireObfuscationModeEnum}.{model.Obfuscation};");
             writer.Line();
             writer.Line($"public static bool Compressed => {(model.Compressed ? "true" : "false")};");
         }
@@ -71,7 +71,7 @@ internal static class PacketEmitter
         if (model.Fields.Length > 0)
         {
             writer.Line();
-            writer.Line("var reader = new global::Fenrir.Core.Wire.MessageReader(source);");
+            writer.Line($"var reader = new {WellKnownNames.MessageReader}(source);");
         }
 
         foreach (var field in model.Fields)
@@ -153,7 +153,7 @@ internal static class PacketEmitter
         writer.OpenBrace();
 
         if (model.Fields.Length > 0)
-            writer.Line("var writer = new global::Fenrir.Core.Wire.MessageWriter(destination);");
+            writer.Line($"var writer = new {WellKnownNames.MessageWriter}(destination);");
 
         FieldModel? legacyUidField = null;
 
@@ -208,17 +208,17 @@ internal static class PacketEmitter
                 switch (field.AvatarXor)
                 {
                     case AvatarXorKind.Int:
-                        writer.Line($"global::Fenrir.Core.Wire.WireXor.XorInt({localName});");
+                        writer.Line($"{WellKnownNames.WireXor}.XorInt({localName});");
                         break;
                     case AvatarXorKind.IntArray:
-                        writer.Line($"global::Fenrir.Core.Wire.WireXor.XorIntArray({localName});");
+                        writer.Line($"{WellKnownNames.WireXor}.XorIntArray({localName});");
                         break;
                     case AvatarXorKind.Char:
-                        writer.Line($"global::Fenrir.Core.Wire.WireXor.XorChar({localName});");
+                        writer.Line($"{WellKnownNames.WireXor}.XorChar({localName});");
                         break;
                     case AvatarXorKind.Char2:
                         writer.Line(
-                            $"global::Fenrir.Core.Wire.WireXor.XorChar2Rows({localName}, {field.AvatarXorRowLength});");
+                            $"{WellKnownNames.WireXor}.XorChar2Rows({localName}, {field.AvatarXorRowLength});");
                         break;
                 }
 
@@ -232,7 +232,7 @@ internal static class PacketEmitter
             writer.Line(
                 "// [ObfuscatedUidField] (§3.3): double-XOR of tID, independent of the global XOR_PACKET applied later by the send layer.");
             writer.Line(
-                $"global::Fenrir.Core.Wire.WireXor.ApplyUidXor(v_{legacyUidField.PropertyName}_slice);");
+                $"{WellKnownNames.WireXor}.ApplyUidXor(v_{legacyUidField.PropertyName}_slice);");
         }
 
         writer.Line();

@@ -3,8 +3,8 @@ namespace Fenrir.Domain.Login;
 public sealed class LoginCapacityState
 {
     private int _currentPlayers;
-    private int _maxPlayers = -1;
     private int _gagePlayers;
+    private int _maxPlayers = -1;
 
     public int MaxPlayers => Volatile.Read(ref _maxPlayers);
 

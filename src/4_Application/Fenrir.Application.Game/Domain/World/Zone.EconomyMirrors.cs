@@ -202,7 +202,6 @@ public sealed partial class Zone
     private void DrainInventoryCommands()
     {
         while (_inventoryInbox.Reader.TryRead(out var command))
-        {
             try
             {
                 ApplyInventoryCommand(in command);
@@ -214,7 +213,6 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
-        }
     }
 
     private void ApplyInventoryCommand(in InventoryZoneCommand command)
@@ -222,7 +220,8 @@ public sealed partial class Zone
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
 
-        var hadWeaponEquipped = state.Inventory.GetSlot(ContainerMatrix.Equipment, EquipmentSlots.WeaponSlot) is not null;
+        var hadWeaponEquipped =
+            state.Inventory.GetSlot(ContainerMatrix.Equipment, EquipmentSlots.WeaponSlot) is not null;
 
         foreach (var snapshot in command.Containers)
         {
@@ -278,7 +277,6 @@ public sealed partial class Zone
     private void DrainSkillCommands()
     {
         while (_skillInbox.Reader.TryRead(out var command))
-        {
             try
             {
                 ApplySkillCommand(in command);
@@ -288,7 +286,6 @@ public sealed partial class Zone
                 logger.LogError(ex, "Zone {MapId} skill command for character {CharacterId} failed", MapId,
                     command.CharacterId);
             }
-        }
     }
 
     private void ApplySkillCommand(in SkillZoneCommand command)
@@ -304,7 +301,6 @@ public sealed partial class Zone
     private void DrainMentorCommands()
     {
         while (_mentorInbox.Reader.TryRead(out var command))
-        {
             try
             {
                 ApplyMentorCommand(in command);
@@ -314,7 +310,6 @@ public sealed partial class Zone
                 logger.LogError(ex, "Zone {MapId} mentor command for character {CharacterId} failed", MapId,
                     command.CharacterId);
             }
-        }
     }
 
     private void ApplyMentorCommand(in MentorZoneCommand command)
@@ -328,7 +323,6 @@ public sealed partial class Zone
     private void DrainGuildCommands()
     {
         while (_guildInbox.Reader.TryRead(out var command))
-        {
             try
             {
                 ApplyGuildMembershipCommand(in command);
@@ -340,7 +334,6 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
-        }
     }
 
     private void ApplyGuildMembershipCommand(in GuildMembershipZoneCommand command)
@@ -357,7 +350,6 @@ public sealed partial class Zone
     private void DrainTribeProgressCommands()
     {
         while (_tribeInbox.Reader.TryRead(out var command))
-        {
             try
             {
                 ApplyTribeProgressCommand(in command);
@@ -369,7 +361,6 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
-        }
     }
 
     private void ApplyTribeProgressCommand(in TribeProgressZoneCommand command)
@@ -767,7 +758,6 @@ public sealed partial class Zone
     private void DrainQuestCommands()
     {
         while (_questInbox.Reader.TryRead(out var command))
-        {
             try
             {
                 ApplyQuestCommand(in command);
@@ -779,7 +769,6 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
-        }
     }
 
     private void ApplyQuestCommand(in QuestZoneCommand command)
@@ -810,7 +799,6 @@ public sealed partial class Zone
     private void DrainMissionCommands()
     {
         while (_missionInbox.Reader.TryRead(out var command))
-        {
             try
             {
                 ApplyMissionCommand(in command);
@@ -822,7 +810,6 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
-        }
     }
 
     private void ApplyMissionCommand(in MissionZoneCommand command)

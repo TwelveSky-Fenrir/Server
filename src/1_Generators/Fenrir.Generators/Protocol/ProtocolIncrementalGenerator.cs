@@ -1,4 +1,6 @@
 using System.Collections.Immutable;
+using System.Linq;
+using Fenrir.Generators.Analysis.Diagnostics;
 using Fenrir.Generators.Analysis.Model;
 using Fenrir.Generators.Analysis.Scanning;
 using Fenrir.Generators.Analysis.Support;
@@ -29,9 +31,16 @@ public sealed class ProtocolIncrementalGenerator : IIncrementalGenerator
         var packetModels = packetResults
             .Select(static (r, _) => r.Model)
             .Where(static m => m is not null)
-            .Select(static (m, _) => m!);
+            .Select(static (m, _) => m!)
+            .WithTrackingName(TrackingNames.PacketModels);
 
-        context.RegisterSourceOutput(packetModels.Collect(), static (spc, models) => EmitAggregates(spc, models));
+        var assemblyName = context.CompilationProvider
+            .Select(static (compilation, _) => compilation.AssemblyName)
+            .WithTrackingName(TrackingNames.AssemblyName);
+
+        context.RegisterSourceOutput(
+            packetModels.Collect().Combine(assemblyName),
+            static (spc, pair) => EmitAggregates(spc, pair.Left, pair.Right));
     }
 
     private static void EmitTypeResult(SourceProductionContext context, GeneratedTypeResult result)
@@ -46,7 +55,10 @@ public sealed class ProtocolIncrementalGenerator : IIncrementalGenerator
         context.AddSource($"{result.Model.Namespace}.{result.Model.TypeName}.g.cs", source);
     }
 
-    private static void EmitAggregates(SourceProductionContext context, ImmutableArray<TypeModel> packets)
+    private static void EmitAggregates(
+        SourceProductionContext context,
+        ImmutableArray<TypeModel> packets,
+        string? assemblyName)
     {
         var (deduplicated, collisionDiagnostics) = OpcodeCollisionChecker.Check(packets);
 
@@ -56,7 +68,23 @@ public sealed class ProtocolIncrementalGenerator : IIncrementalGenerator
         if (deduplicated.IsEmpty)
             return;
 
-        context.AddSource(OpcodeRegistryEmitter.HintName, OpcodeRegistryEmitter.Emit(deduplicated));
-        context.AddSource(SessionStateGateEmitter.HintName, SessionStateGateEmitter.Emit(deduplicated));
+        var servers = deduplicated.Select(p => p.Server).Distinct().OrderBy(s => s).ToImmutableArray();
+        if (servers.Length > 1)
+        {
+            var emitted = deduplicated[0].Server;
+            foreach (var stray in deduplicated.Where(p => p.Server != emitted))
+                context.ReportDiagnostic(Diagnostic.Create(
+                    FenrirDiagnostics.MultipleServersInCompilation,
+                    stray.Location,
+                    assemblyName ?? "(unknown)",
+                    string.Join(", ", servers),
+                    emitted));
+            return;
+        }
+
+        var namespaceName = EmittedNames.NamespaceFor(assemblyName);
+
+        context.AddSource(OpcodeRegistryEmitter.HintName, OpcodeRegistryEmitter.Emit(deduplicated, namespaceName));
+        context.AddSource(SessionStateGateEmitter.HintName, SessionStateGateEmitter.Emit(deduplicated, namespaceName));
     }
 }

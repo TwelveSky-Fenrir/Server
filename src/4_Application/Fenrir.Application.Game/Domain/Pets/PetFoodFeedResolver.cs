@@ -22,7 +22,7 @@ public static class PetFoodFeedResolver
         return GrowUpStepByFoodItemId.TryGetValue(foodItemId, out growUpStep);
     }
 
-        public static PetFoodFeedResult Resolve(int petItemId, int currentGrowth, int currentActivity, int foodItemId,
+    public static PetFoodFeedResult Resolve(int petItemId, int currentGrowth, int currentActivity, int foodItemId,
         int bulkCount, FrozenDictionary<int, ItemDefinition> itemsById)
     {
         if (!TryResolveGrowUpStep(foodItemId, out var growUpStep))

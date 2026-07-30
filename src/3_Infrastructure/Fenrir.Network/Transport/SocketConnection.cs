@@ -1,7 +1,6 @@
 using System.IO.Pipelines;
 using System.Net;
 using System.Net.Sockets;
-using Fenrir.Network.Compression;
 using Fenrir.Network.Transport.Logging;
 using Microsoft.Extensions.Logging;
 

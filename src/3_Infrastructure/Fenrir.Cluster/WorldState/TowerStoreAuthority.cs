@@ -3,32 +3,17 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Cluster.WorldState;
 
-/// <summary>
-///     The CenterServer's single authoritative writer of the 12-tower primary-state aggregate. Preloads the
-///     primary states at boot and flushes changed towers on the ~6s cadence and on stop.
-/// </summary>
-/// <remarks>
-///     Reimplemented from the tower aggregate (Server/ts25center/S08_MyDB.cpp:469-513). Only the primary state
-///     array (<c>mState1Tower[0..11]</c>) is persisted -- the legacy secondary array is filled with <c>-1</c> at
-///     boot and never written back in the cited range (flagged in the contract for a re-check; not persisted
-///     here either). Reuses the existing <see cref="ITowerRepository" /> procedures; no new schema.
-///     <para>
-///         The Center-side write source (who sets tower states) is a separate ingest path and is DORMANT this
-///         lot; this store provides the authoritative storage, preload and flush so that path has a single
-///         writer to target when Lot 5 flips the authority.
-///     </para>
-/// </remarks>
 public sealed class TowerStoreAuthority(ITowerRepository repository, ILogger<TowerStoreAuthority> logger)
 {
     public const int TowerCount = 12;
-
-    private readonly Lock _lock = new();
-    private readonly int[] _packedState = new int[TowerCount];
     private readonly byte?[] _controllingTribe = new byte?[TowerCount];
     private readonly bool[] _dirty = new bool[TowerCount];
 
-    private bool _initialized;
+    private readonly Lock _lock = new();
+    private readonly int[] _packedState = new int[TowerCount];
     private long _flushSequence;
+
+    private bool _initialized;
 
     public async Task InitializeAsync(CancellationToken ct)
     {
@@ -56,7 +41,6 @@ public sealed class TowerStoreAuthority(ITowerRepository repository, ILogger<Tow
         logger.LogInformation("Center TowerStore loaded: {Count} tower rows", rows.Count);
     }
 
-    /// <summary>Publishes a tower's authoritative primary state (packed level*100+type) and controller.</summary>
     public bool SetTowerState(int towerIndex, byte level, byte towerType, byte? controllingTribeId)
     {
         if (towerIndex < 0 || towerIndex >= TowerCount)
@@ -111,7 +95,8 @@ public sealed class TowerStoreAuthority(ITowerRepository repository, ILogger<Tow
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Center TowerStore flush failed for tower {TowerIndex} -- retried next interval", i);
+                logger.LogError(ex, "Center TowerStore flush failed for tower {TowerIndex} -- retried next interval",
+                    i);
             }
         }
 

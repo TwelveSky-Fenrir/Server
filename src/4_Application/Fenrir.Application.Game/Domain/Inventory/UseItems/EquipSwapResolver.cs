@@ -26,7 +26,7 @@ public static class EquipSwapResolver
 
     private static bool IsEligibleSort(byte sort)
     {
-        return sort is (>= 6 and <= 22) or 28 or 29 or 31 or 32 or 33;
+        return sort is >= 6 and <= 22 or 28 or 29 or 31 or 32 or 33;
     }
 
     public static bool TryDeriveEquipSlot(byte equipPartTag, out byte slot)

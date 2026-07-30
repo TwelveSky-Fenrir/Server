@@ -2,7 +2,6 @@ using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.Stats;
-using Fenrir.Network.Abstractions;
 using Fenrir.Core.Packets.Shared;
 
 namespace Fenrir.Application.Game.Domain.World;

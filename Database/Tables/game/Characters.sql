@@ -17,186 +17,186 @@
 -- same as any other parameter/column assignment).
 CREATE TABLE game.Characters
 (
-    CharacterId              INT IDENTITY (1,1) NOT NULL,
-    AccountId                INT                NOT NULL,
-    Slot                     TINYINT            NOT NULL,
-    Name                     NVARCHAR(13) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,           -- MAX_AVATAR_NAME_LENGTH=13, a real wire truncation limit. Collation pinned explicitly rather than inheriting the database's default (SQL_Latin1_General_CP1_CI_AS is SQL Server's own documented en-US default, so this changes no observable behavior today) -- stops usp_Character_Rename/usp_Character_GetIdByName's global name-uniqueness check from silently depending on that default continuing to hold; legacy pinned the equivalent column to utf8_unicode_ci explicitly (Server/BuildEU33/DB/nxtserver.sql:34).
-    Tribe                    TINYINT            NOT NULL
-        CONSTRAINT CK_Characters_Tribe CHECK (Tribe BETWEEN 0 AND 3),                                 -- 0-3, MAX_TRIBE_NUM=4 (matches game.Tribes.TribeId's own CK_Tribes_TribeId). Deliberately CHECK-only, no FK to game.Tribes: game.Tribes is populated by usp_WorldState_EnsureInitialized on first GameServer-shard boot (game.Tribes has no seed script of its own), while character creation runs on LoginServer, which can legitimately run before any GameServer shard has ever booted in a fresh environment -- an FK here would introduce a cross-server boot-ordering hazard the CHECK does not.
-    Gender                   TINYINT            NOT NULL,
-    HeadType                 TINYINT            NOT NULL,
-    FaceType                 TINYINT            NOT NULL,
-    Level                    SMALLINT           NOT NULL
+    CharacterId              INT IDENTITY (1,1)                                NOT NULL,
+    AccountId                INT                                               NOT NULL,
+    Slot                     TINYINT                                           NOT NULL,
+    Name                     NVARCHAR(13) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,          -- MAX_AVATAR_NAME_LENGTH=13, a real wire truncation limit. Collation pinned explicitly rather than inheriting the database's default (SQL_Latin1_General_CP1_CI_AS is SQL Server's own documented en-US default, so this changes no observable behavior today) -- stops usp_Character_Rename/usp_Character_GetIdByName's global name-uniqueness check from silently depending on that default continuing to hold; legacy pinned the equivalent column to utf8_unicode_ci explicitly (Server/BuildEU33/DB/nxtserver.sql:34).
+    Tribe                    TINYINT                                           NOT NULL
+        CONSTRAINT CK_Characters_Tribe CHECK (Tribe BETWEEN 0 AND 3),                             -- 0-3, MAX_TRIBE_NUM=4 (matches game.Tribes.TribeId's own CK_Tribes_TribeId). Deliberately CHECK-only, no FK to game.Tribes: game.Tribes is populated by usp_WorldState_EnsureInitialized on first GameServer-shard boot (game.Tribes has no seed script of its own), while character creation runs on LoginServer, which can legitimately run before any GameServer shard has ever booted in a fresh environment -- an FK here would introduce a cross-server boot-ordering hazard the CHECK does not.
+    Gender                   TINYINT                                           NOT NULL,
+    HeadType                 TINYINT                                           NOT NULL,
+    FaceType                 TINYINT                                           NOT NULL,
+    Level                    SMALLINT                                          NOT NULL
         CONSTRAINT DF_Characters_Level DEFAULT 1,
-    Level2                   SMALLINT           NOT NULL
+    Level2                   SMALLINT                                          NOT NULL
         CONSTRAINT DF_Characters_Level2 DEFAULT 1,                                                -- aLevel2, the post-Level-145 "high level" rebirth ladder (1-12, MAX_LIMIT_HIGH_LEVEL_NUM)
-    Exp2                     INT                NOT NULL
+    Exp2                     INT                                               NOT NULL
         CONSTRAINT DF_Characters_Exp2 DEFAULT 0
         CONSTRAINT CK_Characters_Exp2 CHECK (Exp2 >= 0),                                          -- aExp2, Level2's own XP counter; reset to 0 on every successful Max Rebirth
-    MapId                    SMALLINT           NOT NULL,
-    PosX                     REAL               NOT NULL,
-    PosY                     REAL               NOT NULL,
-    PosZ                     REAL               NOT NULL,
-    Heading                  REAL               NOT NULL
+    MapId                    SMALLINT                                          NOT NULL,
+    PosX                     REAL                                              NOT NULL,
+    PosY                     REAL                                              NOT NULL,
+    PosZ                     REAL                                              NOT NULL,
+    Heading                  REAL                                              NOT NULL
         CONSTRAINT DF_Characters_Heading DEFAULT 0,                                               -- ACTION_INFO.aFront
-    Life                     INT                NOT NULL,
-    MaxLife                  INT                NOT NULL,
-    Mana                     INT                NOT NULL,
-    MaxMana                  INT                NOT NULL,
-    Experience               BIGINT             NOT NULL
+    Life                     INT                                               NOT NULL,
+    MaxLife                  INT                                               NOT NULL,
+    Mana                     INT                                               NOT NULL,
+    MaxMana                  INT                                               NOT NULL,
+    Experience               BIGINT                                            NOT NULL
         CONSTRAINT DF_Characters_Experience DEFAULT 0
         CONSTRAINT CK_Characters_Experience CHECK (Experience >= 0),                              -- aExp1 (NOT "aExp1+aExp2 combined" -- Server/BuildEU33/DB/nxtserver.sql:41-43 and Server/ts25zone/UpperCom/S06_MyUpperCom05.cpp:229-240 both persist aExp1/aExp2 as two fully independent values, never summed; see Exp2 below)
-    StatVit                  INT                NOT NULL
+    StatVit                  INT                                               NOT NULL
         CONSTRAINT DF_Characters_StatVit DEFAULT 0,
-    StatStr                  INT                NOT NULL
+    StatStr                  INT                                               NOT NULL
         CONSTRAINT DF_Characters_StatStr DEFAULT 0,
-    StatInt                  INT                NOT NULL
+    StatInt                  INT                                               NOT NULL
         CONSTRAINT DF_Characters_StatInt DEFAULT 0,
-    StatDex                  INT                NOT NULL
+    StatDex                  INT                                               NOT NULL
         CONSTRAINT DF_Characters_StatDex DEFAULT 0,
-    StatPoints               INT                NOT NULL
+    StatPoints               INT                                               NOT NULL
         CONSTRAINT DF_Characters_StatPoints DEFAULT 0,
-    SkillPoints              INT                NOT NULL
+    SkillPoints              INT                                               NOT NULL
         CONSTRAINT DF_Characters_SkillPoints DEFAULT 0,
-    Money                    BIGINT             NOT NULL
+    Money                    BIGINT                                            NOT NULL
         CONSTRAINT DF_Characters_Money DEFAULT 0
         CONSTRAINT CK_Characters_Money CHECK (Money >= 0),
-    BigMoney                 INT                NOT NULL
+    BigMoney                 INT                                               NOT NULL
         CONSTRAINT DF_Characters_BigMoney DEFAULT 0
         CONSTRAINT CK_Characters_BigMoney CHECK (BigMoney >= 0),
-    StoreMoney               BIGINT             NOT NULL
+    StoreMoney               BIGINT                                            NOT NULL
         CONSTRAINT DF_Characters_StoreMoney DEFAULT 0
         CONSTRAINT CK_Characters_StoreMoney CHECK (StoreMoney >= 0),
-    BigStoreMoney            INT                NOT NULL
+    BigStoreMoney            INT                                               NOT NULL
         CONSTRAINT DF_Characters_BigStoreMoney DEFAULT 0
         CONSTRAINT CK_Characters_BigStoreMoney CHECK (BigStoreMoney >= 0),
-    RebirthCount             TINYINT            NOT NULL
+    RebirthCount             TINYINT                                           NOT NULL
         CONSTRAINT DF_Characters_RebirthCount DEFAULT 0
         CONSTRAINT CK_Characters_RebirthCount CHECK (RebirthCount BETWEEN 0 AND 12),              -- aRebirthNum; MAX_REBIRTH_LIMIT=12 (G1-G12) IS live in ReleaseEU33 via the Rebirth-Pill item path (WUSE_ITEM_632 unconditionally #define'd) -- see Application/Fenrir.Application.Game.Domain/Progression/RebirthProgression.cs. Path B (TribeActionService.RebirthAsync, CZ_TRIBE_WORK_SEND tSort 11) is separately app-capped at generation 6; only Path A (UseInventoryItemService's Rebirth-Pill branch) reaches 7-12. CHECK bound is defense-in-depth: both trigger paths already app-cap before writing (RebirthProgression.MaxRebirthGeneration), but this closes the gap for a future writer that doesn't re-validate.
-    Title                    INT                NOT NULL
+    Title                    INT                                               NOT NULL
         CONSTRAINT DF_Characters_Title DEFAULT 0,
-    Halo                     INT                NOT NULL
+    Halo                     INT                                               NOT NULL
         CONSTRAINT DF_Characters_Halo DEFAULT 0,
-    ContributionPoints       INT                NOT NULL
+    ContributionPoints       INT                                               NOT NULL
         CONSTRAINT DF_Characters_ContributionPoints DEFAULT 0,                                    -- aKillOtherTribe (CP)
-    TeacherPoint             INT                NOT NULL
+    TeacherPoint             INT                                               NOT NULL
         CONSTRAINT DF_Characters_TeacherPoint DEFAULT 0
         CONSTRAINT CK_Characters_TeacherPoint CHECK (TeacherPoint >= 0),                          -- quest reward type 5
-    EatLifePotion            SMALLINT           NOT NULL
+    EatLifePotion            SMALLINT                                          NOT NULL
         CONSTRAINT DF_Characters_EatLifePotion DEFAULT 0
         CONSTRAINT CK_Characters_EatLifePotion CHECK (EatLifePotion BETWEEN 0 AND 400),
-    EatManaPotion            SMALLINT           NOT NULL
+    EatManaPotion            SMALLINT                                          NOT NULL
         CONSTRAINT DF_Characters_EatManaPotion DEFAULT 0
         CONSTRAINT CK_Characters_EatManaPotion CHECK (EatManaPotion BETWEEN 0 AND 400),
-    EatStrPotion             SMALLINT           NOT NULL
+    EatStrPotion             SMALLINT                                          NOT NULL
         CONSTRAINT DF_Characters_EatStrPotion DEFAULT 0
         CONSTRAINT CK_Characters_EatStrPotion CHECK (EatStrPotion BETWEEN 0 AND 400),
-    EatDexPotion             SMALLINT           NOT NULL
+    EatDexPotion             SMALLINT                                          NOT NULL
         CONSTRAINT DF_Characters_EatDexPotion DEFAULT 0
         CONSTRAINT CK_Characters_EatDexPotion CHECK (EatDexPotion BETWEEN 0 AND 400),
-    EatElePotion             SMALLINT           NOT NULL
+    EatElePotion             SMALLINT                                          NOT NULL
         CONSTRAINT DF_Characters_EatElePotion DEFAULT 0
         CONSTRAINT CK_Characters_EatElePotion CHECK (EatElePotion BETWEEN 0 AND 400),
-    ProtectForDeath          INT                NOT NULL
+    ProtectForDeath          INT                                               NOT NULL
         CONSTRAINT DF_Characters_ProtectForDeath DEFAULT 0
         CONSTRAINT CK_Characters_ProtectForDeath CHECK (ProtectForDeath >= 0),
-    ProtectForDestroy        INT                NOT NULL
+    ProtectForDestroy        INT                                               NOT NULL
         CONSTRAINT DF_Characters_ProtectForDestroy DEFAULT 0
         CONSTRAINT CK_Characters_ProtectForDestroy CHECK (ProtectForDestroy >= 0),
-    DoubleExpTime1           INT                NOT NULL
+    DoubleExpTime1           INT                                               NOT NULL
         CONSTRAINT DF_Characters_DoubleExpTime1 DEFAULT 0,                                        -- aDoubleExpTime1: raw per-tick decrementing counter (NOT a YYYYMMDD date), 0 = no boost; welcome grant is the bare literal 300 (Server/ts25login/S04_MyWork02.cpp:886-887), decremented once per firing (Server/ts25zone/S07_MyGame04.cpp:955-969)
-    DoubleExpTime2           INT                NOT NULL
+    DoubleExpTime2           INT                                               NOT NULL
         CONSTRAINT DF_Characters_DoubleExpTime2 DEFAULT 0,                                        -- aDoubleExpTime2, same decrementing-counter shape as DoubleExpTime1
-    AutoBuffTime             INT                NOT NULL
+    AutoBuffTime             INT                                               NOT NULL
         CONSTRAINT DF_Characters_AutoBuffTime DEFAULT 0,                                          -- aAutoBuffTime/aContinueSkillDay, YYYYMMDD (PlayerRuntimeState.AutoBuffTime encoding), 0 = no boost
-    DropItemTime             INT                NOT NULL
+    DropItemTime             INT                                               NOT NULL
         CONSTRAINT DF_Characters_DropItemTime DEFAULT 0,
-    InventoryDate            INT                NOT NULL
+    InventoryDate            INT                                               NOT NULL
         CONSTRAINT DF_Characters_InventoryDate DEFAULT 0,                                         -- bonus inventory page rental
-    StoreDate                INT                NOT NULL
+    StoreDate                INT                                               NOT NULL
         CONSTRAINT DF_Characters_StoreDate DEFAULT 0,
-    BloodCoin                INT                NOT NULL
+    BloodCoin                INT                                               NOT NULL
         CONSTRAINT DF_Characters_BloodCoin DEFAULT 0
         CONSTRAINT CK_Characters_BloodCoin CHECK (BloodCoin >= 0),
-    RewardClaimDay           TINYINT            NOT NULL
+    RewardClaimDay           TINYINT                                           NOT NULL
         CONSTRAINT DF_Characters_RewardClaimDay DEFAULT 0
         CONSTRAINT CK_Characters_RewardClaimDay CHECK (RewardClaimDay BETWEEN 0 AND 7),
-    RewardClaimDate          INT                NOT NULL
+    RewardClaimDate          INT                                               NOT NULL
         CONSTRAINT DF_Characters_RewardClaimDate DEFAULT 0,
-    TeacherCharacterId       INT                NULL,
-    StudentCharacterId       INT                NULL,
-    JoinWar                  INT                NOT NULL
+    TeacherCharacterId       INT                                               NULL,
+    StudentCharacterId       INT                                               NULL,
+    JoinWar                  INT                                               NOT NULL
         CONSTRAINT DF_Characters_JoinWar DEFAULT 0
         CONSTRAINT CK_Characters_JoinWar CHECK (JoinWar >= 0),
-    MissionKillOtherTribe    INT                NOT NULL
+    MissionKillOtherTribe    INT                                               NOT NULL
         CONSTRAINT DF_Characters_MissionKillOtherTribe DEFAULT 0
         CONSTRAINT CK_Characters_MissionKillOtherTribe CHECK (MissionKillOtherTribe >= 0),        -- aMissionDate.aKillOtherTribe, distinct from ContributionPoints
-    MissionKillMonster       INT                NOT NULL
+    MissionKillMonster       INT                                               NOT NULL
         CONSTRAINT DF_Characters_MissionKillMonster DEFAULT 0
         CONSTRAINT CK_Characters_MissionKillMonster CHECK (MissionKillMonster >= 0),
-    MissionPlayTime          INT                NOT NULL
+    MissionPlayTime          INT                                               NOT NULL
         CONSTRAINT DF_Characters_MissionPlayTime DEFAULT 0
         CONSTRAINT CK_Characters_MissionPlayTime CHECK (MissionPlayTime >= 0),
-    AutoHuntEnabled          BIT                NOT NULL
+    AutoHuntEnabled          BIT                                               NOT NULL
         CONSTRAINT DF_Characters_AutoHuntEnabled DEFAULT 0,
-    AutoHuntConfig           VARBINARY(112)     NOT NULL
+    AutoHuntConfig           VARBINARY(112)                                    NOT NULL
         CONSTRAINT DF_Characters_AutoHuntConfig DEFAULT 0x,
-    AutoLifeRatio            TINYINT            NOT NULL
+    AutoLifeRatio            TINYINT                                           NOT NULL
         CONSTRAINT DF_Characters_AutoLifeRatio DEFAULT 0
         CONSTRAINT CK_Characters_AutoLifeRatio CHECK (AutoLifeRatio BETWEEN 0 AND 5),
-    AutoManaRatio            TINYINT            NOT NULL
+    AutoManaRatio            TINYINT                                           NOT NULL
         CONSTRAINT DF_Characters_AutoManaRatio DEFAULT 0
         CONSTRAINT CK_Characters_AutoManaRatio CHECK (AutoManaRatio BETWEEN 0 AND 5),
-    PetGrowth                INT                NOT NULL
+    PetGrowth                INT                                               NOT NULL
         CONSTRAINT DF_Characters_PetGrowth DEFAULT 0
         CONSTRAINT CK_Characters_PetGrowth CHECK (PetGrowth >= 0),
-    PetActivity              TINYINT            NOT NULL
+    PetActivity              TINYINT                                           NOT NULL
         CONSTRAINT DF_Characters_PetActivity DEFAULT 0
         CONSTRAINT CK_Characters_PetActivity CHECK (PetActivity BETWEEN 0 AND 100),
-    TribeTransferPermitCount INT                NOT NULL
+    TribeTransferPermitCount INT                                               NOT NULL
         CONSTRAINT DF_Characters_TribeTransferPermitCount DEFAULT 0
         CONSTRAINT CK_Characters_TribeTransferPermitCount CHECK (TribeTransferPermitCount >= 0),  -- banked Faction Transfer Scroll (world.Items 8153/8154) uses; no spend path exists yet, same posture as BloodCoin's absent grant path
-    PremiumExpireUtc         BIGINT             NOT NULL
+    PremiumExpireUtc         BIGINT                                            NOT NULL
         CONSTRAINT DF_Characters_PremiumExpireUtc DEFAULT 0,                                      -- aPremium, Unix epoch seconds (0 = none); distinct scale from the YYYYMMDD ints above
-    PreviousTribe            TINYINT            NOT NULL
+    PreviousTribe            TINYINT                                           NOT NULL
         CONSTRAINT DF_Characters_PreviousTribe DEFAULT 0
         CONSTRAINT CK_Characters_PreviousTribe CHECK (PreviousTribe BETWEEN 0 AND 2),             -- the Noble Dragon/Royal Serpent/Grand Tiger starter-kit template (0-2, never 3) that selected this character's equipment/skills/hotkeys -- genuinely independent from Tribe (0-3), checked for self-consistency at every zone entry (Server/ts25zone/S04_MyWork02.cpp:880-901)
-    MountItemId              INT                NOT NULL
+    MountItemId              INT                                               NOT NULL
         CONSTRAINT DF_Characters_MountItemId DEFAULT 0,                                           -- 0 = no mount; ANIMAL_NUM_TIGER1 (1301) granted at creation
-    MountExpActivity         INT                NOT NULL
+    MountExpActivity         INT                                               NOT NULL
         CONSTRAINT DF_Characters_MountExpActivity DEFAULT 0,                                      -- aAnimalExpActivity[0]
-    MountPower               INT                NOT NULL
+    MountPower               INT                                               NOT NULL
         CONSTRAINT DF_Characters_MountPower DEFAULT 0,                                            -- aAnimalPower[0]
-    MountSlotIndex           INT                NOT NULL
+    MountSlotIndex           INT                                               NOT NULL
         CONSTRAINT DF_Characters_MountSlotIndex DEFAULT -1,                                       -- aAnimalIndex; -1 = none active
-    MountTime                INT                NOT NULL
+    MountTime                INT                                               NOT NULL
         CONSTRAINT DF_Characters_MountTime DEFAULT 0,                                             -- aAnimalTime
-    AutoTime2                INT                NOT NULL
+    AutoTime2                INT                                               NOT NULL
         CONSTRAINT DF_Characters_AutoTime2 DEFAULT 0
         CONSTRAINT CK_Characters_AutoTime2 CHECK (AutoTime2 >= 0),                                -- aAutoTime2: per-real-minute-decrementing free auto-hunt allowance (Server/ts25zone/S07_MyGame04.cpp:787-823); 1440 (24h) granted at creation (Server/ts25login/S04_MyWork02.cpp:888)
-    Zone241Time              INT                NOT NULL
+    Zone241Time              INT                                               NOT NULL
         CONSTRAINT DF_Characters_Zone241Time DEFAULT 0
         CONSTRAINT CK_Characters_Zone241Time CHECK (Zone241Time >= 0),                            -- aZone241Time (Server/Header/Protocol/STRUCT.h:751-757's persisted avatar snapshot field, always wired as literal 0 today). First durable consumer: Rebirth-advancement Path B ("Max Rebirth", CZ_TRIBE_WORK_SEND tSort 11) unconditionally += 10 on precondition pass (Server/ts25zone/S04_MyWork02.cpp:11342-11390); see usp_Character_AdjustZone241Time for the write-path primitive.
-    WarPoint                 INT                NOT NULL
+    WarPoint                 INT                                               NOT NULL
         CONSTRAINT DF_Characters_WarPoint DEFAULT 0
         CONSTRAINT CK_Characters_WarPoint CHECK (WarPoint >= 0),                                  -- aWarPoint (USE_WAR_POINT_SYSTEM, Server/Header/Protocol/STRUCT.h:554): spendable War-Point balance, deliberately kept OUT of usp_Character_PersistProgressBatch (same posture as Money/BloodCoin) -- it only moves through the dedicated atomic usp_Character_BuyWarPointItem so a last-write-wins flush can never clobber it.
-    PetBagDate               INT                NOT NULL
+    PetBagDate               INT                                               NOT NULL
         CONSTRAINT DF_Characters_PetBagDate DEFAULT 0,                                            -- aPetBagDate (Server/Header/Protocol/STRUCT.h:520-521): pet-bag upper-half (slots 10-19) rental-entitlement expiry date, same shape as InventoryDate/StoreDate above. DEFAULT 0 matches legacy's own confirmed baseline (ServerDocs/11_ts25login/01_Flux_Authentification_Redirection.md:381-383: creation never sets aPetBagDate) -- unlike InventoryDate/StoreDate, usp_Character_CreateWithStarterKit does NOT grant this at creation; no citation establishes what, if anything, ever grants it a non-zero value.
-    M15PetLuckyBoxPity       TINYINT            NOT NULL
+    M15PetLuckyBoxPity       TINYINT                                           NOT NULL
         CONSTRAINT DF_Characters_M15PetLuckyBoxPity DEFAULT 0
         CONSTRAINT CK_Characters_M15PetLuckyBoxPity CHECK (M15PetLuckyBoxPity BETWEEN 0 AND 200), -- M15 Pet Lucky Box (world.Items 8111) pity counter (legacy gBox8111, Server/Header/Protocol/STRUCT.h:568-571); ceiling 200 matches M15PetLuckyBox8111RewardTable.PityCeiling (Server/ts25zone/S04_MyWork03.cpp:1615-1621,7729-7735).
-    VisibleState             TINYINT            NOT NULL
+    VisibleState             TINYINT                                           NOT NULL
         CONSTRAINT DF_Characters_VisibleState DEFAULT 1,                                          -- account-login avatar roster reconstruction (usp_Character_GetAccountRoster)
-    SpecialState             TINYINT            NOT NULL
+    SpecialState             TINYINT                                           NOT NULL
         CONSTRAINT DF_Characters_SpecialState DEFAULT 0,
-    CostumeIndex             INT                NOT NULL
+    CostumeIndex             INT                                               NOT NULL
         CONSTRAINT DF_Characters_CostumeIndex DEFAULT -1
         CONSTRAINT CK_Characters_CostumeIndex CHECK (CostumeIndex BETWEEN -1 AND 9),              -- -1 = no costume equipped
-    FlushSequence            BIGINT             NOT NULL
+    FlushSequence            BIGINT                                            NOT NULL
         CONSTRAINT DF_Characters_FlushSequence DEFAULT 0,                                         -- idempotent write-behind
-    CreatedAtUtc             DATETIME2(3)       NOT NULL
+    CreatedAtUtc             DATETIME2(3)                                      NOT NULL
         CONSTRAINT DF_Characters_CreatedAtUtc DEFAULT SYSUTCDATETIME(),
-    UpdatedAtUtc             DATETIME2(3)       NOT NULL
+    UpdatedAtUtc             DATETIME2(3)                                      NOT NULL
         CONSTRAINT DF_Characters_UpdatedAtUtc DEFAULT SYSUTCDATETIME(),
     CONSTRAINT PK_Characters PRIMARY KEY CLUSTERED (CharacterId),
     CONSTRAINT UQ_Characters_Name UNIQUE (Name),

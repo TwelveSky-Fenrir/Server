@@ -5,13 +5,13 @@
 -- character is a member of at most one guild at a time.
 CREATE TABLE game.GuildMembers
 (
-    GuildId     INT          NOT NULL,
-    CharacterId INT          NOT NULL,
-    Role        TINYINT      NOT NULL
+    GuildId      INT          NOT NULL,
+    CharacterId  INT          NOT NULL,
+    Role         TINYINT      NOT NULL
         CONSTRAINT DF_GuildMembers_Role DEFAULT 0,
-    CallName    NVARCHAR(4)  NOT NULL
+    CallName     NVARCHAR(4)  NOT NULL
         CONSTRAINT DF_GuildMembers_CallName DEFAULT N'',
-    JoinedAtUtc DATETIME2(3) NOT NULL
+    JoinedAtUtc  DATETIME2(3) NOT NULL
         CONSTRAINT DF_GuildMembers_JoinedAtUtc DEFAULT SYSUTCDATETIME(),
     UpdatedAtUtc DATETIME2(3) NOT NULL
         CONSTRAINT DF_GuildMembers_UpdatedAtUtc DEFAULT SYSUTCDATETIME(), -- bumped on Role/CallName mutation, never on JoinedAtUtc itself

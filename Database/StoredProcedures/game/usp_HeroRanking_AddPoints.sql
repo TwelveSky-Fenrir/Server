@@ -45,7 +45,8 @@ BEGIN
     BEGIN TRANSACTION;
 
     IF NOT EXISTS (SELECT 1
-                   FROM game.HeroRankings WITH (UPDLOCK, HOLDLOCK)
+                   FROM game.HeroRankings
+                   WITH (UPDLOCK, HOLDLOCK)
                    WHERE CharacterId = @CharacterId
                      AND PeriodKind = @PeriodKind)
         INSERT INTO game.HeroRankings (CharacterId, PeriodKind, Points, TribeId, Level, RecordedAtUtc)

@@ -10,11 +10,10 @@ using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.World.Monsters;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.Stats;
-using Fenrir.Data.WriteBehind;
-using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Network.Framing;
 using Fenrir.Core.Packets.Shared;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Data.WriteBehind;
+using Fenrir.Network.Framing;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.World;
@@ -38,6 +37,57 @@ public sealed partial class Zone
     private const int QuestKillCreditRelayOrArchetype5Sort = 8;
 
     private const int CombatInboxCapacity = 4096;
+
+
+    private const int PvpKillDropSort = 11;
+
+    private const int PvpKillDropMinimumCombinedLevel = 145;
+
+    private const int YangGokPvpDropRatePercent = 35;
+
+    private const int RegularWarDropStreakRequirementFast = 3;
+
+    private const int RegularWarDropStreakRequirement = 10;
+
+    private static readonly int[] YangGokPvpDropBoxes = [602, 601, 2249, 8005, 8112];
+
+    private static readonly int[] KillDropElixirs = [506, 507, 508, 509, 578, 579];
+
+    private static readonly int[] KillDropAnimalTier5 = [1301, 1302, 1303, 1313, 1317, 1320, 1323, 1326];
+
+    private static readonly int[] KillDropAnimalTier10 = [1304, 1305, 1306, 1314, 1318, 1321, 1324, 1327];
+
+    private static readonly KillDropEntry[] RegularWarDropTierA =
+        [KillDropEntry.Item(1379), KillDropEntry.Item(1378)];
+
+    private static readonly KillDropEntry[] RegularWarDropTierB =
+    [
+        KillDropEntry.Item(721), KillDropEntry.Item(724), KillDropEntry.Animal5,
+        KillDropEntry.Item(722), KillDropEntry.Item(1449)
+    ];
+
+    private static readonly KillDropEntry[] RegularWarDropTierC =
+    [
+        KillDropEntry.Item(1237), KillDropEntry.Item(694), KillDropEntry.Item(1103), KillDropEntry.Item(1124),
+        KillDropEntry.Item(1166), KillDropEntry.Item(8102), KillDropEntry.Item(1371)
+    ];
+
+    private static readonly KillDropEntry[] RegularWarDropTierD =
+        [KillDropEntry.Elixir, KillDropEntry.Item(695), KillDropEntry.Item(696)];
+
+    private static readonly KillDropEntry[] CityDropTierA =
+        [KillDropEntry.Animal10, KillDropEntry.Item(724), KillDropEntry.Item(721)];
+
+    private static readonly KillDropEntry[] CityDropTierB =
+        [KillDropEntry.Animal5, KillDropEntry.Item(8102), KillDropEntry.Item(720), KillDropEntry.Item(1166)];
+
+    private static readonly KillDropEntry[] CityDropTierC =
+    [
+        KillDropEntry.Binary(694, 1449), KillDropEntry.Item(1103), KillDropEntry.Item(1124), KillDropEntry.Item(722)
+    ];
+
+    private static readonly KillDropEntry[] CityDropTierD =
+        [KillDropEntry.Elixir, KillDropEntry.Binary(695, 696)];
 
     private readonly Channel<CombatCommand> _combatInbox = Channel.CreateBounded<CombatCommand>(
         new BoundedChannelOptions(CombatInboxCapacity)
@@ -67,7 +117,6 @@ public sealed partial class Zone
     private void DrainCombatCommands()
     {
         while (_combatInbox.Reader.TryRead(out var command))
-        {
             try
             {
                 ApplyCombatCommand(in command);
@@ -77,7 +126,6 @@ public sealed partial class Zone
                 logger.LogError(ex, "Zone {MapId} combat command from character {CharacterId} failed", MapId,
                     command.AttackerCharacterId);
             }
-        }
     }
 
     private void ApplySenderLocation(PlayerRuntimeState state, AttackForProtocol attackInfo)
@@ -396,57 +444,6 @@ public sealed partial class Zone
         attackerState.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
     }
 
-
-    private const int PvpKillDropSort = 11;
-
-    private const int PvpKillDropMinimumCombinedLevel = 145;
-
-    private const int YangGokPvpDropRatePercent = 35;
-
-    private const int RegularWarDropStreakRequirementFast = 3;
-
-    private const int RegularWarDropStreakRequirement = 10;
-
-    private static readonly int[] YangGokPvpDropBoxes = [602, 601, 2249, 8005, 8112];
-
-    private static readonly int[] KillDropElixirs = [506, 507, 508, 509, 578, 579];
-
-    private static readonly int[] KillDropAnimalTier5 = [1301, 1302, 1303, 1313, 1317, 1320, 1323, 1326];
-
-    private static readonly int[] KillDropAnimalTier10 = [1304, 1305, 1306, 1314, 1318, 1321, 1324, 1327];
-
-    private static readonly KillDropEntry[] RegularWarDropTierA =
-        [KillDropEntry.Item(1379), KillDropEntry.Item(1378)];
-
-    private static readonly KillDropEntry[] RegularWarDropTierB =
-    [
-        KillDropEntry.Item(721), KillDropEntry.Item(724), KillDropEntry.Animal5,
-        KillDropEntry.Item(722), KillDropEntry.Item(1449)
-    ];
-
-    private static readonly KillDropEntry[] RegularWarDropTierC =
-    [
-        KillDropEntry.Item(1237), KillDropEntry.Item(694), KillDropEntry.Item(1103), KillDropEntry.Item(1124),
-        KillDropEntry.Item(1166), KillDropEntry.Item(8102), KillDropEntry.Item(1371)
-    ];
-
-    private static readonly KillDropEntry[] RegularWarDropTierD =
-        [KillDropEntry.Elixir, KillDropEntry.Item(695), KillDropEntry.Item(696)];
-
-    private static readonly KillDropEntry[] CityDropTierA =
-        [KillDropEntry.Animal10, KillDropEntry.Item(724), KillDropEntry.Item(721)];
-
-    private static readonly KillDropEntry[] CityDropTierB =
-        [KillDropEntry.Animal5, KillDropEntry.Item(8102), KillDropEntry.Item(720), KillDropEntry.Item(1166)];
-
-    private static readonly KillDropEntry[] CityDropTierC =
-    [
-        KillDropEntry.Binary(694, 1449), KillDropEntry.Item(1103), KillDropEntry.Item(1124), KillDropEntry.Item(722)
-    ];
-
-    private static readonly KillDropEntry[] CityDropTierD =
-        [KillDropEntry.Elixir, KillDropEntry.Binary(695, 696)];
-
     private void DropItemsForKillOtherTribe(PlayerRuntimeState attackerState, PlayerRuntimeState defenderState,
         int attackerCombinedLevel, int defenderCombinedLevel)
     {
@@ -535,34 +532,6 @@ public sealed partial class Zone
             _ => byte.MaxValue
         };
         return owningTribe != byte.MaxValue;
-    }
-
-    private enum KillDropEntryKind : byte
-    {
-        Item,
-        Binary,
-        Elixir,
-        Animal5,
-        Animal10
-    }
-
-    private readonly record struct KillDropEntry(KillDropEntryKind Kind, int First, int Second)
-    {
-        public static readonly KillDropEntry Elixir = new(KillDropEntryKind.Elixir, 0, 0);
-
-        public static readonly KillDropEntry Animal5 = new(KillDropEntryKind.Animal5, 0, 0);
-
-        public static readonly KillDropEntry Animal10 = new(KillDropEntryKind.Animal10, 0, 0);
-
-        public static KillDropEntry Item(int id)
-        {
-            return new KillDropEntry(KillDropEntryKind.Item, id, 0);
-        }
-
-        public static KillDropEntry Binary(int first, int second)
-        {
-            return new KillDropEntry(KillDropEntryKind.Binary, first, second);
-        }
     }
 
     public void GrantContributionPoints(int characterId, int amount)
@@ -1038,6 +1007,34 @@ public sealed partial class Zone
                 }
 
                 break;
+        }
+    }
+
+    private enum KillDropEntryKind : byte
+    {
+        Item,
+        Binary,
+        Elixir,
+        Animal5,
+        Animal10
+    }
+
+    private readonly record struct KillDropEntry(KillDropEntryKind Kind, int First, int Second)
+    {
+        public static readonly KillDropEntry Elixir = new(KillDropEntryKind.Elixir, 0, 0);
+
+        public static readonly KillDropEntry Animal5 = new(KillDropEntryKind.Animal5, 0, 0);
+
+        public static readonly KillDropEntry Animal10 = new(KillDropEntryKind.Animal10, 0, 0);
+
+        public static KillDropEntry Item(int id)
+        {
+            return new KillDropEntry(KillDropEntryKind.Item, id, 0);
+        }
+
+        public static KillDropEntry Binary(int first, int second)
+        {
+            return new KillDropEntry(KillDropEntryKind.Binary, first, second);
         }
     }
 }

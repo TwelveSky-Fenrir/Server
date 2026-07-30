@@ -1,11 +1,11 @@
 using System.IO.Pipelines;
 using System.Net;
-using Fenrir.Network.Abstractions;
-using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Core.Wire;
+using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Protocol.Login;
 using Microsoft.Extensions.Logging;
 
-namespace Fenrir.Application.Login;
+namespace Fenrir.Application.Login.Sessions;
 
 public sealed class LoginClientSession(
     long sessionId,

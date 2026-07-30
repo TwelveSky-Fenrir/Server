@@ -36,7 +36,7 @@ public static class EnchantResolver
 
     private const byte WingSort = 6;
 
-        private const int SweetPotatoSuccessBonus = 5;
+    private const int SweetPotatoSuccessBonus = 5;
 
     public static EnchantResult Resolve(
         ItemDefinition targetItemDefinition,
@@ -163,7 +163,7 @@ public static class EnchantResolver
             false, ConsumesImproveCharge: consumesImproveCharge);
     }
 
-        private static EnchantResult ResolveWingStandardMaterial(ItemRowDto materialItem, byte currentImprove,
+    private static EnchantResult ResolveWingStandardMaterial(ItemRowDto materialItem, byte currentImprove,
         int luck, int protectForWingCharges, int improveItemValueCharges, IRandomSource random)
     {
         if (!WingEnchantMaterialWhitelist.StandardWingMaterials.TryGetValue(materialItem.ItemId,

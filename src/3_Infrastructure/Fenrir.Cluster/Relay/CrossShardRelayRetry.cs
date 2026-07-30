@@ -7,7 +7,7 @@ internal static class CrossShardRelayRetry
 
     public static async ValueTask RunAsync(Func<ValueTask> operation, CancellationToken ct)
     {
-        for (var attempt = 0; ; attempt++)
+        for (var attempt = 0;; attempt++)
             try
             {
                 await operation().ConfigureAwait(false);
@@ -21,7 +21,7 @@ internal static class CrossShardRelayRetry
 
     public static async ValueTask RunSync(Action operation, CancellationToken ct)
     {
-        for (var attempt = 0; ; attempt++)
+        for (var attempt = 0;; attempt++)
             try
             {
                 operation();

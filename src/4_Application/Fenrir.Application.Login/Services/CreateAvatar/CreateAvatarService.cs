@@ -1,6 +1,6 @@
 using Fenrir.Application.Login.Abstractions.CreateAvatar;
-using Fenrir.Domain.Login.Avatars;
 using Fenrir.Core.Packets.Shared;
+using Fenrir.Domain.Login.Avatars;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 

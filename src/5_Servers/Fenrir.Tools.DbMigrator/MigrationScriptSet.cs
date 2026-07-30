@@ -7,8 +7,7 @@ public sealed record LoadedScript(string RelativePath, string Content, byte[] Ha
 
 public static class MigrationScriptSet
 {
-
-        public static async Task<IReadOnlyList<LoadedScript>?> LoadAsync(string databaseDirectory,
+    public static async Task<IReadOnlyList<LoadedScript>?> LoadAsync(string databaseDirectory,
         IReadOnlyList<string> relativePaths)
     {
         var loaded = new List<LoadedScript>(relativePaths.Count);

@@ -11,12 +11,12 @@
 -- registering a new admin.ErrorCatalog row, since it is the identical precondition already thrown by both
 -- usp_Cash_Debit and usp_Cash_Credit for the same failure kind.
 CREATE PROCEDURE game.usp_Cash_CreditAndConsumeItem @AccountId INT,
-                                                     @Amount INT,
-                                                     @Reason TINYINT,
-                                                     @ProductId INT = NULL,
-                                                     @CharacterId INT,
-                                                     @Container TINYINT,
-                                                     @Items game.tvp_CharacterItemSlot READONLY
+                                                    @Amount INT,
+                                                    @Reason TINYINT,
+                                                    @ProductId INT = NULL,
+                                                    @CharacterId INT,
+                                                    @Container TINYINT,
+                                                    @Items game.tvp_CharacterItemSlot READONLY
 AS
 BEGIN
     SET

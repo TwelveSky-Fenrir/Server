@@ -8,20 +8,16 @@ public sealed class CenterLinkAuthenticator : ICenterLinkAuthenticator
 {
     private readonly byte[]? _key;
 
-        public CenterLinkAuthenticator(string? sharedSecret)
+    public CenterLinkAuthenticator(string? sharedSecret)
     {
-        // Fail-closed SANS crasher le boot : un secret vide OU trop court (affaiblirait la clé HMAC) => lien
-        // DÉSACTIVÉ (IsEnabled == false, aucun handshake authentifiable). Le secret faible n'est jamais utilisé,
-        // mais les serveurs démarrent quand même — le lien S2S reste simplement inactif (dormant en mode Shard).
-        // Le CenterServerHost logue déjà l'état DISABLED au démarrage.
         _key = string.IsNullOrEmpty(sharedSecret) || sharedSecret.Length < CenterLinkAuth.MinSecretLength
             ? null
             : Encoding.UTF8.GetBytes(sharedSecret);
     }
 
-        public bool IsEnabled => _key is not null;
+    public bool IsEnabled => _key is not null;
 
-        public CenterLinkChallenge IssueChallenge()
+    public CenterLinkChallenge IssueChallenge()
     {
         ThrowIfDisabled();
 
@@ -30,7 +26,8 @@ public sealed class CenterLinkAuthenticator : ICenterLinkAuthenticator
         return new CenterLinkChallenge(nonce);
     }
 
-        public bool VerifyHelloMac(in CenterLinkChallenge challenge, ReadOnlySpan<byte> context, ReadOnlySpan<byte> clientMac)
+    public bool VerifyHelloMac(in CenterLinkChallenge challenge, ReadOnlySpan<byte> context,
+        ReadOnlySpan<byte> clientMac)
     {
         if (_key is null)
             return false;
@@ -44,21 +41,24 @@ public sealed class CenterLinkAuthenticator : ICenterLinkAuthenticator
         return CryptographicOperations.FixedTimeEquals(expected, clientMac);
     }
 
-        public int ComputeHelloMac(ReadOnlySpan<byte> nonce, ReadOnlySpan<byte> context, Span<byte> destination)
+    public int ComputeHelloMac(ReadOnlySpan<byte> nonce, ReadOnlySpan<byte> context, Span<byte> destination)
     {
         ThrowIfDisabled();
 
         if (nonce.Length != CenterLinkAuth.NonceSize)
             throw new ArgumentException($"Nonce must be exactly {CenterLinkAuth.NonceSize} bytes.", nameof(nonce));
         if (context.Length > CenterLinkAuth.MaxContextLength)
-            throw new ArgumentException($"Context must not exceed {CenterLinkAuth.MaxContextLength} bytes.", nameof(context));
+            throw new ArgumentException($"Context must not exceed {CenterLinkAuth.MaxContextLength} bytes.",
+                nameof(context));
         if (destination.Length < CenterLinkAuth.MacSize)
-            throw new ArgumentException($"Destination must be at least {CenterLinkAuth.MacSize} bytes.", nameof(destination));
+            throw new ArgumentException($"Destination must be at least {CenterLinkAuth.MacSize} bytes.",
+                nameof(destination));
 
         return ComputeMac(_key!, nonce, context, destination);
     }
 
-    private static int ComputeMac(byte[] key, ReadOnlySpan<byte> nonce, ReadOnlySpan<byte> context, Span<byte> destination)
+    private static int ComputeMac(byte[] key, ReadOnlySpan<byte> nonce, ReadOnlySpan<byte> context,
+        Span<byte> destination)
     {
         Span<byte> message = stackalloc byte[CenterLinkAuth.NonceSize + CenterLinkAuth.MaxContextLength];
         nonce.CopyTo(message);

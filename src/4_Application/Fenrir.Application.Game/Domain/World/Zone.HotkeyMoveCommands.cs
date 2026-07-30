@@ -41,7 +41,6 @@ public sealed partial class Zone
     private void DrainHotkeyMoveCommands()
     {
         while (_hotkeyMoveInbox.Reader.TryRead(out var command))
-        {
             try
             {
                 ApplyHotkeyMoveCommand(in command);
@@ -53,7 +52,6 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
-        }
     }
 
     private void ApplyHotkeyMoveCommand(in HotkeyMoveZoneCommand command)

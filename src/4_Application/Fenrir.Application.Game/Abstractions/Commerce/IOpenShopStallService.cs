@@ -1,7 +1,6 @@
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Data.Abstractions.Commerce;
 using Fenrir.Core.Packets.Shared;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 
 namespace Fenrir.Application.Game.Abstractions.Commerce;
 

@@ -51,32 +51,42 @@ public sealed class SocialCrossShardRelayHost(
         }
     }
 
-    protected override void OnOutboxFull(SocialCrossShardRelayEntry entry) =>
+    protected override void OnOutboxFull(SocialCrossShardRelayEntry entry)
+    {
         logger.LogWarning(
             "Cross-shard social relay outbox full on shard {ShardId}; dropping one {Kind}/{MessageType} row " +
             "addressed to character {TargetCharacterId} on shard {TargetShardId} (any same-shard delivery " +
             "already happened, only the cross-shard leg of this one step is lost)",
             options.Value.ShardId, entry.Kind, entry.MessageType, entry.TargetCharacterId, entry.TargetShardId);
+    }
 
-    protected override void OnOutboundFlushFailed(Exception ex) =>
+    protected override void OnOutboundFlushFailed(Exception ex)
+    {
         logger.LogError(ex, "Social cross-shard relay outbound flush failed for shard {ShardId}",
             options.Value.ShardId);
+    }
 
-    protected override void OnInboundDeliveryFailed(Exception ex) =>
+    protected override void OnInboundDeliveryFailed(Exception ex)
+    {
         logger.LogError(ex, "Social cross-shard relay inbound delivery failed for shard {ShardId}",
             options.Value.ShardId);
+    }
 
-    protected override void OnPublishFailed(SocialCrossShardRelayEntry entry, Exception ex) =>
+    protected override void OnPublishFailed(SocialCrossShardRelayEntry entry, Exception ex)
+    {
         logger.LogError(ex,
             "Failed to publish a {Kind}/{MessageType} row to the cross-shard social relay from shard " +
             "{ShardId} (target character {TargetCharacterId} on shard {TargetShardId}); this one step " +
             "is lost",
             entry.Kind, entry.MessageType, options.Value.ShardId, entry.TargetCharacterId,
             entry.TargetShardId);
+    }
 
-    protected override void OnDeliveryFailed(SocialCrossShardRelayDto dto, Exception ex) =>
+    protected override void OnDeliveryFailed(SocialCrossShardRelayDto dto, Exception ex)
+    {
         logger.LogError(ex,
             "Failed to locally deliver relayed social row {RelayId} (kind {Kind}, message {MessageType}) " +
             "on shard {ShardId}",
             dto.RelayId, dto.Kind, dto.MessageType, options.Value.ShardId);
+    }
 }

@@ -2,9 +2,9 @@ using System.Threading.Channels;
 using Fenrir.Application.Game.Domain.Gm;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Stats;
-using Fenrir.Data.WriteBehind;
 using Fenrir.Core.Packets.Shared;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Data.WriteBehind;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.World;
@@ -59,7 +59,6 @@ public sealed partial class Zone
     private void DrainGmExperienceCommands()
     {
         while (_gmExperienceInbox.Reader.TryRead(out var command))
-        {
             try
             {
                 ApplyGmSelfExperienceGrantCommand(in command);
@@ -71,7 +70,6 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
-        }
     }
 
     private void ApplyGmSelfExperienceGrantCommand(in GmSelfExperienceGrantZoneCommand command)
@@ -132,7 +130,8 @@ public sealed partial class Zone
         GmZone124PartyPullZoneCommand command, CancellationToken ct, TimeSpan? timeout = null)
     {
         var applied =
-            new TaskCompletionSource<IReadOnlyList<PlayerRuntimeState>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            new TaskCompletionSource<IReadOnlyList<PlayerRuntimeState>>(TaskCreationOptions
+                .RunContinuationsAsynchronously);
         var withSignal = command with { Applied = applied };
 
         if (!PostGmZone124PartyPullCommand(in withSignal))
@@ -151,7 +150,6 @@ public sealed partial class Zone
     private void DrainGmZone124PartyPullCommands()
     {
         while (_gmZone124PartyPullInbox.Reader.TryRead(out var command))
-        {
             try
             {
                 var pulled = ApplyGmZone124PartyPullCommand(in command);
@@ -162,7 +160,6 @@ public sealed partial class Zone
                 logger.LogError(ex, "Zone {MapId} GM zone-124 party pull command failed", MapId);
                 command.Applied?.TrySetException(ex);
             }
-        }
     }
 
     private List<PlayerRuntimeState> ApplyGmZone124PartyPullCommand(in GmZone124PartyPullZoneCommand command)

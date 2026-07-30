@@ -1,4 +1,3 @@
-using Fenrir.Network.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Network.Dispatch.Logging;

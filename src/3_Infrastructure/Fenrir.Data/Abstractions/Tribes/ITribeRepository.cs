@@ -18,7 +18,7 @@ public interface ITribeRepository
 
     public ValueTask<ReadOnlyCollection<TribeBankSlotDto>> GetBankAsync(byte tribeId, CancellationToken ct);
 
-        public ValueTask<ReadOnlyCollection<TribeBankTotalDto>> GetBankTotalsAsync(CancellationToken ct);
+    public ValueTask<ReadOnlyCollection<TribeBankTotalDto>> GetBankTotalsAsync(CancellationToken ct);
 
     public ValueTask<long> WithdrawBankAsync(byte tribeId, byte slotIndex, int characterId, CancellationToken ct);
 

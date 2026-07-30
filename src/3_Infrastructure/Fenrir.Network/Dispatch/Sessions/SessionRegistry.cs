@@ -16,6 +16,16 @@ public sealed class SessionRegistry(ILogger<SessionRegistry>? logger = null) : I
 
     public int Count => _sessions.Count;
 
+    public int KickByRemoteAddress(string ipAddress)
+    {
+        var kicked = SnapshotByRemoteAddress(ipAddress);
+
+        foreach (var session in kicked)
+            session.Abort(DisconnectReason.IpBlocked);
+
+        return kicked.Length;
+    }
+
     public void Register(ClientSession session)
     {
         _sessions[session.SessionId] = session;
@@ -49,16 +59,6 @@ public sealed class SessionRegistry(ILogger<SessionRegistry>? logger = null) : I
                 builder.Add(session);
 
         return builder.ToImmutable();
-    }
-
-        public int KickByRemoteAddress(string ipAddress)
-    {
-        var kicked = SnapshotByRemoteAddress(ipAddress);
-
-        foreach (var session in kicked)
-            session.Abort(DisconnectReason.IpBlocked);
-
-        return kicked.Length;
     }
 
     public ImmutableArray<ClientSession> SnapshotIdle(TimeSpan idleTimeout, DateTimeOffset nowUtc)

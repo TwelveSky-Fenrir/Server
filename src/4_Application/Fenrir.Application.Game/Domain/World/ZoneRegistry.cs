@@ -3,7 +3,6 @@ using System.Collections.Frozen;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using Fenrir.Application.Game.Domain.World.Geometry;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Movement;
 using Fenrir.Application.Game.Domain.Progression;
@@ -13,6 +12,7 @@ using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Application.Game.Domain.Social.Friends;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
+using Fenrir.Application.Game.Domain.World.Geometry;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
@@ -120,12 +120,6 @@ public sealed class ZoneRegistry
 
     public void Initialize(IReadOnlyCollection<short> maps)
     {
-        // Pré-charge les navmesh (.WM) EN PARALLÈLE avant de construire les zones. Le chargement séquentiel dans le
-        // ctor de Zone (via ToFrozenDictionary) bloquait le thread de boot AVANT host.RunAsync() le temps de parser
-        // ~135 Mo sur 117 maps -- fenêtre pendant laquelle le GameServer n'écoute pas et ne s'inscrit pas à
-        // l'annuaire (le client voit alors « zones fermées »). Le parse d'un .WM est indépendant par fichier, donc
-        // parallélisable sans état partagé ; le résultat est passé au ctor via 'geometry' (court-circuite l'appel
-        // synchrone à Zone.TryLoadGeometry).
         var sw = Stopwatch.StartNew();
         var geometries = new ConcurrentDictionary<short, ZoneGeometry?>();
         Parallel.ForEach(maps, mapId => geometries[mapId] = Zone.TryLoadGeometry(mapId, _options, _zoneLogger));

@@ -14,18 +14,20 @@ public interface ICharacterWriteBehindFlusher : IWriteBehindFlusher
 public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWriteBehindFlusher
 {
     private readonly ICharacterRepository _characters;
-    private readonly ICharacterLogoutStateRepository _logoutState;
+    private readonly SemaphoreSlim _disconnectRetrySignal = new(0, 1);
+
+    private readonly PeriodicTimer _disconnectRetryTimer = new(WriteBehindFlusher<int>.DefaultInterval);
     private readonly WriteBehindFlusher<int> _flusher;
 
     private readonly SemaphoreSlim _flushGate = new(1, 1);
     private readonly ILogger<PositionWriteBehindHost> _logger;
-    private readonly ZoneRegistry _zones;
+    private readonly ICharacterLogoutStateRepository _logoutState;
 
-    private readonly Dictionary<int, (CharacterProgressTvp Progress, CharacterPositionTvp Position, PlayerRuntimeState CapturedState)>
+    private readonly Dictionary<int, (CharacterProgressTvp Progress, CharacterPositionTvp Position, PlayerRuntimeState
+            CapturedState)>
         _pendingDisconnectRetries = new();
 
-    private readonly PeriodicTimer _disconnectRetryTimer = new(WriteBehindFlusher<int>.DefaultInterval);
-    private readonly SemaphoreSlim _disconnectRetrySignal = new(0, 1);
+    private readonly ZoneRegistry _zones;
 
     public PositionWriteBehindHost(ZoneRegistry zones, DirtyTracker<int> dirtyTracker, ICharacterRepository characters,
         ICharacterLogoutStateRepository logoutState, ProgressWriteBehindHost progress,
@@ -134,6 +136,14 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
         }
     }
 
+    public async ValueTask DisposeAsync()
+    {
+        await _flusher.DisposeAsync().ConfigureAwait(false);
+        _flushGate.Dispose();
+        _disconnectRetryTimer.Dispose();
+        _disconnectRetrySignal.Dispose();
+    }
+
     private void ReleaseDisconnectRetrySignal()
     {
         try
@@ -214,14 +224,6 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
         {
             _flushGate.Release();
         }
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        await _flusher.DisposeAsync().ConfigureAwait(false);
-        _flushGate.Dispose();
-        _disconnectRetryTimer.Dispose();
-        _disconnectRetrySignal.Dispose();
     }
 
     protected override Task ExecuteAsync(CancellationToken stoppingToken)

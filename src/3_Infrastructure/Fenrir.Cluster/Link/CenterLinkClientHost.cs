@@ -1,11 +1,11 @@
+using System.Buffers;
 using System.IO.Pipelines;
 using System.Net.Sockets;
-using Fenrir.Core.Abstractions;
 using Fenrir.Core.Wire;
-using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Framing;
 using Fenrir.Network.Transport;
+using Fenrir.Protocol.Center;
 using Fenrir.Security.Abstractions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -13,17 +13,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Cluster.Link;
 
-/// <summary>
-///     Maintains the persistent OUTBOUND link from a LoginServer/GameServer to the CenterServer, and provides the
-///     <see cref="ICenterLink" /> send API over it. The mirror of <c>CenterServerHost</c>: it dials the Center,
-///     completes the HMAC handshake in reverse (receive nonce -> compute MAC -> send MAC), then pumps outbound sends
-///     and inbound fan-out until the link drops, at which point it reconnects with exponential backoff.
-///     <para>
-///         Boot is LAZY and never blocking: this is a <see cref="BackgroundService" />, so the host starts and accepts
-///         its own clients even while the Center is unreachable. There is no <c>WaitFor(center)</c> anywhere — the
-///         uplink simply comes up whenever it can.
-///     </para>
-/// </summary>
 internal sealed class CenterLinkClientHost(
     ILogger<CenterLinkClientHost> logger,
     IOptions<CenterLinkClientOptions> options,
@@ -44,10 +33,6 @@ internal sealed class CenterLinkClientHost(
 
         try
         {
-            // ClientSession.Send already no-ops once the session is aborted, so a session captured
-            // mid-teardown is safe; the try/catch only guards the vanishingly small window where the TX pipe
-            // is completed out from under us during teardown. A best-effort uplink send must never disrupt the
-            // caller's thread (a zone tick / handler thread).
             session.Send(in packet);
         }
         catch (Exception ex)
@@ -92,8 +77,6 @@ internal sealed class CenterLinkClientHost(
             if (stoppingToken.IsCancellationRequested)
                 break;
 
-            // A link that actually came up resets the backoff, so a later drop reconnects promptly; repeated
-            // connect/handshake failures keep doubling the delay toward the ceiling.
             if (authenticated)
                 delay = initialDelay;
 
@@ -113,11 +96,6 @@ internal sealed class CenterLinkClientHost(
         logger.LogInformation("CenterLink uplink stopped");
     }
 
-    /// <summary>
-    ///     Runs one connect -> handshake -> receive-loop attempt end to end. Returns true iff the link
-    ///     authenticated (used by the caller to decide whether to reset the backoff). Never throws — every fault is
-    ///     classified and logged here, and teardown is symmetric with <c>CenterServerHost.RunLinkAsync</c>'s finally.
-    /// </summary>
     private async Task<bool> TryRunLinkAsync(string host, int port, CenterLinkClientOptions opts, CancellationToken ct)
     {
         Socket? socket = null;
@@ -137,7 +115,7 @@ internal sealed class CenterLinkClientHost(
             }
 
             connection = new SocketConnection(socket, logger);
-            socket = null; // ownership transferred: SocketConnection.DisposeAsync now owns the socket.
+            socket = null;
             ioTask = connection.RunIoAsync(ct);
 
             session = new CenterUplinkSession(Interlocked.Increment(ref _sessionSeq), connection, logger);
@@ -180,9 +158,6 @@ internal sealed class CenterLinkClientHost(
 
             if (connection is not null)
             {
-                // Same teardown ordering as CenterServerHost: Abort() unblocks the in-flight socket read, then we
-                // join RunIoAsync before disposing. RunIoAsync's loops never throw out (they encode any failure
-                // into pipe completion), so awaiting it here is safe without a guard.
                 connection.Abort();
                 if (ioTask is not null)
                     await ioTask.ConfigureAwait(false);
@@ -190,16 +165,10 @@ internal sealed class CenterLinkClientHost(
                 await connection.DisposeAsync().ConfigureAwait(false);
             }
 
-            socket?.Dispose(); // non-null only if SocketConnection construction threw before taking ownership.
+            socket?.Dispose();
         }
     }
 
-    /// <summary>
-    ///     Client half of the handshake, the exact reverse of <c>CenterServerHost.TryAuthenticateAsync</c>: receive
-    ///     the raw <see cref="CenterLinkAuth.NonceSize" />-byte nonce, compute the HMAC over it (empty context, same
-    ///     as the server verifies), and send the raw <see cref="CenterLinkAuth.MacSize" />-byte MAC back. Nonce/MAC
-    ///     travel un-framed and in clear, identical to the accept side.
-    /// </summary>
     private async Task<bool> PerformHandshakeAsync(CenterUplinkSession session, SocketConnection connection,
         CancellationToken ct)
     {
@@ -218,12 +187,6 @@ internal sealed class CenterLinkClientHost(
         return true;
     }
 
-    /// <summary>
-    ///     Decodes the CenterServer's fan-out stream with <see cref="S2SFrameReader" /> + the generated
-    ///     <c>CenterOpcodeRegistry.Provider</c> (1-byte opcode header), mirroring <c>CenterServerHost</c>'s dispatch
-    ///     loop. Each frame is routed to the optional inbound <see cref="IFrameDispatcher" />; if none is wired (the
-    ///     default this lot — no client-side inbound handlers exist yet), the frame is logged and dropped.
-    /// </summary>
     private async Task ReceiveLoopAsync(CenterUplinkSession session, SocketConnection connection, CancellationToken ct)
     {
         var reader = connection.Input;
@@ -246,9 +209,7 @@ internal sealed class CenterLinkClientHost(
 
                     if (inboundSink is not null)
                     {
-                        // Application synchrone, span-based : le fan-out est un effet in-memory broadcast-vers-zones,
-                        // pas du dispatch par-session. Pas d'await => la copie de sécurité ref-struct est inutile.
-                        var span = seq.IsSingleSegment ? seq.FirstSpan : System.Buffers.BuffersExtensions.ToArray(in seq);
+                        var span = seq.IsSingleSegment ? seq.FirstSpan : BuffersExtensions.ToArray(in seq);
                         inboundSink.Receive(opcode, span);
                     }
                     else
@@ -259,7 +220,7 @@ internal sealed class CenterLinkClientHost(
                     }
                 }
             }
-            catch (Fenrir.Network.Framing.ProtocolViolationException ex)
+            catch (ProtocolViolationException ex)
             {
                 logger.LogWarning(
                     "CenterLink: unrecognized fan-out opcode {Opcode} for {Server} -- closing uplink", ex.Opcode,
@@ -274,7 +235,6 @@ internal sealed class CenterLinkClientHost(
         }
     }
 
-    /// <summary>Reads exactly <paramref name="count" /> raw bytes, or null if the peer closes first (handshake use).</summary>
     private static async Task<byte[]?> ReadExactAsync(PipeReader reader, int count, CancellationToken ct)
     {
         while (true)
@@ -285,7 +245,7 @@ internal sealed class CenterLinkClientHost(
             if (buffer.Length >= count)
             {
                 var slice = buffer.Slice(0, count);
-                var bytes = System.Buffers.BuffersExtensions.ToArray(in slice);
+                var bytes = BuffersExtensions.ToArray(in slice);
                 reader.AdvanceTo(slice.End);
                 return bytes;
             }
@@ -302,7 +262,6 @@ internal sealed class CenterLinkClientHost(
 
     private static TimeSpan WithJitter(TimeSpan delay)
     {
-        // Up to +20% jitter so a fleet of shards restarting together doesn't stampede the Center in lockstep.
         var jitterCeiling = (int)(delay.TotalMilliseconds * 0.2) + 1;
         return delay + TimeSpan.FromMilliseconds(Random.Shared.Next(0, jitterCeiling));
     }

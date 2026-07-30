@@ -4,18 +4,17 @@ namespace Fenrir.Application.Game.Domain.Enchant;
 
 public static class WingEnchantMaterialWhitelist
 {
+    public const int GuaranteedSuccessScrollItemId = 826;
 
-        public const int GuaranteedSuccessScrollItemId = 826;
-
-        public const int ProtectedMaterialItemId = 8106;
+    public const int ProtectedMaterialItemId = 8106;
 
     public const int ProtectedMaterialFailureResultCode = 9;
 
     public const int ProtectedMaterialEnchantValue = 1;
 
-        public const int WingEnchantCpCost = 50;
+    public const int WingEnchantCpCost = 50;
 
-        public static readonly FrozenDictionary<int, int> StandardWingMaterials = new Dictionary<int, int>
+    public static readonly FrozenDictionary<int, int> StandardWingMaterials = new Dictionary<int, int>
     {
         [695] = 1,
         [696] = 2,

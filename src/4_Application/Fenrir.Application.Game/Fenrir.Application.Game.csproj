@@ -25,6 +25,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\2_Core\Fenrir.Core\Fenrir.Core.csproj"/>
+    <!-- T10 : les 246 paquets Zone et ZoneSessionState vivent désormais dans un projet-protocole
+         dédié. Cet assembly n'en garde que les 110 handlers. Requis par 273 de ses fichiers. -->
+    <ProjectReference Include="..\..\2_Core\Fenrir.Protocol.Game\Fenrir.Protocol.Game.csproj"/>
+    <!-- Arête EXPLICITE bien que transitive via Fenrir.Cluster : ZoneEventBroadcaster et
+         ZoneCenterBroadcastIngestor émettent directement des WorldEventOutbound sur l'uplink Center. -->
+    <ProjectReference Include="..\..\2_Core\Fenrir.Protocol.Center\Fenrir.Protocol.Center.csproj"/>
     <ProjectReference Include="..\..\2_Core\Fenrir.Domain.Game\Fenrir.Domain.Game.csproj"/>
     <ProjectReference Include="..\..\3_Infrastructure\Fenrir.Network\Fenrir.Network.csproj"/>
     <ProjectReference Include="..\..\3_Infrastructure\Fenrir.Data\Fenrir.Data.csproj"/>

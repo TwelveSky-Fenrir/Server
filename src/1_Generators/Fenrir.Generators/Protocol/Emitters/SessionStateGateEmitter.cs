@@ -9,16 +9,15 @@ internal static class SessionStateGateEmitter
 {
     public const string HintName = "SessionStateGate.g.cs";
 
-    public static string Emit(ImmutableArray<TypeModel> packets)
+    public static string Emit(ImmutableArray<TypeModel> packets, string namespaceName)
     {
         var server = packets[0].Server;
-        var (className, stateEnum, namespaceName) = server switch
+        var className = EmittedNames.SessionStateGate(server);
+        var stateEnum = server switch
         {
-            FenrirServer.Login => ("LoginSessionStateGate", WellKnownNames.LoginSessionStateEnum,
-                "Fenrir.Application.Login"),
-            FenrirServer.Zone => ("ZoneSessionStateGate", WellKnownNames.ZoneSessionStateEnum,
-                "Fenrir.Application.Game"),
-            _ => ("CenterSessionStateGate", WellKnownNames.CenterSessionStateEnum, "Fenrir.Cluster")
+            FenrirServer.Login => WellKnownNames.LoginSessionStateEnum,
+            FenrirServer.Zone => WellKnownNames.ZoneSessionStateEnum,
+            _ => WellKnownNames.CenterSessionStateEnum
         };
 
         var entries = packets

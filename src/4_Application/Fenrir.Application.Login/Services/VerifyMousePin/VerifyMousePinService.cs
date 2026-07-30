@@ -1,7 +1,7 @@
 using Fenrir.Application.Login.Abstractions.VerifyMousePin;
-using Fenrir.Domain.Login.Pins;
 using Fenrir.Application.Login.Services.AccountSecurity;
 using Fenrir.Data.Security;
+using Fenrir.Domain.Login.Pins;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Login.Services.VerifyMousePin;

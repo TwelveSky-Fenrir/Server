@@ -4,9 +4,9 @@ using Fenrir.Application.Game.Domain.Gm;
 using Fenrir.Application.Game.Domain.Social.Chat;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game;
+using Fenrir.Application.Game.Sessions;
 using Fenrir.Core.Packets.Shared;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Chat;

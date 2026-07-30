@@ -4,8 +4,7 @@ using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Fishing;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Network.Abstractions;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.FishingConsumables;

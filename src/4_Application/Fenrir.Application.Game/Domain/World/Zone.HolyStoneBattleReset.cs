@@ -1,6 +1,6 @@
 using System.Threading.Channels;
 using Fenrir.Application.Game.Domain.Simulation;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.World;
@@ -28,7 +28,6 @@ public sealed partial class Zone
     private void DrainHolyStoneBattleRankResetCommands()
     {
         while (_holyStoneBattleRankResetInbox.Reader.TryRead(out _))
-        {
             try
             {
                 ApplyHolyStoneBattleRankReset();
@@ -37,7 +36,6 @@ public sealed partial class Zone
             {
                 logger.LogError(ex, "Zone {MapId} HSB cluster-wide rank reset failed", MapId);
             }
-        }
     }
 
     private void ApplyHolyStoneBattleRankReset()

@@ -10,14 +10,14 @@
 -- gate in that citation. mAddPlayerNum is the one sibling column still intentionally not carried over.
 CREATE TABLE admin.ServerQuota
 (
-    Id             TINYINT NOT NULL
+    Id            TINYINT NOT NULL
         CONSTRAINT DF_ServerQuota_Id DEFAULT 1,
-    MaxPlayers     INT     NOT NULL,
+    MaxPlayers    INT     NOT NULL,
     -- Wire-visible sibling column, distinct from mAddPlayerNum above: unlike MaxPlayers below, no CHECK
     -- constraint here -- legacy never validates this field either, and unlike MaxPlayers it has no
     -- consuming quota gate a negative value could silently break. See usp_ServerQuota_GetMaxPlayers.sql
     -- for the read side.
-    GagePlayerNum  INT     NOT NULL
+    GagePlayerNum INT     NOT NULL
         CONSTRAINT DF_ServerQuota_GagePlayerNum DEFAULT 0,
     CONSTRAINT PK_ServerQuota PRIMARY KEY CLUSTERED (Id),
     CONSTRAINT CK_ServerQuota_Id CHECK (Id = 1),

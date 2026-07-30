@@ -5,11 +5,6 @@ using CaeriusNet.Commands.Writes;
 
 namespace Fenrir.Cluster.WorldState;
 
-/// <summary>
-///     CaeriusNet-backed daily (and Monday-weekly) reward-claim reset for the CenterServer, consumed by
-///     <c>DailyResetHost</c>. Routes the reset through <c>game.usp_Character_ResetDailyRewardClaims</c> instead
-///     of a hard-coded member table name, correcting legacy Bug 4.
-/// </summary>
 public sealed record CenterDailyRewardReset(ICaeriusNetDbContext Db) : ICenterDailyRewardReset
 {
     public ValueTask ResetDailyRewardClaimsAsync(bool clearWeeklyDayCounter, CancellationToken ct)

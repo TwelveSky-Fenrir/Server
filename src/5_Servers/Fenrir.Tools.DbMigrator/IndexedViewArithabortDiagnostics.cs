@@ -25,7 +25,8 @@ public static class IndexedViewArithabortDiagnostics
         }
         catch (SqlException ex)
         {
-            Console.WriteLine($"Could not verify ARITHABORT/compatibility level (non-fatal, diagnostic only): {ex.Message}");
+            Console.WriteLine(
+                $"Could not verify ARITHABORT/compatibility level (non-fatal, diagnostic only): {ex.Message}");
         }
     }
 }

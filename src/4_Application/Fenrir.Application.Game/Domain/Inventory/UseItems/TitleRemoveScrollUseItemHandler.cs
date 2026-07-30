@@ -4,7 +4,7 @@ using Fenrir.Application.Game.Domain.Consumables;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.GameData;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.Inventory.UseItems;

@@ -64,11 +64,6 @@ public sealed record CharacterShardLocationRepository(ICaeriusNetDbContext Db) :
         }
     }
 
-    private static bool IsWriteConflict(int errorNumber)
-    {
-        return errorNumber is ErrorWriteConflict or ErrorDependencyFailure or ErrorCommitDependencyAborted;
-    }
-
     public ValueTask<CharacterShardLocationDto?> FindByNameAsync(string avatarName, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("runtime", "usp_CharacterShardLocation_FindByName", 1,
@@ -87,5 +82,10 @@ public sealed record CharacterShardLocationRepository(ICaeriusNetDbContext Db) :
             .Build();
 
         return Db.FirstQueryAsync<CharacterShardLocationDto>(sp, ct);
+    }
+
+    private static bool IsWriteConflict(int errorNumber)
+    {
+        return errorNumber is ErrorWriteConflict or ErrorDependencyFailure or ErrorCommitDependencyAborted;
     }
 }

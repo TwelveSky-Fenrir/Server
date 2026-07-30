@@ -38,8 +38,7 @@ internal static class FieldScanner
             if (field is null)
                 continue;
 
-            field.Offset = offset + field.ReservedBefore;
-            offset = field.Offset + field.OwnSize;
+            offset += field.ReservedBefore + field.OwnSize;
             fields.Add(field);
         }
 
@@ -161,7 +160,7 @@ internal static class FieldScanner
                     return null;
                 }
 
-                var nestedElementSize = ResolveNestedSize(elementNamedType, compilation, visiting);
+                var nestedElementSize = ResolveNestedSize(elementNamedType, compilation, visiting, property, diagnostics);
 
                 return new FieldModel
                 {
@@ -267,7 +266,7 @@ internal static class FieldScanner
         if (type is INamedTypeSymbol { TypeKind: TypeKind.Struct } namedType)
             if (ImplementsWireType(namedType))
             {
-                var nestedSize = ResolveNestedSize(namedType, compilation, visiting);
+                var nestedSize = ResolveNestedSize(namedType, compilation, visiting, property, diagnostics);
 
                 return new FieldModel
                 {
@@ -294,7 +293,7 @@ internal static class FieldScanner
     }
 
     private static int ResolveNestedSize(INamedTypeSymbol nestedType, Compilation compilation,
-        HashSet<INamedTypeSymbol> visiting)
+        HashSet<INamedTypeSymbol> visiting, IPropertySymbol property, List<Diagnostic> diagnostics)
     {
         var wireTypeAttribute = nestedType.GetAttributes().Find(WellKnownNames.FenrirWireTypeAttribute);
         if (wireTypeAttribute is not null)
@@ -302,6 +301,17 @@ internal static class FieldScanner
             var expected = wireTypeAttribute.GetCtorInt32(0);
             if (expected >= 0)
                 return expected;
+        }
+
+        if (nestedType.DeclaringSyntaxReferences.IsEmpty)
+        {
+            diagnostics.Add(Diagnostic.Create(
+                FenrirDiagnostics.UnresolvableNestedSize,
+                property.Locations.FirstOrDefault(),
+                nestedType.ToDisplayString(),
+                property.ContainingType.Name,
+                property.Name));
+            return 0;
         }
 
         if (!visiting.Add(nestedType))

@@ -1,7 +1,6 @@
 using System.IO.Pipelines;
 using System.Net;
 using System.Threading.Channels;
-using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Logging;
 using Fenrir.Network.Framing;
 using Microsoft.Extensions.Logging;
@@ -20,20 +19,20 @@ public abstract class ClientSession(
     private const int LoginMaxPendingSendBytes = 40_960;
     private const int ZoneMaxPendingSendBytes = 1_024_000;
 
-    private readonly Channel<byte[]> _pendingSends =
-        Channel.CreateUnbounded<byte[]>(new UnboundedChannelOptions { SingleReader = true });
-
-    private readonly SemaphoreSlim _sendLock = new(1, 1);
-
     private readonly int _maxPendingSendBytes = server switch
     {
         FenrirServer.Zone => ZoneMaxPendingSendBytes,
         _ => LoginMaxPendingSendBytes
     };
 
-    private long _pendingSendBytes;
+    private readonly Channel<byte[]> _pendingSends =
+        Channel.CreateUnbounded<byte[]>(new UnboundedChannelOptions { SingleReader = true });
+
+    private readonly SemaphoreSlim _sendLock = new(1, 1);
     private int _backpressureStreak;
     private int _completed;
+
+    private long _pendingSendBytes;
 
     public IDuplexPipe Transport { get; } = transport;
 

@@ -1,9 +1,8 @@
 using System.Buffers;
 using System.Buffers.Binary;
-using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Framing;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.World.ZoneWar;

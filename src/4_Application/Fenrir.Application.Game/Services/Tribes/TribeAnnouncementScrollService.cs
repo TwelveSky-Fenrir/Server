@@ -2,8 +2,7 @@ using Fenrir.Application.Game.Abstractions.Tribes;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Network.Abstractions;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 

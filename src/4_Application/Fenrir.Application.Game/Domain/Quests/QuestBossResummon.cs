@@ -4,12 +4,11 @@ namespace Fenrir.Application.Game.Domain.Quests;
 
 public static class QuestBossResummon
 {
+    public const int TriggerQuestSort = 5;
 
-        public const int TriggerQuestSort = 5;
+    public const float SummonRadiusUnits = 300.0f;
 
-        public const float SummonRadiusUnits = 300.0f;
-
-        public static QuestBossSummonRequest? Evaluate(int questSort, int presentState, QuestDefinition quest,
+    public static QuestBossSummonRequest? Evaluate(int questSort, int presentState, QuestDefinition quest,
         short currentMapId, float avatarX, float avatarY, float avatarZ)
     {
         if (questSort != TriggerQuestSort || presentState != QuestStateMachine.StateInProgress)
@@ -29,7 +28,7 @@ public static class QuestBossResummon
         return new QuestBossSummonRequest(row.Solution1 ?? 0, summonX, summonY, summonZ);
     }
 
-        public static bool IsWithinSummonRadius(float avatarX, float avatarY, float avatarZ,
+    public static bool IsWithinSummonRadius(float avatarX, float avatarY, float avatarZ,
         float summonX, float summonY, float summonZ)
     {
         var dx = avatarX - summonX;

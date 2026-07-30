@@ -1,10 +1,9 @@
 using System.Buffers;
 using System.Threading.Channels;
 using Fenrir.Application.Game.Domain.Social.Chat;
-using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Framing;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.World;
@@ -30,7 +29,6 @@ public sealed partial class Zone
     private void DrainChatCommands()
     {
         while (_chatInbox.Reader.TryRead(out var command))
-        {
             try
             {
                 ApplyChatCommand(in command);
@@ -40,7 +38,6 @@ public sealed partial class Zone
                 logger.LogError(ex, "Zone {MapId} chat command from character {CharacterId} failed", MapId,
                     command.SenderCharacterId);
             }
-        }
     }
 
     private void ApplyChatCommand(in ChatZoneCommand command)
@@ -62,14 +59,14 @@ public sealed partial class Zone
                     if (_players.TryGetValue(id, out var recipient) &&
                         IsAlliedOrSameTribe(sender.Tribe, recipient.Tribe))
                         _localChatRecipientScratch.Add(id);
-                BroadcastChatFrame(in response, _localChatRecipientScratch, requiresPositionalEligibility: true);
+                BroadcastChatFrame(in response, _localChatRecipientScratch, true);
                 break;
             }
             case ChatBroadcastKind.Shout:
             {
                 var response = new ShoutResponse
                     { AvatarName = sender.Name, Content = command.Content, Link = command.Link };
-                BroadcastChatFrame(in response, _players.Keys, requiresPositionalEligibility: false);
+                BroadcastChatFrame(in response, _players.Keys, false);
                 break;
             }
             case ChatBroadcastKind.Tribe:
@@ -80,7 +77,7 @@ public sealed partial class Zone
                 foreach (var recipient in _players.Values)
                     if (IsAlliedOrSameTribe(sender.Tribe, recipient.Tribe))
                         recipientIds.Add(recipient.CharacterId);
-                BroadcastChatFrame(in response, recipientIds, requiresPositionalEligibility: false);
+                BroadcastChatFrame(in response, recipientIds, false);
                 break;
             }
         }

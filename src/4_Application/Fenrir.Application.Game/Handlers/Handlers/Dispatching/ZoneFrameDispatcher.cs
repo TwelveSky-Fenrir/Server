@@ -1,11 +1,10 @@
-using Fenrir.Core.Wire;
 using System.Buffers;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Network.Abstractions;
-using Fenrir.Application.Game;
+using Fenrir.Application.Game.Sessions;
+using Fenrir.Core.Wire;
 using Microsoft.Extensions.Logging;
 
-namespace Fenrir.Application.Game;
+namespace Fenrir.Application.Game.Handlers.Handlers.Dispatching;
 
 public sealed class ZoneFrameDispatcher(ILogger<ZoneFrameDispatcher> logger) : IFrameDispatcher
 {
@@ -17,10 +16,10 @@ public sealed class ZoneFrameDispatcher(ILogger<ZoneFrameDispatcher> logger) : I
 
         var memory = payload.IsSingleSegment ? payload.First : payload.ToArray();
 
-        if (MessageDispatcher.TryHandleInline(server, opcode, memory.Span, session))
+        if (ZoneMessageDispatcher.TryHandleInline(server, opcode, memory.Span, session))
             return;
 
-        if (await MessageDispatcher.TryHandleAsync(server, opcode, memory, session, cancellationToken)
+        if (await ZoneMessageDispatcher.TryHandleAsync(server, opcode, memory, session, cancellationToken)
                 .ConfigureAwait(false))
             return;
 
@@ -31,7 +30,7 @@ public sealed class ZoneFrameDispatcher(ILogger<ZoneFrameDispatcher> logger) : I
 
     private static bool IsWithheldByPendingZoneTransfer(IPacketSession session, byte opcode)
     {
-        return session is ZoneClientSession { CurrentZone: Zone zone, CharacterId: { } characterId } &&
+        return session is ZoneClientSession { CurrentZone: Domain.World.Zone zone, CharacterId: { } characterId } &&
                zone.TryGetPlayer(characterId, out var state) && state is not null &&
                ZoneTransferFreezeGate.ShouldWithhold(state.IsMovingZone, opcode,
                    Opcodes.Zone.Incoming.ZoneTransferCancel);

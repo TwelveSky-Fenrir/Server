@@ -5,8 +5,8 @@ using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
-using Fenrir.Data.Abstractions.Inventory;
 using Fenrir.Core.Packets.Shared;
+using Fenrir.Data.Abstractions.Inventory;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Inventory;

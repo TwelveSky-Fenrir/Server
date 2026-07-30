@@ -3,7 +3,7 @@ using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Data.WriteBehind;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 
 namespace Fenrir.Application.Game.Domain.World;
 

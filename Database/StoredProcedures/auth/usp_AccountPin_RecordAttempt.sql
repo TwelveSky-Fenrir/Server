@@ -22,6 +22,6 @@ BEGIN
                                WHEN FailedLoginCount + 1 >= 10 THEN DATEADD(MINUTE, 15, SYSUTCDATETIME())
                                WHEN FailedLoginCount + 1 >= 5 THEN DATEADD(MINUTE, 1, SYSUTCDATETIME())
                                ELSE LockoutUntilUtc
-              END
+            END
     WHERE AccountId = @AccountId;
 END;

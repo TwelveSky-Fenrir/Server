@@ -1,9 +1,8 @@
-using Fenrir.Core.Wire;
 using System.Buffers;
-using Fenrir.Network.Abstractions;
+using Fenrir.Core.Wire;
 using Microsoft.Extensions.Logging;
 
-namespace Fenrir.Application.Login;
+namespace Fenrir.Application.Login.Handlers.Dispatching;
 
 public sealed class LoginFrameDispatcher(ILogger<LoginFrameDispatcher> logger) : IFrameDispatcher
 {
@@ -12,10 +11,10 @@ public sealed class LoginFrameDispatcher(ILogger<LoginFrameDispatcher> logger) :
     {
         var memory = payload.IsSingleSegment ? payload.First : payload.ToArray();
 
-        if (MessageDispatcher.TryHandleInline(server, opcode, memory.Span, session))
+        if (LoginMessageDispatcher.TryHandleInline(server, opcode, memory.Span, session))
             return;
 
-        if (await MessageDispatcher.TryHandleAsync(server, opcode, memory, session, cancellationToken)
+        if (await LoginMessageDispatcher.TryHandleAsync(server, opcode, memory, session, cancellationToken)
                 .ConfigureAwait(false))
             return;
 

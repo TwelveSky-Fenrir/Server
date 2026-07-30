@@ -1,5 +1,5 @@
 using Fenrir.Application.Game.Domain.Tribes;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.Inventory.UseItems;
@@ -44,7 +44,7 @@ public sealed class ForcedNeutralTribeResetUseItemHandler(
 
         await characters.ApplyTribeFourConversionAsync(context.CharacterId, ForcedNeutralTribeResetGate.NeutralTribe,
             state.QuestStepPermanent, state.QuestActiveFlag, state.QuestSort, state.QuestTargetPhase,
-            state.QuestKillCounter, consumeSharedQuota: false, cancellationToken);
+            state.QuestKillCounter, false, cancellationToken);
 
         if (!await context.Zone.PostTribeProgressCommandAndWaitAsync(
                 new TribeProgressZoneCommand(context.CharacterId, Tribe: ForcedNeutralTribeResetGate.NeutralTribe),

@@ -56,15 +56,10 @@ public sealed class ZoneTransferService(
             return new ZoneTransferResult(ZoneTransferOutcome.ShardUnavailable, "", 0, 0);
         }
 
-        // Modèle « zone = endpoint » (Décision A / doc 03 §3) : le port renvoyé au client est celui de SA zone
-        // (legacy 1100 + N), pas le port du shard. Le GameServer binde un listener par map sur exactement ce port.
         var zonePort = options.Value.ZoneBasePort + healedMapId;
 
         if (!await reachabilityProbe.IsReachableAsync(shard.Host, zonePort, cancellationToken))
         {
-            // Une zone injoignable n'implique PLUS que tout le shard est mort (il héberge N zones sur N ports) :
-            // on refuse cette entrée sans évincer la ligne d'annuaire. Un shard réellement mort est purgé par la
-            // fenêtre de fraîcheur du heartbeat (StalenessCutoffSeconds), pas par une sonde d'une seule zone.
             logger.LogWarning(
                 "Zone transfer rejected: zone endpoint {Host}:{Port} (MapId {MapId}) failed a reachability probe for " +
                 "character {CharacterId} (account {AccountId}); that zone's listener is not accepting on shard {ShardId}",

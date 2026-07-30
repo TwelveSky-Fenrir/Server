@@ -1,8 +1,7 @@
 using Fenrir.Application.Game.Abstractions.Social;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Network.Abstractions;
-using Fenrir.Application.Game;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Application.Game.Sessions;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;

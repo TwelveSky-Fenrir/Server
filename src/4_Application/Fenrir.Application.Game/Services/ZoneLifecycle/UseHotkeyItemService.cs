@@ -53,9 +53,9 @@ public sealed class UseHotkeyItemService(
 
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
         var petFoodEligible = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack) &&
-            petStack.ItemId != 0 &&
-            worldData.ItemsById.TryGetValue(petStack.ItemId, out var petDefinition) &&
-            petDefinition.Item.Sort == PetFoodEquippedItemSort;
+                              petStack.ItemId != 0 &&
+                              worldData.ItemsById.TryGetValue(petStack.ItemId, out var petDefinition) &&
+                              petDefinition.Item.Sort == PetFoodEquippedItemSort;
 
         var mountFoodEligible =
             MountAnimalSortClassifier.Classify(state.AnimalNumber, worldData.ItemsById) ==

@@ -6,7 +6,7 @@
 -- Same strictly-greater FlushSequence idempotence guard as both batch procedures; both TVPs carry one
 -- row each, stamped with the same FlushSequence value by the caller.
 CREATE PROCEDURE game.usp_Character_PersistFinalFlush @Progress game.tvp_CharacterProgress READONLY,
-                                                       @Position game.tvp_CharacterPosition READONLY
+                                                      @Position game.tvp_CharacterPosition READONLY
 AS
 BEGIN
     SET NOCOUNT ON;

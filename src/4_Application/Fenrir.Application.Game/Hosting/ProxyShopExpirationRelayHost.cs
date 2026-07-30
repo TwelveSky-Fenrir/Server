@@ -40,31 +40,41 @@ public sealed class ProxyShopExpirationRelayHost(
         }
     }
 
-    protected override void OnOutboxFull(ProxyShopExpirationRelayEntry entry) =>
+    protected override void OnOutboxFull(ProxyShopExpirationRelayEntry entry)
+    {
         logger.LogWarning(
             "Cross-shard proxy-shop expiration relay outbox full on shard {ShardId}; dropping the cross-shard " +
             "leg of one rental extension for character {CharacterId} (the durable game.OfflineShops.ShopDate " +
             "write already succeeded either way)",
             options.Value.ShardId, entry.CharacterId);
+    }
 
-    protected override void OnOutboundFlushFailed(Exception ex) =>
+    protected override void OnOutboundFlushFailed(Exception ex)
+    {
         logger.LogError(ex, "Proxy-shop expiration relay outbound flush failed for shard {ShardId}",
             options.Value.ShardId);
+    }
 
-    protected override void OnInboundDeliveryFailed(Exception ex) =>
+    protected override void OnInboundDeliveryFailed(Exception ex)
+    {
         logger.LogError(ex, "Proxy-shop expiration relay inbound delivery failed for shard {ShardId}",
             options.Value.ShardId);
+    }
 
-    protected override void OnPublishFailed(ProxyShopExpirationRelayEntry entry, Exception ex) =>
+    protected override void OnPublishFailed(ProxyShopExpirationRelayEntry entry, Exception ex)
+    {
         logger.LogError(ex,
             "Failed to publish a proxy-shop expiration relay row for character {CharacterId} from " +
             "shard {ShardId}; the cross-shard leg of this one extension is lost (the durable date is " +
             "already saved)",
             entry.CharacterId, options.Value.ShardId);
+    }
 
-    protected override void OnDeliveryFailed(ProxyShopExpirationRelayDto dto, Exception ex) =>
+    protected override void OnDeliveryFailed(ProxyShopExpirationRelayDto dto, Exception ex)
+    {
         logger.LogError(ex,
             "Failed to locally deliver relayed proxy-shop expiration update {RelayId} for character " +
             "{CharacterId} on shard {ShardId}",
             dto.RelayId, dto.CharacterId, options.Value.ShardId);
+    }
 }

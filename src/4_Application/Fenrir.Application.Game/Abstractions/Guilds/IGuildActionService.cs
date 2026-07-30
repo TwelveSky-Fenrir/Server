@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Core.Packets.Shared;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 
 namespace Fenrir.Application.Game.Abstractions.Guilds;
 

@@ -19,7 +19,7 @@ using Fenrir.Application.Game.Domain.World.Loot;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Application.Game.Stats.Context;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -508,9 +508,9 @@ public sealed class UseInventoryItemService(
 
         var baseConsumable = new ConsumableContext(state.EatLifePotion, state.EatManaPotion, state.EatStrPotion,
             state.EatDexPotion, state.EatElePotion,
-            HpBoostActive: state.HPBoost > 0,
-            WarriorPillActive: state.WarriorPill > 0,
-            DmgBoostActive: state.DmgBoost > 0);
+            state.HPBoost > 0,
+            state.WarriorPill > 0,
+            state.DmgBoost > 0);
         var consumableOverride = kind switch
         {
             StatPotionKind.Life => baseConsumable with { EatLifePotion = newRawCounter },

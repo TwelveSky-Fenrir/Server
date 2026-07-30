@@ -1,7 +1,7 @@
 using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
-using Fenrir.Application.Game;
+using Fenrir.Application.Game.Sessions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 

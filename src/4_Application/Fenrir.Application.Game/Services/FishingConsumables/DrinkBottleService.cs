@@ -18,7 +18,7 @@ public sealed class DrinkBottleService(WorldDataCache worldData) : IDrinkBottleS
             ? petStack.ItemId
             : 0;
 
-        var resolved = BottleResolver.ResolveDrink(state.BottleSlots, sort, value, petBlocksDrinking: petItemId != 0);
+        var resolved = BottleResolver.ResolveDrink(state.BottleSlots, sort, value, petItemId != 0);
 
         switch (resolved.Outcome)
         {

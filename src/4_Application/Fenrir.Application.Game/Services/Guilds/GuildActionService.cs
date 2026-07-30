@@ -3,7 +3,7 @@ using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Social;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Core.Packets.Shared;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Guilds;

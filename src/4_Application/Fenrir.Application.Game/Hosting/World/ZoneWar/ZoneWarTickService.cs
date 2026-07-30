@@ -1,8 +1,7 @@
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.WorldState;
-using Fenrir.Network.Abstractions;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 

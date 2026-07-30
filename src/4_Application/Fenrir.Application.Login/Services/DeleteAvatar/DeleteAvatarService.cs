@@ -38,7 +38,7 @@ public sealed class DeleteAvatarService(
         return new DeleteAvatarResult(DeleteAvatarOutcome.Success);
     }
 
-        private async ValueTask<DeleteAvatarOutcome> CheckBusinessRulesAsync(CharacterSummaryDto character,
+    private async ValueTask<DeleteAvatarOutcome> CheckBusinessRulesAsync(CharacterSummaryDto character,
         CancellationToken ct)
     {
         var tribeRole = await tribes.GetRoleForCharacterAsync(character.CharacterId, ct);

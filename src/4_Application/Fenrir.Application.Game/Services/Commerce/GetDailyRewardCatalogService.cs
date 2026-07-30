@@ -1,7 +1,7 @@
 using Fenrir.Application.Game.Abstractions.Commerce;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.GameData;
-using Fenrir.Application.Game.Packets.Zone;
+using Fenrir.Protocol.Game;
 
 namespace Fenrir.Application.Game.Services.Commerce;
 

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Game.Services.Tribes;
 
 public sealed class TribeBankWithdrawService(ITribeRepository tribes, ILogger<TribeBankWithdrawService> logger)
+    : ITribeBankWithdrawService
 {
     private const int SlotCount = 50;
     private const int RequiredSubMasterCount = 3;

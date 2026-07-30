@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Abstractions.World;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;

@@ -1,6 +1,5 @@
 using Fenrir.Application.Game.Abstractions.Tribes;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Services.Tribes;
 using Fenrir.Application.Game.Sessions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
@@ -10,7 +9,7 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Tribes;
 
 public sealed class TribeBankHandler(
     ITribeBankService bankService,
-    TribeBankWithdrawService withdrawService,
+    ITribeBankWithdrawService withdrawService,
     ILogger<TribeBankHandler>? logger = null)
     : IAsyncPacketHandler<TribeBankRequest>
 {

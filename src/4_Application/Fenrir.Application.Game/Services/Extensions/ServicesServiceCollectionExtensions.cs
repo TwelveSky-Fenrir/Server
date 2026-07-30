@@ -62,7 +62,7 @@ public static class ServicesServiceCollectionExtensions
         services.AddSingleton<ITribePointRosterGateway, SqlTribePointRosterGateway>();
         services.AddSingleton<ITribeBankTaxSweepGateway, SqlTribeBankTaxSweepGateway>();
         services.AddSingleton<FourGuildScoringService>();
-        services.AddSingleton<TribeBankWithdrawService>();
+        services.AddSingleton<ITribeBankWithdrawService, TribeBankWithdrawService>();
 
         services.AddSingleton<FourGuildKillPointRelayHost>();
         services.AddSingleton<IFourGuildKillPointQueue>(sp => sp.GetRequiredService<FourGuildKillPointRelayHost>());

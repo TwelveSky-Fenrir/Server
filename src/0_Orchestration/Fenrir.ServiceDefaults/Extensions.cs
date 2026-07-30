@@ -10,8 +10,7 @@ public static class Extensions
 {
     extension<TBuilder>(TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
-
-                public TBuilder AddFenrirDefaults()
+        public TBuilder AddFenrirDefaults()
         {
             builder.ConfigureOpenTelemetry();
 
@@ -20,7 +19,7 @@ public static class Extensions
             return builder;
         }
 
-                public TBuilder ConfigureOpenTelemetry()
+        public TBuilder ConfigureOpenTelemetry()
         {
             builder.Logging.AddOpenTelemetry(logging =>
             {
@@ -29,8 +28,22 @@ public static class Extensions
             });
 
             builder.Services.AddOpenTelemetry()
-                .WithMetrics(metrics => { metrics.AddRuntimeInstrumentation(); })
-                .WithTracing(tracing => { tracing.AddSource(builder.Environment.ApplicationName); });
+                .WithMetrics(metrics =>
+                {
+                    metrics.AddRuntimeInstrumentation();
+
+                    // Sans cette ligne, AUCUN instrument Fenrir n'est exporte : ZoneTickMetrics produit
+                    // fenrir.zone.tick.stage.duration 3 fois par tick et par map, soit des milliers
+                    // d'enregistrements par seconde integralement jetes. Le joker est necessaire parce que
+                    // ZoneTickMetrics est `internal` : sa constante MeterName est inaccessible d'ici.
+                    metrics.AddMeter("Fenrir.*");
+                })
+                .WithTracing(tracing =>
+                {
+                    // ApplicationName vaut "Fenrir.GameServer" alors que l'unique ActivitySource du depot
+                    // s'appelle "Fenrir" : le recouvrement etait nul, aucune trace ne sortait.
+                    tracing.AddSource("Fenrir.*");
+                });
 
             builder.AddOpenTelemetryExporters();
 

@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Abstractions.World;
 using Fenrir.Application.Game.Domain.Mounts;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Data.WriteBehind;
@@ -5,11 +6,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Hosting.World;
-
-public interface ICharacterWriteBehindFlusher : IWriteBehindFlusher
-{
-    public ValueTask FlushCharacterNowAsync(int characterId, CancellationToken ct);
-}
 
 public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWriteBehindFlusher
 {

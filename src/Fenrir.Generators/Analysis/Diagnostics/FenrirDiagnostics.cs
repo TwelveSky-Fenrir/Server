@@ -126,6 +126,24 @@ internal static class FenrirDiagnostics
         true,
         customTags: [WellKnownDiagnosticTags.CompilationEnd]);
 
+    public static readonly DiagnosticDescriptor ForbiddenNamespaceImport = new(
+        "FEN114",
+        "Layer imports a forbidden assembly's namespace",
+        "'{0}' lives under '{1}/' and imports '{2}'; {3}",
+        Category,
+        DiagnosticSeverity.Error,
+        true);
+
+    public static readonly DiagnosticDescriptor ForbiddenImportRuleMatchedNothing = new(
+        "FEN110",
+        "Forbidden-import rule is no longer in force",
+        "Forbidden-import rules for assembly '{0}' are no longer armed: {1}; restore the layout, or update " +
+        "ForbiddenImportRules in Fenrir.Generators to follow it",
+        Category,
+        DiagnosticSeverity.Error,
+        true,
+        customTags: [WellKnownDiagnosticTags.CompilationEnd]);
+
     public static readonly DiagnosticDescriptor AsynchronyInInlineHandler = new(
         "FEN202",
         "Asynchrony in an inline packet handler",

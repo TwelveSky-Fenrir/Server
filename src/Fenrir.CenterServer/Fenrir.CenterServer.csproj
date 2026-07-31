@@ -15,5 +15,8 @@
     <ProjectReference Include="..\Fenrir.Security\Fenrir.Security.csproj"/>
     <ProjectReference Include="..\Fenrir.Cluster.Center\Fenrir.Cluster.Center.csproj"/>
     <ProjectReference Include="..\Fenrir.ServiceDefaults\Fenrir.ServiceDefaults.csproj"/>
+    <ProjectReference Include="..\Fenrir.Generators\Fenrir.Generators.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"/>
   </ItemGroup>
 </Project>

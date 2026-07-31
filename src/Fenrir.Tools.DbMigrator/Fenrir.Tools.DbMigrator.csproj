@@ -17,5 +17,8 @@
 
   <ItemGroup>
     <None Include="..\..\Database\**\*.*" CopyToOutputDirectory="PreserveNewest" LinkBase="Database"/>
+    <ProjectReference Include="..\Fenrir.Generators\Fenrir.Generators.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"/>
   </ItemGroup>
 </Project>

@@ -144,6 +144,17 @@ internal static class FenrirDiagnostics
         true,
         customTags: [WellKnownDiagnosticTags.CompilationEnd]);
 
+    public static readonly DiagnosticDescriptor DuplicateDispatcherInClosure = new(
+        "FEN105",
+        "Two referenced assemblies emit the same server's dispatcher",
+        "'{0}' references both '{1}' and '{2}', which each emit '{3}'; one server's opcodes are split across " +
+        "two dispatch tables, so whichever one the frame dispatcher binds routes only its half and the rest " +
+        "falls through to the default arm at runtime, with no build-time signal anywhere else",
+        Category,
+        DiagnosticSeverity.Error,
+        true,
+        customTags: [WellKnownDiagnosticTags.CompilationEnd]);
+
     public static readonly DiagnosticDescriptor ForbiddenAssemblyInClosure = new(
         "FEN115",
         "Forbidden assembly in the compile-time closure",

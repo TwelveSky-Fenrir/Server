@@ -1,7 +1,7 @@
 using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Handlers.Logging;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -13,7 +13,7 @@ public sealed class AvatarActionResumeHandler(
 {
     public void Handle(in AvatarActionResumeRequest packet, IPacketSession session)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
 
         if (zoneSession.CurrentZone is not Zone zone)
             return;

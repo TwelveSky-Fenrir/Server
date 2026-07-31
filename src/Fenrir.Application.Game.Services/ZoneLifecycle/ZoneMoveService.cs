@@ -5,7 +5,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Domain.Game.GameData;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -30,7 +30,7 @@ public sealed class ZoneMoveService(
 {
     private const short ZoneDepartureEventCode = 5;
 
-    public async ValueTask HandleAsync(ZoneMoveRequest packet, ZoneClientSession zoneSession,
+    public async ValueTask HandleAsync(ZoneMoveRequest packet, IZoneSession zoneSession,
         CancellationToken cancellationToken)
     {
         var characterId = zoneSession.CharacterId!.Value;
@@ -197,7 +197,7 @@ public sealed class ZoneMoveService(
     }
 
     private async ValueTask HandleCrossShardAsync(short targetZoneNumber, int characterId, PlayerRuntimeState state,
-        short originZoneId, ZoneClientSession zoneSession, CancellationToken cancellationToken)
+        short originZoneId, IZoneSession zoneSession, CancellationToken cancellationToken)
     {
         var shards = await directory.GetDirectoryAsync(cancellationToken);
         foreach (var candidate in shards)
@@ -292,7 +292,7 @@ public sealed class ZoneMoveService(
         zoneSession.Send(new ZoneMoveResponse { Result = 1, Ip = "", Port = 0 });
     }
 
-    private async ValueTask LogZoneDepartureAsync(ZoneClientSession zoneSession, int characterId, short sourceMapId,
+    private async ValueTask LogZoneDepartureAsync(IZoneSession zoneSession, int characterId, short sourceMapId,
         short targetMapId, CancellationToken cancellationToken)
     {
         try

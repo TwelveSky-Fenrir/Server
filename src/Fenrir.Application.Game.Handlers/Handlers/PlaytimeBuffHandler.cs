@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Abstractions.BuffsMountsCosmetics;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -11,7 +11,7 @@ public sealed class PlaytimeBuffHandler(IPlaytimeBuffService service, ILogger<Pl
 {
     public void Handle(in PlaytimeBuffRequest packet, IPacketSession session)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
         if (zoneSession.CurrentZone is not Zone zone)
             return;
 

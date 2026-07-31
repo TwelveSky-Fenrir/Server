@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Social;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -13,7 +13,7 @@ public sealed class FindGuildMemberHandler(
     public async ValueTask HandleAsync(FindGuildMemberRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
 
         logger?.LogDebug(
             "Session {SessionId}: CZ_GUILD_FIND_SEND received (character {CharacterId}, target {AvatarName})",

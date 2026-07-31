@@ -1,7 +1,7 @@
 using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -19,7 +19,7 @@ public sealed class ZoneHandshakeService(
     private const short ZoneTransferAcceptedEventCode = 3;
 
     public async ValueTask<ZoneHandshakeResult> ConsumeTicketAsync(string obfuscatedId, int declaredTribe,
-        ZoneClientSession session, CancellationToken cancellationToken)
+        IZoneSession session, CancellationToken cancellationToken)
     {
         if (!ObfuscatedUidCodec.TryDecodeAccountId(obfuscatedId, out var accountId))
         {

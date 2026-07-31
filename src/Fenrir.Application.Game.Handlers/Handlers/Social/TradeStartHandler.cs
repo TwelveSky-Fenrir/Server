@@ -1,7 +1,7 @@
 using Fenrir.Application.Game.Abstractions.Social;
 using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -14,7 +14,7 @@ public sealed class TradeStartHandler(
 {
     public void Handle(in TradeStartRequest packet, IPacketSession session)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
         var callerId = zoneSession.CharacterId!.Value;
 
         logger.LogDebug("TradeStart: session {SessionId} character {CharacterId}", session.SessionId, callerId);

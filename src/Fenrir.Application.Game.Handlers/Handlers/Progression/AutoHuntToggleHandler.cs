@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Progression;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -15,7 +15,7 @@ public sealed class AutoHuntToggleHandler(
     public async ValueTask HandleAsync(AutoHuntToggleRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
         var characterId = zoneSession.CharacterId!.Value;
 
         logger.LogDebug(

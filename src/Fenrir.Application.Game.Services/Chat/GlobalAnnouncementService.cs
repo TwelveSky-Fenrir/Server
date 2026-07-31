@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Chat;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -9,7 +9,7 @@ namespace Fenrir.Application.Game.Services.Chat;
 public sealed class GlobalAnnouncementService(ZoneRegistry zones, ILogger<GlobalAnnouncementService> logger)
     : IGlobalAnnouncementService
 {
-    public void TryAnnounce(ZoneClientSession zoneSession, string content)
+    public void TryAnnounce(IZoneSession zoneSession, string content)
     {
         if (!zoneSession.MeetsGmTier(GmCommandTier.Basic))
         {

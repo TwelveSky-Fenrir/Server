@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Social;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -13,7 +13,7 @@ public sealed class FriendAskHandler(IFriendService friendService, ILogger<Frien
     public async ValueTask HandleAsync(FriendRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
 
         logger.LogDebug("FriendAsk: session {SessionId} character {CharacterId} target {TargetAvatarName}",
             session.SessionId, zoneSession.CharacterId, packet.AvatarName);

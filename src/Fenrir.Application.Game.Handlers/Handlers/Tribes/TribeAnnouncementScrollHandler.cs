@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Tribes;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -13,7 +13,7 @@ public sealed class TribeAnnouncementScrollHandler(
 {
     public void Handle(in TribeAnnouncementScrollRequest packet, IPacketSession session)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
 
         logger?.LogDebug(
             "Session {SessionId}: CZ_TRIBE_NOTIFY_SEND received (character {CharacterId}, content length {ContentLength})",

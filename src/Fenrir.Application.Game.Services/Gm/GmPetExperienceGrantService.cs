@@ -3,7 +3,7 @@ using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Domain.Game.GameData;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
@@ -26,7 +26,7 @@ public sealed class GmPetExperienceGrantService(
 
     private const byte PetItemCatalogSort = 22;
 
-    public async ValueTask HandleAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
+    public async ValueTask HandleAsync(byte[] data, IZoneSession zoneSession, PlayerRuntimeState state,
         CancellationToken cancellationToken)
     {
         if (!zoneSession.MeetsGmTier(GmCommandTier.Admin))

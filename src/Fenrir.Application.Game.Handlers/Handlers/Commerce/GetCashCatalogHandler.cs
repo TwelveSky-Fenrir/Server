@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Commerce;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -11,7 +11,7 @@ public sealed class GetCashCatalogHandler(IGetCashCatalogService service, ILogge
 {
     public void Handle(in GetCashCatalogRequest packet, IPacketSession session)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
 
         logger.LogDebug("GetCashCatalog: session {SessionId} character {CharacterId}", session.SessionId,
             zoneSession.CharacterId);

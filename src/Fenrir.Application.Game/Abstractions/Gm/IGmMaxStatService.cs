@@ -1,10 +1,10 @@
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 
 namespace Fenrir.Application.Game.Abstractions.Gm;
 
 public interface IGmMaxStatService
 {
-    public ValueTask HandleAsync(ZoneClientSession zoneSession, PlayerRuntimeState state, Zone zone,
+    public ValueTask HandleAsync(IZoneSession zoneSession, PlayerRuntimeState state, Zone zone,
         CancellationToken cancellationToken);
 }

@@ -1,11 +1,11 @@
 using System.Collections.Concurrent;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Protocol.Game;
 
 namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public sealed record TribeQuotaEntry(
-    ZoneClientSession Session,
+    IZoneSession Session,
     int Tribe,
     int AccountId,
     int CharacterId,
@@ -27,7 +27,7 @@ public sealed class TribeQuotaRegistry
         return count;
     }
 
-    public void Record(ZoneClientSession session, int tribe, int accountId, int characterId,
+    public void Record(IZoneSession session, int tribe, int accountId, int characterId,
         DateTimeOffset registeredAtUtc)
     {
         _entries[session.SessionId] = new TribeQuotaEntry(session, tribe, accountId, characterId, registeredAtUtc);

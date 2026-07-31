@@ -1,7 +1,7 @@
 using Fenrir.Application.Game.Abstractions.Chat;
 using Fenrir.Application.Game.Domain.Social.Chat;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
 
@@ -11,7 +11,7 @@ public sealed class WorldChatHandler(IWorldChatService worldChatService) : IInli
 {
     public void Handle(in WorldChatRequest packet, IPacketSession session)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
 
         if (ChatRouter.IsContentEmpty(packet.Content))
         {

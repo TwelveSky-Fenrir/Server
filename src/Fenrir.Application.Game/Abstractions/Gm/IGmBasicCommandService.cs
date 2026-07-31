@@ -1,51 +1,51 @@
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 
 namespace Fenrir.Application.Game.Abstractions.Gm;
 
 public interface IGmBasicCommandService
 {
-    public ValueTask HandleVisibilityAsync(int sort, byte[] data, ZoneClientSession zoneSession,
+    public ValueTask HandleVisibilityAsync(int sort, byte[] data, IZoneSession zoneSession,
         PlayerRuntimeState state,
         Zone zone, CancellationToken cancellationToken);
 
-    public ValueTask HandleSelfTeleportAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
+    public ValueTask HandleSelfTeleportAsync(byte[] data, IZoneSession zoneSession, PlayerRuntimeState state,
         Zone zone, CancellationToken cancellationToken);
 
-    public ValueTask HandleMoveToPositionAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
+    public ValueTask HandleMoveToPositionAsync(byte[] data, IZoneSession zoneSession, PlayerRuntimeState state,
         Zone zone, CancellationToken cancellationToken);
 
-    public ValueTask HandleForceKillMonsterAsync(byte[] data, ZoneClientSession zoneSession, Zone zone,
+    public ValueTask HandleForceKillMonsterAsync(byte[] data, IZoneSession zoneSession, Zone zone,
         CancellationToken cancellationToken);
 
-    public ValueTask HandleTribeChangeAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
+    public ValueTask HandleTribeChangeAsync(byte[] data, IZoneSession zoneSession, PlayerRuntimeState state,
         Zone zone, CancellationToken cancellationToken);
 
-    public ValueTask HandleSelfSpecialStateAsync(int sort, byte[] data, ZoneClientSession zoneSession,
+    public ValueTask HandleSelfSpecialStateAsync(int sort, byte[] data, IZoneSession zoneSession,
         PlayerRuntimeState state, Zone zone, CancellationToken cancellationToken);
 
-    public ValueTask HandleFindAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
+    public ValueTask HandleFindAsync(byte[] data, IZoneSession zoneSession, PlayerRuntimeState state,
         CancellationToken cancellationToken);
 
-    public ValueTask HandleCallAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
+    public ValueTask HandleCallAsync(byte[] data, IZoneSession zoneSession, PlayerRuntimeState state,
         Zone zone, CancellationToken cancellationToken);
 
-    public ValueTask HandleMoveToTargetAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
+    public ValueTask HandleMoveToTargetAsync(byte[] data, IZoneSession zoneSession, PlayerRuntimeState state,
         Zone zone, CancellationToken cancellationToken);
 
-    public ValueTask HandleTargetSpecialStateAsync(int sort, byte[] data, ZoneClientSession zoneSession,
+    public ValueTask HandleTargetSpecialStateAsync(int sort, byte[] data, IZoneSession zoneSession,
         PlayerRuntimeState state, CancellationToken cancellationToken);
 
-    public ValueTask HandleKickAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
+    public ValueTask HandleKickAsync(byte[] data, IZoneSession zoneSession, PlayerRuntimeState state,
         CancellationToken cancellationToken);
 
-    public ValueTask HandleTribeBankAsync(byte[] data, ZoneClientSession zoneSession,
+    public ValueTask HandleTribeBankAsync(byte[] data, IZoneSession zoneSession,
         CancellationToken cancellationToken);
 
-    public ValueTask HandleLevelSetAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
+    public ValueTask HandleLevelSetAsync(byte[] data, IZoneSession zoneSession, PlayerRuntimeState state,
         Zone zone,
         CancellationToken cancellationToken);
 
-    public ValueTask HandleStatEditAsync(byte[] data, ZoneClientSession zoneSession,
+    public ValueTask HandleStatEditAsync(byte[] data, IZoneSession zoneSession,
         CancellationToken cancellationToken);
 }

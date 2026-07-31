@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Abstractions.BuffsMountsCosmetics;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -13,7 +13,7 @@ public sealed class StellarCoreStateHandler(IStellarCoreStateService service, IL
     public async ValueTask HandleAsync(StellarCoreStateRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
         var characterId = zoneSession.CharacterId!.Value;
 
         logger.LogDebug(

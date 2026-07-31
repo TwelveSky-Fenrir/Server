@@ -1,7 +1,7 @@
 using Fenrir.Application.Game.Abstractions.Social;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -17,7 +17,7 @@ public sealed class PartyKickHandler(
 {
     public void Handle(in PartyKickRequest packet, IPacketSession session)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
 
         logger.LogDebug("PartyKick: session {SessionId} character {CharacterId} target {TargetAvatarName}",
             session.SessionId, zoneSession.CharacterId, packet.AvatarName);

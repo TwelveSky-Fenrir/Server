@@ -1,7 +1,7 @@
 using Fenrir.Application.Game.Abstractions.Social;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -14,7 +14,7 @@ public sealed class TradeEndHandler(
 {
     public void Handle(in TradeEndRequest packet, IPacketSession session)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
         var characterId = zoneSession.CharacterId!.Value;
 
         logger.LogDebug("TradeEnd: session {SessionId} character {CharacterId}", session.SessionId, characterId);

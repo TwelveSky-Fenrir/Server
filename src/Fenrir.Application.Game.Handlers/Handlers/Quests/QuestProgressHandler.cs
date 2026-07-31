@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Quests;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -15,7 +15,7 @@ public sealed class QuestProgressHandler(
     public async ValueTask HandleAsync(QuestProgressRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
         var characterId = zoneSession.CharacterId!.Value;
         var accountId = zoneSession.AccountId!.Value;
 
@@ -38,7 +38,7 @@ public sealed class QuestProgressHandler(
         }
     }
 
-    private async ValueTask DispatchAsync(QuestProgressRequest packet, ZoneClientSession zoneSession, Zone zone,
+    private async ValueTask DispatchAsync(QuestProgressRequest packet, IZoneSession zoneSession, Zone zone,
         PlayerRuntimeState state, int characterId, int accountId, CancellationToken ct)
     {
         QuestActionResult? result = packet.Sort switch

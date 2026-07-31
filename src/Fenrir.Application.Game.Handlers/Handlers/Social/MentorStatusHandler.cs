@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Social;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -12,7 +12,7 @@ public sealed class MentorStatusHandler(IMentorStatusService mentorStatusService
 {
     public void Handle(in MentorStatusRequest packet, IPacketSession session)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
 
         logger.LogDebug("MentorStatus: session {SessionId} character {CharacterId}", session.SessionId,
             zoneSession.CharacterId);

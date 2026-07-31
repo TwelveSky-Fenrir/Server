@@ -1,7 +1,7 @@
 using Fenrir.Application.Game.Abstractions.Gm;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Network.Dispatch.Sessions;
 using Microsoft.Extensions.Logging;
 
@@ -16,7 +16,7 @@ public sealed class GmMaxStatService(IEventLogRepository eventLog, ILogger<GmMax
 
     private const int MaxSkillPoints = 3000;
 
-    public async ValueTask HandleAsync(ZoneClientSession zoneSession, PlayerRuntimeState state, Zone zone,
+    public async ValueTask HandleAsync(IZoneSession zoneSession, PlayerRuntimeState state, Zone zone,
         CancellationToken cancellationToken)
     {
         if (!zoneSession.MeetsGmTier(GmCommandTier.Admin))

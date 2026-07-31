@@ -8,7 +8,7 @@ using Fenrir.Application.Game.Domain.Crafting;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
@@ -44,7 +44,7 @@ public sealed class GenericActionHandler(
     public async ValueTask HandleAsync(GenericActionRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
         var characterId = zoneSession.CharacterId!.Value;
 
         if (logger.IsEnabled(LogLevel.Debug))
@@ -73,7 +73,7 @@ public sealed class GenericActionHandler(
     }
 
     private async ValueTask DispatchAsync(GenericActionRequest packet, IPacketSession session,
-        ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId,
+        IZoneSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId,
         CancellationToken cancellationToken)
     {
         var sort = packet.Sort;
@@ -780,7 +780,7 @@ public sealed class GenericActionHandler(
         Respond(session, zoneSession, sort, packet.Data, moveResult);
     }
 
-    private void Respond(IPacketSession session, ZoneClientSession zoneSession, int sort, byte[] data,
+    private void Respond(IPacketSession session, IZoneSession zoneSession, int sort, byte[] data,
         GenericActionResult result)
     {
         if (result.Status == GenericActionStatus.Aborted)
@@ -803,7 +803,7 @@ public sealed class GenericActionHandler(
         });
     }
 
-    private void RespondDrop(IPacketSession session, ZoneClientSession zoneSession, int sort, byte[] data,
+    private void RespondDrop(IPacketSession session, IZoneSession zoneSession, int sort, byte[] data,
         InventoryToWorldDropResult result)
     {
         if (result.Status == InventoryToWorldDropStatus.Aborted)
@@ -827,7 +827,7 @@ public sealed class GenericActionHandler(
         });
     }
 
-    private void RespondRune(IPacketSession session, ZoneClientSession zoneSession, int sort, byte[] data,
+    private void RespondRune(IPacketSession session, IZoneSession zoneSession, int sort, byte[] data,
         RuneStoneCraftResult result)
     {
         if (result.Outcome == RuneStoneCraftOutcome.Disconnect)

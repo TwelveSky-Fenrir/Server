@@ -1,11 +1,11 @@
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 
 namespace Fenrir.Application.Game.Abstractions.Gm;
 
 public interface IGmCreateItemService
 {
-    public ValueTask HandleAsync(int sort, byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
+    public ValueTask HandleAsync(int sort, byte[] data, IZoneSession zoneSession, PlayerRuntimeState state,
         Zone zone,
         CancellationToken cancellationToken);
 }

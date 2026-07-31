@@ -1,5 +1,5 @@
 using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -11,7 +11,7 @@ public sealed class ZoneMoveHandler(IZoneMoveService service, ILogger<ZoneMoveHa
     public ValueTask HandleAsync(ZoneMoveRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
 
         logger?.LogDebug(
             "Session {SessionId}: ZoneMoveRequest (op20) received for character {CharacterId} -- target zone {TargetZone} (from {PresentZone}), sort {Sort}",

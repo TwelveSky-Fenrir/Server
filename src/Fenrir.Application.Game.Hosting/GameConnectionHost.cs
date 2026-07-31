@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Hosting.Sessions;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
@@ -7,7 +8,6 @@ using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.Hosting.World;
-using Fenrir.Application.Game.Sessions;
 using Fenrir.Network.Dispatch;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Transport;

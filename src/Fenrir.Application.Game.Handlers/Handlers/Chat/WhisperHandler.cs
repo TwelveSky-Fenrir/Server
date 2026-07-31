@@ -1,7 +1,7 @@
 using Fenrir.Application.Game.Abstractions.Chat;
 using Fenrir.Application.Game.Domain.Social.Chat;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
@@ -17,7 +17,7 @@ public sealed class WhisperHandler(IWhisperService whisperService, ILogger<Whisp
     public async ValueTask HandleAsync(WhisperRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
 
         if (ChatRouter.IsContentEmpty(packet.Content) || string.IsNullOrEmpty(packet.AvatarName))
         {

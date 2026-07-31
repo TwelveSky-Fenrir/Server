@@ -2,7 +2,7 @@ using Fenrir.Application.Game.Abstractions.Gm;
 using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
@@ -23,7 +23,7 @@ public sealed class GmCallPvpService(
     private static readonly (float X, float Y, float Z) DuelSlot1Coordinate = (-232f, 36f, 2f);
     private static readonly (float X, float Y, float Z) DuelSlot2Coordinate = (232f, 36f, 2f);
 
-    public async ValueTask HandleAsync(GmCallPvpPayload packet, byte[] data, ZoneClientSession zoneSession,
+    public async ValueTask HandleAsync(GmCallPvpPayload packet, byte[] data, IZoneSession zoneSession,
         CancellationToken cancellationToken)
     {
         if (!zoneSession.MeetsGmTier(GmCommandTier.Basic))
@@ -89,7 +89,7 @@ public sealed class GmCallPvpService(
 
 
             await eventLog.LogAsync(GmDuelAndInventoryActionEventCodes.CallPvpRelocate, EventLogCategory.GmAction,
-                callerAccountId, callerCharacterId, ((ZoneClientSession)candidate.Session).AccountId,
+                callerAccountId, callerCharacterId, ((IZoneSession)candidate.Session).AccountId,
                 candidate.CharacterId, null, null, null, null, null, 1,
                 $"DuelSlot={packet.DuelSlot};TargetName={candidate.Name}", cancellationToken);
 

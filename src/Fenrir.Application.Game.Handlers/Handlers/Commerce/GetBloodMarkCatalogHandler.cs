@@ -1,5 +1,5 @@
 using Fenrir.Application.Game.Abstractions.Commerce;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -11,7 +11,7 @@ public sealed class GetBloodMarkCatalogHandler(
 {
     public void Handle(in GetBloodMarkCatalogRequest packet, IPacketSession session)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
 
         logger.LogDebug("GetBloodMarkCatalog: session {SessionId} character {CharacterId}", session.SessionId,
             zoneSession.CharacterId);

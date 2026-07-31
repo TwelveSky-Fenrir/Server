@@ -1,8 +1,8 @@
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 
 namespace Fenrir.Application.Game.Abstractions.Gm;
 
 public interface IGmGrantMoneyService
 {
-    public ValueTask HandleAsync(byte[] data, ZoneClientSession zoneSession, CancellationToken cancellationToken);
+    public ValueTask HandleAsync(byte[] data, IZoneSession zoneSession, CancellationToken cancellationToken);
 }

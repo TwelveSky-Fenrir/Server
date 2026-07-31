@@ -1,5 +1,5 @@
 using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -11,7 +11,7 @@ public sealed class EnterWorldHandler(IEnterWorldService service, ILogger<EnterW
     public ValueTask HandleAsync(EnterWorldRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
 
         logger?.LogInformation(
             "Session {SessionId}: EnterWorldRequest (op12) received for account {AccountId} character {CharacterId}",

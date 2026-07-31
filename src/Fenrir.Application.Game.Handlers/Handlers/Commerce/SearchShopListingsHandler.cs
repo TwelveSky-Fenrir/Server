@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Commerce;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -13,7 +13,7 @@ public sealed class SearchShopListingsHandler(
     public async ValueTask HandleAsync(SearchShopListingsRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
 
         logger.LogDebug("SearchShopListings: session {SessionId} character {CharacterId} sort1 {Sort1} sort2 {Sort2}",
             session.SessionId, zoneSession.CharacterId, packet.Sort1, packet.Sort2);

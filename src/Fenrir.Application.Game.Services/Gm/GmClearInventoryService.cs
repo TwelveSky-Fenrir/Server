@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.Gm;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
@@ -24,7 +24,7 @@ public sealed class GmClearInventoryService(
 
     private static readonly IReadOnlyList<CharacterItemSlotTvp> EmptyTvps = [];
 
-    public async ValueTask HandleAsync(GmClearInventoryPayload packet, byte[] data, ZoneClientSession zoneSession,
+    public async ValueTask HandleAsync(GmClearInventoryPayload packet, byte[] data, IZoneSession zoneSession,
         PlayerRuntimeState state, Zone zone, CancellationToken cancellationToken)
     {
         if (!zoneSession.MeetsGmTier(GmCommandTier.Basic))

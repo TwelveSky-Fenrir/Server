@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Tribes;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -14,7 +14,7 @@ public sealed class TribeActionHandler(
     public async ValueTask HandleAsync(TribeActionRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
 
         logger?.LogDebug("Session {SessionId}: CZ_TRIBE_WORK_SEND received (character {CharacterId}, sort {Sort})",
             session.SessionId, zoneSession.CharacterId, packet.Sort);
@@ -38,7 +38,7 @@ public sealed class TribeActionHandler(
     }
 
     private async ValueTask DispatchAsync(TribeActionRequest packet, IPacketSession session,
-        ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, CancellationToken ct)
+        IZoneSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, CancellationToken ct)
     {
         switch (packet.Sort)
         {
@@ -116,7 +116,7 @@ public sealed class TribeActionHandler(
         }
     }
 
-    private void Respond(IPacketSession session, ZoneClientSession zoneSession, TribeActionRequest packet,
+    private void Respond(IPacketSession session, IZoneSession zoneSession, TribeActionRequest packet,
         int characterId, TribeActionOutcome outcome)
     {
         if (outcome.Aborted)

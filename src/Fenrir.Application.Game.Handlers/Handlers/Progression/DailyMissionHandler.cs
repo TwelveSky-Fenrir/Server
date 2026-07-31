@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Progression;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
@@ -14,7 +14,7 @@ public sealed class DailyMissionHandler(IDailyMissionService dailyMissionService
     public async ValueTask HandleAsync(DailyMissionRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
         var characterId = zoneSession.CharacterId!.Value;
 
         logger.LogDebug(

@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Progression;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -14,7 +14,7 @@ public sealed class HeroRewardClaimHandler(
     public async ValueTask HandleAsync(HeroRewardClaimRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
         if (zoneSession.CurrentZone is not Zone zone)
             return;
 

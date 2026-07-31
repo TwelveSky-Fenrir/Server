@@ -1,7 +1,7 @@
 using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Network.Dispatch.Sessions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -13,7 +13,7 @@ public sealed class ZoneTransferCancelService(
     IOptions<GameServerOptions> options,
     ILogger<ZoneTransferCancelService> logger) : IZoneTransferCancelService
 {
-    public async ValueTask HandleAsync(ZoneClientSession zoneSession, CancellationToken cancellationToken)
+    public async ValueTask HandleAsync(IZoneSession zoneSession, CancellationToken cancellationToken)
     {
         var characterId = zoneSession.CharacterId!.Value;
 

@@ -1,5 +1,5 @@
 using Fenrir.Application.Game.Abstractions.Social;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -10,7 +10,7 @@ public sealed class FriendCancelHandler(IFriendService friendService, ILogger<Fr
 {
     public void Handle(in FriendCancelRequest packet, IPacketSession session)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
 
         logger.LogDebug("FriendCancel: session {SessionId} character {CharacterId}", session.SessionId,
             zoneSession.CharacterId);

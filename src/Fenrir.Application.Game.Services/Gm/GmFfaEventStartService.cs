@@ -1,7 +1,7 @@
 using Fenrir.Application.Game.Abstractions.Gm;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
@@ -23,7 +23,7 @@ public sealed class GmFfaEventStartService(
 
     private static readonly TimeSpan DefaultCountdown = TimeSpan.FromMinutes(10);
 
-    public async ValueTask HandleAsync(GmFfaEventStartPayload packet, byte[] data, ZoneClientSession zoneSession,
+    public async ValueTask HandleAsync(GmFfaEventStartPayload packet, byte[] data, IZoneSession zoneSession,
         CancellationToken cancellationToken)
     {
         if (!zoneSession.MeetsGmTier(GmCommandTier.Elevated))

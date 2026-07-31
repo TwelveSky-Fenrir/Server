@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Tribes;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -15,7 +15,7 @@ public sealed class TribeVoteHandler(ITribeVoteService voteService, ILogger<Trib
     public async ValueTask HandleAsync(TribeVoteRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
 
         logger?.LogDebug(
             "Session {SessionId}: CZ_TRIBE_VOTE_SEND received (character {CharacterId}, sort {Sort}, value {Value})",

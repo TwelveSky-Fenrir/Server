@@ -1,7 +1,7 @@
 using Fenrir.Application.Game.Abstractions.ItemModification;
 using Fenrir.Application.Game.Domain.Crafting;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -14,7 +14,7 @@ public sealed class CraftPetHandler(ICraftPetService craftPetService, ILogger<Cr
     public async ValueTask HandleAsync(CraftPetRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
         var characterId = zoneSession.CharacterId!.Value;
         var accountId = zoneSession.AccountId!.Value;
 
@@ -39,7 +39,7 @@ public sealed class CraftPetHandler(ICraftPetService craftPetService, ILogger<Cr
     }
 
     private async ValueTask ResolveAndApplyAsync(CraftPetRequest packet, IPacketSession session,
-        ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, int accountId,
+        IZoneSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, int accountId,
         CancellationToken cancellationToken)
     {
         CraftPetResult result;

@@ -1,5 +1,5 @@
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 
 namespace Fenrir.Application.Game.Abstractions.Tribes;
 
@@ -10,6 +10,6 @@ public readonly record struct TribeBankResult(bool Success, int Sort, int[]? Tri
 
 public interface ITribeBankService
 {
-    public ValueTask<TribeBankResult> ViewAsync(ZoneClientSession zoneSession, PlayerRuntimeState state,
+    public ValueTask<TribeBankResult> ViewAsync(IZoneSession zoneSession, PlayerRuntimeState state,
         CancellationToken ct);
 }

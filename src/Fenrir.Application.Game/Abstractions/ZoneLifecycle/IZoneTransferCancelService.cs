@@ -1,8 +1,8 @@
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 
 namespace Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 
 public interface IZoneTransferCancelService
 {
-    public ValueTask HandleAsync(ZoneClientSession zoneSession, CancellationToken cancellationToken);
+    public ValueTask HandleAsync(IZoneSession zoneSession, CancellationToken cancellationToken);
 }

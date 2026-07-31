@@ -1,8 +1,8 @@
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 
 namespace Fenrir.Application.Game.Abstractions.Chat;
 
 public interface IGlobalAnnouncementService
 {
-    public void TryAnnounce(ZoneClientSession zoneSession, string content);
+    public void TryAnnounce(IZoneSession zoneSession, string content);
 }

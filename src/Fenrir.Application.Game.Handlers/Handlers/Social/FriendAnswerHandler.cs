@@ -1,5 +1,5 @@
 using Fenrir.Application.Game.Abstractions.Social;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -10,7 +10,7 @@ public sealed class FriendAnswerHandler(IFriendService friendService, ILogger<Fr
 {
     public void Handle(in FriendAnswerRequest packet, IPacketSession session)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
 
         logger.LogDebug("FriendAnswer: session {SessionId} character {CharacterId} answer {Answer}",
             session.SessionId, zoneSession.CharacterId, packet.Answer);

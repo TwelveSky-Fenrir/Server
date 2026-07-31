@@ -1,7 +1,7 @@
 using Fenrir.Application.Game.Abstractions.Gm;
 using Fenrir.Application.Game.Domain.Gm;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
@@ -19,7 +19,7 @@ public sealed class GmExpGrantService(
 
     private const byte SuccessOutcome = 1;
 
-    public async ValueTask HandleAsync(GmExpGrantPayload packet, byte[] data, ZoneClientSession zoneSession,
+    public async ValueTask HandleAsync(GmExpGrantPayload packet, byte[] data, IZoneSession zoneSession,
         PlayerRuntimeState state, Zone zone, CancellationToken cancellationToken)
     {
         if (!zoneSession.MeetsGmTier(GmCommandTier.Elevated))

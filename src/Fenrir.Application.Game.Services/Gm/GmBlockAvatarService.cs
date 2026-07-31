@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Gm;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
@@ -22,7 +22,7 @@ public sealed class GmBlockAvatarService(
 
     private static readonly TimeSpan BlockDuration = TimeSpan.FromDays(365 * 30);
 
-    public async ValueTask HandleAsync(GmBlockAvatarPayload packet, ZoneClientSession zoneSession,
+    public async ValueTask HandleAsync(GmBlockAvatarPayload packet, IZoneSession zoneSession,
         CancellationToken cancellationToken)
     {
         if (!zoneSession.IsGm)
@@ -43,7 +43,7 @@ public sealed class GmBlockAvatarService(
             return;
         }
 
-        var targetAccountId = ((ZoneClientSession)target.Session).AccountId;
+        var targetAccountId = ((IZoneSession)target.Session).AccountId;
 
         await eventLog.LogAsync(GmActionEventCodes.Block, EventLogCategory.GmAction, zoneSession.AccountId,
             callerCharacterId, targetAccountId, target.CharacterId, null, null, null, null, null, 1,
@@ -56,6 +56,6 @@ public sealed class GmBlockAvatarService(
             "GM character {GmCharacterId} blocked avatar {TargetCharacterId} ({TargetName})",
             callerCharacterId, target.CharacterId, target.Name);
 
-        ((ZoneClientSession)target.Session).Abort(DisconnectReason.Banned);
+        ((IZoneSession)target.Session).Abort(DisconnectReason.Banned);
     }
 }

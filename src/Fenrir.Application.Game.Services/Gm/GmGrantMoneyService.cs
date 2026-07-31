@@ -1,5 +1,5 @@
 using Fenrir.Application.Game.Abstractions.Gm;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -16,7 +16,7 @@ public sealed class GmGrantMoneyService(
 
     private const byte NoOpOutcome = 0;
 
-    public async ValueTask HandleAsync(byte[] data, ZoneClientSession zoneSession, CancellationToken cancellationToken)
+    public async ValueTask HandleAsync(byte[] data, IZoneSession zoneSession, CancellationToken cancellationToken)
     {
         if (!zoneSession.MeetsGmTier(GmCommandTier.Elevated))
         {

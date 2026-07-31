@@ -1,7 +1,7 @@
 using Fenrir.Application.Game.Abstractions.Chat;
 using Fenrir.Application.Game.Domain.Social.Chat;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -13,7 +13,7 @@ public sealed class PartyChatHandler(IPartyChatService partyChatService, ILogger
 {
     public void Handle(in PartyChatRequest packet, IPacketSession session)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
 
         logger.LogDebug(
             "PartyChat: session {SessionId} character {CharacterId} content length {ContentLength}",

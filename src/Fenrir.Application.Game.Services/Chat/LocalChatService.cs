@@ -4,7 +4,7 @@ using Fenrir.Application.Game.Domain.Gm;
 using Fenrir.Application.Game.Domain.Social.Chat;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -21,7 +21,7 @@ public sealed class LocalChatService(
 
     private static readonly ItemLinkInfo EmptyLink = new() { Index = 0, Activity = 0, Value = 0, Socket = new int[3] };
 
-    public bool TryPostChat(Zone zone, ZoneClientSession zoneSession, PlayerRuntimeState sender, string content,
+    public bool TryPostChat(Zone zone, IZoneSession zoneSession, PlayerRuntimeState sender, string content,
         ItemLinkInfo link)
     {
         if (sender.IsMuted)
@@ -44,7 +44,7 @@ public sealed class LocalChatService(
         return true;
     }
 
-    private void HandleGmCommand(Zone zone, ZoneClientSession zoneSession, PlayerRuntimeState sender,
+    private void HandleGmCommand(Zone zone, IZoneSession zoneSession, PlayerRuntimeState sender,
         LocalChatGmCommand command)
     {
         if (!zoneSession.MeetsGmTier(command.RequiredTier))

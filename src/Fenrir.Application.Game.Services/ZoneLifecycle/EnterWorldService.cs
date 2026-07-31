@@ -14,7 +14,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Domain.Game.GameData;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Domain.Game.Stats;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Network.Dispatch.Sessions;
@@ -50,7 +50,7 @@ public sealed class EnterWorldService(
 {
     private const int Zone241TimeAvatarChangeInfoSort = 14;
 
-    public async ValueTask HandleAsync(EnterWorldRequest packet, ZoneClientSession zoneSession,
+    public async ValueTask HandleAsync(EnterWorldRequest packet, IZoneSession zoneSession,
         CancellationToken cancellationToken)
     {
         var accountId = zoneSession.AccountId!.Value;

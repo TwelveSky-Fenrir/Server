@@ -2,24 +2,18 @@ using System.IO.Pipelines;
 using System.Net;
 using Fenrir.Core.Wire;
 using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
-namespace Fenrir.Application.Game.Sessions;
-
-public enum GmCommandTier : short
-{
-    Basic = 1,
-    Elevated = 10,
-    Admin = 100
-}
+namespace Fenrir.Application.Game.Hosting.Sessions;
 
 public sealed class ZoneClientSession(
     long sessionId,
     IDuplexPipe transport,
     IPEndPoint? remoteEndPoint = null,
     ILogger? logger = null)
-    : ClientSession(sessionId, transport, FenrirServer.Zone, remoteEndPoint, logger)
+    : ClientSession(sessionId, transport, FenrirServer.Zone, remoteEndPoint, logger), IZoneSession
 {
     public ZoneSessionState State { get; private set; } = ZoneSessionState.Connected;
 

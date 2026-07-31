@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Tribes;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Tribes;
@@ -9,7 +9,7 @@ public sealed class TribeBankService(ITribeRepository tribes, ILogger<TribeBankS
 {
     private const int SlotCount = 50;
 
-    public async ValueTask<TribeBankResult> ViewAsync(ZoneClientSession zoneSession, PlayerRuntimeState state,
+    public async ValueTask<TribeBankResult> ViewAsync(IZoneSession zoneSession, PlayerRuntimeState state,
         CancellationToken ct)
     {
         if (state.TribeRole == 0 && !zoneSession.MeetsGmTier(GmCommandTier.Basic))

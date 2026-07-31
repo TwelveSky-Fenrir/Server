@@ -16,7 +16,7 @@ using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Domain.Game.GameData;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Domain.Game.Stats;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Data.WriteBehind;
@@ -283,7 +283,7 @@ public sealed partial class Zone
                 _grid.Remove(characterId, existing.CurrentCell);
                 _players[characterId] = state;
 
-                if (existing.Session is ZoneClientSession staleZoneSession)
+                if (existing.Session is IZoneSession staleZoneSession)
                     staleZoneSession.CurrentZone = null;
 
                 if (existing.Session is { } staleClientSession)

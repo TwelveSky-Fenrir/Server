@@ -1,5 +1,5 @@
 using Fenrir.Application.Game.Abstractions.Social;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -11,7 +11,7 @@ public sealed class GuildInviteAnswerHandler(
 {
     public void Handle(in GuildInviteAnswerRequest packet, IPacketSession session)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
 
         logger?.LogDebug(
             "Session {SessionId}: CZ_GUILD_ANSWER_SEND received (character {CharacterId}, answer {Answer})",

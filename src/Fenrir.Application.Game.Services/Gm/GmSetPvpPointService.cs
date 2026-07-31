@@ -1,5 +1,5 @@
 using Fenrir.Application.Game.Abstractions.Gm;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
@@ -13,7 +13,7 @@ public sealed class GmSetPvpPointService(ILogger<GmSetPvpPointService> logger) :
     private const int AcceptedResult = 0;
     private const int RejectedResult = 1;
 
-    public ValueTask HandleAsync(GmSetPvpPointPayload packet, byte[] data, ZoneClientSession zoneSession,
+    public ValueTask HandleAsync(GmSetPvpPointPayload packet, byte[] data, IZoneSession zoneSession,
         CancellationToken cancellationToken)
     {
         if (!zoneSession.MeetsGmTier(GmCommandTier.Basic))

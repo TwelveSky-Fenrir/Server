@@ -1,7 +1,7 @@
 using Fenrir.Application.Game.Abstractions.Social;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -14,7 +14,7 @@ public sealed class PartyAnswerHandler(
 {
     public void Handle(in PartyAnswerRequest packet, IPacketSession session)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
 
         logger.LogDebug("PartyAnswer: session {SessionId} character {CharacterId} answer {Answer}",
             session.SessionId, zoneSession.CharacterId, packet.Answer);

@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 
 namespace Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 
@@ -26,5 +26,5 @@ public readonly record struct ZoneHandshakeResult(
 public interface IZoneHandshakeService
 {
     public ValueTask<ZoneHandshakeResult> ConsumeTicketAsync(string obfuscatedId, int declaredTribe,
-        ZoneClientSession session, CancellationToken cancellationToken);
+        IZoneSession session, CancellationToken cancellationToken);
 }

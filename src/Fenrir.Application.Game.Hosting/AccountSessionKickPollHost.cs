@@ -1,6 +1,6 @@
+using Fenrir.Application.Game.Hosting.Sessions;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Hosting;

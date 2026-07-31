@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Guilds;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -13,7 +13,7 @@ public sealed class GuildActionHandler(IGuildActionService service, ILogger<Guil
     public async ValueTask HandleAsync(GuildActionRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
-        var zoneSession = (ZoneClientSession)session;
+        var zoneSession = (IZoneSession)session;
 
         logger?.LogDebug("Session {SessionId}: CZ_GUILD_WORK_SEND received (character {CharacterId}, sort {Sort})",
             session.SessionId, zoneSession.CharacterId, packet.Sort);
@@ -37,7 +37,7 @@ public sealed class GuildActionHandler(IGuildActionService service, ILogger<Guil
     }
 
     private async ValueTask DispatchAsync(GuildActionRequest packet, IPacketSession session,
-        ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, CancellationToken ct)
+        IZoneSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, CancellationToken ct)
     {
         switch (packet.Sort)
         {
@@ -110,7 +110,7 @@ public sealed class GuildActionHandler(IGuildActionService service, ILogger<Guil
         }
     }
 
-    private void Respond(IPacketSession session, ZoneClientSession zoneSession, int characterId, int sort,
+    private void Respond(IPacketSession session, IZoneSession zoneSession, int characterId, int sort,
         GuildActionResult result)
     {
         if (result.Abort)

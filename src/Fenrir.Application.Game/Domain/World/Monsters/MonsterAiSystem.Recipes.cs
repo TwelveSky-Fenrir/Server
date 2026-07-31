@@ -1,5 +1,5 @@
 using Fenrir.Application.Game.Domain.Simulation;
-using Fenrir.Application.Game.Sessions;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Protocol.Game;
 
 namespace Fenrir.Application.Game.Domain.World.Monsters;
@@ -47,7 +47,7 @@ public sealed partial class MonsterAiSystem
 
         foreach (var player in zone.Players)
         {
-            if (player.Session is not ZoneClientSession { State: ZoneSessionState.InWorld })
+            if (player.Session is not IZoneSession { State: ZoneSessionState.InWorld })
                 continue;
 
             if (player.IsMovingZone || IsHiding(player))

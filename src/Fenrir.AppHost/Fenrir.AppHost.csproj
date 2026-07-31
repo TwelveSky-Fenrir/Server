@@ -1,0 +1,17 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.4.6">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <UserSecretsId>c71f23c2-ba7d-4978-bdb5-b3607f8eb507</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.SqlServer"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Fenrir.LoginServer\Fenrir.LoginServer.csproj"/>
+    <ProjectReference Include="..\Fenrir.CenterServer\Fenrir.CenterServer.csproj"/>
+    <ProjectReference Include="..\Fenrir.GameServer\Fenrir.GameServer.csproj"/>
+    <ProjectReference Include="..\Fenrir.Tools.DbMigrator\Fenrir.Tools.DbMigrator.csproj"/>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions"/>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Fenrir.Data.Abstractions.World"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Fenrir.Core\Fenrir.Core.csproj"/>
+    <ProjectReference Include="..\Fenrir.Data.Abstractions\Fenrir.Data.Abstractions.csproj"/>
+  </ItemGroup>
+</Project>

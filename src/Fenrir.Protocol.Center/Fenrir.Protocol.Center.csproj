@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <Using Include="Fenrir.Core.Abstractions"/>
+    <Using Include="Fenrir.Core.Opcodes"/>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Fenrir.Core\Fenrir.Core.csproj"/>
+    <ProjectReference Include="..\Fenrir.Generators\Fenrir.Generators.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"/>
+  </ItemGroup>
+</Project>

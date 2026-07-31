@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\Fenrir.Data.Abstractions\Fenrir.Data.Abstractions.csproj"/>
+    <ProjectReference Include="..\Fenrir.Data.WriteBehind\Fenrir.Data.WriteBehind.csproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CaeriusNet"/>
+    <PackageReference Include="Microsoft.Data.SqlClient"/>
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions"/>
+  </ItemGroup>
+</Project>

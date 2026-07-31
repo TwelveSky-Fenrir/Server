@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="K4os.Compression.LZ4"/>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Fenrir.Core.Wire"/>
+    <Using Include="Fenrir.Core.Abstractions"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Fenrir.Core\Fenrir.Core.csproj"/>
+  </ItemGroup>
+</Project>

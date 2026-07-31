@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Fenrir.Core.Abstractions"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Fenrir.Core\Fenrir.Core.csproj"/>
+    <ProjectReference Include="..\Fenrir.Protocol.Center\Fenrir.Protocol.Center.csproj"/>
+    <ProjectReference Include="..\Fenrir.Network\Fenrir.Network.csproj"/>
+    <ProjectReference Include="..\Fenrir.Data.Abstractions\Fenrir.Data.Abstractions.csproj"/>
+    <ProjectReference Include="..\Fenrir.Security\Fenrir.Security.csproj"/>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Fenrir.Core.Abstractions"/>
+    <Using Include="Fenrir.Core.Opcodes"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Fenrir.Data.Abstractions.Accounts"/>
+    <Using Include="Fenrir.Data.Abstractions.Admin"/>
+    <Using Include="Fenrir.Data.Abstractions.Characters"/>
+    <Using Include="Fenrir.Data.Abstractions.Commerce"/>
+    <Using Include="Fenrir.Data.Abstractions.Game"/>
+    <Using Include="Fenrir.Data.Abstractions.Guilds"/>
+    <Using Include="Fenrir.Data.Abstractions.Progression"/>
+    <Using Include="Fenrir.Data.Abstractions.Runtime"/>
+    <Using Include="Fenrir.Data.Abstractions.Security"/>
+    <Using Include="Fenrir.Data.Abstractions.Social"/>
+    <Using Include="Fenrir.Data.Abstractions.Tribes"/>
+    <Using Include="Fenrir.Data.Abstractions.World"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Fenrir.Core\Fenrir.Core.csproj"/>
+    <ProjectReference Include="..\Fenrir.Protocol.Game\Fenrir.Protocol.Game.csproj"/>
+    <ProjectReference Include="..\Fenrir.Protocol.Center\Fenrir.Protocol.Center.csproj"/>
+    <ProjectReference Include="..\Fenrir.Domain.Game\Fenrir.Domain.Game.csproj"/>
+    <ProjectReference Include="..\Fenrir.Network\Fenrir.Network.csproj"/>
+    <ProjectReference Include="..\Fenrir.Data.Abstractions\Fenrir.Data.Abstractions.csproj"/>
+    <ProjectReference Include="..\Fenrir.Data.WriteBehind\Fenrir.Data.WriteBehind.csproj"/>
+    <ProjectReference Include="..\Fenrir.Security\Fenrir.Security.csproj"/>
+    <ProjectReference Include="..\Fenrir.Cluster.Client\Fenrir.Cluster.Client.csproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Fenrir.Generators\Fenrir.Generators.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"/>
+  </ItemGroup>
+</Project>

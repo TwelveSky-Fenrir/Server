@@ -1,58 +1,57 @@
 <Solution>
-
-  <!-- ===================================================================================================
-       Solution CIBLE des Fondations (Lot F1). Squelette ~17 projets sous src/, conforme à la structure de
-       Roadmap/FONDATIONS/02_Architecture_Cible_Solution.md (§2) et à la matrice de dépendances (§5.2).
-       La solution existante TwelveSky2.Fenrir.slnx reste intacte et fonctionnelle jusqu'au Lot F6
-       (déplacement des fichiers). Voir src/README.md.
-       =================================================================================================== -->
-
-  <Folder Name="/src/0_Orchestration/">
-    <Project Path="src/0_Orchestration/Fenrir.AppHost/Fenrir.AppHost.csproj"/>
-    <Project Path="src/0_Orchestration/Fenrir.ServiceDefaults/Fenrir.ServiceDefaults.csproj"/>
+  <Folder Name="/00_Build/">
+    <Project Path="src/Fenrir.Generators/Fenrir.Generators.csproj"/>
   </Folder>
 
-  <Folder Name="/src/1_Generators/">
-    <Project Path="src/1_Generators/Fenrir.Generators/Fenrir.Generators.csproj"/>
+  <Folder Name="/10_Protocol/">
+    <Project Path="src/Fenrir.Core/Fenrir.Core.csproj"/>
+    <Project Path="src/Fenrir.Protocol.Center/Fenrir.Protocol.Center.csproj"/>
+    <Project Path="src/Fenrir.Protocol.Login/Fenrir.Protocol.Login.csproj"/>
+    <Project Path="src/Fenrir.Protocol.Game/Fenrir.Protocol.Game.csproj"/>
   </Folder>
 
-  <Folder Name="/src/2_Core/">
-    <Project Path="src/2_Core/Fenrir.Core/Fenrir.Core.csproj"/>
-    <Project Path="src/2_Core/Fenrir.Protocol.Center/Fenrir.Protocol.Center.csproj"/>
-    <Project Path="src/2_Core/Fenrir.Protocol.Login/Fenrir.Protocol.Login.csproj"/>
-    <Project Path="src/2_Core/Fenrir.Protocol.Game/Fenrir.Protocol.Game.csproj"/>
-    <Project Path="src/2_Core/Fenrir.Domain.Login/Fenrir.Domain.Login.csproj"/>
-    <Project Path="src/2_Core/Fenrir.Domain.Game/Fenrir.Domain.Game.csproj"/>
+  <Folder Name="/20_Networking/">
+    <Project Path="src/Fenrir.Network/Fenrir.Network.csproj"/>
   </Folder>
 
-  <Folder Name="/src/3_Infrastructure/">
-    <Project Path="src/3_Infrastructure/Fenrir.Network/Fenrir.Network.csproj"/>
-    <Project Path="src/3_Infrastructure/Fenrir.Data/Fenrir.Data.csproj"/>
-    <Project Path="src/3_Infrastructure/Fenrir.Observability/Fenrir.Observability.csproj"/>
-    <Project Path="src/3_Infrastructure/Fenrir.Security/Fenrir.Security.csproj"/>
-    <Project Path="src/3_Infrastructure/Fenrir.Cluster/Fenrir.Cluster.csproj"/>
+  <Folder Name="/30_Platform/">
+    <Project Path="src/Fenrir.Data.Abstractions/Fenrir.Data.Abstractions.csproj"/>
+    <Project Path="src/Fenrir.Data.WriteBehind/Fenrir.Data.WriteBehind.csproj"/>
+    <Project Path="src/Fenrir.Data/Fenrir.Data.csproj"/>
+    <Project Path="src/Fenrir.Security/Fenrir.Security.csproj"/>
+    <Project Path="src/Fenrir.Cluster.Center/Fenrir.Cluster.Center.csproj"/>
+    <Project Path="src/Fenrir.Cluster.Client/Fenrir.Cluster.Client.csproj"/>
   </Folder>
 
-  <Folder Name="/src/4_Application/">
-    <Project Path="src/4_Application/Fenrir.Application.Login/Fenrir.Application.Login.csproj"/>
-    <Project Path="src/4_Application/Fenrir.Application.Game/Fenrir.Application.Game.csproj"/>
+  <Folder Name="/40_Application/">
+    <Project Path="src/Fenrir.Domain.Game/Fenrir.Domain.Game.csproj"/>
+    <Project Path="src/Fenrir.Domain.Login/Fenrir.Domain.Login.csproj"/>
+    <Project Path="src/Fenrir.Application.Game/Fenrir.Application.Game.csproj"/>
+    <Project Path="src/Fenrir.Application.Game.Handlers/Fenrir.Application.Game.Handlers.csproj"/>
+    <Project Path="src/Fenrir.Application.Game.Services/Fenrir.Application.Game.Services.csproj"/>
+    <Project Path="src/Fenrir.Application.Game.Hosting/Fenrir.Application.Game.Hosting.csproj"/>
+    <Project Path="src/Fenrir.Application.Login/Fenrir.Application.Login.csproj"/>
   </Folder>
 
-  <Folder Name="/src/5_Servers/">
-    <Project Path="src/5_Servers/Fenrir.LoginServer/Fenrir.LoginServer.csproj"/>
-    <Project Path="src/5_Servers/Fenrir.CenterServer/Fenrir.CenterServer.csproj"/>
-    <Project Path="src/5_Servers/Fenrir.GameServer/Fenrir.GameServer.csproj"/>
-    <Project Path="src/5_Servers/Fenrir.Tools.DbMigrator/Fenrir.Tools.DbMigrator.csproj"/>
+  <Folder Name="/50_Hosting/">
+    <Project Path="src/Fenrir.LoginServer/Fenrir.LoginServer.csproj"/>
+    <Project Path="src/Fenrir.CenterServer/Fenrir.CenterServer.csproj"/>
+    <Project Path="src/Fenrir.GameServer/Fenrir.GameServer.csproj"/>
+    <Project Path="src/Fenrir.Tools.DbMigrator/Fenrir.Tools.DbMigrator.csproj"/>
   </Folder>
 
-  <Folder Name="/_Fondations/">
-    <File Path="Roadmap/00_INDEX.md"/>
-    <File Path="Roadmap/FONDATIONS/02_Architecture_Cible_Solution.md"/>
-    <File Path="Roadmap/FONDATIONS/10_Plan_de_Reorganisation.md"/>
-    <File Path="src/README.md"/>
+  <Folder Name="/60_Orchestration/">
+    <Project Path="src/Fenrir.AppHost/Fenrir.AppHost.csproj"/>
+    <Project Path="src/Fenrir.ServiceDefaults/Fenrir.ServiceDefaults.csproj"/>
   </Folder>
 
-  <Folder Name="/Database/">
+  <Folder Name="/90_Solution Items/">
+    <File Path=".editorconfig"/>
+    <File Path=".gitattributes"/>
+    <File Path="Directory.Build.props"/>
+    <File Path="Directory.Build.targets"/>
+    <File Path="Directory.Packages.props"/>
+    <File Path="global.json"/>
     <File Path="Database/_manifest.txt"/>
   </Folder>
 

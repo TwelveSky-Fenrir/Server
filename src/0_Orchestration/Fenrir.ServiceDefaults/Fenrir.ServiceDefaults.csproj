@@ -7,13 +7,15 @@
   <ItemGroup>
     <!-- PAS de FrameworkReference Microsoft.AspNetCore.App : les serveurs Fenrir sont TCP-only (ADR-0008).
          Une FrameworkReference ici se propagerait transitivement au runtimeconfig.json des binaires même
-         sans code ASP.NET Core. AddFenrirDefaults() (export OTLP + service discovery) est câblé au Lot F2. -->
-    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks"/>
-    <PackageReference Include="Microsoft.Extensions.Http.Resilience"/>
-    <PackageReference Include="Microsoft.Extensions.ServiceDiscovery"/>
+         sans code ASP.NET Core. AddFenrirDefaults() ne fait donc qu'OpenTelemetry (métriques/traces/logs).
+
+         Quatre paquets retirés le 2026-07-31, tous morts à la mesure sur src/ (0 occurrence) :
+         · Microsoft.Extensions.Diagnostics.HealthChecks — aucun AddHealthChecks/IHealthCheck nulle part ;
+         · Microsoft.Extensions.Http.Resilience et OpenTelemetry.Instrumentation.Http — aucun HttpClient ni
+           IHttpClientFactory, et AddHttpClientInstrumentation n'est jamais appelé ;
+         · Microsoft.Extensions.ServiceDiscovery — ne résout que des URI http(s):// pour un HttpClient. -->
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol"/>
     <PackageReference Include="OpenTelemetry.Extensions.Hosting"/>
-    <PackageReference Include="OpenTelemetry.Instrumentation.Http"/>
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime"/>
   </ItemGroup>
 

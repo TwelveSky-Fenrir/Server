@@ -12,9 +12,11 @@ public static class Extensions
     {
         public TBuilder AddFenrirDefaults()
         {
+            // Pas d'AddServiceDiscovery ici : il ne resout que des URI http(s):// consommees par un
+            // HttpClient, et le produit n'en instancie aucun (mesure 2026-07-31 : 0 occurrence de
+            // HttpClient/IHttpClientFactory dans src/). Le seul lien S2S est TCP brut et lit Center__Endpoint
+            // tel quel (CenterLinkClientHost.TryParseEndpoint), sans passer par la resolution de services.
             builder.ConfigureOpenTelemetry();
-
-            builder.Services.AddServiceDiscovery();
 
             return builder;
         }

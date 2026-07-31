@@ -147,7 +147,7 @@ public sealed class GameServerOptions
     public Dictionary<int, ZoneConfig> Zones { get; set; } = new();
 
     public int MountKillExperiencePerKill { get; set; } =
-        MountKillExperienceCalculator.PlaceholderBaseExperiencePerKill;
+        MountKillExperienceCalculator.DefaultBaseExperiencePerKill;
 
     public int CrossTribeCpAddValue { get; set; } = 3;
 

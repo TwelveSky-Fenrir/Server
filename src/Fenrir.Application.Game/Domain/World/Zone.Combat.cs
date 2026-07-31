@@ -340,7 +340,7 @@ public sealed partial class Zone
             {
                 var granted = PvpKillContributionPointCalculator.ClampGrant(attackerState.ContributionPoints,
                     PvpKillContributionPointCalculator.FfaOverrideFlatAmount,
-                    PvpKillContributionPointCalculator.PlaceholderHardCap);
+                    PvpKillContributionPointCalculator.ContributionPointHardCap);
                 GrantContributionPoints(attackerState.CharacterId, granted);
             }
 
@@ -364,7 +364,7 @@ public sealed partial class Zone
             worldState?.World.TribeSymbolBattle ?? false);
 
         var grantedAmount = PvpKillContributionPointCalculator.ClampGrant(attackerState.ContributionPoints,
-            baseAmount, PvpKillContributionPointCalculator.PlaceholderHardCap);
+            baseAmount, PvpKillContributionPointCalculator.ContributionPointHardCap);
         GrantContributionPoints(attackerState.CharacterId, grantedAmount);
     }
 
@@ -376,7 +376,7 @@ public sealed partial class Zone
 
         var granted = PvpKillContributionPointCalculator.ClampGrant(attackerState.ContributionPoints,
             PvpKillContributionPointCalculator.RegularWarOverrideFlatCpAmount,
-            PvpKillContributionPointCalculator.PlaceholderHardCap);
+            PvpKillContributionPointCalculator.ContributionPointHardCap);
         GrantContributionPoints(attackerState.CharacterId, granted);
 
         GrantWarPoints(attackerState.CharacterId, PvpKillContributionPointCalculator.RegularWarOverrideWarPointAmount);

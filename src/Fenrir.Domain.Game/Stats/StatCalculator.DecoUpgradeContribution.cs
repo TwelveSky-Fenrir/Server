@@ -81,8 +81,10 @@ public static partial class StatCalculator
             if (bySlot[d] is not { } deco) continue;
             if (!IsDecorationItem(deco.Item.Type, deco.Item.EquipInfo2)) continue;
 
-            var decoPacked = PackDecorationUpgradeOctets(deco.Enchant, 0, 0, 0);
-            total += ReturnNewStat(stat, decoPacked);
+            // ReturnNewStat attend l'entier packe COMPLET : le legacy lui passe aEquip[i][2] entier
+            // (Server/Header/Protocol/MyFactor.cpp:1730 et 7 autres sites). N'envoyer que l'octet
+            // d'enchant annulait la table haute, soit jusqu'a 2000 PV ou 1000 de defense par decoration.
+            total += ReturnNewStat(stat, deco.PackedUpgradeValue);
         }
 
         return total;

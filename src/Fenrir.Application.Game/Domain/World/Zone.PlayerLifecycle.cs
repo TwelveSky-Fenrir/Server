@@ -20,7 +20,6 @@ using Fenrir.Core.Packets.Shared;
 using Fenrir.Core.Wire;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Domain.Game.GameData;
-using Fenrir.Domain.Game.Stats;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -271,6 +270,10 @@ public sealed partial class Zone
             state.DrunkBottleTicksRemaining = drunkBottleTicksRemaining;
 
         HydrateMountState(state, data);
+
+        // data.Stats vient d'EnterWorldService, calcule sans runtimeState : ni buff, ni rune, ni monture, ni
+        // zone. Le legacy recalcule tout a l'entree puis borne (Server/ts25zone/S04_MyWork02.cpp:1036).
+        RecomputeAndPublish(state, clampVitals: true);
 
         var cell = _grid.CellOf(state.PosX, state.PosZ);
         state.CurrentCell = cell;
@@ -1220,18 +1223,10 @@ public sealed partial class Zone
 
     private void RecomputeDerivedStats(PlayerRuntimeState state)
     {
-        var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
-            state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo, state.RebirthCount, state.Level2);
-        var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
-
-        var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
-            ? petStack.ItemId
-            : 0;
-        var petContribution = PetGrowthCalculator.Compute(petItemId, state.PetGrowth, state.PetActivity,
-            worldData.ItemsById);
-
-        state.Stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
-            petContribution, state);
+        // Famille buff/pet/monture : le legacy appelle SetBasicAbilityFromEquip SANS SetHPMP, donc une
+        // expiration de buff laisse les PV courants au-dessus du nouveau maximum
+        // (Server/ts25zone/S07_MyGame04.cpp:1329, Server/ts25zone/S04_MyWork02.cpp:2431).
+        RecomputeAndPublish(state, clampVitals: false);
     }
 
     private void BroadcastCasterEffectSnapshot(PlayerRuntimeState state)

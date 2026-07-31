@@ -10,6 +10,11 @@ var sqlPassword = builder.AddParameter("sql-password", true);
 var centerSharedSecret = builder.AddParameter("center-shared-secret", true);
 
 const int zoneBasePort = 1100;
+
+// Plus grand ZoneNumber du catalogue world.Zones (seed 007_zones.sql : 117 zones, de 1 a 349). Le bloc
+// reserve est donc 1101..1449. Une zone au-dela ferait binder le shard hors de ce que la topologie
+// annonce ; le garde de boot le refuse au lieu de le faire en silence.
+const int maxZoneNumber = 349;
 const int sqlHostPort = 14330;
 
 var gamePublicHost = Environment.GetEnvironmentVariable("FENRIR_PUBLIC_HOST") is { Length: > 0 } configuredHost
@@ -67,6 +72,13 @@ foreach (var shardId in shardIds)
         .WithEnvironment("Game__ShardId", shardId.ToString())
         .WithEnvironment("Game__Port", anchorZonePort.ToString())
         .WithEnvironment("Game__ZoneBasePort", zoneBasePort.ToString())
+        // Le bloc que CETTE topologie reserve. Le shard le recroise au boot avec les maps que lui donne
+        // admin.ShardMapAssignments et refuse de demarrer s'il devrait binder en dehors -- l'AppHost ne
+        // peut pas connaitre la liste des maps (elle vient de la base, indisponible a ce moment), mais il
+        // sait quel bloc il a mis de cote.
+        .WithEnvironment("Game__ZonePortRangeStart", (zoneBasePort + 1).ToString())
+        .WithEnvironment("Game__ZonePortRangeEnd", (zoneBasePort + maxZoneNumber).ToString())
+        .WithEnvironment("Game__ReservedPorts", $"{centerPort},{loginPort},{sqlHostPort}")
         .WithEnvironment("Game__PublicHost", gamePublicHost)
         .WithEnvironment("Center__Endpoint", centerEndpoint)
         .WithEnvironment("Center__SharedSecret", centerSharedSecret);

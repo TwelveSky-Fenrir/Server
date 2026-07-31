@@ -115,6 +115,20 @@ try
         throw new InvalidOperationException(
             $"No maps assigned to shard {shardId} in admin.ShardMapAssignments -- a GameServer hosting no world is always a configuration mistake.");
 
+    bootStep = "ZonePortRangeGuard.EnsureAllPortsWithinReservedBlock";
+    var portOptions = host.Services.GetRequiredService<IOptions<GameServerOptions>>().Value;
+    ZonePortRangeGuard.EnsureAllPortsWithinReservedBlock(
+        shardId,
+        hostedMaps,
+        portOptions.ZoneBasePort,
+        portOptions.ZonePortRangeStart,
+        portOptions.ZonePortRangeEnd,
+        portOptions.ReservedPorts
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(static value => int.TryParse(value, out var port) ? port : -1)
+            .Where(static port => port > 0)
+            .ToArray());
+
     bootStep = "ShardPartitionGuard.EnsureNoOverlapAsync";
     await ShardPartitionGuard.EnsureNoOverlapAsync(shardId, hostedMaps,
         host.Services.GetRequiredService<IGameServerDirectoryRepository>(),

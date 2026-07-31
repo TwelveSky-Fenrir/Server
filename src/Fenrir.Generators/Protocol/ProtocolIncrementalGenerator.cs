@@ -46,7 +46,7 @@ public sealed class ProtocolIncrementalGenerator : IIncrementalGenerator
     private static void EmitTypeResult(SourceProductionContext context, GeneratedTypeResult result)
     {
         foreach (var diagnostic in result.Diagnostics)
-            context.ReportDiagnostic(diagnostic);
+            context.ReportDiagnostic(diagnostic.ToDiagnostic());
 
         if (result.Model is null)
             return;
@@ -63,7 +63,7 @@ public sealed class ProtocolIncrementalGenerator : IIncrementalGenerator
         var (deduplicated, collisionDiagnostics) = OpcodeCollisionChecker.Check(packets);
 
         foreach (var diagnostic in collisionDiagnostics)
-            context.ReportDiagnostic(diagnostic);
+            context.ReportDiagnostic(diagnostic.ToDiagnostic());
 
         if (deduplicated.IsEmpty)
             return;
@@ -73,12 +73,12 @@ public sealed class ProtocolIncrementalGenerator : IIncrementalGenerator
         {
             var emitted = deduplicated[0].Server;
             foreach (var stray in deduplicated.Where(p => p.Server != emitted))
-                context.ReportDiagnostic(Diagnostic.Create(
+                context.ReportDiagnostic(DiagnosticInfo.Create(
                     FenrirDiagnostics.MultipleServersInCompilation,
                     stray.Location,
                     assemblyName ?? "(unknown)",
                     string.Join(", ", servers),
-                    emitted));
+                    emitted).ToDiagnostic());
             return;
         }
 

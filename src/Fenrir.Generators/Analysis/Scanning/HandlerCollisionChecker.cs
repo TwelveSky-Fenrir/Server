@@ -8,10 +8,10 @@ namespace Fenrir.Generators.Analysis.Scanning;
 
 internal static class HandlerCollisionChecker
 {
-    public static (ImmutableArray<HandlerModel> Deduplicated, ImmutableArray<Diagnostic> Diagnostics) Check(
+    public static (ImmutableArray<HandlerModel> Deduplicated, ImmutableArray<DiagnosticInfo> Diagnostics) Check(
         ImmutableArray<HandlerModel> handlers)
     {
-        var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
+        var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
         var seen = new Dictionary<(FenrirServer, byte), HandlerModel>();
         var deduplicated = ImmutableArray.CreateBuilder<HandlerModel>(handlers.Length);
 
@@ -21,7 +21,7 @@ internal static class HandlerCollisionChecker
 
             if (seen.TryGetValue(key, out var existing))
             {
-                diagnostics.Add(Diagnostic.Create(
+                diagnostics.Add(DiagnosticInfo.Create(
                     FenrirDiagnostics.HandlerCollision,
                     handler.Location,
                     existing.HandlerTypeFullName,

@@ -1,5 +1,3 @@
-using Microsoft.CodeAnalysis;
-
 namespace Fenrir.Generators.Analysis.Model;
 
 internal readonly record struct HandlerModel
@@ -14,5 +12,5 @@ internal readonly record struct HandlerModel
 
     public required bool IsAsync { get; init; }
 
-    public required Location Location { get; init; }
+    public required LocationInfo? Location { get; init; }
 }

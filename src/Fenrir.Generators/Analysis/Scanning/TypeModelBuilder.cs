@@ -14,7 +14,7 @@ internal static class TypeModelBuilder
 {
     public static GeneratedTypeResult BuildPacket(GeneratorAttributeSyntaxContext context)
     {
-        var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
+        var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
 
         if (context.TargetSymbol is not INamedTypeSymbol typeSymbol || !CheckShape(context, typeSymbol, diagnostics))
             return new GeneratedTypeResult { Model = null, Diagnostics = diagnostics.ToImmutable() };
@@ -29,12 +29,12 @@ internal static class TypeModelBuilder
         var allowedStates = attribute.GetNamedByteArray("AllowedStates");
 
         if (direction == FenrirDirection.Outgoing && allowedStates.Length > 0)
-            diagnostics.Add(Diagnostic.Create(
+            diagnostics.Add(DiagnosticInfo.Create(
                 FenrirDiagnostics.AllowedStatesOnOutgoingPacket,
                 typeSymbol.Locations.FirstOrDefault(),
                 typeSymbol.Name));
 
-        var fieldDiagnostics = new List<Diagnostic>();
+        var fieldDiagnostics = new List<DiagnosticInfo>();
         var fields = FieldScanner.Scan(typeSymbol, context.SemanticModel.Compilation, fieldDiagnostics,
             out var fieldsSize);
         diagnostics.AddRange(fieldDiagnostics);
@@ -48,7 +48,7 @@ internal static class TypeModelBuilder
         var computedTotal = headerSize + fieldsSize;
 
         if (expectedSize != -1 && expectedSize != computedTotal)
-            diagnostics.Add(Diagnostic.Create(
+            diagnostics.Add(DiagnosticInfo.Create(
                 FenrirDiagnostics.ExpectedSizeMismatch,
                 typeSymbol.Locations.FirstOrDefault(),
                 typeSymbol.Name,
@@ -80,7 +80,7 @@ internal static class TypeModelBuilder
             ImplementsOutgoing = implementsOutgoing,
             Fields = fields,
             FieldsSize = fieldsSize,
-            Location = typeSymbol.Locations.FirstOrDefault() ?? Location.None
+            Location = LocationInfo.From(typeSymbol.Locations.FirstOrDefault())
         };
 
         return new GeneratedTypeResult { Model = model, Diagnostics = diagnostics.ToImmutable() };
@@ -88,7 +88,7 @@ internal static class TypeModelBuilder
 
     public static GeneratedTypeResult BuildWireType(GeneratorAttributeSyntaxContext context)
     {
-        var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
+        var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
 
         if (context.TargetSymbol is not INamedTypeSymbol typeSymbol || !CheckShape(context, typeSymbol, diagnostics))
             return new GeneratedTypeResult { Model = null, Diagnostics = diagnostics.ToImmutable() };
@@ -97,18 +97,18 @@ internal static class TypeModelBuilder
         var expectedSize = attribute.GetCtorInt32(0);
 
         if (expectedSize < 0)
-            diagnostics.Add(Diagnostic.Create(
+            diagnostics.Add(DiagnosticInfo.Create(
                 FenrirDiagnostics.WireTypeMissingExpectedSize,
                 typeSymbol.Locations.FirstOrDefault(),
                 typeSymbol.Name));
 
-        var fieldDiagnostics = new List<Diagnostic>();
+        var fieldDiagnostics = new List<DiagnosticInfo>();
         var fields = FieldScanner.Scan(typeSymbol, context.SemanticModel.Compilation, fieldDiagnostics,
             out var fieldsSize);
         diagnostics.AddRange(fieldDiagnostics);
 
         if (expectedSize != -1 && expectedSize != fieldsSize)
-            diagnostics.Add(Diagnostic.Create(
+            diagnostics.Add(DiagnosticInfo.Create(
                 FenrirDiagnostics.ExpectedSizeMismatch,
                 typeSymbol.Locations.FirstOrDefault(),
                 typeSymbol.Name,
@@ -129,14 +129,14 @@ internal static class TypeModelBuilder
             ImplementsOutgoing = false,
             Fields = fields,
             FieldsSize = fieldsSize,
-            Location = typeSymbol.Locations.FirstOrDefault() ?? Location.None
+            Location = LocationInfo.From(typeSymbol.Locations.FirstOrDefault())
         };
 
         return new GeneratedTypeResult { Model = model, Diagnostics = diagnostics.ToImmutable() };
     }
 
     private static bool CheckShape(GeneratorAttributeSyntaxContext context, INamedTypeSymbol typeSymbol,
-        ImmutableArray<Diagnostic>.Builder diagnostics)
+        ImmutableArray<DiagnosticInfo>.Builder diagnostics)
     {
         var isPartial = context.TargetNode is TypeDeclarationSyntax typeDeclaration &&
                         typeDeclaration.Modifiers.Any(SyntaxKind.PartialKeyword);
@@ -144,7 +144,7 @@ internal static class TypeModelBuilder
         if (typeSymbol is { TypeKind: TypeKind.Struct, IsRecord: true, IsReadOnly: true } && isPartial)
             return true;
 
-        diagnostics.Add(Diagnostic.Create(FenrirDiagnostics.NotReadonlyPartialRecordStruct,
+        diagnostics.Add(DiagnosticInfo.Create(FenrirDiagnostics.NotReadonlyPartialRecordStruct,
             typeSymbol.Locations.FirstOrDefault(), typeSymbol.Name));
         return false;
     }

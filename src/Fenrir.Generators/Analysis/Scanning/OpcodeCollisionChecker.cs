@@ -8,10 +8,10 @@ namespace Fenrir.Generators.Analysis.Scanning;
 
 internal static class OpcodeCollisionChecker
 {
-    public static (ImmutableArray<TypeModel> Deduplicated, ImmutableArray<Diagnostic> Diagnostics) Check(
+    public static (ImmutableArray<TypeModel> Deduplicated, ImmutableArray<DiagnosticInfo> Diagnostics) Check(
         ImmutableArray<TypeModel> packets)
     {
-        var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
+        var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
         var seen = new Dictionary<(FenrirServer, FenrirDirection, byte), TypeModel>();
         var deduplicated = ImmutableArray.CreateBuilder<TypeModel>(packets.Length);
 
@@ -21,7 +21,7 @@ internal static class OpcodeCollisionChecker
 
             if (seen.TryGetValue(key, out var existing))
             {
-                diagnostics.Add(Diagnostic.Create(
+                diagnostics.Add(DiagnosticInfo.Create(
                     FenrirDiagnostics.OpcodeCollision,
                     packet.Location,
                     existing.FullTypeName,

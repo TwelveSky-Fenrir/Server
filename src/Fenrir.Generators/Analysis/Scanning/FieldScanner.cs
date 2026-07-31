@@ -14,7 +14,7 @@ internal static class FieldScanner
     public static ImmutableArray<FieldModel> Scan(
         INamedTypeSymbol typeSymbol,
         Compilation compilation,
-        List<Diagnostic> diagnostics,
+        List<DiagnosticInfo> diagnostics,
         out int totalSize)
     {
         var visiting = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default) { typeSymbol };
@@ -24,7 +24,7 @@ internal static class FieldScanner
     private static ImmutableArray<FieldModel> ScanCore(
         INamedTypeSymbol typeSymbol,
         Compilation compilation,
-        List<Diagnostic> diagnostics,
+        List<DiagnosticInfo> diagnostics,
         HashSet<INamedTypeSymbol> visiting,
         out int totalSize)
     {
@@ -76,7 +76,7 @@ internal static class FieldScanner
     private static FieldModel? BuildField(
         IPropertySymbol property,
         Compilation compilation,
-        List<Diagnostic> diagnostics,
+        List<DiagnosticInfo> diagnostics,
         HashSet<INamedTypeSymbol> visiting)
     {
         var propertyAttributes = property.GetAttributes();
@@ -87,7 +87,7 @@ internal static class FieldScanner
         {
             var length = reservedAttribute.GetCtorInt32(0);
             if (length <= 0)
-                diagnostics.Add(Diagnostic.Create(FenrirDiagnostics.InvalidLength, property.Locations.FirstOrDefault(),
+                diagnostics.Add(DiagnosticInfo.Create(FenrirDiagnostics.InvalidLength, property.Locations.FirstOrDefault(),
                     property.ContainingType.Name, property.Name, "[Reserved]"));
             else
                 reservedBefore = length;
@@ -99,7 +99,7 @@ internal static class FieldScanner
         {
             var length = fixedStringAttribute.GetCtorInt32(0);
             if (length <= 0)
-                diagnostics.Add(Diagnostic.Create(FenrirDiagnostics.InvalidLength, property.Locations.FirstOrDefault(),
+                diagnostics.Add(DiagnosticInfo.Create(FenrirDiagnostics.InvalidLength, property.Locations.FirstOrDefault(),
                     property.ContainingType.Name, property.Name, "[FixedString]"));
             fixedStringLength = length;
         }
@@ -110,7 +110,7 @@ internal static class FieldScanner
         {
             var count = fixedArrayAttribute.GetCtorInt32(0);
             if (count <= 0)
-                diagnostics.Add(Diagnostic.Create(FenrirDiagnostics.InvalidLength, property.Locations.FirstOrDefault(),
+                diagnostics.Add(DiagnosticInfo.Create(FenrirDiagnostics.InvalidLength, property.Locations.FirstOrDefault(),
                     property.ContainingType.Name, property.Name, "[FixedArray]"));
             fixedArrayCount = count;
         }
@@ -126,7 +126,7 @@ internal static class FieldScanner
         {
             if (fixedStringLength is null)
             {
-                diagnostics.Add(Diagnostic.Create(FenrirDiagnostics.MissingSizeAttribute,
+                diagnostics.Add(DiagnosticInfo.Create(FenrirDiagnostics.MissingSizeAttribute,
                     property.Locations.FirstOrDefault(), property.ContainingType.Name, property.Name,
                     type.ToDisplayString(), "[FixedString(N)]"));
                 return null;
@@ -154,7 +154,7 @@ internal static class FieldScanner
             {
                 if (fixedArrayCount is null)
                 {
-                    diagnostics.Add(Diagnostic.Create(FenrirDiagnostics.MissingSizeAttribute,
+                    diagnostics.Add(DiagnosticInfo.Create(FenrirDiagnostics.MissingSizeAttribute,
                         property.Locations.FirstOrDefault(), property.ContainingType.Name, property.Name,
                         type.ToDisplayString(), "[FixedArray(N)]"));
                     return null;
@@ -190,7 +190,7 @@ internal static class FieldScanner
                         AvatarXor = avatarXor,
                         AvatarXorRowLength = avatarXorRowLength
                     };
-                diagnostics.Add(Diagnostic.Create(FenrirDiagnostics.MissingSizeAttribute,
+                diagnostics.Add(DiagnosticInfo.Create(FenrirDiagnostics.MissingSizeAttribute,
                     property.Locations.FirstOrDefault(), property.ContainingType.Name, property.Name,
                     type.ToDisplayString(), "[FixedArray(R)] AND [FixedString(N)] (row width)"));
                 return null;
@@ -206,7 +206,7 @@ internal static class FieldScanner
 
             if (arrayShape is null)
             {
-                diagnostics.Add(Diagnostic.Create(FenrirDiagnostics.UnsupportedFieldType,
+                diagnostics.Add(DiagnosticInfo.Create(FenrirDiagnostics.UnsupportedFieldType,
                     property.Locations.FirstOrDefault(), property.ContainingType.Name, property.Name,
                     type.ToDisplayString()));
                 return null;
@@ -214,7 +214,7 @@ internal static class FieldScanner
 
             if (fixedArrayCount is null)
             {
-                diagnostics.Add(Diagnostic.Create(FenrirDiagnostics.MissingSizeAttribute,
+                diagnostics.Add(DiagnosticInfo.Create(FenrirDiagnostics.MissingSizeAttribute,
                     property.Locations.FirstOrDefault(), property.ContainingType.Name, property.Name,
                     type.ToDisplayString(), "[FixedArray(N)]"));
                 return null;
@@ -280,7 +280,7 @@ internal static class FieldScanner
                 };
             }
 
-        diagnostics.Add(Diagnostic.Create(FenrirDiagnostics.UnsupportedFieldType, property.Locations.FirstOrDefault(),
+        diagnostics.Add(DiagnosticInfo.Create(FenrirDiagnostics.UnsupportedFieldType, property.Locations.FirstOrDefault(),
             property.ContainingType.Name, property.Name, type.ToDisplayString()));
         return null;
     }
@@ -294,7 +294,7 @@ internal static class FieldScanner
     }
 
     private static int ResolveNestedSize(INamedTypeSymbol nestedType, Compilation compilation,
-        HashSet<INamedTypeSymbol> visiting, IPropertySymbol property, List<Diagnostic> diagnostics)
+        HashSet<INamedTypeSymbol> visiting, IPropertySymbol property, List<DiagnosticInfo> diagnostics)
     {
         var wireTypeAttribute = nestedType.GetAttributes().Find(WellKnownNames.FenrirWireTypeAttribute);
         if (wireTypeAttribute is not null)
@@ -306,7 +306,7 @@ internal static class FieldScanner
 
         if (nestedType.DeclaringSyntaxReferences.IsEmpty)
         {
-            diagnostics.Add(Diagnostic.Create(
+            diagnostics.Add(DiagnosticInfo.Create(
                 FenrirDiagnostics.UnresolvableNestedSize,
                 property.Locations.FirstOrDefault(),
                 nestedType.ToDisplayString(),
@@ -320,7 +320,7 @@ internal static class FieldScanner
 
         try
         {
-            var discardedDiagnostics = new List<Diagnostic>();
+            var discardedDiagnostics = new List<DiagnosticInfo>();
             ScanCore(nestedType, compilation, discardedDiagnostics, visiting, out var total);
             return total;
         }

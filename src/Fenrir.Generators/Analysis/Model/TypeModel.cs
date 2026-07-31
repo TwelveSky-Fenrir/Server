@@ -36,5 +36,5 @@ internal sealed record TypeModel
 
     public int PayloadOrWireSize => FieldsSize;
 
-    public required Location Location { get; init; }
+    public required LocationInfo? Location { get; init; }
 }

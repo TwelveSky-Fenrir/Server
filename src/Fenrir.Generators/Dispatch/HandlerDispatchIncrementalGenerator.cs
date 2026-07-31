@@ -71,7 +71,7 @@ public sealed class HandlerDispatchIncrementalGenerator : IIncrementalGenerator
                 Server = server,
                 Opcode = opcode,
                 IsAsync = isAsync,
-                Location = typeSymbol.Locations.FirstOrDefault() ?? Location.None
+                Location = LocationInfo.From(typeSymbol.Locations.FirstOrDefault())
             });
         }
 
@@ -95,12 +95,12 @@ public sealed class HandlerDispatchIncrementalGenerator : IIncrementalGenerator
         if (servers.Length > 1)
         {
             foreach (var stray in handlers.Where(h => h.Server != server))
-                context.ReportDiagnostic(Diagnostic.Create(
+                context.ReportDiagnostic(DiagnosticInfo.Create(
                     FenrirDiagnostics.MultipleHandlerServersInCompilation,
                     stray.Location,
                     assemblyName ?? "(unknown)",
                     string.Join(", ", servers),
-                    server));
+                    server).ToDiagnostic());
             return;
         }
 
@@ -186,7 +186,7 @@ public sealed class HandlerDispatchIncrementalGenerator : IIncrementalGenerator
         var (_, diagnostics) = HandlerCollisionChecker.Check(handlers.ToImmutableArray());
 
         foreach (var diagnostic in diagnostics)
-            context.ReportDiagnostic(diagnostic);
+            context.ReportDiagnostic(diagnostic.ToDiagnostic());
     }
 
     /// <remarks>

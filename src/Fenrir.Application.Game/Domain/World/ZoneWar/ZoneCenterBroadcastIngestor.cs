@@ -1,10 +1,8 @@
+using Fenrir.Application.Game.Abstractions.World;
 using System.Buffers;
 using System.Buffers.Binary;
 using Fenrir.Application.Game.Domain.World.WorldState;
-using Fenrir.Cluster.Client.Link;
-using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Network.Framing;
-using Fenrir.Protocol.Center;
+using Fenrir.Core.Wire;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -15,11 +13,9 @@ public sealed class ZoneCenterBroadcastIngestor(
     ZoneCenterSiegeState state,
     ZoneRegistry zones,
     ILogger<ZoneCenterBroadcastIngestor> logger,
-    IRvrSiegeEventRelayQueue? relayQueue = null,
-    IOptions<GameServerOptions>? gameOptions = null,
     Zone051Zone053SiegeState? zone051Zone053State = null,
     AllianceProposalCenterState? allianceState = null,
-    Lazy<ICenterLink>? centerLink = null)
+    IWorldEventUplink? uplink = null)
 {
     public const int PayloadSize = 130;
 
@@ -76,17 +72,7 @@ public sealed class ZoneCenterBroadcastIngestor(
 
     private void EnqueueForOtherShards(int eventCode, ReadOnlySpan<byte> data)
     {
-        if (gameOptions?.Value.WorldStateAuthority == WorldStateAuthorityMode.Center)
-        {
-            centerLink?.Value.Send(new WorldEventOutbound { Sort = eventCode, Data = data.ToArray() });
-            return;
-        }
-
-        if (relayQueue is null)
-            return;
-
-        var shardId = gameOptions?.Value.ShardId ?? 0;
-        relayQueue.Enqueue(new RvrSiegeEventRelayEntry(shardId, eventCode, data.ToArray()));
+        uplink?.Publish(eventCode, data);
     }
 
     private void ApplyStateEffect(int eventCode, ReadOnlySpan<byte> data)
@@ -272,7 +258,7 @@ public sealed class ZoneCenterBroadcastIngestor(
             foreach (var player in zone.Players)
                 try
                 {
-                    if (player.Session is ClientSession clientSession)
+                    if (player.Session is { } clientSession)
                         clientSession.SendRaw(span);
                 }
                 catch (Exception ex)

@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 using Fenrir.Application.Game.Domain.Commerce;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Core.Packets.Shared;
-using Fenrir.Network.Framing;
+using Fenrir.Core.Wire;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 

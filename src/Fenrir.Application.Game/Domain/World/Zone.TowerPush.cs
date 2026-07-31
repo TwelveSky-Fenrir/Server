@@ -1,6 +1,6 @@
 using System.Buffers;
 using Fenrir.Application.Game.Domain.Progression;
-using Fenrir.Network.Framing;
+using Fenrir.Core.Wire;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 

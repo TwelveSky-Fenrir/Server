@@ -1,6 +1,5 @@
 using Fenrir.Application.Game.Domain.Commerce;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Network.Dispatch.Sessions;
 
 namespace Fenrir.Application.Game.Domain.Simulation;
 
@@ -26,7 +25,7 @@ public sealed class PersonalShopRegionEnforcementSystem : ISimulationSystem
             return;
 
         foreach (var state in toDisconnect)
-            if (state.Session is ClientSession client)
+            if (state.Session is { } client)
                 client.Abort(DisconnectReason.StateViolation);
     }
 }

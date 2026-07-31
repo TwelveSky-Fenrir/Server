@@ -7,7 +7,6 @@ using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Domain.Game.GameData;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Data.WriteBehind;
-using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Options;
 
@@ -125,7 +124,7 @@ public sealed class AutoHuntTickSystem(
         state.NoManaCount++;
         if (state.NoManaCount == NoManaRelocateThreshold)
             state.Session.Send(new ReturnToHomeZoneResponse());
-        else if (state.NoManaCount > NoManaRelocateThreshold && state.Session is ClientSession client)
+        else if (state.NoManaCount > NoManaRelocateThreshold && state.Session is { } client)
             client.Abort(DisconnectReason.StateViolation);
     }
 

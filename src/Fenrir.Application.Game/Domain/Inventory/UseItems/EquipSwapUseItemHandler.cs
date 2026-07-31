@@ -1,5 +1,4 @@
 using Fenrir.Domain.Game.GameData;
-using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -29,7 +28,7 @@ public sealed class EquipSwapUseItemHandler(
             logger.LogInformation(
                 "Character {CharacterId} op23 equip-swap rejected: {Outcome} (item {ItemId}, action-sort {ActionSort}) -- disconnecting (legacy Quit(), no acknowledgment)",
                 context.CharacterId, resolved.Outcome, context.Item.ItemId, state.ActionSort);
-            if (state.Session is ClientSession client)
+            if (state.Session is { } client)
                 client.Abort(DisconnectReason.StateViolation);
             return UseItemResponses.Fail(context.Page, context.Index);
         }

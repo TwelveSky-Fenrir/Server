@@ -1,5 +1,4 @@
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
 
 namespace Fenrir.Application.Game.Domain.Simulation;
@@ -39,7 +38,7 @@ public sealed class HoisundoCountdownSystem : ISimulationSystem
             return;
 
         foreach (var state in toDisconnect)
-            if (state.Session is ClientSession client)
+            if (state.Session is { } client)
                 client.Abort(DisconnectReason.TimedZoneExpired);
     }
 

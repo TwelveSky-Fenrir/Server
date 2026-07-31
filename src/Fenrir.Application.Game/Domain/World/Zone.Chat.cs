@@ -1,8 +1,7 @@
 using System.Buffers;
 using System.Threading.Channels;
 using Fenrir.Application.Game.Domain.Social.Chat;
-using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Network.Framing;
+using Fenrir.Core.Wire;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -98,7 +97,7 @@ public sealed partial class Zone
             foreach (var id in recipientIds)
                 try
                 {
-                    ClientSession? clientSession;
+                    IPacketSession? clientSession;
                     var eligible = requiresPositionalEligibility
                         ? TryGetBroadcastRecipient(id, out _, out clientSession)
                         : TryGetZoneWideBroadcastRecipient(id, out clientSession);

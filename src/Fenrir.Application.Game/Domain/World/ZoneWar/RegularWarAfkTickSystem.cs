@@ -1,5 +1,4 @@
 using Fenrir.Application.Game.Domain.Simulation;
-using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -71,7 +70,7 @@ public sealed class RegularWarAfkTickSystem(
             return;
 
         foreach (var player in toDisconnect)
-            if (player.Session is ClientSession client)
+            if (player.Session is { } client)
                 client.Abort(DisconnectReason.IdleTimeout);
     }
 

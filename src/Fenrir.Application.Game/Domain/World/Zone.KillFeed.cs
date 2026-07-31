@@ -2,7 +2,7 @@ using System.Buffers;
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
-using Fenrir.Network.Framing;
+using Fenrir.Core.Wire;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 

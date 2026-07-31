@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Simulation;
-using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -154,7 +153,7 @@ public sealed class ValleyWarSystem(
             return;
 
         foreach (var player in toDisconnect)
-            if (player.Session is ClientSession client)
+            if (player.Session is { } client)
                 client.Abort(DisconnectReason.ValleyWarForcedReset);
     }
 }

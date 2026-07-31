@@ -1,6 +1,5 @@
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Loot;
-using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -59,7 +58,7 @@ public sealed class CostumeStellarCoreUseItemHandler(
                 logger.LogInformation(
                     "Character {CharacterId} op23 costume grant: wardrobe full for item {ItemId} -- disconnecting (legacy Quit(), no acknowledgment)",
                     context.CharacterId, item.ItemId);
-                if (state.Session is ClientSession client)
+                if (state.Session is { } client)
                     client.Abort(DisconnectReason.WardrobeFull);
                 return UseItemResponses.Fail(context.Page, context.Index);
 
@@ -118,7 +117,7 @@ public sealed class CostumeStellarCoreUseItemHandler(
                 logger.LogInformation(
                     "Character {CharacterId} op23 stellar-core grant: wardrobe full for item {ItemId} -- disconnecting (legacy Quit(), no acknowledgment)",
                     context.CharacterId, item.ItemId);
-                if (state.Session is ClientSession client)
+                if (state.Session is { } client)
                     client.Abort(DisconnectReason.WardrobeFull);
                 return UseItemResponses.Fail(context.Page, context.Index);
 

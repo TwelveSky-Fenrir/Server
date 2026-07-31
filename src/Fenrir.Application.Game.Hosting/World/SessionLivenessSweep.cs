@@ -1,7 +1,7 @@
 using Fenrir.Network.Dispatch.Sessions;
 using Microsoft.Extensions.Logging;
 
-namespace Fenrir.Application.Game.Domain.World;
+namespace Fenrir.Application.Game.Hosting.World;
 
 public sealed class SessionLivenessSweep(SessionRegistry registry, ILogger<SessionLivenessSweep> logger)
 {

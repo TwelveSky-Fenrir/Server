@@ -1,8 +1,7 @@
 using System.Buffers;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Core.Packets.Shared;
-using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Network.Framing;
+using Fenrir.Core.Wire;
 using Fenrir.Protocol.Game;
 
 namespace Fenrir.Application.Game.Domain.Guilds;
@@ -25,7 +24,7 @@ public static class GuildInfoBroadcaster
             foreach (var zone in zones.Zones)
             foreach (var member in zone.Players)
                 if (member.GuildId == guildId && member.CharacterId != excludeCharacterId &&
-                    member.Session is ClientSession clientSession)
+                    member.Session is { } clientSession)
                     clientSession.SendRaw(span);
         }
         finally

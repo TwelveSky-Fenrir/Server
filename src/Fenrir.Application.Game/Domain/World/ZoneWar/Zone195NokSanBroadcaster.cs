@@ -1,7 +1,6 @@
 using System.Buffers;
 using System.Buffers.Binary;
-using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Network.Framing;
+using Fenrir.Core.Wire;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -87,7 +86,7 @@ public sealed class Zone195NokSanBroadcaster(
             foreach (var player in zone.Players)
                 try
                 {
-                    if (player.Session is ClientSession clientSession)
+                    if (player.Session is { } clientSession)
                         clientSession.SendRaw(span);
                 }
                 catch (Exception ex)

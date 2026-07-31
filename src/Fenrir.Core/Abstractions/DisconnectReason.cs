@@ -1,4 +1,4 @@
-namespace Fenrir.Network.Dispatch.Sessions;
+namespace Fenrir.Core.Abstractions;
 
 public enum DisconnectReason
 {
@@ -11,28 +11,16 @@ public enum DisconnectReason
     ServerShutdown,
     Evicted,
     Faulted,
-
     IpBlocked,
-
     Banned,
-
     IdleTimeout,
-
     ProcessingFault,
-
     SendBufferOverflow,
-
     TimedZoneExpired,
-
     GmCommandLogout,
-
     GmKicked,
-
     ValleyWarForcedReset,
-
     WardrobeFull,
-
     LabyrinthMissionEnded,
-
     ContributionPointExchangeRetired
 }

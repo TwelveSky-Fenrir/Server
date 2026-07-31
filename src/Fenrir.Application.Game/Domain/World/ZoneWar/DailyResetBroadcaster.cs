@@ -1,6 +1,5 @@
 using System.Buffers;
-using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Network.Framing;
+using Fenrir.Core.Wire;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -44,7 +43,7 @@ public sealed class DailyResetBroadcaster(ZoneRegistry zones, ILogger<DailyReset
             foreach (var player in zone.Players)
                 try
                 {
-                    if (player.Session is ClientSession clientSession)
+                    if (player.Session is { } clientSession)
                         clientSession.SendRaw(span);
                 }
                 catch (Exception ex)

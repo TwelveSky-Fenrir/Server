@@ -1,7 +1,6 @@
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Data.WriteBehind;
-using Fenrir.Network.Dispatch.Sessions;
 
 namespace Fenrir.Application.Game.Domain.World;
 
@@ -72,9 +71,9 @@ public sealed partial class Zone
 
     public void ForceDisconnectAllForZone175()
     {
-        List<ClientSession>? toKick = null;
+        List<IPacketSession>? toKick = null;
         foreach (var (_, state) in _players)
-            if (state.Session is ClientSession client)
+            if (state.Session is { } client)
                 (toKick ??= []).Add(client);
 
         if (toKick is null)

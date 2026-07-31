@@ -4,7 +4,6 @@ using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Domain.Game.GameData;
-using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -47,13 +46,13 @@ public sealed class TribeScrollTransferUseItemHandler(
             {
                 case TribeScrollTransferOutcome.InvalidDestinationTribe:
                 {
-                    if (state.Session is ClientSession client)
+                    if (state.Session is { } client)
                         client.Abort(DisconnectReason.Malformed);
                     break;
                 }
                 case TribeScrollTransferOutcome.AlreadyTargetTribe:
                 {
-                    if (state.Session is ClientSession client)
+                    if (state.Session is { } client)
                         client.Abort(DisconnectReason.StateViolation);
                     break;
                 }

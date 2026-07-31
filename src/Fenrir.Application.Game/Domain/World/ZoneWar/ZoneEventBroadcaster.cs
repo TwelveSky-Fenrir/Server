@@ -1,11 +1,9 @@
+using Fenrir.Application.Game.Abstractions.World;
 using System.Buffers;
 using System.Buffers.Binary;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.World.WorldState;
-using Fenrir.Cluster.Client.Link;
-using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Network.Framing;
-using Fenrir.Protocol.Center;
+using Fenrir.Core.Wire;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -19,10 +17,8 @@ public sealed class ZoneEventBroadcaster(
     TribeGuardSpawner? guardSpawner = null,
     TribeSymbolSpawner? symbolSpawner = null,
     ZoneCenterSiegeState? siegeState = null,
-    IRvrSiegeEventRelayQueue? relayQueue = null,
-    IOptions<GameServerOptions>? gameOptions = null,
     Zone039ArmingReactor? zone039Reactor = null,
-    Lazy<ICenterLink>? centerLink = null)
+    IWorldEventUplink? uplink = null)
 {
     private const int DataSize = 130;
 
@@ -236,17 +232,7 @@ public sealed class ZoneEventBroadcaster(
 
     private void EnqueueForOtherShards(int sort, byte[] data)
     {
-        if (gameOptions?.Value.WorldStateAuthority == WorldStateAuthorityMode.Center)
-        {
-            centerLink?.Value.Send(new WorldEventOutbound { Sort = sort, Data = data });
-            return;
-        }
-
-        if (relayQueue is null)
-            return;
-
-        var shardId = gameOptions?.Value.ShardId ?? 0;
-        relayQueue.Enqueue(new RvrSiegeEventRelayEntry(shardId, sort, data));
+        uplink?.Publish(sort, data);
     }
 
     public void ApplyRelayedEvent(int sort, ReadOnlySpan<byte> data)
@@ -346,7 +332,7 @@ public sealed class ZoneEventBroadcaster(
             foreach (var player in zone.Players)
                 try
                 {
-                    if (player.Session is ClientSession clientSession)
+                    if (player.Session is { } clientSession)
                         clientSession.SendRaw(span);
                 }
                 catch (Exception ex)

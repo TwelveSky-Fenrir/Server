@@ -20,8 +20,7 @@ using Fenrir.Application.Game.Sessions;
 using Fenrir.Domain.Game.Stats;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Data.WriteBehind;
-using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Network.Framing;
+using Fenrir.Core.Wire;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -287,7 +286,7 @@ public sealed partial class Zone
                 if (existing.Session is ZoneClientSession staleZoneSession)
                     staleZoneSession.CurrentZone = null;
 
-                if (existing.Session is ClientSession staleClientSession)
+                if (existing.Session is { } staleClientSession)
                     staleClientSession.Abort(DisconnectReason.Evicted);
             }
             else
@@ -739,7 +738,7 @@ public sealed partial class Zone
                     "Zone {MapId}: character {CharacterId} DISCONNECTED (Faulted) -- op16 resume-action " +
                     "Sort={Sort} Type={Type} not in AvatarActionResumeWhitelist",
                     MapId, characterId, action.Sort, action.Type);
-                if (state.Session is ClientSession client)
+                if (state.Session is { } client)
                     client.Abort(DisconnectReason.Faulted);
                 return;
             }
@@ -759,7 +758,7 @@ public sealed partial class Zone
                 "Zone {MapId}: character {CharacterId} DISCONNECTED (Faulted) -- op15 Sort={Sort} Type={Type} " +
                 "not in CharacterMotionWhitelist",
                 MapId, characterId, action.Sort, action.Type);
-            if (state.Session is ClientSession client)
+            if (state.Session is { } client)
                 client.Abort(DisconnectReason.Faulted);
             return;
         }
@@ -966,7 +965,7 @@ public sealed partial class Zone
             "Character {CharacterId} skill-cast tamper guard tripped ({Offense}) on zone {MapId} -- disconnecting",
             state.CharacterId, verdict.Offense, MapId);
 
-        if (state.Session is ClientSession client)
+        if (state.Session is { } client)
             client.Abort(DisconnectReason.Faulted);
 
         return false;
@@ -1358,10 +1357,10 @@ public sealed partial class Zone
     }
 
     private bool TryGetBroadcastRecipient(int characterId, [NotNullWhen(true)] out PlayerRuntimeState? recipient,
-        [NotNullWhen(true)] out ClientSession? clientSession)
+        [NotNullWhen(true)] out IPacketSession? clientSession)
     {
         if (_players.TryGetValue(characterId, out recipient) &&
-            recipient.Session is ClientSession session &&
+            recipient.Session is { } session &&
             !recipient.IsMovingZone &&
             !IsReviveHackBroadcastSuppressed(recipient))
         {
@@ -1374,10 +1373,10 @@ public sealed partial class Zone
     }
 
     private bool TryGetZoneWideBroadcastRecipient(int characterId,
-        [NotNullWhen(true)] out ClientSession? clientSession)
+        [NotNullWhen(true)] out IPacketSession? clientSession)
     {
         if (_players.TryGetValue(characterId, out var recipient) &&
-            recipient.Session is ClientSession session &&
+            recipient.Session is { } session &&
             !recipient.IsMovingZone)
         {
             clientSession = session;

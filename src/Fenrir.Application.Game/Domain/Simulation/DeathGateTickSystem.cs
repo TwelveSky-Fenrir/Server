@@ -1,6 +1,5 @@
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.WorldState;
-using Fenrir.Network.Dispatch.Sessions;
 
 namespace Fenrir.Application.Game.Domain.Simulation;
 
@@ -28,7 +27,7 @@ public sealed class DeathGateTickSystem(WorldStateService worldState) : ISimulat
             return;
 
         foreach (var state in toForceQuit)
-            if (state.Session is ClientSession client)
+            if (state.Session is { } client)
                 client.Abort(DisconnectReason.StateViolation);
     }
 

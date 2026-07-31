@@ -12,7 +12,7 @@ using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Domain.Game.Stats;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Data.WriteBehind;
-using Fenrir.Network.Framing;
+using Fenrir.Core.Wire;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 

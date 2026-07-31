@@ -55,7 +55,7 @@ public abstract class ClientSession(
 
         if (TPacket.Compressed)
         {
-            SendRaw(FrameWriter.WriteCompressedFrame(in packet));
+            SendRaw(CompressedFrameWriter.WriteCompressedFrame(in packet));
             return;
         }
 
@@ -159,7 +159,7 @@ public abstract class ClientSession(
         logger?.LogWarning(
             "Session {SessionId} ({Server}, {RemoteEndPoint}): aborting -- pending send bytes for opcode {Opcode} would exceed the {MaxPendingSendBytes}-byte cap",
             SessionId, Server, RemoteEndPoint, opcode, _maxPendingSendBytes);
-        Abort(Sessions.DisconnectReason.SendBufferOverflow);
+        Abort(Fenrir.Core.Abstractions.DisconnectReason.SendBufferOverflow);
     }
 
     protected void LogSessionStateChanged<TState>(TState previousState, TState newState) where TState : struct, Enum
@@ -237,7 +237,7 @@ public abstract class ClientSession(
                 logger?.LogWarning(
                     "Session {SessionId}: aborting as a slow consumer -- {Streak} consecutive non-synchronous TX flushes",
                     SessionId, _backpressureStreak);
-                Abort(Sessions.DisconnectReason.SlowConsumer);
+                Abort(Fenrir.Core.Abstractions.DisconnectReason.SlowConsumer);
                 keepDraining = false;
             }
         }

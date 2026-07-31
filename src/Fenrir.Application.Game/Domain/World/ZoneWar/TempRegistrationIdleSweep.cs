@@ -1,4 +1,3 @@
-using Fenrir.Network.Dispatch.Sessions;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.World.ZoneWar;

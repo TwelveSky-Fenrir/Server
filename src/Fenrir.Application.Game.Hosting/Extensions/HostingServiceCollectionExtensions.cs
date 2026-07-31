@@ -146,6 +146,7 @@ public static class HostingServiceCollectionExtensions
     private static void AddZoneWar(IServiceCollection services)
     {
         services.AddSingleton<TribeVoteElection>();
+        services.AddSingleton<IWorldEventUplink, WorldEventUplink>();
         services.AddSingleton<ZoneEventBroadcaster>();
 
         services.AddSingleton<ZoneCenterSiegeState>();

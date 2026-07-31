@@ -23,12 +23,14 @@ public sealed class TradeLockService(
             return new TradeLockAttempt(false, null);
         }
 
-        var side = trade.SideOf(characterId);
-        if (side.MenuState >= 2)
+        if (!trade.CanAdvanceConfirmation(characterId))
         {
-            logger.LogDebug("Trade lock ignored: character {CharacterId} already fully confirmed", characterId);
+            logger.LogDebug(
+                "Trade lock ignored: character {CharacterId} cannot advance its confirmation notch yet", characterId);
             return new TradeLockAttempt(false, null);
         }
+
+        var side = trade.SideOf(characterId);
 
         side.MenuState++;
         logger.LogDebug("Trade lock notch: character {CharacterId} menu state now {MenuState}", characterId,

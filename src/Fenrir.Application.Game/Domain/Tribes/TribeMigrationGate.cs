@@ -8,6 +8,8 @@ public static class TribeMigrationGate
 
     public const byte TribeFour = 3;
 
+    private const int TribeCount = 4;
+
     public static TribeMigrationOutcome Evaluate(TribeMigrationEligibilityContext ctx)
     {
         if (!ctx.FeatureEnabled)
@@ -80,42 +82,43 @@ public static class TribeMigrationGate
 
     private static bool PassesAllianceAdjustedWorldState(TribeMigrationEligibilityContext ctx)
     {
-        var adjusted = new int[3];
-        for (byte tribe = 0; tribe < 3; tribe++)
-        {
-            adjusted[tribe] = ctx.TribePoints[tribe];
-            if (ctx.AllyOf(tribe) is { } ally && ally < 3)
-                adjusted[tribe] += ctx.TribePoints[ally];
-        }
+        Span<int> adjusted = stackalloc int[TribeCount];
+        for (byte tribe = 0; tribe < TribeCount; tribe++)
+            adjusted[tribe] = PointsWithAlliance(ctx, tribe);
 
-        var strongestBloc = Math.Max(adjusted[0], Math.Max(adjusted[1], adjusted[2]));
-        if (ctx.TribePoints[TribeFour] >= strongestBloc)
+        var biggest = 0;
+        for (var tribe = 1; tribe < TribeCount; tribe++)
+            if (adjusted[tribe] >= adjusted[biggest])
+                biggest = tribe;
+
+        if (biggest == TribeFour)
             return false;
 
-        var mine = adjusted[ctx.CurrentTribe];
-        for (byte tribe = 0; tribe < 3; tribe++)
-        {
-            if (tribe == ctx.CurrentTribe)
-                continue;
-            if (mine >= adjusted[tribe])
-                return true;
-        }
+        var smallest = 0;
+        for (var tribe = 1; tribe < TribeCount; tribe++)
+            if (adjusted[tribe] <= adjusted[smallest])
+                smallest = tribe;
 
-        return false;
+        return ctx.CurrentTribe != smallest;
+    }
+
+    private static int PointsWithAlliance(TribeMigrationEligibilityContext ctx, byte tribe)
+    {
+        var points = ctx.TribePoints[tribe];
+        if (ctx.AllyOf(tribe) is { } ally && ally < TribeCount)
+            points += ctx.TribePoints[ally];
+
+        return points;
     }
 
     private static bool IsRawDominantTribe(byte tribe, IReadOnlyList<int> tribePoints)
     {
-        var mine = tribePoints[tribe];
-        for (byte other = 0; other < 3; other++)
-        {
-            if (other == tribe)
-                continue;
-            if (tribePoints[other] >= mine)
-                return false;
-        }
+        var biggest = 0;
+        for (var other = 1; other < TribeCount; other++)
+            if (tribePoints[other] > tribePoints[biggest])
+                biggest = other;
 
-        return true;
+        return biggest == tribe;
     }
 }
 

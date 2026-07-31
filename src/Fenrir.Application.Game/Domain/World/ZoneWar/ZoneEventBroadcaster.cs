@@ -234,8 +234,6 @@ public sealed class ZoneEventBroadcaster(
         uplink?.Publish(sort, data);
     }
 
-    // Effet d'etat et reactions de monde UNIQUEMENT : la diffusion appartient au routeur unique
-    // (ZoneCenterBroadcastIngestor), qui est la seule porte d'entree des evenements relayes.
     public void ApplyRelayedStateAndReactions(int sort, ReadOnlySpan<byte> data)
     {
         if (data.Length != DataSize)

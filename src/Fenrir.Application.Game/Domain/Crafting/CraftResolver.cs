@@ -231,8 +231,8 @@ public static class CraftResolver
     public static WingFifthTierResult ResolveWingFifthTier(int sort, int material1ItemId, int material2ItemId,
         int material3ItemId, int catalystItemId, IRandomSource random)
     {
-        if (sort == CraftRecipeCatalog.WingSixthTierUnvalidatedSort)
-            return new WingFifthTierResult(WingFifthTierOutcome.DustConsolation, CraftRecipeCatalog.DustItemId);
+        if (sort != CraftRecipeCatalog.WingFifthTierSort)
+            return new WingFifthTierResult(WingFifthTierOutcome.Rejected, 0);
 
         if (material1ItemId != CraftRecipeCatalog.WingFifthMaterialItemId ||
             material2ItemId != CraftRecipeCatalog.WingFifthMaterialItemId ||

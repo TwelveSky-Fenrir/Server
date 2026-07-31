@@ -55,8 +55,6 @@ public static class LoginTrain
         Costume = new int[10]
     };
 
-    // Server/ts25login/S04_MyWork02.cpp:430-432 - the failure path sends UserSort 0, never the account's own
-    // grade; only the success path forwards uUserSort (the account authorization level).
     public static LoginResponse BuildLoginRecv(int result, string id, int secondLoginSort, string mousePassword,
         string resultString = "", int userSort = 0)
     {

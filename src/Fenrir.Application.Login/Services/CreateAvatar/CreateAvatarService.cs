@@ -17,6 +17,8 @@ public sealed class CreateAvatarService(
     private const int StartLife = 30;
     private const int StartMana = 21;
 
+    private const int StartVisibleState = 1;
+
     private const int StartMaxLife = 100;
     private const int StartMaxMana = 50;
 
@@ -132,6 +134,9 @@ public sealed class CreateAvatarService(
 
             var avatarInfo = AvatarInfoFactory.CreateForCharacter(character!) with
             {
+                VisibleState = StartVisibleState,
+                InventoryDate = welcomeBuffUntilDate,
+                StoreDate = welcomeBuffUntilDate,
                 Vit = 1,
                 Str = 1,
                 Int = 1,
@@ -179,6 +184,9 @@ public sealed class CreateAvatarService(
         {
             return AvatarInfoFactory.Zeroed with
             {
+                VisibleState = StartVisibleState,
+                InventoryDate = welcomeBuffUntilDate,
+                StoreDate = welcomeBuffUntilDate,
                 Name = avatarName,
                 Tribe = tribe,
                 Gender = gender,

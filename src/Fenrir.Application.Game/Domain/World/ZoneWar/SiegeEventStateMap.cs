@@ -53,8 +53,6 @@ public static class SiegeEventStateMap
         return state >= 0;
     }
 
-    // 201 est le compte a rebours et n'ecrit aucun etat (Server/ts25center/S04_MyWork02.cpp:829) : la plage
-    // commence donc a 202.
     public static bool TryMapZone194(int eventCode, out int state)
     {
         state = eventCode switch

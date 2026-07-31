@@ -41,14 +41,6 @@ internal sealed class ForbiddenImportProject
     public ImmutableArray<string> RequiredFolders { get; }
 }
 
-/// <remarks>
-/// Complementaire de <see cref="LayerRules" />, et non redondante : LayerRules resout les DEUX extremites
-/// de ses fleches par chemin de fichier DANS la meme assembly (voir
-/// <c>LayeringAnalyzer.AddDeclaringFolders</c>, qui exige
-/// <c>type.ContainingAssembly == sourceAssembly</c>). Elle est donc structurellement aveugle a un type
-/// venu d'un autre assembly. Cette table-ci couvre exactement ce cas : dossier source resolu par chemin,
-/// cible resolue par PREFIXE DE NAMESPACE.
-/// </remarks>
 internal static class ForbiddenImportRules
 {
     private const string Domain = "Domain";

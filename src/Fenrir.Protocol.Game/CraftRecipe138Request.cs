@@ -3,7 +3,6 @@ using Fenrir.Core.Wire;
 
 namespace Fenrir.Protocol.Game;
 
-// Layout CZ_MAKE_ITEM138_SEND CLIENT.h:290-305 (6 paires, typedef propre); mort en M33/LNW33: opcode 138 non enregistre dans W_FUNCTION.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.MakeItem138, ExpectedSize = 61,
     AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
 public readonly partial record struct CraftRecipe138Request : IIncomingPacket<CraftRecipe138Request>

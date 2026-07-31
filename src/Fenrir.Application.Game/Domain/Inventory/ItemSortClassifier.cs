@@ -17,8 +17,6 @@ public static class ItemSortClassifier
 
     public static int Classify(int itemType, int equipPartTag, int itemId, int itemSort)
     {
-        // Grade 5 never falls through to the itemId / sort-28 arms, it returns 0 instead
-        // (Server/ts25zone/S07_MyGame03.cpp:6812-6837). equipPartTag is iEquipInfo[1].
         if (itemType == NewEliteGrade)
             return equipPartTag switch
             {

@@ -8,8 +8,6 @@ public static class PvpKillContributionPointCalculator
 
     public const int WarriorScrollBuffBonus = 1;
 
-    // MAX_NUMBER_SIZE, plafond dur applique par getMaxCP a chaque octroi de CP.
-    // Server/Header/Protocol/DEFINE.h:363, Server/ts25zone/S07_MyGame03.cpp:2345
     public const int ContributionPointHardCap = 2_000_000_000;
 
     public const int FfaOverrideFlatAmount = 20;

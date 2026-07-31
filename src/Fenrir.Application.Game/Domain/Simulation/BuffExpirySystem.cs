@@ -1,14 +1,10 @@
+using Fenrir.Application.Game.Domain.Buffs;
 using Fenrir.Application.Game.Domain.World;
 
 namespace Fenrir.Application.Game.Domain.Simulation;
 
 public sealed class BuffExpirySystem : ISimulationSystem
 {
-    private const int SlotCount = 35;
-    private const int DarkAttackPotionDebuffSlot = 16;
-    private const int DarkAttackExclusivitySlot = 15;
-    private const int HitRateExclusivitySlot = 17;
-    private const int DodgeRateExclusivitySlot = 18;
     private const int ExpiredMarker = 2;
 
     public void Simulate(Zone zone, int legacyTicksElapsed)
@@ -28,13 +24,13 @@ public sealed class BuffExpirySystem : ISimulationSystem
         var changedSlots = state.BuffChangeScratch;
         var anyChanged = false;
 
-        for (var slot = 0; slot < SlotCount; slot++)
+        for (var slot = 0; slot < BuffCatalog.SlotCount; slot++)
         {
             var valueIndex = slot * 2;
             var durationIndex = valueIndex + 1;
             var magnitude = buff[valueIndex];
 
-            if (slot != DarkAttackPotionDebuffSlot && magnitude >= 1 && buff[durationIndex] < 1)
+            if (BuffCatalog.IsDurationCounted(slot) && magnitude >= 1 && buff[durationIndex] < 1)
             {
                 ZeroSlot(buff, slot);
                 MarkSlotExpired(changedSlots, slot, ref anyChanged);
@@ -81,13 +77,13 @@ public sealed class BuffExpirySystem : ISimulationSystem
     {
         switch (slot)
         {
-            case DarkAttackExclusivitySlot:
+            case BuffCatalog.DarkAttack:
                 state.DarkAttackKind = 0;
                 break;
-            case HitRateExclusivitySlot:
+            case BuffCatalog.HitRatePotion:
                 state.HitRateKind = 0;
                 break;
-            case DodgeRateExclusivitySlot:
+            case BuffCatalog.DodgeRatePotion:
                 state.DodgeRateKind = 0;
                 break;
         }

@@ -41,6 +41,12 @@ public sealed class UseInventoryItemService(
 {
     private const byte BottleSort = 26;
 
+    private const byte MixSkillSort = 23;
+
+    private const byte MixSkillSort2 = 24;
+
+    private const int DeathProtectionScrollAmount = 20;
+
     private const int TowerConstructItemId = 665;
 
     private const int TowerHealItemId = 667;
@@ -85,6 +91,9 @@ public sealed class UseInventoryItemService(
         if (itemStack is not { } item || !worldData.ItemsById.TryGetValue(item.ItemId, out var itemDefinition))
             return Fail(characterId, itemStack, page, index, value);
 
+        if (itemDefinition.Item.Sort is MixSkillSort or MixSkillSort2 || item.ItemId is 8150 or 8151 or 8152)
+            return Fail(characterId, item, page, index, value);
+
         if (itemDefinition.Item.Sort == BottleSort)
             return await ResolveBottleAsync(zone, state, characterId, page, index, item, cancellationToken);
 
@@ -114,6 +123,10 @@ public sealed class UseInventoryItemService(
         if (ResolveScrollFamily(item.ItemId) is { } scrollSpec)
             return await ResolveProtectionScrollAsync(zone, state, characterId, page, index, item, scrollSpec.Kind,
                 scrollSpec.FixedAmount, cancellationToken);
+
+        if (IsDeathProtectionScroll(item.ItemId))
+            return await ResolveDeathProtectionScrollAsync(zone, state, characterId, page, index, item,
+                cancellationToken);
 
         if (item.ItemId == FactionNoticeItemId)
             return await ResolveFactionNoticeAsync(zone, state, characterId, page, index, item, cancellationToken);
@@ -719,8 +732,8 @@ public sealed class UseInventoryItemService(
             8418 => new CharmChargeSpec(ProtectionCharmCounterKind.Destroy, 5),
             8103 or 8436 => new CharmChargeSpec(ProtectionCharmCounterKind.Costume, 1),
             828 or 837 => new CharmChargeSpec(ProtectionCharmCounterKind.Destroy2, 1),
-            1166 or 1188 or 8435 => new CharmChargeSpec(ProtectionCharmCounterKind.Halo, 1),
-            17033 or 99405 => new CharmChargeSpec(ProtectionCharmCounterKind.Halo, 3),
+            1166 or 8435 or 17033 or 99405 => new CharmChargeSpec(ProtectionCharmCounterKind.Halo, 1),
+            1188 => new CharmChargeSpec(ProtectionCharmCounterKind.Halo, 3),
             _ => null
         };
     }
@@ -845,6 +858,40 @@ public sealed class UseInventoryItemService(
             logger.LogError(
                 "Zone {MapId} tribe-progress inbox full: dropped protection-scroll mirror for character {CharacterId}",
                 zone.MapId, characterId);
+
+        var consumed = await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
+
+        return kind == ProtectionScrollCounterKind.DropItemTime
+            ? consumed with { Value = charged.NewCounterValue }
+            : consumed;
+    }
+
+    private static bool IsDeathProtectionScroll(int itemId)
+    {
+        return itemId is 1108 or 7002 or 8416;
+    }
+
+    private async ValueTask<UseInventoryItemResponse> ResolveDeathProtectionScrollAsync(Zone zone,
+        PlayerRuntimeState state, int characterId, byte page, byte index, ItemStack item,
+        CancellationToken cancellationToken)
+    {
+        int newCounter;
+        try
+        {
+            newCounter = await characters.AdjustDeathProtectionAsync(characterId, DeathProtectionScrollAmount,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "Character {CharacterId} death-protection scroll credit failed for item {ItemId}; item left untouched",
+                characterId, item.ItemId);
+            return Fail(characterId, item, page, index);
+        }
+
+        logger.LogInformation(
+            "Character {CharacterId} use-inventory-item (death-protection scroll) applied: item {ItemId}, new counter {NewCounter}",
+            characterId, item.ItemId, newCounter);
 
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }

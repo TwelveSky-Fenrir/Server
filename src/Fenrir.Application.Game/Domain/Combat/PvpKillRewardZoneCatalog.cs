@@ -38,8 +38,6 @@ public static class PvpKillRewardZoneCatalog
         if (Array.IndexOf(CityZoneIds, zoneId) >= 0)
             return new PvpKillZoneRewardProfile(!isStunTrigger, true, true, true, 0);
 
-        // aucun bras attrape-tout: le default du switch legacy est sous __GOD__, absent de la build M33/LNW33
-        // (Server/ts25zone/S07_MyGame03.cpp:2844-2854)
         return PvpKillZoneRewardProfile.None;
     }
 }

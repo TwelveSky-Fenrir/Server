@@ -5,10 +5,14 @@ namespace Fenrir.Application.Game.Domain.World.Monsters;
 
 public sealed class MonsterEntity
 {
+    public const int TribeSymbolDamageSlots = 4;
+
     private const int MaxAttackDamageEntries = 50;
 
     private readonly List<MonsterAttackDamageEntry> _attackDamage = [];
     private readonly Lock _attackDamageLock = new();
+
+    private readonly int[] _tribeSymbolDamage = new int[TribeSymbolDamageSlots];
 
     private int _deathClaimed;
     private int _life;
@@ -86,6 +90,14 @@ public sealed class MonsterEntity
     public float HomeReturnTargetZ { get; set; }
 
     public int PursuerCapacity { get; init; }
+
+    public bool TribeSymbolFirstAttackArmed { get; set; }
+
+    public bool AllianceStoneFirstAttackArmed { get; set; }
+
+    public int TribeSymbolFirstAttackElapsedLegacyTicks { get; set; }
+
+    public int AllianceStoneFirstAttackElapsedLegacyTicks { get; set; }
 
     public int Life => Volatile.Read(ref _life);
 
@@ -185,6 +197,59 @@ public sealed class MonsterEntity
 
             newLife = Math.Min(MaxLife, oldLife + amount);
         } while (Interlocked.CompareExchange(ref _life, newLife, oldLife) != oldLife);
+    }
+
+    public void RestoreFullLife()
+    {
+        int oldLife;
+        do
+        {
+            oldLife = Volatile.Read(ref _life);
+            if (oldLife <= 0)
+                return;
+        } while (Interlocked.CompareExchange(ref _life, MaxLife, oldLife) != oldLife);
+    }
+
+    public void AddTribeSymbolDamage(byte tribe, int damage)
+    {
+        if (damage <= 0 || tribe >= TribeSymbolDamageSlots)
+            return;
+
+        Interlocked.Add(ref _tribeSymbolDamage[tribe], damage);
+    }
+
+    public void ResetTribeSymbolDamage()
+    {
+        for (var slot = 0; slot < _tribeSymbolDamage.Length; slot++)
+            Interlocked.Exchange(ref _tribeSymbolDamage[slot], 0);
+    }
+
+    public bool TryResolveTribeSymbolWinner(out byte winnerTribe)
+    {
+        winnerTribe = 0;
+
+        for (var candidate = 0; candidate < TribeSymbolDamageSlots; candidate++)
+        {
+            var value = Volatile.Read(ref _tribeSymbolDamage[candidate]);
+            var strictlyAhead = true;
+
+            for (var other = 0; other < TribeSymbolDamageSlots; other++)
+            {
+                if (other == candidate || value > Volatile.Read(ref _tribeSymbolDamage[other]))
+                    continue;
+
+                strictlyAhead = false;
+                break;
+            }
+
+            if (!strictlyAhead)
+                continue;
+
+            winnerTribe = (byte)candidate;
+            return true;
+        }
+
+        return false;
     }
 
     internal void RegisterAttackDamage(int attackerCharacterId, object sessionToken, int damage)

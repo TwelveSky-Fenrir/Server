@@ -137,9 +137,6 @@ public sealed class OpenShopStallService(
             return new OpenShopStallResponse { Result = 105, PshopInfo = listing };
         }
 
-        // The rental credit is owned by the character and only ever bought (rental-extension consumables);
-        // opening never grants days and never shortens what is already paid for
-        // (Server/ts25zone/S07_MyGame09.cpp:393-409: refuse when expired, then mShopDate = aProxyShopDate).
         OfflineShopRowDto? existing;
         try
         {

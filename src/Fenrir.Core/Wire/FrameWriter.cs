@@ -11,10 +11,6 @@ public static class FrameWriter
     public static int WriteFrame<TPacket>(in TPacket packet, Span<byte> destination)
         where TPacket : struct, IOutgoingPacket
     {
-        // TPacket.Compressed est static abstract : la branche est eliminee a la compilation pour les
-        // paquets non compresses. Sans ce garde, un paquet compresse ecrit ici part EN CLAIR la ou le
-        // client attend une enveloppe LZ4 -- et le protocole n'ayant pas de length-prefix, la session se
-        // desynchronise definitivement au lieu de lever.
         if (TPacket.Compressed)
             throw new InvalidOperationException(
                 $"Packet opcode {TPacket.Opcode} declares Compressed = true and cannot be written through " +

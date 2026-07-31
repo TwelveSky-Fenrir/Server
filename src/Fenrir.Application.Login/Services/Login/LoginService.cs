@@ -50,6 +50,8 @@ public sealed class LoginService(
 
     private const int ResultBlocked = 9;
 
+    private const int ResultAvatarLoadFailed = 10;
+
     private const int ResultCustomMessage = 10000;
 
     private const int ResultSuccess = 0;
@@ -100,8 +102,6 @@ public sealed class LoginService(
             return Failure(ResultVersionMismatch, "", false);
         }
 
-        // Server/ts25login/S04_MyWork02.cpp:170-177 runs CheckNameString on tID AND tPassword; the password half is
-        // deliberately not ported - it would forbid every non-alphanumeric password Argon2 already protects.
         if (!AvatarNameValidator.HasOnlyWhitelistedCharacters(packet.Id))
         {
             logger.LogWarning("Login rejected: login {Id} contains characters outside the legacy name whitelist",
@@ -221,6 +221,19 @@ public sealed class LoginService(
         var requirePin = options.Value.RequireSecondPassword;
         var pinMask = storedPin is null ? "" : LoginTrain.ExistingPinMask;
 
+        CharacterAccountRosterBundle roster;
+        ImmutableArray<AvatarRosterEntry> rosterEntries;
+        try
+        {
+            roster = await characters.GetAccountRosterAsync(accountId, cancellationToken);
+            rosterEntries = await ResolveRosterEntriesAsync(roster, cancellationToken);
+        }
+        catch (SqlException ex)
+        {
+            logger.LogError(ex, "Login failed: avatar roster load errored for account {AccountId}", accountId);
+            return Failure(ResultAvatarLoadFailed, "", true);
+        }
+
         var newToken = Guid.NewGuid();
         AccountSessionClaimDto claim;
         try
@@ -264,18 +277,37 @@ public sealed class LoginService(
                 break;
         }
 
-        await accountSessions.RecordDeviceSignatureAsync(accountId,
-            quotaGateApplies ? packet.Adapter.AdapterName : DeviceSpoofingGuard.PlaceholderAdapterGuid,
-            quotaGateApplies ? packet.Adapter.IPAddress : DeviceSpoofingGuard.PlaceholderRemoteIp,
-            quotaGateApplies ? remoteIp ?? "" : DeviceSpoofingGuard.PlaceholderRemoteIp, cancellationToken);
+        try
+        {
+            await accountSessions.RecordDeviceSignatureAsync(accountId,
+                quotaGateApplies ? packet.Adapter.AdapterName : DeviceSpoofingGuard.PlaceholderAdapterGuid,
+                quotaGateApplies ? packet.Adapter.IPAddress : DeviceSpoofingGuard.PlaceholderRemoteIp,
+                quotaGateApplies ? remoteIp ?? "" : DeviceSpoofingGuard.PlaceholderRemoteIp, cancellationToken);
+        }
+        catch (SqlException ex)
+        {
+            logger.LogWarning(ex,
+                "Login: device signature update failed for account {AccountId}; the per-adapter cap will not see this session",
+                accountId);
+        }
 
-        registry.AssociateAccount(sessionId, accountId);
+        if (registry.AssociateAccount(sessionId, accountId) is { } supersededLocal)
+        {
+            logger.LogWarning(
+                "Login: evicting a superseded local session for account {AccountId} that the DB claim did not report",
+                accountId);
+            supersededLocal.Abort(DisconnectReason.Evicted);
+        }
 
-        var roster = await characters.GetAccountRosterAsync(accountId, cancellationToken);
-        var rosterEntries = await ResolveRosterEntriesAsync(roster, cancellationToken);
-
-        await eventLog.LogAsync(LoginSucceededEventCode, EventLogCategory.Session, accountId, null, null, null,
-            null, null, null, null, null, 1, remoteIp is null ? null : $"RemoteIp={remoteIp}", cancellationToken);
+        try
+        {
+            await eventLog.LogAsync(LoginSucceededEventCode, EventLogCategory.Session, accountId, null, null, null,
+                null, null, null, null, null, 1, remoteIp is null ? null : $"RemoteIp={remoteIp}", cancellationToken);
+        }
+        catch (SqlException ex)
+        {
+            logger.LogWarning(ex, "Login: succeeded-login event-log write failed for account {AccountId}", accountId);
+        }
 
         logger.LogInformation(
             "Login succeeded: account {AccountId} authenticated, {CharacterCount} character(s), PIN required {RequirePin}",

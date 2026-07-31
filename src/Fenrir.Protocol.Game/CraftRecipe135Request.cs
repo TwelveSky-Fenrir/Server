@@ -3,7 +3,6 @@ using Fenrir.Core.Wire;
 
 namespace Fenrir.Protocol.Game;
 
-// Layout CZ_MAKE_ITEM135_SEND CLIENT.h:278-289; mort en M33/LNW33: opcode 135 non enregistre dans W_FUNCTION.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.MakeItem135, ExpectedSize = 45,
     AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
 public readonly partial record struct CraftRecipe135Request : IIncomingPacket<CraftRecipe135Request>

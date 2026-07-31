@@ -17,38 +17,40 @@ public static class AllianceProposalCenterEventMap
 
     public const int EventCodeRangeEnd = BreakAllianceViaStoneCaptureEventCode;
 
-    public static void Apply(int eventCode, ReadOnlySpan<byte> data, AllianceProposalCenterState state,
+    public static bool Apply(int eventCode, ReadOnlySpan<byte> data, AllianceProposalCenterState state,
         ILogger logger)
     {
         switch (eventCode)
         {
             case FinalizeNewAllianceEventCode:
-                ApplyFinalizeNewAlliance(data, state, logger);
-                break;
+                return ApplyFinalizeNewAlliance(data, state, logger);
 
             case BreakAllianceViaRitualEventCode:
             case BreakAllianceViaStoneCaptureEventCode:
-                ApplyBreakAlliance(eventCode, data, state, logger);
-                break;
+                return ApplyBreakAlliance(eventCode, data, state, logger);
 
             case AllianceStoneUnderAttackEventCode:
-                break;
+                return true;
+
+            default:
+                return true;
         }
     }
 
-    private static void ApplyFinalizeNewAlliance(ReadOnlySpan<byte> data, AllianceProposalCenterState state,
+    private static bool ApplyFinalizeNewAlliance(ReadOnlySpan<byte> data, AllianceProposalCenterState state,
         ILogger logger)
     {
         var tribeA = ReadInt32(data, 0);
         var tribeB = ReadInt32(data, 4);
 
         if (!TryValidateTribes(tribeA, tribeB, FinalizeNewAllianceEventCode, logger))
-            return;
+            return false;
 
         state.ApplyFinalize((byte)tribeA, (byte)tribeB);
+        return true;
     }
 
-    private static void ApplyBreakAlliance(int eventCode, ReadOnlySpan<byte> data, AllianceProposalCenterState state,
+    private static bool ApplyBreakAlliance(int eventCode, ReadOnlySpan<byte> data, AllianceProposalCenterState state,
         ILogger logger)
     {
         var tribeA = ReadInt32(data, 0);
@@ -57,9 +59,10 @@ public static class AllianceProposalCenterEventMap
         var expiryB = ReadInt32(data, 12);
 
         if (!TryValidateTribes(tribeA, tribeB, eventCode, logger))
-            return;
+            return false;
 
         state.ApplyBreak((byte)tribeA, (byte)tribeB, expiryA, expiryB);
+        return true;
     }
 
     private static bool TryValidateTribes(int tribeA, int tribeB, int eventCode, ILogger logger)
@@ -68,7 +71,7 @@ public static class AllianceProposalCenterEventMap
             return true;
 
         logger.LogWarning(
-            "Alliance proposal event {EventCode} referenced out-of-range tribe id(s) {TribeA}/{TribeB} -- ignored",
+            "Alliance proposal event {EventCode} referenced out-of-range tribe id(s) {TribeA}/{TribeB} -- ignored, dropped without relay",
             eventCode, tribeA, tribeB);
         return false;
     }

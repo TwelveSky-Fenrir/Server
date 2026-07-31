@@ -8,9 +8,6 @@ public static class CompressedFrameWriter
     public static byte[] WriteCompressedFrame<TPacket>(in TPacket packet)
         where TPacket : struct, IOutgoingPacket
     {
-        // Symetrique du garde de FrameWriter.WriteFrame : ce chemin-ci n'applique PAS le XOR de paquet.
-        // Aucun paquet ne cumule Compressed et XorPacketGlobal aujourd'hui ; si l'un apparaissait, il
-        // partirait non obfusque, en silence.
         if (TPacket.Obfuscation != WireObfuscationMode.None)
             throw new InvalidOperationException(
                 $"Packet opcode {TPacket.Opcode} declares Compressed = true together with " +

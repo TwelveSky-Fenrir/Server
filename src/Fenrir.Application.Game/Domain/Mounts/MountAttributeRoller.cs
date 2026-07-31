@@ -10,7 +10,7 @@ public static class MountAttributeRoller
 
         for (var step = 0; step < MountPowerCodec.DigitCount; step++)
         {
-            var placeIndex = (pick + step) % MountPowerCodec.DigitCount;
+            var placeIndex = ScanPlace(pick, step);
             if (MountPowerCodec.DigitAtPlace(power, placeIndex) >= MountPowerCodec.MaxDigit)
                 continue;
 
@@ -38,23 +38,28 @@ public static class MountAttributeRoller
 
         var decremented = MountPowerCodec.WithDigitAtPlace(power, sourcePlace, sourceDigit - 1);
 
-        Span<int> candidates = stackalloc int[MountPowerCodec.DigitCount];
-        var candidateCount = 0;
-        for (var placeIndex = 0; placeIndex < MountPowerCodec.DigitCount; placeIndex++)
+        var pick = random.NextInt32(MountPowerCodec.DigitCount);
+
+        for (var step = 0; step < MountPowerCodec.DigitCount; step++)
         {
+            var placeIndex = ScanPlace(pick, step);
             if (placeIndex == sourcePlace)
                 continue;
-            if (MountPowerCodec.DigitAtPlace(decremented, placeIndex) >= MountPowerCodec.MaxDigit)
+
+            var targetDigit = MountPowerCodec.DigitAtPlace(decremented, placeIndex);
+            if (targetDigit >= MountPowerCodec.MaxDigit)
                 continue;
-            candidates[candidateCount++] = placeIndex;
+
+            return new TransferRoll(true,
+                MountPowerCodec.WithDigitAtPlace(decremented, placeIndex, targetDigit + 1));
         }
 
-        if (candidateCount == 0)
-            return new TransferRoll(true, decremented);
+        return new TransferRoll(true, decremented);
+    }
 
-        var targetPlace = candidates[random.NextInt32(candidateCount)];
-        var targetDigit = MountPowerCodec.DigitAtPlace(decremented, targetPlace);
-        return new TransferRoll(true, MountPowerCodec.WithDigitAtPlace(decremented, targetPlace, targetDigit + 1));
+    private static int ScanPlace(int pick, int step)
+    {
+        return (pick + MountPowerCodec.DigitCount - step) % MountPowerCodec.DigitCount;
     }
 
     public readonly record struct ConvertRoll(bool Applied, int PlaceValueAdded, int NewPower);

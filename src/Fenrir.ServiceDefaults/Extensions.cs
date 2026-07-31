@@ -22,17 +22,8 @@ public static class Extensions
         {
             builder.Services.Configure<HostOptions>(options =>
             {
-                // Ce budget est PARTAGE par tous les StopAsync, pas alloue a chacun. GameServer en compte 41,
-                // et le plus lent est le drain de GameConnectionHost : chaque connexion en vol fait jusqu'a
-                // quatre allers-retours base (flush final, journal de deconnexion, teardown de session). Les
-                // 30 s par defaut sont un budget muet — depasse, l'hote abandonne les flushes restants sans
-                // que rien ne distingue « tout est ecrit » de « on a coupe au milieu ».
                 options.ShutdownTimeout = TimeSpan.FromSeconds(60);
 
-                // ServicesStopConcurrently reste FALSE (defaut) : l'arret sequentiel en ordre inverse
-                // d'enregistrement est un contrat dont le depot depend — GameConnectionHost est enregistre
-                // apres PositionWriteBehindHost precisement pour que le drain finisse avant que le flusher
-                // partage ne coupe sa boucle.
             });
 
             return builder;

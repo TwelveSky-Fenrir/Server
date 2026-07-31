@@ -1,11 +1,21 @@
+using System.Buffers.Binary;
 using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Application.Game.Domain.Simulation;
+using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Protocol.Game;
 
 namespace Fenrir.Application.Game.Domain.World.Monsters;
 
 public sealed partial class MonsterAiSystem
 {
+    private const int StoneIdleResetLegacyTicks = 60 * 120;
+
+    private const int TribeSymbolIdleResetEventCode = 43;
+
+    private const int AllianceStoneIdleResetEventCode = 50;
+
+    private const byte MonsterSymbolRespawnLockSpecialType = 15;
+
     private const float ThrowCarInnerRadiusRatio = 0.25f;
 
     private const int ThrowerWanderRollSpan = 100;
@@ -15,6 +25,81 @@ public sealed partial class MonsterAiSystem
     private const int Zone175BossAggroCapacity = 50;
 
     private const int GuardDetectionCellTolerance = 2;
+
+    private void RunTribeSymbolStoneDecision(MonsterEntity monster, int legacyTicksElapsed)
+    {
+        if (!monster.TribeSymbolFirstAttackArmed)
+            return;
+
+        monster.TribeSymbolFirstAttackElapsedLegacyTicks = Math.Min(StoneIdleResetLegacyTicks,
+            monster.TribeSymbolFirstAttackElapsedLegacyTicks + legacyTicksElapsed);
+        if (monster.TribeSymbolFirstAttackElapsedLegacyTicks < StoneIdleResetLegacyTicks)
+            return;
+
+        if (monster.Template.SpecialType == MonsterSymbolRespawnLockSpecialType)
+            return;
+
+        PublishStoneIdleReset(TribeSymbolIdleResetEventCode, TribeSymbolSlotOf(monster.Template.SpecialType));
+
+        monster.TribeSymbolFirstAttackArmed = false;
+        monster.TribeSymbolFirstAttackElapsedLegacyTicks = 0;
+        monster.ResetTribeSymbolDamage();
+        monster.RestoreFullLife();
+    }
+
+    private void RunAllianceStoneDecision(MonsterEntity monster, int legacyTicksElapsed)
+    {
+        if (!monster.AllianceStoneFirstAttackArmed)
+            return;
+
+        monster.AllianceStoneFirstAttackElapsedLegacyTicks = Math.Min(StoneIdleResetLegacyTicks,
+            monster.AllianceStoneFirstAttackElapsedLegacyTicks + legacyTicksElapsed);
+        if (monster.AllianceStoneFirstAttackElapsedLegacyTicks < StoneIdleResetLegacyTicks)
+            return;
+
+        PublishStoneIdleReset(AllianceStoneIdleResetEventCode, AllianceStoneSlotOf(monster.Template.SpecialType));
+
+        monster.AllianceStoneFirstAttackArmed = false;
+        monster.AllianceStoneFirstAttackElapsedLegacyTicks = 0;
+        monster.RestoreFullLife();
+    }
+
+    private static int TribeSymbolSlotOf(byte specialType)
+    {
+        return specialType switch
+        {
+            11 => 0,
+            12 => 1,
+            13 => 2,
+            28 => 3,
+            14 => 4,
+            _ => 0
+        };
+    }
+
+    private static int AllianceStoneSlotOf(byte specialType)
+    {
+        return specialType switch
+        {
+            31 => 0,
+            32 => 1,
+            33 => 2,
+            34 => 3,
+            _ => 0
+        };
+    }
+
+    private void PublishStoneIdleReset(int eventCode, int slotIndex)
+    {
+        if (_siegeIngestor is null)
+            return;
+
+        Span<byte> payload = stackalloc byte[ZoneCenterBroadcastIngestor.PayloadSize];
+        payload.Clear();
+        BinaryPrimitives.WriteInt32LittleEndian(payload, slotIndex);
+
+        _siegeIngestor.Value.Ingest(eventCode, payload);
+    }
 
     private void RunThrowerDecision(Zone zone, MonsterEntity monster)
     {

@@ -83,9 +83,6 @@ public sealed class ProxyShopBootReloadHost(
 
             if (shop.ShopDate < today)
             {
-                // The expiry sweep is deliberately cluster-wide while registration is per-shard: legacy
-                // ts25extra swept every open shop once at boot (Server/ts25extra/S08_MyDB.cpp:503-511), and an
-                // expired shop on a map no shard hosts would otherwise stay buyable via the search path.
                 if (await CloseExpiredAsync(characterId, ct).ConfigureAwait(false))
                     expired++;
                 else
@@ -116,8 +113,6 @@ public sealed class ProxyShopBootReloadHost(
                 continue;
             }
 
-            // UniqueNumber must reproduce OpenShopStallService's characterId*2+1 exactly: the client keys the
-            // stall by it, so a reloaded stall carrying a different value is a second, ghost stall.
             zone.RegisterProxyShop(new ProxyShopBroadcastEntry(characterId, unchecked(characterId * 2 + 1),
                 ownerName, shop.ShopName, shop.LocationX, shop.LocationY, shop.LocationZ, shop.ShopDate));
             registered++;

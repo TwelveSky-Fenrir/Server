@@ -57,8 +57,8 @@ public static class RegularWarRewardCalculator
             var baseMoney = rewardValues.GetMoneyReward(participant.RebirthTier, participant.Level);
             var baseExperience = rewardValues.GetExperienceReward(participant.Level);
 
-            var money = isWinningSide ? baseMoney : baseMoney / 2;
-            var experience = isWinningSide ? baseExperience : baseExperience / 2;
+            var money = isDraw ? 0 : isWinningSide ? baseMoney : baseMoney / 2;
+            var experience = isDraw ? 0 : isWinningSide ? baseExperience : baseExperience / 2;
 
             var cpBonus = 0;
             if (!isDraw && config.CpBonusRule is { } rule &&

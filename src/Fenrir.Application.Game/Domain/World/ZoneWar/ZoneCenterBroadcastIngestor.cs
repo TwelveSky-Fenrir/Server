@@ -58,7 +58,8 @@ public sealed class ZoneCenterBroadcastIngestor(
         if (!Allow(eventCode, nameof(Ingest)))
             return;
 
-        ApplyStateEffect(eventCode, data);
+        if (!ApplyStateEffect(eventCode, data))
+            return;
 
         if (eventCode == PingEventCode)
             BroadcastAllZonesPing();
@@ -78,13 +79,12 @@ public sealed class ZoneCenterBroadcastIngestor(
         if (!Allow(eventCode, nameof(ApplyRelayedEvent)))
             return;
 
-        ApplyStateEffect(eventCode, data);
+        if (!ApplyStateEffect(eventCode, data))
+            return;
+
         Relay(eventCode, data);
     }
 
-    // Le center legacy tombait dans son default: pour tout tSort inconnu, sans jamais relayer. Ici le relais
-    // rediffuse a TOUS les joueurs connectes : laisser passer un code arbitraire ferait de ce chemin un
-    // amplificateur de broadcast pilotable par le pair.
     private bool Allow(int eventCode, string entryPoint)
     {
         if (KnownTSortRegistry.IsKnown(eventCode))
@@ -102,94 +102,84 @@ public sealed class ZoneCenterBroadcastIngestor(
         uplink?.Publish(eventCode, data);
     }
 
-    private void ApplyStateEffect(int eventCode, ReadOnlySpan<byte> data)
+    private bool ApplyStateEffect(int eventCode, ReadOnlySpan<byte> data)
     {
         switch (eventCode)
         {
             case >= Zone049RangeStart and <= Zone049RangeEnd:
-                ApplyZone049(eventCode, data);
-                break;
+                return ApplyZone049(eventCode, data);
 
             case Zone175ResetEventCode:
-                ApplyZone175(eventCode, data, true);
-                break;
+                return ApplyZone175(eventCode, data, true);
 
             case >= Zone175RangeStart and <= Zone175RangeEnd:
-                ApplyZone175(eventCode, data, false);
-                break;
+                return ApplyZone175(eventCode, data, false);
 
             case >= Zone267RangeStart and <= Zone267RangeEnd:
-                ApplyZone267(eventCode, data);
-                break;
+                return ApplyZone267(eventCode, data);
 
             case >= Zone241RangeStart and <= Zone241RangeEnd:
-                ApplyZone241(eventCode, data);
-                break;
+                return ApplyZone241(eventCode, data);
 
             case >= Zone051Zone053BroadcastResolver.Zone051RangeStart
                 and <= Zone051Zone053BroadcastResolver.Zone051RangeEnd
                 when zone051Zone053State is not null:
-                Zone051Zone053BroadcastResolver.ApplyZone051(zone051Zone053State, eventCode, data, logger);
-                break;
+                return Zone051Zone053BroadcastResolver.ApplyZone051(zone051Zone053State, eventCode, data, logger);
 
             case >= Zone051Zone053BroadcastResolver.Zone053RangeStart
                 and <= Zone051Zone053BroadcastResolver.Zone053RangeEnd
                 when zone051Zone053State is not null:
-                Zone051Zone053BroadcastResolver.ApplyZone053(zone051Zone053State, eventCode, data, logger);
-                break;
+                return Zone051Zone053BroadcastResolver.ApplyZone053(zone051Zone053State, eventCode, data, logger);
 
             case >= Zone194RangeStart and <= Zone194RangeEnd:
                 if (SiegeEventStateMap.TryMapZone194(eventCode, out var zone194State))
                     state.SetZone194State(zone194State);
-                break;
+                return true;
 
             case TribeMasterCallAbilityEventCode:
-                ApplyTribeMasterCallAbility(data);
-                break;
+                return ApplyTribeMasterCallAbility(data);
 
             case DtmEventCode:
-                ApplyDtm(data);
-                break;
+                return ApplyDtm(data);
 
             case >= Zone335RangeStart and <= Zone335RangeEnd:
                 if (SiegeEventStateMap.TryMapZone335(eventCode, out var ffaState))
                     state.SetZone335(ffaState);
-                break;
+                return true;
 
             case TribeBonusRatioEventMap.EventCode:
-                TribeBonusRatioEventMap.Apply(state, data, logger);
-                break;
+                return TribeBonusRatioEventMap.Apply(state, data, logger);
 
             case >= AllianceProposalCenterEventMap.EventCodeRangeStart
                 and <= AllianceProposalCenterEventMap.EventCodeRangeEnd
                 when allianceState is not null:
-                AllianceProposalCenterEventMap.Apply(eventCode, data, allianceState, logger);
-                break;
+                return AllianceProposalCenterEventMap.Apply(eventCode, data, allianceState, logger);
 
             case PingEventCode:
                 HsbRewardFlagResetReactor.Apply(zones);
-                break;
+                return true;
 
-            // Sorts dont l'effet d'etat et les reactions de monde vivent dans ZoneEventBroadcaster
-            // (resummon de gardes, evictions, reset de rang). On delegue plutot que de dupliquer, mais le
-            // ROUTAGE est ici : il n'existe plus qu'une seule porte d'entree pour un evenement relaye.
             case 38 or 39 or 40 or 42 or 45 or 46 or 47:
                 worldReactions?.Value.ApplyRelayedStateAndReactions(eventCode, data);
-                break;
+                return true;
+
+            default:
+                return true;
         }
     }
 
-    private void ApplyZone049(int eventCode, ReadOnlySpan<byte> data)
+    private bool ApplyZone049(int eventCode, ReadOnlySpan<byte> data)
     {
         if (eventCode == Zone049RangeStart)
-            return;
+            return true;
 
         var slot = ReadInt32(data, 0);
         if (!ZoneCenterSiegeState.IsValidZone049Slot(slot))
         {
-            logger.LogWarning("Zone049 sub-code {EventCode} referenced out-of-range slot {Slot} -- ignored",
+            logger.LogWarning(
+                "Zone049 sub-code {EventCode} referenced out-of-range slot {Slot} -- ignored, dropped without relay",
                 eventCode, slot);
-            return;
+            return false;
         }
 
         var (value, stampTime) = eventCode switch
@@ -206,9 +196,10 @@ public sealed class ZoneCenterBroadcastIngestor(
         };
 
         state.SetZone049State(slot, value, stampTime);
+        return true;
     }
 
-    private void ApplyZone175(int eventCode, ReadOnlySpan<byte> data, bool isReset)
+    private bool ApplyZone175(int eventCode, ReadOnlySpan<byte> data, bool isReset)
     {
         var instance = ReadInt32(data, 0);
         var slot = ReadInt32(data, 4);
@@ -216,52 +207,56 @@ public sealed class ZoneCenterBroadcastIngestor(
         if (!ZoneCenterSiegeState.IsValidZone175Cell(instance, slot))
         {
             logger.LogWarning(
-                "Zone175 event {EventCode} referenced out-of-range instance {Instance}/slot {Slot} -- ignored",
+                "Zone175 event {EventCode} referenced out-of-range instance {Instance}/slot {Slot} -- ignored, dropped without relay",
                 eventCode, instance, slot);
-            return;
+            return false;
         }
 
         if (isReset)
             state.ResetZone175(instance, slot);
         else if (SiegeEventStateMap.TryMapZone175(eventCode, out var mapped))
             state.SetZone175(instance, slot, mapped);
+
+        return true;
     }
 
-    private void ApplyZone267(int eventCode, ReadOnlySpan<byte> data)
+    private bool ApplyZone267(int eventCode, ReadOnlySpan<byte> data)
     {
         var tribeIndex = ReadInt32(data, 0);
 
         if (!ZoneCenterSiegeState.IsValidTribe(tribeIndex))
         {
-            logger.LogWarning("Zone267 event {EventCode} referenced out-of-range tribe index {TribeIndex} -- ignored",
+            logger.LogWarning(
+                "Zone267 event {EventCode} referenced out-of-range tribe index {TribeIndex} -- ignored, dropped without relay",
                 eventCode, tribeIndex);
-            return;
+            return false;
         }
 
         if (SiegeEventStateMap.TryMapZone267(eventCode, out var mapped))
             state.SetZone267((byte)tribeIndex, mapped);
+
+        return true;
     }
 
-    private void ApplyZone241(int eventCode, ReadOnlySpan<byte> data)
+    private bool ApplyZone241(int eventCode, ReadOnlySpan<byte> data)
     {
         var instance = ReadInt32(data, 0);
 
         if (!ZoneCenterSiegeState.IsValidZone241Instance(instance))
         {
-            logger.LogWarning("Zone241 event {EventCode} referenced out-of-range instance {Instance} -- ignored",
+            logger.LogWarning(
+                "Zone241 event {EventCode} referenced out-of-range instance {Instance} -- ignored, dropped without relay",
                 eventCode, instance);
-            return;
+            return false;
         }
 
         if (SiegeEventStateMap.TryMapZone241(eventCode, out var challengeState))
             state.SetZone241(instance, challengeState);
+
+        return true;
     }
 
-    // Le legacy n'a QU'UN tableau mTribeMasterCallAbility : ecrit ici sur tSort 302, purge sur tSort 45 par
-    // la fin de bataille des symboles, lu par le combat. La cible est donc _tribeFormationAbility de
-    // WorldStateService, pas un magasin de siege separe. Le legacy ne borne ni la tribu ni le code
-    // (Server/ts25center/S04_MyWork02.cpp:924 ecrit dans un int[MAX_TRIBE_NUM]) : on borne les deux.
-    private void ApplyTribeMasterCallAbility(ReadOnlySpan<byte> data)
+    private bool ApplyTribeMasterCallAbility(ReadOnlySpan<byte> data)
     {
         var tribeId = ReadInt32(data, 0);
         var formationCode = ReadInt32(data, 4);
@@ -269,41 +264,45 @@ public sealed class ZoneCenterBroadcastIngestor(
         if (!ZoneCenterSiegeState.IsValidTribe(tribeId))
         {
             logger.LogWarning(
-                "Tribe-master call-ability event referenced out-of-range tribe id {TribeId} -- ignored", tribeId);
-            return;
+                "Tribe-master call-ability event referenced out-of-range tribe id {TribeId} -- ignored, dropped without relay",
+                tribeId);
+            return false;
         }
 
         if (formationCode is < 0 or > byte.MaxValue)
         {
             logger.LogWarning(
-                "Tribe-master call-ability event for tribe {TribeId} carried out-of-range formation code {Code} -- ignored",
+                "Tribe-master call-ability event for tribe {TribeId} carried out-of-range formation code {Code} -- ignored, dropped without relay",
                 tribeId, formationCode);
-            return;
+            return false;
         }
 
         if (worldState is null)
         {
             logger.LogWarning(
-                "Tribe-master call-ability event for tribe {TribeId} dropped: no WorldStateService registered",
+                "Tribe-master call-ability event for tribe {TribeId} dropped without relay: no WorldStateService registered",
                 tribeId);
-            return;
+            return false;
         }
 
         worldState.SetTribeFormationAbility((byte)tribeId, (byte)formationCode);
+        return true;
     }
 
-    private void ApplyDtm(ReadOnlySpan<byte> data)
+    private bool ApplyDtm(ReadOnlySpan<byte> data)
     {
         var tribeId = ReadInt32(data, 0);
         var effectValue = ReadInt32(data, 4);
 
         if (!ZoneCenterSiegeState.IsValidTribe(tribeId))
         {
-            logger.LogWarning("DTM event referenced out-of-range tribe id {TribeId} -- ignored", tribeId);
-            return;
+            logger.LogWarning("DTM event referenced out-of-range tribe id {TribeId} -- ignored, dropped without relay",
+                tribeId);
+            return false;
         }
 
         state.SetZone038DtmValue((byte)tribeId, effectValue);
+        return true;
     }
 
     private void BroadcastAllZonesPing()

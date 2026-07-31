@@ -13,34 +13,40 @@ public static class Zone051Zone053BroadcastResolver
 
     public const int Zone053RangeEnd = 30;
 
-    public static void ApplyZone051(Zone051Zone053SiegeState state, int selector, ReadOnlySpan<byte> data,
+    public static bool ApplyZone051(Zone051Zone053SiegeState state, int selector, ReadOnlySpan<byte> data,
         ILogger logger)
     {
         var slot = ReadInt32(data, 0);
         if (!Zone051Zone053SiegeState.IsValidZone051Slot(slot))
         {
-            logger.LogWarning("Zone051 selector {Selector} referenced out-of-range slot {Slot} -- ignored",
+            logger.LogWarning(
+                "Zone051 selector {Selector} referenced out-of-range slot {Slot} -- ignored, dropped without relay",
                 selector, slot);
-            return;
+            return false;
         }
 
         if (Zone051Zone053StateMap.TryMapZone051(selector, out var mapped))
             state.SetZone051(slot, mapped);
+
+        return true;
     }
 
-    public static void ApplyZone053(Zone051Zone053SiegeState state, int selector, ReadOnlySpan<byte> data,
+    public static bool ApplyZone053(Zone051Zone053SiegeState state, int selector, ReadOnlySpan<byte> data,
         ILogger logger)
     {
         var slot = ReadInt32(data, 0);
         if (!Zone051Zone053SiegeState.IsValidZone053Slot(slot))
         {
-            logger.LogWarning("Zone053 selector {Selector} referenced out-of-range slot {Slot} -- ignored",
+            logger.LogWarning(
+                "Zone053 selector {Selector} referenced out-of-range slot {Slot} -- ignored, dropped without relay",
                 selector, slot);
-            return;
+            return false;
         }
 
         if (Zone051Zone053StateMap.TryMapZone053(selector, out var mapped))
             state.SetZone053(slot, mapped);
+
+        return true;
     }
 
     private static int ReadInt32(ReadOnlySpan<byte> data, int offset)

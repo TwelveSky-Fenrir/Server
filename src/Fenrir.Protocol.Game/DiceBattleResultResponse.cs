@@ -3,7 +3,6 @@ using Fenrir.Core.Wire;
 
 namespace Fenrir.Protocol.Game;
 
-// Layout ZC_DICE_BATTLE_RECV Server/Header/Protocol/ZONE.h:1070-1075 ; mort en M33/LNW33 : aucun emetteur, le seul candidat est commente Server/ts25zone/S05_MyTransfer.cpp:1402.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.DiceBattleResult,
     ExpectedSize = 13)]
 public readonly partial record struct DiceBattleResultResponse : IOutgoingPacket

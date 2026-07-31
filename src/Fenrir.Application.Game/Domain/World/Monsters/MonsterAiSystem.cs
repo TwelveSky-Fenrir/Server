@@ -5,10 +5,14 @@ using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World.Geometry;
 using Fenrir.Application.Game.Domain.World.Pathfinding;
 using Fenrir.Application.Game.Domain.World.WorldState;
+using Fenrir.Application.Game.Domain.World.ZoneWar;
 
 namespace Fenrir.Application.Game.Domain.World.Monsters;
 
-public sealed partial class MonsterAiSystem(IRandomSource? random = null, WorldStateService? worldState = null)
+public sealed partial class MonsterAiSystem(
+    IRandomSource? random = null,
+    WorldStateService? worldState = null,
+    Lazy<ZoneCenterBroadcastIngestor>? siegeIngestor = null)
     : ISimulationSystem
 {
     private const float TickSeconds = SimulationClock.LegacyTickMilliseconds / 1000f;
@@ -34,6 +38,8 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null, WorldS
     private const float LegacyFrameUnitsPerSecond = 30f;
 
     private readonly IRandomSource _random = random ?? SystemRandomSource.Instance;
+
+    private readonly Lazy<ZoneCenterBroadcastIngestor>? _siegeIngestor = siegeIngestor;
 
     private readonly WorldStateService? _worldState = worldState;
 
@@ -76,21 +82,7 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null, WorldS
                 break;
 
             case MonsterAiState.AttackWindup:
-                if (monster.StateTicks++ == 0)
-                {
-                    monster.StateFrameAccumulator = 0f;
-                    if (monster.TargetCharacterId is { } attackTargetId)
-                        zone.ResolveMonsterAttack(monster, attackTargetId);
-                }
-
-                monster.StateFrameAccumulator += dt * LegacyFrameUnitsPerSecond;
-                if (monster.StateFrameAccumulator >= Math.Max(1, (int)monster.Template.FrameInfo3))
-                {
-                    monster.StateFrameAccumulator = 0f;
-                    monster.AiState = MonsterAiState.Decision;
-                    monster.StateTicks = 0;
-                }
-
+                RunAttackWindup(zone, monster, dt);
                 break;
 
             case MonsterAiState.RangedAttackWindup:
@@ -144,6 +136,32 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null, WorldS
         }
 
         zone.SyncMonsterCell(monster);
+    }
+
+    private static void RunAttackWindup(Zone zone, MonsterEntity monster, float dt)
+    {
+        if (monster.StateTicks++ == 0)
+        {
+            monster.StateFrameAccumulator = 0f;
+            if (monster.TargetCharacterId is { } attackTargetId)
+                zone.ResolveMonsterAttack(monster, attackTargetId);
+        }
+
+        monster.StateFrameAccumulator += dt * LegacyFrameUnitsPerSecond;
+        if (monster.StateFrameAccumulator < Math.Max(1, (int)monster.Template.FrameInfo3))
+            return;
+
+        if (monster.AttackPacketConfirmationArmed)
+        {
+            if (monster.StateTicks < SimulationClock.OneSecondGateLegacyTicks)
+                return;
+
+            monster.AttackPacketConfirmationArmed = false;
+        }
+
+        monster.StateFrameAccumulator = 0f;
+        monster.AiState = MonsterAiState.Decision;
+        monster.StateTicks = 0;
     }
 
     private void RunPatrol(Zone zone, MonsterEntity monster, float dt, int legacyTicksElapsed,
@@ -209,7 +227,13 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null, WorldS
                 break;
 
             case MonsterSpecialSort.TribeSymbolStone:
+                RunTribeSymbolStoneDecision(monster, legacyTicksElapsed);
+                break;
+
             case MonsterSpecialSort.AllianceStone:
+                RunAllianceStoneDecision(monster, legacyTicksElapsed);
+                break;
+
             case MonsterSpecialSort.Tower:
                 break;
 
@@ -386,9 +410,7 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null, WorldS
         if (pick.DistanceSquared <= meleeRadiusSq)
         {
             monster.AssignTarget(pick.CharacterId, target.UniqueNumber, target.PosX, target.PosY, target.PosZ);
-            monster.AiState = MonsterAiState.AttackWindup;
-            monster.StateTicks = 0;
-            zone.BroadcastMonsterActionChange(monster);
+            CommitMeleeEngagement(zone, monster, target);
             return;
         }
 
@@ -543,6 +565,7 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null, WorldS
             return false;
 
         var detectionRadiusSq = (float)detectionRadius * detectionRadius;
+        var monsterCellY = MathF.Floor(monster.PosY / zone.AoiCellSize);
 
         foreach (var characterId in zone.NeighborsOfPosition(monster.PosX, monster.PosZ))
         {
@@ -553,6 +576,9 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null, WorldS
                 continue;
 
             if (monster.InstanceId is { } requiredInstanceId && player.DungeonInstanceId != requiredInstanceId)
+                continue;
+
+            if (!WithinAoiCellHeightBand(zone, monsterCellY, player))
                 continue;
 
             if (DistanceSquared(monster.PosX, monster.PosZ, player.PosX, player.PosZ) > detectionRadiusSq)
@@ -591,8 +617,7 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null, WorldS
             if (other.ServerIndex == monster.ServerIndex)
                 continue;
 
-            if (other.AiState is not (MonsterAiState.Chase or MonsterAiState.AttackWindup
-                or MonsterAiState.RangedAttackWindup))
+            if (other.AiState is not (MonsterAiState.Chase or MonsterAiState.AttackWindup))
                 continue;
 
             if (other.TargetCharacterId == candidateCharacterId)
@@ -612,24 +637,27 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null, WorldS
         return player.VisibleState == 0;
     }
 
-    private PlayerRuntimeState TryShortRangeRetarget(Zone zone, MonsterEntity monster, PlayerRuntimeState current,
-        int legacyTicksElapsed)
+    private bool TryShortRangeRetarget(Zone zone, MonsterEntity monster, int legacyTicksElapsed,
+        [NotNullWhen(true)] out PlayerRuntimeState? retargeted)
     {
+        retargeted = null;
+
         if (monster.Template.AttackType is not (1 or 3 or 6))
-            return current;
+            return false;
 
         monster.DetectionThrottleTicks += legacyTicksElapsed;
         if (monster.DetectionThrottleTicks < SimulationClock.MonsterDetectionThrottleLegacyTicks)
-            return current;
+            return false;
 
         monster.DetectionThrottleTicks = 0;
 
         var shortRadius = monster.Template.RadiusInfo1;
         if (shortRadius <= 0)
-            return current;
+            return false;
 
         var shortRadiusSq = (float)shortRadius * shortRadius;
         var heightHalfExtent = (float)monster.Template.Size2;
+        var monsterCellY = MathF.Floor(monster.PosY / zone.AoiCellSize);
 
         foreach (var characterId in zone.NeighborsOfPosition(monster.PosX, monster.PosZ))
         {
@@ -640,6 +668,9 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null, WorldS
                 continue;
 
             if (monster.InstanceId is { } requiredInstanceId && candidate.DungeonInstanceId != requiredInstanceId)
+                continue;
+
+            if (!WithinAoiCellHeightBand(zone, monsterCellY, candidate))
                 continue;
 
             var candidateDistSq = DistanceSquared(monster.PosX, monster.PosZ, candidate.PosX, candidate.PosZ);
@@ -655,10 +686,16 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null, WorldS
             monster.AssignTarget(characterId, candidate.UniqueNumber, candidate.PosX, candidate.PosY,
                 candidate.PosZ);
             monster.RegisterAcquisition(characterId, candidate);
-            return candidate;
+            retargeted = candidate;
+            return true;
         }
 
-        return current;
+        return false;
+    }
+
+    private static bool WithinAoiCellHeightBand(Zone zone, float monsterCellY, PlayerRuntimeState player)
+    {
+        return MathF.Abs(MathF.Floor(player.PosY / zone.AoiCellSize) - monsterCellY) <= 1f;
     }
 
     private void RunChase(Zone zone, MonsterEntity monster, float dt, int legacyTicksElapsed)
@@ -666,26 +703,20 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null, WorldS
         if (monster.TargetCharacterId is not { } targetId || !zone.TryGetPlayer(targetId, out var target) ||
             !IsCandidateValid(target))
         {
-            monster.ReleaseTarget();
-            monster.AiState = MonsterAiState.Decision;
-            monster.StateTicks = 0;
-
-            zone.BroadcastMonsterActionChange(monster);
+            ReleaseAndReturnToDecision(zone, monster);
             return;
         }
 
-        target = TryShortRangeRetarget(zone, monster, target, legacyTicksElapsed);
-
-        var distanceToTargetSq = DistanceSquared(monster.PosX, monster.PosZ, target.PosX, target.PosZ);
-
         var detectionRadiusSq = (float)monster.Template.RadiusInfo2 * monster.Template.RadiusInfo2;
-        if (distanceToTargetSq > detectionRadiusSq)
+        if (DistanceSquared(monster.PosX, monster.PosZ, target.PosX, target.PosZ) > detectionRadiusSq)
         {
-            monster.ReleaseTarget();
-            monster.AiState = MonsterAiState.Decision;
-            monster.StateTicks = 0;
+            ReleaseAndReturnToDecision(zone, monster);
+            return;
+        }
 
-            zone.BroadcastMonsterActionChange(monster);
+        if (TryShortRangeRetarget(zone, monster, legacyTicksElapsed, out var retargeted))
+        {
+            CommitMeleeEngagement(zone, monster, retargeted);
             return;
         }
 
@@ -693,31 +724,40 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null, WorldS
         monster.TargetLocationY = target.PosY;
         monster.TargetLocationZ = target.PosZ;
 
-        var attackRadiusSq = (float)monster.Template.RadiusInfo1 * monster.Template.RadiusInfo1;
-        if (distanceToTargetSq <= attackRadiusSq)
-        {
-            CommitMeleeEngagementOrGiveUpToHeightMismatch(zone, monster, target);
-            return;
-        }
-
-        if (IsZone175TypeBoss(monster.Template.SpecialType) && distanceToTargetSq <= detectionRadiusSq)
-        {
-            monster.AiState = MonsterAiState.RangedAttackWindup;
-            monster.StateTicks = 0;
-
-            zone.BroadcastMonsterActionChange(monster);
-            return;
-        }
-
         if (MoveToward(zone, monster, target.PosX, target.PosZ, monster.Template.RunSpeed, dt,
                 monster.Template.RadiusInfo1))
         {
-            AbandonChaseAndReturnHome(zone, monster);
+            ReleaseAndReturnToDecision(zone, monster);
             return;
         }
 
+        if (IsZone175TypeBoss(monster.Template.SpecialType))
+            return;
+
+        var attackRadiusSq = (float)monster.Template.RadiusInfo1 * monster.Template.RadiusInfo1;
         if (DistanceSquared(monster.PosX, monster.PosZ, target.PosX, target.PosZ) <= attackRadiusSq)
             CommitMeleeEngagementOrGiveUpToHeightMismatch(zone, monster, target);
+    }
+
+    private static void ReleaseAndReturnToDecision(Zone zone, MonsterEntity monster)
+    {
+        monster.ReleaseTarget();
+        monster.AiState = MonsterAiState.Decision;
+        monster.StateTicks = 0;
+
+        zone.BroadcastMonsterActionChange(monster);
+    }
+
+    private static void CommitMeleeEngagement(Zone zone, MonsterEntity monster, PlayerRuntimeState target)
+    {
+        monster.Heading = WireHeading.Between(monster.PosX, monster.PosZ, target.PosX, target.PosZ);
+        monster.AiState = MonsterAiState.AttackWindup;
+        monster.StateTicks = 0;
+
+        if (monster.Template.AttackType is 1 or 2)
+            monster.AttackPacketConfirmationArmed = true;
+
+        zone.BroadcastMonsterActionChange(monster);
     }
 
     private static void CommitMeleeEngagementOrGiveUpToHeightMismatch(Zone zone, MonsterEntity monster,
@@ -728,14 +768,7 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null, WorldS
 
         if (verticalSeparation <= heightTolerance)
         {
-            monster.Heading = WireHeading.Between(monster.PosX, monster.PosZ, target.PosX, target.PosZ);
-            monster.AiState = MonsterAiState.AttackWindup;
-            monster.StateTicks = 0;
-
-            if (monster.Template.AttackType is 1 or 2)
-                monster.AttackPacketConfirmationArmed = true;
-
-            zone.BroadcastMonsterActionChange(monster);
+            CommitMeleeEngagement(zone, monster, target);
             return;
         }
 

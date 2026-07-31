@@ -2,9 +2,6 @@ namespace Fenrir.Application.Game.Domain.Guilds;
 
 public static class GuildBuffTopUp
 {
-    // Meme unite que GuildBuffDecay : BuffTimeForDiff est en SECONDES epoch. Le legacy borne d'abord la date
-    // d'expiration a maintenant si elle est deja passee, puis ajoute les minutes achetees
-    // (Server/ts25extra/S08_MyDB.cpp:1169-1183).
     public static Result Apply(GuildSummaryDto guild, int minutes, DateTimeOffset nowUtc)
     {
         var nowEpochSeconds = nowUtc.ToUnixTimeSeconds();

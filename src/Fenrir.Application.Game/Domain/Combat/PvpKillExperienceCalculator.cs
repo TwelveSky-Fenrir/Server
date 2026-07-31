@@ -10,8 +10,6 @@ public static class PvpKillExperienceCalculator
 
     public const float DefaultZoneMultiplier = 1.0f;
 
-    // Pas de base scalaire dans le legacy: baseAmount vient de la table par niveau de victime
-    // puis du scaling d'ecart. Server/ts25zone/S07_MyGame03.cpp:2908
     public static int ComputeGain(
         int baseAmount,
         int attackerCombinedLevel,

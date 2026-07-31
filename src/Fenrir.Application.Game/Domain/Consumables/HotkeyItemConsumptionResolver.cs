@@ -61,9 +61,9 @@ public static class HotkeyItemConsumptionResolver
 
     public const byte ConsumableItemCategory = 2;
 
-    private const int AssassinScrollBuffDurationLegacyTicks = 40;
+    private const int AssassinScrollBuffDurationGatePeriods = 40;
 
-    private const int StandardScrollOrBookBuffDurationLegacyTicks = 60;
+    private const int StandardScrollOrBookBuffDurationGatePeriods = 60;
 
     public static Result Resolve(
         int page, int index, HotkeySlot slot,
@@ -128,7 +128,7 @@ public static class HotkeyItemConsumptionResolver
                 if (!isDarkAttackScrollZoneAllowed || currentDarkAttackMarker == DepartedSpiritScrollMarkerValue)
                     return Result.RejectedCleanResult;
                 return SucceedWithBuff(slot, DarkAttackBuffSlot, DarkAttackBuffPercent,
-                    AssassinScrollBuffDurationLegacyTicks,
+                    AssassinScrollBuffDurationGatePeriods,
                     AntiCheatMarkerKind.DarkAttack, AssassinScrollMarkerValue, false);
             }
             case 13:
@@ -136,16 +136,16 @@ public static class HotkeyItemConsumptionResolver
                 if (!isDarkAttackScrollZoneAllowed || currentDarkAttackMarker == AssassinScrollMarkerValue)
                     return Result.RejectedCleanResult;
                 return SucceedWithBuff(slot, DarkAttackBuffSlot, DarkAttackBuffPercent,
-                    StandardScrollOrBookBuffDurationLegacyTicks,
+                    StandardScrollOrBookBuffDurationGatePeriods,
                     AntiCheatMarkerKind.DarkAttack, DepartedSpiritScrollMarkerValue, false);
             }
             case 14:
                 return SucceedWithBuff(slot, HitRateBuffSlot, HitOrDodgeBuffPercent,
-                    StandardScrollOrBookBuffDurationLegacyTicks,
+                    StandardScrollOrBookBuffDurationGatePeriods,
                     AntiCheatMarkerKind.HitRate, HitOrDodgeBuffMarkerValue, true);
             case 15:
                 return SucceedWithBuff(slot, DodgeRateBuffSlot, HitOrDodgeBuffPercent,
-                    StandardScrollOrBookBuffDurationLegacyTicks,
+                    StandardScrollOrBookBuffDurationGatePeriods,
                     AntiCheatMarkerKind.DodgeRate, HitOrDodgeBuffMarkerValue, true);
 
             case 6:

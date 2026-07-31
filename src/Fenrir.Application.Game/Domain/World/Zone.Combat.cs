@@ -38,6 +38,10 @@ public sealed partial class Zone
 
     private const int CombatInboxCapacity = 4096;
 
+    private const int TribeSymbolFirstAttackEventCode = 41;
+
+    private const int AllianceStoneFirstAttackEventCode = 48;
+
 
     private const int PvpKillDropSort = 11;
 
@@ -48,6 +52,13 @@ public sealed partial class Zone
     private const int RegularWarDropStreakRequirementFast = 3;
 
     private const int RegularWarDropStreakRequirement = 10;
+
+    private const float Map38TelebornKillRadius = 1000f;
+
+    private static readonly (float X, float Y, float Z)[] Map38TelebornKillControlPoints =
+    [
+        (-1728f, -26f, 9657f), (-10f, -26f, 11223f), (1169f, -26f, 11209f), (2739f, -26f, 9660f)
+    ];
 
     private static readonly int[] YangGokPvpDropBoxes = [602, 601, 2249, 8005, 8112];
 
@@ -107,6 +118,9 @@ public sealed partial class Zone
 
     private readonly KillCooldownTracker _regularWarCpOverrideCooldown = new();
 
+    private readonly MonsterSpawnScheduler? _stoneSiegeAnnouncer =
+        simulationSystems.OfType<MonsterSpawnScheduler>().FirstOrDefault();
+
     private readonly Dictionary<int, int> _regularWarKillDropStreak = new();
 
     public bool PostCombatCommand(in CombatCommand command)
@@ -141,8 +155,6 @@ public sealed partial class Zone
 
     private void ApplyCombatCommand(in CombatCommand command)
     {
-        // Server/ts25zone/S04_MyWork01.cpp:326-331 : le repartiteur avale tout opcode d'un joueur
-        // en IsMovingZone, sauf 11/12/21 ; aucun opcode d'attaque n'en fait partie.
         if (_players.TryGetValue(command.AttackerCharacterId, out var sender) && sender.IsMovingZone)
             return;
 
@@ -293,9 +305,13 @@ public sealed partial class Zone
                 DateTime.UtcNow))
             return;
 
+        var symbolBattleActive = worldState?.World.TribeSymbolBattle ?? false;
+
         var zoneRuntime = new PvpKillRewardZoneRuntimeState(
-            worldState?.World.TribeSymbolBattle ?? false,
-            Zone195TimeEventGate.IsOpen);
+            symbolBattleActive,
+            Zone195TimeEventGate.IsOpen,
+            false,
+            IsMap38DailyMissionKillWindowOpen(attackerState, symbolBattleActive));
         var profile = PvpKillExtendedRewardZones.TryResolve(MapId, isStunTrigger, zoneRuntime)
                       ?? PvpKillRewardZoneCatalog.Resolve(MapId, isStunTrigger);
 
@@ -315,6 +331,27 @@ public sealed partial class Zone
 
         if (profile.GrantDrop)
             DropItemsForKillOtherTribe(attackerState, defenderState, attackerCombinedLevel, defenderCombinedLevel);
+    }
+
+    private bool IsMap38DailyMissionKillWindowOpen(PlayerRuntimeState attackerState, bool symbolBattleActive)
+    {
+        if (MapId != PvpKillExtendedRewardZones.DtmZoneId)
+            return false;
+
+        if (!symbolBattleActive)
+            return false;
+
+        var radiusSquared = Map38TelebornKillRadius * Map38TelebornKillRadius;
+        foreach (var point in Map38TelebornKillControlPoints)
+        {
+            var dx = attackerState.PosX - point.X;
+            var dy = attackerState.PosY - point.Y;
+            var dz = attackerState.PosZ - point.Z;
+            if (dx * dx + dy * dy + dz * dz <= radiusSquared)
+                return false;
+        }
+
+        return true;
     }
 
     private void ApplyTowerCpForPvpBonus(PlayerRuntimeState attackerState)
@@ -400,31 +437,42 @@ public sealed partial class Zone
     private void ApplyPvpKillExperience(PlayerRuntimeState attackerState, PvpKillZoneRewardProfile profile,
         int attackerCombinedLevel, int defenderCombinedLevel)
     {
-        if (profile.GrantExperience)
-        {
-            var scaledBase = PvpKillExperienceScaling.Scale(
-                PvpKillExperienceBaseTable.Lookup(defenderCombinedLevel),
-                attackerCombinedLevel,
-                defenderCombinedLevel);
-            var zoneMultiplier = PvpKillExperienceScaling.ResolveZoneMultiplier(
-                RegularWarMapCatalog.TryGet(MapId, out _),
-                options.CrossTribeXpRatio);
-            var gain = PvpKillExperienceCalculator.ComputeGain(
-                scaledBase,
-                attackerCombinedLevel,
-                defenderCombinedLevel,
-                false,
-                false,
-                zoneMultiplier);
+        if (!profile.GrantExperience)
+            return;
 
-            if (gain > 0)
-                ApplyCharacterExperienceGain(attackerState, gain);
-        }
+        var scaledBase = PvpKillExperienceScaling.Scale(
+            PvpKillExperienceBaseTable.Lookup(defenderCombinedLevel),
+            attackerCombinedLevel,
+            defenderCombinedLevel);
+        var zoneMultiplier = PvpKillExperienceScaling.ResolveZoneMultiplier(
+            RegularWarMapCatalog.TryGet(MapId, out _),
+            options.CrossTribeXpRatio);
+        var gain = PvpKillExperienceCalculator.ComputeGain(
+            scaledBase,
+            attackerCombinedLevel,
+            defenderCombinedLevel,
+            false,
+            false,
+            zoneMultiplier);
 
-        var petExpGain = PvpKillPetExperienceCalculator.ComputeGain(attackerCombinedLevel);
-        CreditPetGrowthFromPvpKill(attackerState, petExpGain);
+        if (gain > 0)
+            ApplyCharacterExperienceGain(attackerState, gain);
+
+        if (HasActivePetEquipped(attackerState))
+            CreditPetGrowthFromPvpKill(attackerState,
+                PvpKillPetExperienceCalculator.ComputeGain(attackerCombinedLevel));
 
         ApplyPvpKillMountExperience(attackerState);
+    }
+
+    private static bool HasActivePetEquipped(PlayerRuntimeState state)
+    {
+        var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
+        var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
+            ? petStack.ItemId
+            : 0;
+
+        return petItemId > 0 && state.PetActivity > 0;
     }
 
     private void ApplyPvpKillMountExperience(PlayerRuntimeState attackerState)
@@ -622,6 +670,8 @@ public sealed partial class Zone
         if (outcome.Rejected)
             return;
 
+        ApplyStoneFirstAttackSideEffects(monster, attackerState);
+
         if (!outcome.Hit)
         {
             attackerState.Session.Send(new AttackResponse
@@ -643,6 +693,9 @@ public sealed partial class Zone
                 AttackRealDamageValue = outcome.DamageApplied
             }
         };
+
+        if (monster.SpecialSort == MonsterSpecialSort.TribeSymbolStone)
+            monster.AddTribeSymbolDamage(attackerState.Tribe, outcome.DamageApplied);
 
         TryDamageMonster(monster.ServerIndex, outcome.DamageApplied, attackerState.CharacterId, out var monsterDied,
             out _);
@@ -672,6 +725,57 @@ public sealed partial class Zone
 
         if (isTowerGuardian)
             ApplyTowerGuardianHitSideEffects(towerIndex, attackerState);
+    }
+
+    private void ApplyStoneFirstAttackSideEffects(MonsterEntity monster, PlayerRuntimeState attackerState)
+    {
+        switch (monster.SpecialSort)
+        {
+            case MonsterSpecialSort.TribeSymbolStone when !monster.TribeSymbolFirstAttackArmed:
+                if (TribeSymbolFirstAttackSlotOf(monster.Template.SpecialType) is not { } symbolSlot)
+                    return;
+
+                monster.TribeSymbolFirstAttackArmed = true;
+                monster.TribeSymbolFirstAttackElapsedLegacyTicks = 0;
+                _stoneSiegeAnnouncer?.AnnounceStoneFirstAttack(TribeSymbolFirstAttackEventCode, symbolSlot,
+                    attackerState.Tribe, attackerState.Name);
+                return;
+
+            case MonsterSpecialSort.AllianceStone when !monster.AllianceStoneFirstAttackArmed:
+                if (AllianceStoneFirstAttackSlotOf(monster.Template.SpecialType) is not { } allianceSlot)
+                    return;
+
+                monster.AllianceStoneFirstAttackArmed = true;
+                monster.AllianceStoneFirstAttackElapsedLegacyTicks = 0;
+                _stoneSiegeAnnouncer?.AnnounceStoneFirstAttack(AllianceStoneFirstAttackEventCode, allianceSlot,
+                    attackerState.Tribe, attackerState.Name);
+                return;
+        }
+    }
+
+    private static int? TribeSymbolFirstAttackSlotOf(byte specialType)
+    {
+        return specialType switch
+        {
+            11 => 0,
+            12 => 1,
+            13 => 2,
+            28 => 3,
+            14 => 4,
+            _ => null
+        };
+    }
+
+    private static int? AllianceStoneFirstAttackSlotOf(byte specialType)
+    {
+        return specialType switch
+        {
+            31 => 0,
+            32 => 1,
+            33 => 2,
+            34 => 3,
+            _ => null
+        };
     }
 
     private bool CanAttackSpecialSortTarget(MonsterEntity monster, byte attackerTribe)
@@ -767,8 +871,6 @@ public sealed partial class Zone
 
     private bool CanAttackMonsterSymbolStone(byte attackerTribe, byte? allianceTribe)
     {
-        // Le verrou de respawn bAttackMonsterSymbol (Server/ts25zone/S10_MySummon.cpp:1961) n'a pas
-        // d'equivalent Fenrir ; l'omettre equivaut a sa valeur initiale TRUE.
         var monsterSymbolTribe = worldState?.World.MonsterSymbol;
         return monsterSymbolTribe != attackerTribe && (allianceTribe is null || monsterSymbolTribe != allianceTribe);
     }

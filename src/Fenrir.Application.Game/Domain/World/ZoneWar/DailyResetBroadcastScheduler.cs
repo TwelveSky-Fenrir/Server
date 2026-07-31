@@ -2,20 +2,27 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public sealed class DailyResetBroadcastScheduler
 {
+    private static readonly TimeSpan FireAtLocalTimeOfDay = TimeSpan.FromMinutes(1);
+
+    private static readonly TimeSpan EagerResetGrace = TimeSpan.FromHours(1);
+
     private DateOnly _lastFiredLocalDate = DateOnly.MinValue;
 
-    // Heure LOCALE du serveur, comme le legacy (Server/Header/datetime.h:41 utilise localtime). Le verrou
-    // porte sur la DATE locale et non sur la minute-du-jour : au passage a l'heure d'hiver 00h01 survient
-    // deux fois, a une heure de jeu d'intervalle, et la proc n'est PAS idempotente sur une table vivante
-    // (toute reclamation faite entre les deux tirs serait effacee et rejouable).
     public bool IsDue(DateTimeOffset localNow)
     {
-        return localNow is { Hour: 0, Minute: 1 }
-               && DateOnly.FromDateTime(localNow.DateTime) != _lastFiredLocalDate;
+        return localNow.TimeOfDay >= FireAtLocalTimeOfDay
+               && DateOnly.FromDateTime(localNow.DateTime) > _lastFiredLocalDate;
+    }
+
+    public bool AllowsEagerReset(DateTimeOffset localNow)
+    {
+        return localNow.TimeOfDay < FireAtLocalTimeOfDay + EagerResetGrace;
     }
 
     public void MarkFired(DateTimeOffset localNow)
     {
-        _lastFiredLocalDate = DateOnly.FromDateTime(localNow.DateTime);
+        var localDate = DateOnly.FromDateTime(localNow.DateTime);
+        if (localDate > _lastFiredLocalDate)
+            _lastFiredLocalDate = localDate;
     }
 }

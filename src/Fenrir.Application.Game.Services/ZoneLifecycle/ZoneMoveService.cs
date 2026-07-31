@@ -160,6 +160,8 @@ public sealed class ZoneMoveService(
                 return;
         }
 
+        ZoneTransferBuffRules.ClearIfDestinationRequiresIt(state.Buffs, targetZoneNumber);
+
         if (!sourceZone.Post(ZoneCommand.MarkZoneTransferPending(characterId)))
         {
             logger.LogError(

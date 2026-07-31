@@ -79,7 +79,6 @@ public sealed class MonsterBossSpawnSystem(
             var entity = MonsterEntity.Create(serverIndex, zone.NextMonsterUniqueNumber(), template, serverIndex,
                 candidate.X, candidate.Y, candidate.Z);
 
-            // Server/ts25zone/S10_MySummon.cpp:732 -- aFront de spawn tire en degres entiers, rand % 360.
             entity.Heading = random.Next(360);
 
             zone.SpawnMonster(entity);

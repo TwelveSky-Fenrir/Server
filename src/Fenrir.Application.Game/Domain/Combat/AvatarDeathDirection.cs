@@ -4,8 +4,6 @@ public static class WireHeading
 {
     private const float RadiansToDegrees = 180f / MathF.PI;
 
-    // GetYAngle (Server/Header/mapcheck.h:32) : le champ filaire aFront est en DEGRES [0,360[ avec une
-    // phase de +180, et vaut exactement 0 -- pas 180 -- quand les deux points coincident (mapcheck.h:34).
     public static float FromDelta(float deltaX, float deltaZ)
     {
         if (deltaX == 0f && deltaZ == 0f)

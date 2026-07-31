@@ -14,19 +14,17 @@ public sealed class MovementRules(IOptions<GameServerOptions> options)
         var dx = intent.Location[0] - current.PosX;
         var dy = intent.Location[1] - current.PosY;
         var dz = intent.Location[2] - current.PosZ;
-        var distance = MathF.Sqrt(dx * dx + dy * dy + dz * dz);
+        var maxDistance = options.Value.MaxPlausibleMoveDistance;
 
-        if (distance > options.Value.MaxPlausibleMoveDistance)
+        if (dx * dx + dy * dy + dz * dz > maxDistance * maxDistance)
             return false;
 
         if (geometry is null)
             return true;
 
-        var targetX = intent.Location[0];
         var targetY = intent.Location[1];
-        var targetZ = intent.Location[2];
 
-        geometry.Resolve(targetX, targetZ, out var walkable, out var groundY);
+        geometry.Resolve(intent.Location[0], intent.Location[2], out var walkable, out var groundY);
 
         if (!walkable)
             return false;

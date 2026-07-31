@@ -65,7 +65,6 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
 
     public const int PreWarTicks = 120;
 
-    // 900 ticks de simulation, pas 900 secondes - Server/ts25zone/S07_MyGame01.cpp:4588,4765,4801
     public const int ActiveWarDurationTicks = 900;
 
     public const int ActiveEvaluationCadenceTicks = 10;
@@ -193,8 +192,6 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
         {
             case RegularWarIdleSubPhase.Cooldown:
                 _cooldownTicksElapsed++;
-                // le legacy n'attend que si mRegularWarNumber > 0 : la 1re manche part sans cooldown
-                // Server/ts25zone/S07_MyGame01.cpp:4645
                 if (WarCycleNumber > 1 && _cooldownTicksElapsed < CooldownTicks)
                     return;
 

@@ -22,7 +22,7 @@ public sealed class FriendRegistry
         lock (_lock)
         {
             return _pendingByAsker.ContainsKey(characterId) || _pendingByTarget.ContainsKey(characterId) ||
-                   _acceptedFor.ContainsKey(characterId) || _acceptedFor.ContainsValue(characterId) ||
+                   _acceptedFor.ContainsKey(characterId) ||
                    _crossShard.IsPending(characterId);
         }
     }
@@ -50,6 +50,9 @@ public sealed class FriendRegistry
 
     public FriendAskOutcome TryAsk(int askerId, int targetId)
     {
+        if (askerId == targetId)
+            return FriendAskOutcome.TargetBusy;
+
         lock (_lock)
         {
             if (IsNegotiating(askerId))
@@ -152,7 +155,11 @@ public sealed class FriendRegistry
     {
         lock (_lock)
         {
-            return _acceptedFor.Remove(characterId, out otherId);
+            if (!_acceptedFor.Remove(characterId, out otherId))
+                return false;
+
+            RemoveMirror(otherId, characterId);
+            return true;
         }
     }
 
@@ -163,8 +170,14 @@ public sealed class FriendRegistry
             if (!_acceptedFor.Remove(characterId, out partnerId))
                 return false;
 
-            _acceptedFor.Remove(partnerId);
+            RemoveMirror(partnerId, characterId);
             return true;
         }
+    }
+
+    private void RemoveMirror(int partnerId, int counterpartId)
+    {
+        if (_acceptedFor.TryGetValue(partnerId, out var mirror) && mirror == counterpartId)
+            _acceptedFor.Remove(partnerId);
     }
 }

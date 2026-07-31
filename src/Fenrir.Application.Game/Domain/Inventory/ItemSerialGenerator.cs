@@ -19,8 +19,6 @@ public static class ItemSerialGenerator
         };
     }
 
-    // Digest horodate ni unique ni monotone : sprintf "%04d%04d" puis atoi vaut haut*10000+bas tant que
-    // bas tient sur 4 chiffres, vrai jusqu'a l'an 9881 (Server/Header/function.h:18-25).
     private static int Digest(DateTimeOffset instant)
     {
         var high = instant.Year + instant.Month + instant.Day + instant.Hour + instant.Minute + instant.Second;

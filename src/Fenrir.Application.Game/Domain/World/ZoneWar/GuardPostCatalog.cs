@@ -2,8 +2,6 @@ using System.Collections.Immutable;
 
 namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
-// ReservedSlotIndex mirrors the legacy index03 walk over a 5x5 pool: postGroup * 5 + slot, where postGroup
-// is the tribe index and group 4 holds the symbol-conditional post (Server/ts25zone/S10_MySummon.cpp:1692-1725).
 
 public static class GuardPostCatalogFactory
 {

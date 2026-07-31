@@ -30,6 +30,7 @@ public sealed class GmBasicCommandService(
 
     private const int SuccessResult = 0;
 
+    private const int HideSort = 501;
     private const int ShowSort = 502;
     private const int MoveSelfSort = 507;
     private const int MoveToPositionSort = 528;
@@ -75,10 +76,13 @@ public sealed class GmBasicCommandService(
     public async ValueTask HandleVisibilityAsync(int sort, byte[] data, IZoneSession zoneSession,
         PlayerRuntimeState state, Zone zone, CancellationToken cancellationToken)
     {
-        if (!MeetsTierOrAbort(zoneSession, sort))
+        if (!await MeetsTierOrAbortAsync(zoneSession, sort, cancellationToken))
             return;
 
         var newVisibleState = sort == ShowSort ? ShownVisibleState : HiddenVisibleState;
+
+        await AuditAsync(sort, zoneSession, null, null, GmCommandCatalog.OutcomeExecuted,
+            $"VisibleState={newVisibleState}", cancellationToken);
 
         if (!await zone.PostTribeProgressCommandAndWaitAsync(
                 new TribeProgressZoneCommand(state.CharacterId, VisibleState: newVisibleState), cancellationToken))
@@ -106,7 +110,7 @@ public sealed class GmBasicCommandService(
     public async ValueTask HandleForceKillMonsterAsync(byte[] data, IZoneSession zoneSession, Zone zone,
         CancellationToken cancellationToken)
     {
-        if (!MeetsTierOrAbort(zoneSession, DieSort))
+        if (!await MeetsTierOrAbortAsync(zoneSession, DieSort, cancellationToken))
             return;
 
         if (!GmMonsterInstanceIndexPayload.TryRead(data, out var payload))
@@ -120,13 +124,20 @@ public sealed class GmBasicCommandService(
         if (index is >= 0 and < MonsterInstanceCapacity && zone.TryGetMonster(index, out var monster) &&
             monster is not null)
         {
-            await eventLog.LogAsync(GmActionEventCodes.MonsterForceKill, EventLogCategory.GmAction,
+            await eventLog.LogAsync(GmCommandCatalog.Resolve(DieSort).AuditEventCode, EventLogCategory.GmAction,
                 zoneSession.AccountId, zoneSession.CharacterId, null, null, null, null, null,
                 monster.Template.MonsterId,
-                null, 1, $"ServerIndex={index};MonsterName={monster.Template.Name}", cancellationToken);
+                null, GmCommandCatalog.OutcomeExecuted,
+                $"Command=DIE;Sort={DieSort};ServerIndex={index};MonsterName={monster.Template.Name}",
+                cancellationToken);
 
             zone.TryDamageMonster(index, monster.Life, null, out _, out _);
             result = SuccessResult;
+        }
+        else
+        {
+            await AuditAsync(DieSort, zoneSession, null, null, GmCommandCatalog.OutcomeRejected,
+                $"ServerIndex={index}", cancellationToken);
         }
 
         SendAck(zoneSession, DieSort, data, result);
@@ -135,7 +146,7 @@ public sealed class GmBasicCommandService(
     public async ValueTask HandleTribeChangeAsync(byte[] data, IZoneSession zoneSession, PlayerRuntimeState state,
         Zone zone, CancellationToken cancellationToken)
     {
-        if (!MeetsTierOrAbort(zoneSession, TribeSort))
+        if (!await MeetsTierOrAbortAsync(zoneSession, TribeSort, cancellationToken))
             return;
 
         if (!GmTribeChangePayload.TryRead(data, out var payload))
@@ -146,7 +157,14 @@ public sealed class GmBasicCommandService(
 
         var selector = payload.Tribe;
         if (selector is < 0 or > Tribe4SpecialValue || selector == state.Tribe)
+        {
+            await AuditAsync(TribeSort, zoneSession, null, null, GmCommandCatalog.OutcomeRejected,
+                $"Selector={selector};FromTribe={state.Tribe}", cancellationToken);
             return;
+        }
+
+        await AuditAsync(TribeSort, zoneSession, null, null, GmCommandCatalog.OutcomeExecuted,
+            $"Selector={selector};FromTribe={state.Tribe}", cancellationToken);
 
         var command = new TribeProgressZoneCommand(state.CharacterId, Tribe: (byte)selector,
             PreviousTribe: selector == Tribe4SpecialValue ? null : (byte)selector, QuestProgress: QuestProgress.None);
@@ -166,10 +184,13 @@ public sealed class GmBasicCommandService(
     public async ValueTask HandleSelfSpecialStateAsync(int sort, byte[] data, IZoneSession zoneSession,
         PlayerRuntimeState state, Zone zone, CancellationToken cancellationToken)
     {
-        if (!MeetsTierOrAbort(zoneSession, sort))
+        if (!await MeetsTierOrAbortAsync(zoneSession, sort, cancellationToken))
             return;
 
         var newSpecialState = sort == EquipSort ? EquipSpecialState : UnequipSpecialState;
+
+        await AuditAsync(sort, zoneSession, null, null, GmCommandCatalog.OutcomeExecuted,
+            $"SpecialState={newSpecialState}", cancellationToken);
 
         if (!await zone.PostTribeProgressCommandAndWaitAsync(
                 new TribeProgressZoneCommand(state.CharacterId, SpecialState: newSpecialState), cancellationToken))
@@ -183,7 +204,7 @@ public sealed class GmBasicCommandService(
     public async ValueTask HandleFindAsync(byte[] data, IZoneSession zoneSession, PlayerRuntimeState state,
         CancellationToken cancellationToken)
     {
-        if (!MeetsTierOrAbort(zoneSession, FindSort))
+        if (!await MeetsTierOrAbortAsync(zoneSession, FindSort, cancellationToken))
             return;
 
         if (!GmTargetNamePayload.TryRead(data, out var payload))
@@ -193,16 +214,25 @@ public sealed class GmBasicCommandService(
         }
 
         var gmData = new byte[GmDataSize];
+        var foundMapId = -1;
         if (zones.TryGetPlayerAndZoneByName(payload.TargetName, out _, out var localZone))
         {
-            BinaryPrimitives.WriteInt32LittleEndian(gmData, localZone!.MapId);
+            foundMapId = localZone!.MapId;
+            BinaryPrimitives.WriteInt32LittleEndian(gmData, foundMapId);
         }
         else
         {
             var remote = await characterShardLocations.FindByNameAsync(payload.TargetName, cancellationToken);
             if (remote is not null)
-                BinaryPrimitives.WriteInt32LittleEndian(gmData, remote.MapId);
+            {
+                foundMapId = remote.MapId;
+                BinaryPrimitives.WriteInt32LittleEndian(gmData, foundMapId);
+            }
         }
+
+        await AuditAsync(FindSort, zoneSession, null, null,
+            foundMapId >= 0 ? GmCommandCatalog.OutcomeExecuted : GmCommandCatalog.OutcomeRejected,
+            $"TargetName={payload.TargetName};FoundMapId={foundMapId}", cancellationToken);
 
         zoneSession.Send(new GmCommandResponse { Sort = FindGmDataTag, GmData = gmData });
         SendAck(zoneSession, FindSort, data, SuccessResult);
@@ -211,7 +241,7 @@ public sealed class GmBasicCommandService(
     public async ValueTask HandleCallAsync(byte[] data, IZoneSession zoneSession, PlayerRuntimeState state,
         Zone zone, CancellationToken cancellationToken)
     {
-        if (!MeetsTierOrAbort(zoneSession, CallSort))
+        if (!await MeetsTierOrAbortAsync(zoneSession, CallSort, cancellationToken))
             return;
 
         if (!GmTargetNamePayload.TryRead(data, out var payload))
@@ -223,6 +253,8 @@ public sealed class GmBasicCommandService(
         var found = zones.TryGetPlayerAndZoneByName(payload.TargetName, out var target, out var targetZone);
         if (!found || target!.CharacterId == state.CharacterId)
         {
+            await AuditAsync(CallSort, zoneSession, null, null, GmCommandCatalog.OutcomeRejected,
+                $"TargetName={payload.TargetName}", cancellationToken);
             SendAck(zoneSession, CallSort, data, FailureResult);
             return;
         }
@@ -243,9 +275,8 @@ public sealed class GmBasicCommandService(
                 "Zone {MapId} tribe-progress inbox full: dropped CALL mirror for target character {CharacterId}",
                 targetZone.MapId, target.CharacterId);
 
-        await eventLog.LogAsync(GmActionEventCodes.Call, EventLogCategory.GmAction, zoneSession.AccountId,
-            zoneSession.CharacterId, ((IZoneSession)target.Session).AccountId, target.CharacterId, null, null,
-            null, null, null, 1, $"TargetName={target.Name}", cancellationToken);
+        await AuditAsync(CallSort, zoneSession, ((IZoneSession)target.Session).AccountId, target.CharacterId,
+            GmCommandCatalog.OutcomeExecuted, $"TargetName={target.Name}", cancellationToken);
 
         var gmData = new byte[GmDataSize];
         new GmMoveCoordinatePayload { Location = [destination.Item1, destination.Item2, destination.Item3] }
@@ -258,7 +289,7 @@ public sealed class GmBasicCommandService(
     public async ValueTask HandleMoveToTargetAsync(byte[] data, IZoneSession zoneSession, PlayerRuntimeState state,
         Zone zone, CancellationToken cancellationToken)
     {
-        if (!MeetsTierOrAbort(zoneSession, MoveToTargetSort))
+        if (!await MeetsTierOrAbortAsync(zoneSession, MoveToTargetSort, cancellationToken))
             return;
 
         if (!GmTargetNamePayload.TryRead(data, out var payload))
@@ -269,7 +300,15 @@ public sealed class GmBasicCommandService(
 
         var found = zones.TryGetPlayerAndZoneByName(payload.TargetName, out var target, out _);
         if (!found || target!.CharacterId == state.CharacterId)
+        {
+            await AuditAsync(MoveToTargetSort, zoneSession, null, null, GmCommandCatalog.OutcomeRejected,
+                $"TargetName={payload.TargetName}", cancellationToken);
+            SendAck(zoneSession, MoveToTargetSort, data, FailureResult);
             return;
+        }
+
+        await AuditAsync(MoveToTargetSort, zoneSession, ((IZoneSession)target.Session).AccountId,
+            target.CharacterId, GmCommandCatalog.OutcomeExecuted, $"TargetName={target.Name}", cancellationToken);
 
         var destination = (target.PosX, target.PosY, target.PosZ);
         if (!await zone.PostTribeProgressCommandAndWaitAsync(
@@ -289,7 +328,7 @@ public sealed class GmBasicCommandService(
     public async ValueTask HandleTargetSpecialStateAsync(int sort, byte[] data, IZoneSession zoneSession,
         PlayerRuntimeState state, CancellationToken cancellationToken)
     {
-        if (!MeetsTierOrAbort(zoneSession, sort))
+        if (!await MeetsTierOrAbortAsync(zoneSession, sort, cancellationToken))
             return;
 
         if (!GmTargetNamePayload.TryRead(data, out var payload))
@@ -301,15 +340,17 @@ public sealed class GmBasicCommandService(
         var found = zones.TryGetPlayerAndZoneByName(payload.TargetName, out var target, out var targetZone);
         if (!found || target!.CharacterId == state.CharacterId)
         {
+            await AuditAsync(sort, zoneSession, null, null, GmCommandCatalog.OutcomeRejected,
+                $"TargetName={payload.TargetName}", cancellationToken);
             SendAck(zoneSession, sort, data, FailureResult);
             return;
         }
 
         var newSpecialState = sort == NchatSort ? NchatSpecialState : YchatSpecialState;
 
-        await eventLog.LogAsync(GmActionEventCodes.Chat, EventLogCategory.GmAction, zoneSession.AccountId,
-            zoneSession.CharacterId, ((IZoneSession)target.Session).AccountId, target.CharacterId, null, null,
-            null, null, null, (byte)newSpecialState, $"TargetName={target.Name}", cancellationToken);
+        await AuditAsync(sort, zoneSession, ((IZoneSession)target.Session).AccountId, target.CharacterId,
+            GmCommandCatalog.OutcomeExecuted, $"TargetName={target.Name};SpecialState={newSpecialState}",
+            cancellationToken);
 
         if (!await targetZone!.PostTribeProgressCommandAndWaitAsync(
                 new TribeProgressZoneCommand(target.CharacterId, SpecialState: newSpecialState), cancellationToken))
@@ -321,7 +362,7 @@ public sealed class GmBasicCommandService(
     public async ValueTask HandleKickAsync(byte[] data, IZoneSession zoneSession, PlayerRuntimeState state,
         CancellationToken cancellationToken)
     {
-        if (!MeetsTierOrAbort(zoneSession, KickSort))
+        if (!await MeetsTierOrAbortAsync(zoneSession, KickSort, cancellationToken))
             return;
 
         if (!GmTargetNamePayload.TryRead(data, out var payload))
@@ -333,33 +374,36 @@ public sealed class GmBasicCommandService(
         var found = zones.TryGetPlayerAndZoneByName(payload.TargetName, out var target, out _);
         if (!found || target!.CharacterId == state.CharacterId)
         {
+            await AuditAsync(KickSort, zoneSession, null, null, GmCommandCatalog.OutcomeRejected,
+                $"TargetName={payload.TargetName}", cancellationToken);
             SendAck(zoneSession, KickSort, data, FailureResult);
             return;
         }
 
-        await eventLog.LogAsync(GmActionEventCodes.Kick, EventLogCategory.GmAction, zoneSession.AccountId,
-            zoneSession.CharacterId, ((IZoneSession)target.Session).AccountId, target.CharacterId, null, null,
-            null, null, null, 1, $"TargetName={target.Name}", cancellationToken);
+        await AuditAsync(KickSort, zoneSession, ((IZoneSession)target.Session).AccountId, target.CharacterId,
+            GmCommandCatalog.OutcomeExecuted, $"TargetName={target.Name}", cancellationToken);
 
         ((IZoneSession)target.Session).Abort(DisconnectReason.GmKicked);
 
         SendAck(zoneSession, KickSort, data, SuccessResult);
     }
 
-    public ValueTask HandleTribeBankAsync(byte[] data, IZoneSession zoneSession,
+    public async ValueTask HandleTribeBankAsync(byte[] data, IZoneSession zoneSession,
         CancellationToken cancellationToken)
     {
-        if (!MeetsTierOrAbort(zoneSession, TribeBankSort))
-            return ValueTask.CompletedTask;
+        if (!await MeetsTierOrAbortAsync(zoneSession, TribeBankSort, cancellationToken))
+            return;
+
+        await AuditAsync(TribeBankSort, zoneSession, null, null, GmCommandCatalog.OutcomeRejected, null,
+            cancellationToken);
 
         SendAck(zoneSession, TribeBankSort, data, FailureResult);
-        return ValueTask.CompletedTask;
     }
 
     public async ValueTask HandleLevelSetAsync(byte[] data, IZoneSession zoneSession, PlayerRuntimeState state,
         Zone zone, CancellationToken cancellationToken)
     {
-        if (!MeetsTierOrAbort(zoneSession, LevelSort))
+        if (!await MeetsTierOrAbortAsync(zoneSession, LevelSort, cancellationToken))
             return;
 
         if (!GmLevelSetPayload.TryRead(data, out var payload))
@@ -371,9 +415,14 @@ public sealed class GmBasicCommandService(
         var requested = payload.Level;
         if (requested > LevelCombinedCapacity)
         {
+            await AuditAsync(LevelSort, zoneSession, null, null, GmCommandCatalog.OutcomeRejected,
+                $"RequestedLevel={requested}", cancellationToken);
             SendAck(zoneSession, LevelSort, data, FailureResult);
             return;
         }
+
+        await AuditAsync(LevelSort, zoneSession, null, null, GmCommandCatalog.OutcomeExecuted,
+            $"RequestedLevel={requested};FromLevel={state.Level}", cancellationToken);
 
         short newLevel;
         short newLevel2;
@@ -431,20 +480,22 @@ public sealed class GmBasicCommandService(
         SendAck(zoneSession, LevelSort, data, SuccessResult);
     }
 
-    public ValueTask HandleStatEditAsync(byte[] data, IZoneSession zoneSession,
+    public async ValueTask HandleStatEditAsync(byte[] data, IZoneSession zoneSession,
         CancellationToken cancellationToken)
     {
-        if (!MeetsTierOrAbort(zoneSession, StatEditSort))
-            return ValueTask.CompletedTask;
+        if (!await MeetsTierOrAbortAsync(zoneSession, StatEditSort, cancellationToken))
+            return;
+
+        await AuditAsync(StatEditSort, zoneSession, null, null, GmCommandCatalog.OutcomeRejected, null,
+            cancellationToken);
 
         SendAck(zoneSession, StatEditSort, data, FailureResult);
-        return ValueTask.CompletedTask;
     }
 
     private async ValueTask TeleportToRawPositionAsync(int sort, byte[] data, IZoneSession zoneSession,
         PlayerRuntimeState state, Zone zone, CancellationToken cancellationToken)
     {
-        if (!MeetsTierOrAbort(zoneSession, sort))
+        if (!await MeetsTierOrAbortAsync(zoneSession, sort, cancellationToken))
             return;
 
         if (!GmMoveCoordinatePayload.TryRead(data, out var payload))
@@ -452,6 +503,9 @@ public sealed class GmBasicCommandService(
             zoneSession.Abort(DisconnectReason.Malformed);
             return;
         }
+
+        await AuditAsync(sort, zoneSession, null, null, GmCommandCatalog.OutcomeExecuted,
+            $"X={payload.Location[0]};Y={payload.Location[1]};Z={payload.Location[2]}", cancellationToken);
 
         if (!await zone.PostTribeProgressCommandAndWaitAsync(
                 new TribeProgressZoneCommand(state.CharacterId,
@@ -466,7 +520,6 @@ public sealed class GmBasicCommandService(
             var gmData = new byte[GmDataSize];
             payload.Write(gmData);
             zoneSession.Send(new GmCommandResponse { Sort = CallMoveGmDataTag, GmData = gmData });
-            return;
         }
 
         SendAck(zoneSession, sort, data, SuccessResult);
@@ -484,23 +537,41 @@ public sealed class GmBasicCommandService(
                 state.PosZ), cancellationToken);
 
         foreach (var member in pulled)
-            await eventLog.LogAsync(GmActionEventCodes.Call, EventLogCategory.GmAction, zoneSession.AccountId,
-                zoneSession.CharacterId, ((IZoneSession)member.Session).AccountId, member.CharacterId, null,
-                null, null, null, null, 1, $"TargetName={member.Name}", cancellationToken);
+            await AuditAsync(CallSort, zoneSession, ((IZoneSession)member.Session).AccountId, member.CharacterId,
+                GmCommandCatalog.OutcomeExecuted, $"TargetName={member.Name};PartyName={targetPartyName}",
+                cancellationToken);
 
         SendAck(zoneSession, CallSort, data, SuccessResult);
     }
 
-    private bool MeetsTierOrAbort(IZoneSession zoneSession, int sort)
+    private async ValueTask<bool> MeetsTierOrAbortAsync(IZoneSession zoneSession, int sort,
+        CancellationToken cancellationToken)
     {
-        if (zoneSession.MeetsGmTier(GmCommandTier.Basic))
+        var descriptor = GmCommandCatalog.Resolve(sort);
+        if (zoneSession.MeetsGmTier(descriptor.RequiredTier))
             return true;
 
+        await AuditAsync(sort, zoneSession, null, null, GmCommandCatalog.OutcomeDenied,
+            $"RequiredTier={(short)descriptor.RequiredTier}", cancellationToken);
+
         logger.LogWarning(
-            "Character {CharacterId} attempted the Basic-tier GM command (sort {Sort}) without sufficient privilege -- disconnecting, no reply",
-            zoneSession.CharacterId, sort);
+            "Character {CharacterId} attempted GM command {Command} (sort {Sort}, required tier {RequiredTier}) without sufficient privilege -- disconnecting, no reply",
+            zoneSession.CharacterId, descriptor.Name, sort, descriptor.RequiredTier);
         zoneSession.Abort(DisconnectReason.Faulted);
         return false;
+    }
+
+    private ValueTask AuditAsync(int sort, IZoneSession zoneSession, int? targetAccountId, int? targetCharacterId,
+        byte outcome, string? detail, CancellationToken cancellationToken)
+    {
+        var descriptor = GmCommandCatalog.Resolve(sort);
+        var payload = detail is null
+            ? $"Command={descriptor.Name};Sort={sort}"
+            : $"Command={descriptor.Name};Sort={sort};{detail}";
+
+        return eventLog.LogAsync(descriptor.AuditEventCode, EventLogCategory.GmAction, zoneSession.AccountId,
+            zoneSession.CharacterId, targetAccountId, targetCharacterId, null, null, null, null, null, outcome,
+            payload, cancellationToken);
     }
 
     private static void SendAck(IZoneSession zoneSession, int sort, byte[] data, int result)

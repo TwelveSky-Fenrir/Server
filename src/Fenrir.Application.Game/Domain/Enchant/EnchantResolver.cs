@@ -60,7 +60,10 @@ public static class EnchantResolver
 
         var isWing = targetItem.Sort == WingSort;
 
-        var result = !isWing && currentImprove >= RegimeBoundary
+        if (isWing && currentImprove >= RegimeBoundary)
+            return Rejected();
+
+        var result = currentImprove >= RegimeBoundary
             ? ResolveAdvanced(targetItem, materialItemDefinition.Item, currentImprove, luck, protectForDestroyCharges,
                 improveItemValueCharges, random, protectForDestroy2Charges)
             : ResolveStandard(targetItem, materialItemDefinition.Item, currentImprove, luck,

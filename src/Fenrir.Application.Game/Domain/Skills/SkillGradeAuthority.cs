@@ -50,9 +50,6 @@ public static class SkillGradeAuthority
                     total += bonus.Value;
 
             total += equipped.Item.CapeInfo3;
-
-            if (slotIndex == CapeSlotIndex && equipped.Item.ItemId == GodOfWarriorCapeItemId)
-                total += 2;
         }
 
         if (PetSlotIndex < equipSlotItems.Length && equipSlotItems[PetSlotIndex] is { } petItem)

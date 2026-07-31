@@ -5,6 +5,10 @@ namespace Fenrir.Application.Game.Domain.Social.Trade;
 public static class TradeLimits
 {
     public const int SlotCount = 8;
+
+    public const int FrozenMenuState = 1;
+
+    public const int ConfirmedMenuState = 2;
 }
 
 public sealed class TradeOfferSide
@@ -15,6 +19,10 @@ public sealed class TradeOfferSide
     public long Money { get; set; }
     public int BigMoney { get; set; }
     public int MenuState { get; set; }
+
+    public bool IsOfferFrozen => MenuState >= TradeLimits.FrozenMenuState;
+
+    public bool IsFullyConfirmed => MenuState >= TradeLimits.ConfirmedMenuState;
 
     public long GetOriginStagedQuantity(byte container, byte slot, int excludingTradeSlotIndex)
     {
@@ -40,6 +48,8 @@ public sealed class TradeSession
     public TradeOfferSide SideA { get; } = new();
     public TradeOfferSide SideB { get; } = new();
 
+    public bool BothFullyConfirmed => SideA.IsFullyConfirmed && SideB.IsFullyConfirmed;
+
     public TradeOfferSide SideOf(int characterId)
     {
         return characterId == PlayerAId ? SideA : SideB;
@@ -53,5 +63,18 @@ public sealed class TradeSession
     public int OpponentOf(int characterId)
     {
         return characterId == PlayerAId ? PlayerBId : PlayerAId;
+    }
+
+    public bool CanAdvanceConfirmation(int characterId)
+    {
+        var side = SideOf(characterId);
+        var opponent = OpponentSideOf(characterId);
+
+        return side.MenuState switch
+        {
+            0 => !opponent.IsFullyConfirmed,
+            TradeLimits.FrozenMenuState => opponent.IsOfferFrozen,
+            _ => false
+        };
     }
 }

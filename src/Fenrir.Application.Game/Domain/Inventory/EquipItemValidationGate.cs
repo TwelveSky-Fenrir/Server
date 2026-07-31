@@ -69,7 +69,6 @@ public static class EquipItemValidationGate
         if (resolved.LevelLimit + resolved.MartialLevelLimit > characterCombinedLevel)
             return Outcome.LevelTooLow;
 
-        // Type null == the caller could not supply ITEM_INFO::iType, so ReturnItemSort is not computable here.
         var classification = resolved.Type is { } itemType
             ? ItemSortClassifier.Classify(itemType, resolved.EquipPartTag, resolved.ItemId, resolved.Sort)
             : itemSortClassificationFallback;
@@ -85,8 +84,6 @@ public static class EquipItemValidationGate
 
     private static bool PassesRebirthGate(EquipCandidate item, int itemSortClassification, int rebirth)
     {
-        // Legacy chains independent "if (cond && rebirth < N) return 0" gates: clearing the itemId gate
-        // never grants equip, the classification gate below still applies (S07_MyGame03.cpp:70-105).
         var minimumRebirthForItemId = item.ItemId switch
         {
             13553 or 33553 or 53553 => 6,

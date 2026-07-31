@@ -13,6 +13,8 @@ public sealed class MentorRegistry
 {
     private readonly Dictionary<int, int> _acceptedByMaster = new();
 
+    private readonly Dictionary<int, int> _acceptedByStudent = new();
+
     private readonly CrossShardNegotiationTracker _crossShard = new();
 
     private readonly Lock _lock = new();
@@ -24,7 +26,7 @@ public sealed class MentorRegistry
         lock (_lock)
         {
             return _pendingByMaster.ContainsKey(characterId) || _pendingByStudent.ContainsKey(characterId) ||
-                   _acceptedByMaster.ContainsKey(characterId) || _acceptedByMaster.ContainsValue(characterId) ||
+                   _acceptedByMaster.ContainsKey(characterId) || _acceptedByStudent.ContainsKey(characterId) ||
                    _crossShard.IsPending(characterId);
         }
     }
@@ -111,7 +113,10 @@ public sealed class MentorRegistry
             _pendingByMaster.Remove(masterId);
 
             if (accepted)
+            {
                 _acceptedByMaster[masterId] = studentId;
+                _acceptedByStudent[studentId] = masterId;
+            }
 
             return true;
         }
@@ -121,7 +126,31 @@ public sealed class MentorRegistry
     {
         lock (_lock)
         {
-            return _acceptedByMaster.Remove(masterId, out studentId);
+            if (!_acceptedByMaster.Remove(masterId, out studentId))
+                return false;
+
+            _acceptedByStudent.Remove(studentId);
+            return true;
+        }
+    }
+
+    public bool TryClearAcceptedForDisconnect(int characterId, out int counterpartId)
+    {
+        lock (_lock)
+        {
+            if (_acceptedByMaster.Remove(characterId, out counterpartId))
+            {
+                _acceptedByStudent.Remove(counterpartId);
+                return true;
+            }
+
+            if (_acceptedByStudent.Remove(characterId, out counterpartId))
+            {
+                _acceptedByMaster.Remove(counterpartId);
+                return true;
+            }
+
+            return false;
         }
     }
 }

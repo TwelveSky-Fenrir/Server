@@ -81,6 +81,15 @@ public sealed class GenericActionService(
             return GenericActionResult.Aborted;
         }
 
+        if (sort == 208 && !IsInventoryToInventoryRequestValid(move, state.InventoryDate))
+        {
+            logger.LogInformation(
+                "Character {CharacterId} container-move aborted: inventory-to-inventory gate ({Page1}:{Index1} -> {Page2}:{Index2}, grid {XPost2},{YPost2}, InventoryDate {InventoryDate})",
+                characterId, move.Page1, move.Index1, move.Page2, move.Index2, move.XPost2, move.YPost2,
+                state.InventoryDate);
+            return GenericActionResult.Aborted;
+        }
+
         var isInventoryToEquip = sort == 210;
 
         if (!ContainerMatrix.TryResolveContainers(sort, move.Page1, move.Page2, out var fromContainer,
@@ -1438,6 +1447,24 @@ public sealed class GenericActionService(
 
         var remaining = stack.Quantity - alreadyStagedQuantity;
         return remaining <= 0 ? null : stack with { Quantity = (int)remaining };
+    }
+
+    private static bool IsInventoryToInventoryRequestValid(DefaultPData move, int inventoryDate)
+    {
+        if (move.Page1 is not (ContainerMatrix.InventoryPage0 or ContainerMatrix.InventoryPage1) ||
+            !ContainerMatrix.IsValidSlot((byte)move.Page1, move.Index1))
+            return false;
+
+        if (move.Page2 is not (ContainerMatrix.InventoryPage0 or ContainerMatrix.InventoryPage1) ||
+            !ContainerMatrix.IsValidSlot((byte)move.Page2, move.Index2))
+            return false;
+
+        if (move.XPost2 is < 0 or > 7 || move.YPost2 is < 0 or > 7)
+            return false;
+
+        var today = GameDate.Today();
+        return RentedInventoryPageGate.IsPageAccessible(move.Page1, inventoryDate, today) &&
+               RentedInventoryPageGate.IsPageAccessible(move.Page2, inventoryDate, today);
     }
 
     private static ItemStack? GetSlotOrNull(PlayerRuntimeState state, byte container, int slot)

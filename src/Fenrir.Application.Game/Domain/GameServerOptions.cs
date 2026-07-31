@@ -11,15 +11,10 @@ public sealed class GameServerOptions
 
     public int ZoneBasePort { get; set; } = 1100;
 
-    // Bloc de ports que l'orchestrateur a REELLEMENT reserve pour les listeners de zone. Le shard verifie
-    // au boot que chaque port derive (ZoneBasePort + mapId) y tombe : il ne peut pas deplacer un port, le
-    // plan d'adressage etant fige par le client legacy, mais il peut refuser de binder hors du bloc.
     public int ZonePortRangeStart { get; set; } = 1101;
 
     public int ZonePortRangeEnd { get; set; } = 1449;
 
-    // Ports que l'orchestrateur a attribues a d'autres ressources ; un port de zone qui tomberait dessus
-    // est un conflit, pas une coincidence.
     public string ReservedPorts { get; set; } = "";
 
     public byte ShardId { get; set; } = 1;

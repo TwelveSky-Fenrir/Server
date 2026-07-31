@@ -20,8 +20,6 @@ public sealed class RankBuffService(WorldStateService worldState) : IRankBuffSer
         return new RankBuffResult(RankBuffResolver.Outcome.Success);
     }
 
-    // ReturnSymbolNumNoMon (Server/Header/function.h:3155): the 4 tribe symbol slots only -- the neutral
-    // monster symbol is deliberately NOT counted here, unlike ReturnSymbolNum used by the combat modifiers.
     private int CountOwnedTribeSymbols(byte tribe)
     {
         if (tribe >= WorldStateService.TribeCount)

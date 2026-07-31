@@ -11,11 +11,6 @@ public sealed class AoiGrid(float cellSize)
         return ((int)MathF.Floor(posX / cellSize), (int)MathF.Floor(posZ / cellSize));
     }
 
-    public void Add(int characterId, (int X, int Z) cell)
-    {
-        AddMembership(characterId, cell);
-    }
-
     public void Add(int characterId, (int X, int Z) cell, float posX, float posY, float posZ)
     {
         AddMembership(characterId, cell);
@@ -26,15 +21,6 @@ public sealed class AoiGrid(float cellSize)
     {
         RemoveMembership(characterId, cell);
         _positions.Remove(characterId);
-    }
-
-    public void Move(int characterId, (int X, int Z) from, (int X, int Z) to)
-    {
-        if (from == to)
-            return;
-
-        RemoveMembership(characterId, from);
-        AddMembership(characterId, to);
     }
 
     public void Move(int characterId, (int X, int Z) from, (int X, int Z) to, float posX, float posY, float posZ)
@@ -66,26 +52,6 @@ public sealed class AoiGrid(float cellSize)
             _cells.Remove(cell);
     }
 
-    public IEnumerable<int> Neighbors((int X, int Z) cell)
-    {
-        for (var dx = -1; dx <= 1; dx++)
-        for (var dz = -1; dz <= 1; dz++)
-            if (_cells.TryGetValue((cell.X + dx, cell.Z + dz), out var members))
-                foreach (var id in members)
-                    yield return id;
-    }
-
-    public IEnumerable<int> Neighbors((int X, int Z) cell, float originX, float originY, float originZ, int scale = 1)
-    {
-        var radiusSquared = ExactRadiusSquared(scale);
-        for (var dx = -scale; dx <= scale; dx++)
-        for (var dz = -scale; dz <= scale; dz++)
-            if (_cells.TryGetValue((cell.X + dx, cell.Z + dz), out var members))
-                foreach (var id in members)
-                    if (WithinExactRadius(id, originX, originY, originZ, radiusSquared))
-                        yield return id;
-    }
-
     public bool HasAnyNeighbor((int X, int Z) cell, int scale = 1)
     {
         for (var dx = -scale; dx <= scale; dx++)
@@ -94,16 +60,6 @@ public sealed class AoiGrid(float cellSize)
                 return true;
 
         return false;
-    }
-
-    public void NeighborsExcludingSelf(List<int> buffer, (int X, int Z) cell, int excludeCharacterId)
-    {
-        for (var dx = -1; dx <= 1; dx++)
-        for (var dz = -1; dz <= 1; dz++)
-            if (_cells.TryGetValue((cell.X + dx, cell.Z + dz), out var members))
-                foreach (var id in members)
-                    if (id != excludeCharacterId)
-                        buffer.Add(id);
     }
 
     public void NeighborsExcludingSelf(List<int> buffer, (int X, int Z) cell, int excludeCharacterId,

@@ -5,9 +5,6 @@ using Microsoft.CodeAnalysis;
 
 namespace Fenrir.Generators.Analysis.Model;
 
-// Meme raison que LocationInfo : un Diagnostic porte un Location, donc un SyntaxTree, donc la Compilation.
-// Les arguments sont figes en chaines a la construction — string.Format produit le meme texte, et des
-// chaines se comparent par valeur sans travail supplementaire.
 internal readonly struct DiagnosticInfo : IEquatable<DiagnosticInfo>
 {
     private DiagnosticInfo(DiagnosticDescriptor descriptor, LocationInfo? location, EquatableArray<string> arguments)

@@ -101,8 +101,9 @@ public sealed class QuestProgressService(
                     out var container, out var slot))
                 return new QuestActionResult(false);
 
-            edits.Deposit(container, slot,
-                new ItemStack(result.RewardItemId, result.RewardItemQuantity, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+            if (result.RewardItemId > 0)
+                edits.Deposit(container, slot,
+                    new ItemStack(result.RewardItemId, result.RewardItemQuantity, 0, 0, 0, 0, 0, 0, 0, 0, 0));
         }
 
         if (result.DeleteItemId > 0)
@@ -388,10 +389,11 @@ public sealed class QuestProgressService(
 
         private static byte? FindSlot(ImmutableDictionary<byte, ItemStack> container, int itemId)
         {
+            byte? hit = null;
             foreach (var (slot, stack) in container)
-                if (stack.ItemId == itemId)
-                    return slot;
-            return null;
+                if (stack.ItemId == itemId && (hit is not { } best || slot < best))
+                    hit = slot;
+            return hit;
         }
     }
 }

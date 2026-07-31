@@ -13,22 +13,15 @@ public static class MonsterDropTailResolver
 
     private const int MaxHighLevel = 12;
 
-    private const int Zone241ForcedEligibleMonsterIdLow = 725;
-
-    private const int Zone241ForcedEligibleMonsterIdHigh = 730;
-
     private const int RebirthItemId = 1444;
     private const int RebirthChestLowTierItemId = 1378;
     private const int RebirthChestMidTierItemId = 1379;
 
     public static IReadOnlyList<DroppedItem> ResolveCpGiftCard(bool generalDropEligible, int monsterId,
-        bool isZone241TypeShard, int killerLevel2, bool isZone126TypeShard, Random random)
+        bool isZone241TypeShard, int killerLevel2, bool isZone126TypeShard, Random random,
+        bool godBuildVariantEnabled = false)
     {
-        var forcedEligible = isZone241TypeShard &&
-                             monsterId is >= Zone241ForcedEligibleMonsterIdLow
-                                 and <= Zone241ForcedEligibleMonsterIdHigh;
-
-        if ((!generalDropEligible && !forcedEligible) || killerLevel2 <= 0)
+        if (!godBuildVariantEnabled || !generalDropEligible || killerLevel2 <= 0)
             return [];
 
         var rate = isZone126TypeShard ? CpGiftBaseRateZone126 : CpGiftBaseRateDefault;
@@ -50,9 +43,10 @@ public static class MonsterDropTailResolver
         return [new DroppedItem(itemId, 1)];
     }
 
-    public static IReadOnlyList<DroppedItem> ResolveRebirthItem(int monsterId, Random random)
+    public static IReadOnlyList<DroppedItem> ResolveRebirthItem(int monsterId, Random random,
+        bool rebirthBuildVariantEnabled = false)
     {
-        if (!IsLodBossMonster(monsterId))
+        if (!rebirthBuildVariantEnabled || !IsLodBossMonster(monsterId))
             return [];
 
         var roll = random.Next(0, 100);

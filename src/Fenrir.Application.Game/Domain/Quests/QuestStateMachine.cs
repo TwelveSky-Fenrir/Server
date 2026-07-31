@@ -123,7 +123,7 @@ public static class QuestStateMachine
         var exp = 0;
         var teacherPoint = 0;
         var rewardItemId = 0;
-        var rewardQuantity = 0;
+        var rewardItemSlot = -1;
 
         foreach (var reward in quest.Rewards)
             switch (reward.RewardType)
@@ -133,19 +133,16 @@ public static class QuestStateMachine
                 case 4: exp += reward.Amount ?? 0; break;
                 case 5: teacherPoint += reward.Amount ?? 0; break;
                 case 6:
-                    if (rewardItemId == 0 && reward.ItemId is { } id)
+                    if (rewardItemSlot < 0 || reward.SlotIndex < rewardItemSlot)
                     {
-                        rewardItemId = id;
-                        rewardQuantity = itemSort(id) switch
-                        {
-                            null => 0,
-                            >= 7 and <= 29 => 0,
-                            _ => 1
-                        };
+                        rewardItemSlot = reward.SlotIndex;
+                        rewardItemId = reward.ItemId ?? 0;
                     }
 
                     break;
             }
+
+        var rewardQuantity = rewardItemSlot >= 0 && itemSort(rewardItemId) == 2 ? 1 : 0;
 
         var deleteItemId = progress.QSort switch
         {

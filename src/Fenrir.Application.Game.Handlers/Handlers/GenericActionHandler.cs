@@ -40,9 +40,6 @@ public sealed class GenericActionHandler(
 {
     private const int PetExperienceStatSort = 14;
 
-    // Discriminant HOTKEY_SORT du sort 204, porte par le premier int du payload et par aucun opcode :
-    // HK_SKILL=1, HK_EMO=2 (Server/ts25zone/S04_MyWork05.cpp:122-128). HK_ITEM=3 tombe dans le default
-    // de ProcessForSkillToHotKey, donc deconnecte (S04_MyWork05.cpp:660-662).
     private const int HotkeyBindSortSkill = 1;
 
     private const int HotkeyBindSortEmoticon = 2;

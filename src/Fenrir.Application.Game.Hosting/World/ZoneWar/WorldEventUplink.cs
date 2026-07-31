@@ -14,8 +14,6 @@ public sealed class WorldEventUplink(
     {
         if (relayQueue is null)
         {
-            // La dependance est optionnelle : sans ce log, un evenement RvR cross-shard perdu ne leve pas
-            // et ne se voit qu'au comportement du jeu.
             logger.LogError("World event sort {Sort} dropped: no IRvrSiegeEventRelayQueue is registered.", sort);
             return;
         }

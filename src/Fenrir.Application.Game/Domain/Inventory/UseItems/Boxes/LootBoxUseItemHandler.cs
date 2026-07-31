@@ -20,25 +20,26 @@ public sealed class LootBoxUseItemHandler(
 
     private const byte SuccessOutcome = 1;
 
-    private static readonly BoxRewardSpec CostumeChestPlaceholderSpec = BoxRewardSpec.Uniform(
+
+    private static readonly BoxRewardSpec CostumeChestOverrideSpec = BoxRewardSpec.Uniform(
         CostumeChest76543RewardTable.BoxItemId, ImmutableArray<int>.Empty, CostumeChest76543RewardTable.RentalDays);
 
-    private static readonly BoxRewardSpec SkyWarlordChestPlaceholderSpec =
+    private static readonly BoxRewardSpec SkyWarlordChestOverrideSpec =
         BoxRewardSpec.Uniform(WarlordChestRewardTable.SkyChestBoxItemId, ImmutableArray<int>.Empty);
 
-    private static readonly BoxRewardSpec EarthWarlordChestPlaceholderSpec =
+    private static readonly BoxRewardSpec EarthWarlordChestOverrideSpec =
         BoxRewardSpec.Uniform(WarlordChestRewardTable.EarthChestBoxItemId, ImmutableArray<int>.Empty);
 
-    private static readonly BoxRewardSpec HeavenlyJadeChestPlaceholderSpec =
+    private static readonly BoxRewardSpec HeavenlyJadeChestOverrideSpec =
         BoxRewardSpec.Uniform(HeavenlyJadeChest1236RewardTable.BoxId, ImmutableArray<int>.Empty);
 
-    private static readonly BoxRewardSpec WingLuckyBoxPlaceholderSpec =
+    private static readonly BoxRewardSpec WingLuckyBoxOverrideSpec =
         BoxRewardSpec.Uniform(WingLuckyBox8005RewardTable.BoxId, ImmutableArray<int>.Empty);
 
-    private static readonly BoxRewardSpec LoyKrathongBoxPlaceholderSpec =
+    private static readonly BoxRewardSpec LoyKrathongBoxOverrideSpec =
         BoxRewardSpec.Uniform(LoyKrathongBox8108RewardTable.BoxId, ImmutableArray<int>.Empty);
 
-    private static readonly BoxRewardSpec ChestBox720PlaceholderSpec =
+    private static readonly BoxRewardSpec ChestBox720OverrideSpec =
         BoxRewardSpec.Uniform(ChestBox720RewardTable.BoxId, ImmutableArray<int>.Empty);
 
     public static ImmutableArray<int> HandledItemIds { get; } = LootBoxCatalog.Default.RegisteredBoxIds
@@ -76,13 +77,13 @@ public sealed class LootBoxUseItemHandler(
 
         return boxId switch
         {
-            CostumeChest76543RewardTable.BoxItemId => CostumeChestPlaceholderSpec,
-            WarlordChestRewardTable.SkyChestBoxItemId => SkyWarlordChestPlaceholderSpec,
-            WarlordChestRewardTable.EarthChestBoxItemId => EarthWarlordChestPlaceholderSpec,
-            HeavenlyJadeChest1236RewardTable.BoxId => HeavenlyJadeChestPlaceholderSpec,
-            WingLuckyBox8005RewardTable.BoxId => WingLuckyBoxPlaceholderSpec,
-            LoyKrathongBox8108RewardTable.BoxId => LoyKrathongBoxPlaceholderSpec,
-            ChestBox720RewardTable.BoxId => ChestBox720PlaceholderSpec,
+            CostumeChest76543RewardTable.BoxItemId => CostumeChestOverrideSpec,
+            WarlordChestRewardTable.SkyChestBoxItemId => SkyWarlordChestOverrideSpec,
+            WarlordChestRewardTable.EarthChestBoxItemId => EarthWarlordChestOverrideSpec,
+            HeavenlyJadeChest1236RewardTable.BoxId => HeavenlyJadeChestOverrideSpec,
+            WingLuckyBox8005RewardTable.BoxId => WingLuckyBoxOverrideSpec,
+            LoyKrathongBox8108RewardTable.BoxId => LoyKrathongBoxOverrideSpec,
+            ChestBox720RewardTable.BoxId => ChestBox720OverrideSpec,
             _ => null
         };
     }

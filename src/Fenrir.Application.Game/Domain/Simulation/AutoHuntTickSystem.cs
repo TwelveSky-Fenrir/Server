@@ -29,8 +29,6 @@ public sealed class AutoHuntTickSystem(
 
     private const int AutoHuntMinuteStatSort = 62;
 
-    // AVATAR_OBJECT::BotBuff (Server/ts25zone/S07_MyGame04.cpp:2402) : pour le skill 82 le slot 31 est teste
-    // en verite brute, pas en > 0 comme tous les autres slots de garde.
     private const int RawTruthGateBuffSlot = 31;
 
     private static readonly FrozenDictionary<int, ImmutableArray<int>> AutoCastGateSlots =
@@ -110,8 +108,6 @@ public sealed class AutoHuntTickSystem(
             if (!result.Success || result.Kind != SkillEffectKind.SelfBuff)
                 continue;
 
-            // Hors serveur de type zone 126 le manque de mana n'interrompt rien : le legacy retombe dans le
-            // corps du cast et laisse la mana passer sous zero (Server/ts25zone/S07_MyGame04.cpp:2461-2482).
             if (state.Mana < result.ManaCost && isZone126)
             {
                 EscalateNoMana(state);
@@ -237,9 +233,6 @@ public sealed class AutoHuntTickSystem(
     {
         var candidates = new List<BotHotKeyResupplyPolicy.InventoryCandidate>();
 
-        // MyUtil::FindInventoryPill (Server/ts25zone/S07_MyGame03.cpp:8556-8559) teste la seconde page en
-        // strictement superieur a la date du jour, la ou tout le reste du legacy la teste en >= : le jour de
-        // l'expiration la page 2 reste utilisable partout sauf ici.
         var pageCount = state.InventoryDate != 0 && state.InventoryDate > GameDate.Today() ? 2 : 1;
 
         for (byte page = 0; page < pageCount; page++)

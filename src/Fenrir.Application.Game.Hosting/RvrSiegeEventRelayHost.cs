@@ -29,9 +29,6 @@ public sealed class RvrSiegeEventRelayHost(
 
     private void DeliverLocally(RvrSiegeEventRelayDto dto)
     {
-        // Seul point du systeme qui voit du trafic non maitrise : la table de relais est alimentable par
-        // n'importe quel shard. La garde doit etre ICI, en amont de l'aiguillage, sinon une troisieme
-        // destination ajoutee plus tard la contourne sans bruit.
         if (!KnownTSortRegistry.IsKnown(dto.Sort))
         {
             logger.LogWarning(

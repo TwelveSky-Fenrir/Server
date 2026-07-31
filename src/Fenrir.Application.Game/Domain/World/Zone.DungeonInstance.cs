@@ -118,7 +118,7 @@ public sealed partial class Zone
 
     private void ClearZone241PersonalDungeonInstance(PlayerRuntimeState state)
     {
-        if (state.DungeonInstanceLifecycleState != DungeonInstanceLifecycle.Summoning)
+        if (state.DungeonInstanceLifecycleState == DungeonInstanceLifecycle.Idle)
             return;
 
         if (state.DungeonInstanceId is not { } instanceId)
@@ -160,7 +160,6 @@ public sealed partial class Zone
             if (!bossAlive)
             {
                 state.DungeonInstanceLifecycleState = DungeonInstanceLifecycle.Success;
-                ClearZone241PersonalDungeonInstance(state);
                 continue;
             }
 

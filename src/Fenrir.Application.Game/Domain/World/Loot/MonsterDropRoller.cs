@@ -26,18 +26,23 @@ public sealed class MonsterDropRoller(
 
     private const float PremiumDropRatioBonus = 1.0f;
 
-    public static bool IsEligible(MonsterRowDto monster, short killerLevel)
+    private const float DropItemTimeUserRatioFactor = 2.0f;
+
+    private const float Zone039GeneralItemRatioBonus = 1.0f;
+
+    public static bool IsEligible(MonsterRowDto monster, short killerLevel, int? killerLevel2 = null)
     {
         if (monster.MartialItemLevel >= 1)
-            return false;
+            return killerLevel2 is { } level2 && level2 - monster.MartialItemLevel <= 0;
 
         return killerLevel - monster.ItemLevel <= 9;
     }
 
-    public MonsterDropResult Roll(MonsterDefinition monster, short killerLevel, byte killerTribe, int killerLuck,
-        QuestProgress killerQuest, Func<int, bool> killerHasItem, bool killerPremiumActive = false)
+    public MonsterDropResult Roll(MonsterDefinition monster, short killerLevel, byte killerPreviousTribe,
+        int killerLuck, QuestProgress killerQuest, Func<int, bool> killerHasItem, bool killerPremiumActive = false,
+        int? killerLevel2 = null, bool killerDropItemTimeActive = false, bool isZone039TypeShard = false)
     {
-        var eligible = IsEligible(monster.Monster, killerLevel);
+        var eligible = IsEligible(monster.Monster, killerLevel, killerLevel2);
 
         var premiumBonus = killerPremiumActive ? PremiumDropRatioBonus : 0f;
         var effectiveItemDropRatio = itemDropRatio + premiumBonus;
@@ -50,8 +55,9 @@ public sealed class MonsterDropRoller(
         if (eligible)
         {
             RollPotions(monster.DropPotions, killerLuck, effectiveItemDropRatio, items);
-            RollGeneralItems(monster.Monster, monster.DropCategoryRates, killerTribe, killerLuck,
-                effectiveUserDropRatio, effectiveItemDropRatio, effectiveRareDropRatio, items);
+            RollGeneralItems(monster.Monster, monster.DropCategoryRates, killerPreviousTribe, killerLuck,
+                effectiveUserDropRatio, effectiveItemDropRatio, effectiveRareDropRatio, killerDropItemTimeActive,
+                isZone039TypeShard, items);
         }
 
         RollQuestItem(monster.DropQuestItem, killerQuest, killerHasItem, items);
@@ -96,8 +102,9 @@ public sealed class MonsterDropRoller(
     }
 
     private void RollGeneralItems(MonsterRowDto monster, IReadOnlyList<MonsterDropCategoryRateRowDto> rates,
-        byte killerTribe, int killerLuck, float effectiveUserDropRatio, float effectiveItemDropRatio,
-        float effectiveRareDropRatio, List<DroppedItem> items)
+        byte killerPreviousTribe, int killerLuck, float effectiveUserDropRatio, float effectiveItemDropRatio,
+        float effectiveRareDropRatio, bool killerDropItemTimeActive, bool isZone039TypeShard,
+        List<DroppedItem> items)
     {
         int levelLow, levelHigh;
         if (monster.MartialItemLevel < 1)
@@ -110,8 +117,11 @@ public sealed class MonsterDropRoller(
             levelLow = levelHigh = monster.ItemLevel + monster.MartialItemLevel;
         }
 
-        var commonUniqueRatio = effectiveUserDropRatio + effectiveItemDropRatio;
-        var rareRatio = effectiveUserDropRatio + effectiveRareDropRatio;
+        var userRatio = effectiveUserDropRatio *
+                        (killerDropItemTimeActive ? DropItemTimeUserRatioFactor : 1.0f);
+        var zoneBonus = isZone039TypeShard ? Zone039GeneralItemRatioBonus : 0.0f;
+        var commonUniqueRatio = userRatio + effectiveItemDropRatio + zoneBonus;
+        var rareRatio = userRatio + effectiveRareDropRatio + zoneBonus;
 
         foreach (var rate in rates)
         {
@@ -139,7 +149,8 @@ public sealed class MonsterDropRoller(
             if (LootRandomSource.RandomNumber(random) > temp)
                 continue;
 
-            var itemId = GeneralItemDropResolver.Resolve(worldData, random, killerTribe, itemType, levelLow, levelHigh);
+            var itemId = GeneralItemDropResolver.Resolve(worldData, random, killerPreviousTribe, itemType, levelLow,
+                levelHigh);
             if (itemId is { } resolved)
                 items.Add(new DroppedItem(resolved, 1));
         }

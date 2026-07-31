@@ -12,7 +12,6 @@ public sealed class RegularWarRewardValueProvider : IRegularWarRewardValueProvid
 
     public long GetMoneyReward(short evolutionTier, short level)
     {
-        // un tier martial > 0 court-circuite la table de niveau - Server/ts25zone/S07_MyGame01.cpp:6728
         if (evolutionTier > 0)
             return evolutionTier switch
             {
@@ -22,7 +21,6 @@ public sealed class RegularWarRewardValueProvider : IRegularWarRewardValueProvid
                 _ => 0
             };
 
-        // variante LNW33 uniquement - Server/ts25zone/S07_MyGame01.cpp:7336-7882
         return level switch
         {
             < 10 => 0,

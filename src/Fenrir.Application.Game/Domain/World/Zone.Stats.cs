@@ -37,8 +37,6 @@ public sealed partial class Zone
 
         if (clampVitals)
         {
-            // SetHPMP ne tronque QUE vers le bas : un maximum qui monte ne soigne jamais, et un maximum qui
-            // baisse rabote les points courants (Server/ts25zone/S07_MyGame04.cpp:146).
             if (state.Life > state.MaxLife)
             {
                 state.Life = state.MaxLife;

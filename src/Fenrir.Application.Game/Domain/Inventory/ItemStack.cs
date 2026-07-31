@@ -33,8 +33,6 @@ public readonly record struct ItemStack(
             SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial);
     }
 
-    // V1 perd gemmes et expiration, que le legacy porte pourtant (Server/ts25zone/S04_MyWork05.cpp:2999-3000
-    // depot, :3104-3105 retrait) ; gardee vivante tant que game.usp_AccountVault_* n'a pas bascule en V2.
     public AccountVaultItemSlotTvp ToVaultTvp(short slotIndex)
     {
         return new AccountVaultItemSlotTvp(slotIndex, ItemId, Quantity,

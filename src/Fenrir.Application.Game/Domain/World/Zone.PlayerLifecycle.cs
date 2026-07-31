@@ -146,10 +146,6 @@ public sealed partial class Zone
             MaxMana = data.MaxMana,
             FlushSequence = data.FlushSequence,
             LastMoveUtc = DateTime.UtcNow,
-            // La porte 1 s est une EGALITE STRICTE sur (rawTick - LastOneSecondGateTick) == 2. Sans ce
-            // seed, un joueur entrant apres le tick 2 de la zone ne l'ouvre JAMAIS : buffs qui n'expirent
-            // plus, stun permanent, aucune regen de meditation. Le legacy seede pareil
-            // (Server/ts25zone/S04_MyWork02.cpp:831, mTickCountFor01Second = mGAME.mTickCount).
             LastOneSecondGateTick = RawLogicTick,
             LastAvatarRebroadcastAt = _clock,
             IsDead = data.IsDead,
@@ -271,8 +267,6 @@ public sealed partial class Zone
 
         HydrateMountState(state, data);
 
-        // data.Stats vient d'EnterWorldService, calcule sans runtimeState : ni buff, ni rune, ni monture, ni
-        // zone. Le legacy recalcule tout a l'entree puis borne (Server/ts25zone/S04_MyWork02.cpp:1036).
         RecomputeAndPublish(state, clampVitals: true);
 
         var cell = _grid.CellOf(state.PosX, state.PosZ);
@@ -792,8 +786,6 @@ public sealed partial class Zone
         if (isResumeAction && !EvaluateResumeActionSkillGradeGuard(state, in action))
             return;
 
-        // Server/ts25zone/S04_MyWork02.cpp:1501-1680 -- toutes les gardes de cast precedent le commit :1727,
-        // un echec ne doit donc ni committer l'etat, ni echo au joueur, ni diffuser en AoI.
         var isGuardedSkillCast = !isResumeAction &&
                                  motion.SkillCategoryCode is SkillCastGuard.HotkeyBoundCategoryCode
                                      or SkillCastGuard.SkillEffectCategoryCode;
@@ -1223,9 +1215,6 @@ public sealed partial class Zone
 
     private void RecomputeDerivedStats(PlayerRuntimeState state)
     {
-        // Famille buff/pet/monture : le legacy appelle SetBasicAbilityFromEquip SANS SetHPMP, donc une
-        // expiration de buff laisse les PV courants au-dessus du nouveau maximum
-        // (Server/ts25zone/S07_MyGame04.cpp:1329, Server/ts25zone/S04_MyWork02.cpp:2431).
         RecomputeAndPublish(state, clampVitals: false);
     }
 

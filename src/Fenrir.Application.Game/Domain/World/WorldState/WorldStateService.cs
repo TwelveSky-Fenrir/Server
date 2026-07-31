@@ -333,7 +333,7 @@ public sealed class WorldStateService(
                     snapshot.HighTribe, consumedValue, ct)
                 .ConfigureAwait(false);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogError(ex,
                 "WorldState: immediate persist of UpdateTribePoint flag consumption failed -- flag left pending, next poll retries the whole sequence");
@@ -375,7 +375,7 @@ public sealed class WorldStateService(
                 await repository.UpdateTribeAsync(tribe.TribeId, tribe.SymbolDate, tribe.HasSymbol, tribe.Points,
                     tribe.IsClosed, ct).ConfigureAwait(false);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 allSucceeded = false;
                 logger.LogError(ex,

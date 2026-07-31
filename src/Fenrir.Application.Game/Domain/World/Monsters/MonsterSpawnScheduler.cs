@@ -1,4 +1,6 @@
+using System.Buffers.Binary;
 using System.Collections.Concurrent;
+using System.Text;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Quests;
@@ -37,10 +39,15 @@ public sealed class MonsterSpawnScheduler(
     MonsterBossRespawnTracker? bossRespawnTracker = null,
     TowerWarState? towerWar = null,
     ValleyWarKillRegistry? valleyWarKillRegistry = null,
-    BossDropCatalog? bossDropCatalog = null)
+    BossDropCatalog? bossDropCatalog = null,
+    Lazy<ZoneCenterBroadcastIngestor>? siegeIngestor = null)
     : ISimulationSystem
 {
     private const int RegularMonsterTableCapacity = 3400;
+
+    private const int FirstAttackNameOffset = 8;
+
+    private const int FirstAttackNameSize = 13;
 
     private const short YangGokNormalBossZoneId = 38;
 
@@ -85,6 +92,23 @@ public sealed class MonsterSpawnScheduler(
     public int SlotCountFor(short mapId)
     {
         return _stateByZone.TryGetValue(mapId, out var state) ? state.Slots.Count : 0;
+    }
+
+    public void AnnounceStoneFirstAttack(int eventCode, int slotIndex, byte attackerTribe, string attackerName)
+    {
+        if (siegeIngestor is null)
+            return;
+
+        Span<byte> payload = stackalloc byte[ZoneCenterBroadcastIngestor.PayloadSize];
+        payload.Clear();
+        BinaryPrimitives.WriteInt32LittleEndian(payload, slotIndex);
+        BinaryPrimitives.WriteInt32LittleEndian(payload[4..], attackerTribe);
+
+        var nameField = payload.Slice(FirstAttackNameOffset, FirstAttackNameSize);
+        var copied = Math.Min(attackerName.Length, FirstAttackNameSize - 1);
+        Encoding.ASCII.GetBytes(attackerName.AsSpan(0, copied), nameField);
+
+        siegeIngestor.Value.Ingest(eventCode, payload);
     }
 
     private MonsterZoneSpawnState BuildState(short mapId, bool isDungeonZone)
@@ -225,8 +249,10 @@ public sealed class MonsterSpawnScheduler(
         if (death.KillerCharacterId is { } killerId)
             zone.TryGetPlayer(killerId, out killer);
 
-        if (killer is not null && TribeSymbolIndexOf(monster.Template.SpecialType) is { } symbolIndex)
-            zoneEventBroadcaster?.Value.AnnounceSymbolResolved(symbolIndex, killer.Tribe);
+        if (monster.SpecialSort == MonsterSpecialSort.TribeSymbolStone &&
+            TribeSymbolIndexOf(monster.Template.SpecialType) is { } symbolIndex &&
+            monster.TryResolveTribeSymbolWinner(out var winnerTribe))
+            zoneEventBroadcaster?.Value.AnnounceSymbolResolved(symbolIndex, winnerTribe);
 
         IReadOnlyList<int>? partyMemberIds = null;
         var killRaceInterceptsExperienceGrant = false;

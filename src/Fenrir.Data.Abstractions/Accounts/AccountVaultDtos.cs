@@ -29,8 +29,6 @@ public sealed partial record AccountVaultItemSlotTvp(
     int SerialNumber,
     string? SocketData);
 
-// Ordinal-mappe : ces quatre parametres finaux exigent que usp_AccountVault_GetV2 les projette dans cet
-// ordre, en fin de SELECT. Les gemmes sont trois et contigues (uSaveSocket[28][3], STRUCT.h:462).
 [GenerateDto]
 public sealed partial record AccountVaultItemSlotV2Dto(
     short SlotIndex,

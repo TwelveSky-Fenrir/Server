@@ -120,11 +120,12 @@ public sealed class BuyCashItemService(
                 };
             }
 
-            newStack = existing with { Quantity = existing.Quantity + grantQuantity };
+            newStack = existing with { Quantity = existing.Quantity + grantQuantity, Serial = 0 };
         }
         else
         {
-            newStack = new ItemStack(entry.ItemId, grantQuantity, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+            var serial = ItemSerialGenerator.Generate(ItemSerialGenerator.EliteItemType, DateTimeOffset.UtcNow);
+            newStack = new ItemStack(entry.ItemId, grantQuantity, 0, 0, 0, 0, 0, 0, 0, 0, serial);
         }
 
         var projectedContainer = state.Inventory.GetContainer((byte)page).SetItem((byte)slot, newStack);
@@ -150,7 +151,7 @@ public sealed class BuyCashItemService(
         var response = new BuyCashItemResponse
         {
             Result = 0, CashSize = newBalance, Page = page, Index = slot,
-            Value = [newStack.ItemId, 0, 0, newStack.Quantity, 0, 0]
+            Value = [newStack.ItemId, 0, 0, newStack.Quantity, 0, newStack.Serial]
         };
 
         var containers = ImmutableArray.Create(new InventoryContainerSnapshot((byte)page, projectedContainer));

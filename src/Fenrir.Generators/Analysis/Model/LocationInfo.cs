@@ -4,8 +4,6 @@ using Microsoft.CodeAnalysis.Text;
 
 namespace Fenrir.Generators.Analysis.Model;
 
-// Un Location retient son SyntaxTree, donc toute la Compilation : le garder dans une valeur de pipeline
-// enracine le graphe entier et, faute d'egalite structurelle, invalide le cache a chaque frappe.
 internal readonly struct LocationInfo : IEquatable<LocationInfo>
 {
     private LocationInfo(string filePath, TextSpan textSpan, LinePositionSpan lineSpan)

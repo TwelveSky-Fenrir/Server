@@ -11,8 +11,6 @@ public readonly record struct EquippedItemSlot(
     int SocketGem2 = 0,
     int SocketGem3 = 0)
 {
-    // Les 4 octets de aEquip[i][2] dans l'ordre ou SetISIUIMValue les empile : IS/IU/IM/IZ
-    // (Server/Header/function.h:415-425 ; noms Server/ts25login/S04_MyWork02.cpp:1110).
     public int PackedUpgradeValue => Enchant | (Combine << 8) | (Refine << 16) | (Socket << 24);
 }
 

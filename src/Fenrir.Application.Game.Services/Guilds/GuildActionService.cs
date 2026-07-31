@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Domain.Social;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Protocol.Game;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Guilds;
@@ -15,6 +16,7 @@ public sealed class GuildActionService(
     ILogger<GuildActionService> logger) : IGuildActionService
 {
     private const int CreateGuildMoneyCost = 10_000_000;
+    private const int GuildNameTakenErrorNumber = 50230;
     internal const int MaxSubMasters = 2;
 
     public async ValueTask<GuildActionResult> CreateGuildAsync(GuildActionRequest packet, Zone zone,
@@ -31,6 +33,12 @@ public sealed class GuildActionService(
         try
         {
             guildId = await guilds.CreateAndDebitMoneyAsync(name, characterId, -CreateGuildMoneyCost, 0, ct);
+        }
+        catch (SqlException ex) when (ex.Number == GuildNameTakenErrorNumber)
+        {
+            logger.LogDebug(ex, "Character {CharacterId} guild create rejected: name {GuildName} is already taken",
+                characterId, name);
+            return GuildActionResult.Success(1, GuildInfoProjection.Empty(), 2);
         }
         catch (Exception ex)
         {
@@ -55,7 +63,11 @@ public sealed class GuildActionService(
         if (state.GuildId is not { } guildId)
             return GuildActionResult.Aborted;
 
-        return GuildActionResult.Success(2, await BuildGuildInfoAsync(guildId, ct));
+        var info = await TryBuildGuildInfoAsync(guildId, ct);
+
+        return info is { } resolved
+            ? GuildActionResult.Success(2, resolved)
+            : GuildActionResult.Success(2, GuildInfoProjection.Empty(), 1);
     }
 
     public async ValueTask<GuildActionResult> FinalizeInviteAsync(PlayerRuntimeState state, int characterId,
@@ -461,18 +473,25 @@ public sealed class GuildActionService(
         try
         {
             await guilds.SetLogoAsync(guildId, payload.Value, ct);
-            logger.LogInformation("Character {CharacterId} updated the logo for guild {GuildId}", state.CharacterId,
-                guildId);
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Guild {GuildId} logo update failed", guildId);
+            return GuildActionResult.Success(1001, GuildInfoProjection.Empty(), 1);
         }
+
+        logger.LogInformation("Character {CharacterId} updated the logo for guild {GuildId}", state.CharacterId,
+            guildId);
 
         return GuildActionResult.Success(1001, GuildInfoProjection.Empty());
     }
 
     private async Task<GuildInfo> BuildGuildInfoAsync(int guildId, CancellationToken ct)
+    {
+        return await TryBuildGuildInfoAsync(guildId, ct) ?? GuildInfoProjection.Empty();
+    }
+
+    private async Task<GuildInfo?> TryBuildGuildInfoAsync(int guildId, CancellationToken ct)
     {
         var guildTask = guilds.GetByIdAsync(guildId, ct);
         var rosterTask = guilds.GetRosterAsync(guildId, ct);
@@ -481,7 +500,7 @@ public sealed class GuildActionService(
 
         return guildTask.Result is { } guild
             ? GuildInfoProjection.Build(guild, rosterTask.Result, noticesTask.Result)
-            : GuildInfoProjection.Empty();
+            : null;
     }
 
     private static GuildRosterRowDto? FindMember(IReadOnlyList<GuildRosterRowDto> roster, string name)

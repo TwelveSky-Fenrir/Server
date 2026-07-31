@@ -8,10 +8,6 @@ using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace Fenrir.Generators.Analyzers;
 
-// Ferme l'angle mort documente de FEN104. Celui-ci ne rapporte que sur les types declares dans la
-// compilation courante : deux assemblies SOEURS qui emettent chacune le dispatcher d'un meme serveur, sans
-// se referencer l'une l'autre, lui sont mutuellement invisibles. Seul l'executable qui les COMPOSE les voit
-// toutes les deux — d'ou une regle qui compte les assemblies REFERENCEES exposant le type.
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class DuplicateDispatcherAnalyzer : DiagnosticAnalyzer
 {

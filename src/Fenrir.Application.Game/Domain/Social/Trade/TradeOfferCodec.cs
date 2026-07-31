@@ -39,7 +39,7 @@ public static class TradeOfferCodec
             trade[baseIndex] = stack.ItemId;
             trade[baseIndex + 1] = stack.Quantity;
             trade[baseIndex + 2] = stack.Enchant | (stack.Combine << 8) | (stack.Refine << 16) | (stack.Socket << 24);
-            trade[baseIndex + 3] = stack.ExpireDate;
+            trade[baseIndex + 3] = stack.Serial;
         }
 
         return trade;

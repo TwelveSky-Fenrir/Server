@@ -4,8 +4,6 @@ namespace Fenrir.Application.Game.Domain.Combat;
 
 public static class FfaEqualStatsOverride
 {
-    // Regle Fenrir sans equivalent legacy retrouve : la carte 335 n'est pas une zone d'equilibrage
-    // (Server/ts25zone/S07_MyGame03.cpp:9150) et aucune des neuf valeurs n'existe dans Server/.
     private const int FixedAttackPower = 45000;
     private const int FixedDefensePower = 30000;
     private const int FixedAttackSuccess = 30000;

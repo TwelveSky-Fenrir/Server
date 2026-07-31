@@ -2,13 +2,6 @@ using System.Globalization;
 
 namespace Fenrir.Application.Game.Hosting;
 
-/// <remarks>
-/// L'orchestrateur reserve un BLOC de ports pour les listeners de zone et ne peut pas connaitre la liste
-/// des maps : elle vient de admin.ShardMapAssignments, resolue par le shard au boot. Ce garde ferme
-/// l'ecart dans l'autre sens — il verifie que chaque port derive tombe bien dans le bloc annonce, plutot
-/// que de dupliquer une liste de maps que SQL calcule deja (027_shard_map_assignments_all_zones.sql
-/// derive l'assignation de world.Zones ; toute liste ecrite a la main divergerait au premier seed).
-/// </remarks>
 public static class ZonePortRangeGuard
 {
     public static void EnsureAllPortsWithinReservedBlock(

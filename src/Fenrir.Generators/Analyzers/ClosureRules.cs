@@ -19,9 +19,6 @@ internal sealed class ForbiddenClosureEntry
     public string Reason { get; }
 }
 
-// Ces invariants n'ont AUCUNE expression possible en ProjectReference : ils portent sur ce qui doit rester
-// ABSENT de la cloture, et une cloture est transitive. Retirer une arete directe ne prouve rien tant qu'un
-// intermediaire peut la reintroduire.
 internal static class ClosureRules
 {
     private const string LeafReason =

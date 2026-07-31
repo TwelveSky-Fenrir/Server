@@ -49,8 +49,6 @@ public static class NpcShopPolicy
 
     private const int SellExemptRangeEndInclusive = 99756;
 
-    private const byte StackableSellSort = 2;
-
     private const long MaxTradeableCost = 2_000_000_000;
 
     public static readonly IReadOnlySet<short> TownZoneNumbers = new HashSet<short> { 1, 6, 11, 37, 140 };
@@ -77,7 +75,7 @@ public static class NpcShopPolicy
 
     public static bool IsStackableSellSort(byte sort)
     {
-        return sort == StackableSellSort;
+        return ContainerMatrix.IsStackableSort(sort);
     }
 
     public static bool IsSellExempt(int itemId)
@@ -181,7 +179,7 @@ public static class NpcShopPolicy
                     return new BuyResult(costFailure, 0, 0, null);
 
                 return new BuyResult(BuyOutcome.Success, moneyCost, cpCost,
-                    existing with { Quantity = mergedQuantity });
+                    existing with { Quantity = mergedQuantity, Serial = 0 });
             }
 
             if (!TryResolveCost(item, requestedQuantity, playerContributionPoints,
@@ -199,11 +197,8 @@ public static class NpcShopPolicy
                 out var singleCpCost, out var singleCostFailure))
             return new BuyResult(singleCostFailure, 0, 0, null);
 
-        // Empilable : le legacy remet le serial a 0 (Server/ts25zone/S04_MyWork05.cpp:229-237), seul le
-        // non-empilable en recoit un (:1976) ; instant absent = 0 tant que l'appelant n'a pas d'horloge.
-        var serial = purchaseInstant is { } instant
-            ? ItemSerialGenerator.Generate(ItemSerialGenerator.UnconditionalItemType, instant)
-            : 0;
+        var serial = ItemSerialGenerator.Generate(ItemSerialGenerator.UnconditionalItemType,
+            purchaseInstant ?? DateTimeOffset.UtcNow);
 
         return new BuyResult(BuyOutcome.Success, singleMoneyCost, singleCpCost,
             new ItemStack(item.ItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, serial));

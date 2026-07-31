@@ -14,8 +14,6 @@ public sealed class ClaimGiftService(IGiftRepository gifts, ILogger<ClaimGiftSer
     {
         var pending = await gifts.GetPendingByAccountAsync(accountId, cancellationToken);
 
-        // Same slot order as GiftListService: the index the client replays here was handed out by CLP_25
-        // (Server/ts25login/S04_MyWork02.cpp:1423), so the tie-break on GiftId must match it exactly.
         var slots = pending.OrderBy(g => g.CreatedAtUtc).ThenBy(g => g.GiftId).ToArray();
 
         if (giftInfoIndex < 0 || giftInfoIndex >= slots.Length)

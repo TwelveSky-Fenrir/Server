@@ -15,7 +15,7 @@ public static class TribeBonusRatioEventMap
 
     private const float RatioScale = 0.1f;
 
-    public static void Apply(ZoneCenterSiegeState state, ReadOnlySpan<byte> data, ILogger? logger = null)
+    public static bool Apply(ZoneCenterSiegeState state, ReadOnlySpan<byte> data, ILogger? logger = null)
     {
         var eventSort = ReadInt32(data, 0);
         var eventValue = ReadInt32(data, 4);
@@ -27,14 +27,14 @@ public static class TribeBonusRatioEventMap
             {
                 var tribeIndex = (byte)(eventSort - GeneralExperienceUpRatioFamilyBase);
                 state.SetExperienceBonusRatio(tribeIndex, eventValue * RatioScale);
-                break;
+                return true;
             }
 
             case >= ItemDropUpRatioFamilyBase and < ItemDropUpRatioFamilyBase + WorldStateService.TribeCount:
             {
                 var tribeIndex = (byte)(eventSort - ItemDropUpRatioFamilyBase);
                 state.SetItemDropBonusRatio(tribeIndex, eventValue * RatioScale);
-                break;
+                return true;
             }
 
             case >= ItemDropUpRatioForMyoungFamilyBase
@@ -42,7 +42,7 @@ public static class TribeBonusRatioEventMap
             {
                 var tribeIndex = (byte)(eventSort - ItemDropUpRatioForMyoungFamilyBase);
                 state.SetMyoungItemDropBonusRatio(tribeIndex, eventValue * RatioScale);
-                break;
+                return true;
             }
 
             case >= KillOtherTribeAddValueFamilyBase
@@ -50,14 +50,14 @@ public static class TribeBonusRatioEventMap
             {
                 var tribeIndex = (byte)(eventSort - KillOtherTribeAddValueFamilyBase);
                 state.SetKillOtherTribeBonus(tribeIndex, eventValue);
-                break;
+                return true;
             }
 
             default:
                 logger?.LogDebug(
                     "Tribe bonus-ratio event (tSort=301) carried unrecognized tEventSort {EventSort} -- ignored, matching legacy's own missing default case",
                     eventSort);
-                break;
+                return true;
         }
     }
 

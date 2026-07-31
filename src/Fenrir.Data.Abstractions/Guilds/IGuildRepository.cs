@@ -48,9 +48,6 @@ public interface IGuildRepository
     public ValueTask SetBuffAsync(int guildId, int buffType, int buffState, int buffTime, long buffTimeForDiff,
         CancellationToken ct);
 
-    // Les deux paires de colonnes de buff sont ecrites SEPAREMENT par le legacy
-    // (Server/ts25extra/S08_MyDB.cpp:1151-1186 pour le temps, :1188-1191 pour le type) : ecrire les quatre
-    // d'un coup fait perdre les minutes payees ecrites entre-temps par un autre ecrivain.
     public ValueTask SetBuffTimeAsync(int guildId, int buffTime, long buffTimeForDiff, CancellationToken ct);
 
     public ValueTask SetBuffTypeAsync(int guildId, int buffType, int buffState, CancellationToken ct);

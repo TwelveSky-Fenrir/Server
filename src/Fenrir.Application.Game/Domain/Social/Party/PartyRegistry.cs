@@ -43,10 +43,11 @@ public sealed class Party
 
     public Party(int leaderId, int firstMemberId)
     {
+        LeaderId = leaderId;
         _members = [leaderId, firstMemberId];
     }
 
-    public int LeaderId => _members[0];
+    public int LeaderId { get; }
 
     public IReadOnlyList<int> Members => _members;
 
@@ -61,7 +62,7 @@ public sealed class Party
 
     public bool TryRemoveMember(int characterId)
     {
-        return _members.Remove(characterId);
+        return characterId != LeaderId && _members.Remove(characterId);
     }
 }
 
@@ -357,13 +358,6 @@ public sealed class PartyRegistry
                 return false;
 
             _leaderByMember.Remove(targetId);
-
-            if (party.Members.Count < 2)
-            {
-                disbanded = true;
-                DisbandLocked(party);
-            }
-
             return true;
         }
     }
@@ -404,12 +398,6 @@ public sealed class PartyRegistry
                         .NotInParty;
 
             _leaderByMember.Remove(characterId);
-
-            if (party.Members.Count < 2)
-            {
-                DisbandLocked(party);
-                return new PartyDisconnectResult(PartyDisconnectKind.MemberLeftAndDisbanded, membersBeforeLeave, []);
-            }
 
             return new PartyDisconnectResult(PartyDisconnectKind.MemberLeft, membersBeforeLeave,
                 party.Members.ToArray());

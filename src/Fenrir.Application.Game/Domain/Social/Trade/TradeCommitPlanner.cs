@@ -5,6 +5,17 @@ namespace Fenrir.Application.Game.Domain.Social.Trade;
 
 public static class TradeCommitPlanner
 {
+    public enum CommitRejection
+    {
+        None,
+
+        InventoryOverflow,
+
+        StaleReservation,
+
+        UnsupportedOrigin
+    }
+
     public static Plan BuildFinalContainers(
         ImmutableDictionary<byte, ItemStack> currentPage0,
         ImmutableDictionary<byte, ItemStack> currentPage1,
@@ -20,12 +31,21 @@ public static class TradeCommitPlanner
                 continue;
 
             if (slot.Container == ContainerMatrix.InventoryPage0)
-                page0 = page0.Remove(slot.Slot);
+            {
+                if (!TryConsumeReservation(ref page0, slot.Slot, slot.Stack))
+                    return Reject(currentPage0, currentPage1, CommitRejection.StaleReservation);
+            }
             else if (slot.Container == ContainerMatrix.InventoryPage1)
-                page1 = page1.Remove(slot.Slot);
+            {
+                if (!TryConsumeReservation(ref page1, slot.Slot, slot.Stack))
+                    return Reject(currentPage0, currentPage1, CommitRejection.StaleReservation);
+            }
+            else
+            {
+                return Reject(currentPage0, currentPage1, CommitRejection.UnsupportedOrigin);
+            }
         }
 
-        var overflowed = false;
         foreach (var received in receivedSlots)
         {
             if (received is not { } slot)
@@ -36,10 +56,30 @@ public static class TradeCommitPlanner
             else if (TryFindFreeSlot(page1, out freeSlot))
                 page1 = page1.SetItem(freeSlot, slot.Stack);
             else
-                overflowed = true;
+                return Reject(currentPage0, currentPage1, CommitRejection.InventoryOverflow);
         }
 
-        return new Plan(page0, page1, overflowed);
+        return new Plan(page0, page1, CommitRejection.None);
+    }
+
+    private static bool TryConsumeReservation(ref ImmutableDictionary<byte, ItemStack> page, byte slot,
+        ItemStack reserved)
+    {
+        if (reserved.Quantity <= 0 || !page.TryGetValue(slot, out var live))
+            return false;
+
+        if (live.ItemId != reserved.ItemId || live.Quantity < reserved.Quantity)
+            return false;
+
+        var remaining = live.Quantity - reserved.Quantity;
+        page = remaining > 0 ? page.SetItem(slot, live with { Quantity = remaining }) : page.Remove(slot);
+        return true;
+    }
+
+    private static Plan Reject(ImmutableDictionary<byte, ItemStack> page0,
+        ImmutableDictionary<byte, ItemStack> page1, CommitRejection rejection)
+    {
+        return new Plan(page0, page1, rejection);
     }
 
     private static bool TryFindFreeSlot(ImmutableDictionary<byte, ItemStack> container, out byte freeSlot)
@@ -60,5 +100,8 @@ public static class TradeCommitPlanner
     public readonly record struct Plan(
         ImmutableDictionary<byte, ItemStack> Page0,
         ImmutableDictionary<byte, ItemStack> Page1,
-        bool Overflowed);
+        CommitRejection Rejection)
+    {
+        public bool Overflowed => Rejection != CommitRejection.None;
+    }
 }

@@ -16,8 +16,6 @@ public sealed class ZoneTransferService(
     IOptions<LoginServerOptions> options,
     ILogger<ZoneTransferService> logger) : IZoneTransferService
 {
-    // ShardUnavailable carries the real endpoint and the real zone number on purpose: the legacy answers
-    // result 1 with ip/port/zone filled in, not zeroed (Server/ts25login/S04_MyWork02.cpp:1590).
     public async ValueTask<ZoneTransferResult> RequestZoneTransferAsync(int accountId, byte avatarPost,
         Guid sessionToken, short accountGrade, CancellationToken cancellationToken)
     {

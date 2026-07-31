@@ -25,19 +25,44 @@ public sealed class FavoredTribeRankBonusLadderService(
             return;
         }
 
+        await ApplyAsync(favoredTribeId, "pending flag", ct).ConfigureAwait(false);
+    }
+
+    // Rotation hebdomadaire de la tribu avantagee. Le seul site d'appel legacy est COMMENTE, dans le bloc
+    // "7 jours ecoules" du rollover de rang heros (Server/ts25center/S08_MyDB.cpp:446) : on le retablit
+    // exactement la. La formule, elle, est de la parite stricte (S08_MyDB.cpp:144-184).
+    // Le declencheur (sentinelle 7 jours) est deja consomme quand on arrive ici : si la persistance des
+    // totaux echoue APRES avoir avance HighTribe, le flush ecrit quand meme HighTribe et l'echelle reste
+    // perimee pendant sept jours. On avance donc HighTribe seulement apres succes complet.
+    public async Task RotateToNextFavoredTribeAsync(CancellationToken ct)
+    {
+        var next = FavoredTribeRankBonusLadder.NextFavoredTribe(worldState.World.HighTribe);
+
+        if (!await ApplyAsync(next, "hero-rank rollover", ct).ConfigureAwait(false))
+            return;
+
+        worldState.SetHighTribe(next);
+        logger.LogInformation("Advantaged tribe rotated to {NextTribe} on hero-rank rollover", next);
+    }
+
+    private async Task<bool> ApplyAsync(byte favoredTribeId, string trigger, CancellationToken ct)
+    {
         var totals = FavoredTribeRankBonusLadder.ComputeTotals(favoredTribeId);
 
         if (!await worldState.TryOverwriteTribePointTotalsAsync(totals, ct).ConfigureAwait(false))
         {
             logger.LogError(
-                "FavoredTribeRankBonusLadder: totals persist failed after the flag was already consumed -- this request is now permanently lost, no broadcast");
-            return;
+                "FavoredTribeRankBonusLadder: totals persist failed after the {Trigger} already fired -- this request is now permanently lost, no broadcast",
+                trigger);
+            return false;
         }
 
         broadcaster.AnnounceTribePointTotals(totals);
 
         logger.LogInformation(
-            "FavoredTribeRankBonusLadder: applied and broadcast -- favored tribe {FavoredTribeId}, totals Tribe0={Tribe0} Tribe1={Tribe1} Tribe2={Tribe2} Tribe3={Tribe3}",
-            favoredTribeId, totals[0], totals[1], totals[2], totals[3]);
+            "FavoredTribeRankBonusLadder: applied and broadcast ({Trigger}) -- favored tribe {FavoredTribeId}, totals Tribe0={Tribe0} Tribe1={Tribe1} Tribe2={Tribe2} Tribe3={Tribe3}",
+            trigger, favoredTribeId, totals[0], totals[1], totals[2], totals[3]);
+
+        return true;
     }
 }

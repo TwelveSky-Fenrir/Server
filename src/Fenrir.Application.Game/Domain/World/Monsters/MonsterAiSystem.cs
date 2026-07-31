@@ -256,7 +256,7 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null, WorldS
                 monster.TargetLocationX = monster.HomeX;
                 monster.TargetLocationY = monster.HomeY;
                 monster.TargetLocationZ = monster.HomeZ;
-                monster.Heading = MathF.Atan2(monster.HomeX - monster.PosX, monster.HomeZ - monster.PosZ);
+                monster.Heading = WireHeading.Between(monster.PosX, monster.PosZ, monster.HomeX, monster.HomeZ);
                 monster.AiState = MonsterAiState.ReturnToSpawn;
                 monster.StateTicks = 0;
                 monster.StateFrameAccumulator = 0f;
@@ -280,7 +280,7 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null, WorldS
         monster.TargetLocationX = destX;
         monster.TargetLocationY = monster.PosY;
         monster.TargetLocationZ = destZ;
-        monster.Heading = MathF.Atan2(destX - monster.PosX, destZ - monster.PosZ);
+        monster.Heading = WireHeading.Between(monster.PosX, monster.PosZ, destX, destZ);
         monster.AiState = MonsterAiState.Patrol;
         monster.StateTicks = 0;
 
@@ -728,7 +728,7 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null, WorldS
 
         if (verticalSeparation <= heightTolerance)
         {
-            monster.Heading = MathF.Atan2(target.PosX - monster.PosX, target.PosZ - monster.PosZ);
+            monster.Heading = WireHeading.Between(monster.PosX, monster.PosZ, target.PosX, target.PosZ);
             monster.AiState = MonsterAiState.AttackWindup;
             monster.StateTicks = 0;
 
@@ -812,7 +812,7 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null, WorldS
                 continue;
             }
 
-            monster.Heading = MathF.Atan2(dx, dz);
+            monster.Heading = WireHeading.FromDelta(dx, dz);
 
             if (remainingStep >= distance)
             {
@@ -868,7 +868,7 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null, WorldS
 
         monster.PosX = newX;
         monster.PosZ = newZ;
-        monster.Heading = MathF.Atan2(dx, dz);
+        monster.Heading = WireHeading.FromDelta(dx, dz);
         return arrived ? MonsterStepOutcome.Arrived : MonsterStepOutcome.Moved;
     }
 

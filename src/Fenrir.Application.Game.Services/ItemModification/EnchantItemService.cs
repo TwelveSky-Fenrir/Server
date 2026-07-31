@@ -59,6 +59,16 @@ public sealed class EnchantItemService(
             return new EnchantItemResult(EnchantItemOutcome.Rejected, 0, 0, 0);
         }
 
+        var today = GameDate.Today();
+        if (!RentedInventoryPageGate.IsPageAccessible(page1, state.InventoryDate, today) ||
+            !RentedInventoryPageGate.IsPageAccessible(page2, state.InventoryDate, today))
+        {
+            logger.LogDebug(
+                "Character {CharacterId} enchant rejected: rented inventory page expired (InventoryDate {InventoryDate})",
+                characterId, state.InventoryDate);
+            return new EnchantItemResult(EnchantItemOutcome.Rejected, 0, 0, 0);
+        }
+
         var targetStack = state.Inventory.GetSlot((byte)page1, (byte)index1);
         var materialStack = state.Inventory.GetSlot((byte)page2, (byte)index2);
 

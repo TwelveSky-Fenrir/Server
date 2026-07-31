@@ -295,7 +295,7 @@ public sealed class HandlerDispatchIncrementalGenerator : IIncrementalGenerator
         {
             FenrirServer.Login => $"{WellKnownNames.FenrirServerEnum}.Login",
             FenrirServer.Zone => $"{WellKnownNames.FenrirServerEnum}.Zone",
-            _ => $"{WellKnownNames.FenrirServerEnum}.Center"
+            _ => throw new System.ArgumentOutOfRangeException(nameof(server), server, null)
         };
     }
 }

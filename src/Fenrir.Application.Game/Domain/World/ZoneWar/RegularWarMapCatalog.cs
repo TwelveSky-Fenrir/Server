@@ -53,7 +53,9 @@ public static class RegularWarMapCatalog
 
     private static ImmutableArray<RegularWarMapConfig> BuildConfiguredMaps()
     {
-        ReadOnlySpan<short> servers = [49, 146, 149, 154, 157, 160, 120, 121, 122, 295, 164];
+        // Slot 10 est la carte 296, pas 164 : Server/ts25zone/S07_MyGame01.cpp:681-683 fait
+        // "case 296: mZone049TypeZoneIndex = 10;" et 164 n'apparait nulle part dans ce switch.
+        ReadOnlySpan<short> servers = [49, 146, 149, 154, 157, 160, 120, 121, 122, 295, 296];
 
         var builder = ImmutableArray.CreateBuilder<RegularWarMapConfig>(servers.Length);
         for (byte slot = 0; slot < servers.Length; slot++)
@@ -63,6 +65,9 @@ public static class RegularWarMapCatalog
             RegularWarCpBonusRule? cpBonus = mapId switch
             {
                 120 => new RegularWarCpBonusRule(50, 25, RegularWarCpBonusCriterion.RebirthTierExactly11),
+                // Ce bras devient INATTEIGNABLE avec la correction ci-dessus : 164 n'est pas une carte de
+                // regular war. La carte reellement visee reste a etablir contre le legacy avant de le
+                // reaffecter -- un bonus de CP attribue a la mauvaise carte est silencieux.
                 164 => new RegularWarCpBonusRule(100, 50, RegularWarCpBonusCriterion.RebirthCount0To6),
                 _ => null
             };

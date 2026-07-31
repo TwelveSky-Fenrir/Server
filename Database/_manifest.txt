@@ -154,6 +154,13 @@ Tables/admin/TribeFourQuota.sql
 Schemas/Types/game/tvp_CharacterPosition.sql
 Schemas/Types/game/tvp_OfflineShopItemSlot.sql
 Schemas/Types/game/tvp_AccountVaultItemSlot.sql
+# INV-B2 : le coffre de compte perdait les gemmes de sertissage et la date d'expiration. Un type TABLE ne
+# s'ALTERe pas et ne se DROPpe pas tant qu'une procedure le prend en parametre (trois le font ici), donc la
+# forme complete arrive comme un type V2 pose A COTE du V1, qui reste vivant et intact -- les procedures
+# basculeront une par une dans un lot suivant, sans casser aucun appelant existant au passage. Nouveau
+# chemin, donc jamais journalise : s'applique aussi bien sur une base fraiche que sur une base persistante.
+# Les colonnes correspondantes de game.AccountVaultItems sont ajoutees par Migrations/004.
+Schemas/Types/game/tvp_AccountVaultItemSlotV2.sql
 Schemas/Types/game/tvp_CharacterItemSlot.sql
 Schemas/Types/game/tvp_CharacterProgress.sql
 Schemas/Types/game/tvp_CharacterSkillSlot.sql
@@ -546,6 +553,21 @@ StoredProcedures/game/usp_Guild_GetTopFourGuild.sql
 StoredProcedures/game/usp_WorldState_RecomputeTribeScores.sql
 StoredProcedures/game/usp_Character_ResetDailyRewardClaims.sql
 
+# G-01 guild-buff write contention: usp_Guild_SetBuff writes the four buff columns unconditionally, but the
+# legacy has TWO DISJOINT updates -- gBuffTime/gBuffTimeForDiff (Server/ts25extra/S08_MyDB.cpp:1151-1186) and
+# gBuffType/gBuffState (:1188-1191). Three Fenrir writers (buff-type selection, guild-scroll recharge, the
+# decay sweep) each do an unguarded read-modify-write over all four columns, so whichever one writes last
+# reverts the other's column pair -- PAID buff minutes vanish with no trace. These two additive procedures
+# each write only their own pair; usp_Guild_SetBuff is left untouched (already applied and SHA-journaled).
+StoredProcedures/game/usp_Guild_SetBuffTime.sql
+StoredProcedures/game/usp_Guild_SetBuffType.sql
+
+# Corrige la monture de depart : 1301/puissance 5 -> 1314/puissance 10, conforme a
+# Server/ts25login/S04_MyWork02.cpp:1163-1166 ("Starting Mount: 10% Bear") et DEFINE.h:165. CREATE OR ALTER,
+# additif : le script d'origine n'est pas edite (journalisation SHA-256). Couple avec les constantes
+# MountGrantItemId / MountGrantPower de CreateAvatarService.cs, qui bougent dans le meme lot.
+StoredProcedures/game/usp_Character_CreateWithStarterKit_MountFix.sql
+
 StoredProcedures/admin/usp_Ban_Create.sql
 StoredProcedures/admin/usp_Ban_GetActiveForAccount.sql
 StoredProcedures/admin/usp_Ban_GetActiveForCharacter.sql
@@ -613,6 +635,15 @@ Migrations/002_character_progress_mount_writeback.sql
 # (Migrations/002). Le script de base est retiré du manifeste (une DB fraîche ne la crée plus) ; ce DROP
 # idempotent la retire des DB déjà migrées.
 Migrations/003_drop_usp_character_setmountprogression.sql
+
+# INV-B2 (coffre de compte : gemmes et expiration) : ajoute SocketGem1/2/3 + ExpireDate a
+# game.AccountVaultItems, exact miroir des colonnes homonymes de game.CharacterItems. Le legacy porte bien
+# les deux au travers du coffre (Server/ts25zone/S04_MyWork05.cpp:2999-3000 au depot, :3104-3105 au retrait,
+# stockage uSaveSocket[28][3] Server/Header/Protocol/STRUCT.h:462) ; sans ces colonnes un objet loue en
+# ressortait avec ExpireDate = 0 et un objet serti perdait ses trois gemmes, de facon persistee. ALTER ADD et
+# non DROP+CREATE : la table porte de vraies donnees joueur. Aucune procedure n'est touchee ici -- toutes
+# listent leurs colonnes explicitement, elles ecriront les defauts 0 jusqu'a leur passage en V2.
+Migrations/004_accountvault_sockets_expiry.sql
 
 Migrations/Seed/001_dev_account.sql
 

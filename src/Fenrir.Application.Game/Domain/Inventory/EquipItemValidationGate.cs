@@ -38,7 +38,18 @@ public static class EquipItemValidationGate
 
     public static Outcome Evaluate(
         EquipCandidate? item,
-        int itemSortClassification,
+        byte characterPreviousTribe,
+        int targetEquipSlotIndex,
+        int characterCombinedLevel,
+        int characterRebirthCount)
+    {
+        return Evaluate(item, ItemSortClassificationNotComputed, characterPreviousTribe, targetEquipSlotIndex,
+            characterCombinedLevel, characterRebirthCount);
+    }
+
+    public static Outcome Evaluate(
+        EquipCandidate? item,
+        int itemSortClassificationFallback,
         byte characterPreviousTribe,
         int targetEquipSlotIndex,
         int characterCombinedLevel,
@@ -58,7 +69,12 @@ public static class EquipItemValidationGate
         if (resolved.LevelLimit + resolved.MartialLevelLimit > characterCombinedLevel)
             return Outcome.LevelTooLow;
 
-        if (!PassesRebirthGate(resolved, itemSortClassification, characterRebirthCount))
+        // Type null == the caller could not supply ITEM_INFO::iType, so ReturnItemSort is not computable here.
+        var classification = resolved.Type is { } itemType
+            ? ItemSortClassifier.Classify(itemType, resolved.EquipPartTag, resolved.ItemId, resolved.Sort)
+            : itemSortClassificationFallback;
+
+        if (!PassesRebirthGate(resolved, classification, characterRebirthCount))
             return Outcome.RebirthTooLow;
 
         if (resolved.Sort < FinalCategoryLow || resolved.Sort > FinalCategoryHigh)
@@ -69,15 +85,21 @@ public static class EquipItemValidationGate
 
     private static bool PassesRebirthGate(EquipCandidate item, int itemSortClassification, int rebirth)
     {
-        switch (item.ItemId)
+        // Legacy chains independent "if (cond && rebirth < N) return 0" gates: clearing the itemId gate
+        // never grants equip, the classification gate below still applies (S07_MyGame03.cpp:70-105).
+        var minimumRebirthForItemId = item.ItemId switch
         {
-            case 13553 or 33553 or 53553: return rebirth >= 6;
-            case 13554 or 33554 or 53554: return rebirth >= 12;
-            case >= 87206 and <= 87213 or >= 87228 and <= 87235 or >= 87250 and <= 87257: return rebirth >= 12;
-            case 86754 or 86756 or 86758: return rebirth >= 6;
-            case 86755 or 86757 or 86759: return rebirth >= 12;
-            case 2303 or 2304 or 2305: return rebirth >= 7;
-        }
+            13553 or 33553 or 53553 => 6,
+            13554 or 33554 or 53554 => 12,
+            >= 87206 and <= 87213 or >= 87228 and <= 87235 or >= 87250 and <= 87257 => 12,
+            86754 or 86756 or 86758 => 6,
+            86755 or 86757 or 86759 => 12,
+            2303 or 2304 or 2305 => 7,
+            _ => 0
+        };
+
+        if (rebirth < minimumRebirthForItemId)
+            return false;
 
         if (item.CheckSetItem == SetItemRebirthGateValue && rebirth < 12)
             return false;
@@ -95,5 +117,13 @@ public static class EquipItemValidationGate
         int LevelLimit,
         int MartialLevelLimit,
         int CheckSetItem,
-        int Sort);
+        int Sort,
+        int? Type = null)
+    {
+        public static EquipCandidate FromRow(ItemRowDto item)
+        {
+            return new EquipCandidate(item.ItemId, item.EquipInfo1, item.EquipInfo2, item.LevelLimit,
+                item.MartialLevelLimit, item.CheckSetItem, item.Sort, item.Type);
+        }
+    }
 }

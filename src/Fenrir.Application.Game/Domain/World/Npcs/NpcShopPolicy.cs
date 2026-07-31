@@ -135,7 +135,8 @@ public static class NpcShopPolicy
     }
 
     public static BuyResult ResolveBuy(NpcDefinition npc, ItemDefinition itemDefinition, int requestedQuantity,
-        ItemStack? destinationSlot, short playerLevel, int playerContributionPoints)
+        ItemStack? destinationSlot, short playerLevel, int playerContributionPoints,
+        DateTimeOffset? purchaseInstant = null)
     {
         var item = itemDefinition.Item;
 
@@ -198,8 +199,14 @@ public static class NpcShopPolicy
                 out var singleCpCost, out var singleCostFailure))
             return new BuyResult(singleCostFailure, 0, 0, null);
 
+        // Empilable : le legacy remet le serial a 0 (Server/ts25zone/S04_MyWork05.cpp:229-237), seul le
+        // non-empilable en recoit un (:1976) ; instant absent = 0 tant que l'appelant n'a pas d'horloge.
+        var serial = purchaseInstant is { } instant
+            ? ItemSerialGenerator.Generate(ItemSerialGenerator.UnconditionalItemType, instant)
+            : 0;
+
         return new BuyResult(BuyOutcome.Success, singleMoneyCost, singleCpCost,
-            new ItemStack(item.ItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+            new ItemStack(item.ItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, serial));
     }
 
     private static bool TryResolveCost(ItemRowDto item, int quantity, int playerContributionPoints,

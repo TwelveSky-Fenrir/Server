@@ -58,6 +58,16 @@ public static class ContainerMatrix
         return itemSort is 2 or 99;
     }
 
+    // ITEMSYSTEM::IsValidSocket (Server/ts25zone/GameSystem/GameSystem_02_Item.cpp:1182-1212) : les seize
+    // sorts d'equipement IAMULET..ISCEPTER (7..21, contigus) plus INEW_CAPE (29), ET iType >= IRARE (3),
+    // valeurs enum Server/Header/Protocol/STRUCT.h:1657,1678-1700. La double condition est essentielle :
+    // sans le sort, une potion "porterait" des gemmes ; sans le type, un equipement commun aussi.
+    // Non garde par USE_SOCKET_GEM : CopyGSocket reste vif malgre le #undef de la build livree.
+    public static bool IsSocketableItem(byte itemSort, byte itemType)
+    {
+        return itemType >= 3 && (itemSort is >= 7 and <= 21 || itemSort is 29);
+    }
+
     public static bool TryGetMaxSlot(byte container, out int maxSlotInclusive)
     {
         switch (container)

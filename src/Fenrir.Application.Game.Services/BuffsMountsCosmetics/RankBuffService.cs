@@ -7,11 +7,9 @@ namespace Fenrir.Application.Game.Services.BuffsMountsCosmetics;
 
 public sealed class RankBuffService(WorldStateService worldState) : IRankBuffService
 {
-    private const int DefaultStoneCount = 1;
-
     public RankBuffResult Apply(Zone zone, PlayerRuntimeState state, int characterId, int sort)
     {
-        var resolved = RankBuffResolver.Resolve(sort, DefaultStoneCount, state.IsMovingZone,
+        var resolved = RankBuffResolver.Resolve(sort, CountOwnedTribeSymbols(state.Tribe), state.IsMovingZone,
             worldState.World.TribeSymbolBattle);
 
         if (!resolved.Succeeded)
@@ -20,5 +18,25 @@ public sealed class RankBuffService(WorldStateService worldState) : IRankBuffSer
         zone.PostAvatarBuffCommand(new AvatarBuffZoneCommand(characterId, RankBuffType: sort, HealToMax: true));
 
         return new RankBuffResult(RankBuffResolver.Outcome.Success);
+    }
+
+    // ReturnSymbolNumNoMon (Server/Header/function.h:3155): the 4 tribe symbol slots only -- the neutral
+    // monster symbol is deliberately NOT counted here, unlike ReturnSymbolNum used by the combat modifiers.
+    private int CountOwnedTribeSymbols(byte tribe)
+    {
+        if (tribe >= WorldStateService.TribeCount)
+            return 0;
+
+        var ally = worldState.GetAllyOf(tribe);
+        var count = 0;
+
+        for (byte slot = 0; slot < WorldStateService.TribeCount; slot++)
+        {
+            var owner = worldState.GetTribeSymbolOwner(slot);
+            if (owner == tribe || (ally is { } allyId && owner == allyId))
+                count++;
+        }
+
+        return count;
     }
 }

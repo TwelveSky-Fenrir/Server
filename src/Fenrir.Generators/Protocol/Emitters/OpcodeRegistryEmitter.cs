@@ -35,11 +35,8 @@ internal static class OpcodeRegistryEmitter
         writer.OpenBrace();
         foreach (var packet in ordered)
         {
-            var incomingHeaderSize = packet.Server == FenrirServer.Center
-                ? WireHeaderSizes.DefaultPacketSize
-                : WireHeaderSizes.ClientPacketSize;
             var headerSize = packet.Direction == FenrirDirection.Incoming
-                ? incomingHeaderSize
+                ? WireHeaderSizes.ClientPacketSize
                 : WireHeaderSizes.DefaultPacketSize;
             var frameSize = packet.FieldsSize + headerSize;
             writer.Line(
@@ -85,9 +82,7 @@ internal static class OpcodeRegistryEmitter
         writer.OpenBrace();
         foreach (var packet in entries)
         {
-            var headerSize = packet.Server == FenrirServer.Center
-                ? WireHeaderSizes.DefaultPacketSize
-                : WireHeaderSizes.ClientPacketSize;
+            var headerSize = WireHeaderSizes.ClientPacketSize;
             writer.Line($"{packet.Opcode} => {packet.FieldsSize + headerSize},");
         }
 
@@ -104,7 +99,7 @@ internal static class OpcodeRegistryEmitter
         {
             FenrirServer.Login => $"{WellKnownNames.FenrirServerEnum}.Login",
             FenrirServer.Zone => $"{WellKnownNames.FenrirServerEnum}.Zone",
-            _ => $"{WellKnownNames.FenrirServerEnum}.Center"
+            _ => throw new System.ArgumentOutOfRangeException(nameof(server), server, null)
         };
     }
 

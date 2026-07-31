@@ -59,7 +59,8 @@ public static class ZoneCenterSiegeProjection
             TribeKillOtherTribeAddValueInfo = killOtherTribeBonus,
             Zone267TypeState = zone267,
             Zone241TypeState = zone241,
-            ZoneFFATypeState = siege.Zone335
+            ZoneFFATypeState = siege.Zone335,
+            Zone194TypeState = siege.Zone194State
         };
     }
 }

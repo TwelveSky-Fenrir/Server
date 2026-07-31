@@ -10,7 +10,7 @@ internal static class EmittedNames
         {
             FenrirServer.Login => "Login",
             FenrirServer.Zone => "Zone",
-            _ => "Center"
+            _ => throw new System.ArgumentOutOfRangeException(nameof(server), server, null)
         };
     }
 

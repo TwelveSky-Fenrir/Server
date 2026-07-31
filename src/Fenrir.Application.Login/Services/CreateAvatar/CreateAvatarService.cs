@@ -39,20 +39,25 @@ public sealed class CreateAvatarService(
     private const int WelcomePremiumGrantDays = 1;
 
     private const byte PetGrantEquipSlot = 8;
-    private const int PetGrantItemId = 2300;
+    private const int PetGrantItemId = 1016;
     private const int PetGrowthGrant = 640_000_000;
     private const byte PetActivityGrant = 100;
 
     private const byte CapeGrantEquipSlot = 1;
-    private const int CapeGrantItemId = 1407;
+    private const int CapeGrantItemId = 1403;
+    private const byte CapeGrantEnchant = 40;
 
-    private const int MountGrantItemId = 1301;
-    private const int MountGrantPower = 5;
+    private const byte WingGrantEquipSlot = 10;
+
+    private const int MountGrantItemId = 1314;
+    private const int MountGrantPower = 10;
     private const int MountGrantTime = 99999999;
 
     private static int _starterGrantSerialSequence;
 
     private static readonly short[] SpawnMapIdByTribe = [1, 6, 11, 140];
+
+    private static readonly int[] WingGrantItemIdByPreviousTribe = [216, 217, 218];
 
     public async ValueTask<CreateAvatarResult> CreateAvatarAsync(
         int accountId,
@@ -73,6 +78,9 @@ public sealed class CreateAvatarService(
         if (FourthFactionGate.BlocksCreation(tribe))
             return new CreateAvatarResult(CreateAvatarOutcome.FourthFactionDisabled, AvatarInfoFactory.Zeroed);
 
+        if (!AvatarNameValidator.HasOnlyWhitelistedCharacters(avatarName))
+            return new CreateAvatarResult(CreateAvatarOutcome.Failure, AvatarInfoFactory.Zeroed);
+
         if (TribeDominanceGate.BlocksCreation(tribe, await tribes.GetAllAsync(cancellationToken)))
             return new CreateAvatarResult(CreateAvatarOutcome.DominantTribeBlocked, AvatarInfoFactory.Zeroed);
 
@@ -85,7 +93,7 @@ public sealed class CreateAvatarService(
             return new CreateAvatarResult(CreateAvatarOutcome.InvalidWeapon, AvatarInfoFactory.Zeroed);
 
         var equipment = BuildEquipmentRows(kit.Equipment, weaponItemId);
-        equipment.AddRange(BuildUnconditionalStarterGrantRows());
+        equipment.AddRange(BuildUnconditionalStarterGrantRows(previousTribe));
         var inventory = BuildInventoryRows(kit.Inventory);
         var skills = BuildSkillRows(kit.Skills);
         var hotkeys = BuildHotkeyRows(kit.Hotkeys);
@@ -239,15 +247,20 @@ public sealed class CreateAvatarService(
         return rows;
     }
 
-    private static List<CharacterItemSlotTvp> BuildUnconditionalStarterGrantRows()
+    private static List<CharacterItemSlotTvp> BuildUnconditionalStarterGrantRows(byte previousTribe)
     {
-        return
+        List<CharacterItemSlotTvp> rows =
         [
-            new CharacterItemSlotTvp(PetGrantEquipSlot, PetGrantItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-                GenerateStarterGrantSerial()),
-            new CharacterItemSlotTvp(CapeGrantEquipSlot, CapeGrantItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+            new(PetGrantEquipSlot, PetGrantItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, GenerateStarterGrantSerial()),
+            new(CapeGrantEquipSlot, CapeGrantItemId, 1, CapeGrantEnchant, 0, 0, 0, 0, 0, 0, 0,
                 GenerateStarterGrantSerial())
         ];
+
+        if (previousTribe < WingGrantItemIdByPreviousTribe.Length)
+            rows.Add(new CharacterItemSlotTvp(WingGrantEquipSlot, WingGrantItemIdByPreviousTribe[previousTribe], 1, 0,
+                0, 0, 0, 0, 0, 0, 0, GenerateStarterGrantSerial()));
+
+        return rows;
     }
 
     private static int GenerateStarterGrantSerial()

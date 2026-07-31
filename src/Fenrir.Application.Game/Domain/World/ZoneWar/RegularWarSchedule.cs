@@ -53,7 +53,7 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
 {
     public const int TribeCount = WorldStateService.TribeCount;
 
-    public const int CooldownTicks = 3600;
+    public const int CooldownTicks = 4800;
 
     public const int CountdownAnnounceIntervalTicks = 120;
 
@@ -65,7 +65,8 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
 
     public const int PreWarTicks = 120;
 
-    public const int ActiveWarDurationTicks = 1800;
+    // 900 ticks de simulation, pas 900 secondes - Server/ts25zone/S07_MyGame01.cpp:4588,4765,4801
+    public const int ActiveWarDurationTicks = 900;
 
     public const int ActiveEvaluationCadenceTicks = 10;
 
@@ -192,7 +193,9 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
         {
             case RegularWarIdleSubPhase.Cooldown:
                 _cooldownTicksElapsed++;
-                if (_cooldownTicksElapsed < CooldownTicks)
+                // le legacy n'attend que si mRegularWarNumber > 0 : la 1re manche part sans cooldown
+                // Server/ts25zone/S07_MyGame01.cpp:4645
+                if (WarCycleNumber > 1 && _cooldownTicksElapsed < CooldownTicks)
                     return;
 
                 _killCountByCharacter.Clear();

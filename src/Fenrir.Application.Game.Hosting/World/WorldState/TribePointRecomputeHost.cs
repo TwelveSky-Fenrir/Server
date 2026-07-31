@@ -1,15 +1,12 @@
-using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Hosting.World.WorldState;
 
 public sealed class TribePointRecomputeHost(
     TribePointLevelRecomputeService levelRecompute,
     FavoredTribeRankBonusLadderService ladder,
-    IOptions<GameServerOptions> options,
     ILogger<TribePointRecomputeHost> logger) : BackgroundService
 {
     public const int TickGate = 6;
@@ -40,12 +37,6 @@ public sealed class TribePointRecomputeHost(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (options.Value.WorldStateAuthority == WorldStateAuthorityMode.Center)
-        {
-            logger.LogInformation("TribePointRecomputeHost inert: WorldStateAuthority=Center");
-            return;
-        }
-
         await RunBootRecomputeAsync(stoppingToken).ConfigureAwait(false);
 
         using var timer = new PeriodicTimer(CenterTick);

@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Abstractions.Progression;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Progression;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Domain.Game.GameData;
@@ -22,8 +23,6 @@ public sealed class DailyMissionService(
     private const int RequiredKillOtherTribe = 10;
 
     private const int Zone241TimeAvatarChangeInfoSort = 14;
-
-    private static readonly byte[] InventoryPages = [ContainerMatrix.InventoryPage0, ContainerMatrix.InventoryPage1];
 
     public async ValueTask<DailyMissionClaimResult> ClaimAsync(int characterId, Zone zone, PlayerRuntimeState state,
         CancellationToken cancellationToken)
@@ -114,7 +113,9 @@ public sealed class DailyMissionService(
 
     private static bool TryFindEmptySlot(PlayerRuntimeState state, out byte container, out byte slot)
     {
-        foreach (var page in InventoryPages)
+        var pageCount = RentedInventoryPageGate.AccessiblePageCount(state.InventoryDate, GameDate.Today());
+
+        for (byte page = 0; page < pageCount; page++)
         {
             var occupied = state.Inventory.GetContainer(page);
             for (var i = 0; i <= 63; i++)

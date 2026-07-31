@@ -23,4 +23,10 @@ public static class FavoredTribeRankBonusLadder
         totals[favoredTribeId] += FavoredTribeBonus;
         return totals;
     }
+
+    public static byte NextFavoredTribe(byte? current)
+    {
+        var next = current is { } value ? (value + 1) % WorldStateService.TribeCount : 0;
+        return (byte)next;
+    }
 }

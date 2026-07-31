@@ -216,6 +216,28 @@ public sealed record GuildRepository(ICaeriusNetDbContext Db) : IGuildRepository
         await Db.ExecuteAsync(sp, ct);
     }
 
+    public async ValueTask SetBuffTimeAsync(int guildId, int buffTime, long buffTimeForDiff, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_Guild_SetBuffTime", 0)
+            .AddParameter("GuildId", guildId, SqlDbType.Int)
+            .AddParameter("BuffTime", buffTime, SqlDbType.Int)
+            .AddParameter("BuffTimeForDiff", buffTimeForDiff, SqlDbType.BigInt)
+            .Build();
+
+        await Db.ExecuteAsync(sp, ct);
+    }
+
+    public async ValueTask SetBuffTypeAsync(int guildId, int buffType, int buffState, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_Guild_SetBuffType", 0)
+            .AddParameter("GuildId", guildId, SqlDbType.Int)
+            .AddParameter("BuffType", buffType, SqlDbType.Int)
+            .AddParameter("BuffState", buffState, SqlDbType.Int)
+            .Build();
+
+        await Db.ExecuteAsync(sp, ct);
+    }
+
     public async ValueTask SetNoticeAsync(int guildId, byte noticeIndex, string text, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_GuildNotice_Set", 0)

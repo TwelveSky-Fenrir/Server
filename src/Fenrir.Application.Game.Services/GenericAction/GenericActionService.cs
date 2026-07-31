@@ -129,14 +129,10 @@ public sealed class GenericActionService(
             EquipItemValidationGate.EquipCandidate? candidate = null;
             if (worldData.ItemsById.TryGetValue(sourceItem.ItemId, out var equipDefinition))
             {
-                var equipRow = equipDefinition.Item;
-                candidate = new EquipItemValidationGate.EquipCandidate(equipRow.ItemId, equipRow.EquipInfo1,
-                    equipRow.EquipInfo2, equipRow.LevelLimit, equipRow.MartialLevelLimit, equipRow.CheckSetItem,
-                    equipRow.Sort);
+                candidate = EquipItemValidationGate.EquipCandidate.FromRow(equipDefinition.Item);
             }
 
             var equipOutcome = EquipItemValidationGate.Evaluate(candidate,
-                EquipItemValidationGate.ItemSortClassificationNotComputed,
                 state.PreviousTribe, move.Index2, state.Level + state.Level2, state.RebirthCount);
 
             if (equipOutcome != EquipItemValidationGate.Outcome.Success)
@@ -1484,7 +1480,8 @@ public sealed class GenericActionService(
         if (candidate is not { } stack || !worldData.ItemsById.TryGetValue(stack.ItemId, out var definition))
             return (null, false, false);
 
-        return (stack, ContainerMatrix.IsStackableSort(definition.Item.Sort), false);
+        return (stack, ContainerMatrix.IsStackableSort(definition.Item.Sort),
+            ContainerMatrix.IsSocketableItem(definition.Item.Sort, definition.Item.Type));
     }
 
     private async ValueTask MirrorInventoryContainerAsync(Zone zone, int characterId, byte container,

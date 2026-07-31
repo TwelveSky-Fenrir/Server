@@ -22,7 +22,8 @@ public abstract class ClientSession(
     private readonly int _maxPendingSendBytes = server switch
     {
         FenrirServer.Zone => ZoneMaxPendingSendBytes,
-        _ => LoginMaxPendingSendBytes
+        FenrirServer.Login => LoginMaxPendingSendBytes,
+        _ => throw new ArgumentOutOfRangeException(nameof(server), server, null)
     };
 
     private readonly Channel<byte[]> _pendingSends =

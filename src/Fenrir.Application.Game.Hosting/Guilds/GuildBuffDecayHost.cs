@@ -43,7 +43,7 @@ public sealed class GuildBuffDecayHost(
             return;
         }
 
-        var now = DateTime.UtcNow;
+        var now = DateTimeOffset.UtcNow;
         foreach (var guild in all)
         {
             var result = GuildBuffDecay.Apply(guild, now);
@@ -52,8 +52,8 @@ public sealed class GuildBuffDecayHost(
 
             try
             {
-                await guilds.SetBuffAsync(guild.GuildId, result.BuffType, result.BuffState, result.BuffTime,
-                    result.BuffTimeForDiff, ct).ConfigureAwait(false);
+                await guilds.SetBuffTimeAsync(guild.GuildId, result.BuffTime, result.BuffTimeForDiff, ct)
+                    .ConfigureAwait(false);
             }
             catch (Exception ex)
             {

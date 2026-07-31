@@ -31,15 +31,6 @@ public sealed class CreateAvatarHandler(ICreateAvatarService createAvatarService
             return;
         }
 
-        if (!AvatarNameValidator.HasOnlyWhitelistedCharacters(packet.AvatarName))
-        {
-            logger.LogWarning(
-                "Create-avatar rejected: name fails whitelist check for account {AccountId} (slot {Slot})",
-                accountId, packet.AvatarPost);
-            session.Send(new CreateAvatarResponse { Result = 1, AvatarInfo = AvatarInfoFactory.Zeroed });
-            return;
-        }
-
         var result = await createAvatarService.CreateAvatarAsync(
             accountId,
             (byte)packet.AvatarPost,

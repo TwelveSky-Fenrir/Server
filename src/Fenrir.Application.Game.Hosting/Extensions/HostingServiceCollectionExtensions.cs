@@ -15,7 +15,6 @@ using Fenrir.Application.Game.Hosting.World;
 using Fenrir.Application.Game.Hosting.World.Monsters;
 using Fenrir.Application.Game.Hosting.World.WorldState;
 using Fenrir.Application.Game.Hosting.World.ZoneWar;
-using Fenrir.Cluster.Client.Link;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Dispatch.FloodProtection;
 using Fenrir.Network.Dispatch.Sessions;
@@ -52,6 +51,8 @@ public static class HostingServiceCollectionExtensions
         services.AddHostedService(sp => sp.GetRequiredService<GuildBuffExpiryRelayHost>());
 
         services.AddHostedService<CommerceCatalogRefreshHost>();
+
+        services.AddHostedService<ProxyShopBootReloadHost>();
 
         services.AddHostedService<ZoneTickHost>();
         services.AddHostedService<MonsterLootFlushHost>();
@@ -155,7 +156,6 @@ public static class HostingServiceCollectionExtensions
         services.AddSingleton<AllianceProposalCenterState>();
         services.AddSingleton<ZoneCenterBroadcastIngestor>();
 
-        services.AddSingleton<ICenterFanOutSink, ZoneCenterFanOutSink>();
 
         services.TryAddSingleton<IZone039MonsterSummonResetGateway, LoggingOnlyZone039MonsterSummonResetGateway>();
         services.AddSingleton<Zone039ArmingReactor>();

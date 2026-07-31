@@ -26,7 +26,6 @@
     <ProjectReference Include="..\Fenrir.Core\Fenrir.Core.csproj"/>
     <ProjectReference Include="..\Fenrir.Protocol.Game\Fenrir.Protocol.Game.csproj"/>
     <ProjectReference Include="..\Fenrir.Network\Fenrir.Network.csproj"/>
-    <ProjectReference Include="..\Fenrir.Cluster.Client\Fenrir.Cluster.Client.csproj"/>
     <ProjectReference Include="..\Fenrir.Data.Abstractions\Fenrir.Data.Abstractions.csproj"/>
     <ProjectReference Include="..\Fenrir.Data.WriteBehind\Fenrir.Data.WriteBehind.csproj"/>
     <ProjectReference Include="..\Fenrir.Generators\Fenrir.Generators.csproj"

@@ -13,33 +13,40 @@ public sealed class ClaimGiftService(IGiftRepository gifts, ILogger<ClaimGiftSer
         CancellationToken cancellationToken)
     {
         var pending = await gifts.GetPendingByAccountAsync(accountId, cancellationToken);
-        if (giftInfoIndex >= pending.Count)
+
+        // Same slot order as GiftListService: the index the client replays here was handed out by CLP_25
+        // (Server/ts25login/S04_MyWork02.cpp:1423), so the tie-break on GiftId must match it exactly.
+        var slots = pending.OrderBy(g => g.CreatedAtUtc).ThenBy(g => g.GiftId).ToArray();
+
+        if (giftInfoIndex < 0 || giftInfoIndex >= slots.Length)
             return new ClaimGiftResult(ClaimGiftOutcome.GiftUnavailable);
+
+        var giftId = slots[giftInfoIndex].GiftId;
 
         try
         {
-            await gifts.ClaimIntoVaultAsync(pending[giftInfoIndex].GiftId, accountId, cancellationToken);
+            await gifts.ClaimIntoVaultAsync(giftId, accountId, cancellationToken);
             return new ClaimGiftResult(ClaimGiftOutcome.Success);
         }
         catch (SqlException ex) when (ex.Number == SqlErrorGiftUnavailable)
         {
             logger.LogWarning(ex,
                 "Account {AccountId} gift claim index {GiftInfoIndex} (GiftId {GiftId}) lost a claim race",
-                accountId, giftInfoIndex, pending[giftInfoIndex].GiftId);
+                accountId, giftInfoIndex, giftId);
             return new ClaimGiftResult(ClaimGiftOutcome.GiftUnavailable);
         }
         catch (SqlException ex) when (ex.Number == SqlErrorVaultFull)
         {
             logger.LogWarning(ex,
                 "Account {AccountId} gift claim index {GiftInfoIndex} (GiftId {GiftId}) rejected: vault is full",
-                accountId, giftInfoIndex, pending[giftInfoIndex].GiftId);
+                accountId, giftInfoIndex, giftId);
             return new ClaimGiftResult(ClaimGiftOutcome.VaultFull);
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex,
                 "Account {AccountId} gift claim index {GiftInfoIndex} (GiftId {GiftId}) failed unexpectedly",
-                accountId, giftInfoIndex, pending[giftInfoIndex].GiftId);
+                accountId, giftInfoIndex, giftId);
             return new ClaimGiftResult(ClaimGiftOutcome.PersistenceFailure);
         }
     }

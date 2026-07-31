@@ -57,12 +57,9 @@ internal static class ForbiddenImportRules
         new ForbiddenImport(Domain, "Fenrir.Network",
             "les regles de jeu ne construisent pas de trames et ne connaissent pas de session concrete ; " +
             "passer par IPacketSession (Fenrir.Core.Abstractions) et FrameWriter (Fenrir.Core.Wire)"),
-        new ForbiddenImport(Domain, "Fenrir.Cluster",
-            "les regles de jeu ne parlent pas au cluster ; passer par un port declare sous Abstractions/, " +
-            "dont l'implementation vit dans Fenrir.Application.Game.Hosting"),
-        new ForbiddenImport(Domain, "Fenrir.Protocol.Center",
-            "les paquets S2S sont un detail du lien Center ; les regles de jeu emettent via un port, " +
-            "jamais un WorldEventOutbound construit a la main"));
+        new ForbiddenImport(Domain, "Fenrir.Protocol.Login",
+            "Login et Game sont deux protocoles distincts dont les opcodes se recouvrent ; une regle de jeu " +
+            "qui compile un paquet Login peut en construire un par accident et le mettre sur le fil"));
 
     private static readonly ImmutableArray<ForbiddenImportProject> Projects = ImmutableArray.Create(
         new ForbiddenImportProject("Fenrir.Application.Game", GameCoreImports));

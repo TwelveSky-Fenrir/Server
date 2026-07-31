@@ -234,7 +234,7 @@ public sealed class ZoneWarTickService(ZoneRegistry zones, ILogger<ZoneWarTickSe
                 BroadcastToAll(new ZoneWar297MonsterCountResponse { MonsterNum = monsterCounts });
                 break;
             case ZoneWarKind.Zone335:
-                BroadcastToAll(new ZoneWar335CountdownResponse { RemainTime = remainTime });
+                BroadcastToAll(new ZoneWarFfaBattleInfoResponse { RemainTime = remainTime });
                 break;
         }
     }

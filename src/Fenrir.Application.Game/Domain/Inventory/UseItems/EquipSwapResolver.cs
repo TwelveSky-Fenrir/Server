@@ -55,8 +55,7 @@ public static class EquipSwapResolver
         if (actionSort != IdleActionSort)
             return new Result(Outcome.NotIdle, 0, default, null);
 
-        var gate = EquipItemValidationGate.Evaluate(candidate,
-            EquipItemValidationGate.ItemSortClassificationNotComputed, characterPreviousTribe,
+        var gate = EquipItemValidationGate.Evaluate(candidate, characterPreviousTribe,
             EquipItemValidationGate.SkipSlotCheck, combinedLevel, rebirthCount);
         if (gate != EquipItemValidationGate.Outcome.Success)
             return new Result(Outcome.NotEquippable, 0, default, null);

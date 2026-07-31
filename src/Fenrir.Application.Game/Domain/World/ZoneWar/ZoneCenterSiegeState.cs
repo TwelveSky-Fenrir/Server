@@ -32,6 +32,7 @@ public sealed class ZoneCenterSiegeState
     private readonly int[,] _zone175 = new int[Zone175Instances, Zone175Slots];
     private readonly DenOfRebirthChallengeState[] _zone241 = new DenOfRebirthChallengeState[Zone241Instances];
     private readonly int[] _zone267 = new int[TribeCount];
+    private int _zone194State;
     private int _zone335;
 
 
@@ -43,6 +44,25 @@ public sealed class ZoneCenterSiegeState
             {
                 return _zone335;
             }
+        }
+    }
+
+    public int Zone194State
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _zone194State;
+            }
+        }
+    }
+
+    public void SetZone194State(int stateCode)
+    {
+        lock (_lock)
+        {
+            _zone194State = stateCode;
         }
     }
 

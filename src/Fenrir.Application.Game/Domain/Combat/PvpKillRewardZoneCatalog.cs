@@ -16,7 +16,7 @@ public static class PvpKillRewardZoneCatalog
 
     public const int FfaHeroPointAmount = 2;
 
-    public const int HeroPointMinimumCombinedLevel = 0;
+    public const int HeroPointMinimumCombinedLevel = 113;
 
     private static readonly short[] UnconditionalFullRewardZoneIds = [194, 267, 268, 269];
 
@@ -38,7 +38,8 @@ public static class PvpKillRewardZoneCatalog
         if (Array.IndexOf(CityZoneIds, zoneId) >= 0)
             return new PvpKillZoneRewardProfile(!isStunTrigger, true, true, true, 0);
 
-        var grantsAnything = !isStunTrigger;
-        return new PvpKillZoneRewardProfile(grantsAnything, grantsAnything, grantsAnything, grantsAnything, 0);
+        // aucun bras attrape-tout: le default du switch legacy est sous __GOD__, absent de la build M33/LNW33
+        // (Server/ts25zone/S07_MyGame03.cpp:2844-2854)
+        return PvpKillZoneRewardProfile.None;
     }
 }

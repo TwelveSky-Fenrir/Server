@@ -39,11 +39,8 @@ internal static class TypeModelBuilder
             out var fieldsSize);
         diagnostics.AddRange(fieldDiagnostics);
 
-        var incomingHeaderSize = server == FenrirServer.Center
-            ? WireHeaderSizes.DefaultPacketSize
-            : WireHeaderSizes.ClientPacketSize;
         var headerSize = direction == FenrirDirection.Incoming
-            ? incomingHeaderSize
+            ? WireHeaderSizes.ClientPacketSize
             : WireHeaderSizes.DefaultPacketSize;
         var computedTotal = headerSize + fieldsSize;
 

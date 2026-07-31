@@ -16,6 +16,8 @@ public sealed class ZoneTransferService(
     IOptions<LoginServerOptions> options,
     ILogger<ZoneTransferService> logger) : IZoneTransferService
 {
+    // ShardUnavailable carries the real endpoint and the real zone number on purpose: the legacy answers
+    // result 1 with ip/port/zone filled in, not zeroed (Server/ts25login/S04_MyWork02.cpp:1590).
     public async ValueTask<ZoneTransferResult> RequestZoneTransferAsync(int accountId, byte avatarPost,
         Guid sessionToken, short accountGrade, CancellationToken cancellationToken)
     {
@@ -53,7 +55,7 @@ public sealed class ZoneTransferService(
             logger.LogWarning(
                 "Zone transfer rejected: no shard available for character {CharacterId} (account {AccountId}, MapId {MapId})",
                 character.CharacterId, accountId, healedMapId);
-            return new ZoneTransferResult(ZoneTransferOutcome.ShardUnavailable, "", 0, 0);
+            return new ZoneTransferResult(ZoneTransferOutcome.ShardUnavailable, "", 0, healedMapId);
         }
 
         var zonePort = options.Value.ZoneBasePort + healedMapId;
@@ -64,7 +66,7 @@ public sealed class ZoneTransferService(
                 "Zone transfer rejected: zone endpoint {Host}:{Port} (MapId {MapId}) failed a reachability probe for " +
                 "character {CharacterId} (account {AccountId}); that zone's listener is not accepting on shard {ShardId}",
                 shard.Host, zonePort, healedMapId, character.CharacterId, accountId, shard.ShardId);
-            return new ZoneTransferResult(ZoneTransferOutcome.ShardUnavailable, "", 0, 0);
+            return new ZoneTransferResult(ZoneTransferOutcome.ShardUnavailable, shard.Host, zonePort, healedMapId);
         }
 
         await tickets.CreateAsync(accountId, summary.CharacterId, shard.ShardId, options.Value.TicketTtlSeconds,

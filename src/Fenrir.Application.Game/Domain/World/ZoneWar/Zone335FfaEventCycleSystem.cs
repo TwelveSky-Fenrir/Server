@@ -279,7 +279,7 @@ public sealed class Zone335FfaEventCycleSystem(
 
     private static void BroadcastLiveCountdown(Zone zone, int remainingLegacyTicks)
     {
-        var response = new ZoneWar335CountdownResponse { RemainTime = remainingLegacyTicks };
+        var response = new ZoneWarFfaBattleInfoResponse { RemainTime = remainingLegacyTicks };
         foreach (var player in zone.Players)
             if (!player.IsMovingZone)
                 player.Session.Send(response);

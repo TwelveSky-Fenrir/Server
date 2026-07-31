@@ -234,7 +234,9 @@ public sealed class ZoneEventBroadcaster(
         uplink?.Publish(sort, data);
     }
 
-    public void ApplyRelayedEvent(int sort, ReadOnlySpan<byte> data)
+    // Effet d'etat et reactions de monde UNIQUEMENT : la diffusion appartient au routeur unique
+    // (ZoneCenterBroadcastIngestor), qui est la seule porte d'entree des evenements relayes.
+    public void ApplyRelayedStateAndReactions(int sort, ReadOnlySpan<byte> data)
     {
         if (data.Length != DataSize)
             throw new ArgumentException($"RvR-siege relay payload must be exactly {DataSize} bytes.", nameof(data));
@@ -271,9 +273,6 @@ public sealed class ZoneEventBroadcaster(
                 worldState.DissolveAlliance((byte)ReadInt32(data, 0), (byte)ReadInt32(data, 4));
                 break;
         }
-
-        var response = new ZoneEventInfoResponse { Sort = sort, Data = data.ToArray() };
-        BroadcastToEveryZone(in response);
 
         switch (sort)
         {

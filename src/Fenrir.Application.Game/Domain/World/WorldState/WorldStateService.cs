@@ -1,14 +1,12 @@
 using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Domain.World.WorldState;
 
 public sealed class WorldStateService(
     IWorldStateRepository repository,
-    ILogger<WorldStateService> logger,
-    IOptions<GameServerOptions>? gameOptions = null)
+    ILogger<WorldStateService> logger)
 {
     public const int TribeCount = 4;
 
@@ -29,9 +27,6 @@ public sealed class WorldStateService(
     private int _scalarVersion;
 
     private WorldRvrState _world;
-
-    private bool IsCenterAuthoritative =>
-        gameOptions?.Value.WorldStateAuthority == WorldStateAuthorityMode.Center;
 
     public bool IsDirty
     {
@@ -323,9 +318,6 @@ public sealed class WorldStateService(
     public async ValueTask<bool> TryConsumeUpdateTribePointFlagAsync(short expectedPendingValue, short consumedValue,
         CancellationToken ct)
     {
-        if (IsCenterAuthoritative)
-            return false;
-
         WorldRvrState snapshot;
         lock (_lock)
         {
@@ -364,9 +356,6 @@ public sealed class WorldStateService(
     {
         if (totals.Count != TribeCount)
             throw new ArgumentException($"Expected exactly {TribeCount} totals.", nameof(totals));
-
-        if (IsCenterAuthoritative)
-            return false;
 
         TribeRvrState[] updated;
         lock (_lock)
@@ -466,9 +455,6 @@ public sealed class WorldStateService(
 
     public async ValueTask FlushIfDirtyAsync(CancellationToken ct)
     {
-        if (IsCenterAuthoritative)
-            return;
-
         WorldRvrState world;
         TribeRvrState[] tribes;
         AllianceOfferState[] allianceOffers;

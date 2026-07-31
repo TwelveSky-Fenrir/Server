@@ -75,6 +75,7 @@ public static class FenrirDataServiceCollectionExtensions
 
         builder.Services.AddSingleton<ICharacterLogoutStateRepository, CharacterLogoutStateRepository>();
         builder.Services.AddSingleton<IAccountSessionRepository, AccountSessionRepository>();
+        builder.Services.AddSingleton<IDailyRewardResetRepository, DailyRewardResetRepository>();
 
         builder.Services.AddSingleton<IGuildTribeBroadcastRelayRepository, GuildTribeBroadcastRelayRepository>();
 

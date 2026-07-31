@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Abstractions.ItemModification;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Forge;
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Loot;
 using Fenrir.Domain.Game.GameData;
@@ -28,6 +29,14 @@ public sealed class RerollItemService(
         {
             logger.LogDebug("Character {CharacterId} reroll-item rejected: invalid slot ({Page1}:{Index1})",
                 characterId, page1, index1);
+            return new RerollItemResult(RerollItemOutcome.Rejected, 0, [0, 0, 0, 0, 0, 0]);
+        }
+
+        if (!RentedInventoryPageGate.IsPageAccessible(page1, state.InventoryDate, GameDate.Today()))
+        {
+            logger.LogDebug(
+                "Character {CharacterId} reroll-item rejected: rented inventory page expired (InventoryDate {InventoryDate})",
+                characterId, state.InventoryDate);
             return new RerollItemResult(RerollItemOutcome.Rejected, 0, [0, 0, 0, 0, 0, 0]);
         }
 

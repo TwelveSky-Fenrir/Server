@@ -124,6 +124,11 @@ public sealed class ZoneRegistry
         var geometries = new ConcurrentDictionary<short, ZoneGeometry?>();
         Parallel.ForEach(maps, mapId => geometries[mapId] = Zone.TryLoadGeometry(mapId, _options, _zoneLogger));
 
+        // Beneficiaire de la taxe = detenteur du symbole, pas la tribu payeuse (Server/ts25zone/S07_MyGame01.cpp:2711).
+        // Un accumulateur par zone: TribeBankTaxSweepFlushHost draine et remet a zero zone par zone.
+        Func<byte, byte>? resolveTribeBankBeneficiary =
+            _worldState is null ? null : _worldState.GetTribeSymbolOwner;
+
         _zones = maps.ToFrozenDictionary(
             mapId => mapId,
             mapId =>
@@ -136,6 +141,7 @@ public sealed class ZoneRegistry
                     tradeRegistry: _tradeRegistry,
                     heroRankPointAccumulator: _heroRankPointAccumulator,
                     characterShardLocations: _characterShardLocations,
+                    tribeBankTax: new TribeBankTaxAccumulator(resolveTribeBankBeneficiary),
                     regularWarActiveMapTracker: _regularWarActiveMapTracker,
                     zoneRegistry: this,
                     geometry: geometry,

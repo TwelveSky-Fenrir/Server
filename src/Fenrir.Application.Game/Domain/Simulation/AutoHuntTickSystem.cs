@@ -1,6 +1,8 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
+using Fenrir.Application.Game.Domain.Hotkeys;
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
@@ -19,6 +21,18 @@ public sealed class AutoHuntTickSystem(
 {
     private const int NoManaRelocateThreshold = 1000;
 
+    private const int InventorySlotCount = 64;
+
+    private const byte HotkeyBindableItemSort = 2;
+
+    private const int AutoHuntDayStatSort = 61;
+
+    private const int AutoHuntMinuteStatSort = 62;
+
+    // AVATAR_OBJECT::BotBuff (Server/ts25zone/S07_MyGame04.cpp:2402) : pour le skill 82 le slot 31 est teste
+    // en verite brute, pas en > 0 comme tous les autres slots de garde.
+    private const int RawTruthGateBuffSlot = 31;
+
     private static readonly FrozenDictionary<int, ImmutableArray<int>> AutoCastGateSlots =
         new Dictionary<int, ImmutableArray<int>>
         {
@@ -26,7 +40,7 @@ public sealed class AutoHuntTickSystem(
             [11] = [1], [34] = [1], [49] = [1],
             [15] = [0], [30] = [0], [53] = [0],
             [19] = [3, 7], [38] = [3, 7], [57] = [3, 7],
-            [82] = [9],
+            [82] = [9, RawTruthGateBuffSlot],
             [83] = [10],
             [84] = [11],
             [103] = [12],
@@ -45,27 +59,35 @@ public sealed class AutoHuntTickSystem(
         if (!state.AutoHuntEnabled || state.AutoHuntConfig is not { } config)
             return;
 
-        if (AdvanceBudgetAndRelocateIfExhausted(state, legacyTicksElapsed))
-            return;
+        if (!state.PshopOpen && !state.IsStunned && !state.IsDead && !IsSuppressedByZoneServerType(zone))
+        {
+            TryAutoCastBuff(zone, state, config);
+            TryResupplyHotkeys(state, config);
+        }
 
-        if (state.IsDead || state.PshopOpen || state.Mana < 1 || state.IsStunned)
-            return;
-
-        if (IsSuppressedByZoneServerType(zone))
-            return;
-
-        TryAutoCastBuff(zone, state, config);
+        AdvanceBudgetAndRelocateIfExhausted(state, legacyTicksElapsed);
     }
 
     private void TryAutoCastBuff(Zone zone, PlayerRuntimeState state, AutoHunt config)
     {
+        if (state.IsMovingZone)
+            return;
+
+        if (state.Mana < 1)
+            return;
+
         var slotCount = state.AutoBuffTime >= GameDate.Today() ? 8 : 2;
 
+        if (IsStunOrDeathMotion(state.ActionSort) || IsBroadcastBuffMotion(state.ActionSort))
+            return;
+
+        var equipSlotItems = BuildEquipSlotItems(state);
         var weaponItemId = state.Inventory.GetSlot(ContainerMatrix.Equipment, EquipmentSlots.WeaponSlot)?.ItemId;
         var weaponSort = weaponItemId is { } itemId && worldData.ItemsById.TryGetValue(itemId, out var weaponDef)
             ? (int?)weaponDef.Item.Sort
             : null;
         var maxLife = state.Stats?.MaxLife ?? state.MaxLife;
+        var manaReductionRatioPercent = ManaCostReduction.GetRatioPercent(equipSlotItems);
 
         var isZone126 = zone.IsZone126TypeZone;
 
@@ -82,28 +104,199 @@ public sealed class AutoHuntTickSystem(
             var grade = Math.Min(requestedGrade, GetMaxLearnedGrade(skillId, state.LearnedSkills));
 
             worldData.SkillsById.TryGetValue(skillId, out var skillDef);
-            var result = SkillCastResolver.TryCast(skillDef, grade, state.Mana, maxLife, weaponSort,
-                state.SupportSkillTimeUpRatio);
+            var result = SkillCastResolver.TryCast(skillDef, grade, int.MaxValue, maxLife, weaponSort,
+                state.SupportSkillTimeUpRatio, manaReductionRatioPercent);
 
-            if (result.Success && result.Kind == SkillEffectKind.SelfBuff)
-            {
-                state.Mana -= result.ManaCost;
-                state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
-                zone.ApplyBuffWrites(state, result.BuffWrites);
-                state.NoManaCount =
-                    0;
-                return;
-            }
+            if (!result.Success || result.Kind != SkillEffectKind.SelfBuff)
+                continue;
 
-            if (isZone126 && result.Failure == SkillCastResolver.FailureReason.InsufficientMana)
+            // Hors serveur de type zone 126 le manque de mana n'interrompt rien : le legacy retombe dans le
+            // corps du cast et laisse la mana passer sous zero (Server/ts25zone/S07_MyGame04.cpp:2461-2482).
+            if (state.Mana < result.ManaCost && isZone126)
             {
                 EscalateNoMana(state);
                 return;
             }
+
+            state.NoManaCount = 0;
+
+            if (result.ManaCost > 0)
+            {
+                state.Mana -= result.ManaCost;
+                state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
+                zone.ApplyBuffWrites(state, result.BuffWrites);
+            }
+
+            return;
         }
     }
 
-    private static bool AdvanceBudgetAndRelocateIfExhausted(PlayerRuntimeState state, int legacyTicksElapsed)
+    private void TryResupplyHotkeys(PlayerRuntimeState state, AutoHunt config)
+    {
+        var bound = ScanBoundPotionCategories(state);
+
+        var petStack = state.Inventory.GetSlot(ContainerMatrix.Equipment, PetSlots.EquipmentSlot);
+        var petEquipped = petStack is { ItemId: > 0 };
+        var animalPreyCmd = config.AnimalPreyCmd != 0;
+        var animalFoodCmd = config.AnimalFoodCmd != 0;
+        var animalPresent = state.AnimalNumber > 0;
+
+        var needsAnything = (!bound.HasHp && !bound.HasHpMp) ||
+                            (!bound.HasMp && !bound.HasHpMp) ||
+                            (!bound.HasPetPrey && animalPreyCmd && petEquipped) ||
+                            (!bound.HasPetFood && animalFoodCmd && animalPresent);
+        if (!needsAnything)
+            return;
+
+        var emptyHotkeySlots = CollectEmptyHotkeySlots(state);
+        if (emptyHotkeySlots.Count == 0)
+            return;
+
+        var candidates = CollectInventoryPillCandidates(state);
+        if (candidates.Count == 0)
+            return;
+
+        var moves = BotHotKeyResupplyPolicy.Resolve(bound, candidates, emptyHotkeySlots, animalPreyCmd, petEquipped,
+            animalFoodCmd, animalPresent);
+
+        foreach (var move in moves)
+            ApplyResupplyMove(state, move);
+    }
+
+    private static void ApplyResupplyMove(PlayerRuntimeState state, BotHotKeyResupplyPolicy.ResupplyMove move)
+    {
+        state.Inventory.ReplaceContainer(move.SourcePage,
+            state.Inventory.GetContainer(move.SourcePage).Remove(move.SourceSlot));
+
+        state.SetHotkeySlot(move.DestinationPage, move.DestinationIndex,
+            new HotkeySlot(HotkeyBindingKind.Item, move.ItemId, move.Quantity));
+
+        state.Session.Send(new AutoHuntHotkeyRebindResponse
+        {
+            Page1 = move.SourcePage,
+            Index1 = move.SourceSlot,
+            Page2 = move.DestinationPage,
+            Index2 = move.DestinationIndex,
+            Value0 = move.ItemId,
+            Value1 = move.Quantity,
+            Value2 = (int)HotkeyBindingKind.Item
+        });
+    }
+
+    private BotHotKeyResupplyPolicy.BoundCategories ScanBoundPotionCategories(PlayerRuntimeState state)
+    {
+        bool hasHp = false, hasMp = false, hasHpMp = false, hasPetPrey = false, hasPetFood = false;
+
+        foreach (var slot in state.Hotkeys.Values)
+        {
+            if (slot.Kind != HotkeyBindingKind.Item || slot.Value2 < 1)
+                continue;
+
+            if (!worldData.ItemsById.TryGetValue(slot.Value1, out var definition) ||
+                definition.Item.Sort != HotkeyBindableItemSort)
+                continue;
+
+            switch (definition.Item.PotionType1)
+            {
+                case 1:
+                case 2:
+                    hasHp = true;
+                    break;
+                case 3:
+                case 4:
+                    hasMp = true;
+                    break;
+                case 5:
+                    hasHpMp = true;
+                    break;
+                case 6:
+                    hasPetPrey = true;
+                    break;
+                case 16:
+                    hasPetFood = true;
+                    break;
+            }
+        }
+
+        return new BotHotKeyResupplyPolicy.BoundCategories(hasHp, hasMp, hasHpMp, hasPetPrey, hasPetFood);
+    }
+
+    private static List<BotHotKeyResupplyPolicy.HotkeyAddress> CollectEmptyHotkeySlots(PlayerRuntimeState state)
+    {
+        var empty = new List<BotHotKeyResupplyPolicy.HotkeyAddress>(4);
+
+        for (byte page = 0; page < HotkeyActionResolver.PageCount; page++)
+        for (byte index = 0; index < HotkeyActionResolver.SlotsPerPage; index++)
+            if (state.GetHotkeySlot(page, index).Value1 == 0)
+                empty.Add(new BotHotKeyResupplyPolicy.HotkeyAddress(page, index));
+
+        return empty;
+    }
+
+    private List<BotHotKeyResupplyPolicy.InventoryCandidate> CollectInventoryPillCandidates(PlayerRuntimeState state)
+    {
+        var candidates = new List<BotHotKeyResupplyPolicy.InventoryCandidate>();
+
+        // MyUtil::FindInventoryPill (Server/ts25zone/S07_MyGame03.cpp:8556-8559) teste la seconde page en
+        // strictement superieur a la date du jour, la ou tout le reste du legacy la teste en >= : le jour de
+        // l'expiration la page 2 reste utilisable partout sauf ici.
+        var pageCount = state.InventoryDate != 0 && state.InventoryDate > GameDate.Today() ? 2 : 1;
+
+        for (byte page = 0; page < pageCount; page++)
+        {
+            var container = state.Inventory.GetContainer(page);
+            for (byte slot = 0; slot < InventorySlotCount; slot++)
+            {
+                if (!container.TryGetValue(slot, out var stack) || stack.ItemId == 0)
+                    continue;
+
+                if (!worldData.ItemsById.TryGetValue(stack.ItemId, out var definition))
+                    continue;
+
+                var category = ClassifyInventoryPill(definition.Item.PotionType1);
+                if (category == BotHotKeyResupplyPolicy.ResupplyCategory.None)
+                    continue;
+
+                candidates.Add(new BotHotKeyResupplyPolicy.InventoryCandidate(page, slot, stack.ItemId,
+                    stack.Quantity, category));
+            }
+        }
+
+        return candidates;
+    }
+
+    private static BotHotKeyResupplyPolicy.ResupplyCategory ClassifyInventoryPill(int potionType1)
+    {
+        return potionType1 switch
+        {
+            6 => BotHotKeyResupplyPolicy.ResupplyCategory.PetPrey,
+            16 => BotHotKeyResupplyPolicy.ResupplyCategory.PetFood,
+            _ => BotHotKeyResupplyPolicy.ClassifyHpMpByPotionType(potionType1)
+        };
+    }
+
+    private ItemDefinition?[] BuildEquipSlotItems(PlayerRuntimeState state)
+    {
+        var equipSlotItems = new ItemDefinition?[SkillGradeAuthority.EquipSlotCount];
+        for (var slot = 0; slot < SkillGradeAuthority.EquipSlotCount; slot++)
+            if (state.Inventory.GetSlot(ContainerMatrix.Equipment, (byte)slot) is { } stack &&
+                worldData.ItemsById.TryGetValue(stack.ItemId, out var definition))
+                equipSlotItems[slot] = definition;
+
+        return equipSlotItems;
+    }
+
+    private static bool IsStunOrDeathMotion(int actionSort)
+    {
+        return actionSort is 11 or 12;
+    }
+
+    private static bool IsBroadcastBuffMotion(int actionSort)
+    {
+        return actionSort is 41 or 60 or 61 or 62 or 66 or 67 or 68 or 75;
+    }
+
+    private static void AdvanceBudgetAndRelocateIfExhausted(PlayerRuntimeState state, int legacyTicksElapsed)
     {
         var result = AutoHuntBudgetPolicy.Advance(state.AutoHuntPaidDayBudget, state.AutoHuntPaidMinuteBudget,
             state.AutoHuntBudgetMinuteAccrualTicks, legacyTicksElapsed, GameDate.Today());
@@ -112,11 +305,20 @@ public sealed class AutoHuntTickSystem(
         state.AutoHuntPaidMinuteBudget = result.MinuteBudget;
         state.AutoHuntBudgetMinuteAccrualTicks = result.MinuteAccrualTicks;
 
-        if (result.Signal != AutoHuntBudgetPolicy.Signal.Exhausted)
-            return false;
-
-        state.Session.Send(new ReturnToHomeZoneResponse());
-        return true;
+        switch (result.Signal)
+        {
+            case AutoHuntBudgetPolicy.Signal.DayBudgetExpired:
+                state.Session.Send(new AvatarStatUpdateResponse
+                    { Sort = AutoHuntDayStatSort, Value = result.DayBudget, Value2 = 0 });
+                break;
+            case AutoHuntBudgetPolicy.Signal.MinuteBudgetDecremented:
+                state.Session.Send(new AvatarStatUpdateResponse
+                    { Sort = AutoHuntMinuteStatSort, Value = result.MinuteBudget, Value2 = 0 });
+                break;
+            case AutoHuntBudgetPolicy.Signal.Exhausted:
+                state.Session.Send(new ReturnToHomeZoneResponse());
+                break;
+        }
     }
 
     private static void EscalateNoMana(PlayerRuntimeState state)
@@ -136,14 +338,20 @@ public sealed class AutoHuntTickSystem(
         if (options.Value.HolyStoneWarEnabled && zone.MapId == options.Value.HolyStoneMapId)
             return true;
 
+        if (options.Value.HolyStoneBattleEnabled && zone.MapId == options.Value.TribeSymbolBattleMapId)
+            return true;
+
         return zone.IsZone241TypeZone;
     }
 
     private static bool IsAlreadyActive(PlayerRuntimeState state, ImmutableArray<int> gateSlots)
     {
         foreach (var slot in gateSlots)
-            if (state.Buffs.Buff[slot * 2 + 1] > 0)
+        {
+            var value = state.Buffs.Buff[slot * 2 + 1];
+            if (slot == RawTruthGateBuffSlot ? value != 0 : value > 0)
                 return true;
+        }
 
         return false;
     }

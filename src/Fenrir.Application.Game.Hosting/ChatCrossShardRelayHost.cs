@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Cluster.Client.Relay;
+using Fenrir.Application.Game.Hosting.Relay;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;

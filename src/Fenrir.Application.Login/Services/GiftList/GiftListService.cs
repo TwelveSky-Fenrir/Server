@@ -11,9 +11,13 @@ public sealed class GiftListService(IGiftRepository gifts, ILogger<GiftListServi
     {
         var pending = await gifts.GetPendingByAccountAsync(accountId, cancellationToken);
 
+        // The wire index is positional and is replayed by CLP_21 (Server/ts25login/S04_MyWork02.cpp:1423):
+        // CreatedAtUtc is DATETIME2(3) and ties, so both gift services must break ties on GiftId identically.
+        var slots = pending.OrderBy(g => g.CreatedAtUtc).ThenBy(g => g.GiftId).ToArray();
+
         var giftItem = new int[MaxGiftPages * 2];
-        for (var i = 0; i < pending.Count && i < MaxGiftPages; i++)
-            giftItem[i * 2] = pending[i].ProductId ?? 0;
+        for (var i = 0; i < slots.Length && i < MaxGiftPages; i++)
+            giftItem[i * 2] = slots[i].ProductId ?? 0;
 
         if (logger.IsEnabled(LogLevel.Debug))
             logger.LogDebug("Gift list read for account {AccountId}: {PendingCount} pending ({ShownCount} shown)",

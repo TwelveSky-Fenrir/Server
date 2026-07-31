@@ -11,6 +11,8 @@ public sealed class ZoneCenterBroadcastIngestor(
     ZoneCenterSiegeState state,
     ZoneRegistry zones,
     ILogger<ZoneCenterBroadcastIngestor> logger,
+    WorldState.WorldStateService? worldState = null,
+    System.Lazy<ZoneEventBroadcaster>? worldReactions = null,
     Zone051Zone053SiegeState? zone051Zone053State = null,
     AllianceProposalCenterState? allianceState = null,
     IWorldEventUplink? uplink = null)
@@ -37,6 +39,12 @@ public sealed class ZoneCenterBroadcastIngestor(
 
     public const int Zone335RangeEnd = 1507;
 
+    public const int Zone194RangeStart = 202;
+
+    public const int Zone194RangeEnd = 208;
+
+    public const int TribeMasterCallAbilityEventCode = 302;
+
     public const int DtmEventCode = 1510;
 
     public const int PingEventCode = 4000;
@@ -46,6 +54,9 @@ public sealed class ZoneCenterBroadcastIngestor(
         if (data.Length != PayloadSize)
             throw new ArgumentException($"Zone-center broadcast payload must be exactly {PayloadSize} bytes.",
                 nameof(data));
+
+        if (!Allow(eventCode, nameof(Ingest)))
+            return;
 
         ApplyStateEffect(eventCode, data);
 
@@ -64,8 +75,26 @@ public sealed class ZoneCenterBroadcastIngestor(
             throw new ArgumentException($"Zone-center broadcast payload must be exactly {PayloadSize} bytes.",
                 nameof(data));
 
+        if (!Allow(eventCode, nameof(ApplyRelayedEvent)))
+            return;
+
         ApplyStateEffect(eventCode, data);
         Relay(eventCode, data);
+    }
+
+    // Le center legacy tombait dans son default: pour tout tSort inconnu, sans jamais relayer. Ici le relais
+    // rediffuse a TOUS les joueurs connectes : laisser passer un code arbitraire ferait de ce chemin un
+    // amplificateur de broadcast pilotable par le pair.
+    private bool Allow(int eventCode, string entryPoint)
+    {
+        if (KnownTSortRegistry.IsKnown(eventCode))
+            return true;
+
+        logger.LogWarning(
+            "Zone-center event sort {Sort} rejected at {EntryPoint}: not in the known-sort allowlist -- dropped without relay",
+            eventCode, entryPoint);
+
+        return false;
     }
 
     private void EnqueueForOtherShards(int eventCode, ReadOnlySpan<byte> data)
@@ -109,6 +138,15 @@ public sealed class ZoneCenterBroadcastIngestor(
                 Zone051Zone053BroadcastResolver.ApplyZone053(zone051Zone053State, eventCode, data, logger);
                 break;
 
+            case >= Zone194RangeStart and <= Zone194RangeEnd:
+                if (SiegeEventStateMap.TryMapZone194(eventCode, out var zone194State))
+                    state.SetZone194State(zone194State);
+                break;
+
+            case TribeMasterCallAbilityEventCode:
+                ApplyTribeMasterCallAbility(data);
+                break;
+
             case DtmEventCode:
                 ApplyDtm(data);
                 break;
@@ -130,6 +168,13 @@ public sealed class ZoneCenterBroadcastIngestor(
 
             case PingEventCode:
                 HsbRewardFlagResetReactor.Apply(zones);
+                break;
+
+            // Sorts dont l'effet d'etat et les reactions de monde vivent dans ZoneEventBroadcaster
+            // (resummon de gardes, evictions, reset de rang). On delegue plutot que de dupliquer, mais le
+            // ROUTAGE est ici : il n'existe plus qu'une seule porte d'entree pour un evenement relaye.
+            case 38 or 39 or 40 or 42 or 45 or 46 or 47:
+                worldReactions?.Value.ApplyRelayedStateAndReactions(eventCode, data);
                 break;
         }
     }
@@ -210,6 +255,41 @@ public sealed class ZoneCenterBroadcastIngestor(
 
         if (SiegeEventStateMap.TryMapZone241(eventCode, out var challengeState))
             state.SetZone241(instance, challengeState);
+    }
+
+    // Le legacy n'a QU'UN tableau mTribeMasterCallAbility : ecrit ici sur tSort 302, purge sur tSort 45 par
+    // la fin de bataille des symboles, lu par le combat. La cible est donc _tribeFormationAbility de
+    // WorldStateService, pas un magasin de siege separe. Le legacy ne borne ni la tribu ni le code
+    // (Server/ts25center/S04_MyWork02.cpp:924 ecrit dans un int[MAX_TRIBE_NUM]) : on borne les deux.
+    private void ApplyTribeMasterCallAbility(ReadOnlySpan<byte> data)
+    {
+        var tribeId = ReadInt32(data, 0);
+        var formationCode = ReadInt32(data, 4);
+
+        if (!ZoneCenterSiegeState.IsValidTribe(tribeId))
+        {
+            logger.LogWarning(
+                "Tribe-master call-ability event referenced out-of-range tribe id {TribeId} -- ignored", tribeId);
+            return;
+        }
+
+        if (formationCode is < 0 or > byte.MaxValue)
+        {
+            logger.LogWarning(
+                "Tribe-master call-ability event for tribe {TribeId} carried out-of-range formation code {Code} -- ignored",
+                tribeId, formationCode);
+            return;
+        }
+
+        if (worldState is null)
+        {
+            logger.LogWarning(
+                "Tribe-master call-ability event for tribe {TribeId} dropped: no WorldStateService registered",
+                tribeId);
+            return;
+        }
+
+        worldState.SetTribeFormationAbility((byte)tribeId, (byte)formationCode);
     }
 
     private void ApplyDtm(ReadOnlySpan<byte> data)

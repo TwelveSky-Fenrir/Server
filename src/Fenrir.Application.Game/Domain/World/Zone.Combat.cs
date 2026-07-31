@@ -141,6 +141,11 @@ public sealed partial class Zone
 
     private void ApplyCombatCommand(in CombatCommand command)
     {
+        // Server/ts25zone/S04_MyWork01.cpp:326-331 : le repartiteur avale tout opcode d'un joueur
+        // en IsMovingZone, sauf 11/12/21 ; aucun opcode d'attaque n'en fait partie.
+        if (_players.TryGetValue(command.AttackerCharacterId, out var sender) && sender.IsMovingZone)
+            return;
+
         if (command.AttackInfo.Case == 1)
         {
             ApplyDuelAttack(command);
@@ -592,7 +597,8 @@ public sealed partial class Zone
 
         var towerIndex = TowerZoneIndexTable.GetTowerIndex(MapId);
         var isTowerGuardian = towerIndex >= 0 && monster.ServerIndex == TowerWarState.GuardianServerIndex(towerIndex);
-        var targetCategoryEligible = !isTowerGuardian || CanAttackTowerGuardian(attackerState.Tribe, towerIndex);
+        var targetCategoryEligible = (!isTowerGuardian || CanAttackTowerGuardian(attackerState.Tribe, towerIndex)) &&
+                                     CanAttackSpecialSortTarget(monster, attackerState.Tribe);
 
         var attackerSnapshot = ToCombatantSnapshot(attackerState);
 
@@ -666,6 +672,105 @@ public sealed partial class Zone
 
         if (isTowerGuardian)
             ApplyTowerGuardianHitSideEffects(towerIndex, attackerState);
+    }
+
+    private bool CanAttackSpecialSortTarget(MonsterEntity monster, byte attackerTribe)
+    {
+        return monster.SpecialSort switch
+        {
+            MonsterSpecialSort.Standard => true,
+            MonsterSpecialSort.TribeSymbolStone => CanAttackTribeSymbolStone(monster.Template.SpecialType,
+                attackerTribe),
+            MonsterSpecialSort.Inert => monster.Template.SpecialType switch
+            {
+                21 => CanAttackTribeOwnedStone(attackerTribe, 0),
+                22 => CanAttackTribeOwnedStone(attackerTribe, 1),
+                23 => CanAttackTribeOwnedStone(attackerTribe, 2),
+                29 => CanAttackTribeOwnedStone(attackerTribe, 3),
+                _ => true
+            },
+            MonsterSpecialSort.AllianceStone => monster.Template.SpecialType switch
+            {
+                31 => CanAttackTribeOwnedStone(attackerTribe, 0),
+                32 => CanAttackTribeOwnedStone(attackerTribe, 1),
+                33 => CanAttackTribeOwnedStone(attackerTribe, 2),
+                34 => CanAttackTribeOwnedStone(attackerTribe, 3),
+                _ => true
+            },
+            MonsterSpecialSort.TribeGuard => monster.Template.Type switch
+            {
+                6 => CanAttackTribeOwnedStone(attackerTribe, 0),
+                7 => CanAttackTribeOwnedStone(attackerTribe, 1),
+                8 => CanAttackTribeOwnedStone(attackerTribe, 2),
+                9 => CanAttackTribeOwnedStone(attackerTribe, 3),
+                _ => true
+            },
+            MonsterSpecialSort.CarThrower => monster.Template.SpecialType switch
+            {
+                35 => CanAttackTribeOwnedStone(attackerTribe, 0),
+                36 => CanAttackTribeOwnedStone(attackerTribe, 1),
+                37 => CanAttackTribeOwnedStone(attackerTribe, 2),
+                38 => CanAttackTribeOwnedStone(attackerTribe, 3),
+                _ => true
+            },
+            MonsterSpecialSort.Tower => CanAttackTowerBySpecialSort(attackerTribe),
+            _ => false
+        };
+    }
+
+    private bool CanAttackTowerBySpecialSort(byte attackerTribe)
+    {
+        var towerIndex = TowerZoneIndexTable.GetTowerIndex(MapId);
+        return towerIndex >= 0 && CanAttackTowerGuardian(attackerTribe, towerIndex);
+    }
+
+    private bool CanAttackTribeOwnedStone(byte attackerTribe, byte stoneTribe)
+    {
+        return attackerTribe != stoneTribe && worldState?.GetAllyOf(stoneTribe) != attackerTribe;
+    }
+
+    private bool CanAttackTribeSymbolStone(byte specialType, byte attackerTribe)
+    {
+        var allianceTribe = worldState?.GetAllyOf(attackerTribe);
+
+        return specialType switch
+        {
+            11 => CanAttackTribeSymbolSlot(0, attackerTribe, allianceTribe),
+            12 => CanAttackTribeSymbolSlot(1, attackerTribe, allianceTribe),
+            13 => CanAttackTribeSymbolSlot(2, attackerTribe, allianceTribe),
+            28 => CanAttackTribeSymbolSlot(3, attackerTribe, allianceTribe),
+            14 => CanAttackMonsterSymbolStone(attackerTribe, allianceTribe),
+            _ => true
+        };
+    }
+
+    private bool CanAttackTribeSymbolSlot(byte slotTribe, byte attackerTribe, byte? allianceTribe)
+    {
+        if (worldState is null || !worldState.World.TribeSymbolBattle)
+            return false;
+
+        var owner = worldState.GetTribeSymbolOwner(slotTribe);
+        if (owner == attackerTribe || owner == allianceTribe)
+            return false;
+
+        var homeTribe = MapId switch
+        {
+            2 => 0,
+            7 => 1,
+            11 => 2,
+            141 => 3,
+            _ => -1
+        };
+
+        return homeTribe < 0 || (attackerTribe != homeTribe && allianceTribe != homeTribe);
+    }
+
+    private bool CanAttackMonsterSymbolStone(byte attackerTribe, byte? allianceTribe)
+    {
+        // Le verrou de respawn bAttackMonsterSymbol (Server/ts25zone/S10_MySummon.cpp:1961) n'a pas
+        // d'equivalent Fenrir ; l'omettre equivaut a sa valeur initiale TRUE.
+        var monsterSymbolTribe = worldState?.World.MonsterSymbol;
+        return monsterSymbolTribe != attackerTribe && (allianceTribe is null || monsterSymbolTribe != allianceTribe);
     }
 
     private bool CanAttackTowerGuardian(byte attackerTribe, int towerIndex)

@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Abstractions.ItemModification;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Forge;
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Domain.Game.GameData;
 using Fenrir.Protocol.Game;
@@ -29,6 +30,16 @@ public sealed class CombineItemService(
             logger.LogDebug(
                 "Character {CharacterId} combine-item rejected: invalid slot(s) ({Page1}:{Index1} / {Page2}:{Index2})",
                 characterId, page1, index1, page2, index2);
+            return new CombineItemResult(CombineItemOutcome.Rejected, 0, 0);
+        }
+
+        var today = GameDate.Today();
+        if (!RentedInventoryPageGate.IsPageAccessible(page1, state.InventoryDate, today) ||
+            !RentedInventoryPageGate.IsPageAccessible(page2, state.InventoryDate, today))
+        {
+            logger.LogDebug(
+                "Character {CharacterId} combine-item rejected: rented inventory page expired (InventoryDate {InventoryDate})",
+                characterId, state.InventoryDate);
             return new CombineItemResult(CombineItemOutcome.Rejected, 0, 0);
         }
 

@@ -3,6 +3,5 @@ namespace Fenrir.Core.Wire;
 public enum FenrirServer : byte
 {
     Login = 0,
-    Zone = 1,
-    Center = 2
+    Zone = 1
 }

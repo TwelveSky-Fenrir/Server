@@ -377,7 +377,7 @@ public sealed class GuildActionService(
 
         try
         {
-            await guilds.SetBuffAsync(guildId, payload.GuildBuffType, 1, guild.BuffTime, guild.BuffTimeForDiff, ct);
+            await guilds.SetBuffTypeAsync(guildId, payload.GuildBuffType, 1, ct);
         }
         catch (Exception ex)
         {

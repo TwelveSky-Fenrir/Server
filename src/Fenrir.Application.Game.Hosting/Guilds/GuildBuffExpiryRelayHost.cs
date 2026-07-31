@@ -1,7 +1,7 @@
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Cluster.Client.Relay;
+using Fenrir.Application.Game.Hosting.Relay;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 

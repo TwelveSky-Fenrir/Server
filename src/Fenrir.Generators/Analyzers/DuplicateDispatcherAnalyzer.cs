@@ -16,7 +16,7 @@ namespace Fenrir.Generators.Analyzers;
 public sealed class DuplicateDispatcherAnalyzer : DiagnosticAnalyzer
 {
     private static readonly FenrirServer[] AllServers =
-        [FenrirServer.Login, FenrirServer.Zone, FenrirServer.Center];
+        [FenrirServer.Login, FenrirServer.Zone];
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } =
         ImmutableArray.Create(FenrirDiagnostics.DuplicateDispatcherInClosure);

@@ -23,14 +23,20 @@ public sealed class DuelMaintenanceSystem(DuelRegistry duels) : ISimulationSyste
             if (!(processedDuelIds ??= []).Add(duel.UniqueNumber))
                 continue;
 
-            Resolve(zone, duel, legacyTicksElapsed);
+            Resolve(zone, duel);
         }
     }
 
-    private void Resolve(Zone zone, ActiveDuel duel, int legacyTicksElapsed)
+    private void Resolve(Zone zone, ActiveDuel duel)
     {
         zone.TryGetPlayer(duel.PlayerA, out var playerA);
         zone.TryGetPlayer(duel.PlayerB, out var playerB);
+
+        // RemainingTicks est un compte de SECONDES: il avance sur la porte 1 s du proprietaire du duel
+        // (aDuelState[2] == 1, soit PlayerA), pas sur le tick logique. Server/ts25zone/S07_MyGame04.cpp:378,665
+        var gateOpens = playerA?.OneSecondGateOpenCount ?? playerB?.OneSecondGateOpenCount ?? 0;
+        if (gateOpens <= 0)
+            return;
 
         if (playerA is null || playerB is null)
         {
@@ -54,7 +60,7 @@ public sealed class DuelMaintenanceSystem(DuelRegistry duels) : ISimulationSyste
             return;
         }
 
-        duel.RemainingTicks -= legacyTicksElapsed;
+        duel.RemainingTicks -= gateOpens;
         if (duel.RemainingTicks <= 0)
         {
             duels.TryEndActiveDuel(duel.PlayerA, out _);

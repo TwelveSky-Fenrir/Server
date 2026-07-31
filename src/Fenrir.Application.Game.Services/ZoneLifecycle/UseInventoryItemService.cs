@@ -315,7 +315,7 @@ public sealed class UseInventoryItemService(
 
         try
         {
-            var topUp = GuildBuffTopUp.Apply(guild, minutes, DateTime.UtcNow);
+            var topUp = GuildBuffTopUp.Apply(guild, minutes, DateTimeOffset.UtcNow);
             await guilds.SetBuffAsync(guildId, topUp.BuffType, topUp.BuffState, topUp.BuffTime,
                 topUp.BuffTimeForDiff, cancellationToken);
         }

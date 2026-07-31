@@ -14,7 +14,6 @@ namespace Fenrir.Application.Game.Services.Commerce;
 
 public sealed class OpenShopStallService(
     IOfflineShopRepository offlineShops,
-    IGameSettingsRepository gameSettings,
     WorldDataCache worldData,
     IEventLogRepository eventLog,
     ILogger<OpenShopStallService> logger) : IOpenShopStallService
@@ -138,6 +137,33 @@ public sealed class OpenShopStallService(
             return new OpenShopStallResponse { Result = 105, PshopInfo = listing };
         }
 
+        // The rental credit is owned by the character and only ever bought (rental-extension consumables);
+        // opening never grants days and never shortens what is already paid for
+        // (Server/ts25zone/S07_MyGame09.cpp:393-409: refuse when expired, then mShopDate = aProxyShopDate).
+        OfflineShopRowDto? existing;
+        try
+        {
+            (existing, _) = await offlineShops.GetByCharacterAsync(characterId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "Character {CharacterId} proxy-shop rental-credit read failed while opening a proxy shop",
+                characterId);
+            return new OpenShopStallResponse { Result = 103, PshopInfo = listing };
+        }
+
+        var shopDate = existing?.ShopDate ?? 0;
+
+        if (shopDate < GameDate.Today())
+        {
+            logger.LogInformation(
+                "Proxy shop open rejected: character {CharacterId} has no unexpired rental credit " +
+                "(game.OfflineShops.ShopDate {ShopDate})",
+                characterId, shopDate);
+            return new OpenShopStallResponse { Result = 104, PshopInfo = listing };
+        }
+
         var page0 = state.Inventory.GetContainer(ContainerMatrix.InventoryPage0);
         var page1 = state.Inventory.GetContainer(ContainerMatrix.InventoryPage1);
 
@@ -160,9 +186,6 @@ public sealed class OpenShopStallService(
             else
                 page1 = page1.Remove((byte)view.InventoryIndex);
         }
-
-        var settings = await gameSettings.GetAsync(cancellationToken);
-        var shopDate = GameDate.Today() + settings.ProxyShopDurationDays;
 
         try
         {

@@ -17,7 +17,7 @@ internal static class SessionStateGateEmitter
         {
             FenrirServer.Login => WellKnownNames.LoginSessionStateEnum,
             FenrirServer.Zone => WellKnownNames.ZoneSessionStateEnum,
-            _ => WellKnownNames.CenterSessionStateEnum
+            _ => throw new System.ArgumentOutOfRangeException(nameof(server), server, null)
         };
 
         var entries = packets

@@ -37,6 +37,7 @@ public static class Opcodes
             public const byte WorldRecommendation = 24;
             public const byte GiftList = 25;
             public const byte WorldRecommendationFinal = 26;
+            public const byte ChangeMaster = 27;
         }
     }
 
@@ -276,6 +277,7 @@ public static class Opcodes
             public const byte ZoneWar241Status = 104;
             public const byte CraftPet = 105;
             public const byte DestroyItem = 106;
+            public const byte ZoneWar270Status = 107;
             public const byte CostumeState = 108;
             public const byte GetCashCatalog = 109;
             public const byte CashCatalogInvalidated = 110;
@@ -283,14 +285,23 @@ public static class Opcodes
             public const byte SkyUpgradeItem = 112;
             public const byte AutoBuffRegister = 113;
             public const byte AutoBuffActivation = 114;
+            public const byte DiceBattleResult = 115;
             public const byte ZoneWar297Status = 116;
+            public const byte SocketSystem = 117;
             public const byte ZoneWar297MonsterCount = 118;
             public const byte MultiItemCreate = 119;
             public const byte AutoHuntHotkeyRebind = 120;
+            public const byte CancelHoisundo = 121;
+            public const byte PcRoomPet = 122;
             public const byte AutoHuntToggle = 123;
+            public const byte SmeltItem = 124;
+            public const byte Zone088TypeInfo = 125;
+            public const byte SamgundoCenterInfo = 126;
             public const byte FishingLine = 127;
             public const byte FishingProgress = 128;
             public const byte FishingCatch = 129;
+            public const byte DecideChallengeFourGuild = 131;
+            public const byte TrapPosition = 133;
             public const byte ProxyShopStallState = 134;
             public const byte GetProxyShop = 135;
             public const byte UpdateProxyShop = 136;
@@ -303,35 +314,33 @@ public static class Opcodes
             public const byte TowerUpgrade = 151;
             public const byte TowerStatus = 152;
             public const byte TowerRepairInfo = 153;
+            public const byte MonsterSummonLimit = 154;
+            public const byte SocketSlotInsert = 155;
+            public const byte ZoneWar319Countdown = 157;
+            public const byte ZoneWar319Status = 158;
+            public const byte ZoneWar319Phase = 159;
             public const byte DailyMission = 163;
             public const byte UpgradeCape = 164;
             public const byte DrunkState = 165;
+            public const byte ZoneWar324Status = 166;
             public const byte CraftLegendaryPet = 168;
+            public const byte OnlineTimeReward = 174;
             public const byte CostumeVisibility = 177;
             public const byte GetBloodMarkCatalog = 178;
             public const byte BuyBloodMarkItem = 179;
+            public const byte RegisterTournament = 190;
+            public const byte SystemMessage = 191;
             public const byte WorldChat = 192;
             public const byte StellarCoreState = 193;
             public const byte SetInventorySlot = 194;
             public const byte GetDailyRewardCatalog = 195;
             public const byte ClaimDailyReward = 196;
+            public const byte PetMove = 197;
+
+            public const byte ZoneWar335Countdown = 198;
             public const byte RuneSocket = 199;
-            public const byte ZoneWar335Countdown = 200;
-        }
-    }
-
-    public static class Center
-    {
-        public static class Incoming
-        {
-            public const byte WorldEvent = 33;
-            public const byte Party = 57;
-        }
-
-        public static class Outgoing
-        {
-            public const byte WorldEvent = 33;
-            public const byte Party = 57;
+            public const byte ZoneWarFfaBattleInfo = 200;
+            public const byte RuneSocketState = 201;
         }
     }
 }

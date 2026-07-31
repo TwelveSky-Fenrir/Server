@@ -48,7 +48,7 @@ public sealed class ClaimDailyRewardService(
         if (itemId < 1 || !worldData.ItemsById.TryGetValue(itemId, out var itemDefinition))
             return null;
 
-        var freeSlot = FindFreeSlot(state.Inventory);
+        var freeSlot = FindFreeSlot(state.Inventory, state.InventoryDate, today);
         if (freeSlot is not { } destination)
         {
             logger.LogInformation("Daily-reward claim denied for character {CharacterId}: inventory full",
@@ -100,15 +100,14 @@ public sealed class ClaimDailyRewardService(
         return response;
     }
 
-    private static (byte Container, byte Slot)? FindFreeSlot(InventoryState inventory)
+    private static (byte Container, byte Slot)? FindFreeSlot(InventoryState inventory, int inventoryDate, int today)
     {
-        for (byte slot = 0; slot <= 63; slot++)
-            if (inventory.GetSlot(ContainerMatrix.InventoryPage0, slot) is null)
-                return (ContainerMatrix.InventoryPage0, slot);
+        var pageCount = RentedInventoryPageGate.AccessiblePageCount(inventoryDate, today);
 
+        for (byte page = 0; page < pageCount; page++)
         for (byte slot = 0; slot <= 63; slot++)
-            if (inventory.GetSlot(ContainerMatrix.InventoryPage1, slot) is null)
-                return (ContainerMatrix.InventoryPage1, slot);
+            if (inventory.GetSlot(page, slot) is null)
+                return (page, slot);
 
         return null;
     }

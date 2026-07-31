@@ -32,14 +32,17 @@ internal static class ClosureRules
         "Login et Game sont deux protocoles distincts dont les opcodes se recouvrent ; un serveur qui " +
         "compile les paquets de l'autre peut en construire un par accident et le mettre sur le fil";
 
-    private const string AuthorityReason =
-        "l'autorite monde est mono-ecrivain et vit dans le processus Center ; un shard qui la voit peut " +
-        "l'appeler EN PROCESS et court-circuiter le protocole S2S";
+    private const string SliceReason =
+        "l'autorite monde est mono-ecrivain et vit desormais DANS le processus GameServer ; le LoginServer " +
+        "qui la verrait pourrait l'appeler en process et ecrire un etat dont il n'est pas proprietaire";
+
+    private const string HostingReason =
+        "Handlers et Services sont des couches de regles ; Hosting compose les singletons d'autorite et les " +
+        "hotes de cycle de vie, il ne doit etre vu que par l'executable";
 
     public static readonly ImmutableArray<ForbiddenClosureEntry> Entries = ImmutableArray.Create(
         new ForbiddenClosureEntry("Fenrir.Core", "Fenrir.Protocol.Game", LeafReason),
         new ForbiddenClosureEntry("Fenrir.Core", "Fenrir.Protocol.Login", LeafReason),
-        new ForbiddenClosureEntry("Fenrir.Core", "Fenrir.Protocol.Center", LeafReason),
         new ForbiddenClosureEntry("Fenrir.Core", "Fenrir.Network", LeafReason),
         new ForbiddenClosureEntry("Fenrir.Core", "Fenrir.Data.Abstractions", LeafReason),
 
@@ -48,8 +51,12 @@ internal static class ClosureRules
         new ForbiddenClosureEntry("Fenrir.GameServer", "Fenrir.Protocol.Login", CrossServerReason),
         new ForbiddenClosureEntry("Fenrir.GameServer", "Fenrir.Application.Login", CrossServerReason),
 
-        new ForbiddenClosureEntry("Fenrir.GameServer", "Fenrir.Cluster.Center", AuthorityReason),
-        new ForbiddenClosureEntry("Fenrir.LoginServer", "Fenrir.Cluster.Center", AuthorityReason),
+        new ForbiddenClosureEntry("Fenrir.LoginServer", "Fenrir.Application.Game.Handlers", SliceReason),
+        new ForbiddenClosureEntry("Fenrir.LoginServer", "Fenrir.Application.Game.Services", SliceReason),
+        new ForbiddenClosureEntry("Fenrir.LoginServer", "Fenrir.Application.Game.Hosting", SliceReason),
+
+        new ForbiddenClosureEntry("Fenrir.Application.Game.Handlers", "Fenrir.Application.Game.Hosting", HostingReason),
+        new ForbiddenClosureEntry("Fenrir.Application.Game.Services", "Fenrir.Application.Game.Hosting", HostingReason),
 
         new ForbiddenClosureEntry("Fenrir.Application.Game", "Fenrir.Network", "les regles de jeu ne " +
             "connaissent pas le transport ; elles passent par IPacketSession et FrameWriter, dans Fenrir.Core"),

@@ -10,9 +10,9 @@ public sealed class HolyStoneCaptureRewardGateway(
     DirtyTracker<int> dirtyTracker,
     ILogger<HolyStoneCaptureRewardGateway> logger) : IHolyStoneCaptureRewardGateway
 {
-    public const int CapturerContributionPoints = 550;
+    public const int CapturerContributionPoints = 50;
 
-    public const int CapturerHeroRankPoints = 750;
+    public const int CapturerHeroRankPoints = 50;
 
     public const int ParticipationContributionPoints = 10;
 

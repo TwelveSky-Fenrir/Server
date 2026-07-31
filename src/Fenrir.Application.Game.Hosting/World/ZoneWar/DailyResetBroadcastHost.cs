@@ -19,7 +19,7 @@ public sealed class DailyResetBroadcastHost(
             while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
                 try
                 {
-                    broadcaster.Tick(DateTime.UtcNow);
+                    await broadcaster.TickAsync(DateTimeOffset.Now, stoppingToken).ConfigureAwait(false);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {

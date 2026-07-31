@@ -1,6 +1,6 @@
 using System.Collections.Frozen;
 using Fenrir.Application.Game.Domain;
-using Fenrir.Cluster.Client.Relay;
+using Fenrir.Application.Game.Hosting.Relay;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 

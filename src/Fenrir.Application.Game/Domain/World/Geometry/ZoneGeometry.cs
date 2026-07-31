@@ -12,8 +12,10 @@ public sealed class ZoneGeometry(WorldTriangle[] triangles, QuadtreeNode[] quadt
 
     public TriangleAdjacencyGraph Navmesh => _navmesh.Value;
 
+    // GetYCoord's tCheckOnlyOne: all 6 legacy call sites pass TRUE, none ever selects the max-Y hit.
+    // Server/ts25zone/S09_MyWorld.cpp:854,902,930,943 + S10_MySummon.cpp:695 + S04_MyWork02.cpp:13476
     public bool TryGetGroundHeight(float x, float z, out float y, float? ceiling = null, bool checkTwoSide = false,
-        bool firstHitOnly = false)
+        bool firstHitOnly = true)
     {
         y = 0f;
         if (quadtree.Length == 0 || !TryDescend(x, z, out var nodeIndex))

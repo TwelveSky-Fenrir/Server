@@ -6,4 +6,6 @@ public sealed record AvatarRosterEntry(
     string GuildName,
     IReadOnlyDictionary<byte, string> FriendNameBySlot,
     string Teacher,
-    string Student);
+    string Student,
+    IReadOnlyList<CharacterRosterPetBagSlotDto> PetBagSlots,
+    IReadOnlyList<CharacterRosterCostumeSlotDto> CostumeSlots);

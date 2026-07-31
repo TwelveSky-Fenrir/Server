@@ -7,6 +7,10 @@ public static class LoginTrain
 {
     public const int AvatarSlotCount = 3;
 
+    private const int PetBagSlotCount = 20;
+
+    private const int CostumeSlotCount = 10;
+
     public const string FailurePinMask = "0000";
 
     public const string ExistingPinMask = "****";
@@ -51,14 +55,16 @@ public static class LoginTrain
         Costume = new int[10]
     };
 
+    // Server/ts25login/S04_MyWork02.cpp:430-432 - the failure path sends UserSort 0, never the account's own
+    // grade; only the success path forwards uUserSort (the account authorization level).
     public static LoginResponse BuildLoginRecv(int result, string id, int secondLoginSort, string mousePassword,
-        string resultString = "")
+        string resultString = "", int userSort = 0)
     {
         return new LoginResponse
         {
             Result = result,
             Id = id,
-            UserSort = 0,
+            UserSort = userSort,
             GoodFellow = 0,
             LoginPlace = 0,
             LoginPremium = 0,
@@ -89,6 +95,9 @@ public static class LoginTrain
 
         return EmptyAvatarSlot with
         {
+            VisibleState = character.VisibleState,
+            SpecialState = character.SpecialState,
+            CostumeIndex = character.CostumeIndex,
             Tribe = character.Tribe,
             PreviousTribe = character.PreviousTribe,
             Gender = character.Gender,
@@ -114,8 +123,32 @@ public static class LoginTrain
                 character.PetActivity),
             Inventory = AvatarInfoFactory.BuildInventoryArrayFromRosterItems(entry.Items),
             StoreItem = AvatarInfoFactory.BuildStoreItemArrayFromRosterItems(entry.Items),
+            PetBag = BuildPetBagArray(entry.PetBagSlots),
+            Costume = BuildCostumeArray(entry.CostumeSlots),
             LogoutInfo = BuildLogoutInfoArray(character)
         };
+    }
+
+    private static int[] BuildPetBagArray(IReadOnlyList<CharacterRosterPetBagSlotDto> slots)
+    {
+        var petBag = new int[PetBagSlotCount];
+
+        foreach (var row in slots)
+            if (row.Slot < PetBagSlotCount)
+                petBag[row.Slot] = row.ItemId;
+
+        return petBag;
+    }
+
+    private static int[] BuildCostumeArray(IReadOnlyList<CharacterRosterCostumeSlotDto> slots)
+    {
+        var costume = new int[CostumeSlotCount];
+
+        foreach (var row in slots)
+            if (row.Slot < CostumeSlotCount)
+                costume[row.Slot] = row.ItemId;
+
+        return costume;
     }
 
     private static int[] BuildLogoutInfoArray(CharacterRosterDto character)

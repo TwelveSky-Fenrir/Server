@@ -100,14 +100,33 @@ public sealed class LoginService(
             return Failure(ResultVersionMismatch, "", false);
         }
 
+        // Server/ts25login/S04_MyWork02.cpp:170-177 runs CheckNameString on tID AND tPassword; the password half is
+        // deliberately not ported - it would forbid every non-alphanumeric password Argon2 already protects.
+        if (!AvatarNameValidator.HasOnlyWhitelistedCharacters(packet.Id))
+        {
+            logger.LogWarning("Login rejected: login {Id} contains characters outside the legacy name whitelist",
+                packet.Id);
+            return Failure(ResultUnknownAccount, "", true);
+        }
+
         var macAddress =
             MacAddressFormatter.Format(packet.Adapter.PhysicalAddress, packet.Adapter.PhysicalAddressLength);
 
-        var account = await accounts.AuthenticateAsync(packet.Id, cancellationToken);
+        AuthenticateAccountDto? account;
+        try
+        {
+            account = await accounts.AuthenticateAsync(packet.Id, cancellationToken);
+        }
+        catch (SqlException ex)
+        {
+            logger.LogError(ex, "Login failed: account lookup errored for login {Id}", packet.Id);
+            return Failure(ResultUnknownAccount, "", true);
+        }
+
         var remoteIp = remoteEndPoint?.Address.ToString();
 
         if (account is not null && account.AccountGrade >= DeviceSpoofingGuard.GmGradeThreshold &&
-            remoteIp is not null && !await gmAllowlist.IsAllowedAsync(remoteIp, cancellationToken))
+            remoteIp is not null && !await IsGmLoginIpAllowedAsync(remoteIp, cancellationToken))
         {
             _ = PasswordHasher.Verify(packet.Password, account.PasswordHash, account.PasswordSalt);
             logger.LogWarning(
@@ -116,7 +135,18 @@ public sealed class LoginService(
             return Failure(ResultIpBlocked, "", true);
         }
 
-        switch (await AuthenticateConstantTimeAsync(account, packet.Password, remoteIp, cancellationToken))
+        AuthenticationOutcome authentication;
+        try
+        {
+            authentication = await AuthenticateConstantTimeAsync(account, packet.Password, remoteIp, cancellationToken);
+        }
+        catch (SqlException ex)
+        {
+            logger.LogError(ex, "Login failed: credential verification errored for login {Id}", packet.Id);
+            return Failure(ResultUnknownAccount, "", true);
+        }
+
+        switch (authentication)
         {
             case AuthenticationOutcome.UnknownAccount:
                 logger.LogWarning("Login failed: login {Id} rejected with result code {ResultCode}", packet.Id,
@@ -265,6 +295,18 @@ public sealed class LoginService(
             .GroupBy(i => i.CharacterId)
             .ToDictionary(g => g.Key, g => (IReadOnlyList<CharacterRosterItemDto>)g.ToArray());
 
+        var petBagByCharacterId = roster.PetBagSlots is null
+            ? new Dictionary<int, IReadOnlyList<CharacterRosterPetBagSlotDto>>()
+            : roster.PetBagSlots
+                .GroupBy(p => p.CharacterId)
+                .ToDictionary(g => g.Key, g => (IReadOnlyList<CharacterRosterPetBagSlotDto>)g.ToArray());
+
+        var costumeByCharacterId = roster.CostumeSlots is null
+            ? new Dictionary<int, IReadOnlyList<CharacterRosterCostumeSlotDto>>()
+            : roster.CostumeSlots
+                .GroupBy(c => c.CharacterId)
+                .ToDictionary(g => g.Key, g => (IReadOnlyList<CharacterRosterCostumeSlotDto>)g.ToArray());
+
         var guildTasks = roster.Characters.Select(c => guilds.GetByCharacterAsync(c.CharacterId, ct).AsTask());
         var friendTasks = roster.Characters.Select(c => friends.GetByCharacterAsync(c.CharacterId, ct).AsTask());
         var mentorTasks = roster.Characters.Select(c => mentor.GetForCharacterAsync(c.CharacterId, ct).AsTask());
@@ -286,10 +328,26 @@ public sealed class LoginService(
                 guildMemberships[i]?.GuildName ?? "",
                 friendNameBySlot,
                 mentorBond?.TeacherName ?? "",
-                mentorBond?.StudentName ?? ""));
+                mentorBond?.StudentName ?? "",
+                petBagByCharacterId.GetValueOrDefault(character.CharacterId, []),
+                costumeByCharacterId.GetValueOrDefault(character.CharacterId, [])));
         }
 
         return entries.ToImmutable();
+    }
+
+    private async ValueTask<bool> IsGmLoginIpAllowedAsync(string remoteIp, CancellationToken ct)
+    {
+        try
+        {
+            return await gmAllowlist.IsAllowedAsync(remoteIp, ct);
+        }
+        catch (SqlException ex)
+        {
+            logger.LogError(ex,
+                "Login: GM allowlist lookup errored for IP {RemoteIp}; treating the IP as not allowlisted", remoteIp);
+            return false;
+        }
     }
 
     private async ValueTask<AuthenticationOutcome> AuthenticateConstantTimeAsync(AuthenticateAccountDto? account,

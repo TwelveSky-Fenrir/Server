@@ -17,7 +17,7 @@ public static class MonsterDeathSequence
         monster.TargetLocationY = 0f;
         monster.TargetLocationZ = knockback.Z;
 
-        monster.Heading = MathF.Atan2(killerX - monster.PosX, killerZ - monster.PosZ);
+        monster.Heading = WireHeading.Between(monster.PosX, monster.PosZ, killerX, killerZ);
 
         return knockback;
     }

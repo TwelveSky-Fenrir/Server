@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Abstractions.ItemModification;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Crafting;
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Domain.Game.GameData;
@@ -47,6 +48,14 @@ public sealed class CraftItemService(
         if (!IsValidInventorySlot(page1, index1) || !IsValidInventorySlot(page2, index2))
         {
             logger.LogDebug("Character {CharacterId} craft (jade-upgrade) rejected: invalid slot(s)", characterId);
+            return new JadeUpgradeResult(JadeUpgradeOutcome.Rejected, 0, 0);
+        }
+
+        if (!ArePagesAccessible(state, page1, page2))
+        {
+            logger.LogDebug(
+                "Character {CharacterId} craft (jade-upgrade) rejected: rented inventory page expired (InventoryDate {InventoryDate})",
+                characterId, state.InventoryDate);
             return new JadeUpgradeResult(JadeUpgradeOutcome.Rejected, 0, 0);
         }
 
@@ -126,6 +135,14 @@ public sealed class CraftItemService(
         if (!IsValidInventorySlot(page1, index1))
         {
             logger.LogDebug("Character {CharacterId} craft (advanced-elixir) rejected: invalid slot", characterId);
+            return new AdvancedElixirResult(AdvancedElixirOutcome.Rejected, null, 0, 0, null);
+        }
+
+        if (!ArePagesAccessible(state, page1))
+        {
+            logger.LogDebug(
+                "Character {CharacterId} craft (advanced-elixir) rejected: rented inventory page expired (InventoryDate {InventoryDate})",
+                characterId, state.InventoryDate);
             return new AdvancedElixirResult(AdvancedElixirOutcome.Rejected, null, 0, 0, null);
         }
 
@@ -228,6 +245,14 @@ public sealed class CraftItemService(
             return RejectedFamilyResult;
         }
 
+        if (!ArePagesAccessible(state, packet.Page1, packet.Page2, packet.Page3, packet.Page4))
+        {
+            logger.LogDebug(
+                "Character {CharacterId} craft (stone-mat-combine) rejected: rented inventory page expired (InventoryDate {InventoryDate})",
+                characterId, state.InventoryDate);
+            return RejectedFamilyResult;
+        }
+
         if (state.Inventory.GetSlot((byte)packet.Page1, (byte)packet.Index1) is not { } material1 ||
             state.Inventory.GetSlot((byte)packet.Page2, (byte)packet.Index2) is not { } material2 ||
             state.Inventory.GetSlot((byte)packet.Page3, (byte)packet.Index3) is not { } material3 ||
@@ -293,6 +318,14 @@ public sealed class CraftItemService(
             !IsValidInventorySlot(packet.Page3, packet.Index3) || !IsValidInventorySlot(packet.Page4, packet.Index4))
         {
             logger.LogDebug("Character {CharacterId} craft (mount-fusion) rejected: invalid slot(s)", characterId);
+            return RejectedFamilyResult;
+        }
+
+        if (!ArePagesAccessible(state, packet.Page1, packet.Page2, packet.Page3, packet.Page4))
+        {
+            logger.LogDebug(
+                "Character {CharacterId} craft (mount-fusion) rejected: rented inventory page expired (InventoryDate {InventoryDate})",
+                characterId, state.InventoryDate);
             return RejectedFamilyResult;
         }
 
@@ -364,6 +397,14 @@ public sealed class CraftItemService(
             !IsValidInventorySlot(packet.Page3, packet.Index3) || !IsValidInventorySlot(packet.Page4, packet.Index4))
         {
             logger.LogDebug("Character {CharacterId} craft (wing-assembly) rejected: invalid slot(s)", characterId);
+            return RejectedFamilyResult;
+        }
+
+        if (!ArePagesAccessible(state, packet.Page1, packet.Page2, packet.Page3, packet.Page4))
+        {
+            logger.LogDebug(
+                "Character {CharacterId} craft (wing-assembly) rejected: rented inventory page expired (InventoryDate {InventoryDate})",
+                characterId, state.InventoryDate);
             return RejectedFamilyResult;
         }
 
@@ -455,6 +496,14 @@ public sealed class CraftItemService(
         if (!IsValidInventorySlot(packet.Page1, packet.Index1))
         {
             logger.LogDebug("Character {CharacterId} craft (feather-tier-up) rejected: invalid slot", characterId);
+            return RejectedFamilyResult;
+        }
+
+        if (!ArePagesAccessible(state, packet.Page1))
+        {
+            logger.LogDebug(
+                "Character {CharacterId} craft (feather-tier-up) rejected: rented inventory page expired (InventoryDate {InventoryDate})",
+                characterId, state.InventoryDate);
             return RejectedFamilyResult;
         }
 
@@ -563,6 +612,14 @@ public sealed class CraftItemService(
             return RejectedFamilyResult;
         }
 
+        if (!ArePagesAccessible(state, packet.Page1, packet.Page2, packet.Page3, packet.Page4))
+        {
+            logger.LogDebug(
+                "Character {CharacterId} craft (wing-tier-reroll) rejected: rented inventory page expired (InventoryDate {InventoryDate})",
+                characterId, state.InventoryDate);
+            return RejectedFamilyResult;
+        }
+
         if (state.Inventory.GetSlot((byte)packet.Page1, (byte)packet.Index1) is not { } material1 ||
             state.Inventory.GetSlot((byte)packet.Page2, (byte)packet.Index2) is not { } material2 ||
             state.Inventory.GetSlot((byte)packet.Page3, (byte)packet.Index3) is not { } material3 ||
@@ -640,6 +697,14 @@ public sealed class CraftItemService(
             return RejectedFamilyResult;
         }
 
+        if (!ArePagesAccessible(state, packet.Page1, packet.Page2, packet.Page3, packet.Page4))
+        {
+            logger.LogDebug(
+                "Character {CharacterId} craft (wing-fifth-tier) rejected: rented inventory page expired (InventoryDate {InventoryDate})",
+                characterId, state.InventoryDate);
+            return RejectedFamilyResult;
+        }
+
         if (state.Inventory.GetSlot((byte)packet.Page1, (byte)packet.Index1) is not { } material1 ||
             state.Inventory.GetSlot((byte)packet.Page2, (byte)packet.Index2) is not { } material2 ||
             state.Inventory.GetSlot((byte)packet.Page3, (byte)packet.Index3) is not { } material3 ||
@@ -707,6 +772,14 @@ public sealed class CraftItemService(
         if (!IsValidInventorySlot(packet.Page1, packet.Index1))
         {
             logger.LogDebug("Character {CharacterId} craft (dust-recycle) rejected: invalid slot", characterId);
+            return RejectedFamilyResult;
+        }
+
+        if (!ArePagesAccessible(state, packet.Page1))
+        {
+            logger.LogDebug(
+                "Character {CharacterId} craft (dust-recycle) rejected: rented inventory page expired (InventoryDate {InventoryDate})",
+                characterId, state.InventoryDate);
             return RejectedFamilyResult;
         }
 
@@ -838,10 +911,24 @@ public sealed class CraftItemService(
                ContainerMatrix.IsValidSlot((byte)page, index);
     }
 
+    private static bool ArePagesAccessible(PlayerRuntimeState state, int page1,
+        int page2 = ContainerMatrix.InventoryPage0, int page3 = ContainerMatrix.InventoryPage0,
+        int page4 = ContainerMatrix.InventoryPage0)
+    {
+        var today = GameDate.Today();
+        return RentedInventoryPageGate.IsPageAccessible(page1, state.InventoryDate, today) &&
+               RentedInventoryPageGate.IsPageAccessible(page2, state.InventoryDate, today) &&
+               RentedInventoryPageGate.IsPageAccessible(page3, state.InventoryDate, today) &&
+               RentedInventoryPageGate.IsPageAccessible(page4, state.InventoryDate, today);
+    }
+
     private static bool TryFindEmptySlot(PlayerRuntimeState state, out byte page, out byte index)
     {
-        foreach (var candidatePage in InventoryPagesInScanOrder)
+        var accessiblePages = RentedInventoryPageGate.AccessiblePageCount(state.InventoryDate, GameDate.Today());
+
+        for (var i = 0; i < accessiblePages; i++)
         {
+            var candidatePage = InventoryPagesInScanOrder[i];
             ContainerMatrix.TryGetMaxSlot(candidatePage, out var maxSlot);
             for (var slot = 0; slot <= maxSlot; slot++)
                 if (state.Inventory.GetSlot(candidatePage, (byte)slot) is null)

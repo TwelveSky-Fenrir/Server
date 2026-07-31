@@ -14,9 +14,7 @@ public sealed class EquipSwapUseItemHandler(
     {
         var state = context.State;
         var equipRow = context.Definition.Item;
-        var candidate = new EquipItemValidationGate.EquipCandidate(equipRow.ItemId, equipRow.EquipInfo1,
-            equipRow.EquipInfo2, equipRow.LevelLimit, equipRow.MartialLevelLimit, equipRow.CheckSetItem,
-            equipRow.Sort);
+        var candidate = EquipItemValidationGate.EquipCandidate.FromRow(equipRow);
 
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
 

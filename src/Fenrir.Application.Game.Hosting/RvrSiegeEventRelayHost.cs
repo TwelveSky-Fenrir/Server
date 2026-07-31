@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
-using Fenrir.Cluster.Client.Relay;
+using Fenrir.Application.Game.Hosting.Relay;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -8,7 +8,6 @@ namespace Fenrir.Application.Game.Hosting;
 
 public sealed class RvrSiegeEventRelayHost(
     Lazy<ZoneCenterBroadcastIngestor> ingestor,
-    Lazy<ZoneEventBroadcaster> broadcaster,
     IRvrSiegeEventRelayRepository relay,
     IOptions<GameServerOptions> options,
     ILogger<RvrSiegeEventRelayHost> logger)
@@ -20,10 +19,6 @@ public sealed class RvrSiegeEventRelayHost(
             options.Value.RvrSiegeEventRelayRetentionSeconds),
         IRvrSiegeEventRelayQueue
 {
-    private const int Zone049RangeStart = 1;
-
-    private const int Zone049RangeEnd = 9;
-
     private const int QueueCapacity = 256;
 
     protected override ValueTask DeliverAsync(RvrSiegeEventRelayDto dto, CancellationToken ct)
@@ -34,10 +29,18 @@ public sealed class RvrSiegeEventRelayHost(
 
     private void DeliverLocally(RvrSiegeEventRelayDto dto)
     {
-        if (dto.Sort is >= Zone049RangeStart and <= Zone049RangeEnd)
-            ingestor.Value.ApplyRelayedEvent(dto.Sort, dto.Data);
-        else
-            broadcaster.Value.ApplyRelayedEvent(dto.Sort, dto.Data);
+        // Seul point du systeme qui voit du trafic non maitrise : la table de relais est alimentable par
+        // n'importe quel shard. La garde doit etre ICI, en amont de l'aiguillage, sinon une troisieme
+        // destination ajoutee plus tard la contourne sans bruit.
+        if (!KnownTSortRegistry.IsKnown(dto.Sort))
+        {
+            logger.LogWarning(
+                "Cross-shard rvr-siege relay {RelayId} sort {Sort} rejected: not in the known-sort allowlist " +
+                "-- dropped without state effect and without broadcast", dto.RelayId, dto.Sort);
+            return;
+        }
+
+        ingestor.Value.ApplyRelayedEvent(dto.Sort, dto.Data);
     }
 
     protected override void OnOutboxFull(RvrSiegeEventRelayEntry entry)

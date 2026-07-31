@@ -147,6 +147,11 @@ public sealed partial class Zone
             MaxMana = data.MaxMana,
             FlushSequence = data.FlushSequence,
             LastMoveUtc = DateTime.UtcNow,
+            // La porte 1 s est une EGALITE STRICTE sur (rawTick - LastOneSecondGateTick) == 2. Sans ce
+            // seed, un joueur entrant apres le tick 2 de la zone ne l'ouvre JAMAIS : buffs qui n'expirent
+            // plus, stun permanent, aucune regen de meditation. Le legacy seede pareil
+            // (Server/ts25zone/S04_MyWork02.cpp:831, mTickCountFor01Second = mGAME.mTickCount).
+            LastOneSecondGateTick = RawLogicTick,
             LastAvatarRebroadcastAt = _clock,
             IsDead = data.IsDead,
             TicksSinceDeath = data.TicksSinceDeath,
@@ -784,6 +789,25 @@ public sealed partial class Zone
         if (isResumeAction && !EvaluateResumeActionSkillGradeGuard(state, in action))
             return;
 
+        // Server/ts25zone/S04_MyWork02.cpp:1501-1680 -- toutes les gardes de cast precedent le commit :1727,
+        // un echec ne doit donc ni committer l'etat, ni echo au joueur, ni diffuser en AoI.
+        var isGuardedSkillCast = !isResumeAction &&
+                                 motion.SkillCategoryCode is SkillCastGuard.HotkeyBoundCategoryCode
+                                     or SkillCastGuard.SkillEffectCategoryCode;
+
+        if (isGuardedSkillCast)
+        {
+            if (!EvaluateSkillCastPreCastGuard(state, action, motion.SkillCategoryCode, out var guardContext))
+                return;
+
+            if (motion.SkillCategoryCode == SkillCastGuard.SkillEffectCategoryCode &&
+                !ApplySkillCastManaCharge(state, action))
+                return;
+
+            if (!EvaluateSkillCastPostCastGuard(state, action, in guardContext))
+                return;
+        }
+
         var previousActionSkillNumber = state.ActionSkillNumber;
         var previousActionSkillGradeNum1 = state.ActionSkillGradeNum1;
         var previousActionSkillGradeNum2 = state.ActionSkillGradeNum2;
@@ -828,26 +852,12 @@ public sealed partial class Zone
 
         if (!isResumeAction)
         {
-            if (motion.SkillCategoryCode is SkillCastGuard.HotkeyBoundCategoryCode
-                or SkillCastGuard.SkillEffectCategoryCode)
+            if (!isGuardedSkillCast)
             {
-                if (!EvaluateSkillCastPreCastGuard(state, action, motion.SkillCategoryCode, out var guardContext))
-                    return;
-
-                if (motion.SkillCategoryCode == SkillCastGuard.SkillEffectCategoryCode &&
-                    !ApplySkillCastManaCharge(state, action))
-                    return;
-
-                if (!EvaluateSkillCastPostCastGuard(state, action, in guardContext))
-                    return;
-            }
-            else if (action.Sort == RestActionSort)
-            {
-                ApplyRestActionProtectionAndHeal(state);
-            }
-            else if (PartyBuffMarkerDispatchRules.ShouldAdvancePartyBuffMarker(isResumeAction, action.Sort))
-            {
-                AdvanceCasterPartyBuffMarker(state, action.SkillNumber, action.Sort);
+                if (action.Sort == RestActionSort)
+                    ApplyRestActionProtectionAndHeal(state);
+                else if (PartyBuffMarkerDispatchRules.ShouldAdvancePartyBuffMarker(isResumeAction, action.Sort))
+                    AdvanceCasterPartyBuffMarker(state, action.SkillNumber, action.Sort);
             }
         }
         else if (action.Sort == SkillEffectConfirmActionSort)

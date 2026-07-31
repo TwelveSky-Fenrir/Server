@@ -5,16 +5,50 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
-public sealed class DailyResetBroadcaster(ZoneRegistry zones, ILogger<DailyResetBroadcaster> logger)
+public sealed class DailyResetBroadcaster(
+    ZoneRegistry zones,
+    IDailyRewardResetRepository dailyRewardReset,
+    ILogger<DailyResetBroadcaster> logger)
 {
     private const int PayloadSize = 130;
 
     private readonly DailyResetBroadcastScheduler _scheduler = new();
 
-    public void Tick(DateTime utcNow)
+    public async ValueTask TickAsync(DateTimeOffset localNow, CancellationToken ct)
     {
-        if (_scheduler.TryConsumeDueFire(utcNow))
-            Broadcast();
+        if (!_scheduler.IsDue(localNow))
+            return;
+
+        // Le legacy remet uRewardClaimDay a zero UNIQUEMENT le lundi et uRewardClaimState tous les jours
+        // (Server/ts25center/S07_MyGame01.cpp:227-233). Le jour se lit sur l'instant qui a declenche, pas
+        // sur un second appel a l'horloge.
+        var clearWeeklyDayCounter = localNow.DayOfWeek == DayOfWeek.Monday;
+
+        try
+        {
+            await dailyRewardReset.ResetDailyRewardClaimsAsync(clearWeeklyDayCounter, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Sans ce log, un arret tombant pendant l'UPDATE ne laisse AUCUNE trace : le catch de l'hote
+            // filtre deja l'annulation.
+            logger.LogWarning(
+                "Daily reward-claim reset cancelled mid-flight during shutdown -- not marked as fired, the next " +
+                "start retries at the next 00:01 local");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // On NE marque PAS le jour comme tire : les ticks restants de la minute (poll 15 s) reessaient.
+            // On ne diffuse pas non plus -- annoncer un reset qui n'a pas eu lieu est pire que le silence.
+            logger.LogCritical(ex,
+                "Daily reward-claim reset FAILED (clearWeeklyDayCounter {ClearWeekly}) -- players cannot claim " +
+                "today's reward; retrying within this minute", clearWeeklyDayCounter);
+            return;
+        }
+
+        _scheduler.MarkFired(localNow);
+        Broadcast();
     }
 
     private void Broadcast()

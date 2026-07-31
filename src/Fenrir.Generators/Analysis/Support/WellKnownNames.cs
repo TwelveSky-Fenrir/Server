@@ -37,6 +37,4 @@ internal static class WellKnownNames
     public const string LoginSessionStateEnum = "global::Fenrir.Protocol.Login.LoginSessionState";
 
     public const string ZoneSessionStateEnum = "global::Fenrir.Protocol.Game.ZoneSessionState";
-
-    public const string CenterSessionStateEnum = "global::Fenrir.Protocol.Center.CenterSessionState";
 }

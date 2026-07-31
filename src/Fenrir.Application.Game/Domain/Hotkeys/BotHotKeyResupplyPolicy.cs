@@ -4,6 +4,8 @@ namespace Fenrir.Application.Game.Domain.Hotkeys;
 
 public static class BotHotKeyResupplyPolicy
 {
+    private const int MaxMoves = 4;
+
     public enum ResupplyCategory
     {
         None,
@@ -40,8 +42,9 @@ public static class BotHotKeyResupplyPolicy
         ArgumentNullException.ThrowIfNull(inventoryCandidates);
         ArgumentNullException.ThrowIfNull(emptyHotkeySlots);
 
-        var moves = ImmutableArray.CreateBuilder<ResupplyMove>(4);
-        var usedCandidates = 0;
+        var moves = ImmutableArray.CreateBuilder<ResupplyMove>(MaxMoves);
+        var usedCandidates = new int[MaxMoves];
+        var usedCount = 0;
         var nextEmptySlot = 0;
 
         if (!boundCategories.HasHp && !boundCategories.HasHpMp)
@@ -65,7 +68,7 @@ public static class BotHotKeyResupplyPolicy
 
             for (var i = 0; i < inventoryCandidates.Count; i++)
             {
-                if ((usedCandidates & (1 << i)) != 0)
+                if (Array.IndexOf(usedCandidates, i, 0, usedCount) >= 0)
                     continue;
 
                 var candidate = inventoryCandidates[i];
@@ -75,7 +78,7 @@ public static class BotHotKeyResupplyPolicy
                 var destination = emptyHotkeySlots[nextEmptySlot];
                 moves.Add(new ResupplyMove(candidate.Page, candidate.Slot, destination.Page, destination.Index,
                     candidate.ItemId, candidate.Quantity));
-                usedCandidates |= 1 << i;
+                usedCandidates[usedCount++] = i;
                 nextEmptySlot++;
                 return;
             }

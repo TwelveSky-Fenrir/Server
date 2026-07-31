@@ -13,7 +13,6 @@
     <ProjectReference Include="..\Fenrir.Network\Fenrir.Network.csproj"/>
     <ProjectReference Include="..\Fenrir.Data\Fenrir.Data.csproj"/>
     <ProjectReference Include="..\Fenrir.Security\Fenrir.Security.csproj"/>
-    <ProjectReference Include="..\Fenrir.Cluster.Client\Fenrir.Cluster.Client.csproj"/>
     <ProjectReference Include="..\Fenrir.Application.Game\Fenrir.Application.Game.csproj"/>
     <ProjectReference Include="..\Fenrir.Application.Game.Handlers\Fenrir.Application.Game.Handlers.csproj"/>
     <ProjectReference Include="..\Fenrir.Application.Game.Services\Fenrir.Application.Game.Services.csproj"/>

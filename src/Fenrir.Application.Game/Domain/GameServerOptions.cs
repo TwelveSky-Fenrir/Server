@@ -152,6 +152,4 @@ public sealed class GameServerOptions
     public int CrossTribeCpAddValue { get; set; } = 3;
 
     public int CrossTribeXpRatio { get; set; } = 2;
-
-    public WorldStateAuthorityMode WorldStateAuthority { get; set; } = WorldStateAuthorityMode.Shard;
 }

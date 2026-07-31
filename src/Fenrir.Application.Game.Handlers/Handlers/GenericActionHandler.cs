@@ -40,6 +40,13 @@ public sealed class GenericActionHandler(
 {
     private const int PetExperienceStatSort = 14;
 
+    // Discriminant HOTKEY_SORT du sort 204, porte par le premier int du payload et par aucun opcode :
+    // HK_SKILL=1, HK_EMO=2 (Server/ts25zone/S04_MyWork05.cpp:122-128). HK_ITEM=3 tombe dans le default
+    // de ProcessForSkillToHotKey, donc deconnecte (S04_MyWork05.cpp:660-662).
+    private const int HotkeyBindSortSkill = 1;
+
+    private const int HotkeyBindSortEmoticon = 2;
+
     public async ValueTask HandleAsync(GenericActionRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
@@ -158,6 +165,54 @@ public sealed class GenericActionHandler(
             var result = await genericActionService.UpgradeSkillAsync(packet.Data, zone, state, characterId,
                 cancellationToken);
             Respond(session, zoneSession, sort, packet.Data, result);
+            return;
+        }
+
+        if (sort == 204)
+        {
+            var bindSort = BinaryPrimitives.ReadInt32LittleEndian(packet.Data.AsSpan(0, 4));
+            var bindValue = BinaryPrimitives.ReadInt32LittleEndian(packet.Data.AsSpan(4, 4));
+            var bindGrade = BinaryPrimitives.ReadInt32LittleEndian(packet.Data.AsSpan(8, 4));
+            var bindPage = BinaryPrimitives.ReadInt32LittleEndian(packet.Data.AsSpan(12, 4));
+            var bindIndex = BinaryPrimitives.ReadInt32LittleEndian(packet.Data.AsSpan(16, 4));
+
+            if (bindSort is not (HotkeyBindSortSkill or HotkeyBindSortEmoticon))
+            {
+                logger.LogInformation(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} aborted, unsupported hotkey binding sort {BindSort}",
+                    zoneSession.SessionId, characterId, sort, bindSort);
+                zoneSession.Abort(DisconnectReason.Faulted);
+                return;
+            }
+
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort,
+                    bindSort == HotkeyBindSortSkill
+                        ? nameof(IHotkeyActionService.BindSkillAsync)
+                        : nameof(IHotkeyActionService.BindEmoticonAsync));
+
+            var bindResult = bindSort == HotkeyBindSortSkill
+                ? await hotkeyActionService.BindSkillAsync(zone, state, characterId, bindValue, bindGrade,
+                    bindPage, bindIndex, cancellationToken)
+                : await hotkeyActionService.BindEmoticonAsync(zone, state, characterId, bindValue, bindPage,
+                    bindIndex, cancellationToken);
+            Respond(session, zoneSession, sort, packet.Data, bindResult);
+            return;
+        }
+
+        if (sort == 205)
+        {
+            var unbindPage = BinaryPrimitives.ReadInt32LittleEndian(packet.Data.AsSpan(0, 4));
+            var unbindIndex = BinaryPrimitives.ReadInt32LittleEndian(packet.Data.AsSpan(4, 4));
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort, nameof(IHotkeyActionService.UnbindAsync));
+            var unbindResult = await hotkeyActionService.UnbindAsync(zone, state, characterId, unbindPage,
+                unbindIndex, cancellationToken);
+            Respond(session, zoneSession, sort, packet.Data, unbindResult);
             return;
         }
 

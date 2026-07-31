@@ -10,7 +10,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Fenrir.LoginServer\Fenrir.LoginServer.csproj"/>
-    <ProjectReference Include="..\Fenrir.CenterServer\Fenrir.CenterServer.csproj"/>
     <ProjectReference Include="..\Fenrir.GameServer\Fenrir.GameServer.csproj"/>
     <ProjectReference Include="..\Fenrir.Tools.DbMigrator\Fenrir.Tools.DbMigrator.csproj"/>
   </ItemGroup>

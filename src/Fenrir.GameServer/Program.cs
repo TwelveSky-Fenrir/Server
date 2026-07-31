@@ -14,7 +14,6 @@ using Fenrir.Application.Game.Hosting;
 using Fenrir.Application.Game.Hosting.Extensions;
 using Fenrir.Application.Game.Hosting.World.ZoneWar;
 using Fenrir.Application.Game.Services.Extensions;
-using Fenrir.Cluster.Client.Link;
 using Fenrir.Core.Abstractions;
 using Fenrir.Data;
 using Fenrir.Data.Abstractions.Admin;
@@ -47,16 +46,6 @@ builder.Services.AddSingleton<IMonsterBossRespawnTimerRepository, MonsterBossRes
 builder.Services.AddGameDomain();
 builder.Services.AddWorldData();
 builder.Services.AddGameServices();
-// Enregistre AVANT AddGameHosting/AddLoginHosting : l'ordre d'enregistrement est l'ordre de
-// demarrage, donc l'INVERSE de l'ordre d'arret. En dernier, CenterLinkClientHost s'arretait EN
-// PREMIER et coupait l'uplink Center pendant que le hote de connexions drainait encore les joueurs
-// et que les sept pompes de relais cross-shard tournaient toujours.
-builder.Services.AddCenterLinkClient(o =>
-{
-    o.Endpoint = builder.Configuration["Center:Endpoint"];
-    o.SharedSecret = builder.Configuration["Center:SharedSecret"];
-});
-
 builder.Services.AddGameHosting();
 builder.Services.AddGameHandlers();
 
@@ -192,8 +181,8 @@ if (mapsMissingGeometry.Count > 0)
         mapsMissingGeometry.Count, hostedMaps.Count, string.Join(", ", mapsMissingGeometry));
 
 bootLogger.LogInformation(
-    "GameServer preload complete; entering host.RunAsync() now -- zone listeners, the directory heartbeat and the " +
-    "Center uplink start here. Expect 'Application started', then 'GameServerDirectory heartbeat host started', then " +
+    "GameServer preload complete; entering host.RunAsync() now -- zone listeners and the directory heartbeat " +
+    "start here. Expect 'Application started', then 'GameServerDirectory heartbeat host started', then " +
     "'registered in runtime.GameServerDirectory'.");
 
 try

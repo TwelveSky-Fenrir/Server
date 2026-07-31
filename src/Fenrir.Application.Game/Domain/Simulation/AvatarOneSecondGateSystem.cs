@@ -1,4 +1,5 @@
 using Fenrir.Application.Game.Domain.World;
+
 namespace Fenrir.Application.Game.Domain.Simulation;
 
 public sealed class AvatarOneSecondGateSystem : ISimulationSystem

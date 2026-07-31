@@ -8,10 +8,10 @@ using Fenrir.Application.Game.Domain.Mounts;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Social.Pshop;
-using Fenrir.Domain.Game.Stats;
 using Fenrir.Core.Packets.Shared;
-using Fenrir.Data.WriteBehind;
 using Fenrir.Core.Wire;
+using Fenrir.Data.WriteBehind;
+using Fenrir.Domain.Game.Stats;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 

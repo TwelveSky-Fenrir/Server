@@ -139,14 +139,14 @@ public sealed class InlineHandlerAsynchronyAnalyzer : DiagnosticAnalyzer
         }
     }
 
-        private static bool IsAwaiter(INamedTypeSymbol? type)
+    private static bool IsAwaiter(INamedTypeSymbol? type)
     {
         return type is not null &&
                type.Name.EndsWith("Awaiter", StringComparison.Ordinal) &&
                SymbolNameHelpers.GetFullNamespace(type.ContainingNamespace) == "System.Runtime.CompilerServices";
     }
 
-        private static bool IsInlineHandle(IMethodSymbol method, INamedTypeSymbol inlineHandlerInterface)
+    private static bool IsInlineHandle(IMethodSymbol method, INamedTypeSymbol inlineHandlerInterface)
     {
         if (!method.Name.EndsWith(HandleMethodName, StringComparison.Ordinal))
             return false;
@@ -183,7 +183,7 @@ public sealed class InlineHandlerAsynchronyAnalyzer : DiagnosticAnalyzer
             reason));
     }
 
-        private readonly struct TaskLikeTypes
+    private readonly struct TaskLikeTypes
     {
         private readonly INamedTypeSymbol? _task;
         private readonly INamedTypeSymbol? _taskOfT;

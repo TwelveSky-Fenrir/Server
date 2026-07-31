@@ -1,6 +1,6 @@
 using System.Collections.Frozen;
-using Fenrir.Domain.Game.Stats.Context;
 using Fenrir.Core.Packets.Shared;
+using Fenrir.Domain.Game.Stats.Context;
 
 namespace Fenrir.Domain.Game.Stats;
 

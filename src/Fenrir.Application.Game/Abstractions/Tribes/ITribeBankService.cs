@@ -1,5 +1,5 @@
-using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Abstractions.Sessions;
+using Fenrir.Application.Game.Domain.World;
 
 namespace Fenrir.Application.Game.Abstractions.Tribes;
 

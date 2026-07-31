@@ -1,5 +1,4 @@
 using Fenrir.Application.Game.Domain;
-using Fenrir.Application.Game.Domain.World;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;

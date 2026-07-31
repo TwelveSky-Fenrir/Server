@@ -111,7 +111,7 @@ public sealed class LayeringAnalyzer : DiagnosticAnalyzer
         }
     }
 
-        private static HashSet<string> ResolveDeclaringFolders(
+    private static HashSet<string> ResolveDeclaringFolders(
         ISymbol? target,
         IAssemblySymbol sourceAssembly,
         string projectDirectory)
@@ -168,7 +168,7 @@ public sealed class LayeringAnalyzer : DiagnosticAnalyzer
         }
     }
 
-        private static void ReportRulesNoLongerArmed(
+    private static void ReportRulesNoLongerArmed(
         CompilationAnalysisContext context,
         LayeredProject project,
         string? projectDirectory,

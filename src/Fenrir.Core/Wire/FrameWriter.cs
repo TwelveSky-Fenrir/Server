@@ -1,5 +1,3 @@
-using Fenrir.Core.Abstractions;
-
 namespace Fenrir.Core.Wire;
 
 public static class FrameWriter

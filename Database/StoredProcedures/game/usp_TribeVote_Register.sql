@@ -32,7 +32,8 @@ BEGIN
         EXISTS (SELECT 1
                 FROM game.TribeVotes
                 WITH (UPDLOCK, HOLDLOCK)
-                WHERE TribeId = @TribeId AND SlotIndex = @SlotIndex)
+                WHERE TribeId = @TribeId
+                  AND SlotIndex = @SlotIndex)
         UPDATE game.TribeVotes
         SET CandidateCharacterId = @CandidateCharacterId,
             CandidateLevel       = @CandidateLevel,

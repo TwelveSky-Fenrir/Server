@@ -1,7 +1,7 @@
 using Fenrir.Application.Game.Abstractions.Commerce;
 using Fenrir.Application.Game.Domain.Commerce;
-using Fenrir.Domain.Game.GameData;
 using Fenrir.Core.Packets.Shared;
+using Fenrir.Domain.Game.GameData;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Commerce;

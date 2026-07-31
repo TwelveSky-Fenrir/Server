@@ -5,10 +5,9 @@ namespace Fenrir.Generators.Analyzers;
 
 internal static class ProjectPaths
 {
+    private const string ProjectDirKey = "build_property.ProjectDir";
 
-        private const string ProjectDirKey = "build_property.ProjectDir";
-
-        public static string? ReadProjectDirectory(AnalyzerConfigOptions globalOptions)
+    public static string? ReadProjectDirectory(AnalyzerConfigOptions globalOptions)
     {
         if (!globalOptions.TryGetValue(ProjectDirKey, out var projectDir) || string.IsNullOrWhiteSpace(projectDir))
             return null;
@@ -17,7 +16,7 @@ internal static class ProjectPaths
         return normalized.EndsWith("/", StringComparison.Ordinal) ? normalized : normalized + "/";
     }
 
-        public static string? TopFolderOf(string? filePath, string normalizedProjectDir)
+    public static string? TopFolderOf(string? filePath, string normalizedProjectDir)
     {
         if (string.IsNullOrEmpty(filePath))
             return null;

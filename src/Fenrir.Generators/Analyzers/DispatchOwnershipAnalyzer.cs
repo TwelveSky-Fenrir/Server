@@ -38,7 +38,7 @@ public sealed class DispatchOwnershipAnalyzer : DiagnosticAnalyzer
             SymbolKind.NamedType);
     }
 
-        private static ImmutableDictionary<FenrirServer, string> FindDispatchersInReferencedAssemblies(
+    private static ImmutableDictionary<FenrirServer, string> FindDispatchersInReferencedAssemblies(
         Compilation compilation)
     {
         var builder = ImmutableDictionary.CreateBuilder<FenrirServer, string>();

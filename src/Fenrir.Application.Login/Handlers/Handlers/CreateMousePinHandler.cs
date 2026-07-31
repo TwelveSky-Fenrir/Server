@@ -1,6 +1,5 @@
 using Fenrir.Application.Login.Abstractions.CreateMousePin;
 using Fenrir.Application.Login.Sessions;
-using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Login;
 using Microsoft.Extensions.Logging;
 

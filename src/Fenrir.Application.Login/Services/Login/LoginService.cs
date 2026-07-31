@@ -1,4 +1,3 @@
-using Fenrir.Security.Credentials;
 using System.Collections.Immutable;
 using System.Net;
 using Fenrir.Application.Login.Abstractions.Login;
@@ -9,6 +8,7 @@ using Fenrir.Domain.Login.Security;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Login;
 using Fenrir.Security;
+using Fenrir.Security.Credentials;
 using Fenrir.Security.RateLimiting;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;

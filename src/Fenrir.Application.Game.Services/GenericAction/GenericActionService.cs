@@ -13,9 +13,9 @@ using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Loot;
 using Fenrir.Application.Game.Domain.World.Npcs;
+using Fenrir.Core.Packets.Shared;
 using Fenrir.Domain.Game.GameData;
 using Fenrir.Domain.Game.Stats;
-using Fenrir.Core.Packets.Shared;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.GenericAction;

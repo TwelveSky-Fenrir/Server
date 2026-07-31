@@ -190,9 +190,9 @@ public sealed class HandlerDispatchIncrementalGenerator : IIncrementalGenerator
     }
 
     /// <remarks>
-    /// La déduplication garde la PREMIÈRE occurrence d'un (serveur, opcode) dans l'ordre de découverte —
-    /// sémantique inchangée, et de toute façon un doublon est déjà une erreur FEN015. Le tri ci-dessous
-    /// n'intervient qu'APRÈS, pour l'émission seule.
+    ///     La déduplication garde la PREMIÈRE occurrence d'un (serveur, opcode) dans l'ordre de découverte —
+    ///     sémantique inchangée, et de toute façon un doublon est déjà une erreur FEN015. Le tri ci-dessous
+    ///     n'intervient qu'APRÈS, pour l'émission seule.
     /// </remarks>
     private static ImmutableArray<HandlerModel> Deduplicate(IEnumerable<HandlerModel> handlers)
     {
@@ -207,19 +207,18 @@ public sealed class HandlerDispatchIncrementalGenerator : IIncrementalGenerator
     }
 
     /// <summary>
-    /// Ordre d'émission stable des bras du <c>switch</c>, indépendant de l'emplacement des fichiers.
+    ///     Ordre d'émission stable des bras du <c>switch</c>, indépendant de l'emplacement des fichiers.
     /// </summary>
     /// <remarks>
-    /// Sans ce tri, l'ordre des bras est celui de découverte des <c>SyntaxTree</c>, c'est-à-dire l'ordre
-    /// alphabétique des chemins : DÉPLACER UN SEUL FICHIER HANDLER RÉÉCRIT TOUT LE DISPATCHER. Or le
-    /// byte-diff du code émis est, dans un dépôt sans test et sans length-prefix, le seul oracle de
-    /// non-régression disponible — et il devenait inutilisable sur le fichier même qui encode la table de
-    /// dispatch, précisément pendant les tranches qui déplacent des fichiers.
-    ///
-    /// Le tri est sémantiquement neutre : les bras sont les cas disjoints d'un <c>switch</c> sur un tuple
-    /// (serveur, opcode), et la déduplication a déjà eu lieu. Le compilateur produit la même table de saut.
-    /// <c>EmitRegistration</c> triait déjà ses <c>TryAddSingleton</c> par nom de type ; cette méthode ne
-    /// fait qu'étendre la même discipline aux bras.
+    ///     Sans ce tri, l'ordre des bras est celui de découverte des <c>SyntaxTree</c>, c'est-à-dire l'ordre
+    ///     alphabétique des chemins : DÉPLACER UN SEUL FICHIER HANDLER RÉÉCRIT TOUT LE DISPATCHER. Or le
+    ///     byte-diff du code émis est, dans un dépôt sans test et sans length-prefix, le seul oracle de
+    ///     non-régression disponible — et il devenait inutilisable sur le fichier même qui encode la table de
+    ///     dispatch, précisément pendant les tranches qui déplacent des fichiers.
+    ///     Le tri est sémantiquement neutre : les bras sont les cas disjoints d'un <c>switch</c> sur un tuple
+    ///     (serveur, opcode), et la déduplication a déjà eu lieu. Le compilateur produit la même table de saut.
+    ///     <c>EmitRegistration</c> triait déjà ses <c>TryAddSingleton</c> par nom de type ; cette méthode ne
+    ///     fait qu'étendre la même discipline aux bras.
     /// </remarks>
     private static ImmutableArray<HandlerModel> InEmissionOrder(ImmutableArray<HandlerModel> handlers)
     {

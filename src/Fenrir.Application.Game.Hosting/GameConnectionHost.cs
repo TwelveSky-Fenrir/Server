@@ -1,4 +1,3 @@
-using Fenrir.Application.Game.Hosting.Sessions;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
@@ -7,12 +6,12 @@ using Fenrir.Application.Game.Abstractions.World;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
-using Fenrir.Application.Game.Hosting.World;
+using Fenrir.Application.Game.Hosting.Sessions;
 using Fenrir.Network.Dispatch;
+using Fenrir.Network.Dispatch.FloodProtection;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Transport;
 using Fenrir.Protocol.Game;
-using Fenrir.Network.Dispatch.FloodProtection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -114,7 +113,8 @@ public sealed class GameConnectionHost(
             : $"only {armedCount} of {hostedCount} zone listener(s) could be bound";
 
         var detail = string.Join("; ",
-            failedBinds.Select(failure => $"map {failure.MapId} on port {failure.Port} ({failure.Error.SocketErrorCode})"));
+            failedBinds.Select(failure =>
+                $"map {failure.MapId} on port {failure.Port} ({failure.Error.SocketErrorCode})"));
 
         return new InvalidOperationException(
             $"Shard {shardId} cannot start: {scope} -- {detail}. LoginServer's zone transfer and ZoneMoveService " +

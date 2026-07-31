@@ -4,8 +4,8 @@ using Fenrir.Application.Game.Abstractions.Hotkeys;
 using Fenrir.Application.Game.Domain.Hotkeys;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Domain.Game.GameData;
 using Fenrir.Core.Packets.Shared;
+using Fenrir.Domain.Game.GameData;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Hotkeys;

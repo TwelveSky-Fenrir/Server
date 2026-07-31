@@ -17,8 +17,9 @@ using Fenrir.Application.Game.Hosting.World.WorldState;
 using Fenrir.Application.Game.Hosting.World.ZoneWar;
 using Fenrir.Cluster.Client.Link;
 using Fenrir.Data.WriteBehind;
-using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Dispatch.FloodProtection;
+using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
@@ -30,7 +31,7 @@ public static class HostingServiceCollectionExtensions
 {
     public static IServiceCollection AddGameHosting(this IServiceCollection services)
     {
-        services.AddSingleton<IOpcodeFrameSizeProvider>(global::Fenrir.Protocol.Game.ZoneOpcodeRegistry.Provider);
+        services.AddSingleton<IOpcodeFrameSizeProvider>(ZoneOpcodeRegistry.Provider);
 
         services.AddSingleton(sp =>
             new ZoneConfigCatalog(sp.GetRequiredService<IOptions<GameServerOptions>>().Value.Zones));

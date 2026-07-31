@@ -2,7 +2,6 @@ namespace Fenrir.Generators.Analysis.Support;
 
 internal static class WellKnownNames
 {
-
     public const string FenrirPacketAttribute = "Fenrir.Core.Attributes.FenrirPacketAttribute";
 
     public const string FenrirWireTypeAttribute = "Fenrir.Core.Attributes.FenrirWireTypeAttribute";
@@ -32,12 +31,12 @@ internal static class WellKnownNames
     public const string FenrirServerEnum = "global::Fenrir.Core.Wire.FenrirServer";
     public const string FenrirDirectionEnum = "global::Fenrir.Core.Wire.FenrirDirection";
 
-        public const string IOpcodeFrameSizeProvider = "global::Fenrir.Core.Abstractions.IOpcodeFrameSizeProvider";
+    public const string IOpcodeFrameSizeProvider = "global::Fenrir.Core.Abstractions.IOpcodeFrameSizeProvider";
 
 
     public const string LoginSessionStateEnum = "global::Fenrir.Protocol.Login.LoginSessionState";
 
-        public const string ZoneSessionStateEnum = "global::Fenrir.Protocol.Game.ZoneSessionState";
+    public const string ZoneSessionStateEnum = "global::Fenrir.Protocol.Game.ZoneSessionState";
 
     public const string CenterSessionStateEnum = "global::Fenrir.Protocol.Center.CenterSessionState";
 }

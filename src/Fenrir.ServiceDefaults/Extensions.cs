@@ -32,10 +32,7 @@ public static class Extensions
 
                     metrics.AddMeter("Fenrir.*");
                 })
-                .WithTracing(tracing =>
-                {
-                    tracing.AddSource("Fenrir.*");
-                });
+                .WithTracing(tracing => { tracing.AddSource("Fenrir.*"); });
 
             builder.AddOpenTelemetryExporters();
 

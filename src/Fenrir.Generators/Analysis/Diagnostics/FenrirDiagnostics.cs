@@ -40,7 +40,7 @@ internal static class FenrirDiagnostics
         DiagnosticSeverity.Error,
         true);
 
-        public static readonly DiagnosticDescriptor WireTypeMissingExpectedSize = new(
+    public static readonly DiagnosticDescriptor WireTypeMissingExpectedSize = new(
         "FEN005",
         "Wire type without an explicit size",
         "Type '{0}' carries [FenrirWireType] without an explicit size; declare [FenrirWireType(<octets>)] " +
@@ -49,7 +49,7 @@ internal static class FenrirDiagnostics
         DiagnosticSeverity.Error,
         true);
 
-        public static readonly DiagnosticDescriptor MultipleServersInCompilation = new(
+    public static readonly DiagnosticDescriptor MultipleServersInCompilation = new(
         "FEN006",
         "Packets of several servers in one assembly",
         "Assembly '{0}' declares packets for several FenrirServer values ({1}); the emitted aggregates are " +
@@ -58,7 +58,7 @@ internal static class FenrirDiagnostics
         DiagnosticSeverity.Error,
         true);
 
-        public static readonly DiagnosticDescriptor UnresolvableNestedSize = new(
+    public static readonly DiagnosticDescriptor UnresolvableNestedSize = new(
         "FEN007",
         "Nested wire type size cannot be resolved",
         "Field '{1}.{2}' nests '{0}', which comes from another assembly's metadata and declares no explicit " +
@@ -67,7 +67,7 @@ internal static class FenrirDiagnostics
         DiagnosticSeverity.Error,
         true);
 
-        public static readonly DiagnosticDescriptor MultipleHandlerServersInCompilation = new(
+    public static readonly DiagnosticDescriptor MultipleHandlerServersInCompilation = new(
         "FEN008",
         "Handlers of several servers in one assembly",
         "Assembly '{0}' declares packet handlers for several FenrirServer values ({1}); a single dispatcher " +
@@ -77,7 +77,7 @@ internal static class FenrirDiagnostics
         DiagnosticSeverity.Error,
         true);
 
-        public static readonly DiagnosticDescriptor PacketMissingExpectedSize = new(
+    public static readonly DiagnosticDescriptor PacketMissingExpectedSize = new(
         "FEN009",
         "Packet without an explicit ExpectedSize",
         "Packet '{0}' declares no ExpectedSize, so nothing verifies its wire size, and the protocol carries no " +
@@ -88,7 +88,7 @@ internal static class FenrirDiagnostics
         DiagnosticSeverity.Error,
         true);
 
-        public static readonly DiagnosticDescriptor DispatchOwnershipConflict = new(
+    public static readonly DiagnosticDescriptor DispatchOwnershipConflict = new(
         "FEN104",
         "Dispatch ownership conflict",
         "Assembly '{0}' declares packet handlers for the '{1}' server, but referenced assembly '{2}' already " +
@@ -98,7 +98,7 @@ internal static class FenrirDiagnostics
         DiagnosticSeverity.Error,
         true);
 
-        public static readonly DiagnosticDescriptor HandlerDependsOnServiceImplementation = new(
+    public static readonly DiagnosticDescriptor HandlerDependsOnServiceImplementation = new(
         "FEN111",
         "Handler layer depends on a service implementation",
         "'{0}' lives under '{1}/' and imports namespace '{2}', whose types are declared under 'Services/'; " +
@@ -107,7 +107,7 @@ internal static class FenrirDiagnostics
         DiagnosticSeverity.Error,
         true);
 
-        public static readonly DiagnosticDescriptor LayerDependsOnHosting = new(
+    public static readonly DiagnosticDescriptor LayerDependsOnHosting = new(
         "FEN112",
         "Layer depends on the hosting composition root",
         "'{0}' lives under '{1}/' and imports namespace '{2}', whose types are declared under 'Hosting/'; " +
@@ -116,7 +116,7 @@ internal static class FenrirDiagnostics
         DiagnosticSeverity.Error,
         true);
 
-        public static readonly DiagnosticDescriptor LayerRuleMatchedNothing = new(
+    public static readonly DiagnosticDescriptor LayerRuleMatchedNothing = new(
         "FEN113",
         "Path-driven layer rule is no longer in force",
         "Path-driven layer rules for assembly '{0}' are no longer armed: {1}; restore the layout, or update " +
@@ -126,7 +126,7 @@ internal static class FenrirDiagnostics
         true,
         customTags: [WellKnownDiagnosticTags.CompilationEnd]);
 
-        public static readonly DiagnosticDescriptor AsynchronyInInlineHandler = new(
+    public static readonly DiagnosticDescriptor AsynchronyInInlineHandler = new(
         "FEN202",
         "Asynchrony in an inline packet handler",
         "'{0}' implements IInlinePacketHandler and runs on the session loop with a microsecond budget, but {1}; " +

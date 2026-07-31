@@ -38,11 +38,11 @@ public abstract class ClientSession(
 
     public FenrirServer Server { get; } = server;
 
-    public IPEndPoint? RemoteEndPoint { get; } = remoteEndPoint;
-
     public byte InboundStreamXorKey { get; set; }
 
     public DisconnectReason? DisconnectReason { get; private set; }
+
+    public IPEndPoint? RemoteEndPoint { get; } = remoteEndPoint;
 
     public DateTimeOffset LastActivityUtc { get; private set; } = DateTimeOffset.UtcNow;
 
@@ -93,13 +93,6 @@ public abstract class ClientSession(
         FlushLocked();
     }
 
-    public void Touch()
-    {
-        LastActivityUtc = DateTimeOffset.UtcNow;
-    }
-
-    public abstract bool IsOpcodeAllowed(byte opcode);
-
     public void SendRaw(ReadOnlySpan<byte> rawFrame)
     {
         if (Volatile.Read(ref _completed) != 0)
@@ -135,6 +128,23 @@ public abstract class ClientSession(
         FlushLocked();
     }
 
+    public void Abort(DisconnectReason reason)
+    {
+        if (Interlocked.CompareExchange(ref _completed, 1, 0) != 0)
+            return;
+
+        DisconnectReason = reason;
+        Transport.Input.CancelPendingRead();
+        Transport.Output.CancelPendingFlush();
+    }
+
+    public void Touch()
+    {
+        LastActivityUtc = DateTimeOffset.UtcNow;
+    }
+
+    public abstract bool IsOpcodeAllowed(byte opcode);
+
     private static byte OpcodeOf(ReadOnlySpan<byte> rawFrame)
     {
         return rawFrame.IsEmpty ? (byte)0 : rawFrame[0];
@@ -159,7 +169,7 @@ public abstract class ClientSession(
         logger?.LogWarning(
             "Session {SessionId} ({Server}, {RemoteEndPoint}): aborting -- pending send bytes for opcode {Opcode} would exceed the {MaxPendingSendBytes}-byte cap",
             SessionId, Server, RemoteEndPoint, opcode, _maxPendingSendBytes);
-        Abort(Fenrir.Core.Abstractions.DisconnectReason.SendBufferOverflow);
+        Abort(Core.Abstractions.DisconnectReason.SendBufferOverflow);
     }
 
     protected void LogSessionStateChanged<TState>(TState previousState, TState newState) where TState : struct, Enum
@@ -237,7 +247,7 @@ public abstract class ClientSession(
                 logger?.LogWarning(
                     "Session {SessionId}: aborting as a slow consumer -- {Streak} consecutive non-synchronous TX flushes",
                     SessionId, _backpressureStreak);
-                Abort(Fenrir.Core.Abstractions.DisconnectReason.SlowConsumer);
+                Abort(Core.Abstractions.DisconnectReason.SlowConsumer);
                 keepDraining = false;
             }
         }
@@ -262,16 +272,6 @@ public abstract class ClientSession(
         catch
         {
         }
-    }
-
-    public void Abort(DisconnectReason reason)
-    {
-        if (Interlocked.CompareExchange(ref _completed, 1, 0) != 0)
-            return;
-
-        DisconnectReason = reason;
-        Transport.Input.CancelPendingRead();
-        Transport.Output.CancelPendingFlush();
     }
 
     public async ValueTask CompleteAsync()

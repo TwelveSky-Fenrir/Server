@@ -1,7 +1,7 @@
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Skills;
-using Fenrir.Domain.Game.GameData;
 using Fenrir.Core.Packets.Shared;
+using Fenrir.Domain.Game.GameData;
 
 namespace Fenrir.Application.Game.Domain.Combat;
 

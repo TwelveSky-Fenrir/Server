@@ -41,7 +41,7 @@ public sealed class PacketExpectedSizeAnalyzer : DiagnosticAnalyzer
             typeSymbol.Name));
     }
 
-        private static Location? AttributeLocation(AttributeData attribute)
+    private static Location? AttributeLocation(AttributeData attribute)
     {
         return attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation();
     }

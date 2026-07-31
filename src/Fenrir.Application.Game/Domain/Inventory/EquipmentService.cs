@@ -2,10 +2,10 @@ using System.Collections.Frozen;
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Mounts;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Core.Packets.Shared;
 using Fenrir.Domain.Game.GameData;
 using Fenrir.Domain.Game.Stats;
 using Fenrir.Domain.Game.Stats.Context;
-using Fenrir.Core.Packets.Shared;
 
 namespace Fenrir.Application.Game.Domain.Inventory;
 

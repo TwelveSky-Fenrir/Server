@@ -1,8 +1,8 @@
 using System.IO.Pipelines;
 using System.Net;
+using Fenrir.Network.Dispatch.FloodProtection;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Transport;
-using Fenrir.Network.Dispatch.FloodProtection;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Network.Dispatch;

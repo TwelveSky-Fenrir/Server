@@ -1,7 +1,7 @@
 using Fenrir.Domain.Login;
+using Fenrir.Network.Dispatch.FloodProtection;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Login;
-using Fenrir.Network.Dispatch.FloodProtection;
 using Fenrir.Security.FloodProtection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;

@@ -1,7 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Chat;
-using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Abstractions.Sessions;
-using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Application.Game.Domain.World;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 

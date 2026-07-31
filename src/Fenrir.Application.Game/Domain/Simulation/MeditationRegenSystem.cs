@@ -1,7 +1,7 @@
 using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Domain.Game.GameData;
 using Fenrir.Data.WriteBehind;
+using Fenrir.Domain.Game.GameData;
 using Fenrir.Protocol.Game;
 
 namespace Fenrir.Application.Game.Domain.Simulation;

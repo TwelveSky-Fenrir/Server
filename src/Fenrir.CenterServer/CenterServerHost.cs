@@ -1,3 +1,7 @@
+using System.Buffers;
+using System.Collections.Concurrent;
+using System.IO.Pipelines;
+using System.Net;
 using Fenrir.Core.Abstractions;
 using Fenrir.Core.Wire;
 using Fenrir.Network.Framing;
@@ -5,10 +9,6 @@ using Fenrir.Network.Transport;
 using Fenrir.Protocol.Center;
 using Fenrir.Security.Abstractions;
 using Microsoft.Extensions.Options;
-using System.Buffers;
-using System.Collections.Concurrent;
-using System.IO.Pipelines;
-using System.Net;
 using ProtocolViolationException = Fenrir.Network.Framing.ProtocolViolationException;
 
 namespace Fenrir.CenterServer;

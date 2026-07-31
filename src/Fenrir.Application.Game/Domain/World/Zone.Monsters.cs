@@ -4,8 +4,8 @@ using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World.Monsters;
 using Fenrir.Core.Packets.Shared;
-using Fenrir.Data.WriteBehind;
 using Fenrir.Core.Wire;
+using Fenrir.Data.WriteBehind;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 

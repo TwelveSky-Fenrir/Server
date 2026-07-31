@@ -1,5 +1,5 @@
-using Fenrir.Application.Game.Abstractions.Social;
 using Fenrir.Application.Game.Abstractions.Sessions;
+using Fenrir.Application.Game.Abstractions.Social;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 

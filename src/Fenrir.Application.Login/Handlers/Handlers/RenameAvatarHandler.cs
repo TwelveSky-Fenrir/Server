@@ -1,7 +1,6 @@
 using Fenrir.Application.Login.Abstractions.RenameAvatar;
 using Fenrir.Application.Login.Sessions;
 using Fenrir.Domain.Login.Avatars;
-using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Login;
 using Microsoft.Extensions.Logging;
 

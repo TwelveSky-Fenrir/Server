@@ -15,8 +15,8 @@ using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World.Geometry;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
-using Fenrir.Domain.Game.GameData;
 using Fenrir.Data.WriteBehind;
+using Fenrir.Domain.Game.GameData;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 

@@ -1,8 +1,8 @@
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Progression;
-using Fenrir.Domain.Game.Stats;
 using Fenrir.Data.WriteBehind;
+using Fenrir.Domain.Game.Stats;
 using Fenrir.Protocol.Game;
 
 namespace Fenrir.Application.Game.Domain.World;

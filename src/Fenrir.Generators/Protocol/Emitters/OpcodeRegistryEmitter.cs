@@ -90,6 +90,7 @@ internal static class OpcodeRegistryEmitter
                 : WireHeaderSizes.ClientPacketSize;
             writer.Line($"{packet.Opcode} => {packet.FieldsSize + headerSize},");
         }
+
         writer.Line("_ => -1,");
         writer.CloseBraceSemicolon();
         writer.Line("return frameSize >= 0;");

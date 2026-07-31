@@ -12,8 +12,8 @@ public sealed class FenrirTcpListener<TSession> : IAsyncDisposable
     private readonly Socket _listenSocket;
 
     private readonly ILogger? _logger;
-    private readonly SessionIdAllocator _sessionIds;
     private readonly Func<long, IDuplexPipe, IPEndPoint?, TSession> _sessionFactory;
+    private readonly SessionIdAllocator _sessionIds;
 
     public FenrirTcpListener(IPEndPoint endpoint, Func<long, IDuplexPipe, IPEndPoint?, TSession> sessionFactory,
         ILogger? logger = null, SessionIdAllocator? sessionIds = null)

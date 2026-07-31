@@ -7,7 +7,6 @@ public static class ClusterServiceCollectionExtensions
 {
     public static IServiceCollection AddFenrirCluster(this IServiceCollection services)
     {
-
         services.AddSingleton<IFrameDispatcher, CenterFrameDispatcher>();
         services.AddCenterPacketHandlers();
 

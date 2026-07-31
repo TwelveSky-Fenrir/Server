@@ -160,7 +160,8 @@ internal static class FieldScanner
                     return null;
                 }
 
-                var nestedElementSize = ResolveNestedSize(elementNamedType, compilation, visiting, property, diagnostics);
+                var nestedElementSize =
+                    ResolveNestedSize(elementNamedType, compilation, visiting, property, diagnostics);
 
                 return new FieldModel
                 {

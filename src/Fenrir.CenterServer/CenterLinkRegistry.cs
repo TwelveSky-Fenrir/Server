@@ -1,11 +1,9 @@
-using Fenrir.Cluster.Center;
+using System.Collections.Concurrent;
 using Fenrir.Cluster.Center.EventBus;
+using Fenrir.Cluster.Center.Party;
 using Fenrir.Cluster.Center.WorldState;
 using Fenrir.Core.Abstractions;
-using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Center;
-using System.Collections.Concurrent;
-using Fenrir.Cluster.Center.Party;
 
 namespace Fenrir.CenterServer;
 
@@ -23,15 +21,6 @@ public sealed class CenterLinkRegistry(ILogger<CenterLinkRegistry> logger)
             "Close-proxy unicast to zone {ZoneNumber} skipped: per-zone link routing awaits the zone-register hello " +
             "(user {UserIndex}, character {CharacterIndex}, openUi {OpenUi})",
             zoneNumber, userIndex, characterIndex, openUi);
-        return ValueTask.CompletedTask;
-    }
-
-    public ValueTask BroadcastWorldEventAsync(int sort, ReadOnlyMemory<byte> data, CancellationToken ct)
-    {
-        var payload = new byte[WorldEventDataSize];
-        data.Span[..Math.Min(data.Length, WorldEventDataSize)].CopyTo(payload);
-        var packet = new WorldEventOutbound { Sort = sort, Data = payload };
-        BroadcastToZones(in packet);
         return ValueTask.CompletedTask;
     }
 
@@ -56,6 +45,15 @@ public sealed class CenterLinkRegistry(ILogger<CenterLinkRegistry> logger)
         }
 
         return dropped;
+    }
+
+    public ValueTask BroadcastWorldEventAsync(int sort, ReadOnlyMemory<byte> data, CancellationToken ct)
+    {
+        var payload = new byte[WorldEventDataSize];
+        data.Span[..Math.Min(data.Length, WorldEventDataSize)].CopyTo(payload);
+        var packet = new WorldEventOutbound { Sort = sort, Data = payload };
+        BroadcastToZones(in packet);
+        return ValueTask.CompletedTask;
     }
 
     internal void Register(CenterLinkSession session, DateTimeOffset now)

@@ -2,7 +2,6 @@ using System.Buffers;
 using System.IO.Pipelines;
 using System.Net.Sockets;
 using Fenrir.Core.Wire;
-using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Framing;
 using Fenrir.Network.Transport;
 using Fenrir.Protocol.Center;
@@ -209,7 +208,7 @@ internal sealed class CenterLinkClientHost(
 
                     if (inboundSink is not null)
                     {
-                        var span = seq.IsSingleSegment ? seq.FirstSpan : BuffersExtensions.ToArray(in seq);
+                        var span = seq.IsSingleSegment ? seq.FirstSpan : seq.ToArray();
                         inboundSink.Receive(opcode, span);
                     }
                     else
@@ -245,7 +244,7 @@ internal sealed class CenterLinkClientHost(
             if (buffer.Length >= count)
             {
                 var slice = buffer.Slice(0, count);
-                var bytes = BuffersExtensions.ToArray(in slice);
+                var bytes = slice.ToArray();
                 reader.AdvanceTo(slice.End);
                 return bytes;
             }

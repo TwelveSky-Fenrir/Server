@@ -43,7 +43,7 @@ internal sealed class LayeredProject
 
     public ImmutableArray<LayerEdge> Edges { get; }
 
-        public ImmutableArray<string> RequiredFolders { get; }
+    public ImmutableArray<string> RequiredFolders { get; }
 
     public bool HasEdgesFrom(string folder)
     {

@@ -1,8 +1,8 @@
+using System.IO.Pipelines;
+using System.Net;
 using Fenrir.Core.Wire;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Center;
-using System.IO.Pipelines;
-using System.Net;
 
 namespace Fenrir.CenterServer;
 

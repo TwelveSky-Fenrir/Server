@@ -1,9 +1,9 @@
 using System.Threading.Channels;
 using Fenrir.Application.Game.Domain.Gm;
 using Fenrir.Application.Game.Domain.Social.Party;
-using Fenrir.Domain.Game.Stats;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Data.WriteBehind;
+using Fenrir.Domain.Game.Stats;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 

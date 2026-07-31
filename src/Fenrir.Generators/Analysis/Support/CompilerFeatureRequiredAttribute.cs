@@ -1,4 +1,6 @@
-﻿namespace System.Runtime.CompilerServices;
+﻿using System;
+
+namespace Fenrir.Generators.Analysis.Support;
 
 [AttributeUsage(AttributeTargets.All, AllowMultiple = true, Inherited = false)]
 internal sealed class CompilerFeatureRequiredAttribute(string featureName) : Attribute

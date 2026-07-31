@@ -1,6 +1,6 @@
+using System.Collections.Concurrent;
 using Fenrir.Application.Game.Domain.World;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
 
 namespace Fenrir.Application.Game.Domain.Simulation;
 

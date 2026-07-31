@@ -1,6 +1,6 @@
 using System.Buffers;
-using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Abstractions.Sessions;
+using Fenrir.Application.Game.Domain.World;
 using Fenrir.Core.Wire;
 using Microsoft.Extensions.Logging;
 
@@ -30,7 +30,7 @@ public sealed class ZoneFrameDispatcher(ILogger<ZoneFrameDispatcher> logger) : I
 
     private static bool IsWithheldByPendingZoneTransfer(IPacketSession session, byte opcode)
     {
-        return session is IZoneSession { CurrentZone: Domain.World.Zone zone, CharacterId: { } characterId } &&
+        return session is IZoneSession { CurrentZone: Zone zone, CharacterId: { } characterId } &&
                zone.TryGetPlayer(characterId, out var state) && state is not null &&
                ZoneTransferFreezeGate.ShouldWithhold(state.IsMovingZone, opcode,
                    Opcodes.Zone.Incoming.ZoneTransferCancel);

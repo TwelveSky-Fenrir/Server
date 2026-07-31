@@ -1,6 +1,6 @@
-using Fenrir.Security.Credentials;
 using Fenrir.Application.Login.Abstractions.CreateMousePin;
 using Fenrir.Domain.Login.Pins;
+using Fenrir.Security.Credentials;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Login.Services.CreateMousePin;

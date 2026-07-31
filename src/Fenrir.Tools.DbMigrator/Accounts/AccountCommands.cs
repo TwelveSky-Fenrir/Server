@@ -1,8 +1,8 @@
-using Fenrir.Security.Credentials;
 using CaeriusNet.Abstractions;
 using CaeriusNet.Builders;
 using Fenrir.Data.Accounts;
 using Fenrir.Data.Security;
+using Fenrir.Security.Credentials;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Tools.DbMigrator.Accounts;

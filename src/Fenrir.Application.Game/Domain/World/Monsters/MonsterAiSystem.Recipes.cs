@@ -1,5 +1,5 @@
-using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Abstractions.Sessions;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Protocol.Game;
 
 namespace Fenrir.Application.Game.Domain.World.Monsters;

@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
-using Fenrir.Core.Wire;
 using Fenrir.Core.Abstractions;
+using Fenrir.Core.Wire;
 
 namespace Fenrir.Security.RateLimiting;
 

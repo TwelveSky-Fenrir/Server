@@ -146,10 +146,12 @@ static string ResolvePrimaryLanIPv4()
     return ordered[0].Address;
 }
 
-static bool IsPrivateLan(byte[] octets) =>
-    octets[0] == 10
-    || (octets[0] == 172 && octets[1] is >= 16 and <= 31)
-    || (octets[0] == 192 && octets[1] == 168);
+static bool IsPrivateLan(byte[] octets)
+{
+    return octets[0] == 10
+           || (octets[0] == 172 && octets[1] is >= 16 and <= 31)
+           || (octets[0] == 192 && octets[1] == 168);
+}
 
 static bool IsVirtualAdapter(NetworkInterface nic)
 {

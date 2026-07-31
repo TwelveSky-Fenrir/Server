@@ -1,10 +1,10 @@
 using System.Buffers;
 using System.Diagnostics;
+using Fenrir.Network.Dispatch.FloodProtection;
 using Fenrir.Network.Dispatch.Logging;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Framing;
 using Fenrir.Network.Transport;
-using Fenrir.Network.Dispatch.FloodProtection;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Network.Dispatch;

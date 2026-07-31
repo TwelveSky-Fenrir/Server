@@ -1,8 +1,8 @@
 using System.IO.Pipelines;
 using System.Net;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Core.Wire;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -36,11 +36,6 @@ public sealed class ZoneClientSession(
     public bool MeetsGmTier(GmCommandTier tier)
     {
         return AccountGrade >= (short)tier;
-    }
-
-    public override bool IsOpcodeAllowed(byte opcode)
-    {
-        return global::Fenrir.Protocol.Game.ZoneSessionStateGate.Allows(State, opcode);
     }
 
     public void MarkTicketConsumed(int accountId, int characterId, Guid? sessionToken = null, short accountGrade = 0,
@@ -78,5 +73,10 @@ public sealed class ZoneClientSession(
     public void ClearZoneTransferPending()
     {
         IsZoneTransferPending = false;
+    }
+
+    public override bool IsOpcodeAllowed(byte opcode)
+    {
+        return ZoneSessionStateGate.Allows(State, opcode);
     }
 }

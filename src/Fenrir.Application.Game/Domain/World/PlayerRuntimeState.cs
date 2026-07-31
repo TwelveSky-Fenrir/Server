@@ -1,8 +1,8 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Skills;
-using Fenrir.Domain.Game.Stats;
 using Fenrir.Data.WriteBehind;
+using Fenrir.Domain.Game.Stats;
 
 namespace Fenrir.Application.Game.Domain.World;
 

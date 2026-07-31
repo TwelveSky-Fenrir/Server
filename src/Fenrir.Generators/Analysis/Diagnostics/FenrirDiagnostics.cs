@@ -144,6 +144,15 @@ internal static class FenrirDiagnostics
         true,
         customTags: [WellKnownDiagnosticTags.CompilationEnd]);
 
+    public static readonly DiagnosticDescriptor ForbiddenAssemblyInClosure = new(
+        "FEN115",
+        "Forbidden assembly in the compile-time closure",
+        "'{0}' resolves '{1}' in its transitive reference closure; {2}",
+        Category,
+        DiagnosticSeverity.Error,
+        true,
+        customTags: [WellKnownDiagnosticTags.CompilationEnd]);
+
     public static readonly DiagnosticDescriptor AsynchronyInInlineHandler = new(
         "FEN202",
         "Asynchrony in an inline packet handler",

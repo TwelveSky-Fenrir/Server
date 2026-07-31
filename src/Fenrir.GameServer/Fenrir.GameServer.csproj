@@ -19,5 +19,8 @@
     <ProjectReference Include="..\Fenrir.Application.Game.Services\Fenrir.Application.Game.Services.csproj"/>
     <ProjectReference Include="..\Fenrir.Application.Game.Hosting\Fenrir.Application.Game.Hosting.csproj"/>
     <ProjectReference Include="..\Fenrir.ServiceDefaults\Fenrir.ServiceDefaults.csproj"/>
+    <ProjectReference Include="..\Fenrir.Generators\Fenrir.Generators.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"/>
   </ItemGroup>
 </Project>

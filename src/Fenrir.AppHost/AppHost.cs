@@ -10,7 +10,6 @@ var sqlPassword = builder.AddParameter("sql-password", true);
 var centerSharedSecret = builder.AddParameter("center-shared-secret", true);
 
 const int zoneBasePort = 1100;
-
 const int sqlHostPort = 14330;
 
 var gamePublicHost = Environment.GetEnvironmentVariable("FENRIR_PUBLIC_HOST") is { Length: > 0 } configuredHost
@@ -27,8 +26,6 @@ var sql = builder.AddSqlServer("sqlserver", sqlPassword)
     .WithLifetime(ContainerLifetime.Persistent);
 
 var fenrirDb = sql.AddDatabase("FenrirDb");
-
-RemoveDefaultHealthCheck(fenrirDb.Resource);
 
 var migrator = builder.AddProject<Fenrir_Tools_DbMigrator>("db-migrator", launchProfileName: null)
     .WithReference(fenrirDb)
@@ -77,12 +74,6 @@ foreach (var shardId in shardIds)
 
 builder.Build().Run();
 return;
-
-static void RemoveDefaultHealthCheck(IResource resource)
-{
-    foreach (var annotation in resource.Annotations.OfType<HealthCheckAnnotation>().ToArray())
-        resource.Annotations.Remove(annotation);
-}
 
 static string ResolvePrimaryLanIPv4()
 {

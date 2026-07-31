@@ -47,17 +47,21 @@ builder.Services.AddSingleton<IMonsterBossRespawnTimerRepository, MonsterBossRes
 builder.Services.AddGameDomain();
 builder.Services.AddWorldData();
 builder.Services.AddGameServices();
-builder.Services.AddGameHosting();
-builder.Services.AddGameHandlers();
-
-builder.Services.AddSingleton<SessionRegistry>();
-builder.Services.AddSingleton<ISessionRateLimiter, SessionRateLimiter>();
-
+// Enregistre AVANT AddGameHosting/AddLoginHosting : l'ordre d'enregistrement est l'ordre de
+// demarrage, donc l'INVERSE de l'ordre d'arret. En dernier, CenterLinkClientHost s'arretait EN
+// PREMIER et coupait l'uplink Center pendant que le hote de connexions drainait encore les joueurs
+// et que les sept pompes de relais cross-shard tournaient toujours.
 builder.Services.AddCenterLinkClient(o =>
 {
     o.Endpoint = builder.Configuration["Center:Endpoint"];
     o.SharedSecret = builder.Configuration["Center:SharedSecret"];
 });
+
+builder.Services.AddGameHosting();
+builder.Services.AddGameHandlers();
+
+builder.Services.AddSingleton<SessionRegistry>();
+builder.Services.AddSingleton<ISessionRateLimiter, SessionRateLimiter>();
 
 DiGraphDump.WriteIfRequested(builder.Services, "gameserver");
 

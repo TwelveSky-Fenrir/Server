@@ -14,7 +14,11 @@ public sealed class LuckyTicketUseItemHandler(
     UseItemInventoryWriter inventoryWriter,
     ILogger<LuckyTicketUseItemHandler> logger) : IUseItemHandler
 {
-    private static readonly BoxRewardSpec PlaceholderSpec = BoxRewardSpec.Uniform(0, ImmutableArray<int>.Empty);
+    // Volontairement vide : la recompense vient de ReturnDropRareItem, une requete sur la table SHM
+    // (Server/ts25zone/GameSystem/GameSystem_02_Item.cpp:941-1023), pas d'une table d'ids. OpenSingle recoit
+    // toujours l'override ci-dessous, donc ni RollRewardId ni RentalDays ni BoxId ne sont jamais lus ici.
+    private static readonly BoxRewardSpec RewardDrawnDynamicallySpec =
+        BoxRewardSpec.Uniform(0, ImmutableArray<int>.Empty);
 
     public static IEnumerable<int> HandledItemIds { get; } = [1035, 1036, 1037];
 
@@ -30,7 +34,7 @@ public sealed class LuckyTicketUseItemHandler(
         var today = GameDate.Today();
         var secondPageAccessible = state.InventoryDate >= today;
 
-        var plan = LootBoxOpenResolver.OpenSingle(PlaceholderSpec, context.Page, context.Index, context.Item,
+        var plan = LootBoxOpenResolver.OpenSingle(RewardDrawnDynamicallySpec, context.Page, context.Index, context.Item,
             page0, page1, ResolveRewardSort, Random.Shared, today,
             () => DrawReward(ticketItemId, state),
             secondPageAccessible,

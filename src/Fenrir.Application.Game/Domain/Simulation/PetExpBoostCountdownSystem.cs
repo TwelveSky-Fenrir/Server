@@ -1,11 +1,14 @@
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Protocol.Game;
 
 namespace Fenrir.Application.Game.Domain.Simulation;
 
 public sealed class PetExpBoostCountdownSystem : ISimulationSystem
 {
+    private const int DoublePetExpTimeStatSort = 44;
+
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
         foreach (var state in zone.Players)
@@ -33,5 +36,9 @@ public sealed class PetExpBoostCountdownSystem : ISimulationSystem
             return;
 
         state.PetExpX2Time = Math.Max(0, state.PetExpX2Time - minutesElapsed);
+
+        // Server/ts25zone/S07_MyGame04.cpp:950 -- unicast au seul porteur, jamais aux voisins.
+        state.Session.Send(new AvatarStatUpdateResponse
+            { Sort = DoublePetExpTimeStatSort, Value = state.PetExpX2Time, Value2 = 0 });
     }
 }

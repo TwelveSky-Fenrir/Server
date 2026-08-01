@@ -2,6 +2,8 @@ namespace Fenrir.Application.Game.Domain.Mounts;
 
 public static class MountKillExperienceCalculator
 {
+    // Server/BuildEU33/ServerInfo.ini:160 MountExpUpRatio, lu brut (S07_MyGame01.cpp:435).
+    // Forfait par kill: Server/ts25zone/S07_MyGame03.cpp:2993 l'affecte sans le multiplier a l'EXP joueur.
     public const int DefaultBaseExperiencePerKill = 40;
 
     public static int ComputeGain(

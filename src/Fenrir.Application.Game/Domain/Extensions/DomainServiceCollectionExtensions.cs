@@ -53,7 +53,8 @@ public static class DomainServiceCollectionExtensions
         services.AddSingleton<ISimulationSystem, AutoHuntTickSystem>();
         services.AddSingleton<ISimulationSystem, MeditationRegenSystem>();
         services.AddSingleton<ISimulationSystem, MonsterAiSystem>();
-        services.AddSingleton<ISimulationSystem, MonsterSpawnScheduler>();
+        services.AddSingleton<MonsterSpawnScheduler>();
+        services.AddSingleton<ISimulationSystem>(static sp => sp.GetRequiredService<MonsterSpawnScheduler>());
 
         services.AddSingleton(static provider =>
             MonsterBossSummonCatalog.BuildFrom(provider.GetRequiredService<WorldDataCache>()));

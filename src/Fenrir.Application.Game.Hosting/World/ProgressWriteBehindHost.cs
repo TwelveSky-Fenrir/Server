@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Domain.Costumes;
 using Fenrir.Application.Game.Domain.Mounts;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Data.WriteBehind;
@@ -12,7 +13,9 @@ public sealed class ProgressWriteBehindHost(ZoneRegistry zones, ICharacterReposi
         CancellationToken ct)
     {
         var rows = new List<CharacterProgressTvp>(dirty.Count);
+        var costumes = new List<CharacterCostumeSlotTvp>();
         var claimed = new HashSet<int>();
+        List<(PlayerRuntimeState State, int WarPoint, int BloodCoin)>? credited = null;
 
         foreach (var (characterId, flags) in dirty)
         {
@@ -21,6 +24,13 @@ public sealed class ProgressWriteBehindHost(ZoneRegistry zones, ICharacterReposi
 
             if (!zones.TryGetPlayer(characterId, out var state))
                 continue;
+
+            // WarPoint/BloodCoin ship as a delta, never a balance -- the baseline only advances once SQL
+            // accepted the credit, so a failed batch replays the same grant instead of losing it.
+            var warPoint = state.WarPoint;
+            var bloodCoin = state.BloodCoin;
+            if (warPoint != state.PersistedWarPoint || bloodCoin != state.PersistedBloodCoin)
+                (credited ??= []).Add((state, warPoint, bloodCoin));
 
             rows.Add(new CharacterProgressTvp(characterId, state.FlushSequence, state.Level, state.Level2,
                 state.Experience, state.Life, state.MaxLife, state.Mana, state.MaxMana, state.StatVit,
@@ -31,12 +41,45 @@ public sealed class ProgressWriteBehindHost(ZoneRegistry zones, ICharacterReposi
                 state.MountGarage[MountPersistenceCodec.PersistedGarageSlot],
                 MountPersistenceCodec.EncodeExpActivity(state.MountActivity, state.MountAccumulatedExp),
                 MountPersistenceCodec.EncodePower(state.MountRolledAttributes),
-                state.AnimalIndex, state.AnimalTime));
+                state.AnimalIndex, state.AnimalTime,
+                state.VisibleState, state.SpecialState, state.UseOrnament ? 1 : 0,
+                state.Title, state.Halo, state.TeacherPoint,
+                warPoint - state.PersistedWarPoint, bloodCoin - state.PersistedBloodCoin,
+                state.PetExpX2Time, state.AnimalAbsorbTime, state.AnimalAbsorbState, state.CostumeIndex,
+                // Nommes a partir d'ici: le TVP est en append continu par plusieurs lots, un ajout positionnel
+                // decale silencieusement tout ce qui suit vers le mauvais parametre.
+                ProtectForHalo: state.ProtectForHalo,
+                BonusItemLevel: state.BonusItemLevel,
+                BonusItemValue: state.BonusItemValue,
+                TribeNotifyScrollCount: state.TribeNotifyScrollCount,
+                TribeFourReturnAllowance: state.TribeFourReturnAllowance,
+                BottleSlots: BottleSlotsCodec.Encode(state.BottleSlots),
+                DrunkBottleIndex: state.DrunkBottleIndex,
+                AutoBuffTime: state.AutoBuffTime,
+                AutoBuffSkill: AutoBuffSkillCodec.Encode(state.AutoBuffSkill),
+                RankPointDate: state.RankPointDate,
+                RankBuffType: state.RankBuffType,
+                AutoTime: state.AutoHuntPaidDayBudget,
+                AutoTime2: state.AutoHuntPaidMinuteBudget,
+                BuffX2Time: state.BuffX2Time,
+                PremiumExpireUtc: state.PremiumExpireUtc,
+                PetGrowth: state.PetGrowth,
+                PetActivity: state.PetActivity));
+
+            // Penderie COMPLETE de chaque personnage emis: la procedure remplace, elle ne fusionne pas.
+            CostumePersistenceCodec.AppendOccupiedSlots(costumes, characterId, state);
 
             claimed.Add(characterId);
         }
 
-        await characters.PersistProgressAsync(rows, ct).ConfigureAwait(false);
+        await characters.PersistProgressAsync(rows, costumes, ct).ConfigureAwait(false);
+
+        if (credited is not null)
+            foreach (var (state, warPoint, bloodCoin) in credited)
+            {
+                state.PersistedWarPoint = warPoint;
+                state.PersistedBloodCoin = bloodCoin;
+            }
 
         return claimed;
     }

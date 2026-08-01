@@ -76,6 +76,10 @@ public sealed partial record CharacterRosterPetBagSlotDto(int CharacterId, byte 
 [GenerateDto]
 public sealed partial record CharacterRosterCostumeSlotDto(int CharacterId, byte Slot, int ItemId);
 
+// game.usp_Character_GetCostumes : une ligne par slot OCCUPE, les absents valent (0, 0, 0) chez l'appelant.
+[GenerateDto]
+public sealed partial record CharacterCostumeSlotDto(byte Slot, int ItemId, int ItemDate, int ExpireDate);
+
 public sealed record CharacterAccountRosterBundle(
     ReadOnlyCollection<CharacterRosterDto> Characters,
     ReadOnlyCollection<CharacterRosterItemDto> Items,
@@ -182,7 +186,27 @@ public sealed partial record CharacterWorldSnapshotDto(
     int Zone241Time = 0,
     int PetBagDate = 0,
     int WarPoint = 0,
-    byte M15PetLuckyBoxPity = 0);
+    byte M15PetLuckyBoxPity = 0,
+    byte VisibleState = 1,
+    byte SpecialState = 0,
+    bool UseOrnament = false,
+    int BloodCoin = 0,
+    int PetExpX2Time = 0,
+    int AnimalAbsorbTime = 0,
+    int AnimalAbsorbState = 0,
+    int CostumeIndex = -1,
+    int ProtectForHalo = 0,
+    int BonusItemLevel = 0,
+    bool BonusItemValue = false,
+    int TribeNotifyScrollCount = 0,
+    int TribeFourReturnAllowance = 0,
+    string BottleSlots = "",
+    int DrunkBottleIndex = -1,
+    string AutoBuffSkill = "",
+    int RankPointDate = 0,
+    int RankBuffType = 0,
+    int AutoTime = 0,
+    int BuffX2Time = 0);
 
 [GenerateDto]
 public sealed partial record CharacterItemSlotDto(

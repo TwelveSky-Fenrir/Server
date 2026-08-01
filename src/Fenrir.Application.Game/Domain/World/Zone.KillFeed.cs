@@ -12,6 +12,8 @@ public sealed partial class Zone
 {
     private const int KillFeedBroadcastSort = 3000;
 
+    private static readonly ImmutableArray<int> EndOfBattleLeaderboardCpByRank = [100, 50, 25];
+
     private KillFeedLeaderboard? _killFeedLeaderboard;
 
     private KillFeedLeaderboard? ResolveKillFeedLeaderboard()
@@ -80,6 +82,8 @@ public sealed partial class Zone
         }
     }
 
+    // RW_Reward n'a qu'un seul bareme pour toutes les cartes a classement (Server/ts25zone/S07_MyGame02.cpp:188) ;
+    // le x2 depend de mCheckZone267TypeServer, mort car ZONE267 est commente (Server/ts25zone/H07_MyGame.h:20).
     public void ApplyKillFeedEndOfBattleRewards(bool isFfaMap, bool isZone267)
     {
         var leaderboard = _killFeedLeaderboard;
@@ -87,9 +91,19 @@ public sealed partial class Zone
             return;
 
         var top3 = leaderboard.GetTopThree();
-        foreach (var reward in KillFeedEndOfBattleRewardCalculator.ComputeRankRewards(top3, isFfaMap, isZone267))
-            if (_players.ContainsKey(reward.CharacterId))
-                GrantContributionPoints(reward.CharacterId, reward.ContributionPoints);
+        var rewardedRanks = Math.Min(EndOfBattleLeaderboardCpByRank.Length, top3.Length);
+
+        for (var rank = 0; rank < rewardedRanks; rank++)
+        {
+            if (!_players.TryGetValue(top3[rank].CharacterId, out var state))
+                continue;
+
+            // Filtres de la boucle de fin 335 : !IsMovingZone, !IsHiding (Server/ts25zone/S07_MyGame01.cpp:10344-10351).
+            if (state.IsMovingZone || state.VisibleState == 0)
+                continue;
+
+            GrantContributionPoints(state.CharacterId, EndOfBattleLeaderboardCpByRank[rank]);
+        }
     }
 
     public void ClearKillFeedLeaderboard()

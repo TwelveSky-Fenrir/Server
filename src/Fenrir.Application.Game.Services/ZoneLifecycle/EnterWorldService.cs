@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.AntiCheat;
 using Fenrir.Application.Game.Domain.Avatars;
+using Fenrir.Application.Game.Domain.Costumes;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Pets;
@@ -48,6 +49,18 @@ public sealed class EnterWorldService(
     ILogger<EnterWorldService> logger) : IEnterWorldService
 {
     private const int Zone241TimeAvatarChangeInfoSort = 14;
+
+    private const int ExperienceEventMessageSort = 56;
+
+    private const int DropEventMessageSort = 57;
+
+    private const int ContributionPointEventMessageSort = 58;
+
+    private const int PetExperienceEventMessageSort = 901;
+
+    private const int MountExperienceEventMessageSort = 902;
+
+    private const int HeroRankPointStatSort = 904;
 
     public async ValueTask HandleAsync(EnterWorldRequest packet, IZoneSession zoneSession,
         CancellationToken cancellationToken)
@@ -238,9 +251,11 @@ public sealed class EnterWorldService(
 
             var runeRowsTask = runes.GetRunesAsync(characterId, cancellationToken);
 
+            var costumeRowsTask = characters.GetCostumesAsync(characterId, cancellationToken);
+
             await Task.WhenAll(isMutedTask.AsTask(), guildTask.AsTask(), tribeRoleTask.AsTask(),
                 friendsTask.AsTask(), mentorTask.AsTask(), heroRankPointsTask.AsTask(),
-                shardLocationUpsertTask.AsTask(), runeRowsTask.AsTask());
+                shardLocationUpsertTask.AsTask(), runeRowsTask.AsTask(), costumeRowsTask.AsTask());
 
             var isMuted = isMutedTask.Result;
             var guildMembership = guildTask.Result;
@@ -249,6 +264,10 @@ public sealed class EnterWorldService(
             var mentorBond = mentorTask.Result;
             var heroRankPoints = heroRankPointsTask.Result ?? 0;
             var (runeSystem, runeSystemStat) = BuildRuneArrays(runeRowsTask.Result);
+            var (costumeWardrobe, costumeDate, costumeExpireDate) =
+                CostumePersistenceCodec.Hydrate(costumeRowsTask.Result);
+            var costumeIndex = CostumePersistenceCodec.NormalizeIndexOnLoad(character.CostumeIndex, costumeWardrobe);
+            var costumeNumber = CostumePersistenceCodec.ResolveWornNumber(costumeIndex, costumeWardrobe);
 
             var guildSummary = guildMembership is { } membership
                 ? await guilds.GetByIdAsync(membership.GuildId, cancellationToken)
@@ -270,7 +289,7 @@ public sealed class EnterWorldService(
             var registerRecv = new EnterWorldResponse
             {
                 AvatarInfo = AvatarInfoFactory.CreateForCharacter(character, bundle.Items, socialSnapshot,
-                    bundle.Skills, bundle.Hotkeys),
+                    bundle.Skills, bundle.Hotkeys, costumeRowsTask.Result),
                 BuffInfo = BuildBuffInfo(bundle.Buffs)
             };
             zoneSession.Send(in registerRecv);
@@ -292,8 +311,10 @@ public sealed class EnterWorldService(
                 UniqueNumber = unchecked((uint)characterId),
                 Data = new ObjectForAvatar
                 {
-                    VisibleState = 1,
-                    SpecialState = 0,
+                    // Server/ts25zone/S04_MyWork02.cpp:970-971 repeuple la copie de diffusion depuis la copie
+                    // persistee avant de l'envoyer telle quelle a l'entrant (:1061) -- jamais l'inverse.
+                    VisibleState = character.VisibleState,
+                    SpecialState = character.SpecialState,
                     KillOtherTribe = 0,
                     GoodFellow = 0,
                     GuildName = socialSnapshot.GuildName,
@@ -344,7 +365,9 @@ public sealed class EnterWorldService(
                     DuelState = new int[3],
                     PShopState = 0,
                     PShopName = "",
-                    CostumeNumber = 0,
+                    // Miroir de diffusion re-seede depuis la copie PERSISTEE, jamais l'inverse :
+                    // Server/ts25zone/S04_MyWork02.cpp:935-941 (costume) et :1000 (absorption).
+                    CostumeNumber = costumeNumber,
                     BufEffectTimeState = 0,
                     BufSort = 0,
                     AutoState = 0,
@@ -353,7 +376,7 @@ public sealed class EnterWorldService(
                     FishingPoint = new float[3],
                     RankPoint = 0,
                     TargetState = 0,
-                    AnimalAbsorbState = 0,
+                    AnimalAbsorbState = character.AnimalAbsorbState,
                     PetValid = 0,
                     Unk1 = 0,
                     PetLocation = [claimedPosX, claimedPosY, claimedPosZ],
@@ -367,6 +390,22 @@ public sealed class EnterWorldService(
                 },
                 CheckChangeActionState = 0
             });
+
+            SendRatioEventMessages(zoneSession, zone);
+
+            // Total absolu, uniquement s'il est non nul: Server/ts25zone/S04_MyWork02.cpp:1084
+            if (heroRankPoints > 0)
+                zoneSession.Send(new AvatarStatUpdateResponse
+                {
+                    Sort = HeroRankPointStatSort,
+                    Value = heroRankPoints,
+                    Value2 = 0
+                });
+
+            // ResetRank (Server/ts25zone/S07_MyGame03.cpp:8283-8385) : le palier de rank-buff tombe des que la
+            // date stockee n'est plus celle du jour, et la date s'amorce au premier passage (aRankPointDate == 0).
+            var rankResetDate = GameDate.Today();
+            var rankBuffType = character.RankPointDate == rankResetDate ? character.RankBuffType : 0;
 
             var entered = zone.Post(ZoneCommand.Enter(characterId, new PlayerEnterData(
                 zoneSession,
@@ -436,6 +475,7 @@ public sealed class EnterWorldService(
                 EatElePotion: character.EatElePotion,
                 DropItemTime: character.DropItemTime,
                 WarPoint: character.WarPoint,
+                BloodCoin: character.BloodCoin,
                 PremiumExpireUtc: character.PremiumExpireUtc,
                 PreviousTribe: character.PreviousTribe,
                 StoreMoney: character.StoreMoney,
@@ -460,7 +500,27 @@ public sealed class EnterWorldService(
                 MountExpActivity: character.MountExpActivity,
                 MountPower: character.MountPower,
                 MountSlotIndex: character.MountSlotIndex,
-                MountTime: character.MountTime)));
+                MountTime: character.MountTime,
+                VisibleState: character.VisibleState,
+                SpecialState: character.SpecialState,
+                UseOrnament: character.UseOrnament,
+                PetExpX2Time: character.PetExpX2Time,
+                AnimalAbsorbTime: character.AnimalAbsorbTime,
+                AnimalAbsorbState: character.AnimalAbsorbState,
+                CostumeIndex: costumeIndex,
+                CostumeWardrobe: costumeWardrobe,
+                CostumeDate: costumeDate,
+                CostumeExpireDate: costumeExpireDate,
+                AutoBuffTime: character.AutoBuffTime,
+                AutoBuffSkill: AutoBuffSkillCodec.Decode(character.AutoBuffSkill),
+                RankPointDate: rankResetDate,
+                RankBuffType: rankBuffType,
+                BuffX2Time: character.BuffX2Time,
+                // SetIntegerLow(aAutoTime, tNowDate, 0) : Server/ts25zone/S07_MyGame03.cpp:5697 -- seule une
+                // date-limite DEJA passee retombe a 0, ce n'est pas une remise a zero systematique.
+                AutoHuntPaidDayBudget: VaultDateNormalization.NormalizeIfExpired(character.AutoTime,
+                    GameDate.Today()),
+                AutoHuntPaidMinuteBudget: character.AutoTime2)));
 
             if (!entered)
             {
@@ -508,6 +568,64 @@ public sealed class EnterWorldService(
                 accountId, characterId, character.MapId);
             zoneSession.Abort(DisconnectReason.ProcessingFault);
         }
+    }
+
+    private void SendRatioEventMessages(IZoneSession zoneSession, Zone zone)
+    {
+        if (!options.Value.Zones.TryGetValue(zone.MapId, out var config))
+            return;
+
+        var isZone126Type = zone.IsZone126TypeZone;
+
+        if (config.GeneralExperienceRatio != 0)
+            zoneSession.Send(new AvatarStatUpdateResponse
+            {
+                Sort = ExperienceEventMessageSort,
+                Value = EncodeRatioEventValue(config.GeneralExperienceRatio, isZone126Type),
+                Value2 = 0
+            });
+
+        if (config.NormalItemDropRatio != 0)
+            zoneSession.Send(new AvatarStatUpdateResponse
+            {
+                Sort = DropEventMessageSort,
+                Value = EncodeRatioEventValue(config.NormalItemDropRatio, isZone126Type),
+                Value2 = 0
+            });
+
+        // Sort 58 pousse la valeur brute, sans CreateRatio0 ni doublement zone 126: Server/ts25zone/S07_MyGame03.cpp:8983
+        if (config.KillOtherTribeAddValue != 0)
+            zoneSession.Send(new AvatarStatUpdateResponse
+            {
+                Sort = ContributionPointEventMessageSort,
+                Value = config.KillOtherTribeAddValue,
+                Value2 = 0
+            });
+
+        // Sort 901: CreateRatio0 puis * 1.0f, pas de doublement zone 126: Server/ts25zone/S07_MyGame03.cpp:8988
+        if (config.PetExperienceRatio != 0)
+            zoneSession.Send(new AvatarStatUpdateResponse
+            {
+                Sort = PetExperienceEventMessageSort,
+                Value = (int)(config.PetExperienceRatio * 0.1f),
+                Value2 = 0
+            });
+
+        // Sort 902 pousse la valeur brute de l'ini, sans CreateRatio0: Server/ts25zone/S07_MyGame01.cpp:435
+        if (config.MountExperienceRatio != 0)
+            zoneSession.Send(new AvatarStatUpdateResponse
+            {
+                Sort = MountExperienceEventMessageSort,
+                Value = config.MountExperienceRatio,
+                Value2 = 0
+            });
+    }
+
+    private static int EncodeRatioEventValue(int configuredRatio, bool isZone126Type)
+    {
+        // CreateRatio0 puis (int)(ratio * 10.0f): Server/Header/function.h:1654, Server/ts25zone/S07_MyGame03.cpp:8968
+        var scaled = (int)(configuredRatio * 0.1f * 10.0f);
+        return isZone126Type ? scaled * 2 : scaled + 1;
     }
 
     private static bool IsTribeAndPreviousTribeConsistent(byte tribe, byte previousTribe)

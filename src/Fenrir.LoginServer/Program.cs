@@ -18,6 +18,7 @@ builder.AddFenrirData();
 builder.Services.AddFenrirSecurity();
 
 builder.Services.Configure<LoginServerOptions>(builder.Configuration.GetSection("Login"));
+builder.Services.Configure<LoginSocketAdmissionOptions>(builder.Configuration.GetSection("Login"));
 builder.Services.AddLoginDomain();
 builder.Services.AddLoginServices();
 builder.Services.AddLoginHosting();

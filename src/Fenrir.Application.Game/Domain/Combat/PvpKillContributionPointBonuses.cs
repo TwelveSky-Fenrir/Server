@@ -4,8 +4,6 @@ namespace Fenrir.Application.Game.Domain.Combat;
 
 public static class PvpKillContributionPointBonuses
 {
-    public const int RebirthAddValueMultiplier = 2;
-
     public const int PerUserCrossTribeAddBonus = 1;
 
     public const int Server160AddedTribeBonus = 2;
@@ -22,9 +20,11 @@ public static class PvpKillContributionPointBonuses
 
     private static readonly FrozenSet<short> MinorityCapitalServerIds = new short[] { 1, 6, 11, 140 }.ToFrozenSet();
 
+    // Le "*= 2" du legacy est sous #ifdef __REBIRTH__ (Server/ts25zone/S07_MyGame01.cpp:444-446), defini
+    // seulement dans le #else de #ifdef M33 (Server/Header/Protocol/DEFINE.h:28) : mort dans les deux builds.
     public static int ComputeGameWideAddValue(int crossTribeCpAddValueConfig)
     {
-        return crossTribeCpAddValueConfig * RebirthAddValueMultiplier;
+        return crossTribeCpAddValueConfig;
     }
 
     public static int ComputePerUserAddValue(bool hasCrossTribeAddTimeEffect)

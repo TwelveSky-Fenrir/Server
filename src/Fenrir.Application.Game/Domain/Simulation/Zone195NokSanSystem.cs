@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.Simulation;
@@ -37,6 +38,8 @@ public sealed class Zone195NokSanSystem(
     public const int RewardWindowStartHour = 20;
 
     public const int RewardWindowEndHour = 21;
+
+    private const int HeroRankPointStatSort = 904;
 
     private readonly ConcurrentDictionary<short, Zone195CaptureMachine> _machines = new();
     private readonly Func<DateTime> _utcNow = utcNow ?? DefaultNowUtc;
@@ -200,6 +203,10 @@ public sealed class Zone195NokSanSystem(
 
         player.HeroRankPoints += heroPoints;
         heroRankPoints.AddPending(player.CharacterId, heroPoints, player.Tribe, player.Level);
+
+        // Total absolu apres credit, unicast: Server/ts25zone/UpperCom/S06_MyUpperCom02.cpp:817
+        player.Session.Send(new AvatarStatUpdateResponse
+            { Sort = HeroRankPointStatSort, Value = player.HeroRankPoints, Value2 = 0 });
     }
 
     private bool IsRewardWindowOpen(Zone195NokSanSite site)

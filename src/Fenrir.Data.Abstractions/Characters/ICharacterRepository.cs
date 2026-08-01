@@ -70,10 +70,16 @@ public interface ICharacterRepository
         IReadOnlyList<CharacterItemSlotTvp> itemsA, byte containerB, IReadOnlyList<CharacterItemSlotTvp> itemsB,
         CancellationToken ct);
 
-    public ValueTask PersistProgressAsync(IReadOnlyList<CharacterProgressTvp> rows, CancellationToken ct);
+    public ValueTask<ReadOnlyCollection<CharacterCostumeSlotDto>> GetCostumesAsync(int characterId,
+        CancellationToken ct);
+
+    // costumes = penderie COMPLETE de chaque personnage present dans rows, slots occupes seulement : la
+    // procedure remplace, elle ne fusionne pas. Parametre requis a dessein -- un oubli viderait les penderies.
+    public ValueTask PersistProgressAsync(IReadOnlyList<CharacterProgressTvp> rows,
+        IReadOnlyList<CharacterCostumeSlotTvp> costumes, CancellationToken ct);
 
     public ValueTask PersistFinalFlushAsync(CharacterProgressTvp progress, CharacterPositionTvp position,
-        CancellationToken ct);
+        IReadOnlyList<CharacterCostumeSlotTvp> costumes, CancellationToken ct);
 
     public ValueTask AdjustMoneyAsync(int characterId, long deltaMoney, int deltaBigMoney, CancellationToken ct);
 
@@ -121,16 +127,17 @@ public interface ICharacterRepository
 
     public ValueTask SetAutoHuntAsync(int characterId, bool enabled, byte[] config, CancellationToken ct);
 
-    public ValueTask SetPetGrowthAsync(int characterId, int petGrowth, byte petActivity, CancellationToken ct);
-
     public ValueTask<int?> GetIdByNameAsync(string name, CancellationToken ct);
 
     public ValueTask<int?> GetItemIdAtSlotAsync(int characterId, byte container, byte slot, CancellationToken ct);
 
-    public ValueTask<RewardClaimStateDto?> GetRewardClaimStateAsync(int characterId, int todayDate,
+    // Keyed by account, not character: legacy carries the claim state on memberinfo and persists it
+    // WHERE uUserIdx (Server/ts25playuser/S08_MyDB.cpp:400). The claimed item still lands in one character's
+    // inventory, hence both ids on the claim call.
+    public ValueTask<RewardClaimStateDto?> GetAccountRewardClaimStateAsync(int accountId, int todayDate,
         CancellationToken ct);
 
-    public ValueTask ClaimDailyRewardAsync(int characterId, int todayDate, byte container,
+    public ValueTask ClaimAccountDailyRewardAsync(int accountId, int characterId, int todayDate, byte container,
         IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct);
 
     public ValueTask<int> SpendBloodCoinAndReplaceContainerAsync(int characterId, int deltaBloodCoin,

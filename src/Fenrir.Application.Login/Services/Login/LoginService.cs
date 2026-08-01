@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Net;
 using Fenrir.Application.Login.Abstractions.Login;
+using Fenrir.Application.Login.Abstractions.RetiredItems;
 using Fenrir.Application.Login.Services.AccountSecurity;
 using Fenrir.Domain.Login;
 using Fenrir.Domain.Login.Avatars;
@@ -29,6 +30,7 @@ public sealed class LoginService(
     IOptions<LoginServerOptions> options,
     SessionRegistry registry,
     IAccountSessionRepository accountSessions,
+    IRetiredItemPurgeService retiredItems,
     IEventLogRepository eventLog,
     IGuildRepository guilds,
     IFriendRepository friends,
@@ -102,9 +104,14 @@ public sealed class LoginService(
             return Failure(ResultVersionMismatch, "", false);
         }
 
-        if (!AvatarNameValidator.HasOnlyWhitelistedCharacters(packet.Id))
+        // Server/ts25login/S04_MyWork02.cpp:168-178 filtre l'identifiant ET le mot de passe (CheckNameString,
+        // Server/Header/safestring.h:43-77) avant toute requete, et rend 6 pour les deux. Fenrir l'applique
+        // inconditionnellement : le legacy le sautait des que mUseWebApi=1, c'est la faille, pas la regle.
+        if (!AvatarNameValidator.HasOnlyWhitelistedCharacters(packet.Id) ||
+            !AvatarNameValidator.HasOnlyWhitelistedCharacters(packet.Password))
         {
-            logger.LogWarning("Login rejected: login {Id} contains characters outside the legacy name whitelist",
+            logger.LogWarning(
+                "Login rejected: login {Id} or its password contains characters outside the legacy whitelist",
                 packet.Id);
             return Failure(ResultUnknownAccount, "", true);
         }
@@ -276,6 +283,10 @@ public sealed class LoginService(
                     accountId, claim.PreviousShardId);
                 break;
         }
+
+        // Legacy purges the retired items only once the account slot is registered and owned, right before the
+        // roster burst (Server/ts25login/S04_MyWork02.cpp:324-426); every earlier failure jumps over it.
+        await retiredItems.PurgeAsync(roster.Items, cancellationToken);
 
         try
         {

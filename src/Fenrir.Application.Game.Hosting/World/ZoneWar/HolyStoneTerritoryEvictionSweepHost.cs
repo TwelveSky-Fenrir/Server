@@ -18,7 +18,7 @@ public sealed class HolyStoneTerritoryEvictionSweepHost(
             while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
                 try
                 {
-                    sweep.Tick(SimulationClock.LegacyTick);
+                    sweep.Tick(1);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {

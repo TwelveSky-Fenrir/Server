@@ -245,7 +245,6 @@ StoredProcedures/game/usp_CharacterQuest_ApplyTransition.sql
 StoredProcedures/game/usp_Character_ApplyDailyMissionClaim.sql
 StoredProcedures/game/usp_Character_SetAutoPotionThreshold.sql
 StoredProcedures/game/usp_Character_SetAutoHunt.sql
-StoredProcedures/game/usp_Character_SetPetGrowth.sql
 StoredProcedures/game/usp_Character_GrantTribeTransferPermit.sql
 StoredProcedures/game/usp_Character_AdjustDeathProtection.sql
 StoredProcedures/game/usp_Character_ClampVitalsFloor.sql
@@ -645,6 +644,132 @@ Migrations/003_drop_usp_character_setmountprogression.sql
 # listent leurs colonnes explicitement, elles ecriront les defauts 0 jusqu'a leur passage en V2.
 Migrations/004_accountvault_sockets_expiry.sql
 
+# La recompense quotidienne repasse au niveau COMPTE. Le legacy porte uRewardClaimDay/uRewardClaimState sur la
+# table de compte memberinfo (Server/BuildEU33/DB/nxtserver.sql:1153-1154) et les persiste WHERE uUserIdx
+# (Server/ts25playuser/S08_MyDB.cpp:400) ; le porteur memoire PLAY_INFO est alloue une fois par compte et la
+# selection de personnage ne le reinitialise pas (Server/ts25playuser/S07_MyGame01.cpp:971-1011) -- c'est tout
+# le mecanisme anti-double-reclamation. Fenrir keyait CharacterId, donc un compte pouvait reclamer 3 fois
+# (MAX_USER_AVATAR_NUM = 3, Server/Header/Protocol/DEFINE.h:277 ; CK_Characters_Slot 0..2). Cree
+# game.AccountDailyRewards (dans game et non auth : Schemas/002_roles.sql interdit auth a fenrir_game_role),
+# fond les lignes par compte selon une regle de conflit explicite -- MAX colonne par colonne, l'etat le plus
+# restrictif atteignable, jamais une reclamation offerte -- et cree les 3 procedures keyees compte. Ne
+# supprime PAS game.Characters.RewardClaimDay/RewardClaimDate : figees et conservees comme trace integrale de
+# l'etat d'avant bascule (aucune perte silencieuse, fusion reconstituable). Nouveau script et non edition :
+# Characters.sql et les 3 procedures d'origine sont deja journalisees SHA-256 (:485, :486, :554).
+Migrations/005_account_daily_reward_key.sql
+
+# Lot 2 (trois drapeaux d'avatar mutes en jeu et jamais ecrits) : VisibleState / SpecialState / UseOrnament.
+# Le legacy les persiste tous les trois par CreateAvatarColumn (Server/Header/CSQLAvatar.cpp:558, :559, :624),
+# et pour VisibleState/SpecialState c'est la copie persistee qui repeuple la copie de diffusion a l'entree en
+# zone, jamais l'inverse (Server/ts25zone/S04_MyWork02.cpp:970-971) : le mode invisible GM survit donc a la
+# deconnexion et au changement de zone. Cote Fenrir les deux colonnes existaient deja (Characters.sql:188,190)
+# mais n'etaient QUE lues par usp_Character_GetAccountRoster ; UseOrnament n'existait nulle part alors qu'il
+# pilote le bonus d'ornement (Server/ts25zone/S04_MyWork02.cpp:11046,11053 ; expiration S07_MyGame04.cpp
+# :1276-1294). Ajoute game.Characters.UseOrnament (BIT DEFAULT 0), 3 colonnes en queue de
+# game.tvp_CharacterProgress + les SET correspondants dans usp_Character_PersistProgressBatch et
+# usp_Character_PersistFinalFlush (donc le chemin d'ecriture DEJA en place, y compris deconnexion et
+# changement de zone), et 3 colonnes en queue de la projection RS0 de usp_Character_GetForWorldEntry -- le
+# chemin de lecture, sans lequel un champ persiste donnerait l'illusion de fonctionner. Se pose apres
+# Migrations/002 dont il reprend la forme du type a 30 colonnes.
+Migrations/006_avatar_state_flags_writeback.sql
+
+# Lot 1 (acquis cosmetiques et monnaies gagnees) : Title / Halo / TeacherPoint / WarPoint / BloodCoin, tous
+# mutes en jeu, tous persistes par le legacy (CreateAvatarColumn, Server/Header/CSQLAvatar.cpp:617, :619, :588,
+# :685-686 sous USE_WAR_POINT_SYSTEM allume dans les deux configurations livrees, :683), aucun ecrit cote
+# Fenrir : chaque gain etait perdu a la deconnexion ET au changement de zone (qui est une reconnexion
+# complete). N'ajoute AUCUNE colonne -- les cinq existent deja sur game.Characters -- donc rien a retro-remplir.
+# DEUX REGIMES : Title/Halo/TeacherPoint en absolu (aucune procedure ne les ecrit, l'etat runtime en est seul
+# proprietaire, meme categorie que ContributionPoints) ; WarPoint/BloodCoin en DELTA (X = X + s.XDelta), parce
+# que ces deux colonnes ont deja un debit atomique -- usp_Character_BuyWarPointItem et
+# usp_Character_SpendBloodCoinAndReplaceContainer -- qui ne touche pas FlushSequence : un absolu y restaurerait
+# les points depenses, la duplication de monnaie pour laquelle Money/BigMoney sont tenus hors de ce TVP. Cable
+# les deux sens : BloodCoin etait le seul des cinq sans AUCUN chemin de lecture, ajoute en queue de RS0 de
+# usp_Character_GetForWorldEntry. Reprend la forme du type a 33 colonnes laissee par
+# Migrations/006_avatar_state_flags_writeback et doit rester AVANT
+# Migrations/007_costume_and_companion_timer_writeback, qui reprend deja ces 5 colonnes plus les siennes.
+# Meme numero 006 que le script d'etat d'avatar : collision de convention de numerotation entre passes
+# concurrentes, l'ordre relatif reel est celui de ce manifeste, meme posture que
+# Migrations/Seed/admin/026_error_catalog_tribe_conversion.sql.
+Migrations/006_character_progress_cosmetics_and_currency_grants.sql
+
+# Lot 6 (penderie de costumes et soldes de compagnon) : PetExpX2Time / AnimalAbsorbTime / AnimalAbsorbState /
+# CostumeWardrobe / CostumeIndex, tous mutes en jeu, tous persistes par le legacy (CreateAvatarColumn,
+# Server/Header/CSQLAvatar.cpp:640, :650, :651, :429-433+701, :661), aucun ecrit cote Fenrir. Ajoute 3 colonnes
+# a game.Characters, ELARGIT CK_Characters_CostumeIndex de -1..9 a -1..19 (aCostumeIndex porte l'etat porte :
+# equiper fait +10, Server/ts25zone/S04_MyWork02.cpp:12402, borne MAX_AVATAR_COSTUME_NUM2 = 19,
+# Server/Header/Protocol/DEFINE.h:342 -- sans quoi la premiere ecriture d'un costume porte violerait la
+# contrainte), ajoute ItemDate/ExpireDate a game.CharacterCostumes (table qui existait, etait LUE par
+# usp_Character_GetAccountRoster, et n'avait AUCUN INSERT/UPDATE nulle part), cree
+# game.tvp_CharacterCostumeSlot, ajoute 4 colonnes en queue de game.tvp_CharacterProgress et le remplacement
+# de penderie aux DEUX procedures de write-behind (flush periodique, deconnexion et changement de zone), borne
+# par OUTPUT inserted.CharacterId pour rester idempotent sur la meme FlushSequence par entite. Chemin de
+# lecture cable des deux cotes : 4 colonnes en queue de RS0 de usp_Character_GetForWorldEntry, plus la
+# nouvelle game.usp_Character_GetCostumes calquee sur usp_Character_GetRunes.
+# Numerote 007 et non 006 : trois passes concurrentes de la meme session avaient deja pris 006, meme
+# convention que Migrations/Seed/admin/024_error_catalog_heroranking_claim_reward.sql. Reprend la forme du
+# type a 33 colonnes laissee par Migrations/006_avatar_state_flags_writeback ; VOIR L'AVERTISSEMENT DE
+# SEQUENCAGE dans son propre en-tete au sujet des deux autres scripts 006 qui recreent le meme type.
+Migrations/007_costume_and_companion_timer_writeback.sql
+
+# Lot 5 (budgets d'auto-chasse, doublement de duree de buff, premium, familier) : AutoTime / AutoTime2 /
+# BuffX2Time / PremiumExpireUtc / PetGrowth / PetActivity, tous mutes dans PlayerRuntimeState, tous persistes
+# par le legacy via CreateAvatarColumn (Server/Header/CSQLAvatar.cpp:641, :642, :638, :681, :690), aucun
+# reecrit cote Fenrir -- un budget paye qui ne survit pas a la deconnexion est exploitable a l'infini par
+# relog. Ajoute game.Characters.AutoTime et .BuffX2Time (les deux seules colonnes reellement absentes), 6
+# colonnes en queue de game.tvp_CharacterProgress et les SET correspondants dans les DEUX procedures de
+# write-behind -- donc le chemin d'ecriture DEJA en place : flush periodique, deconnexion
+# (GameConnectionHost.cs:249) et changement de zone (ZoneMoveService.cs:174,:259). Cable aussi le chemin de
+# LECTURE : AutoTime/BuffX2Time en queue de RS0 de usp_Character_GetForWorldEntry (les quatre autres y etaient
+# deja projetes mais AutoTime2 n'atteignait jamais PlayerRuntimeState). Reprend VERBATIM la forme laissee par
+# Migrations/007 -- type a 42 colonnes, parametre @Costumes, remplacement de penderie borne par
+# OUTPUT inserted.CharacterId -- et y ajoute les six siennes en queue : le mapper TVP genere lie
+# POSITIONNELLEMENT, donc c'est la DERNIERE migration appliquee qui doit porter l'union, et tout lot qui
+# s'enregistre apres celui-ci doit reprendre ces 48 colonnes. Numerote 008 : 006 et 007 etaient pris par des
+# passes concurrentes.
+Migrations/008_autohunt_buffx2_premium_pet_writeback.sql
+
+# Lot 5 (dead-proc sweep) : drop game.usp_Character_SetPetGrowth, sans appelant applicatif depuis toujours
+# (ICharacterRepository.SetPetGrowthAsync existait et etait implementee, personne ne l'appelait) et remplacee
+# par le write-behind familier de Migrations/008. Le script de base est retire du manifeste -- une base fraiche
+# ne la cree plus ; ce DROP idempotent la retire des bases deja provisionnees. Meme sequence que
+# Migrations/003_drop_usp_character_setmountprogression.sql.
+Migrations/009_drop_usp_character_setpetgrowth.sql
+
+# Lot 4 (auto-buff et rank-buff) : AutoBuffSkill / AutoBuffTime / RankBuffType, mutes en jeu, persistes par le
+# legacy (CreateAvatarColumn, Server/Header/CSQLAvatar.cpp:703, :672, :647), aucun ecrit cote Fenrir --
+# les 8 emplacements d'auto-buff enregistres etaient perdus a chaque deconnexion et le palier de rank-buff avec
+# eux. Ajoute AutoBuffSkill (NVARCHAR(48) : le format texte a largeur fixe du legacy, verbatim -- 8 x 2 entiers
+# sur 3 chiffres, CSQLAvatar.cpp:421-424 + CSQLDatabase.cpp:511-528) et RankPointDate / RankBuffType a
+# game.Characters, puis 4 colonnes en queue de game.tvp_CharacterProgress et les SET correspondants dans
+# usp_Character_PersistProgressBatch et usp_Character_PersistFinalFlush -- le chemin d'ecriture DEJA en place,
+# donc deconnexion (GameConnectionHost.cs:249) et changement de zone (ZoneMoveService.cs:174,:259). Cable aussi
+# le chemin de LECTURE : 3 colonnes en queue de RS0 (AutoBuffTime y etait deja projete mais n'atteignait jamais
+# PlayerRuntimeState). RankPointDate accompagne obligatoirement RankBuffType : MyUtil::ResetRank
+# (Server/ts25zone/S07_MyGame03.cpp:8283-8385) purge le palier des que la date stockee n'est plus celle du
+# jour ; sans elle le buff serait eternel. aRankPoint n'a aucun site d'incrementation cote Fenrir, aucune
+# colonne n'est creee pour lui. DrunkBottleIndex, quatrieme champ du lot, est volontairement ABSENT : il est
+# livre avec BottleSlots par le lot compteurs-et-bouteilles. Reprend la forme du type a 37 colonnes laissee par
+# Migrations/007 ; VOIR L'AVERTISSEMENT DE SEQUENCAGE dans son propre en-tete -- le lot qui s'enregistrera en
+# dernier doit declarer l'union de toutes les colonnes, dont ces quatre.
+Migrations/010_character_autobuff_and_rankbuff_writeback.sql
+
+# Lot compteurs-et-bouteilles : ProtectForHalo / BonusItemLevel / BonusItemValue / TribeNotifyScrollCount /
+# TribeFourReturnAllowance / BottleSlots + DrunkBottleIndex. Six champs mutes en jeu, tous persistes par le
+# legacy sans #ifdef par CreateAvatarColumn (Server/Header/CSQLAvatar.cpp:595, :621, :620, :648, :639,
+# :675-677), aucun ecrit ni relu cote Fenrir : stock cash d'enchantement de halo, palier de recompense de
+# niveau arme et son drapeau, stock de parchemins d'annonce de faction, quota de retour depuis la tribu 4,
+# et les 10 bouteilles avec l'index de celle bue. TribeFourReturnAllowance a sa PROPRE colonne :
+# game.Characters.TribeTransferPermitCount porte les parchemins 8153/8154, un autre mecanisme.
+# BottleSlots est UNE colonne NVARCHAR(70) = 10 groupes de 5+2 chiffres, exactement les largeurs legacy de
+# aBottle/aBottleCount (Server/Header/CSQLAvatar.cpp:308-313) mais fusionnees pour que les deux moities d'un
+# slot ne puissent pas diverger. Le chrono d'ivresse aBottleTime reste EPHEMERE (absent de
+# CreateAvatarColumn, remis a 0 a l'entree en monde, Server/ts25zone/S04_MyWork02.cpp:919).
+# Ecriture par les deux procedures de write-behind DEJA en place (donc deconnexion et changement de zone
+# couverts), lecture par 7 colonnes en queue de RS0 de usp_Character_GetForWorldEntry.
+# S'enregistre en DERNIER du bloc Migrations/ et declare donc l'UNION des colonnes de tous les lots
+# paralleles (006, 007, 010) : voir l'avertissement de sequencage dans son propre en-tete.
+Migrations/011_avatar_counters_and_bottles_writeback.sql
+
 Migrations/Seed/001_dev_account.sql
 
 # Numbering renamed 2026-07-12 (dead-file-sweep-game-world naming-hygiene finding) to be monotonic in
@@ -779,3 +904,27 @@ Migrations/Seed/admin/026_error_catalog_tribe_conversion.sql
 # Charge toutes les maps : assigne l'intégralité de world.Zones à shard 1 (au-delà du défaut 1/6/11/140 de
 # 005). Additif/idempotent, s'exécute après le seed world.Zones (007).
 Migrations/Seed/admin/027_shard_map_assignments_all_zones.sql
+
+# Enregistre 50359 (le personnage presente ne appartient pas au compte reclamant), leve par
+# game.usp_AccountDailyReward_Claim cree en Migrations/005_account_daily_reward_key.sql, et rafraichit la
+# description de 50270 dont l'emetteur et le sujet changent (compte au lieu de personnage). UPDATE et non
+# INSERT garde pour 50270 : la ligne existe deja depuis 004_error_catalog_v8_commerce.sql.
+Migrations/Seed/admin/028_error_catalog_account_daily_reward.sql
+
+# Lot 2 (bail de session Login verifie) : cree runtime.tvp_AccountSessionLease et
+# runtime.usp_AccountSession_RefreshAndGetHeldLeases -- meme UPDATE de bail que
+# usp_AccountSession_RefreshAndGetKicked mais restreint a (AccountId, SessionToken) et RENVOYANT les baux
+# effectivement detenus, seule facon pour un LoginServer de constater que sa propre ligne
+# runtime.AccountSessions a disparu (branche ConflictLogin d'un AUTRE processus) et de fermer la session,
+# comme Server/ts25login/S07_MyGame01.cpp:59-72. Nouveau type + nouvelle procedure et non edition :
+# les deux fichiers de base sont deja journalises SHA-256, et changer la forme du jeu de resultats de
+# RefreshAndGetKicked casserait son consommateur GameServer (mappage par ordinal). Numerote 030 et non 010 :
+# la bande 001-009 est consommee en parallele par d'autres lots en vol.
+Migrations/030_accountsession_lease_verification.sql
+
+# Lot 2 (revocation du ticket de passation) : cree runtime.usp_SessionTicket_Revoke, appele par le handler
+# op23 FAIL_MOVE_ZONE. Le legacy rend la passation mecaniquement impossible apres op23 en repassant
+# l'emplacement playuser de LP_MOVING_ZONE a LP_UPDATE_USER (Server/ts25playuser/S07_MyGame01.cpp:968 vs
+# :1057-1060) ; sans revocation le ticket Fenrir restait consommable pendant tout son TTL de 15 s. Doit
+# s'appliquer APRES Migrations/001 qui drope et recree runtime.SessionTickets.
+Migrations/031_sessionticket_revoke.sql

@@ -13,6 +13,9 @@ public sealed partial class Zone
 
     private const int Zone101TimeStatSort = 18;
 
+    // S002STATE_BONUS_POINT : valeur absolue apres increment, au seul interesse (Server/ts25zone/S07_MyGame03.cpp:210-211).
+    private const int BonusStatPointStatSort = 2;
+
     public void ApplyHighLevelExperienceGain(PlayerRuntimeState target, int gain,
         bool antiCheatExperienceFlagged = false)
     {
@@ -30,6 +33,9 @@ public sealed partial class Zone
             case HighLevelExperienceOutcomeKind.MainPoolFill:
             case HighLevelExperienceOutcomeKind.RebirthTierAccrual:
                 target.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+                if (outcome.StatPointsGranted > 0)
+                    target.Session.Send(new AvatarStatUpdateResponse
+                        { Sort = BonusStatPointStatSort, Value = target.StatPoints, Value2 = 0 });
                 return;
 
             case HighLevelExperienceOutcomeKind.RebirthTierLevelUp:

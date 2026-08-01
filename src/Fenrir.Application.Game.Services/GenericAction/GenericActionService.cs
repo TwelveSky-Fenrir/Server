@@ -1,11 +1,14 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.GenericAction;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Application.Game.Abstractions.WarPoint;
+using Fenrir.Application.Game.Domain.Gm;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Skills;
+using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.Stats;
@@ -16,6 +19,7 @@ using Fenrir.Application.Game.Domain.World.Npcs;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Domain.Game.GameData;
 using Fenrir.Domain.Game.Stats;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.GenericAction;
@@ -30,7 +34,8 @@ public sealed class GenericActionService(
     TradeRegistry trades,
     ZoneRegistry zoneRegistry,
     ILogger<GenericActionService> logger,
-    IWarPointShopService? warPointShop = null)
+    IWarPointShopService? warPointShop = null,
+    DuelRegistry? duels = null)
     : IGenericActionService
 {
     private const short TimeExchangeEventCode = 1;
@@ -57,6 +62,179 @@ public sealed class GenericActionService(
     public async ValueTask<GenericActionResult> MoveContainerAsync(int sort, byte[] data, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
     {
+        switch (GmStubCommandResolver.Evaluate(sort, state.UserSort))
+        {
+            case GmStubCommandOutcome.NotAuthorized:
+                logger.LogDebug(
+                    "Character {CharacterId} attempted GM stub sort {Sort} without the {RequiredTier} tier: rejected, no state change, no disconnect",
+                    characterId, sort, GmStubCommandResolver.RequiredTier);
+                return GenericActionResult.Failed;
+
+            case GmStubCommandOutcome.NoOpFailure:
+                logger.LogInformation(
+                    "Character {CharacterId} invoked GM stub sort {Sort}: body is empty in the shipped legacy build, answering failure with the payload echoed back",
+                    characterId, sort);
+                return GenericActionResult.Failed;
+
+            case GmStubCommandOutcome.NotAStubCommand:
+                break;
+        }
+
+        switch (GmLevel2CommandResolver.Evaluate(sort, MeetsGmTier(state, GmLevel2CommandResolver.RequiredTier)))
+        {
+            case GmLevel2CommandOutcome.NotAuthorized:
+                logger.LogDebug(
+                    "Character {CharacterId} attempted GM command {Command} (sort {Sort}) without the {RequiredTier} tier: refused, no state change, no disconnect",
+                    characterId, GmLevel2CommandResolver.CommandName, GmLevel2CommandResolver.Sort,
+                    GmLevel2CommandResolver.RequiredTier);
+                return GenericActionResult.Failed;
+
+            case GmLevel2CommandOutcome.Refused:
+                logger.LogInformation(
+                    "Character {CharacterId} invoked GM command {Command} (sort {Sort}): body is neutralized in both shipped legacy builds, answering failure with the payload echoed back",
+                    characterId, GmLevel2CommandResolver.CommandName, GmLevel2CommandResolver.Sort);
+                return GenericActionResult.Failed;
+
+            case GmLevel2CommandOutcome.NotThisCommand:
+                break;
+        }
+
+        switch (GmDeleteItemCommandResolver.Evaluate(sort,
+                    MeetsGmTier(state, GmDeleteItemCommandResolver.RequiredTier)))
+        {
+            case GmDeleteItemCommandOutcome.NotAuthorized:
+                logger.LogDebug(
+                    "Character {CharacterId} attempted GM command {Command} (sort {Sort}) without the {RequiredTier} tier: refused, no state change, no disconnect",
+                    characterId, GmDeleteItemCommandResolver.CommandName, GmDeleteItemCommandResolver.Sort,
+                    GmDeleteItemCommandResolver.RequiredTier);
+                return GenericActionResult.Failed;
+
+            case GmDeleteItemCommandOutcome.Refused:
+                logger.LogInformation(
+                    "Character {CharacterId} invoked GM command {Command} (sort {Sort}): body is empty in both shipped legacy builds, answering failure with no state change",
+                    characterId, GmDeleteItemCommandResolver.CommandName, GmDeleteItemCommandResolver.Sort);
+                return GenericActionResult.Failed;
+
+            case GmDeleteItemCommandOutcome.NotThisCommand:
+                break;
+        }
+
+        switch (GmMonsterKillCommandResolver.Evaluate(sort,
+                    MeetsGmTier(state, GmMonsterKillCommandResolver.RequiredTier)))
+        {
+            case GmMonsterKillCommandOutcome.NotAuthorized:
+                logger.LogDebug(
+                    "Character {CharacterId} attempted GM command {Command} (sort {Sort}) without the {RequiredTier} tier: refused, no state change, no disconnect",
+                    characterId, GmMonsterKillCommandResolver.CommandName, GmMonsterKillCommandResolver.Sort,
+                    GmMonsterKillCommandResolver.RequiredTier);
+                return GenericActionResult.Failed;
+
+            case GmMonsterKillCommandOutcome.Refused:
+                logger.LogInformation(
+                    "Character {CharacterId} invoked GM command {Command} (sort {Sort}): the case is an empty stub in both shipped legacy builds, no monster is affected, answering failure with the payload echoed back",
+                    characterId, GmMonsterKillCommandResolver.CommandName, GmMonsterKillCommandResolver.Sort);
+                return GenericActionResult.Failed;
+
+            case GmMonsterKillCommandOutcome.NotThisCommand:
+                break;
+        }
+
+        switch (Zone124DuelReadyResolver.Evaluate(sort, MeetsGmTier(state, Zone124DuelReadyResolver.RequiredTier),
+                    zone.MapId))
+        {
+            case Zone124DuelReadyOutcome.NotAuthorized:
+                logger.LogDebug(
+                    "Character {CharacterId} attempted GM command {Command} (sort {Sort}) without the {RequiredTier} tier: refused, no state change, no disconnect",
+                    characterId, Zone124DuelReadyResolver.CommandName, Zone124DuelReadyResolver.Sort,
+                    Zone124DuelReadyResolver.RequiredTier);
+                return GenericActionResult.Failed;
+
+            case Zone124DuelReadyOutcome.WrongMap:
+                logger.LogInformation(
+                    "Character {CharacterId} invoked GM command {Command} (sort {Sort}) from map {MapId}: only map {RequiredMapId} musters, refused",
+                    characterId, Zone124DuelReadyResolver.CommandName, Zone124DuelReadyResolver.Sort, zone.MapId,
+                    Zone124DuelReadyResolver.MapId);
+                return GenericActionResult.Failed;
+
+            case Zone124DuelReadyOutcome.Authorized:
+                return await MusterZone124DuelReadyAsync(zone, characterId, cancellationToken);
+
+            case Zone124DuelReadyOutcome.NotThisCommand:
+                break;
+        }
+
+        switch (Zone124DuelStartResolver.Evaluate(sort, MeetsGmTier(state, Zone124DuelStartResolver.RequiredTier),
+                    zone.MapId))
+        {
+            case Zone124DuelStartOutcome.NotAuthorized:
+                logger.LogDebug(
+                    "Character {CharacterId} attempted GM command {Command} (sort {Sort}) without the {RequiredTier} tier: refused, no state change, no disconnect",
+                    characterId, Zone124DuelStartResolver.CommandName, Zone124DuelStartResolver.Sort,
+                    Zone124DuelStartResolver.RequiredTier);
+                return GenericActionResult.Failed;
+
+            case Zone124DuelStartOutcome.WrongMap:
+                logger.LogInformation(
+                    "Character {CharacterId} invoked GM command {Command} (sort {Sort}) from map {MapId}: only map {RequiredMapId} runs the mass duel, refused",
+                    characterId, Zone124DuelStartResolver.CommandName, Zone124DuelStartResolver.Sort, zone.MapId,
+                    Zone124DuelStartResolver.MapId);
+                return GenericActionResult.Failed;
+
+            case Zone124DuelStartOutcome.Authorized:
+                return await StartZone124DuelAsync(zone, characterId, cancellationToken);
+
+            case Zone124DuelStartOutcome.NotThisCommand:
+                break;
+        }
+
+        switch (Zone124DuelEndResolver.Evaluate(sort, MeetsGmTier(state, Zone124DuelEndResolver.RequiredTier),
+                    zone.MapId))
+        {
+            case Zone124DuelEndOutcome.NotAuthorized:
+                logger.LogDebug(
+                    "Character {CharacterId} attempted GM command {Command} (sort {Sort}) without the {RequiredTier} tier: refused, no state change, no disconnect",
+                    characterId, Zone124DuelEndResolver.CommandName, Zone124DuelEndResolver.Sort,
+                    Zone124DuelEndResolver.RequiredTier);
+                return GenericActionResult.Failed;
+
+            case Zone124DuelEndOutcome.WrongMap:
+                logger.LogInformation(
+                    "Character {CharacterId} invoked GM command {Command} (sort {Sort}) from map {MapId}: only map {RequiredMapId} runs the mass duel, refused",
+                    characterId, Zone124DuelEndResolver.CommandName, Zone124DuelEndResolver.Sort, zone.MapId,
+                    Zone124DuelEndResolver.MapId);
+                return GenericActionResult.Failed;
+
+            case Zone124DuelEndOutcome.Authorized:
+                return EndZone124Duel(zone, characterId);
+
+            case Zone124DuelEndOutcome.NotThisCommand:
+                break;
+        }
+
+        switch (Zone124DuelOutResolver.Evaluate(sort, MeetsGmTier(state, Zone124DuelOutResolver.RequiredTier),
+                    zone.MapId))
+        {
+            case Zone124DuelOutOutcome.NotAuthorized:
+                logger.LogDebug(
+                    "Character {CharacterId} attempted GM command {Command} (sort {Sort}) without the {RequiredTier} tier: refused, no state change, no disconnect",
+                    characterId, Zone124DuelOutResolver.CommandName, Zone124DuelOutResolver.Sort,
+                    Zone124DuelOutResolver.RequiredTier);
+                return GenericActionResult.Failed;
+
+            case Zone124DuelOutOutcome.WrongMap:
+                logger.LogInformation(
+                    "Character {CharacterId} invoked GM command {Command} (sort {Sort}) from map {MapId}: only map {RequiredMapId} runs the mass duel, refused",
+                    characterId, Zone124DuelOutResolver.CommandName, Zone124DuelOutResolver.Sort, zone.MapId,
+                    Zone124DuelOutResolver.MapId);
+                return GenericActionResult.Failed;
+
+            case Zone124DuelOutOutcome.Authorized:
+                return await EvacuateZone124DuelAsync(zone, characterId, cancellationToken);
+
+            case Zone124DuelOutOutcome.NotThisCommand:
+                break;
+        }
+
         if (!ContainerMatrix.IsImplementedContainerMoveSort(sort))
         {
             logger.LogDebug("Character {CharacterId} container-move rejected: sort {Sort} not implemented",
@@ -1465,6 +1643,255 @@ public sealed class GenericActionService(
         var today = GameDate.Today();
         return RentedInventoryPageGate.IsPageAccessible(move.Page1, inventoryDate, today) &&
                RentedInventoryPageGate.IsPageAccessible(move.Page2, inventoryDate, today);
+    }
+
+    private static bool MeetsGmTier(PlayerRuntimeState state, GmCommandTier tier)
+    {
+        return state.Session is IZoneSession zoneSession && zoneSession.MeetsGmTier(tier);
+    }
+
+    // Server/ts25zone/S04_MyWork04.cpp:1842 : la boucle legacy est bornee par mServerMaxUserNum, lu depuis l'INI
+    // (Header/ini.h:222-256) et non par une capacite allouee ; on enumere ici la collection de sessions vivantes.
+    private async ValueTask<GenericActionResult> MusterZone124DuelReadyAsync(Zone zone, int characterId,
+        CancellationToken cancellationToken)
+    {
+        var mustered = 0;
+
+        foreach (var candidate in zone.Players)
+        {
+            var isDuelEngaged = duels is not null &&
+                                (duels.IsNegotiating(candidate.CharacterId) ||
+                                 duels.TryGetActiveDuel(candidate.CharacterId, out _));
+
+            var placement = Zone124DuelReadyResolver.Place(candidate.IsMovingZone, isDuelEngaged, candidate.PosX,
+                candidate.PosY, candidate.PosZ);
+
+            if (placement.Side == Zone124DuelReadySide.None)
+                continue;
+
+            // S04_MyWork04.cpp:1799/1809 : le case 599 remet mLastHSTick a 0 avant de teleporter, le case 600
+            // l'oublie ; on le remet ici, une relocation imposee par le serveur n'est pas de l'inactivite.
+            if (!await zone.PostTribeProgressCommandAndWaitAsync(
+                    new TribeProgressZoneCommand(candidate.CharacterId,
+                        TeleportTo: (placement.X, placement.Y, placement.Z),
+                        FullActionRebroadcast: true, ResetAfkTick: true), cancellationToken))
+            {
+                logger.LogError(
+                    "Zone {MapId} tribe-progress inbox full: dropped DUEL-READY muster for character {CharacterId}",
+                    zone.MapId, candidate.CharacterId);
+                continue;
+            }
+
+            mustered++;
+        }
+
+        logger.LogInformation(
+            "Character {CharacterId} applied GM command {Command} (sort {Sort}) on map {MapId}: {MusteredCount} player(s) relocated to the line-up points",
+            characterId, Zone124DuelReadyResolver.CommandName, Zone124DuelReadyResolver.Sort, zone.MapId, mustered);
+
+        return GenericActionResult.Succeeded;
+    }
+
+    // Server/ts25zone/S04_MyWork04.cpp:1901-1946 : le legacy recrute et arme le duel dans la meme passe, puis pose
+    // mDuel_124_Pvp meme a zero recrue. On recrute d'abord, on n'engage que si les deux camps sont peuples.
+    private async ValueTask<GenericActionResult> StartZone124DuelAsync(Zone zone, int characterId,
+        CancellationToken cancellationToken)
+    {
+        var recruits = new List<(PlayerRuntimeState Player, Zone124DuelStartRecruitment Recruitment)>();
+        var westCount = 0;
+        var eastCount = 0;
+
+        foreach (var candidate in zone.Players)
+        {
+            var isDuelEngaged = duels is not null &&
+                                (duels.IsNegotiating(candidate.CharacterId) ||
+                                 duels.TryGetActiveDuel(candidate.CharacterId, out _));
+
+            var recruitment = Zone124DuelStartResolver.Recruit(candidate.IsMovingZone, isDuelEngaged, candidate.PosX,
+                candidate.PosY, candidate.PosZ);
+
+            switch (recruitment.Side)
+            {
+                case Zone124DuelStartSide.West:
+                    westCount++;
+                    break;
+
+                case Zone124DuelStartSide.East:
+                    eastCount++;
+                    break;
+
+                case Zone124DuelStartSide.None:
+                default:
+                    continue;
+            }
+
+            recruits.Add((candidate, recruitment));
+        }
+
+        if (!Zone124DuelStartResolver.HasBothCamps(westCount, eastCount))
+        {
+            logger.LogInformation(
+                "Character {CharacterId} invoked GM command {Command} (sort {Sort}) on map {MapId} with {WestCount} west / {EastCount} east recruit(s): a camp is empty, refused without touching any player",
+                characterId, Zone124DuelStartResolver.CommandName, Zone124DuelStartResolver.Sort, zone.MapId,
+                westCount, eastCount);
+            return GenericActionResult.Failed;
+        }
+
+        var sessionNumber = Zone124DuelStartResolver.AllocateSessionNumber(characterId, zone.RawLogicTick);
+        var engaged = 0;
+
+        foreach (var (player, recruitment) in recruits)
+        {
+            // S04_MyWork04.cpp:1992-2057 : le case 603 remet mLastHSTick a 0 avant de teleporter, le case 601
+            // l'oublie ; on le remet ici, une relocation imposee par le serveur n'est pas de l'inactivite.
+            if (!await zone.PostTribeProgressCommandAndWaitAsync(
+                    new TribeProgressZoneCommand(player.CharacterId,
+                        TeleportTo: (recruitment.X, recruitment.Y, recruitment.Z),
+                        FullActionRebroadcast: true, ResetAfkTick: true), cancellationToken))
+            {
+                logger.LogError(
+                    "Zone {MapId} tribe-progress inbox full: dropped DUEL-START relocation for character {CharacterId}",
+                    zone.MapId, player.CharacterId);
+                continue;
+            }
+
+            player.Session.Send(new DuelStartResponse
+            {
+                DuelState = Zone124DuelStartResolver.BuildDuelState(recruitment.Side, sessionNumber),
+                RemainTime = Zone124DuelStartResolver.DurationUnits,
+                EatDrugState = Zone124DuelStartResolver.EatDrugState
+            });
+
+            engaged++;
+        }
+
+        logger.LogWarning(
+            "Character {CharacterId} applied GM command {Command} (sort {Sort}) on map {MapId}: mass duel {SessionNumber} engaged {EngagedCount} player(s), {WestCount} west vs {EastCount} east",
+            characterId, Zone124DuelStartResolver.CommandName, Zone124DuelStartResolver.Sort, zone.MapId,
+            sessionNumber, engaged, westCount, eastCount);
+
+        return GenericActionResult.Succeeded;
+    }
+
+    // Server/ts25zone/S04_MyWork04.cpp:1948-1991 : arret administratif du duel de masse, sans vainqueur et sans
+    // teleportation (contrairement a 601 et 603). Le corps ne lit aucun champ de tData : aucun index a borner.
+    // Le legacy retient sur mDuelProcessState == 4 ; le seul equivalent serveur est le duel actif du registre.
+    private GenericActionResult EndZone124Duel(Zone zone, int characterId)
+    {
+        zone.ResetZone124MassDuel();
+
+        // S04_MyWork04.cpp:1986 : chaque retenu recoit DUEL_END_RECV. On fige d'abord la liste : TryEndActiveDuel
+        // retire aussi l'adversaire, donc clore au fil de l'eau priverait le partenaire de son paquet.
+        var engaged = new List<PlayerRuntimeState>();
+
+        foreach (var candidate in zone.Players)
+        {
+            var isDuelEngaged = duels is not null && duels.TryGetActiveDuel(candidate.CharacterId, out _);
+
+            if (Zone124DuelEndResolver.Clears(candidate.IsMovingZone, isDuelEngaged))
+                engaged.Add(candidate);
+        }
+
+        foreach (var player in engaged)
+        {
+            duels!.TryEndActiveDuel(player.CharacterId, out _);
+
+            player.CanUseConsumables = true;
+            player.Session.Send(new DuelEndResponse { Result = Zone124DuelEndResolver.Result });
+
+            BroadcastZone124DuelStateCleared(zone, player);
+        }
+
+        logger.LogWarning(
+            "Character {CharacterId} applied GM command {Command} (sort {Sort}) on map {MapId}: mass duel torn down, {ClearedCount} player(s) released",
+            characterId, Zone124DuelEndResolver.CommandName, Zone124DuelEndResolver.Sort, zone.MapId,
+            engaged.Count);
+
+        return GenericActionResult.Succeeded;
+    }
+
+    // S04_MyWork04.cpp:1988-1989 : AVATAR_CHANGE_INFO_1 sort 7 a 0/0/0, diffuse par Broadcast11 rayon 1. Sur la
+    // zone 124 mCheckZone124TypeServer est vrai, donc le garde-fou mProtect_ReviveHack (S07_MyGame03.cpp:808)
+    // ne filtre personne et le sujet lui-meme reste destinataire.
+    private void BroadcastZone124DuelStateCleared(Zone zone, PlayerRuntimeState subject)
+    {
+        var packet = new AvatarStateFlagResponse
+        {
+            ServerIndex = subject.CharacterId,
+            UniqueNumber = subject.UniqueNumber,
+            Sort = Zone124DuelEndResolver.ClearedDuelStateSort,
+            Value01 = 0,
+            Value02 = 0,
+            Value03 = 0
+        };
+
+        var radius = zone.AoiCellSize * Zone124DuelEndResolver.BroadcastScale;
+
+        foreach (var recipient in zone.Players)
+        {
+            if (recipient.IsMovingZone ||
+                !Zone124DuelEndResolver.IsWithinBroadcastRadius(subject.PosX, subject.PosY, subject.PosZ,
+                    recipient.PosX, recipient.PosY, recipient.PosZ, radius))
+                continue;
+
+            try
+            {
+                recipient.Session.Send(packet);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex,
+                    "Zone {MapId} DUEL-END duel-state broadcast to character {RecipientId} failed", zone.MapId,
+                    recipient.CharacterId);
+            }
+        }
+    }
+
+    // Server/ts25zone/S04_MyWork04.cpp:1992-2057 : evacuation de l'arene vers le point de repli. Contrairement au
+    // case 602 (filtre mDuelProcessState != 4, 1977-1979), la selection est purement geometrique : elle emporte
+    // aussi les non-participants et le GM appelant, qui n'est jamais exclu. Comportement legacy conserve tel quel.
+    private async ValueTask<GenericActionResult> EvacuateZone124DuelAsync(Zone zone, int characterId,
+        CancellationToken cancellationToken)
+    {
+        zone.ResetZone124MassDuel();
+
+        var evacuated = 0;
+
+        foreach (var candidate in zone.Players)
+        {
+            if (!Zone124DuelOutResolver.IsInsideArena(candidate.IsMovingZone, candidate.PosX, candidate.PosY,
+                    candidate.PosZ))
+                continue;
+
+            if (duels is not null)
+                duels.TryEndActiveDuel(candidate.CharacterId, out _);
+
+            candidate.CanUseConsumables = true;
+
+            // S04_MyWork04.cpp:2040-2043 : mLastHSTick remis a 0 juste avant la teleportation, dans cet ordre.
+            if (!await zone.PostTribeProgressCommandAndWaitAsync(
+                    new TribeProgressZoneCommand(candidate.CharacterId,
+                        TeleportTo: Zone124DuelOutResolver.EvacuationPoint,
+                        FullActionRebroadcast: true, ResetAfkTick: true), cancellationToken))
+            {
+                logger.LogError(
+                    "Zone {MapId} tribe-progress inbox full: dropped DUEL-OUT evacuation for character {CharacterId}",
+                    zone.MapId, candidate.CharacterId);
+                continue;
+            }
+
+            // S04_MyWork04.cpp:2050-2054 : les deux diffusions partent APRES l'ecrasement de aLocation, donc sur
+            // les coordonnees d'arrivee. On diffuse ici une fois la teleportation appliquee, pour la meme raison.
+            BroadcastZone124DuelStateCleared(zone, candidate);
+
+            evacuated++;
+        }
+
+        logger.LogWarning(
+            "Character {CharacterId} applied GM command {Command} (sort {Sort}) on map {MapId}: {EvacuatedCount} player(s) evacuated to the fallback point",
+            characterId, Zone124DuelOutResolver.CommandName, Zone124DuelOutResolver.Sort, zone.MapId, evacuated);
+
+        return GenericActionResult.Succeeded;
     }
 
     private static ItemStack? GetSlotOrNull(PlayerRuntimeState state, byte container, int slot)

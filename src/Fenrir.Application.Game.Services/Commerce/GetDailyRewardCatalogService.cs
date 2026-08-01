@@ -10,10 +10,10 @@ public sealed class GetDailyRewardCatalogService(ICharacterRepository characters
 {
     private const int RewardBundleId = 1;
 
-    public async ValueTask<GetDailyRewardCatalogResponse> GetCatalogAsync(int characterId,
+    public async ValueTask<GetDailyRewardCatalogResponse> GetCatalogAsync(int accountId,
         CancellationToken cancellationToken)
     {
-        var state = await characters.GetRewardClaimStateAsync(characterId, GameDate.Today(), cancellationToken);
+        var state = await characters.GetAccountRewardClaimStateAsync(accountId, GameDate.Today(), cancellationToken);
 
         var rewardItems = new int[7];
         if (worldData.RewardBundleItemsByBundleId.TryGetValue(RewardBundleId, out var slots))

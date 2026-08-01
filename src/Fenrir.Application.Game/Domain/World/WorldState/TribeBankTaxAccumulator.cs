@@ -27,6 +27,8 @@ public sealed class TribeBankTaxAccumulator(Func<byte, byte>? resolveBeneficiary
 
     public const double MonsterKillCurrencyTaxRate = 0.09;
 
+    public const long GrossAmountFloor = 100;
+
     public static readonly TimeSpan SweepInterval = TimeSpan.FromMinutes(10);
 
     private readonly Lock _lock = new();
@@ -59,6 +61,11 @@ public sealed class TribeBankTaxAccumulator(Func<byte, byte>? resolveBeneficiary
 
         var beneficiary = resolveBeneficiaryTribe?.Invoke(actingTribe) ?? actingTribe;
         if (beneficiary >= TribeCount)
+            return;
+
+        // Server/ts25zone/S07_MyGame01.cpp:2721,2727 -- the floor is on the GROSS amount, never on the tax.
+        // Same outcome as "tax <= 0" at 1%; at 9% it is the difference between crediting 1 and crediting 0.
+        if (baseAmount < GrossAmountFloor)
             return;
 
         var tax = (long)(baseAmount * rate);

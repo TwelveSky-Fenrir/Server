@@ -5,6 +5,7 @@ using System.Diagnostics.CodeAnalysis;
 using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Application.Game.Domain.AntiCheat;
 using Fenrir.Application.Game.Domain.Combat;
+using Fenrir.Application.Game.Domain.Costumes;
 using Fenrir.Application.Game.Domain.Hotkeys;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Mounts;
@@ -43,7 +44,11 @@ public sealed partial class Zone
 
     private const short HolyShieldCooldownZoneId = 124;
 
+    private const int ContributionPointStatSort = 3;
+
     private const int CharacterHpStatSort = 10;
+
+    private const int ManaRecoveredAvatarChangeInfoSort = 9;
 
     private static readonly TimeSpan HolyShieldReapplyCooldown = TimeSpan.FromSeconds(10);
 
@@ -187,14 +192,22 @@ public sealed partial class Zone
             EatElePotion = data.EatElePotion,
             DropItemTime = data.DropItemTime,
             WarPoint = data.WarPoint,
+            PersistedWarPoint = data.WarPoint,
+            BloodCoin = data.BloodCoin,
+            PersistedBloodCoin = data.BloodCoin,
             PremiumExpireUtc = data.PremiumExpireUtc,
             BuffX2Time = data.BuffX2Time,
+            AutoHuntPaidDayBudget = data.AutoHuntPaidDayBudget,
+            AutoHuntPaidMinuteBudget = data.AutoHuntPaidMinuteBudget,
             StoreMoney = data.StoreMoney,
             BigMoney = data.BigMoney,
             InventoryDate = data.InventoryDate,
             StoreDate = data.StoreDate,
             PetBagDate = data.PetBagDate,
             M15PetLuckyBoxPity = data.M15PetLuckyBoxPity,
+            VisibleState = data.VisibleState,
+            SpecialState = data.SpecialState,
+            UseOrnament = data.UseOrnament,
             SourceIp = data.SourceIp
         };
 
@@ -265,7 +278,16 @@ public sealed partial class Zone
         if (data.DrunkBottleTicksRemaining is { } drunkBottleTicksRemaining)
             state.DrunkBottleTicksRemaining = drunkBottleTicksRemaining;
 
+        // aAutoBuffTime est une DATE YYYYMMDD, pas un compteur -- jamais decrementee par tick
+        // (Server/Header/Protocol/STRUCT.h:450, alias aContinueSkillDay).
+        state.AutoBuffTime = data.AutoBuffTime;
+        if (data.AutoBuffSkill is { } autoBuffSkill)
+            state.AutoBuffSkill = autoBuffSkill;
+        state.RankPointDate = data.RankPointDate;
+        state.RankBuffType = data.RankBuffType;
+
         HydrateMountState(state, data);
+        HydrateCostumeState(state, data);
 
         RecomputeAndPublish(state, clampVitals: true);
 
@@ -343,6 +365,22 @@ public sealed partial class Zone
         state.AnimalIndex = data.MountSlotIndex;
         state.AnimalTime = data.MountTime;
         state.AnimalNumber = MountPersistenceCodec.IsMounted(data.MountSlotIndex) ? data.MountItemId : 0;
+        state.AnimalAbsorbTime = data.AnimalAbsorbTime;
+        state.AnimalAbsorbState = data.AnimalAbsorbState;
+    }
+
+    private static void HydrateCostumeState(PlayerRuntimeState state, PlayerEnterData data)
+    {
+        if (data.CostumeWardrobe is { } wardrobe)
+            state.CostumeWardrobe = wardrobe;
+        if (data.CostumeDate is { } costumeDate)
+            state.CostumeDate = costumeDate;
+        if (data.CostumeExpireDate is { } costumeExpireDate)
+            state.CostumeExpireDate = costumeExpireDate;
+
+        // Le zone REECRIT l'index persiste a la charge: Server/ts25zone/S04_MyWork02.cpp:937-941.
+        state.CostumeIndex = CostumePersistenceCodec.NormalizeIndexOnLoad(data.CostumeIndex, state.CostumeWardrobe);
+        state.CostumeNumber = CostumePersistenceCodec.ResolveWornNumber(state.CostumeIndex, state.CostumeWardrobe);
     }
 
     private void TryPublishPartyResyncRequest(int characterId, string avatarName)
@@ -662,6 +700,9 @@ public sealed partial class Zone
             case >= ExperienceFormulas.MaxLimitLevel:
                 state.ContributionPoints -= ExperienceFormulas.CpLossAtLevelCap;
                 state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+                // ProcessForCP is silent unless tSend is TRUE; this branch passes it: Server/ts25zone/S07_MyGame02.cpp:2939
+                state.Session.Send(new AvatarStatUpdateResponse
+                    { Sort = ContributionPointStatSort, Value = state.ContributionPoints, Value2 = 0 });
                 QueueDeathEventLog(DeathExperienceLossEventCode, state.CharacterId, ContributionPointsLossOutcome,
                     $"Kind=ContributionPoints;Loss={ExperienceFormulas.CpLossAtLevelCap};Level={state.Level}");
                 return;
@@ -1117,14 +1158,18 @@ public sealed partial class Zone
                     ResetPartyBuffMarker(state);
                 break;
             case SkillEffectKind.HealLife:
-                if (ApplyTargetedHeal(state, action, true, result.HealAmount) is not null)
+                if (ApplyTargetedHeal(state, action, true, result.HealAmount, out _) is not null)
                     BroadcastCasterEffectSnapshot(state);
                 break;
             case SkillEffectKind.HealMana:
-                if (ApplyTargetedHeal(state, action, false, result.HealAmount) is { } manaRecipient)
+                if (ApplyTargetedHeal(state, action, false, result.HealAmount, out var recoveredMana) is
+                    { } manaRecipient)
                 {
                     BroadcastCasterEffectSnapshot(state);
                     BroadcastManaRecoveryToTarget(manaRecipient);
+                    // Server/ts25zone/S07_MyGame03.cpp:8898 : Value01 est le delta rendu, pas le mana absolu,
+                    // et le Broadcast11 qui suit est ancre sur la CIBLE, jamais sur le lanceur.
+                    BroadcastAvatarStateFlag(manaRecipient, ManaRecoveredAvatarChangeInfoSort, recoveredMana, 0, 0);
                 }
 
                 break;
@@ -1168,8 +1213,9 @@ public sealed partial class Zone
     }
 
     private PlayerRuntimeState? ApplyTargetedHeal(PlayerRuntimeState caster, ActionInfo action, bool isLife,
-        int rawAmount)
+        int rawAmount, out int appliedAmount)
     {
+        appliedAmount = 0;
         if (rawAmount < 1)
             return null;
         if (!_players.TryGetValue(action.TargetObjectIndex, out var target))
@@ -1190,7 +1236,7 @@ public sealed partial class Zone
             maxValue);
 
         if (!TargetedHealResolver.TryResolveAmount(caster.CharacterId,
-                unchecked((uint)action.TargetObjectUniqueNumber), eligibility, rawAmount, out var appliedAmount))
+                unchecked((uint)action.TargetObjectUniqueNumber), eligibility, rawAmount, out appliedAmount))
             return null;
 
         if (isLife)
@@ -1468,7 +1514,8 @@ public sealed partial class Zone
                 FishingPoint = new float[3],
                 RankPoint = 0,
                 TargetState = 0,
-                AnimalAbsorbState = 0,
+                // Miroir de diffusion derive du persiste: Server/ts25zone/S04_MyWork02.cpp:1000.
+                AnimalAbsorbState = state.AnimalAbsorbState,
                 PetValid = 0,
                 Unk1 = 0,
                 PetLocation = new float[3],

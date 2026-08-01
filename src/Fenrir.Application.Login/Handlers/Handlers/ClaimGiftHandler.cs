@@ -30,7 +30,8 @@ public sealed class ClaimGiftHandler(IClaimGiftService claimGiftService, ILogger
             return;
         }
 
-        var result = await claimGiftService.ClaimGiftAsync(accountId, packet.GiftInfoIndex, cancellationToken);
+        var result = await claimGiftService.ClaimGiftAsync(accountId, packet.GiftInfoIndex, loginSession.GiftSlots,
+            cancellationToken);
 
         switch (result.Outcome)
         {

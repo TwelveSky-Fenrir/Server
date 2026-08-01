@@ -5,26 +5,19 @@ namespace Fenrir.Application.Game.Domain.Combat;
 public static class KillFeedEndOfBattleRewardCalculator
 {
     public static ImmutableArray<RankReward> ComputeRankRewards(ImmutableArray<KillFeedRankedEntry> topThree,
-        bool isFfaMap, bool isZone267)
+        bool isZone267)
     {
         if (topThree.IsDefaultOrEmpty)
             return [];
 
-        var (top1, top2, top3) = isFfaMap
-            ? (KillFeedRewardConstants.FfaTop1ContributionPoints, KillFeedRewardConstants.FfaTop2ContributionPoints,
-                KillFeedRewardConstants.FfaTop3ContributionPoints)
-            : (KillFeedRewardConstants.NonFfaTop1ContributionPoints,
-                KillFeedRewardConstants.NonFfaTop2ContributionPoints,
-                KillFeedRewardConstants.NonFfaTop3ContributionPoints);
+        var multiplier = isZone267 ? KillFeedRewardConstants.Zone267ContributionPointMultiplier : 1;
 
-        if (!isFfaMap && isZone267)
-        {
-            top1 *= KillFeedRewardConstants.Zone267ContributionPointMultiplier;
-            top2 *= KillFeedRewardConstants.Zone267ContributionPointMultiplier;
-            top3 *= KillFeedRewardConstants.Zone267ContributionPointMultiplier;
-        }
-
-        ReadOnlySpan<int> amountByRank = [top1, top2, top3];
+        ReadOnlySpan<int> amountByRank =
+        [
+            KillFeedRewardConstants.Top1ContributionPoints * multiplier,
+            KillFeedRewardConstants.Top2ContributionPoints * multiplier,
+            KillFeedRewardConstants.Top3ContributionPoints * multiplier
+        ];
 
         var count = Math.Min(3, topThree.Length);
         var builder = ImmutableArray.CreateBuilder<RankReward>(count);

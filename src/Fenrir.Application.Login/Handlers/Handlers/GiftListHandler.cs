@@ -18,7 +18,7 @@ public sealed class GiftListHandler(IGiftListService giftListService, ILogger<Gi
             logger.LogDebug("Session {SessionId}: op25 CL_GIFT_INFO_SEND received for account {AccountId}",
                 session.SessionId, accountId);
 
-        var giftItem = await giftListService.GetGiftListAsync(accountId, cancellationToken);
+        var giftItem = await giftListService.GetGiftListAsync(accountId, loginSession.GiftSlots, cancellationToken);
 
         session.Send(new GiftListResponse { Result = 0, GiftItem = giftItem });
     }

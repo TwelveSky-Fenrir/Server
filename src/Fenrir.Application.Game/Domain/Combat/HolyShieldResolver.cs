@@ -1,10 +1,12 @@
+using Fenrir.Application.Game.Domain.Buffs;
+
 namespace Fenrir.Application.Game.Domain.Combat;
 
 public static class HolyShieldResolver
 {
-    public const int BaseSlot = 9;
+    public const int BaseSlot = BuffCatalog.HolyShield;
 
-    public static readonly int[] TieredSlots = [29, 30, 31, 32, 33, 34];
+    public static readonly int[] TieredSlots = BuffCatalog.HolyShieldCapeSlots;
 
     public static int Absorb(int[] buff, int incomingDamage)
     {
@@ -34,10 +36,8 @@ public static class HolyShieldResolver
 
     private static int ResolveActiveSlot(int[] buff)
     {
-        foreach (var slot in TieredSlots)
-            if (buff[slot * 2] > 0)
-                return slot;
-
+        // Slots 29-34 morts : seul ecrivain sous #ifdef MG5ORIGIN_ECAPE, jamais defini (Server/ts25zone/S07_MyGame03.cpp:8726),
+        // donc la chaine de priorite 29..34 de Server/ts25zone/S07_MyGame04.cpp:2686-2697 se reduit toujours au slot 9.
         return buff[BaseSlot * 2] > 0 ? BaseSlot : -1;
     }
 

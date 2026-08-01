@@ -14,13 +14,13 @@ public sealed class GetDailyRewardCatalogHandler(
         CancellationToken cancellationToken)
     {
         var zoneSession = (IZoneSession)session;
-        var characterId = zoneSession.CharacterId!.Value;
+        var accountId = zoneSession.AccountId!.Value;
 
         logger.LogDebug(
-            "Session {SessionId}: GetDailyRewardCatalogRequest (op154) received for character {CharacterId}",
-            session.SessionId, characterId);
+            "Session {SessionId}: GetDailyRewardCatalogRequest (op154) received for account {AccountId}, character {CharacterId}",
+            session.SessionId, accountId, zoneSession.CharacterId);
 
-        var response = await service.GetCatalogAsync(characterId, cancellationToken);
+        var response = await service.GetCatalogAsync(accountId, cancellationToken);
 
         session.Send(response);
     }

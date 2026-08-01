@@ -8,16 +8,12 @@ public interface IHolyStoneForcedReturnGateway
     public void ForceReturnToSafeLocation(Zone zone, PlayerRuntimeState player);
 }
 
-public sealed class LoggingOnlyHolyStoneForcedReturnGateway(ILogger<LoggingOnlyHolyStoneForcedReturnGateway> logger)
-    : IHolyStoneForcedReturnGateway
+public sealed class HolyStoneForcedReturnGateway : IHolyStoneForcedReturnGateway
 {
     public void ForceReturnToSafeLocation(Zone zone, PlayerRuntimeState player)
     {
-        logger.LogWarning(
-            "HolyStoneTerritory: character {CharacterId} on zone {MapId} should be forcibly returned to its " +
-            "default/safe location (no longer matches the Stone's holder tribe), but no real forced-return " +
-            "destination is wired yet -- see HolyStoneTerritoryEvictionSweep's remarks", player.CharacterId,
-            zone.MapId);
+        // Le balayage tourne hors du fil de tick : on poste, le tick envoie. Server/ts25zone/S07_MyGame01.cpp:3985
+        zone.PostHolyStoneForcedReturn(player.CharacterId);
     }
 }
 
@@ -28,26 +24,29 @@ public sealed class HolyStoneTerritoryEvictionSweep(
     IHolyStoneForcedReturnGateway forcedReturn,
     ILogger<HolyStoneTerritoryEvictionSweep> logger)
 {
-    public static readonly TimeSpan IdleInterval = TimeSpan.FromMinutes(1);
+    // Compteur entier de ticks, pas une duree : le legacy franchit a mZone039TypePostTick >= GetGameTickMinute()
+    // soit 120 ticks (Server/Header/function.h:1643-1646), puis >= 6. Une minute en TimeSpan vaut 120,24 ticks
+    // de 499 ms : le seuil tombait a 121 avec un residu de 379 ms qui se reportait de cycle en cycle.
+    public const int IdleLegacyTicks = 120;
 
-    public static readonly TimeSpan GraceInterval = TimeSpan.FromSeconds(3);
+    public const int GraceLegacyTicks = 6;
 
     private readonly IReadOnlyCollection<short> _territoryMapIds = territoryMapIds;
-    private TimeSpan _accumulated;
+    private int _accumulatedLegacyTicks;
 
     public HolyStoneTerritoryEvictionPhase Phase { get; private set; } = HolyStoneTerritoryEvictionPhase.Idle;
 
-    public void Tick(TimeSpan elapsed)
+    public void Tick(int legacyTicksElapsed)
     {
-        _accumulated += elapsed;
+        _accumulatedLegacyTicks += legacyTicksElapsed;
 
         while (true)
         {
-            var threshold = Phase == HolyStoneTerritoryEvictionPhase.Idle ? IdleInterval : GraceInterval;
-            if (_accumulated < threshold)
+            var threshold = Phase == HolyStoneTerritoryEvictionPhase.Idle ? IdleLegacyTicks : GraceLegacyTicks;
+            if (_accumulatedLegacyTicks < threshold)
                 return;
 
-            _accumulated -= threshold;
+            _accumulatedLegacyTicks -= threshold;
 
             if (Phase == HolyStoneTerritoryEvictionPhase.Idle)
             {

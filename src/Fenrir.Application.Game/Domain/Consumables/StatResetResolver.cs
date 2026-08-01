@@ -13,8 +13,8 @@ public static class StatResetResolver
     {
         UpTo99,
         Level100To112,
-        Level113PlusNoRebirth,
-        Level145PlusWithRebirth
+        Level113PlusNoGrade,
+        Level145PlusWithGrade
     }
 
     public enum StatSelector
@@ -27,7 +27,9 @@ public static class StatResetResolver
 
     public const int StatFloor = 1;
 
-    public static bool TryResolveLevelBand(short level, int rebirthCount, out LevelBand band)
+    // Bandes sur aLevel1 et aLevel2 (le grade), jamais aRebirthNum: Server/ts25zone/S04_MyWork03.cpp:2883 et :2891.
+    // Le legacy ecrit "aLevel2 > 0 -> echec", donc un aLevel2 negatif est accepte en bande L.
+    public static bool TryResolveLevelBand(short level, int highLevel, out LevelBand band)
     {
         switch (level)
         {
@@ -37,11 +39,11 @@ public static class StatResetResolver
             case <= 112:
                 band = LevelBand.Level100To112;
                 return true;
-            case >= 145 when rebirthCount >= 1:
-                band = LevelBand.Level145PlusWithRebirth;
+            case >= 145 when highLevel >= 1:
+                band = LevelBand.Level145PlusWithGrade;
                 return true;
-            case >= 113 when rebirthCount == 0:
-                band = LevelBand.Level113PlusNoRebirth;
+            case >= 113 when highLevel <= 0:
+                band = LevelBand.Level113PlusNoGrade;
                 return true;
             default:
                 band = default;

@@ -67,6 +67,12 @@ public sealed partial class Zone
         {
             state.HeroRankPoints += grant.HeroRankPoints;
             _heroRankPointAccumulator.AddPending(state.CharacterId, grant.HeroRankPoints, state.Tribe, state.Level);
+
+            // Total absolu apres credit, unicast: Server/ts25zone/UpperCom/S06_MyUpperCom02.cpp:817
+            state.Session.Send(new AvatarStatUpdateResponse
+            {
+                Sort = HeroRankPointStatSort, Value = state.HeroRankPoints, Value2 = 0
+            });
         }
 
         if (grant.RequestItemDrop)

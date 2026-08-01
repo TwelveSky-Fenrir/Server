@@ -22,6 +22,8 @@ public sealed partial class Zone
 
     private const int MissionInboxCapacity = 256;
 
+    private const int PetGrowStepAvatarChangeInfoSort = 10;
+
     private const int QuestInboxCapacity = 512;
 
     private const int SkillInboxCapacity = 1024;
@@ -743,6 +745,11 @@ public sealed partial class Zone
 
         if (command.RebirthBroadcast)
             BroadcastAvatarStateFlag(state, 14, state.ContributionPoints, state.RebirthCount, state.Zone241Time);
+
+        // Server/ts25zone/GameSystem/GameSystem_07_Pet.cpp:1949 : les trois valeurs restent a 0, le client
+        // relit l'apparence et les stats du familier ; emis avant le SendBroadcast de la ligne 1950.
+        if (command.PetGrowStepBroadcast)
+            BroadcastAvatarStateFlag(state, PetGrowStepAvatarChangeInfoSort, 0, 0, 0);
 
         if (command.FullActionRebroadcast)
         {

@@ -1,4 +1,6 @@
+using System.Collections.Frozen;
 using System.Collections.Immutable;
+using Fenrir.Application.Game.Domain.Consumables;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World.Loot;
@@ -20,6 +22,12 @@ public sealed class LootBoxUseItemHandler(
 
     private const byte SuccessOutcome = 1;
 
+    private const int WingLuckyBoxId = 8005;
+
+    private const int LoyKrathongBoxId = 8108;
+
+    private const int NoRewardItemId = 0;
+
 
     private static readonly BoxRewardSpec CostumeChestOverrideSpec = BoxRewardSpec.Uniform(
         CostumeChest76543RewardTable.BoxItemId, ImmutableArray<int>.Empty, CostumeChest76543RewardTable.RentalDays);
@@ -33,11 +41,27 @@ public sealed class LootBoxUseItemHandler(
     private static readonly BoxRewardSpec HeavenlyJadeChestOverrideSpec =
         BoxRewardSpec.Uniform(HeavenlyJadeChest1236RewardTable.BoxId, ImmutableArray<int>.Empty);
 
-    private static readonly BoxRewardSpec WingLuckyBoxOverrideSpec =
-        BoxRewardSpec.Uniform(WingLuckyBox8005RewardTable.BoxId, ImmutableArray<int>.Empty);
+    // Server/ts25zone/S04_MyWork03.cpp:6144-6196 -- rand_mir()%200, seuils INCLUSIFS 5/60/100/180 puis else ;
+    // le seuil 160 et les ids 8101/8102/8106 du bloc //test 6197-6249 sont du code commente, pas la table.
+    private static readonly FrozenDictionary<byte, BoxRewardSpec> WingLuckyBoxSpecByPreviousTribe =
+        new Dictionary<byte, BoxRewardSpec>
+        {
+            [0] = BuildWingLuckyBoxSpec(201),
+            [1] = BuildWingLuckyBoxSpec(202),
+            [2] = BuildWingLuckyBoxSpec(203)
+        }.ToFrozenDictionary();
 
-    private static readonly BoxRewardSpec LoyKrathongBoxOverrideSpec =
-        BoxRewardSpec.Uniform(LoyKrathongBox8108RewardTable.BoxId, ImmutableArray<int>.Empty);
+    // Server/ts25zone/S04_MyWork03.cpp:6300-6316 -- rand_mir()%100, seuils cumulatifs stricts 6/14/26/46/68.
+    // Les 32% restants n'assignent rien : le legacy relit le tValue CLIENT (objet arbitraire), refus ici.
+    private static readonly BoxRewardSpec LoyKrathongBoxSpec = BoxRewardSpec.Weighted(LoyKrathongBoxId,
+    [
+        new LootBoxRewardResolver.WeightedReward(1407, 6),
+        new LootBoxRewardResolver.WeightedReward(1103, 8),
+        new LootBoxRewardResolver.WeightedReward(2397, 12),
+        new LootBoxRewardResolver.WeightedReward(698, 20),
+        new LootBoxRewardResolver.WeightedReward(1221, 22),
+        new LootBoxRewardResolver.WeightedReward(NoRewardItemId, 32)
+    ]);
 
     private static readonly BoxRewardSpec ChestBox720OverrideSpec =
         BoxRewardSpec.Uniform(ChestBox720RewardTable.BoxId, ImmutableArray<int>.Empty);
@@ -47,8 +71,8 @@ public sealed class LootBoxUseItemHandler(
         .Add(WarlordChestRewardTable.SkyChestBoxItemId)
         .Add(WarlordChestRewardTable.EarthChestBoxItemId)
         .Add(HeavenlyJadeChest1236RewardTable.BoxId)
-        .Add(WingLuckyBox8005RewardTable.BoxId)
-        .Add(LoyKrathongBox8108RewardTable.BoxId)
+        .Add(WingLuckyBoxId)
+        .Add(LoyKrathongBoxId)
         .Add(ChestBox720RewardTable.BoxId);
 
     public async ValueTask<UseInventoryItemResponse> HandleAsync(UseItemContext context,
@@ -56,7 +80,7 @@ public sealed class LootBoxUseItemHandler(
     {
         var boxId = context.Item.ItemId;
 
-        if (ResolveSpec(boxId) is not { } spec || context.Item.Quantity < 1)
+        if (ResolveSpec(boxId, context.State.PreviousTribe) is not { } spec || context.Item.Quantity < 1)
         {
             logger.LogDebug(
                 "Character {CharacterId} op23 loot-box ({BoxId}) rejected: no populated reward table or empty stack (quantity {Quantity})",
@@ -70,10 +94,27 @@ public sealed class LootBoxUseItemHandler(
             : await OpenSingleAsync(context, spec, cancellationToken);
     }
 
-    private static BoxRewardSpec? ResolveSpec(int boxId)
+    private static BoxRewardSpec BuildWingLuckyBoxSpec(int tribeWingItemId)
+    {
+        return BoxRewardSpec.RareBandThenPools(WingLuckyBoxId,
+            ImmutableArray<LootBoxRewardResolver.RewardBand>.Empty,
+            [
+                new LootBoxRewardResolver.RewardPool(5, [2477]),
+                new LootBoxRewardResolver.RewardPool(60, [tribeWingItemId]),
+                new LootBoxRewardResolver.RewardPool(100, [2397, 694, 693, 692, 696, 698]),
+                new LootBoxRewardResolver.RewardPool(180, [506, 507, 508, 509, 578, 579]),
+                new LootBoxRewardResolver.RewardPool(199, [1166, 1118, 1103, 1222, 1145, 1237])
+            ]);
+    }
+
+    private static BoxRewardSpec? ResolveSpec(int boxId, byte previousTribe)
     {
         if (LootBoxCatalog.Default.TryGetSpec(boxId) is { } spec)
             return spec;
+
+        // Tribu hors 0/1/2 : le legacy deconnecte (S04_MyWork03.cpp:6163), on refuse sans rien consommer.
+        if (boxId == WingLuckyBoxId)
+            return WingLuckyBoxSpecByPreviousTribe.TryGetValue(previousTribe, out var wingSpec) ? wingSpec : null;
 
         return boxId switch
         {
@@ -81,8 +122,7 @@ public sealed class LootBoxUseItemHandler(
             WarlordChestRewardTable.SkyChestBoxItemId => SkyWarlordChestOverrideSpec,
             WarlordChestRewardTable.EarthChestBoxItemId => EarthWarlordChestOverrideSpec,
             HeavenlyJadeChest1236RewardTable.BoxId => HeavenlyJadeChestOverrideSpec,
-            WingLuckyBox8005RewardTable.BoxId => WingLuckyBoxOverrideSpec,
-            LoyKrathongBox8108RewardTable.BoxId => LoyKrathongBoxOverrideSpec,
+            LoyKrathongBoxId => LoyKrathongBoxSpec,
             ChestBox720RewardTable.BoxId => ChestBox720OverrideSpec,
             _ => null
         };
@@ -97,7 +137,7 @@ public sealed class LootBoxUseItemHandler(
 
         var today = GameDate.Today();
         var plan = LootBoxOpenResolver.OpenSingle(spec, context.Page, context.Index, context.Item, page0, page1,
-            ResolveRewardSort, Random.Shared, today, ResolveRewardIdOverride(context),
+            ResolveRewardSort, Random.Shared, today, ResolveRewardIdOverride(context, spec),
             state.InventoryDate >= today);
 
         await MirrorM15PetLuckyBoxPityAsync(context, cancellationToken);
@@ -144,7 +184,7 @@ public sealed class LootBoxUseItemHandler(
 
         var today = GameDate.Today();
         var plan = LootBoxOpenResolver.OpenBulk(spec, context.Page, context.Index, context.Item, page0, page1,
-            ResolveRewardSort, Random.Shared, today, context.Value, ResolveRewardIdOverride(context),
+            ResolveRewardSort, Random.Shared, today, context.Value, ResolveRewardIdOverride(context, spec),
             state.InventoryDate >= today);
 
         await MirrorM15PetLuckyBoxPityAsync(context, cancellationToken);
@@ -231,7 +271,7 @@ public sealed class LootBoxUseItemHandler(
         return worldData.ItemsById.TryGetValue(rewardItemId, out var def) ? def.Item.Sort : null;
     }
 
-    private static Func<int>? ResolveRewardIdOverride(UseItemContext context)
+    private static Func<int>? ResolveRewardIdOverride(UseItemContext context, BoxRewardSpec spec)
     {
         var boxId = context.Item.ItemId;
 
@@ -302,15 +342,8 @@ public sealed class LootBoxUseItemHandler(
             };
         }
 
-        if (boxId == WingLuckyBox8005RewardTable.BoxId)
-        {
-            var previousTribe = context.State.PreviousTribe;
-            return () =>
-            {
-                var result = WingLuckyBox8005RewardTable.Roll(previousTribe, Random.Shared);
-                return result.Success ? result.RewardItemId : 0;
-            };
-        }
+        if (boxId == WingLuckyBoxId)
+            return () => LootBoxRewardResolver.RollPools(Random.Shared, spec.Pools);
 
         if (boxId == ChestBox720RewardTable.BoxId)
         {
@@ -318,16 +351,6 @@ public sealed class LootBoxUseItemHandler(
             return () =>
             {
                 var result = ChestBox720RewardTable.Roll(previousTribe, Random.Shared);
-                return result.Success ? result.RewardItemId : 0;
-            };
-        }
-
-        if (boxId == LoyKrathongBox8108RewardTable.BoxId)
-        {
-            var previousTribe = context.State.PreviousTribe;
-            return () =>
-            {
-                var result = LoyKrathongBox8108RewardTable.Roll(previousTribe, Random.Shared);
                 return result.Success ? result.RewardItemId : 0;
             };
         }

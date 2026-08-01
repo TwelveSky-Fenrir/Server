@@ -1,6 +1,5 @@
 using Fenrir.Application.Login.Abstractions.RenameAvatar;
 using Fenrir.Application.Login.Sessions;
-using Fenrir.Domain.Login.Avatars;
 using Fenrir.Protocol.Login;
 using Microsoft.Extensions.Logging;
 
@@ -10,8 +9,6 @@ public sealed class RenameAvatarHandler(IRenameAvatarService renameAvatarService
     : IAsyncPacketHandler<RenameAvatarRequest>
 {
     private const int MaxAvatarPost = 2;
-    private const int InventoryPageCount = 2;
-    private const int InventorySlotCount = 64;
 
     public async ValueTask HandleAsync(RenameAvatarRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
@@ -24,11 +21,9 @@ public sealed class RenameAvatarHandler(IRenameAvatarService renameAvatarService
                 "Session {SessionId}: op19 CL_CHANGE_AVATAR_NAME_SEND received for account {AccountId} slot {Slot}",
                 session.SessionId, accountId, packet.AvatarPost);
 
-        if (packet.AvatarPost is < 0 or > MaxAvatarPost ||
-            packet.ChangeAvatarName.Length == 0 ||
-            packet.Page is < 0 or >= InventoryPageCount ||
-            packet.Index is < 0 or >= InventorySlotCount ||
-            !AvatarNameValidator.HasOnlyWhitelistedCharacters(packet.ChangeAvatarName))
+        // Only the two checks the legacy performs before its "same name" answer stay here
+        // (Server/ts25login/S04_MyWork02.cpp:1298-1312); page/index/charset are gated after it, in the service.
+        if (packet.AvatarPost is < 0 or > MaxAvatarPost || packet.ChangeAvatarName.Length == 0)
         {
             logger.LogWarning(
                 "Avatar rename rejected: malformed request from account {AccountId} (slot {Slot}) -- aborting",
@@ -38,7 +33,7 @@ public sealed class RenameAvatarHandler(IRenameAvatarService renameAvatarService
         }
 
         var result = await renameAvatarService.RenameAvatarAsync(accountId, (byte)packet.AvatarPost,
-            packet.ChangeAvatarName, (byte)packet.Page, (byte)packet.Index, cancellationToken);
+            packet.ChangeAvatarName, packet.Page, packet.Index, cancellationToken);
 
         switch (result.Outcome)
         {
@@ -83,6 +78,12 @@ public sealed class RenameAvatarHandler(IRenameAvatarService renameAvatarService
             case RenameAvatarOutcome.ItemMismatch:
                 logger.LogWarning(
                     "Avatar rename rejected: account {AccountId} slot {Slot} -- rename scroll not found at the claimed slot -- aborting",
+                    accountId, packet.AvatarPost);
+                loginSession.Abort(DisconnectReason.Malformed);
+                return;
+            case RenameAvatarOutcome.Malformed:
+                logger.LogWarning(
+                    "Avatar rename rejected: account {AccountId} slot {Slot} -- page/index out of range or name outside the whitelist -- aborting",
                     accountId, packet.AvatarPost);
                 loginSession.Abort(DisconnectReason.Malformed);
                 return;

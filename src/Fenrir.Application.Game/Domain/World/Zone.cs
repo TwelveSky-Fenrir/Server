@@ -211,6 +211,7 @@ public sealed partial class Zone(
         DrainHeroRankingQueryCommands();
         DrainHeroRankingRolloverCommands();
         DrainHolyStoneCountdownEvictionCommands();
+        DrainHolyStoneForcedReturnCommands();
         DrainHolyStoneBattleRankResetCommands();
         DrainFishingCommands();
         DrainMountCommands();

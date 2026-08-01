@@ -4,6 +4,6 @@ namespace Fenrir.Application.Game.Abstractions.Commerce;
 
 public interface IGetDailyRewardCatalogService
 {
-    public ValueTask<GetDailyRewardCatalogResponse> GetCatalogAsync(int characterId,
+    public ValueTask<GetDailyRewardCatalogResponse> GetCatalogAsync(int accountId,
         CancellationToken cancellationToken);
 }

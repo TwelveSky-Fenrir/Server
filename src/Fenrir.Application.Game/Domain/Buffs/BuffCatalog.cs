@@ -51,8 +51,12 @@ public static class BuffCatalog
     public const int HolyShieldStripRollBase = 1000;
     public const int ReflectRollBase = 1500;
 
+    // Inertes : jamais alimentes sous M33/LNW33, seul ecrivain sous MG5ORIGIN_ECAPE non defini (Server/ts25zone/S07_MyGame03.cpp:8726).
+    public static readonly int[] HolyShieldCapeSlots =
+        [29, 30, 31, 32, 33, 34];
+
     public static readonly int[] HolyShieldSlots =
-        [HolyShield, 29, 30, 31, 32, 33, 34];
+        [HolyShield, .. HolyShieldCapeSlots];
 
     public static readonly int[] ExclusivityFlagSlots =
         [DarkAttack, HitRatePotion, DodgeRatePotion];

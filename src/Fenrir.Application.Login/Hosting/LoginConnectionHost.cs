@@ -20,13 +20,17 @@ public sealed class LoginConnectionHost(
     IOpcodeFrameSizeProvider opcodeRegistry,
     ISessionRateLimiter rateLimiter,
     SessionRegistry registry,
+    LoginIdleClock idleClock,
     LoginCapacityState capacity,
     IAccountSessionRepository accountSessions,
     IEventLogRepository eventLog,
     IpFloodGuard ipFloodGuard,
+    LoginSocketAdmissionGate admissionGate,
     ILogger<LoginConnectionHost> logger) : BackgroundService
 {
     private const short LoginSessionEndedEventCode = 2;
+
+    private const int GreetingRandomModulus = 1001;
 
     private readonly ConcurrentDictionary<Task, byte> _inFlightConnections = new();
 
@@ -93,9 +97,20 @@ public sealed class LoginConnectionHost(
     private async Task OnAcceptedAsync(LoginClientSession loginSession, SocketConnection connection,
         CancellationToken ct)
     {
-        registry.Register(loginSession);
-
         var remoteIp = loginSession.RemoteEndPoint?.Address.ToString();
+
+        if (!admissionGate.TryAcquire())
+        {
+            logger.LogWarning(
+                "Login connection refused: session {SessionId} from {RemoteIp} -- the server already holds its {MaxConcurrentConnections} concurrent sockets",
+                loginSession.SessionId, remoteIp, admissionGate.MaxConcurrentConnections);
+
+            await connection.DisposeAsync().ConfigureAwait(false);
+            return;
+        }
+
+        registry.Register(loginSession);
+        idleClock.Arm(loginSession, DateTimeOffset.UtcNow);
 
         logger.LogInformation("Login connection accepted: session {SessionId} from {RemoteIp}",
             loginSession.SessionId, remoteIp);
@@ -144,7 +159,9 @@ public sealed class LoginConnectionHost(
             }
 
             registry.Unregister(loginSession.SessionId);
+            idleClock.Release(loginSession.SessionId);
             rateLimiter.Remove(loginSession.SessionId);
+            admissionGate.Release();
             await connection.DisposeAsync().ConfigureAwait(false);
         }
     }
@@ -187,7 +204,10 @@ public sealed class LoginConnectionHost(
 
     private void Greet(LoginClientSession session, SocketConnection connection)
     {
-        var randomNumber = RandomNumberGenerator.GetInt32(int.MinValue, int.MaxValue);
+        // Legacy domain: (rand % 1001) * (rand % 1001), so always in [0, 1000000] and never negative
+        // (Server/ts25login/S03_MyUser.cpp:214). Only the low byte is the stream key (:215).
+        var randomNumber = RandomNumberGenerator.GetInt32(GreetingRandomModulus) *
+                           RandomNumberGenerator.GetInt32(GreetingRandomModulus);
 
         session.InboundStreamXorKey = unchecked((byte)randomNumber);
         connection.GetInboundXorKey = () => session.InboundStreamXorKey;

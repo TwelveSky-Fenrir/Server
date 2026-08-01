@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using System.Collections.Immutable;
 using Fenrir.Domain.Game.GameData;
 
@@ -8,18 +9,20 @@ public readonly record struct PortalRegistration(float X, float Y, float Z, shor
 public sealed class PortalProximityCatalog
 {
     public static readonly PortalProximityCatalog Empty =
-        new(ImmutableDictionary<short, ImmutableArray<PortalRegistration>>.Empty);
+        new(FrozenDictionary<short, ImmutableArray<PortalRegistration>>.Empty);
 
-    private readonly ImmutableDictionary<short, ImmutableArray<PortalRegistration>> _portalsByZone;
+    private readonly FrozenDictionary<short, ImmutableArray<PortalRegistration>> _portalsByZone;
 
-    public PortalProximityCatalog(ImmutableDictionary<short, ImmutableArray<PortalRegistration>> portalsByZone)
+    public PortalProximityCatalog(FrozenDictionary<short, ImmutableArray<PortalRegistration>> portalsByZone)
     {
         _portalsByZone = portalsByZone;
     }
 
+    // Server/Header/S19_MyZoneMoveInfo.cpp:1250-1254 -- ReturnNextZone walks slots 0..mNextZoneNum-1 and takes the
+    // first match, so slot order is the tie-break (zone 38 slots 8/9 share one coordinate). Never sort nor dedupe.
     public static PortalProximityCatalog FromWorldData(WorldDataCache worldData)
     {
-        var builder = ImmutableDictionary.CreateBuilder<short, ImmutableArray<PortalRegistration>>();
+        var builder = new Dictionary<short, ImmutableArray<PortalRegistration>>(worldData.ZonesByNumber.Count);
 
         foreach (var (zoneNumber, zone) in worldData.ZonesByNumber)
         {
@@ -34,7 +37,7 @@ public sealed class PortalProximityCatalog
                 builder[zoneNumber] = registrations.ToImmutable();
         }
 
-        return new PortalProximityCatalog(builder.ToImmutable());
+        return new PortalProximityCatalog(builder.ToFrozenDictionary());
     }
 
     public bool TryGetPortals(short zoneId, out ImmutableArray<PortalRegistration> portals)

@@ -157,7 +157,7 @@ public static class HostingServiceCollectionExtensions
         services.AddSingleton<ZoneCenterBroadcastIngestor>();
 
 
-        services.TryAddSingleton<IZone039MonsterSummonResetGateway, LoggingOnlyZone039MonsterSummonResetGateway>();
+        services.TryAddSingleton<IZone039MonsterSummonResetGateway, Zone039MonsterSummonResetGateway>();
         services.AddSingleton<Zone039ArmingReactor>();
         services.AddSingleton<DailyResetBroadcaster>();
         services.AddHostedService<DailyResetBroadcastHost>();
@@ -175,7 +175,7 @@ public static class HostingServiceCollectionExtensions
         services.AddSingleton(sp => new Lazy<ZoneRegistry>(sp.GetRequiredService<ZoneRegistry>));
 
         services.AddSingleton<Zone195NokSanState>();
-        services.AddSingleton(Zone195NokSanSiteCatalog.Empty);
+        services.AddSingleton(Zone195NokSanSiteCatalog.Legacy);
         services.AddSingleton<Zone195NokSanBroadcaster>();
         services.AddSingleton<IZone195NokSanBroadcaster>(sp => sp.GetRequiredService<Zone195NokSanBroadcaster>());
         services.AddSingleton(sp =>
@@ -205,7 +205,7 @@ public static class HostingServiceCollectionExtensions
 
         services.AddHostedService<TribeVoteElectionCalendarHost>();
 
-        services.AddSingleton(GuardPostCatalog.Empty);
+        services.AddSingleton(GuardPostCatalogFactory.BuildLive());
         services.AddSingleton(TribeSymbolPlacementCatalog.Default);
         services.AddSingleton<TribeGuardOptions>();
         services.AddSingleton<TribeGuardSpawner>();
@@ -215,7 +215,8 @@ public static class HostingServiceCollectionExtensions
 
         services.AddSingleton(TribeGuardCorridorCatalogFactory.BuildLive());
 
-        services.AddSingleton(PortalProximityCatalog.Empty);
+        services.AddSingleton(static provider => PortalProximityCatalog.FromWorldData(
+            provider.GetRequiredService<Fenrir.Domain.Game.GameData.WorldDataCache>()));
 
         services.AddSingleton<TribeGuardCorridorState>();
         services.AddSingleton<TribeGuardCorridorStateDerivationSystem>();
@@ -242,7 +243,7 @@ public static class HostingServiceCollectionExtensions
     private static void AddHolyStoneScheduling(IServiceCollection services)
     {
         services.TryAddSingleton<IHolyStoneCaptureRewardGateway, HolyStoneCaptureRewardGateway>();
-        services.TryAddSingleton<IHolyStoneForcedReturnGateway, LoggingOnlyHolyStoneForcedReturnGateway>();
+        services.TryAddSingleton<IHolyStoneForcedReturnGateway, HolyStoneForcedReturnGateway>();
 
         services.AddSingleton(sp =>
         {
@@ -274,16 +275,14 @@ public static class HostingServiceCollectionExtensions
         });
         services.AddHostedService<HolyStoneWarCycleHost>();
 
-        services.AddSingleton(sp =>
-        {
-            var opts = sp.GetRequiredService<IOptions<GameServerOptions>>().Value;
-            return new HolyStoneTerritoryEvictionSweep(
-                sp.GetRequiredService<WorldStateService>(),
-                sp.GetRequiredService<ZoneRegistry>(),
-                opts.HolyStoneTerritoryMapIds.ToArray(),
-                sp.GetRequiredService<IHolyStoneForcedReturnGateway>(),
-                sp.GetRequiredService<ILogger<HolyStoneTerritoryEvictionSweep>>());
-        });
+        // Le legacy code ce perimetre en dur (Server/ts25zone/S07_MyGame01.cpp:806-820) ; l'option
+        // HolyStoneTerritoryMapIds n'etait seedee nulle part, donc le balayage n'iterait jamais rien.
+        services.AddSingleton(sp => new HolyStoneTerritoryEvictionSweep(
+            sp.GetRequiredService<WorldStateService>(),
+            sp.GetRequiredService<ZoneRegistry>(),
+            [.. ScheduledZoneCenterEventCodes.Zone039ArmingGatedMapIds],
+            sp.GetRequiredService<IHolyStoneForcedReturnGateway>(),
+            sp.GetRequiredService<ILogger<HolyStoneTerritoryEvictionSweep>>()));
         services.AddHostedService<HolyStoneTerritoryEvictionSweepHost>();
     }
 

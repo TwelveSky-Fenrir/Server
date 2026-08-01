@@ -1,4 +1,5 @@
 using Fenrir.Application.Game.Abstractions.World;
+using Fenrir.Application.Game.Domain.Costumes;
 using Fenrir.Application.Game.Domain.Mounts;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Data.WriteBehind;
@@ -19,8 +20,9 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
     private readonly ILogger<PositionWriteBehindHost> _logger;
     private readonly ICharacterLogoutStateRepository _logoutState;
 
-    private readonly Dictionary<int, (CharacterProgressTvp Progress, CharacterPositionTvp Position, PlayerRuntimeState
-            CapturedState)>
+    private readonly Dictionary<int, (CharacterProgressTvp Progress, CharacterPositionTvp Position,
+            List<CharacterCostumeSlotTvp> Costumes, PlayerRuntimeState
+            CapturedState, int CapturedWarPoint, int CapturedBloodCoin)>
         _pendingDisconnectRetries = new();
 
     private readonly ZoneRegistry _zones;
@@ -97,6 +99,10 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
                 return;
             }
 
+            // WarPoint/BloodCoin ship as a delta, never a balance -- see ProgressWriteBehindHost.FlushAsync.
+            var warPoint = state.WarPoint;
+            var bloodCoin = state.BloodCoin;
+
             var progressRow = new CharacterProgressTvp(characterId, state.FlushSequence, state.Level, state.Level2,
                 state.Experience, state.Life, state.MaxLife, state.Mana, state.MaxMana, state.StatVit, state.StatStr,
                 state.StatInt, state.StatDex, state.StatPoints, state.SkillPoints, state.ContributionPoints,
@@ -105,14 +111,46 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
                 state.MountGarage[MountPersistenceCodec.PersistedGarageSlot],
                 MountPersistenceCodec.EncodeExpActivity(state.MountActivity, state.MountAccumulatedExp),
                 MountPersistenceCodec.EncodePower(state.MountRolledAttributes),
-                state.AnimalIndex, state.AnimalTime);
+                state.AnimalIndex, state.AnimalTime,
+                state.VisibleState, state.SpecialState, state.UseOrnament ? 1 : 0,
+                state.Title, state.Halo, state.TeacherPoint,
+                warPoint - state.PersistedWarPoint, bloodCoin - state.PersistedBloodCoin,
+                state.PetExpX2Time, state.AnimalAbsorbTime, state.AnimalAbsorbState, state.CostumeIndex,
+                // Nommes a partir d'ici: le TVP est en append continu par plusieurs lots, un ajout positionnel
+                // decale silencieusement tout ce qui suit vers le mauvais parametre.
+                ProtectForHalo: state.ProtectForHalo,
+                BonusItemLevel: state.BonusItemLevel,
+                BonusItemValue: state.BonusItemValue,
+                TribeNotifyScrollCount: state.TribeNotifyScrollCount,
+                TribeFourReturnAllowance: state.TribeFourReturnAllowance,
+                BottleSlots: BottleSlotsCodec.Encode(state.BottleSlots),
+                DrunkBottleIndex: state.DrunkBottleIndex,
+                AutoBuffTime: state.AutoBuffTime,
+                AutoBuffSkill: AutoBuffSkillCodec.Encode(state.AutoBuffSkill),
+                RankPointDate: state.RankPointDate,
+                RankBuffType: state.RankBuffType,
+                AutoTime: state.AutoHuntPaidDayBudget,
+                AutoTime2: state.AutoHuntPaidMinuteBudget,
+                BuffX2Time: state.BuffX2Time,
+                PremiumExpireUtc: state.PremiumExpireUtc,
+                PetGrowth: state.PetGrowth,
+                PetActivity: state.PetActivity);
 
             var positionRow = new CharacterPositionTvp(characterId, state.FlushSequence, state.MapId, state.PosX,
                 state.PosY, state.PosZ, state.Heading);
 
+            // Penderie COMPLETE: la procedure remplace, elle ne fusionne pas. Capturee ici pour que la file de
+            // reprise rejoue exactement l'instantane de deconnexion, pas un etat relu plus tard.
+            var costumeRows = new List<CharacterCostumeSlotTvp>();
+            CostumePersistenceCodec.AppendOccupiedSlots(costumeRows, characterId, state);
+
             try
             {
-                await _characters.PersistFinalFlushAsync(progressRow, positionRow, ct).ConfigureAwait(false);
+                await _characters.PersistFinalFlushAsync(progressRow, positionRow, costumeRows, ct)
+                    .ConfigureAwait(false);
+
+                state.PersistedWarPoint = warPoint;
+                state.PersistedBloodCoin = bloodCoin;
 
                 var logoutRow = new CharacterLogoutStateTvp(characterId, state.FlushSequence, state.MapId,
                     (int)state.PosX, (int)state.PosY, (int)state.PosZ, state.Life, state.Mana);
@@ -120,7 +158,8 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
             }
             catch (Exception ex)
             {
-                _pendingDisconnectRetries[characterId] = (progressRow, positionRow, state);
+                _pendingDisconnectRetries[characterId] =
+                    (progressRow, positionRow, costumeRows, state, warPoint, bloodCoin);
                 _logger.LogError(ex,
                     "Failed to persist final Position/Vitals/Progression state for character {CharacterId} on disconnect -- queued for retry until it succeeds",
                     characterId);
@@ -192,7 +231,8 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
 
             foreach (var characterId in _pendingDisconnectRetries.Keys.ToArray())
             {
-                var (progressRow, positionRow, capturedState) = _pendingDisconnectRetries[characterId];
+                var (progressRow, positionRow, costumeRows, capturedState, capturedWarPoint, capturedBloodCoin) =
+                    _pendingDisconnectRetries[characterId];
 
                 if (_zones.TryGetPlayer(characterId, out var liveState) && !ReferenceEquals(liveState, capturedState))
                 {
@@ -205,7 +245,14 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
 
                 try
                 {
-                    await _characters.PersistFinalFlushAsync(progressRow, positionRow, ct).ConfigureAwait(false);
+                    await _characters.PersistFinalFlushAsync(progressRow, positionRow, costumeRows, ct)
+                        .ConfigureAwait(false);
+
+                    // Max and not +=: a periodic flush may already have credited this same grant, in which case
+                    // the row above was a FlushSequence-guard no-op and the baseline must not move twice.
+                    capturedState.PersistedWarPoint = Math.Max(capturedState.PersistedWarPoint, capturedWarPoint);
+                    capturedState.PersistedBloodCoin = Math.Max(capturedState.PersistedBloodCoin, capturedBloodCoin);
+
                     _pendingDisconnectRetries.Remove(characterId);
                 }
                 catch (Exception ex)

@@ -14,10 +14,11 @@ public sealed class ClaimDailyRewardHandler(IClaimDailyRewardService service, IL
     {
         var zoneSession = (IZoneSession)session;
         var characterId = zoneSession.CharacterId!.Value;
+        var accountId = zoneSession.AccountId!.Value;
 
         logger.LogDebug(
-            "Session {SessionId}: ClaimDailyRewardRequest (op155) received for character {CharacterId}",
-            session.SessionId, characterId);
+            "Session {SessionId}: ClaimDailyRewardRequest (op155) received for account {AccountId}, character {CharacterId}",
+            session.SessionId, accountId, characterId);
 
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
@@ -26,12 +27,13 @@ public sealed class ClaimDailyRewardHandler(IClaimDailyRewardService service, IL
         await state.EconomyActionLock.WaitAsync(cancellationToken);
         try
         {
-            var result = await service.ResolveAndApplyAsync(packet, zone, state, characterId, cancellationToken);
+            var result =
+                await service.ResolveAndApplyAsync(packet, zone, state, accountId, characterId, cancellationToken);
             if (result is null)
             {
                 logger.LogWarning(
-                    "Daily-reward claim rejected for character {CharacterId} -- aborting session",
-                    characterId);
+                    "Daily-reward claim rejected for account {AccountId}, character {CharacterId} -- aborting session",
+                    accountId, characterId);
                 zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             }

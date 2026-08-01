@@ -1,3 +1,4 @@
+using Fenrir.Application.Login.Sessions;
 using Fenrir.Domain.Login;
 using Fenrir.Network.Dispatch.FloodProtection;
 using Fenrir.Network.Dispatch.Sessions;
@@ -14,6 +15,13 @@ public static class HostingServiceCollectionExtensions
     public static IServiceCollection AddLoginHosting(this IServiceCollection services)
     {
         services.AddSingleton<IOpcodeFrameSizeProvider>(LoginOpcodeRegistry.Provider);
+        services.AddSingleton<LoginIdleClock>();
+
+        services.AddSingleton<IValidateOptions<LoginSocketAdmissionOptions>, LoginSocketAdmissionOptionsValidator>();
+        services.AddOptions<LoginSocketAdmissionOptions>().ValidateOnStart();
+        services.AddSingleton(sp => new LoginSocketAdmissionGate(
+            sp.GetRequiredService<IOptions<LoginSocketAdmissionOptions>>().Value.MaxConcurrentConnections));
+
         services.AddHostedService<LoginConnectionHost>();
 
         services.AddSingleton<LoginSessionLivenessSweep>();

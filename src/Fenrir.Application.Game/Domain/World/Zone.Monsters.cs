@@ -208,7 +208,8 @@ public sealed partial class Zone
             if (MonsterCombatResolver.RollHolyShieldRemoval(monster.Template.SpecialType, attackSubMode, _random))
                 RemoveDefenderHolyShields(target);
 
-            (viewDamage, realDamage) = ApplyHolyShieldAbsorption(target, outcome);
+            (viewDamage, realDamage) =
+                ApplyHolyShieldAbsorption(target, outcome, HolyShieldHitByMonsterAvatarChangeInfoSort);
         }
 
         var response = new AttackResponse

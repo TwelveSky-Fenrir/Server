@@ -25,10 +25,24 @@ public sealed class TowerLifecycleSystem(
 
         AdvanceConstruction(zone, towerIndex, now);
 
-        towerWar.TryResetIdleAttackState(towerIndex, now);
-        towerWar.TryClearStaleEngagement(towerIndex, now);
+        if (IsGuardianAttackTickEligible(zone, towerIndex))
+        {
+            towerWar.TryResetIdleAttackState(towerIndex, now);
+            towerWar.TryClearStaleEngagement(towerIndex, now);
+        }
 
         ApplyPendingGuardianHeal(zone, towerIndex);
+    }
+
+    // A002 case 10 needs alive + aSort 1 + sort 10 + first-attack armed (Server/ts25zone/S07_MyGame05.cpp:46,57,843,845).
+    // Only re-armer is RecordGuardianHit, off-tick, so the closed window is not a dead end.
+    private bool IsGuardianAttackTickEligible(Zone zone, int towerIndex)
+    {
+        if (!towerWar.IsEngagementWindowOpen(towerIndex))
+            return false;
+
+        return zone.TryGetMonster(TowerWarState.GuardianServerIndex(towerIndex), out var guardian) &&
+               guardian is { AiState: MonsterAiState.Decision, SpecialSort: MonsterSpecialSort.Tower };
     }
 
     private void ApplyPendingGuardianHeal(Zone zone, int towerIndex)

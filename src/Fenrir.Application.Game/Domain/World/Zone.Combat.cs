@@ -224,7 +224,7 @@ public sealed partial class Zone
             return;
 
         if (outcome.ChargeConsumed)
-            attackerState.Buffs.Buff[8 * 2] = 0;
+            ConsumeChargeBuff(attackerState);
 
         var viewDamage = outcome.ViewDamage;
         var realDamage = outcome.DamageApplied;
@@ -460,7 +460,7 @@ public sealed partial class Zone
 
         if (HasActivePetEquipped(attackerState))
             CreditPetGrowthFromPvpKill(attackerState,
-                PvpKillPetExperienceCalculator.ComputeGain(attackerCombinedLevel));
+                PvpKillPetExperienceCalculator.ComputeGain(attackerState.Level));
 
         ApplyPvpKillMountExperience(attackerState);
     }
@@ -665,7 +665,7 @@ public sealed partial class Zone
             zone195NokSanState?.GetMonsterDamageBonus(attackerSnapshot.Tribe) ?? 0);
 
         if (outcome.ChargeConsumed)
-            attackerState.Buffs.Buff[8 * 2] = 0;
+            ConsumeChargeBuff(attackerState);
 
         if (outcome.Rejected)
             return;

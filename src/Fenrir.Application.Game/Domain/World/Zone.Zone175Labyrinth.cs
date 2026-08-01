@@ -1,12 +1,15 @@
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Data.WriteBehind;
+using Fenrir.Protocol.Game;
 
 namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
     private const DisconnectReason Zone175TerminalDisconnectReason = DisconnectReason.LabyrinthMissionEnded;
+
+    private const int Zone175MoneyChangeSort = 23;
 
     public bool HasAnyZone175QualifyingPlayer()
     {
@@ -59,8 +62,17 @@ public sealed partial class Zone
             }
 
             if (money > 0)
+            {
                 QueueMoneyGrant(state.CharacterId, money);
 
+                // Server/ts25zone/S07_MyGame01.cpp:8291 sends the gained delta, not the new total.
+                state.Session.Send(new AvatarStatUpdateResponse
+                {
+                    Sort = Zone175MoneyChangeSort,
+                    Value = (int)Math.Min(money, int.MaxValue),
+                    Value2 = 0
+                });
+            }
 
             if (contributionPoints != 0)
                 GrantContributionPoints(state.CharacterId, contributionPoints);

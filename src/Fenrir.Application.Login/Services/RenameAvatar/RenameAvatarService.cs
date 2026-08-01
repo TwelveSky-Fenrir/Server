@@ -16,21 +16,32 @@ public sealed class RenameAvatarService(
     IEventLogRepository eventLog,
     ILogger<RenameAvatarService> logger) : IRenameAvatarService
 {
+    private const int InventoryPageCount = 2;
+    private const int InventorySlotCount = 64;
+
     public async ValueTask<RenameAvatarResult> RenameAvatarAsync(int accountId, byte avatarPost,
-        string changeAvatarName, byte itemContainer, byte itemSlot, CancellationToken cancellationToken)
+        string changeAvatarName, int itemContainer, int itemSlot, CancellationToken cancellationToken)
     {
         var roster = await characters.GetByAccountAsync(accountId, cancellationToken);
         var character = roster.FirstOrDefault(c => c.Slot == avatarPost);
         if (character is null || character.Name.Length == 0)
             return new RenameAvatarResult(RenameAvatarOutcome.SlotEmpty);
 
+        // The "same name" answer is emitted BEFORE the page/index bounds and before the charset filter
+        // (Server/ts25login/S04_MyWork02.cpp:1313-1337): those bounds must not turn it into a disconnect.
         if (string.Equals(changeAvatarName, character.Name, StringComparison.OrdinalIgnoreCase))
             return new RenameAvatarResult(RenameAvatarOutcome.NameTaken);
 
-        var itemIdAtSlot =
-            await characters.GetItemIdAtSlotAsync(character.CharacterId, itemContainer, itemSlot, cancellationToken);
+        if (itemContainer is < 0 or >= InventoryPageCount || itemSlot is < 0 or >= InventorySlotCount)
+            return new RenameAvatarResult(RenameAvatarOutcome.Malformed);
+
+        var itemIdAtSlot = await characters.GetItemIdAtSlotAsync(character.CharacterId, (byte)itemContainer,
+            (byte)itemSlot, cancellationToken);
         if (!AvatarRenameGate.ItemAtSlotIsRenameScroll(itemIdAtSlot))
             return new RenameAvatarResult(RenameAvatarOutcome.ItemMismatch);
+
+        if (!AvatarNameValidator.HasOnlyWhitelistedCharacters(changeAvatarName))
+            return new RenameAvatarResult(RenameAvatarOutcome.Malformed);
 
         var relationshipRefusal = await CheckRelationshipRefusalsAsync(character, cancellationToken);
         if (relationshipRefusal is { } outcome)
@@ -39,8 +50,8 @@ public sealed class RenameAvatarService(
         int code;
         try
         {
-            code = await renames.RenameAndConsumeItemAsync(accountId, avatarPost, changeAvatarName, itemContainer,
-                itemSlot, cancellationToken);
+            code = await renames.RenameAndConsumeItemAsync(accountId, avatarPost, changeAvatarName,
+                (byte)itemContainer, (byte)itemSlot, cancellationToken);
         }
         catch (Exception ex)
         {

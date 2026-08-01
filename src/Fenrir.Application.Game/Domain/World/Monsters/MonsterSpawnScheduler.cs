@@ -24,6 +24,11 @@ internal sealed class MonsterSpawnSlot
 
 internal sealed class MonsterZoneSpawnState
 {
+    // shmMONSTERSummonState==0 skips the respawn-delay check for one whole pass, then re-arms
+    // -- Server/ts25zone/S10_MySummon.cpp:905-928. Per-zone here: legacy runs one process per map.
+    public int IgnoreRespawnDelayPending;
+
+    public int SummonStateResetPending;
     public required List<MonsterSpawnSlot> Slots { get; init; }
     public required MonsterDropRoller DropRoller { get; init; }
     public required Random Random { get; init; }
@@ -75,6 +80,9 @@ public sealed class MonsterSpawnScheduler(
 
         DrainDeaths(zone, state);
 
+        if (Interlocked.Exchange(ref state.SummonStateResetPending, 0) != 0)
+            ApplySummonStateReset(zone, state);
+
         foreach (var slot in state.Slots)
             if (!slot.Alive)
                 slot.RespawnTicksRemaining = Math.Max(0, slot.RespawnTicksRemaining - legacyTicksElapsed);
@@ -84,9 +92,41 @@ public sealed class MonsterSpawnScheduler(
             return;
 
         state.TicksSinceLastScan = 0;
+        var ignoreRespawnDelay = Interlocked.Exchange(ref state.IgnoreRespawnDelayPending, 0) != 0;
         foreach (var slot in state.Slots)
-            if (slot is { Alive: false, RespawnTicksRemaining: <= 0 })
+            if (!slot.Alive && (ignoreRespawnDelay || slot.RespawnTicksRemaining <= 0))
                 Spawn(zone, slot);
+    }
+
+    public void RequestSummonStateReset(Zone zone)
+    {
+        ArgumentNullException.ThrowIfNull(zone);
+
+        var state = _stateByZone.GetOrAdd(zone.MapId, _ => BuildState(zone.MapId, zone.IsDungeonServerZone));
+        Interlocked.Exchange(ref state.SummonStateResetPending, 1);
+    }
+
+    // Legacy loops on the region count but indexes the monster instance array, so only a prefix is freed --
+    // Server/ts25zone/S10_MySummon.cpp:931-939 against the count read at Server/ts25zone/S10_MySummon.cpp:502.
+    private void ApplySummonStateReset(Zone zone, MonsterZoneSpawnState state)
+    {
+        var freedPrefix = Math.Min(RegionRowCountFor(zone.MapId), state.Slots.Count);
+        for (var index = 0; index < freedPrefix; index++)
+        {
+            var slot = state.Slots[index];
+            if (!slot.Alive)
+                continue;
+
+            zone.DespawnMonsterSilently(slot.ServerIndex);
+            slot.Alive = false;
+        }
+
+        Interlocked.Exchange(ref state.IgnoreRespawnDelayPending, 1);
+    }
+
+    private int RegionRowCountFor(short mapId)
+    {
+        return worldData.ZonesByNumber.TryGetValue(mapId, out var zoneDef) ? zoneDef.MonsterSpawnRegions.Length : 0;
     }
 
     public int SlotCountFor(short mapId)

@@ -22,7 +22,9 @@ public enum RenameAvatarOutcome
 
     SqlError,
 
-    SlotEmpty
+    SlotEmpty,
+
+    Malformed
 }
 
 public readonly record struct RenameAvatarResult(RenameAvatarOutcome Outcome);
@@ -30,5 +32,5 @@ public readonly record struct RenameAvatarResult(RenameAvatarOutcome Outcome);
 public interface IRenameAvatarService
 {
     public ValueTask<RenameAvatarResult> RenameAvatarAsync(int accountId, byte avatarPost, string changeAvatarName,
-        byte itemContainer, byte itemSlot, CancellationToken cancellationToken);
+        int itemContainer, int itemSlot, CancellationToken cancellationToken);
 }

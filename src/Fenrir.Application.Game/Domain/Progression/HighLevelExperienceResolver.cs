@@ -157,8 +157,11 @@ public static class HighLevelExperienceResolver
         var band = MaxMainExperience - mainExperienceFloor;
         if (band > 0)
         {
-            var presentPercent = (int)((mainExperience - mainExperienceFloor) * 100 / band);
-            var nextPercent = (int)((newMain - mainExperienceFloor) * 100 / band);
+            // Ratio en binary32, multiplication avant division: Server/ts25zone/S07_MyGame03.cpp:205-207.
+            // Une division entiere exacte diverge aux bornes de pourcent (operandes ~1e9, mantisse 24 bits).
+            var range = (float)band;
+            var presentPercent = (int)((float)(mainExperience - mainExperienceFloor) * 100.0f / range);
+            var nextPercent = (int)((float)(newMain - mainExperienceFloor) * 100.0f / range);
             statPoints = nextPercent - presentPercent;
             if (statPoints < 0)
                 statPoints = 0;
@@ -167,10 +170,11 @@ public static class HighLevelExperienceResolver
         return HighLevelExperienceOutcome.MainPoolFill(newMain, statPoints);
     }
 
+    // Meme chaine binary32 que Server/ts25zone/S07_MyGame03.cpp:408-410 (corps mort sous __GOD__, seule formule ecrite).
     private static int PercentOfThreshold(int exp2, int threshold)
     {
         if (threshold <= 0)
             return 0;
-        return (int)((long)exp2 * 100 / threshold);
+        return (int)((float)exp2 * 100.0f / (float)threshold);
     }
 }

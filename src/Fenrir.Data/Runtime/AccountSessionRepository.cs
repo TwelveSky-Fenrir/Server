@@ -140,6 +140,32 @@ public sealed record AccountSessionRepository(ICaeriusNetDbContext Db) : IAccoun
         }
     }
 
+    public async ValueTask<ImmutableArray<HeldAccountSessionDto>> RefreshAndGetHeldLeasesAsync(
+        AccountSessionServerKind serverKind, byte? shardId, IReadOnlyCollection<AccountSessionLeaseTvp> leases,
+        CancellationToken ct)
+    {
+        if (leases.Count == 0)
+            return ImmutableArray<HeldAccountSessionDto>.Empty;
+
+        for (var attempt = 1;; attempt++)
+        {
+            var sp = new StoredProcedureParametersBuilder("runtime", "usp_AccountSession_RefreshAndGetHeldLeases",
+                    leases.Count, CommandTimeoutSeconds)
+                .AddParameter("ServerKind", (byte)serverKind, SqlDbType.TinyInt)
+                .AddParameter("ShardId", (object?)shardId ?? DBNull.Value, SqlDbType.TinyInt)
+                .AddTvpParameter("Leases", leases)
+                .Build();
+
+            try
+            {
+                return await Db.QueryAsImmutableArrayAsync<HeldAccountSessionDto>(sp, ct);
+            }
+            catch (SqlException ex) when (attempt < MaxWriteConflictAttempts && IsWriteConflict(ex.Number))
+            {
+            }
+        }
+    }
+
     public async ValueTask<ImmutableArray<ReapedAccountSessionDto>> ReapStaleAsync(CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("runtime", "usp_AccountSession_ReapStale", 16,

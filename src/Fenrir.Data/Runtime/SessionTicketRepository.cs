@@ -64,6 +64,26 @@ public sealed record SessionTicketRepository(ICaeriusNetDbContext Db) : ISession
         }
     }
 
+    public async ValueTask RevokeAsync(int accountId, CancellationToken ct)
+    {
+        for (var attempt = 1;; attempt++)
+        {
+            var parameters =
+                new StoredProcedureParametersBuilder("runtime", "usp_SessionTicket_Revoke", 0, CommandTimeoutSeconds)
+                    .AddParameter("AccountId", accountId, SqlDbType.Int)
+                    .Build();
+
+            try
+            {
+                await Db.ExecuteAsync(parameters, ct);
+                return;
+            }
+            catch (SqlException ex) when (attempt < MaxWriteConflictAttempts && IsWriteConflict(ex.Number))
+            {
+            }
+        }
+    }
+
     public ValueTask PurgeExpiredAsync(CancellationToken ct)
     {
         var parameters =

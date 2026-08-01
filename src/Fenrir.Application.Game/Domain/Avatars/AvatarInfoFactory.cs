@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Domain.Costumes;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Mounts;
 using Fenrir.Application.Game.Domain.Pets;
@@ -29,12 +30,21 @@ public static class AvatarInfoFactory
 
     public static AvatarInfo CreateForCharacter(CharacterWorldSnapshotDto character,
         IReadOnlyList<CharacterItemSlotDto> items, AvatarSocialSnapshot? social = null,
-        IReadOnlyList<CharacterSkillDto>? skills = null, IReadOnlyList<CharacterHotkeyDto>? hotkeys = null)
+        IReadOnlyList<CharacterSkillDto>? skills = null, IReadOnlyList<CharacterHotkeyDto>? hotkeys = null,
+        IReadOnlyList<CharacterCostumeSlotDto>? costumes = null)
     {
         var s = social ?? AvatarSocialSnapshot.Empty;
+        var (wardrobe, costumeDate, costumeExpireDate) = CostumePersistenceCodec.Hydrate(costumes ?? []);
 
         return AvatarInfoTemplates.Zeroed with
         {
+            Costume = [.. wardrobe],
+            CostumeDate = [.. costumeDate],
+            CostumeExpireDate = [.. costumeExpireDate],
+            CostumeIndex = CostumePersistenceCodec.NormalizeIndexOnLoad(character.CostumeIndex, wardrobe),
+            PetExpX2Time = character.PetExpX2Time,
+            AnimalAbsorbTime = character.AnimalAbsorbTime,
+            AnimalAbsorbState = character.AnimalAbsorbState,
             Name = character.Name,
             Tribe = character.Tribe,
             PreviousTribe = character.PreviousTribe,
@@ -68,7 +78,9 @@ public static class AvatarInfoFactory
             EatStrPotion = character.EatStrPotion,
             EatDexPotion = character.EatDexPotion,
             EatElePotion = character.EatElePotion,
+            AutoTime = character.AutoTime,
             AutoTime2 = character.AutoTime2,
+            BuffX2Time = character.BuffX2Time,
             DoubleExpTime1 = character.DoubleExpTime1,
             DoubleExpTime2 = character.DoubleExpTime2,
             AutoBuffTime = character.AutoBuffTime,
@@ -111,6 +123,13 @@ public static class AvatarInfoFactory
     {
         return AvatarInfoTemplates.Zeroed with
         {
+            Costume = [.. state.CostumeWardrobe],
+            CostumeDate = [.. state.CostumeDate],
+            CostumeExpireDate = [.. state.CostumeExpireDate],
+            CostumeIndex = state.CostumeIndex,
+            PetExpX2Time = state.PetExpX2Time,
+            AnimalAbsorbTime = state.AnimalAbsorbTime,
+            AnimalAbsorbState = state.AnimalAbsorbState,
             Name = state.Name,
             Tribe = state.Tribe,
             PreviousTribe = state.PreviousTribe,

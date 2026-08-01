@@ -35,6 +35,12 @@ public interface IAccountSessionRepository
     public ValueTask<ImmutableArray<KickedAccountDto>> RefreshAndGetKickedAsync(AccountSessionServerKind serverKind,
         byte? shardId, IReadOnlyCollection<int> accountIds, CancellationToken ct);
 
+    // Renvoie les baux effectivement detenus : tout couple envoye et non renvoye a perdu sa ligne.
+    // Server/ts25login/S07_MyGame01.cpp:59-72 (register_2 != 0 -> Quit de la session).
+    public ValueTask<ImmutableArray<HeldAccountSessionDto>> RefreshAndGetHeldLeasesAsync(
+        AccountSessionServerKind serverKind, byte? shardId, IReadOnlyCollection<AccountSessionLeaseTvp> leases,
+        CancellationToken ct);
+
     public ValueTask<ImmutableArray<ReapedAccountSessionDto>> ReapStaleAsync(CancellationToken ct);
 
     public ValueTask<int> GetActiveSessionCountAsync(CancellationToken ct);

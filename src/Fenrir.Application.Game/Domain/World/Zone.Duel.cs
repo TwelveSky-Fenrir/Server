@@ -55,8 +55,7 @@ public sealed partial class Zone
             return;
 
         if (outcome.ChargeConsumed)
-            attackerState.Buffs.Buff[8 * 2] =
-                0;
+            ConsumeChargeBuff(attackerState);
 
         var viewDamage = outcome.ViewDamage;
         var realDamage = outcome.DamageApplied;

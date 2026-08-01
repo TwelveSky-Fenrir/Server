@@ -76,8 +76,8 @@ public sealed class RerollItemService(
 
             await characters.AdjustMoneyAsync(characterId, resolved.Cost, 0, cancellationToken);
 
-            zone.CreditNpcServiceTribeTax(state.Tribe, resolved.Cost);
-
+            // Deliberate divergence: Server/ts25zone/S04_MyWork02.cpp:3815 credits the bank, then the NULL exit
+            // at 3879-3885 returns before the debit at 3934 -- a credit with no debit mints money.
             logger.LogInformation(
                 "Character {CharacterId} reroll-item found no candidate result item for target {TargetItemId}",
                 characterId, target.ItemId);

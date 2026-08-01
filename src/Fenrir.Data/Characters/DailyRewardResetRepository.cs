@@ -10,7 +10,7 @@ public sealed record DailyRewardResetRepository(ICaeriusNetDbContext Db) : IDail
 {
     public ValueTask ResetDailyRewardClaimsAsync(bool clearWeeklyDayCounter, CancellationToken ct)
     {
-        var sp = new StoredProcedureParametersBuilder("game", "usp_Character_ResetDailyRewardClaims", 0)
+        var sp = new StoredProcedureParametersBuilder("game", "usp_AccountDailyReward_ResetAll", 0)
             .AddParameter("ClearWeeklyDayCounter", clearWeeklyDayCounter, SqlDbType.Bit)
             .Build();
 

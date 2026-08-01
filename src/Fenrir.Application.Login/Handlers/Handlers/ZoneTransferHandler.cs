@@ -10,6 +10,8 @@ public sealed class ZoneTransferHandler(IZoneTransferService zoneTransferService
 {
     private const int MaxAvatarPost = 2;
 
+    private const int ClosedZonePort = 0;
+
     public async ValueTask HandleAsync(ZoneTransferRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
@@ -43,7 +45,10 @@ public sealed class ZoneTransferHandler(IZoneTransferService zoneTransferService
                 logger.LogWarning(
                     "Zone transfer rejected: account {AccountId} slot {Slot} outcome {Outcome}", accountId,
                     packet.AvatarPost, result.Outcome);
-                session.Send(new ZoneTransferResponse { Result = 1, Ip = "", Port = 0, Zone = 0 });
+                // Closed zone still echoes the resolved address and zone number (Server/ts25login/S04_MyWork02.cpp:1590).
+                // Port stays 0: that branch is entered precisely because the directory port was 0 (:1587).
+                session.Send(new ZoneTransferResponse
+                    { Result = 1, Ip = result.Ip, Port = ClosedZonePort, Zone = result.Zone });
                 return;
             case ZoneTransferOutcome.Success:
                 loginSession.MarkHandoverIssued();

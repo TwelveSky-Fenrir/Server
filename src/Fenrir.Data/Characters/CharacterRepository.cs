@@ -227,30 +227,46 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-    public async ValueTask PersistProgressAsync(IReadOnlyList<CharacterProgressTvp> rows, CancellationToken ct)
+    public async ValueTask<ReadOnlyCollection<CharacterCostumeSlotDto>> GetCostumesAsync(int characterId,
+        CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetCostumes", 10)
+            .AddParameter("CharacterId", characterId, SqlDbType.Int)
+            .Build();
+
+        return await Db.QueryAsReadOnlyCollectionAsync<CharacterCostumeSlotDto>(sp, ct);
+    }
+
+    public async ValueTask PersistProgressAsync(IReadOnlyList<CharacterProgressTvp> rows,
+        IReadOnlyList<CharacterCostumeSlotTvp> costumes, CancellationToken ct)
     {
         if (rows.Count == 0)
             return;
 
-        var sp = new StoredProcedureParametersBuilder("game", "usp_Character_PersistProgressBatch", 0)
-            .AddTvpParameter("Progress", rows)
-            .Build();
+        var builder = new StoredProcedureParametersBuilder("game", "usp_Character_PersistProgressBatch", 0)
+            .AddTvpParameter("Progress", rows);
 
-        await Db.ExecuteAsync(sp, ct);
+        // Penderie entierement vide: TVP omis (SQL Server refuse un TVP a zero ligne), le DELETE seul la vide.
+        if (costumes.Count > 0)
+            builder.AddTvpParameter("Costumes", costumes);
+
+        await Db.ExecuteAsync(builder.Build(), ct);
     }
 
     public async ValueTask PersistFinalFlushAsync(CharacterProgressTvp progress, CharacterPositionTvp position,
-        CancellationToken ct)
+        IReadOnlyList<CharacterCostumeSlotTvp> costumes, CancellationToken ct)
     {
         IReadOnlyList<CharacterProgressTvp> progressRows = [progress];
         IReadOnlyList<CharacterPositionTvp> positionRows = [position];
 
-        var sp = new StoredProcedureParametersBuilder("game", "usp_Character_PersistFinalFlush", 0)
+        var builder = new StoredProcedureParametersBuilder("game", "usp_Character_PersistFinalFlush", 0)
             .AddTvpParameter("Progress", progressRows)
-            .AddTvpParameter("Position", positionRows)
-            .Build();
+            .AddTvpParameter("Position", positionRows);
 
-        await Db.ExecuteAsync(sp, ct);
+        if (costumes.Count > 0)
+            builder.AddTvpParameter("Costumes", costumes);
+
+        await Db.ExecuteAsync(builder.Build(), ct);
     }
 
     public async ValueTask AdjustMoneyAsync(int characterId, long deltaMoney, int deltaBigMoney, CancellationToken ct)
@@ -458,17 +474,6 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-    public async ValueTask SetPetGrowthAsync(int characterId, int petGrowth, byte petActivity, CancellationToken ct)
-    {
-        var sp = new StoredProcedureParametersBuilder("game", "usp_Character_SetPetGrowth", 0)
-            .AddParameter("CharacterId", characterId, SqlDbType.Int)
-            .AddParameter("PetGrowth", petGrowth, SqlDbType.Int)
-            .AddParameter("PetActivity", petActivity, SqlDbType.TinyInt)
-            .Build();
-
-        await Db.ExecuteAsync(sp, ct);
-    }
-
     public async ValueTask<int?> GetIdByNameAsync(string name, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetIdByName", 1)
@@ -491,21 +496,22 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return row?.ItemId;
     }
 
-    public async ValueTask<RewardClaimStateDto?> GetRewardClaimStateAsync(int characterId, int todayDate,
+    public async ValueTask<RewardClaimStateDto?> GetAccountRewardClaimStateAsync(int accountId, int todayDate,
         CancellationToken ct)
     {
-        var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetRewardClaimState", 1)
-            .AddParameter("CharacterId", characterId, SqlDbType.Int)
+        var sp = new StoredProcedureParametersBuilder("game", "usp_AccountDailyReward_GetState", 1)
+            .AddParameter("AccountId", accountId, SqlDbType.Int)
             .AddParameter("TodayDate", todayDate, SqlDbType.Int)
             .Build();
 
         return await Db.FirstQueryAsync<RewardClaimStateDto>(sp, ct);
     }
 
-    public async ValueTask ClaimDailyRewardAsync(int characterId, int todayDate, byte container,
+    public async ValueTask ClaimAccountDailyRewardAsync(int accountId, int characterId, int todayDate, byte container,
         IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
     {
-        var builder = new StoredProcedureParametersBuilder("game", "usp_Character_ClaimDailyReward", 0)
+        var builder = new StoredProcedureParametersBuilder("game", "usp_AccountDailyReward_Claim", 0)
+            .AddParameter("AccountId", accountId, SqlDbType.Int)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
             .AddParameter("TodayDate", todayDate, SqlDbType.Int)
             .AddParameter("Container", container, SqlDbType.TinyInt);

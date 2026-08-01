@@ -1,5 +1,7 @@
+using Fenrir.Application.Login.Sessions;
 using Fenrir.Domain.Login;
 using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Protocol.Login;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -35,9 +37,49 @@ public sealed class AccountSessionLivenessHost(
         if (accountIds.IsEmpty)
             return;
 
-        var ids = accountIds.Select(id => (int)id).ToArray();
+        var leases = new List<AccountSessionLeaseTvp>(accountIds.Length);
+        var sessionsByAccount = new Dictionary<int, LoginClientSession>(accountIds.Length);
 
-        _ = await accountSessions.RefreshAndGetKickedAsync(AccountSessionServerKind.Login, null, ids, ct)
+        foreach (var accountId in accountIds)
+        {
+            if (!registry.TryGetByAccount(accountId, out var session) || session is not LoginClientSession login)
+                continue;
+
+            // Le bail n'est plus a nous des la passation : la ligne bascule en ServerKind=Game et ne doit
+            // surtout pas etre reclamee. Server/ts25login/S07_MyGame01.cpp:61 saute register_2 si IsMovingZone.
+            if (login.State == LoginSessionState.HandoverIssued)
+                continue;
+
+            if (login.AccountSessionToken is not { } token)
+                continue;
+
+            var id = (int)accountId;
+            leases.Add(new AccountSessionLeaseTvp(id, token));
+            sessionsByAccount[id] = login;
+        }
+
+        if (leases.Count == 0)
+            return;
+
+        var held = await accountSessions
+            .RefreshAndGetHeldLeasesAsync(AccountSessionServerKind.Login, null, leases, ct)
             .ConfigureAwait(false);
+
+        var stillHeld = new HashSet<int>(held.Length);
+        foreach (var row in held)
+            stillHeld.Add(row.AccountId);
+
+        foreach (var lease in leases)
+        {
+            if (stillHeld.Contains(lease.AccountId))
+                continue;
+
+            logger.LogWarning(
+                "Account {AccountId}: runtime.AccountSessions lease lost (row gone or reclaimed by another " +
+                "session token) -- closing session {SessionId}",
+                lease.AccountId, sessionsByAccount[lease.AccountId].SessionId);
+
+            sessionsByAccount[lease.AccountId].Abort(DisconnectReason.Evicted);
+        }
     }
 }

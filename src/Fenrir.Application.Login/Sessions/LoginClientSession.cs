@@ -24,9 +24,14 @@ public sealed class LoginClientSession(
 
     public Guid? AccountSessionToken { get; private set; }
 
+    public GiftSlotBoard GiftSlots { get; } = new();
+
     public override bool IsOpcodeAllowed(byte opcode)
     {
-        return LoginSessionStateGate.Allows(State, opcode);
+        if (!LoginSessionStateGate.Allows(State, opcode))
+            return false;
+
+        return !ChangeMasterStateGate.AppliesTo(opcode) || ChangeMasterStateGate.Allows(State);
     }
 
     public void MarkVersionOk()

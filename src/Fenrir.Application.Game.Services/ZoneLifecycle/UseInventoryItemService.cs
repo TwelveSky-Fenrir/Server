@@ -609,8 +609,8 @@ public sealed class UseInventoryItemService(
         {
             1134 => StatResetResolver.LevelBand.UpTo99,
             1135 => StatResetResolver.LevelBand.Level100To112,
-            1136 => StatResetResolver.LevelBand.Level113PlusNoRebirth,
-            1142 or 1459 => StatResetResolver.LevelBand.Level145PlusWithRebirth,
+            1136 => StatResetResolver.LevelBand.Level113PlusNoGrade,
+            1142 or 1459 => StatResetResolver.LevelBand.Level145PlusWithGrade,
             _ => null
         };
     }
@@ -621,8 +621,8 @@ public sealed class UseInventoryItemService(
         {
             1137 => StatResetResolver.LevelBand.UpTo99,
             1138 => StatResetResolver.LevelBand.Level100To112,
-            1139 => StatResetResolver.LevelBand.Level113PlusNoRebirth,
-            1143 or 2022 or 8417 => StatResetResolver.LevelBand.Level145PlusWithRebirth,
+            1139 => StatResetResolver.LevelBand.Level113PlusNoGrade,
+            1143 or 2022 or 8417 => StatResetResolver.LevelBand.Level145PlusWithGrade,
             _ => null
         };
     }
@@ -631,7 +631,7 @@ public sealed class UseInventoryItemService(
         int characterId, byte page, byte index, ItemStack item, StatResetResolver.LevelBand requiredBand,
         CancellationToken cancellationToken)
     {
-        if (!StatResetResolver.TryResolveLevelBand(state.Level, state.RebirthCount, out var actualBand) ||
+        if (!StatResetResolver.TryResolveLevelBand(state.Level, state.Level2, out var actualBand) ||
             actualBand != requiredBand)
             return Fail(characterId, item, page, index);
 
@@ -658,7 +658,7 @@ public sealed class UseInventoryItemService(
         if (selector is < 1 or > 4)
             return Fail(characterId, item, page, index);
 
-        if (!StatResetResolver.TryResolveLevelBand(state.Level, state.RebirthCount, out var actualBand) ||
+        if (!StatResetResolver.TryResolveLevelBand(state.Level, state.Level2, out var actualBand) ||
             actualBand != requiredBand)
             return Fail(characterId, item, page, index);
 
@@ -970,7 +970,8 @@ public sealed class UseInventoryItemService(
 
         if (!await zone.PostTribeProgressCommandAndWaitAsync(
                 new TribeProgressZoneCommand(characterId, PetGrowth: feed.NewGrowth, UpdatedStats: updatedStats,
-                    FullActionRebroadcast: feed.TierIncreased), cancellationToken))
+                    PetGrowStepBroadcast: feed.TierIncreased, FullActionRebroadcast: feed.TierIncreased),
+                cancellationToken))
             logger.LogError(
                 "Zone {MapId} tribe-progress inbox full: dropped pet-food growth mirror for character {CharacterId}",
                 zone.MapId, characterId);

@@ -43,11 +43,25 @@ public sealed class ZoneCenterBroadcastIngestor(
 
     public const int Zone194RangeEnd = 208;
 
+    public const int Zone038WinEventCode = ScheduledZoneCenterEventCodes.Zone038WinEventCode;
+
+    public const int TribeSymbolBattleCountdownEventCode = 39;
+
+    public const int TribeSymbolBattleStartEventCode = 40;
+
+    public const int TribeSymbolResolvedEventCode = 42;
+
+    public const int TribeSymbolBattleEndEventCode = 45;
+
     public const int TribeMasterCallAbilityEventCode = 302;
 
     public const int DtmEventCode = 1510;
 
     public const int PingEventCode = 4000;
+
+    // Le switch imbrique du legacy accepte 0..3 (symbole de tribu) et 4 (symbole du monstre neutre),
+    // sans default : tout autre index est un no-op silencieux (Server/ts25center/S04_MyWork02.cpp:377-395).
+    private const int MonsterSymbolSlot = WorldState.WorldStateService.TribeCount;
 
     public void Ingest(int eventCode, ReadOnlySpan<byte> data)
     {
@@ -66,7 +80,7 @@ public sealed class ZoneCenterBroadcastIngestor(
 
         Relay(eventCode, data);
 
-        if (eventCode is >= Zone049RangeStart and <= Zone049RangeEnd)
+        if (KnownTSortRegistry.CrossesShardBoundary(eventCode))
             EnqueueForOtherShards(eventCode, data);
     }
 
@@ -81,6 +95,11 @@ public sealed class ZoneCenterBroadcastIngestor(
 
         if (!ApplyStateEffect(eventCode, data))
             return;
+
+        // Le legacy diffuse 1601 (charge nulle) PUIS 4000 sur une seule trame 4000 entrante
+        // (Server/ts25center/S04_MyWork02.cpp:1151-1157 puis :1214) : le shard receveur doit les deux.
+        if (eventCode == PingEventCode)
+            BroadcastAllZonesPing();
 
         Relay(eventCode, data);
     }
@@ -151,21 +170,104 @@ public sealed class ZoneCenterBroadcastIngestor(
                 return TribeBonusRatioEventMap.Apply(state, data, logger);
 
             case >= AllianceProposalCenterEventMap.EventCodeRangeStart
-                and <= AllianceProposalCenterEventMap.EventCodeRangeEnd
-                when allianceState is not null:
-                return AllianceProposalCenterEventMap.Apply(eventCode, data, allianceState, logger);
+                and <= AllianceProposalCenterEventMap.EventCodeRangeEnd:
+                return ApplyAllianceEvent(eventCode, data);
 
             case PingEventCode:
                 HsbRewardFlagResetReactor.Apply(zones);
                 return true;
 
-            case 38 or 39 or 40 or 42 or 45 or 46 or 47:
-                worldReactions?.Value.ApplyRelayedStateAndReactions(eventCode, data);
-                return true;
+            case Zone038WinEventCode or TribeSymbolBattleCountdownEventCode or TribeSymbolBattleStartEventCode
+                or TribeSymbolResolvedEventCode or TribeSymbolBattleEndEventCode:
+                return ApplyWorldReaction(eventCode, data);
 
             default:
                 return true;
         }
+    }
+
+    private bool ApplyAllianceEvent(int eventCode, ReadOnlySpan<byte> data)
+    {
+        if (!TryValidateWorldReactionIndices(eventCode, data))
+            return false;
+
+        if (allianceState is not null &&
+            !AllianceProposalCenterEventMap.Apply(eventCode, data, allianceState, logger))
+            return false;
+
+        if (eventCode is AllianceProposalCenterEventMap.FinalizeNewAllianceEventCode
+            or AllianceProposalCenterEventMap.BreakAllianceViaRitualEventCode)
+            worldReactions?.Value.ApplyRelayedStateAndReactions(eventCode, data);
+
+        return true;
+    }
+
+    private bool ApplyWorldReaction(int eventCode, ReadOnlySpan<byte> data)
+    {
+        if (!TryValidateWorldReactionIndices(eventCode, data))
+            return false;
+
+        worldReactions?.Value.ApplyRelayedStateAndReactions(eventCode, data);
+        return true;
+    }
+
+    private bool TryValidateWorldReactionIndices(int eventCode, ReadOnlySpan<byte> data)
+    {
+        switch (eventCode)
+        {
+            case Zone038WinEventCode:
+                return ValidateTribe(eventCode, ReadInt32(data, 0));
+
+            case TribeSymbolResolvedEventCode:
+            {
+                var symbolSlot = ReadInt32(data, 0);
+
+                if (symbolSlot is < 0 or > MonsterSymbolSlot)
+                {
+                    logger.LogWarning(
+                        "Tribe-symbol resolution event referenced out-of-range symbol slot {SymbolSlot} -- ignored, dropped without relay",
+                        symbolSlot);
+                    return false;
+                }
+
+                return ValidateTribe(eventCode, ReadInt32(data, 4));
+            }
+
+            case AllianceProposalCenterEventMap.FinalizeNewAllianceEventCode
+                or AllianceProposalCenterEventMap.BreakAllianceViaRitualEventCode
+                or AllianceProposalCenterEventMap.BreakAllianceViaStoneCaptureEventCode:
+            {
+                var tribeA = ReadInt32(data, 0);
+                var tribeB = ReadInt32(data, 4);
+
+                if (!ValidateTribe(eventCode, tribeA) || !ValidateTribe(eventCode, tribeB))
+                    return false;
+
+                if (eventCode == AllianceProposalCenterEventMap.FinalizeNewAllianceEventCode && tribeA == tribeB)
+                {
+                    logger.LogWarning(
+                        "Alliance formation event named tribe {TribeId} on both sides -- ignored, dropped without relay",
+                        tribeA);
+                    return false;
+                }
+
+                return true;
+            }
+
+            default:
+                return true;
+        }
+    }
+
+    private bool ValidateTribe(int eventCode, int tribeId)
+    {
+        if (ZoneCenterSiegeState.IsValidTribe(tribeId))
+            return true;
+
+        logger.LogWarning(
+            "Zone-center event {EventCode} referenced out-of-range tribe id {TribeId} -- ignored, dropped without relay",
+            eventCode, tribeId);
+        return false;
     }
 
     private bool ApplyZone049(int eventCode, ReadOnlySpan<byte> data)

@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Domain.Buffs;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Data.WriteBehind;
 
@@ -6,6 +7,16 @@ namespace Fenrir.Application.Game.Domain.World;
 public sealed partial class Zone
 {
     private const short ReflectDisabledZoneId = 124;
+
+    private const int ChargeConsumedAvatarChangeInfoSort = 2;
+
+    private const int HolyShieldRemovedAvatarChangeInfoSort = 3;
+
+    private const int ReturnDamageAvatarChangeInfoSort = 4;
+
+    private const int HolyShieldHitByPlayerAvatarChangeInfoSort = 5;
+
+    private const int HolyShieldHitByMonsterAvatarChangeInfoSort = 6;
 
     private bool TryApplyReflectAndDestroyer(PlayerRuntimeState attackerState, PlayerRuntimeState defenderState,
         in AttackOutcome outcome, CrossAvatarAttackKind kind)
@@ -27,6 +38,8 @@ public sealed partial class Zone
 
         if (!reflect.ReflectFired)
             return false;
+
+        BroadcastAvatarStateFlag(attackerState, ReturnDamageAvatarChangeInfoSort, reflect.ReflectDamage, 0, 0);
 
         attackerState.Life -= reflect.ReflectDamage;
         attackerState.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
@@ -50,13 +63,19 @@ public sealed partial class Zone
         return true;
     }
 
-    private (int View, int Real) ApplyHolyShieldAbsorption(PlayerRuntimeState defenderState, in AttackOutcome outcome)
+    // Sort par defaut 5 : DecreaseHolyShield(9,...,5,...) est le cas avatar->avatar (Server/ts25zone/S07_MyGame02.cpp:1048),
+    // le cas monstre->avatar passe 6 (Server/ts25zone/S07_MyGame02.cpp:2892).
+    private (int View, int Real) ApplyHolyShieldAbsorption(PlayerRuntimeState defenderState, in AttackOutcome outcome,
+        int changeInfoSort = HolyShieldHitByPlayerAvatarChangeInfoSort)
     {
         var preElementMainDamage = outcome.ViewDamage - outcome.ElementDamage;
         var absorbed = HolyShieldResolver.Absorb(defenderState.Buffs.Buff, preElementMainDamage);
 
         if (absorbed > 0)
+        {
+            BroadcastAvatarStateFlag(defenderState, changeInfoSort, absorbed, 0, 0);
             BroadcastHolyShieldChange(defenderState);
+        }
 
         var view = preElementMainDamage - absorbed + outcome.ElementDamage;
         var real = Math.Min(view, defenderState.Life);
@@ -65,8 +84,22 @@ public sealed partial class Zone
 
     private void RemoveDefenderHolyShields(PlayerRuntimeState defenderState)
     {
-        if (HolyShieldResolver.RemoveAll(defenderState.Buffs.Buff))
+        var removed = HolyShieldResolver.RemoveAll(defenderState.Buffs.Buff);
+
+        // Emission inconditionnelle, meme sans bouclier actif : Server/ts25zone/S07_MyGame04.cpp:2739.
+        BroadcastAvatarStateFlag(defenderState, HolyShieldRemovedAvatarChangeInfoSort, 0, 0, 0);
+
+        if (removed)
             BroadcastHolyShieldChange(defenderState);
+    }
+
+    // Le legacy passe tClientBuffSlotValue = 0, donc Value01 vaut 0 et non la charge : Server/ts25zone/S07_MyGame02.cpp:733.
+    // DecreaseBuff efface aussi le second mot du slot (duree/aEffectValueForView) quand il tombe sous 1 : :2670-2676.
+    private void ConsumeChargeBuff(PlayerRuntimeState attackerState)
+    {
+        attackerState.Buffs.Buff[BuffCatalog.Charge * 2] = 0;
+        attackerState.Buffs.Buff[BuffCatalog.Charge * 2 + 1] = 0;
+        BroadcastAvatarStateFlag(attackerState, ChargeConsumedAvatarChangeInfoSort, 0, 0, 0);
     }
 
     private void BroadcastHolyShieldChange(PlayerRuntimeState state)

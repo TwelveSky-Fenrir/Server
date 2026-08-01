@@ -17,18 +17,18 @@ public sealed class ClaimDailyRewardService(
     private const int RewardBundleId = 1;
 
     public async ValueTask<ClaimDailyRewardResponse?> ResolveAndApplyAsync(ClaimDailyRewardRequest packet, Zone zone,
-        PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
+        PlayerRuntimeState state, int accountId, int characterId, CancellationToken cancellationToken)
     {
         var today = GameDate.Today();
-        var claimState = await characters.GetRewardClaimStateAsync(characterId, today, cancellationToken);
+        var claimState = await characters.GetAccountRewardClaimStateAsync(accountId, today, cancellationToken);
         if (claimState is null)
             return null;
 
         if (claimState.RewardClaimDate == today || claimState.RewardClaimDay > 6)
         {
             logger.LogInformation(
-                "Daily-reward claim denied for character {CharacterId}: already claimed today or cycle exhausted (day {RewardClaimDay})",
-                characterId, claimState.RewardClaimDay);
+                "Daily-reward claim denied for account {AccountId}: already claimed today or cycle exhausted (day {RewardClaimDay})",
+                accountId, claimState.RewardClaimDay);
             return new ClaimDailyRewardResponse
                 { Result = 1, Value = new int[6], InvenPage = -1, InvenX = -1, InvenY = -1 };
         }
@@ -64,14 +64,14 @@ public sealed class ClaimDailyRewardService(
 
         try
         {
-            await characters.ClaimDailyRewardAsync(characterId, today, destination.Container,
+            await characters.ClaimAccountDailyRewardAsync(accountId, characterId, today, destination.Container,
                 ToTvps(projectedContainer), cancellationToken);
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex,
-                "Character {CharacterId} daily-reward claim ClaimDailyRewardAsync failed (treated as already claimed)",
-                characterId);
+                "Account {AccountId} daily-reward claim ClaimAccountDailyRewardAsync failed (treated as already claimed)",
+                accountId);
             return new ClaimDailyRewardResponse
                 { Result = 1, Value = new int[6], InvenPage = -1, InvenX = -1, InvenY = -1 };
         }
@@ -94,8 +94,8 @@ public sealed class ClaimDailyRewardService(
                 zone.MapId, characterId);
 
         logger.LogInformation(
-            "Character {CharacterId} claimed daily reward day {RewardClaimDay}: item {ItemId} into container {Container}",
-            characterId, day, itemId, destination.Container);
+            "Account {AccountId} claimed daily reward day {RewardClaimDay} on character {CharacterId}: item {ItemId} into container {Container}",
+            accountId, day, characterId, itemId, destination.Container);
 
         return response;
     }

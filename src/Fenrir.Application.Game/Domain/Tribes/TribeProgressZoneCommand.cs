@@ -47,6 +47,7 @@ public readonly record struct TribeProgressZoneCommand(
     int? TeacherPoint = null,
     int? PetGrowth = null,
     byte? PetActivity = null,
+    bool PetGrowStepBroadcast = false,
     int? PlayTimeEvent = null,
     int? EatLifePotion = null,
     int? EatManaPotion = null,

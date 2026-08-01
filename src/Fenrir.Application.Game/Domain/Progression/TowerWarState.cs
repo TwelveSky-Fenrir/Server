@@ -182,6 +182,14 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
+    public bool IsEngagementWindowOpen(int towerIndex)
+    {
+        lock (_lock)
+        {
+            return _firstAttackRecorded[towerIndex];
+        }
+    }
+
     public DateTime? GetFirstAttackAtUtc(int towerIndex)
     {
         lock (_lock)

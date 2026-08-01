@@ -3,7 +3,8 @@ using Fenrir.Core.Wire;
 
 namespace Fenrir.Protocol.Game;
 
-[FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.ZoneWar297TypeCancel, ExpectedSize = 30,
+[FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.ZoneWar297TypeCancel,
+    ExpectedSize = 30,
     AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
 public readonly partial record struct ZoneWar297TypeCancelRequest : IIncomingPacket<ZoneWar297TypeCancelRequest>
 {

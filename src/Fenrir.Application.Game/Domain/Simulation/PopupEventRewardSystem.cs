@@ -98,17 +98,12 @@ public sealed class PopupEventRewardSystem(PopupEventState state) : ISimulationS
         }
     }
 
-    // Un des deux seuls tSort qui portent tValue2 : les deux compteurs partent ensemble, meme depuis le
-    // chemin monstre. Unicast au tueur, apres l'increment puis apres la remise a 0:
-    // Server/ts25zone/S07_MyGame03.cpp:2629 ; :2643 ; Server/ts25zone/S07_MyGame05.cpp:2235 ; :2242
     private static void SendPopupKillCounters(PlayerRuntimeState killer, PopupCounters counters)
     {
         killer.Session.Send(new AvatarStatUpdateResponse
             { Sort = PopupKillCounterStatSort, Value = counters.Avt, Value2 = counters.Monster });
     }
 
-    // Unicast au seul tueur, apres l'increment puis apres la remise a 0:
-    // Server/ts25zone/S07_MyGame03.cpp:2603 ; Server/ts25zone/S07_MyGame03.cpp:2617
     private static void SendWarPopupCounter(PlayerRuntimeState killer, int counter)
     {
         killer.Session.Send(new AvatarStatUpdateResponse

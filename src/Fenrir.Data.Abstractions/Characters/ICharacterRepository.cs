@@ -73,8 +73,6 @@ public interface ICharacterRepository
     public ValueTask<ReadOnlyCollection<CharacterCostumeSlotDto>> GetCostumesAsync(int characterId,
         CancellationToken ct);
 
-    // costumes = penderie COMPLETE de chaque personnage present dans rows, slots occupes seulement : la
-    // procedure remplace, elle ne fusionne pas. Parametre requis a dessein -- un oubli viderait les penderies.
     public ValueTask PersistProgressAsync(IReadOnlyList<CharacterProgressTvp> rows,
         IReadOnlyList<CharacterCostumeSlotTvp> costumes, CancellationToken ct);
 
@@ -131,9 +129,6 @@ public interface ICharacterRepository
 
     public ValueTask<int?> GetItemIdAtSlotAsync(int characterId, byte container, byte slot, CancellationToken ct);
 
-    // Keyed by account, not character: legacy carries the claim state on memberinfo and persists it
-    // WHERE uUserIdx (Server/ts25playuser/S08_MyDB.cpp:400). The claimed item still lands in one character's
-    // inventory, hence both ids on the claim call.
     public ValueTask<RewardClaimStateDto?> GetAccountRewardClaimStateAsync(int accountId, int todayDate,
         CancellationToken ct);
 

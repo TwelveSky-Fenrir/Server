@@ -27,8 +27,6 @@ public sealed class RenameAvatarService(
         if (character is null || character.Name.Length == 0)
             return new RenameAvatarResult(RenameAvatarOutcome.SlotEmpty);
 
-        // The "same name" answer is emitted BEFORE the page/index bounds and before the charset filter
-        // (Server/ts25login/S04_MyWork02.cpp:1313-1337): those bounds must not turn it into a disconnect.
         if (string.Equals(changeAvatarName, character.Name, StringComparison.OrdinalIgnoreCase))
             return new RenameAvatarResult(RenameAvatarOutcome.NameTaken);
 

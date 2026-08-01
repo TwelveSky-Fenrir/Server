@@ -2,9 +2,6 @@ using System.Collections.Immutable;
 
 namespace Fenrir.Data.Abstractions.Characters;
 
-// aBottle[10] (item id, 5 digits, EFIX_ITEM) et aBottleCount[10] (count, 2 digits, EFIX_NONE) sont deux colonnes
-// legacy distinctes (Server/Header/CSQLAvatar.cpp:308-311) ; encodees ici cote a cote par slot dans une seule
-// colonne, aux memes largeurs fixes.
 public static class BottleSlotsCodec
 {
     public const int SlotCount = 10;
@@ -66,21 +63,19 @@ public static class BottleSlotsCodec
         return builder.MoveToImmutable();
     }
 
-    // CSQLAvatar.cpp:19-23 (EFIX_NONE/EFIX_ITEM ramenent le negatif a 0) puis CSQLDatabase.cpp:518 ("%0Nd").
     private static void WriteValue(Span<char> destination, ref int position, int value, int digits, int modulus)
     {
         var clamped = (value < 0 ? 0 : value) % modulus;
 
         for (var i = digits - 1; i >= 0; i--)
         {
-            destination[position + i] = (char)('0' + (clamped % 10));
+            destination[position + i] = (char)('0' + clamped % 10);
             clamped /= 10;
         }
 
         position += digits;
     }
 
-    // CSQLDatabase.cpp:530-544 : atoi de la tranche, un caractere non numerique arrete la lecture.
     private static int ReadValue(ReadOnlySpan<char> digits)
     {
         var value = 0;
@@ -90,7 +85,7 @@ public static class BottleSlotsCodec
             if (digit is < '0' or > '9')
                 break;
 
-            value = (value * 10) + (digit - '0');
+            value = value * 10 + (digit - '0');
         }
 
         return value;

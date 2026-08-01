@@ -34,6 +34,10 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
 
     public static readonly TimeSpan EngagementAutoClear = TimeSpan.FromMinutes(10);
 
+    private readonly int[] _attackState = CreateIdleAttackStates();
+
+    private readonly int[] _bonusInputScratch = new int[TowerCount];
+
     private readonly int[] _constructKind = new int[TowerCount];
 
     private readonly byte?[] _controllingTribe = new byte?[TowerCount];
@@ -56,10 +60,6 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
     private readonly DateTime?[] _siegeStartedAtUtc = new DateTime?[TowerCount];
 
     private readonly TowerTribeRewardBonus[] _tribeBonus = new TowerTribeRewardBonus[TowerRewardBonusTable.TribeCount];
-
-    private readonly int[] _attackState = CreateIdleAttackStates();
-
-    private readonly int[] _bonusInputScratch = new int[TowerCount];
 
     private readonly bool[] _valid = new bool[TowerCount];
 

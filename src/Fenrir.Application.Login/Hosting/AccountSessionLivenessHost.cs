@@ -45,8 +45,6 @@ public sealed class AccountSessionLivenessHost(
             if (!registry.TryGetByAccount(accountId, out var session) || session is not LoginClientSession login)
                 continue;
 
-            // Le bail n'est plus a nous des la passation : la ligne bascule en ServerKind=Game et ne doit
-            // surtout pas etre reclamee. Server/ts25login/S07_MyGame01.cpp:61 saute register_2 si IsMovingZone.
             if (login.State == LoginSessionState.HandoverIssued)
                 continue;
 

@@ -877,8 +877,6 @@ public sealed partial class Zone
         if (command.RankBuffType is { } rankBuffType)
         {
             state.RankBuffType = rankBuffType;
-            // Persiste (aRankBuffType, Server/Header/CSQLAvatar.cpp:647) : sans ce marquage le palier
-            // ne partirait au flush que si un autre champ du meme lot etait deja sale.
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
         }
 
@@ -964,8 +962,6 @@ public sealed partial class Zone
         if (command.RegisteredSkills is { } registered)
         {
             state.AutoBuffSkill = registered;
-            // Persiste (aAutoBuffSkill, Server/Header/CSQLAvatar.cpp:703) : les 8 emplacements enregistres
-            // doivent survivre a la deconnexion et au changement de zone.
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
         }
 

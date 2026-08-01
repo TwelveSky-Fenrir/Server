@@ -36,8 +36,6 @@ public static class HolyShieldResolver
 
     private static int ResolveActiveSlot(int[] buff)
     {
-        // Slots 29-34 morts : seul ecrivain sous #ifdef MG5ORIGIN_ECAPE, jamais defini (Server/ts25zone/S07_MyGame03.cpp:8726),
-        // donc la chaine de priorite 29..34 de Server/ts25zone/S07_MyGame04.cpp:2686-2697 se reduit toujours au slot 9.
         return buff[BaseSlot * 2] > 0 ? BaseSlot : -1;
     }
 

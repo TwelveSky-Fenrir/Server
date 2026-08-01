@@ -56,19 +56,19 @@
 -- elles restent en base, simplement plus jamais appelees.
 
 IF OBJECT_ID('game.AccountDailyRewards', 'U') IS NULL
-    CREATE TABLE game.AccountDailyRewards
-    (
-        AccountId       INT          NOT NULL,
-        RewardClaimDay  TINYINT      NOT NULL
-            CONSTRAINT DF_AccountDailyRewards_RewardClaimDay DEFAULT 0
-            CONSTRAINT CK_AccountDailyRewards_RewardClaimDay CHECK (RewardClaimDay BETWEEN 0 AND 7),
-        RewardClaimDate INT          NOT NULL
-            CONSTRAINT DF_AccountDailyRewards_RewardClaimDate DEFAULT 0,
-        UpdatedAtUtc    DATETIME2(3) NOT NULL
-            CONSTRAINT DF_AccountDailyRewards_UpdatedAtUtc DEFAULT SYSUTCDATETIME(),
-        CONSTRAINT PK_AccountDailyRewards PRIMARY KEY CLUSTERED (AccountId),
-        CONSTRAINT FK_AccountDailyRewards_Auth_Account FOREIGN KEY (AccountId) REFERENCES auth.Accounts (AccountId)
-    );
+CREATE TABLE game.AccountDailyRewards
+(
+    AccountId       INT          NOT NULL,
+    RewardClaimDay  TINYINT      NOT NULL
+        CONSTRAINT DF_AccountDailyRewards_RewardClaimDay DEFAULT 0
+        CONSTRAINT CK_AccountDailyRewards_RewardClaimDay CHECK (RewardClaimDay BETWEEN 0 AND 7),
+    RewardClaimDate INT          NOT NULL
+        CONSTRAINT DF_AccountDailyRewards_RewardClaimDate DEFAULT 0,
+    UpdatedAtUtc    DATETIME2(3) NOT NULL
+        CONSTRAINT DF_AccountDailyRewards_UpdatedAtUtc DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT PK_AccountDailyRewards PRIMARY KEY CLUSTERED (AccountId),
+    CONSTRAINT FK_AccountDailyRewards_Auth_Account FOREIGN KEY (AccountId) REFERENCES auth.Accounts (AccountId)
+);
 GO
 
 -- BACKFILL -- REGLE DE CONFLIT, EXPLICITE ET CONSERVATRICE
@@ -136,19 +136,19 @@ BEGIN
     DECLARE
         @Date INT = 0;
 
-    SELECT @Day  = RewardClaimDay,
+    SELECT @Day = RewardClaimDay,
            @Date = RewardClaimDate
     FROM game.AccountDailyRewards
     WHERE AccountId = @AccountId;
 
     -- CAST en TINYINT : melanger une branche TINYINT et un litteral INT promeut en INT, que le champ
     -- TINYINT de l'appelant rejette.
-    SELECT RewardClaimDay = CAST(CASE
-                                     WHEN @Date <> 0
-                                         AND DATEDIFF(DAY, 0, @TodayAsDate) / 7 <>
-                                             DATEDIFF(DAY, 0, TRY_CONVERT(DATE, CAST(@Date AS VARCHAR(8)), 112)) / 7
-                                         THEN 0
-                                     ELSE @Day
+    SELECT RewardClaimDay  = CAST(CASE
+                                      WHEN @Date <> 0
+                                          AND DATEDIFF(DAY, 0, @TodayAsDate) / 7 <>
+                                              DATEDIFF(DAY, 0, TRY_CONVERT(DATE, CAST(@Date AS VARCHAR(8)), 112)) / 7
+                                          THEN 0
+                                      ELSE @Day
         END AS TINYINT),
            RewardClaimDate = @Date;
 END;
@@ -196,7 +196,8 @@ BEGIN
 
     IF
         NOT EXISTS (SELECT 1
-                    FROM game.AccountDailyRewards WITH (UPDLOCK, HOLDLOCK)
+                    FROM game.AccountDailyRewards
+                    WITH (UPDLOCK, HOLDLOCK)
                     WHERE AccountId = @AccountId)
         INSERT INTO game.AccountDailyRewards (AccountId)
         VALUES (@AccountId);

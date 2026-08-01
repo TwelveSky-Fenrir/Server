@@ -7,9 +7,6 @@ public readonly record struct GiftSlotEntry(int GiftId, int ProductId)
     public bool IsOccupied => GiftId != 0;
 }
 
-// Server/ts25login/S08_MyDB.cpp:939-974 : uGiftInfo est un tableau de 10 emplacements A POSITION FIXE,
-// lu d'une colonne texte de 50 caracteres decoupee en 10 tranches de 5 chiffres. Un rang derive d'un tri
-// se redensifie a chaque consommation et fait glisser tous les index superieurs.
 public sealed class GiftSlotBoard
 {
     public const int SlotCount = 10;

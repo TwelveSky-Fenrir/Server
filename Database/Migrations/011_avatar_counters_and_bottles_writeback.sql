@@ -85,69 +85,69 @@ IF NOT EXISTS (SELECT 1
                FROM sys.columns
                WHERE object_id = OBJECT_ID(N'game.Characters')
                  AND name = N'ProtectForHalo')
-    ALTER TABLE game.Characters
-        ADD ProtectForHalo INT NOT NULL
-            CONSTRAINT DF_Characters_ProtectForHalo DEFAULT 0
-            CONSTRAINT CK_Characters_ProtectForHalo CHECK (ProtectForHalo >= 0);
+ALTER TABLE game.Characters
+    ADD ProtectForHalo INT NOT NULL
+        CONSTRAINT DF_Characters_ProtectForHalo DEFAULT 0
+        CONSTRAINT CK_Characters_ProtectForHalo CHECK (ProtectForHalo >= 0);
 GO
 
 IF NOT EXISTS (SELECT 1
                FROM sys.columns
                WHERE object_id = OBJECT_ID(N'game.Characters')
                  AND name = N'BonusItemLevel')
-    ALTER TABLE game.Characters
-        ADD BonusItemLevel INT NOT NULL
-            CONSTRAINT DF_Characters_BonusItemLevel DEFAULT 0
-            CONSTRAINT CK_Characters_BonusItemLevel CHECK (BonusItemLevel >= 0);
+ALTER TABLE game.Characters
+    ADD BonusItemLevel INT NOT NULL
+        CONSTRAINT DF_Characters_BonusItemLevel DEFAULT 0
+        CONSTRAINT CK_Characters_BonusItemLevel CHECK (BonusItemLevel >= 0);
 GO
 
 IF NOT EXISTS (SELECT 1
                FROM sys.columns
                WHERE object_id = OBJECT_ID(N'game.Characters')
                  AND name = N'BonusItemValue')
-    ALTER TABLE game.Characters
-        ADD BonusItemValue BIT NOT NULL
-            CONSTRAINT DF_Characters_BonusItemValue DEFAULT 0;
+ALTER TABLE game.Characters
+    ADD BonusItemValue BIT NOT NULL
+        CONSTRAINT DF_Characters_BonusItemValue DEFAULT 0;
 GO
 
 IF NOT EXISTS (SELECT 1
                FROM sys.columns
                WHERE object_id = OBJECT_ID(N'game.Characters')
                  AND name = N'TribeNotifyScrollCount')
-    ALTER TABLE game.Characters
-        ADD TribeNotifyScrollCount INT NOT NULL
-            CONSTRAINT DF_Characters_TribeNotifyScrollCount DEFAULT 0
-            CONSTRAINT CK_Characters_TribeNotifyScrollCount CHECK (TribeNotifyScrollCount >= 0);
+ALTER TABLE game.Characters
+    ADD TribeNotifyScrollCount INT NOT NULL
+        CONSTRAINT DF_Characters_TribeNotifyScrollCount DEFAULT 0
+        CONSTRAINT CK_Characters_TribeNotifyScrollCount CHECK (TribeNotifyScrollCount >= 0);
 GO
 
 IF NOT EXISTS (SELECT 1
                FROM sys.columns
                WHERE object_id = OBJECT_ID(N'game.Characters')
                  AND name = N'TribeFourReturnAllowance')
-    ALTER TABLE game.Characters
-        ADD TribeFourReturnAllowance INT NOT NULL
-            CONSTRAINT DF_Characters_TribeFourReturnAllowance DEFAULT 0
-            CONSTRAINT CK_Characters_TribeFourReturnAllowance CHECK (TribeFourReturnAllowance >= 0);
+ALTER TABLE game.Characters
+    ADD TribeFourReturnAllowance INT NOT NULL
+        CONSTRAINT DF_Characters_TribeFourReturnAllowance DEFAULT 0
+        CONSTRAINT CK_Characters_TribeFourReturnAllowance CHECK (TribeFourReturnAllowance >= 0);
 GO
 
 IF NOT EXISTS (SELECT 1
                FROM sys.columns
                WHERE object_id = OBJECT_ID(N'game.Characters')
                  AND name = N'BottleSlots')
-    ALTER TABLE game.Characters
-        ADD BottleSlots NVARCHAR(70) NOT NULL
-            CONSTRAINT DF_Characters_BottleSlots DEFAULT N''
-            CONSTRAINT CK_Characters_BottleSlots CHECK (LEN(BottleSlots) IN (0, 70));
+ALTER TABLE game.Characters
+    ADD BottleSlots NVARCHAR(70) NOT NULL
+        CONSTRAINT DF_Characters_BottleSlots DEFAULT N''
+        CONSTRAINT CK_Characters_BottleSlots CHECK (LEN(BottleSlots) IN (0, 70));
 GO
 
 IF NOT EXISTS (SELECT 1
                FROM sys.columns
                WHERE object_id = OBJECT_ID(N'game.Characters')
                  AND name = N'DrunkBottleIndex')
-    ALTER TABLE game.Characters
-        ADD DrunkBottleIndex INT NOT NULL
-            CONSTRAINT DF_Characters_DrunkBottleIndex DEFAULT -1
-            CONSTRAINT CK_Characters_DrunkBottleIndex CHECK (DrunkBottleIndex BETWEEN -1 AND 9);
+ALTER TABLE game.Characters
+    ADD DrunkBottleIndex INT NOT NULL
+        CONSTRAINT DF_Characters_DrunkBottleIndex DEFAULT -1
+        CONSTRAINT CK_Characters_DrunkBottleIndex CHECK (DrunkBottleIndex BETWEEN -1 AND 9);
 GO
 
 -- 2. Dropper les deux procedures qui referencent le type (elles bloquent DROP TYPE), puis le type lui-meme.

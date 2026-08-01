@@ -150,13 +150,13 @@
 -- Garde d'idempotence sur la premiere colonne : les trois sont ajoutees dans le meme ALTER, elles sont donc
 -- soit toutes presentes soit toutes absentes.
 IF COL_LENGTH('game.Characters', 'PetExpX2Time') IS NULL
-    ALTER TABLE game.Characters
-        ADD PetExpX2Time INT NOT NULL
-                CONSTRAINT DF_Characters_PetExpX2Time DEFAULT 0,
-            AnimalAbsorbTime INT NOT NULL
-                CONSTRAINT DF_Characters_AnimalAbsorbTime DEFAULT 0,
-            AnimalAbsorbState INT NOT NULL
-                CONSTRAINT DF_Characters_AnimalAbsorbState DEFAULT 0;
+ALTER TABLE game.Characters
+    ADD PetExpX2Time INT NOT NULL
+            CONSTRAINT DF_Characters_PetExpX2Time DEFAULT 0,
+        AnimalAbsorbTime INT NOT NULL
+            CONSTRAINT DF_Characters_AnimalAbsorbTime DEFAULT 0,
+        AnimalAbsorbState INT NOT NULL
+            CONSTRAINT DF_Characters_AnimalAbsorbState DEFAULT 0;
 GO
 
 -- ---------------------------------------------------------------------------
@@ -166,8 +166,8 @@ IF EXISTS (SELECT 1
            FROM sys.check_constraints
            WHERE name = N'CK_Characters_CostumeIndex'
              AND parent_object_id = OBJECT_ID(N'game.Characters'))
-    ALTER TABLE game.Characters
-        DROP CONSTRAINT CK_Characters_CostumeIndex;
+ALTER TABLE game.Characters
+    DROP CONSTRAINT CK_Characters_CostumeIndex;
 GO
 
 ALTER TABLE game.Characters
@@ -178,11 +178,11 @@ GO
 -- 3. game.CharacterCostumes : aCostumeDate et aCostumeExpireDate.
 -- ---------------------------------------------------------------------------
 IF COL_LENGTH('game.CharacterCostumes', 'ItemDate') IS NULL
-    ALTER TABLE game.CharacterCostumes
-        ADD ItemDate INT NOT NULL
-                CONSTRAINT DF_CharacterCostumes_ItemDate DEFAULT 0,
-            ExpireDate INT NOT NULL
-                CONSTRAINT DF_CharacterCostumes_ExpireDate DEFAULT 0;
+ALTER TABLE game.CharacterCostumes
+    ADD ItemDate INT NOT NULL
+            CONSTRAINT DF_CharacterCostumes_ItemDate DEFAULT 0,
+        ExpireDate INT NOT NULL
+            CONSTRAINT DF_CharacterCostumes_ExpireDate DEFAULT 0;
 GO
 
 -- ---------------------------------------------------------------------------
@@ -277,7 +277,10 @@ BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
-    DECLARE @Applied TABLE (CharacterId INT NOT NULL PRIMARY KEY);
+    DECLARE @Applied TABLE
+                     (
+                         CharacterId INT NOT NULL PRIMARY KEY
+                     );
 
     BEGIN TRANSACTION;
 
@@ -360,7 +363,10 @@ BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
-    DECLARE @Applied TABLE (CharacterId INT NOT NULL PRIMARY KEY);
+    DECLARE @Applied TABLE
+                     (
+                         CharacterId INT NOT NULL PRIMARY KEY
+                     );
 
     BEGIN TRANSACTION;
 

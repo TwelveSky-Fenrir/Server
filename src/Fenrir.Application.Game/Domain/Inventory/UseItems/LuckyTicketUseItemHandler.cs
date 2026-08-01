@@ -14,9 +14,6 @@ public sealed class LuckyTicketUseItemHandler(
     UseItemInventoryWriter inventoryWriter,
     ILogger<LuckyTicketUseItemHandler> logger) : IUseItemHandler
 {
-    // Volontairement vide : la recompense vient de ReturnDropRareItem, une requete sur la table SHM
-    // (Server/ts25zone/GameSystem/GameSystem_02_Item.cpp:941-1023), pas d'une table d'ids. OpenSingle recoit
-    // toujours l'override ci-dessous, donc ni RollRewardId ni RentalDays ni BoxId ne sont jamais lus ici.
     private static readonly BoxRewardSpec RewardDrawnDynamicallySpec =
         BoxRewardSpec.Uniform(0, ImmutableArray<int>.Empty);
 

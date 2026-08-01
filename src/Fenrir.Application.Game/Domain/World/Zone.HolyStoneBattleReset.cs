@@ -78,9 +78,6 @@ public sealed partial class Zone
                 RecomputeStatsAndBroadcastBuffs(state, changedSlots);
             }
 
-            // La purge quotidienne est persistee (ResetRank ecrit aRankPointDate/aRankBuffType dans
-            // AVATAR_INFO, Server/ts25zone/S07_MyGame03.cpp:8376-8378) : sans marquage elle serait annulee
-            // par le prochain chargement, qui relirait l'ancienne date.
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
         }
     }

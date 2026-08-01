@@ -21,8 +21,6 @@ public sealed class RenameAvatarHandler(IRenameAvatarService renameAvatarService
                 "Session {SessionId}: op19 CL_CHANGE_AVATAR_NAME_SEND received for account {AccountId} slot {Slot}",
                 session.SessionId, accountId, packet.AvatarPost);
 
-        // Only the two checks the legacy performs before its "same name" answer stay here
-        // (Server/ts25login/S04_MyWork02.cpp:1298-1312); page/index/charset are gated after it, in the service.
         if (packet.AvatarPost is < 0 or > MaxAvatarPost || packet.ChangeAvatarName.Length == 0)
         {
             logger.LogWarning(

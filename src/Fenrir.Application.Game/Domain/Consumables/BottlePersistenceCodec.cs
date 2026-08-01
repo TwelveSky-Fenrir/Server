@@ -13,14 +13,11 @@ public static class BottlePersistenceCodec
     private const int MinItemId = 2;
     private const int MaxCount = 99;
 
-    private static readonly ImmutableArray<(int ItemId, int Count)> EmptySlots =
+    public static ImmutableArray<(int ItemId, int Count)> Empty { get; } =
     [
         (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0)
     ];
 
-    public static ImmutableArray<(int ItemId, int Count)> Empty => EmptySlots;
-
-    // Largeurs et clamp EFIX_ITEM du legacy (Server/Header/CSQLAvatar.cpp:24-27,308-313).
     public static string Encode(ImmutableArray<(int ItemId, int Count)> slots)
     {
         Span<char> buffer = stackalloc char[EncodedLength];
@@ -46,12 +43,10 @@ public static class BottlePersistenceCodec
         return new string(buffer);
     }
 
-    // Assainissement d'entree en monde du legacy : si l'un des deux est < 1, les deux passent a 0
-    // (Server/ts25zone/S04_MyWork02.cpp:920-927).
     public static ImmutableArray<(int ItemId, int Count)> Decode(string? encoded)
     {
         if (encoded is null || encoded.Length < EncodedLength)
-            return EmptySlots;
+            return Empty;
 
         var span = encoded.AsSpan();
         var builder = ImmutableArray.CreateBuilder<(int ItemId, int Count)>(BottleResolver.SlotCount);

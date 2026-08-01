@@ -39,7 +39,6 @@ public sealed class LoginHandler(ILoginService loginService, ILogger<LoginHandle
 
                 var secondLoginSort = result.RequirePin ? 1 : 0;
 
-                // Server/ts25login/S04_MyWork02.cpp:432 : succes -> SEND_LOGIN(..., uUserSort, ...), echec -> 0.
                 LoginTrain.Send(session,
                     LoginTrain.BuildLoginRecv(ResultSuccess, "MG" + result.AccountId, secondLoginSort,
                         result.PinMask, userSort: result.AccountGrade),

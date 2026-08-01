@@ -76,7 +76,6 @@ public sealed partial record CharacterRosterPetBagSlotDto(int CharacterId, byte 
 [GenerateDto]
 public sealed partial record CharacterRosterCostumeSlotDto(int CharacterId, byte Slot, int ItemId);
 
-// game.usp_Character_GetCostumes : une ligne par slot OCCUPE, les absents valent (0, 0, 0) chez l'appelant.
 [GenerateDto]
 public sealed partial record CharacterCostumeSlotDto(byte Slot, int ItemId, int ItemDate, int ExpireDate);
 

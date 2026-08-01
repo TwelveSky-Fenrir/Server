@@ -1,5 +1,3 @@
-using System;
-
 namespace System.Runtime.CompilerServices;
 
 [AttributeUsage(AttributeTargets.All, AllowMultiple = true, Inherited = false)]

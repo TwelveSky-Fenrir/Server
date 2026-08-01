@@ -1,5 +1,3 @@
-using Microsoft.CodeAnalysis;
-
 namespace Fenrir.Generators.Analysis.Model;
 
 internal sealed record TypeModel

@@ -87,7 +87,8 @@ internal static class FieldScanner
         {
             var length = reservedAttribute.GetCtorInt32(0);
             if (length <= 0)
-                diagnostics.Add(DiagnosticInfo.Create(FenrirDiagnostics.InvalidLength, property.Locations.FirstOrDefault(),
+                diagnostics.Add(DiagnosticInfo.Create(FenrirDiagnostics.InvalidLength,
+                    property.Locations.FirstOrDefault(),
                     property.ContainingType.Name, property.Name, "[Reserved]"));
             else
                 reservedBefore = length;
@@ -99,7 +100,8 @@ internal static class FieldScanner
         {
             var length = fixedStringAttribute.GetCtorInt32(0);
             if (length <= 0)
-                diagnostics.Add(DiagnosticInfo.Create(FenrirDiagnostics.InvalidLength, property.Locations.FirstOrDefault(),
+                diagnostics.Add(DiagnosticInfo.Create(FenrirDiagnostics.InvalidLength,
+                    property.Locations.FirstOrDefault(),
                     property.ContainingType.Name, property.Name, "[FixedString]"));
             fixedStringLength = length;
         }
@@ -110,7 +112,8 @@ internal static class FieldScanner
         {
             var count = fixedArrayAttribute.GetCtorInt32(0);
             if (count <= 0)
-                diagnostics.Add(DiagnosticInfo.Create(FenrirDiagnostics.InvalidLength, property.Locations.FirstOrDefault(),
+                diagnostics.Add(DiagnosticInfo.Create(FenrirDiagnostics.InvalidLength,
+                    property.Locations.FirstOrDefault(),
                     property.ContainingType.Name, property.Name, "[FixedArray]"));
             fixedArrayCount = count;
         }
@@ -280,7 +283,8 @@ internal static class FieldScanner
                 };
             }
 
-        diagnostics.Add(DiagnosticInfo.Create(FenrirDiagnostics.UnsupportedFieldType, property.Locations.FirstOrDefault(),
+        diagnostics.Add(DiagnosticInfo.Create(FenrirDiagnostics.UnsupportedFieldType,
+            property.Locations.FirstOrDefault(),
             property.ContainingType.Name, property.Name, type.ToDisplayString()));
         return null;
     }

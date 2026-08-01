@@ -6,12 +6,8 @@ public static class KnownTSortRegistry
 {
     public static readonly FrozenSet<int> KnownSorts = Build();
 
-    // Les deux seuls tSort qui font `return` avant le fan-out global du center legacy
-    // (Server/ts25center/S04_MyWork02.cpp:1189 pour 9998, :1211 pour 10000). Volontairement hors de KnownSorts.
     public static readonly FrozenSet<int> NeverFannedOutSorts = new[] { 9998, 10000 }.ToFrozenSet();
 
-    // Produits par le center lui-meme, jamais recus d'une zone : 1234 (S07_MyGame01.cpp:262),
-    // 1600 (S07_MyGame01.cpp:236), 1601 (S04_MyWork02.cpp:1154). Chaque shard a deja son propre producteur.
     public static readonly FrozenSet<int> CenterOriginatedSorts = new[] { 1234, 1600, 1601 }.ToFrozenSet();
 
     public static bool IsKnown(int sort)
@@ -73,8 +69,6 @@ public static class KnownTSortRegistry
 
         set.Add(1133);
 
-        // Codes origine-center : 1234 traverse deja le relais inter-shard (publie par
-        // FavoredTribeRankBonusLadderService), d'ou l'allowlist. Voir CenterOriginatedSorts pour la non-republication.
         set.Add(1234);
         set.Add(1600);
         set.Add(1601);

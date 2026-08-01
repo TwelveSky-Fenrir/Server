@@ -63,8 +63,6 @@ public sealed class TribeBankTaxAccumulator(Func<byte, byte>? resolveBeneficiary
         if (beneficiary >= TribeCount)
             return;
 
-        // Server/ts25zone/S07_MyGame01.cpp:2721,2727 -- the floor is on the GROSS amount, never on the tax.
-        // Same outcome as "tax <= 0" at 1%; at 9% it is the difference between crediting 1 and crediting 0.
         if (baseAmount < GrossAmountFloor)
             return;
 

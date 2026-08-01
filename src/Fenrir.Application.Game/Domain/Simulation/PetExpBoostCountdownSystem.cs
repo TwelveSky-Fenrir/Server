@@ -37,7 +37,6 @@ public sealed class PetExpBoostCountdownSystem : ISimulationSystem
 
         state.PetExpX2Time = Math.Max(0, state.PetExpX2Time - minutesElapsed);
 
-        // Server/ts25zone/S07_MyGame04.cpp:950 -- unicast au seul porteur, jamais aux voisins.
         state.Session.Send(new AvatarStatUpdateResponse
             { Sort = DoublePetExpTimeStatSort, Value = state.PetExpX2Time, Value2 = 0 });
     }

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Immutable;
 using System.Linq;
 using Fenrir.Generators.Analysis.Model;
@@ -17,7 +18,7 @@ internal static class SessionStateGateEmitter
         {
             FenrirServer.Login => WellKnownNames.LoginSessionStateEnum,
             FenrirServer.Zone => WellKnownNames.ZoneSessionStateEnum,
-            _ => throw new System.ArgumentOutOfRangeException(nameof(server), server, null)
+            _ => throw new ArgumentOutOfRangeException(nameof(server), server, null)
         };
 
         var entries = packets

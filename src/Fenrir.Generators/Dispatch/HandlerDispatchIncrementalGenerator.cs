@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -189,7 +190,7 @@ public sealed class HandlerDispatchIncrementalGenerator : IIncrementalGenerator
             context.ReportDiagnostic(diagnostic.ToDiagnostic());
     }
 
-        private static ImmutableArray<HandlerModel> Deduplicate(IEnumerable<HandlerModel> handlers)
+    private static ImmutableArray<HandlerModel> Deduplicate(IEnumerable<HandlerModel> handlers)
     {
         var seen = new HashSet<(FenrirServer, byte)>();
         var builder = ImmutableArray.CreateBuilder<HandlerModel>();
@@ -201,7 +202,7 @@ public sealed class HandlerDispatchIncrementalGenerator : IIncrementalGenerator
         return builder.ToImmutable();
     }
 
-        private static ImmutableArray<HandlerModel> InEmissionOrder(ImmutableArray<HandlerModel> handlers)
+    private static ImmutableArray<HandlerModel> InEmissionOrder(ImmutableArray<HandlerModel> handlers)
     {
         return handlers.OrderBy(h => h.Server).ThenBy(h => h.Opcode).ToImmutableArray();
     }
@@ -276,7 +277,7 @@ public sealed class HandlerDispatchIncrementalGenerator : IIncrementalGenerator
         {
             FenrirServer.Login => $"{WellKnownNames.FenrirServerEnum}.Login",
             FenrirServer.Zone => $"{WellKnownNames.FenrirServerEnum}.Zone",
-            _ => throw new System.ArgumentOutOfRangeException(nameof(server), server, null)
+            _ => throw new ArgumentOutOfRangeException(nameof(server), server, null)
         };
     }
 }

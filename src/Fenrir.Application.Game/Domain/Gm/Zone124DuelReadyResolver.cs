@@ -24,18 +24,14 @@ public enum Zone124DuelReadySide : byte
 
 public readonly record struct Zone124DuelReadyPlacement(Zone124DuelReadySide Side, float X, float Y, float Z);
 
-// Server/ts25zone/S04_MyWork04.cpp:1821-1874 : case 600 DUEL READY, sans #ifdef, vivant sous M33 et LNW33EU.
-// Le tData du client n'est jamais decode (ligne 1832 le reexpedie en bloc) : ce sort ne recoit aucun index.
 public static class Zone124DuelReadyResolver
 {
     public const int Sort = 600;
 
     public const string CommandName = "DUEL-READY";
 
-    // uUserSort >= 1 : le plus bas des trois paliers GM de ProcessForData (S04_MyWork04.cpp:1822).
     public const GmCommandTier RequiredTier = GmCommandTier.Basic;
 
-    // Server/ts25zone/S07_MyGame01.cpp:509-516 : 124 est la seule map marquee mCheckZone124TypeServer.
     public const short MapId = 124;
 
     public const float MusterRadius = 52f;
@@ -59,8 +55,6 @@ public static class Zone124DuelReadyResolver
         return mapId == MapId ? Zone124DuelReadyOutcome.Authorized : Zone124DuelReadyOutcome.WrongMap;
     }
 
-    // Server/ts25zone/S04_MyWork04.cpp:1843-1872 : sauts IsMovingZone / mDuelProcessState, puis les deux spheres.
-    // Le filtre mAuthInfo.AuthType == 1 est commente lignes 1849-1851, donc mort : il n'est pas porte.
     public static Zone124DuelReadyPlacement Place(bool isMovingZone, bool isDuelEngaged, float x, float y, float z)
     {
         if (isMovingZone || isDuelEngaged)
@@ -75,8 +69,6 @@ public static class Zone124DuelReadyResolver
             : default;
     }
 
-    // Server/ts25zone/S07_MyGame03.cpp:4704-4707 : ReturnLengthXYZ est un sqrtf 3D complet, Y inclus.
-    // Le rayon 52 est donc une sphere et non un cylindre : ne pas laisser tomber le terme Y.
     private static bool IsInsideMuster((float X, float Y, float Z) muster, float x, float y, float z)
     {
         var dx = muster.X - x;

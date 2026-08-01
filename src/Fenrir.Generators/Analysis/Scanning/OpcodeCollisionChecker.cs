@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using Fenrir.Generators.Analysis.Diagnostics;
 using Fenrir.Generators.Analysis.Model;
-using Microsoft.CodeAnalysis;
 
 namespace Fenrir.Generators.Analysis.Scanning;
 

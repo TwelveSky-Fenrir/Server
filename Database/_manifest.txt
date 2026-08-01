@@ -567,6 +567,14 @@ StoredProcedures/game/usp_Guild_SetBuffType.sql
 # MountGrantItemId / MountGrantPower de CreateAvatarService.cs, qui bougent dans le meme lot.
 StoredProcedures/game/usp_Character_CreateWithStarterKit_MountFix.sql
 
+# cash-balance-buy audit (2026-08-01): usp_Cash_Credit and usp_Cash_CreditAndConsumeItem credited
+# game.AccountCash.Balance with no upper bound at all, mirroring legacy MemberInfo.uCash's own unguarded
+# `uCash=uCash+%d` (Server/ts25extra/S08_MyDB.cpp:134) -- hardened here rather than reproduced, same
+# 2,000,000,000 cap convention as usp_Character_AdjustMoney. CREATE OR ALTER, additive: the two shipped
+# scripts are not edited (SHA-256 journaling).
+StoredProcedures/game/usp_Cash_Credit_UpperBoundGuard.sql
+StoredProcedures/game/usp_Cash_CreditAndConsumeItem_UpperBoundGuard.sql
+
 StoredProcedures/admin/usp_Ban_Create.sql
 StoredProcedures/admin/usp_Ban_GetActiveForAccount.sql
 StoredProcedures/admin/usp_Ban_GetActiveForCharacter.sql
@@ -934,6 +942,10 @@ Migrations/Seed/admin/027_shard_map_assignments_all_zones.sql
 # description de 50270 dont l'emetteur et le sujet changent (compte au lieu de personnage). UPDATE et non
 # INSERT garde pour 50270 : la ligne existe deja depuis 004_error_catalog_v8_commerce.sql.
 Migrations/Seed/admin/028_error_catalog_account_daily_reward.sql
+
+# Registers 50360 for usp_Cash_Credit_UpperBoundGuard.sql / usp_Cash_CreditAndConsumeItem_UpperBoundGuard.sql
+# above (cash-balance-buy audit).
+Migrations/Seed/admin/029_error_catalog_cash_credit_upper_bound.sql
 
 # Lot 2 (bail de session Login verifie) : cree runtime.tvp_AccountSessionLease et
 # runtime.usp_AccountSession_RefreshAndGetHeldLeases -- meme UPDATE de bail que

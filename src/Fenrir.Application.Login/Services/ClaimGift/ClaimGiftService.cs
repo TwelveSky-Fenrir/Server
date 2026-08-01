@@ -13,8 +13,6 @@ public sealed class ClaimGiftService(IGiftRepository gifts, ILogger<ClaimGiftSer
     public async ValueTask<ClaimGiftResult> ClaimGiftAsync(int accountId, int giftInfoIndex, GiftSlotBoard slots,
         CancellationToken cancellationToken)
     {
-        // Server/ts25login/S04_MyWork02.cpp:1421 lit uGiftInfo tel qu'il est deja charge : op21 ne recharge
-        // jamais, seuls MyDB::Login et op25 le font (S08_MyDB.cpp:939-974).
         if (!slots.IsLoaded)
             slots.Refresh(await gifts.GetPendingByAccountAsync(accountId, cancellationToken));
 

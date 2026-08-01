@@ -7,6 +7,6 @@ public static class FishingCastResolver
     public static bool HasWaterAtCurrentPosition(ZoneGeometry? geometry, float x, float y, float z)
     {
         return geometry is not null &&
-               geometry.TryGetGroundHeight(x, z, out _, y + 20f, false, true);
+               geometry.TryGetGroundHeight(x, z, out _, y + 20f);
     }
 }

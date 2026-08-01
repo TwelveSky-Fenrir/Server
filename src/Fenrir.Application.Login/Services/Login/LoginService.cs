@@ -104,9 +104,6 @@ public sealed class LoginService(
             return Failure(ResultVersionMismatch, "", false);
         }
 
-        // Server/ts25login/S04_MyWork02.cpp:168-178 filtre l'identifiant ET le mot de passe (CheckNameString,
-        // Server/Header/safestring.h:43-77) avant toute requete, et rend 6 pour les deux. Fenrir l'applique
-        // inconditionnellement : le legacy le sautait des que mUseWebApi=1, c'est la faille, pas la regle.
         if (!AvatarNameValidator.HasOnlyWhitelistedCharacters(packet.Id) ||
             !AvatarNameValidator.HasOnlyWhitelistedCharacters(packet.Password))
         {
@@ -284,8 +281,6 @@ public sealed class LoginService(
                 break;
         }
 
-        // Legacy purges the retired items only once the account slot is registered and owned, right before the
-        // roster burst (Server/ts25login/S04_MyWork02.cpp:324-426); every earlier failure jumps over it.
         await retiredItems.PurgeAsync(roster.Items, cancellationToken);
 
         try

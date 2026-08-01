@@ -288,8 +288,6 @@ public sealed partial class Zone
         if (data.DrunkBottleTicksRemaining is { } drunkBottleTicksRemaining)
             state.DrunkBottleTicksRemaining = drunkBottleTicksRemaining;
 
-        // aAutoBuffTime est une DATE YYYYMMDD, pas un compteur -- jamais decrementee par tick
-        // (Server/Header/Protocol/STRUCT.h:450, alias aContinueSkillDay).
         state.AutoBuffTime = data.AutoBuffTime;
         if (data.AutoBuffSkill is { } autoBuffSkill)
             state.AutoBuffSkill = autoBuffSkill;
@@ -303,7 +301,7 @@ public sealed partial class Zone
         HydrateMountState(state, data);
         HydrateCostumeState(state, data);
 
-        RecomputeAndPublish(state, clampVitals: true);
+        RecomputeAndPublish(state, true);
 
         var cell = _grid.CellOf(state.PosX, state.PosZ);
         state.CurrentCell = cell;
@@ -392,7 +390,6 @@ public sealed partial class Zone
         if (data.CostumeExpireDate is { } costumeExpireDate)
             state.CostumeExpireDate = costumeExpireDate;
 
-        // Le zone REECRIT l'index persiste a la charge: Server/ts25zone/S04_MyWork02.cpp:937-941.
         state.CostumeIndex = CostumePersistenceCodec.NormalizeIndexOnLoad(data.CostumeIndex, state.CostumeWardrobe);
         state.CostumeNumber = CostumePersistenceCodec.ResolveWornNumber(state.CostumeIndex, state.CostumeWardrobe);
     }
@@ -714,7 +711,6 @@ public sealed partial class Zone
             case >= ExperienceFormulas.MaxLimitLevel:
                 state.ContributionPoints -= ExperienceFormulas.CpLossAtLevelCap;
                 state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
-                // ProcessForCP is silent unless tSend is TRUE; this branch passes it: Server/ts25zone/S07_MyGame02.cpp:2939
                 state.Session.Send(new AvatarStatUpdateResponse
                     { Sort = ContributionPointStatSort, Value = state.ContributionPoints, Value2 = 0 });
                 QueueDeathEventLog(DeathExperienceLossEventCode, state.CharacterId, ContributionPointsLossOutcome,
@@ -1181,8 +1177,6 @@ public sealed partial class Zone
                 {
                     BroadcastCasterEffectSnapshot(state);
                     BroadcastManaRecoveryToTarget(manaRecipient);
-                    // Server/ts25zone/S07_MyGame03.cpp:8898 : Value01 est le delta rendu, pas le mana absolu,
-                    // et le Broadcast11 qui suit est ancre sur la CIBLE, jamais sur le lanceur.
                     BroadcastAvatarStateFlag(manaRecipient, ManaRecoveredAvatarChangeInfoSort, recoveredMana, 0, 0);
                 }
 
@@ -1275,7 +1269,7 @@ public sealed partial class Zone
 
     private void RecomputeDerivedStats(PlayerRuntimeState state)
     {
-        RecomputeAndPublish(state, clampVitals: false);
+        RecomputeAndPublish(state, false);
     }
 
     private void BroadcastCasterEffectSnapshot(PlayerRuntimeState state)
@@ -1528,7 +1522,6 @@ public sealed partial class Zone
                 FishingPoint = new float[3],
                 RankPoint = 0,
                 TargetState = 0,
-                // Miroir de diffusion derive du persiste: Server/ts25zone/S04_MyWork02.cpp:1000.
                 AnimalAbsorbState = state.AnimalAbsorbState,
                 PetValid = 0,
                 Unk1 = 0,

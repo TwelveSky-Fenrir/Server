@@ -1,5 +1,3 @@
-using System;
-
 namespace System.Diagnostics.CodeAnalysis;
 
 [AttributeUsage(AttributeTargets.Constructor)]

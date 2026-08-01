@@ -1,6 +1,5 @@
 using Fenrir.Application.Game.Domain.Mounts;
 using Fenrir.Application.Game.Domain.World.Configuration;
-using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 
 namespace Fenrir.Application.Game.Domain;

@@ -16,6 +16,7 @@ using Fenrir.Application.Game.Hosting.World.Monsters;
 using Fenrir.Application.Game.Hosting.World.WorldState;
 using Fenrir.Application.Game.Hosting.World.ZoneWar;
 using Fenrir.Data.WriteBehind;
+using Fenrir.Domain.Game.GameData;
 using Fenrir.Network.Dispatch.FloodProtection;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Protocol.Game;
@@ -216,7 +217,7 @@ public static class HostingServiceCollectionExtensions
         services.AddSingleton(TribeGuardCorridorCatalogFactory.BuildLive());
 
         services.AddSingleton(static provider => PortalProximityCatalog.FromWorldData(
-            provider.GetRequiredService<Fenrir.Domain.Game.GameData.WorldDataCache>()));
+            provider.GetRequiredService<WorldDataCache>()));
 
         services.AddSingleton<TribeGuardCorridorState>();
         services.AddSingleton<TribeGuardCorridorStateDerivationSystem>();
@@ -275,8 +276,6 @@ public static class HostingServiceCollectionExtensions
         });
         services.AddHostedService<HolyStoneWarCycleHost>();
 
-        // Le legacy code ce perimetre en dur (Server/ts25zone/S07_MyGame01.cpp:806-820) ; l'option
-        // HolyStoneTerritoryMapIds n'etait seedee nulle part, donc le balayage n'iterait jamais rien.
         services.AddSingleton(sp => new HolyStoneTerritoryEvictionSweep(
             sp.GetRequiredService<WorldStateService>(),
             sp.GetRequiredService<ZoneRegistry>(),

@@ -46,8 +46,6 @@ public static class CostumePersistenceCodec
         return (wardrobe.ToImmutable(), date.ToImmutable(), expire.ToImmutable());
     }
 
-    // Normalisation d'entree, pas une simple lecture: un index porte qui pointe un slot vide retombe a -1.
-    // Server/ts25zone/S04_MyWork02.cpp:937-941 (le zone REECRIT wAvatar.aCostumeIndex a la charge).
     public static int NormalizeIndexOnLoad(int costumeIndex, ImmutableArray<int> wardrobe)
     {
         if (costumeIndex < SlotCount)

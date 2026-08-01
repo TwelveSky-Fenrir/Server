@@ -67,10 +67,6 @@ public sealed partial class PlayerRuntimeState
 
     public int BloodCoin { get; set; }
 
-    // Portion of WarPoint/BloodCoin already credited to game.Characters. The write-behind flush persists the
-    // difference, never the balance: usp_Character_BuyWarPointItem and
-    // usp_Character_SpendBloodCoinAndReplaceContainer debit the same columns relatively without touching
-    // FlushSequence, so an absolute flush would restore already-spent points.
     public int PersistedWarPoint { get; set; }
 
     public int PersistedBloodCoin { get; set; }

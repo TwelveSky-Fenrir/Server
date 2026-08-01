@@ -138,28 +138,32 @@ IF NOT EXISTS (SELECT 1
                FROM sys.columns
                WHERE object_id = OBJECT_ID(N'game.Characters')
                  AND name = N'AutoTime')
-    ALTER TABLE game.Characters
-        ADD AutoTime INT NOT NULL
-            CONSTRAINT DF_Characters_AutoTime DEFAULT 0; -- aAutoTime (Server/Header/CSQLAvatar.cpp:641) : budget d'auto-chasse en DATE LIMITE YYYYMMDD, meme echelle qu'InventoryDate/StoreDate, PAS un compteur de minutes comme AutoTime2
+ALTER TABLE game.Characters
+    ADD AutoTime INT NOT NULL
+        CONSTRAINT DF_Characters_AutoTime DEFAULT 0; -- aAutoTime (Server/Header/CSQLAvatar.cpp:641) : budget d'auto-chasse en DATE LIMITE YYYYMMDD, meme echelle qu'InventoryDate/StoreDate, PAS un compteur de minutes comme AutoTime2
 GO
 
 IF NOT EXISTS (SELECT 1
                FROM sys.columns
                WHERE object_id = OBJECT_ID(N'game.Characters')
                  AND name = N'BuffX2Time')
-    ALTER TABLE game.Characters
-        ADD BuffX2Time INT NOT NULL
-            CONSTRAINT DF_Characters_BuffX2Time DEFAULT 0; -- aBuffX2Time alias aKiTime (Server/Header/CSQLAvatar.cpp:638) : minutes restantes de doublement de duree de buff, decrement par minute reelle (Server/ts25zone/S07_MyGame04.cpp:1035-1042)
+ALTER TABLE game.Characters
+    ADD BuffX2Time INT NOT NULL
+        CONSTRAINT DF_Characters_BuffX2Time DEFAULT 0; -- aBuffX2Time alias aKiTime (Server/Header/CSQLAvatar.cpp:638) : minutes restantes de doublement de duree de buff, decrement par minute reelle (Server/ts25zone/S07_MyGame04.cpp:1035-1042)
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_Characters_AutoTime')
-    ALTER TABLE game.Characters
-        ADD CONSTRAINT CK_Characters_AutoTime CHECK (AutoTime >= 0);
+IF NOT EXISTS (SELECT 1
+               FROM sys.check_constraints
+               WHERE name = N'CK_Characters_AutoTime')
+ALTER TABLE game.Characters
+    ADD CONSTRAINT CK_Characters_AutoTime CHECK (AutoTime >= 0);
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_Characters_BuffX2Time')
-    ALTER TABLE game.Characters
-        ADD CONSTRAINT CK_Characters_BuffX2Time CHECK (BuffX2Time >= 0);
+IF NOT EXISTS (SELECT 1
+               FROM sys.check_constraints
+               WHERE name = N'CK_Characters_BuffX2Time')
+ALTER TABLE game.Characters
+    ADD CONSTRAINT CK_Characters_BuffX2Time CHECK (BuffX2Time >= 0);
 GO
 
 -- 2. Dropper les deux procedures qui referencent le type (elles bloquent DROP TYPE), puis le type.
@@ -239,7 +243,10 @@ BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
-    DECLARE @Applied TABLE (CharacterId INT NOT NULL PRIMARY KEY);
+    DECLARE @Applied TABLE
+                     (
+                         CharacterId INT NOT NULL PRIMARY KEY
+                     );
 
     BEGIN TRANSACTION;
 
@@ -326,7 +333,10 @@ BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
-    DECLARE @Applied TABLE (CharacterId INT NOT NULL PRIMARY KEY);
+    DECLARE @Applied TABLE
+                     (
+                         CharacterId INT NOT NULL PRIMARY KEY
+                     );
 
     BEGIN TRANSACTION;
 

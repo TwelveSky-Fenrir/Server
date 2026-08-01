@@ -65,7 +65,6 @@ public sealed partial class Zone
             {
                 QueueMoneyGrant(state.CharacterId, money);
 
-                // Server/ts25zone/S07_MyGame01.cpp:8291 sends the gained delta, not the new total.
                 state.Session.Send(new AvatarStatUpdateResponse
                 {
                     Sort = Zone175MoneyChangeSort,

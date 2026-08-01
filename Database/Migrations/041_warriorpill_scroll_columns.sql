@@ -101,18 +101,18 @@ IF NOT EXISTS (SELECT 1
                FROM sys.columns
                WHERE object_id = OBJECT_ID(N'game.Characters')
                  AND name = N'WarriorPill')
-    ALTER TABLE game.Characters
-        ADD WarriorPill INT NOT NULL
-            CONSTRAINT DF_Characters_WarriorPill DEFAULT 0
-            CONSTRAINT CK_Characters_WarriorPill CHECK (WarriorPill >= 0); -- aWarriorPill (Server/Header/CSQLAvatar.cpp:674), decrement par minute (Server/ts25zone/S07_MyGame04.cpp:1015-1019)
+ALTER TABLE game.Characters
+    ADD WarriorPill INT NOT NULL
+        CONSTRAINT DF_Characters_WarriorPill DEFAULT 0
+        CONSTRAINT CK_Characters_WarriorPill CHECK (WarriorPill >= 0); -- aWarriorPill (Server/Header/CSQLAvatar.cpp:674), decrement par minute (Server/ts25zone/S07_MyGame04.cpp:1015-1019)
 GO
 
 IF NOT EXISTS (SELECT 1
                FROM sys.columns
                WHERE object_id = OBJECT_ID(N'game.Characters')
                  AND name = N'WarriorScroll')
-    ALTER TABLE game.Characters
-        ADD WarriorScroll INT NOT NULL
-            CONSTRAINT DF_Characters_WarriorScroll DEFAULT 0
-            CONSTRAINT CK_Characters_WarriorScroll CHECK (WarriorScroll >= 0); -- aWarriorScroll (Server/Header/CSQLAvatar.cpp:673), credit S04_MyWork03.cpp:5146-5149, decrement par minute S07_MyGame04.cpp:1020-1024
+ALTER TABLE game.Characters
+    ADD WarriorScroll INT NOT NULL
+        CONSTRAINT DF_Characters_WarriorScroll DEFAULT 0
+        CONSTRAINT CK_Characters_WarriorScroll CHECK (WarriorScroll >= 0); -- aWarriorScroll (Server/Header/CSQLAvatar.cpp:673), credit S04_MyWork03.cpp:5146-5149, decrement par minute S07_MyGame04.cpp:1020-1024
 GO

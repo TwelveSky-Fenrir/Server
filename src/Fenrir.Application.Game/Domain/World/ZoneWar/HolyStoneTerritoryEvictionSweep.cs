@@ -12,7 +12,6 @@ public sealed class HolyStoneForcedReturnGateway : IHolyStoneForcedReturnGateway
 {
     public void ForceReturnToSafeLocation(Zone zone, PlayerRuntimeState player)
     {
-        // Le balayage tourne hors du fil de tick : on poste, le tick envoie. Server/ts25zone/S07_MyGame01.cpp:3985
         zone.PostHolyStoneForcedReturn(player.CharacterId);
     }
 }
@@ -24,9 +23,6 @@ public sealed class HolyStoneTerritoryEvictionSweep(
     IHolyStoneForcedReturnGateway forcedReturn,
     ILogger<HolyStoneTerritoryEvictionSweep> logger)
 {
-    // Compteur entier de ticks, pas une duree : le legacy franchit a mZone039TypePostTick >= GetGameTickMinute()
-    // soit 120 ticks (Server/Header/function.h:1643-1646), puis >= 6. Une minute en TimeSpan vaut 120,24 ticks
-    // de 499 ms : le seuil tombait a 121 avec un residu de 379 ms qui se reportait de cycle en cycle.
     public const int IdleLegacyTicks = 120;
 
     public const int GraceLegacyTicks = 6;

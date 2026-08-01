@@ -315,9 +315,7 @@ public sealed class GenericActionService(
         {
             EquipItemValidationGate.EquipCandidate? candidate = null;
             if (worldData.ItemsById.TryGetValue(sourceItem.ItemId, out var equipDefinition))
-            {
                 candidate = EquipItemValidationGate.EquipCandidate.FromRow(equipDefinition.Item);
-            }
 
             var equipOutcome = EquipItemValidationGate.Evaluate(candidate,
                 state.PreviousTribe, move.Index2, state.Level + state.Level2, state.RebirthCount);
@@ -1650,8 +1648,6 @@ public sealed class GenericActionService(
         return state.Session is IZoneSession zoneSession && zoneSession.MeetsGmTier(tier);
     }
 
-    // Server/ts25zone/S04_MyWork04.cpp:1842 : la boucle legacy est bornee par mServerMaxUserNum, lu depuis l'INI
-    // (Header/ini.h:222-256) et non par une capacite allouee ; on enumere ici la collection de sessions vivantes.
     private async ValueTask<GenericActionResult> MusterZone124DuelReadyAsync(Zone zone, int characterId,
         CancellationToken cancellationToken)
     {
@@ -1669,8 +1665,6 @@ public sealed class GenericActionService(
             if (placement.Side == Zone124DuelReadySide.None)
                 continue;
 
-            // S04_MyWork04.cpp:1799/1809 : le case 599 remet mLastHSTick a 0 avant de teleporter, le case 600
-            // l'oublie ; on le remet ici, une relocation imposee par le serveur n'est pas de l'inactivite.
             if (!await zone.PostTribeProgressCommandAndWaitAsync(
                     new TribeProgressZoneCommand(candidate.CharacterId,
                         TeleportTo: (placement.X, placement.Y, placement.Z),
@@ -1692,8 +1686,6 @@ public sealed class GenericActionService(
         return GenericActionResult.Succeeded;
     }
 
-    // Server/ts25zone/S04_MyWork04.cpp:1901-1946 : le legacy recrute et arme le duel dans la meme passe, puis pose
-    // mDuel_124_Pvp meme a zero recrue. On recrute d'abord, on n'engage que si les deux camps sont peuples.
     private async ValueTask<GenericActionResult> StartZone124DuelAsync(Zone zone, int characterId,
         CancellationToken cancellationToken)
     {
@@ -1742,8 +1734,6 @@ public sealed class GenericActionService(
 
         foreach (var (player, recruitment) in recruits)
         {
-            // S04_MyWork04.cpp:1992-2057 : le case 603 remet mLastHSTick a 0 avant de teleporter, le case 601
-            // l'oublie ; on le remet ici, une relocation imposee par le serveur n'est pas de l'inactivite.
             if (!await zone.PostTribeProgressCommandAndWaitAsync(
                     new TribeProgressZoneCommand(player.CharacterId,
                         TeleportTo: (recruitment.X, recruitment.Y, recruitment.Z),
@@ -1773,15 +1763,10 @@ public sealed class GenericActionService(
         return GenericActionResult.Succeeded;
     }
 
-    // Server/ts25zone/S04_MyWork04.cpp:1948-1991 : arret administratif du duel de masse, sans vainqueur et sans
-    // teleportation (contrairement a 601 et 603). Le corps ne lit aucun champ de tData : aucun index a borner.
-    // Le legacy retient sur mDuelProcessState == 4 ; le seul equivalent serveur est le duel actif du registre.
     private GenericActionResult EndZone124Duel(Zone zone, int characterId)
     {
         zone.ResetZone124MassDuel();
 
-        // S04_MyWork04.cpp:1986 : chaque retenu recoit DUEL_END_RECV. On fige d'abord la liste : TryEndActiveDuel
-        // retire aussi l'adversaire, donc clore au fil de l'eau priverait le partenaire de son paquet.
         var engaged = new List<PlayerRuntimeState>();
 
         foreach (var candidate in zone.Players)
@@ -1810,9 +1795,6 @@ public sealed class GenericActionService(
         return GenericActionResult.Succeeded;
     }
 
-    // S04_MyWork04.cpp:1988-1989 : AVATAR_CHANGE_INFO_1 sort 7 a 0/0/0, diffuse par Broadcast11 rayon 1. Sur la
-    // zone 124 mCheckZone124TypeServer est vrai, donc le garde-fou mProtect_ReviveHack (S07_MyGame03.cpp:808)
-    // ne filtre personne et le sujet lui-meme reste destinataire.
     private void BroadcastZone124DuelStateCleared(Zone zone, PlayerRuntimeState subject)
     {
         var packet = new AvatarStateFlagResponse
@@ -1847,9 +1829,6 @@ public sealed class GenericActionService(
         }
     }
 
-    // Server/ts25zone/S04_MyWork04.cpp:1992-2057 : evacuation de l'arene vers le point de repli. Contrairement au
-    // case 602 (filtre mDuelProcessState != 4, 1977-1979), la selection est purement geometrique : elle emporte
-    // aussi les non-participants et le GM appelant, qui n'est jamais exclu. Comportement legacy conserve tel quel.
     private async ValueTask<GenericActionResult> EvacuateZone124DuelAsync(Zone zone, int characterId,
         CancellationToken cancellationToken)
     {
@@ -1868,7 +1847,6 @@ public sealed class GenericActionService(
 
             candidate.CanUseConsumables = true;
 
-            // S04_MyWork04.cpp:2040-2043 : mLastHSTick remis a 0 juste avant la teleportation, dans cet ordre.
             if (!await zone.PostTribeProgressCommandAndWaitAsync(
                     new TribeProgressZoneCommand(candidate.CharacterId,
                         TeleportTo: Zone124DuelOutResolver.EvacuationPoint,
@@ -1880,8 +1858,6 @@ public sealed class GenericActionService(
                 continue;
             }
 
-            // S04_MyWork04.cpp:2050-2054 : les deux diffusions partent APRES l'ecrasement de aLocation, donc sur
-            // les coordonnees d'arrivee. On diffuse ici une fois la teleportation appliquee, pour la meme raison.
             BroadcastZone124DuelStateCleared(zone, candidate);
 
             evacuated++;

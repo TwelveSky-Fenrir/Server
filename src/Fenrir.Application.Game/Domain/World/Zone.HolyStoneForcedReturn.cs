@@ -34,9 +34,6 @@ public sealed partial class Zone
 
     private void ApplyHolyStoneForcedReturn(int characterId)
     {
-        // Server/ts25zone/S07_MyGame01.cpp:3974-3985 : le predicat de selection est en amont
-        // (!ReturnWinZone038(aTribe), :3982) ; ici ni un user non pret ni un IsMovingZone n'est expulse, et le
-        // seul effet est l'opcode nu ZCP_RETURN_TO_AUTO_ZONE - le Quit() y est commente, aucune destination calculee.
         if (!_players.TryGetValue(characterId, out var state) || state.IsMovingZone)
             return;
 

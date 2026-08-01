@@ -2,9 +2,6 @@ using System.Collections.Immutable;
 
 namespace Fenrir.Data.Abstractions.Characters;
 
-// aStellarCoreExpireDate[MAX_AVATAR_STELLAR_NUM] (Server/Header/Protocol/STRUCT.h:559, 10 slots) encoded here
-// as one fixed-width text column, same shape as CostumeExpireDate's per-slot sibling but packed like
-// BottleSlots/AutoBuffSkill instead of split into occupied-slot rows.
 public static class StellarCoreExpireDateCodec
 {
     public const int SlotCount = 10;
@@ -55,21 +52,19 @@ public static class StellarCoreExpireDateCodec
         return builder.MoveToImmutable();
     }
 
-    // EFIX_ANIMAL_POWER (Server/Header/CSQLAvatar.cpp:39-42): hors bornes ECRASE A 0, pas de modulo.
     private static void WriteValue(Span<char> destination, ref int position, int value)
     {
         var clamped = value is < LowerBound or > UpperBound ? 0 : value;
 
         for (var i = DigitsPerSlot - 1; i >= 0; i--)
         {
-            destination[position + i] = (char)('0' + (clamped % 10));
+            destination[position + i] = (char)('0' + clamped % 10);
             clamped /= 10;
         }
 
         position += DigitsPerSlot;
     }
 
-    // CSQLDatabase.cpp:530-544: atoi de la tranche, un caractere non numerique arrete la lecture.
     private static int ReadValue(ReadOnlySpan<char> digits)
     {
         var value = 0;
@@ -79,7 +74,7 @@ public static class StellarCoreExpireDateCodec
             if (digit is < '0' or > '9')
                 break;
 
-            value = (value * 10) + (digit - '0');
+            value = value * 10 + (digit - '0');
         }
 
         return value;

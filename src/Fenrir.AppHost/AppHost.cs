@@ -59,7 +59,7 @@ foreach (var shardId in shardIds)
         .WithEnvironment("Game__ZonePortRangeEnd", (zoneBasePort + maxZoneNumber).ToString())
         .WithEnvironment("Game__ReservedPorts", reservedPorts)
         .WithEnvironment("Game__PublicHost", gamePublicHost);
-        ;
+    ;
 }
 
 builder.Build().Run();

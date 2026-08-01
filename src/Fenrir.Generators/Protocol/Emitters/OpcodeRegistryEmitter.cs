@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Immutable;
 using System.Linq;
 using Fenrir.Generators.Analysis.Model;
@@ -99,7 +100,7 @@ internal static class OpcodeRegistryEmitter
         {
             FenrirServer.Login => $"{WellKnownNames.FenrirServerEnum}.Login",
             FenrirServer.Zone => $"{WellKnownNames.FenrirServerEnum}.Zone",
-            _ => throw new System.ArgumentOutOfRangeException(nameof(server), server, null)
+            _ => throw new ArgumentOutOfRangeException(nameof(server), server, null)
         };
     }
 

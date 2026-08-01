@@ -2,8 +2,6 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Login.Hosting;
 
-// Server/Header/ini.h:178 et :245 : Login.Server/MaxUser -> mServerMaxUserNum, distinct du plafond de
-// COMPTES mGAME.mMaxPlayerNum. Valeur livree : Server/BuildEU33/ServerInfo.ini:122.
 public sealed class LoginSocketAdmissionOptions
 {
     public int MaxConcurrentConnections { get; set; } = 1000;

@@ -8,8 +8,6 @@ public sealed class LoginIdleClock
 {
     private readonly ConcurrentDictionary<long, SessionClock> _clocks = new();
 
-    // op11 et op24 sont volontairement absents : UpdateUseTime n'existe ni dans W_LOGIN_SEND
-    // (Server/ts25login/S04_MyWork02.cpp:129-435) ni dans W_CHANGE_MASTER_SEND (S04_MyWork02.cpp:1643-1646).
     public static bool Rearms(byte opcode)
     {
         return opcode switch

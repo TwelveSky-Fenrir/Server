@@ -204,7 +204,6 @@ public sealed class Zone195NokSanSystem(
         player.HeroRankPoints += heroPoints;
         heroRankPoints.AddPending(player.CharacterId, heroPoints, player.Tribe, player.Level);
 
-        // Total absolu apres credit, unicast: Server/ts25zone/UpperCom/S06_MyUpperCom02.cpp:817
         player.Session.Send(new AvatarStatUpdateResponse
             { Sort = HeroRankPointStatSort, Value = player.HeroRankPoints, Value2 = 0 });
     }

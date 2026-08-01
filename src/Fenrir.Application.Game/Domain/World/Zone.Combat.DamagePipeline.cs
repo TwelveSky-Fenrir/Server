@@ -63,8 +63,6 @@ public sealed partial class Zone
         return true;
     }
 
-    // Sort par defaut 5 : DecreaseHolyShield(9,...,5,...) est le cas avatar->avatar (Server/ts25zone/S07_MyGame02.cpp:1048),
-    // le cas monstre->avatar passe 6 (Server/ts25zone/S07_MyGame02.cpp:2892).
     private (int View, int Real) ApplyHolyShieldAbsorption(PlayerRuntimeState defenderState, in AttackOutcome outcome,
         int changeInfoSort = HolyShieldHitByPlayerAvatarChangeInfoSort)
     {
@@ -86,15 +84,12 @@ public sealed partial class Zone
     {
         var removed = HolyShieldResolver.RemoveAll(defenderState.Buffs.Buff);
 
-        // Emission inconditionnelle, meme sans bouclier actif : Server/ts25zone/S07_MyGame04.cpp:2739.
         BroadcastAvatarStateFlag(defenderState, HolyShieldRemovedAvatarChangeInfoSort, 0, 0, 0);
 
         if (removed)
             BroadcastHolyShieldChange(defenderState);
     }
 
-    // Le legacy passe tClientBuffSlotValue = 0, donc Value01 vaut 0 et non la charge : Server/ts25zone/S07_MyGame02.cpp:733.
-    // DecreaseBuff efface aussi le second mot du slot (duree/aEffectValueForView) quand il tombe sous 1 : :2670-2676.
     private void ConsumeChargeBuff(PlayerRuntimeState attackerState)
     {
         attackerState.Buffs.Buff[BuffCatalog.Charge * 2] = 0;

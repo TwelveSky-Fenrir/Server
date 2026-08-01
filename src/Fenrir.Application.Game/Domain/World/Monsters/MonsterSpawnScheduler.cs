@@ -24,8 +24,6 @@ internal sealed class MonsterSpawnSlot
 
 internal sealed class MonsterZoneSpawnState
 {
-    // shmMONSTERSummonState==0 skips the respawn-delay check for one whole pass, then re-arms
-    // -- Server/ts25zone/S10_MySummon.cpp:905-928. Per-zone here: legacy runs one process per map.
     public int IgnoreRespawnDelayPending;
 
     public int SummonStateResetPending;
@@ -106,8 +104,6 @@ public sealed class MonsterSpawnScheduler(
         Interlocked.Exchange(ref state.SummonStateResetPending, 1);
     }
 
-    // Legacy loops on the region count but indexes the monster instance array, so only a prefix is freed --
-    // Server/ts25zone/S10_MySummon.cpp:931-939 against the count read at Server/ts25zone/S10_MySummon.cpp:502.
     private void ApplySummonStateReset(Zone zone, MonsterZoneSpawnState state)
     {
         var freedPrefix = Math.Min(RegionRowCountFor(zone.MapId), state.Slots.Count);

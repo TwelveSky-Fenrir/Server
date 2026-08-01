@@ -188,18 +188,14 @@ public sealed class EnchantItemService(
                         zone.MapId, characterId);
         }
 
-        // S146SWEET_POTATO part des le calcul de probabilite, donc avant les sorts de protection et avant
-        // IMPROVE_ITEM_RECV, seulement au joueur: Server/ts25zone/S04_MyWork02.cpp:3160.
         if (newImproveItemValue is { } remainingSweetPotatoCharges)
             state.Session.Send(new AvatarStatUpdateResponse
                 { Sort = SweetPotatoStatSort, Value = remainingSweetPotatoCharges, Value2 = 0 });
 
-        // S104PROTECT_ITEM2 part avant IMPROVE_ITEM_RECV et seulement au joueur: Server/ts25zone/S04_MyWork02.cpp:2945.
         if (newProtectForDestroy2 is { } remainingProtect2Charges)
             state.Session.Send(new AvatarStatUpdateResponse
                 { Sort = ProtectItem2StatSort, Value = remainingProtect2Charges, Value2 = 0 });
 
-        // S015PROTECT_ITEM part avant IMPROVE_ITEM_RECV et seulement au joueur: Server/ts25zone/S04_MyWork02.cpp:3368.
         if (newProtectForDestroy is { } remainingProtectCharges)
             state.Session.Send(new AvatarStatUpdateResponse
                 { Sort = ProtectItemStatSort, Value = remainingProtectCharges, Value2 = 0 });

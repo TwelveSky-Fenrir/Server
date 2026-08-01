@@ -41,8 +41,6 @@ public sealed class LootBoxUseItemHandler(
     private static readonly BoxRewardSpec HeavenlyJadeChestOverrideSpec =
         BoxRewardSpec.Uniform(HeavenlyJadeChest1236RewardTable.BoxId, ImmutableArray<int>.Empty);
 
-    // Server/ts25zone/S04_MyWork03.cpp:6144-6196 -- rand_mir()%200, seuils INCLUSIFS 5/60/100/180 puis else ;
-    // le seuil 160 et les ids 8101/8102/8106 du bloc //test 6197-6249 sont du code commente, pas la table.
     private static readonly FrozenDictionary<byte, BoxRewardSpec> WingLuckyBoxSpecByPreviousTribe =
         new Dictionary<byte, BoxRewardSpec>
         {
@@ -51,8 +49,6 @@ public sealed class LootBoxUseItemHandler(
             [2] = BuildWingLuckyBoxSpec(203)
         }.ToFrozenDictionary();
 
-    // Server/ts25zone/S04_MyWork03.cpp:6300-6316 -- rand_mir()%100, seuils cumulatifs stricts 6/14/26/46/68.
-    // Les 32% restants n'assignent rien : le legacy relit le tValue CLIENT (objet arbitraire), refus ici.
     private static readonly BoxRewardSpec LoyKrathongBoxSpec = BoxRewardSpec.Weighted(LoyKrathongBoxId,
     [
         new LootBoxRewardResolver.WeightedReward(1407, 6),
@@ -112,7 +108,6 @@ public sealed class LootBoxUseItemHandler(
         if (LootBoxCatalog.Default.TryGetSpec(boxId) is { } spec)
             return spec;
 
-        // Tribu hors 0/1/2 : le legacy deconnecte (S04_MyWork03.cpp:6163), on refuse sans rien consommer.
         if (boxId == WingLuckyBoxId)
             return WingLuckyBoxSpecByPreviousTribe.TryGetValue(previousTribe, out var wingSpec) ? wingSpec : null;
 

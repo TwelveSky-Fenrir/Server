@@ -4,7 +4,8 @@
   </Folder>
 
   <Folder Name="/10_Protocol/">
-    <Project Path="src/Fenrir.Core/Fenrir.Core.csproj"/>    <Project Path="src/Fenrir.Protocol.Login/Fenrir.Protocol.Login.csproj"/>
+    <Project Path="src/Fenrir.Core/Fenrir.Core.csproj"/>
+    <Project Path="src/Fenrir.Protocol.Login/Fenrir.Protocol.Login.csproj"/>
     <Project Path="src/Fenrir.Protocol.Game/Fenrir.Protocol.Game.csproj"/>
   </Folder>
 
@@ -16,7 +17,8 @@
     <Project Path="src/Fenrir.Data.Abstractions/Fenrir.Data.Abstractions.csproj"/>
     <Project Path="src/Fenrir.Data.WriteBehind/Fenrir.Data.WriteBehind.csproj"/>
     <Project Path="src/Fenrir.Data/Fenrir.Data.csproj"/>
-    <Project Path="src/Fenrir.Security/Fenrir.Security.csproj"/>  </Folder>
+    <Project Path="src/Fenrir.Security/Fenrir.Security.csproj"/>
+  </Folder>
 
   <Folder Name="/40_Application/">
     <Project Path="src/Fenrir.Domain.Game/Fenrir.Domain.Game.csproj"/>
@@ -29,7 +31,8 @@
   </Folder>
 
   <Folder Name="/50_Hosting/">
-    <Project Path="src/Fenrir.LoginServer/Fenrir.LoginServer.csproj"/>    <Project Path="src/Fenrir.GameServer/Fenrir.GameServer.csproj"/>
+    <Project Path="src/Fenrir.LoginServer/Fenrir.LoginServer.csproj"/>
+    <Project Path="src/Fenrir.GameServer/Fenrir.GameServer.csproj"/>
     <Project Path="src/Fenrir.Tools.DbMigrator/Fenrir.Tools.DbMigrator.csproj"/>
   </Folder>
 

@@ -45,8 +45,6 @@ public sealed class Zone039MonsterSummonResetGateway(
     MonsterSpawnScheduler spawnScheduler,
     ILogger<Zone039MonsterSummonResetGateway> logger) : IZone039MonsterSummonResetGateway
 {
-    // Only map 74 resets; there is no mServerNumber == 39 anywhere -- Server/ts25zone/S07_MyGame08.cpp:211-215.
-    // Deferred to the zone tick because AoiGrid is not thread-safe and this runs off the tick thread.
     public void ResetGeneralSpawnTable(Zone zone)
     {
         ArgumentNullException.ThrowIfNull(zone);

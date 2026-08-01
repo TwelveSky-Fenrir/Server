@@ -314,8 +314,6 @@ public sealed class TribeActionService(
                 state.ContributionPoints - HaloEnchantCpCost, ProtectForHalo: newProtect), ct);
         }
 
-        // S031PROTECT_HALO part au seul joueur, et seulement quand une charge est consommee, avant le
-        // TRIBE_WORK_RECV: Server/ts25zone/S04_MyWork02.cpp:10930.
         if (outcome == TribeHaloEnchantOutcome.ProtectionConsumed)
             state.Session.Send(new AvatarStatUpdateResponse
                 { Sort = ProtectHaloStatSort, Value = newProtect, Value2 = 0 });

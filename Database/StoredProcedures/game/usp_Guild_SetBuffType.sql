@@ -3,8 +3,8 @@
 -- Selecting a buff type must not carry a stale BuffTime read back to the row: usp_Guild_SetBuff writes
 -- all four columns, so it destroys minutes credited by a concurrent recharge or decay flush.
 CREATE PROCEDURE game.usp_Guild_SetBuffType @GuildId INT,
-                                           @BuffType INT,
-                                           @BuffState INT
+                                            @BuffType INT,
+                                            @BuffState INT
 AS
 BEGIN
     SET

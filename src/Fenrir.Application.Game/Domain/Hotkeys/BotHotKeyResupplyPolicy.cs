@@ -4,8 +4,6 @@ namespace Fenrir.Application.Game.Domain.Hotkeys;
 
 public static class BotHotKeyResupplyPolicy
 {
-    private const int MaxMoves = 4;
-
     public enum ResupplyCategory
     {
         None,
@@ -20,6 +18,8 @@ public static class BotHotKeyResupplyPolicy
 
         PetFood
     }
+
+    private const int MaxMoves = 4;
 
     public static ResupplyCategory ClassifyHpMpByPotionType(int potionType1)
     {

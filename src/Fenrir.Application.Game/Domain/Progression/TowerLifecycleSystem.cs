@@ -34,8 +34,6 @@ public sealed class TowerLifecycleSystem(
         ApplyPendingGuardianHeal(zone, towerIndex);
     }
 
-    // A002 case 10 needs alive + aSort 1 + sort 10 + first-attack armed (Server/ts25zone/S07_MyGame05.cpp:46,57,843,845).
-    // Only re-armer is RecordGuardianHit, off-tick, so the closed window is not a dead end.
     private bool IsGuardianAttackTickEligible(Zone zone, int towerIndex)
     {
         if (!towerWar.IsEngagementWindowOpen(towerIndex))

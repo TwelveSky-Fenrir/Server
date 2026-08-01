@@ -246,7 +246,6 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         var builder = new StoredProcedureParametersBuilder("game", "usp_Character_PersistProgressBatch", 0)
             .AddTvpParameter("Progress", rows);
 
-        // Penderie entierement vide: TVP omis (SQL Server refuse un TVP a zero ligne), le DELETE seul la vide.
         if (costumes.Count > 0)
             builder.AddTvpParameter("Costumes", costumes);
 

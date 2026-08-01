@@ -1,3 +1,4 @@
+using System;
 using Fenrir.Generators.Analysis.Model;
 
 namespace Fenrir.Generators.Analysis.Support;
@@ -10,7 +11,7 @@ internal static class EmittedNames
         {
             FenrirServer.Login => "Login",
             FenrirServer.Zone => "Zone",
-            _ => throw new System.ArgumentOutOfRangeException(nameof(server), server, null)
+            _ => throw new ArgumentOutOfRangeException(nameof(server), server, null)
         };
     }
 

@@ -15,9 +15,6 @@ public sealed class ZoneTransferFailureHandler(
         var loginSession = (LoginClientSession)session;
         var accountId = loginSession.AccountId!.Value;
 
-        // Le rollback legacy n'est pas cosmetique : register_2 repasse l'emplacement de LP_MOVING_ZONE a
-        // LP_UPDATE_USER (Server/ts25playuser/S07_MyGame01.cpp:968), etat depuis lequel la zone REFUSE la
-        // reprise (S07_MyGame01.cpp:1057-1060). Le ticket doit donc mourir avant l'etat local.
         try
         {
             await tickets.RevokeAsync(accountId, cancellationToken).ConfigureAwait(false);

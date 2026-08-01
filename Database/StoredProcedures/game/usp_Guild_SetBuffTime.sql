@@ -4,8 +4,8 @@
 -- its own read and its write. BuffTimeForDiff is a legacy time_t: EPOCH SECONDS, not .NET ticks
 -- (Server/ts25extra/S08_MyDB.cpp:1169-1174).
 CREATE PROCEDURE game.usp_Guild_SetBuffTime @GuildId INT,
-                                           @BuffTime INT,
-                                           @BuffTimeForDiff BIGINT
+                                            @BuffTime INT,
+                                            @BuffTimeForDiff BIGINT
 AS
 BEGIN
     SET

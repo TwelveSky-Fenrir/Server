@@ -98,7 +98,6 @@ public sealed class DailyMissionService(
                 "Zone {MapId} tribe-progress inbox full: dropped Zone241Time mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
 
-        // Total absolu apres l'increment, unicast, avant MISSION_COMPLETE_RECV: Server/ts25zone/S04_MyWork02.cpp:14278.
         state.Session.Send(new AvatarStatUpdateResponse
             { Sort = Zone241TimeStatSort, Value = newZone241Time, Value2 = 0 });
 

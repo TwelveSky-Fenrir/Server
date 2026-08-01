@@ -99,7 +99,6 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
                 return;
             }
 
-            // WarPoint/BloodCoin ship as a delta, never a balance -- see ProgressWriteBehindHost.FlushAsync.
             var warPoint = state.WarPoint;
             var bloodCoin = state.BloodCoin;
 
@@ -116,25 +115,23 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
                 state.Title, state.Halo, state.TeacherPoint,
                 warPoint - state.PersistedWarPoint, bloodCoin - state.PersistedBloodCoin,
                 state.PetExpX2Time, state.AnimalAbsorbTime, state.AnimalAbsorbState, state.CostumeIndex,
-                // Nommes a partir d'ici: le TVP est en append continu par plusieurs lots, un ajout positionnel
-                // decale silencieusement tout ce qui suit vers le mauvais parametre.
-                ProtectForHalo: state.ProtectForHalo,
-                BonusItemLevel: state.BonusItemLevel,
-                BonusItemValue: state.BonusItemValue,
-                TribeNotifyScrollCount: state.TribeNotifyScrollCount,
-                TribeFourReturnAllowance: state.TribeFourReturnAllowance,
-                BottleSlots: BottleSlotsCodec.Encode(state.BottleSlots),
-                DrunkBottleIndex: state.DrunkBottleIndex,
-                AutoBuffTime: state.AutoBuffTime,
-                AutoBuffSkill: AutoBuffSkillCodec.Encode(state.AutoBuffSkill),
-                RankPointDate: state.RankPointDate,
-                RankBuffType: state.RankBuffType,
-                AutoTime: state.AutoHuntPaidDayBudget,
-                AutoTime2: state.AutoHuntPaidMinuteBudget,
-                BuffX2Time: state.BuffX2Time,
-                PremiumExpireUtc: state.PremiumExpireUtc,
-                PetGrowth: state.PetGrowth,
-                PetActivity: state.PetActivity,
+                state.ProtectForHalo,
+                state.BonusItemLevel,
+                state.BonusItemValue,
+                state.TribeNotifyScrollCount,
+                state.TribeFourReturnAllowance,
+                BottleSlotsCodec.Encode(state.BottleSlots),
+                state.DrunkBottleIndex,
+                state.AutoBuffTime,
+                AutoBuffSkillCodec.Encode(state.AutoBuffSkill),
+                state.RankPointDate,
+                state.RankBuffType,
+                state.AutoHuntPaidDayBudget,
+                state.AutoHuntPaidMinuteBudget,
+                state.BuffX2Time,
+                state.PremiumExpireUtc,
+                state.PetGrowth,
+                state.PetActivity,
                 RankPoint: state.RankPoint,
                 CloakLuckyBoxPity: state.CloakLuckyBoxPity,
                 CloakVariantBoxPity: state.CloakVariantBoxPity,
@@ -167,8 +164,6 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
             var positionRow = new CharacterPositionTvp(characterId, state.FlushSequence, state.MapId, state.PosX,
                 state.PosY, state.PosZ, state.Heading);
 
-            // Penderie COMPLETE: la procedure remplace, elle ne fusionne pas. Capturee ici pour que la file de
-            // reprise rejoue exactement l'instantane de deconnexion, pas un etat relu plus tard.
             var costumeRows = new List<CharacterCostumeSlotTvp>();
             CostumePersistenceCodec.AppendOccupiedSlots(costumeRows, characterId, state);
 
@@ -276,8 +271,6 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
                     await _characters.PersistFinalFlushAsync(progressRow, positionRow, costumeRows, ct)
                         .ConfigureAwait(false);
 
-                    // Max and not +=: a periodic flush may already have credited this same grant, in which case
-                    // the row above was a FlushSequence-guard no-op and the baseline must not move twice.
                     capturedState.PersistedWarPoint = Math.Max(capturedState.PersistedWarPoint, capturedWarPoint);
                     capturedState.PersistedBloodCoin = Math.Max(capturedState.PersistedBloodCoin, capturedBloodCoin);
 

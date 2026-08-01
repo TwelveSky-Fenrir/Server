@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Buffers.Binary;
 using Fenrir.Application.Game.Abstractions.World;
+using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Core.Wire;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -11,8 +12,8 @@ public sealed class ZoneCenterBroadcastIngestor(
     ZoneCenterSiegeState state,
     ZoneRegistry zones,
     ILogger<ZoneCenterBroadcastIngestor> logger,
-    WorldState.WorldStateService? worldState = null,
-    System.Lazy<ZoneEventBroadcaster>? worldReactions = null,
+    WorldStateService? worldState = null,
+    Lazy<ZoneEventBroadcaster>? worldReactions = null,
     Zone051Zone053SiegeState? zone051Zone053State = null,
     AllianceProposalCenterState? allianceState = null,
     IWorldEventUplink? uplink = null)
@@ -59,9 +60,7 @@ public sealed class ZoneCenterBroadcastIngestor(
 
     public const int PingEventCode = 4000;
 
-    // Le switch imbrique du legacy accepte 0..3 (symbole de tribu) et 4 (symbole du monstre neutre),
-    // sans default : tout autre index est un no-op silencieux (Server/ts25center/S04_MyWork02.cpp:377-395).
-    private const int MonsterSymbolSlot = WorldState.WorldStateService.TribeCount;
+    private const int MonsterSymbolSlot = WorldStateService.TribeCount;
 
     public void Ingest(int eventCode, ReadOnlySpan<byte> data)
     {
@@ -96,8 +95,6 @@ public sealed class ZoneCenterBroadcastIngestor(
         if (!ApplyStateEffect(eventCode, data))
             return;
 
-        // Le legacy diffuse 1601 (charge nulle) PUIS 4000 sur une seule trame 4000 entrante
-        // (Server/ts25center/S04_MyWork02.cpp:1151-1157 puis :1214) : le shard receveur doit les deux.
         if (eventCode == PingEventCode)
             BroadcastAllZonesPing();
 

@@ -98,9 +98,9 @@ IF NOT EXISTS (SELECT 1
                FROM sys.columns
                WHERE object_id = OBJECT_ID(N'game.Characters')
                  AND name = N'UseOrnament')
-    ALTER TABLE game.Characters
-        ADD UseOrnament BIT NOT NULL
-            CONSTRAINT DF_Characters_UseOrnament DEFAULT 0; -- aUseOrnament (Server/Header/CSQLAvatar.cpp:624) : interrupteur du bonus d'ornement plaque or / plaque argent, bascule par TRIBE_WORK sort 9/10 (Server/ts25zone/S04_MyWork02.cpp:11046,11053) et remis a 0 par l'expiration des compteurs (Server/ts25zone/S07_MyGame04.cpp:1290-1293)
+ALTER TABLE game.Characters
+    ADD UseOrnament BIT NOT NULL
+        CONSTRAINT DF_Characters_UseOrnament DEFAULT 0; -- aUseOrnament (Server/Header/CSQLAvatar.cpp:624) : interrupteur du bonus d'ornement plaque or / plaque argent, bascule par TRIBE_WORK sort 9/10 (Server/ts25zone/S04_MyWork02.cpp:11046,11053) et remis a 0 par l'expiration des compteurs (Server/ts25zone/S07_MyGame04.cpp:1290-1293)
 GO
 
 -- 2. Dropper les deux procedures qui referencent le type (elles bloquent DROP TYPE), puis le type lui-meme.

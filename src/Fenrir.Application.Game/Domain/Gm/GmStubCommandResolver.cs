@@ -11,8 +11,6 @@ public enum GmStubCommandOutcome
     NoOpFailure
 }
 
-// Server/ts25zone/S04_MyWork04.cpp:1704-1712 : corps du case 525 vide apres la garde GM, aucun effet d'etat.
-// tResult reste a son initialisation 1 (S04_MyWork04.cpp:305) : il n'existe aucun chemin de succes.
 public static class GmStubCommandResolver
 {
     public const int UseItemSort = 525;

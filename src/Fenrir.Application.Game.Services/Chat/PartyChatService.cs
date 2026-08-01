@@ -21,8 +21,6 @@ public sealed class PartyChatService(ZoneRegistry zones, PartyRegistry parties, 
             return false;
         }
 
-        // PARTY_CHAT_SEND n'appelle jamais CHECK_MUTE (Server/ts25zone/S04_MyWork02.cpp:9455-9480) --
-        // contrairement a GENERAL_CHAT/SHOUT/GUILD_CHAT/TRIBE_CHAT/WORLD_CHAT, qui eux le font.
         var response = new PartyChatResponse { AvatarName = sender.Name, Content = content, Link = EmptyLink };
 
         foreach (var memberId in members)

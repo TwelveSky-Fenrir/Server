@@ -66,19 +66,19 @@
 --    charge/aucun temps restant, l'etat d'un avatar qui n'a jamais consomme le parchemin/la cle correspondante).
 -- ---------------------------------------------------------------------------
 IF COL_LENGTH('game.Characters', 'ImproveItemValue') IS NULL
-    ALTER TABLE game.Characters
-        ADD ImproveItemValue INT NOT NULL
-                CONSTRAINT DF_Characters_ImproveItemValue DEFAULT 0
-                CONSTRAINT CK_Characters_ImproveItemValue CHECK (ImproveItemValue >= 0),
-            AddItemValue     INT NOT NULL
-                CONSTRAINT DF_Characters_AddItemValue DEFAULT 0
-                CONSTRAINT CK_Characters_AddItemValue CHECK (AddItemValue >= 0),
-            HighItemValue    INT NOT NULL
-                CONSTRAINT DF_Characters_HighItemValue DEFAULT 0
-                CONSTRAINT CK_Characters_HighItemValue CHECK (HighItemValue >= 0),
-            TaiyanKeyTimer   INT NOT NULL
-                CONSTRAINT DF_Characters_TaiyanKeyTimer DEFAULT 0
-                CONSTRAINT CK_Characters_TaiyanKeyTimer CHECK (TaiyanKeyTimer >= 0);
+ALTER TABLE game.Characters
+    ADD ImproveItemValue INT NOT NULL
+            CONSTRAINT DF_Characters_ImproveItemValue DEFAULT 0
+            CONSTRAINT CK_Characters_ImproveItemValue CHECK (ImproveItemValue >= 0),
+        AddItemValue INT NOT NULL
+            CONSTRAINT DF_Characters_AddItemValue DEFAULT 0
+            CONSTRAINT CK_Characters_AddItemValue CHECK (AddItemValue >= 0),
+        HighItemValue INT NOT NULL
+            CONSTRAINT DF_Characters_HighItemValue DEFAULT 0
+            CONSTRAINT CK_Characters_HighItemValue CHECK (HighItemValue >= 0),
+        TaiyanKeyTimer INT NOT NULL
+            CONSTRAINT DF_Characters_TaiyanKeyTimer DEFAULT 0
+            CONSTRAINT CK_Characters_TaiyanKeyTimer CHECK (TaiyanKeyTimer >= 0);
 GO
 
 -- ---------------------------------------------------------------------------
@@ -97,69 +97,69 @@ GO
 -- ---------------------------------------------------------------------------
 CREATE TYPE game.tvp_CharacterProgress AS TABLE
 (
-    CharacterId        INT          NOT NULL,
-    FlushSequence      BIGINT       NOT NULL,
-    Level              SMALLINT     NOT NULL,
-    Level2             SMALLINT     NOT NULL,
-    Experience         BIGINT       NOT NULL,
-    Life               INT          NOT NULL,
-    MaxLife            INT          NOT NULL,
-    Mana               INT          NOT NULL,
-    MaxMana            INT          NOT NULL,
-    StatVit            INT          NOT NULL,
-    StatStr            INT          NOT NULL,
-    StatInt            INT          NOT NULL,
-    StatDex            INT          NOT NULL,
-    StatPoints         INT          NOT NULL,
-    SkillPoints        INT          NOT NULL,
-    ContributionPoints INT          NOT NULL,
-    Exp2               INT          NOT NULL,
-    RebirthCount       INT          NOT NULL,
-    EatLifePotion      INT          NOT NULL,
-    EatManaPotion      INT          NOT NULL,
-    EatStrPotion       INT          NOT NULL,
-    EatDexPotion       INT          NOT NULL,
-    EatElePotion       INT          NOT NULL,
-    DropItemTime       INT          NOT NULL,
-    M15PetLuckyBoxPity INT          NOT NULL,
-    MountItemId        INT          NOT NULL,
-    MountExpActivity   INT          NOT NULL,
-    MountPower         INT          NOT NULL,
-    MountSlotIndex     INT          NOT NULL,
-    MountTime          INT          NOT NULL,
-    VisibleState       INT          NOT NULL,
-    SpecialState       INT          NOT NULL,
-    UseOrnament        INT          NOT NULL,
-    Title              INT          NOT NULL,
-    Halo               INT          NOT NULL,
-    TeacherPoint       INT          NOT NULL,
-    WarPointDelta      INT          NOT NULL,
-    BloodCoinDelta     INT          NOT NULL,
-    PetExpX2Time       INT          NOT NULL,
-    AnimalAbsorbTime   INT          NOT NULL,
-    AnimalAbsorbState  INT          NOT NULL,
-    CostumeIndex       INT          NOT NULL,
-    ProtectForHalo     INT          NOT NULL,
-    BonusItemLevel     INT          NOT NULL,
-    BonusItemValue     BIT          NOT NULL,
-    TribeNotifyScrollCount   INT     NOT NULL,
-    TribeFourReturnAllowance INT     NOT NULL,
-    BottleSlots        NVARCHAR(70) NOT NULL,
-    DrunkBottleIndex   INT          NOT NULL,
-    AutoBuffTime       INT          NOT NULL,
-    AutoBuffSkill      NVARCHAR(48) NOT NULL,
-    RankPointDate      INT          NOT NULL,
-    RankBuffType       INT          NOT NULL,
-    AutoTime           INT          NOT NULL,
-    AutoTime2          INT          NOT NULL,
-    BuffX2Time         INT          NOT NULL,
-    PremiumExpireUtc   BIGINT       NOT NULL,
-    PetGrowth          INT          NOT NULL,
-    PetActivity        INT          NOT NULL,
-    ImproveItemValue   INT          NOT NULL,
-    AddItemValue       INT          NOT NULL,
-    HighItemValue      INT          NOT NULL,
-    TaiyanKeyTimer     INT          NOT NULL
+    CharacterId              INT          NOT NULL,
+    FlushSequence            BIGINT       NOT NULL,
+    Level                    SMALLINT     NOT NULL,
+    Level2                   SMALLINT     NOT NULL,
+    Experience               BIGINT       NOT NULL,
+    Life                     INT          NOT NULL,
+    MaxLife                  INT          NOT NULL,
+    Mana                     INT          NOT NULL,
+    MaxMana                  INT          NOT NULL,
+    StatVit                  INT          NOT NULL,
+    StatStr                  INT          NOT NULL,
+    StatInt                  INT          NOT NULL,
+    StatDex                  INT          NOT NULL,
+    StatPoints               INT          NOT NULL,
+    SkillPoints              INT          NOT NULL,
+    ContributionPoints       INT          NOT NULL,
+    Exp2                     INT          NOT NULL,
+    RebirthCount             INT          NOT NULL,
+    EatLifePotion            INT          NOT NULL,
+    EatManaPotion            INT          NOT NULL,
+    EatStrPotion             INT          NOT NULL,
+    EatDexPotion             INT          NOT NULL,
+    EatElePotion             INT          NOT NULL,
+    DropItemTime             INT          NOT NULL,
+    M15PetLuckyBoxPity       INT          NOT NULL,
+    MountItemId              INT          NOT NULL,
+    MountExpActivity         INT          NOT NULL,
+    MountPower               INT          NOT NULL,
+    MountSlotIndex           INT          NOT NULL,
+    MountTime                INT          NOT NULL,
+    VisibleState             INT          NOT NULL,
+    SpecialState             INT          NOT NULL,
+    UseOrnament              INT          NOT NULL,
+    Title                    INT          NOT NULL,
+    Halo                     INT          NOT NULL,
+    TeacherPoint             INT          NOT NULL,
+    WarPointDelta            INT          NOT NULL,
+    BloodCoinDelta           INT          NOT NULL,
+    PetExpX2Time             INT          NOT NULL,
+    AnimalAbsorbTime         INT          NOT NULL,
+    AnimalAbsorbState        INT          NOT NULL,
+    CostumeIndex             INT          NOT NULL,
+    ProtectForHalo           INT          NOT NULL,
+    BonusItemLevel           INT          NOT NULL,
+    BonusItemValue           BIT          NOT NULL,
+    TribeNotifyScrollCount   INT          NOT NULL,
+    TribeFourReturnAllowance INT          NOT NULL,
+    BottleSlots              NVARCHAR(70) NOT NULL,
+    DrunkBottleIndex         INT          NOT NULL,
+    AutoBuffTime             INT          NOT NULL,
+    AutoBuffSkill            NVARCHAR(48) NOT NULL,
+    RankPointDate            INT          NOT NULL,
+    RankBuffType             INT          NOT NULL,
+    AutoTime                 INT          NOT NULL,
+    AutoTime2                INT          NOT NULL,
+    BuffX2Time               INT          NOT NULL,
+    PremiumExpireUtc         BIGINT       NOT NULL,
+    PetGrowth                INT          NOT NULL,
+    PetActivity              INT          NOT NULL,
+    ImproveItemValue         INT          NOT NULL,
+    AddItemValue             INT          NOT NULL,
+    HighItemValue            INT          NOT NULL,
+    TaiyanKeyTimer           INT          NOT NULL
 );
 GO
 
@@ -175,7 +175,10 @@ BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
-    DECLARE @Applied TABLE (CharacterId INT NOT NULL PRIMARY KEY);
+    DECLARE @Applied TABLE
+                     (
+                         CharacterId INT NOT NULL PRIMARY KEY
+                     );
 
     BEGIN TRANSACTION;
 
@@ -192,7 +195,7 @@ BEGIN
         c.StatInt                  = s.StatInt,
         c.StatDex                  = s.StatDex,
         c.StatPoints               = s.StatPoints,
-        c.SkillPoints               = s.SkillPoints,
+        c.SkillPoints              = s.SkillPoints,
         c.ContributionPoints       = s.ContributionPoints,
         c.Exp2                     = s.Exp2,
         c.RebirthCount             = s.RebirthCount,
@@ -278,7 +281,10 @@ BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
-    DECLARE @Applied TABLE (CharacterId INT NOT NULL PRIMARY KEY);
+    DECLARE @Applied TABLE
+                     (
+                         CharacterId INT NOT NULL PRIMARY KEY
+                     );
 
     BEGIN TRANSACTION;
 
@@ -295,7 +301,7 @@ BEGIN
         c.StatInt                  = p.StatInt,
         c.StatDex                  = p.StatDex,
         c.StatPoints               = p.StatPoints,
-        c.SkillPoints               = p.SkillPoints,
+        c.SkillPoints              = p.SkillPoints,
         c.ContributionPoints       = p.ContributionPoints,
         c.Exp2                     = p.Exp2,
         c.RebirthCount             = p.RebirthCount,

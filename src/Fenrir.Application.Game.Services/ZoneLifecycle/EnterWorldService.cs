@@ -311,8 +311,6 @@ public sealed class EnterWorldService(
                 UniqueNumber = unchecked((uint)characterId),
                 Data = new ObjectForAvatar
                 {
-                    // Server/ts25zone/S04_MyWork02.cpp:970-971 repeuple la copie de diffusion depuis la copie
-                    // persistee avant de l'envoyer telle quelle a l'entrant (:1061) -- jamais l'inverse.
                     VisibleState = character.VisibleState,
                     SpecialState = character.SpecialState,
                     KillOtherTribe = 0,
@@ -365,8 +363,6 @@ public sealed class EnterWorldService(
                     DuelState = new int[3],
                     PShopState = 0,
                     PShopName = "",
-                    // Miroir de diffusion re-seede depuis la copie PERSISTEE, jamais l'inverse :
-                    // Server/ts25zone/S04_MyWork02.cpp:935-941 (costume) et :1000 (absorption).
                     CostumeNumber = costumeNumber,
                     BufEffectTimeState = 0,
                     BufSort = 0,
@@ -393,7 +389,6 @@ public sealed class EnterWorldService(
 
             SendRatioEventMessages(zoneSession, zone);
 
-            // Total absolu, uniquement s'il est non nul: Server/ts25zone/S04_MyWork02.cpp:1084
             if (heroRankPoints > 0)
                 zoneSession.Send(new AvatarStatUpdateResponse
                 {
@@ -402,8 +397,6 @@ public sealed class EnterWorldService(
                     Value2 = 0
                 });
 
-            // ResetRank (Server/ts25zone/S07_MyGame03.cpp:8283-8385) : le palier de rank-buff tombe des que la
-            // date stockee n'est plus celle du jour, et la date s'amorce au premier passage (aRankPointDate == 0).
             var rankResetDate = GameDate.Today();
             var rankBuffType = character.RankPointDate == rankResetDate ? character.RankBuffType : 0;
             var rankPoint = character.RankPointDate == rankResetDate ? character.RankPoint : 0;
@@ -531,8 +524,6 @@ public sealed class EnterWorldService(
                 CloakVariantBoxPity: character.CloakVariantBoxPity,
                 MountVariantBoxPity: character.MountVariantBoxPity,
                 BuffX2Time: character.BuffX2Time,
-                // SetIntegerLow(aAutoTime, tNowDate, 0) : Server/ts25zone/S07_MyGame03.cpp:5697 -- seule une
-                // date-limite DEJA passee retombe a 0, ce n'est pas une remise a zero systematique.
                 AutoHuntPaidDayBudget: VaultDateNormalization.NormalizeIfExpired(character.AutoTime,
                     GameDate.Today()),
                 AutoHuntPaidMinuteBudget: character.AutoTime2)));
@@ -608,7 +599,6 @@ public sealed class EnterWorldService(
                 Value2 = 0
             });
 
-        // Sort 58 pousse la valeur brute, sans CreateRatio0 ni doublement zone 126: Server/ts25zone/S07_MyGame03.cpp:8983
         if (config.KillOtherTribeAddValue != 0)
             zoneSession.Send(new AvatarStatUpdateResponse
             {
@@ -617,7 +607,6 @@ public sealed class EnterWorldService(
                 Value2 = 0
             });
 
-        // Sort 901: CreateRatio0 puis * 1.0f, pas de doublement zone 126: Server/ts25zone/S07_MyGame03.cpp:8988
         if (config.PetExperienceRatio != 0)
             zoneSession.Send(new AvatarStatUpdateResponse
             {
@@ -626,7 +615,6 @@ public sealed class EnterWorldService(
                 Value2 = 0
             });
 
-        // Sort 902 pousse la valeur brute de l'ini, sans CreateRatio0: Server/ts25zone/S07_MyGame01.cpp:435
         if (config.MountExperienceRatio != 0)
             zoneSession.Send(new AvatarStatUpdateResponse
             {
@@ -638,7 +626,6 @@ public sealed class EnterWorldService(
 
     private static int EncodeRatioEventValue(int configuredRatio, bool isZone126Type)
     {
-        // CreateRatio0 puis (int)(ratio * 10.0f): Server/Header/function.h:1654, Server/ts25zone/S07_MyGame03.cpp:8968
         var scaled = (int)(configuredRatio * 0.1f * 10.0f);
         return isZone126Type ? scaled * 2 : scaled + 1;
     }

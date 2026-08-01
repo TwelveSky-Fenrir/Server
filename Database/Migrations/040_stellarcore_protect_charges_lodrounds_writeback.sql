@@ -81,50 +81,50 @@ IF NOT EXISTS (SELECT 1
                FROM sys.columns
                WHERE object_id = OBJECT_ID(N'game.Characters')
                  AND name = N'ProtectForRefine')
-    ALTER TABLE game.Characters
-        ADD ProtectForRefine INT NOT NULL
-            CONSTRAINT DF_Characters_ProtectForRefine DEFAULT 0
-            CONSTRAINT CK_Characters_ProtectForRefine CHECK (ProtectForRefine >= 0);
+ALTER TABLE game.Characters
+    ADD ProtectForRefine INT NOT NULL
+        CONSTRAINT DF_Characters_ProtectForRefine DEFAULT 0
+        CONSTRAINT CK_Characters_ProtectForRefine CHECK (ProtectForRefine >= 0);
 GO
 
 IF NOT EXISTS (SELECT 1
                FROM sys.columns
                WHERE object_id = OBJECT_ID(N'game.Characters')
                  AND name = N'ProtectForCostume')
-    ALTER TABLE game.Characters
-        ADD ProtectForCostume INT NOT NULL
-            CONSTRAINT DF_Characters_ProtectForCostume DEFAULT 0
-            CONSTRAINT CK_Characters_ProtectForCostume CHECK (ProtectForCostume >= 0);
+ALTER TABLE game.Characters
+    ADD ProtectForCostume INT NOT NULL
+        CONSTRAINT DF_Characters_ProtectForCostume DEFAULT 0
+        CONSTRAINT CK_Characters_ProtectForCostume CHECK (ProtectForCostume >= 0);
 GO
 
 IF NOT EXISTS (SELECT 1
                FROM sys.columns
                WHERE object_id = OBJECT_ID(N'game.Characters')
                  AND name = N'ProtectForDestroy2')
-    ALTER TABLE game.Characters
-        ADD ProtectForDestroy2 INT NOT NULL
-            CONSTRAINT DF_Characters_ProtectForDestroy2 DEFAULT 0
-            CONSTRAINT CK_Characters_ProtectForDestroy2 CHECK (ProtectForDestroy2 >= 0);
+ALTER TABLE game.Characters
+    ADD ProtectForDestroy2 INT NOT NULL
+        CONSTRAINT DF_Characters_ProtectForDestroy2 DEFAULT 0
+        CONSTRAINT CK_Characters_ProtectForDestroy2 CHECK (ProtectForDestroy2 >= 0);
 GO
 
 IF NOT EXISTS (SELECT 1
                FROM sys.columns
                WHERE object_id = OBJECT_ID(N'game.Characters')
                  AND name = N'LodRounds')
-    ALTER TABLE game.Characters
-        ADD LodRounds INT NOT NULL
-            CONSTRAINT DF_Characters_LodRounds DEFAULT 0
-            CONSTRAINT CK_Characters_LodRounds CHECK (LodRounds >= 0);
+ALTER TABLE game.Characters
+    ADD LodRounds INT NOT NULL
+        CONSTRAINT DF_Characters_LodRounds DEFAULT 0
+        CONSTRAINT CK_Characters_LodRounds CHECK (LodRounds >= 0);
 GO
 
 IF NOT EXISTS (SELECT 1
                FROM sys.columns
                WHERE object_id = OBJECT_ID(N'game.Characters')
                  AND name = N'StellarCoreExpireDate')
-    ALTER TABLE game.Characters
-        ADD StellarCoreExpireDate NVARCHAR(80) NOT NULL
-            CONSTRAINT DF_Characters_StellarCoreExpireDate DEFAULT N''
-            CONSTRAINT CK_Characters_StellarCoreExpireDate CHECK (LEN(StellarCoreExpireDate) IN (0, 80));
+ALTER TABLE game.Characters
+    ADD StellarCoreExpireDate NVARCHAR(80) NOT NULL
+        CONSTRAINT DF_Characters_StellarCoreExpireDate DEFAULT N''
+        CONSTRAINT CK_Characters_StellarCoreExpireDate CHECK (LEN(StellarCoreExpireDate) IN (0, 80));
 GO
 
 -- 2. Dropper les deux procedures qui referencent le type, puis le type lui-meme.
@@ -137,84 +137,84 @@ GO
 --    colonnes de ce lot en queue.
 CREATE TYPE game.tvp_CharacterProgress AS TABLE
 (
-    CharacterId              INT           NOT NULL,
-    FlushSequence            BIGINT        NOT NULL,
-    Level                    SMALLINT      NOT NULL,
-    Level2                   SMALLINT      NOT NULL,
-    Experience               BIGINT        NOT NULL,
-    Life                     INT           NOT NULL,
-    MaxLife                  INT           NOT NULL,
-    Mana                     INT           NOT NULL,
-    MaxMana                  INT           NOT NULL,
-    StatVit                  INT           NOT NULL,
-    StatStr                  INT           NOT NULL,
-    StatInt                  INT           NOT NULL,
-    StatDex                  INT           NOT NULL,
-    StatPoints               INT           NOT NULL,
-    SkillPoints               INT          NOT NULL,
-    ContributionPoints       INT           NOT NULL,
-    Exp2                     INT           NOT NULL,
-    RebirthCount             INT           NOT NULL,
-    EatLifePotion            INT           NOT NULL,
-    EatManaPotion            INT           NOT NULL,
-    EatStrPotion             INT           NOT NULL,
-    EatDexPotion             INT           NOT NULL,
-    EatElePotion             INT           NOT NULL,
-    DropItemTime             INT           NOT NULL,
-    M15PetLuckyBoxPity       INT           NOT NULL,
-    MountItemId              INT           NOT NULL,
-    MountExpActivity         INT           NOT NULL,
-    MountPower               INT           NOT NULL,
-    MountSlotIndex           INT           NOT NULL,
-    MountTime                INT           NOT NULL,
-    VisibleState             INT           NOT NULL,
-    SpecialState              INT          NOT NULL,
-    UseOrnament               INT          NOT NULL,
-    Title                     INT          NOT NULL,
-    Halo                      INT          NOT NULL,
-    TeacherPoint              INT          NOT NULL,
-    WarPointDelta             INT          NOT NULL,
-    BloodCoinDelta            INT          NOT NULL,
-    PetExpX2Time              INT          NOT NULL,
-    AnimalAbsorbTime          INT          NOT NULL,
-    AnimalAbsorbState         INT          NOT NULL,
-    CostumeIndex              INT          NOT NULL,
-    ProtectForHalo            INT          NOT NULL,
-    BonusItemLevel            INT          NOT NULL,
-    BonusItemValue            BIT          NOT NULL,
-    TribeNotifyScrollCount    INT          NOT NULL,
-    TribeFourReturnAllowance  INT          NOT NULL,
-    BottleSlots               NVARCHAR(70) NOT NULL,
-    DrunkBottleIndex          INT          NOT NULL,
-    AutoBuffTime               INT         NOT NULL,
-    AutoBuffSkill              NVARCHAR(48) NOT NULL,
-    RankPointDate              INT         NOT NULL,
-    RankBuffType                INT        NOT NULL,
-    AutoTime                    INT        NOT NULL,
-    AutoTime2                   INT        NOT NULL,
-    BuffX2Time                  INT        NOT NULL,
-    PremiumExpireUtc             BIGINT    NOT NULL,
-    PetGrowth                    INT       NOT NULL,
-    PetActivity                  INT       NOT NULL,
-    RankPoint                    INT       NOT NULL,
-    CloakLuckyBoxPity            INT       NOT NULL,
-    CloakVariantBoxPity          INT       NOT NULL,
-    MountVariantBoxPity          INT       NOT NULL,
-    ImproveItemValue             INT       NOT NULL,
-    AddItemValue                 INT       NOT NULL,
-    HighItemValue                INT       NOT NULL,
-    TaiyanKeyTimer                INT      NOT NULL,
-    ProtectForRefine               INT     NOT NULL,
-    ProtectForDestroy               INT    NOT NULL,
-    ProtectForCostume                INT   NOT NULL,
-    ProtectForDestroy2                INT  NOT NULL,
-    LodRounds                          INT NOT NULL,
-    StellarCoreExpireDate       NVARCHAR(80) NOT NULL,
-    EliteDungeonTime                   INT NOT NULL,
-    DungeonKeyTime                     INT NOT NULL,
-    IvyHallTicketTime                  INT NOT NULL,
-    ScrollOfSeekersTime                INT NOT NULL,
-    FightingGodForDestroy              INT NOT NULL
+    CharacterId              INT          NOT NULL,
+    FlushSequence            BIGINT       NOT NULL,
+    Level                    SMALLINT     NOT NULL,
+    Level2                   SMALLINT     NOT NULL,
+    Experience               BIGINT       NOT NULL,
+    Life                     INT          NOT NULL,
+    MaxLife                  INT          NOT NULL,
+    Mana                     INT          NOT NULL,
+    MaxMana                  INT          NOT NULL,
+    StatVit                  INT          NOT NULL,
+    StatStr                  INT          NOT NULL,
+    StatInt                  INT          NOT NULL,
+    StatDex                  INT          NOT NULL,
+    StatPoints               INT          NOT NULL,
+    SkillPoints              INT          NOT NULL,
+    ContributionPoints       INT          NOT NULL,
+    Exp2                     INT          NOT NULL,
+    RebirthCount             INT          NOT NULL,
+    EatLifePotion            INT          NOT NULL,
+    EatManaPotion            INT          NOT NULL,
+    EatStrPotion             INT          NOT NULL,
+    EatDexPotion             INT          NOT NULL,
+    EatElePotion             INT          NOT NULL,
+    DropItemTime             INT          NOT NULL,
+    M15PetLuckyBoxPity       INT          NOT NULL,
+    MountItemId              INT          NOT NULL,
+    MountExpActivity         INT          NOT NULL,
+    MountPower               INT          NOT NULL,
+    MountSlotIndex           INT          NOT NULL,
+    MountTime                INT          NOT NULL,
+    VisibleState             INT          NOT NULL,
+    SpecialState             INT          NOT NULL,
+    UseOrnament              INT          NOT NULL,
+    Title                    INT          NOT NULL,
+    Halo                     INT          NOT NULL,
+    TeacherPoint             INT          NOT NULL,
+    WarPointDelta            INT          NOT NULL,
+    BloodCoinDelta           INT          NOT NULL,
+    PetExpX2Time             INT          NOT NULL,
+    AnimalAbsorbTime         INT          NOT NULL,
+    AnimalAbsorbState        INT          NOT NULL,
+    CostumeIndex             INT          NOT NULL,
+    ProtectForHalo           INT          NOT NULL,
+    BonusItemLevel           INT          NOT NULL,
+    BonusItemValue           BIT          NOT NULL,
+    TribeNotifyScrollCount   INT          NOT NULL,
+    TribeFourReturnAllowance INT          NOT NULL,
+    BottleSlots              NVARCHAR(70) NOT NULL,
+    DrunkBottleIndex         INT          NOT NULL,
+    AutoBuffTime             INT          NOT NULL,
+    AutoBuffSkill            NVARCHAR(48) NOT NULL,
+    RankPointDate            INT          NOT NULL,
+    RankBuffType             INT          NOT NULL,
+    AutoTime                 INT          NOT NULL,
+    AutoTime2                INT          NOT NULL,
+    BuffX2Time               INT          NOT NULL,
+    PremiumExpireUtc         BIGINT       NOT NULL,
+    PetGrowth                INT          NOT NULL,
+    PetActivity              INT          NOT NULL,
+    RankPoint                INT          NOT NULL,
+    CloakLuckyBoxPity        INT          NOT NULL,
+    CloakVariantBoxPity      INT          NOT NULL,
+    MountVariantBoxPity      INT          NOT NULL,
+    ImproveItemValue         INT          NOT NULL,
+    AddItemValue             INT          NOT NULL,
+    HighItemValue            INT          NOT NULL,
+    TaiyanKeyTimer           INT          NOT NULL,
+    ProtectForRefine         INT          NOT NULL,
+    ProtectForDestroy        INT          NOT NULL,
+    ProtectForCostume        INT          NOT NULL,
+    ProtectForDestroy2       INT          NOT NULL,
+    LodRounds                INT          NOT NULL,
+    StellarCoreExpireDate    NVARCHAR(80) NOT NULL,
+    EliteDungeonTime         INT          NOT NULL,
+    DungeonKeyTime           INT          NOT NULL,
+    IvyHallTicketTime        INT          NOT NULL,
+    ScrollOfSeekersTime      INT          NOT NULL,
+    FightingGodForDestroy    INT          NOT NULL
 );
 GO
 

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using Fenrir.Generators.Analysis.Diagnostics;
@@ -40,7 +41,7 @@ public sealed class DuplicateDispatcherAnalyzer : DiagnosticAnalyzer
             if (emitters.Count < 2)
                 continue;
 
-            emitters.Sort(System.StringComparer.Ordinal);
+            emitters.Sort(StringComparer.Ordinal);
 
             for (var i = 1; i < emitters.Count; i++)
                 context.ReportDiagnostic(Diagnostic.Create(

@@ -126,8 +126,6 @@ public sealed class TribeGuardSpawner(
             if (post.MapId != zone.MapId || post.TribeId != winningTribe)
                 continue;
 
-            // Le "return" de JonNangin couvre aussi la branche vainqueur, pas seulement la branche ordinaire
-            // (Server/ts25zone/S10_MySummon.cpp:1678).
             if (post.TribeId == 3 && !_options.FourthTribeGuardPostsEnabled)
                 continue;
 
@@ -180,10 +178,6 @@ public sealed class TribeGuardSpawner(
         return slotState;
     }
 
-    // MONSTERSYSTEM::Search balaie mDATA par mIndex croissant et rend le PREMIER trouve
-    // (Server/ts25zone/GameSystem/GameSystem_04_Monster.cpp:244-260). Le couple (type, specialType) n'est pas
-    // unique -- (6,27) rend 609, 653 et 665 -- et l'ordre d'enumeration d'un FrozenDictionary n'est pas
-    // l'ordre des cles : sans ce minimum, un garde peut naitre sur le gabarit a 360 M PV.
     private bool TryFindTemplate(byte mainType, byte specialType, [NotNullWhen(true)] out MonsterRowDto? template)
     {
         MonsterRowDto? best = null;

@@ -204,8 +204,6 @@ public sealed class LoginConnectionHost(
 
     private void Greet(LoginClientSession session, SocketConnection connection)
     {
-        // Legacy domain: (rand % 1001) * (rand % 1001), so always in [0, 1000000] and never negative
-        // (Server/ts25login/S03_MyUser.cpp:214). Only the low byte is the stream key (:215).
         var randomNumber = RandomNumberGenerator.GetInt32(GreetingRandomModulus) *
                            RandomNumberGenerator.GetInt32(GreetingRandomModulus);
 

@@ -76,22 +76,22 @@
 --    ticket consomme, l'etat d'un avatar qui n'a jamais utilise le parchemin/objet correspondant).
 -- ---------------------------------------------------------------------------
 IF COL_LENGTH('game.Characters', 'EliteDungeonTime') IS NULL
-    ALTER TABLE game.Characters
-        ADD EliteDungeonTime INT NOT NULL
-                CONSTRAINT DF_Characters_EliteDungeonTime DEFAULT 0
-                CONSTRAINT CK_Characters_EliteDungeonTime CHECK (EliteDungeonTime >= 0),
-            DungeonKeyTime    INT NOT NULL
-                CONSTRAINT DF_Characters_DungeonKeyTime DEFAULT 0
-                CONSTRAINT CK_Characters_DungeonKeyTime CHECK (DungeonKeyTime >= 0),
-            IvyHallTicketTime INT NOT NULL
-                CONSTRAINT DF_Characters_IvyHallTicketTime DEFAULT 0
-                CONSTRAINT CK_Characters_IvyHallTicketTime CHECK (IvyHallTicketTime >= 0),
-            ScrollOfSeekersTime INT NOT NULL
-                CONSTRAINT DF_Characters_ScrollOfSeekersTime DEFAULT 0
-                CONSTRAINT CK_Characters_ScrollOfSeekersTime CHECK (ScrollOfSeekersTime >= 0),
-            FightingGodForDestroy INT NOT NULL
-                CONSTRAINT DF_Characters_FightingGodForDestroy DEFAULT 0
-                CONSTRAINT CK_Characters_FightingGodForDestroy CHECK (FightingGodForDestroy >= 0);
+ALTER TABLE game.Characters
+    ADD EliteDungeonTime INT NOT NULL
+            CONSTRAINT DF_Characters_EliteDungeonTime DEFAULT 0
+            CONSTRAINT CK_Characters_EliteDungeonTime CHECK (EliteDungeonTime >= 0),
+        DungeonKeyTime INT NOT NULL
+            CONSTRAINT DF_Characters_DungeonKeyTime DEFAULT 0
+            CONSTRAINT CK_Characters_DungeonKeyTime CHECK (DungeonKeyTime >= 0),
+        IvyHallTicketTime INT NOT NULL
+            CONSTRAINT DF_Characters_IvyHallTicketTime DEFAULT 0
+            CONSTRAINT CK_Characters_IvyHallTicketTime CHECK (IvyHallTicketTime >= 0),
+        ScrollOfSeekersTime INT NOT NULL
+            CONSTRAINT DF_Characters_ScrollOfSeekersTime DEFAULT 0
+            CONSTRAINT CK_Characters_ScrollOfSeekersTime CHECK (ScrollOfSeekersTime >= 0),
+        FightingGodForDestroy INT NOT NULL
+            CONSTRAINT DF_Characters_FightingGodForDestroy DEFAULT 0
+            CONSTRAINT CK_Characters_FightingGodForDestroy CHECK (FightingGodForDestroy >= 0);
 GO
 
 -- ---------------------------------------------------------------------------
@@ -123,7 +123,7 @@ CREATE TYPE game.tvp_CharacterProgress AS TABLE
     StatInt                  INT          NOT NULL,
     StatDex                  INT          NOT NULL,
     StatPoints               INT          NOT NULL,
-    SkillPoints               INT          NOT NULL,
+    SkillPoints              INT          NOT NULL,
     ContributionPoints       INT          NOT NULL,
     Exp2                     INT          NOT NULL,
     RebirthCount             INT          NOT NULL,
@@ -167,7 +167,7 @@ CREATE TYPE game.tvp_CharacterProgress AS TABLE
     BuffX2Time               INT          NOT NULL,
     PremiumExpireUtc         BIGINT       NOT NULL,
     PetGrowth                INT          NOT NULL,
-    PetActivity               INT          NOT NULL,
+    PetActivity              INT          NOT NULL,
     EliteDungeonTime         INT          NOT NULL,
     DungeonKeyTime           INT          NOT NULL,
     IvyHallTicketTime        INT          NOT NULL,
@@ -188,7 +188,10 @@ BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
-    DECLARE @Applied TABLE (CharacterId INT NOT NULL PRIMARY KEY);
+    DECLARE @Applied TABLE
+                     (
+                         CharacterId INT NOT NULL PRIMARY KEY
+                     );
 
     BEGIN TRANSACTION;
 
@@ -292,7 +295,10 @@ BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
-    DECLARE @Applied TABLE (CharacterId INT NOT NULL PRIMARY KEY);
+    DECLARE @Applied TABLE
+                     (
+                         CharacterId INT NOT NULL PRIMARY KEY
+                     );
 
     BEGIN TRANSACTION;
 

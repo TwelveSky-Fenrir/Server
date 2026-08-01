@@ -105,15 +105,15 @@
 --    existantes -- 48 zeros = les 8 emplacements vides dans l'encodage legacy, 0 = pas de rank-buff et pas de
 --    date amorcee (ResetRank amorcera la date au premier passage, exactement comme pour un avatar legacy neuf).
 IF COL_LENGTH('game.Characters', 'AutoBuffSkill') IS NULL
-    ALTER TABLE game.Characters
-        ADD AutoBuffSkill NVARCHAR(48) NOT NULL
-                CONSTRAINT DF_Characters_AutoBuffSkill DEFAULT
-                    N'000000000000000000000000000000000000000000000000',
-            RankPointDate INT          NOT NULL
-                CONSTRAINT DF_Characters_RankPointDate DEFAULT 0,
-            RankBuffType  INT          NOT NULL
-                CONSTRAINT DF_Characters_RankBuffType DEFAULT 0
-                CONSTRAINT CK_Characters_RankBuffType CHECK (RankBuffType BETWEEN 0 AND 7);
+ALTER TABLE game.Characters
+    ADD AutoBuffSkill NVARCHAR(48) NOT NULL
+            CONSTRAINT DF_Characters_AutoBuffSkill DEFAULT
+                N'000000000000000000000000000000000000000000000000',
+        RankPointDate INT NOT NULL
+            CONSTRAINT DF_Characters_RankPointDate DEFAULT 0,
+        RankBuffType INT NOT NULL
+            CONSTRAINT DF_Characters_RankBuffType DEFAULT 0
+            CONSTRAINT CK_Characters_RankBuffType CHECK (RankBuffType BETWEEN 0 AND 7);
 GO
 
 -- 2. Les deux procedures qui referencent le type bloquent son DROP : les supprimer d'abord, puis le type.

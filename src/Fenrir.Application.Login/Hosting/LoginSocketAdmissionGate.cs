@@ -1,7 +1,5 @@
 namespace Fenrir.Application.Login.Hosting;
 
-// Server/ts25login/S02_MyServer.cpp:269-280 : balayage des mServerMaxUserNum slots a l'accept, closesocket
-// immediat si aucun n'est libre, AVANT le moindre octet lu ou ecrit -- ni greeting, ni reponse.
 public sealed class LoginSocketAdmissionGate(int maxConcurrentConnections)
 {
     private int _current;

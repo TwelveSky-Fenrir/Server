@@ -118,10 +118,10 @@ public sealed partial class Zone
 
     private readonly KillCooldownTracker _regularWarCpOverrideCooldown = new();
 
+    private readonly Dictionary<int, int> _regularWarKillDropStreak = new();
+
     private readonly MonsterSpawnScheduler? _stoneSiegeAnnouncer =
         simulationSystems.OfType<MonsterSpawnScheduler>().FirstOrDefault();
-
-    private readonly Dictionary<int, int> _regularWarKillDropStreak = new();
 
     public bool PostCombatCommand(in CombatCommand command)
     {
@@ -389,7 +389,6 @@ public sealed partial class Zone
         if (!profile.GrantContributionPoints)
             return;
 
-        // 300: Server/ts25zone/S04_MyWork02.cpp:520-534, seul cas qui met mKillOtherTribeAddValue a 1.
         var hasCrossTribeAddTimeEffect = attackerState.StateTimeEffect == 300;
         var towerControlBonus = towerWar?.GetTribeBonus(attackerState.Tribe).CpForPvpBonus ?? 0;
 
@@ -401,7 +400,6 @@ public sealed partial class Zone
             towerControlBonus,
             PvpKillContributionPointBonuses.ComputeGameWideAddValue(options.CrossTribeCpAddValue));
 
-        // -1: pas de recensement Zone049 map 160 cote C# (Server/ts25zone/S07_MyGame01.cpp:4710-4745).
         var serverHomeTribe = TryGetCityOwningTribe(MapId, out var owningTribe) ? owningTribe : -1;
         baseAmount += PvpKillContributionPointBonuses.ComputeConditionalBonuses(
             MapId, attackerState.Tribe,
@@ -457,8 +455,6 @@ public sealed partial class Zone
         var zoneMultiplier = PvpKillExperienceScaling.ResolveZoneMultiplier(
             RegularWarMapCatalog.TryGet(MapId, out _),
             options.CrossTribeXpRatio);
-        // hasDoubleExpCharge reste false: aDoubleKillExpTime n'a pas d'equivalent PlayerRuntimeState
-        // ni de colonne (Server/Header/Protocol/STRUCT.h:382, Server/Header/CSQLAvatar.cpp:604).
         var gain = PvpKillExperienceCalculator.ComputeGain(
             scaledBase,
             attackerCombinedLevel,

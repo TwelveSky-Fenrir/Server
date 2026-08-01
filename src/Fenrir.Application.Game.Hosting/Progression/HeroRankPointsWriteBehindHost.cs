@@ -1,5 +1,4 @@
 using Fenrir.Application.Game.Domain.Progression;
-using Fenrir.Application.Game.Domain.World.WorldState;
 using Microsoft.Extensions.Hosting;
 
 namespace Fenrir.Application.Game.Hosting.Progression;

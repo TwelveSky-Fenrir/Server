@@ -50,7 +50,7 @@ public static class AutoBuffSkillCodec
         {
             var offset = slot * ValuesPerSlot * DigitsPerValue;
 
-            builder.Add(offset + (ValuesPerSlot * DigitsPerValue) > source.Length
+            builder.Add(offset + ValuesPerSlot * DigitsPerValue > source.Length
                 ? (0, 0)
                 : (ReadValue(source.Slice(offset, DigitsPerValue)),
                     ReadValue(source.Slice(offset + DigitsPerValue, DigitsPerValue))));
@@ -59,18 +59,16 @@ public static class AutoBuffSkillCodec
         return builder.MoveToImmutable();
     }
 
-    // CSQLAvatar.cpp:19-23 (EFIX_NONE ramene le negatif a 0) puis CSQLDatabase.cpp:518 ("%03d" de value % 1000).
     private static void WriteValue(Span<char> destination, ref int position, int value)
     {
         var clamped = (value < 0 ? 0 : value) % ValueModulus;
 
-        destination[position] = (char)('0' + (clamped / 100));
-        destination[position + 1] = (char)('0' + (clamped / 10 % 10));
-        destination[position + 2] = (char)('0' + (clamped % 10));
+        destination[position] = (char)('0' + clamped / 100);
+        destination[position + 1] = (char)('0' + clamped / 10 % 10);
+        destination[position + 2] = (char)('0' + clamped % 10);
         position += DigitsPerValue;
     }
 
-    // CSQLDatabase.cpp:530-544 : atoi de la tranche, un caractere non numerique arrete la lecture.
     private static int ReadValue(ReadOnlySpan<char> digits)
     {
         var value = 0;
@@ -80,7 +78,7 @@ public static class AutoBuffSkillCodec
             if (digit is < '0' or > '9')
                 break;
 
-            value = (value * 10) + (digit - '0');
+            value = value * 10 + (digit - '0');
         }
 
         return value;

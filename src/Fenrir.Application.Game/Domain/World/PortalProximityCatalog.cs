@@ -18,8 +18,6 @@ public sealed class PortalProximityCatalog
         _portalsByZone = portalsByZone;
     }
 
-    // Server/Header/S19_MyZoneMoveInfo.cpp:1250-1254 -- ReturnNextZone walks slots 0..mNextZoneNum-1 and takes the
-    // first match, so slot order is the tie-break (zone 38 slots 8/9 share one coordinate). Never sort nor dedupe.
     public static PortalProximityCatalog FromWorldData(WorldDataCache worldData)
     {
         var builder = new Dictionary<short, ImmutableArray<PortalRegistration>>(worldData.ZonesByNumber.Count);

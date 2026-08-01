@@ -20,11 +20,7 @@ public static class Extensions
 
         public TBuilder ConfigureShutdown()
         {
-            builder.Services.Configure<HostOptions>(options =>
-            {
-                options.ShutdownTimeout = TimeSpan.FromSeconds(60);
-
-            });
+            builder.Services.Configure<HostOptions>(options => { options.ShutdownTimeout = TimeSpan.FromSeconds(60); });
 
             return builder;
         }

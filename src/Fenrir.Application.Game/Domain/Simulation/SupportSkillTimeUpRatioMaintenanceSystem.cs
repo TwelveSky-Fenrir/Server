@@ -36,7 +36,6 @@ public sealed class SupportSkillTimeUpRatioMaintenanceSystem(DirtyTracker<int> d
             state.BuffX2Time = Math.Max(0, state.BuffX2Time - minutesElapsed);
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
 
-            // Server/ts25zone/S07_MyGame04.cpp:1038 -- unicast au seul porteur, jamais aux voisins.
             state.Session.Send(new AvatarStatUpdateResponse
                 { Sort = DoubleBuffTimeStatSort, Value = state.BuffX2Time, Value2 = 0 });
 
@@ -51,7 +50,6 @@ public sealed class SupportSkillTimeUpRatioMaintenanceSystem(DirtyTracker<int> d
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
             recomputeNeeded = true;
 
-            // S116ITEM_PREMIUM part avant la notification zone 126: Server/ts25zone/S07_MyGame04.cpp:1095.
             state.Session.Send(new AvatarStatUpdateResponse
                 { Sort = PremiumStatSort, Value = 0, Value2 = 0 });
 
@@ -64,7 +62,6 @@ public sealed class SupportSkillTimeUpRatioMaintenanceSystem(DirtyTracker<int> d
 
     private static void NotifyZone126CreditExhaustedOnPremiumExpiry(PlayerRuntimeState state, short mapId)
     {
-        // Server/ts25zone/S07_MyGame04.cpp:1096-1099 -- premium was the only credit left on map 126.
         if (mapId != Zone126MapId || state.UserSort >= 1 || state.Zone126Time != 0)
             return;
 

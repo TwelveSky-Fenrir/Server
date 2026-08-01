@@ -27,8 +27,6 @@ public static class StatResetResolver
 
     public const int StatFloor = 1;
 
-    // Bandes sur aLevel1 et aLevel2 (le grade), jamais aRebirthNum: Server/ts25zone/S04_MyWork03.cpp:2883 et :2891.
-    // Le legacy ecrit "aLevel2 > 0 -> echec", donc un aLevel2 negatif est accepte en bande L.
     public static bool TryResolveLevelBand(short level, int highLevel, out LevelBand band)
     {
         switch (level)

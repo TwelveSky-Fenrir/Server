@@ -25,8 +25,6 @@ public sealed class ProgressWriteBehindHost(ZoneRegistry zones, ICharacterReposi
             if (!zones.TryGetPlayer(characterId, out var state))
                 continue;
 
-            // WarPoint/BloodCoin ship as a delta, never a balance -- the baseline only advances once SQL
-            // accepted the credit, so a failed batch replays the same grant instead of losing it.
             var warPoint = state.WarPoint;
             var bloodCoin = state.BloodCoin;
             if (warPoint != state.PersistedWarPoint || bloodCoin != state.PersistedBloodCoin)
@@ -46,25 +44,23 @@ public sealed class ProgressWriteBehindHost(ZoneRegistry zones, ICharacterReposi
                 state.Title, state.Halo, state.TeacherPoint,
                 warPoint - state.PersistedWarPoint, bloodCoin - state.PersistedBloodCoin,
                 state.PetExpX2Time, state.AnimalAbsorbTime, state.AnimalAbsorbState, state.CostumeIndex,
-                // Nommes a partir d'ici: le TVP est en append continu par plusieurs lots, un ajout positionnel
-                // decale silencieusement tout ce qui suit vers le mauvais parametre.
-                ProtectForHalo: state.ProtectForHalo,
-                BonusItemLevel: state.BonusItemLevel,
-                BonusItemValue: state.BonusItemValue,
-                TribeNotifyScrollCount: state.TribeNotifyScrollCount,
-                TribeFourReturnAllowance: state.TribeFourReturnAllowance,
-                BottleSlots: BottleSlotsCodec.Encode(state.BottleSlots),
-                DrunkBottleIndex: state.DrunkBottleIndex,
-                AutoBuffTime: state.AutoBuffTime,
-                AutoBuffSkill: AutoBuffSkillCodec.Encode(state.AutoBuffSkill),
-                RankPointDate: state.RankPointDate,
-                RankBuffType: state.RankBuffType,
-                AutoTime: state.AutoHuntPaidDayBudget,
-                AutoTime2: state.AutoHuntPaidMinuteBudget,
-                BuffX2Time: state.BuffX2Time,
-                PremiumExpireUtc: state.PremiumExpireUtc,
-                PetGrowth: state.PetGrowth,
-                PetActivity: state.PetActivity,
+                state.ProtectForHalo,
+                state.BonusItemLevel,
+                state.BonusItemValue,
+                state.TribeNotifyScrollCount,
+                state.TribeFourReturnAllowance,
+                BottleSlotsCodec.Encode(state.BottleSlots),
+                state.DrunkBottleIndex,
+                state.AutoBuffTime,
+                AutoBuffSkillCodec.Encode(state.AutoBuffSkill),
+                state.RankPointDate,
+                state.RankBuffType,
+                state.AutoHuntPaidDayBudget,
+                state.AutoHuntPaidMinuteBudget,
+                state.BuffX2Time,
+                state.PremiumExpireUtc,
+                state.PetGrowth,
+                state.PetActivity,
                 RankPoint: state.RankPoint,
                 CloakLuckyBoxPity: state.CloakLuckyBoxPity,
                 CloakVariantBoxPity: state.CloakVariantBoxPity,
@@ -94,7 +90,6 @@ public sealed class ProgressWriteBehindHost(ZoneRegistry zones, ICharacterReposi
                 WarriorPill: state.WarriorPill,
                 WarriorScroll: state.WarriorScroll));
 
-            // Penderie COMPLETE de chaque personnage emis: la procedure remplace, elle ne fusionne pas.
             CostumePersistenceCodec.AppendOccupiedSlots(costumes, characterId, state);
 
             claimed.Add(characterId);

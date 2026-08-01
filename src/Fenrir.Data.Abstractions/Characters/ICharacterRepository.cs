@@ -70,6 +70,13 @@ public interface ICharacterRepository
         IReadOnlyList<CharacterItemSlotTvp> itemsA, byte containerB, IReadOnlyList<CharacterItemSlotTvp> itemsB,
         CancellationToken ct);
 
+    public ValueTask ReplaceContainerV2Async(int characterId, byte container,
+        IReadOnlyList<CharacterItemSlotV2Tvp> items, CancellationToken ct);
+
+    public ValueTask ReplaceTwoContainersV2Async(int characterId, byte containerA,
+        IReadOnlyList<CharacterItemSlotV2Tvp> itemsA, byte containerB, IReadOnlyList<CharacterItemSlotV2Tvp> itemsB,
+        CancellationToken ct);
+
     public ValueTask<ReadOnlyCollection<CharacterCostumeSlotDto>> GetCostumesAsync(int characterId,
         CancellationToken ct);
 

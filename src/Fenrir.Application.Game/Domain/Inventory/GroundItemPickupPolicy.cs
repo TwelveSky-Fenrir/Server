@@ -20,7 +20,8 @@ public static class GroundItemPickupPolicy
 
     public const int MaxStackQuantity = 999;
 
-    public static Result Resolve(ItemDefinition itemDefinition, GroundItemEntity groundItem, ItemStack? destinationSlot)
+    public static Result Resolve(ItemDefinition itemDefinition, GroundItemEntity groundItem,
+        ItemStack? destinationSlot, byte requestedX, byte requestedY)
     {
         var sort = itemDefinition.Item.Sort;
 
@@ -43,19 +44,21 @@ public static class GroundItemPickupPolicy
             }
 
             return new Result(Outcome.Placed,
-                BuildStack(groundItem, groundItem.Quantity, enchant, combine, refine, socket), 0);
+                BuildStack(groundItem, groundItem.Quantity, enchant, combine, refine, socket, requestedX,
+                    requestedY), 0);
         }
 
         return destinationSlot is not null
             ? new Result(Outcome.Rejected, null, 0)
-            : new Result(Outcome.Placed, BuildStack(groundItem, 1, enchant, combine, refine, socket), 0);
+            : new Result(Outcome.Placed,
+                BuildStack(groundItem, 1, enchant, combine, refine, socket, requestedX, requestedY), 0);
     }
 
     private static ItemStack BuildStack(GroundItemEntity groundItem, int quantity, byte enchant, byte combine,
-        byte refine, byte socket)
+        byte refine, byte socket, byte xPos, byte yPos)
     {
         return new ItemStack(groundItem.ItemId, quantity, enchant, combine, refine, socket, groundItem.SocketGem1,
-            groundItem.SocketGem2, groundItem.SocketGem3, 0, groundItem.SerialNumber);
+            groundItem.SocketGem2, groundItem.SocketGem3, 0, groundItem.SerialNumber, xPos, yPos);
     }
 
     public readonly record struct Result(Outcome Outcome, ItemStack? NewSlot, long MoneyAmount)

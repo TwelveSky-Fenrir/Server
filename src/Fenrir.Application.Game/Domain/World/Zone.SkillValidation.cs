@@ -14,7 +14,12 @@ public enum KillCpType : byte
 
 public static class OneShotKillClassifier
 {
-    private static readonly FrozenSet<int> OneShotSkillIndices = FrozenSet<int>.Empty;
+    // Server/ts25zone/S07_MyGame02.cpp:546-614 (AtkGet1Hit), called live at :634
+    private static readonly FrozenSet<int> OneShotSkillIndices = new[]
+    {
+        8, 12, 16, 27, 31, 35, 46, 50, 54, 58, 61, 63, 65, 67, 69, 71, 73, 75,
+        85, 87, 89, 91, 93, 95, 97, 99, 101, 121, 123, 125, 127, 129, 131, 133, 135, 137
+    }.ToFrozenSet();
 
     public static bool IsOneShotSkill(int skillIndex)
     {

@@ -45,6 +45,9 @@ public static class AvatarInfoFactory
             PetExpX2Time = character.PetExpX2Time,
             AnimalAbsorbTime = character.AnimalAbsorbTime,
             AnimalAbsorbState = character.AnimalAbsorbState,
+            VisibleState = character.VisibleState,
+            SpecialState = character.SpecialState,
+            UseOrnament = character.UseOrnament ? 1 : 0,
             Name = character.Name,
             Tribe = character.Tribe,
             PreviousTribe = character.PreviousTribe,
@@ -130,6 +133,9 @@ public static class AvatarInfoFactory
             PetExpX2Time = state.PetExpX2Time,
             AnimalAbsorbTime = state.AnimalAbsorbTime,
             AnimalAbsorbState = state.AnimalAbsorbState,
+            VisibleState = state.VisibleState,
+            SpecialState = state.SpecialState,
+            UseOrnament = state.UseOrnament ? 1 : 0,
             Name = state.Name,
             Tribe = state.Tribe,
             PreviousTribe = state.PreviousTribe,
@@ -268,8 +274,11 @@ public static class AvatarInfoFactory
 
             var baseIndex = (page * InventorySlotsPerPage + item.Slot) * InventoryWireIntsPerSlot;
             inventory[baseIndex] = item.ItemId;
+            inventory[baseIndex + 1] = item.XPos;
+            inventory[baseIndex + 2] = item.YPos;
             inventory[baseIndex + 3] = item.Quantity;
             inventory[baseIndex + 4] = PackUpgradeBytes(item.Enchant, item.Combine, item.Refine, item.Socket);
+            inventory[baseIndex + 5] = item.Serial;
         }
 
         return inventory;
@@ -295,8 +304,11 @@ public static class AvatarInfoFactory
 
             var baseIndex = (page * InventorySlotsPerPage + slot) * InventoryWireIntsPerSlot;
             inventory[baseIndex] = stack.ItemId;
+            inventory[baseIndex + 1] = stack.XPos;
+            inventory[baseIndex + 2] = stack.YPos;
             inventory[baseIndex + 3] = stack.Quantity;
             inventory[baseIndex + 4] = PackUpgradeBytes(stack.Enchant, stack.Combine, stack.Refine, stack.Socket);
+            inventory[baseIndex + 5] = stack.Serial;
         }
     }
 

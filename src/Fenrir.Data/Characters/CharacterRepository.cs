@@ -227,6 +227,38 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
+    public async ValueTask ReplaceContainerV2Async(int characterId, byte container,
+        IReadOnlyList<CharacterItemSlotV2Tvp> items, CancellationToken ct)
+    {
+        var builder = new StoredProcedureParametersBuilder("game", "usp_CharacterItems_ReplaceContainerV2", 0)
+            .AddParameter("CharacterId", characterId, SqlDbType.Int)
+            .AddParameter("Container", container, SqlDbType.TinyInt);
+
+        if (items.Count > 0)
+            builder.AddTvpParameter("Items", items);
+
+        await Db.ExecuteAsync(builder.Build(), ct);
+    }
+
+    public async ValueTask ReplaceTwoContainersV2Async(int characterId, byte containerA,
+        IReadOnlyList<CharacterItemSlotV2Tvp> itemsA, byte containerB, IReadOnlyList<CharacterItemSlotV2Tvp> itemsB,
+        CancellationToken ct)
+    {
+        var builder = new StoredProcedureParametersBuilder("game", "usp_CharacterItems_ReplaceTwoContainersV2", 0)
+            .AddParameter("CharacterId", characterId, SqlDbType.Int)
+            .AddParameter("ContainerA", containerA, SqlDbType.TinyInt);
+
+        if (itemsA.Count > 0)
+            builder.AddTvpParameter("ItemsA", itemsA);
+
+        builder.AddParameter("ContainerB", containerB, SqlDbType.TinyInt);
+
+        if (itemsB.Count > 0)
+            builder.AddTvpParameter("ItemsB", itemsB);
+
+        await Db.ExecuteAsync(builder.Build(), ct);
+    }
+
     public async ValueTask<ReadOnlyCollection<CharacterCostumeSlotDto>> GetCostumesAsync(int characterId,
         CancellationToken ct)
     {

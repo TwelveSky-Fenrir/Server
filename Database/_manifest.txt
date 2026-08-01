@@ -1094,3 +1094,18 @@ Migrations/041_tower_cp_milestone_and_vault_date_writeback.sql
 # 041_tower_cp_milestone_and_vault_date_writeback.sql (colonnes WarriorPill/WarriorScroll/
 # TowerCpMilestoneCounter), ce que garantit sa position en derniere ligne de ce manifeste.
 Migrations/042_character_progress_tvp_full_reconciliation.sql
+
+# AvatarInfoFactory ne projetait jamais VisibleState/SpecialState dans le paquet EnterWorldResponse.AvatarInfo
+# (retombait sur le 0/0 de AvatarInfoTemplates.Zeroed, soit l'etat /hide legacy, pour tout personnage, GM ou
+# non). Corrige cote C# ; ce script ajoute juste les deux CHECK de domaine en garde-fou DB, verifie sans
+# risque contre tous les ecrivains actuels de ces colonnes (CreateAvatarService, GmBasicCommandService).
+Migrations/043_characters_visiblestate_specialstate_domain_guard.sql
+
+# Ajoute XPos/YPos (grille de sac 8x8) a game.CharacterItems, absents depuis la normalisation qui a reduit le
+# layout legacy a 6 champs par slot. game.tvp_CharacterItemSlot etant reference par 24 procedures, on pose un
+# type V2 a cote (meme motif que tvp_AccountVaultItemSlotV2), migre seulement pour les deux chemins d'ecriture
+# concernes (deplacement en inventaire, ramassage au sol) ; les 22 autres restent sur V1 (XPos=YPos=0).
+Migrations/044_characteritems_bag_position.sql
+
+# Enregistre 50361 pour la garde ContainerA=ContainerB de usp_CharacterItems_ReplaceTwoContainersV2 ci-dessus.
+Migrations/Seed/admin/030_error_catalog_characteritems_v2.sql

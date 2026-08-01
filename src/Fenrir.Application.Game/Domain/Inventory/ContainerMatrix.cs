@@ -12,6 +12,7 @@ public static class ContainerMatrix
         DestinationOutOfRange,
         SourceEmpty,
         InsufficientQuantity,
+        InvalidQuantity,
 
         DestinationOccupied
     }
@@ -123,7 +124,7 @@ public static class ContainerMatrix
 
     public static MoveOutcomeResult ResolveMove(
         byte fromContainer, int fromSlot, int requestedQuantity,
-        byte toContainer, int toSlot,
+        byte toContainer, int toSlot, byte toX, byte toY,
         ItemStack? source, ItemStack? destination,
         bool sourceIsStackable)
     {
@@ -139,14 +140,22 @@ public static class ContainerMatrix
         if (fromContainer == toContainer && fromSlot == toSlot)
             return new MoveOutcomeResult(MoveOutcome.NoOp, source, destination);
 
-        var quantity = requestedQuantity <= 0 ? src.Quantity : requestedQuantity;
+        if (requestedQuantity < 0 || requestedQuantity > GroundItemPickupPolicy.MaxStackQuantity)
+            return new MoveOutcomeResult(MoveOutcome.InvalidQuantity, source, destination);
+
+        var quantity = requestedQuantity == 0 ? src.Quantity : requestedQuantity;
         if (quantity > src.Quantity)
             return new MoveOutcomeResult(MoveOutcome.InsufficientQuantity, source, destination);
 
         if (destination is not { } dst)
         {
             var effectiveQuantity = sourceIsStackable ? quantity : src.Quantity;
-            var moved = src with { Quantity = effectiveQuantity };
+            // XPos/YPos only mean anything for the two bag containers (game.CharacterItems' CK_
+            // CharacterItems_BagPosition bounds every row 0-7 regardless of container) -- non-bag
+            // destinations keep the source slot's already-valid position instead of an unvalidated toX/toY.
+            var moved = toContainer is InventoryPage0 or InventoryPage1
+                ? src with { Quantity = effectiveQuantity, XPos = toX, YPos = toY }
+                : src with { Quantity = effectiveQuantity };
             var remaining = src.Quantity - effectiveQuantity;
             ItemStack? newSource = remaining > 0 ? src with { Quantity = remaining } : null;
             return new MoveOutcomeResult(MoveOutcome.Success, newSource, moved);

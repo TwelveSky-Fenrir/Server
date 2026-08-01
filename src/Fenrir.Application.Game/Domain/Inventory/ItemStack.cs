@@ -13,12 +13,14 @@ public readonly record struct ItemStack(
     int SocketGem2,
     int SocketGem3,
     int ExpireDate,
-    int Serial)
+    int Serial,
+    byte XPos = 0,
+    byte YPos = 0)
 {
     public static ItemStack FromRow(CharacterItemSlotDto row)
     {
         return new ItemStack(row.ItemId, row.Quantity, row.Enchant, row.Combine, row.Refine, row.Socket,
-            row.SocketGem1, row.SocketGem2, row.SocketGem3, row.ExpireDate, row.Serial);
+            row.SocketGem1, row.SocketGem2, row.SocketGem3, row.ExpireDate, row.Serial, row.XPos, row.YPos);
     }
 
     public CharacterItemSlotTvp ToTvp(byte slot)
@@ -27,10 +29,16 @@ public readonly record struct ItemStack(
             SocketGem2, SocketGem3, ExpireDate, Serial);
     }
 
+    public CharacterItemSlotV2Tvp ToTvpV2(byte slot)
+    {
+        return new CharacterItemSlotV2Tvp(slot, ItemId, Quantity, Enchant, Combine, Refine, Socket, SocketGem1,
+            SocketGem2, SocketGem3, ExpireDate, Serial, XPos, YPos);
+    }
+
     public CharacterItemSlotDto ToRow(byte container, byte slot)
     {
         return new CharacterItemSlotDto(container, slot, ItemId, Quantity, Enchant, Combine, Refine, Socket,
-            SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial);
+            SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial, XPos, YPos);
     }
 
     public AccountVaultItemSlotTvp ToVaultTvp(short slotIndex)

@@ -18,6 +18,7 @@ public sealed class CreateAvatarService(
     private const int StartMana = 21;
 
     private const int StartVisibleState = 1;
+    private const int StartSpecialState = 0;
 
     private const int StartMaxLife = 100;
     private const int StartMaxMana = 50;
@@ -138,6 +139,7 @@ public sealed class CreateAvatarService(
             var avatarInfo = AvatarInfoFactory.CreateForCharacter(character!) with
             {
                 VisibleState = StartVisibleState,
+                SpecialState = StartSpecialState,
                 InventoryDate = welcomeBuffUntilDate,
                 StoreDate = welcomeBuffUntilDate,
                 Vit = 1,
@@ -166,6 +168,12 @@ public sealed class CreateAvatarService(
                 Premium = premiumUntilUnixSeconds
             };
 
+            if (avatarInfo.VisibleState != StartVisibleState || avatarInfo.SpecialState != StartSpecialState)
+                logger.LogCritical(
+                    "Character creation produced out-of-domain state for account {AccountId} character {CharacterId}: VisibleState={VisibleState} (expected {ExpectedVisibleState}), SpecialState={SpecialState} (expected {ExpectedSpecialState})",
+                    accountId, characterId, avatarInfo.VisibleState, StartVisibleState, avatarInfo.SpecialState,
+                    StartSpecialState);
+
             return new CreateAvatarResult(CreateAvatarOutcome.Success, avatarInfo);
         }
         catch (SqlException ex) when (ex.Number == SqlErrorNameAlreadyTaken)
@@ -188,6 +196,7 @@ public sealed class CreateAvatarService(
             return AvatarInfoFactory.Zeroed with
             {
                 VisibleState = StartVisibleState,
+                SpecialState = StartSpecialState,
                 InventoryDate = welcomeBuffUntilDate,
                 StoreDate = welcomeBuffUntilDate,
                 Name = avatarName,

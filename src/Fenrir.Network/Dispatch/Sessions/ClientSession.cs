@@ -194,13 +194,11 @@ public abstract class ClientSession(
 
             _backpressureStreak = 0;
 
-            if (!TryWriteNextQueuedFrame())
-            {
-                _sendLock.Release();
+            if (TryWriteNextQueuedFrame()) continue;
+            _sendLock.Release();
 
-                if (!_pendingSends.Reader.TryPeek(out _) || !_sendLock.Wait(0))
-                    return;
-            }
+            if (!_pendingSends.Reader.TryPeek(out _) || !_sendLock.Wait(0))
+                return;
         }
     }
 

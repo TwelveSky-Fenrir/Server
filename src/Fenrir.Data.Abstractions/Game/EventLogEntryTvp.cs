@@ -1,8 +1,5 @@
-using CaeriusNet.Attributes.Tvp;
-
 namespace Fenrir.Data.Abstractions.Game;
 
-[GenerateTvp(Schema = "game", TvpName = "tvp_EventLogEntry")]
 public sealed partial record EventLogEntryTvp(
     short EventCode,
     byte Category,

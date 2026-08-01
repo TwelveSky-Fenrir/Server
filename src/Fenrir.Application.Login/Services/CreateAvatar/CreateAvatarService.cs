@@ -86,6 +86,11 @@ public sealed class CreateAvatarService(
         if (TribeDominanceGate.BlocksCreation(tribe, await tribes.GetAllAsync(cancellationToken)))
             return new CreateAvatarResult(CreateAvatarOutcome.DominantTribeBlocked, AvatarInfoFactory.Zeroed);
 
+        // Server/ts25login/S04_MyWork02.cpp:616-622 ne verifie jamais tTribe == tPreviousTribe ; un couple
+        // hybride se persistait puis devenait inatteignable en zone (S04_MyWork02.cpp:874-894).
+        if (TribeLineageGate.BlocksCreation(tribe, previousTribe))
+            return new CreateAvatarResult(CreateAvatarOutcome.TribeLineageMismatch, AvatarInfoFactory.Zeroed);
+
         var mapId = SpawnMapIdByTribe[tribe];
 
         var kit = await starterKits.GetByPreviousTribeAsync(previousTribe, mapId, cancellationToken);

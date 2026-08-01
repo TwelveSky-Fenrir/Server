@@ -206,7 +206,31 @@ public sealed partial record CharacterWorldSnapshotDto(
     int RankPointDate = 0,
     int RankBuffType = 0,
     int AutoTime = 0,
-    int BuffX2Time = 0);
+    int BuffX2Time = 0,
+    int ImproveItemValue = 0,
+    int AddItemValue = 0,
+    int HighItemValue = 0,
+    int TaiyanKeyTimer = 0,
+    int RankPoint = 0,
+    byte CloakLuckyBoxPity = 0,
+    byte CloakVariantBoxPity = 0,
+    byte MountVariantBoxPity = 0,
+    int ProtectForRefine = 0,
+    int ProtectForCostume = 0,
+    int ProtectForDestroy2 = 0,
+    int LodRounds = 0,
+    string StellarCoreExpireDate = "",
+    int EliteDungeonTime = 0,
+    int DungeonKeyTime = 0,
+    int IvyHallTicketTime = 0,
+    int ScrollOfSeekersTime = 0,
+    int FightingGodForDestroy = 0,
+    int PlayTime1 = 0,
+    int PlayTime3 = 0,
+    int HsbStoneRewardClaimed = -1,
+    int TowerCpMilestoneCounter = 0,
+    int WarriorPill = 0,
+    int WarriorScroll = 0);
 
 [GenerateDto]
 public sealed partial record CharacterItemSlotDto(

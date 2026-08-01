@@ -322,9 +322,6 @@ public sealed partial class Zone
             attackerState.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
         }
 
-        if (profile.GrantContributionPoints)
-            ApplyTowerCpForPvpBonus(attackerState);
-
         ApplyPvpKillContributionPointFormula(attackerState, defenderState, profile);
         ApplyPvpKillHeroPoints(attackerState, profile, attackerCombinedLevel);
         ApplyPvpKillExperience(attackerState, profile, attackerCombinedLevel, defenderCombinedLevel);
@@ -366,12 +363,17 @@ public sealed partial class Zone
     {
         if (regularWarActiveMapTracker?.IsBattleInProgress(MapId) == true)
         {
+            if (profile.GrantContributionPoints)
+                ApplyTowerCpForPvpBonus(attackerState);
             ApplyRegularWarCpOverride(attackerState, defenderState);
             return;
         }
 
         if (MapId == PvpKillRewardZoneCatalog.FfaMapNumber)
         {
+            if (profile.GrantContributionPoints)
+                ApplyTowerCpForPvpBonus(attackerState);
+
             if (_ffaCpOverrideCooldown.TryRegisterKill(attackerState.CharacterId, defenderState.CharacterId,
                     DateTime.UtcNow, PvpKillContributionPointCalculator.FlatOverrideCooldown))
             {
@@ -387,18 +389,26 @@ public sealed partial class Zone
         if (!profile.GrantContributionPoints)
             return;
 
+        // 300: Server/ts25zone/S04_MyWork02.cpp:520-534, seul cas qui met mKillOtherTribeAddValue a 1.
+        var hasCrossTribeAddTimeEffect = attackerState.StateTimeEffect == 300;
+        var towerControlBonus = towerWar?.GetTribeBonus(attackerState.Tribe).CpForPvpBonus ?? 0;
+
         var baseAmount = PvpKillContributionPointCalculator.ComputeBaseAmount(
-            false,
-            false,
-            PvpKillContributionPointBonuses.ComputePerUserAddValue(false),
+            attackerState.PremiumExpireUtc > 0,
+            attackerState.WarriorScroll > 0,
+            PvpKillContributionPointBonuses.ComputePerUserAddValue(hasCrossTribeAddTimeEffect),
             0,
-            0,
+            towerControlBonus,
             PvpKillContributionPointBonuses.ComputeGameWideAddValue(options.CrossTribeCpAddValue));
+
+        // -1: pas de recensement Zone049 map 160 cote C# (Server/ts25zone/S07_MyGame01.cpp:4710-4745).
+        var serverHomeTribe = TryGetCityOwningTribe(MapId, out var owningTribe) ? owningTribe : -1;
         baseAmount += PvpKillContributionPointBonuses.ComputeConditionalBonuses(
             MapId, attackerState.Tribe,
             -1,
             attackerState.Level,
-            worldState?.World.TribeSymbolBattle ?? false);
+            worldState?.World.TribeSymbolBattle ?? false,
+            serverHomeTribe);
 
         var grantedAmount = PvpKillContributionPointCalculator.ClampGrant(attackerState.ContributionPoints,
             baseAmount, PvpKillContributionPointCalculator.ContributionPointHardCap);
@@ -447,11 +457,13 @@ public sealed partial class Zone
         var zoneMultiplier = PvpKillExperienceScaling.ResolveZoneMultiplier(
             RegularWarMapCatalog.TryGet(MapId, out _),
             options.CrossTribeXpRatio);
+        // hasDoubleExpCharge reste false: aDoubleKillExpTime n'a pas d'equivalent PlayerRuntimeState
+        // ni de colonne (Server/Header/Protocol/STRUCT.h:382, Server/Header/CSQLAvatar.cpp:604).
         var gain = PvpKillExperienceCalculator.ComputeGain(
             scaledBase,
             attackerCombinedLevel,
             defenderCombinedLevel,
-            false,
+            attackerState.WarriorScroll > 0,
             false,
             zoneMultiplier);
 

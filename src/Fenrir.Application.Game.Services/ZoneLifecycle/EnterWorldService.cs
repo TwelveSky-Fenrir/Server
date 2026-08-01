@@ -406,6 +406,7 @@ public sealed class EnterWorldService(
             // date stockee n'est plus celle du jour, et la date s'amorce au premier passage (aRankPointDate == 0).
             var rankResetDate = GameDate.Today();
             var rankBuffType = character.RankPointDate == rankResetDate ? character.RankBuffType : 0;
+            var rankPoint = character.RankPointDate == rankResetDate ? character.RankPoint : 0;
 
             var entered = zone.Post(ZoneCommand.Enter(characterId, new PlayerEnterData(
                 zoneSession,
@@ -474,6 +475,10 @@ public sealed class EnterWorldService(
                 EatDexPotion: character.EatDexPotion,
                 EatElePotion: character.EatElePotion,
                 DropItemTime: character.DropItemTime,
+                ImproveItemValue: character.ImproveItemValue,
+                AddItemValue: character.AddItemValue,
+                HighItemValue: character.HighItemValue,
+                TaiyanKeyTimer: character.TaiyanKeyTimer,
                 WarPoint: character.WarPoint,
                 BloodCoin: character.BloodCoin,
                 PremiumExpireUtc: character.PremiumExpireUtc,
@@ -483,6 +488,12 @@ public sealed class EnterWorldService(
                 InventoryDate: VaultDateNormalization.NormalizeIfExpired(character.InventoryDate, GameDate.Today()),
                 StoreDate: character.StoreDate,
                 PetBagDate: character.PetBagDate,
+                PlayTime1: character.PlayTime1,
+                PlayTime3: character.PlayTime3,
+                HsbStoneRewardClaimed: character.HsbStoneRewardClaimed == 1,
+                TowerCpMilestoneCounter: character.TowerCpMilestoneCounter,
+                WarriorPill: character.WarriorPill,
+                WarriorScroll: character.WarriorScroll,
                 M15PetLuckyBoxPity: character.M15PetLuckyBoxPity,
                 SourceIp: SessionSourceIp.Normalize(zoneSession.RemoteEndPoint),
                 RuneSystem: runeSystem,
@@ -515,6 +526,10 @@ public sealed class EnterWorldService(
                 AutoBuffSkill: AutoBuffSkillCodec.Decode(character.AutoBuffSkill),
                 RankPointDate: rankResetDate,
                 RankBuffType: rankBuffType,
+                RankPoint: rankPoint,
+                CloakLuckyBoxPity: character.CloakLuckyBoxPity,
+                CloakVariantBoxPity: character.CloakVariantBoxPity,
+                MountVariantBoxPity: character.MountVariantBoxPity,
                 BuffX2Time: character.BuffX2Time,
                 // SetIntegerLow(aAutoTime, tNowDate, 0) : Server/ts25zone/S07_MyGame03.cpp:5697 -- seule une
                 // date-limite DEJA passee retombe a 0, ce n'est pas une remise a zero systematique.

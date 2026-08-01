@@ -191,6 +191,10 @@ public sealed partial class Zone
             EatDexPotion = data.EatDexPotion,
             EatElePotion = data.EatElePotion,
             DropItemTime = data.DropItemTime,
+            ImproveItemValue = data.ImproveItemValue,
+            AddItemValue = data.AddItemValue,
+            HighItemValue = data.HighItemValue,
+            TaiyanKeyTimer = data.TaiyanKeyTimer,
             WarPoint = data.WarPoint,
             PersistedWarPoint = data.WarPoint,
             BloodCoin = data.BloodCoin,
@@ -204,6 +208,12 @@ public sealed partial class Zone
             InventoryDate = data.InventoryDate,
             StoreDate = data.StoreDate,
             PetBagDate = data.PetBagDate,
+            PlayTime1 = data.PlayTime1,
+            PlayTime3 = data.PlayTime3,
+            HsbStoneRewardClaimed = data.HsbStoneRewardClaimed,
+            TowerCpMilestoneCounter = data.TowerCpMilestoneCounter,
+            WarriorPill = data.WarriorPill,
+            WarriorScroll = data.WarriorScroll,
             M15PetLuckyBoxPity = data.M15PetLuckyBoxPity,
             VisibleState = data.VisibleState,
             SpecialState = data.SpecialState,
@@ -285,6 +295,10 @@ public sealed partial class Zone
             state.AutoBuffSkill = autoBuffSkill;
         state.RankPointDate = data.RankPointDate;
         state.RankBuffType = data.RankBuffType;
+        state.RankPoint = data.RankPoint;
+        state.CloakLuckyBoxPity = data.CloakLuckyBoxPity;
+        state.CloakVariantBoxPity = data.CloakVariantBoxPity;
+        state.MountVariantBoxPity = data.MountVariantBoxPity;
 
         HydrateMountState(state, data);
         HydrateCostumeState(state, data);

@@ -46,7 +46,7 @@ public sealed class CreateAvatarHandler(ICreateAvatarService createAvatarService
         switch (result.Outcome)
         {
             case CreateAvatarOutcome.InvalidWeapon or CreateAvatarOutcome.FourthFactionDisabled
-                or CreateAvatarOutcome.SlotOccupied:
+                or CreateAvatarOutcome.SlotOccupied or CreateAvatarOutcome.TribeLineageMismatch:
                 logger.LogWarning(
                     "Create-avatar rejected: account {AccountId} slot {Slot} outcome {Outcome}", accountId,
                     packet.AvatarPost, result.Outcome);

@@ -770,6 +770,30 @@ Migrations/010_character_autobuff_and_rankbuff_writeback.sql
 # paralleles (006, 007, 010) : voir l'avertissement de sequencage dans son propre en-tete.
 Migrations/011_avatar_counters_and_bottles_writeback.sql
 
+# Regression fix: Migration 010 rebuilt game.tvp_CharacterProgress from Migration 007's form instead of
+# Migration 008's, dropping 11 columns. Migration 011 restored 5 (Title/Halo/TeacherPoint/WarPointDelta/
+# BloodCoinDelta); this script restores the other 6 (AutoTime/AutoTime2/BuffX2Time/PremiumExpireUtc/
+# PetGrowth/PetActivity), which stayed unreachable by the write-behind TVP path until now. Numbered 012 to
+# land right after 011, the last migration to touch this type -- see the script's own header.
+Migrations/012_autohunt_premium_pet_writeback_restore.sql
+
+# Lot 12 (EliteDungeonTime/DungeonKeyTime/IvyHallTicketTime/ScrollOfSeekersTime/FightingGodForDestroy) : cinq
+# compteurs de ticket/parchemin mutes en jeu (Zone.EconomyMirrors.cs, TimedBuffCountdownSystem.cs), persistes
+# par le legacy sans #ifdef (CreateAvatarColumn, Server/Header/CSQLAvatar.cpp:600,605,606,608,660), jamais
+# ecrits cote Fenrir. Ajoute les cinq colonnes a game.Characters. RESTAURE AU PASSAGE, independamment de
+# Migrations/012, le parametre @Costumes/la transaction/le remplacement de penderie de
+# Migrations/008_autohunt_buffx2_premium_pet_writeback perdus par 010/011/012, et complete la projection RS0
+# de usp_Character_GetForWorldEntry avec AutoTime/BuffX2Time (deja lus cote C# depuis la fin de
+# Migrations/011, jamais projetes cote SQL) avant ses cinq colonnes propres. Se rebase sur la forme TERMINALE
+# de Migrations/012 (59 colonnes) + ses cinq en queue (64) -- ne declare PAS l'union avec les lots RankPoint/
+# CloakLuckyBoxPity/CloakVariantBoxPity/MountVariantBoxPity, ImproveItemValue/AddItemValue/HighItemValue/
+# TaiyanKeyTimer, ProtectForRefine/ProtectForCostume/ProtectForDestroy2/LodRounds/StellarCoreExpireDate, ni
+# PetBagDate/PlayTime1/PlayTime3/HsbStoneRewardClaimed, tous deja presents en queue du record C#
+# CharacterProgressTvp/CharacterWorldSnapshotDto au moment de l'ecriture sans script SQL coherent -- voir
+# l'avertissement de sequencage dans l'en-tete du script. Une passe de reconciliation dediee (meme motif que
+# 012 pour 011/008) devra fondre tous ces lots avant mise en production.
+Migrations/034_ticket_counters_and_fighting_god_writeback.sql
+
 Migrations/Seed/001_dev_account.sql
 
 # Numbering renamed 2026-07-12 (dead-file-sweep-game-world naming-hygiene finding) to be monotonic in
@@ -928,3 +952,133 @@ Migrations/030_accountsession_lease_verification.sql
 # :1057-1060) ; sans revocation le ticket Fenrir restait consommable pendant tout son TTL de 15 s. Doit
 # s'appliquer APRES Migrations/001 qui drope et recree runtime.SessionTickets.
 Migrations/031_sessionticket_revoke.sql
+
+# Lot 11 (PetBagDate write path, PlayTime1, PlayTime3, HsbStoneRewardClaimed) : quatre champs mutes/charges
+# cote Fenrir et jamais reecrits. Ajoute UNIQUEMENT les trois colonnes game.Characters reellement absentes
+# (PlayTime1/PlayTime3/HsbStoneRewardClaimed -- PetBagDate a deja sa colonne depuis Migrations/002). Ne touche
+# PAS game.tvp_CharacterProgress/les procedures de write-behind/usp_Character_GetForWorldEntry/
+# CharacterProgressTvp.cs/CharacterWorldSnapshotDto.cs/PlayerEnterData : au moment de l'ecriture, ces objets
+# sont en cours de DROP+CREATE concurrent par au moins Migrations/012,
+# 033_holystone_rankpoint_and_lootbox_pity, 034_animal_double_exp_and_combat_boost_columns et un lot
+# ImproveItemValue/AddItemValue/HighItemValue/TaiyanKeyTimer (fichier absent du disque a l'ecriture -- cf. le
+# commentaire Lot 9 juste en dessous). Voir l'en-tete du script pour l'inventaire exact et la specification de
+# raccordement laissee au lot qui fera la reconciliation finale du type.
+Migrations/032_playtime_petbagdate_hsbreward_writeback.sql
+
+# Lot 9 (ImproveItemValue/AddItemValue/HighItemValue/TaiyanKeyTimer) : quatre compteurs mutes en jeu
+# (Zone.EconomyMirrors.cs, TimedBuffCountdownSystem.cs), persistes par le legacy sans #ifdef
+# (CreateAvatarColumn, Server/Header/CSQLAvatar.cpp:668-670,607), jamais ecrits cote Fenrir. Ajoute les quatre
+# colonnes a game.Characters. RECONCILIE AU PASSAGE un angle mort decouvert en preparant ce lot :
+# Migrations/010 et 011 se sont chacun rebases sur Migrations/007 plutot que sur
+# Migrations/008_autohunt_buffx2_premium_pet_writeback, donc le DERNIER script applique (011) a
+# silencieusement efface les six colonnes de 008 (AutoTime/AutoTime2/BuffX2Time/PremiumExpireUtc/PetGrowth/
+# PetActivity) et son parametre @Costumes/sa transaction/son remplacement de penderie -- alors que le record
+# C# CharacterProgressTvp, ProgressWriteBehindHost, PositionWriteBehindHost.FlushCharacterNowAsync et
+# CharacterRepository.PersistProgressAsync/PersistFinalFlushAsync s'attendent deja tous a leur presence, et
+# que CharacterWorldSnapshotDto lit deja AutoTime/BuffX2Time en fin de RS0 alors que la projection reellement
+# appliquee ne les selectionne pas (echec IndexOutOfRange garanti a chaque entree en monde). Un type TABLE ne
+# s'ALTERe pas : ce script DROP+RECREE game.tvp_CharacterProgress avec la forme TERMINALE exacte du record
+# C# (53 colonnes de 011, + les six oubliees de 008, + les quatre de ce lot en queue), recree les deux
+# procedures de write-behind avec @Costumes/la transaction/le remplacement de penderie restaures, et complete
+# la projection RS0 de usp_Character_GetForWorldEntry (AutoTime/BuffX2Time + les quatre nouvelles). Voir
+# l'en-tete du script pour la citation ligne a ligne des quatre fichiers verifies.
+Migrations/032_progress_writeback_reconciliation_and_item_value_counters.sql
+
+# Lot 10 (RankPoint/CloakLuckyBoxPity/CloakVariantBoxPity/MountVariantBoxPity, Holy Stone Battle rank +
+# pity de loot-box cape/variante-cape/variante-monture) : ajoute UNIQUEMENT les quatre colonnes
+# game.Characters, gardees par IF NOT EXISTS. Ne touche PAS game.tvp_CharacterProgress/les procedures de
+# write-behind/usp_Character_GetForWorldEntry : au moment de l'ecriture, ces objets sont en cours de
+# DROP+CREATE concurrent par au moins Migrations/012, 032_playtime_petbagdate_hsbreward,
+# 032_progress_writeback_reconciliation et un lot StellarCore/Protect*/LodRounds -- ecrire un DROP+CREATE
+# de plus ajouterait une candidate supplementaire a la course deja documentee dans
+# Migrations/034_animal_double_exp_and_combat_boost_columns.sql. PlayerEnterData/EnterWorldService.cs/
+# Zone.PlayerLifecycle.cs et Fenrir.Data.Abstractions.Characters.CharacterProgressTvp/
+# CharacterWorldSnapshotDto sont deja cables cote C# pour les quatre champs (verifie sur le disque a
+# l'ecriture) ; seul le DROP+CREATE terminal du TVP/des procedures/de la projection RS0 reste a faire par le
+# lot qui cloturera la course. Voir l'en-tete du script pour le detail complet.
+Migrations/033_holystone_rankpoint_and_lootbox_pity_writeback.sql
+
+# Lot 13 (DoubleExpTime1/DoubleExpTime2/AnimalDoubleExp/DmgBoost/HPBoost/CriBoost, TimedBuffCountdownSystem.cs) :
+# ajoute UNIQUEMENT les quatre colonnes game.Characters reellement absentes (AnimalDoubleExp/DmgBoost/HPBoost/
+# CriBoost -- DoubleExpTime1/2 ont deja leur colonne depuis la table de base). Ne touche PAS
+# game.tvp_CharacterProgress/les procedures de write-behind/usp_Character_GetForWorldEntry/
+# CharacterProgressTvp.cs/CharacterWorldSnapshotDto.cs/PlayerEnterData : au moment de l'ecriture, ces objets
+# sont en cours de DROP+CREATE concurrent par au moins Migrations/012, 032_playtime_petbagdate_hsbreward,
+# 033_holystone_rankpoint_and_lootbox_pity et un lot ImproveItemValue/AddItemValue/HighItemValue/
+# TaiyanKeyTimer (fichier absent du disque a l'ecriture -- cf. le commentaire Lot 9 juste au-dessus). Voir
+# l'en-tete du script pour l'inventaire exact et la specification de raccordement laissee au lot qui fera la
+# reconciliation finale du type.
+Migrations/034_animal_double_exp_and_combat_boost_columns.sql
+
+# Lot 8 : six compteurs/tableaux mutes en jeu cote Fenrir, jamais persistes, que le legacy persiste tous
+# sans #ifdef dans CreateAvatarColumn (Server/Header/CSQLAvatar.cpp:556-756) -- ProtectForRefine/
+# ProtectForCostume/ProtectForDestroy2 (nouvelles colonnes), ProtectForDestroy (colonne et lecture RS0 DEJA
+# presentes, seul le cote ecriture manquait), LodRounds (aZone241Time, voir la note de l'en-tete du script
+# sur la duplication avec game.Characters.Zone241Time deja persiste sous un autre nom cote Fenrir -- angle
+# mort distinct, non reconcilie ici) et StellarCoreExpireDate (tableau de 10 dates d'expiration, encode en
+# une colonne texte a largeur fixe comme BottleSlots/AutoBuffSkill ; le tableau soeur des items equipes
+# StellarCoreWardrobe reste hors de ce lot). Numerote 040, au-dela de tout numero 03x vu a l'ecriture : ce
+# depot etait modifie en continu par plusieurs lots paralleles pendant la preparation de ce script (voir
+# l'en-tete du script pour l'inventaire exact des colonnes concurrentes integrees dans le DROP+CREATE de
+# game.tvp_CharacterProgress -- a REVERIFIER contre l'etat final une fois tous les lots integres, meme role
+# que Migrations/012 vis-a-vis de 010/011). Chemin de lecture cable jusqu'a CharacterWorldSnapshotDto/RS0 ;
+# le dernier maillon (copie dans PlayerRuntimeState a l'entree en monde, PlayerEnterData/EnterWorldService/
+# Zone.PlayerLifecycle.cs) reste hors perimetre d'ecriture de ce lot et doit etre cable separement.
+Migrations/040_stellarcore_protect_charges_lodrounds_writeback.sql
+
+# Lot 14 (WarriorPill/WarriorScroll, TimedBuffCountdownSystem.cs TickGroupB) : ajoute UNIQUEMENT les deux
+# colonnes game.Characters reellement absentes, persistees par le legacy sans #ifdef (CreateAvatarColumn,
+# Server/Header/CSQLAvatar.cpp:673-674), jamais ecrites cote Fenrir. Ne touche PAS game.tvp_CharacterProgress/
+# les procedures de write-behind/usp_Character_GetForWorldEntry : au moment de l'ecriture, ces objets sont en
+# cours de DROP+CREATE concurrent (TowerCpMilestoneCounter vient d'apparaitre en queue de
+# CharacterProgressTvp.cs/CharacterWorldSnapshotDto.cs sans script SQL encore, et Migrations/040 lui-meme ne
+# projette pas encore EliteDungeonTime/PlayTime1/PlayTime3/HsbStoneRewardClaimed dans sa RS0). Cote
+# application, WarriorPill/WarriorScroll sont DEJA cables integralement par ce lot (CharacterProgressTvp.cs,
+# CharacterWorldSnapshotDto.cs, PlayerEnterData/ZoneCommand.cs, EnterWorldService.cs,
+# Zone.PlayerLifecycle.cs, ProgressWriteBehindHost.cs, PositionWriteBehindHost.cs) -- seul le cote SQL reste
+# a cabler par le lot qui fera la reconciliation finale de game.tvp_CharacterProgress. Zone101Time/
+# Zone126Time/Zone050Time2, demandes dans le meme lot, sont deliberement RETIRES (BLOQUE) : memes citations
+# legacy STRUCT.h:384/386/480 + CSQLAvatar.cpp:606/608/660 que celles deja utilisees par
+# Migrations/034_ticket_counters_and_fighting_god_writeback.sql pour EliteDungeonTime/ScrollOfSeekersTime/
+# IvyHallTicketTime -- deux proprietes PlayerRuntimeState distinctes mutent deja le meme compteur legacy sans
+# jamais se resynchroniser, piege documente et deliberement non resolu par ce script-la ; ajouter trois
+# colonnes de plus ici creerait une troisieme representation persistee au lieu de fusionner, hors perimetre
+# d'ecriture de ce lot (changement de logique de jeu dans Domain/Simulation/TimedBuffCountdownSystem.cs et
+# Domain/World/Zone.EconomyMirrors.cs). Voir l'en-tete du script pour le detail complet.
+Migrations/041_warriorpill_scroll_columns.sql
+
+# Lot 15 (TowerCpMilestoneCounter/InventoryDate/StoreDate, trois champs mutes en jeu cote Fenrir jamais
+# persistes -- confirme par recherche exhaustive avant redaction) : ajoute la colonne game.Characters
+# manquante (TowerCpMilestoneCounter, aKillMonsterNum2 -- InventoryDate/StoreDate ont deja leur colonne) et
+# devient la reconciliation finale de game.tvp_CharacterProgress/usp_Character_PersistProgressBatch/
+# usp_Character_PersistFinalFlush/usp_Character_GetForWorldEntry : DROP+CREATE du type au miroir exact du
+# record CharacterProgressTvp.cs tel qu'observe (87 colonnes, verifie programmatiquement), ce qui cable au
+# passage PetBagDate/PlayTime1/PlayTime3/HsbStoneRewardClaimed (Lot 11, colonnes deja presentes depuis
+# Migrations/032_playtime_petbagdate_hsbreward_writeback.sql mais jamais branchees jusqu'ici) et
+# WarriorPill/WarriorScroll (Lot 14, colonnes ajoutees par Migrations/041_warriorpill_scroll_columns.sql --
+# DOIT s'appliquer avant ce script). Redeclare aussi RS0 (usp_Character_GetForWorldEntry) en COMPLET,
+# verifiee colonne-par-colonne contre CharacterWorldSnapshotDto (121 colonnes, 0 mismatch) : au passage,
+# CORRIGE un bug d'ordre preexistant dans Migrations/040 qui permutait RankPoint/CloakLuckyBoxPity/
+# CloakVariantBoxPity/MountVariantBoxPity avec ImproveItemValue/AddItemValue/HighItemValue/TaiyanKeyTimer
+# (huit colonnes silencieusement croisees en lecture depuis Migrations/040), et etend RS0 jusqu'a
+# EliteDungeonTime/DungeonKeyTime/IvyHallTicketTime/ScrollOfSeekersTime/FightingGodForDestroy/PlayTime1/
+# PlayTime3/HsbStoneRewardClaimed/TowerCpMilestoneCounter/WarriorPill/WarriorScroll, absentes de RS0 depuis
+# Migrations/040 (qui s'arretait a StellarCoreExpireDate). Voir l'en-tete du script pour le detail complet et
+# l'avertissement sur l'etat concurrent au moment de l'ecriture.
+Migrations/041_tower_cp_milestone_and_vault_date_writeback.sql
+
+# Lot 16 -- reconciliation FINALE de game.tvp_CharacterProgress et de son round-trip. Les migrations 012 et
+# 030..041 sont des brouillons partiels et mutuellement contradictoires : ce script les rend toutes
+# obsoletes pour ces quatre objets, sans en modifier aucune. DROP+CREATE du type au miroir POSITIONNEL exact
+# de CharacterProgressTvp.cs (87 colonnes, verifie nom par nom et position par position contre le record),
+# recreation des deux procedures de write-behind couvrant les 85 colonnes assignables (WarPointDelta/
+# BloodCoinDelta restant additifs sur WarPoint/BloodCoin) et restaurant la forme complete de Migrations/034
+# (BEGIN TRANSACTION, @Costumes, @Applied, OUTPUT inserted, garde FlushSequence) que 040 et 041_tower
+# avaient perdue alors que CharacterRepository.PersistProgressAsync/PersistFinalFlushAsync passent toujours
+# le TVP Costumes. RS0 de usp_Character_GetForWorldEntry redeclare au miroir ORDINAL exact de
+# CharacterWorldSnapshotDto (121 colonnes, 0 mismatch) ; les quatre autres result sets repris verbatim.
+# Aucun ALTER TABLE : les 87 colonnes cibles du TVP et les 121 sources du DTO existent toutes deja.
+# DEPENDANCE : doit s appliquer APRES 041_warriorpill_scroll_columns.sql et
+# 041_tower_cp_milestone_and_vault_date_writeback.sql (colonnes WarriorPill/WarriorScroll/
+# TowerCpMilestoneCounter), ce que garantit sa position en derniere ligne de ce manifeste.
+Migrations/042_character_progress_tvp_full_reconciliation.sql

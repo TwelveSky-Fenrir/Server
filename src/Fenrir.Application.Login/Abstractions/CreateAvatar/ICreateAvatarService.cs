@@ -12,6 +12,8 @@ public enum CreateAvatarOutcome
 
     FourthFactionDisabled,
 
+    TribeLineageMismatch,
+
     SlotOccupied,
 
     NameTaken

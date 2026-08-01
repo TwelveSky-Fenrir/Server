@@ -1,0 +1,32 @@
+using Fenrir.Application.Game.Abstractions.Progression;
+using Fenrir.Application.Game.Domain.World;
+using Microsoft.Extensions.Logging;
+
+namespace Fenrir.Application.Game.Services.Progression;
+
+public sealed class AutoPotionThresholdService(
+    ICharacterRepository characters,
+    ILogger<AutoPotionThresholdService> logger)
+    : IAutoPotionThresholdService
+{
+    public async ValueTask<AutoPotionThresholdResult> ApplyAsync(int characterId, PlayerRuntimeState state,
+        int value01, int value02, CancellationToken cancellationToken)
+    {
+        if (value01 is < 0 or > 5 || value02 is < 0 or > 5)
+            return new AutoPotionThresholdResult(true);
+
+        var lifeRatio = (byte)value01;
+        var manaRatio = (byte)value02;
+
+        await characters.SetAutoPotionThresholdAsync(characterId, lifeRatio, manaRatio, cancellationToken);
+
+        state.AutoLifeRatio = lifeRatio;
+        state.AutoManaRatio = manaRatio;
+
+        logger.LogInformation(
+            "Character {CharacterId} set auto-potion thresholds: life {LifeRatio} mana {ManaRatio}",
+            characterId, lifeRatio, manaRatio);
+
+        return new AutoPotionThresholdResult(false);
+    }
+}

@@ -20,5 +20,10 @@
          one of the three executables ends up on this path (DbMigrator directly, LoginServer/GameServer
          via Fenrir.Data/CaeriusNet), so it is overridden here rather than per-project. -->
     <InvariantGlobalization>false</InvariantGlobalization>
+
+    <!-- AOT-safe config binding: without this, Configure<TOptions>(GetSection(...)) falls back to the
+         reflection ConfigurationBinder and raises IL2026 under PublishAot. The source generator intercepts
+         the Configure/Bind/Get call sites in each server's Program.cs. -->
+    <EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
   </PropertyGroup>
 </Project>

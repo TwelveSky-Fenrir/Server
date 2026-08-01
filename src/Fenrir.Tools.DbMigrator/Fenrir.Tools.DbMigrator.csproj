@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <FenrirExecutable>true</FenrirExecutable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient"/>
+    <PackageReference Include="CaeriusNet"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Fenrir.Data\Fenrir.Data.csproj"/>
+    <ProjectReference Include="..\Fenrir.Security\Fenrir.Security.csproj"/>
+    <ProjectReference Include="..\Fenrir.ServiceDefaults\Fenrir.ServiceDefaults.csproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\Database\**\*.*" CopyToOutputDirectory="PreserveNewest" LinkBase="Database"/>
+    <ProjectReference Include="..\Fenrir.Generators\Fenrir.Generators.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"/>
+  </ItemGroup>
+</Project>

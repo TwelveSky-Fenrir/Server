@@ -1,0 +1,54 @@
+<Solution>
+  <Folder Name="/00_Build/">
+    <Project Path="src/Fenrir.Generators/Fenrir.Generators.csproj"/>
+  </Folder>
+
+  <Folder Name="/10_Protocol/">
+    <Project Path="src/Fenrir.Core/Fenrir.Core.csproj"/>
+    <Project Path="src/Fenrir.Protocol.Login/Fenrir.Protocol.Login.csproj"/>
+    <Project Path="src/Fenrir.Protocol.Game/Fenrir.Protocol.Game.csproj"/>
+  </Folder>
+
+  <Folder Name="/20_Networking/">
+    <Project Path="src/Fenrir.Network/Fenrir.Network.csproj"/>
+  </Folder>
+
+  <Folder Name="/30_Platform/">
+    <Project Path="src/Fenrir.Data.Abstractions/Fenrir.Data.Abstractions.csproj"/>
+    <Project Path="src/Fenrir.Data.WriteBehind/Fenrir.Data.WriteBehind.csproj"/>
+    <Project Path="src/Fenrir.Data/Fenrir.Data.csproj"/>
+    <Project Path="src/Fenrir.Security/Fenrir.Security.csproj"/>
+  </Folder>
+
+  <Folder Name="/40_Application/">
+    <Project Path="src/Fenrir.Domain.Game/Fenrir.Domain.Game.csproj"/>
+    <Project Path="src/Fenrir.Domain.Login/Fenrir.Domain.Login.csproj"/>
+    <Project Path="src/Fenrir.Application.Game/Fenrir.Application.Game.csproj"/>
+    <Project Path="src/Fenrir.Application.Game.Handlers/Fenrir.Application.Game.Handlers.csproj"/>
+    <Project Path="src/Fenrir.Application.Game.Services/Fenrir.Application.Game.Services.csproj"/>
+    <Project Path="src/Fenrir.Application.Game.Hosting/Fenrir.Application.Game.Hosting.csproj"/>
+    <Project Path="src/Fenrir.Application.Login/Fenrir.Application.Login.csproj"/>
+  </Folder>
+
+  <Folder Name="/50_Hosting/">
+    <Project Path="src/Fenrir.LoginServer/Fenrir.LoginServer.csproj"/>
+    <Project Path="src/Fenrir.GameServer/Fenrir.GameServer.csproj"/>
+    <Project Path="src/Fenrir.Tools.DbMigrator/Fenrir.Tools.DbMigrator.csproj"/>
+  </Folder>
+
+  <Folder Name="/60_Orchestration/">
+    <Project Path="src/Fenrir.AppHost/Fenrir.AppHost.csproj"/>
+    <Project Path="src/Fenrir.ServiceDefaults/Fenrir.ServiceDefaults.csproj"/>
+  </Folder>
+
+  <Folder Name="/90_Solution Items/">
+    <File Path=".editorconfig"/>
+    <File Path=".gitattributes"/>
+    <File Path="Directory.Build.props"/>
+    <File Path="Directory.Build.targets"/>
+    <File Path="Directory.Packages.props"/>
+    <File Path="global.json"/>
+    <File Path="Database/_manifest.txt"/>
+  </Folder>
+
+</Solution>

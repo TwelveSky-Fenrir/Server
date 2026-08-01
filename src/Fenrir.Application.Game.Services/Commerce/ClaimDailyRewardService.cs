@@ -1,0 +1,122 @@
+using System.Collections.Immutable;
+using Fenrir.Application.Game.Abstractions.Commerce;
+using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Simulation;
+using Fenrir.Application.Game.Domain.World;
+using Fenrir.Domain.Game.GameData;
+using Fenrir.Protocol.Game;
+using Microsoft.Extensions.Logging;
+
+namespace Fenrir.Application.Game.Services.Commerce;
+
+public sealed class ClaimDailyRewardService(
+    ICharacterRepository characters,
+    WorldDataCache worldData,
+    ILogger<ClaimDailyRewardService> logger) : IClaimDailyRewardService
+{
+    private const int RewardBundleId = 1;
+
+    public async ValueTask<ClaimDailyRewardResponse?> ResolveAndApplyAsync(ClaimDailyRewardRequest packet, Zone zone,
+        PlayerRuntimeState state, int accountId, int characterId, CancellationToken cancellationToken)
+    {
+        var today = GameDate.Today();
+        var claimState = await characters.GetAccountRewardClaimStateAsync(accountId, today, cancellationToken);
+        if (claimState is null)
+            return null;
+
+        if (claimState.RewardClaimDate == today || claimState.RewardClaimDay > 6)
+        {
+            logger.LogInformation(
+                "Daily-reward claim denied for account {AccountId}: already claimed today or cycle exhausted (day {RewardClaimDay})",
+                accountId, claimState.RewardClaimDay);
+            return new ClaimDailyRewardResponse
+                { Result = 1, Value = new int[6], InvenPage = -1, InvenX = -1, InvenY = -1 };
+        }
+
+        if (!worldData.RewardBundleItemsByBundleId.TryGetValue(RewardBundleId, out var slots))
+            return null;
+
+        var day = claimState.RewardClaimDay;
+        var itemId = 0;
+        foreach (var slot in slots)
+            if (slot.SlotIndex == day + 1)
+            {
+                itemId = slot.ItemId ?? 0;
+                break;
+            }
+
+        if (itemId < 1 || !worldData.ItemsById.TryGetValue(itemId, out var itemDefinition))
+            return null;
+
+        var freeSlot = FindFreeSlot(state.Inventory, state.InventoryDate, today);
+        if (freeSlot is not { } destination)
+        {
+            logger.LogInformation("Daily-reward claim denied for character {CharacterId}: inventory full",
+                characterId);
+            return new ClaimDailyRewardResponse
+                { Result = 2, Value = new int[6], InvenPage = -1, InvenX = -1, InvenY = -1 };
+        }
+
+        var coupon = itemDefinition.Item.Sort == 99 ? 1 : 0;
+        var newStack = new ItemStack(itemId, coupon, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        var projectedContainer =
+            state.Inventory.GetContainer(destination.Container).SetItem(destination.Slot, newStack);
+
+        try
+        {
+            await characters.ClaimAccountDailyRewardAsync(accountId, characterId, today, destination.Container,
+                ToTvps(projectedContainer), cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "Account {AccountId} daily-reward claim ClaimAccountDailyRewardAsync failed (treated as already claimed)",
+                accountId);
+            return new ClaimDailyRewardResponse
+                { Result = 1, Value = new int[6], InvenPage = -1, InvenX = -1, InvenY = -1 };
+        }
+
+        var response = new ClaimDailyRewardResponse
+        {
+            Result = 0,
+            Value = [itemId, 0, 0, coupon, 0, 0],
+            InvenPage = destination.Container,
+            InvenX = 0,
+            InvenY = 0
+        };
+
+        var containers =
+            ImmutableArray.Create(new InventoryContainerSnapshot(destination.Container, projectedContainer));
+        if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
+                cancellationToken))
+            logger.LogError(
+                "Zone {MapId} inventory inbox full: dropped daily-reward mirror for character {CharacterId}",
+                zone.MapId, characterId);
+
+        logger.LogInformation(
+            "Account {AccountId} claimed daily reward day {RewardClaimDay} on character {CharacterId}: item {ItemId} into container {Container}",
+            accountId, day, characterId, itemId, destination.Container);
+
+        return response;
+    }
+
+    private static (byte Container, byte Slot)? FindFreeSlot(InventoryState inventory, int inventoryDate, int today)
+    {
+        var pageCount = RentedInventoryPageGate.AccessiblePageCount(inventoryDate, today);
+
+        for (byte page = 0; page < pageCount; page++)
+        for (byte slot = 0; slot <= 63; slot++)
+            if (inventory.GetSlot(page, slot) is null)
+                return (page, slot);
+
+        return null;
+    }
+
+    private static List<CharacterItemSlotTvp> ToTvps(ImmutableDictionary<byte, ItemStack> container)
+    {
+        var list = new List<CharacterItemSlotTvp>(container.Count);
+        foreach (var (slot, stack) in container)
+            list.Add(stack.ToTvp(slot));
+        return list;
+    }
+}

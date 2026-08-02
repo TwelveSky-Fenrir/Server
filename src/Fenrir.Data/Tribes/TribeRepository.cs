@@ -4,6 +4,7 @@ using CaeriusNet.Abstractions;
 using CaeriusNet.Builders;
 using CaeriusNet.Commands.Reads;
 using CaeriusNet.Commands.Writes;
+using CaeriusNet.Exceptions;
 using Fenrir.Data.Abstractions.Tribes;
 using Microsoft.Data.SqlClient;
 
@@ -110,8 +111,9 @@ public sealed record TribeRepository(ICaeriusNetDbContext Db) : ITribeRepository
             {
                 return await Db.ExecuteScalarAsync<long>(sp, ct);
             }
-            catch (SqlException ex) when (attempt < MaxSlotInsertRaceAttempts &&
-                                          IsTransientSlotInsertRaceConflict(ex.Number))
+            catch (CaeriusNetSqlException ex) when (attempt < MaxSlotInsertRaceAttempts &&
+                                                     ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                                                     IsTransientSlotInsertRaceConflict(sqlErrorNumber))
             {
             }
         }

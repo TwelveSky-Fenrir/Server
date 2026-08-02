@@ -1,3 +1,4 @@
+using CaeriusNet.Exceptions;
 using Fenrir.Application.Game.Abstractions.Guilds;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Social;
@@ -34,7 +35,7 @@ public sealed class GuildActionService(
         {
             guildId = await guilds.CreateAndDebitMoneyAsync(name, characterId, -CreateGuildMoneyCost, 0, ct);
         }
-        catch (SqlException ex) when (ex.Number == GuildNameTakenErrorNumber)
+        catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException { Number: GuildNameTakenErrorNumber })
         {
             logger.LogDebug(ex, "Character {CharacterId} guild create rejected: name {GuildName} is already taken",
                 characterId, name);

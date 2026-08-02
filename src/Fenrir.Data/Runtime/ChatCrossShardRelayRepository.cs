@@ -4,6 +4,7 @@ using CaeriusNet.Abstractions;
 using CaeriusNet.Builders;
 using CaeriusNet.Commands.Reads;
 using CaeriusNet.Commands.Writes;
+using CaeriusNet.Exceptions;
 using Fenrir.Data.Abstractions.Runtime;
 using Microsoft.Data.SqlClient;
 
@@ -52,7 +53,9 @@ public sealed record ChatCrossShardRelayRepository(ICaeriusNetDbContext Db) : IC
             {
                 return await Db.QueryAsImmutableArrayAsync<ChatCrossShardWhisperDto>(sp, ct);
             }
-            catch (SqlException ex) when (attempt < MaxWriteConflictAttempts && IsWriteConflict(ex.Number))
+            catch (CaeriusNetSqlException ex)
+                when (attempt < MaxWriteConflictAttempts && ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                      IsWriteConflict(sqlErrorNumber))
             {
             }
         }

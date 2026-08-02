@@ -1,5 +1,5 @@
+using CaeriusNet.Exceptions;
 using Fenrir.Application.Login.Abstractions.RetiredItems;
-using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Login.Services.RetiredItems;
@@ -37,7 +37,7 @@ public sealed class RetiredItemPurgeService(
                     "Retired-item purge: removed {PurgedCount} item(s) from character {CharacterId} container {Container}",
                     rows.Length - kept.Length, characterId, containerId);
             }
-            catch (SqlException ex)
+            catch (CaeriusNetSqlException ex)
             {
                 logger.LogWarning(ex,
                     "Retired-item purge failed for character {CharacterId} container {Container}; the roster projection still hides those items but they remain persisted",

@@ -4,6 +4,7 @@ using CaeriusNet.Abstractions;
 using CaeriusNet.Builders;
 using CaeriusNet.Commands.Reads;
 using CaeriusNet.Commands.Writes;
+using CaeriusNet.Exceptions;
 using Fenrir.Data.Abstractions.Runtime;
 using Microsoft.Data.SqlClient;
 
@@ -37,7 +38,9 @@ public sealed record AccountSessionRepository(ICaeriusNetDbContext Db) : IAccoun
                        throw new InvalidOperationException(
                            "usp_AccountSession_ClaimOrSignalKick always returns exactly one row.");
             }
-            catch (SqlException ex) when (attempt < MaxWriteConflictAttempts && IsWriteConflict(ex.Number))
+            catch (CaeriusNetSqlException ex)
+                when (attempt < MaxWriteConflictAttempts && ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                      IsWriteConflict(sqlErrorNumber))
             {
             }
         }
@@ -59,7 +62,9 @@ public sealed record AccountSessionRepository(ICaeriusNetDbContext Db) : IAccoun
             {
                 return await Db.ExecuteScalarAsync<bool>(sp, ct);
             }
-            catch (SqlException ex) when (attempt < MaxWriteConflictAttempts && IsWriteConflict(ex.Number))
+            catch (CaeriusNetSqlException ex)
+                when (attempt < MaxWriteConflictAttempts && ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                      IsWriteConflict(sqlErrorNumber))
             {
             }
         }
@@ -83,7 +88,9 @@ public sealed record AccountSessionRepository(ICaeriusNetDbContext Db) : IAccoun
                 await Db.ExecuteAsync(sp, ct);
                 return;
             }
-            catch (SqlException ex) when (attempt < MaxWriteConflictAttempts && IsWriteConflict(ex.Number))
+            catch (CaeriusNetSqlException ex)
+                when (attempt < MaxWriteConflictAttempts && ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                      IsWriteConflict(sqlErrorNumber))
             {
             }
         }
@@ -107,7 +114,9 @@ public sealed record AccountSessionRepository(ICaeriusNetDbContext Db) : IAccoun
                 await Db.ExecuteAsync(sp, ct);
                 return;
             }
-            catch (SqlException ex) when (attempt < MaxWriteConflictAttempts && IsWriteConflict(ex.Number))
+            catch (CaeriusNetSqlException ex)
+                when (attempt < MaxWriteConflictAttempts && ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                      IsWriteConflict(sqlErrorNumber))
             {
             }
         }
@@ -134,7 +143,9 @@ public sealed record AccountSessionRepository(ICaeriusNetDbContext Db) : IAccoun
             {
                 return await Db.QueryAsImmutableArrayAsync<KickedAccountDto>(sp, ct);
             }
-            catch (SqlException ex) when (attempt < MaxWriteConflictAttempts && IsWriteConflict(ex.Number))
+            catch (CaeriusNetSqlException ex)
+                when (attempt < MaxWriteConflictAttempts && ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                      IsWriteConflict(sqlErrorNumber))
             {
             }
         }
@@ -160,7 +171,9 @@ public sealed record AccountSessionRepository(ICaeriusNetDbContext Db) : IAccoun
             {
                 return await Db.QueryAsImmutableArrayAsync<HeldAccountSessionDto>(sp, ct);
             }
-            catch (SqlException ex) when (attempt < MaxWriteConflictAttempts && IsWriteConflict(ex.Number))
+            catch (CaeriusNetSqlException ex)
+                when (attempt < MaxWriteConflictAttempts && ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                      IsWriteConflict(sqlErrorNumber))
             {
             }
         }
@@ -216,7 +229,9 @@ public sealed record AccountSessionRepository(ICaeriusNetDbContext Db) : IAccoun
                 await Db.ExecuteAsync(sp, ct);
                 return;
             }
-            catch (SqlException ex) when (attempt < MaxWriteConflictAttempts && IsWriteConflict(ex.Number))
+            catch (CaeriusNetSqlException ex)
+                when (attempt < MaxWriteConflictAttempts && ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                      IsWriteConflict(sqlErrorNumber))
             {
             }
         }

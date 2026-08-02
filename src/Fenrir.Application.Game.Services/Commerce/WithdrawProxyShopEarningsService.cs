@@ -1,3 +1,4 @@
+using CaeriusNet.Exceptions;
 using Fenrir.Application.Game.Abstractions.Commerce;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Protocol.Game;
@@ -24,7 +25,7 @@ public sealed class WithdrawProxyShopEarningsService(
             await offlineShops.WithdrawMoneyAsync(characterId, money, bigMoney, GameDate.Today(),
                 cancellationToken);
         }
-        catch (SqlException ex) when (ex.Number == NothingToWithdrawErrorNumber)
+        catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException { Number: NothingToWithdrawErrorNumber })
         {
             logger.LogInformation(
                 "Character {CharacterId} offline-shop withdraw denied: nothing to withdraw", characterId);

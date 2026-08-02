@@ -1,3 +1,4 @@
+using CaeriusNet.Exceptions;
 using Fenrir.Application.Login.Abstractions.ClaimGift;
 using Fenrir.Application.Login.Sessions;
 using Microsoft.Data.SqlClient;
@@ -28,14 +29,14 @@ public sealed class ClaimGiftService(IGiftRepository gifts, ILogger<ClaimGiftSer
             await gifts.ClaimIntoVaultAsync(entry.GiftId, accountId, cancellationToken);
             return new ClaimGiftResult(ClaimGiftOutcome.Success);
         }
-        catch (SqlException ex) when (ex.Number == SqlErrorGiftUnavailable)
+        catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException { Number: SqlErrorGiftUnavailable })
         {
             logger.LogWarning(ex,
                 "Account {AccountId} gift claim slot {GiftInfoIndex} (GiftId {GiftId}) lost a claim race",
                 accountId, giftInfoIndex, entry.GiftId);
             return new ClaimGiftResult(ClaimGiftOutcome.GiftUnavailable);
         }
-        catch (SqlException ex) when (ex.Number == SqlErrorVaultFull)
+        catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException { Number: SqlErrorVaultFull })
         {
             slots.Restore(giftInfoIndex, entry);
             logger.LogWarning(ex,

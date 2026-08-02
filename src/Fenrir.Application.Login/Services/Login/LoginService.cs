@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Net;
+using CaeriusNet.Exceptions;
 using Fenrir.Application.Login.Abstractions.Login;
 using Fenrir.Application.Login.Abstractions.RetiredItems;
 using Fenrir.Application.Login.Services.AccountSecurity;
@@ -11,7 +12,6 @@ using Fenrir.Protocol.Login;
 using Fenrir.Security;
 using Fenrir.Security.Credentials;
 using Fenrir.Security.RateLimiting;
-using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -121,7 +121,7 @@ public sealed class LoginService(
         {
             account = await accounts.AuthenticateAsync(packet.Id, cancellationToken);
         }
-        catch (SqlException ex)
+        catch (CaeriusNetSqlException ex)
         {
             logger.LogError(ex, "Login failed: account lookup errored for login {Id}", packet.Id);
             return Failure(ResultUnknownAccount, "", true);
@@ -144,7 +144,7 @@ public sealed class LoginService(
         {
             authentication = await AuthenticateConstantTimeAsync(account, packet.Password, remoteIp, cancellationToken);
         }
-        catch (SqlException ex)
+        catch (CaeriusNetSqlException ex)
         {
             logger.LogError(ex, "Login failed: credential verification errored for login {Id}", packet.Id);
             return Failure(ResultUnknownAccount, "", true);
@@ -232,7 +232,7 @@ public sealed class LoginService(
             roster = await characters.GetAccountRosterAsync(accountId, cancellationToken);
             rosterEntries = await ResolveRosterEntriesAsync(roster, cancellationToken);
         }
-        catch (SqlException ex)
+        catch (CaeriusNetSqlException ex)
         {
             logger.LogError(ex, "Login failed: avatar roster load errored for account {AccountId}", accountId);
             return Failure(ResultAvatarLoadFailed, "", true);
@@ -244,7 +244,7 @@ public sealed class LoginService(
         {
             claim = await accountSessions.ClaimOrSignalKickAsync(accountId, newToken, cancellationToken);
         }
-        catch (SqlException ex)
+        catch (CaeriusNetSqlException ex)
         {
             logger.LogError(ex,
                 "Login failed: account-session claim errored for account {AccountId} after authentication succeeded",
@@ -290,7 +290,7 @@ public sealed class LoginService(
                 quotaGateApplies ? packet.Adapter.IPAddress : DeviceSpoofingGuard.PlaceholderRemoteIp,
                 quotaGateApplies ? remoteIp ?? "" : DeviceSpoofingGuard.PlaceholderRemoteIp, cancellationToken);
         }
-        catch (SqlException ex)
+        catch (CaeriusNetSqlException ex)
         {
             logger.LogWarning(ex,
                 "Login: device signature update failed for account {AccountId}; the per-adapter cap will not see this session",
@@ -310,7 +310,7 @@ public sealed class LoginService(
             await eventLog.LogAsync(LoginSucceededEventCode, EventLogCategory.Session, accountId, null, null, null,
                 null, null, null, null, null, 1, remoteIp is null ? null : $"RemoteIp={remoteIp}", cancellationToken);
         }
-        catch (SqlException ex)
+        catch (CaeriusNetSqlException ex)
         {
             logger.LogWarning(ex, "Login: succeeded-login event-log write failed for account {AccountId}", accountId);
         }
@@ -380,7 +380,7 @@ public sealed class LoginService(
         {
             return await gmAllowlist.IsAllowedAsync(remoteIp, ct);
         }
-        catch (SqlException ex)
+        catch (CaeriusNetSqlException ex)
         {
             logger.LogError(ex,
                 "Login: GM allowlist lookup errored for IP {RemoteIp}; treating the IP as not allowlisted", remoteIp);

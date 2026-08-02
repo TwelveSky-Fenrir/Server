@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using CaeriusNet.Exceptions;
 using Fenrir.Application.Game.Abstractions.Commerce;
 using Fenrir.Application.Game.Domain.Commerce;
 using Fenrir.Application.Game.Domain.Inventory;
@@ -164,7 +165,7 @@ public sealed class BuyShopItemService(
                 ToTvps(projectedSellerContainer), buyer.CharacterId, (byte)packet.Page2,
                 ToTvps(projectedBuyerContainer), slot.Price, cancellationToken);
         }
-        catch (SqlException ex) when (ex.Number == SellerMoneyCapExceededErrorNumber)
+        catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException { Number: SellerMoneyCapExceededErrorNumber })
         {
             logger.LogInformation(
                 "PShop purchase blocked: crediting {Price} to seller {SellerId} would exceed the maximum money value (buyer {BuyerId})",
@@ -253,14 +254,14 @@ public sealed class BuyShopItemService(
                 slot.Price, buyer.CharacterId, (byte)packet.Page2, ToTvps(projectedBuyerContainer),
                 cancellationToken);
         }
-        catch (SqlException ex) when (ex.Number == ProxyListingStaleErrorNumber)
+        catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException { Number: ProxyListingStaleErrorNumber })
         {
             logger.LogInformation(
                 "Proxy PShop purchase rejected: proxy seller {SellerId} slot {Page1}/{Index1} changed since it was listed (stale purchase, buyer {BuyerId})",
                 sellerId, packet.Page1, packet.Index1, buyer.CharacterId);
             return new BuyShopItemCommitResult(false, BuildReply(4, 0, 0, 0), null);
         }
-        catch (SqlException ex) when (ex.Number == ProxyBigMoneyCapExceededErrorNumber)
+        catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException { Number: ProxyBigMoneyCapExceededErrorNumber })
         {
             logger.LogInformation(
                 "Proxy PShop purchase blocked: crediting {Price} to proxy seller {SellerId} would exceed the BigMoney cap (buyer {BuyerId})",

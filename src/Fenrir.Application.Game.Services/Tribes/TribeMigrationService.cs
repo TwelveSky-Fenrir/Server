@@ -1,3 +1,4 @@
+using CaeriusNet.Exceptions;
 using Fenrir.Application.Game.Abstractions.Tribes;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Quests;
@@ -63,7 +64,7 @@ public sealed class TribeMigrationService(
                 result.NewQuestProgress.QSort, result.NewQuestProgress.TargetPhase,
                 result.NewQuestProgress.KillCounter, true, ct).ConfigureAwait(false);
         }
-        catch (SqlException ex) when (ex.Number == QuotaExhaustedErrorNumber)
+        catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException { Number: QuotaExhaustedErrorNumber })
         {
             logger.LogInformation(
                 "Character {CharacterId} fourth-tribe conversion rejected: shared daily quota exhausted",

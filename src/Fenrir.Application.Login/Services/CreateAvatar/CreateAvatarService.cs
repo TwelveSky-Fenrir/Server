@@ -1,3 +1,4 @@
+using CaeriusNet.Exceptions;
 using Fenrir.Application.Login.Abstractions.CreateAvatar;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Domain.Login.Avatars;
@@ -176,7 +177,7 @@ public sealed class CreateAvatarService(
 
             return new CreateAvatarResult(CreateAvatarOutcome.Success, avatarInfo);
         }
-        catch (SqlException ex) when (ex.Number == SqlErrorNameAlreadyTaken)
+        catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException { Number: SqlErrorNameAlreadyTaken })
         {
             logger.LogWarning(ex,
                 "Character creation rejected for account {AccountId} slot {AvatarPost}: name {AvatarName} already taken",

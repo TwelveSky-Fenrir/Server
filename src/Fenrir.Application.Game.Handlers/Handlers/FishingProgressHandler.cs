@@ -27,10 +27,9 @@ public sealed class FishingProgressHandler(
 
         if (zone.MapId != FishingLineHandler.FishingZoneNumber)
         {
-            logger.LogWarning(
-                "Fishing-progress request rejected for character {CharacterId}: map {MapId} is not the fishing zone -- aborting session",
+            logger.LogDebug(
+                "Fishing-progress request ignored for character {CharacterId}: map {MapId} is not the fishing zone",
                 characterId, zone.MapId);
-            zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 
@@ -48,9 +47,8 @@ public sealed class FishingProgressHandler(
                 if (packet.FishingStep is < 0 or > 5)
                 {
                     logger.LogWarning(
-                        "Fishing-progress request rejected for character {CharacterId}: invalid step {FishingStep} -- aborting session",
+                        "Fishing-progress request ignored for character {CharacterId}: invalid step {FishingStep}",
                         characterId, packet.FishingStep);
-                    zoneSession.Abort(DisconnectReason.Faulted);
                     return;
                 }
 
@@ -58,9 +56,8 @@ public sealed class FishingProgressHandler(
                 break;
             default:
                 logger.LogWarning(
-                    "Fishing-progress request rejected for character {CharacterId}: invalid sort {Sort} -- aborting session",
+                    "Fishing-progress request ignored for character {CharacterId}: invalid sort {Sort}",
                     characterId, packet.Sort);
-                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
         }
 

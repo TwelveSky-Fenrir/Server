@@ -28,9 +28,8 @@ public sealed class WithdrawProxyShopEarningsHandler(
         if (zone.MapId != OpenShopStallHandler.PshopZoneNumber)
         {
             logger.LogWarning(
-                "Withdraw proxy shop earnings rejected: character {CharacterId} is outside the market district (zone {MapId}) -- session will be disconnected",
+                "Withdraw proxy shop earnings rejected: character {CharacterId} is outside the market district (zone {MapId})",
                 characterId, zone.MapId);
-            zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 

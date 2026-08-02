@@ -46,7 +46,6 @@ public sealed class TribeMigrationHandler(
                 session.Send(new TribeMigrationResponse { Result = 1 });
                 return;
             default:
-                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
         }
     }

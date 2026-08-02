@@ -6,25 +6,25 @@ namespace Fenrir.Data.Abstractions.Game;
 
 public sealed partial record EventLogEntryTvp : ITvpMapper<EventLogEntryTvp>
 {
-    public static string TvpTypeName => "game.tvp_EventLogEntry";
-
     private static readonly SqlMetaData[] TvpMetaData =
     [
-        new SqlMetaData("EventCode", SqlDbType.SmallInt),
-        new SqlMetaData("Category", SqlDbType.TinyInt),
-        new SqlMetaData("ActorAccountId", SqlDbType.Int),
-        new SqlMetaData("ActorCharacterId", SqlDbType.Int),
-        new SqlMetaData("TargetAccountId", SqlDbType.Int),
-        new SqlMetaData("TargetCharacterId", SqlDbType.Int),
-        new SqlMetaData("ShardId", SqlDbType.SmallInt),
-        new SqlMetaData("DeltaMoney", SqlDbType.BigInt),
-        new SqlMetaData("DeltaBigMoney", SqlDbType.BigInt),
-        new SqlMetaData("ItemId", SqlDbType.Int),
-        new SqlMetaData("Quantity", SqlDbType.Int),
-        new SqlMetaData("Outcome", SqlDbType.TinyInt),
-        new SqlMetaData("Payload", SqlDbType.NVarChar, SqlMetaData.Max),
-        new SqlMetaData("OccurredAtUtc", SqlDbType.DateTime2),
+        new("EventCode", SqlDbType.SmallInt),
+        new("Category", SqlDbType.TinyInt),
+        new("ActorAccountId", SqlDbType.Int),
+        new("ActorCharacterId", SqlDbType.Int),
+        new("TargetAccountId", SqlDbType.Int),
+        new("TargetCharacterId", SqlDbType.Int),
+        new("ShardId", SqlDbType.SmallInt),
+        new("DeltaMoney", SqlDbType.BigInt),
+        new("DeltaBigMoney", SqlDbType.BigInt),
+        new("ItemId", SqlDbType.Int),
+        new("Quantity", SqlDbType.Int),
+        new("Outcome", SqlDbType.TinyInt),
+        new("Payload", SqlDbType.NVarChar, SqlMetaData.Max),
+        new("OccurredAtUtc", SqlDbType.DateTime2)
     ];
+
+    public static string TvpTypeName => "game.tvp_EventLogEntry";
 
     public IEnumerable<SqlDataRecord> MapAsSqlDataRecords(IEnumerable<EventLogEntryTvp> items)
     {
@@ -38,17 +38,28 @@ public sealed partial record EventLogEntryTvp : ITvpMapper<EventLogEntryTvp>
             {
                 record.SetInt16(0, item.EventCode);
                 record.SetByte(1, item.Category);
-                if (item.ActorAccountId is null) record.SetDBNull(2); else record.SetInt32(2, item.ActorAccountId.Value);
-                if (item.ActorCharacterId is null) record.SetDBNull(3); else record.SetInt32(3, item.ActorCharacterId.Value);
-                if (item.TargetAccountId is null) record.SetDBNull(4); else record.SetInt32(4, item.TargetAccountId.Value);
-                if (item.TargetCharacterId is null) record.SetDBNull(5); else record.SetInt32(5, item.TargetCharacterId.Value);
-                if (item.ShardId is null) record.SetDBNull(6); else record.SetInt16(6, item.ShardId.Value);
-                if (item.DeltaMoney is null) record.SetDBNull(7); else record.SetInt64(7, item.DeltaMoney.Value);
-                if (item.DeltaBigMoney is null) record.SetDBNull(8); else record.SetInt64(8, item.DeltaBigMoney.Value);
-                if (item.ItemId is null) record.SetDBNull(9); else record.SetInt32(9, item.ItemId.Value);
-                if (item.Quantity is null) record.SetDBNull(10); else record.SetInt32(10, item.Quantity.Value);
-                if (item.Outcome is null) record.SetDBNull(11); else record.SetByte(11, item.Outcome.Value);
-                if (item.Payload is null) record.SetDBNull(12); else record.SetString(12, item.Payload);
+                if (item.ActorAccountId is null) record.SetDBNull(2);
+                else record.SetInt32(2, item.ActorAccountId.Value);
+                if (item.ActorCharacterId is null) record.SetDBNull(3);
+                else record.SetInt32(3, item.ActorCharacterId.Value);
+                if (item.TargetAccountId is null) record.SetDBNull(4);
+                else record.SetInt32(4, item.TargetAccountId.Value);
+                if (item.TargetCharacterId is null) record.SetDBNull(5);
+                else record.SetInt32(5, item.TargetCharacterId.Value);
+                if (item.ShardId is null) record.SetDBNull(6);
+                else record.SetInt16(6, item.ShardId.Value);
+                if (item.DeltaMoney is null) record.SetDBNull(7);
+                else record.SetInt64(7, item.DeltaMoney.Value);
+                if (item.DeltaBigMoney is null) record.SetDBNull(8);
+                else record.SetInt64(8, item.DeltaBigMoney.Value);
+                if (item.ItemId is null) record.SetDBNull(9);
+                else record.SetInt32(9, item.ItemId.Value);
+                if (item.Quantity is null) record.SetDBNull(10);
+                else record.SetInt32(10, item.Quantity.Value);
+                if (item.Outcome is null) record.SetDBNull(11);
+                else record.SetByte(11, item.Outcome.Value);
+                if (item.Payload is null) record.SetDBNull(12);
+                else record.SetString(12, item.Payload);
                 record.SetDateTime(13, item.OccurredAtUtc);
                 yield return record;
             }

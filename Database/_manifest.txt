@@ -1109,3 +1109,19 @@ Migrations/044_characteritems_bag_position.sql
 
 # Enregistre 50361 pour la garde ContainerA=ContainerB de usp_CharacterItems_ReplaceTwoContainersV2 ci-dessus.
 Migrations/Seed/admin/030_error_catalog_characteritems_v2.sql
+
+# Scrolls d'apparence (item 1214) et de genre (item 1171) : cree usp_Character_UpdateAppearance et
+# usp_Character_UpdateGender. Les colonnes HeadType/FaceType/Gender existent deja sur game.Characters.
+# Aucun ALTER TABLE : la migration ne fait que poser les deux procedures de mise a jour atomique
+# correspondantes, appelees par UseInventoryItemService.ResolveAppearanceChangeScrollAsync et
+# ResolveGenderScrollAsync.
+Migrations/045_appearance_gender_scroll_procedures.sql
+
+# Ajoute SilverTime/GoldTime a game.Characters + reconstruit game.tvp_CharacterProgress et les
+# procedures write-behind pour les scrolls ornements (item 1370 Silver Scroll, item 1167 Gold Scroll).
+Migrations/046_ornament_silver_gold_time_columns.sql
+
+# Ajoute DoubleKillNumTime/DoubleKillExpTime/DoubleKillNumTime2 a game.Characters + reconstruit
+# game.tvp_CharacterProgress (93 colonnes) et les procedures write-behind + GetForWorldEntry pour
+# les scrolls de kill-bonus PvP (items 1118/1119/1120/1155/1163/1186/1228 et variantes).
+Migrations/047_kill_timer_columns.sql

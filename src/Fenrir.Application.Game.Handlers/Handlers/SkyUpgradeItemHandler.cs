@@ -40,7 +40,7 @@ public sealed class SkyUpgradeItemHandler(
 
             if (result.Outcome != SkyUpgradeItemOutcome.Applied)
             {
-                zoneSession.Abort(DisconnectReason.Faulted);
+                session.Send(new SkyUpgradeItemResponse { Result = 1, Cost = 0, Value = new int[6] });
                 return;
             }
 

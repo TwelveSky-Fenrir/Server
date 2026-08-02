@@ -25,10 +25,9 @@ public sealed class FishingCatchHandler(IFishingCatchService fishingCatchService
 
         if (zone.MapId != FishingLineHandler.FishingZoneNumber)
         {
-            logger.LogWarning(
-                "Fishing-catch request rejected for character {CharacterId}: map {MapId} is not the fishing zone -- aborting session",
+            logger.LogDebug(
+                "Fishing-catch request ignored for character {CharacterId}: map {MapId} is not the fishing zone",
                 characterId, zone.MapId);
-            zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 

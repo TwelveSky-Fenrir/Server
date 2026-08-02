@@ -36,8 +36,8 @@ public sealed class CraftLegendaryPetHandler(
             if (result.Outcome != CraftLegendaryPetOutcome.Applied)
             {
                 logger.LogWarning(
-                    "Craft-legendary-pet rejected for character {CharacterId} -- aborting session", characterId);
-                zoneSession.Abort(DisconnectReason.Faulted);
+                    "Craft-legendary-pet rejected for character {CharacterId}", characterId);
+                session.Send(new CraftLegendaryPetResponse { Result = 1, Value = [0, 0, 0, 0, 0, 0], Padding = 0 });
                 return;
             }
 

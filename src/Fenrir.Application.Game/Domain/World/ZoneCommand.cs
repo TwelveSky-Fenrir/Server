@@ -277,4 +277,20 @@ public sealed record PlayerEnterData(
     bool HsbStoneRewardClaimed = false,
     int TowerCpMilestoneCounter = 0,
     int WarriorPill = 0,
-    int WarriorScroll = 0);
+    int WarriorScroll = 0,
+    int SilverTime = 0,
+    int GoldTime = 0,
+    /// <summary>Minutes remaining on the Scroll of Loyalty / Scroll of the Gods buff (bonus CP per PvP kill).</summary>
+    int DoubleKillNumTime = 0,
+    /// <summary>Minutes remaining on the Scroll of Battle / Scroll of the Gods buff (bonus EXP per PvP kill).</summary>
+    int DoubleKillExpTime = 0,
+    /// <summary>Per-kill charge count for the Crushed Demon Scroll — decremented per PvP kill, NOT per minute.</summary>
+    int DoubleKillNumTime2 = 0,
+    /// <summary>
+    ///     Death-protection shield stacks. Loaded from <c>CharacterProgressDto.ProtectForDeath</c> at zone
+    ///     entry; decremented in-zone when a death event is absorbed. Silently resets to 0 on
+    ///     zone-transfer if <c>ProtectForDeath</c> has not yet been added to
+    ///     <c>CharacterProgressTvp</c> — coordinate with <b>fenrir-database-engineer</b> before
+    ///     relying on this surviving zone changes.
+    /// </summary>
+    int ProtectForDeath = 0);

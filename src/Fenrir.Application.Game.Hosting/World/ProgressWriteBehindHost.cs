@@ -88,7 +88,13 @@ public sealed class ProgressWriteBehindHost(ZoneRegistry zones, ICharacterReposi
                 InventoryDate: state.InventoryDate,
                 StoreDate: state.StoreDate,
                 WarriorPill: state.WarriorPill,
-                WarriorScroll: state.WarriorScroll));
+                WarriorScroll: state.WarriorScroll,
+                SilverTime: state.SilverTime,
+                GoldTime: state.GoldTime,
+                DoubleKillNumTime: state.DoubleKillNumTime,
+                DoubleKillExpTime: state.DoubleKillExpTime,
+                DoubleKillNumTime2: state.DoubleKillNumTime2,
+                ProtectForDeath: state.ProtectForDeath));
 
             CostumePersistenceCodec.AppendOccupiedSlots(costumes, characterId, state);
 

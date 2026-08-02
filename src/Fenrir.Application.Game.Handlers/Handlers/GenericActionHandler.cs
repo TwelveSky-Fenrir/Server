@@ -176,9 +176,9 @@ public sealed class GenericActionHandler(
             if (bindSort is not (HotkeyBindSortSkill or HotkeyBindSortEmoticon))
             {
                 logger.LogInformation(
-                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} aborted, unsupported hotkey binding sort {BindSort}",
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} rejected, unsupported hotkey binding sort {BindSort}",
                     zoneSession.SessionId, characterId, sort, bindSort);
-                zoneSession.Abort(DisconnectReason.Faulted);
+                Respond(session, zoneSession, sort, packet.Data, GenericActionResult.Failed);
                 return;
             }
 
@@ -295,10 +295,11 @@ public sealed class GenericActionHandler(
 
         if (sort == 236)
         {
-            logger.LogInformation(
-                "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} disconnects unconditionally",
-                zoneSession.SessionId, characterId, sort);
-            zoneSession.Abort(DisconnectReason.ContributionPointExchangeRetired);
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} is a retired feature -- soft-fail",
+                    zoneSession.SessionId, characterId, sort);
+            Respond(session, zoneSession, sort, packet.Data, GenericActionResult.Failed);
             return;
         }
 

@@ -325,6 +325,7 @@ public sealed partial class Zone
         ApplyPvpKillContributionPointFormula(attackerState, defenderState, profile);
         ApplyPvpKillHeroPoints(attackerState, profile, attackerCombinedLevel);
         ApplyPvpKillExperience(attackerState, profile, attackerCombinedLevel, defenderCombinedLevel);
+        DecrementDoubleKillNumTime2OnKill(attackerState);
 
         if (profile.GrantDrop)
             DropItemsForKillOtherTribe(attackerState, defenderState, attackerCombinedLevel, defenderCombinedLevel);
@@ -395,6 +396,7 @@ public sealed partial class Zone
         var baseAmount = PvpKillContributionPointCalculator.ComputeBaseAmount(
             attackerState.PremiumExpireUtc > 0,
             attackerState.WarriorScroll > 0,
+            attackerState.DoubleKillNumTime > 0,
             PvpKillContributionPointBonuses.ComputePerUserAddValue(hasCrossTribeAddTimeEffect),
             0,
             towerControlBonus,
@@ -460,7 +462,7 @@ public sealed partial class Zone
             attackerCombinedLevel,
             defenderCombinedLevel,
             attackerState.WarriorScroll > 0,
-            false,
+            attackerState.DoubleKillExpTime > 0,
             zoneMultiplier);
 
         if (gain > 0)
@@ -502,6 +504,28 @@ public sealed partial class Zone
 
         attackerState.MountAccumulatedExp = attackerState.MountAccumulatedExp.SetItem(slot,
             MountActivityExpCodec.ClampExp(mountExperience + gain));
+        attackerState.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+    }
+
+    /// <summary>
+    ///     Decrements <c>DoubleKillNumTime2</c> (Crushed Demon Scroll per-kill charge) by 1 on each PvP kill,
+    ///     broadcasts sort 30 with the new value, and marks progress dirty.
+    ///     No-op when the counter is already zero.
+    /// </summary>
+    /// <remarks>
+    ///     Unlike the minute-based DoubleKillNumTime/DoubleKillExpTime timers, this counter is
+    ///     decremented per kill (not per minute) and tracked separately — it does NOT go through
+    ///     <see cref="TimedBuffCountdownSystem"/>.
+    ///     Réf. C++: Server/ts25zone/S07_MyGame02.cpp:2445-2448 — <c>aDoubleKillNumTime2</c> decrement + S030 broadcast.
+    /// </remarks>
+    private void DecrementDoubleKillNumTime2OnKill(PlayerRuntimeState attackerState)
+    {
+        if (attackerState.DoubleKillNumTime2 <= 0)
+            return;
+
+        attackerState.DoubleKillNumTime2 = Math.Max(0, attackerState.DoubleKillNumTime2 - 1);
+        attackerState.Session.Send(new AvatarStatUpdateResponse
+            { Sort = 30, Value = attackerState.DoubleKillNumTime2, Value2 = 0 });
         attackerState.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
     }
 
@@ -639,9 +663,6 @@ public sealed partial class Zone
             return;
 
         ApplySenderLocation(attackerState, command.AttackInfo);
-
-        if (!AttackPacketBudget.TryConsume(attackerState, command.AttackInfo.AttackActionValue4))
-            return;
 
         if (!_monsters.TryGetValue(command.AttackInfo.ServerIndex2, out var monster))
             return;
@@ -1026,7 +1047,40 @@ public sealed partial class Zone
         if (xpBonusRatio > 0f && monsterGeneralExperience >= 1)
             rawGain += (int)(monsterGeneralExperience * xpBonusRatio);
 
+        // EXP multipliers from premium content — applied to raw gain before rebirth divisor.
+        // Legacy: Server/ts25zone/S07_MyGame05.cpp:3597-3611
+        if (state.FightingGodForDestroy > 0 && state.Level < ExperienceFormulas.RebirthDivisorLevelThreshold &&
+            state.Level2 == 0)
+            rawGain *= 2;
+        if (state.DoubleExpTime1 > 0)
+            rawGain *= 2;
+        if (state.DoubleExpTime2 > 0)
+            rawGain *= 2;
+        if (IsZone126TypeZone)
+            rawGain *= 2;
+        if (state.PremiumExpireUtc > DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+            rawGain *= 2;
+
+        // +10% XP bonus if the player's tribe holds Zone 038 (HolyStoneBattle).
+        // Legacy: Server/ts25zone/S07_MyGame05.cpp:3613-3616 — ReturnWinZone038 check + 10% of base XP.
+        if (monsterGeneralExperience >= 1 && worldState?.World.Zone038WinTribe == state.Tribe)
+            rawGain += (int)(monsterGeneralExperience * 0.1f);
+
         var finalGain = ExperienceFormulas.ApplyRebirthDivisor(rawGain, state.Level);
+
+        // Mentor (teacher) XP bonus: +50% when the student is solo, below level 113, and their bonded teacher
+        // is present in the same zone.  Ref. Server/ts25zone/S07_MyGame05.cpp:3644 -- the 50% multiplier is
+        // applied to the base gain and credited separately so it doesn't compound with other per-kill bonuses.
+        const int MentorMaxStudentLevel = 113;
+        if (partyMemberIds is null or { Count: 0 }
+            && state.Level < MentorMaxStudentLevel
+            && state.TeacherCharacterId is { } teacherId
+            && _players.ContainsKey(teacherId))
+        {
+            var mentorBonus = finalGain / 2;
+            if (mentorBonus > 0)
+                finalGain += mentorBonus;
+        }
 
         if (MonsterKillExperienceGate.ShouldProcess(true, false, finalGain, monsterPatExperience))
         {

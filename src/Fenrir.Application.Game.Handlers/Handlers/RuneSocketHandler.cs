@@ -35,10 +35,13 @@ public sealed class RuneSocketHandler(IRuneSocketService runeSocketService, ILog
 
                     if (result.Outcome != RuneSocketOutcome.Applied)
                     {
-                        logger.LogWarning(
-                            "Rune insert rejected for character {CharacterId}: runeIndex {RuneIndex} -- aborting session",
+                        logger.LogDebug(
+                            "Rune insert rejected for character {CharacterId}: runeIndex {RuneIndex} (invalid slot, item not found, or insufficient funds)",
                             characterId, packet.RuneIndex);
-                        zoneSession.Abort(DisconnectReason.Faulted);
+                        session.Send(new RuneSocketResponse
+                        {
+                            Result = 1, Page = 0, Index = 0, ItemIndex = 0, RuneIndex = 0
+                        });
                         return;
                     }
 
@@ -61,10 +64,13 @@ public sealed class RuneSocketHandler(IRuneSocketService runeSocketService, ILog
                     switch (result.Outcome)
                     {
                         case RuneSocketOutcome.Rejected:
-                            logger.LogWarning(
-                                "Rune remove rejected for character {CharacterId}: runeIndex {RuneIndex} -- aborting session",
+                            logger.LogDebug(
+                                "Rune remove rejected for character {CharacterId}: runeIndex {RuneIndex} (invalid slot or item not found)",
                                 characterId, packet.RuneIndex);
-                            zoneSession.Abort(DisconnectReason.Faulted);
+                            session.Send(new RuneSocketResponse
+                            {
+                                Result = 1, Page = 0, Index = 0, ItemIndex = 0, RuneIndex = 0
+                            });
                             return;
                         case RuneSocketOutcome.InventoryFull:
                             logger.LogInformation(

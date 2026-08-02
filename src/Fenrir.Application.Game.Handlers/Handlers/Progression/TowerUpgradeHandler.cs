@@ -32,10 +32,9 @@ public sealed class TowerUpgradeHandler(ITowerUpgradeService towerUpgradeService
 
             if (result.Outcome != TowerUpgradeOutcome.Success)
             {
-                logger.LogWarning(
-                    "Tower-upgrade rejected for character {CharacterId} on map {MapId} -- aborting session",
+                logger.LogDebug(
+                    "Tower-upgrade ignored for character {CharacterId} on map {MapId}: validation failed, missing materials, or wrong role/zone",
                     characterId, zone.MapId);
-                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             }
 

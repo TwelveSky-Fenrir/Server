@@ -12,7 +12,11 @@ public sealed class PalaceRankUpgradeUseItemHandler(
     IEventLogRepository eventLog,
     ILogger<PalaceRankUpgradeUseItemHandler> logger) : IUseItemHandler
 {
-    public const int ItemId = 2193;
+    public const int ItemIdPlus1 = 2193;
+    public const int ItemIdPlus10 = 867;
+
+    // Legacy: item 2193 adds 1, item 867 adds 10. Both cap at 96. Server/ts25zone/S04_MyWork03.cpp:5066,5097.
+    public static IEnumerable<int> HandledItemIds { get; } = [ItemIdPlus1, ItemIdPlus10];
 
     private const int RankCeiling = 96;
 
@@ -28,12 +32,13 @@ public sealed class PalaceRankUpgradeUseItemHandler(
         if (context.Item.Quantity < 1 || state.Halo >= RankCeiling)
         {
             logger.LogDebug(
-                "Character {CharacterId} op23 palace-rank (2193) rejected: rank {Rank}, quantity {Quantity}",
-                context.CharacterId, state.Halo, context.Item.Quantity);
+                "Character {CharacterId} op23 palace-rank ({ItemId}) rejected: rank {Rank}, quantity {Quantity}",
+                context.CharacterId, context.Item.ItemId, state.Halo, context.Item.Quantity);
             return UseItemResponses.Fail(context.Page, context.Index);
         }
 
-        var newRank = state.Halo + 1;
+        var grantAmount = context.Item.ItemId == ItemIdPlus10 ? 10 : 1;
+        var newRank = Math.Min(state.Halo + grantAmount, RankCeiling);
         var updatedStats = UseItemStatRecompute.WithTitleHalo(state, worldData, state.Title, newRank);
 
         await eventLog.LogAsync(PalaceRankGrantEventCode, EventLogCategory.CashItemUse, context.AccountId,

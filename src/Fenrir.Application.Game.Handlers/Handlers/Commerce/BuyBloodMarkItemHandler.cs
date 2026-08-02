@@ -31,9 +31,8 @@ public sealed class BuyBloodMarkItemHandler(
             if (result is null)
             {
                 logger.LogWarning(
-                    "Buy blood mark item rejected: character {CharacterId} request failed structural validation -- session will be disconnected",
+                    "Buy blood mark item rejected: character {CharacterId} request failed structural validation",
                     characterId);
-                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             }
 

@@ -68,9 +68,35 @@ public static class ExperienceFormulas
         return characterLevel < RebirthDivisorLevelThreshold ? rawGain / 3 : rawGain / 5;
     }
 
-    public static long ComputeDeathExperienceLoss(long currentExperience, int levelFactor1)
+    /// <summary>
+    ///     Computes raw EXP loss on death.
+    /// </summary>
+    /// <param name="currentExperience">The character's current experience value.</param>
+    /// <param name="levelFactor1">
+    ///     The floor EXP for the character's current level (ExpRangeMin from the level row).
+    ///     Legacy calls this <c>tLevelFactor1</c> / <c>tMinusGeneralExperience</c>.
+    /// </param>
+    /// <param name="personalExpDownRatio">
+    ///     Per-character EXP-loss multiplier (<c>mGeneralExpDownRatio</c>). Starts at 1.0 and may be reduced
+    ///     by certain character effects. Pass 1.0f when no active modifier is known.
+    ///     Ref: Server/ts25zone/S07_MyGame02.cpp:2921-2964.
+    /// </param>
+    /// <param name="globalExpDownRatio">
+    ///     Server-wide EXP-loss multiplier (<c>mGAME.mGeneralExpDownRatio</c>). Normally 1.0.
+    ///     Pass 1.0f when no active server override is in effect.
+    ///     Ref: Server/ts25zone/S07_MyGame02.cpp:2921-2964.
+    /// </param>
+    /// <returns>
+    ///     The EXP amount to subtract (≥ 0; capped at <paramref name="currentExperience" /> so the result
+    ///     can never drive EXP negative). Returns 0 when the ratio-reduced loss rounds below 1.
+    /// </returns>
+    public static long ComputeDeathExperienceLoss(
+        long currentExperience,
+        int levelFactor1,
+        float personalExpDownRatio = 1.0f,
+        float globalExpDownRatio = 1.0f)
     {
-        var loss = (long)((currentExperience - levelFactor1) * 0.05f);
+        var loss = (long)((currentExperience - levelFactor1) * 0.05f * personalExpDownRatio * globalExpDownRatio);
         if (loss < 1) return 0;
         return loss > currentExperience ? currentExperience : loss;
     }

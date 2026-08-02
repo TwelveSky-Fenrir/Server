@@ -80,12 +80,12 @@ public sealed class GameServerOptions
 
     public ISet<DayOfWeek> HolyStoneBattleDays { get; set; } = new HashSet<DayOfWeek>();
 
-    public short HolyStoneMapId { get; set; }
+    public short HolyStoneMapId { get; set; } = 38;
 
-    public float HolyStoneX { get; set; }
-    public float HolyStoneZ { get; set; }
-    public float HolyStoneCaptureRadius { get; set; } = 1f;
-    public float HolyStoneParticipationRadius { get; set; } = 1f;
+    public float HolyStoneX { get; set; } = -40f;
+    public float HolyStoneZ { get; set; } = 6379f;
+    public float HolyStoneCaptureRadius { get; set; } = 25f;
+    public float HolyStoneParticipationRadius { get; set; } = 3500f;
 
     public ISet<short> HolyStoneTerritoryMapIds { get; set; } = new HashSet<short>();
 

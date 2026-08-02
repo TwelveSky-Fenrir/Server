@@ -31,7 +31,6 @@ public sealed class FriendRemoveHandler(IFriendService friendService, ILogger<Fr
             case FriendRemoveResultKind.IndexOutOfRange:
                 return;
             case FriendRemoveResultKind.SlotEmpty:
-                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             case FriendRemoveResultKind.Removed:
                 session.Send(new FriendRemoveResponse { Index = packet.Index });

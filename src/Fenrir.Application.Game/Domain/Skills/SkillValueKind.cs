@@ -12,10 +12,6 @@ public enum SkillValueKind
     StunDefense = 5,
     FastRunSpeed = 6,
     AttackPowerRatio = 7,
-    // Read into SkillGradeRowDto.AttackInfo2 but structurally unreachable: the case that
-    // applies it (AttackActionValue1==3, Server/ts25zone/S07_MyGame02.cpp:1050-1058 PvP,
-    // :1979-1988 PvM) is dead because the enclosing functions' own upstream gate
-    // (:736-749 / :1856-1874) only ever accepts {1,2}. Intentionally not consumed here.
     ElementAttackPowerRatio = 8,
     AttackInfo3 = 9,
 

@@ -61,9 +61,10 @@ public sealed class UseInventoryItemHandler(IUseInventoryItemService service, IL
         if (page == ContainerMatrix.InventoryPage1 && state.InventoryDate < GameDate.Today())
         {
             logger.LogInformation(
-                "Session {SessionId} character {CharacterId}: UseInventoryItemRequest aborted, dated-vault page expired (InventoryDate {InventoryDate})",
+                "Session {SessionId} character {CharacterId}: UseInventoryItemRequest rejected, dated-vault page expired (InventoryDate {InventoryDate})",
                 zoneSession.SessionId, characterId, state.InventoryDate);
-            zoneSession.Abort(DisconnectReason.Faulted);
+            session.Send(new UseInventoryItemResponse
+                { Result = 1, Page = page, Index = index, Value = packet.Value, Value2 = 0 });
             return;
         }
 
@@ -71,10 +72,12 @@ public sealed class UseInventoryItemHandler(IUseInventoryItemService service, IL
         try
         {
             var response = await service.ResolveAsync(zone, state, characterId, accountId, (byte)page, (byte)index,
-                packet.Value, cancellationToken);
+                packet.Value, session, cancellationToken);
             if (response is null)
             {
-                zoneSession.Abort(DisconnectReason.Faulted);
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: UseInventoryItemRequest unhandled item type at slot ({Page}:{Index}) -- no reply sent",
+                    zoneSession.SessionId, characterId, page, index);
                 return;
             }
 

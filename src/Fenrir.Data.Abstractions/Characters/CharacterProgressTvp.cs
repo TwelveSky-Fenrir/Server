@@ -90,4 +90,10 @@ public sealed partial record CharacterProgressTvp(
     int InventoryDate,
     int StoreDate,
     int WarriorPill,
-    int WarriorScroll);
+    int WarriorScroll,
+    int SilverTime,
+    int GoldTime,
+    int DoubleKillNumTime,
+    int DoubleKillExpTime,
+    int DoubleKillNumTime2,
+    int ProtectForDeath);

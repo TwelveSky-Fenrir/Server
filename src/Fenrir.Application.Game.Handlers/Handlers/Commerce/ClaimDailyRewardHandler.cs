@@ -32,9 +32,8 @@ public sealed class ClaimDailyRewardHandler(IClaimDailyRewardService service, IL
             if (result is null)
             {
                 logger.LogWarning(
-                    "Daily-reward claim rejected for account {AccountId}, character {CharacterId} -- aborting session",
+                    "Daily-reward claim rejected for account {AccountId}, character {CharacterId}",
                     accountId, characterId);
-                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             }
 

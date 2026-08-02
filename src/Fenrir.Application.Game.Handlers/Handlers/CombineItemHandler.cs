@@ -36,7 +36,7 @@ public sealed class CombineItemHandler(ICombineItemService combineItemService, I
 
             if (result.Outcome != CombineItemOutcome.Applied)
             {
-                zoneSession.Abort(DisconnectReason.Faulted);
+                session.Send(new CombineItemResponse { Result = 1, Cost = 0 });
                 return;
             }
 

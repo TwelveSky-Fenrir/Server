@@ -13,10 +13,7 @@ public sealed class WorldChatHandler(IWorldChatService worldChatService) : IInli
         var zoneSession = (IZoneSession)session;
 
         if (ChatRouter.IsContentEmpty(packet.Content))
-        {
-            zoneSession.Abort(DisconnectReason.Faulted);
             return;
-        }
 
         if (zoneSession.CurrentZone is not Zone zone)
             return;
@@ -27,6 +24,6 @@ public sealed class WorldChatHandler(IWorldChatService worldChatService) : IInli
 
         var outcome = worldChatService.TrySendChat(sender, packet.Content);
         if (outcome == WorldChatOutcome.LevelTooLow)
-            zoneSession.Abort(DisconnectReason.Faulted);
+            return;
     }
 }

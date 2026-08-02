@@ -229,7 +229,12 @@ public sealed partial record CharacterWorldSnapshotDto(
     int HsbStoneRewardClaimed = -1,
     int TowerCpMilestoneCounter = 0,
     int WarriorPill = 0,
-    int WarriorScroll = 0);
+    int WarriorScroll = 0,
+    int SilverTime = 0,
+    int GoldTime = 0,
+    int DoubleKillNumTime = 0,
+    int DoubleKillExpTime = 0,
+    int DoubleKillNumTime2 = 0);
 
 [GenerateDto]
 public sealed partial record CharacterItemSlotDto(

@@ -40,7 +40,7 @@ public sealed class UpgradeItemRankHandler(
             switch (result.Outcome)
             {
                 case UpgradeItemRankOutcome.Rejected:
-                    zoneSession.Abort(DisconnectReason.Faulted);
+                    session.Send(new UpgradeItemRankResponse { Result = 1, Cost = 0, Value = new int[6] });
                     return;
                 case UpgradeItemRankOutcome.NoCandidate:
                     session.Send(new UpgradeItemRankResponse

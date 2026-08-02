@@ -487,6 +487,11 @@ public sealed class EnterWorldService(
                 TowerCpMilestoneCounter: character.TowerCpMilestoneCounter,
                 WarriorPill: character.WarriorPill,
                 WarriorScroll: character.WarriorScroll,
+                SilverTime: character.SilverTime,
+                GoldTime: character.GoldTime,
+                DoubleKillNumTime: character.DoubleKillNumTime,
+                DoubleKillExpTime: character.DoubleKillExpTime,
+                DoubleKillNumTime2: character.DoubleKillNumTime2,
                 M15PetLuckyBoxPity: character.M15PetLuckyBoxPity,
                 SourceIp: SessionSourceIp.Normalize(zoneSession.RemoteEndPoint),
                 RuneSystem: runeSystem,
@@ -526,7 +531,8 @@ public sealed class EnterWorldService(
                 BuffX2Time: character.BuffX2Time,
                 AutoHuntPaidDayBudget: VaultDateNormalization.NormalizeIfExpired(character.AutoTime,
                     GameDate.Today()),
-                AutoHuntPaidMinuteBudget: character.AutoTime2)));
+                AutoHuntPaidMinuteBudget: character.AutoTime2,
+                ProtectForDeath: character.ProtectForDeath)));
 
             if (!entered)
             {

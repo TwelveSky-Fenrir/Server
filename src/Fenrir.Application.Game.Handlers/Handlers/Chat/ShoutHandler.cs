@@ -13,10 +13,7 @@ public sealed class ShoutHandler(IShoutService shoutService) : IInlinePacketHand
         var zoneSession = (IZoneSession)session;
 
         if (ChatRouter.IsContentEmpty(packet.Content))
-        {
-            zoneSession.Abort(DisconnectReason.Faulted);
             return;
-        }
 
         if (zoneSession.CurrentZone is not Zone zone)
             return;

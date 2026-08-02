@@ -35,9 +35,8 @@ public sealed class ContinueSkillUseHandler(IContinueSkillUseService service, IL
 
             case AutoBuffActivationResolver.ResultKind.Disconnect:
                 logger.LogWarning(
-                    "Auto-buff activation rejected for character {CharacterId}: sort {Sort} -- aborting session",
+                    "Auto-buff activation rejected for character {CharacterId}: sort {Sort} -- ignoring (game-logic condition, not malformed wire input)",
                     characterId, packet.Sort);
-                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
 
             case AutoBuffActivationResolver.ResultKind.Activate:

@@ -102,7 +102,8 @@ public sealed class PartyInviteService(
             return new PartyInviteResult(PartyInviteResultKind.TargetNotFound);
         }
 
-        if (inviter.Tribe != remote.Tribe)
+        var allyOfInviterTribe = worldState.GetAllyOf(inviter.Tribe);
+        if (inviter.Tribe != remote.Tribe && remote.Tribe != allyOfInviterTribe)
         {
             logger.LogWarning(
                 "Party invite rejected: character {InviterCharacterId} (tribe {InviterTribe}) targeted cross-shard character {TargetCharacterId} (tribe {TargetTribe}) -- session will be disconnected",

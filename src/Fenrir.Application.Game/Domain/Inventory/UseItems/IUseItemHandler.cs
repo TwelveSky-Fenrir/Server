@@ -18,7 +18,8 @@ public readonly record struct UseItemContext(
     byte Index,
     ItemStack Item,
     ItemDefinition Definition,
-    int Value);
+    int Value,
+    IPacketSession Session);
 
 public static class UseItemResponses
 {

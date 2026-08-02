@@ -19,10 +19,7 @@ public sealed class TribeAnnouncementHandler(
             session.SessionId, zoneSession.CharacterId, packet.Content.Length);
 
         if (string.IsNullOrEmpty(packet.Content))
-        {
-            zoneSession.Abort(DisconnectReason.Faulted);
             return;
-        }
 
         if (zoneSession.CurrentZone is not Zone zone)
             return;

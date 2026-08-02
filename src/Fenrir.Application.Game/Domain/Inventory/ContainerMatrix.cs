@@ -150,9 +150,6 @@ public static class ContainerMatrix
         if (destination is not { } dst)
         {
             var effectiveQuantity = sourceIsStackable ? quantity : src.Quantity;
-            // XPos/YPos only mean anything for the two bag containers (game.CharacterItems' CK_
-            // CharacterItems_BagPosition bounds every row 0-7 regardless of container) -- non-bag
-            // destinations keep the source slot's already-valid position instead of an unvalidated toX/toY.
             var moved = toContainer is InventoryPage0 or InventoryPage1
                 ? src with { Quantity = effectiveQuantity, XPos = toX, YPos = toY }
                 : src with { Quantity = effectiveQuantity };

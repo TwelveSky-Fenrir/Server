@@ -130,6 +130,19 @@ public interface ICharacterRepository
     public ValueTask SetAutoPotionThresholdAsync(int characterId, byte autoLifeRatio, byte autoManaRatio,
         CancellationToken ct);
 
+    public ValueTask UpdateAppearanceAsync(int characterId, byte headType, byte faceType, CancellationToken ct);
+
+    /// <summary>
+    ///     Persists a gender + appearance change (item 1171 -- Gender Scroll).
+    /// </summary>
+    /// <remarks>
+    ///     Ref. legacy: Server/ts25zone/S04_MyWork03.cpp:3175-3193.
+    ///     Requires <c>usp_Character_UpdateGenderAndAppearance (CharacterId, Gender, HeadType, FaceType)</c>
+    ///     -- fenrir-database-engineer must supply the stored procedure.
+    /// </remarks>
+    public ValueTask UpdateGenderAndAppearanceAsync(int characterId, byte gender, byte headType, byte faceType,
+        CancellationToken ct);
+
     public ValueTask SetAutoHuntAsync(int characterId, bool enabled, byte[] config, CancellationToken ct);
 
     public ValueTask<int?> GetIdByNameAsync(string name, CancellationToken ct);

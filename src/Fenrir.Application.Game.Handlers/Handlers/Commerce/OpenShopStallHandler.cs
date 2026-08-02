@@ -30,9 +30,8 @@ public sealed class OpenShopStallHandler(IOpenShopStallService service, ILogger<
         if (zone.MapId != PshopZoneNumber)
         {
             logger.LogWarning(
-                "Open shop stall rejected: character {CharacterId} is outside the market district (zone {MapId}) -- session will be disconnected",
+                "Open shop stall rejected: character {CharacterId} is outside the market district (zone {MapId})",
                 characterId, zone.MapId);
-            zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 
@@ -40,7 +39,6 @@ public sealed class OpenShopStallHandler(IOpenShopStallService service, ILogger<
         switch (prepared.Outcome)
         {
             case OpenShopStallPrepareOutcome.Abort:
-                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             case OpenShopStallPrepareOutcome.LiveOpened:
             case OpenShopStallPrepareOutcome.Blocked:

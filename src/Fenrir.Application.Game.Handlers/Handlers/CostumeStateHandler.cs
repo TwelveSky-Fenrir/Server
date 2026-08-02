@@ -37,9 +37,8 @@ public sealed class CostumeStateHandler(ICostumeStateService service, ILogger<Co
 
                 case CostumeStateOutcome.Disconnect:
                     logger.LogWarning(
-                        "Costume-state rejected for character {CharacterId}: sort {Sort} value {Value} -- aborting session",
+                        "Costume-state rejected for character {CharacterId}: sort {Sort} value {Value} -- ignoring (game-logic condition, not malformed wire input)",
                         characterId, packet.Sort, packet.Value);
-                    zoneSession.Abort(DisconnectReason.Faulted);
                     return;
 
                 case CostumeStateOutcome.Reply:

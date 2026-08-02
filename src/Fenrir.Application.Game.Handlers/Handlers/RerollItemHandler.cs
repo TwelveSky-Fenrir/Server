@@ -37,7 +37,7 @@ public sealed class RerollItemHandler(IRerollItemService rerollItemService, ILog
             switch (result.Outcome)
             {
                 case RerollItemOutcome.Rejected:
-                    zoneSession.Abort(DisconnectReason.Faulted);
+                    session.Send(new RerollItemResponse { Result = 1, Cost = 0, Value = new int[6] });
                     return;
                 case RerollItemOutcome.NoCandidate:
                     session.Send(new RerollItemResponse { Result = 1, Cost = result.Cost, Value = result.Value });

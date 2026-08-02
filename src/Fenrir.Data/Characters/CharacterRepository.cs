@@ -494,6 +494,38 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
+    public async ValueTask UpdateAppearanceAsync(int characterId, byte headType, byte faceType, CancellationToken ct)
+    {
+        // Ref: Server/ts25zone/S04_MyWork03.cpp:3163-3179 -- item 1214 appearance-change scroll.
+        // Updates aHeadType/aFaceType on the character row; no legacy equivalent of a broadcast was active
+        // (the broadcast call is commented out in legacy), so only the DB write + in-memory mirror happen.
+        // fenrir-database-engineer must supply usp_Character_UpdateAppearance (CharacterId, HeadType, FaceType).
+        var sp = new StoredProcedureParametersBuilder("game", "usp_Character_UpdateAppearance", 0)
+            .AddParameter("CharacterId", characterId, SqlDbType.Int)
+            .AddParameter("HeadType", headType, SqlDbType.TinyInt)
+            .AddParameter("FaceType", faceType, SqlDbType.TinyInt)
+            .Build();
+
+        await Db.ExecuteAsync(sp, ct);
+    }
+
+    public async ValueTask UpdateGenderAndAppearanceAsync(int characterId, byte gender, byte headType, byte faceType,
+        CancellationToken ct)
+    {
+        // Ref: Server/ts25zone/S04_MyWork03.cpp:3175-3193 -- item 1171 gender scroll.
+        // Updates aGender, aHeadType, aFaceType on the character row; no broadcast (commented out in legacy).
+        // fenrir-database-engineer must supply usp_Character_UpdateGenderAndAppearance
+        // (CharacterId, Gender, HeadType, FaceType).
+        var sp = new StoredProcedureParametersBuilder("game", "usp_Character_UpdateGenderAndAppearance", 0)
+            .AddParameter("CharacterId", characterId, SqlDbType.Int)
+            .AddParameter("Gender", gender, SqlDbType.TinyInt)
+            .AddParameter("HeadType", headType, SqlDbType.TinyInt)
+            .AddParameter("FaceType", faceType, SqlDbType.TinyInt)
+            .Build();
+
+        await Db.ExecuteAsync(sp, ct);
+    }
+
     public async ValueTask SetAutoHuntAsync(int characterId, bool enabled, byte[] config, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_SetAutoHunt", 0)

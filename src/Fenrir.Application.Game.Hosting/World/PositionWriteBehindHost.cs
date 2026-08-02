@@ -159,7 +159,13 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
                 InventoryDate: state.InventoryDate,
                 StoreDate: state.StoreDate,
                 WarriorPill: state.WarriorPill,
-                WarriorScroll: state.WarriorScroll);
+                WarriorScroll: state.WarriorScroll,
+                SilverTime: state.SilverTime,
+                GoldTime: state.GoldTime,
+                DoubleKillNumTime: state.DoubleKillNumTime,
+                DoubleKillExpTime: state.DoubleKillExpTime,
+                DoubleKillNumTime2: state.DoubleKillNumTime2,
+                ProtectForDeath: state.ProtectForDeath);
 
             var positionRow = new CharacterPositionTvp(characterId, state.FlushSequence, state.MapId, state.PosX,
                 state.PosY, state.PosZ, state.Heading);

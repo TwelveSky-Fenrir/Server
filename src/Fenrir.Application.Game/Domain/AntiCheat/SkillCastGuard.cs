@@ -48,6 +48,9 @@ public static class SkillCastGuard
         if (context.SkillCategoryCode is not (HotkeyBoundCategoryCode or SkillEffectCategoryCode))
             return SkillCastVerdict.Passed;
 
+        if (context.ClaimedSkillNumber == 0)
+            return SkillCastVerdict.Passed;
+
         var isAutoLearnedBranch = context.SkillCategoryCode == SkillEffectCategoryCode && context.IsAutoState;
 
         if (isAutoLearnedBranch)
@@ -60,7 +63,7 @@ public static class SkillCastGuard
             return new SkillCastVerdict(SkillCastOffense.HotkeyMismatch, SkillCastEnforcement.Disconnect);
         }
 
-        if (context.ClaimedBonusGrade != context.ServerBonusGrade)
+        if (context.ClaimedBonusGrade > context.ServerBonusGrade)
         {
             var enforcement = context.SkillCategoryCode == HotkeyBoundCategoryCode
                 ? SkillCastEnforcement.Disconnect

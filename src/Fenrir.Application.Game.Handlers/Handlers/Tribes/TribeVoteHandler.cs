@@ -23,9 +23,8 @@ public sealed class TribeVoteHandler(ITribeVoteService voteService, ILogger<Trib
         if (packet.Sort is not (1 or 3) || packet.Value is < 0 or >= SlotCount)
         {
             logger?.LogWarning(
-                "Session {SessionId}: CZ_TRIBE_VOTE_SEND malformed (sort {Sort}, value {Value}) -- aborting",
+                "Session {SessionId}: CZ_TRIBE_VOTE_SEND malformed (sort {Sort}, value {Value}) -- ignoring",
                 session.SessionId, packet.Sort, packet.Value);
-            zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 
@@ -50,7 +49,6 @@ public sealed class TribeVoteHandler(ITribeVoteService voteService, ILogger<Trib
                     { Result = result.Result, Sort = packet.Sort, Value = packet.Value });
                 return;
             default:
-                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
         }
     }

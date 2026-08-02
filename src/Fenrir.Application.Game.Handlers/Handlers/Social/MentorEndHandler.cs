@@ -27,10 +27,7 @@ public sealed class MentorEndHandler(IMentorEndService mentorEndService, ILogger
         var result = await mentorEndService.EndAsync(state, cancellationToken);
 
         if (result.Kind == MentorEndResultKind.NotBonded)
-        {
-            zoneSession.Abort(DisconnectReason.Faulted);
             return;
-        }
 
         session.Send(new MentorEndResponse());
     }

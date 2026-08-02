@@ -26,10 +26,9 @@ public sealed class FishingLineHandler(IFishingLineService fishingLineService, I
 
         if (zone.MapId != FishingZoneNumber)
         {
-            logger.LogWarning(
-                "Fishing-line request rejected for character {CharacterId}: map {MapId} is not the fishing zone -- aborting session",
+            logger.LogDebug(
+                "Fishing-line request ignored for character {CharacterId}: map {MapId} is not the fishing zone",
                 characterId, zone.MapId);
-            zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 
@@ -48,9 +47,8 @@ public sealed class FishingLineHandler(IFishingLineService fishingLineService, I
                 break;
             default:
                 logger.LogWarning(
-                    "Fishing-line request rejected for character {CharacterId}: invalid sort {Sort} -- aborting session",
+                    "Fishing-line request ignored for character {CharacterId}: invalid sort {Sort}",
                     characterId, packet.Sort);
-                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
         }
 

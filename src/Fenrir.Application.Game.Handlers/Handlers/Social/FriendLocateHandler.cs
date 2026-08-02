@@ -31,7 +31,6 @@ public sealed class FriendLocateHandler(IFriendService friendService, ILogger<Fr
             case FriendLocateResultKind.IndexOutOfRange:
                 return;
             case FriendLocateResultKind.SlotEmpty:
-                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             case FriendLocateResultKind.Found:
                 session.Send(new FriendLocateResponse { Index = packet.Index, ZoneNumber = result.ZoneNumber });

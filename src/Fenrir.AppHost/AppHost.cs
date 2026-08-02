@@ -10,7 +10,6 @@ var sqlPassword = builder.AddParameter("sql-password", true);
 const int zoneBasePort = 1100;
 
 const int maxZoneNumber = 349;
-const int sqlHostPort = 14330;
 
 var gamePublicHost = Environment.GetEnvironmentVariable("FENRIR_PUBLIC_HOST") is { Length: > 0 } configuredHost
     ? configuredHost
@@ -21,9 +20,10 @@ Console.WriteLine(
 
 var sql = builder.AddSqlServer("sqlserver", sqlPassword)
     .WithImageTag("2025-latest")
-    .WithHostPort(sqlHostPort)
     .WithDataVolume("fenrir-sql-data")
-    .WithLifetime(ContainerLifetime.Persistent);
+    .WithLifetime(ContainerLifetime.Persistent)
+    .WithEnvironment("ACCEPT_EULA", "Y")
+    .WithEnvironment("MSSQL_PID", "Developer");
 
 var fenrirDb = sql.AddDatabase("FenrirDb");
 
@@ -39,7 +39,7 @@ builder.AddProject<Fenrir_LoginServer>("login-server", launchProfileName: null)
     .WithEnvironment("Login__Port", loginPort.ToString())
     .WithEnvironment("Login__ZoneBasePort", zoneBasePort.ToString());
 
-var reservedPorts = string.Join(',', new[] { loginPort, sqlHostPort });
+var reservedPorts = loginPort.ToString();
 
 byte[] shardIds = [1];
 

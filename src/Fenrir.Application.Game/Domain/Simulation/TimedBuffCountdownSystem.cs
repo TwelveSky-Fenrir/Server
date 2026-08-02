@@ -64,6 +64,14 @@ public sealed class TimedBuffCountdownSystem : ISimulationSystem
         state.CriBoost = TickTimer(state, 48, state.CriBoost, minutesElapsed);
         state.WarriorPill = TickTimer(state, 91, state.WarriorPill, minutesElapsed);
         state.WarriorScroll = TickTimer(state, 87, state.WarriorScroll, minutesElapsed);
+        state.SilverTime = TickTimer(state, 90, state.SilverTime, minutesElapsed);
+        state.GoldTime = TickTimer(state, 101, state.GoldTime, minutesElapsed);
+        // TODO(fenrir-gameplay-domain-engineer): Sort codes for DoubleKillNumTime and DoubleKillExpTime countdown
+        // broadcasts are not confirmed from legacy (B_AVATAR_CHANGE_INFO_2 calls in S04_MyWork03.cpp / S07_MyGame02.cpp).
+        // Replace the placeholder values 28 / 29 with the real sort codes once verified by cpp-ts25-explorer.
+        // Réf. legacy fields: aDoubleKillNumTime, aDoubleKillExpTime — Server/ts25zone/S04_MyWork03.cpp.
+        state.DoubleKillNumTime = TickTimer(state, 28, state.DoubleKillNumTime, minutesElapsed);
+        state.DoubleKillExpTime = TickTimer(state, 29, state.DoubleKillExpTime, minutesElapsed);
     }
 
     private static void TickPaidZones(Zone zone, PlayerRuntimeState state, int minutesElapsed, long nowUnixSeconds)

@@ -214,11 +214,17 @@ public sealed partial class Zone
             TowerCpMilestoneCounter = data.TowerCpMilestoneCounter,
             WarriorPill = data.WarriorPill,
             WarriorScroll = data.WarriorScroll,
+            SilverTime = data.SilverTime,
+            GoldTime = data.GoldTime,
+            DoubleKillNumTime = data.DoubleKillNumTime,
+            DoubleKillExpTime = data.DoubleKillExpTime,
+            DoubleKillNumTime2 = data.DoubleKillNumTime2,
             M15PetLuckyBoxPity = data.M15PetLuckyBoxPity,
             VisibleState = data.VisibleState,
             SpecialState = data.SpecialState,
             UseOrnament = data.UseOrnament,
-            SourceIp = data.SourceIp
+            SourceIp = data.SourceIp,
+            ProtectForDeath = data.ProtectForDeath
         };
 
         state.ResetVolatileAntiCheatCountersOnEntry(_clock);
@@ -607,7 +613,7 @@ public sealed partial class Zone
         state.IsDead = true;
         state.TicksSinceDeath = 0;
 
-        state.ReviveHackFlag = cause != DeathCause.Duel;
+        state.ReviveHackFlag = true;
         state.CanUseConsumables = false;
         state.DeathSubCounter = ReviveEligibilityRules.DeathSubCounterBaseline;
 
@@ -708,22 +714,53 @@ public sealed partial class Zone
         {
             case < ExperienceFormulas.MinimumLevelForDeathExperienceLoss:
                 return;
+
             case >= ExperienceFormulas.MaxLimitLevel:
-                state.ContributionPoints -= ExperienceFormulas.CpLossAtLevelCap;
-                state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
-                state.Session.Send(new AvatarStatUpdateResponse
-                    { Sort = ContributionPointStatSort, Value = state.ContributionPoints, Value2 = 0 });
-                QueueDeathEventLog(DeathExperienceLossEventCode, state.CharacterId, ContributionPointsLossOutcome,
-                    $"Kind=ContributionPoints;Loss={ExperienceFormulas.CpLossAtLevelCap};Level={state.Level}");
+                // Level-cap path: no EXP loss. Shield absorbs the CP penalty if available;
+                // otherwise 10 CP are deducted.
+                // Ref: Server/ts25zone/S07_MyGame02.cpp:2921-2964 (aProtectForDeath guard at level cap).
+                if (state.ProtectForDeath > 0)
+                {
+                    state.ProtectForDeath--;
+                    state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+                    QueueDeathEventLog(DeathExperienceLossEventCode, state.CharacterId,
+                        ContributionPointsLossOutcome,
+                        $"Kind=DeathShield;RemainingStacks={state.ProtectForDeath};Level={state.Level}");
+                }
+                else
+                {
+                    state.ContributionPoints -= ExperienceFormulas.CpLossAtLevelCap;
+                    state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+                    state.Session.Send(new AvatarStatUpdateResponse
+                        { Sort = ContributionPointStatSort, Value = state.ContributionPoints, Value2 = 0 });
+                    QueueDeathEventLog(DeathExperienceLossEventCode, state.CharacterId,
+                        ContributionPointsLossOutcome,
+                        $"Kind=ContributionPoints;Loss={ExperienceFormulas.CpLossAtLevelCap};Level={state.Level}");
+                }
+
                 return;
         }
 
         if (!worldData.LevelsByLevel.TryGetValue(state.Level, out var levelRow))
             return;
 
+        // Both ratio params default to 1.0f; when per-character/server-wide EXP-down modifiers are
+        // wired in, thread them here instead of the defaults.
+        // Ref: Server/ts25zone/S07_MyGame02.cpp:2921-2964 (mGeneralExpDownRatio, mGAME.mGeneralExpDownRatio).
         var loss = ExperienceFormulas.ComputeDeathExperienceLoss(state.Experience, levelRow.ExpRangeMin);
         if (loss <= 0)
             return;
+
+        // Shield absorbs EXP loss: decrement one stack instead of deducting EXP.
+        // Ref: Server/ts25zone/S07_MyGame02.cpp:2956-2962 (aProtectForDeath > 0 branch).
+        if (state.ProtectForDeath > 0)
+        {
+            state.ProtectForDeath--;
+            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+            QueueDeathEventLog(DeathExperienceLossEventCode, state.CharacterId, ExperienceLossOutcome,
+                $"Kind=DeathShield;RemainingStacks={state.ProtectForDeath};Level={state.Level}");
+            return;
+        }
 
         state.Experience -= loss;
         state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
@@ -1035,8 +1072,28 @@ public sealed partial class Zone
         state.Life = maxLife / 3 + 1;
         state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
 
-        state.Session.Send(new AvatarStatUpdateResponse
-            { Sort = CharacterHpStatSort, Value = state.Life, Value2 = 0 });
+        var response = new AvatarStatUpdateResponse
+            { Sort = CharacterHpStatSort, Value = state.Life, Value2 = 0 };
+
+        var total = FrameWriter.FrameSizeOf<AvatarStatUpdateResponse>();
+        var rented = ArrayPool<byte>.Shared.Rent(total);
+
+        try
+        {
+            var span = rented.AsSpan(0, total);
+            FrameWriter.WriteFrame(in response, span);
+
+            SendRawFrameToRecipient(state.CharacterId, span, state.DungeonInstanceId);
+            _healTargetNeighborScratch.Clear();
+            _grid.NeighborsExcludingSelf(_healTargetNeighborScratch, state.CurrentCell, state.CharacterId,
+                state.PosX, state.PosY, state.PosZ);
+            foreach (var neighborId in _healTargetNeighborScratch)
+                SendRawFrameToRecipient(neighborId, span, state.DungeonInstanceId);
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(rented);
+        }
     }
 
     private void HandlePetAction(int characterId, in ActionInfo action)

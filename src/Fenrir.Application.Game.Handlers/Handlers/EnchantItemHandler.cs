@@ -36,7 +36,7 @@ public sealed class EnchantItemHandler(IEnchantItemService enchantItemService, I
 
             if (result.Outcome == EnchantItemOutcome.Rejected)
             {
-                zoneSession.Abort(DisconnectReason.Faulted);
+                session.Send(new EnchantItemResponse { Result = 1, Cost = 0, Value = 0 });
                 return;
             }
 

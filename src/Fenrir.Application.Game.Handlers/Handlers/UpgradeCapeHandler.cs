@@ -31,8 +31,8 @@ public sealed class UpgradeCapeHandler(IUpgradeCapeService upgradeCapeService, I
             if (result.Outcome != UpgradeCapeOutcome.Applied)
             {
                 logger.LogWarning(
-                    "Cape-upgrade rejected for character {CharacterId} -- aborting session", characterId);
-                zoneSession.Abort(DisconnectReason.Faulted);
+                    "Cape-upgrade rejected for character {CharacterId}", characterId);
+                session.Send(new UpgradeCapeResponse { Result = 1, Value = [0, 0, 0, 0, 0, 0], Padding = 0 });
                 return;
             }
 

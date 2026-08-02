@@ -27,9 +27,8 @@ public sealed class UpdateProxyShopHandler(IUpdateProxyShopService service, ILog
         if (zone.MapId != OpenShopStallHandler.PshopZoneNumber)
         {
             logger.LogWarning(
-                "Update proxy shop rejected: character {CharacterId} is outside the market district (zone {MapId}) -- session will be disconnected",
+                "Update proxy shop rejected: character {CharacterId} is outside the market district (zone {MapId})",
                 characterId, zone.MapId);
-            zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 
@@ -37,9 +36,8 @@ public sealed class UpdateProxyShopHandler(IUpdateProxyShopService service, ILog
         if (validation.Abort)
         {
             logger.LogWarning(
-                "Update proxy shop rejected: character {CharacterId} request failed structural validation -- session will be disconnected",
+                "Update proxy shop rejected: character {CharacterId} request failed structural validation",
                 characterId);
-            zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 
@@ -55,9 +53,8 @@ public sealed class UpdateProxyShopHandler(IUpdateProxyShopService service, ILog
             if (result is null)
             {
                 logger.LogWarning(
-                    "Update proxy shop rejected: character {CharacterId} buySort {BuySort} failed structural validation post-lock -- session will be disconnected",
+                    "Update proxy shop rejected: character {CharacterId} buySort {BuySort} failed structural validation post-lock",
                     characterId, packet.BuySort);
-                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             }
 

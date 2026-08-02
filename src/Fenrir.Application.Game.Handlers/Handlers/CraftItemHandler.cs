@@ -44,7 +44,7 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService, ILogger
 
                     if (result.Outcome != JadeUpgradeOutcome.Applied)
                     {
-                        zoneSession.Abort(DisconnectReason.Faulted);
+                        session.Send(new CraftItemResponse { Result = 1, Value = [0, 0, 0, 0, 0, 0] });
                         return;
                     }
 
@@ -61,7 +61,7 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService, ILogger
 
                     if (result.Outcome == AdvancedElixirOutcome.Rejected)
                     {
-                        zoneSession.Abort(DisconnectReason.Faulted);
+                        session.Send(new CraftItemResponse { Result = 1, Value = [0, 0, 0, 0, 0, 0] });
                         return;
                     }
 
@@ -98,7 +98,7 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService, ILogger
 
                     if (!result.Applied)
                     {
-                        zoneSession.Abort(DisconnectReason.Faulted);
+                        session.Send(new CraftItemResponse { Result = 1, Value = [0, 0, 0, 0, 0, 0] });
                         return;
                     }
 
@@ -113,7 +113,7 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService, ILogger
 
                     if (!result.Applied)
                     {
-                        zoneSession.Abort(DisconnectReason.Faulted);
+                        session.Send(new CraftItemResponse { Result = 1, Value = [0, 0, 0, 0, 0, 0] });
                         return;
                     }
 
@@ -127,7 +127,7 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService, ILogger
 
                     if (!result.Applied)
                     {
-                        zoneSession.Abort(DisconnectReason.Faulted);
+                        session.Send(new CraftItemResponse { Result = 1, Value = [0, 0, 0, 0, 0, 0] });
                         return;
                     }
 
@@ -142,7 +142,7 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService, ILogger
 
                     if (!result.Applied)
                     {
-                        zoneSession.Abort(DisconnectReason.Faulted);
+                        session.Send(new CraftItemResponse { Result = 1, Value = [0, 0, 0, 0, 0, 0] });
                         return;
                     }
 
@@ -157,7 +157,7 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService, ILogger
 
                     if (!result.Applied)
                     {
-                        zoneSession.Abort(DisconnectReason.Faulted);
+                        session.Send(new CraftItemResponse { Result = 1, Value = [0, 0, 0, 0, 0, 0] });
                         return;
                     }
 
@@ -172,7 +172,7 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService, ILogger
 
                     if (!result.Applied)
                     {
-                        zoneSession.Abort(DisconnectReason.Faulted);
+                        session.Send(new CraftItemResponse { Result = 1, Value = [0, 0, 0, 0, 0, 0] });
                         return;
                     }
 
@@ -190,7 +190,7 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService, ILogger
 
                     if (!result.Applied)
                     {
-                        zoneSession.Abort(DisconnectReason.Faulted);
+                        session.Send(new CraftItemResponse { Result = 1, Value = [0, 0, 0, 0, 0, 0] });
                         return;
                     }
 
@@ -204,9 +204,8 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService, ILogger
                 }
                 default:
                     logger.LogInformation(
-                        "Session {SessionId} character {CharacterId}: CraftItemRequest aborted, unrecognized recipe sort {Sort}",
+                        "Session {SessionId} character {CharacterId}: CraftItemRequest ignored, unrecognized recipe sort {Sort}",
                         zoneSession.SessionId, characterId, packet.Sort);
-                    zoneSession.Abort(DisconnectReason.Faulted);
                     return;
             }
         }

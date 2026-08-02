@@ -61,8 +61,7 @@ public static class HotkeyActionResolver
         None,
         InvalidPage,
         InvalidIndex,
-        AlreadyEmpty,
-        ItemBindingNotSupported
+        ItemSlotRequiresWithdraw
     }
 
     public enum WithdrawItemFailure
@@ -160,11 +159,8 @@ public static class HotkeyActionResolver
         if (!IsValidIndex(index))
             return UnbindResult.Fail(UnbindFailure.InvalidIndex);
 
-        if (slot.IsEmpty)
-            return UnbindResult.Fail(UnbindFailure.AlreadyEmpty);
-
         if (slot.Kind == HotkeyBindingKind.Item)
-            return UnbindResult.Fail(UnbindFailure.ItemBindingNotSupported);
+            return UnbindResult.Fail(UnbindFailure.ItemSlotRequiresWithdraw);
 
         return UnbindResult.Succeeded;
     }

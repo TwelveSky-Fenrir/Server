@@ -48,7 +48,6 @@ public static class SkillCatalog
             SkillValueKind.StunDefense => grade.StunDefense,
             SkillValueKind.FastRunSpeed => grade.FastRunSpeed,
             SkillValueKind.AttackPowerRatio => grade.AttackInfo1,
-            // See ElementAttackPowerRatio note in SkillValueKind.cs -- intentionally unconsumed, legacy dead code
             SkillValueKind.ElementAttackPowerRatio => grade.AttackInfo2,
             SkillValueKind.AttackInfo3 => grade.AttackInfo3,
             SkillValueKind.RunTime => grade.RunTime,

@@ -29,10 +29,9 @@ public sealed class AutoHuntToggleHandler(
 
         if (result.Aborted)
         {
-            logger.LogWarning(
-                "Auto-hunt toggle rejected for character {CharacterId} on map {MapId}: sort {Sort} -- aborting session",
+            logger.LogDebug(
+                "Auto-hunt toggle rejected for character {CharacterId} on map {MapId}: sort {Sort} (zone blocked, missing weapon/skill, or invalid config)",
                 characterId, zone.MapId, packet.Sort);
-            zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 

@@ -38,7 +38,7 @@ public sealed class DestroyItemHandler(IDestroyItemService destroyItemService, I
 
             if (result.Outcome != DestroyItemOutcome.Applied)
             {
-                zoneSession.Abort(DisconnectReason.Faulted);
+                session.Send(new DestroyItemResponse { Result = 1, Money = 0, Value = [0, 0, 0, 0, 0, 0] });
                 return;
             }
 

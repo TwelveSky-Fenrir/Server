@@ -77,7 +77,7 @@ public static class HotkeyItemConsumptionResolver
             return Result.DisconnectResult;
 
         if (slot.Kind != HotkeyBindingKind.Item)
-            return Result.DisconnectResult;
+            return Result.RejectedCleanResult;
 
         if (isStunned || isDead)
             return Result.RejectedCleanResult;
@@ -169,7 +169,7 @@ public static class HotkeyItemConsumptionResolver
             }
 
             default:
-                return Result.DisconnectResult;
+                return Result.RejectedCleanResult;
         }
     }
 

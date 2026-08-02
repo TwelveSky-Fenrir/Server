@@ -14,9 +14,9 @@ public sealed partial class PlayerRuntimeState
 
     public required byte Tribe { get; set; }
 
-    public required byte Gender { get; init; }
-    public required byte HeadType { get; init; }
-    public required byte FaceType { get; init; }
+    public required byte Gender { get; set; }
+    public required byte HeadType { get; set; }
+    public required byte FaceType { get; set; }
 
     public required short Level { get; set; }
 

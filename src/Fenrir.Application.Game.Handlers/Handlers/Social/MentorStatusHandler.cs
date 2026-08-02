@@ -28,7 +28,6 @@ public sealed class MentorStatusHandler(IMentorStatusService mentorStatusService
         switch (result.Kind)
         {
             case MentorStatusResultKind.NoPartner:
-                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             case MentorStatusResultKind.PartnerNotInZone:
                 return;

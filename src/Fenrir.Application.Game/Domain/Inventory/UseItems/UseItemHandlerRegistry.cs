@@ -24,15 +24,18 @@ public sealed class UseItemHandlerRegistry
         IvyHallTicketUseItemHandler ivyHallTicket,
         LuckyTicketUseItemHandler luckyTicket,
         ScrollOfSeekersUseItemHandler scrollOfSeekers,
-        CostumeStellarCoreUseItemHandler costumeStellarCore)
+        SkillBoxUseItemHandler skillBox,
+        CostumeStellarCoreUseItemHandler costumeStellarCore,
+        MultiItemCreateUseItemHandler multiItemCreate)
     {
         var byId = new Dictionary<int, IUseItemHandler>
         {
             [TitleUpgradeUseItemHandler.ItemId] = titleUpgrade,
-            [PalaceRankUpgradeUseItemHandler.ItemId] = palaceRank,
             [ForcedNeutralTribeResetUseItemHandler.ItemId] = forcedNeutralTribeReset,
             [DungeonKeyUseItemHandler.ItemId] = dungeonKey
         };
+        foreach (var id in PalaceRankUpgradeUseItemHandler.HandledItemIds)
+            byId[id] = palaceRank;
         foreach (var id in TitleRemoveScrollUseItemHandler.HandledItemIds)
             byId[id] = titleRemoveScroll;
         foreach (var id in TribeScrollTransferUseItemHandler.HandledItemIds)
@@ -49,6 +52,10 @@ public sealed class UseItemHandlerRegistry
             byId[id] = luckyTicket;
         foreach (var id in ScrollOfSeekersUseItemHandler.HandledItemIds)
             byId[id] = scrollOfSeekers;
+        foreach (var id in SkillBoxUseItemHandler.HandledItemIds)
+            byId[id] = skillBox;
+        foreach (var id in MultiItemCreateUseItemHandler.HandledItemIds)
+            byId[id] = multiItemCreate;
         _byId = byId.ToFrozenDictionary();
         _equipSwap = equipSwap;
         _costumeStellarCore = costumeStellarCore;

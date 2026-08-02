@@ -155,7 +155,9 @@ public static class DomainServiceCollectionExtensions
         services.AddSingleton<IvyHallTicketUseItemHandler>();
         services.AddSingleton<LuckyTicketUseItemHandler>();
         services.AddSingleton<ScrollOfSeekersUseItemHandler>();
+        services.AddSingleton<SkillBoxUseItemHandler>();
         services.AddSingleton<CostumeStellarCoreUseItemHandler>();
+        services.AddSingleton<MultiItemCreateUseItemHandler>();
         services.AddSingleton<UseItemHandlerRegistry>();
 
         return services;

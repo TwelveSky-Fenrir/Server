@@ -40,7 +40,7 @@ public sealed class DowngradeItemRankHandler(
             switch (result.Outcome)
             {
                 case DowngradeItemRankOutcome.Rejected:
-                    zoneSession.Abort(DisconnectReason.Faulted);
+                    session.Send(new DowngradeItemRankResponse { Result = 1, Cost = 0, Value = new int[6] });
                     return;
                 case DowngradeItemRankOutcome.NoCandidate:
                     session.Send(new DowngradeItemRankResponse

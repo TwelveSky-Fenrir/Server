@@ -28,10 +28,9 @@ public sealed class MountAbsorbHandler(IMountAbsorbService service, ILogger<Moun
             case 1:
                 if (!service.TryAbsorb(zone, state, characterId))
                 {
-                    logger.LogWarning(
-                        "Mount-absorb rejected for character {CharacterId}: absorb not available -- aborting session",
+                    logger.LogDebug(
+                        "Mount-absorb ignored for character {CharacterId}: absorb not available (not mounted, or absorb time depleted)",
                         characterId);
-                    zoneSession.Abort(DisconnectReason.Faulted);
                     return;
                 }
 
@@ -45,9 +44,8 @@ public sealed class MountAbsorbHandler(IMountAbsorbService service, ILogger<Moun
 
             default:
                 logger.LogWarning(
-                    "Mount-absorb rejected for character {CharacterId}: invalid sort {Sort} -- aborting session",
+                    "Mount-absorb ignored for character {CharacterId}: invalid sort {Sort}",
                     characterId, packet.Sort);
-                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
         }
     }

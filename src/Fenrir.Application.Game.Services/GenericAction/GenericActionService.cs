@@ -254,9 +254,9 @@ public sealed class GenericActionService(
         if (dragDropOutcome != InventoryEquipDragDropTransferGate.Outcome.Valid)
         {
             logger.LogInformation(
-                "Character {CharacterId} container-move aborted: {DragDropOutcome} (sort {Sort}, {Page1}:{Index1} -> {Page2}:{Index2})",
+                "Character {CharacterId} container-move rejected: {DragDropOutcome} (sort {Sort}, {Page1}:{Index1} -> {Page2}:{Index2})",
                 characterId, dragDropOutcome, sort, move.Page1, move.Index1, move.Page2, move.Index2);
-            return GenericActionResult.Aborted;
+            return GenericActionResult.Failed;
         }
 
         if (sort == 208 && !IsInventoryToInventoryRequestValid(move, state.InventoryDate))
@@ -265,7 +265,7 @@ public sealed class GenericActionService(
                 "Character {CharacterId} container-move aborted: inventory-to-inventory gate ({Page1}:{Index1} -> {Page2}:{Index2}, grid {XPost2},{YPost2}, InventoryDate {InventoryDate})",
                 characterId, move.Page1, move.Index1, move.Page2, move.Index2, move.XPost2, move.YPost2,
                 state.InventoryDate);
-            return GenericActionResult.Aborted;
+            return GenericActionResult.Failed;
         }
 
         var isInventoryToEquip = sort == 210;
@@ -276,7 +276,7 @@ public sealed class GenericActionService(
             logger.LogDebug(
                 "Character {CharacterId} container-move rejected: unresolvable containers (sort {Sort}, page1 {Page1}, page2 {Page2})",
                 characterId, sort, move.Page1, move.Page2);
-            return isInventoryToEquip ? GenericActionResult.Aborted : GenericActionResult.Failed;
+            return GenericActionResult.Failed;
         }
 
         if (isInventoryToEquip && state.ActionSort != IdleActionSort)
@@ -299,7 +299,7 @@ public sealed class GenericActionService(
             logger.LogInformation(
                 "Character {CharacterId} container-move rejected: source slot empty ({FromContainer}:{Index1})",
                 characterId, fromContainer, move.Index1);
-            return isInventoryToEquip ? GenericActionResult.Aborted : GenericActionResult.Failed;
+            return GenericActionResult.Failed;
         }
 
         var touchesEquipment = toContainer == ContainerMatrix.Equipment || fromContainer == ContainerMatrix.Equipment;
@@ -325,7 +325,7 @@ public sealed class GenericActionService(
                 logger.LogInformation(
                     "Character {CharacterId} equip rejected by validation gate: outcome {EquipOutcome}, item {ItemId}",
                     characterId, equipOutcome, sourceItem.ItemId);
-                return GenericActionResult.Aborted;
+                return GenericActionResult.Failed;
             }
         }
 
@@ -342,7 +342,7 @@ public sealed class GenericActionService(
             logger.LogInformation(
                 "Character {CharacterId} container-move rejected by policy (sort {Sort}, {FromContainer}:{Index1} -> {ToContainer}:{Index2})",
                 characterId, sort, fromContainer, move.Index1, toContainer, move.Index2);
-            return isInventoryToEquip ? GenericActionResult.Aborted : GenericActionResult.Failed;
+            return GenericActionResult.Failed;
         }
 
         if (resolved.Outcome == ContainerMatrix.MoveOutcome.NoOp)
@@ -576,7 +576,7 @@ public sealed class GenericActionService(
             logger.LogInformation(
                 "Character {CharacterId} skill-learn aborted: NPC {NpcId} unavailable/out of range", characterId,
                 request.NpcId);
-            return GenericActionResult.Aborted;
+            return GenericActionResult.Failed;
         }
 
         worldData.SkillsById.TryGetValue(request.SkillId, out var skillDefinition);
@@ -589,7 +589,7 @@ public sealed class GenericActionService(
             logger.LogInformation(
                 "Character {CharacterId} skill-learn aborted by resolver (skill {SkillId}, skillPoints {SkillPoints})",
                 characterId, request.SkillId, state.SkillPoints);
-            return GenericActionResult.Aborted;
+            return GenericActionResult.Failed;
         }
 
         var learned = new LearnedSkill(request.SkillId, result.Cost);
@@ -633,7 +633,7 @@ public sealed class GenericActionService(
             logger.LogInformation(
                 "Character {CharacterId} skill-upgrade aborted by resolver (slot {SkillIndex}, skillPoints {SkillPoints})",
                 characterId, request.SkillIndex, state.SkillPoints);
-            return GenericActionResult.Aborted;
+            return GenericActionResult.Failed;
         }
 
         var slot = (byte)request.SkillIndex;
@@ -666,7 +666,7 @@ public sealed class GenericActionService(
             logger.LogInformation(
                 "Character {CharacterId} NPC-shop-sell aborted: shop unavailable (zone {MapId})", characterId,
                 zone.MapId);
-            return GenericActionResult.Aborted;
+            return GenericActionResult.Failed;
         }
 
         var page1 = move.Page1;
@@ -678,7 +678,7 @@ public sealed class GenericActionService(
             logger.LogInformation(
                 "Character {CharacterId} NPC-shop-sell aborted: invalid slot ({Page1}:{Index1})", characterId,
                 page1, index1);
-            return GenericActionResult.Aborted;
+            return GenericActionResult.Failed;
         }
 
         if (page1 == ContainerMatrix.InventoryPage1 && state.InventoryDate < GameDate.Today())
@@ -686,7 +686,7 @@ public sealed class GenericActionService(
             logger.LogInformation(
                 "Character {CharacterId} NPC-shop-sell aborted: dated-vault last page expired (InventoryDate {InventoryDate})",
                 characterId, state.InventoryDate);
-            return GenericActionResult.Aborted;
+            return GenericActionResult.Failed;
         }
 
         var sourceStack = state.Inventory.GetSlot((byte)page1, (byte)index1);
@@ -694,7 +694,7 @@ public sealed class GenericActionService(
         {
             logger.LogInformation(
                 "Character {CharacterId} NPC-shop-sell aborted: source slot empty/unresolvable", characterId);
-            return GenericActionResult.Aborted;
+            return GenericActionResult.Failed;
         }
 
         var resolved = NpcShopPolicy.ResolveSell(itemDefinition, source, move.Quantity1);
@@ -703,7 +703,7 @@ public sealed class GenericActionService(
             logger.LogInformation(
                 "Character {CharacterId} NPC-shop-sell aborted by resolver (item {ItemId} x{Quantity})",
                 characterId, source.ItemId, move.Quantity1);
-            return GenericActionResult.Aborted;
+            return GenericActionResult.Failed;
         }
 
         var currentContainer = state.Inventory.GetContainer((byte)page1);
@@ -728,7 +728,7 @@ public sealed class GenericActionService(
             logger.LogWarning(ex,
                 "Character {CharacterId} NPC-shop-sell AdjustMoneyAndReplaceContainerAsync failed (treated as money-cap breach)",
                 characterId);
-            return GenericActionResult.Aborted;
+            return GenericActionResult.Failed;
         }
 
         var containers = ImmutableArray.Create(new InventoryContainerSnapshot((byte)page1, projectedContainer));
@@ -756,7 +756,7 @@ public sealed class GenericActionService(
             logger.LogInformation(
                 "Character {CharacterId} NPC-shop-buy aborted: shop unavailable (zone {MapId})", characterId,
                 zone.MapId);
-            return GenericActionResult.Aborted;
+            return GenericActionResult.Failed;
         }
 
         if (!worldData.NpcsById.TryGetValue(move.Page1, out var npc) ||
@@ -765,7 +765,7 @@ public sealed class GenericActionService(
             logger.LogInformation(
                 "Character {CharacterId} NPC-shop-buy aborted: NPC {NpcId} or item {ItemId} not found", characterId,
                 move.Page1, move.Index1);
-            return GenericActionResult.Aborted;
+            return GenericActionResult.Failed;
         }
 
         var page2 = move.Page2;
@@ -777,7 +777,7 @@ public sealed class GenericActionService(
             logger.LogInformation(
                 "Character {CharacterId} NPC-shop-buy aborted: invalid destination slot ({Page2}:{Index2})",
                 characterId, page2, index2);
-            return GenericActionResult.Aborted;
+            return GenericActionResult.Failed;
         }
 
         if (page2 == ContainerMatrix.InventoryPage1 && state.InventoryDate < GameDate.Today())
@@ -785,7 +785,7 @@ public sealed class GenericActionService(
             logger.LogInformation(
                 "Character {CharacterId} NPC-shop-buy aborted: dated-vault last page expired (InventoryDate {InventoryDate})",
                 characterId, state.InventoryDate);
-            return GenericActionResult.Aborted;
+            return GenericActionResult.Failed;
         }
 
         var destinationSlot = state.Inventory.GetSlot((byte)page2, (byte)index2);
@@ -801,7 +801,7 @@ public sealed class GenericActionService(
                     logger.LogInformation(
                         "Character {CharacterId} NPC-shop-buy aborted by War-Point routing (NPC {NpcId}, item {ItemId})",
                         characterId, move.Page1, move.Index1);
-                    return GenericActionResult.Aborted;
+                    return GenericActionResult.Failed;
 
                 case WarPointBuyStatus.SoftRejected:
                     logger.LogInformation(
@@ -825,7 +825,7 @@ public sealed class GenericActionService(
             logger.LogInformation(
                 "Character {CharacterId} NPC-shop-buy rejected by resolver (item {ItemId} x{Quantity}, cleanFailure={IsCleanFailure})",
                 characterId, move.Index1, move.Quantity1, resolved.IsCleanFailure);
-            return resolved.IsCleanFailure ? GenericActionResult.Failed : GenericActionResult.Aborted;
+            return GenericActionResult.Failed;
         }
 
         var projectedContainer = state.Inventory.GetContainer((byte)page2)
@@ -850,7 +850,7 @@ public sealed class GenericActionService(
             logger.LogWarning(ex,
                 "Character {CharacterId} NPC-shop-buy aborted: AdjustMoneyAndReplaceContainerAsync failed (insufficient funds)",
                 characterId);
-            return GenericActionResult.Aborted;
+            return GenericActionResult.Failed;
         }
 
         var containers = ImmutableArray.Create(new InventoryContainerSnapshot((byte)page2, projectedContainer));
@@ -1378,7 +1378,7 @@ public sealed class GenericActionService(
             logger.LogInformation(
                 "Character {CharacterId} stat-point allocation aborted: illegal category or unaffordable amount (statSort {StatSort}, addValue {AddValue}, available {StatPoints})",
                 characterId, statSort, addValue, state.StatPoints);
-            return GenericActionResult.Aborted;
+            return GenericActionResult.Failed;
         }
 
         var newVit = state.StatVit + (resolved.Stat == StatAllocationResolver.BaseStat.Vitality ? resolved.Amount : 0);
@@ -1482,7 +1482,7 @@ public sealed class GenericActionService(
             logger.LogInformation(
                 "Character {CharacterId} Merit-to-CP exchange aborted: {Outcome} (requestedUnits {RequestedUnits}, level {Level}, teacherPoint {TeacherPoint})",
                 characterId, outcome, requestedUnits, state.Level, state.TeacherPoint);
-            return GenericActionResult.Aborted;
+            return GenericActionResult.Failed;
         }
 
         var teacherPointCost = requestedUnits * MeritContributionPointExchangeResolver.TeacherPointCostPerUnit;

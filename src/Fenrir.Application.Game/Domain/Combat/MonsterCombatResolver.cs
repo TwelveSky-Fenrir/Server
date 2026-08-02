@@ -36,9 +36,6 @@ public static class MonsterCombatResolver
             return AttackOutcome.Reject(AttackRejectReason.AttackerDead);
         if (monster.Life < 1)
             return AttackOutcome.Reject(AttackRejectReason.DefenderDead);
-        if (attacker.ZoneEntryAtZoneClock is { } attackerZoneEntry &&
-            zoneClock - attackerZoneEntry < CombatResolver.ProtectDuration)
-            return AttackOutcome.Reject(AttackRejectReason.AttackerProtected);
 
         if (!string.IsNullOrEmpty(monster.OwnerName) &&
             !string.Equals(monster.OwnerName, attacker.Name, StringComparison.Ordinal))

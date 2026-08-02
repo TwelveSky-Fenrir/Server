@@ -34,9 +34,9 @@ public sealed class HotkeyActionService(
         if (!resolved.Success)
         {
             logger.LogInformation(
-                "Character {CharacterId} hotkey-bind-skill disconnect: resolver rejected ({Failure})",
+                "Character {CharacterId} hotkey-bind-skill failed: resolver rejected ({Failure})",
                 characterId, resolved.Failure);
-            return GenericActionResult.Aborted;
+            return GenericActionResult.Failed;
         }
 
         await PersistAndMirrorSingleSlotAsync(zone, characterId, (byte)destinationPage, (byte)destinationIndex,
@@ -61,9 +61,9 @@ public sealed class HotkeyActionService(
         if (!resolved.Success)
         {
             logger.LogInformation(
-                "Character {CharacterId} hotkey-bind-emoticon disconnect: resolver rejected ({Failure})",
+                "Character {CharacterId} hotkey-bind-emoticon failed: resolver rejected ({Failure})",
                 characterId, resolved.Failure);
-            return GenericActionResult.Aborted;
+            return GenericActionResult.Failed;
         }
 
         await PersistAndMirrorSingleSlotAsync(zone, characterId, (byte)destinationPage, (byte)destinationIndex,
@@ -85,9 +85,9 @@ public sealed class HotkeyActionService(
 
         if (!resolved.Success)
         {
-            logger.LogInformation("Character {CharacterId} hotkey-unbind disconnect: resolver rejected ({Failure})",
+            logger.LogInformation("Character {CharacterId} hotkey-unbind failed: resolver rejected ({Failure})",
                 characterId, resolved.Failure);
-            return GenericActionResult.Aborted;
+            return GenericActionResult.Failed;
         }
 
         await PersistAndMirrorSingleSlotAsync(zone, characterId, (byte)page, (byte)index, HotkeySlot.Empty,
@@ -124,9 +124,9 @@ public sealed class HotkeyActionService(
         if (!resolved.Success)
         {
             logger.LogInformation(
-                "Character {CharacterId} hotkey-bind-item disconnect: resolver rejected ({Failure})", characterId,
+                "Character {CharacterId} hotkey-bind-item failed: resolver rejected ({Failure})", characterId,
                 resolved.Failure);
-            return GenericActionResult.Aborted;
+            return GenericActionResult.Failed;
         }
 
         var sourceContainer = (byte)sourcePage;
@@ -175,9 +175,9 @@ public sealed class HotkeyActionService(
         if (!resolved.Success)
         {
             logger.LogInformation(
-                "Character {CharacterId} hotkey-withdraw-item disconnect: resolver rejected ({Failure})",
+                "Character {CharacterId} hotkey-withdraw-item failed: resolver rejected ({Failure})",
                 characterId, resolved.Failure);
-            return GenericActionResult.Aborted;
+            return GenericActionResult.Failed;
         }
 
         var destinationContainer = (byte)destinationPage;
@@ -238,9 +238,9 @@ public sealed class HotkeyActionService(
         if (!resolved.Success)
         {
             logger.LogInformation(
-                "Character {CharacterId} hotkey-rearrange disconnect: resolver rejected ({Failure})", characterId,
+                "Character {CharacterId} hotkey-rearrange failed: resolver rejected ({Failure})", characterId,
                 resolved.Failure);
-            return GenericActionResult.Aborted;
+            return GenericActionResult.Failed;
         }
 
         await characters.UpsertHotkeySlotAsync(characterId, (byte)sourcePage, (byte)sourceIndex,

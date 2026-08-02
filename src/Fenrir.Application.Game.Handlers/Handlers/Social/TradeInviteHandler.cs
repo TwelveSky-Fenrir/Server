@@ -33,7 +33,6 @@ public sealed class TradeInviteHandler(ITradeInviteService tradeInviteService, I
                 session.Send(new TradeAnswerResponse { Answer = 4 });
                 return;
             case TradeInviteResultKind.MustDisconnect:
-                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             case TradeInviteResultKind.AskerBusy:
                 session.Send(new TradeAnswerResponse { Answer = 3 });

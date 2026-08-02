@@ -39,10 +39,7 @@ public sealed class TribeBankHandler(
             };
 
             if (!result.Success)
-            {
-                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
-            }
 
             session.Send(new TribeBankResponse
                 { Result = 0, Sort = result.Sort, TribeBankInfo = result.TribeBankInfo!, Money = result.Money });

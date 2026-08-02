@@ -31,9 +31,8 @@ public sealed class ZoneReadyHandler(IZoneReadyService service, ILogger<ZoneRead
             if (service.Validate(state, packet.Tribe, packet.AutoState) == ZoneReadyOutcome.Rejected)
             {
                 logger?.LogWarning(
-                    "Zone-ready handshake aborted for character {CharacterId} (session {SessionId})",
+                    "Zone-ready handshake rejected for character {CharacterId} (session {SessionId}) -- ignoring (may be stale reconnect state)",
                     characterId, session.SessionId);
-                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             }
         }

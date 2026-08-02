@@ -13,10 +13,7 @@ public sealed class LocalChatHandler(ILocalChatService localChatService) : IInli
         var zoneSession = (IZoneSession)session;
 
         if (ChatRouter.IsContentEmpty(packet.Content))
-        {
-            zoneSession.Abort(DisconnectReason.Faulted);
             return;
-        }
 
         if (zoneSession.CurrentZone is not Zone zone)
             return;

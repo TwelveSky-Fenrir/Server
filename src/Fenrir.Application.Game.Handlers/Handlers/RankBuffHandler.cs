@@ -36,10 +36,9 @@ public sealed class RankBuffHandler(IRankBuffService service, ILogger<RankBuffHa
 
         if (!result.Succeeded)
         {
-            logger.LogWarning(
-                "Rank-buff rejected for character {CharacterId}: sort {Sort} (mid zone-transfer, out-of-range tier, or insufficient territory-symbol count) -- aborting session",
-                characterId, packet.Sort);
-            zoneSession.Abort(DisconnectReason.Faulted);
+            logger.LogInformation(
+                "Rank-buff rejected for character {CharacterId}: sort {Sort} outcome {Outcome} -- silent no-op",
+                characterId, packet.Sort, result.Outcome);
             return;
         }
 

@@ -38,10 +38,10 @@ public sealed class DuelAskHandler(IDuelService duelService, ILogger<DuelAskHand
                 session.Send(new DuelAnswerResponse { Answer = 4 });
                 return;
             case DuelAskResultKind.TribeMismatch:
-                zoneSession.Abort(DisconnectReason.Faulted);
+                session.Send(new DuelAnswerResponse { Answer = 3 });
                 return;
             case DuelAskResultKind.ChallengerAlreadyDueling:
-                zoneSession.Abort(DisconnectReason.Faulted);
+                session.Send(new DuelAnswerResponse { Answer = 3 });
                 return;
             case DuelAskResultKind.ChallengerBusy:
                 session.Send(new DuelAnswerResponse { Answer = 3 });

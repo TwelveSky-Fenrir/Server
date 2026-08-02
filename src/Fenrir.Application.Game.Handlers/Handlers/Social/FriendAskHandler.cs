@@ -36,7 +36,6 @@ public sealed class FriendAskHandler(IFriendService friendService, ILogger<Frien
                 return;
             case FriendAskResultKind.AlreadyFriendOrFull:
             case FriendAskResultKind.TribeMismatch:
-                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             case FriendAskResultKind.AskerBusy:
                 session.Send(new FriendAnswerResponse { Answer = 3 });

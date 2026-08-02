@@ -31,7 +31,6 @@ public sealed class MentorAskHandler(IMentorAskService mentorAskService, ILogger
         {
             case MentorAskResultKind.AskerMustDisconnect:
             case MentorAskResultKind.TargetMustDisconnect:
-                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             case MentorAskResultKind.TargetNotFound:
                 session.Send(new MentorAnswerResponse { Answer = 4 });

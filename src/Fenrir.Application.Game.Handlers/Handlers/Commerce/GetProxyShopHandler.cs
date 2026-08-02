@@ -24,9 +24,8 @@ public sealed class GetProxyShopHandler(IGetProxyShopService service, ILogger<Ge
         if (zone.MapId != OpenShopStallHandler.PshopZoneNumber)
         {
             logger.LogWarning(
-                "Get proxy shop rejected: character {CharacterId} is outside the market district (zone {MapId}) -- session will be disconnected",
+                "Get proxy shop rejected: character {CharacterId} is outside the market district (zone {MapId})",
                 characterId, zone.MapId);
-            zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 

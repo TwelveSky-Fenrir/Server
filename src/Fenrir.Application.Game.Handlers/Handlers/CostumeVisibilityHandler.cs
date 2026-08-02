@@ -20,9 +20,8 @@ public sealed class CostumeVisibilityHandler(
         if (packet.Sort is not (0 or 1))
         {
             logger.LogWarning(
-                "Costume-visibility rejected for session {SessionId}: invalid sort {Sort} -- aborting session",
+                "Costume-visibility ignored for session {SessionId}: invalid sort {Sort}",
                 session.SessionId, packet.Sort);
-            zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 

@@ -29,11 +29,8 @@ public sealed class AutoPotionThresholdHandler(
             cancellationToken);
 
         if (result.Aborted)
-        {
-            logger.LogWarning(
-                "Auto-potion threshold rejected for character {CharacterId}: life {LifeThreshold}/mana {ManaThreshold} out of range -- aborting session",
+            logger.LogDebug(
+                "Auto-potion threshold ignored for character {CharacterId}: life {LifeThreshold}/mana {ManaThreshold} out of valid range 0-5",
                 characterId, packet.Value01, packet.Value02);
-            zoneSession.Abort(DisconnectReason.Faulted);
-        }
     }
 }

@@ -36,9 +36,8 @@ public sealed class StellarCoreStateHandler(IStellarCoreStateService service, IL
 
                 case StellarCoreStateOutcome.Disconnect:
                     logger.LogWarning(
-                        "Stellar-core-state rejected for character {CharacterId}: sort {Sort} value {Value} -- aborting session",
+                        "Stellar-core-state rejected for character {CharacterId}: sort {Sort} value {Value} -- ignoring (game-logic condition, not malformed wire input)",
                         characterId, packet.Sort, packet.Value);
-                    zoneSession.Abort(DisconnectReason.Faulted);
                     return;
 
                 case StellarCoreStateOutcome.Reply:

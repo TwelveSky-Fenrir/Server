@@ -19,10 +19,7 @@ public sealed class TribeAnnouncementScrollHandler(
             session.SessionId, zoneSession.CharacterId, packet.Content.Length);
 
         if (string.IsNullOrEmpty(packet.Content))
-        {
-            zoneSession.Abort(DisconnectReason.Faulted);
             return;
-        }
 
         if (zoneSession.CurrentZone is not Zone zone)
             return;
@@ -32,6 +29,6 @@ public sealed class TribeAnnouncementScrollHandler(
             return;
 
         if (!announcementService.TryBroadcast(zone, sender, characterId, session, packet.Content))
-            zoneSession.Abort(DisconnectReason.Faulted);
+            return;
     }
 }

@@ -616,6 +616,19 @@ public sealed partial class Zone
                 state.MountRolledAttributeTotal.SetItem(attributeGarageSlot, MountPowerCodec.DigitSum(newPower));
         }
 
+        if (command.MountExpSlot is { } expSlot && command.MountExpNewValue is { } expNewValue)
+        {
+            state.MountAccumulatedExp = state.MountAccumulatedExp.SetItem(expSlot, expNewValue);
+            var activity = state.MountActivity[expSlot];
+            state.Session.Send(new AvatarStatUpdateResponse
+            {
+                Sort = MountActivityExpStatSort,
+                Value = MountActivityExpCodec.Pack(activity, expNewValue),
+                Value2 = 0
+            });
+            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+        }
+
         if (changed)
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
 
@@ -730,6 +743,15 @@ public sealed partial class Zone
             state.CostumeDate = state.CostumeDate.SetItem(grantedSlot, command.GrantedCostumeDate ?? 0);
             state.CostumeExpireDate = state.CostumeExpireDate.SetItem(grantedSlot, command.GrantedExpireDate ?? 0);
         }
+
+        if (command.NewHeadType is { } newHeadType)
+            state.HeadType = newHeadType;
+
+        if (command.NewFaceType is { } newFaceType)
+            state.FaceType = newFaceType;
+
+        if (command.NewGender is { } newGender)
+            state.Gender = newGender;
 
         if (command.Life is { } life)
         {
@@ -965,12 +987,26 @@ public sealed partial class Zone
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
         }
 
+        if (command.ClearAutoHuntConfig)
+        {
+            state.AutoHuntEnabled = false;
+            state.AutoHuntConfig = null;
+            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+        }
+
         if (command.ApplyRegisteredBuffs)
             ApplyRegisteredAutoBuffs(state);
 
         if (command.ActivateAutoBuff)
         {
-            state.Mana = AutoBuffActivationResolver.ManaAfterActivation(state.Mana);
+            var newMana = AutoBuffActivationResolver.ManaAfterActivation(state.Mana);
+            if (newMana != state.Mana)
+            {
+                state.Mana = newMana;
+                state.Session.Send(new AvatarStatUpdateResponse
+                    { Sort = 11, Value = newMana, Value2 = 0 });
+            }
+
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
         }
 
@@ -1120,6 +1156,8 @@ public readonly record struct MountZoneCommand(
     int? DeleteGarageSlot = null,
     int? AttributeDeleteGarageSlot = null,
     int? AttributeDeleteStatSlotIndex = null,
+    int? MountExpSlot = null,
+    int? MountExpNewValue = null,
     TaskCompletionSource? Applied = null);
 
 public enum CostumeBroadcastKind : byte
@@ -1144,6 +1182,9 @@ public readonly record struct CostumeZoneCommand(
     int? GrantedItemId = null,
     int? GrantedCostumeDate = null,
     int? GrantedExpireDate = null,
+    byte? NewHeadType = null,
+    byte? NewFaceType = null,
+    byte? NewGender = null,
     TaskCompletionSource? Applied = null);
 
 public enum StellarCoreBroadcastKind : byte
@@ -1191,4 +1232,5 @@ public readonly record struct AutoBuffZoneCommand(
     bool ApplyRegisteredBuffs = false,
     int? ActionSort = null,
     bool Broadcast = false,
+    bool ClearAutoHuntConfig = false,
     TaskCompletionSource? Applied = null);

@@ -26,10 +26,9 @@ public sealed class DailyMissionHandler(IDailyMissionService dailyMissionService
 
         if (packet.Sort is not (1 or 2))
         {
-            logger.LogWarning(
-                "Daily-mission request rejected for character {CharacterId}: invalid sort {Sort} -- aborting session",
+            logger.LogDebug(
+                "Daily-mission request ignored for character {CharacterId}: invalid sort {Sort}",
                 characterId, packet.Sort);
-            zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 
@@ -48,9 +47,9 @@ public sealed class DailyMissionHandler(IDailyMissionService dailyMissionService
             {
                 case DailyMissionClaimOutcome.Aborted:
                     logger.LogDebug(
-                        "Daily-mission claim rejected for character {CharacterId}: requirements not met -- aborting session",
+                        "Daily-mission claim rejected for character {CharacterId}: requirements not met (level, join-war, or kill count)",
                         characterId);
-                    zoneSession.Abort(DisconnectReason.Faulted);
+                    SendResult(session, packet.Sort, 1, state);
                     return;
                 case DailyMissionClaimOutcome.InventoryFull:
                     logger.LogInformation(

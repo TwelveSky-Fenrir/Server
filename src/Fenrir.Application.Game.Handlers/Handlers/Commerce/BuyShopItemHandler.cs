@@ -28,9 +28,8 @@ public sealed class BuyShopItemHandler(IBuyShopItemService service, ILogger<BuyS
         {
             case BuyShopItemSellerOutcome.Abort:
                 logger.LogWarning(
-                    "Buy shop item rejected: character {CharacterId} request failed structural validation -- session will be disconnected",
+                    "Buy shop item rejected: character {CharacterId} request failed structural validation",
                     buyerId);
-                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             case BuyShopItemSellerOutcome.Reply:
                 logger.LogDebug(
@@ -59,9 +58,8 @@ public sealed class BuyShopItemHandler(IBuyShopItemService service, ILogger<BuyS
                 if (commit.Abort)
                 {
                     logger.LogWarning(
-                        "Buy shop item rejected: buyer {BuyerId}/seller {SellerId} commit failed structural validation -- session will be disconnected",
+                        "Buy shop item rejected: buyer {BuyerId}/seller {SellerId} commit failed structural validation",
                         buyer.CharacterId, seller.CharacterId);
-                    zoneSession.Abort(DisconnectReason.Faulted);
                     return;
                 }
 
@@ -92,9 +90,8 @@ public sealed class BuyShopItemHandler(IBuyShopItemService service, ILogger<BuyS
             if (commit.Abort)
             {
                 logger.LogWarning(
-                    "Buy shop item rejected: buyer {BuyerId}/proxy seller {SellerId} commit failed structural validation -- session will be disconnected",
+                    "Buy shop item rejected: buyer {BuyerId}/proxy seller {SellerId} commit failed structural validation",
                     buyer.CharacterId, lookup.ProxySellerId);
-                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             }
 

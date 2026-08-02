@@ -34,7 +34,6 @@ public sealed class GuildInviteHandler(
             case GuildInviteAskResultKind.NotAuthorized:
             case GuildInviteAskResultKind.TargetAlreadyGuilded:
             case GuildInviteAskResultKind.TribeMismatch:
-                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             case GuildInviteAskResultKind.TargetNotFound:
                 session.Send(new GuildInviteAnswerResponse { Answer = 4 });

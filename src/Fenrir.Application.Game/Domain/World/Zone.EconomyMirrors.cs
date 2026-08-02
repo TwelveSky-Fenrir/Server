@@ -8,6 +8,7 @@ using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Social.Mentor;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Data.WriteBehind;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.World;
@@ -29,6 +30,33 @@ public sealed partial class Zone
     private const int SkillInboxCapacity = 1024;
 
     private const int TribeInboxCapacity = 512;
+
+    /// <summary>Sort code for the mount absorb time stat update sent to the client on scroll use.</summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3376
+    ///     <c>mTRANSFER.B_AVATAR_CHANGE_INFO_2(tUserInfo, S078MOUNT_ABSORB_TIME, wAvatar.aAnimalAbsorbTime)</c>
+    /// </remarks>
+    private const int AnimalAbsorbTimeStatSort = 78;
+
+    /// <summary>Sort code for the paid auto-hunt day budget stat update sent to the client on scroll use.</summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3740-3795 — <c>B_AVATAR_CHANGE_INFO_2(..., 61, aAutoTime)</c>
+    /// </remarks>
+    private const int AutoHuntPaidDayBudgetStatSort = 61;
+
+    /// <summary>Sort code for the auto-hunt minute budget stat update.</summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3740-3795 — <c>B_AVATAR_CHANGE_INFO_2(..., 62, aAutoTime2)</c>
+    /// </remarks>
+    private const int AutoHuntPaidMinuteBudgetStatSort = 62;
+
+    /// <summary>Sort code for the Silver Ornament scroll time stat update.</summary>
+    /// <remarks>Réf. sort: S090 — <c>B_AVATAR_CHANGE_INFO_2(..., 90, aSilverTime)</c></remarks>
+    private const int SilverOrnamentStatSort = 90;
+
+    /// <summary>Sort code for the Gold Ornament scroll time stat update.</summary>
+    /// <remarks>Réf. sort: S101 — <c>B_AVATAR_CHANGE_INFO_2(..., 101, aGoldTime)</c></remarks>
+    private const int GoldOrnamentStatSort = 101;
 
     private readonly List<int> _gmTeleportNeighborScratch = [];
 
@@ -295,7 +323,9 @@ public sealed partial class Zone
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
 
-        state.LearnedSkills = state.LearnedSkills.SetItem(command.Slot, command.Skill);
+        state.LearnedSkills = command.Skill.SkillId == 0
+            ? state.LearnedSkills.Remove(command.Slot)
+            : state.LearnedSkills.SetItem(command.Slot, command.Skill);
         state.SkillPoints = command.NewSkillPoints;
         state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
     }
@@ -405,6 +435,66 @@ public sealed partial class Zone
         if (command.UseOrnament is { } useOrnament)
         {
             state.UseOrnament = useOrnament;
+            changed = true;
+        }
+
+        if (command.SilverTime is { } silverTime)
+        {
+            state.SilverTime = silverTime;
+            changed = true;
+        }
+
+        if (command.GoldTime is { } goldTime)
+        {
+            state.GoldTime = goldTime;
+            changed = true;
+        }
+
+        if (command.DoubleKillNumTime is { } dkNumTime)
+        {
+            state.DoubleKillNumTime = dkNumTime;
+            changed = true;
+        }
+
+        if (command.DoubleKillExpTime is { } dkExpTime)
+        {
+            state.DoubleKillExpTime = dkExpTime;
+            changed = true;
+        }
+
+        if (command.DoubleKillNumTime2 is { } dkNumTime2)
+        {
+            state.DoubleKillNumTime2 = dkNumTime2;
+            changed = true;
+        }
+
+        if (command.DmgBoost is { } dmgBoost)
+        {
+            state.DmgBoost = dmgBoost;
+            changed = true;
+        }
+
+        if (command.HPBoost is { } hpBoost)
+        {
+            state.HPBoost = hpBoost;
+            changed = true;
+        }
+
+        if (command.CriBoost is { } criBoost)
+        {
+            state.CriBoost = criBoost;
+            changed = true;
+        }
+
+        if (command.WarriorPill is { } warriorPill)
+        {
+            state.WarriorPill = warriorPill;
+            changed = true;
+        }
+
+        if (command.WarriorScroll is { } warriorScroll)
+        {
+            state.WarriorScroll = warriorScroll;
             changed = true;
         }
 
@@ -543,6 +633,24 @@ public sealed partial class Zone
         if (command.HighItemValue is { } highItemValue)
         {
             state.HighItemValue = highItemValue;
+            changed = true;
+        }
+
+        if (command.DoubleExpTime1 is { } doubleExpTime1)
+        {
+            state.DoubleExpTime1 = doubleExpTime1;
+            changed = true;
+        }
+
+        if (command.DoubleExpTime2 is { } doubleExpTime2)
+        {
+            state.DoubleExpTime2 = doubleExpTime2;
+            changed = true;
+        }
+
+        if (command.FightingGodForDestroy is { } fightingGodForDestroy)
+        {
+            state.FightingGodForDestroy = fightingGodForDestroy;
             changed = true;
         }
 
@@ -708,8 +816,95 @@ public sealed partial class Zone
             changed = true;
         }
 
+        if (command.PremiumExpireUtc is { } premiumExpireUtc)
+        {
+            state.PremiumExpireUtc = premiumExpireUtc;
+            changed = true;
+        }
+
+        // AutoHuntPaidDayBudget — compact date integer budget for paid auto-hunt day time.
+        // Persisted via ProgressWriteBehindHost. Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3740-3795
+        // Legacy sends B_AVATAR_CHANGE_INFO_2(tUserInfo, 61, wAvatar.aAutoTime) immediately after update.
+        if (command.AutoHuntPaidDayBudget is { } newAutoHuntPaidDayBudget)
+        {
+            state.AutoHuntPaidDayBudget = newAutoHuntPaidDayBudget;
+            state.Session.Send(new AvatarStatUpdateResponse
+                { Sort = AutoHuntPaidDayBudgetStatSort, Value = newAutoHuntPaidDayBudget, Value2 = 0 });
+            changed = true;
+        }
+
+        // AutoHuntPaidMinuteBudget — minute counter for paid auto-hunt minute time.
+        // Persisted via ProgressWriteBehindHost. Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3740-3795
+        // Legacy sends B_AVATAR_CHANGE_INFO_2(tUserInfo, 62, wAvatar.aAutoTime2) immediately after update.
+        if (command.AutoHuntPaidMinuteBudget is { } newAutoHuntPaidMinuteBudget)
+        {
+            state.AutoHuntPaidMinuteBudget = newAutoHuntPaidMinuteBudget;
+            state.Session.Send(new AvatarStatUpdateResponse
+                { Sort = AutoHuntPaidMinuteBudgetStatSort, Value = newAutoHuntPaidMinuteBudget, Value2 = 0 });
+            changed = true;
+        }
+
+        // AutoBuffTime — compact date integer (e.g. 20261231). Persisted via ProgressWriteBehindHost.
+        // Client learns the new value from the UseInventoryItemResponse.Value, not a stat-update packet.
+        // Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3147-3152
+        if (command.AutoBuffTime is { } newAutoBuffTime)
+        {
+            state.AutoBuffTime = newAutoBuffTime;
+            changed = true;
+        }
+
+        // AnimalAbsorbTime — minute counter. Persisted via ProgressWriteBehindHost.
+        // Legacy broadcasts immediately via B_AVATAR_CHANGE_INFO_2 sort 78 after updating.
+        // Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3374-3376
+        if (command.AnimalAbsorbTime is { } newAnimalAbsorbTime)
+        {
+            state.AnimalAbsorbTime = newAnimalAbsorbTime;
+            state.Session.Send(new AvatarStatUpdateResponse
+                { Sort = AnimalAbsorbTimeStatSort, Value = newAnimalAbsorbTime, Value2 = 0 });
+            changed = true;
+        }
+
+        // AnimalDoubleExp — in-memory minute counter only; not in write-behind pipeline and not loaded from DB
+        // on zone-enter, so no dirty flag is needed. Client receives the UseInventoryItemResponse success
+        // signal; TimedBuffCountdownSystem broadcasts sort 75 decrements as normal.
+        // Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3381-3387
+        if (command.AnimalDoubleExp is { } newAnimalDoubleExp)
+            state.AnimalDoubleExp = newAnimalDoubleExp;
+
+        // BuffX2Time — minute counter that doubles skill-buff durations via SupportSkillTimeUpRatio.
+        // Persisted via ProgressWriteBehindHost (DirtyFlags.Progression).
+        // The AvatarStatUpdateResponse (sort 42) is sent by the service before posting this command,
+        // matching the same split used by SilverTime/GoldTime — no re-broadcast here.
+        // RecomputeSupportSkillTimeUpRatio() must run whenever the counter changes, since it controls
+        // whether the x2 multiplier is active for any buff the character casts or receives.
+        // Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3063-3074 — aBuffX2Time += 60; SetUserBonus2().
+        if (command.BuffX2Time is { } newBuffX2Time)
+        {
+            state.BuffX2Time = newBuffX2Time;
+            state.RecomputeSupportSkillTimeUpRatio();
+            changed = true;
+        }
+
         if (changed)
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+
+        if (command.LifeGain is { } inventoryLifeGain)
+        {
+            var gainedMaxLife = state.Stats?.MaxLife ?? state.MaxLife;
+            state.Life = Math.Clamp(state.Life + inventoryLifeGain, 0, gainedMaxLife);
+            state.Session.Send(new AvatarStatUpdateResponse
+                { Sort = CharacterHpStatSort, Value = state.Life, Value2 = 0 });
+            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
+        }
+
+        if (command.ManaGain is { } inventoryManaGain)
+        {
+            var gainedMaxMana = state.Stats?.MaxMana ?? state.MaxMana;
+            state.Mana = Math.Clamp(state.Mana + inventoryManaGain, 0, gainedMaxMana);
+            state.Session.Send(new AvatarStatUpdateResponse
+                { Sort = CharacterMpStatSort, Value = state.Mana, Value2 = 0 });
+            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
+        }
 
         if (command.ResetAfkTick)
             state.AfkTick = 0;

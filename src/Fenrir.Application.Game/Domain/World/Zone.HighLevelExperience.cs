@@ -15,6 +15,21 @@ public sealed partial class Zone
 
     private const int BonusStatPointStatSort = 2;
 
+    /// <summary>
+    ///     Grants an instant EXP pill's pre-computed gain to <paramref name="target" />, routing
+    ///     through the same level-up and rebirth-tier pipeline as monster-kill experience.
+    /// </summary>
+    /// <remarks>
+    ///     Called by <c>UseInventoryItemService</c> after per-item gates and the absolute-cap check
+    ///     in <see cref="Fenrir.Application.Game.Domain.Inventory.UseItems.InstantExpPillFormulas" />
+    ///     have already passed, and after the formula has confirmed <paramref name="gain" /> is
+    ///     positive. The caller owns all gate logic; this method applies the gain unconditionally.
+    /// </remarks>
+    public void GrantInstantExperience(PlayerRuntimeState target, int gain)
+    {
+        ApplyCharacterExperienceGain(target, gain);
+    }
+
     public void ApplyHighLevelExperienceGain(PlayerRuntimeState target, int gain,
         bool antiCheatExperienceFlagged = false)
     {

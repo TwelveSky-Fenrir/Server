@@ -44,9 +44,8 @@ public sealed class MountStateHandler(IMountStateService service, ILogger<MountS
 
             case MountStateOutcome.Disconnect:
                 logger.LogWarning(
-                    "Mount-state rejected for character {CharacterId}: sort {Sort} value {Value} -- aborting session",
+                    "Mount-state rejected for character {CharacterId}: sort {Sort} value {Value} -- ignoring (game-logic condition, not malformed wire input)",
                     characterId, packet.Sort, packet.Value);
-                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
 
             case MountStateOutcome.Select:

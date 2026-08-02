@@ -19,10 +19,7 @@ public sealed class WhisperHandler(IWhisperService whisperService, ILogger<Whisp
         var zoneSession = (IZoneSession)session;
 
         if (ChatRouter.IsContentEmpty(packet.Content) || string.IsNullOrEmpty(packet.AvatarName))
-        {
-            zoneSession.Abort(DisconnectReason.Faulted);
             return;
-        }
 
         if (zoneSession.CurrentZone is not Zone zone)
             return;

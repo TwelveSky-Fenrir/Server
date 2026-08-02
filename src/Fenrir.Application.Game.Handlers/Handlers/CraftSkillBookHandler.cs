@@ -39,7 +39,7 @@ public sealed class CraftSkillBookHandler(
 
             if (result.Outcome != CraftSkillBookOutcome.Applied)
             {
-                zoneSession.Abort(DisconnectReason.Faulted);
+                session.Send(new CraftSkillBookResponse { Result = 1, Value = [0, 0, 0, 0, 0, 0] });
                 return;
             }
 

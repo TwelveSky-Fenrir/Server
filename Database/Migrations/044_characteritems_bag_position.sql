@@ -12,12 +12,15 @@
 -- 1a. New columns, DEFAULT 0 so every pre-existing row (and every V1 write path that keeps inserting
 --     through the un-widened column list) stays valid against the CHECK below without a data backfill.
 ALTER TABLE game.CharacterItems
-    ADD XPos TINYINT NOT NULL CONSTRAINT DF_CharacterItems_XPos DEFAULT 0,
-        YPos TINYINT NOT NULL CONSTRAINT DF_CharacterItems_YPos DEFAULT 0;
+    ADD XPos TINYINT NOT NULL
+            CONSTRAINT DF_CharacterItems_XPos DEFAULT 0,
+        YPos TINYINT NOT NULL
+            CONSTRAINT DF_CharacterItems_YPos DEFAULT 0;
 GO
 
-ALTER TABLE game.CharacterItems WITH CHECK
-    ADD CONSTRAINT CK_CharacterItems_BagPosition CHECK (XPos BETWEEN 0 AND 7 AND YPos BETWEEN 0 AND 7);
+ALTER TABLE game.CharacterItems
+    WITH CHECK
+        ADD CONSTRAINT CK_CharacterItems_BagPosition CHECK (XPos BETWEEN 0 AND 7 AND YPos BETWEEN 0 AND 7);
 GO
 
 -- 1b. V2 TVP: exact column-for-column copy of tvp_CharacterItemSlot.sql, XPos/YPos appended.

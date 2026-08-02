@@ -26,6 +26,12 @@ public sealed partial class Zone
 
     private const int BloodPointAvatarChangeInfoSort = 300;
 
+    /// <summary>Réf. C++ : Server/Header/Protocol/STRUCT.h:1515-1545 — <c>S004DOUBLE_PVP_CP = 4</c>.</summary>
+    private const int DoubleKillNumTimeChargeStatSort = 4;
+
+    /// <summary>Réf. C++ : Server/Header/Protocol/STRUCT.h:1515-1545 — <c>S005DOUBLE_PVP_EXP = 5</c>.</summary>
+    private const int DoubleKillExpTimeChargeStatSort = 5;
+
     private const int ExperienceStatSort = 13;
 
     private const int LevelUpAvatarChangeInfoSort = 1;
@@ -396,7 +402,6 @@ public sealed partial class Zone
         var baseAmount = PvpKillContributionPointCalculator.ComputeBaseAmount(
             attackerState.PremiumExpireUtc > 0,
             attackerState.WarriorScroll > 0,
-            attackerState.DoubleKillNumTime > 0,
             PvpKillContributionPointBonuses.ComputePerUserAddValue(hasCrossTribeAddTimeEffect),
             0,
             towerControlBonus,
@@ -410,9 +415,40 @@ public sealed partial class Zone
             worldState?.World.TribeSymbolBattle ?? false,
             serverHomeTribe);
 
-        var grantedAmount = PvpKillContributionPointCalculator.ClampGrant(attackerState.ContributionPoints,
+        ApplyDoubleAwardCpGrant(attackerState, baseAmount);
+    }
+
+    /// <summary>
+    ///     Grants <paramref name="baseAmount" /> once, then — while <c>DoubleKillNumTime</c> is still positive —
+    ///     grants the identical amount a second time, independently clamped. Each half is broadcast/tracked
+    ///     per its own rules: sort 4 (remaining charges) fires only on the doubled half, sort 3 (running total)
+    ///     fires at most once, covering either or both halves.
+    /// </summary>
+    /// <remarks>Réf. C++ : Server/ts25zone/S07_MyGame03.cpp:2871-2893.</remarks>
+    private void ApplyDoubleAwardCpGrant(PlayerRuntimeState attackerState, int baseAmount)
+    {
+        var firstGrant = PvpKillContributionPointCalculator.ClampGrant(attackerState.ContributionPoints,
             baseAmount, PvpKillContributionPointCalculator.ContributionPointHardCap);
-        GrantContributionPoints(attackerState.CharacterId, grantedAmount);
+        GrantContributionPoints(attackerState.CharacterId, firstGrant);
+
+        var totalChanged = firstGrant != 0;
+
+        var doubleAward = PvpKillContributionPointCalculator.ResolveDoubleAward(attackerState.ContributionPoints,
+            baseAmount, PvpKillContributionPointCalculator.ContributionPointHardCap, attackerState.DoubleKillNumTime);
+        if (doubleAward.Fired)
+        {
+            attackerState.DoubleKillNumTime = doubleAward.NewDoubleKillNumTime;
+            attackerState.Session.Send(new AvatarStatUpdateResponse
+            {
+                Sort = DoubleKillNumTimeChargeStatSort, Value = doubleAward.NewDoubleKillNumTime, Value2 = 0
+            });
+            GrantContributionPoints(attackerState.CharacterId, doubleAward.GrantedAmount);
+            totalChanged = true;
+        }
+
+        if (totalChanged)
+            attackerState.Session.Send(new AvatarStatUpdateResponse
+                { Sort = ContributionPointStatSort, Value = attackerState.ContributionPoints, Value2 = 0 });
     }
 
     private void ApplyRegularWarCpOverride(PlayerRuntimeState attackerState, PlayerRuntimeState defenderState)
@@ -457,16 +493,31 @@ public sealed partial class Zone
         var zoneMultiplier = PvpKillExperienceScaling.ResolveZoneMultiplier(
             RegularWarMapCatalog.TryGet(MapId, out _),
             options.CrossTribeXpRatio);
+        var hasDoubleExpCharge = attackerState.DoubleKillExpTime > 0;
         var gain = PvpKillExperienceCalculator.ComputeGain(
             scaledBase,
             attackerCombinedLevel,
             defenderCombinedLevel,
             attackerState.WarriorScroll > 0,
-            attackerState.DoubleKillExpTime > 0,
+            hasDoubleExpCharge,
             zoneMultiplier);
 
         if (gain > 0)
             ApplyCharacterExperienceGain(attackerState, gain);
+
+        // Unlike the CP double-award (two independent clamped additions), this is a single ×8 scaling of
+        // the EXP value itself (PvpKillExperienceCalculator.DoubleExpChargeMultiplier); the counter is
+        // decremented/broadcast whenever it was positive, independent of the resulting gain's magnitude.
+        // Réf. C++ : Server/ts25zone/S07_MyGame03.cpp:2906-2968.
+        if (hasDoubleExpCharge)
+        {
+            attackerState.DoubleKillExpTime--;
+            attackerState.Session.Send(new AvatarStatUpdateResponse
+            {
+                Sort = DoubleKillExpTimeChargeStatSort, Value = attackerState.DoubleKillExpTime, Value2 = 0
+            });
+            attackerState.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+        }
 
         if (HasActivePetEquipped(attackerState))
             CreditPetGrowthFromPvpKill(attackerState,

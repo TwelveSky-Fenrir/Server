@@ -151,20 +151,24 @@ public sealed class UseInventoryItemService(
     // ──────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    ///     Sort code for <c>DoubleKillNumTime</c> countdown broadcasts (Scroll of Loyalty / Scroll of the Gods timer).
-    ///     TODO(fenrir-gameplay-domain-engineer): Value 28 is a placeholder — the real B_AVATAR_CHANGE_INFO_2
-    ///     sort code for <c>aDoubleKillNumTime</c> has NOT been confirmed from Server/ts25zone/S04_MyWork03.cpp.
-    ///     Replace with the verified value once cpp-ts25-explorer confirms it.
+    ///     Sort code for <c>DoubleKillNumTime</c> progress broadcasts (Scroll of Loyalty / Scroll of the Gods timer).
     /// </summary>
-    private const int DoubleKillNumTimeSortCode = 28;
+    /// <remarks>
+    ///     Réf. C++ : Server/Header/Protocol/STRUCT.h:1515-1545 — unconditional, unguarded enum;
+    ///     <c>S004DOUBLE_PVP_CP = 4</c>. 28 and 29 (this constant's former value and
+    ///     <see cref="DoubleKillExpTimeSortCode" />'s) collide with the unrelated, unconditional
+    ///     <c>S028LUCKY_COMBINE</c>/<c>S029LUCKY_UPGRADE</c> members and were never live for this purpose.
+    /// </remarks>
+    private const int DoubleKillNumTimeSortCode = 4;
 
     /// <summary>
-    ///     Sort code for <c>DoubleKillExpTime</c> countdown broadcasts (Scroll of Battle / Scroll of the Gods timer).
-    ///     TODO(fenrir-gameplay-domain-engineer): Value 29 is a placeholder — the real B_AVATAR_CHANGE_INFO_2
-    ///     sort code for <c>aDoubleKillExpTime</c> has NOT been confirmed from Server/ts25zone/S04_MyWork03.cpp.
-    ///     Replace with the verified value once cpp-ts25-explorer confirms it.
+    ///     Sort code for <c>DoubleKillExpTime</c> progress broadcasts (Scroll of Battle / Scroll of the Gods timer).
     /// </summary>
-    private const int DoubleKillExpTimeSortCode = 29;
+    /// <remarks>
+    ///     Réf. C++ : Server/Header/Protocol/STRUCT.h:1515-1545 — <c>S005DOUBLE_PVP_EXP = 5</c>. See
+    ///     <see cref="DoubleKillNumTimeSortCode" /> for why 28/29 were wrong.
+    /// </remarks>
+    private const int DoubleKillExpTimeSortCode = 5;
 
     /// <summary>Sort code for <c>DoubleKillNumTime2</c> per-kill counter broadcast. S030.</summary>
     /// <remarks>Réf. C++: Server/ts25zone/S07_MyGame02.cpp:2445-2448 — explicit sort 30 in legacy.</remarks>

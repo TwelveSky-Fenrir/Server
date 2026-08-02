@@ -621,6 +621,7 @@ public sealed partial class Zone
 
         QueueDeathEventLog(CharacterDeathEventCode, characterId, (byte)cause, $"Cause={cause};Level={state.Level}");
 
+        // EXP/CP loss is MonsterKill-only; PlayerKill/Duel/StunLock never lose EXP in legacy (S07_MyGame02.cpp:1086-1100,1448-1508,2968-3212).
         if (cause == DeathCause.MonsterKill)
             ApplyDeathExperienceLoss(state);
 

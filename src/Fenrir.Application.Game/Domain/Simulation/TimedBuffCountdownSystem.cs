@@ -66,12 +66,10 @@ public sealed class TimedBuffCountdownSystem : ISimulationSystem
         state.WarriorScroll = TickTimer(state, 87, state.WarriorScroll, minutesElapsed);
         state.SilverTime = TickTimer(state, 90, state.SilverTime, minutesElapsed);
         state.GoldTime = TickTimer(state, 101, state.GoldTime, minutesElapsed);
-        // TODO(fenrir-gameplay-domain-engineer): Sort codes for DoubleKillNumTime and DoubleKillExpTime countdown
-        // broadcasts are not confirmed from legacy (B_AVATAR_CHANGE_INFO_2 calls in S04_MyWork03.cpp / S07_MyGame02.cpp).
-        // Replace the placeholder values 28 / 29 with the real sort codes once verified by cpp-ts25-explorer.
-        // Réf. legacy fields: aDoubleKillNumTime, aDoubleKillExpTime — Server/ts25zone/S04_MyWork03.cpp.
-        state.DoubleKillNumTime = TickTimer(state, 28, state.DoubleKillNumTime, minutesElapsed);
-        state.DoubleKillExpTime = TickTimer(state, 29, state.DoubleKillExpTime, minutesElapsed);
+        // Sort codes 4/5 (S004DOUBLE_PVP_CP/S005DOUBLE_PVP_EXP) per the unconditional enum at
+        // Server/Header/Protocol/STRUCT.h:1515-1545 — 28/29 collide with unrelated S028/S029 members.
+        state.DoubleKillNumTime = TickTimer(state, 4, state.DoubleKillNumTime, minutesElapsed);
+        state.DoubleKillExpTime = TickTimer(state, 5, state.DoubleKillExpTime, minutesElapsed);
     }
 
     private static void TickPaidZones(Zone zone, PlayerRuntimeState state, int minutesElapsed, long nowUnixSeconds)

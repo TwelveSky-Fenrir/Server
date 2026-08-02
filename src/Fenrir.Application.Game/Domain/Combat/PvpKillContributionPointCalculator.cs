@@ -6,16 +6,6 @@ public static class PvpKillContributionPointCalculator
 
     public const int WarriorScrollBuffBonus = 1;
 
-    /// <summary>
-    ///     Extra CP added per PvP kill when <c>DoubleKillNumTime &gt; 0</c> (Scroll of Loyalty / Scroll of the Gods).
-    ///     TODO(fenrir-gameplay-domain-engineer): Exact legacy value not confirmed from contract.
-    ///     Verify the bonus amount from Server/ts25zone/S07_MyGame02.cpp B_AVATAR_CHANGE_INFO_2 or
-    ///     the aDoubleKillNumTime branch before shipping. Using the same +1 as WarriorScrollBuffBonus as a
-    ///     placeholder — replace if the actual legacy value differs.
-    ///     Réf. legacy: aDoubleKillNumTime check — Server/ts25zone/S07_MyGame02.cpp.
-    /// </summary>
-    public const int DoubleKillNumTimeBuff = 1;
-
     public const int ContributionPointHardCap = 2_000_000_000;
 
     public const int FfaOverrideFlatAmount = 20;
@@ -31,7 +21,6 @@ public static class PvpKillContributionPointCalculator
     public static int ComputeBaseAmount(
         bool hasPremiumStatus,
         bool hasWarriorScrollBuff,
-        bool hasDoubleKillNumTimeBuff,
         int perCharacterOverride,
         int perTribeWorldStateBonus,
         int towerControlBonus,
@@ -43,8 +32,6 @@ public static class PvpKillContributionPointCalculator
             amount += PremiumStatusBonus;
         if (hasWarriorScrollBuff)
             amount += WarriorScrollBuffBonus;
-        if (hasDoubleKillNumTimeBuff)
-            amount += DoubleKillNumTimeBuff;
 
         return amount;
     }
@@ -54,4 +41,27 @@ public static class PvpKillContributionPointCalculator
         var grant = Math.Min(amountToAdd, cap - (long)currentTotal);
         return grant > 0 ? (int)grant : 0;
     }
+
+    /// <summary>
+    ///     Resolves the CP double-award: while <c>DoubleKillNumTime</c> is still positive after the kill's
+    ///     first grant, the identical base amount is applied a second time, independently clamped against
+    ///     <paramref name="totalAfterFirstGrant" />. Not a flat bonus and not a ×2 multiplier — the whole
+    ///     per-kill CP figure is granted twice, each half capped on its own.
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S07_MyGame03.cpp:2871-2893 (double-award block) and :2345-2353
+    ///     (<c>getMaxCP</c>, the clamp underlying both grants).
+    /// </remarks>
+    public static DoubleAwardResult ResolveDoubleAward(int totalAfterFirstGrant, int baseAmount, int cap,
+        int doubleKillNumTime)
+    {
+        if (doubleKillNumTime <= 0)
+            return default;
+
+        var grant = ClampGrant(totalAfterFirstGrant, baseAmount, cap);
+        return grant > 0 ? new DoubleAwardResult(true, grant, doubleKillNumTime - 1) : default;
+    }
+
+    /// <summary>Outcome of <see cref="ResolveDoubleAward" />; <see cref="GrantedAmount" />/<see cref="NewDoubleKillNumTime" /> are meaningful only when <see cref="Fired" />.</summary>
+    public readonly record struct DoubleAwardResult(bool Fired, int GrantedAmount, int NewDoubleKillNumTime);
 }

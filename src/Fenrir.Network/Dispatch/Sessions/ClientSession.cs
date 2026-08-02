@@ -276,6 +276,15 @@ public abstract class ClientSession(
     public async ValueTask CompleteAsync()
     {
         await Transport.Input.CompleteAsync().ConfigureAwait(false);
-        await Transport.Output.CompleteAsync().ConfigureAwait(false);
+
+        await _sendLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            await Transport.Output.CompleteAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            _sendLock.Release();
+        }
     }
 }

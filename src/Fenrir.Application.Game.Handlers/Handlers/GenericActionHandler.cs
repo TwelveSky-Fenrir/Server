@@ -541,7 +541,7 @@ public sealed class GenericActionHandler(
                     "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
                     zoneSession.SessionId, characterId, sort,
                     nameof(IGmBasicCommandService.HandleForceKillMonsterAsync));
-            await gmBasicCommandService.HandleForceKillMonsterAsync(packet.Data, zoneSession, zone,
+            await gmBasicCommandService.HandleForceKillMonsterAsync(packet.Data, zoneSession, state, zone,
                 cancellationToken);
             return;
         }

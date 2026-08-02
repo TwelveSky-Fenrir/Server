@@ -8,6 +8,7 @@ namespace Fenrir.Application.Game.Hosting;
 
 public sealed class GameServerDirectoryHeartbeat(
     IGameServerDirectoryRepository directory,
+    IShardMapAssignmentRepository shardMapAssignments,
     ZoneRegistry zones,
     IOptions<GameServerOptions> options,
     ILogger<GameServerDirectoryHeartbeat> logger) : BackgroundService
@@ -20,6 +21,16 @@ public sealed class GameServerDirectoryHeartbeat(
             "GameServerDirectory heartbeat host started for shard {ShardId}; first registration attempt to " +
             "runtime.GameServerDirectory as {Host}:{Port} follows (every {IntervalSeconds}s)", opts.ShardId,
             opts.PublicHost, opts.Port, opts.HeartbeatIntervalSeconds);
+
+        // Snapshot once, at ExecuteAsync start (which cannot run before ZoneRegistry.Initialize --
+        // see Program.cs). This is this shard's own ground truth of what it actually loaded at boot,
+        // and it deliberately never changes at runtime. ShardPartitionGuard.EnsureNoOverlapAsync's own
+        // boot-time call already used this exact hostedMaps value; re-passing that same frozen snapshot
+        // below (instead of re-querying this shard's own current admin.ShardMapAssignments row) is what
+        // lets the periodic re-check below catch a map reassigned away from this shard without a
+        // restart -- the one gap the one-shot boot guard cannot see for *other* shards. See
+        // ShardPartitionGuard's own remarks for the full reasoning and the concrete failure scenario.
+        var hostedMapIds = zones.Zones.Select(static zone => zone.MapId).ToArray();
 
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(opts.HeartbeatIntervalSeconds));
 
@@ -44,6 +55,34 @@ public sealed class GameServerDirectoryHeartbeat(
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 logger.LogError(ex, "GameServerDirectory heartbeat failed for shard {ShardId}", opts.ShardId);
+            }
+
+            try
+            {
+                // Re-runs the exact same disjoint-partition check ShardPartitionGuard ran once at boot,
+                // every heartbeat interval, so a map reassigned away from this still-running shard (without
+                // restarting it) is caught within one heartbeat interval instead of only at some other
+                // shard's own next boot (which cannot see this shard's stale in-memory state at all -- its
+                // own fresh admin.ShardMapAssignments read already agrees it doesn't own the map anymore).
+                await ShardPartitionGuard.EnsureNoOverlapAsync(opts.ShardId, hostedMapIds, directory,
+                        shardMapAssignments, stoppingToken)
+                    .ConfigureAwait(false);
+            }
+            catch (InvalidOperationException ex)
+            {
+                logger.LogCritical(ex,
+                    "ADR-0012 PARTITION DRIFT for shard {ShardId}: this shard is still actively hosting a map " +
+                    "that admin.ShardMapAssignments -- and possibly another live shard -- no longer agrees " +
+                    "belongs to it. This is a post-boot re-check, not the one-shot boot guard, and it takes no " +
+                    "automatic remediation (stopping a live Zone or migrating its players is out of scope for a " +
+                    "heartbeat host). Restart this shard once the correct owner of the conflicting map is " +
+                    "confirmed and no shard is left double-hosting it.", opts.ShardId);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogError(ex,
+                    "Post-boot shard-partition re-check failed for shard {ShardId} (transient DB/directory " +
+                    "failure, not a detected conflict) -- will retry next heartbeat", opts.ShardId);
             }
         } while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false));
     }

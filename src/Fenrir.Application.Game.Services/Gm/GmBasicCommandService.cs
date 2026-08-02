@@ -107,8 +107,8 @@ public sealed class GmBasicCommandService(
         return TeleportToRawPositionAsync(MoveToPositionSort, data, zoneSession, state, zone, cancellationToken);
     }
 
-    public async ValueTask HandleForceKillMonsterAsync(byte[] data, IZoneSession zoneSession, Zone zone,
-        CancellationToken cancellationToken)
+    public async ValueTask HandleForceKillMonsterAsync(byte[] data, IZoneSession zoneSession,
+        PlayerRuntimeState state, Zone zone, CancellationToken cancellationToken)
     {
         if (!await MeetsTierOrAbortAsync(zoneSession, DieSort, cancellationToken))
             return;
@@ -131,7 +131,15 @@ public sealed class GmBasicCommandService(
                 $"Command=DIE;Sort={DieSort};ServerIndex={index};MonsterName={monster.Template.Name}",
                 cancellationToken);
 
-            zone.TryDamageMonster(index, monster.Life, null, out _, out _);
+            // Mirrored through Zone's own tick (tribe-progress queue): TryDamageMonster touches
+            // single-writer, tick-thread-only AoiGrid/scratch-list state.
+            if (!await zone.PostTribeProgressCommandAndWaitAsync(
+                    new TribeProgressZoneCommand(state.CharacterId, GmForceKillMonsterServerIndex: index),
+                    cancellationToken))
+                logger.LogError(
+                    "Zone {MapId} tribe-progress inbox full: dropped GM DIE mirror for character {CharacterId} (monster server index {ServerIndex})",
+                    zone.MapId, state.CharacterId, index);
+
             result = SuccessResult;
         }
         else

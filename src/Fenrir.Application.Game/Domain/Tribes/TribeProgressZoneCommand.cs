@@ -66,6 +66,7 @@ public readonly record struct TribeProgressZoneCommand(
     long? StoreMoney = null,
     int? SkillPoints = null,
     int? GmSummonMonsterTemplateId = null,
+    int? GmForceKillMonsterServerIndex = null,
     int? VisibleState = null,
     int? SpecialState = null,
     byte? PreviousTribe = null,

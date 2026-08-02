@@ -944,6 +944,13 @@ public sealed partial class Zone
         if (command.GmSummonMonsterTemplateId is { } gmSummonMonsterTemplateId)
             SpawnGmSummonedMonster(gmSummonMonsterTemplateId, state);
 
+        // Re-read Life here (tick thread) rather than trusting a value read before the command was
+        // posted -- the monster may have taken further damage or already died in the interim.
+        if (command.GmForceKillMonsterServerIndex is { } gmForceKillMonsterServerIndex &&
+            TryGetMonster(gmForceKillMonsterServerIndex, out var gmForceKillMonster) &&
+            gmForceKillMonster is not null)
+            TryDamageMonster(gmForceKillMonsterServerIndex, gmForceKillMonster.Life, null, out _, out _);
+
         if (command.RebirthBroadcast)
             BroadcastAvatarStateFlag(state, 14, state.ContributionPoints, state.RebirthCount, state.Zone241Time);
 

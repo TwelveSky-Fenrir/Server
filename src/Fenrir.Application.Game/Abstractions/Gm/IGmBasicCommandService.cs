@@ -15,8 +15,8 @@ public interface IGmBasicCommandService
     public ValueTask HandleMoveToPositionAsync(byte[] data, IZoneSession zoneSession, PlayerRuntimeState state,
         Zone zone, CancellationToken cancellationToken);
 
-    public ValueTask HandleForceKillMonsterAsync(byte[] data, IZoneSession zoneSession, Zone zone,
-        CancellationToken cancellationToken);
+    public ValueTask HandleForceKillMonsterAsync(byte[] data, IZoneSession zoneSession, PlayerRuntimeState state,
+        Zone zone, CancellationToken cancellationToken);
 
     public ValueTask HandleTribeChangeAsync(byte[] data, IZoneSession zoneSession, PlayerRuntimeState state,
         Zone zone, CancellationToken cancellationToken);

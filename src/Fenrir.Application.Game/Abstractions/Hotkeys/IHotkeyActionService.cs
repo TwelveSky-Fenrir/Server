@@ -17,10 +17,10 @@ public interface IHotkeyActionService
         int page, int index, CancellationToken cancellationToken);
 
     public ValueTask<GenericActionResult> BindItemAsync(Zone zone, PlayerRuntimeState state, int characterId,
-        DefaultPData move, CancellationToken cancellationToken);
+        DefaultPData move, bool secondInventoryPageEntitlementActive, CancellationToken cancellationToken);
 
     public ValueTask<GenericActionResult> WithdrawItemAsync(Zone zone, PlayerRuntimeState state, int characterId,
-        DefaultPData move, CancellationToken cancellationToken);
+        DefaultPData move, bool secondInventoryPageEntitlementActive, CancellationToken cancellationToken);
 
     public ValueTask<GenericActionResult> RearrangeAsync(Zone zone, PlayerRuntimeState state, int characterId,
         DefaultPData move, CancellationToken cancellationToken);

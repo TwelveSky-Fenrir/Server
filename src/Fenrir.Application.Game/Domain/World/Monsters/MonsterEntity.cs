@@ -75,6 +75,8 @@ public sealed class MonsterEntity
 
     public int DetectionThrottleTicks { get; set; }
 
+    public DateTime? LastCarThrowerDetectionCheckAtUtc { get; set; }
+
     public int IdleReturnElapsedTicks { get; set; }
 
     public int IdleWanderElapsedTicks { get; set; }

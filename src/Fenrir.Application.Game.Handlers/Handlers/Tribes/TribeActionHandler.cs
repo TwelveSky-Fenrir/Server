@@ -89,9 +89,10 @@ public sealed class TribeActionHandler(
             case 13:
             case 14:
             case 15:
-                logger?.LogDebug(
-                    "Character {CharacterId} sent CZ_TRIBE_WORK_SEND sort {Sort} (dead sub-command) -- ignoring session {SessionId}",
+                logger?.LogInformation(
+                    "Character {CharacterId} sent CZ_TRIBE_WORK_SEND sort {Sort} -- unconditional disconnect, no response sent (Server/ts25zone/S04_MyWork02.cpp:11101-11112), session {SessionId}",
                     characterId, packet.Sort, session.SessionId);
+                session.Abort(DisconnectReason.Faulted);
                 return;
             case 16:
                 Respond(session, packet, characterId,

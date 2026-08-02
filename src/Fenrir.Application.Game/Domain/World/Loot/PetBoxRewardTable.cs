@@ -7,12 +7,8 @@ public static class PetBoxRewardTable
 {
     public const int BoxId = 602;
 
-    public static readonly ImmutableArray<LootBoxRewardResolver.RewardBand> RareBands =
-    [
-        new(40, 1012),
-        new(40, 1016)
-    ];
-
+    // No pre-roll jackpot in legacy RandomPet; band-then-pool only, 0-199.
+    // Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:829-881.
     public static readonly ImmutableArray<LootBoxRewardResolver.RewardPool> Pools =
     [
         new(20, [1178]),
@@ -22,5 +18,6 @@ public static class PetBoxRewardTable
         new(199, [1103, 1118, 1145, 1166, 1222, 1237])
     ];
 
-    public static readonly BoxRewardSpec Spec = BoxRewardSpec.RareBandThenPools(BoxId, RareBands, Pools);
+    public static readonly BoxRewardSpec Spec =
+        BoxRewardSpec.RareBandThenPools(BoxId, ImmutableArray<LootBoxRewardResolver.RewardBand>.Empty, Pools);
 }

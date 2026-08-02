@@ -50,7 +50,14 @@ public sealed partial class Zone
 
     private const int ManaRecoveredAvatarChangeInfoSort = 9;
 
+    private const int RegularWarAfkResetSortCode = 2;
+
+    private const string RegularWarAfkCheckerSenderName = "AFK Checker";
+
     private static readonly TimeSpan HolyShieldReapplyCooldown = TimeSpan.FromSeconds(10);
+
+    private static readonly ItemLinkInfo RegularWarAfkCheckerLink =
+        new() { Index = 0, Activity = 0, Value = 0, Socket = new int[3] };
 
     private readonly List<int> _buffStateNeighborScratch = [];
 
@@ -745,10 +752,11 @@ public sealed partial class Zone
         if (!worldData.LevelsByLevel.TryGetValue(state.Level, out var levelRow))
             return;
 
-        // Both ratio params default to 1.0f; when per-character/server-wide EXP-down modifiers are
-        // wired in, thread them here instead of the defaults.
-        // Ref: Server/ts25zone/S07_MyGame02.cpp:2921-2964 (mGeneralExpDownRatio, mGAME.mGeneralExpDownRatio).
-        var loss = ExperienceFormulas.ComputeDeathExperienceLoss(state.Experience, levelRow.ExpRangeMin);
+        // personalExpDownRatio derives from the live premium-expiry timestamp; globalExpDownRatio is the
+        // per-process raw-integer config knob. Ref: S03_MyUser.cpp:524-541; S07_MyGame02.cpp:2943-2944.
+        var personalExpDownRatio = ExperienceFormulas.ResolvePersonalExpDownRatio(state.PremiumExpireUtc);
+        var loss = ExperienceFormulas.ComputeDeathExperienceLoss(state.Experience, levelRow.ExpRangeMin,
+            personalExpDownRatio, options.GlobalExpDownRatio);
         if (loss <= 0)
             return;
 
@@ -816,6 +824,9 @@ public sealed partial class Zone
             BroadcastStunActionState(state, state.StunDurationSeconds);
             return;
         }
+
+        if (!isResumeAction)
+            MaybeResetRegularWarAfkTick(state, in action);
 
         if (IsFormationSkillZoneLocked(action.SkillNumber))
             return;
@@ -954,6 +965,38 @@ public sealed partial class Zone
             AdvanceCasterPartyBuffMarker(state, action.SkillNumber, action.Sort);
         }
     }
+
+    private void MaybeResetRegularWarAfkTick(PlayerRuntimeState state, in ActionInfo action)
+    {
+        var isZone195 = options.Zone195MapIds.Contains(MapId);
+        if (!isZone195 && !IsWarZone049Type)
+            return;
+
+        if (IsRegularWarAfkExemptSkill(action.SkillNumber) || state.AutoHuntEnabled)
+            return;
+
+        if (action.SkillNumber <= 0 && action.Sort != RegularWarAfkResetSortCode &&
+            action.Sort != StunActionSort && state.ActionSort != StunActionSort)
+            return;
+
+        var fullUnits = isZone195 ? RegularWarAfkTickSystem.Zone195FullUnits : RegularWarAfkTickSystem.WarActiveFullUnits;
+        if (state.AfkTick >= fullUnits * RegularWarAfkTickSystem.UnitLegacyTicks)
+            state.Session.Send(new LocalChatResponse
+            {
+                AvatarName = RegularWarAfkCheckerSenderName,
+                Content = $"Reset 0/{fullUnits}",
+                Link = RegularWarAfkCheckerLink
+            });
+
+        state.AfkTick = 0;
+    }
+
+    private static bool IsRegularWarAfkExemptSkill(int skillNumber) => skillNumber switch
+    {
+        1 or 6 or 7 or 10 or 11 or 14 or 15 or 18 or 19 or 20 or 25 or 26 or 29 or 30 or 33 or 34 or 37 or 38 or 39
+            or 44 or 45 or 48 or 49 or 52 or 53 or 56 or 57 or 82 or 83 or 84 or 103 or 104 or 105 => true,
+        _ => false
+    };
 
     private SkillCastGuardContext BuildSkillCastGuardContext(PlayerRuntimeState state, ActionInfo action,
         int skillCategoryCode)

@@ -108,6 +108,7 @@ public static class SessionLoop
             if (session.DisconnectReason is not null)
                 return new BufferOutcome(remaining.Start, remaining.End, true);
 
+            var frameStart = remaining.Start;
             FenrirServer frameServer;
             byte frameOpcode;
             ReadOnlySequence<byte> framePayload;
@@ -164,8 +165,12 @@ public static class SessionLoop
             {
                 var dispatchStartTimestamp = debugEnabled ? Stopwatch.GetTimestamp() : 0L;
 
-                await dispatcher.DispatchAsync(frameServer, frameOpcode, framePayload, session, cancellationToken)
+                var dispatchOutcome = await dispatcher
+                    .DispatchAsync(frameServer, frameOpcode, framePayload, session, cancellationToken)
                     .ConfigureAwait(false);
+
+                if (dispatchOutcome == FrameDispatchOutcome.Withheld)
+                    return new BufferOutcome(frameStart, remaining.End, false);
 
                 if (debugEnabled)
                     logger!.PacketDispatched(session.SessionId, frameServer, frameOpcode,

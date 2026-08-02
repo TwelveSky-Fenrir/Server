@@ -618,6 +618,12 @@ public sealed partial class Zone
             changed = true;
         }
 
+        if (command.ProtectForWing is { } protectForWing)
+        {
+            state.ProtectForWing = protectForWing;
+            changed = true;
+        }
+
         if (command.ImproveItemValue is { } improveItemValue)
         {
             state.ImproveItemValue = improveItemValue;

@@ -778,7 +778,7 @@ public sealed partial class Zone
             monster.AddTribeSymbolDamage(attackerState.Tribe, outcome.DamageApplied);
 
         TryDamageMonster(monster.ServerIndex, outcome.DamageApplied, attackerState.CharacterId, out var monsterDied,
-            out _);
+            out _, outcome.Critical);
 
         _pvmAttackRecipientScratch.Clear();
         _pvmAttackRecipientScratch.Add(attackerState.CharacterId);
@@ -797,10 +797,7 @@ public sealed partial class Zone
 
         BroadcastAttackResult(_pvmAttackRecipientScratch, response, attackerState.DungeonInstanceId);
 
-        if (monsterDied)
-            MonsterDeathSequence.BeginCorpseCountdown(monster, attackerState.PosX, attackerState.PosZ,
-                outcome.Critical, _random);
-        else
+        if (!monsterDied)
             TryApplyPvmFlinch(monster, outcome.DamageApplied);
 
         if (isTowerGuardian)
@@ -1088,6 +1085,11 @@ public sealed partial class Zone
         IReadOnlyList<int>? partyMemberIds = null, int monsterPatExperience = 0, int monsterLifeValue = 0)
     {
         if (!_players.TryGetValue(killerCharacterId, out var state))
+            return;
+
+        // ZONE200-map XP suppression (maps 200/297/298/299): the whole grant below never runs.
+        // Legacy: Server/ts25zone/S07_MyGame05.cpp:3555-3560 (ProcessForExp early return).
+        if (IsZone200TypeZone)
             return;
 
         var fixedLevel = ExperienceFormulas.ReturnFixedLevel(state.Level);

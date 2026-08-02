@@ -15,10 +15,12 @@ public sealed class TcpServer<TSession>(
     ISessionRateLimiter? rateLimiter = null,
     IpFloodGuard? ipFloodGuard = null,
     ILogger? logger = null,
-    SessionIdAllocator? sessionIds = null) : IAsyncDisposable
+    SessionIdAllocator? sessionIds = null,
+    bool applyOsSocketBuffers = false) : IAsyncDisposable
     where TSession : ClientSession
 {
-    private readonly FenrirTcpListener<TSession> _listener = new(endpoint, sessionFactory, logger, sessionIds);
+    private readonly FenrirTcpListener<TSession> _listener =
+        new(endpoint, sessionFactory, logger, sessionIds, applyOsSocketBuffers);
 
     public ValueTask DisposeAsync()
     {

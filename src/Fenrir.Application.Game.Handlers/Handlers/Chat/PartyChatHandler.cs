@@ -19,7 +19,10 @@ public sealed class PartyChatHandler(IPartyChatService partyChatService, ILogger
             session.SessionId, zoneSession.CharacterId, packet.Content.Length);
 
         if (ChatRouter.IsContentEmpty(packet.Content))
+        {
+            zoneSession.Abort(DisconnectReason.Faulted);
             return;
+        }
 
         if (zoneSession.CurrentZone is not Zone zone)
             return;

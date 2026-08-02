@@ -22,9 +22,13 @@ public sealed partial class MonsterAiSystem
 
     private const int ThrowerWanderProximityCellTolerance = 2;
 
+    private const int ThrowCarDetectionCellTolerance = 2;
+
     private const int Zone175BossAggroCapacity = 50;
 
     private const int GuardDetectionCellTolerance = 2;
+
+    private static readonly TimeSpan CarThrowerDetectionCheckThrottle = TimeSpan.FromMilliseconds(100);
 
     private void RunTribeSymbolStoneDecision(MonsterEntity monster, int legacyTicksElapsed)
     {
@@ -158,6 +162,13 @@ public sealed partial class MonsterAiSystem
 
     private void TryThrowCarAcquire(Zone zone, MonsterEntity monster)
     {
+        var now = DateTime.UtcNow;
+        if (monster.LastCarThrowerDetectionCheckAtUtc is { } lastCheck &&
+            now - lastCheck < CarThrowerDetectionCheckThrottle)
+            return;
+
+        monster.LastCarThrowerDetectionCheckAtUtc = now;
+
         if (monster.Template.AttackType is not (1 or 3 or 6))
             return;
 
@@ -166,6 +177,11 @@ public sealed partial class MonsterAiSystem
             return;
 
         var innerBand = ThrowCarInnerRadiusRatio * meleeRadius;
+
+        var cellSize = zone.AoiCellSize;
+        var monsterCellX = MathF.Floor(monster.PosX / cellSize);
+        var monsterCellY = MathF.Floor(monster.PosY / cellSize);
+        var monsterCellZ = MathF.Floor(monster.PosZ / cellSize);
 
         foreach (var characterId in zone.NeighborsOfPosition(monster.PosX, monster.PosZ))
         {
@@ -176,6 +192,11 @@ public sealed partial class MonsterAiSystem
                 continue;
 
             if (monster.InstanceId is { } requiredInstanceId && player.DungeonInstanceId != requiredInstanceId)
+                continue;
+
+            if (MathF.Abs(MathF.Floor(player.PosX / cellSize) - monsterCellX) > ThrowCarDetectionCellTolerance ||
+                MathF.Abs(MathF.Floor(player.PosY / cellSize) - monsterCellY) > ThrowCarDetectionCellTolerance ||
+                MathF.Abs(MathF.Floor(player.PosZ / cellSize) - monsterCellZ) > ThrowCarDetectionCellTolerance)
                 continue;
 
             var length = Distance3D(monster, player);

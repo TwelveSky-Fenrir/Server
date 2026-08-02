@@ -39,7 +39,8 @@ public sealed class MentorAskService(
             return new MentorAskResult(MentorAskResultKind.AskerMustDisconnect);
         }
 
-        if (CommunityWorkGate.IsBusy(master, duels, trades, friends, parties, mentors, guildInvites))
+        if (CommunityWorkGate.IsBusy(master, duels, trades, friends, parties, mentors, guildInvites) ||
+            master.IsStunned || master.IsDead)
         {
             logger.LogDebug("Mentor ask rejected: character {MasterId} already has a pending negotiation",
                 master.CharacterId);
@@ -57,11 +58,10 @@ public sealed class MentorAskService(
         if (student is null)
             return await AskCrossShardAsync(master, targetAvatarName, cancellationToken).ConfigureAwait(false);
 
-        // Student must be same tribe and strictly below the master level threshold (≤ 112 per S04_MyWork02.cpp:9024-9079).
-        // Using master.Level as the upper bound is wrong for masters above level 113 — a level-115
-        // student would pass that test but the legacy gate is a hard cap of 112, not a relative
-        // "less than master" check.
-        if (student.Tribe != master.Tribe || student.Level >= MinimumMasterLevel)
+        // Live check is master-relative, not a fixed ceiling: MG5ORIGIN is unconditionally #defined
+        // with no #undef anywhere under Server/, so the #else branch is what compiles.
+        // S04_MyWork02.cpp:9050-9058; DEFINE.h:18.
+        if (student.Tribe != master.Tribe || student.Level >= master.Level)
         {
             logger.LogWarning(
                 "Mentor ask rejected: character {MasterId} (level {MasterLevel}, tribe {MasterTribe}) targeted ineligible character {TargetCharacterId} (level {TargetLevel}, tribe {TargetTribe}) -- session will be disconnected",
@@ -69,7 +69,8 @@ public sealed class MentorAskService(
             return new MentorAskResult(MentorAskResultKind.TargetMustDisconnect);
         }
 
-        if (CommunityWorkGate.IsBusy(student, duels, trades, friends, parties, mentors, guildInvites))
+        if (CommunityWorkGate.IsBusy(student, duels, trades, friends, parties, mentors, guildInvites) ||
+            student.IsStunned || student.IsDead)
         {
             logger.LogDebug("Mentor ask rejected: target character {TargetCharacterId} is busy",
                 student.CharacterId);

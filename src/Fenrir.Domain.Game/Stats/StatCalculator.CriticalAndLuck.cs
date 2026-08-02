@@ -27,9 +27,6 @@ public static partial class StatCalculator
         if (bySlot[10] is { } deco2)
             crit += deco2.Item.ItemId switch { 213 or 214 or 215 => 1, 216 or 217 or 218 => 3, _ => 0 };
 
-        if (bySlot[8] is { } petAmulet)
-            crit += PhoenixFlatBonus(petAmulet.Item.ItemId, 1, 2, 3);
-
         crit += CostumeCriticalContribution(cosmetic.CostumeEnchantCs);
 
         return crit;
@@ -57,9 +54,6 @@ public static partial class StatCalculator
         critDef += SetBonusTables.CapeIuBonus(bySlot[1], 8, 0.5f);
         if (bySlot[1] is { } cape && cape.Item.ItemId == 1404)
             critDef += 30;
-
-        if (bySlot[8] is { } petAmulet)
-            critDef += PhoenixFlatBonus(petAmulet.Item.ItemId, 7, 9, 12);
 
         critDef += StellarCoreCriticalDefenceContribution(cosmetic);
 

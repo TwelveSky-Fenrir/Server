@@ -6,6 +6,9 @@ public static class MonsterBroadcastScale
 
     public static int ForMonster(byte monsterType, byte monsterSpecialType)
     {
+        if (monsterSpecialType is >= 40 and <= 44)
+            return 3;
+
         if (monsterType == 1)
             return monsterSpecialType switch
             {

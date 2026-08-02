@@ -24,24 +24,36 @@ public sealed class ClaimDailyRewardHandler(IClaimDailyRewardService service, IL
             state is null)
             return;
 
+        bool disconnect;
         await state.EconomyActionLock.WaitAsync(cancellationToken);
         try
         {
             var result =
                 await service.ResolveAndApplyAsync(packet, zone, state, accountId, characterId, cancellationToken);
-            if (result is null)
+            disconnect = result.Disconnect;
+            if (disconnect)
+            {
+                logger.LogWarning(
+                    "Daily-reward claim cycle exhausted for account {AccountId}, character {CharacterId}: disconnecting",
+                    accountId, characterId);
+            }
+            else if (result.Response is null)
             {
                 logger.LogWarning(
                     "Daily-reward claim rejected for account {AccountId}, character {CharacterId}",
                     accountId, characterId);
-                return;
             }
-
-            session.Send(result.Value);
+            else
+            {
+                session.Send(result.Response.Value);
+            }
         }
         finally
         {
             state.EconomyActionLock.Release();
         }
+
+        if (disconnect)
+            zoneSession.Abort(DisconnectReason.Faulted);
     }
 }

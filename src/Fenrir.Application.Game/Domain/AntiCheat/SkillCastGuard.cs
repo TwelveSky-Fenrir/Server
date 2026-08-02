@@ -63,7 +63,7 @@ public static class SkillCastGuard
             return new SkillCastVerdict(SkillCastOffense.HotkeyMismatch, SkillCastEnforcement.Disconnect);
         }
 
-        if (context.ClaimedBonusGrade > context.ServerBonusGrade)
+        if (context.ClaimedBonusGrade != context.ServerBonusGrade)
         {
             var enforcement = context.SkillCategoryCode == HotkeyBoundCategoryCode
                 ? SkillCastEnforcement.Disconnect

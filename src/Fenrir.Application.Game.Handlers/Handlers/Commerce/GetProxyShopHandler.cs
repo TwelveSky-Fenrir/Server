@@ -18,6 +18,15 @@ public sealed class GetProxyShopHandler(IGetProxyShopService service, ILogger<Ge
         logger.LogDebug("GetProxyShop: session {SessionId} character {CharacterId} sort {Sort} target {AvatarName}",
             session.SessionId, characterId, packet.Sort, packet.AvatarName);
 
+        if (packet.Sort is not (1 or 2 or 3))
+        {
+            logger.LogDebug(
+                "GetProxyShop: session {SessionId} character {CharacterId} sent unrecognized Sort {Sort}, aborting (Server/ts25zone/S07_MyGame09.cpp:550-552 default label)",
+                session.SessionId, characterId, packet.Sort);
+            zoneSession.Abort(DisconnectReason.Faulted);
+            return;
+        }
+
         if (zoneSession.CurrentZone is not Zone zone)
             return;
 

@@ -34,9 +34,9 @@ public sealed class HotkeyActionService(
         if (!resolved.Success)
         {
             logger.LogInformation(
-                "Character {CharacterId} hotkey-bind-skill failed: resolver rejected ({Failure})",
+                "Character {CharacterId} hotkey-bind-skill disconnect: resolver rejected ({Failure})",
                 characterId, resolved.Failure);
-            return GenericActionResult.Failed;
+            return GenericActionResult.Aborted;
         }
 
         await PersistAndMirrorSingleSlotAsync(zone, characterId, (byte)destinationPage, (byte)destinationIndex,
@@ -61,9 +61,9 @@ public sealed class HotkeyActionService(
         if (!resolved.Success)
         {
             logger.LogInformation(
-                "Character {CharacterId} hotkey-bind-emoticon failed: resolver rejected ({Failure})",
+                "Character {CharacterId} hotkey-bind-emoticon disconnect: resolver rejected ({Failure})",
                 characterId, resolved.Failure);
-            return GenericActionResult.Failed;
+            return GenericActionResult.Aborted;
         }
 
         await PersistAndMirrorSingleSlotAsync(zone, characterId, (byte)destinationPage, (byte)destinationIndex,
@@ -85,9 +85,9 @@ public sealed class HotkeyActionService(
 
         if (!resolved.Success)
         {
-            logger.LogInformation("Character {CharacterId} hotkey-unbind failed: resolver rejected ({Failure})",
+            logger.LogInformation("Character {CharacterId} hotkey-unbind disconnect: resolver rejected ({Failure})",
                 characterId, resolved.Failure);
-            return GenericActionResult.Failed;
+            return GenericActionResult.Aborted;
         }
 
         await PersistAndMirrorSingleSlotAsync(zone, characterId, (byte)page, (byte)index, HotkeySlot.Empty,
@@ -100,7 +100,7 @@ public sealed class HotkeyActionService(
     }
 
     public async ValueTask<GenericActionResult> BindItemAsync(Zone zone, PlayerRuntimeState state, int characterId,
-        DefaultPData move, CancellationToken cancellationToken)
+        DefaultPData move, bool secondInventoryPageEntitlementActive, CancellationToken cancellationToken)
     {
         var sourcePage = move.Page1;
         var sourceIndex = move.Index1;
@@ -119,14 +119,15 @@ public sealed class HotkeyActionService(
         }
 
         var resolved = HotkeyActionResolver.ResolveBindItem(destination, destinationPage, destinationIndex,
-            sourceItem, sourcePage, sourceIndex, move.Quantity1, sourceIsStackable, sourceIsExcludedPotion);
+            sourceItem, sourcePage, sourceIndex, move.Quantity1, sourceIsStackable, sourceIsExcludedPotion,
+            secondInventoryPageEntitlementActive);
 
         if (!resolved.Success)
         {
             logger.LogInformation(
-                "Character {CharacterId} hotkey-bind-item failed: resolver rejected ({Failure})", characterId,
+                "Character {CharacterId} hotkey-bind-item disconnect: resolver rejected ({Failure})", characterId,
                 resolved.Failure);
-            return GenericActionResult.Failed;
+            return GenericActionResult.Aborted;
         }
 
         var sourceContainer = (byte)sourcePage;
@@ -159,7 +160,8 @@ public sealed class HotkeyActionService(
     }
 
     public async ValueTask<GenericActionResult> WithdrawItemAsync(Zone zone, PlayerRuntimeState state,
-        int characterId, DefaultPData move, CancellationToken cancellationToken)
+        int characterId, DefaultPData move, bool secondInventoryPageEntitlementActive,
+        CancellationToken cancellationToken)
     {
         var sourcePage = move.Page1;
         var sourceIndex = move.Index1;
@@ -170,14 +172,15 @@ public sealed class HotkeyActionService(
         var destinationItem = ResolveInventorySlotOrNull(state, destinationPage, destinationIndex);
 
         var resolved = HotkeyActionResolver.ResolveWithdrawItem(source, sourcePage, sourceIndex, move.Quantity1,
-            destinationItem, destinationPage, destinationIndex, move.XPost2, move.YPost2);
+            destinationItem, destinationPage, destinationIndex, move.XPost2, move.YPost2,
+            secondInventoryPageEntitlementActive);
 
         if (!resolved.Success)
         {
             logger.LogInformation(
-                "Character {CharacterId} hotkey-withdraw-item failed: resolver rejected ({Failure})",
+                "Character {CharacterId} hotkey-withdraw-item disconnect: resolver rejected ({Failure})",
                 characterId, resolved.Failure);
-            return GenericActionResult.Failed;
+            return GenericActionResult.Aborted;
         }
 
         var destinationContainer = (byte)destinationPage;
@@ -220,15 +223,6 @@ public sealed class HotkeyActionService(
         var destinationPage = move.Page2;
         var destinationIndex = move.Index2;
 
-        if (sourcePage == destinationPage && sourceIndex == destinationIndex &&
-            HotkeyActionResolver.IsValidPage(sourcePage) && HotkeyActionResolver.IsValidIndex(sourceIndex))
-        {
-            logger.LogDebug(
-                "Character {CharacterId} hotkey-rearrange no-op: source equals destination ({Page}:{Index})",
-                characterId, sourcePage, sourceIndex);
-            return GenericActionResult.Succeeded;
-        }
-
         var source = ResolveHotkeySlotOrEmpty(state, sourcePage, sourceIndex);
         var destination = ResolveHotkeySlotOrEmpty(state, destinationPage, destinationIndex);
 
@@ -238,9 +232,9 @@ public sealed class HotkeyActionService(
         if (!resolved.Success)
         {
             logger.LogInformation(
-                "Character {CharacterId} hotkey-rearrange failed: resolver rejected ({Failure})", characterId,
+                "Character {CharacterId} hotkey-rearrange disconnect: resolver rejected ({Failure})", characterId,
                 resolved.Failure);
-            return GenericActionResult.Failed;
+            return GenericActionResult.Aborted;
         }
 
         await characters.UpsertHotkeySlotAsync(characterId, (byte)sourcePage, (byte)sourceIndex,

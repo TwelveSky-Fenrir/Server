@@ -154,7 +154,7 @@ public sealed class ZoneMoveService(
                 {
                     Result = 1,
                     Ip = options.Value.PublicHost,
-                    Port = options.Value.Port
+                    Port = options.Value.ZoneBasePort + targetZoneNumber
                 });
                 zoneSession.Send(new ReturnToHomeZoneResponse());
                 return;

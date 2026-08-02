@@ -35,13 +35,10 @@ public sealed class RuneSocketHandler(IRuneSocketService runeSocketService, ILog
 
                     if (result.Outcome != RuneSocketOutcome.Applied)
                     {
-                        logger.LogDebug(
-                            "Rune insert rejected for character {CharacterId}: runeIndex {RuneIndex} (invalid slot, item not found, or insufficient funds)",
-                            characterId, packet.RuneIndex);
-                        session.Send(new RuneSocketResponse
-                        {
-                            Result = 1, Page = 0, Index = 0, ItemIndex = 0, RuneIndex = 0
-                        });
+                        logger.LogInformation(
+                            "Session {SessionId} character {CharacterId}: RuneSocket insert (op157 sort 0) rejected, disconnecting (Server/ts25zone/S04_MyWork03.cpp:6345-6394 every case-0 validation failure calls Quit())",
+                            zoneSession.SessionId, characterId);
+                        zoneSession.Abort(DisconnectReason.Faulted);
                         return;
                     }
 

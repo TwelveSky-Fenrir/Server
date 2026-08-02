@@ -28,6 +28,7 @@ public static class LegacyImportCommand
             var seedWorldDirectory = commandArgs[2];
             ItemSeedGenerator.Generate(dataDirectory, Path.Combine(seedWorldDirectory, "005_items.sql"));
             MonsterSeedGenerator.Generate(dataDirectory, Path.Combine(seedWorldDirectory, "015_monsters.sql"));
+            GemSocketSeedGenerator.Generate(dataDirectory, Path.Combine(seedWorldDirectory, "021_gem_sockets.sql"));
             return 0;
         }
 

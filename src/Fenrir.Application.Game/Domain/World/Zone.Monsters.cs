@@ -21,6 +21,8 @@ public sealed partial class Zone
 
     private readonly ConcurrentQueue<DeadMonsterEvent> _deadMonsters = new();
 
+    private readonly ConcurrentQueue<MonsterEntity> _invalidatedMonsters = new();
+
     private readonly SemaphoreSlim _moneyGrantSignal = new(0, int.MaxValue);
 
     private readonly List<int> _monsterBroadcastNeighborScratch = [];
@@ -92,7 +94,7 @@ public sealed partial class Zone
     }
 
     public bool TryDamageMonster(int serverIndex, int amount, int? attackerCharacterId, out bool died,
-        out int remainingLife)
+        out int remainingLife, bool isCriticalHit = false)
     {
         if (!_monsters.TryGetValue(serverIndex, out var monster))
         {
@@ -101,18 +103,40 @@ public sealed partial class Zone
             return false;
         }
 
-        if (attackerCharacterId is { } attackerId && _players.TryGetValue(attackerId, out var attackerState))
+        PlayerRuntimeState? attackerState = null;
+        if (attackerCharacterId is { } attackerId && _players.TryGetValue(attackerId, out attackerState))
             monster.RegisterAttackDamage(attackerId, attackerState, amount);
 
         died = monster.TakeDamage(amount, out remainingLife);
         if (died)
         {
-            _monsters.TryRemove(serverIndex, out _);
+            // Legacy A013 (S07_MyGame05.cpp:1531-1563): stays valid/present for FrameInfo5/30 sec (see
+            // MonsterAiSystem's Dead case) before InvalidateDeadMonster removes it; not removed here.
             var creditedCharacterId = SelectMonsterKillCredit(monster, attackerCharacterId);
+
+            var killerX = attackerState?.PosX ?? monster.PosX;
+            var killerZ = attackerState?.PosZ ?? monster.PosZ;
+            MonsterDeathSequence.BeginCorpseCountdown(monster, killerX, killerZ, isCriticalHit, _random);
+            BroadcastMonsterDeath(monster);
+
             _deadMonsters.Enqueue(new DeadMonsterEvent(monster, creditedCharacterId));
         }
 
         return true;
+    }
+
+    public void InvalidateDeadMonster(MonsterEntity monster)
+    {
+        if (!_monsters.TryRemove(monster.ServerIndex, out _))
+            return;
+
+        RemoveMonsterFromGrid(monster);
+        _invalidatedMonsters.Enqueue(monster);
+    }
+
+    public bool TryDequeueInvalidatedMonster(out MonsterEntity? monster)
+    {
+        return _invalidatedMonsters.TryDequeue(out monster);
     }
 
     private int? SelectMonsterKillCredit(MonsterEntity monster, int? killingBlowAttackerId)

@@ -16,25 +16,32 @@ public sealed class ClaimDailyRewardService(
 {
     private const int RewardBundleId = 1;
 
-    public async ValueTask<ClaimDailyRewardResponse?> ResolveAndApplyAsync(ClaimDailyRewardRequest packet, Zone zone,
+    public async ValueTask<ClaimDailyRewardResult> ResolveAndApplyAsync(ClaimDailyRewardRequest packet, Zone zone,
         PlayerRuntimeState state, int accountId, int characterId, CancellationToken cancellationToken)
     {
         var today = GameDate.Today();
         var claimState = await characters.GetAccountRewardClaimStateAsync(accountId, today, cancellationToken);
         if (claimState is null)
-            return null;
+            return new ClaimDailyRewardResult(false, null);
 
-        if (claimState.RewardClaimDate == today || claimState.RewardClaimDay > 6)
+        if (claimState.RewardClaimDate == today)
         {
             logger.LogInformation(
-                "Daily-reward claim denied for account {AccountId}: already claimed today or cycle exhausted (day {RewardClaimDay})",
+                "Daily-reward claim denied for account {AccountId}: already claimed today", accountId);
+            return new ClaimDailyRewardResult(false, new ClaimDailyRewardResponse
+                { Result = 1, Value = new int[6], InvenPage = -1, InvenX = -1, InvenY = -1 });
+        }
+
+        if (claimState.RewardClaimDay > 6)
+        {
+            logger.LogInformation(
+                "Daily-reward claim denied for account {AccountId}: claim cycle exhausted (day {RewardClaimDay}), disconnecting per legacy Quit() (Server/ts25zone/S04_MyWork02.cpp:15332-15336)",
                 accountId, claimState.RewardClaimDay);
-            return new ClaimDailyRewardResponse
-                { Result = 1, Value = new int[6], InvenPage = -1, InvenX = -1, InvenY = -1 };
+            return new ClaimDailyRewardResult(true, null);
         }
 
         if (!worldData.RewardBundleItemsByBundleId.TryGetValue(RewardBundleId, out var slots))
-            return null;
+            return new ClaimDailyRewardResult(false, null);
 
         var day = claimState.RewardClaimDay;
         var itemId = 0;
@@ -46,15 +53,15 @@ public sealed class ClaimDailyRewardService(
             }
 
         if (itemId < 1 || !worldData.ItemsById.TryGetValue(itemId, out var itemDefinition))
-            return null;
+            return new ClaimDailyRewardResult(false, null);
 
         var freeSlot = FindFreeSlot(state.Inventory, state.InventoryDate, today);
         if (freeSlot is not { } destination)
         {
             logger.LogInformation("Daily-reward claim denied for character {CharacterId}: inventory full",
                 characterId);
-            return new ClaimDailyRewardResponse
-                { Result = 2, Value = new int[6], InvenPage = -1, InvenX = -1, InvenY = -1 };
+            return new ClaimDailyRewardResult(false, new ClaimDailyRewardResponse
+                { Result = 2, Value = new int[6], InvenPage = -1, InvenX = -1, InvenY = -1 });
         }
 
         var coupon = itemDefinition.Item.Sort == 99 ? 1 : 0;
@@ -72,8 +79,8 @@ public sealed class ClaimDailyRewardService(
             logger.LogWarning(ex,
                 "Account {AccountId} daily-reward claim ClaimAccountDailyRewardAsync failed (treated as already claimed)",
                 accountId);
-            return new ClaimDailyRewardResponse
-                { Result = 1, Value = new int[6], InvenPage = -1, InvenX = -1, InvenY = -1 };
+            return new ClaimDailyRewardResult(false, new ClaimDailyRewardResponse
+                { Result = 1, Value = new int[6], InvenPage = -1, InvenX = -1, InvenY = -1 });
         }
 
         var response = new ClaimDailyRewardResponse
@@ -97,7 +104,7 @@ public sealed class ClaimDailyRewardService(
             "Account {AccountId} claimed daily reward day {RewardClaimDay} on character {CharacterId}: item {ItemId} into container {Container}",
             accountId, day, characterId, itemId, destination.Container);
 
-        return response;
+        return new ClaimDailyRewardResult(false, response);
     }
 
     private static (byte Container, byte Slot)? FindFreeSlot(InventoryState inventory, int inventoryDate, int today)

@@ -97,6 +97,39 @@ public sealed class FriendRegistry
         }
     }
 
+    // Asker-only removal for the interactive Cancel flow; TryCancel above (dual removal) stays reserved
+    // for PendingSocialRequestAutoCancelSystem's disconnect sweep.
+    public bool TryWithdrawAsk(int askerId, out int targetId)
+    {
+        lock (_lock)
+        {
+            if (_pendingByAsker.Remove(askerId, out targetId))
+                return true;
+
+            if (_crossShard.TryConsumeOutbound(askerId, out var crossShardAsk))
+            {
+                targetId = crossShardAsk.TargetCharacterId;
+                return true;
+            }
+
+            return false;
+        }
+    }
+
+    public bool TryAcknowledgeWithdrawal(int targetId, int expectedAskerId)
+    {
+        lock (_lock)
+        {
+            if (_pendingByTarget.TryGetValue(targetId, out var recordedAskerId) && recordedAskerId == expectedAskerId)
+            {
+                _pendingByTarget.Remove(targetId);
+                return true;
+            }
+
+            return false;
+        }
+    }
+
     public bool TryRegisterCrossShardInbound(int targetId, CrossShardInboundAsk ask)
     {
         lock (_lock)
@@ -132,20 +165,31 @@ public sealed class FriendRegistry
         }
     }
 
-    public bool TryAnswer(int targetId, bool accepted, out int askerId)
+    // Target's own state always commits first; asker's own state only advances when askerBusyByZoneTransfer
+    // is false. guardBlocked distinguishes that gated rejection from "no pending ask at all".
+    public bool TryAnswer(int targetId, bool accepted, bool askerBusyByZoneTransfer, out int askerId,
+        out bool guardBlocked)
     {
+        guardBlocked = false;
+
         lock (_lock)
         {
             if (!_pendingByTarget.Remove(targetId, out askerId))
                 return false;
 
+            if (accepted)
+                _acceptedFor[targetId] = askerId;
+
+            if (askerBusyByZoneTransfer)
+            {
+                guardBlocked = true;
+                return false;
+            }
+
             _pendingByAsker.Remove(askerId);
 
             if (accepted)
-            {
                 _acceptedFor[askerId] = targetId;
-                _acceptedFor[targetId] = askerId;
-            }
 
             return true;
         }
@@ -160,6 +204,23 @@ public sealed class FriendRegistry
 
             RemoveMirror(otherId, characterId);
             return true;
+        }
+    }
+
+    public bool TryPeekAccepted(int characterId, out int otherId)
+    {
+        lock (_lock)
+        {
+            return _acceptedFor.TryGetValue(characterId, out otherId);
+        }
+    }
+
+    // Own-side-only reset for the interactive Make abort path; the counterpart's own mirror is left untouched.
+    public bool ClearAcceptedSelf(int characterId)
+    {
+        lock (_lock)
+        {
+            return _acceptedFor.Remove(characterId);
         }
     }
 

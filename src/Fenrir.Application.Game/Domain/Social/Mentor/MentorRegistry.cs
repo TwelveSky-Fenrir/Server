@@ -103,34 +103,96 @@ public sealed class MentorRegistry
         }
     }
 
-    public bool TryAnswer(int studentId, bool accepted, out int masterId)
+    // Master-only removal for the interactive Cancel flow; TryCancel above (dual removal) stays reserved
+    // for PendingSocialRequestAutoCancelSystem's disconnect sweep.
+    public bool TryWithdrawAsk(int masterId, out int studentId)
     {
+        lock (_lock)
+        {
+            if (_pendingByMaster.Remove(masterId, out studentId))
+                return true;
+
+            if (_crossShard.TryConsumeOutbound(masterId, out var crossShardAsk))
+            {
+                studentId = crossShardAsk.TargetCharacterId;
+                return true;
+            }
+
+            return false;
+        }
+    }
+
+    public bool TryAcknowledgeWithdrawal(int studentId, int expectedMasterId)
+    {
+        lock (_lock)
+        {
+            if (_pendingByStudent.TryGetValue(studentId, out var recordedMasterId) &&
+                recordedMasterId == expectedMasterId)
+            {
+                _pendingByStudent.Remove(studentId);
+                return true;
+            }
+
+            return false;
+        }
+    }
+
+    // Student's own state always commits first; master's own state (and the counterpart notice) only
+    // advances once the master is confirmed still pointing back at this student AND masterBusyByZoneTransfer
+    // is false. guardBlocked distinguishes the zone-transfer rejection from a stale/mismatched negotiation.
+    public bool TryAnswer(int studentId, bool accepted, bool masterBusyByZoneTransfer, out int masterId,
+        out bool guardBlocked)
+    {
+        guardBlocked = false;
+
         lock (_lock)
         {
             if (!_pendingByStudent.Remove(studentId, out masterId))
                 return false;
 
+            if (accepted)
+                _acceptedByStudent[studentId] = masterId;
+
+            if (!_pendingByMaster.TryGetValue(masterId, out var recordedStudentId) || recordedStudentId != studentId)
+                return false;
+
+            if (masterBusyByZoneTransfer)
+            {
+                guardBlocked = true;
+                return false;
+            }
+
             _pendingByMaster.Remove(masterId);
 
             if (accepted)
-            {
                 _acceptedByMaster[masterId] = studentId;
-                _acceptedByStudent[studentId] = masterId;
-            }
 
             return true;
         }
     }
 
+    // Master-only removal for the interactive Start flow; the counterpart's own accepted entry is only
+    // cleared via TryAcknowledgeStart once it's confirmed reachable and not mid zone-transfer.
     public bool TryConsumeStart(int masterId, out int studentId)
     {
         lock (_lock)
         {
-            if (!_acceptedByMaster.Remove(masterId, out studentId))
-                return false;
+            return _acceptedByMaster.Remove(masterId, out studentId);
+        }
+    }
 
-            _acceptedByStudent.Remove(studentId);
-            return true;
+    public bool TryAcknowledgeStart(int studentId, int expectedMasterId)
+    {
+        lock (_lock)
+        {
+            if (_acceptedByStudent.TryGetValue(studentId, out var recordedMasterId) &&
+                recordedMasterId == expectedMasterId)
+            {
+                _acceptedByStudent.Remove(studentId);
+                return true;
+            }
+
+            return false;
         }
     }
 

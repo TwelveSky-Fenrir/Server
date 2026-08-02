@@ -1,7 +1,12 @@
+using Fenrir.Application.Game.Abstractions.Sessions;
+using Fenrir.Protocol.Game;
+
 namespace Fenrir.Application.Game.Domain.World.Monsters;
 
 public static class MonsterAggroListPruner
 {
+    private const int TrackedAttackerCellTolerance = 1;
+
     public static Result Prune(Zone zone, MonsterEntity monster, IEnumerable<MonsterEntity> allMonsters,
         List<Survivor>? resultBuffer = null)
     {
@@ -17,10 +22,15 @@ public static class MonsterAggroListPruner
         var meleeRadiusSq = (float)meleeRadius * meleeRadius;
         var leashRadiusSq = (float)leashRadius * leashRadius;
 
+        var cellSize = zone.AoiCellSize;
+        var monsterCellX = MathF.Floor(monster.PosX / cellSize);
+        var monsterCellY = MathF.Floor(monster.PosY / cellSize);
+        var monsterCellZ = MathF.Floor(monster.PosZ / cellSize);
+
         foreach (var entry in monster.SnapshotAttackDamage())
         {
             if (!TryEvaluateEntry(zone, monster, allMonsters, entry, meleeRadiusSq, leashRadiusSq,
-                    out var distanceSquared))
+                    cellSize, monsterCellX, monsterCellY, monsterCellZ, out var distanceSquared))
                 continue;
 
             survivors.Add(new Survivor(entry.CharacterId, entry.SessionToken, entry.CumulativeDamage,
@@ -31,7 +41,8 @@ public static class MonsterAggroListPruner
     }
 
     private static bool TryEvaluateEntry(Zone zone, MonsterEntity monster, IEnumerable<MonsterEntity> allMonsters,
-        MonsterAttackDamageEntry entry, float meleeRadiusSq, float leashRadiusSq, out float distanceSquared)
+        MonsterAttackDamageEntry entry, float meleeRadiusSq, float leashRadiusSq,
+        float cellSize, float monsterCellX, float monsterCellY, float monsterCellZ, out float distanceSquared)
     {
         distanceSquared = 0f;
 
@@ -39,7 +50,18 @@ public static class MonsterAggroListPruner
             !ReferenceEquals(player, entry.SessionToken))
             return false;
 
+        if (player.Session is not IZoneSession { State: ZoneSessionState.InWorld })
+            return false;
+
         if (player.IsMovingZone || IsHiding(player) || player.IsDead)
+            return false;
+
+        if (player.ActionSort is 0 or 33)
+            return false;
+
+        if (MathF.Abs(MathF.Floor(player.PosX / cellSize) - monsterCellX) > TrackedAttackerCellTolerance ||
+            MathF.Abs(MathF.Floor(player.PosY / cellSize) - monsterCellY) > TrackedAttackerCellTolerance ||
+            MathF.Abs(MathF.Floor(player.PosZ / cellSize) - monsterCellZ) > TrackedAttackerCellTolerance)
             return false;
 
         distanceSquared = DistanceSquared(monster.PosX, monster.PosZ, player.PosX, player.PosZ);

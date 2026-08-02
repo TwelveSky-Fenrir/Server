@@ -23,6 +23,17 @@ public sealed class MentorStartService(
         return true;
     }
 
+    public bool ConfirmStudentForStart(int studentId, int masterId)
+    {
+        if (mentors.TryAcknowledgeStart(studentId, masterId))
+            return true;
+
+        logger.LogDebug(
+            "Mentor start: character {MasterId}'s counterpart {StudentId} no longer shows a matching accepted negotiation -- bond not established, master's own state already reset",
+            masterId, studentId);
+        return false;
+    }
+
     public async ValueTask BondAsync(PlayerRuntimeState master, PlayerRuntimeState student, Zone studentZone,
         CancellationToken cancellationToken)
     {

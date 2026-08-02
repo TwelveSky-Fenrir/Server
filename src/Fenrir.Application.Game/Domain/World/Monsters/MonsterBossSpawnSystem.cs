@@ -32,7 +32,7 @@ public sealed class MonsterBossSpawnSystem(
         var live = 0;
         for (var i = 0; i < MonsterBossSpawnMachine.BossSlotWindowSize; i++)
             if (zone.TryGetMonster(MonsterBossSpawnMachine.DefaultBossSlotBase + i, out var monster) &&
-                monster is not null)
+                monster is not null && monster.Life > 0)
                 live++;
         return live;
     }

@@ -12,6 +12,7 @@ public static class MonsterDeathSequence
 
         monster.AiState = MonsterAiState.Dead;
         monster.StateTicks = 0;
+        monster.StateFrameAccumulator = 0f;
 
         monster.TargetLocationX = knockback.X;
         monster.TargetLocationY = 0f;
@@ -24,6 +25,6 @@ public static class MonsterDeathSequence
 
     public static bool IsCorpseCountdownComplete(MonsterEntity monster)
     {
-        return monster.StateTicks >= Math.Max(1, (int)monster.Template.FrameInfo5);
+        return monster.StateFrameAccumulator >= Math.Max(1, (int)monster.Template.FrameInfo5);
     }
 }

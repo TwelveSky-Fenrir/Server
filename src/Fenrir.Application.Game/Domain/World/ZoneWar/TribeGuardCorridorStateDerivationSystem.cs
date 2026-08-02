@@ -44,7 +44,7 @@ public sealed class TribeGuardCorridorStateDerivationSystem(
 
         var anyAlive = false;
         foreach (var slot in slots)
-            if (zone.TryGetMonster(slot, out _))
+            if (zone.TryGetMonster(slot, out var guard) && guard is not null && guard.Life > 0)
             {
                 anyAlive = true;
                 break;

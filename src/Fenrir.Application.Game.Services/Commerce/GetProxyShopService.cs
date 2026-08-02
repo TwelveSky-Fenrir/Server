@@ -1,72 +1,115 @@
 using Fenrir.Application.Game.Abstractions.Commerce;
 using Fenrir.Application.Game.Domain.Commerce;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Core.Packets.Shared;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Commerce;
 
+/// <summary>
+///     Server/ts25zone/S07_MyGame09.cpp:506-556 -- Sort 1 ("ask for open or close") loads the caller's own
+///     shop from the backing store and only succeeds while it is closed (ShopState 0); Sort 2/3 ("get
+///     self"/"get other", handled identically) scan the zone's own live open-shop registry by name instead.
+///     Response encoding follows Server/ts25zone/S05_MyTransfer.cpp:1719-1725: on success, Result echoes the
+///     request Sort and Sort carries 0; on failure, Result is always 0 and Sort carries the failure code.
+/// </summary>
 public sealed class GetProxyShopService(
     IOfflineShopRepository offlineShops,
-    ICharacterRepository characters,
     ILogger<GetProxyShopService> logger) : IGetProxyShopService
 {
-    public async ValueTask<GetProxyShopResponse> GetAsync(GetProxyShopRequest packet, Zone zone, int characterId,
+    private const int NoError = 0;
+    private const int BackingQueryFailedCode = 100;
+    private const int NotFoundOrNotOpenCode = 101;
+    private const int BackingQueryNonZeroResultCode = 102;
+    private const int ShopNotClosedCode = 1;
+
+    public ValueTask<GetProxyShopResponse> GetAsync(GetProxyShopRequest packet, Zone zone, int characterId,
+        CancellationToken cancellationToken) =>
+        packet.Sort == 1
+            ? GetOwnClosedShopAsync(zone, characterId, cancellationToken)
+            : BrowseOpenShopByNameAsync(packet, zone, cancellationToken);
+
+    private async ValueTask<GetProxyShopResponse> GetOwnClosedShopAsync(Zone zone, int characterId,
         CancellationToken cancellationToken)
     {
-        if (packet.Sort is 1 or 2)
+        OfflineShopRowDto? shop;
+        IReadOnlyList<OfflineShopItemRowDto> items;
+        try
         {
-            var (shop, items) = await offlineShops.GetByCharacterAsync(characterId, cancellationToken);
-            var name = zone.TryGetPlayer(characterId, out var self) && self is not null
-                ? self.Name
-                : packet.AvatarName;
-
-            if (shop is null)
-                logger.LogDebug("Get proxy shop: character {CharacterId} has no proxy shop of their own",
-                    characterId);
-            else
-                logger.LogDebug(
-                    "Get proxy shop: character {CharacterId} fetched their own proxy shop ({ItemCount} items)",
-                    characterId, items.Count);
-
-            return new GetProxyShopResponse
-            {
-                Result = shop is null ? 101 : 0, Sort = packet.Sort,
-                ProxyUser = ProxyShopWireMapper.Build(name, shop, items)
-            };
+            (shop, items) = await offlineShops.GetByCharacterAsync(characterId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Get proxy shop (sort 1) round trip failed for character {CharacterId}",
+                characterId);
+            return Failure(BackingQueryFailedCode);
         }
 
-        var targetId = await characters.GetIdByNameAsync(packet.AvatarName, cancellationToken);
-        if (targetId is null)
+        if (shop is null)
         {
-            logger.LogDebug(
-                "Get proxy shop rejected: character {CharacterId} target {TargetAvatarName} does not exist",
-                characterId, packet.AvatarName);
-            return new GetProxyShopResponse
-            {
-                Result = 101, Sort = packet.Sort, ProxyUser = ProxyShopWireMapper.Build(packet.AvatarName, null, [])
-            };
+            logger.LogDebug("Get proxy shop (sort 1): character {CharacterId} has no offline-shop record",
+                characterId);
+            return Failure(BackingQueryNonZeroResultCode);
         }
 
-        var (targetShop, targetItems) = await offlineShops.GetByCharacterAsync(targetId.Value, cancellationToken);
-        if (targetShop is not { ShopState: 1 })
+        if (shop.ShopState != 0)
         {
             logger.LogDebug(
-                "Get proxy shop rejected: character {CharacterId} target {TargetCharacterId} has no open proxy shop",
-                characterId, targetId.Value);
-            return new GetProxyShopResponse
-            {
-                Result = 101, Sort = packet.Sort, ProxyUser = ProxyShopWireMapper.Build(packet.AvatarName, null, [])
-            };
+                "Get proxy shop (sort 1) rejected: character {CharacterId} shop is not closed (state {ShopState})",
+                characterId, shop.ShopState);
+            return Failure(ShopNotClosedCode);
+        }
+
+        var ownName = zone.TryGetPlayer(characterId, out var self) && self is not null ? self.Name : string.Empty;
+        logger.LogDebug(
+            "Get proxy shop (sort 1): character {CharacterId} loaded their own closed proxy shop ({ItemCount} items)",
+            characterId, items.Count);
+        return Success(1, ProxyShopWireMapper.Build(ownName, shop, items));
+    }
+
+    private async ValueTask<GetProxyShopResponse> BrowseOpenShopByNameAsync(GetProxyShopRequest packet, Zone zone,
+        CancellationToken cancellationToken)
+    {
+        if (!zone.TryFindProxyShopByName(packet.AvatarName, out var entry))
+        {
+            logger.LogDebug(
+                "Get proxy shop (sort {Sort}) rejected: no open proxy shop named {AvatarName} in zone {MapId}",
+                packet.Sort, packet.AvatarName, zone.MapId);
+            return Failure(NotFoundOrNotOpenCode);
+        }
+
+        OfflineShopRowDto? shop;
+        IReadOnlyList<OfflineShopItemRowDto> items;
+        try
+        {
+            (shop, items) = await offlineShops.GetByCharacterAsync(entry.CharacterId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "Get proxy shop (sort {Sort}) item round trip failed for character {CharacterId}",
+                packet.Sort, entry.CharacterId);
+            return Failure(BackingQueryFailedCode);
+        }
+
+        if (shop is null)
+        {
+            logger.LogDebug(
+                "Get proxy shop (sort {Sort}) rejected: {AvatarName}'s shop closed between registry lookup and read",
+                packet.Sort, packet.AvatarName);
+            return Failure(NotFoundOrNotOpenCode);
         }
 
         logger.LogDebug(
-            "Get proxy shop: character {CharacterId} fetched target {TargetCharacterId}'s proxy shop ({ItemCount} items)",
-            characterId, targetId.Value, targetItems.Count);
-        return new GetProxyShopResponse
-        {
-            Result = 0, Sort = packet.Sort,
-            ProxyUser = ProxyShopWireMapper.Build(packet.AvatarName, targetShop, targetItems)
-        };
+            "Get proxy shop (sort {Sort}): resolved {AvatarName}'s open proxy shop ({ItemCount} items)",
+            packet.Sort, packet.AvatarName, items.Count);
+        return Success(packet.Sort, ProxyShopWireMapper.Build(entry.OwnerName, shop, items));
     }
+
+    private static GetProxyShopResponse Success(int sort, ProxyShopUserInfo payload) =>
+        new() { Result = sort, Sort = NoError, ProxyUser = payload };
+
+    private static GetProxyShopResponse Failure(int errorCode) =>
+        new() { Result = 0, Sort = errorCode, ProxyUser = ProxyShopWireMapper.Build(string.Empty, null, []) };
 }

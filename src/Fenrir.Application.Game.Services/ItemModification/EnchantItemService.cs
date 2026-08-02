@@ -26,6 +26,8 @@ public sealed class EnchantItemService(
 
     private const int ProtectItem2StatSort = 104;
 
+    private const int WingProtectStatSort = 99;
+
     private const int SweetPotatoStatSort = 146;
 
     public async ValueTask<EnchantItemResult> EnchantAsync(EnchantItemRequest packet, Zone zone,
@@ -92,7 +94,7 @@ public sealed class EnchantItemService(
 
         var resolved = EnchantResolver.Resolve(targetDefinition, target, materialDefinition, luck,
             state.ProtectForDestroy, state.ImproveItemValue, SystemRandomSource.Instance,
-            state.ProtectForDestroy2);
+            state.ProtectForDestroy2, state.ProtectForWing);
 
         if (resolved.Outcome == EnchantResolver.EnchantOutcome.Rejected)
         {
@@ -159,6 +161,7 @@ public sealed class EnchantItemService(
 
         int? newProtectForDestroy = resolved.ConsumesProtectCharge ? state.ProtectForDestroy - 1 : null;
         int? newProtectForDestroy2 = resolved.ConsumesProtectCharge2 ? state.ProtectForDestroy2 - 1 : null;
+        int? newProtectForWing = resolved.ConsumesWingProtectCharge ? state.ProtectForWing - 1 : null;
         int? newImproveItemValue = resolved.ConsumesImproveCharge ? state.ImproveItemValue - 1 : null;
 
         if (resolved.IsWing)
@@ -167,7 +170,7 @@ public sealed class EnchantItemService(
             if (!await zone.PostTribeProgressCommandAndWaitAsync(
                     new TribeProgressZoneCommand(characterId, newContributionPoints,
                         ProtectForDestroy: newProtectForDestroy, ProtectForDestroy2: newProtectForDestroy2,
-                        ImproveItemValue: newImproveItemValue),
+                        ProtectForWing: newProtectForWing, ImproveItemValue: newImproveItemValue),
                     cancellationToken))
                 logger.LogError(
                     "Zone {MapId} tribe-progress inbox full: dropped CP/charge mirror for character {CharacterId} after wing enchant -- SQL write-behind will retry on next dirty flush",
@@ -200,6 +203,10 @@ public sealed class EnchantItemService(
             state.Session.Send(new AvatarStatUpdateResponse
                 { Sort = ProtectItemStatSort, Value = remainingProtectCharges, Value2 = 0 });
 
+        if (newProtectForWing is { } remainingWingProtectCharges)
+            state.Session.Send(new AvatarStatUpdateResponse
+                { Sort = WingProtectStatSort, Value = remainingWingProtectCharges, Value2 = 0 });
+
         var resultCode = MapResultCode(resolved.Outcome, resolved.IsWing);
 
         if (resolved.Outcome == EnchantResolver.EnchantOutcome.Success)
@@ -218,7 +225,9 @@ public sealed class EnchantItemService(
                 characterId, null, null, null, resolved.IsWing ? null : -(long)resolved.Cost, null, target.ItemId,
                 target.Quantity, (byte)resultCode,
                 resolved.IsWing
-                    ? $"Serial={target.Serial};From={target.Enchant};To={resolved.NewEnchant};Material={material.ItemId};CpCost={resolved.Cost}"
+                    ? resolved.ConsumesWingProtectCharge
+                        ? $"Tag=PT_WING;Serial={target.Serial};From={target.Enchant};To={resolved.NewEnchant};Material={material.ItemId};CpCost={resolved.Cost}"
+                        : $"Serial={target.Serial};From={target.Enchant};To={resolved.NewEnchant};Material={material.ItemId};CpCost={resolved.Cost}"
                     : $"Serial={target.Serial};From={target.Enchant};To={resolved.NewEnchant};Material={material.ItemId}",
                 DateTime.UtcNow)))
             logger.LogWarning(

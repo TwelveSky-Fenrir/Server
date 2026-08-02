@@ -67,7 +67,7 @@ public sealed partial class Zone
         state.DungeonInstanceLifecycleState = DungeonInstanceLifecycle.Summoning;
         state.DungeonInstanceTick = 0;
 
-        if (!_monsters.TryGetValue(characterId, out var occupant) || occupant is null)
+        if (!_monsters.TryGetValue(characterId, out var occupant) || occupant is null || occupant.Life <= 0)
         {
             var bossMonsterId = PersonalDungeonBossTables.ResolveCatalogD(MapId);
             if (!worldData.MonstersById.TryGetValue(bossMonsterId, out var monsterDefinition))
@@ -155,7 +155,7 @@ public sealed partial class Zone
 
             var instanceId = state.DungeonInstanceId ?? state.CharacterId;
             var bossAlive = _monsters.TryGetValue(instanceId, out var boss) && boss is not null &&
-                            boss.InstanceId == instanceId;
+                            boss.InstanceId == instanceId && boss.Life > 0;
 
             if (!bossAlive)
             {

@@ -145,11 +145,6 @@ public static partial class StatCalculator
         return false;
     }
 
-    private static int PhoenixFlatBonus(int itemId, int b76005, int b76006, int b76007)
-    {
-        return itemId switch { 76005 => b76005, 76006 => b76006, 76007 => b76007, _ => 0 };
-    }
-
     private static EquippedItemSlot?[] BuildSlotLookup(IReadOnlyList<EquippedItemSlot> equipment)
     {
         var bySlot = new EquippedItemSlot?[13];

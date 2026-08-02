@@ -94,12 +94,56 @@ public sealed class GuildInviteRegistry
         }
     }
 
-    public bool TryAnswer(int targetId, bool accepted, out int askerId)
+    // Asker-only removal for the interactive Cancel flow; TryCancel above (dual removal) stays reserved
+    // for PendingSocialRequestAutoCancelSystem's disconnect sweep.
+    public bool TryWithdrawAsk(int askerId, out int targetId)
     {
+        lock (_lock)
+        {
+            if (_pendingByAsker.Remove(askerId, out targetId))
+                return true;
+
+            if (_crossShard.TryConsumeOutbound(askerId, out var crossShardAsk))
+            {
+                targetId = crossShardAsk.TargetCharacterId;
+                return true;
+            }
+
+            return false;
+        }
+    }
+
+    public bool TryAcknowledgeWithdrawal(int targetId, int expectedAskerId)
+    {
+        lock (_lock)
+        {
+            if (_pendingByTarget.TryGetValue(targetId, out var recordedAskerId) && recordedAskerId == expectedAskerId)
+            {
+                _pendingByTarget.Remove(targetId);
+                return true;
+            }
+
+            return false;
+        }
+    }
+
+    // Target's own pending state always commits first; asker's own state only advances when
+    // askerBusyByZoneTransfer is false. guardBlocked distinguishes that gated rejection from "no pending invite".
+    public bool TryAnswer(int targetId, bool accepted, bool askerBusyByZoneTransfer, out int askerId,
+        out bool guardBlocked)
+    {
+        guardBlocked = false;
+
         lock (_lock)
         {
             if (!_pendingByTarget.Remove(targetId, out askerId))
                 return false;
+
+            if (askerBusyByZoneTransfer)
+            {
+                guardBlocked = true;
+                return false;
+            }
 
             _pendingByAsker.Remove(askerId);
 

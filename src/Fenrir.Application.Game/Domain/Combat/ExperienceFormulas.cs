@@ -10,6 +10,12 @@ public static class ExperienceFormulas
 
     public const int MinimumLevelForDeathExperienceLoss = 10;
 
+    /// <summary>Neutral personalExpDownRatio -- no premium discount. Ref: S03_MyUser.cpp:524-541.</summary>
+    public const float PersonalExpDownRatioDefault = 1.0f;
+
+    /// <summary>personalExpDownRatio while premium is active. Ref: S03_MyUser.cpp:524-541.</summary>
+    public const float PersonalExpDownRatioPremium = 0.5f;
+
     public static int ReturnFixedLevel(int level)
     {
         if (level < 100)
@@ -69,6 +75,15 @@ public static class ExperienceFormulas
     }
 
     /// <summary>
+    ///     Resolves personalExpDownRatio from the character's stored premium-expiry timestamp: 0.5 while
+    ///     nonzero (premium active), else the neutral 1.0. Ref: S03_MyUser.cpp:524-541;
+    ///     S07_MyGame04.cpp:1081-1095 (the timestamp is cleared to 0 the instant it's found lapsed, so this
+    ///     check never lags an expired subscription).
+    /// </summary>
+    public static float ResolvePersonalExpDownRatio(long premiumExpireUtc) =>
+        premiumExpireUtc != 0 ? PersonalExpDownRatioPremium : PersonalExpDownRatioDefault;
+
+    /// <summary>
     ///     Computes raw EXP loss on death.
     /// </summary>
     /// <param name="currentExperience">The character's current experience value.</param>
@@ -77,26 +92,33 @@ public static class ExperienceFormulas
     ///     Legacy calls this <c>tLevelFactor1</c> / <c>tMinusGeneralExperience</c>.
     /// </param>
     /// <param name="personalExpDownRatio">
-    ///     Per-character EXP-loss multiplier (<c>mGeneralExpDownRatio</c>). Starts at 1.0 and may be reduced
-    ///     by certain character effects. Pass 1.0f when no active modifier is known.
-    ///     Ref: Server/ts25zone/S07_MyGame02.cpp:2921-2964.
+    ///     Per-character EXP-loss multiplier (<c>mGeneralExpDownRatio</c>), a true fraction. See
+    ///     <see cref="ResolvePersonalExpDownRatio" />. Ref: Server/ts25zone/S07_MyGame02.cpp:2943-2944.
     /// </param>
     /// <param name="globalExpDownRatio">
-    ///     Server-wide EXP-loss multiplier (<c>mGAME.mGeneralExpDownRatio</c>). Normally 1.0.
-    ///     Pass 1.0f when no active server override is in effect.
-    ///     Ref: Server/ts25zone/S07_MyGame02.cpp:2921-2964.
+    ///     Server-process-wide EXP-loss multiplier (<c>mGAME.mGeneralExpDownRatio</c>) -- a raw, unscaled
+    ///     integer read once from configuration at startup, NOT a fraction. Applied as a second, separate
+    ///     multiplication after the personal-ratio result is already truncated (see remarks).
+    ///     Ref: Server/ts25zone/S07_MyGame02.cpp:2943-2944; H07_MyGame.h:77; S07_MyGame01.cpp:422-432.
     /// </param>
     /// <returns>
     ///     The EXP amount to subtract (≥ 0; capped at <paramref name="currentExperience" /> so the result
-    ///     can never drive EXP negative). Returns 0 when the ratio-reduced loss rounds below 1.
+    ///     can never drive EXP negative). Returns 0 when the fully-reduced loss is below 1.
     /// </returns>
+    /// <remarks>
+    ///     Two-stage computation, matching legacy's own sequencing rather than one combined float multiply:
+    ///     the personal-ratio loss is computed and truncated to a whole number FIRST, and only that
+    ///     already-truncated whole number is then multiplied by the raw-integer global ratio, as a distinct
+    ///     second step. Ref: Server/ts25zone/S07_MyGame02.cpp:2943-2944.
+    /// </remarks>
     public static long ComputeDeathExperienceLoss(
         long currentExperience,
         int levelFactor1,
-        float personalExpDownRatio = 1.0f,
-        float globalExpDownRatio = 1.0f)
+        float personalExpDownRatio = PersonalExpDownRatioDefault,
+        int globalExpDownRatio = 1)
     {
-        var loss = (long)((currentExperience - levelFactor1) * 0.05f * personalExpDownRatio * globalExpDownRatio);
+        var personalLoss = (long)((currentExperience - levelFactor1) * 0.05f * personalExpDownRatio);
+        var loss = personalLoss * globalExpDownRatio;
         if (loss < 1) return 0;
         return loss > currentExperience ? currentExperience : loss;
     }

@@ -16,6 +16,8 @@ public sealed class WithdrawProxyShopEarningsService(
     private const short ProxyShopWithdrawEventCode = 4;
 
     private const int NothingToWithdrawErrorNumber = 50340;
+    private const int MoneyCapOverflowErrorNumber = 50261;
+    private const int BigMoneyCapOverflowErrorNumber = 50333;
 
     public async ValueTask<WithdrawProxyShopEarningsResponse> WithdrawAsync(int characterId, int accountId,
         int money, int bigMoney, CancellationToken cancellationToken)
@@ -30,6 +32,20 @@ public sealed class WithdrawProxyShopEarningsService(
             logger.LogInformation(
                 "Character {CharacterId} offline-shop withdraw denied: nothing to withdraw", characterId);
             return new WithdrawProxyShopEarningsResponse { Result = 4, Money = 0, BigMoney = 0 };
+        }
+        catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException { Number: MoneyCapOverflowErrorNumber })
+        {
+            logger.LogInformation(
+                "Character {CharacterId} offline-shop withdraw blocked: crediting {Money} would exceed the money cap",
+                characterId, money);
+            return new WithdrawProxyShopEarningsResponse { Result = 1, Money = 0, BigMoney = 0 };
+        }
+        catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException { Number: BigMoneyCapOverflowErrorNumber })
+        {
+            logger.LogInformation(
+                "Character {CharacterId} offline-shop withdraw blocked: crediting {BigMoney} would exceed the BigMoney cap",
+                characterId, bigMoney);
+            return new WithdrawProxyShopEarningsResponse { Result = 2, Money = 0, BigMoney = 0 };
         }
         catch (Exception ex)
         {

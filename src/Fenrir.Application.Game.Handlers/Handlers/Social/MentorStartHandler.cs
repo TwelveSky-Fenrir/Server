@@ -25,7 +25,11 @@ public sealed class MentorStartHandler(
             return;
 
         if (!zones.TryGetPlayer(masterId, out var master) ||
-            !zones.TryGetPlayerAndZone(studentId, out var student, out var studentZone))
+            !zones.TryGetPlayerAndZone(studentId, out var student, out var studentZone) ||
+            student.IsMovingZone)
+            return;
+
+        if (!mentorStartService.ConfirmStudentForStart(studentId, masterId))
             return;
 
         await mentorStartService.BondAsync(master, student, studentZone, cancellationToken);

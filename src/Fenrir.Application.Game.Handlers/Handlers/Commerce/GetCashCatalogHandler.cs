@@ -20,6 +20,8 @@ public sealed class GetCashCatalogHandler(IGetCashCatalogService service, ILogge
         if (zoneSession.CurrentZone is Zone zone && zoneSession.CharacterId is { } characterId)
             zone.TryGetPlayer(characterId, out state);
 
-        session.Send(service.GetCatalog(state));
+        var response = service.GetCatalog(state);
+        if (response is not null)
+            session.Send(response.Value);
     }
 }

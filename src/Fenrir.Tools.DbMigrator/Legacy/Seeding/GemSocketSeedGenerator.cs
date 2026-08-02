@@ -10,10 +10,8 @@ public static class GemSocketSeedGenerator
 {
     private const int MaxRowsPerInsert = 500;
 
-    public static GemSocketSeedStats Generate(string dataDir, string outputDir)
+    public static GemSocketSeedStats Generate(string dataDir, string outputPath)
     {
-        Directory.CreateDirectory(outputDir);
-
         var sockets = SocketReader.ReadAll(dataDir);
 
         var rows = new List<string>(sockets.Count);
@@ -48,7 +46,8 @@ public static class GemSocketSeedGenerator
 
         sb.AppendLine("END;");
 
-        File.WriteAllText(Path.Combine(outputDir, "060_gem_sockets.sql"), sb.ToString());
+        File.WriteAllText(outputPath, sb.ToString());
+        Console.WriteLine($"{Path.GetFileName(outputPath)}: {rows.Count} gem-socket rows -> {outputPath}");
 
         return new GemSocketSeedStats(rows.Count);
     }

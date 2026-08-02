@@ -60,7 +60,8 @@ public sealed class FriendService(
                 return FriendAskResultKind.AlreadyFriendOrFull;
             }
 
-            if (CommunityWorkGate.IsBusy(asker, duels, trades, friends, parties, mentors, guildInvites))
+            if (CommunityWorkGate.IsBusy(asker, duels, trades, friends, parties, mentors, guildInvites) ||
+                asker.IsStunned || asker.IsDead)
             {
                 logger.LogDebug("Friend ask rejected: character {AskerId} already has a pending negotiation",
                     asker.CharacterId);
@@ -75,9 +76,11 @@ public sealed class FriendService(
                 return FriendAskResultKind.TribeMismatch;
             }
 
-            if (CommunityWorkGate.IsBusy(target, duels, trades, friends, parties, mentors, guildInvites))
+            if (CommunityWorkGate.IsBusy(target, duels, trades, friends, parties, mentors, guildInvites) ||
+                target.IsStunned || target.IsDead || target.IsMovingZone)
             {
-                logger.LogDebug("Friend ask rejected: target character {TargetCharacterId} is busy",
+                logger.LogDebug(
+                    "Friend ask rejected: target character {TargetCharacterId} is busy or mid zone-transfer",
                     target.CharacterId);
                 return FriendAskResultKind.TargetBusy;
             }
@@ -104,7 +107,8 @@ public sealed class FriendService(
             }
         }
 
-        if (CommunityWorkGate.IsBusy(asker, duels, trades, friends, parties, mentors, guildInvites))
+        if (CommunityWorkGate.IsBusy(asker, duels, trades, friends, parties, mentors, guildInvites) ||
+            asker.IsStunned || asker.IsDead)
         {
             logger.LogDebug("Friend ask rejected: character {AskerId} already has a pending negotiation",
                 asker.CharacterId);
@@ -142,14 +146,31 @@ public sealed class FriendService(
             return;
         }
 
-        if (!friends.TryAnswer(targetId, answerCode == 0, out var askerId))
+        if (!friends.TryPeekPending(targetId, out var pendingAskerId, out var isAsker) || isAsker)
         {
             logger.LogDebug("Friend answer ignored: character {TargetId} has no pending ask", targetId);
             return;
         }
 
-        if (zones.TryGetPlayer(askerId, out var asker))
-            asker.Session.Send(new FriendAnswerResponse { Answer = answerCode });
+        var askerBusyByZoneTransfer = !zones.TryGetPlayer(pendingAskerId, out var asker) || asker.IsMovingZone;
+
+        if (!friends.TryAnswer(targetId, answerCode == 0, askerBusyByZoneTransfer, out var askerId,
+                out var guardBlocked))
+        {
+            if (guardBlocked)
+                logger.LogDebug(
+                    "Friend answer: character {TargetId} committed answer {AnswerCode} locally, but asker {AskerId} is unreachable or mid zone-transfer -- no notice sent, asker's own record left as-is",
+                    targetId, answerCode, askerId);
+            else
+                logger.LogDebug("Friend answer ignored: character {TargetId} has no pending ask", targetId);
+
+            return;
+        }
+
+        if (asker is null)
+            return;
+
+        asker.Session.Send(new FriendAnswerResponse { Answer = answerCode });
 
         logger.LogDebug("Friend answer: character {TargetId} answered {AnswerCode} to asker {AskerId}", targetId,
             answerCode, askerId);
@@ -157,14 +178,22 @@ public sealed class FriendService(
 
     public void Cancel(int askerId)
     {
-        if (!friends.TryCancel(askerId, out var targetId))
+        if (!friends.TryWithdrawAsk(askerId, out var targetId))
         {
             logger.LogDebug("Friend cancel ignored: character {AskerId} has no pending ask to cancel", askerId);
             return;
         }
 
-        if (zones.TryGetPlayer(targetId, out var target))
-            target.Session.Send(new FriendCancelResponse());
+        if (!zones.TryGetPlayer(targetId, out var target) || target.IsMovingZone ||
+            !friends.TryAcknowledgeWithdrawal(targetId, askerId))
+        {
+            logger.LogDebug(
+                "Friend cancel: character {AskerId} withdrew locally, but counterpart {TargetId} is unreachable, mid zone-transfer, or no longer reciprocally linked -- left un-notified",
+                askerId, targetId);
+            return;
+        }
+
+        target.Session.Send(new FriendCancelResponse());
 
         logger.LogDebug("Friend ask cancelled: character {AskerId} withdrew ask to character {TargetId}", askerId,
             targetId);
@@ -218,9 +247,27 @@ public sealed class FriendService(
             return new FriendAddResult(FriendAddResultKind.InvalidSlot);
         }
 
-        if (!friends.TryConsumeAccepted(state.CharacterId, out var otherId))
+        if (!friends.TryPeekAccepted(state.CharacterId, out var otherId))
         {
             logger.LogDebug("Friend add ignored: character {CharacterId} has no accepted friend request to consume",
+                state.CharacterId);
+            return new FriendAddResult(FriendAddResultKind.NoPendingAccept);
+        }
+
+        if (!zones.TryGetPlayer(otherId, out var other) ||
+            !friends.TryPeekAccepted(other.CharacterId, out var backPointer) || backPointer != state.CharacterId ||
+            other.IsMovingZone)
+        {
+            friends.ClearAcceptedSelf(state.CharacterId);
+            logger.LogDebug(
+                "Friend add aborted: character {CharacterId} counterpart {OtherId} is unreachable, no longer reciprocally accepted, or mid zone-transfer -- own state reset to idle, counterpart left untouched",
+                state.CharacterId, otherId);
+            return new FriendAddResult(FriendAddResultKind.NoPendingAccept);
+        }
+
+        if (!friends.TryConsumeAccepted(state.CharacterId, out otherId))
+        {
+            logger.LogDebug("Friend add ignored: character {CharacterId} accepted state changed concurrently",
                 state.CharacterId);
             return new FriendAddResult(FriendAddResultKind.NoPendingAccept);
         }
@@ -230,10 +277,9 @@ public sealed class FriendService(
 
         state.Friends[slot] = otherId;
 
-        var otherName = zones.TryGetPlayer(otherId, out var other) ? other.Name : "";
         logger.LogInformation("Friend added: character {CharacterId} added character {OtherId} to slot {Index}",
             state.CharacterId, otherId, index);
-        return new FriendAddResult(FriendAddResultKind.Added, otherName);
+        return new FriendAddResult(FriendAddResultKind.Added, other.Name);
     }
 
     public async ValueTask<FriendRemoveResultKind> RemoveAsync(PlayerRuntimeState state, int index,

@@ -165,7 +165,7 @@ public sealed class TowerUpgradeService(
             return Fail(characterId, page, index, "not the requester's own tribe zone");
 
         var guardianIndex = TowerWarState.GuardianServerIndex(towerIndex);
-        if (!zone.TryGetMonster(guardianIndex, out var guardian) || guardian is null)
+        if (!zone.TryGetMonster(guardianIndex, out var guardian) || guardian is null || guardian.Life <= 0)
             return Fail(characterId, page, index, "no live tower guardian");
 
         if (!WithinHealRange(state, zone.MapId))

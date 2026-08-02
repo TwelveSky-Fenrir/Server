@@ -44,13 +44,8 @@ public static partial class StatCalculator
 
         if (bySlot[8] is { } petAmulet)
         {
-            atk -= petAmulet.Item
-                .AttackPower;
-            atk += PhoenixFlatBonus(petAmulet.Item.ItemId, 3000, 4000, 5000);
-            atk += PhoenixDamageSecondPassBonus(petAmulet.Item.ItemId);
-
-            if (!PetAmuletPhoenixOverlapIds.Contains(petAmulet.Item.ItemId))
-                atk += PetAmuletAttackBonus(petAmulet.Item.ItemId, petAmulet.Item.Sort);
+            atk -= petAmulet.Item.AttackPower;
+            atk += PetAmuletAttackBonus(petAmulet.Item.ItemId, petAmulet.Item.Sort);
         }
 
         atk += SetBonusTables.GetBaseFlatAttackPowerBonus(setNumber);

@@ -427,13 +427,11 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
     {
         lock (_lock)
         {
-            if (_attackState[towerIndex] == AttackStateIdle || _lastAttackAtUtc[towerIndex] is not { } last)
-                return false;
-
-            if (utcNow - last < AttackStateIdleReset)
+            if (_lastAttackAtUtc[towerIndex] is not { } last || utcNow - last < AttackStateIdleReset)
                 return false;
 
             _attackState[towerIndex] = AttackStateIdle;
+            _lastAttackAtUtc[towerIndex] = utcNow;
             return true;
         }
     }

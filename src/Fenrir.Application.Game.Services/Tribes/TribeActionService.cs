@@ -32,8 +32,6 @@ public sealed class TribeActionService(
     private const int AlertCharmCpCost = 10;
     private const int RebirthCpCost = 10_000;
 
-    private const int MaxRebirth = 6;
-
     private const int ProtectHaloStatSort = 31;
 
     public async ValueTask<TribeActionOutcome> ResetStatsAsync(Zone zone, PlayerRuntimeState state, int characterId,
@@ -376,14 +374,6 @@ public sealed class TribeActionService(
             !RebirthProgression.IsHighLevelExperienceFull(state.Level2, state.Exp2) ||
             state.ContributionPoints < RebirthCpCost)
             return TribeActionOutcome.Abort;
-
-        if (state.RebirthCount >= MaxRebirth)
-        {
-            logger.LogDebug(
-                "Character {CharacterId} Max Rebirth (Path B) rejected: already at the path-specific cap ({RebirthCount}/{MaxRebirth})",
-                characterId, state.RebirthCount, MaxRebirth);
-            return TribeActionOutcome.Ok(1);
-        }
 
         var newRebirthCount = state.RebirthCount + 1;
         var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,

@@ -9,6 +9,7 @@ namespace Fenrir.Network.Transport;
 public sealed class FenrirTcpListener<TSession> : IAsyncDisposable
 {
     private const int Backlog = 512;
+    private readonly bool _applyOsSocketBuffers;
     private readonly Socket _listenSocket;
 
     private readonly ILogger? _logger;
@@ -16,10 +17,11 @@ public sealed class FenrirTcpListener<TSession> : IAsyncDisposable
     private readonly SessionIdAllocator _sessionIds;
 
     public FenrirTcpListener(IPEndPoint endpoint, Func<long, IDuplexPipe, IPEndPoint?, TSession> sessionFactory,
-        ILogger? logger = null, SessionIdAllocator? sessionIds = null)
+        ILogger? logger = null, SessionIdAllocator? sessionIds = null, bool applyOsSocketBuffers = false)
     {
         _sessionFactory = sessionFactory;
         _logger = logger;
+        _applyOsSocketBuffers = applyOsSocketBuffers;
 
         _sessionIds = sessionIds ?? SessionIdAllocator.Shared;
 
@@ -58,7 +60,7 @@ public sealed class FenrirTcpListener<TSession> : IAsyncDisposable
             SocketConnection? connection = null;
             try
             {
-                connection = new SocketConnection(accepted, _logger);
+                connection = new SocketConnection(accepted, _logger, _applyOsSocketBuffers);
                 var sessionId = _sessionIds.Next();
                 var session = _sessionFactory(sessionId, connection, connection.RemoteEndPoint);
 

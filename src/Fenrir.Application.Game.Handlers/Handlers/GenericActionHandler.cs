@@ -178,7 +178,7 @@ public sealed class GenericActionHandler(
                 logger.LogInformation(
                     "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} rejected, unsupported hotkey binding sort {BindSort}",
                     zoneSession.SessionId, characterId, sort, bindSort);
-                Respond(session, zoneSession, sort, packet.Data, GenericActionResult.Failed);
+                Respond(session, zoneSession, sort, packet.Data, GenericActionResult.Aborted);
                 return;
             }
 
@@ -295,11 +295,10 @@ public sealed class GenericActionHandler(
 
         if (sort == 236)
         {
-            if (debugEnabled)
-                logger.LogDebug(
-                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} is a retired feature -- soft-fail",
-                    zoneSession.SessionId, characterId, sort);
-            Respond(session, zoneSession, sort, packet.Data, GenericActionResult.Failed);
+            logger.LogInformation(
+                "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} disconnects unconditionally, no response sent (Server/ts25zone/S04_MyWork04.cpp:849-853 live LNW33 case 236: Quit())",
+                zoneSession.SessionId, characterId, sort);
+            zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 
@@ -416,12 +415,13 @@ public sealed class GenericActionHandler(
                     "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to hotkey family",
                     zoneSession.SessionId, characterId, sort);
 
+            var secondInventoryPageActive = state.InventoryDate >= GameDate.Today();
             var hotkeyResult = sort switch
             {
                 211 or 253 => await hotkeyActionService.BindItemAsync(zone, state, characterId, hotkeyMove,
-                    cancellationToken),
+                    secondInventoryPageActive, cancellationToken),
                 214 => await hotkeyActionService.WithdrawItemAsync(zone, state, characterId, hotkeyMove,
-                    cancellationToken),
+                    secondInventoryPageActive, cancellationToken),
                 _ => await hotkeyActionService.RearrangeAsync(zone, state, characterId, hotkeyMove,
                     cancellationToken)
             };

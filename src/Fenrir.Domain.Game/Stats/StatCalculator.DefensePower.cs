@@ -32,19 +32,13 @@ public static partial class StatCalculator
         if (bySlot[8] is { } petAmulet)
         {
             def -= petAmulet.Item.DefensePower;
-            def += PhoenixFlatBonus(petAmulet.Item.ItemId, 5000, 7500, 12500);
-
-            if (!PetAmuletPhoenixOverlapIds.Contains(petAmulet.Item.ItemId))
-                def += PetAmuletDefenseBonus(petAmulet.Item.ItemId, petAmulet.Item.Sort);
+            def += PetAmuletDefenseBonus(petAmulet.Item.ItemId, petAmulet.Item.Sort);
         }
 
         def += SetBonusTables.GetBaseFlatDefensePowerBonus(setNumber);
 
         if (bySlot[1] is { } capeSlot)
             def += capeSlot.Item.ItemId switch { 1404 => 2200, 1401 => 650, _ => 0 };
-
-        if (bySlot[8] is { } petAmuletFinal)
-            def += PhoenixFlatBonus(petAmuletFinal.Item.ItemId, 2000, 4500, 9500);
 
         def += StellarCoreDefensePowerContribution(cosmetic);
         def += OrnamentDefenseContribution(zone, bySlot);

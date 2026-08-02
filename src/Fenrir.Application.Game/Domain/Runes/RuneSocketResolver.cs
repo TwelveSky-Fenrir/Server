@@ -26,7 +26,7 @@ public static class RuneSocketResolver
             return new InsertResult(InsertOutcome.Rejected);
 
         var naturalSlot = sourceItemId - BaseItemId;
-        if (runeIndex != naturalSlot || runeSystem[runeIndex] != 0)
+        if (runeSystem[runeIndex] != 0 || runeSystem[naturalSlot] != 0)
             return new InsertResult(InsertOutcome.Rejected);
 
         return new InsertResult(InsertOutcome.Success);

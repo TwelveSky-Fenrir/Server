@@ -8,7 +8,8 @@ namespace Fenrir.Application.Login.Handlers.Dispatching;
 public sealed class LoginFrameDispatcher(LoginIdleClock idleClock, ILogger<LoginFrameDispatcher> logger)
     : IFrameDispatcher
 {
-    public async ValueTask DispatchAsync(FenrirServer server, byte opcode, ReadOnlySequence<byte> payload,
+    public async ValueTask<FrameDispatchOutcome> DispatchAsync(FenrirServer server, byte opcode,
+        ReadOnlySequence<byte> payload,
         IPacketSession session, CancellationToken cancellationToken)
     {
         var memory = payload.IsSingleSegment ? payload.First : payload.ToArray();
@@ -16,19 +17,21 @@ public sealed class LoginFrameDispatcher(LoginIdleClock idleClock, ILogger<Login
         if (LoginMessageDispatcher.TryHandleInline(server, opcode, memory.Span, session))
         {
             RearmIdleClock(opcode, session);
-            return;
+            return FrameDispatchOutcome.Handled;
         }
 
         if (await LoginMessageDispatcher.TryHandleAsync(server, opcode, memory, session, cancellationToken)
                 .ConfigureAwait(false))
         {
             RearmIdleClock(opcode, session);
-            return;
+            return FrameDispatchOutcome.Handled;
         }
 
         logger.LogWarning(
             "No handler registered for {Server} opcode {Opcode}, or handler present but payload failed to parse ({PayloadLength} bytes)",
             server, opcode, memory.Length);
+
+        return FrameDispatchOutcome.Handled;
     }
 
     private void RearmIdleClock(byte opcode, IPacketSession session)

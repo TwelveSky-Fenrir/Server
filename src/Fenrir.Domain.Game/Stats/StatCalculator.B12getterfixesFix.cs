@@ -30,11 +30,6 @@ public static partial class StatCalculator
     }
 
 
-    public static int PhoenixDamageSecondPassBonus(int petSlotItemId)
-    {
-        return PhoenixFlatBonus(petSlotItemId, 0, 1000, 2000);
-    }
-
     public static bool IsBalanceStatZone(short zoneNumber)
     {
         return BalanceStatZoneNumbers.Contains(zoneNumber);

@@ -125,14 +125,32 @@ public sealed class GuildInviteService(
             return;
         }
 
-        if (!invites.TryAnswer(targetId, answerCode == 0, out var askerId))
+        if (!invites.TryPeekPending(targetId, out var pendingAskerId, out var isAsker) || isAsker)
         {
             logger.LogDebug("Character {TargetId} guild invite answer ignored: no pending invite found", targetId);
             return;
         }
 
-        if (zones.TryGetPlayer(askerId, out var asker))
-            asker.Session.Send(new GuildInviteAnswerResponse { Answer = answerCode });
+        var askerBusyByZoneTransfer = !zones.TryGetPlayer(pendingAskerId, out var asker) || asker.IsMovingZone;
+
+        if (!invites.TryAnswer(targetId, answerCode == 0, askerBusyByZoneTransfer, out var askerId,
+                out var guardBlocked))
+        {
+            if (guardBlocked)
+                logger.LogDebug(
+                    "Character {TargetId} guild invite answer: committed answer {AnswerCode} locally, but asker {AskerId} is unreachable or mid zone-transfer -- no notice sent, asker's own record left as-is",
+                    targetId, answerCode, askerId);
+            else
+                logger.LogDebug("Character {TargetId} guild invite answer ignored: no pending invite found",
+                    targetId);
+
+            return;
+        }
+
+        if (asker is null)
+            return;
+
+        asker.Session.Send(new GuildInviteAnswerResponse { Answer = answerCode });
 
         logger.LogInformation(
             "Character {TargetId} answered guild invite from character {AskerId}: accepted={Accepted}", targetId,
@@ -141,14 +159,22 @@ public sealed class GuildInviteService(
 
     public void Cancel(int askerId)
     {
-        if (!invites.TryCancel(askerId, out var targetId))
+        if (!invites.TryWithdrawAsk(askerId, out var targetId))
         {
             logger.LogDebug("Character {AskerId} guild invite cancel ignored: no pending invite found", askerId);
             return;
         }
 
-        if (zones.TryGetPlayer(targetId, out var target))
-            target.Session.Send(new GuildInviteCancelResponse());
+        if (!zones.TryGetPlayer(targetId, out var target) || target.IsMovingZone ||
+            !invites.TryAcknowledgeWithdrawal(targetId, askerId))
+        {
+            logger.LogDebug(
+                "Character {AskerId} guild invite cancel: withdrew locally, but target {TargetId} is unreachable, mid zone-transfer, or no longer reciprocally linked -- left un-notified",
+                askerId, targetId);
+            return;
+        }
+
+        target.Session.Send(new GuildInviteCancelResponse());
 
         logger.LogInformation("Character {AskerId} cancelled guild invite to character {TargetId}", askerId,
             targetId);

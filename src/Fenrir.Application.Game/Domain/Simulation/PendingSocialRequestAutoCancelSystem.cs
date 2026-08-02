@@ -55,7 +55,7 @@ public sealed class PendingSocialRequestAutoCancelSystem(
         if (isAsker)
             friendRegistry.TryCancel(characterId, out _);
         else
-            friendRegistry.TryAnswer(characterId, false, out _);
+            friendRegistry.TryAnswer(characterId, false, false, out _, out _);
     }
 
     private void SweepMentor(int characterId)
@@ -67,7 +67,7 @@ public sealed class PendingSocialRequestAutoCancelSystem(
         if (isMaster)
             mentorRegistry.TryCancel(characterId, out _);
         else
-            mentorRegistry.TryAnswer(characterId, false, out _);
+            mentorRegistry.TryAnswer(characterId, false, false, out _, out _);
     }
 
     private void SweepParty(int characterId)
@@ -91,6 +91,6 @@ public sealed class PendingSocialRequestAutoCancelSystem(
         if (isAsker)
             guildInviteRegistry.TryCancel(characterId, out _);
         else
-            guildInviteRegistry.TryAnswer(characterId, false, out _);
+            guildInviteRegistry.TryAnswer(characterId, false, false, out _, out _);
     }
 }

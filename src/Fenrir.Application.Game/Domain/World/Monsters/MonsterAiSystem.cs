@@ -1,11 +1,13 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World.Geometry;
 using Fenrir.Application.Game.Domain.World.Pathfinding;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
+using Fenrir.Protocol.Game;
 
 namespace Fenrir.Application.Game.Domain.World.Monsters;
 
@@ -132,7 +134,14 @@ public sealed partial class MonsterAiSystem(
                 break;
 
             case MonsterAiState.Dead:
-                break;
+                monster.StateFrameAccumulator += dt * LegacyFrameUnitsPerSecond;
+                if (!MonsterDeathSequence.IsCorpseCountdownComplete(monster))
+                    break;
+
+                // InvalidateDeadMonster removes the monster's grid entry; the trailing SyncMonsterCell
+                // below would re-add it (AoiGrid.Move re-inserts on a from/to mismatch), so return here.
+                zone.InvalidateDeadMonster(monster);
+                return;
         }
 
         zone.SyncMonsterCell(monster);
@@ -629,7 +638,8 @@ public sealed partial class MonsterAiSystem(
 
     private static bool IsCandidateValid([NotNullWhen(true)] PlayerRuntimeState? player)
     {
-        return player is not null && !player.IsMovingZone && !IsHiding(player) && !player.IsDead;
+        return player is not null && player.Session is IZoneSession { State: ZoneSessionState.InWorld } &&
+               !player.IsMovingZone && !IsHiding(player) && !player.IsDead;
     }
 
     private static bool IsHiding(PlayerRuntimeState player)

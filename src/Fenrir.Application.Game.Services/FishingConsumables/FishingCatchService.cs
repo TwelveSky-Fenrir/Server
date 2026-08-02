@@ -57,6 +57,13 @@ public sealed class FishingCatchService(ICharacterRepository characters, ILogger
                     characterId);
                 session.Send(new FishingCatchResponse
                     { Result = 2, ItemIndex = itemId, Page = -1, Index = -1, XY = -1 });
+
+                if (!await zone.PostFishingCommandAndWaitAsync(
+                        new FishingZoneCommand(characterId, 0, 0, state.CatchingFish, false, null, castAt),
+                        cancellationToken))
+                    logger.LogError(
+                        "Zone {MapId} fishing inbox full: dropped catch-abort mirror for character {CharacterId}",
+                        zone.MapId, characterId);
                 return;
             }
 

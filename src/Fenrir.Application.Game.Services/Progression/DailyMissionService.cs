@@ -17,19 +17,18 @@ public sealed class DailyMissionService(
     WorldDataCache worldData,
     ILogger<DailyMissionService> logger) : IDailyMissionService
 {
+    /// <summary>Base Level alone (aLevel1), never CombinedLevel -- Server/ts25zone/S04_MyWork02.cpp:14214.</summary>
     private const int MinimumClaimLevel = ExperienceFormulas.RebirthDivisorLevelThreshold;
 
     private const int RequiredJoinWar = 1;
     private const int RequiredKillOtherTribe = 10;
-
-    private const int Zone241TimeAvatarChangeInfoSort = 14;
 
     private const int Zone241TimeStatSort = 200;
 
     public async ValueTask<DailyMissionClaimResult> ClaimAsync(int characterId, Zone zone, PlayerRuntimeState state,
         CancellationToken cancellationToken)
     {
-        if (state.CombinedLevel < MinimumClaimLevel || state.MissionJoinWar < RequiredJoinWar ||
+        if (state.Level < MinimumClaimLevel || state.MissionJoinWar < RequiredJoinWar ||
             state.MissionKillOtherTribe < RequiredKillOtherTribe)
             return new DailyMissionClaimResult(DailyMissionClaimOutcome.Aborted, 0, 0);
 
@@ -100,16 +99,6 @@ public sealed class DailyMissionService(
 
         state.Session.Send(new AvatarStatUpdateResponse
             { Sort = Zone241TimeStatSort, Value = newZone241Time, Value2 = 0 });
-
-        state.Session.Send(new AvatarStateFlagResponse
-        {
-            ServerIndex = state.CharacterId,
-            UniqueNumber = state.UniqueNumber,
-            Sort = Zone241TimeAvatarChangeInfoSort,
-            Value01 = state.ContributionPoints,
-            Value02 = state.RebirthCount,
-            Value03 = newZone241Time
-        });
 
         logger.LogInformation(
             "Character {CharacterId} claimed daily-mission second-tier-level-cap Zone241Time bonus: new total {NewZone241Time}",

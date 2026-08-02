@@ -5,5 +5,5 @@ namespace Fenrir.Application.Game.Abstractions.Commerce;
 
 public interface IGetCashCatalogService
 {
-    public GetCashCatalogResponse GetCatalog(PlayerRuntimeState? state);
+    public GetCashCatalogResponse? GetCatalog(PlayerRuntimeState? state);
 }

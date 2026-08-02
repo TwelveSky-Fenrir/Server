@@ -35,6 +35,7 @@ public readonly record struct TribeProgressZoneCommand(
     int? ProtectForDestroy = null,
     int? ProtectForCostume = null,
     int? ProtectForDestroy2 = null,
+    int? ProtectForWing = null,
     int? ImproveItemValue = null,
     int? AddItemValue = null,
     int? HighItemValue = null,

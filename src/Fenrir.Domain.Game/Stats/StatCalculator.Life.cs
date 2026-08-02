@@ -50,13 +50,7 @@ public static partial class StatCalculator
         hp += SetBonusTables.CapeIuBonus(bySlot[1], 3, 200f);
 
         if (bySlot[8] is { } petAmulet)
-        {
-            hp += PhoenixFlatBonus(petAmulet.Item.ItemId, 5000, 7500, 12500);
-            hp += PhoenixFlatBonus(petAmulet.Item.ItemId, 2000, 4500, 9500);
-
-            if (!PetAmuletPhoenixOverlapIds.Contains(petAmulet.Item.ItemId))
-                hp += PetAmuletLifeBonus(petAmulet.Item.ItemId, petAmulet.Item.Sort);
-        }
+            hp += PetAmuletLifeBonus(petAmulet.Item.ItemId, petAmulet.Item.Sort);
 
         hp += StellarCoreMaxLifeContribution(cosmetic);
         hp += RankBuffMaxLifeBonus(zone);
@@ -157,13 +151,7 @@ public static partial class StatCalculator
             mp += cape.Item.ItemId switch { 1401 => 50, 1404 => 100, _ => 0 };
 
         if (bySlot[8] is { } petAmulet)
-        {
-            mp += PhoenixFlatBonus(petAmulet.Item.ItemId, 5000, 7500, 12500);
-            mp += PhoenixFlatBonus(petAmulet.Item.ItemId, 2000, 4500, 9500);
-
-            if (!PetAmuletPhoenixOverlapIds.Contains(petAmulet.Item.ItemId))
-                mp += PetAmuletManaBonus(petAmulet.Item.ItemId, petAmulet.Item.Sort);
-        }
+            mp += PetAmuletManaBonus(petAmulet.Item.ItemId, petAmulet.Item.Sort);
 
         mp += MountFlatMaxMana(mount);
 

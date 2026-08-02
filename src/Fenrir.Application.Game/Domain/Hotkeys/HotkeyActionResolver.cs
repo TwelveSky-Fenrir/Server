@@ -21,6 +21,7 @@ public static class HotkeyActionResolver
         InvalidDestinationIndex,
         InvalidSourcePage,
         InvalidSourceIndex,
+        SecondInventoryPageExpired,
         SourceEmpty,
         NotStackable,
         ExcludedPotionSubtype,
@@ -61,6 +62,7 @@ public static class HotkeyActionResolver
         None,
         InvalidPage,
         InvalidIndex,
+        SourceEmpty,
         ItemSlotRequiresWithdraw
     }
 
@@ -75,6 +77,7 @@ public static class HotkeyActionResolver
         InsufficientSourceQuantity,
         InvalidDestinationPage,
         InvalidDestinationIndex,
+        SecondInventoryPageExpired,
         InvalidDestinationX,
         InvalidDestinationY,
         DestinationItemMismatch,
@@ -159,6 +162,9 @@ public static class HotkeyActionResolver
         if (!IsValidIndex(index))
             return UnbindResult.Fail(UnbindFailure.InvalidIndex);
 
+        if (slot.IsEmpty)
+            return UnbindResult.Fail(UnbindFailure.SourceEmpty);
+
         if (slot.Kind == HotkeyBindingKind.Item)
             return UnbindResult.Fail(UnbindFailure.ItemSlotRequiresWithdraw);
 
@@ -168,7 +174,8 @@ public static class HotkeyActionResolver
     public static BindItemResult ResolveBindItem(
         HotkeySlot destination, int destinationPage, int destinationIndex,
         ItemStack? sourceItem, int sourcePage, int sourceIndex, int requestedQuantity,
-        bool sourceItemIsStackable, bool sourceItemIsExcludedPotionSubtype)
+        bool sourceItemIsStackable, bool sourceItemIsExcludedPotionSubtype,
+        bool secondInventoryPageEntitlementActive)
     {
         if (!IsValidPage(destinationPage))
             return BindItemResult.Fail(BindItemFailure.InvalidDestinationPage);
@@ -181,6 +188,9 @@ public static class HotkeyActionResolver
 
         if (!ContainerMatrix.IsValidSlot((byte)sourcePage, sourceIndex))
             return BindItemResult.Fail(BindItemFailure.InvalidSourceIndex);
+
+        if (sourcePage == ContainerMatrix.InventoryPage1 && !secondInventoryPageEntitlementActive)
+            return BindItemResult.Fail(BindItemFailure.SecondInventoryPageExpired);
 
         if (sourceItem is not { } source)
             return BindItemResult.Fail(BindItemFailure.SourceEmpty);
@@ -221,7 +231,7 @@ public static class HotkeyActionResolver
     public static WithdrawItemResult ResolveWithdrawItem(
         HotkeySlot source, int sourcePage, int sourceIndex, int requestedQuantity,
         ItemStack? destinationItem, int destinationPage, int destinationIndex,
-        int destinationX, int destinationY)
+        int destinationX, int destinationY, bool secondInventoryPageEntitlementActive)
     {
         if (!IsValidPage(sourcePage))
             return WithdrawItemResult.Fail(WithdrawItemFailure.InvalidSourcePage);
@@ -246,6 +256,9 @@ public static class HotkeyActionResolver
 
         if (!ContainerMatrix.IsValidSlot((byte)destinationPage, destinationIndex))
             return WithdrawItemResult.Fail(WithdrawItemFailure.InvalidDestinationIndex);
+
+        if (destinationPage == ContainerMatrix.InventoryPage1 && !secondInventoryPageEntitlementActive)
+            return WithdrawItemResult.Fail(WithdrawItemFailure.SecondInventoryPageExpired);
 
         if (destinationX < 0 || destinationX > 7)
             return WithdrawItemResult.Fail(WithdrawItemFailure.InvalidDestinationX);
@@ -295,9 +308,6 @@ public static class HotkeyActionResolver
         if (source.IsEmpty)
             return RearrangeResult.Fail(RearrangeFailure.SourceEmpty);
 
-        if (sourcePage == destinationPage && sourceIndex == destinationIndex)
-            return new RearrangeResult(true, RearrangeFailure.None, source, destination);
-
         if (source.Kind is HotkeyBindingKind.Skill or HotkeyBindingKind.Emoticon)
         {
             if (!destination.IsEmpty)
@@ -326,6 +336,11 @@ public static class HotkeyActionResolver
         {
             newQuantity = requestedQuantity;
         }
+
+        // Aliased from1/to1 (S04_MyWork05.cpp:2007-2008): the decrement and the re-increment above both
+        // land on the same slot and net to no change (S04_MyWork05.cpp:2050-2085).
+        if (sourcePage == destinationPage && sourceIndex == destinationIndex)
+            return new RearrangeResult(true, RearrangeFailure.None, source, destination);
 
         var remaining = source.Value2 - requestedQuantity;
         var newSource = remaining > 0 ? source with { Value2 = remaining } : HotkeySlot.Empty;

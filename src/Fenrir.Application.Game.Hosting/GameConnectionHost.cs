@@ -59,7 +59,8 @@ public sealed class GameConnectionHost(
                     opcodeRegistry,
                     rateLimiter,
                     ipFloodGuard,
-                    logger)));
+                    logger,
+                    applyOsSocketBuffers: true)));
 
                 logger.LogInformation("GameServer zone listener bound: map {MapId} on port {Port} (shard {ShardId})",
                     mapId, port, opts.ShardId);

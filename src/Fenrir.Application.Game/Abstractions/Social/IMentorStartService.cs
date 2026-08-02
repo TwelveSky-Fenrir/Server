@@ -6,6 +6,8 @@ public interface IMentorStartService
 {
     public bool TryConsumeStart(int masterId, out int studentId);
 
+    public bool ConfirmStudentForStart(int studentId, int masterId);
+
     public ValueTask BondAsync(PlayerRuntimeState master, PlayerRuntimeState student, Zone studentZone,
         CancellationToken cancellationToken);
 }

@@ -80,9 +80,10 @@ public sealed class GuildActionHandler(IGuildActionService service, ILogger<Guil
                     await service.SetMemberTitleAsync(packet, state, ct));
                 return;
             case 11:
-                logger?.LogDebug(
-                    "Character {CharacterId} sent CZ_GUILD_WORK_SEND sort 11 (dead sub-command) -- ignoring session {SessionId}",
+                logger?.LogInformation(
+                    "Character {CharacterId} sent CZ_GUILD_WORK_SEND sort 11 (GuildMark) -- unconditional disconnect, no response sent (Server/ts25zone/S04_MyWork02.cpp:10230-10232), session {SessionId}",
                     characterId, session.SessionId);
+                session.Abort(DisconnectReason.Faulted);
                 return;
             case 12:
             case 13:

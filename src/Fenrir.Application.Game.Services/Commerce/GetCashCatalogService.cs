@@ -9,9 +9,17 @@ namespace Fenrir.Application.Game.Services.Commerce;
 public sealed class GetCashCatalogService(CommerceCatalogCache catalog, ILogger<GetCashCatalogService> logger)
     : IGetCashCatalogService
 {
-    public GetCashCatalogResponse GetCatalog(PlayerRuntimeState? state)
+    public GetCashCatalogResponse? GetCatalog(PlayerRuntimeState? state)
     {
         var version = catalog.CashCatalogVersion;
+
+        if (state is not null && state.KnownCashCatalogVersion == version)
+        {
+            logger.LogDebug(
+                "Get cash catalog: character {CharacterId} already at version {Version}, skipping resend",
+                state.CharacterId, version);
+            return null;
+        }
 
         if (state is not null)
         {

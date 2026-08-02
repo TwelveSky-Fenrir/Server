@@ -27,8 +27,9 @@ public sealed class DailyMissionHandler(IDailyMissionService dailyMissionService
         if (packet.Sort is not (1 or 2))
         {
             logger.LogDebug(
-                "Daily-mission request ignored for character {CharacterId}: invalid sort {Sort}",
-                characterId, packet.Sort);
+                "Daily-mission request (op126): malformed sort {Sort} for character {CharacterId} -- legacy default disconnects, no response (S04_MyWork02.cpp:14281-14293)",
+                packet.Sort, characterId);
+            zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 
@@ -38,6 +39,7 @@ public sealed class DailyMissionHandler(IDailyMissionService dailyMissionService
             return;
         }
 
+        bool disconnect;
         await state.EconomyActionLock.WaitAsync(cancellationToken);
         try
         {
@@ -46,27 +48,32 @@ public sealed class DailyMissionHandler(IDailyMissionService dailyMissionService
             switch (result.Outcome)
             {
                 case DailyMissionClaimOutcome.Aborted:
+                    disconnect = true;
                     logger.LogDebug(
-                        "Daily-mission claim rejected for character {CharacterId}: requirements not met (level, join-war, or kill count)",
+                        "Daily-mission claim (op126) for character {CharacterId}: eligibility gate or reward-item lookup failed -- legacy disconnects, no response (S04_MyWork02.cpp:14214-14246)",
                         characterId);
-                    SendResult(session, packet.Sort, 1, state);
-                    return;
+                    break;
                 case DailyMissionClaimOutcome.InventoryFull:
+                    disconnect = false;
                     logger.LogInformation(
                         "Daily-mission claim denied for character {CharacterId}: inventory full",
                         characterId);
                     SendResult(session, packet.Sort, 3, state);
-                    return;
+                    break;
                 case DailyMissionClaimOutcome.Success:
                 default:
+                    disconnect = false;
                     SendResult(session, packet.Sort, 0, state, result.JoinWar, result.KillOtherTribe);
-                    return;
+                    break;
             }
         }
         finally
         {
             state.EconomyActionLock.Release();
         }
+
+        if (disconnect)
+            zoneSession.Abort(DisconnectReason.Faulted);
     }
 
     private static void SendResult(IPacketSession session, int sort, int result, PlayerRuntimeState state,

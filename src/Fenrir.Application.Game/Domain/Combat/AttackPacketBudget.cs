@@ -9,10 +9,10 @@ public static class AttackPacketBudget
         if (!enforceCeiling || !state.AttackBudgetEnforced)
             return true;
 
+        state.AttackSubPacketsUsed++;
+
         if (state.AttackSubPacketsUsed > state.AttackSubPacketCeiling)
             return false;
-
-        state.AttackSubPacketsUsed++;
 
         return attackActionValue4 == state.ActionSort;
     }

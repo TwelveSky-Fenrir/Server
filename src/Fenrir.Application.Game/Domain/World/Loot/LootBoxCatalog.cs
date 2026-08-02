@@ -12,14 +12,16 @@ public sealed class LootBoxCatalog
     {
         var specs = new List<BoxRewardSpec>
         {
+            // Mount Box — no pre-roll jackpot in legacy RandomMount; band-then-pool only, 0-199.
+            // Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:770-827.
             BoxRewardSpec.RareBandThenPools(601,
-                [new LootBoxRewardResolver.RewardBand(50, 635)],
+                ImmutableArray<LootBoxRewardResolver.RewardBand>.Empty,
                 [
                     new LootBoxRewardResolver.RewardPool(10, [92286]),
                     new LootBoxRewardResolver.RewardPool(40, [1301, 1302, 1303, 1313, 1317, 1320, 1323, 1326]),
                     new LootBoxRewardResolver.RewardPool(100, [611, 612, 652]),
                     new LootBoxRewardResolver.RewardPool(160, [506, 507, 508, 509, 578, 579]),
-                    new LootBoxRewardResolver.RewardPool(200, [1166, 1118, 1103, 1222, 1145, 1237])
+                    new LootBoxRewardResolver.RewardPool(199, [1166, 1118, 1103, 1222, 1145, 1237])
                 ]),
 
             PetBoxRewardTable.Spec,

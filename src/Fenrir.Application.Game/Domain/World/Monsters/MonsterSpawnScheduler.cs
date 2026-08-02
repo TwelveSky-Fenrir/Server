@@ -77,6 +77,7 @@ public sealed class MonsterSpawnScheduler(
         }
 
         DrainDeaths(zone, state);
+        DrainInvalidations(zone, state);
 
         if (Interlocked.Exchange(ref state.SummonStateResetPending, 0) != 0)
             ApplySummonStateReset(zone, state);
@@ -235,11 +236,19 @@ public sealed class MonsterSpawnScheduler(
 
     private void DrainDeaths(Zone zone, MonsterZoneSpawnState state)
     {
+        // Loot/exp/quest-progress granting -- unrelated to the A013 corpse-countdown lifecycle, so this
+        // stays on the pre-existing immediate cadence (drained the same tick TryDamageMonster died).
         while (zone.TryDequeueDeadMonster(out var death))
-        {
-            zone.RemoveMonsterFromGrid(death!.Monster);
+            ProcessDeath(zone, state, death!);
+    }
 
-            var slot = state.Slots.Find(s => s.ServerIndex == death!.Monster.ServerIndex);
+    private void DrainInvalidations(Zone zone, MonsterZoneSpawnState state)
+    {
+        // Only reached once MonsterAiSystem's Dead case clears FrameInfo5/30 sec of corpse persistence
+        // (Zone.InvalidateDeadMonster) -- this is the single moment respawn eligibility starts.
+        while (zone.TryDequeueInvalidatedMonster(out var monster))
+        {
+            var slot = state.Slots.Find(s => s.ServerIndex == monster!.ServerIndex);
             if (slot is not null)
             {
                 slot.Alive = false;
@@ -251,7 +260,10 @@ public sealed class MonsterSpawnScheduler(
                         DateTime.UtcNow + SimulationClock.ToTimeSpan(respawnTicks));
             }
 
-            ProcessDeath(zone, state, death!);
+            if (monster!.SpecialSort == MonsterSpecialSort.TribeSymbolStone &&
+                TribeSymbolIndexOf(monster.Template.SpecialType) is { } symbolIndex &&
+                monster.TryResolveTribeSymbolWinner(out var winnerTribe))
+                zoneEventBroadcaster?.Value.AnnounceSymbolResolved(symbolIndex, winnerTribe);
         }
     }
 
@@ -285,18 +297,11 @@ public sealed class MonsterSpawnScheduler(
         if (death.KillerCharacterId is { } killerId)
             zone.TryGetPlayer(killerId, out killer);
 
-        if (monster.SpecialSort == MonsterSpecialSort.TribeSymbolStone &&
-            TribeSymbolIndexOf(monster.Template.SpecialType) is { } symbolIndex &&
-            monster.TryResolveTribeSymbolWinner(out var winnerTribe))
-            zoneEventBroadcaster?.Value.AnnounceSymbolResolved(symbolIndex, winnerTribe);
-
         IReadOnlyList<int>? partyMemberIds = null;
         var killRaceInterceptsExperienceGrant = false;
         if (killer is not null)
             partyMemberIds = GrantKillLoot(zone, state, monster, monsterDefinition, killer,
                 out killRaceInterceptsExperienceGrant);
-
-        zone.BroadcastMonsterDeath(monster);
 
         if (killer is null)
             return;
@@ -365,7 +370,14 @@ public sealed class MonsterSpawnScheduler(
         }
 
         if (money is { } amount)
+        {
             zone.QueueMoneyGrant(killer.CharacterId, amount);
+
+            // Tax base only (AddTribeBankInfo3, S07_MyGame01.cpp:2726-2729); killer still keeps the full
+            // amount since Fenrir credits the wallet directly instead of a reducible ground-pickup item.
+            var tribeTaxBase = amount - (long)(amount * InventoryToWorldDropPolicy.MonsterMoneyGroundReductionRatio);
+            zone.CreditMonsterKillTribeTax(killer.Tribe, tribeTaxBase);
+        }
 
         foreach (var publicItem in bossOutcome.PublicItems)
             zone.SpawnGroundItem(publicItem.ItemId, publicItem.Quantity, monster.PosX, monster.PosY, monster.PosZ,

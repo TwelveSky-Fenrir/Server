@@ -543,4 +543,4 @@ Migrations/Seed/admin/030_error_catalog_characteritems_v2.sql
 
 Migrations/Seed/admin/031_error_catalog_retire_50361.sql
 
-Migrations/Seed/admin/032_error_catalog_trade_currency_cap.sql
+Migrations/Seed/admin/032_error_catalog_trade_currency_caps.sql

@@ -1,6 +1,9 @@
 namespace Fenrir.Tools.DbMigrator;
 
-public sealed record MigratorOptions(string ConnectionString, string DatabaseDirectory, string EnvironmentName,
+public sealed record MigratorOptions(
+    string ConnectionString,
+    string DatabaseDirectory,
+    string EnvironmentName,
     bool Recreate = false)
 {
     public const string DevOnlySeedScriptPath = "Migrations/Seed/001_dev_account.sql";

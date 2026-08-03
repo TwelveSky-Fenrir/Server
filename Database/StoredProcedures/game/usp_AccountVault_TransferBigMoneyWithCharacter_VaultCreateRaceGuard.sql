@@ -1,10 +1,10 @@
 CREATE OR ALTER PROCEDURE game.usp_AccountVault_TransferBigMoneyWithCharacter @CharacterId INT,
-                                                                     @DeltaCharacterBigMoney INT,
-                                                                     @AccountId INT,
-                                                                     @DeltaVaultBigMoney INT,
-                                                                     @AuditEventCode SMALLINT = NULL,
-                                                                     @AuditFromDelta BIGINT = NULL,
-                                                                     @AuditToDelta BIGINT = NULL
+                                                                              @DeltaCharacterBigMoney INT,
+                                                                              @AccountId INT,
+                                                                              @DeltaVaultBigMoney INT,
+                                                                              @AuditEventCode SMALLINT = NULL,
+                                                                              @AuditFromDelta BIGINT = NULL,
+                                                                              @AuditToDelta BIGINT = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -52,7 +52,7 @@ BEGIN
                 IF @AuditEventCode IS NOT NULL
                     EXEC game.usp_EventLog_Insert
                          @EventCode = @AuditEventCode,
-                         @Category = 25, 
+                         @Category = 25,
                          @ActorAccountId = @AccountId,
                          @ActorCharacterId = @CharacterId,
                          @DeltaMoney = @AuditFromDelta,
@@ -86,7 +86,7 @@ BEGIN
     IF @AuditEventCode IS NOT NULL
         EXEC game.usp_EventLog_Insert
              @EventCode = @AuditEventCode,
-             @Category = 25, 
+             @Category = 25,
              @ActorAccountId = @AccountId,
              @ActorCharacterId = @CharacterId,
              @DeltaMoney = @AuditFromDelta,

@@ -8,7 +8,6 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Monsters;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
-using Fenrir.Application.Game.Handlers;
 using Fenrir.Application.Game.Handlers.Extensions;
 using Fenrir.Application.Game.Hosting;
 using Fenrir.Application.Game.Hosting.Extensions;

@@ -1,8 +1,8 @@
 CREATE OR ALTER PROCEDURE game.usp_AccountVault_TransferItemWithCharacter @CharacterId INT,
-                                                                 @Container TINYINT,
-                                                                 @Items game.tvp_CharacterItemSlot READONLY,
-                                                                 @AccountId INT,
-                                                                 @VaultItems game.tvp_AccountVaultItemSlot READONLY
+                                                                          @Container TINYINT,
+                                                                          @Items game.tvp_CharacterItemSlot READONLY,
+                                                                          @AccountId INT,
+                                                                          @VaultItems game.tvp_AccountVaultItemSlot READONLY
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -75,7 +75,8 @@ BEGIN
                 FROM game.AccountVaultItems
                 WHERE AccountId = @AccountId;
 
-                INSERT INTO game.AccountVaultItems (AccountId, SlotIndex, ItemId, Quantity, Value, SerialNumber, SocketData)
+                INSERT INTO game.AccountVaultItems (AccountId, SlotIndex, ItemId, Quantity, Value, SerialNumber,
+                                                    SocketData)
                 SELECT @AccountId,
                        SlotIndex,
                        ItemId,

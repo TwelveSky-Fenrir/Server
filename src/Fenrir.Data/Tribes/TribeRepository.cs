@@ -112,8 +112,8 @@ public sealed record TribeRepository(ICaeriusNetDbContext Db) : ITribeRepository
                 return await Db.ExecuteScalarAsync<long>(sp, ct);
             }
             catch (CaeriusNetSqlException ex) when (attempt < MaxSlotInsertRaceAttempts &&
-                                                     ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
-                                                     IsTransientSlotInsertRaceConflict(sqlErrorNumber))
+                                                    ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                                                    IsTransientSlotInsertRaceConflict(sqlErrorNumber))
             {
             }
         }

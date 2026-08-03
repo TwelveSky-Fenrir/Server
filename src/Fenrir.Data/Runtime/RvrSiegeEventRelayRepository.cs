@@ -49,7 +49,8 @@ public sealed record RvrSiegeEventRelayRepository(ICaeriusNetDbContext Db) : IRv
                 return await Db.QueryAsImmutableArrayAsync<RvrSiegeEventRelayDto>(sp, ct);
             }
             catch (CaeriusNetSqlException ex)
-                when (attempt < MaxWriteConflictAttempts && ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                when (attempt < MaxWriteConflictAttempts &&
+                      ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
                       IsWriteConflict(sqlErrorNumber))
             {
             }

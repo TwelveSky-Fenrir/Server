@@ -18,7 +18,7 @@ CREATE TABLE world.Skills
     CONSTRAINT CK_Skills_TribeInfo1 CHECK (TribeInfo1 BETWEEN 1 AND 4),
     CONSTRAINT CK_Skills_TribeInfo2 CHECK (TribeInfo2 BETWEEN 1 AND 10),
     CONSTRAINT CK_Skills_LearnSkillPoint CHECK (LearnSkillPoint BETWEEN 1 AND 1000),
-    CONSTRAINT CK_Skills_MaxUpgradePoint CHECK (MaxUpgradePoint BETWEEN 1 AND 1000), 
+    CONSTRAINT CK_Skills_MaxUpgradePoint CHECK (MaxUpgradePoint BETWEEN 1 AND 1000),
     CONSTRAINT CK_Skills_TotalHitNumber CHECK (TotalHitNumber BETWEEN 0 AND 10),
     CONSTRAINT CK_Skills_ValidRadius CHECK (ValidRadius BETWEEN 0 AND 1000)
 );

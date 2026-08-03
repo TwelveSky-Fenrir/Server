@@ -41,7 +41,8 @@ public sealed record SessionTicketRepository(ICaeriusNetDbContext Db) : ISession
                 return;
             }
             catch (CaeriusNetSqlException ex)
-                when (attempt < MaxWriteConflictAttempts && ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                when (attempt < MaxWriteConflictAttempts &&
+                      ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
                       IsWriteConflict(sqlErrorNumber))
             {
             }
@@ -62,7 +63,8 @@ public sealed record SessionTicketRepository(ICaeriusNetDbContext Db) : ISession
                 return await Db.FirstQueryAsync<ConsumedTicketDto>(parameters, ct);
             }
             catch (CaeriusNetSqlException ex)
-                when (attempt < MaxWriteConflictAttempts && ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                when (attempt < MaxWriteConflictAttempts &&
+                      ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
                       IsWriteConflict(sqlErrorNumber))
             {
             }
@@ -84,7 +86,8 @@ public sealed record SessionTicketRepository(ICaeriusNetDbContext Db) : ISession
                 return;
             }
             catch (CaeriusNetSqlException ex)
-                when (attempt < MaxWriteConflictAttempts && ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                when (attempt < MaxWriteConflictAttempts &&
+                      ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
                       IsWriteConflict(sqlErrorNumber))
             {
             }

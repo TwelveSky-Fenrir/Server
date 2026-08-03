@@ -75,8 +75,8 @@ BEGIN
                 END;
 
             EXEC game.usp_EventLog_Insert
-                 @EventCode = 1, 
-                 @Category = 22, 
+                 @EventCode = 1,
+                 @Category = 22,
                  @ActorAccountId = @AccountId,
                  @ActorCharacterId = @CharacterId,
                  @ItemId = @AuditItemId,

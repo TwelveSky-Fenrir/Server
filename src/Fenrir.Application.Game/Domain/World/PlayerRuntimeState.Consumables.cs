@@ -2,8 +2,7 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public partial class PlayerRuntimeState
 {
-
-        public int ProtectForDeath { get; set; }
+    public int ProtectForDeath { get; set; }
 
     public int LodRounds { get; set; }
 
@@ -15,7 +14,7 @@ public partial class PlayerRuntimeState
 
     public int ProtectForDestroy2 { get; set; }
 
-        public int ProtectForWing { get; set; }
+    public int ProtectForWing { get; set; }
 
     public int ImproveItemValue { get; set; }
 

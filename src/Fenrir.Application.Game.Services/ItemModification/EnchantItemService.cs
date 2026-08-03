@@ -31,8 +31,6 @@ public sealed partial class EnchantItemService(
 
     private const int SweetPotatoStatSort = 146;
 
-    private readonly record struct EnchantSlots(byte Page1, byte Index1, byte Page2, byte Index2);
-
     public async ValueTask<EnchantItemResult> EnchantAsync(EnchantItemRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
     {
@@ -339,4 +337,6 @@ public sealed partial class EnchantItemService(
             list.Add(stack.ToTvp(slot));
         return list;
     }
+
+    private readonly record struct EnchantSlots(byte Page1, byte Index1, byte Page2, byte Index2);
 }

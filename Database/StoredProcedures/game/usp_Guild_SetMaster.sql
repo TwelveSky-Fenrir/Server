@@ -22,7 +22,7 @@ BEGIN
         TRANSACTION;
 
     UPDATE game.GuildMembers
-    SET Role         = 0, 
+    SET Role         = 0,
         UpdatedAtUtc = SYSUTCDATETIME()
     WHERE GuildId = @GuildId
       AND Role = 2

@@ -27,20 +27,29 @@ public sealed class WithdrawProxyShopEarningsService(
             await offlineShops.WithdrawMoneyAsync(characterId, money, bigMoney, GameDate.Today(),
                 cancellationToken);
         }
-        catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException { Number: NothingToWithdrawErrorNumber })
+        catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException
+                                                {
+                                                    Number: NothingToWithdrawErrorNumber
+                                                })
         {
             logger.LogInformation(
                 "Character {CharacterId} offline-shop withdraw denied: nothing to withdraw", characterId);
             return new WithdrawProxyShopEarningsResponse { Result = 4, Money = 0, BigMoney = 0 };
         }
-        catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException { Number: MoneyCapOverflowErrorNumber })
+        catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException
+                                                {
+                                                    Number: MoneyCapOverflowErrorNumber
+                                                })
         {
             logger.LogInformation(
                 "Character {CharacterId} offline-shop withdraw blocked: crediting {Money} would exceed the money cap",
                 characterId, money);
             return new WithdrawProxyShopEarningsResponse { Result = 1, Money = 0, BigMoney = 0 };
         }
-        catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException { Number: BigMoneyCapOverflowErrorNumber })
+        catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException
+                                                {
+                                                    Number: BigMoneyCapOverflowErrorNumber
+                                                })
         {
             logger.LogInformation(
                 "Character {CharacterId} offline-shop withdraw blocked: crediting {BigMoney} would exceed the BigMoney cap",

@@ -21,17 +21,15 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
-    private byte? _regularWarSmallestPresentTribe;
-
     private const int CombinedLevelGapCap = 13;
 
     private const int WarPointStatSort = 905;
 
     private const int BloodPointAvatarChangeInfoSort = 300;
 
-        private const int DoubleKillNumTimeChargeStatSort = 4;
+    private const int DoubleKillNumTimeChargeStatSort = 4;
 
-        private const int DoubleKillExpTimeChargeStatSort = 5;
+    private const int DoubleKillExpTimeChargeStatSort = 5;
 
     private const int ExperienceStatSort = 13;
 
@@ -132,6 +130,8 @@ public sealed partial class Zone
 
     private readonly Zone175LabyrinthSystem? _zone175LabyrinthSystem =
         simulationSystems.OfType<Zone175LabyrinthSystem>().FirstOrDefault();
+
+    private byte? _regularWarSmallestPresentTribe;
 
     public bool PostCombatCommand(in CombatCommand command)
     {
@@ -422,7 +422,7 @@ public sealed partial class Zone
         ApplyDoubleAwardCpGrant(attackerState, baseAmount);
     }
 
-        private void ApplyDoubleAwardCpGrant(PlayerRuntimeState attackerState, int baseAmount)
+    private void ApplyDoubleAwardCpGrant(PlayerRuntimeState attackerState, int baseAmount)
     {
         var firstGrant = PvpKillContributionPointCalculator.ClampGrant(attackerState.ContributionPoints,
             baseAmount, PvpKillContributionPointCalculator.ContributionPointHardCap);
@@ -556,7 +556,7 @@ public sealed partial class Zone
         attackerState.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
     }
 
-        private void DecrementDoubleKillNumTime2OnKill(PlayerRuntimeState attackerState)
+    private void DecrementDoubleKillNumTime2OnKill(PlayerRuntimeState attackerState)
     {
         if (attackerState.DoubleKillNumTime2 <= 0)
             return;
@@ -799,7 +799,7 @@ public sealed partial class Zone
             ApplyTowerGuardianHitSideEffects(towerIndex, attackerState);
     }
 
-        private int? ResolveZone175BossDamageWireEcho(PlayerRuntimeState attackerState, MonsterEntity monster,
+    private int? ResolveZone175BossDamageWireEcho(PlayerRuntimeState attackerState, MonsterEntity monster,
         int realDamage)
     {
         if (_zone175LabyrinthSystem is not { } zone175System || !zone175System.IsZone175Map(MapId))

@@ -51,7 +51,7 @@ public sealed partial class Zone
         return true;
     }
 
-        public bool TryFindProxyShopByName(string avatarName, [NotNullWhen(true)] out ProxyShopBroadcastEntry? entry)
+    public bool TryFindProxyShopByName(string avatarName, [NotNullWhen(true)] out ProxyShopBroadcastEntry? entry)
     {
         foreach (var candidate in _proxyShops.Values)
             if (string.Equals(candidate.OwnerName, avatarName, StringComparison.OrdinalIgnoreCase))

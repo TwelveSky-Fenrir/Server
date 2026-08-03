@@ -132,7 +132,7 @@ public interface ICharacterRepository
 
     public ValueTask UpdateAppearanceAsync(int characterId, byte headType, byte faceType, CancellationToken ct);
 
-        public ValueTask UpdateGenderAndAppearanceAsync(int characterId, byte gender, byte headType, byte faceType,
+    public ValueTask UpdateGenderAndAppearanceAsync(int characterId, byte gender, byte headType, byte faceType,
         CancellationToken ct);
 
     public ValueTask SetAutoHuntAsync(int characterId, bool enabled, byte[] config, CancellationToken ct);

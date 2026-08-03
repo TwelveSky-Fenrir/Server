@@ -5,7 +5,7 @@ CREATE TABLE game.HeroRankings
     Points        INT           NOT NULL
         CONSTRAINT DF_HeroRankings_Points DEFAULT 0,
     TribeId       TINYINT       NULL,
-    Level         SMALLINT      NULL, 
+    Level         SMALLINT      NULL,
     RewardClaimed BIT           NULL,
     Description   NVARCHAR(255) NULL,
     RecordedAtUtc DATETIME2(3)  NOT NULL

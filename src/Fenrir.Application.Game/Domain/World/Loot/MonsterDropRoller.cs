@@ -51,7 +51,7 @@ public sealed class MonsterDropRoller(
         var effectiveItemDropRatio = itemDropRatio + premiumBonus;
         var effectiveRareDropRatio = rareDropRatio + premiumBonus;
         var effectiveUserDropRatio = (killerItemDropUpBuffActive ? ItemDropUpBuffUserDropRatio : userDropRatio) +
-                                      premiumBonus;
+                                     premiumBonus;
 
         var money = eligible ? RollMoney(monster.DropMoney, killerLuck, effectiveItemDropRatio) : null;
         var items = new List<DroppedItem>();

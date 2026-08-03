@@ -59,7 +59,7 @@ public readonly struct ZoneCommand
 
     public int DuelUniqueNumber { get; init; }
 
-        public TaskCompletionSource<PlayerRuntimeState?>? LeaveSnapshot { get; init; }
+    public TaskCompletionSource<PlayerRuntimeState?>? LeaveSnapshot { get; init; }
 
     public static ZoneCommand Enter(int characterId, PlayerEnterData data)
     {
@@ -297,11 +297,7 @@ public sealed record PlayerEnterData(
     int WarriorScroll = 0,
     int SilverTime = 0,
     int GoldTime = 0,
-
-        int DoubleKillNumTime = 0,
-
-        int DoubleKillExpTime = 0,
-
-        int DoubleKillNumTime2 = 0,
-
-        int ProtectForDeath = 0);
+    int DoubleKillNumTime = 0,
+    int DoubleKillExpTime = 0,
+    int DoubleKillNumTime2 = 0,
+    int ProtectForDeath = 0);

@@ -78,7 +78,7 @@ BEGIN
                                ON tgt.GroupIndex = src.GroupIndex AND tgt.TribeId = @ToTribe
             WHERE ci.CharacterId = @CharacterId
               AND ci.Container = 2
-              AND ci.Slot <> 8; 
+              AND ci.Slot <> 8;
 
             IF EXISTS (SELECT 1 FROM @EquipMapped WHERE NewItemId IS NULL)
                 THROW 50320, N'usp_Character_ApplyTribeConversion: an equipped item has no target-tribe equivalent.', 1;

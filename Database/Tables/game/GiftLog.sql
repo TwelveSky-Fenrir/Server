@@ -2,7 +2,7 @@ CREATE TABLE game.GiftLog
 (
     GiftLogId    INT IDENTITY (1,1) NOT NULL,
     AccountId    INT                NOT NULL,
-    ProductId    INT                NULL, 
+    ProductId    INT                NULL,
     Quantity     INT                NOT NULL
         CONSTRAINT DF_GiftLog_Quantity DEFAULT 0,
     Value        INT                NOT NULL

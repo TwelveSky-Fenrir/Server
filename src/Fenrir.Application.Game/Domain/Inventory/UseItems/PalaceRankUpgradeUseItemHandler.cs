@@ -15,13 +15,13 @@ public sealed class PalaceRankUpgradeUseItemHandler(
     public const int ItemIdPlus1 = 2193;
     public const int ItemIdPlus10 = 867;
 
-    public static IEnumerable<int> HandledItemIds { get; } = [ItemIdPlus1, ItemIdPlus10];
-
     private const int RankCeiling = 96;
 
     private const short PalaceRankGrantEventCode = 5;
 
     private const byte SuccessOutcome = 1;
+
+    public static IEnumerable<int> HandledItemIds { get; } = [ItemIdPlus1, ItemIdPlus10];
 
     public async ValueTask<UseInventoryItemResponse> HandleAsync(UseItemContext context,
         CancellationToken cancellationToken)

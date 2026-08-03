@@ -49,13 +49,13 @@ BEGIN
     SET @GuildId = SCOPE_IDENTITY();
 
     INSERT INTO game.GuildMembers (GuildId, CharacterId, Role)
-    VALUES (@GuildId, @MasterCharacterId, 2); 
+    VALUES (@GuildId, @MasterCharacterId, 2);
 
     SET @Payload = CONCAT(N'GuildId=', @GuildId, N';AvatarName=', @AvatarName, N';Grade=1');
 
     EXEC game.usp_EventLog_Insert
-         @EventCode = 1, 
-         @Category = 11, 
+         @EventCode = 1,
+         @Category = 11,
          @ActorAccountId = @ActorAccountId,
          @ActorCharacterId = @MasterCharacterId,
          @DeltaMoney = @DeltaMoney,

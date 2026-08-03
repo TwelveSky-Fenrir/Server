@@ -1,7 +1,7 @@
 CREATE TABLE world.MonsterDropCategoryRates
 (
     MonsterId     INT     NOT NULL,
-    CategoryIndex TINYINT NOT NULL, 
+    CategoryIndex TINYINT NOT NULL,
     Value         INT     NOT NULL,
     CONSTRAINT PK_MonsterDropCategoryRates PRIMARY KEY CLUSTERED (MonsterId, CategoryIndex),
     CONSTRAINT FK_MonsterDropCategoryRates_Monster FOREIGN KEY (MonsterId) REFERENCES world.Monsters (MonsterId),

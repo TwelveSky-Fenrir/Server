@@ -1,9 +1,9 @@
 CREATE OR ALTER PROCEDURE game.usp_AccountVault_TransferMoneyWithCharacter @CharacterId INT,
-                                                                  @DeltaCharacterMoney BIGINT,
-                                                                  @AccountId INT,
-                                                                  @DeltaVaultMoney BIGINT,
-                                                                  @AuditEventCode SMALLINT = NULL,
-                                                                  @AuditQuantity INT = NULL
+                                                                           @DeltaCharacterMoney BIGINT,
+                                                                           @AccountId INT,
+                                                                           @DeltaVaultMoney BIGINT,
+                                                                           @AuditEventCode SMALLINT = NULL,
+                                                                           @AuditQuantity INT = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -51,7 +51,7 @@ BEGIN
                 IF @AuditEventCode IS NOT NULL
                     EXEC game.usp_EventLog_Insert
                          @EventCode = @AuditEventCode,
-                         @Category = 20, 
+                         @Category = 20,
                          @ActorAccountId = @AccountId,
                          @ActorCharacterId = @CharacterId,
                          @DeltaMoney = @DeltaCharacterMoney,
@@ -85,7 +85,7 @@ BEGIN
     IF @AuditEventCode IS NOT NULL
         EXEC game.usp_EventLog_Insert
              @EventCode = @AuditEventCode,
-             @Category = 20, 
+             @Category = 20,
              @ActorAccountId = @AccountId,
              @ActorCharacterId = @CharacterId,
              @DeltaMoney = @DeltaCharacterMoney,

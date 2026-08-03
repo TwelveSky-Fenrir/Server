@@ -54,7 +54,8 @@ public sealed record ChatCrossShardRelayRepository(ICaeriusNetDbContext Db) : IC
                 return await Db.QueryAsImmutableArrayAsync<ChatCrossShardWhisperDto>(sp, ct);
             }
             catch (CaeriusNetSqlException ex)
-                when (attempt < MaxWriteConflictAttempts && ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                when (attempt < MaxWriteConflictAttempts &&
+                      ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
                       IsWriteConflict(sqlErrorNumber))
             {
             }

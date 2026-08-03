@@ -7,12 +7,11 @@ namespace Fenrir.Application.Game.Hosting.World;
 
 public sealed class ZoneTickHost(ZoneRegistry zones, ILogger<ZoneTickHost> logger) : BackgroundService
 {
+    private const int ConsecutiveFailuresBeforePermanentlyDownSignal = 5;
     private static readonly TimeSpan InitialRestartBackoff = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan MaxRestartBackoff = TimeSpan.FromSeconds(30);
 
     private static readonly TimeSpan FailureStreakResetThreshold = MaxRestartBackoff;
-
-    private const int ConsecutiveFailuresBeforePermanentlyDownSignal = 5;
 
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -50,13 +49,11 @@ public sealed class ZoneTickHost(ZoneRegistry zones, ILogger<ZoneTickHost> logge
 
                 if (consecutiveFailures >= ConsecutiveFailuresBeforePermanentlyDownSignal &&
                     consecutiveFailures % ConsecutiveFailuresBeforePermanentlyDownSignal == 0)
-                {
                     logger.LogCritical(
                         "Zone {MapId} has failed {ConsecutiveFailures} consecutive tick-loop restarts and is " +
                         "likely permanently broken (corrupted state or a startup bug), not merely slow to " +
                         "recover; it is still being retried under supervision, but this warrants operator " +
                         "attention distinct from a routine restart", zone.MapId, consecutiveFailures);
-                }
             }
 
             try

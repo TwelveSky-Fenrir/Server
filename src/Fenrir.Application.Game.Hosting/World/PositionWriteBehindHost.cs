@@ -114,6 +114,14 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
         }
     }
 
+    public async ValueTask DisposeAsync()
+    {
+        await _flusher.DisposeAsync().ConfigureAwait(false);
+        _flushGate.Dispose();
+        _disconnectRetryTimer.Dispose();
+        _disconnectRetrySignal.Dispose();
+    }
+
     private async ValueTask PersistFinalFlushAsync(PlayerRuntimeState state, CancellationToken ct)
     {
         var characterId = state.CharacterId;
@@ -121,69 +129,69 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
         var bloodCoin = state.BloodCoin;
 
         var progressRow = new CharacterProgressTvp(characterId, state.FlushSequence, state.Level, state.Level2,
-                state.Experience, state.Life, state.MaxLife, state.Mana, state.MaxMana, state.StatVit, state.StatStr,
-                state.StatInt, state.StatDex, state.StatPoints, state.SkillPoints, state.ContributionPoints,
-                state.Exp2, state.RebirthCount, state.EatLifePotion, state.EatManaPotion, state.EatStrPotion,
-                state.EatDexPotion, state.EatElePotion, state.DropItemTime, state.M15PetLuckyBoxPity,
-                state.MountGarage[MountPersistenceCodec.PersistedGarageSlot],
-                MountPersistenceCodec.EncodeExpActivity(state.MountActivity, state.MountAccumulatedExp),
-                MountPersistenceCodec.EncodePower(state.MountRolledAttributes),
-                state.AnimalIndex, state.AnimalTime,
-                state.VisibleState, state.SpecialState, state.UseOrnament ? 1 : 0,
-                state.Title, state.Halo, state.TeacherPoint,
-                warPoint - state.PersistedWarPoint, bloodCoin - state.PersistedBloodCoin,
-                state.PetExpX2Time, state.AnimalAbsorbTime, state.AnimalAbsorbState, state.CostumeIndex,
-                state.ProtectForHalo,
-                state.BonusItemLevel,
-                state.BonusItemValue,
-                state.TribeNotifyScrollCount,
-                state.TribeFourReturnAllowance,
-                BottleSlotsCodec.Encode(state.BottleSlots),
-                state.DrunkBottleIndex,
-                state.AutoBuffTime,
-                AutoBuffSkillCodec.Encode(state.AutoBuffSkill),
-                state.RankPointDate,
-                state.RankBuffType,
-                state.AutoHuntPaidDayBudget,
-                state.AutoHuntPaidMinuteBudget,
-                state.BuffX2Time,
-                state.PremiumExpireUtc,
-                state.PetGrowth,
-                state.PetActivity,
-                RankPoint: state.RankPoint,
-                CloakLuckyBoxPity: state.CloakLuckyBoxPity,
-                CloakVariantBoxPity: state.CloakVariantBoxPity,
-                MountVariantBoxPity: state.MountVariantBoxPity,
-                ImproveItemValue: state.ImproveItemValue,
-                AddItemValue: state.AddItemValue,
-                HighItemValue: state.HighItemValue,
-                TaiyanKeyTimer: state.TaiyanKeyTimer,
-                ProtectForRefine: state.ProtectForRefine,
-                ProtectForDestroy: state.ProtectForDestroy,
-                ProtectForCostume: state.ProtectForCostume,
-                ProtectForDestroy2: state.ProtectForDestroy2,
-                LodRounds: state.LodRounds,
-                StellarCoreExpireDate: StellarCoreExpireDateCodec.Encode(state.StellarCoreExpireDate),
-                EliteDungeonTime: state.EliteDungeonTime,
-                DungeonKeyTime: state.DungeonKeyTime,
-                IvyHallTicketTime: state.IvyHallTicketTime,
-                ScrollOfSeekersTime: state.ScrollOfSeekersTime,
-                FightingGodForDestroy: state.FightingGodForDestroy,
-                PetBagDate: state.PetBagDate,
-                PlayTime1: state.PlayTime1,
-                PlayTime3: state.PlayTime3,
-                HsbStoneRewardClaimed: state.HsbStoneRewardClaimed ? 1 : 0,
-                TowerCpMilestoneCounter: state.TowerCpMilestoneCounter,
-                InventoryDate: state.InventoryDate,
-                StoreDate: state.StoreDate,
-                WarriorPill: state.WarriorPill,
-                WarriorScroll: state.WarriorScroll,
-                SilverTime: state.SilverTime,
-                GoldTime: state.GoldTime,
-                DoubleKillNumTime: state.DoubleKillNumTime,
-                DoubleKillExpTime: state.DoubleKillExpTime,
-                DoubleKillNumTime2: state.DoubleKillNumTime2,
-                ProtectForDeath: state.ProtectForDeath);
+            state.Experience, state.Life, state.MaxLife, state.Mana, state.MaxMana, state.StatVit, state.StatStr,
+            state.StatInt, state.StatDex, state.StatPoints, state.SkillPoints, state.ContributionPoints,
+            state.Exp2, state.RebirthCount, state.EatLifePotion, state.EatManaPotion, state.EatStrPotion,
+            state.EatDexPotion, state.EatElePotion, state.DropItemTime, state.M15PetLuckyBoxPity,
+            state.MountGarage[MountPersistenceCodec.PersistedGarageSlot],
+            MountPersistenceCodec.EncodeExpActivity(state.MountActivity, state.MountAccumulatedExp),
+            MountPersistenceCodec.EncodePower(state.MountRolledAttributes),
+            state.AnimalIndex, state.AnimalTime,
+            state.VisibleState, state.SpecialState, state.UseOrnament ? 1 : 0,
+            state.Title, state.Halo, state.TeacherPoint,
+            warPoint - state.PersistedWarPoint, bloodCoin - state.PersistedBloodCoin,
+            state.PetExpX2Time, state.AnimalAbsorbTime, state.AnimalAbsorbState, state.CostumeIndex,
+            state.ProtectForHalo,
+            state.BonusItemLevel,
+            state.BonusItemValue,
+            state.TribeNotifyScrollCount,
+            state.TribeFourReturnAllowance,
+            BottleSlotsCodec.Encode(state.BottleSlots),
+            state.DrunkBottleIndex,
+            state.AutoBuffTime,
+            AutoBuffSkillCodec.Encode(state.AutoBuffSkill),
+            state.RankPointDate,
+            state.RankBuffType,
+            state.AutoHuntPaidDayBudget,
+            state.AutoHuntPaidMinuteBudget,
+            state.BuffX2Time,
+            state.PremiumExpireUtc,
+            state.PetGrowth,
+            state.PetActivity,
+            RankPoint: state.RankPoint,
+            CloakLuckyBoxPity: state.CloakLuckyBoxPity,
+            CloakVariantBoxPity: state.CloakVariantBoxPity,
+            MountVariantBoxPity: state.MountVariantBoxPity,
+            ImproveItemValue: state.ImproveItemValue,
+            AddItemValue: state.AddItemValue,
+            HighItemValue: state.HighItemValue,
+            TaiyanKeyTimer: state.TaiyanKeyTimer,
+            ProtectForRefine: state.ProtectForRefine,
+            ProtectForDestroy: state.ProtectForDestroy,
+            ProtectForCostume: state.ProtectForCostume,
+            ProtectForDestroy2: state.ProtectForDestroy2,
+            LodRounds: state.LodRounds,
+            StellarCoreExpireDate: StellarCoreExpireDateCodec.Encode(state.StellarCoreExpireDate),
+            EliteDungeonTime: state.EliteDungeonTime,
+            DungeonKeyTime: state.DungeonKeyTime,
+            IvyHallTicketTime: state.IvyHallTicketTime,
+            ScrollOfSeekersTime: state.ScrollOfSeekersTime,
+            FightingGodForDestroy: state.FightingGodForDestroy,
+            PetBagDate: state.PetBagDate,
+            PlayTime1: state.PlayTime1,
+            PlayTime3: state.PlayTime3,
+            HsbStoneRewardClaimed: state.HsbStoneRewardClaimed ? 1 : 0,
+            TowerCpMilestoneCounter: state.TowerCpMilestoneCounter,
+            InventoryDate: state.InventoryDate,
+            StoreDate: state.StoreDate,
+            WarriorPill: state.WarriorPill,
+            WarriorScroll: state.WarriorScroll,
+            SilverTime: state.SilverTime,
+            GoldTime: state.GoldTime,
+            DoubleKillNumTime: state.DoubleKillNumTime,
+            DoubleKillExpTime: state.DoubleKillExpTime,
+            DoubleKillNumTime2: state.DoubleKillNumTime2,
+            ProtectForDeath: state.ProtectForDeath);
 
         var positionRow = new CharacterPositionTvp(characterId, state.FlushSequence, state.MapId, state.PosX,
             state.PosY, state.PosZ, state.Heading);
@@ -211,14 +219,6 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
                 "Failed to persist final Position/Vitals/Progression state for character {CharacterId} on disconnect -- queued for retry until it succeeds",
                 characterId);
         }
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        await _flusher.DisposeAsync().ConfigureAwait(false);
-        _flushGate.Dispose();
-        _disconnectRetryTimer.Dispose();
-        _disconnectRetrySignal.Dispose();
     }
 
     private void ReleaseDisconnectRetrySignal()

@@ -1001,7 +1001,8 @@ public sealed partial class Zone
             action.Sort != StunActionSort && state.ActionSort != StunActionSort)
             return;
 
-        var fullUnits = isZone195 ? RegularWarAfkTickSystem.Zone195FullUnits : RegularWarAfkTickSystem.WarActiveFullUnits;
+        var fullUnits =
+            isZone195 ? RegularWarAfkTickSystem.Zone195FullUnits : RegularWarAfkTickSystem.WarActiveFullUnits;
         if (state.AfkTick >= RegularWarAfkTickSystem.ResetNotificationLegacyTicks)
             state.Session.Send(new LocalChatResponse
             {
@@ -1013,12 +1014,15 @@ public sealed partial class Zone
         state.AfkTick = 0;
     }
 
-    private static bool IsRegularWarAfkExemptSkill(int skillNumber) => skillNumber switch
+    private static bool IsRegularWarAfkExemptSkill(int skillNumber)
     {
-        1 or 6 or 7 or 10 or 11 or 14 or 15 or 18 or 19 or 20 or 25 or 26 or 29 or 30 or 33 or 34 or 37 or 38 or 39
-            or 44 or 45 or 48 or 49 or 52 or 53 or 56 or 57 or 82 or 83 or 84 or 103 or 104 or 105 => true,
-        _ => false
-    };
+        return skillNumber switch
+        {
+            1 or 6 or 7 or 10 or 11 or 14 or 15 or 18 or 19 or 20 or 25 or 26 or 29 or 30 or 33 or 34 or 37 or 38 or 39
+                or 44 or 45 or 48 or 49 or 52 or 53 or 56 or 57 or 82 or 83 or 84 or 103 or 104 or 105 => true,
+            _ => false
+        };
+    }
 
     private SkillCastGuardContext BuildSkillCastGuardContext(PlayerRuntimeState state, ActionInfo action,
         int skillCategoryCode)

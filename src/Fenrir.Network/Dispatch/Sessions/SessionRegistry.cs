@@ -10,23 +10,23 @@ public sealed class SessionRegistry : IFloodKickSink
 {
     private static readonly Meter Meter = new("Fenrir.Network.Sessions");
 
-    private readonly ILogger<SessionRegistry>? logger;
-
     private readonly ConcurrentDictionary<long, long> _accountToSession = new();
 
     private readonly Lock _associationLock = new();
+
+    private readonly ObservableGauge<int> _sessionCountGauge;
     private readonly ConcurrentDictionary<long, ClientSession> _sessions = new();
 
     private readonly ConcurrentDictionary<long, long> _sessionToAccount = new();
 
-    private readonly ObservableGauge<int> _sessionCountGauge;
+    private readonly ILogger<SessionRegistry>? logger;
 
     public SessionRegistry(ILogger<SessionRegistry>? logger = null)
     {
         this.logger = logger;
         _sessionCountGauge = Meter.CreateObservableGauge(
-            "fenrir.sessions.active", () => _sessions.Count, unit: null,
-            description: "Number of client sessions currently registered on this server");
+            "fenrir.sessions.active", () => _sessions.Count, null,
+            "Number of client sessions currently registered on this server");
     }
 
     public int Count => _sessions.Count;

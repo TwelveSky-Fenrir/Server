@@ -1,6 +1,6 @@
 CREATE PROCEDURE game.usp_Character_UpdateAppearance @CharacterId INT,
-                                                     @HeadType    TINYINT,
-                                                     @FaceType    TINYINT
+                                                     @HeadType TINYINT,
+                                                     @FaceType TINYINT
 AS
 BEGIN
     SET NOCOUNT ON;

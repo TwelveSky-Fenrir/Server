@@ -35,7 +35,9 @@ public sealed class HeroRewardClaimService(IHeroRankingRepository heroRankings, 
             await heroRankings.ClaimRewardAsync(characterId, 1, points, cancellationToken);
         }
         catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException
-                 { Number: AlreadyClaimedOrNotRankedErrorNumber })
+                                                {
+                                                    Number: AlreadyClaimedOrNotRankedErrorNumber
+                                                })
         {
             logger.LogInformation(
                 "Character {CharacterId} hero-reward claim lost a cross-shard race: usp_HeroRanking_ClaimReward's guarded UPDATE found the reward already claimed",
@@ -43,7 +45,9 @@ public sealed class HeroRewardClaimService(IHeroRankingRepository heroRankings, 
             return new HeroRewardClaimResult(HeroRewardClaimOutcome.AlreadyClaimed);
         }
         catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException
-                 { Number: UnknownCharacterErrorNumber })
+                                                {
+                                                    Number: UnknownCharacterErrorNumber
+                                                })
         {
             logger.LogWarning(ex,
                 "Character {CharacterId} hero-reward claim failed: usp_HeroRanking_ClaimReward found no matching character row for the contribution-points grant",

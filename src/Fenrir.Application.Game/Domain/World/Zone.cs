@@ -112,7 +112,7 @@ public sealed partial class Zone(
         return _inbox.Writer.TryWrite(command);
     }
 
-        public async Task<PlayerRuntimeState?> PostLeaveCommandAndWaitAsync(int characterId, CancellationToken ct,
+    public async Task<PlayerRuntimeState?> PostLeaveCommandAndWaitAsync(int characterId, CancellationToken ct,
         TimeSpan? timeout = null)
     {
         var snapshotSignal =

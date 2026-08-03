@@ -1,9 +1,9 @@
 CREATE TABLE runtime.PartyResyncRelay
 (
     RelayId           BIGINT IDENTITY (1,1) NOT NULL,
-    Sort              TINYINT               NOT NULL, 
-    SourceShardId     TINYINT               NOT NULL, 
-    SourceCharacterId INT                   NOT NULL, 
+    Sort              TINYINT               NOT NULL,
+    SourceShardId     TINYINT               NOT NULL,
+    SourceCharacterId INT                   NOT NULL,
     PartyName         NVARCHAR(13)          NOT NULL,
     AvatarName        NVARCHAR(13)          NOT NULL,
     CorrelationId     UNIQUEIDENTIFIER      NOT NULL,

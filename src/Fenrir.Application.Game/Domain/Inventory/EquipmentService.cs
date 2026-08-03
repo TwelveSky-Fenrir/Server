@@ -79,10 +79,10 @@ public static class EquipmentService
         var zone = new ZoneContext(
             state.MapId,
             state.UseOrnament,
-            OrnamentGoldTimeRemaining: state.GoldTime,
-            OrnamentSilverTimeRemaining: state.SilverTime,
-            RankBuffType: state.RankBuffType,
-            TribeRole: state.TribeRole,
+            state.GoldTime,
+            state.SilverTime,
+            state.RankBuffType,
+            state.TribeRole,
             DrunkStateId: ResolveDrunkStateId(state),
             GuildBuffActive: state.GuildBuffActive,
             GuildId: state.GuildId ?? 0);

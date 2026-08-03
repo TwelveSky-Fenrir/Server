@@ -137,7 +137,8 @@ public sealed class LoginService(
             AuthenticationOutcome authentication;
             try
             {
-                authentication = await AuthenticateConstantTimeAsync(account, packet.Password, remoteIp, cancellationToken);
+                authentication =
+                    await AuthenticateConstantTimeAsync(account, packet.Password, remoteIp, cancellationToken);
             }
             catch (CaeriusNetSqlException ex)
             {
@@ -195,7 +196,6 @@ public sealed class LoginService(
 
                 int concurrentDeviceSessionCount;
                 if (configuredAccountLimit is null)
-                {
                     try
                     {
                         concurrentDeviceSessionCount = await accountSessions.GetConcurrentDeviceSessionCountAsync(
@@ -209,17 +209,15 @@ public sealed class LoginService(
                             accountId);
                         concurrentDeviceSessionCount = PerAdapterLoginCapGate.DeadCodeLiveCountBaseline;
                     }
-                }
                 else
-                {
                     concurrentDeviceSessionCount = 0;
-                }
 
                 switch (PerAdapterLoginCapGate.Evaluate(account.AccountGrade, macAddress, configuredAccountLimit,
                             concurrentDeviceSessionCount))
                 {
                     case PerAdapterLoginCapOutcome.OutrightBanned:
-                        logger.LogWarning("Login rejected: MAC {MacAddress} is banned (login {Id}, account {AccountId})",
+                        logger.LogWarning(
+                            "Login rejected: MAC {MacAddress} is banned (login {Id}, account {AccountId})",
                             macAddress, packet.Id, accountId);
                         return Failure(ResultCustomMessage, MacBannedMessage, true);
                     case PerAdapterLoginCapOutcome.ConnectionLimitExceeded:
@@ -343,11 +341,13 @@ public sealed class LoginService(
             try
             {
                 await eventLog.LogAsync(LoginSucceededEventCode, EventLogCategory.Session, accountId, null, null, null,
-                    null, null, null, null, null, 1, remoteIp is null ? null : $"RemoteIp={remoteIp}", cancellationToken);
+                    null, null, null, null, null, 1, remoteIp is null ? null : $"RemoteIp={remoteIp}",
+                    cancellationToken);
             }
             catch (CaeriusNetSqlException ex)
             {
-                logger.LogWarning(ex, "Login: succeeded-login event-log write failed for account {AccountId}", accountId);
+                logger.LogWarning(ex, "Login: succeeded-login event-log write failed for account {AccountId}",
+                    accountId);
             }
 
             logger.LogInformation(

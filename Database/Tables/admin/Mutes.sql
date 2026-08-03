@@ -8,7 +8,7 @@ CREATE TABLE admin.Mutes
     LiftedAtUtc      DATETIME2(3)       NULL,
     CreatedAtUtc     DATETIME2(3)       NOT NULL
         CONSTRAINT DF_Mutes_CreatedAtUtc DEFAULT SYSUTCDATETIME(),
-    ActorAccountId   INT                NULL, 
+    ActorAccountId   INT                NULL,
     ActorCharacterId INT                NULL,
     CONSTRAINT PK_Mutes PRIMARY KEY CLUSTERED (MuteId),
     CONSTRAINT CK_Mutes_AccountOrCharacter CHECK (AccountId IS NOT NULL OR CharacterId IS NOT NULL),

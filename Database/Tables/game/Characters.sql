@@ -239,119 +239,119 @@ CREATE TABLE game.Characters
         CONSTRAINT DF_Characters_MountItemId DEFAULT 0,
     MountExpActivity         INT                                               NOT NULL
         CONSTRAINT DF_Characters_MountExpActivity DEFAULT 0,
-    MountPower                INT                                              NOT NULL
+    MountPower               INT                                               NOT NULL
         CONSTRAINT DF_Characters_MountPower DEFAULT 0,
-    MountSlotIndex            INT                                              NOT NULL
+    MountSlotIndex           INT                                               NOT NULL
         CONSTRAINT DF_Characters_MountSlotIndex DEFAULT -1,
-    MountTime                 INT                                              NOT NULL
+    MountTime                INT                                               NOT NULL
         CONSTRAINT DF_Characters_MountTime DEFAULT 0,
 
-    PetExpX2Time              INT                                              NOT NULL
+    PetExpX2Time             INT                                               NOT NULL
         CONSTRAINT DF_Characters_PetExpX2Time DEFAULT 0,
-    AnimalAbsorbTime          INT                                              NOT NULL
+    AnimalAbsorbTime         INT                                               NOT NULL
         CONSTRAINT DF_Characters_AnimalAbsorbTime DEFAULT 0,
-    AnimalAbsorbState         INT                                              NOT NULL
+    AnimalAbsorbState        INT                                               NOT NULL
         CONSTRAINT DF_Characters_AnimalAbsorbState DEFAULT 0,
 
-    AutoTime                  INT                                              NOT NULL
+    AutoTime                 INT                                               NOT NULL
         CONSTRAINT DF_Characters_AutoTime DEFAULT 0
         CONSTRAINT CK_Characters_AutoTime CHECK (AutoTime >= 0),
 
-    AutoTime2                 INT                                              NOT NULL
+    AutoTime2                INT                                               NOT NULL
         CONSTRAINT DF_Characters_AutoTime2 DEFAULT 0
         CONSTRAINT CK_Characters_AutoTime2 CHECK (AutoTime2 >= 0),
 
-    BuffX2Time                INT                                              NOT NULL
+    BuffX2Time               INT                                               NOT NULL
         CONSTRAINT DF_Characters_BuffX2Time DEFAULT 0
         CONSTRAINT CK_Characters_BuffX2Time CHECK (BuffX2Time >= 0),
 
-    Zone241Time                INT                                             NOT NULL
+    Zone241Time              INT                                               NOT NULL
         CONSTRAINT DF_Characters_Zone241Time DEFAULT 0
         CONSTRAINT CK_Characters_Zone241Time CHECK (Zone241Time >= 0),
-    WarPoint                    INT                                            NOT NULL
+    WarPoint                 INT                                               NOT NULL
         CONSTRAINT DF_Characters_WarPoint DEFAULT 0
         CONSTRAINT CK_Characters_WarPoint CHECK (WarPoint >= 0),
 
-    RankPoint                    INT                                           NOT NULL
+    RankPoint                INT                                               NOT NULL
         CONSTRAINT DF_Characters_RankPoint DEFAULT 0
         CONSTRAINT CK_Characters_RankPoint CHECK (RankPoint >= 0),
 
-    PetBagDate                    INT                                          NOT NULL
+    PetBagDate               INT                                               NOT NULL
         CONSTRAINT DF_Characters_PetBagDate DEFAULT 0,
-    M15PetLuckyBoxPity             TINYINT                                     NOT NULL
+    M15PetLuckyBoxPity       TINYINT                                           NOT NULL
         CONSTRAINT DF_Characters_M15PetLuckyBoxPity DEFAULT 0
         CONSTRAINT CK_Characters_M15PetLuckyBoxPity CHECK (M15PetLuckyBoxPity BETWEEN 0 AND 200),
 
-    CloakLuckyBoxPity               TINYINT                                    NOT NULL
+    CloakLuckyBoxPity        TINYINT                                           NOT NULL
         CONSTRAINT DF_Characters_CloakLuckyBoxPity DEFAULT 0
         CONSTRAINT CK_Characters_CloakLuckyBoxPity CHECK (CloakLuckyBoxPity BETWEEN 0 AND 100),
-    CloakVariantBoxPity              TINYINT                                   NOT NULL
+    CloakVariantBoxPity      TINYINT                                           NOT NULL
         CONSTRAINT DF_Characters_CloakVariantBoxPity DEFAULT 0
         CONSTRAINT CK_Characters_CloakVariantBoxPity CHECK (CloakVariantBoxPity BETWEEN 0 AND 200),
-    MountVariantBoxPity               TINYINT                                  NOT NULL
+    MountVariantBoxPity      TINYINT                                           NOT NULL
         CONSTRAINT DF_Characters_MountVariantBoxPity DEFAULT 0
         CONSTRAINT CK_Characters_MountVariantBoxPity CHECK (MountVariantBoxPity BETWEEN 0 AND 200),
 
-    VisibleState                       TINYINT                                 NOT NULL
+    VisibleState             TINYINT                                           NOT NULL
         CONSTRAINT DF_Characters_VisibleState DEFAULT 1,
-    SpecialState                        TINYINT                                NOT NULL
+    SpecialState             TINYINT                                           NOT NULL
         CONSTRAINT DF_Characters_SpecialState DEFAULT 0,
 
-    UseOrnament                          BIT                                   NOT NULL
+    UseOrnament              BIT                                               NOT NULL
         CONSTRAINT DF_Characters_UseOrnament DEFAULT 0,
 
-    CostumeIndex                          INT                                  NOT NULL
+    CostumeIndex             INT                                               NOT NULL
         CONSTRAINT DF_Characters_CostumeIndex DEFAULT -1
         CONSTRAINT CK_Characters_CostumeIndex CHECK (CostumeIndex BETWEEN -1 AND 19),
 
-    ProtectForHalo                         INT                                 NOT NULL
+    ProtectForHalo           INT                                               NOT NULL
         CONSTRAINT DF_Characters_ProtectForHalo DEFAULT 0
         CONSTRAINT CK_Characters_ProtectForHalo CHECK (ProtectForHalo >= 0),
-    BonusItemLevel                          INT                                NOT NULL
+    BonusItemLevel           INT                                               NOT NULL
         CONSTRAINT DF_Characters_BonusItemLevel DEFAULT 0
         CONSTRAINT CK_Characters_BonusItemLevel CHECK (BonusItemLevel >= 0),
-    BonusItemValue                           BIT                               NOT NULL
+    BonusItemValue           BIT                                               NOT NULL
         CONSTRAINT DF_Characters_BonusItemValue DEFAULT 0,
-    TribeNotifyScrollCount                    INT                              NOT NULL
+    TribeNotifyScrollCount   INT                                               NOT NULL
         CONSTRAINT DF_Characters_TribeNotifyScrollCount DEFAULT 0
         CONSTRAINT CK_Characters_TribeNotifyScrollCount CHECK (TribeNotifyScrollCount >= 0),
-    TribeFourReturnAllowance                   INT                             NOT NULL
+    TribeFourReturnAllowance INT                                               NOT NULL
         CONSTRAINT DF_Characters_TribeFourReturnAllowance DEFAULT 0
         CONSTRAINT CK_Characters_TribeFourReturnAllowance CHECK (TribeFourReturnAllowance >= 0),
-    BottleSlots                                 NVARCHAR(70)                   NOT NULL
+    BottleSlots              NVARCHAR(70)                                      NOT NULL
         CONSTRAINT DF_Characters_BottleSlots DEFAULT N''
         CONSTRAINT CK_Characters_BottleSlots CHECK (LEN(BottleSlots) IN (0, 70)),
-    DrunkBottleIndex                              INT                          NOT NULL
+    DrunkBottleIndex         INT                                               NOT NULL
         CONSTRAINT DF_Characters_DrunkBottleIndex DEFAULT -1
         CONSTRAINT CK_Characters_DrunkBottleIndex CHECK (DrunkBottleIndex BETWEEN -1 AND 9),
 
-    TowerCpMilestoneCounter                        INT                         NOT NULL
+    TowerCpMilestoneCounter  INT                                               NOT NULL
         CONSTRAINT DF_Characters_TowerCpMilestoneCounter DEFAULT 0
         CONSTRAINT CK_Characters_TowerCpMilestoneCounter CHECK (TowerCpMilestoneCounter >= 0),
 
-    SilverTime                                      INT                        NOT NULL
+    SilverTime               INT                                               NOT NULL
         CONSTRAINT DF_Characters_SilverTime DEFAULT 0,
-    GoldTime                                         INT                       NOT NULL
+    GoldTime                 INT                                               NOT NULL
         CONSTRAINT DF_Characters_GoldTime DEFAULT 0,
 
-    DoubleKillNumTime                                 INT                      NOT NULL
+    DoubleKillNumTime        INT                                               NOT NULL
         CONSTRAINT DF_Characters_DoubleKillNumTime DEFAULT 0,
-    DoubleKillExpTime                                  INT                     NOT NULL
+    DoubleKillExpTime        INT                                               NOT NULL
         CONSTRAINT DF_Characters_DoubleKillExpTime DEFAULT 0,
-    DoubleKillNumTime2                                  INT                    NOT NULL
+    DoubleKillNumTime2       INT                                               NOT NULL
         CONSTRAINT DF_Characters_DoubleKillNumTime2 DEFAULT 0,
 
-    FlushSequence             BIGINT                                           NOT NULL
+    FlushSequence            BIGINT                                            NOT NULL
         CONSTRAINT DF_Characters_FlushSequence DEFAULT 0,
 
-    PositionFlushSequence      BIGINT                                          NOT NULL
+    PositionFlushSequence    BIGINT                                            NOT NULL
         CONSTRAINT DF_Characters_PositionFlushSequence DEFAULT 0,
-    ProgressFlushSequence       BIGINT                                         NOT NULL
+    ProgressFlushSequence    BIGINT                                            NOT NULL
         CONSTRAINT DF_Characters_ProgressFlushSequence DEFAULT 0,
 
-    CreatedAtUtc              DATETIME2(3)                                     NOT NULL
+    CreatedAtUtc             DATETIME2(3)                                      NOT NULL
         CONSTRAINT DF_Characters_CreatedAtUtc DEFAULT SYSUTCDATETIME(),
-    UpdatedAtUtc              DATETIME2(3)                                     NOT NULL
+    UpdatedAtUtc             DATETIME2(3)                                      NOT NULL
         CONSTRAINT DF_Characters_UpdatedAtUtc DEFAULT SYSUTCDATETIME(),
 
     CONSTRAINT PK_Characters PRIMARY KEY CLUSTERED (CharacterId),

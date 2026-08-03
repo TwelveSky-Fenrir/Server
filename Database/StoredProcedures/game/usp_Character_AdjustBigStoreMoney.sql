@@ -25,7 +25,7 @@ BEGIN
     IF @AuditEventCode IS NOT NULL
         EXEC game.usp_EventLog_Insert
              @EventCode = @AuditEventCode,
-             @Category = 25, 
+             @Category = 25,
              @ActorCharacterId = @CharacterId,
              @DeltaMoney = @AuditFromDelta,
              @DeltaBigMoney = @AuditToDelta,

@@ -6,14 +6,18 @@ namespace Fenrir.Application.Game.Domain.Inventory.UseItems;
 
 public static class InstantExpPillFormulas
 {
+    public static bool IsInstantExpPill(int itemId)
+    {
+        return itemId is 649 or 650 or 1489 or 1490;
+    }
 
-        public static bool IsInstantExpPill(int itemId) => itemId is 649 or 650 or 1489 or 1490;
+    public static bool IsAtAbsoluteExpCeiling(short level, long experience)
+    {
+        return level == LevelProgressionCalculator.MaxLevel
+               && experience >= HighLevelExperienceResolver.MaxMainExperience;
+    }
 
-        public static bool IsAtAbsoluteExpCeiling(short level, long experience)
-        => level == LevelProgressionCalculator.MaxLevel
-           && experience >= HighLevelExperienceResolver.MaxMainExperience;
-
-        public static int ComputeLevelBandGain(
+    public static int ComputeLevelBandGain(
         short level,
         FrozenDictionary<short, LevelRowDto> levelsByLevel,
         int multiplier)
@@ -24,7 +28,7 @@ public static class InstantExpPillFormulas
         var factor1 = (long)row.ExpRangeMin;
         var factor2 = level == LevelProgressionCalculator.MaxLevel
             ? HighLevelExperienceResolver.MaxMainExperience
-            : (long)row.ExpRangeMax;
+            : row.ExpRangeMax;
 
         var band = factor2 - factor1;
         if (band <= 0)
@@ -34,7 +38,7 @@ public static class InstantExpPillFormulas
         return baseUnit * multiplier;
     }
 
-        public static int ComputeRebirthTierGain(short level2)
+    public static int ComputeRebirthTierGain(short level2)
     {
         if (level2 < 1 || level2 > RebirthProgression.MaxHighLevel)
             return 0;

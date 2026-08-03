@@ -1,28 +1,31 @@
 CREATE PROCEDURE game.usp_Character_PersistFinalFlush @Progress game.tvp_CharacterProgress READONLY,
-                                                        @Position game.tvp_CharacterPosition READONLY,
-                                                        @Costumes game.tvp_CharacterCostumeSlot READONLY
+                                                      @Position game.tvp_CharacterPosition READONLY,
+                                                      @Costumes game.tvp_CharacterCostumeSlot READONLY
 AS
 BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
-    DECLARE @Applied TABLE (CharacterId INT NOT NULL PRIMARY KEY);
+    DECLARE @Applied TABLE
+                     (
+                         CharacterId INT NOT NULL PRIMARY KEY
+                     );
 
     BEGIN TRANSACTION;
 
     UPDATE c
-    SET c.FlushSequence          = p.FlushSequence,
-        c.Level                  = p.Level,
-        c.Level2                 = p.Level2,
-        c.Experience              = p.Experience,
-        c.Life                    = p.Life,
-        c.MaxLife                 = p.MaxLife,
-        c.Mana                    = p.Mana,
-        c.MaxMana                 = p.MaxMana,
-        c.StatVit                 = p.StatVit,
-        c.StatStr                 = p.StatStr,
-        c.StatInt                 = p.StatInt,
-        c.StatDex                 = p.StatDex,
+    SET c.FlushSequence            = p.FlushSequence,
+        c.Level                    = p.Level,
+        c.Level2                   = p.Level2,
+        c.Experience               = p.Experience,
+        c.Life                     = p.Life,
+        c.MaxLife                  = p.MaxLife,
+        c.Mana                     = p.Mana,
+        c.MaxMana                  = p.MaxMana,
+        c.StatVit                  = p.StatVit,
+        c.StatStr                  = p.StatStr,
+        c.StatInt                  = p.StatInt,
+        c.StatDex                  = p.StatDex,
         c.StatPoints               = p.StatPoints,
         c.SkillPoints              = p.SkillPoints,
         c.ContributionPoints       = p.ContributionPoints,
@@ -55,8 +58,8 @@ BEGIN
         c.ProtectForHalo           = p.ProtectForHalo,
         c.BonusItemLevel           = p.BonusItemLevel,
         c.BonusItemValue           = p.BonusItemValue,
-        c.TribeNotifyScrollCount     = p.TribeNotifyScrollCount,
-        c.TribeFourReturnAllowance   = p.TribeFourReturnAllowance,
+        c.TribeNotifyScrollCount   = p.TribeNotifyScrollCount,
+        c.TribeFourReturnAllowance = p.TribeFourReturnAllowance,
         c.BottleSlots              = p.BottleSlots,
         c.DrunkBottleIndex         = p.DrunkBottleIndex,
         c.AutoBuffTime             = p.AutoBuffTime,

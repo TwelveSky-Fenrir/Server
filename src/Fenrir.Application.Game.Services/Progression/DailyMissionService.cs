@@ -17,8 +17,7 @@ public sealed class DailyMissionService(
     WorldDataCache worldData,
     ILogger<DailyMissionService> logger) : IDailyMissionService
 {
-
-        private const int MinimumClaimLevel = ExperienceFormulas.RebirthDivisorLevelThreshold;
+    private const int MinimumClaimLevel = ExperienceFormulas.RebirthDivisorLevelThreshold;
 
     private const int RequiredJoinWar = 1;
     private const int RequiredKillOtherTribe = 10;

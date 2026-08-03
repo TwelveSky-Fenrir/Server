@@ -125,8 +125,8 @@ BEGIN
 
     INSERT INTO game.EventLog (EventCode, Category, ActorAccountId, ActorCharacterId, TargetAccountId,
                                TargetCharacterId, ItemId, Quantity, Outcome, Payload)
-    SELECT 1, 
-           0, 
+    SELECT 1,
+           0,
            @AccountA,
            @CharacterA,
            @AccountB,
@@ -159,8 +159,8 @@ BEGIN
 
     IF @OfferedMoneyA > 0 OR @OfferedBigMoneyA > 0
         EXEC game.usp_EventLog_Insert
-             @EventCode = 2, 
-             @Category = 0, 
+             @EventCode = 2,
+             @Category = 0,
              @ActorAccountId = @AccountA,
              @ActorCharacterId = @CharacterA,
              @TargetAccountId = @AccountB,

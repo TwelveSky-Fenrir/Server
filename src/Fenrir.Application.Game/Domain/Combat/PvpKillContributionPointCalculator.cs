@@ -42,7 +42,7 @@ public static class PvpKillContributionPointCalculator
         return grant > 0 ? (int)grant : 0;
     }
 
-        public static DoubleAwardResult ResolveDoubleAward(int totalAfterFirstGrant, int baseAmount, int cap,
+    public static DoubleAwardResult ResolveDoubleAward(int totalAfterFirstGrant, int baseAmount, int cap,
         int doubleKillNumTime)
     {
         if (doubleKillNumTime <= 0)
@@ -52,5 +52,5 @@ public static class PvpKillContributionPointCalculator
         return grant > 0 ? new DoubleAwardResult(true, grant, doubleKillNumTime - 1) : default;
     }
 
-        public readonly record struct DoubleAwardResult(bool Fired, int GrantedAmount, int NewDoubleKillNumTime);
+    public readonly record struct DoubleAwardResult(bool Fired, int GrantedAmount, int NewDoubleKillNumTime);
 }

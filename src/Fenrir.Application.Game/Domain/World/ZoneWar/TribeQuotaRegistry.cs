@@ -34,7 +34,7 @@ public sealed class TribeQuotaRegistry
         }
     }
 
-        public bool TryReserve(IZoneSession session, int tribe, int accountId, DateTimeOffset registeredAtUtc,
+    public bool TryReserve(IZoneSession session, int tribe, int accountId, DateTimeOffset registeredAtUtc,
         TribeQuotaGroup quotaGroup, int capacity, out int population)
     {
         lock (_lock)

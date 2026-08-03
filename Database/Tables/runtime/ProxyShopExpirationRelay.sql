@@ -1,9 +1,9 @@
 CREATE TABLE runtime.ProxyShopExpirationRelay
 (
     RelayId           BIGINT IDENTITY (1,1) NOT NULL,
-    SourceShardId     TINYINT               NOT NULL, 
+    SourceShardId     TINYINT               NOT NULL,
     CharacterId       INT                   NOT NULL,
-    NewExpirationDate INT                   NOT NULL, 
+    NewExpirationDate INT                   NOT NULL,
     CorrelationId     UNIQUEIDENTIFIER      NOT NULL,
     CreatedAtUtc      DATETIME2(3)          NOT NULL,
     CONSTRAINT PK_ProxyShopExpirationRelay PRIMARY KEY NONCLUSTERED (RelayId),

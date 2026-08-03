@@ -107,26 +107,26 @@ public sealed class UseInventoryItemService(
 
     private const int GoldScrollItemId = 1167;
 
-        private const int WarPointBoxItemId = 8110;
+    private const int WarPointBoxItemId = 8110;
 
-        private const int WarPointBoxGrantAmount = 5;
+    private const int WarPointBoxGrantAmount = 5;
 
-        private const int BuffDurationPillItemId = 1132;
+    private const int BuffDurationPillItemId = 1132;
 
     private const int BuffX2TimeStatSort = 42;
 
-        private const int SilverScrollDurationMinutes = 180;
+    private const int SilverScrollDurationMinutes = 180;
 
-        private const int GoldScrollDurationMinutes = 240;
+    private const int GoldScrollDurationMinutes = 240;
 
 
-        private const int DoubleKillNumTimeSortCode = 4;
+    private const int DoubleKillNumTimeSortCode = 4;
 
-        private const int DoubleKillExpTimeSortCode = 5;
+    private const int DoubleKillExpTimeSortCode = 5;
 
-        private const int DoubleKillNumTime2SortCode = 30;
+    private const int DoubleKillNumTime2SortCode = 30;
 
-        private const int DoubleKillNumTime2ChargeAmount = 50;
+    private const int DoubleKillNumTime2ChargeAmount = 50;
 
     private static readonly ImmutableHashSet<int> TribeConversionBookItemIds =
         ImmutableHashSet.Create(99014, 99015, 99016);
@@ -376,7 +376,8 @@ public sealed class UseInventoryItemService(
 
         if (useItemRegistry?.Resolve(item, itemDefinition) is { } useItemHandler)
             return await useItemHandler.HandleAsync(
-                new UseItemContext(zone, state, characterId, accountId, page, index, item, itemDefinition, value, session),
+                new UseItemContext(zone, state, characterId, accountId, page, index, item, itemDefinition, value,
+                    session),
                 cancellationToken);
 
         if (itemDefinition.Item.Sort == HotkeyItemConsumptionResolver.ConsumableItemCategory
@@ -1183,7 +1184,7 @@ public sealed class UseInventoryItemService(
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
 
-        private async ValueTask<UseInventoryItemResponse> ResolveAppearanceChangeScrollAsync(Zone zone,
+    private async ValueTask<UseInventoryItemResponse> ResolveAppearanceChangeScrollAsync(Zone zone,
         PlayerRuntimeState state, int characterId, byte page, byte index, ItemStack item, int packedValue,
         CancellationToken cancellationToken)
     {
@@ -1217,7 +1218,7 @@ public sealed class UseInventoryItemService(
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
 
-        private async ValueTask<UseInventoryItemResponse> ResolveGenderScrollAsync(Zone zone,
+    private async ValueTask<UseInventoryItemResponse> ResolveGenderScrollAsync(Zone zone,
         PlayerRuntimeState state, int characterId, byte page, byte index, ItemStack item, int packedValue,
         CancellationToken cancellationToken)
     {
@@ -1253,7 +1254,7 @@ public sealed class UseInventoryItemService(
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
 
-        private async ValueTask<UseInventoryItemResponse> ResolveInstantExpPillAsync(
+    private async ValueTask<UseInventoryItemResponse> ResolveInstantExpPillAsync(
         Zone zone, PlayerRuntimeState state, int characterId, byte page, byte index,
         ItemStack item, CancellationToken cancellationToken)
     {
@@ -1514,26 +1515,35 @@ public sealed class UseInventoryItemService(
         };
     }
 
-        private static int? ResolveDoubleKillNumTimeAmount(int itemId) => itemId switch
+    private static int? ResolveDoubleKillNumTimeAmount(int itemId)
     {
-        1118 or 1454 or 8401 => 30,
-        _ => null
-    };
+        return itemId switch
+        {
+            1118 or 1454 or 8401 => 30,
+            _ => null
+        };
+    }
 
-        private static int? ResolveDoubleKillExpTimeAmount(int itemId) => itemId switch
+    private static int? ResolveDoubleKillExpTimeAmount(int itemId)
     {
-        1119 or 1456 or 8402 => 30,
-        _ => null
-    };
+        return itemId switch
+        {
+            1119 or 1456 or 8402 => 30,
+            _ => null
+        };
+    }
 
-        private static int? ResolveDoubleKillBothAmount(int itemId) => itemId switch
+    private static int? ResolveDoubleKillBothAmount(int itemId)
     {
-        1120 or 1163 or 1186 => 30,
-        1228 => 90,
-        _ => null
-    };
+        return itemId switch
+        {
+            1120 or 1163 or 1186 => 30,
+            1228 => 90,
+            _ => null
+        };
+    }
 
-        private async ValueTask<UseInventoryItemResponse> ResolveDoubleKillBothScrollAsync(Zone zone,
+    private async ValueTask<UseInventoryItemResponse> ResolveDoubleKillBothScrollAsync(Zone zone,
         PlayerRuntimeState state, int characterId, byte page, byte index, ItemStack item, int addAmount,
         CancellationToken cancellationToken)
     {
@@ -1563,25 +1573,37 @@ public sealed class UseInventoryItemService(
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
 
-    private static int? ResolveDmgBoostMinutes(int itemId) => itemId switch
+    private static int? ResolveDmgBoostMinutes(int itemId)
     {
-        1191 => 180, 1192 => 90, 1193 => 30, _ => null
-    };
+        return itemId switch
+        {
+            1191 => 180, 1192 => 90, 1193 => 30, _ => null
+        };
+    }
 
-    private static int? ResolveHpBoostMinutes(int itemId) => itemId switch
+    private static int? ResolveHpBoostMinutes(int itemId)
     {
-        1194 => 180, 1195 => 90, 1196 => 30, _ => null
-    };
+        return itemId switch
+        {
+            1194 => 180, 1195 => 90, 1196 => 30, _ => null
+        };
+    }
 
-    private static int? ResolveCriBoostMinutes(int itemId) => itemId switch
+    private static int? ResolveCriBoostMinutes(int itemId)
     {
-        1197 => 180, 1198 => 90, 1199 => 30, _ => null
-    };
+        return itemId switch
+        {
+            1197 => 180, 1198 => 90, 1199 => 30, _ => null
+        };
+    }
 
-    private static int? ResolveWarriorPillMinutes(int itemId) => itemId switch
+    private static int? ResolveWarriorPillMinutes(int itemId)
     {
-        626 or 17037 => 180, 627 => 90, 628 => 30, _ => null
-    };
+        return itemId switch
+        {
+            626 or 17037 => 180, 627 => 90, 628 => 30, _ => null
+        };
+    }
 
     private async ValueTask<UseInventoryItemResponse> ResolveTimedCounterItemAsync(
         Zone zone, PlayerRuntimeState state, int characterId, byte page, byte index, ItemStack item,
@@ -1610,16 +1632,14 @@ public sealed class UseInventoryItemService(
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
 
-        private async ValueTask<UseInventoryItemResponse> ResolveCpRandomBagAsync(Zone zone, PlayerRuntimeState state,
+    private async ValueTask<UseInventoryItemResponse> ResolveCpRandomBagAsync(Zone zone, PlayerRuntimeState state,
         int characterId, byte page, byte index, ItemStack item, CancellationToken cancellationToken)
     {
         var roll = Random.Shared.Next(100);
 
         if (roll > 40)
-        {
             return await ResolveDoubleKillBothScrollAsync(zone, state, characterId, page, index, item, 30,
                 cancellationToken);
-        }
 
         int cpAmount;
         if (roll == 0)
@@ -1646,7 +1666,7 @@ public sealed class UseInventoryItemService(
             characterId, item.ItemId, roll, cpAmount, added.NewValue);
 
         if (!await zone.PostTribeProgressCommandAndWaitAsync(
-                new TribeProgressZoneCommand(characterId, ContributionPoints: added.NewValue),
+                new TribeProgressZoneCommand(characterId, added.NewValue),
                 cancellationToken))
             logger.LogError(
                 "Zone {MapId} tribe-progress inbox full: dropped CP-random-bag CP mirror for character {CharacterId}",
@@ -1799,7 +1819,7 @@ public sealed class UseInventoryItemService(
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
 
-        private async ValueTask<UseInventoryItemResponse> ResolvePremiumServiceAsync(
+    private async ValueTask<UseInventoryItemResponse> ResolvePremiumServiceAsync(
         Zone zone, PlayerRuntimeState state, int characterId, byte page, byte index,
         ItemStack item, int days, CancellationToken cancellationToken)
     {
@@ -1832,38 +1852,50 @@ public sealed class UseInventoryItemService(
         };
     }
 
-        private static int? ResolveAutoBuffScrollDays(int itemId) => itemId switch
+    private static int? ResolveAutoBuffScrollDays(int itemId)
     {
-        1201 or 2021 or 8406 => 7,
-        1215 => 30,
-        1216 or 8405 => 1,
-        _ => null
-    };
+        return itemId switch
+        {
+            1201 or 2021 or 8406 => 7,
+            1215 => 30,
+            1216 or 8405 => 1,
+            _ => null
+        };
+    }
 
-        private static int? ResolveMountAbsorbMinutes(int itemId) => itemId switch
+    private static int? ResolveMountAbsorbMinutes(int itemId)
     {
-        613 => 60,
-        1222 => 180,
-        _ => null
-    };
+        return itemId switch
+        {
+            613 => 60,
+            1222 => 180,
+            _ => null
+        };
+    }
 
-        private static int? ResolveAutoHuntMinutesAmount(int itemId) => itemId switch
+    private static int? ResolveAutoHuntMinutesAmount(int itemId)
     {
-        574 or 2314 or 8403 => 300,
-        722 => 180,
-        _ => null
-    };
+        return itemId switch
+        {
+            574 or 2314 or 8403 => 300,
+            722 => 180,
+            _ => null
+        };
+    }
 
-        private static int? ResolveAutoHuntDaysAmount(int itemId) => itemId switch
+    private static int? ResolveAutoHuntDaysAmount(int itemId)
     {
-        610 or 686 or 8404 => 7,
-        658 or 8105 => 1,
-        687 => 15,
-        1217 => 30,
-        _ => null
-    };
+        return itemId switch
+        {
+            610 or 686 or 8404 => 7,
+            658 or 8105 => 1,
+            687 => 15,
+            1217 => 30,
+            _ => null
+        };
+    }
 
-        private async ValueTask<UseInventoryItemResponse> ResolveAutoHuntMinutesScrollAsync(
+    private async ValueTask<UseInventoryItemResponse> ResolveAutoHuntMinutesScrollAsync(
         Zone zone, PlayerRuntimeState state, int characterId, byte page, byte index,
         ItemStack item, int minutes, CancellationToken cancellationToken)
     {
@@ -1885,7 +1917,7 @@ public sealed class UseInventoryItemService(
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
 
-        private async ValueTask<UseInventoryItemResponse> ResolveAutoHuntDaysScrollAsync(
+    private async ValueTask<UseInventoryItemResponse> ResolveAutoHuntDaysScrollAsync(
         Zone zone, PlayerRuntimeState state, int characterId, byte page, byte index,
         ItemStack item, int days, CancellationToken cancellationToken)
     {
@@ -1909,13 +1941,16 @@ public sealed class UseInventoryItemService(
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
 
-        private static int? ResolveMountDoubleExpMinutes(int itemId) => itemId switch
+    private static int? ResolveMountDoubleExpMinutes(int itemId)
     {
-        1221 or 17034 or 8412 => 180,
-        _ => null
-    };
+        return itemId switch
+        {
+            1221 or 17034 or 8412 => 180,
+            _ => null
+        };
+    }
 
-        private async ValueTask<UseInventoryItemResponse> ResolveAutoBuffScrollAsync(
+    private async ValueTask<UseInventoryItemResponse> ResolveAutoBuffScrollAsync(
         Zone zone, PlayerRuntimeState state, int characterId, byte page, byte index,
         ItemStack item, int days, CancellationToken cancellationToken)
     {
@@ -1952,7 +1987,7 @@ public sealed class UseInventoryItemService(
         return new UseInventoryItemResponse { Result = 0, Page = page, Index = index, Value = newDate, Value2 = 0 };
     }
 
-        private async ValueTask<UseInventoryItemResponse> ResolveMountAbsorbScrollAsync(
+    private async ValueTask<UseInventoryItemResponse> ResolveMountAbsorbScrollAsync(
         Zone zone, PlayerRuntimeState state, int characterId, byte page, byte index,
         ItemStack item, int minutes, CancellationToken cancellationToken)
     {
@@ -1973,7 +2008,7 @@ public sealed class UseInventoryItemService(
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
 
-        private async ValueTask<UseInventoryItemResponse> ResolveMountDoubleExpScrollAsync(
+    private async ValueTask<UseInventoryItemResponse> ResolveMountDoubleExpScrollAsync(
         Zone zone, PlayerRuntimeState state, int characterId, byte page, byte index,
         ItemStack item, int minutes, CancellationToken cancellationToken)
     {
@@ -2080,7 +2115,7 @@ public sealed class UseInventoryItemService(
         return response;
     }
 
-        private ValueTask<UseInventoryItemResponse> ResolveWarPointBoxAsync(Zone zone, PlayerRuntimeState state,
+    private ValueTask<UseInventoryItemResponse> ResolveWarPointBoxAsync(Zone zone, PlayerRuntimeState state,
         int characterId, byte page, byte index, ItemStack item, CancellationToken cancellationToken)
     {
         zone.GrantWarPoints(characterId, WarPointBoxGrantAmount);

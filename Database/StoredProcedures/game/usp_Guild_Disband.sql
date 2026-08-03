@@ -37,8 +37,8 @@ BEGIN
     SET @Payload = CONCAT(N'GuildId=', @GuildId, N';AvatarName=', @AvatarName, N';Grade=', @Grade);
 
     EXEC game.usp_EventLog_Insert
-         @EventCode = 3, 
-         @Category = 11, 
+         @EventCode = 3,
+         @Category = 11,
          @ActorAccountId = @ActorAccountId,
          @ActorCharacterId = @CharacterId,
          @DeltaMoney = 0,

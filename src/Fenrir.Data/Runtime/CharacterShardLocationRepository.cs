@@ -39,7 +39,8 @@ public sealed record CharacterShardLocationRepository(ICaeriusNetDbContext Db) :
                 return;
             }
             catch (CaeriusNetSqlException ex)
-                when (attempt < MaxWriteConflictAttempts && ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                when (attempt < MaxWriteConflictAttempts &&
+                      ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
                       IsWriteConflict(sqlErrorNumber))
             {
             }
@@ -62,7 +63,8 @@ public sealed record CharacterShardLocationRepository(ICaeriusNetDbContext Db) :
                 return;
             }
             catch (CaeriusNetSqlException ex)
-                when (attempt < MaxWriteConflictAttempts && ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                when (attempt < MaxWriteConflictAttempts &&
+                      ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
                       IsWriteConflict(sqlErrorNumber))
             {
             }

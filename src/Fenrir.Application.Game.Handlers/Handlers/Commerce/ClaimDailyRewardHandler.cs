@@ -32,21 +32,15 @@ public sealed class ClaimDailyRewardHandler(IClaimDailyRewardService service, IL
                 await service.ResolveAndApplyAsync(packet, zone, state, accountId, characterId, cancellationToken);
             disconnect = result.Disconnect;
             if (disconnect)
-            {
                 logger.LogWarning(
                     "Daily-reward claim cycle exhausted for account {AccountId}, character {CharacterId}: disconnecting",
                     accountId, characterId);
-            }
             else if (result.Response is null)
-            {
                 logger.LogWarning(
                     "Daily-reward claim rejected for account {AccountId}, character {CharacterId}",
                     accountId, characterId);
-            }
             else
-            {
                 session.Send(result.Response.Value);
-            }
         }
         finally
         {

@@ -21,15 +21,15 @@ public partial class PlayerRuntimeState
 
     public int WarriorScroll { get; set; }
 
-        public int DoubleKillNumTime { get; set; }
+    public int DoubleKillNumTime { get; set; }
 
-        public int DoubleKillExpTime { get; set; }
+    public int DoubleKillExpTime { get; set; }
 
-        public int DoubleKillNumTime2 { get; set; }
+    public int DoubleKillNumTime2 { get; set; }
 
-        public int SilverTime { get; set; }
+    public int SilverTime { get; set; }
 
-        public int GoldTime { get; set; }
+    public int GoldTime { get; set; }
 
 
     public int Zone101Time { get; set; }

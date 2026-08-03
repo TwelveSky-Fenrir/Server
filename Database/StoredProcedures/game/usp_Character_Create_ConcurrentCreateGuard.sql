@@ -1,18 +1,18 @@
 CREATE OR ALTER PROCEDURE game.usp_Character_Create @AccountId INT,
-                                                     @Slot TINYINT,
-                                                     @Name NVARCHAR(13),
-                                                     @Tribe TINYINT,
-                                                     @Gender TINYINT,
-                                                     @HeadType TINYINT,
-                                                     @FaceType TINYINT,
-                                                     @MapId SMALLINT,
-                                                     @PosX REAL,
-                                                     @PosY REAL,
-                                                     @PosZ REAL,
-                                                     @Life INT,
-                                                     @MaxLife INT,
-                                                     @Mana INT,
-                                                     @MaxMana INT
+                                                    @Slot TINYINT,
+                                                    @Name NVARCHAR(13),
+                                                    @Tribe TINYINT,
+                                                    @Gender TINYINT,
+                                                    @HeadType TINYINT,
+                                                    @FaceType TINYINT,
+                                                    @MapId SMALLINT,
+                                                    @PosX REAL,
+                                                    @PosY REAL,
+                                                    @PosZ REAL,
+                                                    @Life INT,
+                                                    @MaxLife INT,
+                                                    @Mana INT,
+                                                    @MaxMana INT
 AS
 BEGIN
     SET NOCOUNT ON;

@@ -1,9 +1,7 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Inventory.UseItems.Boxes;
 using Fenrir.Application.Game.Domain.Simulation;
-using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Loot;
-using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Domain.Game.GameData;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -18,7 +16,7 @@ public sealed class SkillBoxUseItemHandler(
     private static readonly BoxRewardSpec RewardDrawnDynamicallySpec =
         BoxRewardSpec.Uniform(0, ImmutableArray<int>.Empty);
 
-        public static IEnumerable<int> HandledItemIds { get; } = [864, 889];
+    public static IEnumerable<int> HandledItemIds { get; } = [864, 889];
 
     public async ValueTask<UseInventoryItemResponse> HandleAsync(UseItemContext context,
         CancellationToken cancellationToken)
@@ -67,7 +65,7 @@ public sealed class SkillBoxUseItemHandler(
         return UseItemResponses.Success(context.Page, context.Index);
     }
 
-        private static int RollReward(byte previousTribe)
+    private static int RollReward(byte previousTribe)
     {
         return Random.Shared.Next(20) switch
         {

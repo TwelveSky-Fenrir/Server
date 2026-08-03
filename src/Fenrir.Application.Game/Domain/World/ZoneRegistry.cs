@@ -200,7 +200,8 @@ public sealed class ZoneRegistry
         return false;
     }
 
-    public bool TryGetPlayerInOtherZone(int characterId, Zone excludeZone, [NotNullWhen(true)] out PlayerRuntimeState? state,
+    public bool TryGetPlayerInOtherZone(int characterId, Zone excludeZone,
+        [NotNullWhen(true)] out PlayerRuntimeState? state,
         [NotNullWhen(true)] out Zone? zone)
     {
         foreach (var candidate in _zones.Values)

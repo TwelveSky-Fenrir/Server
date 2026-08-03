@@ -18,7 +18,7 @@ public sealed class MultiItemCreateUseItemHandler(
     private const int NumBaseStandard = 6000;
     private const int NumBase99Xxx = 8000;
 
-        private static readonly FrozenDictionary<int, int[]> ItemListById = new Dictionary<int, int[]>
+    private static readonly FrozenDictionary<int, int[]> ItemListById = new Dictionary<int, int[]>
     {
         [835] = [1437, 1437, 1437, 1437, 1437, 1437, 1437, 1437],
 

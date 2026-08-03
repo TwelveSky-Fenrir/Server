@@ -1,11 +1,11 @@
 CREATE TABLE runtime.GuildTribeBroadcastRelay
 (
     RelayId          BIGINT IDENTITY (1,1) NOT NULL,
-    Kind             TINYINT               NOT NULL, 
-    SourceShardId    TINYINT               NOT NULL, 
-    GuildId          INT                   NULL,     
-    Tribe            TINYINT               NULL,     
-    RoleField        TINYINT               NOT NULL, 
+    Kind             TINYINT               NOT NULL,
+    SourceShardId    TINYINT               NOT NULL,
+    GuildId          INT                   NULL,
+    Tribe            TINYINT               NULL,
+    RoleField        TINYINT               NOT NULL,
     AvatarName       NVARCHAR(13)          NOT NULL,
     Content          NVARCHAR(61)          NOT NULL,
     HasItemLink      BIT                   NOT NULL,

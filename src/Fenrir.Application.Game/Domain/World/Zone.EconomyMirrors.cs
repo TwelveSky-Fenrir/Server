@@ -31,15 +31,15 @@ public sealed partial class Zone
 
     private const int TribeInboxCapacity = 512;
 
-        private const int AnimalAbsorbTimeStatSort = 78;
+    private const int AnimalAbsorbTimeStatSort = 78;
 
-        private const int AutoHuntPaidDayBudgetStatSort = 61;
+    private const int AutoHuntPaidDayBudgetStatSort = 61;
 
-        private const int AutoHuntPaidMinuteBudgetStatSort = 62;
+    private const int AutoHuntPaidMinuteBudgetStatSort = 62;
 
-        private const int SilverOrnamentStatSort = 90;
+    private const int SilverOrnamentStatSort = 90;
 
-        private const int GoldOrnamentStatSort = 101;
+    private const int GoldOrnamentStatSort = 101;
 
     private readonly List<int> _gmTeleportNeighborScratch = [];
 

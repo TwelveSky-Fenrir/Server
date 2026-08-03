@@ -8,7 +8,7 @@ public sealed class TimedBuffCountdownSystem : ISimulationSystem
 {
     private const int MaxMountExp = 100000;
 
-        internal static readonly FrozenSet<short> GroupAExcludedMaps =
+    internal static readonly FrozenSet<short> GroupAExcludedMaps =
         new short[] { 1, 6, 11, 140, 38, 37, 119, 124, 49, 51, 53, 194, 195, 267 }.ToFrozenSet();
 
     private static readonly FrozenSet<short> GroupBIncludedMaps =

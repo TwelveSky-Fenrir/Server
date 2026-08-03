@@ -1,5 +1,5 @@
 CREATE OR ALTER PROCEDURE game.usp_Gift_ClaimIntoVault @GiftId INT,
-                                              @AccountId INT
+                                                       @AccountId INT
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -104,7 +104,8 @@ BEGIN
                         THROW 50274, N'Account vault is full (28 slots) (retry).', 1;
                     END;
 
-                INSERT INTO game.AccountVaultItems (AccountId, SlotIndex, ItemId, Quantity, Value, SerialNumber, SocketData)
+                INSERT INTO game.AccountVaultItems (AccountId, SlotIndex, ItemId, Quantity, Value, SerialNumber,
+                                                    SocketData)
                 SELECT @AccountId, @FreeSlot, ProductId, Quantity, Value, 0, NULL
                 FROM @Claimed;
 

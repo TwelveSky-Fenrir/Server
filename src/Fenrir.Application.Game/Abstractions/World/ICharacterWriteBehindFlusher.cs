@@ -7,5 +7,5 @@ public interface ICharacterWriteBehindFlusher : IWriteBehindFlusher
 {
     public ValueTask FlushCharacterNowAsync(int characterId, CancellationToken ct);
 
-        public ValueTask FlushCharacterSnapshotAsync(PlayerRuntimeState snapshot, CancellationToken ct);
+    public ValueTask FlushCharacterSnapshotAsync(PlayerRuntimeState snapshot, CancellationToken ct);
 }

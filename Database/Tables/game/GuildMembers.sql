@@ -9,7 +9,7 @@ CREATE TABLE game.GuildMembers
     JoinedAtUtc  DATETIME2(3) NOT NULL
         CONSTRAINT DF_GuildMembers_JoinedAtUtc DEFAULT SYSUTCDATETIME(),
     UpdatedAtUtc DATETIME2(3) NOT NULL
-        CONSTRAINT DF_GuildMembers_UpdatedAtUtc DEFAULT SYSUTCDATETIME(), 
+        CONSTRAINT DF_GuildMembers_UpdatedAtUtc DEFAULT SYSUTCDATETIME(),
     CONSTRAINT PK_GuildMembers PRIMARY KEY CLUSTERED (GuildId, CharacterId),
     CONSTRAINT UQ_GuildMembers_CharacterId UNIQUE (CharacterId),
     CONSTRAINT CK_GuildMembers_Role CHECK (Role BETWEEN 0 AND 2),

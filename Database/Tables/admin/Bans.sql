@@ -7,7 +7,7 @@ CREATE TABLE admin.Bans
     ExpiresAtUtc     DATETIME2(3)       NULL,
     CreatedAtUtc     DATETIME2(3)       NOT NULL
         CONSTRAINT DF_Bans_CreatedAtUtc DEFAULT SYSUTCDATETIME(),
-    ActorAccountId   INT                NULL, 
+    ActorAccountId   INT                NULL,
     ActorCharacterId INT                NULL,
     CONSTRAINT PK_Bans PRIMARY KEY CLUSTERED (BanId),
     CONSTRAINT CK_Bans_AccountOrCharacter CHECK (AccountId IS NOT NULL OR CharacterId IS NOT NULL),

@@ -18,10 +18,12 @@ public sealed class GetProxyShopService(
     private const int ShopNotClosedCode = 1;
 
     public ValueTask<GetProxyShopResponse> GetAsync(GetProxyShopRequest packet, Zone zone, int characterId,
-        CancellationToken cancellationToken) =>
-        packet.Sort == 1
+        CancellationToken cancellationToken)
+    {
+        return packet.Sort == 1
             ? GetOwnClosedShopAsync(zone, characterId, cancellationToken)
             : BrowseOpenShopByNameAsync(packet, zone, cancellationToken);
+    }
 
     private async ValueTask<GetProxyShopResponse> GetOwnClosedShopAsync(Zone zone, int characterId,
         CancellationToken cancellationToken)
@@ -100,9 +102,14 @@ public sealed class GetProxyShopService(
         return Success(packet.Sort, ProxyShopWireMapper.Build(entry.OwnerName, shop, items));
     }
 
-    private static GetProxyShopResponse Success(int sort, ProxyShopUserInfo payload) =>
-        new() { Result = sort, Sort = NoError, ProxyUser = payload };
+    private static GetProxyShopResponse Success(int sort, ProxyShopUserInfo payload)
+    {
+        return new GetProxyShopResponse { Result = sort, Sort = NoError, ProxyUser = payload };
+    }
 
-    private static GetProxyShopResponse Failure(int errorCode) =>
-        new() { Result = 0, Sort = errorCode, ProxyUser = ProxyShopWireMapper.Build(string.Empty, null, []) };
+    private static GetProxyShopResponse Failure(int errorCode)
+    {
+        return new GetProxyShopResponse
+            { Result = 0, Sort = errorCode, ProxyUser = ProxyShopWireMapper.Build(string.Empty, null, []) };
+    }
 }

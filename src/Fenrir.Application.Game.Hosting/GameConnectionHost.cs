@@ -34,9 +34,9 @@ public sealed class GameConnectionHost(
 {
     private const short LogoutEventCode = 4;
 
-    private readonly ConcurrentDictionary<Task, byte> _inFlightConnections = new();
-
     private readonly SemaphoreSlim _disconnectSqlGate = new(1, 1);
+
+    private readonly ConcurrentDictionary<Task, byte> _inFlightConnections = new();
 
     private readonly List<(short MapId, int Port, TcpServer<ZoneClientSession> Server)> _servers = [];
 

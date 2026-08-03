@@ -39,7 +39,8 @@ public sealed record AccountSessionRepository(ICaeriusNetDbContext Db) : IAccoun
                            "usp_AccountSession_ClaimOrSignalKick always returns exactly one row.");
             }
             catch (CaeriusNetSqlException ex)
-                when (attempt < MaxWriteConflictAttempts && ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                when (attempt < MaxWriteConflictAttempts &&
+                      ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
                       IsWriteConflict(sqlErrorNumber))
             {
             }
@@ -63,7 +64,8 @@ public sealed record AccountSessionRepository(ICaeriusNetDbContext Db) : IAccoun
                 return await Db.ExecuteScalarAsync<bool>(sp, ct);
             }
             catch (CaeriusNetSqlException ex)
-                when (attempt < MaxWriteConflictAttempts && ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                when (attempt < MaxWriteConflictAttempts &&
+                      ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
                       IsWriteConflict(sqlErrorNumber))
             {
             }
@@ -89,7 +91,8 @@ public sealed record AccountSessionRepository(ICaeriusNetDbContext Db) : IAccoun
                 return;
             }
             catch (CaeriusNetSqlException ex)
-                when (attempt < MaxWriteConflictAttempts && ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                when (attempt < MaxWriteConflictAttempts &&
+                      ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
                       IsWriteConflict(sqlErrorNumber))
             {
             }
@@ -115,7 +118,8 @@ public sealed record AccountSessionRepository(ICaeriusNetDbContext Db) : IAccoun
                 return;
             }
             catch (CaeriusNetSqlException ex)
-                when (attempt < MaxWriteConflictAttempts && ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                when (attempt < MaxWriteConflictAttempts &&
+                      ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
                       IsWriteConflict(sqlErrorNumber))
             {
             }
@@ -144,7 +148,8 @@ public sealed record AccountSessionRepository(ICaeriusNetDbContext Db) : IAccoun
                 return await Db.QueryAsImmutableArrayAsync<KickedAccountDto>(sp, ct);
             }
             catch (CaeriusNetSqlException ex)
-                when (attempt < MaxWriteConflictAttempts && ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                when (attempt < MaxWriteConflictAttempts &&
+                      ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
                       IsWriteConflict(sqlErrorNumber))
             {
             }
@@ -172,7 +177,8 @@ public sealed record AccountSessionRepository(ICaeriusNetDbContext Db) : IAccoun
                 return await Db.QueryAsImmutableArrayAsync<HeldAccountSessionDto>(sp, ct);
             }
             catch (CaeriusNetSqlException ex)
-                when (attempt < MaxWriteConflictAttempts && ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                when (attempt < MaxWriteConflictAttempts &&
+                      ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
                       IsWriteConflict(sqlErrorNumber))
             {
             }
@@ -230,7 +236,8 @@ public sealed record AccountSessionRepository(ICaeriusNetDbContext Db) : IAccoun
                 return;
             }
             catch (CaeriusNetSqlException ex)
-                when (attempt < MaxWriteConflictAttempts && ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                when (attempt < MaxWriteConflictAttempts &&
+                      ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
                       IsWriteConflict(sqlErrorNumber))
             {
             }

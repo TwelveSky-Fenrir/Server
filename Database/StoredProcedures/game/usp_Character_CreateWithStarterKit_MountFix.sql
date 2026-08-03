@@ -1,4 +1,3 @@
-
 CREATE OR ALTER PROCEDURE game.usp_Character_CreateWithStarterKit @AccountId INT,
                                                                   @Slot TINYINT,
                                                                   @Name NVARCHAR(13),

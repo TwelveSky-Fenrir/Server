@@ -1,10 +1,10 @@
 CREATE TABLE world.QuestRewards
 (
     QuestId    INT     NOT NULL,
-    SlotIndex  TINYINT NOT NULL, 
-    RewardType TINYINT NOT NULL, 
-    ItemId     INT     NULL,     
-    Amount     INT     NULL,     
+    SlotIndex  TINYINT NOT NULL,
+    RewardType TINYINT NOT NULL,
+    ItemId     INT     NULL,
+    Amount     INT     NULL,
     CONSTRAINT PK_QuestRewards PRIMARY KEY CLUSTERED (QuestId, SlotIndex),
     CONSTRAINT FK_QuestRewards_Quest FOREIGN KEY (QuestId) REFERENCES world.Quests (QuestId),
     CONSTRAINT FK_QuestRewards_Item FOREIGN KEY (ItemId) REFERENCES world.Items (ItemId),

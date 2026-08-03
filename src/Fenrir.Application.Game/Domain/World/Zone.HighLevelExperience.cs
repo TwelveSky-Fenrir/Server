@@ -15,7 +15,7 @@ public sealed partial class Zone
 
     private const int BonusStatPointStatSort = 2;
 
-        public void GrantInstantExperience(PlayerRuntimeState target, int gain)
+    public void GrantInstantExperience(PlayerRuntimeState target, int gain)
     {
         ApplyCharacterExperienceGain(target, gain);
     }

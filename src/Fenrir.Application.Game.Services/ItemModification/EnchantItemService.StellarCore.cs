@@ -1,7 +1,6 @@
 using Fenrir.Application.Game.Abstractions.ItemModification;
 using Fenrir.Application.Game.Domain.Enchant;
 using Fenrir.Application.Game.Domain.Inventory;
-using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Domain.Game.GameData;
 using Microsoft.Extensions.Logging;
@@ -37,7 +36,7 @@ public sealed partial class EnchantItemService
 
         if (!eventLogQueue.Enqueue(new EventLogEntryTvp(EnchantEventCode, (byte)EventLogCategory.Enchant, null,
                 characterId, null, null, null, -(long)resolved.Cost, null, target.ItemId, target.Quantity,
-                (byte)StellarCoreResultCode,
+                StellarCoreResultCode,
                 $"Serial={target.Serial};From={target.ItemId};To={resolved.NewTargetItemId};Material={material.ItemId}",
                 DateTime.UtcNow)))
             logger.LogWarning(

@@ -28,7 +28,7 @@ BEGIN
         @GuildId = SCOPE_IDENTITY();
 
     INSERT INTO game.GuildMembers (GuildId, CharacterId, Role)
-    VALUES (@GuildId, @MasterCharacterId, 2); 
+    VALUES (@GuildId, @MasterCharacterId, 2);
 
     COMMIT TRANSACTION;
 

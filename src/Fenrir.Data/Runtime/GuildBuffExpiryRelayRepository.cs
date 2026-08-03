@@ -49,7 +49,8 @@ public sealed record GuildBuffExpiryRelayRepository(ICaeriusNetDbContext Db) : I
                 return await Db.QueryAsImmutableArrayAsync<GuildBuffExpiryRelayDto>(sp, ct);
             }
             catch (CaeriusNetSqlException ex)
-                when (attempt < MaxWriteConflictAttempts && ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                when (attempt < MaxWriteConflictAttempts &&
+                      ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
                       IsWriteConflict(sqlErrorNumber))
             {
             }

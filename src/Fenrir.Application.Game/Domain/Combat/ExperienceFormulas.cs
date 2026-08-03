@@ -10,9 +10,9 @@ public static class ExperienceFormulas
 
     public const int MinimumLevelForDeathExperienceLoss = 10;
 
-        public const float PersonalExpDownRatioDefault = 1.0f;
+    public const float PersonalExpDownRatioDefault = 1.0f;
 
-        public const float PersonalExpDownRatioPremium = 0.5f;
+    public const float PersonalExpDownRatioPremium = 0.5f;
 
     public static int ReturnFixedLevel(int level)
     {
@@ -72,10 +72,12 @@ public static class ExperienceFormulas
         return characterLevel < RebirthDivisorLevelThreshold ? rawGain / 3 : rawGain / 5;
     }
 
-        public static float ResolvePersonalExpDownRatio(long premiumExpireUtc) =>
-        premiumExpireUtc != 0 ? PersonalExpDownRatioPremium : PersonalExpDownRatioDefault;
+    public static float ResolvePersonalExpDownRatio(long premiumExpireUtc)
+    {
+        return premiumExpireUtc != 0 ? PersonalExpDownRatioPremium : PersonalExpDownRatioDefault;
+    }
 
-        public static long ComputeDeathExperienceLoss(
+    public static long ComputeDeathExperienceLoss(
         long currentExperience,
         int levelFactor1,
         float personalExpDownRatio = PersonalExpDownRatioDefault,

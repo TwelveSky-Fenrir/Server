@@ -286,7 +286,7 @@ public sealed class MonsterSpawnScheduler(
         return mapId == YangGokNormalBossZoneId && monsterId is >= 564 and <= 568;
     }
 
-        private void ProcessDeath(Zone zone, MonsterZoneSpawnState state, DeadMonsterEvent death)
+    private void ProcessDeath(Zone zone, MonsterZoneSpawnState state, DeadMonsterEvent death)
     {
         var monster = death.Monster;
 

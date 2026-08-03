@@ -29,7 +29,8 @@ BEGIN
             DECLARE
                 @LockGate INT;
             SELECT @LockGate = COUNT(*)
-            FROM game.HeroRankings WITH (UPDLOCK, HOLDLOCK)
+            FROM game.HeroRankings
+            WITH (UPDLOCK, HOLDLOCK)
             WHERE PeriodKind = 0;
 
             DELETE

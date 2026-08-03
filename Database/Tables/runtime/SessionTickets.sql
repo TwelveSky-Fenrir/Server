@@ -5,8 +5,8 @@ CREATE TABLE runtime.SessionTickets
     ShardId      TINYINT          NOT NULL,
     TargetMapId  SMALLINT         NOT NULL,
     ExpiresAtUtc DATETIME2(3)     NOT NULL,
-    SessionToken UNIQUEIDENTIFIER NOT NULL, 
-    AccountGrade SMALLINT         NOT NULL, 
+    SessionToken UNIQUEIDENTIFIER NOT NULL,
+    AccountGrade SMALLINT         NOT NULL,
     CONSTRAINT PK_SessionTickets PRIMARY KEY NONCLUSTERED HASH (AccountId)
         WITH (BUCKET_COUNT = 1024),
     INDEX IX_SessionTickets_ExpiresAtUtc NONCLUSTERED (ExpiresAtUtc)

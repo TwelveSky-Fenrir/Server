@@ -32,9 +32,9 @@ public sealed class LoginConnectionHost(
 
     private const int GreetingRandomModulus = 1001;
 
-    private readonly ConcurrentDictionary<Task, byte> _inFlightConnections = new();
-
     private readonly SemaphoreSlim _disconnectSqlGate = new(1, 1);
+
+    private readonly ConcurrentDictionary<Task, byte> _inFlightConnections = new();
 
     private TcpServer<LoginClientSession>? _server;
 

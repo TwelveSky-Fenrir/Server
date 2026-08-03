@@ -61,7 +61,8 @@ public sealed record GuildTribeBroadcastRelayRepository(ICaeriusNetDbContext Db)
                 return await Db.QueryAsImmutableArrayAsync<GuildTribeBroadcastRelayDto>(sp, ct);
             }
             catch (CaeriusNetSqlException ex)
-                when (attempt < MaxWriteConflictAttempts && ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                when (attempt < MaxWriteConflictAttempts &&
+                      ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
                       IsWriteConflict(sqlErrorNumber))
             {
             }

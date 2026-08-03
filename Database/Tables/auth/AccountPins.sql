@@ -1,7 +1,7 @@
 CREATE TABLE auth.AccountPins
 (
     AccountId        INT           NOT NULL,
-    PinHash          VARBINARY(32) NOT NULL, 
+    PinHash          VARBINARY(32) NOT NULL,
     PinSalt          VARBINARY(16) NOT NULL,
     UpdatedAtUtc     DATETIME2(3)  NOT NULL
         CONSTRAINT DF_AccountPins_UpdatedAtUtc DEFAULT SYSUTCDATETIME(),

@@ -92,7 +92,11 @@ public sealed class ProgressWriteBehindHost(ZoneRegistry zones, ICharacterReposi
                 DoubleKillNumTime: state.DoubleKillNumTime,
                 DoubleKillExpTime: state.DoubleKillExpTime,
                 DoubleKillNumTime2: state.DoubleKillNumTime2,
-                ProtectForDeath: state.ProtectForDeath));
+                ProtectForDeath: state.ProtectForDeath,
+                AnimalDoubleExp: state.AnimalDoubleExp,
+                DmgBoost: state.DmgBoost,
+                HPBoost: state.HPBoost,
+                CriBoost: state.CriBoost));
 
             CostumePersistenceCodec.AppendOccupiedSlots(costumes, characterId, state);
         }

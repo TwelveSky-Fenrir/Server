@@ -96,4 +96,8 @@ public sealed partial record CharacterProgressTvp(
     int DoubleKillNumTime,
     int DoubleKillExpTime,
     int DoubleKillNumTime2,
-    int ProtectForDeath);
+    int ProtectForDeath,
+    int AnimalDoubleExp,
+    int DmgBoost,
+    int HPBoost,
+    int CriBoost);

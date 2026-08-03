@@ -300,4 +300,8 @@ public sealed record PlayerEnterData(
     int DoubleKillNumTime = 0,
     int DoubleKillExpTime = 0,
     int DoubleKillNumTime2 = 0,
-    int ProtectForDeath = 0);
+    int ProtectForDeath = 0,
+    int AnimalDoubleExp = 0,
+    int DmgBoost = 0,
+    int HPBoost = 0,
+    int CriBoost = 0);

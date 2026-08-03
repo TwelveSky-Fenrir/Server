@@ -553,7 +553,11 @@ public sealed class EnterWorldService(
                 AutoHuntPaidDayBudget: VaultDateNormalization.NormalizeIfExpired(character.AutoTime,
                     GameDate.Today()),
                 AutoHuntPaidMinuteBudget: character.AutoTime2,
-                ProtectForDeath: character.ProtectForDeath)));
+                ProtectForDeath: character.ProtectForDeath,
+                AnimalDoubleExp: character.AnimalDoubleExp,
+                DmgBoost: character.DmgBoost,
+                HPBoost: character.HPBoost,
+                CriBoost: character.CriBoost)));
 
             if (!entered)
             {

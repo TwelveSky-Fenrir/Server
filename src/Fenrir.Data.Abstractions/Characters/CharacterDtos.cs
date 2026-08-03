@@ -234,7 +234,11 @@ public sealed partial record CharacterWorldSnapshotDto(
     int GoldTime = 0,
     int DoubleKillNumTime = 0,
     int DoubleKillExpTime = 0,
-    int DoubleKillNumTime2 = 0);
+    int DoubleKillNumTime2 = 0,
+    int AnimalDoubleExp = 0,
+    int DmgBoost = 0,
+    int HPBoost = 0,
+    int CriBoost = 0);
 
 [GenerateDto]
 public sealed partial record CharacterItemSlotDto(

@@ -191,7 +191,11 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
             DoubleKillNumTime: state.DoubleKillNumTime,
             DoubleKillExpTime: state.DoubleKillExpTime,
             DoubleKillNumTime2: state.DoubleKillNumTime2,
-            ProtectForDeath: state.ProtectForDeath);
+            ProtectForDeath: state.ProtectForDeath,
+            AnimalDoubleExp: state.AnimalDoubleExp,
+            DmgBoost: state.DmgBoost,
+            HPBoost: state.HPBoost,
+            CriBoost: state.CriBoost);
 
         var positionRow = new CharacterPositionTvp(characterId, state.FlushSequence, state.MapId, state.PosX,
             state.PosY, state.PosZ, state.Heading);

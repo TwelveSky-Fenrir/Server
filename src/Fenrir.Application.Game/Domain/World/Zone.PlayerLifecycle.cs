@@ -233,7 +233,11 @@ public sealed partial class Zone
             SpecialState = data.SpecialState,
             UseOrnament = data.UseOrnament,
             SourceIp = data.SourceIp,
-            ProtectForDeath = data.ProtectForDeath
+            ProtectForDeath = data.ProtectForDeath,
+            AnimalDoubleExp = data.AnimalDoubleExp,
+            DmgBoost = data.DmgBoost,
+            HPBoost = data.HPBoost,
+            CriBoost = data.CriBoost
         };
 
         state.ResetVolatileAntiCheatCountersOnEntry(_clock);

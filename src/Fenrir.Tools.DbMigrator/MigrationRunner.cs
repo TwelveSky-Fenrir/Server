@@ -17,6 +17,9 @@ public static class MigrationRunner
 
         var scriptPaths = await ManifestReader.ReadScriptPathsAsync(options.ManifestPath);
 
+        if (!ManifestIntegrityChecker.Validate(options.DatabaseDirectory, scriptPaths))
+            return 1;
+
         var scripts = await MigrationScriptSet.LoadAsync(options.DatabaseDirectory, scriptPaths);
         if (scripts is null)
             return 1;

@@ -370,8 +370,6 @@ public sealed class WorldStateService(
 
             symbolOwners = (byte[])_tribeSymbolOwner.Clone();
 
-            // An absolute overwrite supersedes any not-yet-flushed additive delta -- otherwise the next
-            // flush would re-apply a delta computed against a baseline this call just replaced, double-counting.
             Array.Clear(_pendingTribePointDeltas);
         }
 
@@ -500,9 +498,6 @@ public sealed class WorldStateService(
 
             lock (_lock)
             {
-                // Snapshot-then-compare, same guard ReconcileAsync uses below: a concurrent mutation during
-                // the I/O above (scalar write, or a fresh point delta the loop below hasn't flushed yet)
-                // must keep _dirty set so the next interval retries instead of silently dropping it.
                 var noNewPointDelta = !Array.Exists(_pendingTribePointDeltas, d => d != 0);
                 if (_scalarVersion == scalarVersionBeforeFlush && noNewPointDelta)
                     _dirty = false;

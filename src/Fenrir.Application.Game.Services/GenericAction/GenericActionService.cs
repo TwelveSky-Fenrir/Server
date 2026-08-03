@@ -584,7 +584,7 @@ public sealed class GenericActionService(
             logger.LogInformation(
                 "Character {CharacterId} skill-learn aborted: NPC {NpcId} unavailable/out of range", characterId,
                 request.NpcId);
-            return GenericActionResult.Failed;
+            return GenericActionResult.Aborted;
         }
 
         worldData.SkillsById.TryGetValue(request.SkillId, out var skillDefinition);
@@ -597,7 +597,7 @@ public sealed class GenericActionService(
             logger.LogInformation(
                 "Character {CharacterId} skill-learn aborted by resolver (skill {SkillId}, skillPoints {SkillPoints})",
                 characterId, request.SkillId, state.SkillPoints);
-            return GenericActionResult.Failed;
+            return GenericActionResult.Aborted;
         }
 
         var learned = new LearnedSkill(request.SkillId, result.Cost);
@@ -641,7 +641,7 @@ public sealed class GenericActionService(
             logger.LogInformation(
                 "Character {CharacterId} skill-upgrade aborted by resolver (slot {SkillIndex}, skillPoints {SkillPoints})",
                 characterId, request.SkillIndex, state.SkillPoints);
-            return GenericActionResult.Failed;
+            return GenericActionResult.Aborted;
         }
 
         var slot = (byte)request.SkillIndex;

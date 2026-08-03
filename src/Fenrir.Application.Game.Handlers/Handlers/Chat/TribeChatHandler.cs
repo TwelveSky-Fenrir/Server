@@ -20,7 +20,6 @@ public sealed class TribeChatHandler(ITribeChatService tribeChatService, ILogger
 
         if (ChatRouter.IsContentEmpty(packet.Content))
         {
-            // Server/ts25zone/S04_MyWork02.cpp:11239-11244 -- empty content is treated as a tampered client.
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }

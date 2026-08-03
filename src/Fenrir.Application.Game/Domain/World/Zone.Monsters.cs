@@ -165,6 +165,11 @@ public sealed partial class Zone
             if (candidate.IsDead)
                 continue;
 
+            if (candidate.IsMovingZone)
+                continue;
+
+            if (candidate.VisibleState == 0)
+                continue;
 
             if (bestDamage is null || entry.CumulativeDamage > bestDamage.Value)
             {

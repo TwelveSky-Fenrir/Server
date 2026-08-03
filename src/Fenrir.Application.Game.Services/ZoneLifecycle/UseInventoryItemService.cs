@@ -809,7 +809,8 @@ public sealed class UseInventoryItemService(
             state.EatDexPotion, state.EatElePotion,
             state.HPBoost > 0,
             state.WarriorPill > 0,
-            state.DmgBoost > 0);
+            state.DmgBoost > 0,
+            state.CriBoost > 0);
         var consumableOverride = kind switch
         {
             StatPotionKind.Life => baseConsumable with { EatLifePotion = newRawCounter },

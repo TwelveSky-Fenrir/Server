@@ -14,8 +14,6 @@ public sealed class WorldChatHandler(IWorldChatService worldChatService) : IInli
 
         if (ChatRouter.IsContentEmpty(packet.Content))
         {
-            // Server/ts25zone/S04_MyWork02.cpp:15145-15150 -- empty content is treated as a tampered client
-            // (the level-10 gate at 15151-15155 is a distinct, out-of-scope disconnect condition).
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }

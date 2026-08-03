@@ -26,8 +26,6 @@ public sealed class HeroRankingRolloverHost(
         {
             try
             {
-                // Force this shard's pending points into PeriodKind=0 before the DB snapshots/clears it --
-                // HeroRankPointsWriteBehindHost's own 2s timer runs independently and is not otherwise synchronized.
                 await heroRankPoints.FlushDirtyAsync(heroRankings, stoppingToken).ConfigureAwait(false);
 
                 if (await heroRankings.RolloverIfDueAsync(stoppingToken).ConfigureAwait(false))

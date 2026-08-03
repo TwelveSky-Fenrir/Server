@@ -119,9 +119,6 @@ public sealed class ZoneMoveService(
             return;
         }
 
-        // No reachability probe here: GameConnectionHost binds every one of this shard's hosted zone
-        // listeners atomically at boot (all-or-nothing), so this handler running at all already proves
-        // the target zone's own listener is bound and accepting.
 
         if (!worldData.ZonesByNumber.ContainsKey(targetZoneNumber))
         {

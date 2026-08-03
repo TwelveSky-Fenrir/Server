@@ -95,7 +95,8 @@ public static class EquipmentService
             state.EatElePotion,
             state.HPBoost > 0,
             state.WarriorPill > 0,
-            state.DmgBoost > 0);
+            state.DmgBoost > 0,
+            state.CriBoost > 0);
 
         var mount = BuildMountContext(state);
 

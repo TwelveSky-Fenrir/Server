@@ -15,7 +15,6 @@ public sealed class LocalChatHandler(ILocalChatService localChatService) : IAsyn
 
         if (ChatRouter.IsContentEmpty(packet.Content))
         {
-            // Server/ts25zone/S04_MyWork02.cpp:7584-7589 -- empty content is treated as a tampered client.
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }

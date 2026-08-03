@@ -36,7 +36,6 @@ public sealed class FriendAskHandler(IFriendService friendService, ILogger<Frien
                 return;
             case FriendAskResultKind.AlreadyFriendOrFull:
             case FriendAskResultKind.TribeMismatch:
-                // Server/ts25zone/S04_MyWork02.cpp:8782-8805,8826-8830 -- Quit(), no response.
                 zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             case FriendAskResultKind.AskerBusy:

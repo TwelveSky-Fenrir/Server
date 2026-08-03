@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Abstractions.BuffsMountsCosmetics;
 using Fenrir.Application.Game.Domain.Costumes;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Domain.World.Loot;
 using Fenrir.Domain.Game.GameData;
 using Microsoft.Extensions.Logging;
 
@@ -19,7 +20,8 @@ public sealed class CostumeStateService(
     public async ValueTask<CostumeStateResult> ApplyAsync(Zone zone, PlayerRuntimeState state, int characterId,
         int accountId, int sort, int value, CancellationToken cancellationToken)
     {
-        var context = new CostumeStateResolver.Context(state.CostumeIndex, state.CostumeWardrobe);
+        var context = new CostumeStateResolver.Context(state.CostumeIndex, state.CostumeWardrobe, state.CostumeDate,
+            state.CostumeExpireDate);
         var result = CostumeStateResolver.Resolve(sort, value, in context);
 
         switch (result.Kind)
@@ -88,7 +90,9 @@ public sealed class CostumeStateService(
             return new CostumeStateResult(CostumeStateOutcome.Reply, 2);
         }
 
-        var newStack = new ItemStack(result.GrantedItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        var (enchant, combine, refine, socket) = ItemValueCodec.Decode(result.GrantedCostumeValue);
+        var newStack = new ItemStack(result.GrantedItemId, 1, enchant, combine, refine, socket, 0, 0, 0,
+            result.GrantedExpireDate, 0);
         var projectedContainer =
             state.Inventory.GetContainer(destination.Container).SetItem(destination.Slot, newStack);
 

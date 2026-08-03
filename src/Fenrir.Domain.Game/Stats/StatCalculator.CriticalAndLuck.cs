@@ -5,7 +5,8 @@ namespace Fenrir.Domain.Game.Stats;
 public static partial class StatCalculator
 {
     private static int ComputeCritical(int setNumber, EquippedItemSlot?[] bySlot,
-        CosmeticContext cosmetic = default, MountContext mount = default)
+        CosmeticContext cosmetic = default, MountContext mount = default, ConsumableContext consumable = default,
+        ZoneContext zone = default)
     {
         var crit = 2;
         for (var i = 0; i < bySlot.Length; i++)
@@ -22,6 +23,8 @@ public static partial class StatCalculator
         if (bySlot[4] is { } ring && !IsLegendary(ring.Item))
             crit += ring.Enchant / 4;
 
+        crit += CriBoostContribution(consumable, zone);
+
         crit += SetBonusTables.GetBaseCriticalFlatBonus(setNumber);
 
         if (bySlot[10] is { } deco2)
@@ -30,6 +33,14 @@ public static partial class StatCalculator
         crit += CostumeCriticalContribution(cosmetic.CostumeEnchantCs);
 
         return crit;
+    }
+
+    private static int CriBoostContribution(ConsumableContext consumable, ZoneContext zone)
+    {
+        return zone.ZoneNumber != BoostExcludedZoneNumber &&
+               (consumable.CriBoostActive || consumable.WarriorPillActive)
+            ? 5
+            : 0;
     }
 
 

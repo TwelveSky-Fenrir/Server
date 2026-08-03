@@ -57,6 +57,10 @@ public sealed partial class Zone
                 Value02 = 0,
                 Value03 = 0
             });
+
+            var changedSlots = state.BuffChangeScratch;
+            Array.Clear(changedSlots);
+            RecomputeStatsAndBroadcastBuffs(state, changedSlots);
         }
     }
 }

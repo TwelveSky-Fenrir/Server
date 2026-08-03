@@ -58,18 +58,19 @@ public sealed class CraftPetHandler(ICraftPetService craftPetService, ILogger<Cr
                     accountId, cancellationToken);
                 break;
             default:
-                logger.LogWarning(
-                    "Craft-pet request ignored for character {CharacterId}: invalid sort {Sort}",
+                logger.LogInformation(
+                    "Craft-pet request failed structural validation for character {CharacterId}: invalid sort {Sort} -- disconnecting",
                     characterId, packet.Sort);
+                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
         }
 
         if (result.Outcome != CraftPetOutcome.Applied)
         {
-            logger.LogWarning(
-                "Craft-pet recipe rejected for character {CharacterId}: sort {Sort}",
+            logger.LogInformation(
+                "Craft-pet recipe rejected for character {CharacterId}: sort {Sort} -- disconnecting",
                 characterId, packet.Sort);
-            session.Send(new CraftPetResponse { Result = 1, Value = [0, 0, 0, 0, 0, 0] });
+            zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 

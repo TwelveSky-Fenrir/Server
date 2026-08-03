@@ -57,7 +57,7 @@ public sealed class TimedBuffCountdownSystem : ISimulationSystem
             TickGroupA(state, minutesElapsed);
 
         if (groupB)
-            TickGroupB(state, minutesElapsed);
+            TickGroupB(zone, state, minutesElapsed);
 
         TickPaidZones(zone, state, minutesElapsed, nowUnixSeconds);
     }
@@ -70,20 +70,29 @@ public sealed class TimedBuffCountdownSystem : ISimulationSystem
         state.DoubleExpTime2 = TickTimer(state, 43, state.DoubleExpTime2, minutesElapsed);
     }
 
-    private static void TickGroupB(PlayerRuntimeState state, int minutesElapsed)
+    private static void TickGroupB(Zone zone, PlayerRuntimeState state, int minutesElapsed)
     {
         if (IsMountActiveBelowMaxExp(state))
             state.AnimalDoubleExp = TickTimer(state, 75, state.AnimalDoubleExp, minutesElapsed);
 
-        state.DmgBoost = TickTimer(state, 46, state.DmgBoost, minutesElapsed);
-        state.HPBoost = TickTimer(state, 47, state.HPBoost, minutesElapsed);
-        state.CriBoost = TickTimer(state, 48, state.CriBoost, minutesElapsed);
-        state.WarriorPill = TickTimer(state, 91, state.WarriorPill, minutesElapsed);
+        var statBoostExpiredToZero = false;
+
+        state.DmgBoost = TickTimer(state, 46, state.DmgBoost, minutesElapsed, ref statBoostExpiredToZero);
+        state.HPBoost = TickTimer(state, 47, state.HPBoost, minutesElapsed, ref statBoostExpiredToZero);
+        state.CriBoost = TickTimer(state, 48, state.CriBoost, minutesElapsed, ref statBoostExpiredToZero);
+        state.WarriorPill = TickTimer(state, 91, state.WarriorPill, minutesElapsed, ref statBoostExpiredToZero);
         state.WarriorScroll = TickTimer(state, 87, state.WarriorScroll, minutesElapsed);
-        state.SilverTime = TickTimer(state, 90, state.SilverTime, minutesElapsed);
-        state.GoldTime = TickTimer(state, 101, state.GoldTime, minutesElapsed);
+        state.SilverTime = TickTimer(state, 90, state.SilverTime, minutesElapsed, ref statBoostExpiredToZero);
+        state.GoldTime = TickTimer(state, 101, state.GoldTime, minutesElapsed, ref statBoostExpiredToZero);
         state.DoubleKillNumTime = TickTimer(state, 4, state.DoubleKillNumTime, minutesElapsed);
         state.DoubleKillExpTime = TickTimer(state, 5, state.DoubleKillExpTime, minutesElapsed);
+
+        if (statBoostExpiredToZero)
+        {
+            var changedSlots = state.BuffChangeScratch;
+            Array.Clear(changedSlots);
+            zone.RecomputeStatsAndBroadcastBuffs(state, changedSlots);
+        }
     }
 
     private static void TickPaidZones(Zone zone, PlayerRuntimeState state, int minutesElapsed, long nowUnixSeconds)
@@ -147,6 +156,16 @@ public sealed class TimedBuffCountdownSystem : ISimulationSystem
 
         var next = Math.Max(0, current - minutesElapsed);
         Broadcast(state, subCode, next);
+        return next;
+    }
+
+    private static int TickTimer(PlayerRuntimeState state, int subCode, int current, int minutesElapsed,
+        ref bool expiredToZero)
+    {
+        var next = TickTimer(state, subCode, current, minutesElapsed);
+        if (current > 0 && next == 0)
+            expiredToZero = true;
+
         return next;
     }
 

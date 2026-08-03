@@ -498,9 +498,6 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
                 var builtState = NormalizeToBuiltState(row.Level);
                 if (builtState > 0)
                 {
-                    // Live/current fields, not the pending-upgrade ones -- this is the tower's already-
-                    // settled state from the last flush, not an in-progress upgrade (PhaseOf would otherwise
-                    // report Building instead of Active for every already-built tower right after boot).
                     _packedState[row.TowerIndex] = builtState * 100 + row.TowerType;
                     _valid[row.TowerIndex] = true;
                 }
@@ -543,11 +540,6 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-    // Cross-shard convergence for a tower hosted on a different shard (mirrors WorldStateService's
-    // flush+reconcile pattern). Skips any tower where THIS shard is the owning writer and holds a local
-    // claim the durable row can't yet express (_dirty, a pending upgrade, an active siege, or a
-    // post-spawn cooldown) -- merging over any of those would corrupt this shard's own invariants
-    // (e.g. reopening BeginUpgrade's single-upgrade-in-flight guard) rather than just being stale.
     public async Task ReconcileAsync(ITowerRepository towers, CancellationToken ct)
     {
         ReadOnlyCollection<TowerStateRowDto> rows;

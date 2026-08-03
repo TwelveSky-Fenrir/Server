@@ -9,5 +9,6 @@ public readonly record struct ConsumableContext(
     bool HpBoostActive = false,
     bool WarriorPillActive = false,
     bool DmgBoostActive = false,
+    bool CriBoostActive = false,
     int MaxPotionEventNum = 0,
     byte EventTribe = 0);

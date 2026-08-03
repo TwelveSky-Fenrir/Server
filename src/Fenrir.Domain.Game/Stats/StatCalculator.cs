@@ -44,7 +44,7 @@ public static partial class StatCalculator
             ComputeDefensePower(wisdom, levelRow, setNumber, bySlot, cosmetic, zone, mount),
             ComputeAttackSuccess(strength, levelRow, setNumber, bySlot, mount, zone, consumable),
             ComputeAttackBlock(wisdom, vitality, levelRow, setNumber, bySlot, mount, zone, consumable),
-            ComputeCritical(setNumber, bySlot, cosmetic, mount),
+            ComputeCritical(setNumber, bySlot, cosmetic, mount, consumable, zone),
             ComputeCriticalDefence(setNumber, attributes.RebirthCount, attributes.Halo, bySlot, cosmetic, mount, zone),
             ComputeLuck(setNumber, bySlot, cosmetic),
             ComputeElementAttackPower(levelRow, setNumber, bySlot, cosmetic, consumable, mount, zone),

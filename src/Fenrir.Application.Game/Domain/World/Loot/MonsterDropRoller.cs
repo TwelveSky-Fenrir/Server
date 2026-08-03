@@ -20,6 +20,8 @@ public sealed class MonsterDropRoller(
 
     public const float DefaultUserDropRatio = 1.0f;
 
+    private const float ItemDropUpBuffUserDropRatio = 1.1f;
+
     private const int UnconditionalItem864Id = 864;
 
     private const int UnconditionalItem864Threshold = 1000;
@@ -40,14 +42,16 @@ public sealed class MonsterDropRoller(
 
     public MonsterDropResult Roll(MonsterDefinition monster, short killerLevel, byte killerPreviousTribe,
         int killerLuck, QuestProgress killerQuest, Func<int, bool> killerHasItem, bool killerPremiumActive = false,
-        int? killerLevel2 = null, bool killerDropItemTimeActive = false, bool isZone039TypeShard = false)
+        int? killerLevel2 = null, bool killerDropItemTimeActive = false, bool isZone039TypeShard = false,
+        bool killerItemDropUpBuffActive = false, float tribeItemDropBonus = 0f, float tribeRareDropBonus = 0f)
     {
         var eligible = IsEligible(monster.Monster, killerLevel, killerLevel2);
 
         var premiumBonus = killerPremiumActive ? PremiumDropRatioBonus : 0f;
         var effectiveItemDropRatio = itemDropRatio + premiumBonus;
         var effectiveRareDropRatio = rareDropRatio + premiumBonus;
-        var effectiveUserDropRatio = userDropRatio + premiumBonus;
+        var effectiveUserDropRatio = (killerItemDropUpBuffActive ? ItemDropUpBuffUserDropRatio : userDropRatio) +
+                                      premiumBonus;
 
         var money = eligible ? RollMoney(monster.DropMoney, killerLuck, effectiveItemDropRatio) : null;
         var items = new List<DroppedItem>();
@@ -56,8 +60,8 @@ public sealed class MonsterDropRoller(
         {
             RollPotions(monster.DropPotions, killerLuck, effectiveItemDropRatio, items);
             RollGeneralItems(monster.Monster, monster.DropCategoryRates, killerPreviousTribe, killerLuck,
-                effectiveUserDropRatio, effectiveItemDropRatio, effectiveRareDropRatio, killerDropItemTimeActive,
-                isZone039TypeShard, items);
+                effectiveUserDropRatio, effectiveItemDropRatio + tribeItemDropBonus,
+                effectiveRareDropRatio + tribeRareDropBonus, killerDropItemTimeActive, isZone039TypeShard, items);
         }
 
         RollQuestItem(monster.DropQuestItem, killerQuest, killerHasItem, items);

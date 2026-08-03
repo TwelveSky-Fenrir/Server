@@ -34,14 +34,7 @@ public sealed class TribeQuotaRegistry
         }
     }
 
-    /// <summary>
-    ///     Checks <paramref name="tribe" />'s population against <paramref name="quotaGroup" />/
-    ///     <paramref name="capacity" /> and reserves this session's slot in the same locked step, closing the
-    ///     TOCTOU a separate read-then-await-then-record sequence would otherwise leave open. Finalize a
-    ///     successful reservation with <see cref="Record" /> (its <see cref="TribeQuotaEntry.CharacterId" /> is a
-    ///     0 placeholder until then) or undo it with <see cref="Release" /> if the caller rejects afterward.
-    /// </summary>
-    public bool TryReserve(IZoneSession session, int tribe, int accountId, DateTimeOffset registeredAtUtc,
+        public bool TryReserve(IZoneSession session, int tribe, int accountId, DateTimeOffset registeredAtUtc,
         TribeQuotaGroup quotaGroup, int capacity, out int population)
     {
         lock (_lock)

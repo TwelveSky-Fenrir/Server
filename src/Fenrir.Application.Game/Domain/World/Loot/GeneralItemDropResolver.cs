@@ -26,6 +26,8 @@ public static class GeneralItemDropResolver
 
     private const int MaxAttempts = 10;
 
+    private const int MaxLimitLevelNum = 145;
+
     public static int? Resolve(WorldDataCache worldData, Random random, byte killerTribe, int itemType,
         int levelLow, int levelHigh, bool includeCape = true, bool includeSkillBook = true)
     {
@@ -94,11 +96,18 @@ public static class GeneralItemDropResolver
 
     private static ItemRowDto? ReturnOne(WorldDataCache worldData, Random random, int level, int type, int sort)
     {
+        var overMartialCap = level > MaxLimitLevelNum;
+        var bucketLevel = overMartialCap ? MaxLimitLevelNum : level;
+        var martialLevel = overMartialCap ? level - MaxLimitLevelNum : 0;
+
         List<ItemRowDto>? matches = null;
         foreach (var definition in worldData.ItemsById.Values)
         {
             var item = definition.Item;
-            if (item.Level != level || item.Type != type || item.Sort != sort)
+            if (item.Level != bucketLevel || item.Type != type || item.Sort != sort)
+                continue;
+
+            if (overMartialCap && item.MartialLevel != martialLevel)
                 continue;
 
             (matches ??= []).Add(item);

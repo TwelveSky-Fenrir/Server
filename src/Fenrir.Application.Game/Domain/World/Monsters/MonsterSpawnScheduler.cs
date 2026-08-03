@@ -43,7 +43,8 @@ public sealed class MonsterSpawnScheduler(
     TowerWarState? towerWar = null,
     ValleyWarKillRegistry? valleyWarKillRegistry = null,
     BossDropCatalog? bossDropCatalog = null,
-    Lazy<ZoneCenterBroadcastIngestor>? siegeIngestor = null)
+    Lazy<ZoneCenterBroadcastIngestor>? siegeIngestor = null,
+    ZoneCenterSiegeState? siegeState = null)
     : ISimulationSystem
 {
     private const int RegularMonsterTableCapacity = 3400;
@@ -51,6 +52,8 @@ public sealed class MonsterSpawnScheduler(
     private const int FirstAttackNameOffset = 8;
 
     private const int FirstAttackNameSize = 13;
+
+    private const int ItemDropUpStateTimeEffect = 120;
 
     private const short YangGokNormalBossZoneId = 38;
 
@@ -360,8 +363,14 @@ public sealed class MonsterSpawnScheduler(
         }
         else
         {
+            var tribeItemDropBonus = siegeState?.GetItemDropBonusRatio(creditedAvatar.Tribe) ?? 0f;
+            var tribeRareDropBonus = siegeState?.GetMyoungItemDropBonusRatio(creditedAvatar.Tribe) ?? 0f;
+            var itemDropUpBuffActive = creditedAvatar.StateTimeEffect == ItemDropUpStateTimeEffect;
+
             var result = state.DropRoller.Roll(monsterDefinition, creditedAvatar.Level, creditedAvatar.Tribe, luck,
-                creditedAvatarQuest, CreditedAvatarHasItem, creditedAvatar.PremiumExpireUtc > 0);
+                creditedAvatarQuest, CreditedAvatarHasItem, creditedAvatar.PremiumExpireUtc > 0,
+                killerItemDropUpBuffActive: itemDropUpBuffActive, tribeItemDropBonus: tribeItemDropBonus,
+                tribeRareDropBonus: tribeRareDropBonus);
             money = result.Money;
 
             var cpGiftItems = MonsterDropTailResolver.ResolveCpGiftCard(dropEligible,

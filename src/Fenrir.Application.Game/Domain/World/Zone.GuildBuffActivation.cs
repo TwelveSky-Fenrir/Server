@@ -41,6 +41,13 @@ public sealed partial class Zone
 
             state.GuildBuffType = command.BuffType;
             state.GuildBuffActive = command.BuffActive;
+
+            if (state.IsMovingZone)
+                continue;
+
+            var changedSlots = state.BuffChangeScratch;
+            Array.Clear(changedSlots);
+            RecomputeStatsAndBroadcastBuffs(state, changedSlots);
         }
     }
 }

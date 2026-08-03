@@ -14,7 +14,6 @@ public sealed class ShoutHandler(IShoutService shoutService) : IInlinePacketHand
 
         if (ChatRouter.IsContentEmpty(packet.Content))
         {
-            // Server/ts25zone/S04_MyWork02.cpp:7800-7805 -- empty content is treated as a tampered client.
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }

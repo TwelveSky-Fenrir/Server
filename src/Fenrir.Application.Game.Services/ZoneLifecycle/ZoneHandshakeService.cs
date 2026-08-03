@@ -43,8 +43,6 @@ public sealed class ZoneHandshakeService(
             return new ZoneHandshakeResult(ZoneHandshakeOutcome.ProtocolViolation);
         }
 
-        // TryReserve checks-and-records atomically (see its own remarks); every rejection from here on must
-        // Release() the reservation so it doesn't permanently occupy a slot.
         if (!tribeQuota.TryReserve(session, declaredTribe, accountId, DateTimeOffset.UtcNow, quotaGroup,
                 options.Value.Capacity, out var populationForDeclaredTribe))
         {

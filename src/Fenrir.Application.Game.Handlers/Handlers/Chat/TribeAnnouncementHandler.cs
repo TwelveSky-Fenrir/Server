@@ -20,7 +20,6 @@ public sealed class TribeAnnouncementHandler(
 
         if (string.IsNullOrEmpty(packet.Content))
         {
-            // Server/ts25zone/S04_MyWork02.cpp:11200-11205 -- empty content is treated as a tampered client.
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }

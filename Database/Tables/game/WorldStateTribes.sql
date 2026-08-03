@@ -1,8 +1,3 @@
--- Legacy: WORLD_INFO's mTribeSymbol[4]/mTribePoint[4]/mTribeCloseInfo[2], normalized to one row per tribe.
--- HasSymbol simplifies the legacy "which tribe holds it" int to a bool; IsClosed widens the legacy
--- 2-element array to all 4 tribes (tribes 2/3 have no legacy source, default false).
--- Points is the source of truth for tribe points (not game.Tribes); game.usp_Tribe_GetAll LEFT JOINs it in.
--- The 4 rows (TribeId 0-3) are created by game.usp_WorldState_EnsureInitialized, not seeded here.
 CREATE TABLE game.WorldStateTribes
 (
     TribeId       TINYINT      NOT NULL,

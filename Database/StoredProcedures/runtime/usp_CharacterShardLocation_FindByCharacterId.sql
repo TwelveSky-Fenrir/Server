@@ -1,6 +1,3 @@
--- Same staleness filter as usp_CharacterShardLocation_FindByName -- see that proc's own remarks. Used by
--- FriendService.LocateAsync as the cross-shard fallback once the local ZoneRegistry lookup misses; Tribe is
--- read back denormalized so the same-tribe gate can be re-applied without a second round trip.
 CREATE PROCEDURE runtime.usp_CharacterShardLocation_FindByCharacterId @CharacterId INT
     WITH NATIVE_COMPILATION , SCHEMABINDING
 AS

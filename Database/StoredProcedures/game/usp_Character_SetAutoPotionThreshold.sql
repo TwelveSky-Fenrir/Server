@@ -1,4 +1,3 @@
--- The handler is silent (no ZC reply); this proc is its only durable effect.
 CREATE PROCEDURE game.usp_Character_SetAutoPotionThreshold @CharacterId INT,
                                                            @AutoLifeRatio TINYINT,
                                                            @AutoManaRatio TINYINT

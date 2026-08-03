@@ -1,5 +1,3 @@
--- TVP for usp_Character_PersistBatch: one row per dirty character; proc discards rows whose
--- FlushSequence is stale vs. game.Characters.FlushSequence (out-of-order delivery).
 CREATE TYPE game.tvp_CharacterPosition AS TABLE
 (
     CharacterId   INT      NOT NULL,

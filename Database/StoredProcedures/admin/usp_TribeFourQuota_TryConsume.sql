@@ -1,8 +1,3 @@
--- Atomic check-and-increment: advances admin.TribeFourQuota.CurrentCount by one and reports success only if
--- doing so would not exceed MaxCount -- the single UPDATE's WHERE clause makes the check-then-act atomic
--- under SQL Server's own row-level locking, so two concurrent callers can never both be granted the last
--- remaining slot. Never throws on exhaustion -- a denied request is an expected, normal outcome (Granted=0),
--- not an error.
 CREATE PROCEDURE admin.usp_TribeFourQuota_TryConsume
 AS
 BEGIN

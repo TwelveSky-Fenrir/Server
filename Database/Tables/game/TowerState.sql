@@ -1,9 +1,3 @@
--- Normalizes legacy `towerinfo` (a singleton row with Tower0..Tower11 columns) into one row per tower.
--- The 12 rows (TowerIndex 0-11) are created by game.usp_TowerState_EnsureInitialized, an idempotent
--- bootstrap the application calls once at world startup -- callers must not INSERT directly.
--- Level/TowerType mirror the legacy mTowerInfo->mState1Tower[i] packed broadcast value (decoded level*100+type,
--- MyGame::GetTowerState/GetTowerType) so a GameServer restart resumes the guardian-monster lifecycle instead of
--- losing it back to Application.Fenrir.Game.Progression.TowerWarState's in-memory-only defaults.
 CREATE TABLE game.TowerState
 (
     TowerIndex         TINYINT      NOT NULL,

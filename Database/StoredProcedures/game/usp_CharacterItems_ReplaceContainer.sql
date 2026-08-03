@@ -1,5 +1,3 @@
--- Wrapped in an explicit transaction: a fault between the DELETE and INSERT must never be able to
--- commit the DELETE alone and wipe an equipment container.
 CREATE PROCEDURE game.usp_CharacterItems_ReplaceContainer @CharacterId INT,
                                                           @Container TINYINT,
                                                           @Items game.tvp_CharacterItemSlot READONLY

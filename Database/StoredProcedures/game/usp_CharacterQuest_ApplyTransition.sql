@@ -1,6 +1,3 @@
--- @DeltaMoney: unlike every other money proc, a cap breach here is silently skipped (Money left
--- unchanged), never thrown -- this matches verified legacy quest-reward semantics, not an oversight.
--- @Container1/@Container2 = 255 means "do not touch"; passing the same id in both is a caller error.
 CREATE PROCEDURE game.usp_CharacterQuest_ApplyTransition @CharacterId INT,
                                                          @StepPermanent INT,
                                                          @ActiveQuestId INT,
@@ -42,7 +39,6 @@ BEGIN
             UpdatedAtUtc = SYSUTCDATETIME()
         WHERE CharacterId = @CharacterId
           AND Money + @DeltaMoney BETWEEN 0 AND 2000000000;
--- Deliberately no error branch: a cap breach or vanished character leaves Money untouched (see header).
 
     IF
         @Container1 <> 255

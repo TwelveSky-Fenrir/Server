@@ -1,5 +1,3 @@
--- Member-count check runs WITH (UPDLOCK, HOLDLOCK) so concurrent joins into a nearly-full guild
--- serialize instead of both passing -- no table constraint backstops this 50-member cap.
 CREATE PROCEDURE game.usp_GuildMember_Add @GuildId INT,
                                           @CharacterId INT,
                                           @Role TINYINT = 0

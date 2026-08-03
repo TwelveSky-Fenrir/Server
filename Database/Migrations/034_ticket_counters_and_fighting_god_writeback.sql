@@ -1,80 +1,4 @@
--- Lot 12 -- cinq compteurs mutes en jeu, persistes par le legacy, jamais ecrits cote Fenrir --
--- EliteDungeonTime / DungeonKeyTime / IvyHallTicketTime / ScrollOfSeekersTime / FightingGodForDestroy.
---
--- CE QUE PERSISTE LE LEGACY, ET OU (CreateAvatarColumn, Server/Header/CSQLAvatar.cpp:556-756, hors de tout
--- #ifdef -- compte dans ReleaseM33 et ReleaseEU33 -- liste partagee SELECT et INSERT/UPDATE :769-812)
---   EliteDungeonTime   aZone101Time    STRUCT.h:384  CSQLAvatar.cpp:606
---                      items 1047/1097/1098 (Elite Dungeon Ticket L/M/S) creditent 180/120/60 via
---                      wCheckAdd(aZone101Time, tAddTime) puis += (S04_MyWork03.cpp:2352-2367).
---   DungeonKeyTime     aZone175Time    STRUCT.h:383  CSQLAvatar.cpp:605
---                      item 1048 (God Temple/Labyrinth Key), aLevel1>=100, credite 1 (S04_MyWork03.cpp:2376-2384).
---   IvyHallTicketTime  aZone050Time2   STRUCT.h:480  CSQLAvatar.cpp:660
---                      items 553/1219 (Ivy Hall Ticket S/L) creditent 180/360, plafond 1576800
---                      (S04_MyWork03.cpp:4965-4981). Le champ voisin aZone050Time2 (commente '//aJuWallTime')
---                      est mort (ligne commentee CSQLAvatar.cpp:643) -- jamais une preuve de persistance ici.
---   ScrollOfSeekersTime aZone126Time   STRUCT.h:386  CSQLAvatar.cpp:608
---                      items 1124/1187/7016/8409/8410 creditent 180 ou 900 (S04_MyWork03.cpp:2459-2474).
---   FightingGodForDestroy aFightingGodForDestroy STRUCT.h:379  CSQLAvatar.cpp:600
---                      items 1121/1122/1123/1234, 1<=aLevel1<=112, creditent 60/120/180
---                      (S04_MyWork03.cpp:2275-2294).
--- Ecriture par le write-behind ts25playuser (S07_MyGame01.cpp:1143-1147 -> S08_MyDB.cpp:99, GetAvatar UPDATE).
---
--- L'ECART FENRIR : les cinq sont deja mutes (Zone.EconomyMirrors.cs -> ApplyTribeProgressCommand pour les
--- quatre premiers, avec MarkProgressDirty(Progression) deja pose ligne 711-712 ; TimedBuffCountdownSystem.cs
--- TickGroupA pour FightingGodForDestroy) mais n'atteignaient aucune colonne, aucun TVP, aucun DTO -- perdus a
--- la deconnexion ET au changement de zone. Confirme par grep : aucune occurrence dans src/Fenrir.Data*,
--- Database/ avant ce script.
---
--- PIEGE CONNU, VOLONTAIREMENT NON RESOLU ICI (hors perimetre de ce lot) : PlayerRuntimeState porte, pour
--- EliteDungeonTime/IvyHallTicketTime/ScrollOfSeekersTime, un DEUXIEME champ runtime distinct qui mute le MEME
--- compteur legacy -- respectivement Zone101Time/Zone050Time2/Zone126Time (PlayerRuntimeState.TimedBuffs.cs),
--- decrementes chaque minute par TimedBuffCountdownSystem.TickPaidZones et credites ailleurs (ex.
--- HighLevelExperienceOutcomeApplier pour Zone101Time). Ce script persiste le compteur EliteDungeonTime/
--- IvyHallTicketTime/ScrollOfSeekersTime tel qu'il existe cote C# aujourd'hui (le solde credite par le
--- ticket) ; il ne fusionne PAS avec Zone101Time/Zone050Time2/Zone126Time, qui restent non persistes. Fusionner
--- les deux est un changement de logique de jeu (Domain/World/Zone.EconomyMirrors.cs,
--- Domain/Simulation/TimedBuffCountdownSystem.cs), hors du perimetre d'ecriture de ce lot (Fenrir.Data*/
--- Database/ + sites de sauvegarde). DungeonKeyTime et FightingGodForDestroy n'ont pas ce probleme (porteur
--- unique).
---
--- ANGLE MORT INDEPENDANT VERIFIE EN PREPARANT CE LOT (meme classe que Migrations/012, lu directement) :
--- Migrations/011_avatar_counters_and_bottles_writeback.sql, dernier script listant a la fois la forme du TYPE
--- ET celle des deux procedures dans la lignee que ce script prolonge, a recree game.tvp_CharacterProgress et
--- usp_Character_PersistProgressBatch/PersistFinalFlush SANS le parametre @Costumes / la transaction / le
--- remplacement de penderie que Migrations/008_autohunt_buffx2_premium_pet_writeback.sql avait a l'origine --
--- lu directement dans les deux scripts. CharacterRepository.PersistProgressAsync/PersistFinalFlushAsync
--- fournissent pourtant deja ce parametre des que la penderie n'est pas vide : usp_Character_PersistProgressBatch
--- echouerait alors avec un parametre inconnu. Restaure ici dans la meme passe.
--- Meme lecture directe : CharacterWorldSnapshotDto (CharacterDtos.cs) lit deja AutoTime/BuffX2Time en fin du
--- prefixe RS0 herite de Migrations/011, mais la projection reellement appliquee (011) ne les selectionne pas
--- -- CaeriusNet lit les colonnes du DataReader par ORDINAL (QueryMultipleReadOnlyCollectionAsync), donc
--- GetWorldEntryBundleAsync echouerait (IndexOutOfRange) a CHAQUE entree en monde. Restaure ici aussi.
---
--- AVERTISSEMENT DE SEQUENCAGE -- SURFACE ACTUELLEMENT DISPUTEE PAR PLUSIEURS LOTS CONCURRENTS
--- Au moment ou ce script est ecrit, Fenrir.Data.Abstractions.Characters.CharacterProgressTvp et
--- CharacterWorldSnapshotDto portent DEJA, en queue, des colonnes d'au moins quatre autres lots non encore
--- reconcilies avec aucun script SQL coherent (repere par lecture directe du disque, non journalise ici en
--- detail) : un groupe RankPoint/CloakLuckyBoxPity/CloakVariantBoxPity/MountVariantBoxPity, un groupe
--- ImproveItemValue/AddItemValue/HighItemValue/TaiyanKeyTimer (Migrations/032_progress_writeback_
--- reconciliation_and_item_value_counters.sql, lui-meme deja partiellement en collision de numerotation avec
--- Migrations/032_playtime_petbagdate_hsbreward_writeback.sql), et un groupe ProtectForRefine/ProtectForDestroy/
--- ProtectForCostume/ProtectForDestroy2/LodRounds/StellarCoreExpireDate. AUCUN de ces groupes n'est repris ici :
--- ce script prolonge la forme STRICTEMENT TERMINALE de Migrations/012_autohunt_premium_pet_writeback_restore.sql
--- (53 colonnes de 011 + les six restaurees par 012 = 59), a laquelle il ajoute ses cinq colonnes en queue (64
--- au total), et ne pretend PAS declarer l'union complete du record C# tel qu'il existe au moment de l'ecriture.
--- Une passe de reconciliation dediee (meme motif que 012 pour 011/008) sera necessaire pour fondre ce script
--- avec les groupes ci-dessus une fois qu'ils auront chacun leur propre script SQL stable -- ne pas le sauter,
--- sous peine de repeter la regression 008->011 une quatrieme fois.
---
--- POURQUOI UN NOUVEAU SCRIPT PLUTOT QU'UNE EDITION
--- Migrations/008/010/011/012 et les fichiers de base sont deja journalises SHA-256. Un type TABLE ne s'ALTERe
--- pas et ne se DROP pas tant qu'une procedure le prend en parametre : DROP+RECREATE integral, meme sequence
--- que 011/012.
 
--- ---------------------------------------------------------------------------
--- 1. game.Characters : cinq nouvelles colonnes. Valeur sure pour les lignes existantes : 0 partout (aucun
---    ticket consomme, l'etat d'un avatar qui n'a jamais utilise le parchemin/objet correspondant).
--- ---------------------------------------------------------------------------
 IF COL_LENGTH('game.Characters', 'EliteDungeonTime') IS NULL
 ALTER TABLE game.Characters
     ADD EliteDungeonTime INT NOT NULL
@@ -94,19 +18,11 @@ ALTER TABLE game.Characters
             CONSTRAINT CK_Characters_FightingGodForDestroy CHECK (FightingGodForDestroy >= 0);
 GO
 
--- ---------------------------------------------------------------------------
--- 2. Les deux procedures qui referencent le type bloquent son DROP : les supprimer d'abord, puis le type.
--- ---------------------------------------------------------------------------
 DROP PROCEDURE IF EXISTS game.usp_Character_PersistFinalFlush;
 DROP PROCEDURE IF EXISTS game.usp_Character_PersistProgressBatch;
 DROP TYPE IF EXISTS game.tvp_CharacterProgress;
 GO
 
--- ---------------------------------------------------------------------------
--- 3. Le type : forme TERMINALE de Migrations/012 (59 colonnes -- 53 de 011 + les six restaurees par 012),
---    plus les cinq de ce lot en toute derniere position. Cinq compteurs mono-proprietaires de
---    PlayerRuntimeState, meme categorie que DropItemTime/ProtectForHalo -- jamais un solde partage.
--- ---------------------------------------------------------------------------
 CREATE TYPE game.tvp_CharacterProgress AS TABLE
 (
     CharacterId              INT          NOT NULL,
@@ -176,11 +92,6 @@ CREATE TYPE game.tvp_CharacterProgress AS TABLE
 );
 GO
 
--- ---------------------------------------------------------------------------
--- 4. Le flush periodique. @Costumes/la transaction/le remplacement de penderie borne par @Applied restaures
---    depuis Migrations/008 (perdus par 010/011/012) ; CharacterRepository.PersistProgressAsync les fournit
---    deja. Garde d'idempotence (FlushSequence strictement croissante) inchangee.
--- ---------------------------------------------------------------------------
 CREATE PROCEDURE game.usp_Character_PersistProgressBatch @Progress game.tvp_CharacterProgress READONLY,
                                                          @Costumes game.tvp_CharacterCostumeSlot READONLY
 AS
@@ -263,7 +174,7 @@ BEGIN
     OUTPUT inserted.CharacterId INTO @Applied (CharacterId)
     FROM game.Characters AS c
              JOIN @Progress AS s ON s.CharacterId = c.CharacterId
-    WHERE s.FlushSequence > c.FlushSequence; -- idempotence guard
+    WHERE s.FlushSequence > c.FlushSequence; 
 
     DELETE cc
     FROM game.CharacterCostumes AS cc
@@ -282,11 +193,6 @@ BEGIN
 END;
 GO
 
--- ---------------------------------------------------------------------------
--- 5. Le flush terminal -- deconnexion (GameConnectionHost) et changement de zone (ZoneMoveService), tous deux
---    via PositionWriteBehindHost.FlushCharacterNowAsync. Progression + position + penderie dans la meme
---    transaction : ce chemin n'a pas de cycle suivant pour rattraper une moitie perdue.
--- ---------------------------------------------------------------------------
 CREATE PROCEDURE game.usp_Character_PersistFinalFlush @Progress game.tvp_CharacterProgress READONLY,
                                                       @Position game.tvp_CharacterPosition READONLY,
                                                       @Costumes game.tvp_CharacterCostumeSlot READONLY
@@ -376,7 +282,7 @@ BEGIN
     FROM game.Characters AS c
              JOIN @Progress AS p ON p.CharacterId = c.CharacterId
              JOIN @Position AS q ON q.CharacterId = c.CharacterId
-    WHERE q.FlushSequence > c.FlushSequence; -- idempotence guard
+    WHERE q.FlushSequence > c.FlushSequence; 
 
     DELETE cc
     FROM game.CharacterCostumes AS cc
@@ -395,13 +301,6 @@ BEGIN
 END;
 GO
 
--- ---------------------------------------------------------------------------
--- 6. Le chemin de LECTURE. RS0 append-only en queue, mappe par ORDINAL sur CharacterWorldSnapshotDto :
---    AutoTime/BuffX2Time (deja lus cote C#, jamais projetes cote SQL depuis Migrations/011 -- angle mort
---    independant decrit en tete de script) puis les cinq nouvelles colonnes de ce lot se posent tout en fin.
---    Prefixe stable de 19 colonnes partage avec usp_Character_GetForWorldEntrySummary intact ; les quatre
---    autres result sets repris verbatim.
--- ---------------------------------------------------------------------------
 CREATE OR ALTER PROCEDURE game.usp_Character_GetForWorldEntry @CharacterId INT
 AS
 BEGIN
@@ -517,10 +416,10 @@ BEGIN
     SELECT Container,
            Slot,
            ItemId,
-           CAST(Quantity AS INT) AS Quantity, -- game.CharacterItems.Quantity is SMALLINT; widen back to INT
-           Enchant,                           -- here so CharacterItemSlotDto's existing int-typed ctor param
-           Combine,                           -- keeps reading it via SqlDataReader.GetInt32 without an
-           Refine,                            -- InvalidCastException (see CharacterItems.sql's own comment)
+           CAST(Quantity AS INT) AS Quantity, 
+           Enchant,                           
+           Combine,                           
+           Refine,                            
            Socket,
            SocketGem1,
            SocketGem2,

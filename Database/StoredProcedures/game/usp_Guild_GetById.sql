@@ -1,4 +1,3 @@
--- Same RS0 shape as usp_Guild_GetAll, scoped to one guild; MemberCount is INT (COUNT(*), not COUNT_BIG(*)).
 CREATE PROCEDURE game.usp_Guild_GetById @GuildId INT
 AS
 BEGIN

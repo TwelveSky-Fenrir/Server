@@ -1,6 +1,3 @@
--- database/50_procedures/game/usp_WorldState_Get.sql
--- 3 result sets in one round trip (WorldState, WorldStateTribes, WorldStateAllianceOffers), loaded at
--- GameServer boot.
 CREATE PROCEDURE game.usp_WorldState_Get
 AS
 BEGIN

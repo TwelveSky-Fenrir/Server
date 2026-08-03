@@ -1,86 +1,4 @@
--- Lot 3 -- six compteurs d'avatar mutes en jeu, persistes par le legacy, et perdus a la deconnexion cote
--- Fenrir.
---
--- Les six sont des colonnes d'avatar a part entiere cote legacy : CreateAvatarColumn
--- (Server/Header/CSQLAvatar.cpp:556-756) est l'unique fonction qui construit la liste de colonnes pour
--- INSERT/SELECT/UPDATE, et elle les declare toutes SANS #ifdef. Le UPDATE part du write-behind de
--- ts25playuser (Server/ts25playuser/S08_MyDB.cpp:99, case 2 de MakeQueryForSave) sur l'AVATAR_INFO en
--- memoire partagee -- wAvatar (Server/Header/Protocol/DEFINE.h:715) -- donc toute ecriture faite par la
--- zone est durable.
---
---   ProtectForHalo            aProtectForHalo,    Server/Header/CSQLAvatar.cpp:595
---                             stock cash consomme a l'echec d'enchantement de halo
---                             (Server/ts25zone/S04_MyWork02.cpp:10927-10931 : wAvatar.aProtectForHalo--),
---                             credite par objet cash (Server/ts25zone/S04_MyWork03.cpp:3414-3415).
---   BonusItemLevel            aBonusItemLevel,    Server/Header/CSQLAvatar.cpp:621
---                             palier de niveau arme mais non reclame, pose en
---                             Server/ts25zone/S07_MyGame03.cpp:4787 (branche #else compilee, LNW33 defini),
---                             remis a 0 a la reclamation (Server/ts25zone/S04_MyWork02.cpp:11036).
---   BonusItemValue            aBonusItemValue,    Server/Header/CSQLAvatar.cpp:620
---                             le drapeau du meme couple : TRUE en S07_MyGame03.cpp:4786, FALSE en
---                             S04_MyWork02.cpp:11035, diffuses ensemble par sort 107. Jamais l'un sans
---                             l'autre.
---   TribeNotifyScrollCount    aTribeNotifyNum,    Server/Header/CSQLAvatar.cpp:648
---                             stock de charges achete (objet 566, Server/ts25zone/S04_MyWork03.cpp:1488-1490),
---                             refus si < 1 puis decrement (Server/ts25zone/S04_MyWork02.cpp:13798-13808).
---   TribeFourReturnAllowance  aReturnTribeNum,    Server/Header/CSQLAvatar.cpp:639
---                             quota de RETOUR depuis la tribu 4 : refus si < 1
---                             (Server/ts25zone/S04_MyWork02.cpp:7509), decrement seulement dans la branche
---                             retour (S04_MyWork02.cpp:7558), credit par l'objet 1189
---                             (Server/ts25zone/S04_MyWork03.cpp:4102-4104).
---   BottleSlots / DrunkBottleIndex
---                             aBottle[10]/aBottleCount[10] (Server/Header/Protocol/STRUCT.h:527-528,
---                             MAX_AVATAR_BOTTLE_NUM = 10 en Server/Header/Protocol/DEFINE.h:392) et
---                             aBottleIndex (Server/Header/CSQLAvatar.cpp:677).
---
--- POURQUOI TribeFourReturnAllowance N'EST PAS game.Characters.TribeTransferPermitCount
--- La colonne existante porte le stock de parchemins de transfert de faction (world.Items 8153/8154), un
--- mecanisme different et deja implemente par ailleurs (game.usp_Character_ApplyTribeScrollConversion,
--- src/Fenrir.Application.Game/Domain/Inventory/UseItems/TribeScrollTransferUseItemHandler.cs). Le quota
--- legacy aReturnTribeNum vient de l'objet 1189 et ne gouverne que la branche retour de la conversion tribu
--- 4. Deux compteurs distincts cote legacy, deux colonnes distinctes ici : les fondre casserait le jour ou
--- l'objet 1189 sera porte. TribeTransferPermitCount reste inchangee.
---
--- COMMENT BottleSlots EST ENCODE
--- Le legacy serialise deja les 10 paires en chaines de largeur fixe (SetAvatar,
--- Server/Header/CSQLAvatar.cpp:308-313) : 5 caracteres par aBottle[i] avec le clamp EFIX_ITEM (0 si < 2 ou
--- > 99999, Server/Header/CSQLAvatar.cpp:24-27) et 2 caracteres par aBottleCount[i], vers char aBottle[51] /
--- char aBottleCount[21] (Server/Header/CSQLDatabase.h:128-129), enregistres en colonnes par FIELD_AVATAR1
--- (Server/Header/CSQLAvatar.cpp:675-676). Fenrir garde les memes largeurs de champ mais UNE seule colonne
--- de 70 caracteres (10 groupes de 5+2) : les deux moities d'un slot ne peuvent alors pas etre ecrites
--- l'une sans l'autre, ce qui est exactement l'invariant que suppose l'assainissement d'entree en monde
--- (Server/ts25zone/S04_MyWork02.cpp:920-927 : si l'un des deux est < 1, les deux passent a 0). N'' pour les
--- lignes existantes = 10 slots vides, la valeur par defaut deja utilisee en memoire.
---
--- CE QUI RESTE VOLONTAIREMENT EPHEMERE
--- aBottleTime (Server/Header/Protocol/STRUCT.h:530), le chrono d'ivresse, est ABSENT de CreateAvatarColumn
--- et remis a 0 a chaque entree en monde (Server/ts25zone/S04_MyWork02.cpp:919).
--- PlayerRuntimeState.DrunkBottleTicksRemaining n'a donc aucune colonne ici et ne doit pas en avoir.
---
--- POURQUOI UN NOUVEAU SCRIPT PLUTOT QU'UNE EDITION DES FICHIERS DE BASE
--- Tables/game/Characters.sql, Schemas/Types/game/tvp_CharacterProgress.sql, les deux procedures de
--- write-behind et usp_Character_GetForWorldEntry.sql sont deja listes dans _manifest.txt, donc journalises
--- par SHA-256 par Fenrir.Tools.DbMigrator sur toute base qui les a appliques une fois. Le migrateur refuse
--- de re-appliquer un chemin journalise dont le contenu a change. Meme raisonnement que Migrations/002.
---
--- POURQUOI DROP+RECREATE DU TYPE, ET CE QUE CE SCRIPT REPREND DES LOTS VOISINS
--- Un type TABLE ne s'ALTER pas et ne se DROP pas tant qu'une procedure le prend en parametre. Toute
--- extension de game.tvp_CharacterProgress est donc forcement une recreation integrale, et le mapper TVP
--- genere par CaeriusNet lie POSITIONNELLEMENT : l'ordre des colonnes du type doit etre le miroir exact de
--- l'ordre des parametres de Fenrir.Data.Abstractions.Characters.CharacterProgressTvp, et l'ordre de RS0
--- celui de CharacterWorldSnapshotDto. Ce script recree donc le type comme l'UNION de tout ce qui existe au
--- moment de son ecriture, dans l'ordre exact du record C# : 30 colonnes de Migrations/002, puis
--- VisibleState/SpecialState/UseOrnament (Migrations/006), Title/Halo/TeacherPoint/WarPointDelta/
--- BloodCoinDelta (lot cosmetiques-et-monnaies), PetExpX2Time/AnimalAbsorbTime/AnimalAbsorbState/
--- CostumeIndex (Migrations/007), les sept du present lot, enfin AutoBuffTime/AutoBuffSkill/RankPointDate/
--- RankBuffType (Migrations/010). Il doit donc s'appliquer APRES tous ceux-la, ce que garantit sa position
--- en fin de bloc Migrations/ du manifeste. Si un lot parallele ajoute encore des colonnes au record C#, le
--- script qui s'enregistrera en dernier devra a son tour declarer l'union complete.
 
--- 1. Les sept colonnes de destination sur game.Characters. Valeurs par defaut sures pour les lignes
---    existantes : 0 partout, N'' pour les bouteilles (10 slots vides), -1 pour l'index de bouteille bue
---    (meme convention "index ou -1" que MountSlotIndex). Chaque ADD est garde par sys.columns : le script
---    reste re-executable a la main sur une base a l'etat inconnu.
 IF NOT EXISTS (SELECT 1
                FROM sys.columns
                WHERE object_id = OBJECT_ID(N'game.Characters')
@@ -150,16 +68,11 @@ ALTER TABLE game.Characters
         CONSTRAINT CK_Characters_DrunkBottleIndex CHECK (DrunkBottleIndex BETWEEN -1 AND 9);
 GO
 
--- 2. Dropper les deux procedures qui referencent le type (elles bloquent DROP TYPE), puis le type lui-meme.
 DROP PROCEDURE IF EXISTS game.usp_Character_PersistFinalFlush;
 DROP PROCEDURE IF EXISTS game.usp_Character_PersistProgressBatch;
 DROP TYPE IF EXISTS game.tvp_CharacterProgress;
 GO
 
--- 3. Recreer le type, miroir exact de CharacterProgressTvp. Les sept du present lot sont dans la meme
--- categorie que DropItemTime/Eat*Potion/Mount*/VisibleState : etat mono-proprietaire porte par
--- PlayerRuntimeState, re-encode a chaque flush, sans autre ecrivain. Aucun solde concurrent parmi eux --
--- Money/BigMoney restent dehors, WarPoint/BloodCoin ne passent ici qu'en DELTA (voir les clauses SET).
 CREATE TYPE game.tvp_CharacterProgress AS TABLE
 (
     CharacterId              INT          NOT NULL,
@@ -218,9 +131,6 @@ CREATE TYPE game.tvp_CharacterProgress AS TABLE
 );
 GO
 
--- 4. Recreer usp_Character_PersistProgressBatch. Garde d'idempotence (FlushSequence strictement superieure)
---    inchangee. WarPoint/BloodCoin restent credites RELATIVEMENT pour composer avec leurs procedures
---    atomiques dediees au lieu de les concurrencer.
 CREATE PROCEDURE game.usp_Character_PersistProgressBatch @Progress game.tvp_CharacterProgress READONLY
 AS
 BEGIN
@@ -283,14 +193,10 @@ BEGIN
         c.UpdatedAtUtc             = SYSUTCDATETIME()
     FROM game.Characters AS c
              JOIN @Progress AS s ON s.CharacterId = c.CharacterId
-    WHERE s.FlushSequence > c.FlushSequence; -- idempotence guard
+    WHERE s.FlushSequence > c.FlushSequence; 
 END;
 GO
 
--- 5. Recreer usp_Character_PersistFinalFlush. C'est le chemin de la DECONNEXION (GameConnectionHost) ET du
---    CHANGEMENT DE ZONE (ZoneMoveService), tous deux via PositionWriteBehindHost.FlushCharacterNowAsync :
---    progression et position dans un seul UPDATE, pour qu'une panne en cours de sequence ne puisse pas
---    couper la photo de deconnexion en deux.
 CREATE PROCEDURE game.usp_Character_PersistFinalFlush @Progress game.tvp_CharacterProgress READONLY,
                                                       @Position game.tvp_CharacterPosition READONLY
 AS
@@ -360,17 +266,10 @@ BEGIN
     FROM game.Characters AS c
              JOIN @Progress AS p ON p.CharacterId = c.CharacterId
              JOIN @Position AS q ON q.CharacterId = c.CharacterId
-    WHERE q.FlushSequence > c.FlushSequence; -- idempotence guard
+    WHERE q.FlushSequence > c.FlushSequence; 
 END;
 GO
 
--- 6. Le chemin de LECTURE. Sans ces sept colonnes dans RS0, elles seraient ecrites et jamais relues : pire
---    que pas de persistance du tout, parce que le compteur paraitrait fonctionner en session avant de
---    repartir de zero au login suivant.
--- RS0 reste append-only en queue -- CharacterWorldSnapshotDto lit par ORDINAL (mapper genere par
--- CaeriusNet), donc une colonne inseree ailleurs qu'a la fin decalerait silencieusement toute la
--- projection. Les sept nouvelles arrivent apres CostumeIndex, derniere colonne posee par Migrations/007.
--- Le prefixe stable de 19 colonnes est intact : usp_Character_GetForWorldEntrySummary n'est pas touchee.
 CREATE OR ALTER PROCEDURE game.usp_Character_GetForWorldEntry @CharacterId INT
 AS
 BEGIN
@@ -479,10 +378,10 @@ BEGIN
     SELECT Container,
            Slot,
            ItemId,
-           CAST(Quantity AS INT) AS Quantity, -- game.CharacterItems.Quantity is SMALLINT; widen back to INT
-           Enchant,                           -- here so CharacterItemSlotDto's existing int-typed ctor param
-           Combine,                           -- keeps reading it via SqlDataReader.GetInt32 without an
-           Refine,                            -- InvalidCastException (see CharacterItems.sql's own comment)
+           CAST(Quantity AS INT) AS Quantity, 
+           Enchant,                           
+           Combine,                           
+           Refine,                            
            Socket,
            SocketGem1,
            SocketGem2,

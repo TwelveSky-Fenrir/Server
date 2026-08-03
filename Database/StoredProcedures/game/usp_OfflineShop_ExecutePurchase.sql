@@ -1,32 +1,3 @@
--- database/50_procedures/game/usp_OfflineShop_ExecutePurchase.sql
--- Money-overflow quirk reproduced exactly (verified S07_MyGame09.cpp:805-816): crediting the seller's shop
--- Money past 2,000,000,000 rolls the excess into +2 BigMoney rather than capping -- not "corrected", per D8.
--- All arithmetic is widened to BIGINT before the addition and every CASE WHEN comparison (matching legacy's
--- own widen-then-compare pattern) then CAST back down to the column's INT type -- game.OfflineShops.Money and
--- @Price are both 32-bit INT, and their true sum can reach ~2,999,999,999, past Int32.MaxValue, so evaluating
--- the addition as 32-bit arithmetic first would raise a raw overflow error (8115) instead of the intended
--- graceful rollover.
---
--- Also auto-closes the shop (ShopState 1 -> 0) the instant a purchase empties every one of its listing slots
--- (Server/ts25zone/S07_MyGame09.cpp:860-880), the same routine an explicit owner-close uses -- this only
--- fires on the "someone bought an item" branch, never on the owner's own "retrieve an unsold item" branch, so
--- usp_OfflineShop_RetrieveItemAndReplaceContainer is untouched. Evaluated across the whole shop (all 25
--- slots), not just the slot that was just sold, and inside this procedure's single transaction so there is no
--- new cross-call TOCTOU window.
---
--- Isolation-level note (procs-game-economy-inventory audit, basse severite): the slot-sale compare-and-swap
--- below -- DELETE ... WHERE SlotIndex = @SlotIndex AND ItemId = @ExpectedItemId AND Quantity = @ExpectedQuantity
--- AND Value = @ExpectedValue AND Price = @Price AND EXISTS (shop still ShopState = 1) -- is already race-safe
--- under this database's default READ COMMITTED SNAPSHOT + OPTIMIZED_LOCKING
--- (Database/Migrations/000_init/001_database_options.sql) with no stricter isolation level required. RCSI only
--- removes reader-vs-writer blocking; it does not change writer-vs-writer locking, so the DELETE still takes a
--- genuine row lock the instant it matches a row. Two concurrent buyers racing the same
--- (@SellerCharacterId, @SlotIndex) pair therefore serialize on that lock: the second DELETE blocks until the
--- first transaction commits (removing the row), then re-evaluates its own WHERE predicate under READ
--- COMMITTED and finds zero matching rows -- falling into the @@ROWCOUNT = 0 branch below and throwing 50272
--- rather than double-selling the same listing. Do not reach for SERIALIZABLE/REPEATABLE READ or an
--- application-level lock here out of unwarranted caution -- the guarded DELETE's own WHERE clause already is
--- the entire CAS and it is sufficient on its own.
 CREATE OR ALTER PROCEDURE game.usp_OfflineShop_ExecutePurchase @SellerCharacterId INT,
                                                                @SlotIndex SMALLINT,
                                                                @ExpectedItemId INT,
@@ -106,9 +77,6 @@ BEGIN
     IF @@ROWCOUNT = 0
         THROW 50273, N'Crediting the seller''s offline-shop earnings would exceed the BigMoney cap (999).', 1;
 
-    -- Sellout auto-close: none of the seller's 25 listing slots holds an item any more -- close the shop the
-    -- same way an explicit owner-close would (ShopState 1 -> 0), so usp_OfflineShop_WithdrawMoney's
-    -- `ShopState = 0` gate no longer waits on rental expiry or a manual close.
     IF NOT EXISTS (SELECT 1 FROM game.OfflineShopItems WHERE CharacterId = @SellerCharacterId)
         UPDATE game.OfflineShops
         SET ShopState = 0

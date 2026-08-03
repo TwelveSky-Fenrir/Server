@@ -10,44 +10,23 @@ Tables/runtime/GameServerDirectory.sql
 Tables/runtime/CharacterShardLocation.sql
 Tables/runtime/AccountSessions.sql
 
-# Cross-shard fan-out outbox for GuildAnnouncement/GuildChat/TribeAnnouncement/TribeAnnouncementScroll
 Tables/runtime/GuildTribeBroadcastRelay.sql
 Tables/runtime/GuildTribeBroadcastCursor.sql
 
-# WS1.4: lightweight cross-shard social-negotiation relay (Party/Friend/Mentor/Duel/Trade/GuildInvite
-# Ask+Answer) -- point-to-point sibling of the GuildTribeBroadcastRelay/Cursor pair above (TargetShardId=
-# @ShardId filter instead of fan-out), see SocialCrossShardRelay.sql's own header for the full design.
 Tables/runtime/SocialCrossShardRelay.sql
 Tables/runtime/SocialCrossShardRelayCursor.sql
-# WS-C3: lightweight cross-shard whisper (op39 / SECRET_CHAT) relay -- point-to-point sibling of the
-# SocialCrossShardRelay/Cursor pair above (fire-and-forget: no MessageType/Ask-Answer, no Kind), see
-# ChatCrossShardRelay.sql's own header for the full design.
 Tables/runtime/ChatCrossShardRelay.sql
 Tables/runtime/ChatCrossShardRelayCursor.sql
 
-# proxy-shop-rental-sync: cross-shard fan-out for the proxy/deputy-shop rental-extension consumables'
-# best-effort live-registry mirror update -- single-purpose sibling of the GuildTribeBroadcastRelay/Cursor
-# pair above (same fan-out shape, no Kind column), see ProxyShopExpirationRelay.sql's own header for the
-# full legacy-limitation/hardening trail.
 Tables/runtime/ProxyShopExpirationRelay.sql
 Tables/runtime/ProxyShopExpirationRelayCursor.sql
 
-# guild-buff-expiry: cross-shard fan-out outbox for the guild-buff-reserve-exhaustion immediate strip-effect
-# push (Server/ts25center/S07_MyGame01.cpp:291-331's edge-triggered gBuffTime<1 branch) -- single-purpose
-# fan-out sibling of the GuildTribeBroadcastRelay/Cursor pair above, see GuildBuffExpiryRelay.sql's own
-# header for the full design.
 Tables/runtime/GuildBuffExpiryRelay.sql
 Tables/runtime/GuildBuffExpiryCursor.sql
 
-# rvr-siege: cross-shard fan-out outbox for the Zone049 siege-zone-slot family (sub-codes 1-9,
-# ZoneCenterBroadcastIngestor) and the tribe-symbol/alliance tSort family (38/39/40/42/45/46/47,
-# ZoneEventBroadcaster) -- single-purpose fan-out sibling of the GuildTribeBroadcastRelay/Cursor pair above
-# (same shape, no Kind column -- every sort already funnels through one generic Sort+Data payload), see
-# RvrSiegeEventRelay.sql's own header for the full design.
 Tables/runtime/RvrSiegeEventRelay.sql
 Tables/runtime/RvrSiegeEventRelayCursor.sql
 
-# party-resync: cross-shard fan-out outbox for party-membership resync-on-reconnect (legacy RELAY_LOGIN_PARTY_CHECK / hub case 108) -- fan-out sibling of GuildTribeBroadcastRelay/Cursor
 Tables/runtime/PartyResyncRelay.sql
 Tables/runtime/PartyResyncRelayCursor.sql
 
@@ -89,7 +68,6 @@ Tables/world/StarterKitInventory.sql
 Tables/world/StarterKitSkills.sql
 Tables/world/StarterKitHotkeys.sql
 
-# Tribe conversion via consumable item (Book of Noble Dragon/Royal Serpent/Grand Tiger V2)
 Tables/world/TribeSkillEquivalences.sql
 Tables/world/TribeItemEquivalences.sql
 Tables/world/TribeCostumeEquivalences.sql
@@ -119,14 +97,10 @@ Tables/game/AccountVaultItems.sql
 
 Tables/game/CharacterItems.sql
 
-# C8 anti-dupe two-character trade commit ledger -- exactly-once backstop for
-# usp_CharacterTradeCommit_ExecuteIdempotent's additive money legs (see that table's own header).
 Tables/game/TradeCommitLedger.sql
 
-# CZ_PROCESS_DATA_SEND pet-bag family (tSort 254/255/256) -- see the table's own header.
 Tables/game/CharacterPetBag.sql
 
-# Per-character owned costume catalog (account-login avatar roster reconstruction) -- see the table's own header.
 Tables/game/CharacterCostumes.sql
 
 Tables/game/CharacterFriends.sql
@@ -154,12 +128,6 @@ Tables/admin/TribeFourQuota.sql
 Schemas/Types/game/tvp_CharacterPosition.sql
 Schemas/Types/game/tvp_OfflineShopItemSlot.sql
 Schemas/Types/game/tvp_AccountVaultItemSlot.sql
-# INV-B2 : le coffre de compte perdait les gemmes de sertissage et la date d'expiration. Un type TABLE ne
-# s'ALTERe pas et ne se DROPpe pas tant qu'une procedure le prend en parametre (trois le font ici), donc la
-# forme complete arrive comme un type V2 pose A COTE du V1, qui reste vivant et intact -- les procedures
-# basculeront une par une dans un lot suivant, sans casser aucun appelant existant au passage. Nouveau
-# chemin, donc jamais journalise : s'applique aussi bien sur une base fraiche que sur une base persistante.
-# Les colonnes correspondantes de game.AccountVaultItems sont ajoutees par Migrations/004.
 Schemas/Types/game/tvp_AccountVaultItemSlotV2.sql
 Schemas/Types/game/tvp_CharacterItemSlot.sql
 Schemas/Types/game/tvp_CharacterProgress.sql
@@ -181,43 +149,27 @@ Views/game/vw_GuildRoster.sql
 Views/game/vw_HeroRankingCurrent.sql
 Views/game/vw_OfflineShopListing.sql
 
-# Guild/tribe aggregate read views (cross-shard leaderboard + bank totals -- see each view's own header
-# for the plain-vs-indexed-view reasoning). vw_GuildRanking depends on vw_GuildRosterCounts above, so it
-# must stay ordered after it within this same Views phase.
 Views/game/vw_GuildRanking.sql
 Views/game/vw_TribeBankTotals.sql
 
 Views/admin/vw_ActiveBans.sql
 
-# Admin/ops dashboard: per-shard session-count vs self-reported heartbeat cross-check (see the view's own
-# header for why it's plain, not indexed, and why WITH (SNAPSHOT) is applied to both memory-optimized reads).
 Views/admin/vw_ActiveSessionsByShard.sql
 
-# Admin/ops dashboard: live session-count vs the operator-tuned server-capacity quota, in one read (see the
-# view's own header for why it's plain, not indexed, and why WITH (SNAPSHOT) is required, not just defensive,
-# here).
 Views/admin/vw_ServerQuotaStatus.sql
 
 StoredProcedures/auth/usp_Account_Authenticate.sql
 StoredProcedures/auth/usp_Account_Create.sql
 StoredProcedures/auth/usp_Account_RecordLoginAttempt.sql
 
-# Operational gap fix: there was no write path anywhere to grant an account GM privilege
-# (AccountGrade/legacy uUserSort), making the GM command tier work (Application/Fenrir.Application.
-# Game.Services/Gm/*) unreachable/untestable end-to-end. Tools/Fenrir.Tools.AccountProvisioning's
-# new "grant-gm" subcommand is the CLI surface over this.
 StoredProcedures/auth/usp_Account_SetGrade.sql
 StoredProcedures/auth/usp_AccountPin_Get.sql
 StoredProcedures/auth/usp_AccountPin_Set.sql
 
-# pincode-second-password security audit: account-scoped/cross-reconnect brute-force lockout for the mouse PIN.
 StoredProcedures/auth/usp_AccountPin_RecordAttempt.sql
 
 StoredProcedures/game/usp_Character_GetByAccount.sql
 
-# Account-login avatar roster population fix (legacy-behavior-translator contract "Account-login avatar
-# roster population", CL_LOGIN_SEND / LC_USER_AVATAR_RECV2): richer companion read to
-# usp_Character_GetByAccount above -- see the new procedure's own header for the full scope/citation.
 StoredProcedures/game/usp_Character_GetAccountRoster.sql
 
 StoredProcedures/game/usp_Character_Create.sql
@@ -226,10 +178,6 @@ StoredProcedures/game/usp_Character_Rename.sql
 StoredProcedures/game/usp_CharacterItem_GetIdAtSlot.sql
 StoredProcedures/game/usp_Character_GetIdByName.sql
 StoredProcedures/game/usp_Character_GetForWorldEntry.sql
-# builder-capacity-timeout-consistency finding: GetForWorldEntryAsync only reads RS0's narrow 19-column
-# prefix but was calling the same 5-result-set usp_Character_GetForWorldEntry as GetWorldEntryBundleAsync,
-# wasting the transmission of the other 4 result sets on every call. usp_Character_GetForWorldEntrySummary
-# is the single-result-set companion now used by GetForWorldEntryAsync -- see that procedure's own header.
 StoredProcedures/game/usp_Character_GetForWorldEntrySummary.sql
 StoredProcedures/game/usp_Character_PersistProgressBatch.sql
 StoredProcedures/game/usp_Character_PersistBatch.sql
@@ -249,22 +197,15 @@ StoredProcedures/game/usp_Character_GrantTribeTransferPermit.sql
 StoredProcedures/game/usp_Character_AdjustDeathProtection.sql
 StoredProcedures/game/usp_Character_ClampVitalsFloor.sql
 
-# C13 War-Point dual-currency NPC shop purchase (USE_WAR_POINT_SYSTEM)
 StoredProcedures/game/usp_Character_BuyWarPointItem.sql
 
-# CZ_PROCESS_DATA_SEND pet-bag family (tSort 254/255/256) atomic procedures -- see game.CharacterPetBag's own header.
 StoredProcedures/game/usp_CharacterPetBag_Deposit.sql
 StoredProcedures/game/usp_CharacterPetBag_Withdraw.sql
 StoredProcedures/game/usp_CharacterPetBag_Rearrange.sql
 
-# B5 Rune system (op157) durable state -- game.CharacterRunes. PersistRunes = atomic runes + optional
-# inventory-container write; GetRunes = standalone world-entry load (NOT merged into GetForWorldEntry).
 StoredProcedures/game/usp_Character_PersistRunes.sql
 StoredProcedures/game/usp_Character_GetRunes.sql
 
-# D1 logout-info snapshot (Tables/game/CharacterLogoutState.sql) -- Upsert/GetByAccount are the one-shot
-# world-entry capture/read; PersistBatch is the continuous write-behind re-capture (movement/combat/
-# periodic-tick), idempotent on CharacterLogoutState's own self-referential FlushSequence column.
 StoredProcedures/game/usp_CharacterLogoutState_Upsert.sql
 StoredProcedures/game/usp_CharacterLogoutState_GetByAccount.sql
 StoredProcedures/game/usp_CharacterLogoutState_PersistBatch.sql
@@ -276,13 +217,11 @@ StoredProcedures/runtime/usp_GameServer_Heartbeat.sql
 StoredProcedures/runtime/usp_GameServer_GetDirectory.sql
 StoredProcedures/runtime/usp_GameServer_MarkUnreachable.sql
 
-# Cross-shard character-location directory (same-shard-miss fallback for whisper/friend-locate/guild-find)
 StoredProcedures/runtime/usp_CharacterShardLocation_Upsert.sql
 StoredProcedures/runtime/usp_CharacterShardLocation_Remove.sql
 StoredProcedures/runtime/usp_CharacterShardLocation_FindByName.sql
 StoredProcedures/runtime/usp_CharacterShardLocation_FindByCharacterId.sql
 
-# Cross-process duplicate-login kick/refusal (runtime.AccountSessions)
 StoredProcedures/runtime/usp_AccountSession_ClaimOrSignalKick.sql
 StoredProcedures/runtime/usp_AccountSession_TransitionToGame.sql
 StoredProcedures/runtime/usp_AccountSession_MarkTearingDown.sql
@@ -291,56 +230,26 @@ StoredProcedures/runtime/usp_AccountSession_RefreshAndGetKicked.sql
 StoredProcedures/runtime/usp_AccountSession_ReapStale.sql
 StoredProcedures/runtime/usp_AccountSession_GetActiveCount.sql
 
-# Per-adapter concurrent-connection quota (legacy mac_limit/adapterCount, no configured admin.MacRestrictions
-# row -- implicit default limit of 2): device-signature bookkeeping and live cross-account count against
-# runtime.AccountSessions (AdapterIdentifier/LocalIp/RemoteIp columns + IX_AccountSessions_DeviceSignature,
-# both folded directly into Tables/runtime/AccountSessions.sql -- see that file's own header).
 StoredProcedures/runtime/usp_AccountSession_RecordDeviceSignature.sql
 StoredProcedures/runtime/usp_AccountSession_GetConcurrentDeviceCount.sql
 
-# Cross-shard fan-out for GuildAnnouncement/GuildChat/TribeAnnouncement/TribeAnnouncementScroll
-# (runtime.GuildTribeBroadcastRelay/runtime.GuildTribeBroadcastCursor) -- see GuildTribeBroadcastRelayHost.
 StoredProcedures/runtime/usp_GuildTribeBroadcastRelay_Publish.sql
 StoredProcedures/runtime/usp_GuildTribeBroadcastRelay_Poll.sql
 
-# WS1.4: lightweight cross-shard social-negotiation relay (runtime.SocialCrossShardRelay/
-# runtime.SocialCrossShardRelayCursor) for the six character-to-character negotiation flows -- Party invite,
-# Friend ask, Mentor ask, Duel ask, Trade invite, Guild invite. Point-to-point (TargetShardId=@ShardId),
-# unlike the fan-out GuildTribeBroadcastRelay pair above -- see usp_SocialCrossShardRelay_Poll.sql's own
-# header for the full citation/design trail. Consumed by a future SocialCrossShardRelayHost
-# (Fenrir.Application.Game.Hosting, not part of this DB-layer change).
 StoredProcedures/runtime/usp_SocialCrossShardRelay_Publish.sql
 StoredProcedures/runtime/usp_SocialCrossShardRelay_Poll.sql
-# WS-C3: lightweight cross-shard whisper relay (runtime.ChatCrossShardRelay/runtime.ChatCrossShardRelayCursor)
-# for the op39 / SECRET_CHAT point-to-point private-chat flow. Point-to-point (TargetShardId=@ShardId), like the
-# SocialCrossShardRelay pair above. Consumed by ChatCrossShardRelayHost (Fenrir.Application.Game.Hosting).
 StoredProcedures/runtime/usp_ChatCrossShardRelay_Publish.sql
 StoredProcedures/runtime/usp_ChatCrossShardRelay_Poll.sql
 
-# proxy-shop-rental-sync: cross-shard fan-out for the proxy/deputy-shop rental-extension consumables'
-# best-effort live-registry mirror update (runtime.ProxyShopExpirationRelay/
-# runtime.ProxyShopExpirationRelayCursor). Fan-out (SourceShardId <> @ShardId), same shape as
-# usp_GuildTribeBroadcastRelay_Publish/_Poll above, single-purpose (no Kind column). Consumed by
-# ProxyShopExpirationRelayHost (Fenrir.Application.Game.Hosting, not part of this DB-layer change).
 StoredProcedures/runtime/usp_ProxyShopExpirationRelay_Publish.sql
 StoredProcedures/runtime/usp_ProxyShopExpirationRelay_Poll.sql
 
-# guild-buff-expiry: cross-shard fan-out for the guild-buff-reserve-exhaustion immediate strip-effect push
-# (runtime.GuildBuffExpiryRelay/runtime.GuildBuffExpiryCursor). Fan-out (SourceShardId <> @ShardId), same
-# shape as usp_GuildTribeBroadcastRelay_Publish/_Poll above, single-purpose (no Kind column). Consumed by
-# GuildBuffExpiryRelayHost (Fenrir.Application.Game.Hosting, not part of this DB-layer change).
 StoredProcedures/runtime/usp_GuildBuffExpiryRelay_Publish.sql
 StoredProcedures/runtime/usp_GuildBuffExpiryRelay_Poll.sql
 
-# rvr-siege: cross-shard fan-out for the Zone049 siege-zone-slot family (sub-codes 1-9) and the tribe-symbol/
-# alliance tSort family (38/39/40/42/45/46/47) (runtime.RvrSiegeEventRelay/runtime.RvrSiegeEventRelayCursor).
-# Fan-out (SourceShardId <> @ShardId), same shape as usp_GuildTribeBroadcastRelay_Publish/_Poll above,
-# single-purpose (no Kind column -- one generic Sort+Data payload carries every sort). Consumed by
-# RvrSiegeEventRelayHost (Fenrir.Application.Game.Hosting, not part of this DB-layer change).
 StoredProcedures/runtime/usp_RvrSiegeEventRelay_Publish.sql
 StoredProcedures/runtime/usp_RvrSiegeEventRelay_Poll.sql
 
-# party-resync fan-out relay (Tables/runtime/PartyResyncRelay.sql): Publish native single-row, Poll interpreted (mirrors usp_GuildTribeBroadcastRelay_Poll)
 StoredProcedures/runtime/usp_PartyResyncRelay_Publish.sql
 StoredProcedures/runtime/usp_PartyResyncRelay_Poll.sql
 
@@ -396,8 +305,6 @@ StoredProcedures/game/usp_Guild_SetGrade.sql
 StoredProcedures/game/usp_Guild_AdjustPoints.sql
 StoredProcedures/game/usp_Guild_GetTopByPoints.sql
 
-# Guild/tribe aggregate read views wave: cross-shard leaderboard (game.vw_GuildRanking) and tribe-bank
-# totals (game.vw_TribeBankTotals) read paths -- additive, does not alter any existing procedure.
 StoredProcedures/game/usp_Guild_GetRanking.sql
 
 StoredProcedures/game/usp_Cash_GetBalance.sql
@@ -425,9 +332,6 @@ StoredProcedures/game/usp_CharacterMentor_GetForCharacter.sql
 StoredProcedures/game/usp_CharacterMentor_Bond.sql
 StoredProcedures/game/usp_CharacterMentor_ClearForCharacter.sql
 StoredProcedures/game/usp_CharacterTrade_Execute.sql
-# C8 durable, anti-dupe variant of the trade commit above -- claims @TradeToken via game.TradeCommitLedger
-# as its first write so a retried confirm can never re-apply the additive money legs. See that procedure's
-# own header for why it is a separate script rather than an edit to usp_CharacterTrade_Execute.
 StoredProcedures/game/usp_CharacterTradeCommit_ExecuteIdempotent.sql
 
 StoredProcedures/game/usp_Gift_Enqueue.sql
@@ -436,15 +340,9 @@ StoredProcedures/game/usp_GiftLog_GetByAccount.sql
 StoredProcedures/game/usp_HeroRanking_Upsert.sql
 StoredProcedures/game/usp_HeroRanking_GetByPeriod.sql
 StoredProcedures/game/usp_HeroRanking_Rollover.sql
-# Cross-shard-shared-state audit fix: locks every PeriodKind=0 row (UPDLOCK, HOLDLOCK) before the
-# snapshot-then-delete below, so a concurrent usp_HeroRanking_AddPoints for the same row blocks instead of
-# racing the gap between the CTE snapshot read and the unconditional DELETE -- see the procedure's own header.
 StoredProcedures/game/usp_HeroRanking_Rollover_SnapshotDeleteLockGuard.sql
 StoredProcedures/game/usp_HeroRanking_AddPoints.sql
 StoredProcedures/game/usp_HeroRanking_GetPoints.sql
-# Transaction-composition audit (2026-07-12): atomically bundles the RewardClaimed flag with the
-# contribution-points grant so a crash/full-inbox between them can never burn a one-time claim without the
-# reward ever landing durably -- see the procedure's own header.
 StoredProcedures/game/usp_HeroRanking_ClaimReward.sql
 StoredProcedures/game/usp_TowerState_EnsureInitialized.sql
 StoredProcedures/game/usp_TowerState_GetAll.sql
@@ -465,35 +363,19 @@ StoredProcedures/game/usp_ProxyShopName_GetByCharacter.sql
 StoredProcedures/game/usp_AccountVault_Get.sql
 StoredProcedures/game/usp_AccountVault_SetItems.sql
 
-# npc-talk gap fix: wires the previously-unimplemented Store/coffre (menu index 2) and Save/vault (menu
-# index 8) CZ_PROCESS_DATA_SEND item/money transfer families into GenericActionService. Store money
-# (Money<->StoreMoney) is same-row-atomic; Save/vault item and money transfers cross game.CharacterItems and
-# game.AccountVault/AccountVaultItems, so each needs its own atomic joint procedure.
 StoredProcedures/game/usp_Character_AdjustStoreMoney.sql
 StoredProcedures/game/usp_AccountVault_TransferMoneyWithCharacter.sql
 StoredProcedures/game/usp_AccountVault_TransferItemWithCharacter.sql
 
-# C8 BigMoney ("1B") family: closes the tSort 241/242/244/245 gap left after the npc-talk gap fix above wired
-# 223-232. usp_Character_AdjustBigStoreMoney is the Inventory<->Store leg (241/244); the Inventory<->Save/vault
-# leg (242/245) is usp_AccountVault_TransferBigMoneyWithCharacter; usp_Character_AdjustBigMoneyConversion is the
-# Money<->BigMoney unit-conversion leg (246/247). All three were built in the same pass, but this last one was
-# never actually appended to this manifest -- a genuine gap fixed by this hardening pass (2026-07-12): the
-# Money<->BigMoney conversion feature (BigMoneyUnitConversionService, tSort 246/247) has been calling this
-# stored procedure since it was written, and it was never created in any database because nothing replayed it.
 StoredProcedures/game/usp_Character_AdjustBigStoreMoney.sql
 StoredProcedures/game/usp_AccountVault_TransferBigMoneyWithCharacter.sql
 StoredProcedures/game/usp_Character_AdjustBigMoneyConversion.sql
 
-# V8 Player Commerce & Cash
 StoredProcedures/game/usp_Character_GetRewardClaimState.sql
 StoredProcedures/game/usp_Character_ClaimDailyReward.sql
 StoredProcedures/game/usp_Character_SpendBloodCoinAndReplaceContainer.sql
 StoredProcedures/game/usp_Cash_DebitAndGrantItem.sql
 
-# Symmetric bundled credit+item-consumption procedure, added to close a transaction-composition-audit
-# finding: GP-ticket redemption's cash credit and ticket consumption were two separate, unguarded round
-# trips from C# (a dupe-cash window on a transient failure between them). See the procedure's own header
-# comment for the full finding.
 StoredProcedures/game/usp_Cash_CreditAndConsumeItem.sql
 
 StoredProcedures/game/usp_Gift_ClaimIntoVault.sql
@@ -504,107 +386,46 @@ StoredProcedures/game/usp_OfflineShop_ExecutePurchase.sql
 StoredProcedures/game/usp_OfflineShop_WithdrawMoney.sql
 StoredProcedures/game/usp_PshopPurchase_Execute.sql
 
-# Proxy-shop rental extension via consumable items (567/592/8422/8423)
 StoredProcedures/game/usp_OfflineShop_ExtendRental.sql
 
-# transaction-composition-audit (2026-07-12): bundles usp_OfflineShop_ExtendRental's rental-date UPDATE with
-# the extension scroll's item-container replace in one transaction, closing an asymmetric-try/catch dupe
-# window in the C# call site -- see the new procedure's own header for the full citation.
 StoredProcedures/game/usp_OfflineShop_ExtendRentalAndReplaceContainer.sql
 
-# Event Log (audit trail)
 StoredProcedures/game/usp_EventLog_Insert.sql
 StoredProcedures/game/usp_EventLog_InsertBatch.sql
 
-# Guild-tx-hygiene: guild create/upgrade + money debit in one transaction (no caller-side compensation)
 StoredProcedures/game/usp_Guild_CreateAndDebitMoney.sql
 StoredProcedures/game/usp_Guild_UpgradeAndDebitMoney.sql
 
-# Tribe conversion via consumable item (Book of Noble Dragon/Royal Serpent/Grand Tiger V2, world.Items
-# 99014/99015/99016): atomic equip/skill/hotkey remap + tribe commit + item consumption in one procedure.
 StoredProcedures/game/usp_Character_ApplyTribeConversion.sql
 
-# Faction-transfer SCROLL tribe conversion (world.Items 8153/8154, TChangeTribe): atomic BEST-EFFORT
-# equip/skill/hotkey remap + tribe flip + scroll consumption in one procedure. Distinct reclassifier from
-# usp_Character_ApplyTribeConversion (book) above -- see that procedure's own header.
 StoredProcedures/game/usp_Character_ApplyTribeScrollConversion.sql
 
-# Fourth-tribe (Fujin) conversion/return (CZ_CHANGE_TO_TRIBE4_SEND, op37): atomic tribe + 5-slot quest-state
-# commit in one procedure. Distinct from usp_Character_ApplyTribeConversion above -- see that procedure's own
-# header.
 StoredProcedures/game/usp_Character_ApplyTribeFourConversion.sql
 
-# Rebirth zone241-time counter (legacy-behavior-translator Rebirth-advancement contract, Path B "Max
-# Rebirth" aZone241Time += 10, Server/ts25zone/S04_MyWork02.cpp:11342-11390): read/write support for
-# game.Characters.Zone241Time (Tables/game/Characters.sql). usp_Character_GetForWorldEntry itself already
-# projects Zone241Time as part of its own RS0 (merged into that base script directly).
 StoredProcedures/game/usp_Character_AdjustZone241Time.sql
 
-# C17 Tribe-bank tax-sweep durable flush, tribe-point roster recompute, four-guild live scoring
 StoredProcedures/game/usp_TribeBank_ApplyTaxSweep.sql
 StoredProcedures/game/usp_TribeRoster_GetForTribePoint.sql
 StoredProcedures/game/usp_Guild_AddFourGuildPoints.sql
 StoredProcedures/game/usp_Guild_GetTopFourGuild.sql
 
-# Lot 3 CenterServer world-state authority persistence seams (Fenrir.Cluster.WorldState). Both aggregate/mutate
-# game.Characters for the Center authority. usp_WorldState_RecomputeTribeScores (ICenterTribeScoreSource, Bug 3
-# fix) SUMs the per-tribe level/rebirth stat server-side over the level-145+ subset via
-# IX_Characters_MaxLevel_TribePoint; baseline 1000 + tribe-3 +800 stay C#-side (TribeScoreRecompute).
-# usp_Character_ResetDailyRewardClaims (ICenterDailyRewardReset, Bug 4 fix) resets the daily reward-claim state
-# (RewardClaimDate) for all members and, on the @ClearWeeklyDayCounter=1 Monday variant, also zeroes the weekly
-# RewardClaimDay counter -- routed through a proc rather than a hard-coded member table name.
 StoredProcedures/game/usp_WorldState_RecomputeTribeScores.sql
 StoredProcedures/game/usp_Character_ResetDailyRewardClaims.sql
 
-# G-01 guild-buff write contention: usp_Guild_SetBuff writes the four buff columns unconditionally, but the
-# legacy has TWO DISJOINT updates -- gBuffTime/gBuffTimeForDiff (Server/ts25extra/S08_MyDB.cpp:1151-1186) and
-# gBuffType/gBuffState (:1188-1191). Three Fenrir writers (buff-type selection, guild-scroll recharge, the
-# decay sweep) each do an unguarded read-modify-write over all four columns, so whichever one writes last
-# reverts the other's column pair -- PAID buff minutes vanish with no trace. These two additive procedures
-# each write only their own pair; usp_Guild_SetBuff is left untouched (already applied and SHA-journaled).
 StoredProcedures/game/usp_Guild_SetBuffTime.sql
 StoredProcedures/game/usp_Guild_SetBuffType.sql
 
-# Corrige la monture de depart : 1301/puissance 5 -> 1314/puissance 10, conforme a
-# Server/ts25login/S04_MyWork02.cpp:1163-1166 ("Starting Mount: 10% Bear") et DEFINE.h:165. CREATE OR ALTER,
-# additif : le script d'origine n'est pas edite (journalisation SHA-256). Couple avec les constantes
-# MountGrantItemId / MountGrantPower de CreateAvatarService.cs, qui bougent dans le meme lot.
 StoredProcedures/game/usp_Character_CreateWithStarterKit_MountFix.sql
 
-# cash-balance-buy audit (2026-08-01): usp_Cash_Credit and usp_Cash_CreditAndConsumeItem credited
-# game.AccountCash.Balance with no upper bound at all, mirroring legacy MemberInfo.uCash's own unguarded
-# `uCash=uCash+%d` (Server/ts25extra/S08_MyDB.cpp:134) -- hardened here rather than reproduced, same
-# 2,000,000,000 cap convention as usp_Character_AdjustMoney. CREATE OR ALTER, additive: the two shipped
-# scripts are not edited (SHA-256 journaling).
 StoredProcedures/game/usp_Cash_Credit_UpperBoundGuard.sql
 StoredProcedures/game/usp_Cash_CreditAndConsumeItem_UpperBoundGuard.sql
 
-# First-credit-ever race (2026-08-03): the UpperBoundGuard pair's @@ROWCOUNT = 0 / no-existing-row branch
-# INSERTs INTO game.AccountCash (PK_AccountCash on AccountId, no bootstrap proc) with no TRY/CATCH, inside
-# an already-open BEGIN TRANSACTION under XACT_ABORT ON -- a losing 2627/2601 dooms the whole transaction
-# (XACT_STATE() = -1), so a bare TRY/CATCH is not sufficient. Same ROLLBACK-and-replay idiom as
-# usp_CharacterLogoutState_Upsert / usp_Character_ApplyTribeFourConversion. CREATE OR ALTER, additive: the
-# UpperBoundGuard scripts are not edited (SHA-256 journaling).
 StoredProcedures/game/usp_Cash_Credit_FirstCreditRaceGuard.sql
 StoredProcedures/game/usp_Cash_CreditAndConsumeItem_FirstCreditRaceGuard.sql
 
-# Concurrent-create TOCTOU fix: usp_Character_Create.sql and usp_Character_CreateWithStarterKit_MountFix.sql
-# only IF EXISTS-precheck the account+slot/name collisions before an unguarded INSERT, so two concurrent
-# creates for the same account+slot or the same name can both pass the precheck and the loser hits a raw
-# 2627/2601 instead of the documented 50201/50202 THROW. Same TRY/CATCH-translate shape auth.usp_Account_Create
-# already carries for the identical race. CREATE OR ALTER, additive: neither shipped script is edited
-# (SHA-256 journaling).
 StoredProcedures/game/usp_Character_Create_ConcurrentCreateGuard.sql
 StoredProcedures/game/usp_Character_CreateWithStarterKit_ConcurrentCreateGuard.sql
 
-# AccountVault auto-create race (2026-08-03): usp_AccountVault_TransferMoneyWithCharacter,
-# usp_AccountVault_TransferBigMoneyWithCharacter, usp_AccountVault_TransferItemWithCharacter, and
-# usp_Gift_ClaimIntoVault all share an IF NOT EXISTS(...) INSERT INTO game.AccountVault(AccountId) bootstrap
-# (PK_AccountVault on AccountId, no bootstrap proc pre-creates the row) with no TRY/CATCH, inside each proc's
-# own already-open BEGIN TRANSACTION under XACT_ABORT ON -- a losing 2627/2601 dooms the whole transaction
-# (XACT_STATE() = -1), not just the one statement. Same ROLLBACK-and-replay idiom as
-# usp_CharacterLogoutState_Upsert / usp_Character_ApplyTribeFourConversion / usp_Cash_Credit_FirstCreditRaceGuard.
-# CREATE OR ALTER, additive: none of the four shipped scripts are edited (SHA-256 journaling).
 StoredProcedures/game/usp_AccountVault_TransferMoneyWithCharacter_VaultCreateRaceGuard.sql
 StoredProcedures/game/usp_AccountVault_TransferBigMoneyWithCharacter_VaultCreateRaceGuard.sql
 StoredProcedures/game/usp_AccountVault_TransferItemWithCharacter_VaultCreateRaceGuard.sql
@@ -623,9 +444,6 @@ StoredProcedures/admin/usp_FirewallRule_Add.sql
 StoredProcedures/admin/usp_FirewallRule_Upsert.sql
 StoredProcedures/admin/usp_FirewallRule_GetAll.sql
 
-# D3 firewall allowlist-reconcile (legacy RemoveIPTick, ~120s): prunes ALLOW-designated rows only -- see
-# usp_FirewallRule_ReconcileAllowlist.sql's own header for why the other two legacy reconcile sub-steps
-# (infra-IP reseed, per-account IP resync) are deliberately not reproduced.
 StoredProcedures/admin/usp_FirewallRule_ReconcileAllowlist.sql
 
 StoredProcedures/admin/usp_GmAllowlist_Add.sql
@@ -637,212 +455,41 @@ StoredProcedures/admin/usp_ShardMapAssignment_GetAll.sql
 StoredProcedures/admin/usp_GameSetting_Get.sql
 StoredProcedures/admin/usp_ServerQuota_GetMaxPlayers.sql
 
-# Shared global conversion quota for CZ_CHANGE_TO_TRIBE4_SEND (op37) -- Fenrir's replacement for the legacy's
-# cross-process ts25extra MyDB::CheckUpdateSky, which has no Fenrir-side "extra" process to consult.
 StoredProcedures/admin/usp_TribeFourQuota_TryConsume.sql
 
-# Role grants -- moved to the end of the schema/table/view/procedure creation chain (not right after
-# Schemas/001_schemas.sql) because several GRANT EXECUTE ON OBJECT:: statements below target specific
-# game.usp_* procedures; SQL Server requires the target object to already exist for an object-level GRANT.
 Schemas/002_roles.sql
 
-# ---------------------------------------------------------------------------
-# Schema migrations (post-base-DDL, pre-seed). A change to a Tables/*.sql,
-# Schemas/Types/*.sql, or StoredProcedures/*.sql script already listed above
-# cannot be made by editing that base file -- DbMigrator SHA-256-journals every
-# applied script and refuses to re-apply one whose content changed, so an
-# in-place edit hard-fails the next run on any already-provisioned database.
-# Additive schema evolution therefore lands here as a new, never-edited script
-# that converts the base-created state to the target state: a fresh database
-# applies base-then-migration, a persistent one skips the already-journaled
-# base scripts and applies only the new migration -- both converge.
-# ---------------------------------------------------------------------------
 
-# Lot 1 (rescope the session ticket to the ZONE): adds runtime.SessionTickets.TargetMapId. The table is
-# MEMORY_OPTIMIZED + DURABILITY=SCHEMA_ONLY and its Create/Consume/Purge procs are WITH NATIVE_COMPILATION,
-# SCHEMABINDING, so this drops the three schema-bound native procs, drops+recreates the (ephemeral, 15s-TTL)
-# SCHEMA_ONLY table with the new column, and recreates the procs -- see the script's own header for the full
-# rationale (why a new script vs. editing base files, why DROP+recreate vs. ALTER, why grants are unaffected).
 Migrations/001_sessiontickets_targetmapid.sql
 
-# Lot 2 (mount attribute write-behind): folds the persisted mount block (game.Characters.MountItemId/
-# MountExpActivity/MountPower/MountSlotIndex/MountTime, already base columns) into the write-behind progress
-# flush. Adds 5 trailing columns to game.tvp_CharacterProgress and the matching SET clauses to
-# usp_Character_PersistProgressBatch + usp_Character_PersistFinalFlush. A TABLE type can't be ALTERed to add
-# columns and can't be dropped while a proc references it, so this drops both dependent procs, drops+recreates
-# the type, and recreates the procs -- see the script's own header for the SHA-journal / grant-safety rationale.
 Migrations/002_character_progress_mount_writeback.sql
 
-# Lot 1 (dead-proc sweep) : drop game.usp_Character_SetMountProgression, remplacée par le write-behind monture
-# (Migrations/002). Le script de base est retiré du manifeste (une DB fraîche ne la crée plus) ; ce DROP
-# idempotent la retire des DB déjà migrées.
 Migrations/003_drop_usp_character_setmountprogression.sql
 
-# INV-B2 (coffre de compte : gemmes et expiration) : ajoute SocketGem1/2/3 + ExpireDate a
-# game.AccountVaultItems, exact miroir des colonnes homonymes de game.CharacterItems. Le legacy porte bien
-# les deux au travers du coffre (Server/ts25zone/S04_MyWork05.cpp:2999-3000 au depot, :3104-3105 au retrait,
-# stockage uSaveSocket[28][3] Server/Header/Protocol/STRUCT.h:462) ; sans ces colonnes un objet loue en
-# ressortait avec ExpireDate = 0 et un objet serti perdait ses trois gemmes, de facon persistee. ALTER ADD et
-# non DROP+CREATE : la table porte de vraies donnees joueur. Aucune procedure n'est touchee ici -- toutes
-# listent leurs colonnes explicitement, elles ecriront les defauts 0 jusqu'a leur passage en V2.
 Migrations/004_accountvault_sockets_expiry.sql
 
-# La recompense quotidienne repasse au niveau COMPTE. Le legacy porte uRewardClaimDay/uRewardClaimState sur la
-# table de compte memberinfo (Server/BuildEU33/DB/nxtserver.sql:1153-1154) et les persiste WHERE uUserIdx
-# (Server/ts25playuser/S08_MyDB.cpp:400) ; le porteur memoire PLAY_INFO est alloue une fois par compte et la
-# selection de personnage ne le reinitialise pas (Server/ts25playuser/S07_MyGame01.cpp:971-1011) -- c'est tout
-# le mecanisme anti-double-reclamation. Fenrir keyait CharacterId, donc un compte pouvait reclamer 3 fois
-# (MAX_USER_AVATAR_NUM = 3, Server/Header/Protocol/DEFINE.h:277 ; CK_Characters_Slot 0..2). Cree
-# game.AccountDailyRewards (dans game et non auth : Schemas/002_roles.sql interdit auth a fenrir_game_role),
-# fond les lignes par compte selon une regle de conflit explicite -- MAX colonne par colonne, l'etat le plus
-# restrictif atteignable, jamais une reclamation offerte -- et cree les 3 procedures keyees compte. Ne
-# supprime PAS game.Characters.RewardClaimDay/RewardClaimDate : figees et conservees comme trace integrale de
-# l'etat d'avant bascule (aucune perte silencieuse, fusion reconstituable). Nouveau script et non edition :
-# Characters.sql et les 3 procedures d'origine sont deja journalisees SHA-256 (:485, :486, :554).
 Migrations/005_account_daily_reward_key.sql
 
-# Lot 2 (trois drapeaux d'avatar mutes en jeu et jamais ecrits) : VisibleState / SpecialState / UseOrnament.
-# Le legacy les persiste tous les trois par CreateAvatarColumn (Server/Header/CSQLAvatar.cpp:558, :559, :624),
-# et pour VisibleState/SpecialState c'est la copie persistee qui repeuple la copie de diffusion a l'entree en
-# zone, jamais l'inverse (Server/ts25zone/S04_MyWork02.cpp:970-971) : le mode invisible GM survit donc a la
-# deconnexion et au changement de zone. Cote Fenrir les deux colonnes existaient deja (Characters.sql:188,190)
-# mais n'etaient QUE lues par usp_Character_GetAccountRoster ; UseOrnament n'existait nulle part alors qu'il
-# pilote le bonus d'ornement (Server/ts25zone/S04_MyWork02.cpp:11046,11053 ; expiration S07_MyGame04.cpp
-# :1276-1294). Ajoute game.Characters.UseOrnament (BIT DEFAULT 0), 3 colonnes en queue de
-# game.tvp_CharacterProgress + les SET correspondants dans usp_Character_PersistProgressBatch et
-# usp_Character_PersistFinalFlush (donc le chemin d'ecriture DEJA en place, y compris deconnexion et
-# changement de zone), et 3 colonnes en queue de la projection RS0 de usp_Character_GetForWorldEntry -- le
-# chemin de lecture, sans lequel un champ persiste donnerait l'illusion de fonctionner. Se pose apres
-# Migrations/002 dont il reprend la forme du type a 30 colonnes.
 Migrations/006_avatar_state_flags_writeback.sql
 
-# Lot 1 (acquis cosmetiques et monnaies gagnees) : Title / Halo / TeacherPoint / WarPoint / BloodCoin, tous
-# mutes en jeu, tous persistes par le legacy (CreateAvatarColumn, Server/Header/CSQLAvatar.cpp:617, :619, :588,
-# :685-686 sous USE_WAR_POINT_SYSTEM allume dans les deux configurations livrees, :683), aucun ecrit cote
-# Fenrir : chaque gain etait perdu a la deconnexion ET au changement de zone (qui est une reconnexion
-# complete). N'ajoute AUCUNE colonne -- les cinq existent deja sur game.Characters -- donc rien a retro-remplir.
-# DEUX REGIMES : Title/Halo/TeacherPoint en absolu (aucune procedure ne les ecrit, l'etat runtime en est seul
-# proprietaire, meme categorie que ContributionPoints) ; WarPoint/BloodCoin en DELTA (X = X + s.XDelta), parce
-# que ces deux colonnes ont deja un debit atomique -- usp_Character_BuyWarPointItem et
-# usp_Character_SpendBloodCoinAndReplaceContainer -- qui ne touche pas FlushSequence : un absolu y restaurerait
-# les points depenses, la duplication de monnaie pour laquelle Money/BigMoney sont tenus hors de ce TVP. Cable
-# les deux sens : BloodCoin etait le seul des cinq sans AUCUN chemin de lecture, ajoute en queue de RS0 de
-# usp_Character_GetForWorldEntry. Reprend la forme du type a 33 colonnes laissee par
-# Migrations/006_avatar_state_flags_writeback et doit rester AVANT
-# Migrations/007_costume_and_companion_timer_writeback, qui reprend deja ces 5 colonnes plus les siennes.
-# Meme numero 006 que le script d'etat d'avatar : collision de convention de numerotation entre passes
-# concurrentes, l'ordre relatif reel est celui de ce manifeste, meme posture que
-# Migrations/Seed/admin/026_error_catalog_tribe_conversion.sql.
 Migrations/006_character_progress_cosmetics_and_currency_grants.sql
 
-# Lot 6 (penderie de costumes et soldes de compagnon) : PetExpX2Time / AnimalAbsorbTime / AnimalAbsorbState /
-# CostumeWardrobe / CostumeIndex, tous mutes en jeu, tous persistes par le legacy (CreateAvatarColumn,
-# Server/Header/CSQLAvatar.cpp:640, :650, :651, :429-433+701, :661), aucun ecrit cote Fenrir. Ajoute 3 colonnes
-# a game.Characters, ELARGIT CK_Characters_CostumeIndex de -1..9 a -1..19 (aCostumeIndex porte l'etat porte :
-# equiper fait +10, Server/ts25zone/S04_MyWork02.cpp:12402, borne MAX_AVATAR_COSTUME_NUM2 = 19,
-# Server/Header/Protocol/DEFINE.h:342 -- sans quoi la premiere ecriture d'un costume porte violerait la
-# contrainte), ajoute ItemDate/ExpireDate a game.CharacterCostumes (table qui existait, etait LUE par
-# usp_Character_GetAccountRoster, et n'avait AUCUN INSERT/UPDATE nulle part), cree
-# game.tvp_CharacterCostumeSlot, ajoute 4 colonnes en queue de game.tvp_CharacterProgress et le remplacement
-# de penderie aux DEUX procedures de write-behind (flush periodique, deconnexion et changement de zone), borne
-# par OUTPUT inserted.CharacterId pour rester idempotent sur la meme FlushSequence par entite. Chemin de
-# lecture cable des deux cotes : 4 colonnes en queue de RS0 de usp_Character_GetForWorldEntry, plus la
-# nouvelle game.usp_Character_GetCostumes calquee sur usp_Character_GetRunes.
-# Numerote 007 et non 006 : trois passes concurrentes de la meme session avaient deja pris 006, meme
-# convention que Migrations/Seed/admin/024_error_catalog_heroranking_claim_reward.sql. Reprend la forme du
-# type a 33 colonnes laissee par Migrations/006_avatar_state_flags_writeback ; VOIR L'AVERTISSEMENT DE
-# SEQUENCAGE dans son propre en-tete au sujet des deux autres scripts 006 qui recreent le meme type.
 Migrations/007_costume_and_companion_timer_writeback.sql
 
-# Lot 5 (budgets d'auto-chasse, doublement de duree de buff, premium, familier) : AutoTime / AutoTime2 /
-# BuffX2Time / PremiumExpireUtc / PetGrowth / PetActivity, tous mutes dans PlayerRuntimeState, tous persistes
-# par le legacy via CreateAvatarColumn (Server/Header/CSQLAvatar.cpp:641, :642, :638, :681, :690), aucun
-# reecrit cote Fenrir -- un budget paye qui ne survit pas a la deconnexion est exploitable a l'infini par
-# relog. Ajoute game.Characters.AutoTime et .BuffX2Time (les deux seules colonnes reellement absentes), 6
-# colonnes en queue de game.tvp_CharacterProgress et les SET correspondants dans les DEUX procedures de
-# write-behind -- donc le chemin d'ecriture DEJA en place : flush periodique, deconnexion
-# (GameConnectionHost.cs:249) et changement de zone (ZoneMoveService.cs:174,:259). Cable aussi le chemin de
-# LECTURE : AutoTime/BuffX2Time en queue de RS0 de usp_Character_GetForWorldEntry (les quatre autres y etaient
-# deja projetes mais AutoTime2 n'atteignait jamais PlayerRuntimeState). Reprend VERBATIM la forme laissee par
-# Migrations/007 -- type a 42 colonnes, parametre @Costumes, remplacement de penderie borne par
-# OUTPUT inserted.CharacterId -- et y ajoute les six siennes en queue : le mapper TVP genere lie
-# POSITIONNELLEMENT, donc c'est la DERNIERE migration appliquee qui doit porter l'union, et tout lot qui
-# s'enregistre apres celui-ci doit reprendre ces 48 colonnes. Numerote 008 : 006 et 007 etaient pris par des
-# passes concurrentes.
 Migrations/008_autohunt_buffx2_premium_pet_writeback.sql
 
-# Lot 5 (dead-proc sweep) : drop game.usp_Character_SetPetGrowth, sans appelant applicatif depuis toujours
-# (ICharacterRepository.SetPetGrowthAsync existait et etait implementee, personne ne l'appelait) et remplacee
-# par le write-behind familier de Migrations/008. Le script de base est retire du manifeste -- une base fraiche
-# ne la cree plus ; ce DROP idempotent la retire des bases deja provisionnees. Meme sequence que
-# Migrations/003_drop_usp_character_setmountprogression.sql.
 Migrations/009_drop_usp_character_setpetgrowth.sql
 
-# Lot 4 (auto-buff et rank-buff) : AutoBuffSkill / AutoBuffTime / RankBuffType, mutes en jeu, persistes par le
-# legacy (CreateAvatarColumn, Server/Header/CSQLAvatar.cpp:703, :672, :647), aucun ecrit cote Fenrir --
-# les 8 emplacements d'auto-buff enregistres etaient perdus a chaque deconnexion et le palier de rank-buff avec
-# eux. Ajoute AutoBuffSkill (NVARCHAR(48) : le format texte a largeur fixe du legacy, verbatim -- 8 x 2 entiers
-# sur 3 chiffres, CSQLAvatar.cpp:421-424 + CSQLDatabase.cpp:511-528) et RankPointDate / RankBuffType a
-# game.Characters, puis 4 colonnes en queue de game.tvp_CharacterProgress et les SET correspondants dans
-# usp_Character_PersistProgressBatch et usp_Character_PersistFinalFlush -- le chemin d'ecriture DEJA en place,
-# donc deconnexion (GameConnectionHost.cs:249) et changement de zone (ZoneMoveService.cs:174,:259). Cable aussi
-# le chemin de LECTURE : 3 colonnes en queue de RS0 (AutoBuffTime y etait deja projete mais n'atteignait jamais
-# PlayerRuntimeState). RankPointDate accompagne obligatoirement RankBuffType : MyUtil::ResetRank
-# (Server/ts25zone/S07_MyGame03.cpp:8283-8385) purge le palier des que la date stockee n'est plus celle du
-# jour ; sans elle le buff serait eternel. aRankPoint n'a aucun site d'incrementation cote Fenrir, aucune
-# colonne n'est creee pour lui. DrunkBottleIndex, quatrieme champ du lot, est volontairement ABSENT : il est
-# livre avec BottleSlots par le lot compteurs-et-bouteilles. Reprend la forme du type a 37 colonnes laissee par
-# Migrations/007 ; VOIR L'AVERTISSEMENT DE SEQUENCAGE dans son propre en-tete -- le lot qui s'enregistrera en
-# dernier doit declarer l'union de toutes les colonnes, dont ces quatre.
 Migrations/010_character_autobuff_and_rankbuff_writeback.sql
 
-# Lot compteurs-et-bouteilles : ProtectForHalo / BonusItemLevel / BonusItemValue / TribeNotifyScrollCount /
-# TribeFourReturnAllowance / BottleSlots + DrunkBottleIndex. Six champs mutes en jeu, tous persistes par le
-# legacy sans #ifdef par CreateAvatarColumn (Server/Header/CSQLAvatar.cpp:595, :621, :620, :648, :639,
-# :675-677), aucun ecrit ni relu cote Fenrir : stock cash d'enchantement de halo, palier de recompense de
-# niveau arme et son drapeau, stock de parchemins d'annonce de faction, quota de retour depuis la tribu 4,
-# et les 10 bouteilles avec l'index de celle bue. TribeFourReturnAllowance a sa PROPRE colonne :
-# game.Characters.TribeTransferPermitCount porte les parchemins 8153/8154, un autre mecanisme.
-# BottleSlots est UNE colonne NVARCHAR(70) = 10 groupes de 5+2 chiffres, exactement les largeurs legacy de
-# aBottle/aBottleCount (Server/Header/CSQLAvatar.cpp:308-313) mais fusionnees pour que les deux moities d'un
-# slot ne puissent pas diverger. Le chrono d'ivresse aBottleTime reste EPHEMERE (absent de
-# CreateAvatarColumn, remis a 0 a l'entree en monde, Server/ts25zone/S04_MyWork02.cpp:919).
-# Ecriture par les deux procedures de write-behind DEJA en place (donc deconnexion et changement de zone
-# couverts), lecture par 7 colonnes en queue de RS0 de usp_Character_GetForWorldEntry.
-# S'enregistre en DERNIER du bloc Migrations/ et declare donc l'UNION des colonnes de tous les lots
-# paralleles (006, 007, 010) : voir l'avertissement de sequencage dans son propre en-tete.
 Migrations/011_avatar_counters_and_bottles_writeback.sql
 
-# Regression fix: Migration 010 rebuilt game.tvp_CharacterProgress from Migration 007's form instead of
-# Migration 008's, dropping 11 columns. Migration 011 restored 5 (Title/Halo/TeacherPoint/WarPointDelta/
-# BloodCoinDelta); this script restores the other 6 (AutoTime/AutoTime2/BuffX2Time/PremiumExpireUtc/
-# PetGrowth/PetActivity), which stayed unreachable by the write-behind TVP path until now. Numbered 012 to
-# land right after 011, the last migration to touch this type -- see the script's own header.
 Migrations/012_autohunt_premium_pet_writeback_restore.sql
 
-# Lot 12 (EliteDungeonTime/DungeonKeyTime/IvyHallTicketTime/ScrollOfSeekersTime/FightingGodForDestroy) : cinq
-# compteurs de ticket/parchemin mutes en jeu (Zone.EconomyMirrors.cs, TimedBuffCountdownSystem.cs), persistes
-# par le legacy sans #ifdef (CreateAvatarColumn, Server/Header/CSQLAvatar.cpp:600,605,606,608,660), jamais
-# ecrits cote Fenrir. Ajoute les cinq colonnes a game.Characters. RESTAURE AU PASSAGE, independamment de
-# Migrations/012, le parametre @Costumes/la transaction/le remplacement de penderie de
-# Migrations/008_autohunt_buffx2_premium_pet_writeback perdus par 010/011/012, et complete la projection RS0
-# de usp_Character_GetForWorldEntry avec AutoTime/BuffX2Time (deja lus cote C# depuis la fin de
-# Migrations/011, jamais projetes cote SQL) avant ses cinq colonnes propres. Se rebase sur la forme TERMINALE
-# de Migrations/012 (59 colonnes) + ses cinq en queue (64) -- ne declare PAS l'union avec les lots RankPoint/
-# CloakLuckyBoxPity/CloakVariantBoxPity/MountVariantBoxPity, ImproveItemValue/AddItemValue/HighItemValue/
-# TaiyanKeyTimer, ProtectForRefine/ProtectForCostume/ProtectForDestroy2/LodRounds/StellarCoreExpireDate, ni
-# PetBagDate/PlayTime1/PlayTime3/HsbStoneRewardClaimed, tous deja presents en queue du record C#
-# CharacterProgressTvp/CharacterWorldSnapshotDto au moment de l'ecriture sans script SQL coherent -- voir
-# l'avertissement de sequencage dans l'en-tete du script. Une passe de reconciliation dediee (meme motif que
-# 012 pour 011/008) devra fondre tous ces lots avant mise en production.
 Migrations/034_ticket_counters_and_fighting_god_writeback.sql
 
 Migrations/Seed/001_dev_account.sql
 
-# Numbering renamed 2026-07-12 (dead-file-sweep-game-world naming-hygiene finding) to be monotonic in
-# actual apply order, matching Migrations/Seed/admin/'s 001-026 convention -- the old numbers (060, 070-072,
-# 080-081, 020, 082-090, an unnumbered Npcs.sql, 021-024, 065, 050-052, 010-013) bore no relation to apply
-# order at all. Content of every file is unchanged; only the file name and this list were touched.
 Migrations/Seed/world/001_levels.sql
 Migrations/Seed/world/002_skills.sql
 Migrations/Seed/world/003_skill_descriptions.sql
@@ -881,303 +528,78 @@ Migrations/Seed/admin/007_error_catalog_c07_item_use.sql
 Migrations/Seed/admin/008_server_quota.sql
 Migrations/Seed/admin/009_error_catalog_guild_tx_hygiene.sql
 
-# character-death-respawn-penalty: registers 50332 for the new usp_Character_AdjustDeathProtection
-# procedure (game.Characters.ProtectForDeath delta adjustment/consumption primitive).
 Migrations/Seed/admin/010_error_catalog_death_protection.sql
 
-# proxy-shop-listing-pricing: registers 50333 for usp_OfflineShop_WithdrawMoney's BigMoney-upper-bound guard.
 Migrations/Seed/admin/011_error_catalog_offline_shop_withdraw_bigmoney_cap.sql
 
-# Fourth-tribe (Fujin) conversion/return (CZ_CHANGE_TO_TRIBE4_SEND, op37): seeds the shared global quota's
-# singleton row (fail-safe MaxCount=0 until an operator raises it).
 Migrations/Seed/admin/012_tribe_four_quota.sql
 
-# Fourth-tribe (Fujin) conversion/return: registers 50334-50335 for the new
-# usp_Character_ApplyTribeFourConversion procedure.
 Migrations/Seed/admin/013_error_catalog_tribe_four_conversion.sql
 
-# Rebirth zone241-time counter: registers 50336 for the new usp_Character_AdjustZone241Time procedure.
 Migrations/Seed/admin/014_error_catalog_character_zone241_time.sql
 
-# npc-talk gap fix: registers 50337-50339 for the new usp_Character_AdjustStoreMoney/
-# usp_AccountVault_TransferMoneyWithCharacter procedures.
 Migrations/Seed/admin/015_error_catalog_store_and_account_vault_transfers.sql
 
-# shop-and-proxyshop legacy-parity audit: registers 50340 for usp_OfflineShop_WithdrawMoney's new distinct
-# "nothing to withdraw" case (Migrations/026_offline_shop_withdraw_split_nothing_and_expiry.sql), and
-# refreshes 50276's catalog description now that it no longer covers that case.
 Migrations/Seed/admin/016_error_catalog_offline_shop_withdraw_nothing.sql
 
-# tribe-scroll-conversion: registers 50341-50348 for the new usp_Character_ApplyTribeScrollConversion
-# procedure (faction-transfer scroll 8153/8154, TChangeTribe reclassifier).
 Migrations/Seed/admin/017_error_catalog_tribe_scroll_conversion.sql
 
-# wave8 error-catalog gap fix: registers the 3 surviving BigMoney codes a Wave-7 duplicate-implementation
-# collision left unseeded -- 50349 (usp_Character_AdjustBigStoreMoney) and 50353/50354 (the
-# usp_AccountVault_TransferBigMoneyWithCharacter procedure, which superseded the old 50350/50351 version via a
-# direct in-place edit to StoredProcedures/game/usp_AccountVault_TransferBigMoneyWithCharacter.sql -- NOT a
-# "Migrations/046" script; no such file exists anywhere in this repo's history, that citation was always a
-# phantom, corrected here).
 Migrations/Seed/admin/018_error_catalog_bigmoney_store_and_vault.sql
 
-# economy-hardening pass (2026-07-12): registers 50352 for usp_Character_AdjustBigMoneyConversion, which was
-# written and consumed (BigMoneyUnitConversionService, tSort 246/247) but never had a catalog row -- the old
-# 018_error_catalog_bigmoney_transfers.sql that used to carry this row was itself an orphan never applied by
-# this manifest (deleted as dead weight in the same pass; see usp_Character_AdjustBigMoneyConversion.sql's own
-# header for the full writeup).
 Migrations/Seed/admin/019_error_catalog_bigmoney_conversion.sql
 
-# usp_Character*/game.tvp_CharacterItemSlot conventions-hardening pass (2026-07-12): registers 50350/50351 for
-# the pet-bag procedure family (usp_CharacterPetBag_Deposit/Rearrange/Withdraw), a gap flagged but not closed
-# by two prior sessions (see the new file's own header for the full citation trail).
 Migrations/Seed/admin/020_error_catalog_petbag.sql
 
-# auth-hardening pass (2026-07-12): registers 50101 (usp_Account_Create) and 50102 (usp_Account_SetGrade),
-# both of which shipped with a THROW but no matching admin.ErrorCatalog row.
 Migrations/Seed/admin/021_error_catalog_auth.sql
 
-# ErrorCatalog completeness sweep (2026-07-12): a full multiline-aware grep of every "THROW <number>" across
-# all 241 StoredProcedures/**/*.sql files found 11 codes THROWn but never catalogued (50100, 50201, 50202,
-# 50210, 50211, 50212, 50221, 50310, 50311, 50330, 50331) -- see the new file's own header for the full
-# methodology and the "no true collisions found" conclusion.
 Migrations/Seed/admin/022_error_catalog_completeness_sweep.sql
 
-# transaction-composition-audit fix (2026-07-12): registers 50355 for usp_Character_ApplyTribeFourConversion's
-# new nested quota-consumption branch (@ConsumeQuota=1) -- see the new file's own header.
 Migrations/Seed/admin/023_error_catalog_tribe_four_quota_atomic.sql
 
-# transaction-composition-audit fix (2026-07-12): registers 50357/50358 for the new usp_HeroRanking_ClaimReward
-# (folds the reward-claim flag and the contribution-points grant into one atomic transaction) -- numbered
-# 024/50357-50358 rather than 023/50355-50356 because a concurrent same-session pass already claimed
-# 023/50355 above; see the new file's own header.
 Migrations/Seed/admin/024_error_catalog_heroranking_claim_reward.sql
 
-# procs-game-economy-inventory audit (basse severite): usp_Cash_Debit no longer exists (removed as dead code
-# in the 2026-07-12 cleanup pass) -- refreshes 50240/50241's catalog descriptions to name the procedures that
-# actually throw them today (usp_Cash_DebitAndGrantItem/usp_Cash_Credit/usp_Cash_CreditAndConsumeItem)
-# instead of the deleted procedure, same UPDATE-not-INSERT convention as
-# Migrations/Seed/admin/016_error_catalog_offline_shop_withdraw_nothing.sql.
 Migrations/Seed/admin/025_error_catalog_cash_debit_rename_refresh.sql
 
-# manifest-structure-cleanliness fix (2026-07-12): 010_error_catalog_tribe_conversion.sql renamed to
-# 026_error_catalog_tribe_conversion.sql -- it shared its leading number with the unrelated
-# 010_error_catalog_death_protection.sql, a pure numbering-convention collision (both were always applied
-# correctly, in a stable relative order, registering non-overlapping codes 50313-50320 vs 50332).
-# Renumbered to the next free high-water-mark number rather than reusing 010, since
-# 010_error_catalog_death_protection.sql was the chronologically-first of the pair and keeps its original
-# number.
 Migrations/Seed/admin/026_error_catalog_tribe_conversion.sql
 
-# Charge toutes les maps : assigne l'intégralité de world.Zones à shard 1 (au-delà du défaut 1/6/11/140 de
-# 005). Additif/idempotent, s'exécute après le seed world.Zones (007).
 Migrations/Seed/admin/027_shard_map_assignments_all_zones.sql
 
-# Enregistre 50359 (le personnage presente ne appartient pas au compte reclamant), leve par
-# game.usp_AccountDailyReward_Claim cree en Migrations/005_account_daily_reward_key.sql, et rafraichit la
-# description de 50270 dont l'emetteur et le sujet changent (compte au lieu de personnage). UPDATE et non
-# INSERT garde pour 50270 : la ligne existe deja depuis 004_error_catalog_v8_commerce.sql.
 Migrations/Seed/admin/028_error_catalog_account_daily_reward.sql
 
-# Registers 50360 for usp_Cash_Credit_UpperBoundGuard.sql / usp_Cash_CreditAndConsumeItem_UpperBoundGuard.sql
-# above (cash-balance-buy audit).
 Migrations/Seed/admin/029_error_catalog_cash_credit_upper_bound.sql
 
-# Lot 2 (bail de session Login verifie) : cree runtime.tvp_AccountSessionLease et
-# runtime.usp_AccountSession_RefreshAndGetHeldLeases -- meme UPDATE de bail que
-# usp_AccountSession_RefreshAndGetKicked mais restreint a (AccountId, SessionToken) et RENVOYANT les baux
-# effectivement detenus, seule facon pour un LoginServer de constater que sa propre ligne
-# runtime.AccountSessions a disparu (branche ConflictLogin d'un AUTRE processus) et de fermer la session,
-# comme Server/ts25login/S07_MyGame01.cpp:59-72. Nouveau type + nouvelle procedure et non edition :
-# les deux fichiers de base sont deja journalises SHA-256, et changer la forme du jeu de resultats de
-# RefreshAndGetKicked casserait son consommateur GameServer (mappage par ordinal). Numerote 030 et non 010 :
-# la bande 001-009 est consommee en parallele par d'autres lots en vol.
 Migrations/030_accountsession_lease_verification.sql
 
-# Lot 2 (revocation du ticket de passation) : cree runtime.usp_SessionTicket_Revoke, appele par le handler
-# op23 FAIL_MOVE_ZONE. Le legacy rend la passation mecaniquement impossible apres op23 en repassant
-# l'emplacement playuser de LP_MOVING_ZONE a LP_UPDATE_USER (Server/ts25playuser/S07_MyGame01.cpp:968 vs
-# :1057-1060) ; sans revocation le ticket Fenrir restait consommable pendant tout son TTL de 15 s. Doit
-# s'appliquer APRES Migrations/001 qui drope et recree runtime.SessionTickets.
 Migrations/031_sessionticket_revoke.sql
 
-# Lot 11 (PetBagDate write path, PlayTime1, PlayTime3, HsbStoneRewardClaimed) : quatre champs mutes/charges
-# cote Fenrir et jamais reecrits. Ajoute UNIQUEMENT les trois colonnes game.Characters reellement absentes
-# (PlayTime1/PlayTime3/HsbStoneRewardClaimed -- PetBagDate a deja sa colonne depuis Migrations/002). Ne touche
-# PAS game.tvp_CharacterProgress/les procedures de write-behind/usp_Character_GetForWorldEntry/
-# CharacterProgressTvp.cs/CharacterWorldSnapshotDto.cs/PlayerEnterData : au moment de l'ecriture, ces objets
-# sont en cours de DROP+CREATE concurrent par au moins Migrations/012,
-# 033_holystone_rankpoint_and_lootbox_pity, 034_animal_double_exp_and_combat_boost_columns et un lot
-# ImproveItemValue/AddItemValue/HighItemValue/TaiyanKeyTimer (fichier absent du disque a l'ecriture -- cf. le
-# commentaire Lot 9 juste en dessous). Voir l'en-tete du script pour l'inventaire exact et la specification de
-# raccordement laissee au lot qui fera la reconciliation finale du type.
 Migrations/032_playtime_petbagdate_hsbreward_writeback.sql
 
-# Lot 9 (ImproveItemValue/AddItemValue/HighItemValue/TaiyanKeyTimer) : quatre compteurs mutes en jeu
-# (Zone.EconomyMirrors.cs, TimedBuffCountdownSystem.cs), persistes par le legacy sans #ifdef
-# (CreateAvatarColumn, Server/Header/CSQLAvatar.cpp:668-670,607), jamais ecrits cote Fenrir. Ajoute les quatre
-# colonnes a game.Characters. RECONCILIE AU PASSAGE un angle mort decouvert en preparant ce lot :
-# Migrations/010 et 011 se sont chacun rebases sur Migrations/007 plutot que sur
-# Migrations/008_autohunt_buffx2_premium_pet_writeback, donc le DERNIER script applique (011) a
-# silencieusement efface les six colonnes de 008 (AutoTime/AutoTime2/BuffX2Time/PremiumExpireUtc/PetGrowth/
-# PetActivity) et son parametre @Costumes/sa transaction/son remplacement de penderie -- alors que le record
-# C# CharacterProgressTvp, ProgressWriteBehindHost, PositionWriteBehindHost.FlushCharacterNowAsync et
-# CharacterRepository.PersistProgressAsync/PersistFinalFlushAsync s'attendent deja tous a leur presence, et
-# que CharacterWorldSnapshotDto lit deja AutoTime/BuffX2Time en fin de RS0 alors que la projection reellement
-# appliquee ne les selectionne pas (echec IndexOutOfRange garanti a chaque entree en monde). Un type TABLE ne
-# s'ALTERe pas : ce script DROP+RECREE game.tvp_CharacterProgress avec la forme TERMINALE exacte du record
-# C# (53 colonnes de 011, + les six oubliees de 008, + les quatre de ce lot en queue), recree les deux
-# procedures de write-behind avec @Costumes/la transaction/le remplacement de penderie restaures, et complete
-# la projection RS0 de usp_Character_GetForWorldEntry (AutoTime/BuffX2Time + les quatre nouvelles). Voir
-# l'en-tete du script pour la citation ligne a ligne des quatre fichiers verifies.
 Migrations/032_progress_writeback_reconciliation_and_item_value_counters.sql
 
-# Lot 10 (RankPoint/CloakLuckyBoxPity/CloakVariantBoxPity/MountVariantBoxPity, Holy Stone Battle rank +
-# pity de loot-box cape/variante-cape/variante-monture) : ajoute UNIQUEMENT les quatre colonnes
-# game.Characters, gardees par IF NOT EXISTS. Ne touche PAS game.tvp_CharacterProgress/les procedures de
-# write-behind/usp_Character_GetForWorldEntry : au moment de l'ecriture, ces objets sont en cours de
-# DROP+CREATE concurrent par au moins Migrations/012, 032_playtime_petbagdate_hsbreward,
-# 032_progress_writeback_reconciliation et un lot StellarCore/Protect*/LodRounds -- ecrire un DROP+CREATE
-# de plus ajouterait une candidate supplementaire a la course deja documentee dans
-# Migrations/034_animal_double_exp_and_combat_boost_columns.sql. PlayerEnterData/EnterWorldService.cs/
-# Zone.PlayerLifecycle.cs et Fenrir.Data.Abstractions.Characters.CharacterProgressTvp/
-# CharacterWorldSnapshotDto sont deja cables cote C# pour les quatre champs (verifie sur le disque a
-# l'ecriture) ; seul le DROP+CREATE terminal du TVP/des procedures/de la projection RS0 reste a faire par le
-# lot qui cloturera la course. Voir l'en-tete du script pour le detail complet.
 Migrations/033_holystone_rankpoint_and_lootbox_pity_writeback.sql
 
-# Lot 13 (DoubleExpTime1/DoubleExpTime2/AnimalDoubleExp/DmgBoost/HPBoost/CriBoost, TimedBuffCountdownSystem.cs) :
-# ajoute UNIQUEMENT les quatre colonnes game.Characters reellement absentes (AnimalDoubleExp/DmgBoost/HPBoost/
-# CriBoost -- DoubleExpTime1/2 ont deja leur colonne depuis la table de base). Ne touche PAS
-# game.tvp_CharacterProgress/les procedures de write-behind/usp_Character_GetForWorldEntry/
-# CharacterProgressTvp.cs/CharacterWorldSnapshotDto.cs/PlayerEnterData : au moment de l'ecriture, ces objets
-# sont en cours de DROP+CREATE concurrent par au moins Migrations/012, 032_playtime_petbagdate_hsbreward,
-# 033_holystone_rankpoint_and_lootbox_pity et un lot ImproveItemValue/AddItemValue/HighItemValue/
-# TaiyanKeyTimer (fichier absent du disque a l'ecriture -- cf. le commentaire Lot 9 juste au-dessus). Voir
-# l'en-tete du script pour l'inventaire exact et la specification de raccordement laissee au lot qui fera la
-# reconciliation finale du type.
 Migrations/034_animal_double_exp_and_combat_boost_columns.sql
 
-# Lot 8 : six compteurs/tableaux mutes en jeu cote Fenrir, jamais persistes, que le legacy persiste tous
-# sans #ifdef dans CreateAvatarColumn (Server/Header/CSQLAvatar.cpp:556-756) -- ProtectForRefine/
-# ProtectForCostume/ProtectForDestroy2 (nouvelles colonnes), ProtectForDestroy (colonne et lecture RS0 DEJA
-# presentes, seul le cote ecriture manquait), LodRounds (aZone241Time, voir la note de l'en-tete du script
-# sur la duplication avec game.Characters.Zone241Time deja persiste sous un autre nom cote Fenrir -- angle
-# mort distinct, non reconcilie ici) et StellarCoreExpireDate (tableau de 10 dates d'expiration, encode en
-# une colonne texte a largeur fixe comme BottleSlots/AutoBuffSkill ; le tableau soeur des items equipes
-# StellarCoreWardrobe reste hors de ce lot). Numerote 040, au-dela de tout numero 03x vu a l'ecriture : ce
-# depot etait modifie en continu par plusieurs lots paralleles pendant la preparation de ce script (voir
-# l'en-tete du script pour l'inventaire exact des colonnes concurrentes integrees dans le DROP+CREATE de
-# game.tvp_CharacterProgress -- a REVERIFIER contre l'etat final une fois tous les lots integres, meme role
-# que Migrations/012 vis-a-vis de 010/011). Chemin de lecture cable jusqu'a CharacterWorldSnapshotDto/RS0 ;
-# le dernier maillon (copie dans PlayerRuntimeState a l'entree en monde, PlayerEnterData/EnterWorldService/
-# Zone.PlayerLifecycle.cs) reste hors perimetre d'ecriture de ce lot et doit etre cable separement.
 Migrations/040_stellarcore_protect_charges_lodrounds_writeback.sql
 
-# Lot 14 (WarriorPill/WarriorScroll, TimedBuffCountdownSystem.cs TickGroupB) : ajoute UNIQUEMENT les deux
-# colonnes game.Characters reellement absentes, persistees par le legacy sans #ifdef (CreateAvatarColumn,
-# Server/Header/CSQLAvatar.cpp:673-674), jamais ecrites cote Fenrir. Ne touche PAS game.tvp_CharacterProgress/
-# les procedures de write-behind/usp_Character_GetForWorldEntry : au moment de l'ecriture, ces objets sont en
-# cours de DROP+CREATE concurrent (TowerCpMilestoneCounter vient d'apparaitre en queue de
-# CharacterProgressTvp.cs/CharacterWorldSnapshotDto.cs sans script SQL encore, et Migrations/040 lui-meme ne
-# projette pas encore EliteDungeonTime/PlayTime1/PlayTime3/HsbStoneRewardClaimed dans sa RS0). Cote
-# application, WarriorPill/WarriorScroll sont DEJA cables integralement par ce lot (CharacterProgressTvp.cs,
-# CharacterWorldSnapshotDto.cs, PlayerEnterData/ZoneCommand.cs, EnterWorldService.cs,
-# Zone.PlayerLifecycle.cs, ProgressWriteBehindHost.cs, PositionWriteBehindHost.cs) -- seul le cote SQL reste
-# a cabler par le lot qui fera la reconciliation finale de game.tvp_CharacterProgress. Zone101Time/
-# Zone126Time/Zone050Time2, demandes dans le meme lot, sont deliberement RETIRES (BLOQUE) : memes citations
-# legacy STRUCT.h:384/386/480 + CSQLAvatar.cpp:606/608/660 que celles deja utilisees par
-# Migrations/034_ticket_counters_and_fighting_god_writeback.sql pour EliteDungeonTime/ScrollOfSeekersTime/
-# IvyHallTicketTime -- deux proprietes PlayerRuntimeState distinctes mutent deja le meme compteur legacy sans
-# jamais se resynchroniser, piege documente et deliberement non resolu par ce script-la ; ajouter trois
-# colonnes de plus ici creerait une troisieme representation persistee au lieu de fusionner, hors perimetre
-# d'ecriture de ce lot (changement de logique de jeu dans Domain/Simulation/TimedBuffCountdownSystem.cs et
-# Domain/World/Zone.EconomyMirrors.cs). Voir l'en-tete du script pour le detail complet.
 Migrations/041_warriorpill_scroll_columns.sql
 
-# Lot 15 (TowerCpMilestoneCounter/InventoryDate/StoreDate, trois champs mutes en jeu cote Fenrir jamais
-# persistes -- confirme par recherche exhaustive avant redaction) : ajoute la colonne game.Characters
-# manquante (TowerCpMilestoneCounter, aKillMonsterNum2 -- InventoryDate/StoreDate ont deja leur colonne) et
-# devient la reconciliation finale de game.tvp_CharacterProgress/usp_Character_PersistProgressBatch/
-# usp_Character_PersistFinalFlush/usp_Character_GetForWorldEntry : DROP+CREATE du type au miroir exact du
-# record CharacterProgressTvp.cs tel qu'observe (87 colonnes, verifie programmatiquement), ce qui cable au
-# passage PetBagDate/PlayTime1/PlayTime3/HsbStoneRewardClaimed (Lot 11, colonnes deja presentes depuis
-# Migrations/032_playtime_petbagdate_hsbreward_writeback.sql mais jamais branchees jusqu'ici) et
-# WarriorPill/WarriorScroll (Lot 14, colonnes ajoutees par Migrations/041_warriorpill_scroll_columns.sql --
-# DOIT s'appliquer avant ce script). Redeclare aussi RS0 (usp_Character_GetForWorldEntry) en COMPLET,
-# verifiee colonne-par-colonne contre CharacterWorldSnapshotDto (121 colonnes, 0 mismatch) : au passage,
-# CORRIGE un bug d'ordre preexistant dans Migrations/040 qui permutait RankPoint/CloakLuckyBoxPity/
-# CloakVariantBoxPity/MountVariantBoxPity avec ImproveItemValue/AddItemValue/HighItemValue/TaiyanKeyTimer
-# (huit colonnes silencieusement croisees en lecture depuis Migrations/040), et etend RS0 jusqu'a
-# EliteDungeonTime/DungeonKeyTime/IvyHallTicketTime/ScrollOfSeekersTime/FightingGodForDestroy/PlayTime1/
-# PlayTime3/HsbStoneRewardClaimed/TowerCpMilestoneCounter/WarriorPill/WarriorScroll, absentes de RS0 depuis
-# Migrations/040 (qui s'arretait a StellarCoreExpireDate). Voir l'en-tete du script pour le detail complet et
-# l'avertissement sur l'etat concurrent au moment de l'ecriture.
 Migrations/041_tower_cp_milestone_and_vault_date_writeback.sql
 
-# Lot 16 -- reconciliation FINALE de game.tvp_CharacterProgress et de son round-trip. Les migrations 012 et
-# 030..041 sont des brouillons partiels et mutuellement contradictoires : ce script les rend toutes
-# obsoletes pour ces quatre objets, sans en modifier aucune. DROP+CREATE du type au miroir POSITIONNEL exact
-# de CharacterProgressTvp.cs (87 colonnes, verifie nom par nom et position par position contre le record),
-# recreation des deux procedures de write-behind couvrant les 85 colonnes assignables (WarPointDelta/
-# BloodCoinDelta restant additifs sur WarPoint/BloodCoin) et restaurant la forme complete de Migrations/034
-# (BEGIN TRANSACTION, @Costumes, @Applied, OUTPUT inserted, garde FlushSequence) que 040 et 041_tower
-# avaient perdue alors que CharacterRepository.PersistProgressAsync/PersistFinalFlushAsync passent toujours
-# le TVP Costumes. RS0 de usp_Character_GetForWorldEntry redeclare au miroir ORDINAL exact de
-# CharacterWorldSnapshotDto (121 colonnes, 0 mismatch) ; les quatre autres result sets repris verbatim.
-# Aucun ALTER TABLE : les 87 colonnes cibles du TVP et les 121 sources du DTO existent toutes deja.
-# DEPENDANCE : doit s appliquer APRES 041_warriorpill_scroll_columns.sql et
-# 041_tower_cp_milestone_and_vault_date_writeback.sql (colonnes WarriorPill/WarriorScroll/
-# TowerCpMilestoneCounter), ce que garantit sa position en derniere ligne de ce manifeste.
 Migrations/042_character_progress_tvp_full_reconciliation.sql
 
-# AvatarInfoFactory ne projetait jamais VisibleState/SpecialState dans le paquet EnterWorldResponse.AvatarInfo
-# (retombait sur le 0/0 de AvatarInfoTemplates.Zeroed, soit l'etat /hide legacy, pour tout personnage, GM ou
-# non). Corrige cote C# ; ce script ajoute juste les deux CHECK de domaine en garde-fou DB, verifie sans
-# risque contre tous les ecrivains actuels de ces colonnes (CreateAvatarService, GmBasicCommandService).
 Migrations/043_characters_visiblestate_specialstate_domain_guard.sql
 
-# Ajoute XPos/YPos (grille de sac 8x8) a game.CharacterItems, absents depuis la normalisation qui a reduit le
-# layout legacy a 6 champs par slot. game.tvp_CharacterItemSlot etant reference par 24 procedures, on pose un
-# type V2 a cote (meme motif que tvp_AccountVaultItemSlotV2), migre seulement pour les deux chemins d'ecriture
-# concernes (deplacement en inventaire, ramassage au sol) ; les 22 autres restent sur V1 (XPos=YPos=0).
 Migrations/044_characteritems_bag_position.sql
 
-# Enregistre 50361 pour la garde ContainerA=ContainerB de usp_CharacterItems_ReplaceTwoContainersV2 ci-dessus.
 Migrations/Seed/admin/030_error_catalog_characteritems_v2.sql
 
-# Scrolls d'apparence (item 1214) et de genre (item 1171) : cree usp_Character_UpdateAppearance et
-# usp_Character_UpdateGender. Les colonnes HeadType/FaceType/Gender existent deja sur game.Characters.
-# Aucun ALTER TABLE : la migration ne fait que poser les deux procedures de mise a jour atomique
-# correspondantes, appelees par UseInventoryItemService.ResolveAppearanceChangeScrollAsync et
-# ResolveGenderScrollAsync.
 Migrations/045_appearance_gender_scroll_procedures.sql
 
-# Ajoute SilverTime/GoldTime a game.Characters + reconstruit game.tvp_CharacterProgress et les
-# procedures write-behind pour les scrolls ornements (item 1370 Silver Scroll, item 1167 Gold Scroll).
 Migrations/046_ornament_silver_gold_time_columns.sql
 
-# Ajoute DoubleKillNumTime/DoubleKillExpTime/DoubleKillNumTime2 a game.Characters + reconstruit
-# game.tvp_CharacterProgress (93 colonnes) et les procedures write-behind + GetForWorldEntry pour
-# les scrolls de kill-bonus PvP (items 1118/1119/1120/1155/1163/1186/1228 et variantes).
 Migrations/047_kill_timer_columns.sql
 
-# BUG FIX (livelock): game.Characters.FlushSequence etait une colonne de garde d'idempotence PARTAGEE
-# entre usp_Character_PersistBatch (Position) et usp_Character_PersistProgressBatch (Progress/Vitals),
-# deux ecrivains periodiques independants qui se disputaient la meme colonne "WHERE incoming > c.FlushSequence"
-# -- pour un personnage dirty sur les deux a la fois (cas courant en combat+deplacement), Progress gagnait
-# toujours la course et l'ecriture Position, avec la meme valeur, echouait silencieusement la garde. Le
-# contournement cote C# (defer + re-mark dirty) ne resolvait rien : la collision revenait au cycle suivant
-# des qu'un evenement Vitals/Progression fusionnait a nouveau dans l'entree dirty. Ajoute deux colonnes de
-# garde independantes (PositionFlushSequence/ProgressFlushSequence), redefinit les deux procedures pour
-# garder chacune sur la sienne, et redefinit usp_Character_GetForWorldEntry/GetForWorldEntrySummary pour
-# amorcer PlayerRuntimeState.FlushSequence via GREATEST() des trois colonnes. Supprime en parallele la
-# logique claim/defer devenue inutile dans PositionWriteBehindHost.cs/ProgressWriteBehindHost.cs.
 Migrations/048_position_progress_flushsequence_split.sql
 
-# Concurrency/legacy-parity audit fix: game.WorldStateTribes never persisted which tribe actually holds a
-# given symbol slot (only a per-slot HasSymbol boolean), so a captured slot reset to identity on every
-# GameServer restart (WorldStateService._tribeSymbolOwner was hard-reset in InitializeAsync, never loaded
-# from the DB row). Adds SymbolOwnerTribeId, backfills it to identity for the pre-existing singleton rows,
-# and redefines usp_WorldState_EnsureInitialized/usp_WorldState_Get/usp_WorldStateTribe_Update/
-# usp_WorldStateTribe_UpdateSymbolState via CREATE OR ALTER (none of the four base scripts are edited).
 Migrations/049_worldstatetribes_symbol_owner_writeback.sql

@@ -1,5 +1,3 @@
--- DELETE-then-INSERT, not MERGE/UPDATE (same idiom as runtime.usp_SessionTicket_Create). Natively
--- compiled -- see game.GuildNotices for why this path is memory-optimized.
 CREATE PROCEDURE game.usp_GuildNotice_Set @GuildId INT,
                                           @NoticeIndex TINYINT,
                                           @Text NVARCHAR(50)

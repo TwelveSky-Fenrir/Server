@@ -1,4 +1,3 @@
--- Seeds world.ZonePortals from 003.BIN. MUST run after the world.Zones seed script (FK dependency).
 IF
     NOT EXISTS (SELECT 1
                 FROM world.ZonePortals)

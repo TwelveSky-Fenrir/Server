@@ -1,5 +1,3 @@
--- Legacy resets the day counter every Monday via a scheduled tick; this proc recomputes the same reset
--- lazily from the stored RewardClaimDate instead (see usp_Character_GetRewardClaimState).
 CREATE PROCEDURE game.usp_Character_ClaimDailyReward @CharacterId INT,
                                                      @TodayDate INT,
                                                      @Container TINYINT,
@@ -17,8 +15,6 @@ BEGIN
     BEGIN
         TRANSACTION;
 
-    -- Read-then-branch is safe: the real invariant is the guarded UPDATE's WHERE below, and concurrent
-    -- claims for the same character already serialize at the app layer.
     DECLARE
         @IsNewWeek BIT;
     SELECT @IsNewWeek = CASE

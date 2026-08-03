@@ -1,4 +1,3 @@
--- Normalized from nSpeech[5][5][51]; SpeechGroup/SpeechIndex mirror the legacy [outer][inner] array indices exactly. Only non-empty lines are stored.
 CREATE TABLE world.NpcSpeeches
 (
     NpcId       INT          NOT NULL,

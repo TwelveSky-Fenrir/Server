@@ -1,5 +1,3 @@
--- DEV/TEST-ONLY fixture, not a production credential (login "dev", password "dev"). Hash/salt precomputed
--- via Fenrir.Data.Security.PasswordHasher (Argon2id) since SQL itself cannot compute it.
 IF
     NOT EXISTS (SELECT 1
                 FROM auth.Accounts

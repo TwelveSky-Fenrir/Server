@@ -1,6 +1,3 @@
--- Merges legacy `herorankcur`/`herorankpre` into one table with a period marker: PeriodKind 0 = Current,
--- 1 = Previous. herorankcur has no hDate/hAccept/hDesc of its own, so RewardClaimed/Description are only
--- meaningful once a period rolls to Previous -- both NULLable rather than given a fake default.
 CREATE TABLE game.HeroRankings
 (
     CharacterId   INT           NOT NULL,
@@ -8,7 +5,7 @@ CREATE TABLE game.HeroRankings
     Points        INT           NOT NULL
         CONSTRAINT DF_HeroRankings_Points DEFAULT 0,
     TribeId       TINYINT       NULL,
-    Level         SMALLINT      NULL, -- sourced from game.Characters.Level (SMALLINT); widened to INT here was an unjustified type drift, aligned to match
+    Level         SMALLINT      NULL, 
     RewardClaimed BIT           NULL,
     Description   NVARCHAR(255) NULL,
     RecordedAtUtc DATETIME2(3)  NOT NULL

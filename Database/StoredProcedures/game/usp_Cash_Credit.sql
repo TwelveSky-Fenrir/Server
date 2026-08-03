@@ -1,5 +1,3 @@
--- First credit for an account mints its AccountCash row; a race of two first-credits is
--- backstopped by PK_AccountCash (the losing insert's transaction retries at the caller).
 CREATE PROCEDURE game.usp_Cash_Credit @AccountId INT,
                                       @Amount INT,
                                       @Reason TINYINT,

@@ -1,5 +1,3 @@
--- Seeds world.MonsterSpawnRegions from every DATA/SUMMON/*.WREGION.csv row. MUST run after both the
--- world.Zones and world.Monsters seed scripts (FK dependency).
 IF
     NOT EXISTS (SELECT 1
                 FROM world.MonsterSpawnRegions)

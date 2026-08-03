@@ -1,5 +1,3 @@
--- A missing GuildId is indistinguishable from insufficient points here (both = 0 rows updated);
--- the error text covers both cases.
 CREATE PROCEDURE game.usp_Guild_AdjustPoints @GuildId INT,
                                              @Delta INT
 AS

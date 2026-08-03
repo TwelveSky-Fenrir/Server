@@ -1,12 +1,3 @@
--- Same TOCTOU-safe money guard as usp_Character_AdjustMoney, plus a whole-container item replace in the
--- same transaction (e.g. NPC shop buy/sell).
---
--- @AuditEventCode etc. optionally nest the NPC-shop-trade audit row (EventLogCategory.NpcShopTrade = 16)
--- into this same transaction, following usp_CharacterTrade_Execute's own precedent for why the audit write
--- and the economic mutation it documents must commit or roll back together rather than as two separate
--- round trips from the caller (transaction-composition-audit finding). Caller omits @AuditEventCode (stays
--- NULL) to skip logging entirely -- e.g. every ItemModification-service caller (enchant/upgrade/etc.) that
--- spends money via this same procedure but isn't part of that audit finding's scope.
 CREATE PROCEDURE game.usp_Character_AdjustMoneyAndReplaceContainer @CharacterId INT,
                                                                    @DeltaMoney BIGINT,
                                                                    @DeltaBigMoney INT,
@@ -27,7 +18,6 @@ BEGIN
     BEGIN
         TRANSACTION;
 
-    -- Guarded UPDATE closes a TOCTOU: two concurrent credits must never jointly breach the cap.
     UPDATE game.Characters
     SET Money        = Money + @DeltaMoney,
         BigMoney     = BigMoney + @DeltaBigMoney,
@@ -39,7 +29,6 @@ BEGIN
     IF
         @@ROWCOUNT = 0
         BEGIN
-            -- Diagnostic re-read only; picks which error code to throw.
             IF
                 EXISTS (SELECT 1
                         FROM game.Characters
@@ -78,7 +67,7 @@ BEGIN
     IF @AuditEventCode IS NOT NULL
         EXEC game.usp_EventLog_Insert
              @EventCode = @AuditEventCode,
-             @Category = 16, -- EventLogCategory.NpcShopTrade
+             @Category = 16, 
              @ActorAccountId = @AuditAccountId,
              @ActorCharacterId = @CharacterId,
              @DeltaMoney = @DeltaMoney,

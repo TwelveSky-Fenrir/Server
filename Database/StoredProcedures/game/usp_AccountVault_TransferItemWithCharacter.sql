@@ -1,11 +1,3 @@
--- Atomic item transfer between one character inventory container (game.CharacterItems) and the owning
--- account's shared vault/bank (game.AccountVault/AccountVaultItems, legacy masterinfo.uSaveItem) --
--- CZ_PROCESS_DATA_SEND tSort 228/251 (deposit) / 229/249 (withdraw). Both sides are whole-replace (same
--- posture as usp_CharacterItems_ReplaceContainer/usp_AccountVault_SetItems), not per-slot patches -- the
--- caller has already computed each side's full final contents via the pure domain policy. Auto-creates the
--- AccountVault row on first use (same posture as usp_Gift_ClaimIntoVault) so a deposit never requires the
--- vault panel to have been opened first.
--- Réf. C++ : Server/ts25zone/S04_MyWork05.cpp:2971-3182 (ProcessForInventoryToSave/ProcessForSaveToInventory).
 CREATE PROCEDURE game.usp_AccountVault_TransferItemWithCharacter @CharacterId INT,
                                                                  @Container TINYINT,
                                                                  @Items game.tvp_CharacterItemSlot READONLY,

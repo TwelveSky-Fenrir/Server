@@ -1,7 +1,3 @@
--- database/50_procedures/game/usp_Tribe_SetMaster.sql
--- TRIBE_WORK tSort 55's tally write: appoints (or, with a null candidate, vacates) one tribe's Force
--- Leader. Unlike usp_Guild_SetMaster there is no membership-role table to flip -- ReturnTribeRole derives
--- directly off game.Tribes.MasterCharacterId (see usp_TribeRole_GetForCharacter).
 CREATE PROCEDURE game.usp_Tribe_SetMaster @TribeId TINYINT,
                                           @NewMasterCharacterId INT = NULL
 AS

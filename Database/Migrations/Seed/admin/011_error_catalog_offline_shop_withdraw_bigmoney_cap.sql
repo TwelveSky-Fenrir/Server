@@ -1,6 +1,3 @@
--- New file rather than an edit to an earlier error-catalog script: applied scripts are never edited.
--- Registers 50333 for the BigMoney-upper-bound guard added to usp_OfflineShop_WithdrawMoney by
--- Migrations/038_offline_shop_withdraw_bigmoney_cap.sql (proxy-shop-listing-pricing finding).
 IF NOT EXISTS (SELECT 1
                FROM admin.ErrorCatalog
                WHERE ErrorNumber = 50333)

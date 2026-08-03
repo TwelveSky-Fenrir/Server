@@ -1,14 +1,3 @@
--- Additive script: the shipped usp_Cash_CreditAndConsumeItem.sql stays unchanged (DbMigrator journals it by
--- SHA-256 and would refuse to reapply it if edited). CREATE OR ALTER on the same procedure name, same
--- pattern as usp_Cash_Credit_UpperBoundGuard.sql (that file's own header carries the full legacy-uCash
--- citation this one shares: Server/ts25extra/S08_MyDB.cpp:134, Server/BuildEU33/DB/nxtserver.sql:1130).
---
--- This procedure is the live GP-ticket-redemption credit path (UseInventoryItemService.ResolveGpTicketAsync
--- -> ICashRepository.CreditAndConsumeItemAsync), so an unbounded Balance += @Amount here is reachable by an
--- ordinary player action repeated at will, not just an admin/webshop deposit path -- same
--- 2,000,000,000 cap and same diagnostic-re-read disambiguation as usp_Cash_Credit_UpperBoundGuard.sql,
--- reusing the same 50360 error number for the identical failure kind (mirrors how 50241 is already shared
--- across all three usp_Cash_* procedures for "amount must be positive").
 CREATE OR ALTER PROCEDURE game.usp_Cash_CreditAndConsumeItem @AccountId INT,
                                                              @Amount INT,
                                                              @Reason TINYINT,

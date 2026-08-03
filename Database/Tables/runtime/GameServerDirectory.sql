@@ -1,7 +1,3 @@
--- Live-shard cache kept warm by usp_GameServer_Heartbeat; a crashed shard just stops heartbeating
--- (nothing to recover from disk) and is aged out of usp_GameServer_GetDirectory's results by its
--- LastHeartbeatUtc filter (no physical row deletion).
--- PK ShardId is assigned by each shard's own static config, never generated here.
 CREATE TABLE runtime.GameServerDirectory
 (
     ShardId          TINYINT      NOT NULL,

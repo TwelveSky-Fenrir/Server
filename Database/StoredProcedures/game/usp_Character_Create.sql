@@ -1,5 +1,3 @@
--- Errors: 50201 slot already occupied, 50202 name already taken -- both pre-checked; the
--- table's unique constraints (UQ_Characters_Account_Slot/UQ_Characters_Name) are the race backstop.
 CREATE PROCEDURE game.usp_Character_Create @AccountId INT,
                                            @Slot TINYINT,
                                            @Name NVARCHAR(13),

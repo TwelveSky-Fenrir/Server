@@ -1,5 +1,3 @@
--- No known legacy grant path exists for BloodCoin (see game.Characters.BloodCoin); @DeltaBloodCoin's
--- sign is not hard-coded here, for forward compat.
 CREATE PROCEDURE game.usp_Character_SpendBloodCoinAndReplaceContainer @CharacterId INT,
                                                                       @DeltaBloodCoin INT,
                                                                       @Container TINYINT,

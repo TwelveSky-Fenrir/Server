@@ -1,9 +1,3 @@
--- One of 3 atomic procedures backing PetBagRepository (Infrastructure/Fenrir.Data/Inventory/PetBagRepository.cs)
--- for the CZ_PROCESS_DATA_SEND pet-bag family (tSort 254/255/256). Application-side (PetBagItemTransferPolicy)
--- has already fully validated the request before this runs (pet-equipped/entitlement/catalog-sort/occupancy
--- checks); the re-verification here (occupied destination slot) closes the same TOCTOU window
--- usp_Character_AdjustStoreMoney's own guarded UPDATE closes for its family, not a duplicate of app-side
--- validation.
 CREATE PROCEDURE game.usp_CharacterPetBag_Deposit @CharacterId INT,
                                                   @InventoryContainer TINYINT,
                                                   @InventoryItems game.tvp_CharacterItemSlot READONLY,

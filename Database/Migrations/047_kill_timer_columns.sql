@@ -1,12 +1,4 @@
--- Ajoute DoubleKillNumTime / DoubleKillExpTime / DoubleKillNumTime2 a game.Characters,
--- reconstruit game.tvp_CharacterProgress (93 colonnes) et les procedures write-behind
--- pour les scrolls de kill-bonus PvP (items 1118/1119/1120/1155/1163/1186/1228/1454/1456/8401/8402/8438).
---
--- DEPENDANCE : doit s'appliquer APRES 046_ornament_silver_gold_time_columns.sql
--- (qui etablit le TVP a 90 colonnes avec SilverTime/GoldTime/ProtectForDeath en queue).
--- Ce script extend le TVP de 90 a 93 colonnes.
 
--- 0. Ajouter les colonnes a game.Characters (idempotent).
 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('game.Characters') AND name = 'DoubleKillNumTime')
     ALTER TABLE game.Characters ADD DoubleKillNumTime INT NOT NULL DEFAULT 0;
 GO
@@ -17,15 +9,11 @@ IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('game.Chara
     ALTER TABLE game.Characters ADD DoubleKillNumTime2 INT NOT NULL DEFAULT 0;
 GO
 
--- 1. Dropper les procedures dependantes puis le type.
 DROP PROCEDURE IF EXISTS game.usp_Character_PersistFinalFlush;
 DROP PROCEDURE IF EXISTS game.usp_Character_PersistProgressBatch;
 DROP TYPE IF EXISTS game.tvp_CharacterProgress;
 GO
 
--- 2. Recreer le type avec les 3 nouvelles colonnes en queue (apres ProtectForDeath).
---    Le TVP doit refleter l'ordre exact de CharacterProgressTvp.cs.
---    93 colonnes au total.
 CREATE TYPE game.tvp_CharacterProgress AS TABLE
 (
     CharacterId              INT          NOT NULL,
@@ -124,7 +112,6 @@ CREATE TYPE game.tvp_CharacterProgress AS TABLE
 );
 GO
 
--- 3. usp_Character_PersistProgressBatch — flush periodique.
 CREATE PROCEDURE game.usp_Character_PersistProgressBatch @Progress game.tvp_CharacterProgress READONLY,
                                                          @Costumes game.tvp_CharacterCostumeSlot READONLY
 AS
@@ -244,7 +231,6 @@ BEGIN
 END;
 GO
 
--- 4. usp_Character_PersistFinalFlush — flush terminal (deconnexion / changement de zone).
 CREATE PROCEDURE game.usp_Character_PersistFinalFlush @Progress  game.tvp_CharacterProgress READONLY,
                                                       @Position  game.tvp_CharacterPosition  READONLY,
                                                       @Costumes  game.tvp_CharacterCostumeSlot READONLY
@@ -368,15 +354,6 @@ BEGIN
 END;
 GO
 
--- 5. usp_Character_GetForWorldEntry : ajouter les 3 colonnes en queue de RS0 (DoubleKillNumTime,
---    DoubleKillExpTime, DoubleKillNumTime2), au miroir ordinal exact de CharacterWorldSnapshotDto (126
---    colonnes). Corps repris de Migrations/046_ornament_silver_gold_time_columns.sql (dernier script a
---    avoir CREATE OR ALTER cette procedure avec succes, per _manifest.txt) -- une version corrompue de ce
---    batch (signature @AccountId/@Slot, colonnes inexistantes IsMuted/UserSort/TribeRole/
---    AutoPotion*Threshold/ci.Kind/cb.Value1-2) avait ete substituee ici par erreur et n'a jamais pu
---    s'appliquer (CREATE PROCEDURE echoue immediatement sur "Invalid column name"). RS1 restaure aussi
---    SocketGem1-3/ExpireDate/XPos/YPos que cette version corrompue avait fait disparaitre --
---    CharacterItemSlotDto attend 15 colonnes dans cet ordre exact (Container..Serial, puis XPos, YPos).
 CREATE OR ALTER PROCEDURE game.usp_Character_GetForWorldEntry @CharacterId INT
 AS
 BEGIN
@@ -516,10 +493,10 @@ BEGIN
     SELECT Container,
            Slot,
            ItemId,
-           CAST(Quantity AS INT) AS Quantity, -- game.CharacterItems.Quantity is SMALLINT; widen back to INT
-           Enchant,                           -- here so CharacterItemSlotDto's existing int-typed ctor param
-           Combine,                           -- keeps reading it via SqlDataReader.GetInt32 without an
-           Refine,                            -- InvalidCastException (see CharacterItems.sql's own comment)
+           CAST(Quantity AS INT) AS Quantity, 
+           Enchant,                           
+           Combine,                           
+           Refine,                            
            Socket,
            SocketGem1,
            SocketGem2,

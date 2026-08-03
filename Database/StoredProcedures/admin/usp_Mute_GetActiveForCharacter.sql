@@ -1,6 +1,3 @@
--- Called once at world entry to set the hidden mute flag in PlayerRuntimeState (not re-queried per
--- chat message). Covers mutes pinned to this character AND to its owning account, so an alt can't
--- dodge an account-level mute.
 CREATE PROCEDURE admin.usp_Mute_GetActiveForCharacter @CharacterId INT
 AS
 BEGIN

@@ -1,5 +1,3 @@
--- Legacy: mTribeVoteName/Level/KillOtherTribe/Point[tribe][slot] (MAX_TRIBE_VOTE_AVATAR_NUM=10); a row
--- exists only for an occupied slot (Level>0 in the legacy code).
 CREATE TABLE game.TribeVotes
 (
     TribeId              TINYINT      NOT NULL,

@@ -1,6 +1,3 @@
--- Called every 5s by each GameServer. Freshness of LastHeartbeatUtc is what
--- usp_GameServer_GetDirectory filters on -- stop heartbeating and the shard silently drops out of
--- the LoginServer's offer, doubling as the maintenance-drain mechanism.
 CREATE PROCEDURE runtime.usp_GameServer_Heartbeat @ShardId TINYINT,
                                                   @Host NVARCHAR(64),
                                                   @Port INT,

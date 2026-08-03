@@ -1,20 +1,3 @@
--- Additive script: usp_Cash_CreditAndConsumeItem_UpperBoundGuard.sql stays unchanged (DbMigrator journals
--- it by SHA-256 and would refuse to reapply it if edited). CREATE OR ALTER on the same procedure name, same
--- pattern as usp_Cash_Credit_FirstCreditRaceGuard.sql (that file's own header carries the full race
--- explanation this one shares).
---
--- Same first-credit-ever race as usp_Cash_Credit_FirstCreditRaceGuard.sql, on the identical
--- game.AccountCash bootstrap INSERT this procedure shares with usp_Cash_Credit: two concurrent first-ever
--- credits for the SAME @AccountId can both pass the "no existing row" check and both attempt the INSERT;
--- the loser hits PK_AccountCash, and because that INSERT sits inside this proc's own explicit
--- BEGIN TRANSACTION under XACT_ABORT ON, a losing 2627/2601 dooms the whole transaction (XACT_STATE() = -1)
--- -- including the CharacterItems container replace and the CashLog row that would otherwise follow. Same
--- ROLLBACK-and-replay idiom as game.usp_CharacterLogoutState_Upsert / game.usp_Character_ApplyTribeFourConversion
--- and the sibling fix: ROLLBACK TRANSACTION, then a fresh BEGIN TRANSACTION that re-runs the guarded UPDATE
--- (now against the winner's committed row), then replays every write this procedure was ever going to make
--- -- CashLog insert, container DELETE+INSERT from @Items, and the NewBalance SELECT -- inside that same
--- fresh transaction, so the GP-ticket-redemption call site still gets its item granted and its balance read
--- back exactly once, never a partial commit of one half without the other.
 CREATE OR ALTER PROCEDURE game.usp_Cash_CreditAndConsumeItem @AccountId INT,
                                                              @Amount INT,
                                                              @Reason TINYINT,

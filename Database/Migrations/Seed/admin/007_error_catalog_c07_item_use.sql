@@ -1,4 +1,3 @@
--- Guarded per-row for the same shared-table reason as 001_error_catalog_admin.sql.
 IF
     NOT EXISTS (SELECT 1
                 FROM admin.ErrorCatalog

@@ -1,10 +1,3 @@
--- Single-character, single-statement counterpart to usp_Character_PersistProgressBatch +
--- usp_Character_PersistBatch, used only by the disconnect-time immediate flush
--- (PositionWriteBehindHost.FlushCharacterNowAsync). Progress and position columns are written in the
--- same UPDATE so the two halves of one logout snapshot can never be split by a mid-sequence failure --
--- unlike the periodic write-behind cycle, this path has no "next cycle" to catch up a dropped half.
--- Same strictly-greater FlushSequence idempotence guard as both batch procedures; both TVPs carry one
--- row each, stamped with the same FlushSequence value by the caller.
 CREATE PROCEDURE game.usp_Character_PersistFinalFlush @Progress game.tvp_CharacterProgress READONLY,
                                                       @Position game.tvp_CharacterPosition READONLY
 AS
@@ -46,5 +39,5 @@ BEGIN
     FROM game.Characters AS c
              JOIN @Progress AS p ON p.CharacterId = c.CharacterId
              JOIN @Position AS q ON q.CharacterId = c.CharacterId
-    WHERE q.FlushSequence > c.FlushSequence; -- idempotence guard
+    WHERE q.FlushSequence > c.FlushSequence; 
 END;

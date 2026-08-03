@@ -1,9 +1,3 @@
--- Singleton row for legacy `worldinfo` (PK wIndex, always exactly one row); Id/CK_WorldState_Id enforce
--- the singleton. Only the scalar WORLD_INFO fields live here -- per-tribe arrays are normalized out to
--- game.WorldStateTribes / game.WorldStateAllianceOffers.
--- Zone038WinTribe: legacy sentinel -1 ("no winner yet") -> NULL (0 is itself a valid TribeId here).
--- The single row (Id=1) is created by game.usp_WorldState_EnsureInitialized, an idempotent bootstrap the
--- application calls once at world startup -- callers must not INSERT directly.
 CREATE TABLE game.WorldState
 (
     Id                   TINYINT      NOT NULL

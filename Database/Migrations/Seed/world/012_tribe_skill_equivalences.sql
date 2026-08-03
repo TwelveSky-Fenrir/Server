@@ -1,7 +1,3 @@
--- Server/ts25zone/S04_MyWork03.cpp:123-164 (tsSkill[][3]), transcribed verbatim: GroupIndex 0-39
--- (one row per legacy array row), TribeId 0/1/2 = Noble Dragon/Royal Serpent/Grand Tiger. Consumed by
--- game.usp_Character_ApplyTribeConversion (skill/hotkey remap) -- see Tables/world/TribeSkillEquivalences.sql
--- for the full table-shape rationale.
 IF NOT EXISTS (SELECT 1
                FROM world.TribeSkillEquivalences)
     BEGIN

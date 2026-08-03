@@ -1,8 +1,3 @@
--- Loot-table summary per monster for tooling. Child-table counts are pre-aggregated in derived tables
--- before joining so a monster with rows in multiple drop tables isn't double-counted by a naive JOIN.
--- Not an indexed-view candidate as written: LEFT OUTER JOIN and derived-table (subquery-in-FROM) expressions
--- are both disallowed in indexed views (Microsoft Learn, "Create indexed views" -- Additional requirements),
--- and this view needs both to show a zero, not a missing row, for a monster with no rows in a given drop table.
 CREATE VIEW world.vw_MonsterWithDropSummary
 AS
 SELECT m.MonsterId,

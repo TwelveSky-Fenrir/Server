@@ -1,5 +1,3 @@
--- Legacy `gmip`: GM-console connection allowlist. The dump's only row (127.0.0.1 dev-loopback) was
--- deliberately not ported as seed data.
 CREATE TABLE admin.GmAllowlists
 (
     GmAllowlistId INT IDENTITY (1,1) NOT NULL,

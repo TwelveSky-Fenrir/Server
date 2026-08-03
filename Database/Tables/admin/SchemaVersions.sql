@@ -1,5 +1,3 @@
--- Migrator's journal; Fenrir.Tools.DbMigrator tolerates this table being absent on a fresh database
--- (treats the journal as empty).
 CREATE TABLE admin.SchemaVersions
 (
     ScriptName   NVARCHAR(260) NOT NULL,

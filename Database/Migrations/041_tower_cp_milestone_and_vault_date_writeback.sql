@@ -1,73 +1,4 @@
--- Lot 15 -- TowerCpMilestoneCounter/InventoryDate/StoreDate : trois champs mutes en jeu cote Fenrir,
--- persistes par le legacy, jamais persistes ici. Confirme par recherche exhaustive avant redaction :
--- 0 resultat pour les trois dans src/Fenrir.Data*/Database/ (TVP, DTO, colonnes, procedures) avant ce script.
---
--- BUG DECOUVERT EN COURS DE REDACTION, CORRIGE AU PASSAGE (section 6 ci-dessous) : la redeclaration RS0 de
--- Migrations/040 permutait RankPoint/CloakLuckyBoxPity/CloakVariantBoxPity/MountVariantBoxPity avec
--- ImproveItemValue/AddItemValue/HighItemValue/TaiyanKeyTimer (ordre inverse de celui declare par
--- CharacterWorldSnapshotDto -- verifie programmatiquement, diff ordinal-par-ordinal des deux listes) :
--- lecture par ordinal, donc ces huit colonnes arrivaient croisees en RAM a chaque entree en monde (RankPoint
--- recevait la valeur d'ImproveItemValue, etc.), silencieusement, sans exception. La section 6 ci-dessous
--- restaure l'ordre correct ; verifie de nouveau apres correction (0 mismatch sur les 119 colonnes de RS0
--- projetees ici, WarriorPill/WarriorScroll exclues -- voir note plus bas).
---
---   TowerCpMilestoneCounter  aKillMonsterNum2, Server/Header/Protocol/STRUCT.h:388. Incremente a chaque kill
---                            qui satisfait ReturnFixedLevel(aLevel1+aLevel2) - mRealLevel < 10
---                            (Server/ts25zone/S07_MyGame02.cpp:2437-2439) ; a 1000 il repasse a 0 et paie
---                            killcp (S07_MyGame02.cpp:2440-2463) -- semantique portee cote Fenrir par
---                            TowerCpForPvmMilestone.RegisterKill, appelee depuis
---                            MonsterSpawnScheduler.ApplyTowerCpForPvmMilestone (hors perimetre d'ecriture de
---                            ce lot). PERSISTE cote legacy : FIELD_AVATAR0(aKillMonsterNum2) dans
---                            CSQLDatabase::CreateAvatarColumn (Server/Header/CSQLAvatar.cpp:556,610), colonne
---                            reelle aKillMonsterNum2 int(11) DEFAULT 0 (Server/BuildEU33/DB/nxtserver.sql:90).
---                            NOUVELLE colonne game.Characters (aucun equivalent existant). ANGLE MORT
---                            DISTINCT, NON TRAITE ICI : AvatarInfo.KillMonsterNum2 reste cable en dur a 0 par
---                            Fenrir.Core/Packets/Shared/AvatarInfoTemplates.cs:63 (AvatarInfoFactory ne le
---                            mappe nulle part) -- ce lot ferme le round-trip DB, pas l'affichage client.
---   InventoryDate/StoreDate  aInventoryDate/aStoreDate, STRUCT.h:356,361. Dates d'expiration des pages
---                            louees d'inventaire/entrepot. Colonnes DEJA presentes
---                            (Database/Tables/game/Characters.sql:114-117) et DEJA lues
---                            (usp_Character_GetForWorldEntry, CharacterWorldSnapshotDto) : seul le cote
---                            ECRITURE manquait -- absentes de tvp_CharacterProgress et des deux procedures de
---                            write-behind. A ce jour, aucun site de mutation runtime ne les modifie (l'opcode
---                            legacy d'extension d'espace, Server/ts25login/S04_MyWork02.cpp reference dans
---                            STRUCT.h + S04_MyWork03.cpp:2672,2685, n'est pas encore porte cote Fenrir) --
---                            seule la normalisation de charge (VaultDateNormalization.NormalizeIfExpired,
---                            EnterWorldService.cs) les fait varier en memoire sans jamais ecrire le resultat
---                            en base. Ce script ferme ce round-trip par avance : sans effet observable tant
---                            que l'opcode d'extension n'existe pas, correct des qu'il le sera (meme motif
---                            avant-compatible que StellarCoreExpireDate dans Migrations/040).
---
--- POURQUOI UN NOUVEAU SCRIPT ET DROP+RECREATE DU TYPE
--- game.tvp_CharacterProgress et les deux procedures de write-behind sont deja journalisees SHA-256 ; le
--- migrateur refuse de re-appliquer un chemin dont le contenu a change. Un type TABLE ne s'ALTERe pas et ne
--- se DROP pas tant qu'une procedure le prend en parametre : meme sequence DROP-procs / DROP-type /
--- CREATE-type / CREATE-procs que Migrations/011/012/040.
---
--- ETAT CONCURRENT AU MOMENT DE L'ECRITURE -- A REVERIFIER IMPERATIVEMENT AVANT APPLICATION REELLE
--- Ce depot est modifie EN CONTINU par plusieurs lots paralleles. Entre la premiere lecture et l'ecriture de
--- ce script, Fenrir.Data.Abstractions.Characters.CharacterProgressTvp a gagne, dans l'ordre :
---   1. PetBagDate/PlayTime1/PlayTime3/HsbStoneRewardClaimed (Lot 11) -- colonnes game.Characters DEJA
---      ajoutees par Migrations/032_playtime_petbagdate_hsbreward_writeback.sql (guarde IF NOT EXISTS) mais
---      jamais cablees jusqu'ici dans le TVP ni dans RS0. Ce script les cable au passage : le DROP+CREATE du
---      type les inclut de toute facon (forme positionnelle du record C#), et laisser un parametre TVP
---      recu-mais-jamais-assigne serait pire que l'etat actuel (illusion de persistance).
---   2. WarriorPill/WarriorScroll (Lot 14, PAS le sujet initial de ce script). Au moment de la premiere
---      passe de redaction, ces deux champs n'avaient AUCUNE colonne game.Characters -- puis
---      Migrations/041_warriorpill_scroll_columns.sql est apparu sur le disque (Lot 14 les ajoute, gardees
---      IF NOT EXISTS, et documente explicitement dans son propre en-tete que "le lot qui fera la
---      reconciliation finale de game.tvp_CharacterProgress" doit les cabler). Ce script EST cette
---      reconciliation : WarriorPill/WarriorScroll sont maintenant cables en INTEGRALITE (TYPE, les deux SET,
---      RS0) au meme titre que TowerCpMilestoneCounter/InventoryDate/StoreDate -- voir sections 4/5/6.
---      DEPENDANCE D'ORDRE D'APPLICATION : Migrations/041_warriorpill_scroll_columns.sql DOIT s'appliquer
---      AVANT ce script (sinon c.WarriorPill/c.WarriorScroll n'existent pas encore et les UPDATE/SELECT
---      ci-dessous echouent) -- Database/_manifest.txt liste ce script juste APRES lui, dans cet ordre.
--- Si un lot supplementaire a etendu le record entre cette redaction et l'application reelle, ce script
--- sous-estime l'union et redevient lui-meme une regression positionnelle -- reverifier contre l'etat final
--- de CharacterProgressTvp.cs/CharacterWorldSnapshotDto avant de merger, meme role que Migrations/012 et 040.
 
--- 1. Colonne de destination sur game.Characters. Seule TowerCpMilestoneCounter est nouvelle -- InventoryDate/
---    StoreDate existent deja (Database/Tables/game/Characters.sql:114-117), aucun ALTER pour elles.
 IF NOT EXISTS (SELECT 1
                FROM sys.columns
                WHERE object_id = OBJECT_ID(N'game.Characters')
@@ -78,15 +9,11 @@ ALTER TABLE game.Characters
         CONSTRAINT CK_Characters_TowerCpMilestoneCounter CHECK (TowerCpMilestoneCounter >= 0);
 GO
 
--- 2. Dropper les deux procedures qui referencent le type, puis le type lui-meme.
 DROP PROCEDURE IF EXISTS game.usp_Character_PersistFinalFlush;
 DROP PROCEDURE IF EXISTS game.usp_Character_PersistProgressBatch;
 DROP TYPE IF EXISTS game.tvp_CharacterProgress;
 GO
 
--- 3. Recreer le type, miroir exact de CharacterProgressTvp tel qu'observe (voir note ci-dessus) + les trois
---    colonnes de ce lot (TowerCpMilestoneCounter/InventoryDate/StoreDate), avant WarriorPill/WarriorScroll
---    en queue (non cables, voir note).
 CREATE TYPE game.tvp_CharacterProgress AS TABLE
 (
     CharacterId              INT          NOT NULL,
@@ -179,7 +106,6 @@ CREATE TYPE game.tvp_CharacterProgress AS TABLE
 );
 GO
 
--- 4. Recreer usp_Character_PersistProgressBatch. Garde d'idempotence inchangee.
 CREATE PROCEDURE game.usp_Character_PersistProgressBatch @Progress game.tvp_CharacterProgress READONLY
 AS
 BEGIN
@@ -276,12 +202,10 @@ BEGIN
         c.UpdatedAtUtc             = SYSUTCDATETIME()
     FROM game.Characters AS c
              JOIN @Progress AS s ON s.CharacterId = c.CharacterId
-    WHERE s.FlushSequence > c.FlushSequence; -- idempotence guard
+    WHERE s.FlushSequence > c.FlushSequence; 
 END;
 GO
 
--- 5. Recreer usp_Character_PersistFinalFlush (deconnexion + changement de zone, via
---    PositionWriteBehindHost.FlushCharacterNowAsync).
 CREATE PROCEDURE game.usp_Character_PersistFinalFlush @Progress game.tvp_CharacterProgress READONLY,
                                                       @Position game.tvp_CharacterPosition READONLY
 AS
@@ -385,20 +309,10 @@ BEGIN
     FROM game.Characters AS c
              JOIN @Progress AS p ON p.CharacterId = c.CharacterId
              JOIN @Position AS q ON q.CharacterId = c.CharacterId
-    WHERE q.FlushSequence > c.FlushSequence; -- idempotence guard
+    WHERE q.FlushSequence > c.FlushSequence; 
 END;
 GO
 
--- 6. Chemin de LECTURE. Redeclaration COMPLETE de RS0, verifiee programmatiquement colonne-par-colonne
---    contre l'ordre declare de CharacterWorldSnapshotDto (0 mismatch) : reprend Migrations/040 jusqu'a
---    StellarCoreExpireDate (avec la correction d'ordre RankPoint/CloakLuckyBoxPity/CloakVariantBoxPity/
---    MountVariantBoxPity <-> ImproveItemValue/AddItemValue/HighItemValue/TaiyanKeyTimer -- voir en-tete) puis
---    ajoute, dans l'ordre du record C# observe, EliteDungeonTime/DungeonKeyTime/IvyHallTicketTime/
---    ScrollOfSeekersTime/FightingGodForDestroy/PlayTime1/PlayTime3/HsbStoneRewardClaimed/
---    TowerCpMilestoneCounter/WarriorPill/WarriorScroll -- onze colonnes deja presentes sur
---    CharacterWorldSnapshotDto mais absentes de RS0 depuis Migrations/040 (qui s'arretait a
---    StellarCoreExpireDate). InventoryDate/StoreDate sont deja projetees plus haut dans la liste (juste
---    apres DropItemTime, position inchangee depuis Migrations/002) : non deplacees.
 CREATE OR ALTER PROCEDURE game.usp_Character_GetForWorldEntry @CharacterId INT
 AS
 BEGIN
@@ -533,10 +447,10 @@ BEGIN
     SELECT Container,
            Slot,
            ItemId,
-           CAST(Quantity AS INT) AS Quantity, -- game.CharacterItems.Quantity is SMALLINT; widen back to INT
-           Enchant,                           -- here so CharacterItemSlotDto's existing int-typed ctor param
-           Combine,                           -- keeps reading it via SqlDataReader.GetInt32 without an
-           Refine,                            -- InvalidCastException (see CharacterItems.sql's own comment)
+           CAST(Quantity AS INT) AS Quantity, 
+           Enchant,                           
+           Combine,                           
+           Refine,                            
            Socket,
            SocketGem1,
            SocketGem2,

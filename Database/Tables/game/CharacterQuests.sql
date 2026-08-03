@@ -1,6 +1,3 @@
--- Legacy: wAvatar.aQuestInfo[5] -> [0]=StepPermanent, [1]=ActiveQuestId, [2]=QSort (quest type),
--- [3]=TargetPhase, [4]=KillCounter. At most one row per character; no row = chain never touched
--- (usp_Character_GetForWorldEntry folds it in via LEFT JOIN + ISNULL(0)).
 CREATE TABLE game.CharacterQuests
 (
     CharacterId   INT NOT NULL,

@@ -1,12 +1,9 @@
--- Same function's aSkill[40][2] block (Grade is always START_SKILL_VALUE=1 at creation). Slots 7,8,9,28,29,
--- 35-39 are 0 (empty) for every tribe and simply have no row here -- see world.StarterKitSkills' comment.
 IF
     NOT EXISTS (SELECT 1
                 FROM world.StarterKitSkills)
     BEGIN
         INSERT INTO world.StarterKitSkills (PreviousTribe, SlotIndex, SkillId, Grade)
         VALUES
-            -- Noble Dragon (PreviousTribe 0)
             (0, 0, 1, 1),
             (0, 1, 2, 1),
             (0, 2, 3, 1),
@@ -38,7 +35,6 @@ IF
             (0, 33, 79, 1),
             (0, 34, 80, 1),
 
-            -- Royal Serpent (PreviousTribe 1)
             (1, 0, 20, 1),
             (1, 1, 21, 1),
             (1, 2, 22, 1),
@@ -70,7 +66,6 @@ IF
             (1, 33, 79, 1),
             (1, 34, 80, 1),
 
-            -- Grand Tiger (PreviousTribe 2)
             (2, 0, 39, 1),
             (2, 1, 40, 1),
             (2, 2, 41, 1),

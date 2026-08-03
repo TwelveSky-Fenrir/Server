@@ -1,12 +1,1 @@
--- Lot 1 (dead-proc sweep) -- drop game.usp_Character_SetMountProgression.
---
--- The dedicated single-mount persistence proc is superseded: mount attribute persistence now rides the
--- write-behind progress flush. Migrations/002_character_progress_mount_writeback.sql folded MountItemId /
--- MountExpActivity / MountPower / MountSlotIndex / MountTime into game.tvp_CharacterProgress and both
--- usp_Character_PersistProgressBatch / usp_Character_PersistFinalFlush, so the discrete-event proc has no
--- remaining role. It had exactly one C# caller, ICharacterRepository.SetMountProgressionAsync, removed in the
--- same change; no code path invokes it anymore. Its base script
--- (StoredProcedures/game/usp_Character_SetMountProgression.sql) is removed from _manifest.txt so fresh
--- databases never create it; this migration drops it from any database that already applied the base script.
--- Idempotent (IF EXISTS): a no-op on databases that never had the proc.
 DROP PROCEDURE IF EXISTS game.usp_Character_SetMountProgression;

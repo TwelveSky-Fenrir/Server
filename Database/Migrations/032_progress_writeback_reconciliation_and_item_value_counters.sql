@@ -1,70 +1,4 @@
--- Lot 9 -- quatre compteurs de charge/temps mutes en jeu, persistes par le legacy, perdus par Fenrir --
--- ImproveItemValue / AddItemValue / HighItemValue / TaiyanKeyTimer.
---
--- CE QUE PERSISTE LE LEGACY, ET OU
---   ImproveItemValue (aImproveItemValue / alias aSweetPotaito)  STRUCT.h:453  CSQLAvatar.cpp:668
---                     credite par parchemin (Server/ts25zone/S04_MyWork03.cpp:2440-2441), consomme -1 a
---                     l'enchant avec broadcast S146SWEET_POTATO (Server/ts25zone/S04_MyWork02.cpp:2908-2912,
---                     :3156-3160).
---   AddItemValue      (aAddItemValue)  STRUCT.h:402  CSQLAvatar.cpp:669
---                     credite par parchemin, plafond MAX_NUMBER_SIZE (Server/ts25zone/S04_MyWork03.cpp:2808-2813),
---                     consomme -1 sur la combinaison, broadcast S028LUCKY_COMBINE (S04_MyWork02.cpp:3722-3726).
---   HighItemValue     (aHighItemValue)  STRUCT.h:403  CSQLAvatar.cpp:670
---                     credite par parchemin (S04_MyWork03.cpp:2831-2832), entree de GetHighLowItemProbability
---                     (S04_MyWork02.cpp:4008,4159), consomme -1 avec broadcast S029LUCKY_UPGRADE
---                     (S04_MyWork02.cpp:4027-4031,4178-4182,14397-14401).
---   TaiyanKeyTimer    (aZone125Time)  STRUCT.h:385  CSQLAvatar.cpp:607
---                     credite par la cle Taiyan, objet 1049 (S04_MyWork03.cpp:2392-2402), decremente d'une
---                     minute avec Quit() a l'epuisement et broadcast S021ZONE_125_TIME
---                     (Server/ts25zone/S07_MyGame04.cpp:1067-1079). C'est le sous-code 21 deja emis par
---                     Fenrir (TimedBuffCountdownSystem.cs:84-87), sous PlayerRuntimeState.TaiyanKeyTimer.
--- Les quatre colonnes sont FIELD_AVATAR0 dans CreateAvatarColumn SANS #ifdef -- elles comptent dans les deux
--- configurations livrees -- donc persistees par le meme UPDATE d'avatar que le reste
--- (Server/ts25playuser/S08_MyDB.cpp:99) et relues au login (Server/ts25login/S08_MyDB.cpp:571).
---
--- L'ECART FENRIR : les quatre sont deja mutees (Zone.EconomyMirrors.cs -> TribeProgressZoneCommand pour les
--- trois premieres ; TimedBuffCountdownSystem.cs pour la quatrieme) mais n'atteignaient aucune colonne, aucun
--- TVP, aucun DTO -- perdues a la deconnexion ET au changement de zone.
---
--- ANGLE MORT DECOUVERT EN PREPARANT CE LOT -- A CORRIGER DANS LE MEME SCRIPT, PAS A COTE
--- game.tvp_CharacterProgress ne peut pas etre ALTERe (type TABLE) : chaque lot le DROP+RECREE en entier, et
--- Migrations/010_character_autobuff_and_rankbuff_writeback.sql puis
--- Migrations/011_avatar_counters_and_bottles_writeback.sql -- tous deux ecrits en parallele de
--- Migrations/008_autohunt_buffx2_premium_pet_writeback.sql -- se sont chacun rebases sur la forme laissee par
--- Migrations/007 (37/42 colonnes), PAS sur celle de 008 (48 colonnes). L'AVERTISSEMENT DE SEQUENCAGE ecrit en
--- toutes lettres dans l'en-tete de 008 ("le dernier script applique gagne et efface silencieusement les
--- colonnes des autres") s'est donc realise : 011, dernier des Migrations/ dans l'ordre du manifeste avant ce
--- lot, recree le type et les deux procedures SANS les six colonnes de 008 (AutoTime, AutoTime2, BuffX2Time,
--- PremiumExpireUtc, PetGrowth, PetActivity). Migrations/012_autohunt_premium_pet_writeback_restore.sql a
--- depuis restaure ces six colonnes au type et aux clauses SET des deux procedures, mais SANS le parametre
--- @Costumes / la transaction / le remplacement de penderie que Migrations/008 avait aussi poses -- alors que
--- Fenrir.Data.Characters.CharacterRepository.PersistProgressAsync/PersistFinalFlushAsync passent deja un
--- parametre @Costumes des que la penderie n'est pas vide (CharacterRepository.cs). Ce script restaure donc
--- @Costumes/la transaction/le remplacement de penderie EN PLUS d'ajouter ses quatre colonnes -- un type SQL
--- sans @Costumes face a un appelant qui le fournit echoue durement des qu'un personnage porte un costume.
---
--- POURQUOI UN NOUVEAU SCRIPT PLUTOT QU'UNE EDITION DES FICHIERS DE BASE OU DES MIGRATIONS 008/010/011/012
--- Les migrations et les fichiers de base sont deja listes dans _manifest.txt, donc journalises par SHA-256
--- par Fenrir.Tools.DbMigrator sur toute base qui les a appliques une fois -- le migrateur refuse de
--- re-appliquer un chemin journalise dont le contenu a change. Une base FRAICHE applique la chaine complete du
--- manifeste puis ce script ; une base PERSISTANTE saute les scripts deja journalises et n'applique que
--- celui-ci. Les deux convergent sur la meme forme terminale.
---
--- CE QUE CE SCRIPT NE FAIT PAS
--- Il ne touche pas usp_Character_GetForWorldEntrySummary (prefixe stable de 19 colonnes, inchange). Il ne
--- deplace ni ne renomme aucune colonne existante -- uniquement des ajouts en queue, ordre exact du record
--- CharacterProgressTvp et de CharacterWorldSnapshotDto au moment de l'ecriture (avant les colonnes d'un lot
--- suivant qui s'enregistrerait apres celui-ci -- voir l'avertissement de sequencage plus haut : la migration
--- qui s'enregistre EN DERNIER doit reprendre l'union complete, ce script n'est pas garanti d'etre celle-la).
--- Il n'ajoute AUCUN IHostedService : ces quatre champs sont mono-proprietaires de PlayerRuntimeState (meme
--- categorie que DropItemTime/Eat*Potion), donc portes par les DEUX chemins de write-behind deja enregistres
--- (ProgressWriteBehindHost pour le flush periodique, PositionWriteBehindHost.FlushCharacterNowAsync pour la
--- deconnexion et le changement de zone), jamais un troisieme chemin d'ecriture.
 
--- ---------------------------------------------------------------------------
--- 1. game.Characters : quatre nouvelles colonnes. Valeur sure pour les lignes existantes : 0 partout (aucune
---    charge/aucun temps restant, l'etat d'un avatar qui n'a jamais consomme le parchemin/la cle correspondante).
--- ---------------------------------------------------------------------------
 IF COL_LENGTH('game.Characters', 'ImproveItemValue') IS NULL
 ALTER TABLE game.Characters
     ADD ImproveItemValue INT NOT NULL
@@ -81,20 +15,11 @@ ALTER TABLE game.Characters
             CONSTRAINT CK_Characters_TaiyanKeyTimer CHECK (TaiyanKeyTimer >= 0);
 GO
 
--- ---------------------------------------------------------------------------
--- 2. Les deux procedures qui referencent le type bloquent son DROP : les supprimer d'abord, puis le type.
--- ---------------------------------------------------------------------------
 DROP PROCEDURE IF EXISTS game.usp_Character_PersistFinalFlush;
 DROP PROCEDURE IF EXISTS game.usp_Character_PersistProgressBatch;
 DROP TYPE IF EXISTS game.tvp_CharacterProgress;
 GO
 
--- ---------------------------------------------------------------------------
--- 3. Le type : les 59 colonnes restaurees par Migrations/012 (53 de 011 + les 6 oubliees de 008), plus les
---    quatre nouvelles de ce lot en queue. PremiumExpireUtc reste BIGINT (time_t Unix, USE_PREMIUM_LONGTIME) ;
---    les quatre nouvelles restent INT, meme categorie que DropItemTime/ProtectForHalo -- des compteurs,
---    jamais un solde partage.
--- ---------------------------------------------------------------------------
 CREATE TYPE game.tvp_CharacterProgress AS TABLE
 (
     CharacterId              INT          NOT NULL,
@@ -163,11 +88,6 @@ CREATE TYPE game.tvp_CharacterProgress AS TABLE
 );
 GO
 
--- ---------------------------------------------------------------------------
--- 4. Le flush periodique. @Costumes/la transaction/le remplacement de penderie borne par @Applied sont repris
---    de Migrations/008 (jamais restaures par 010/011/012) ; CharacterRepository.PersistProgressAsync les
---    fournit deja. Garde d'idempotence (FlushSequence strictement croissante) inchangee.
--- ---------------------------------------------------------------------------
 CREATE PROCEDURE game.usp_Character_PersistProgressBatch @Progress game.tvp_CharacterProgress READONLY,
                                                          @Costumes game.tvp_CharacterCostumeSlot READONLY
 AS
@@ -249,7 +169,7 @@ BEGIN
     OUTPUT inserted.CharacterId INTO @Applied (CharacterId)
     FROM game.Characters AS c
              JOIN @Progress AS s ON s.CharacterId = c.CharacterId
-    WHERE s.FlushSequence > c.FlushSequence; -- idempotence guard
+    WHERE s.FlushSequence > c.FlushSequence; 
 
     DELETE cc
     FROM game.CharacterCostumes AS cc
@@ -268,11 +188,6 @@ BEGIN
 END;
 GO
 
--- ---------------------------------------------------------------------------
--- 5. Le flush terminal -- deconnexion (GameConnectionHost) et changement de zone (ZoneMoveService), tous deux
---    via PositionWriteBehindHost.FlushCharacterNowAsync. Progression + position + penderie dans la meme
---    transaction : ce chemin n'a pas de cycle suivant pour rattraper une moitie perdue.
--- ---------------------------------------------------------------------------
 CREATE PROCEDURE game.usp_Character_PersistFinalFlush @Progress game.tvp_CharacterProgress READONLY,
                                                       @Position game.tvp_CharacterPosition READONLY,
                                                       @Costumes game.tvp_CharacterCostumeSlot READONLY
@@ -361,7 +276,7 @@ BEGIN
     FROM game.Characters AS c
              JOIN @Progress AS p ON p.CharacterId = c.CharacterId
              JOIN @Position AS q ON q.CharacterId = c.CharacterId
-    WHERE q.FlushSequence > c.FlushSequence; -- idempotence guard
+    WHERE q.FlushSequence > c.FlushSequence; 
 
     DELETE cc
     FROM game.CharacterCostumes AS cc
@@ -380,13 +295,6 @@ BEGIN
 END;
 GO
 
--- ---------------------------------------------------------------------------
--- 6. Le chemin de LECTURE. RS0 est append-only en queue, mappe par ORDINAL sur CharacterWorldSnapshotDto :
---    AutoTime/BuffX2Time (deja lus cote C#, jamais projetes cote SQL depuis 011) puis les quatre nouvelles
---    colonnes de ce lot se posent tout en fin, jamais au milieu. Le prefixe stable de 19 colonnes partage
---    avec usp_Character_GetForWorldEntrySummary est intact ; les quatre autres result sets sont repris
---    verbatim.
--- ---------------------------------------------------------------------------
 CREATE OR ALTER PROCEDURE game.usp_Character_GetForWorldEntry @CharacterId INT
 AS
 BEGIN
@@ -501,10 +409,10 @@ BEGIN
     SELECT Container,
            Slot,
            ItemId,
-           CAST(Quantity AS INT) AS Quantity, -- game.CharacterItems.Quantity is SMALLINT; widen back to INT
-           Enchant,                           -- here so CharacterItemSlotDto's existing int-typed ctor param
-           Combine,                           -- keeps reading it via SqlDataReader.GetInt32 without an
-           Refine,                            -- InvalidCastException (see CharacterItems.sql's own comment)
+           CAST(Quantity AS INT) AS Quantity, 
+           Enchant,                           
+           Combine,                           
+           Refine,                            
            Socket,
            SocketGem1,
            SocketGem2,

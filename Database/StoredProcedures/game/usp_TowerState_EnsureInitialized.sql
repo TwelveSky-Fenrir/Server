@@ -1,6 +1,3 @@
--- database/50_procedures/game/usp_TowerState_EnsureInitialized.sql
--- Idempotent bootstrap: seeds 12 uncontrolled tower rows on first call only. Call once at GameServer
--- startup.
 CREATE PROCEDURE game.usp_TowerState_EnsureInitialized
 AS
 BEGIN

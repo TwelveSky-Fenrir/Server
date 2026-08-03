@@ -1,6 +1,3 @@
--- database/50_procedures/game/usp_TribeSubMaster_Set.sql
--- Not idempotent: throws rather than silently duplicating if the slot is occupied or the character
--- already holds a different slot in this tribe (DemandInsertTribeSubMaster, S04_MyWork02.cpp:10859).
 CREATE PROCEDURE game.usp_TribeSubMaster_Set @TribeId TINYINT,
                                              @SlotIndex TINYINT,
                                              @CharacterId INT

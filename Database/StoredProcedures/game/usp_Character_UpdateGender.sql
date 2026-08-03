@@ -1,8 +1,3 @@
--- Atomically updates a character's Gender, HeadType and FaceType (used by the Gender Scroll, item 1171).
---
--- Return codes:
---   0   updated successfully
---   1   character not found
 CREATE PROCEDURE game.usp_Character_UpdateGenderAndAppearance @CharacterId INT,
                                                               @Gender      TINYINT,
                                                               @HeadType    TINYINT,

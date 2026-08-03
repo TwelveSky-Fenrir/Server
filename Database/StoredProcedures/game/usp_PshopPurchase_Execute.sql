@@ -1,7 +1,3 @@
--- database/50_procedures/game/usp_PshopPurchase_Execute.sql
--- Live PShop trades never touch BigMoney (verified S04_MyWork02.cpp:7056/7073). No item-slot CAS guard
--- here: the caller already re-validated the seller's live inventory under both participants'
--- EconomyActionLock before calling.
 CREATE PROCEDURE game.usp_PshopPurchase_Execute @SellerCharacterId INT,
                                                 @SellerContainer TINYINT,
                                                 @SellerItems game.tvp_CharacterItemSlot READONLY,

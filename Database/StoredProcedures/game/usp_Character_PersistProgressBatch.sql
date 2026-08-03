@@ -1,7 +1,3 @@
--- Idempotent: same strictly-greater FlushSequence guard as usp_Character_PersistBatch (one shared
--- monotonic sequence per character across both flush flavors).
--- Money/BigMoney intentionally absent: balances only move through usp_Character_AdjustMoney, to
--- avoid a last-write-wins flush clobbering a balance.
 CREATE PROCEDURE game.usp_Character_PersistProgressBatch @Progress game.tvp_CharacterProgress READONLY
 AS
 BEGIN
@@ -36,5 +32,5 @@ BEGIN
         c.UpdatedAtUtc       = SYSUTCDATETIME()
     FROM game.Characters AS c
              JOIN @Progress AS s ON s.CharacterId = c.CharacterId
-    WHERE s.FlushSequence > c.FlushSequence; -- idempotence guard
+    WHERE s.FlushSequence > c.FlushSequence; 
 END;

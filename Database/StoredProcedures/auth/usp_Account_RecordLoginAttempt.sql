@@ -1,5 +1,3 @@
--- NOT idempotent when @Success = 0: each call increments FailedLoginCount, so callers must report
--- each real attempt exactly once. Progressive lockout: >=10 failures -> 15 min, >=5 -> 1 min.
 CREATE PROCEDURE auth.usp_Account_RecordLoginAttempt @AccountId INT,
                                                      @Success BIT
 AS

@@ -1,6 +1,3 @@
--- Adds usp_Character_UpdateAppearance (item 1214 Appearance Change Scroll) and
--- usp_Character_UpdateGenderAndAppearance (item 1171 Gender Scroll). Both update HeadType/FaceType
--- on game.Characters; the gender scroll also updates Gender. These columns already exist.
 
 IF OBJECT_ID('game.usp_Character_UpdateAppearance', 'P') IS NOT NULL
     DROP PROCEDURE game.usp_Character_UpdateAppearance;

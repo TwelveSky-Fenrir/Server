@@ -1,16 +1,3 @@
--- Adds persistent X/Y grid-position coordinates for personal-inventory bag items (game.CharacterItems.
--- Container IN (0, 1), InventoryPage0/InventoryPage1 -- equip/store/trade/pet-bag never had X/Y in legacy
--- and are not touched here). Two write paths only: inventory-to-inventory move and ground-item pickup.
---
--- WHY A V2 TYPE INSTEAD OF ALTERING tvp_CharacterItemSlot: same reasoning as Schemas/Types/game/
--- tvp_AccountVaultItemSlotV2.sql -- a TABLE type cannot be ALTERed and cannot be DROPped while any
--- procedure still takes it as a parameter, and ~22 other write paths in ItemStack.ToTvp/usp_CharacterItems_
--- ReplaceContainer(TwoContainers) stay on V1 deliberately, out of scope for this change. V2 is a strict
--- superset of V1's column list (identical prefix, XPos/YPos appended), so ReplaceContainerV2/
--- ReplaceTwoContainersV2 are the V1 bodies unchanged except for the widened TVP type and INSERT list.
---
--- 1a. New columns, DEFAULT 0 so every pre-existing row (and every V1 write path that keeps inserting
---     through the un-widened column list) stays valid against the CHECK below without a data backfill.
 ALTER TABLE game.CharacterItems
     ADD XPos TINYINT NOT NULL
             CONSTRAINT DF_CharacterItems_XPos DEFAULT 0,
@@ -23,7 +10,6 @@ ALTER TABLE game.CharacterItems
         ADD CONSTRAINT CK_CharacterItems_BagPosition CHECK (XPos BETWEEN 0 AND 7 AND YPos BETWEEN 0 AND 7);
 GO
 
--- 1b. V2 TVP: exact column-for-column copy of tvp_CharacterItemSlot.sql, XPos/YPos appended.
 CREATE TYPE game.tvp_CharacterItemSlotV2 AS TABLE
 (
     Slot       TINYINT NOT NULL,
@@ -43,8 +29,6 @@ CREATE TYPE game.tvp_CharacterItemSlotV2 AS TABLE
 );
 GO
 
--- 1c. V2 siblings of usp_CharacterItems_ReplaceContainer / usp_CharacterItems_ReplaceTwoContainers --
---     same transaction shape, same XACT_ABORT ON, same DELETE-then-INSERT, INSERT list widened by XPos/YPos.
 CREATE PROCEDURE game.usp_CharacterItems_ReplaceContainerV2 @CharacterId INT,
                                                             @Container TINYINT,
                                                             @Items game.tvp_CharacterItemSlotV2 READONLY
@@ -88,11 +72,6 @@ BEGIN
 END;
 GO
 
--- ContainerA=ContainerB guard reuses the V1 wording but needs its own ErrorCatalog row: 50260 already
--- means the same guard for usp_CharacterItems_ReplaceTwoContainers, and the collision rule in
--- admin.ErrorCatalog's own header only allows reusing a number when every thrower means the identical
--- failure for the identical procedure family -- V1 and V2 are two different procedures, so this gets the
--- next free number instead (registered by Migrations/Seed/admin/030_error_catalog_characteritems_v2.sql).
 CREATE PROCEDURE game.usp_CharacterItems_ReplaceTwoContainersV2 @CharacterId INT,
                                                                 @ContainerA TINYINT,
                                                                 @ItemsA game.tvp_CharacterItemSlotV2 READONLY,
@@ -168,10 +147,6 @@ BEGIN
 END;
 GO
 
--- 1d. usp_Character_GetForWorldEntry, reproduced verbatim from Migrations/042_character_progress_tvp_full_
---     reconciliation.sql (the last script to CREATE OR ALTER it, per _manifest.txt) -- only the
---     CharacterItems result set changes, widened to project XPos, YPos. Every other result set (RS0,
---     Skills, Hotkeys, Buffs) is untouched.
 CREATE OR ALTER PROCEDURE game.usp_Character_GetForWorldEntry @CharacterId INT
 AS
 BEGIN
@@ -306,10 +281,10 @@ BEGIN
     SELECT Container,
            Slot,
            ItemId,
-           CAST(Quantity AS INT) AS Quantity, -- game.CharacterItems.Quantity is SMALLINT; widen back to INT
-           Enchant,                           -- here so CharacterItemSlotDto's existing int-typed ctor param
-           Combine,                           -- keeps reading it via SqlDataReader.GetInt32 without an
-           Refine,                            -- InvalidCastException (see CharacterItems.sql's own comment)
+           CAST(Quantity AS INT) AS Quantity, 
+           Enchant,                           
+           Combine,                           
+           Refine,                            
            Socket,
            SocketGem1,
            SocketGem2,

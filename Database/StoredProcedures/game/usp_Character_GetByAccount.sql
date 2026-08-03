@@ -1,4 +1,3 @@
--- Ordered by Slot to match the legacy tAvatarPost slot layout.
 CREATE PROCEDURE game.usp_Character_GetByAccount @AccountId INT
 AS
 BEGIN

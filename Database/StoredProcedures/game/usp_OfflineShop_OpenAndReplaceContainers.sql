@@ -1,10 +1,3 @@
--- database/50_procedures/game/usp_OfflineShop_OpenAndReplaceContainers.sql
--- Refuses to open over an existing shop that is still open or still holds unclaimed items/money -- the
--- owner must fully retrieve/withdraw the previous shop first.
--- A standalone usp_OfflineShop_Upsert (open without the paired inventory-container replace) used to exist
--- but had zero callers -- every real "open shop" client flow also relocates the listed items out of the
--- player's own inventory in the same action, so a bare upsert was never needed -- removed as dead code in
--- the 2026-07-12 Database/ cleanup pass.
 CREATE PROCEDURE game.usp_OfflineShop_OpenAndReplaceContainers @CharacterId INT,
                                                                @ZoneNumber SMALLINT,
                                                                @ShopDate INT,

@@ -1,4 +1,3 @@
--- New file rather than an edit to an earlier error-catalog script: applied scripts are never edited.
 IF
     NOT EXISTS (SELECT 1
                 FROM admin.ErrorCatalog

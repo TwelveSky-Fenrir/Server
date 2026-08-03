@@ -1,23 +1,3 @@
--- Additive script: usp_Gift_ClaimIntoVault.sql stays unchanged (DbMigrator journals it by SHA-256 and would
--- refuse to reapply it if edited). CREATE OR ALTER on the same procedure name, same pattern as
--- usp_AccountVault_TransferMoneyWithCharacter_VaultCreateRaceGuard.sql (that file's own header carries the
--- full race explanation this one shares).
---
--- Here the bootstrap INSERT sits between the Gift claim (game.Gifts Status 0 -> 1, captured into @Claimed)
--- and the free-slot scan/AccountVaultItems insert/GiftLog insert, so a losing 2627/2601 that dooms the whole
--- transaction (XACT_STATE() = -1) would otherwise roll the Gift claim back to Status = 0 and silently retry
--- nothing -- the caller would see a raw constraint-violation error instead of either a clean claim or a
--- documented THROW, and the gift would NOT go back to "Pending" the way a genuine 50274 full-vault failure
--- leaves it (per this procedure's own top-of-file remark). The CATCH ROLLBACK TRANSACTIONs and replays the
--- Gift claim, the free-slot scan, and both inserts in a fresh transaction, skipping the now-unnecessary
--- AccountVault existence check (the winner's INSERT is guaranteed committed by the time our own INSERT could
--- raise the duplicate-key error). @Claimed and @FreeSlot are declared once, up front, before either attempt,
--- matching game.usp_Cash_Credit_FirstCreditRaceGuard's own precedent of declaring the OUTPUT-capturing
--- variable before the guarded write so it is safely in scope for both the original path and the CATCH
--- replay; @Claimed is explicitly cleared before the replay's OUTPUT re-populates it, and @FreeSlot is
--- re-scanned fresh rather than reused, since a legitimate "vault filled up in the meantime" (THROW 50274 on
--- retry) is a real outcome here, not a bug -- same reasoning as usp_Character_ApplyTribeFourConversion's own
--- retry re-checking its quota fresh rather than trusting the failed attempt's stale read.
 CREATE OR ALTER PROCEDURE game.usp_Gift_ClaimIntoVault @GiftId INT,
                                               @AccountId INT
 AS

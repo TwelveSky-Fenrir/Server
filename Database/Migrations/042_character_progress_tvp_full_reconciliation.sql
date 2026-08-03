@@ -1,17 +1,9 @@
--- Reconciliation finale game.tvp_CharacterProgress / write-behind / RS0 contre le C# courant.
--- Type recree au miroir positionnel EXACT de CharacterProgressTvp (87 colonnes) ; RS0 au miroir ordinal
--- EXACT de CharacterWorldSnapshotDto (121 colonnes). Les deux procedures reprennent la forme complete de
--- Migrations/034 (transaction + @Costumes + @Applied + garde FlushSequence), regressee par 040 et 041_tower.
--- Aucune colonne a ajouter a game.Characters : les 87 du TVP et les 121 du DTO existent deja (verifie).
--- ORDRE D'APPLICATION : apres 041_warriorpill_scroll_columns.sql et 041_tower_cp_milestone_and_vault_date.
 
--- 1. Dropper les deux procedures qui referencent le type, puis le type.
 DROP PROCEDURE IF EXISTS game.usp_Character_PersistFinalFlush;
 DROP PROCEDURE IF EXISTS game.usp_Character_PersistProgressBatch;
 DROP TYPE IF EXISTS game.tvp_CharacterProgress;
 GO
 
--- 2. Le type. L'ordre des colonnes EST le binding du TVP : celui du record C#, position pour position.
 CREATE TYPE game.tvp_CharacterProgress AS TABLE
 (
     CharacterId              INT          NOT NULL,
@@ -104,8 +96,6 @@ CREATE TYPE game.tvp_CharacterProgress AS TABLE
 );
 GO
 
--- 3. Flush periodique (ProgressWriteBehindHost). @Costumes est omis par l'appelant quand la penderie est
---    vide : SQL Server le recoit alors comme table vide, et le DELETE borne par @Applied la vide bien.
 CREATE PROCEDURE game.usp_Character_PersistProgressBatch @Progress game.tvp_CharacterProgress READONLY,
                                                          @Costumes game.tvp_CharacterCostumeSlot READONLY
 AS
@@ -211,7 +201,7 @@ BEGIN
     OUTPUT inserted.CharacterId INTO @Applied (CharacterId)
     FROM game.Characters AS c
              JOIN @Progress AS s ON s.CharacterId = c.CharacterId
-    WHERE s.FlushSequence > c.FlushSequence; -- idempotence guard
+    WHERE s.FlushSequence > c.FlushSequence; 
 
     DELETE cc
     FROM game.CharacterCostumes AS cc
@@ -230,8 +220,6 @@ BEGIN
 END;
 GO
 
--- 4. Flush terminal (deconnexion, changement de zone). Progression + position + penderie dans la meme
---    transaction : ce chemin n'a pas de cycle suivant pour rattraper une moitie perdue.
 CREATE PROCEDURE game.usp_Character_PersistFinalFlush @Progress game.tvp_CharacterProgress READONLY,
                                                       @Position game.tvp_CharacterPosition READONLY,
                                                       @Costumes game.tvp_CharacterCostumeSlot READONLY
@@ -344,7 +332,7 @@ BEGIN
     FROM game.Characters AS c
              JOIN @Progress AS p ON p.CharacterId = c.CharacterId
              JOIN @Position AS q ON q.CharacterId = c.CharacterId
-    WHERE q.FlushSequence > c.FlushSequence; -- idempotence guard
+    WHERE q.FlushSequence > c.FlushSequence; 
 
     DELETE cc
     FROM game.CharacterCostumes AS cc
@@ -363,8 +351,6 @@ BEGIN
 END;
 GO
 
--- 5. Chemin de LECTURE. RS0 est lu par ORDINAL : l'ordre du SELECT EST l'ordre de
---    CharacterWorldSnapshotDto. Les quatre autres result sets sont repris verbatim de Migrations/041_tower.
 CREATE OR ALTER PROCEDURE game.usp_Character_GetForWorldEntry @CharacterId INT
 AS
 BEGIN
@@ -499,10 +485,10 @@ BEGIN
     SELECT Container,
            Slot,
            ItemId,
-           CAST(Quantity AS INT) AS Quantity, -- game.CharacterItems.Quantity is SMALLINT; widen back to INT
-           Enchant,                           -- here so CharacterItemSlotDto's existing int-typed ctor param
-           Combine,                           -- keeps reading it via SqlDataReader.GetInt32 without an
-           Refine,                            -- InvalidCastException (see CharacterItems.sql's own comment)
+           CAST(Quantity AS INT) AS Quantity, 
+           Enchant,                           
+           Combine,                           
+           Refine,                            
            Socket,
            SocketGem1,
            SocketGem2,

@@ -1,5 +1,3 @@
--- Legacy: gBuffType/gBuffState/gBuffTime/gBuffTimeForDiff. Activation is this update plus an
--- in-process notification only; the legacy center rebroadcast is not implemented.
 CREATE PROCEDURE game.usp_Guild_SetBuff @GuildId INT,
                                         @BuffType INT,
                                         @BuffState INT,

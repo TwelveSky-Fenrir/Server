@@ -1,8 +1,3 @@
--- Additive script: usp_AccountVault_TransferBigMoneyWithCharacter.sql stays unchanged (DbMigrator journals
--- it by SHA-256 and would refuse to reapply it if edited). CREATE OR ALTER on the same procedure name, same
--- pattern as usp_AccountVault_TransferMoneyWithCharacter_VaultCreateRaceGuard.sql (that file's own header
--- carries the full race explanation this one shares -- identical AccountVault bootstrap shape, just the
--- BigMoney pair of columns/error codes/audit category instead of the Money pair).
 CREATE OR ALTER PROCEDURE game.usp_AccountVault_TransferBigMoneyWithCharacter @CharacterId INT,
                                                                      @DeltaCharacterBigMoney INT,
                                                                      @AccountId INT,
@@ -57,7 +52,7 @@ BEGIN
                 IF @AuditEventCode IS NOT NULL
                     EXEC game.usp_EventLog_Insert
                          @EventCode = @AuditEventCode,
-                         @Category = 25, -- EventLogCategory.BigMoneyConversion
+                         @Category = 25, 
                          @ActorAccountId = @AccountId,
                          @ActorCharacterId = @CharacterId,
                          @DeltaMoney = @AuditFromDelta,
@@ -91,7 +86,7 @@ BEGIN
     IF @AuditEventCode IS NOT NULL
         EXEC game.usp_EventLog_Insert
              @EventCode = @AuditEventCode,
-             @Category = 25, -- EventLogCategory.BigMoneyConversion
+             @Category = 25, 
              @ActorAccountId = @AccountId,
              @ActorCharacterId = @CharacterId,
              @DeltaMoney = @AuditFromDelta,

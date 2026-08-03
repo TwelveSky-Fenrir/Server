@@ -1,19 +1,3 @@
--- database/50_procedures/game/usp_WorldState_EnsureInitialized.sql
--- Idempotent bootstrap: seeds game.Tribes 0-3 (MAX_TRIBE_NUM=4, game.Tribes has no seed script of its own --
--- Migrations/Seed only seeds admin/world) + the WorldState singleton + 4 WorldStateTribes rows on first call
--- only, in that order, since WorldStateTribes FKs into Tribes (FK_WorldStateTribes_Tribe). Call once at
--- GameServer startup.
---
--- GameServer is sharded (Orchestration/Fenrir.AppHost/AppHost.cs runs one game-shard-NN process per shard
--- id), and every shard process calls this procedure once at boot (WorldStateService.InitializeAsync,
--- Program.cs) with no external serialization between shards. Plain "IF NOT EXISTS (...) INSERT" guards are
--- not atomic under SQL Server's default READ COMMITTED isolation: two shards' EXISTS checks can both see
--- "no row yet" before either INSERT commits, so the second INSERT would hit PK_WorldState (or the
--- Tribes/WorldStateTribes equivalents) -- observed live as a CaeriusNetSqlException: "Violation of PRIMARY
--- KEY constraint 'PK_WorldState'... duplicate key value (1)" during concurrent shard boot. Fix: take an
--- exclusive sp_getapplock scoped to the transaction (auto-released on COMMIT/ROLLBACK) before the existence
--- checks, so concurrent callers serialize instead of racing -- the second caller blocks until the first
--- commits, then re-evaluates NOT EXISTS and correctly finds the rows already present.
 CREATE PROCEDURE game.usp_WorldState_EnsureInitialized
 AS
 BEGIN

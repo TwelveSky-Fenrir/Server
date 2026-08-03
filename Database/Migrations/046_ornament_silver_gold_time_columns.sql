@@ -1,20 +1,4 @@
--- Ajoute SilverTime / GoldTime a game.Characters, reconstruit game.tvp_CharacterProgress (89 colonnes)
--- et les procedures write-behind (flush periodique + flush terminal) pour les scrolls ornements
--- (item 1370 Silver Scroll / item 1167 Gold Scroll).
---
--- Les deux colonnes nouvelles sont ajoutees en fin de TVP, au miroir positionnel exact de
--- CharacterProgressTvp.cs (SilverTime en colonne 88, GoldTime en colonne 89 -- les deux dernieres).
--- La reconstruction du type suit exactement le motif etabli par Migrations/042_character_progress_tvp_full_reconciliation.sql :
--- 1. DROP des deux procedures dependantes
--- 2. DROP TYPE
--- 3. CREATE TYPE (avec les deux colonnes de queue)
--- 4. RECREER usp_Character_PersistProgressBatch
--- 5. RECREER usp_Character_PersistFinalFlush
--- 6. CREATE OR ALTER usp_Character_GetForWorldEntry (RS0 en queue : SilverTime, GoldTime)
---
--- DEPENDANCE : doit s'appliquer APRES 045_appearance_gender_scroll_procedures.sql.
 
--- 0. Ajouter les colonnes a game.Characters (idempotent).
 IF NOT EXISTS (SELECT 1
                FROM sys.columns
                WHERE object_id = OBJECT_ID('game.Characters')
@@ -39,14 +23,11 @@ IF NOT EXISTS (SELECT 1
         ADD GoldTime INT NOT NULL DEFAULT 0;
 GO
 
--- 1. Dropper les deux procedures qui referencent le type, puis le type.
 DROP PROCEDURE IF EXISTS game.usp_Character_PersistFinalFlush;
 DROP PROCEDURE IF EXISTS game.usp_Character_PersistProgressBatch;
 DROP TYPE IF EXISTS game.tvp_CharacterProgress;
 GO
 
--- 2. Le type. L'ordre des colonnes EST le binding du TVP : celui du record C#, position pour position.
---    Reprise verbatim de Migrations/042 + SilverTime / GoldTime en queue.
 CREATE TYPE game.tvp_CharacterProgress AS TABLE
 (
     CharacterId              INT          NOT NULL,
@@ -142,7 +123,6 @@ CREATE TYPE game.tvp_CharacterProgress AS TABLE
 );
 GO
 
--- 3. Flush periodique (ProgressWriteBehindHost). Reprise verbatim de Migrations/042 + deux colonnes de queue.
 CREATE PROCEDURE game.usp_Character_PersistProgressBatch @Progress game.tvp_CharacterProgress READONLY,
                                                          @Costumes game.tvp_CharacterCostumeSlot READONLY
 AS
@@ -251,7 +231,7 @@ BEGIN
     OUTPUT inserted.CharacterId INTO @Applied (CharacterId)
     FROM game.Characters AS c
              JOIN @Progress AS s ON s.CharacterId = c.CharacterId
-    WHERE s.FlushSequence > c.FlushSequence; -- idempotence guard
+    WHERE s.FlushSequence > c.FlushSequence; 
 
     DELETE cc
     FROM game.CharacterCostumes AS cc
@@ -270,7 +250,6 @@ BEGIN
 END;
 GO
 
--- 4. Flush terminal (deconnexion, changement de zone). Reprise verbatim de Migrations/042 + deux colonnes de queue.
 CREATE PROCEDURE game.usp_Character_PersistFinalFlush @Progress game.tvp_CharacterProgress READONLY,
                                                       @Position game.tvp_CharacterPosition READONLY,
                                                       @Costumes game.tvp_CharacterCostumeSlot READONLY
@@ -386,7 +365,7 @@ BEGIN
     FROM game.Characters AS c
              JOIN @Progress AS p ON p.CharacterId = c.CharacterId
              JOIN @Position AS q ON q.CharacterId = c.CharacterId
-    WHERE q.FlushSequence > c.FlushSequence; -- idempotence guard
+    WHERE q.FlushSequence > c.FlushSequence; 
 
     DELETE cc
     FROM game.CharacterCostumes AS cc
@@ -405,8 +384,6 @@ BEGIN
 END;
 GO
 
--- 5. Chemin de LECTURE. RS0 est lu par ORDINAL : SilverTime et GoldTime sont appended en queue,
---    au miroir de CharacterWorldSnapshotDto. Les quatre autres result sets sont repris verbatim.
 CREATE OR ALTER PROCEDURE game.usp_Character_GetForWorldEntry @CharacterId INT
 AS
 BEGIN
@@ -543,10 +520,10 @@ BEGIN
     SELECT Container,
            Slot,
            ItemId,
-           CAST(Quantity AS INT) AS Quantity, -- game.CharacterItems.Quantity is SMALLINT; widen back to INT
-           Enchant,                           -- here so CharacterItemSlotDto's existing int-typed ctor param
-           Combine,                           -- keeps reading it via SqlDataReader.GetInt32 without an
-           Refine,                            -- InvalidCastException (see CharacterItems.sql's own comment)
+           CAST(Quantity AS INT) AS Quantity, 
+           Enchant,                           
+           Combine,                           
+           Refine,                            
            Socket,
            SocketGem1,
            SocketGem2,

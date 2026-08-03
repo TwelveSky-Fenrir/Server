@@ -1,5 +1,3 @@
--- Deliberately does not touch SkillPoints: that counter rides the existing write-behind progression
--- path (usp_Character_PersistProgressBatch) instead of a second synchronous path here.
 CREATE PROCEDURE game.usp_CharacterSkills_UpsertSlot @CharacterId INT,
                                                      @SlotIndex TINYINT,
                                                      @SkillId INT,

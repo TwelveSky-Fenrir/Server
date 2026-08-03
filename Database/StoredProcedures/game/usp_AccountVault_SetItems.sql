@@ -1,4 +1,3 @@
--- ItemId NULL means empty slot (translate legacy 0 -> NULL before calling).
 CREATE PROCEDURE game.usp_AccountVault_SetItems @AccountId INT,
                                                 @Items game.tvp_AccountVaultItemSlot READONLY
 AS

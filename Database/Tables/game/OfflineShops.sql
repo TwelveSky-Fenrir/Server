@@ -1,8 +1,3 @@
--- Legacy `proxyinfo`: the offline player-vending-stall feature (a character plants a shop, logs off,
--- others browse/buy) -- not network topology, despite the name.
--- ShopName is always persisted empty in this build (dead PPSHOP_V2 code path); game.ProxyShopNames is the
--- real, authoritative shop display name. This column is kept for legacy-fidelity only.
--- LocationX/Y/Z are INT (not float) because the legacy save path itself truncates to int before writing.
 CREATE TABLE game.OfflineShops
 (
     CharacterId INT          NOT NULL,
@@ -25,8 +20,6 @@ CREATE TABLE game.OfflineShops
         CONSTRAINT DF_OfflineShops_ShopName DEFAULT N'',
     CONSTRAINT PK_OfflineShops PRIMARY KEY CLUSTERED (CharacterId),
     CONSTRAINT FK_OfflineShops_Character FOREIGN KEY (CharacterId) REFERENCES game.Characters (CharacterId),
-    -- Cross-schema FK naming: see admin.Bans' own header comment for the FK_<ChildTable>_<TargetSchema>_<Role>
-    -- convention -- the FK above stays bare (same-schema, game -> game).
     CONSTRAINT FK_OfflineShops_World_Zone FOREIGN KEY (ZoneNumber) REFERENCES world.Zones (ZoneNumber),
     INDEX IX_OfflineShops_Zone NONCLUSTERED (ZoneNumber)
 );

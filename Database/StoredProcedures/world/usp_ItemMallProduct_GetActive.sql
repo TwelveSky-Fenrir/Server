@@ -1,4 +1,3 @@
--- Reads vw_ItemMallCatalog: a product whose ItemId no longer exists in world.Items is silently excluded here.
 CREATE PROCEDURE world.usp_ItemMallProduct_GetActive
 AS
 BEGIN

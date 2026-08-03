@@ -1,8 +1,3 @@
--- PeriodKind=0 reads game.vw_HeroRankingCurrent (already joined for display name); PeriodKind=1
--- joins game.HeroRankings directly since the view only covers the current period.
--- Caller wraps this with a per-PeriodKind AddInMemoryCache entry (HeroRankingRepository.GetByPeriodAsync):
--- 2s for PeriodKind=0 (hot-write, dedupes concurrent pollers only), 5min for PeriodKind=1 (frozen between
--- rollovers, explicitly evicted by ClaimRewardAsync/MarkRewardClaimedAsync/a due RolloverIfDueAsync).
 CREATE PROCEDURE game.usp_HeroRanking_GetByPeriod @PeriodKind TINYINT
 AS
 BEGIN

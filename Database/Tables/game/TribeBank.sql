@@ -1,6 +1,3 @@
--- Legacy: mTribeBankInfo[tribe][slot] (MAX_TRIBE_BANK_SLOT_NUM=50), one row per slot; MEMORY_OPTIMIZED
--- since this is the hottest write path in the domain.
--- No FK on TribeId: In-Memory OLTP tables can't FK to disk-based game.Tribes; enforced by the application.
 CREATE TABLE game.TribeBank
 (
     TribeId   TINYINT NOT NULL,

@@ -1,44 +1,4 @@
--- BUG FIX: game.Characters.FlushSequence was a SINGLE shared idempotency-guard column raced by TWO
--- independent write-behind writers -- usp_Character_PersistBatch (Position, periodic) and
--- usp_Character_PersistProgressBatch (Progress/Vitals, periodic) -- both guarding with
--- "WHERE incoming.FlushSequence > c.FlushSequence". PositionWriteBehindHost's flush cycle calls
--- ProgressWriteBehindHost.FlushAsync FIRST, so for any character dirty for BOTH Position and Progress in
--- the same drain (the common case for an actively fighting-and-moving player -- combat alone calls
--- MarkProgressDirty at ~15 call sites), Progress always wins the shared column first and Position's own
--- write of the SAME FlushSequence value then fails the "> c.FlushSequence" guard and is silently a no-op.
--- The C# side (PositionWriteBehindHost.cs) was working around this by deferring the position write and
--- re-marking the character dirty for next cycle -- which does not fix anything, it just moves the same
--- collision to the next cycle, where it recurs as long as the character keeps generating both kinds of
--- dirty events. Net effect: a continuously fighting+moving character's PosX/PosY/PosZ/MapId could go the
--- entire session without ever being durably written by the periodic write-behind path (only
--- usp_Character_PersistFinalFlush at clean disconnect/zone-transfer -- one joint UPDATE, one shared
--- FlushSequence snapshot -- was immune). Under an ungraceful shutdown the position-loss window for an
--- active character was therefore bounded by session length, not the ~5s write-behind interval.
---
--- FIX: give Position and Progress their own independent guard columns. usp_Character_PersistBatch now
--- guards+writes ONLY PositionFlushSequence; usp_Character_PersistProgressBatch guards+writes ONLY
--- ProgressFlushSequence. They can never collide again because they never compare against or overwrite
--- the same column. The general game.Characters.FlushSequence column is left exactly as-is, still
--- guarded/written only by usp_Character_PersistFinalFlush (disconnect/zone-transfer, one joint UPDATE)
--- and usp_Character_ClampVitalsFloor (login-side vitals floor clamp) -- neither of those two ever raced
--- the periodic pair, so they needed no change. usp_Character_GetForWorldEntry /
--- usp_Character_GetForWorldEntrySummary now seed the C#-side single monotonic PlayerRuntimeState.FlushSequence
--- counter from GREATEST(FlushSequence, PositionFlushSequence, ProgressFlushSequence) instead of the bare
--- general column, so the very first write-behind cycle of a new session is always guaranteed to exceed
--- whichever of the three columns is actually the freshest, regardless of which procedure last touched it.
--- (GREATEST is a SQL Server 2022+ T-SQL function, verified available -- Fenrir targets SQL Server 2025.)
---
--- PositionWriteBehindHost.cs / ProgressWriteBehindHost.cs (Fenrir.Application.Game.Hosting) had their
--- claim/defer collision-avoidance logic removed in the same change: with independent guard columns there
--- is nothing left to avoid colliding on, so Position rows are now built and persisted unconditionally for
--- every Position-dirty character every cycle, same as Progress already was.
---
--- DEPENDANCE : doit s'appliquer apres 047_kill_timer_columns.sql (dernier script a avoir CREATE OR ALTER /
--- CREATE PROCEDURE ces quatre objets). Ne touche pas game.tvp_CharacterProgress / game.tvp_CharacterPosition
--- (formes de TVP inchangees) -- uniquement game.Characters (deux colonnes ajoutees) et les procedures qui
--- lisent/ecrivent son FlushSequence.
 
--- 0. Nouvelles colonnes de garde, independantes, sur game.Characters (idempotent).
 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('game.Characters') AND name = 'PositionFlushSequence')
     ALTER TABLE game.Characters ADD PositionFlushSequence BIGINT NOT NULL CONSTRAINT DF_Characters_PositionFlushSequence DEFAULT 0;
 GO
@@ -46,10 +6,6 @@ IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('game.Chara
     ALTER TABLE game.Characters ADD ProgressFlushSequence BIGINT NOT NULL CONSTRAINT DF_Characters_ProgressFlushSequence DEFAULT 0;
 GO
 
--- Backfill: seed both new per-writer guard columns from the existing shared FlushSequence value so
--- already-persisted characters don't regress the idempotency guard on the very first post-migration
--- write-behind cycle. WHERE clause makes this naturally idempotent even if ever re-run by hand: once a
--- row has a non-zero Position/ProgressFlushSequence it is no longer touched here.
 UPDATE game.Characters
 SET PositionFlushSequence = FlushSequence,
     ProgressFlushSequence = FlushSequence
@@ -57,7 +13,6 @@ WHERE PositionFlushSequence = 0
   AND ProgressFlushSequence = 0;
 GO
 
--- 1. usp_Character_PersistBatch -- guards+writes PositionFlushSequence only (was: shared FlushSequence).
 CREATE OR ALTER PROCEDURE game.usp_Character_PersistBatch @Positions game.tvp_CharacterPosition READONLY
 AS
 BEGIN
@@ -75,14 +30,10 @@ BEGIN
     FROM game.Characters AS c
              JOIN @Positions AS s
                   ON s.CharacterId = c.CharacterId
-    WHERE s.FlushSequence > c.PositionFlushSequence; -- idempotence guard, own column (Migrations/048) --
-                                                      -- no longer shares a column with usp_Character_PersistProgressBatch
+    WHERE s.FlushSequence > c.PositionFlushSequence; 
 END;
 GO
 
--- 2. usp_Character_PersistProgressBatch -- guards+writes ProgressFlushSequence only (was: shared
---    FlushSequence). Body otherwise identical to Migrations/047_kill_timer_columns.sql's version (93-column
---    TVP, WarPoint/BloodCoin delta application, OUTPUT-driven CharacterCostumeSlots resync).
 CREATE OR ALTER PROCEDURE game.usp_Character_PersistProgressBatch @Progress game.tvp_CharacterProgress READONLY,
                                                                   @Costumes game.tvp_CharacterCostumeSlot READONLY
 AS
@@ -189,8 +140,7 @@ BEGIN
     OUTPUT inserted.CharacterId INTO @Applied
     FROM game.Characters c
     INNER JOIN @Progress s ON c.CharacterId = s.CharacterId
-    WHERE s.FlushSequence > c.ProgressFlushSequence; -- idempotence guard, own column (Migrations/048) --
-                                                      -- no longer shares a column with usp_Character_PersistBatch
+    WHERE s.FlushSequence > c.ProgressFlushSequence; 
 
     DELETE ci
     FROM game.CharacterCostumeSlots ci
@@ -203,9 +153,6 @@ BEGIN
 END;
 GO
 
--- 3. usp_Character_GetForWorldEntry -- unchanged except RS0's FlushSequence column, now the GREATEST of
---    all three FlushSequence-family columns so a new session's seed value can never be behind whichever
---    of Position/Progress/the general column was actually last written.
 CREATE OR ALTER PROCEDURE game.usp_Character_GetForWorldEntry @CharacterId INT
 AS
 BEGIN
@@ -345,10 +292,10 @@ BEGIN
     SELECT Container,
            Slot,
            ItemId,
-           CAST(Quantity AS INT) AS Quantity, -- game.CharacterItems.Quantity is SMALLINT; widen back to INT
-           Enchant,                           -- here so CharacterItemSlotDto's existing int-typed ctor param
-           Combine,                           -- keeps reading it via SqlDataReader.GetInt32 without an
-           Refine,                            -- InvalidCastException (see CharacterItems.sql's own comment)
+           CAST(Quantity AS INT) AS Quantity, 
+           Enchant,                           
+           Combine,                           
+           Refine,                            
            Socket,
            SocketGem1,
            SocketGem2,
@@ -386,10 +333,6 @@ BEGIN
 END;
 GO
 
--- 4. usp_Character_GetForWorldEntrySummary -- same GREATEST treatment as usp_Character_GetForWorldEntry
---    above, for the narrow 19-column read CharacterRepository.GetForWorldEntryAsync actually uses
---    (ZoneTransferService / GetForWorldEntryDto). Body otherwise unchanged from the base
---    StoredProcedures/game/usp_Character_GetForWorldEntrySummary.sql script.
 CREATE OR ALTER PROCEDURE game.usp_Character_GetForWorldEntrySummary @CharacterId INT
 AS
 BEGIN

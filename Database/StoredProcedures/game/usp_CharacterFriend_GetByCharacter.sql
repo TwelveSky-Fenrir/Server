@@ -1,4 +1,3 @@
--- FriendName is resolved live via join (a renamed friend shows their current name, not a stored snapshot).
 CREATE PROCEDURE game.usp_CharacterFriend_GetByCharacter @CharacterId INT
 AS
 BEGIN

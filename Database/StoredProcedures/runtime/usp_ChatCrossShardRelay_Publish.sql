@@ -1,12 +1,3 @@
--- Called once per outbound cross-shard whisper row, from ChatCrossShardRelayHost's own outbound drain loop
--- (WhisperService.ResolveAsync enqueues after a same-shard ZoneRegistry miss resolves the target on another
--- shard via ICharacterShardLocationRepository) -- never directly from an IAsyncPacketHandler's per-connection
--- path. Single-row INSERT, no dependencies -- natively compiled like this feature's sibling single-row
--- hot-path procs (usp_SocialCrossShardRelay_Publish, usp_GuildTribeBroadcastRelay_Publish,
--- usp_CharacterShardLocation_Upsert).
---
--- @CorrelationId retry-safe idempotency guard -- see usp_GuildTribeBroadcastRelay_Publish's own remarks for
--- the full rationale and why this uses the SELECT-into-variable/IS NULL shape rather than a bare IF EXISTS.
 CREATE PROCEDURE runtime.usp_ChatCrossShardRelay_Publish @SourceShardId TINYINT,
                                                          @SourceCharacterId INT,
                                                          @SourceAvatarName NVARCHAR(13),

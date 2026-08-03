@@ -1,5 +1,3 @@
--- Role is the DB-side enum (0 member/1 sub-master/2 master), the INVERSE of the raw legacy wire's
--- aGuildRole encoding; callers must translate via GuildRoleCodec, never compare directly.
 CREATE PROCEDURE game.usp_GuildMember_GetByCharacter @CharacterId INT
 AS
 BEGIN

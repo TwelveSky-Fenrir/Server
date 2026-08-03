@@ -1,5 +1,3 @@
--- Also appends a GiftLog row for this Pending state, so the log covers every state a gift passes through.
--- See game.Gifts's header for why this queue-append shape (rather than a fixed-slot write) is deliberate.
 CREATE PROCEDURE game.usp_Gift_Enqueue @AccountId INT,
                                        @ProductId INT = NULL,
                                        @Quantity INT,

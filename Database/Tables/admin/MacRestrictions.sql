@@ -1,6 +1,3 @@
--- Legacy `macinfo`: caps accounts per MAC address and/or per install (MachineGuid, NULL-able). The
--- composite UNIQUE relies on SQL Server treating each NULL as distinct, allowing one MAC-wide default
--- row plus per-MachineGuid override rows for the same MAC.
 CREATE TABLE admin.MacRestrictions
 (
     MacRestrictionId INT IDENTITY (1,1) NOT NULL,

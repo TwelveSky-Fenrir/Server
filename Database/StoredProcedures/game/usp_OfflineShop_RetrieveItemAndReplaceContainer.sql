@@ -1,6 +1,3 @@
--- database/50_procedures/game/usp_OfflineShop_RetrieveItemAndReplaceContainer.sql
--- Single guarded DELETE (CAS): the shop must be closed AND the slot must still match every expected
--- value, checked in the same statement that removes it -- no read/write race window.
 CREATE PROCEDURE game.usp_OfflineShop_RetrieveItemAndReplaceContainer @CharacterId INT,
                                                                       @SlotIndex SMALLINT,
                                                                       @ExpectedItemId INT,

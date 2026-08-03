@@ -1,6 +1,3 @@
--- Normalizes both nSkillInfo1[3][8] and nSkillInfo2[3][3][3][8] into one sparse table (only nonzero slots kept); ArrayKind distinguishes the source array (1=SkillInfo1, 2=SkillInfo2).
--- ArrayKind=1: Tier=outer index (0-2), Dim2/Dim3 NULL, SlotIndex=inner 0-7. ArrayKind=2: nSkillInfo2 read as flat int[216], [a,b,c,d]->a*72+b*24+c*8+d; Tier/Dim2/Dim3=a/b/c, SlotIndex=d (meaning of the 3 extra dims beyond SkillInfo1 is unconfirmed).
--- Surrogate IDENTITY PK: the natural key (NpcId,ArrayKind,Tier,Dim2,Dim3,SlotIndex) can't be the PK since Dim2/Dim3 are nullable for ArrayKind=1.
 CREATE TABLE world.NpcSkillOffers
 (
     NpcSkillOfferId INT IDENTITY (1,1) NOT NULL,

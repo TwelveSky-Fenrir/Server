@@ -1,7 +1,3 @@
--- Lower (>=0) and upper (MAX_NUMBER_SIZE=2,000,000,000) bounds are folded into one guarded UPDATE, not a
--- separate pre-check, to close a TOCTOU where two concurrent credits could jointly breach the cap.
--- BigMoney has no upper cap enforced here -- legacy's cap on it guards a different, narrower quantity
--- (the "1B" conversion pathway); documented gap, not an oversight.
 CREATE PROCEDURE game.usp_Character_AdjustMoney @CharacterId INT,
                                                 @DeltaMoney BIGINT,
                                                 @DeltaBigMoney INT
@@ -23,7 +19,6 @@ BEGIN
     IF
         @@ROWCOUNT = 0
         BEGIN
-            -- Diagnostic re-read only (no TOCTOU risk): picks which of the two error codes to throw.
             IF
                 EXISTS (SELECT 1
                         FROM game.Characters

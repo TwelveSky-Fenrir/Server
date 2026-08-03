@@ -1,4 +1,3 @@
--- Reads through game.vw_GuildRoster (already carries guild/character display names, not just ids).
 CREATE PROCEDURE game.usp_GuildMember_GetByGuild @GuildId INT
 AS
 BEGIN

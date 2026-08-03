@@ -1,4 +1,3 @@
--- Returns 3 result sets in fixed order: Skills, SkillDescriptions, SkillGrades (2 rows per skill, grade 0/1).
 CREATE PROCEDURE world.usp_Skill_GetAll
 AS
 BEGIN

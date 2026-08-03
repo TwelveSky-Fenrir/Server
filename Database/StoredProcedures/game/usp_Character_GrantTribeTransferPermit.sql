@@ -1,6 +1,3 @@
--- game.Characters.TribeTransferPermitCount: consuming a Faction Transfer Scroll (world.Items 8153/8154)
--- credits one banked permit here. @Delta's sign is not hard-coded, for forward compat, same posture as
--- usp_Character_SpendBloodCoinAndReplaceContainer's @DeltaBloodCoin -- no known legacy spend path exists yet.
 CREATE PROCEDURE game.usp_Character_GrantTribeTransferPermit @CharacterId INT,
                                                              @Delta INT
 AS

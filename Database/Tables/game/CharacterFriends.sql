@@ -1,6 +1,3 @@
--- Legacy: aFriend[10] (MAX_FRIEND_NUM); one row per occupied slot, Slot is the client-chosen index.
--- ONE-DIRECTIONAL by design (legacy: only the sender adds the friend): a row says "CharacterId considers
--- FriendCharacterId a friend"; the reverse is a separate row or may not exist.
 CREATE TABLE game.CharacterFriends
 (
     CharacterId       INT          NOT NULL,

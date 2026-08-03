@@ -1,9 +1,3 @@
--- Server/ts25zone/S04_MyWork03.cpp:465-506 (tsFation[][3], live/uncommented rows only -- the
--- source itself comments out a block of region-specific seasonal costumes never enabled for this build,
--- and those are deliberately NOT transcribed here), transcribed verbatim: GroupIndex 0-26 (one row per
--- legacy array row), TribeId 0/1/2 = Noble Dragon/Royal Serpent/Grand Tiger. Consumed by
--- game.usp_Character_ApplyTribeConversion's Application-layer caller for the (not yet DB-persisted)
--- worn-costume remap -- see Tables/world/TribeCostumeEquivalences.sql for the full rationale.
 IF NOT EXISTS (SELECT 1
                FROM world.TribeCostumeEquivalences)
     BEGIN

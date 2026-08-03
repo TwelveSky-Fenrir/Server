@@ -1,4 +1,3 @@
--- Row absence = empty slot, same convention as game.CharacterPetBag/game.CharacterHotkeys.
 CREATE TABLE game.CharacterCostumes
 (
     CharacterId INT     NOT NULL,

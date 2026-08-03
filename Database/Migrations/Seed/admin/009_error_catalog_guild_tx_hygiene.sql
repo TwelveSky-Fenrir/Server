@@ -1,5 +1,3 @@
--- New file rather than an edit to an earlier error-catalog script: applied scripts are never edited.
--- Backs usp_Guild_CreateAndDebitMoney/usp_Guild_UpgradeAndDebitMoney (guild-tx-hygiene fix, not legacy parity).
 IF
     NOT EXISTS (SELECT 1
                 FROM admin.ErrorCatalog

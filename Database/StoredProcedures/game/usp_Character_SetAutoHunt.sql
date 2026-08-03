@@ -1,4 +1,3 @@
--- Stored as an opaque blob, not decomposed into columns: the legacy copies the client struct verbatim with no validation.
 CREATE PROCEDURE game.usp_Character_SetAutoHunt @CharacterId INT,
                                                 @Enabled BIT,
                                                 @Config VARBINARY(112)

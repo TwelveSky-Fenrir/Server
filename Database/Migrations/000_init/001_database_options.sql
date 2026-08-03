@@ -1,4 +1,3 @@
--- Explicit non-default database options (none of these are SQL Server 2025 defaults).
 
 ALTER
     DATABASE CURRENT SET ACCELERATED_DATABASE_RECOVERY = ON;
@@ -9,8 +8,6 @@ ALTER
 ALTER
     DATABASE CURRENT SET QUERY_STORE = ON (OPERATION_MODE = READ_WRITE);
 
--- Memory-optimized filegroup for `runtime` (SCHEMA_ONLY tables). Guarded: ADD FILEGROUP/ADD FILE
--- fail hard if re-run.
 IF
     NOT EXISTS (SELECT 1
                 FROM sys.filegroups

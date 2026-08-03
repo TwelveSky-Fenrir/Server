@@ -1,10 +1,3 @@
--- Legacy NPC_INFO; one row per record where Index != 0 (369 of 500 slots are unused placeholders). NpcId is the legacy nIndex, the PK other domains' FKs rely on (e.g. world.ZoneNpcSpawns.NpcId).
--- Size1/2/3 (nSize[3]) per-axis meaning (width/height/radius?) is unconfirmed, so columns stay numbered rather than named.
--- The CHECKs below mirror legacy's load-time field validation (Npc_CheckValidElement,
--- Server/Header/S15_MyShare.cpp:1836-1963, bounds at Server/Header/Protocol/STRUCT.h:206-235), which rejects
--- the whole 500-slot Load_Npc call on the first offending record -- fatal to both ts25sharemem's and
--- ts25zone's boot sequence. A relational CHECK is the closest Fenrir equivalent of "this value can never be
--- stored" (stricter in one respect: enforced on every write, not just one boot-time pass).
 CREATE TABLE world.Npcs
 (
     NpcId            INT          NOT NULL,

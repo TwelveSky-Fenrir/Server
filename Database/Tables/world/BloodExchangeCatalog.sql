@@ -1,4 +1,3 @@
--- Legacy MySQL `bloodinfo` (a "blood exchange" trade-in catalog); BloodExchangeSlot is the legacy `Number`, stored as-given (including outlier slot 100000, same pattern as ItemMallProducts). Empty filler slots are not represented as rows.
 CREATE TABLE world.BloodExchangeCatalog
 (
     BloodExchangeSlot INT NOT NULL,

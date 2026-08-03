@@ -1,4 +1,3 @@
--- Returns 2 result sets in fixed order: Items, ItemBonusSkills.
 CREATE PROCEDURE world.usp_Item_GetAll
 AS
 BEGIN

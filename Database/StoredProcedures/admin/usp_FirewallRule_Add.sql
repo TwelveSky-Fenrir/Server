@@ -1,8 +1,3 @@
--- THROW 50303 if @IpAddress already has a rule. The pre-check below is only the fast path for the
--- ordinary (non-racing) case -- under RCSI the pre-check's own read never blocks a concurrent writer, so
--- two concurrent Add calls for the same brand-new IP can both pass it before either commits. The TRY/CATCH
--- around the INSERT is what actually guarantees the caller always observes the catalogued 50303 rather
--- than a raw UQ_FirewallRules_IpAddress constraint-violation error on the race's loser.
 CREATE PROCEDURE admin.usp_FirewallRule_Add @IpAddress VARCHAR(45),
                                             @RuleType TINYINT
 AS

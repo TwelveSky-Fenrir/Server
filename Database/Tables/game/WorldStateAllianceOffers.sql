@@ -1,6 +1,3 @@
--- Legacy: mPossibleAllianceInfo[tribe][2] (WORLD_INFO), one row per (from,to) tribe pair.
--- IsAccepted has no legacy source (mAllianceState uses a different indexing scheme); defaults false until
--- the alliance feature is implemented.
 CREATE TABLE game.WorldStateAllianceOffers
 (
     FromTribeId TINYINT NOT NULL,

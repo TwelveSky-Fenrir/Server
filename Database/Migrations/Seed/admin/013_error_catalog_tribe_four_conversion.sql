@@ -1,6 +1,3 @@
--- New file rather than an edit to an earlier error-catalog script: applied scripts are never edited.
--- Backs game.usp_Character_ApplyTribeFourConversion (fourth-tribe/Fujin conversion and return,
--- CZ_CHANGE_TO_TRIBE4_SEND op37).
 IF NOT EXISTS (SELECT 1
                FROM admin.ErrorCatalog
                WHERE ErrorNumber = 50334)

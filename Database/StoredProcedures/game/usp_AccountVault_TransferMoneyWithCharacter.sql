@@ -1,14 +1,3 @@
--- Atomic transfer between a character's wallet (game.Characters.Money) and its account's shared vault/bank
--- (game.AccountVault.Money, legacy masterinfo.uSaveMoney) -- CZ_PROCESS_DATA_SEND tSort 231 (deposit,
--- DeltaCharacterMoney negative/DeltaVaultMoney positive) / 232 (withdraw, the reverse). Auto-creates the
--- AccountVault row on first use (same posture as usp_Gift_ClaimIntoVault) so a deposit never requires the
--- vault panel to have been opened first.
--- Réf. C++ : Server/ts25zone/S04_MyWork05.cpp:3275-3341 (ProcessForInventoryMoneyToSaveMoney/
--- ProcessForSaveMoneyToInventoryMoney) ; Server/Header/Protocol/DEFINE.h:365 (MAX_NUMBER_SIZE = 2,000,000,000).
---
--- @AuditEventCode optionally nests the SaveSlotMoney audit row (EventLogCategory.SaveSlotMoney = 20) into
--- this same already-open transaction, following usp_CharacterTrade_Execute's own precedent
--- (transaction-composition-audit finding). Caller omits @AuditEventCode (stays NULL) to skip logging.
 CREATE PROCEDURE game.usp_AccountVault_TransferMoneyWithCharacter @CharacterId INT,
                                                                   @DeltaCharacterMoney BIGINT,
                                                                   @AccountId INT,
@@ -52,7 +41,7 @@ BEGIN
     IF @AuditEventCode IS NOT NULL
         EXEC game.usp_EventLog_Insert
              @EventCode = @AuditEventCode,
-             @Category = 20, -- EventLogCategory.SaveSlotMoney
+             @Category = 20, 
              @ActorAccountId = @AccountId,
              @ActorCharacterId = @CharacterId,
              @DeltaMoney = @DeltaCharacterMoney,

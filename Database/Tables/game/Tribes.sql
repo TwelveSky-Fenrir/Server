@@ -1,7 +1,3 @@
--- Legacy `tribeinfo` is a real fixed-4-row table (MAX_TRIBE_NUM=4); TribeId is stored as-given (0-3),
--- never IDENTITY. MasterCharacterId replaces the legacy VARCHAR name column with a real FK.
--- Sub-masters are not columns here (see game.TribeSubMasters, a real 12-slot array unlike a guild's 2).
--- Points lives in game.WorldStateTribes (its true legacy home is WORLD_INFO, not tribeinfo), not here.
 CREATE TABLE game.Tribes
 (
     TribeId           TINYINT NOT NULL,

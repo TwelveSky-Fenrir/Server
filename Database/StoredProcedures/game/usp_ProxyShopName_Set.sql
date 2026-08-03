@@ -1,5 +1,3 @@
--- database/50_procedures/game/usp_ProxyShopName_Set.sql
--- Replaces PROXY_NAME_INFO.DAT's save-on-set/clear path; an empty string is a valid "name cleared" value.
 CREATE PROCEDURE game.usp_ProxyShopName_Set @CharacterId INT,
                                             @ShopName NVARCHAR(48)
     WITH NATIVE_COMPILATION , SCHEMABINDING

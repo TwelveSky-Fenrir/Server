@@ -1,8 +1,3 @@
--- Continuous write-behind re-capture for game.CharacterLogoutState (D1 behavior contract: movement/combat/
--- periodic-tick re-stamp, distinct from usp_CharacterLogoutState_Upsert's single one-shot capture at world
--- entry). Idempotent on FlushSequence (game.CharacterLogoutState's own column, self-referential -- see that
--- table's own header for why it must not be conflated with game.Characters.FlushSequence): a retried flush
--- of the same batch can never regress a snapshot a later flush already applied.
 CREATE PROCEDURE game.usp_CharacterLogoutState_PersistBatch @Snapshots game.tvp_CharacterLogoutState READONLY
 AS
 BEGIN

@@ -1,5 +1,3 @@
--- Same function's aHotKey[0][0..2] block. Key 0 = the tribe's first learned skill; keys 1-2 = the same
--- item hotkey (item 34, MAX_ITEM_DUPLICATION_NUM=999) duplicated onto both slots, identical for every tribe.
 IF
     NOT EXISTS (SELECT 1
                 FROM world.StarterKitHotkeys)

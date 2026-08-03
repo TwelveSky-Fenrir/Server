@@ -1,4 +1,3 @@
--- Normalizes legacy rewardinfo.rItem01..rItem07 into one row per slot; SlotIndex is 1-based to match rItem01.."07 directly.
 CREATE TABLE world.RewardBundleItems
 (
     RewardBundleId INT     NOT NULL,

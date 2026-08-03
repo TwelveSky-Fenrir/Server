@@ -1,6 +1,3 @@
--- database/50_procedures/game/usp_WorldState_Update.sql
--- Idempotent: a missing singleton row (usp_WorldState_EnsureInitialized never called) affects 0 rows and
--- does not error.
 CREATE PROCEDURE game.usp_WorldState_Update @Zone038WinTribe TINYINT = NULL,
                                             @Zone038WinTribeTime INT = NULL,
                                             @TribeSymbolBattle BIT,

@@ -1,29 +1,14 @@
 <Project>
-  <!-- Importé APRÈS le corps du .csproj : c'est le seul endroit où lire $(FenrirExecutable)
-       tel que positionné par le projet lui-même (Directory.Build.props est importé AVANT). -->
   <PropertyGroup Condition="'$(FenrirExecutable)' == 'true'">
     <PublishAot>true</PublishAot>
     <OptimizationPreference>Speed</OptimizationPreference>
     <StackTraceSupport>true</StackTraceSupport>
     <EventSourceSupport>true</EventSourceSupport>
 
-    <!-- Microsoft.Data.SqlClient (used directly by Fenrir.Tools.DbMigrator, transitively via CaeriusNet by
-         Fenrir.Data-referencing servers) drags in System.Configuration.ConfigurationManager for a legacy
-         app.config/Kerberos/certificate-store fallback path we never exercise (explicit connection strings
-         only, no App.config, no client certs). IL2104/IL3053 are assembly-level "not verified trim-safe"
-         summaries, not call-site-specific findings; reviewed and accepted, see ADR-0006. -->
     <NoWarn>$(NoWarn);IL2104;IL3053</NoWarn>
 
-    <!-- Verified live (ADR-0006): Directory.Build.props' global InvariantGlobalization=true makes
-         Microsoft.Data.SqlClient throw NotSupportedException ("Globalization Invariant Mode is not
-         supported") the moment SqlConnection.OpenAsync negotiates collation with the server; every
-         one of the three executables ends up on this path (DbMigrator directly, LoginServer/GameServer
-         via Fenrir.Data/CaeriusNet), so it is overridden here rather than per-project. -->
     <InvariantGlobalization>false</InvariantGlobalization>
 
-    <!-- AOT-safe config binding: without this, Configure<TOptions>(GetSection(...)) falls back to the
-         reflection ConfigurationBinder and raises IL2026 under PublishAot. The source generator intercepts
-         the Configure/Bind/Get call sites in each server's Program.cs. -->
     <EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
   </PropertyGroup>
 </Project>

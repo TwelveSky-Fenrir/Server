@@ -1,4 +1,3 @@
--- Legacy packs this as gMemberCall[slot] inside the gMember blob; here it's a real column.
 CREATE PROCEDURE game.usp_GuildMember_SetCallName @GuildId INT,
                                                   @CharacterId INT,
                                                   @CallName NVARCHAR(4)

@@ -1,5 +1,3 @@
--- Clears only the calling character's own pointer, not the partner's opposite pointer -- a documented
--- legacy asymmetry, not a bug to fix; the partner must separately end their own side.
 CREATE PROCEDURE game.usp_CharacterMentor_ClearForCharacter @CharacterId INT
 AS
 BEGIN

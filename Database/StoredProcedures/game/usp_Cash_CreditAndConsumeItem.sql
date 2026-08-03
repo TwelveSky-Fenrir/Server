@@ -1,15 +1,3 @@
--- Credits game.AccountCash, plus a whole-container item-consumption in the same transaction, so a fault
--- between the credit and the consumption can never dupe cash while leaving the consumed item still
--- physically present. Mirrors usp_Cash_DebitAndGrantItem's existing shape in the opposite direction (that
--- procedure's own header comment explains why a bare single-purpose debit/credit procedure isn't enough
--- once a container mutation must be atomic with it). Closes a transaction-composition-audit finding:
--- GP-ticket redemption previously called usp_Cash_Credit and a separate, unguarded
--- usp_CharacterItems_ReplaceContainer round trip from C#; a transient failure on the second call let cash
--- durably commit while the ticket item never left the character's inventory -- a repeatable premium-currency
--- duplication vector on client retry (a client resend of the identical "use item" request re-credited cash
--- again for the same physical item). Reuses error 50241 ("cash amount must be positive") rather than
--- registering a new admin.ErrorCatalog row, since it is the identical precondition already thrown by both
--- usp_Cash_Debit and usp_Cash_Credit for the same failure kind.
 CREATE PROCEDURE game.usp_Cash_CreditAndConsumeItem @AccountId INT,
                                                     @Amount INT,
                                                     @Reason TINYINT,

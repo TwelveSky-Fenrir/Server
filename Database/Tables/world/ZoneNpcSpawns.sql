@@ -1,5 +1,3 @@
--- Normalized from ZONENPCINFODATA.NpcNumber/NpcCoord/NpcAngle; one row per populated slot only (of a 100-slot-per-zone array).
--- NpcId is NULL (never 0) when the legacy slot has no NPC placed.
 CREATE TABLE world.ZoneNpcSpawns
 (
     ZoneNumber SMALLINT NOT NULL,

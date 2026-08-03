@@ -1,7 +1,3 @@
--- Legacy: PROXY_NAME_INFO.DAT (CharacterId -> shop display name); this table, not game.OfflineShops.ShopName,
--- is authoritative (that column is legacy-dead in this build).
--- No FK on CharacterId: memory-optimized table can't FK to disk-based game.Characters; enforced by the
--- application (usp_ProxyShopName_Set).
 CREATE TABLE game.ProxyShopNames
 (
     CharacterId INT          NOT NULL,

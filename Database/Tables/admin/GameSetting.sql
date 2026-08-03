@@ -1,6 +1,3 @@
--- Singleton row for admin-tunable settings with no legacy source value (unlike most numeric constants,
--- which stay as verified C# consts). ProxyShopDurationDays is a Fenrir-invented substitute for legacy's
--- unported aProxyShopDate rental field.
 CREATE TABLE admin.GameSetting
 (
     Id                    TINYINT NOT NULL

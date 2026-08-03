@@ -1,5 +1,3 @@
--- Seeds world.ItemMallProducts from the legacy `itemmallinfo` table; 402 of 561 rows are all-zero
--- padding and are dropped. Rows with a real ItemID but Active=0 are kept as-is (IsActive=0).
 IF
     NOT EXISTS (SELECT 1
                 FROM world.ItemMallProducts)
@@ -145,7 +143,7 @@ IF
                (397, 3, 93312, 0, 0, 0),
                (398, 3, 93315, 0, 0, 0),
                (399, 3, 93315, 0, 0,
-                0), -- duplicate ItemId vs. Number 398 exists as-given in the legacy dump; not a decode error, kept verbatim
+                0), 
                (400, 3, 93321, 0, 0, 0),
                (401, 3, 93324, 0, 0, 0),
                (402, 3, 93327, 0, 0, 0),

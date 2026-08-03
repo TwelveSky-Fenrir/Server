@@ -1,12 +1,3 @@
--- New file rather than an edit to 002_error_catalog_a3.sql: applied scripts are never edited.
---
--- 50268/50269 descriptions refreshed 2026-07-12 (error-catalog-completeness hardening -- see
--- admin.ErrorCatalog's own "no true error-code collisions found" audit): usp_CharacterTradeCommit_ExecuteIdempotent
--- (the C8 idempotent trade-commit variant) THROWs these identical two codes by explicit design (see that
--- procedure's own header comment) but was never added to either row's proc list. Edited in place per this
--- campaign's explicit authorization to correct already-applied Migrations/ scripts rather than layering a new
--- file on top for a pure Description-text refresh -- same convention the concurrent 50261/50222 fix in
--- 002_error_catalog_a3.sql already used this session.
 IF
     NOT EXISTS (SELECT 1
                 FROM admin.ErrorCatalog

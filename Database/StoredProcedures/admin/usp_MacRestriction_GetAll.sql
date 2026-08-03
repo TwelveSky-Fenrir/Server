@@ -1,4 +1,3 @@
--- Loaded once at LoginServer boot; checked at account creation / MAC registration time, not per packet.
 CREATE PROCEDURE admin.usp_MacRestriction_GetAll
 AS
 BEGIN

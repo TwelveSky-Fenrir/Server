@@ -1,5 +1,3 @@
--- Guarded per-row (not a table-empty check): admin.ErrorCatalog is shared across every domain, and other
--- domains' seed scripts may run before or after this one in any order.
 IF
     NOT EXISTS (SELECT 1
                 FROM admin.ErrorCatalog

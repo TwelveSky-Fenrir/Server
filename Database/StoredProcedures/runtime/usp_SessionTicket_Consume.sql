@@ -1,7 +1,3 @@
--- Not idempotent, never retryable: read-then-delete-then-select-if-valid. The DELETE always runs, so
--- a replay/duplicate call for the same AccountId finds nothing the second time (single-use ticket;
--- a blind retry here is the classic MMO ticket-dupe bug). SessionToken/AccountGrade are appended as the
--- SELECT's last columns (ordinal-mapped) -- ConsumedTicketDto's ctor appends them last too.
 CREATE PROCEDURE runtime.usp_SessionTicket_Consume @AccountId INT
     WITH NATIVE_COMPILATION , SCHEMABINDING
 AS

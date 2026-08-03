@@ -1,4 +1,3 @@
--- Idempotent: deleting an already-empty slot is a silent no-op (the legacy quits on this case; not reproduced here).
 CREATE PROCEDURE game.usp_CharacterFriend_Remove @CharacterId INT,
                                                  @Slot TINYINT
 AS

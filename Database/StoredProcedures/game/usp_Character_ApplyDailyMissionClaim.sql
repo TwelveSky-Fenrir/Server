@@ -1,5 +1,3 @@
--- @Container = 255 (sentinel) means "counters only, no item deposit"; otherwise the container is fully replaced.
--- Counters and item deposit commit atomically: legacy only ever decrements counters alongside a successful item grant.
 CREATE PROCEDURE game.usp_Character_ApplyDailyMissionClaim @CharacterId INT,
                                                            @JoinWar INT,
                                                            @KillOtherTribe INT,

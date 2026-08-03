@@ -1,5 +1,3 @@
--- Normalized from ZONEMOVEDATA.Xyz/NextZone: only the first NextZoneNum of each zone's 100-slot arrays are populated.
--- TargetZoneNumber is NULL (never 0) both when the raw NextZone is literally 0 (no destination) and when it names a zone this build never shipped.
 CREATE TABLE world.ZonePortals
 (
     ZoneNumber       SMALLINT NOT NULL,

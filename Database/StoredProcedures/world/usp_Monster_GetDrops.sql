@@ -1,4 +1,3 @@
--- Returns 5 result sets in fixed order: MonsterDropMoney, MonsterDropPotions, MonsterDropExtraItems, MonsterDropCategoryRates, MonsterDropQuestItems.
 CREATE PROCEDURE world.usp_Monster_GetDrops
 AS
 BEGIN

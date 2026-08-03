@@ -1,13 +1,3 @@
--- database/50_procedures/game/usp_TribeBank_Withdraw.sql
--- Folds the legacy PlayUser process's single-operation withdraw+credit
--- (ZONE_TRIBE_BANK_LOAD_FOR_PLAYUSER_SEND) into one transaction: Fenrir splits the tribe bank and character
--- money across two tables, so a mid-sequence failure must never debit one without crediting the other.
--- Always empties the whole slot (matches the legacy's own mGAME.mTribeBankInfo[tribe][slot] = 0), never a
--- partial withdrawal. Not natively compiled (unlike usp_TribeBank_Deposit): a natively compiled module
--- cannot touch the disk-based game.Characters table. game.TribeBank access needs WITH (SNAPSHOT) for the
--- same cross-container reason as usp_Guild_Disband.
--- Also writes game.TribeBankLog (BalanceAfter is always 0 here -- see usp_TribeBank_DepositFromCharacter for
--- the deposit-side entries).
 CREATE PROCEDURE game.usp_TribeBank_Withdraw @TribeId TINYINT,
                                              @SlotIndex TINYINT,
                                              @CharacterId INT

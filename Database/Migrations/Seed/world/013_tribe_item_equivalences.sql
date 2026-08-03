@@ -1,10 +1,3 @@
--- Server/ts25zone/S04_MyWork03.cpp:326-462 (tsItem[][3], __GOD__-live rows only -- the preceding
--- #ifndef __GOD__ block at :241-323 is dead code in every real build and is deliberately NOT transcribed
--- here), transcribed verbatim: GroupIndex 0-130 (one row per legacy array row, in source order: "rare set
--- v2", "elite set v2", then the plain-numbered rows), TribeId 0/1/2 = Noble Dragon/Royal Serpent/Grand
--- Tiger. Consumed by game.usp_Character_ApplyTribeConversion's equipped-gear remap -- see
--- Tables/world/TribeItemEquivalences.sql for the full table-shape rationale (including the +129 "V2 band"
--- arithmetic, which is NOT separately seeded here).
 IF NOT EXISTS (SELECT 1
                FROM world.TribeItemEquivalences)
     BEGIN

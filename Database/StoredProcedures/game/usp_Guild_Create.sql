@@ -1,5 +1,3 @@
--- Grade is set to 1 explicitly, not the table's DEFAULT 0: legacy CreateGuild hard-codes gGrade=1, and
--- the grade-upgrade switch has no case for grade 0 (a guild left at 0 could never upgrade).
 CREATE PROCEDURE game.usp_Guild_Create @Name NVARCHAR(12),
                                        @MasterCharacterId INT
 AS
@@ -30,7 +28,7 @@ BEGIN
         @GuildId = SCOPE_IDENTITY();
 
     INSERT INTO game.GuildMembers (GuildId, CharacterId, Role)
-    VALUES (@GuildId, @MasterCharacterId, 2); -- 2 = master (game.GuildMembers role enum)
+    VALUES (@GuildId, @MasterCharacterId, 2); 
 
     COMMIT TRANSACTION;
 

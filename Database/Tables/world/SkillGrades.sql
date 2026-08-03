@@ -1,14 +1,3 @@
--- Normalizes SKILL_INFO's gGradeInfo[2]: exactly 2 rows per skill (grade 0/1), never sparse.
--- The CHECKs below mirror legacy's load-time field validation (MyShm::Skill_CheckValidElement,
--- Server/Header/S15_MyShare.cpp:1277-1497), same rationale as world.Skills's own CHECKs. Deliberately NOT
--- retyping any TINYINT column here even though several of these bounds (1000/10000) exceed TINYINT's
--- 0-255 storage ceiling: for those columns the floor is real new enforcement but the upper bound is
--- unreachable in practice beneath the column's own narrower ceiling. Widening those columns to SMALLINT
--- would be the fully faithful fix, but it ripples into Fenrir.Data.Abstractions/World/SkillDtos.cs
--- (currently `byte`-typed) and every Skills domain consumer of those DTOs -- a cross-cutting schema/DTO
--- decision, not something folded silently into this table's definition. The full-fidelity CHECK bound is
--- kept anyway so no follow-up constraint change is needed if/when those columns are ever widened. Flag for
--- fenrir-solution-architect if a real skill ever needs one of these fields above 255.
 CREATE TABLE world.SkillGrades
 (
     SkillId          INT      NOT NULL,
@@ -21,7 +10,7 @@ CREATE TABLE world.SkillGrades
     FastRunSpeed     SMALLINT NOT NULL,
     AttackInfo1      SMALLINT NOT NULL,
     AttackInfo2      TINYINT  NOT NULL,
-    AttackInfo3      TINYINT  NOT NULL, -- always 0 in current data; reserved slot in AttackInfo[3], kept for fidelity
+    AttackInfo3      TINYINT  NOT NULL, 
     RunTime          SMALLINT NOT NULL,
     ChargingDamageUp TINYINT  NOT NULL,
     AttackPowerUp    TINYINT  NOT NULL,
@@ -29,7 +18,7 @@ CREATE TABLE world.SkillGrades
     AttackSuccessUp  TINYINT  NOT NULL,
     AttackBlockUp    TINYINT  NOT NULL,
     ElementAttackUp  TINYINT  NOT NULL,
-    ElementDefenseUp TINYINT  NOT NULL, -- always 0 in current data; reserved, kept for fidelity
+    ElementDefenseUp TINYINT  NOT NULL, 
     AttackSpeedUp    TINYINT  NOT NULL,
     RunSpeedUp       TINYINT  NOT NULL,
     ShieldLifeUp     TINYINT  NOT NULL,

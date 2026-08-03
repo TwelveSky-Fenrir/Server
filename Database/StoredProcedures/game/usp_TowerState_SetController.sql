@@ -1,6 +1,3 @@
--- database/50_procedures/game/usp_TowerState_SetController.sql
--- Whole-row progress write for one tower: level/type (0/0 once destroyed) plus the controlling tribe.
--- Idempotent; CapturedAtUtc refreshes on every call that sets a non-NULL controller.
 CREATE PROCEDURE game.usp_TowerState_SetController @TowerIndex TINYINT,
                                                    @Level TINYINT,
                                                    @TowerType TINYINT,

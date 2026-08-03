@@ -1,5 +1,3 @@
--- Legacy: mTribeSubMaster[tribe][0..11] (MAX_TRIBE_SUBMASTER_NUM=12); SlotIndex is the raw array position,
--- CharacterId replaces the legacy per-slot name.
 CREATE TABLE game.TribeSubMasters
 (
     TribeId     TINYINT NOT NULL,

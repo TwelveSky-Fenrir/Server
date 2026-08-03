@@ -1,5 +1,3 @@
--- Same TOCTOU-safe money guard as usp_Character_AdjustMoney, plus two whole-container item replaces in
--- the same transaction (e.g. enchant when target/material land on different pages).
 CREATE PROCEDURE game.usp_Character_AdjustMoneyAndReplaceTwoContainers @CharacterId INT,
                                                                        @DeltaMoney BIGINT,
                                                                        @DeltaBigMoney INT,
@@ -21,7 +19,6 @@ BEGIN
     BEGIN
         TRANSACTION;
 
-    -- Guarded UPDATE closes a TOCTOU: two concurrent credits must never jointly breach the cap.
     UPDATE game.Characters
     SET Money        = Money + @DeltaMoney,
         BigMoney     = BigMoney + @DeltaBigMoney,
@@ -33,7 +30,6 @@ BEGIN
     IF
         @@ROWCOUNT = 0
         BEGIN
-            -- Diagnostic re-read only; picks which error code to throw.
             IF
                 EXISTS (SELECT 1
                         FROM game.Characters

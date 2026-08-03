@@ -1,82 +1,4 @@
--- Lot 8 : six compteurs/tableaux mutes en jeu cote Fenrir, jamais persistes, que le legacy persiste tous
--- sans #ifdef dans CreateAvatarColumn (Server/Header/CSQLAvatar.cpp:556-756), donc ecrits par le
--- write-behind ts25playuser (Server/ts25playuser/S08_MyDB.cpp:99) des lors qu'une zone les modifie.
---
---   ProtectForRefine   aProtectForRefine/aProtectForSmelt, CSQLAvatar.cpp:596. Stock de charges credite a
---                      l'usage d'un consommable (Server/ts25zone/S04_MyWork03.cpp:1545-1546), consomme au
---                      raffinage (S04_MyWork02.cpp:13306,13429-13432).
---   ProtectForDestroy  aProtectForDestroy, CSQLAvatar.cpp:593. Colonne et lecture RS0 DEJA presentes
---                      (game.Characters.ProtectForDestroy, usp_Character_GetForWorldEntry) mais jamais
---                      ecrite : absente de tvp_CharacterProgress et des deux procedures de write-behind.
---                      Ce script comble uniquement le cote ecriture ; aucun ALTER TABLE necessaire pour elle.
---   ProtectForCostume  aProtectForCostume, CSQLAvatar.cpp:599, enregistree SANS garde USE_COSTUME. Creditee
---                      par consommable (S04_MyWork03.cpp:2429-2432), consommee avec notification
---                      S202_PROTECT_COSTUME (S04_MyWork02.cpp:2642-2648).
---   ProtectForDestroy2 aProtectForDestroy2, CSQLAvatar.cpp:594. Second palier de charges, distinct de
---                      ProtectForDestroy (credit S04_MyWork03.cpp:2451-2452, consommation
---                      S104PROTECT_ITEM2 S04_MyWork02.cpp:2941-2945).
---   LodRounds          aZone241Time, CSQLAvatar.cpp:635 (alias historique aChallengeNum). ATTENTION DE
---                      LECTURE : Fenrir porte DEUX proprietes PlayerRuntimeState distinctes pour ce meme
---                      champ legacy -- Zone241Time (deja persiste par ce script AVANT ce lot, via
---                      game.Characters.Zone241Time / usp_Character_AdjustZone241Time, alimente par la
---                      mission quotidienne et le peage de zone 241) et LodRounds (alimente par le seul
---                      ticket 1434 "Life or Death", mort sous M33/LNW33 -- #ifdef WUSE_ITEM_1434 n'existe
---                      que sous #ifdef __REBIRTH__, Server/Header/use_inventory.h:73-82). Les deux
---                      mutent aujourd'hui INDEPENDAMMENT en memoire sans jamais se resynchroniser. Ce
---                      script persiste LodRounds tel que nomme cote Fenrir (nouvelle colonne dediee,
---                      extension du meme tvp_CharacterProgress -- pas un chemin d'ecriture parallele) parce
---                      que c'est le champ demande et que le producteur mort n'est "pas une raison de le
---                      laisser ephemere" ; mais la duplication avec Zone241Time reste un angle mort distinct
---                      a reconcilier hors de ce lot (unifier les deux proprietes PlayerRuntimeState),
---                      changement qui touche Zone.EconomyMirrors.cs/UseInventoryItemService.cs/
---                      PlayerRuntimeState.Consumables.cs, hors perimetre d'ecriture de ce lot.
---   StellarCoreExpireDate aStellarCoreExpireDate[MAX_AVATAR_STELLAR_NUM=10], CSQLAvatar.cpp:722, chaque
---                      slot CREATE_INT(...,8,EFIX_ANIMAL_POWER) (CSQLAvatar.cpp:524-527) : hors bornes
---                      0..99999999 => ECRASE A 0, pas de modulo (CSQLAvatar.cpp:39-42). Encode ici comme
---                      UNE colonne texte a largeur fixe (10*8=80 caracteres), meme convention que
---                      BottleSlots/AutoBuffSkill (StellarCoreExpireDateCodec, meme fichier que
---                      BottleSlotsCodec/AutoBuffSkillCodec). Producteurs vivants sous M33 (USE_STELLAR_CORE
---                      allume) : equipement (Server/ts25zone/S04_MyWork03.cpp:1455), retrait
---                      (S04_MyWork02.cpp:15283-15298). NOTE DE PORTEE : le tableau soeur des ITEMS
---                      equipes (aStellarCore, PlayerRuntimeState.StellarCoreWardrobe) reste, lui,
---                      NON PERSISTE -- hors de ce lot, qui ne nomme que StellarCoreExpireDate. Persister
---                      les dates d'expiration sans le tableau d'items est sans danger (le seul lecteur
---                      actuel est l'affichage client AvatarInfo, pas de logique serveur qui suppose
---                      l'occupation d'un slot) et avant-compatible : une fois StellarCoreWardrobe porte a
---                      son tour (meme motif que game.CharacterCostumes/tvp_CharacterCostumeSlot), les dates
---                      deja en base deviennent immediatement correctes sans script de rattrapage.
---
--- POURQUOI UN NOUVEAU SCRIPT ET DROP+RECREATE DU TYPE
--- game.Characters, tvp_CharacterProgress et les deux procedures de write-behind sont deja journalisees
--- SHA-256 (fichiers de base + Migrations/002...033) ; le migrateur refuse de re-appliquer un chemin dont le
--- contenu a change. Un type TABLE ne s'ALTERe pas et ne se DROP pas tant qu'une procedure le prend en
--- parametre : meme sequence DROP-procs / DROP-type / CREATE-type / CREATE-procs que Migrations/011/012.
---
--- ETAT CONCURRENT AU MOMENT DE L'ECRITURE -- A REVERIFIER IMPERATIVEMENT AVANT APPLICATION REELLE
--- Ce depot est modifie EN CONTINU pendant la preparation de ce script par plusieurs lots paralleles qui
--- etendent eux aussi tvp_CharacterProgress/usp_Character_PersistProgressBatch/usp_Character_PersistFinalFlush/
--- usp_Character_GetForWorldEntry : au moins RankPoint/CloakLuckyBoxPity/CloakVariantBoxPity/
--- MountVariantBoxPity, ImproveItemValue/AddItemValue/HighItemValue/TaiyanKeyTimer, et
--- EliteDungeonTime/DungeonKeyTime/IvyHallTicketTime/ScrollOfSeekersTime/FightingGodForDestroy ont ete vus
--- apparaitre dans Fenrir.Data.Abstractions.Characters.CharacterProgressTvp (et dans les deux hotes de
--- write-behind) au cours meme de la redaction de ce script ; le numero Migrations/032 a ete repris et
--- renomme plusieurs fois en quelques minutes. CE SCRIPT RECREE LE TYPE COMME L'UNION OBSERVEE AU DERNIER
--- INSTANT VERIFIE (voir CharacterProgressTvp.cs / CharacterWorldSnapshotDto au moment de l'ecriture) + les
--- six colonnes de ce lot en queue -- CE N'EST PAS UNE GARANTIE que c'est la forme FINALE. Il doit
--- s'appliquer apres tout script qui ajoute a game.Characters les colonnes des lots cites ci-dessus
--- (numerote 040, au-dela de tout numero vu a l'ecriture) ET avant d'etre considere fiable, la personne qui
--- merge doit reverifier ce DROP+CREATE contre l'etat definitif de CharacterProgressTvp.cs une fois tous les
--- lots paralleles integres -- exactement le role qu'a joue Migrations/012 vis-a-vis de 010/011. Si un lot
--- supplementaire est arrive entre-temps, ce script sous-estimera l'union et redeviendra lui-meme une
--- regression au sens de Migrations/012 ; ne pas le traiter comme definitif sans cette reverification.
---
--- usp_Character_GetForWorldEntry utilise CREATE OR ALTER (pas de type TABLE en parametre) : la
--- redeclaration ci-dessous est la projection RS0 COMPLETE et correcte independamment de l'etat intermediaire
--- du cluster 03x au moment ou ce script s'execute reellement.
 
--- 1. Colonnes de destination sur game.Characters. ProtectForDestroy existe deja (voir base
---    Tables/game/Characters.sql:103-105) : pas d'ALTER pour elle, seulement le cablage TVP/procedures
---    ci-dessous. Chaque ADD est garde par sys.columns.
 IF NOT EXISTS (SELECT 1
                FROM sys.columns
                WHERE object_id = OBJECT_ID(N'game.Characters')
@@ -127,14 +49,11 @@ ALTER TABLE game.Characters
         CONSTRAINT CK_Characters_StellarCoreExpireDate CHECK (LEN(StellarCoreExpireDate) IN (0, 80));
 GO
 
--- 2. Dropper les deux procedures qui referencent le type, puis le type lui-meme.
 DROP PROCEDURE IF EXISTS game.usp_Character_PersistFinalFlush;
 DROP PROCEDURE IF EXISTS game.usp_Character_PersistProgressBatch;
 DROP TYPE IF EXISTS game.tvp_CharacterProgress;
 GO
 
--- 3. Recreer le type, miroir exact de CharacterProgressTvp tel qu'observe (voir note ci-dessus) + les six
---    colonnes de ce lot en queue.
 CREATE TYPE game.tvp_CharacterProgress AS TABLE
 (
     CharacterId              INT          NOT NULL,
@@ -218,7 +137,6 @@ CREATE TYPE game.tvp_CharacterProgress AS TABLE
 );
 GO
 
--- 4. Recreer usp_Character_PersistProgressBatch. Garde d'idempotence inchangee.
 CREATE PROCEDURE game.usp_Character_PersistProgressBatch @Progress game.tvp_CharacterProgress READONLY
 AS
 BEGIN
@@ -306,12 +224,10 @@ BEGIN
         c.UpdatedAtUtc             = SYSUTCDATETIME()
     FROM game.Characters AS c
              JOIN @Progress AS s ON s.CharacterId = c.CharacterId
-    WHERE s.FlushSequence > c.FlushSequence; -- idempotence guard
+    WHERE s.FlushSequence > c.FlushSequence; 
 END;
 GO
 
--- 5. Recreer usp_Character_PersistFinalFlush (deconnexion + changement de zone, via
---    PositionWriteBehindHost.FlushCharacterNowAsync).
 CREATE PROCEDURE game.usp_Character_PersistFinalFlush @Progress game.tvp_CharacterProgress READONLY,
                                                       @Position game.tvp_CharacterPosition READONLY
 AS
@@ -406,15 +322,10 @@ BEGIN
     FROM game.Characters AS c
              JOIN @Progress AS p ON p.CharacterId = c.CharacterId
              JOIN @Position AS q ON q.CharacterId = c.CharacterId
-    WHERE q.FlushSequence > c.FlushSequence; -- idempotence guard
+    WHERE q.FlushSequence > c.FlushSequence; 
 END;
 GO
 
--- 6. Chemin de LECTURE. Redeclaration COMPLETE et correcte de RS0, independante de l'etat intermediaire du
---    cluster 03x (restaure AutoTime/BuffX2Time si un script concurrent ne l'a pas deja fait -- ordinaux fixes
---    par CharacterWorldSnapshotDto, generateur CaeriusNet, lecture par position) et ajoute en queue
---    ProtectForRefine/ProtectForCostume/ProtectForDestroy2/LodRounds/StellarCoreExpireDate. ProtectForDestroy
---    est deja projetee plus haut dans la liste (juste apres ProtectForDeath) : non deplacee.
 CREATE OR ALTER PROCEDURE game.usp_Character_GetForWorldEntry @CharacterId INT
 AS
 BEGIN
@@ -538,10 +449,10 @@ BEGIN
     SELECT Container,
            Slot,
            ItemId,
-           CAST(Quantity AS INT) AS Quantity, -- game.CharacterItems.Quantity is SMALLINT; widen back to INT
-           Enchant,                           -- here so CharacterItemSlotDto's existing int-typed ctor param
-           Combine,                           -- keeps reading it via SqlDataReader.GetInt32 without an
-           Refine,                            -- InvalidCastException (see CharacterItems.sql's own comment)
+           CAST(Quantity AS INT) AS Quantity, 
+           Enchant,                           
+           Combine,                           
+           Refine,                            
            Socket,
            SocketGem1,
            SocketGem2,

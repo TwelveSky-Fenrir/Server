@@ -1,5 +1,3 @@
--- Seeds world.ZoneNpcSpawns from 002.BIN. MUST run after both the world.Zones and world.Npcs seed
--- scripts (FK dependency).
 IF
     NOT EXISTS (SELECT 1
                 FROM world.ZoneNpcSpawns)

@@ -1,14 +1,1 @@
--- Lot 5 (dead-proc sweep) -- drop game.usp_Character_SetPetGrowth.
---
--- La procedure dediee n'a jamais eu d'appelant applicatif : ICharacterRepository.SetPetGrowthAsync existait
--- et etait implementee, mais aucun code de jeu ne l'invoquait -- la croissance et l'activite du familier
--- n'atteignaient jamais SQL, alors meme que les colonnes existaient et etaient relues. C'est le piege exact
--- que l'existence d'une procedure dediee rend invisible.
--- Migrations/008_autohunt_buffx2_premium_pet_writeback.sql fond PetGrowth et PetActivity dans
--- game.tvp_CharacterProgress et dans les deux procedures de flush write-behind, donc la procedure a evenement
--- discret n'a plus de role ; la garder ouvrirait un second chemin d'ecriture sur la meme entite, et deux
--- chemins finissent par diverger. SetPetGrowthAsync est supprimee de l'interface et de l'implementation dans
--- le meme changement. Son script de base (StoredProcedures/game/usp_Character_SetPetGrowth.sql) est retire de
--- _manifest.txt pour qu'une base fraiche ne la cree plus ; ce DROP la retire des bases deja provisionnees.
--- Idempotent (IF EXISTS). Meme sequence que Migrations/003_drop_usp_character_setmountprogression.sql.
 DROP PROCEDURE IF EXISTS game.usp_Character_SetPetGrowth;

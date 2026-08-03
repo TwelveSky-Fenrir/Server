@@ -1,12 +1,3 @@
--- New file rather than an edit to an earlier error-catalog script: applied scripts are never edited.
--- Backs game.usp_Character_ApplyTribeConversion (tribe conversion via Book of Noble Dragon/Royal
--- Serpent/Grand Tiger V2, world.Items 99014/99015/99016) -- one distinct code per precondition/abort kind,
--- matching the behavior contract's own 8-way precondition list.
---
--- Renamed from 010_error_catalog_tribe_conversion.sql (2026-07-12, manifest-structure-cleanliness): the
--- old "010" leading number collided with the unrelated 010_error_catalog_death_protection.sql. Both files
--- were always applied correctly in a stable relative order registering non-overlapping codes, so this was
--- a pure numbering-convention fix, not a functional one -- see _manifest.txt's own comment on this entry.
 IF NOT EXISTS (SELECT 1
                FROM admin.ErrorCatalog
                WHERE ErrorNumber = 50313)

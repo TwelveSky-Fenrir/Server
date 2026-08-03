@@ -1,5 +1,3 @@
--- Normalized from ZONEMOVEDATA.StartCoord/StartCoordZone: only the first StartCoordNum of each zone's 100-slot arrays are populated.
--- ZoneNumber is the zone landed IN; FromZoneNumber is the zone arrived FROM, NULL (never 0) per the same convention as world.ZonePortals.TargetZoneNumber.
 CREATE TABLE world.ZoneSpawnPoints
 (
     ZoneNumber     SMALLINT NOT NULL,

@@ -1,20 +1,9 @@
--- Regression fix. Migration 010 rebuilt game.tvp_CharacterProgress from Migration 007's 37-column form
--- instead of Migration 008's 42-column form, silently dropping 11 columns (5 restored by Migration 011:
--- Title/Halo/TeacherPoint/WarPointDelta/BloodCoinDelta). The other 6 -- AutoTime/AutoTime2/BuffX2Time/
--- PremiumExpireUtc/PetGrowth/PetActivity -- were never restored and stayed unreachable by the write-behind
--- TVP path. game.Characters already carries all 6 columns (base table + Migration 008 ALTER); no ALTER
--- TABLE is needed here, only the type and its two consuming procedures.
---
--- New script, not an edit: the base type/procedure files and Migrations 008/010/011 are already
--- SHA-256-journaled. Same DROP-procs / DROP-type / CREATE-type / CREATE-procs sequence as those scripts.
 
 DROP PROCEDURE IF EXISTS game.usp_Character_PersistFinalFlush;
 DROP PROCEDURE IF EXISTS game.usp_Character_PersistProgressBatch;
 DROP TYPE IF EXISTS game.tvp_CharacterProgress;
 GO
 
--- Mirrors Fenrir.Data.Abstractions.Characters.CharacterProgressTvp field order exactly (59 columns): the
--- 53 left by Migration 011, plus the 6 lost columns restored here in queue.
 CREATE TYPE game.tvp_CharacterProgress AS TABLE
 (
     CharacterId              INT          NOT NULL,
@@ -79,9 +68,6 @@ CREATE TYPE game.tvp_CharacterProgress AS TABLE
 );
 GO
 
--- Periodic flush. Idempotence guard (FlushSequence strictly increasing) unchanged. The 6 restored columns
--- are absolute writes, same ownership class as the other PlayerRuntimeState-owned counters -- no concurrent
--- writer (unlike WarPoint/BloodCoin, which stay delta).
 CREATE PROCEDURE game.usp_Character_PersistProgressBatch @Progress game.tvp_CharacterProgress READONLY
 AS
 BEGIN
@@ -150,12 +136,10 @@ BEGIN
         c.UpdatedAtUtc             = SYSUTCDATETIME()
     FROM game.Characters AS c
              JOIN @Progress AS s ON s.CharacterId = c.CharacterId
-    WHERE s.FlushSequence > c.FlushSequence; -- idempotence guard
+    WHERE s.FlushSequence > c.FlushSequence; 
 END;
 GO
 
--- Terminal flush -- disconnect (GameConnectionHost) and zone change (ZoneMoveService), both via
--- PositionWriteBehindHost.FlushCharacterNowAsync. Progression and position in one UPDATE, unchanged.
 CREATE PROCEDURE game.usp_Character_PersistFinalFlush @Progress game.tvp_CharacterProgress READONLY,
                                                       @Position game.tvp_CharacterPosition READONLY
 AS
@@ -231,6 +215,6 @@ BEGIN
     FROM game.Characters AS c
              JOIN @Progress AS p ON p.CharacterId = c.CharacterId
              JOIN @Position AS q ON q.CharacterId = c.CharacterId
-    WHERE q.FlushSequence > c.FlushSequence; -- idempotence guard
+    WHERE q.FlushSequence > c.FlushSequence; 
 END;
 GO

@@ -1,5 +1,3 @@
--- Called once per world-entry (EnterWorldService), never per tick or per movement. UPDATE-then-INSERT
--- upsert (no MERGE, per architecture reference), same shape as usp_GameServer_Heartbeat.
 CREATE PROCEDURE runtime.usp_CharacterShardLocation_Upsert @CharacterId INT,
                                                            @ShardId TINYINT,
                                                            @MapId SMALLINT,

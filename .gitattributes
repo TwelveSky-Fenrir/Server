@@ -1,11 +1,5 @@
-# Normalisation de fin de ligne. L'index est deja 100 % LF (mesure : 2 293 fichiers, tous `i/lf`),
-# donc ce fichier fige un etat acquis au lieu de le changer -- son ajout produit zero diff de contenu.
-# Sans lui, un `git config core.autocrlf true` cote poste (defaut de l'installeur Git for Windows)
-# reintroduit du CRLF au premier checkout, en contradiction directe avec `.editorconfig` qui impose
-# `end_of_line = lf`.
 * text=auto eol=lf
 
-# Binaires : jamais normalises.
 *.png   binary
 *.jpg   binary
 *.jpeg  binary
@@ -20,11 +14,9 @@
 *.snk   binary
 *.WM    binary
 
-# Fichiers de donnees monde legacy : format binaire proprietaire du client ts25, jamais du texte.
 *.bin   binary
 *.dat   binary
 
-# Le diff Git par defaut sur ces formats est illisible ; on garde le texte mais sans fusion auto.
 *.slnx      text eol=lf merge=union
 *.csproj    text eol=lf
 *.props     text eol=lf

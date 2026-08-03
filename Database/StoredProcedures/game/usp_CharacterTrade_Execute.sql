@@ -1,14 +1,3 @@
--- All statements commit as one transaction -- never a "items moved but money didn't" half-state.
--- TradeSession has already computed both sides' final contents.
---
--- Also writes the trade audit trail (GL_615_TRADE_ITEM/GL_615_TRADE_ITEM2/GL_616_TRADE_MONEY parity,
--- EventLogCategory.Trade) in the same transaction: @TradedItemsA/@TradedItemsB are each side's finalized
--- trade-window offer (up to 8 slots, MAX_TRADE_SLOT_NUM), logged one row per occupied slot (ItemId > 0);
--- @OfferedMoneyA/@OfferedBigMoneyA/@OfferedMoneyB/@OfferedBigMoneyB are each side's own raw contributed money
--- offer, logged only when a side contributed a nonzero amount of either component -- matching legacy's own
--- >0 gate (Server/ts25zone/S04_MyWork02.cpp:8992,9003,8987,8998). Outcome = 1 (success) is the only value
--- ever logged: both money-adjustment guards above already THROW (50268/50269) before this point on any
--- failure, so there is nothing to log on a rejected attempt.
 CREATE PROCEDURE game.usp_CharacterTrade_Execute @CharacterA INT,
                                                  @ItemsA0 game.tvp_CharacterItemSlot READONLY,
                                                  @ItemsA1 game.tvp_CharacterItemSlot READONLY,
@@ -130,18 +119,14 @@ BEGIN
            Serial
     FROM @ItemsB1;
 
-    -- Audit logging (GL_615_TRADE_ITEM/GL_615_TRADE_ITEM2/GL_616_TRADE_MONEY parity) -- both characters are
-    -- confirmed to exist by the two guarded UPDATEs above, so these SELECTs always resolve an account id.
     DECLARE @AccountA INT, @AccountB INT;
     SELECT @AccountA = AccountId FROM game.Characters WHERE CharacterId = @CharacterA;
     SELECT @AccountB = AccountId FROM game.Characters WHERE CharacterId = @CharacterB;
 
-    -- Character A's offered items -> B. Empty/omitted @TradedItemsA (no rows with ItemId > 0) produces
-    -- nothing, matching legacy's own empty-slot skip.
     INSERT INTO game.EventLog (EventCode, Category, ActorAccountId, ActorCharacterId, TargetAccountId,
                                TargetCharacterId, ItemId, Quantity, Outcome, Payload)
-    SELECT 1, -- item transfer (GL_615_TRADE_ITEM/GL_615_TRADE_ITEM2)
-           0, -- EventLogCategory.Trade
+    SELECT 1, 
+           0, 
            @AccountA,
            @CharacterA,
            @AccountB,
@@ -155,7 +140,6 @@ BEGIN
     FROM @TradedItemsA
     WHERE ItemId > 0;
 
-    -- Character B's offered items -> A (symmetric).
     INSERT INTO game.EventLog (EventCode, Category, ActorAccountId, ActorCharacterId, TargetAccountId,
                                TargetCharacterId, ItemId, Quantity, Outcome, Payload)
     SELECT 1,
@@ -173,11 +157,10 @@ BEGIN
     FROM @TradedItemsB
     WHERE ItemId > 0;
 
-    -- Character A's offered money -> B. No row at all when A contributed zero of both components.
     IF @OfferedMoneyA > 0 OR @OfferedBigMoneyA > 0
         EXEC game.usp_EventLog_Insert
-             @EventCode = 2, -- money transfer (GL_616_TRADE_MONEY)
-             @Category = 0, -- EventLogCategory.Trade
+             @EventCode = 2, 
+             @Category = 0, 
              @ActorAccountId = @AccountA,
              @ActorCharacterId = @CharacterA,
              @TargetAccountId = @AccountB,
@@ -186,7 +169,6 @@ BEGIN
              @DeltaBigMoney = @OfferedBigMoneyA,
              @Outcome = 1;
 
-    -- Character B's offered money -> A (symmetric).
     IF @OfferedMoneyB > 0 OR @OfferedBigMoneyB > 0
         EXEC game.usp_EventLog_Insert
              @EventCode = 2,

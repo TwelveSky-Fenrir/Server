@@ -1,4 +1,3 @@
--- One-directional: writes only the calling character's own friend slot (see game.CharacterFriends).
 CREATE PROCEDURE game.usp_CharacterFriend_Add @CharacterId INT,
                                               @Slot TINYINT,
                                               @FriendCharacterId INT

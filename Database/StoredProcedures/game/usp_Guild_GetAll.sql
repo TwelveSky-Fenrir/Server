@@ -1,5 +1,3 @@
--- MemberCount is INT (not BIGINT): game.vw_GuildRosterCounts' COUNT(*) returns INT, and the DTO field
--- must match or it throws InvalidCastException.
 CREATE PROCEDURE game.usp_Guild_GetAll
 AS
 BEGIN

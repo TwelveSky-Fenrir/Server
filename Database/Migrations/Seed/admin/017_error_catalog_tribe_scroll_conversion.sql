@@ -1,9 +1,3 @@
--- New file rather than an edit to an earlier error-catalog script: applied scripts are never edited.
--- Backs game.usp_Character_ApplyTribeScrollConversion (faction-transfer scroll, world.Items 8153/8154 --
--- TChangeTribe reclassifier). One distinct code per precondition/gate, matching the behavior contract's own
--- scroll gate list. Distinct block from 50313-50320 (the Book-of-* tribe-conversion mechanic) even though the
--- two procedures share equivalence data -- they are genuinely different reclassifiers and the app layer
--- switches on the number.
 IF NOT EXISTS (SELECT 1
                FROM admin.ErrorCatalog
                WHERE ErrorNumber = 50341)

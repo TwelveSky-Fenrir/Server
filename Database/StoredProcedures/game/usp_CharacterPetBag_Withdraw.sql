@@ -1,6 +1,3 @@
--- One of 3 atomic procedures backing PetBagRepository (Infrastructure/Fenrir.Data/Inventory/PetBagRepository.cs)
--- for the CZ_PROCESS_DATA_SEND pet-bag family (tSort 254/255/256). See usp_CharacterPetBag_Deposit's own
--- header for the shared TOCTOU-closing rationale.
 CREATE PROCEDURE game.usp_CharacterPetBag_Withdraw @CharacterId INT,
                                                    @PetBagSlot TINYINT,
                                                    @InventoryContainer TINYINT,

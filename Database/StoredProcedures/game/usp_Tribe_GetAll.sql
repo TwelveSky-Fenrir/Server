@@ -1,5 +1,3 @@
--- database/50_procedures/game/usp_Tribe_GetAll.sql
--- Points comes from game.WorldStateTribes, not Tribes; NULL until usp_WorldState_EnsureInitialized runs.
 CREATE PROCEDURE game.usp_Tribe_GetAll
 AS
 BEGIN

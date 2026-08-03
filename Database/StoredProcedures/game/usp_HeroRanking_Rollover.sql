@@ -1,14 +1,3 @@
--- Weekly Current->Previous rollover, ported from the legacy's MyDB::UpdateRank (S08_MyDB.cpp:348-467):
--- once 7 real days have elapsed since the last flip, the Previous period is replaced by (up to) the top 10
--- Current-period characters per tribe, and Current is cleared for the new period to accumulate into.
--- Points<=0 and TribeId IS NULL rows are dropped rather than promoted, matching the legacy's own
--- "ORDER BY hPoint DESC LIMIT 10" / "if (hPoint < 1) continue" (S08_MyDB.cpp:409,423) -- both HeroRankBuilder
--- and HeroRewardResolver already treat anything past rank 10 or without a live tribe as unreachable, so there
--- is nothing to gain from keeping it around.
--- Safe to call redundantly and concurrently from every GameServer shard: the whole check-and-flip runs
--- inside one transaction holding an update lock on the singleton sentinel row (game.HeroRankingRolloverState),
--- so a second caller that races in just blocks until the first commits, then reads the refreshed date and
--- no-ops. Returns whether THIS call performed the flip, purely so the caller can log it.
 CREATE PROCEDURE game.usp_HeroRanking_Rollover
 AS
 BEGIN

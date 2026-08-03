@@ -1,4 +1,3 @@
--- Role: 0 member, 1 sub-master; role 2 (master) must go through usp_Guild_SetMaster instead.
 CREATE PROCEDURE game.usp_GuildMember_SetRole @GuildId INT,
                                               @CharacterId INT,
                                               @Role TINYINT

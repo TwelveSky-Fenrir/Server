@@ -1,5 +1,3 @@
--- Exists to close a real item-loss window: callers used to invoke usp_CharacterItems_ReplaceContainer
--- twice as independent transactions, so a fault between them could empty the source and never fill the destination.
 CREATE PROCEDURE game.usp_CharacterItems_ReplaceTwoContainers @CharacterId INT,
                                                               @ContainerA TINYINT,
                                                               @ItemsA game.tvp_CharacterItemSlot READONLY,

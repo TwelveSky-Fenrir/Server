@@ -368,148 +368,191 @@ BEGIN
 END;
 GO
 
--- 5. usp_Character_GetForWorldEntry : ajouter les 3 colonnes en queue de RS0.
-CREATE OR ALTER PROCEDURE game.usp_Character_GetForWorldEntry @AccountId INT, @Slot TINYINT
+-- 5. usp_Character_GetForWorldEntry : ajouter les 3 colonnes en queue de RS0 (DoubleKillNumTime,
+--    DoubleKillExpTime, DoubleKillNumTime2), au miroir ordinal exact de CharacterWorldSnapshotDto (126
+--    colonnes). Corps repris de Migrations/046_ornament_silver_gold_time_columns.sql (dernier script a
+--    avoir CREATE OR ALTER cette procedure avec succes, per _manifest.txt) -- une version corrompue de ce
+--    batch (signature @AccountId/@Slot, colonnes inexistantes IsMuted/UserSort/TribeRole/
+--    AutoPotion*Threshold/ci.Kind/cb.Value1-2) avait ete substituee ici par erreur et n'a jamais pu
+--    s'appliquer (CREATE PROCEDURE echoue immediatement sur "Invalid column name"). RS1 restaure aussi
+--    SocketGem1-3/ExpireDate/XPos/YPos que cette version corrompue avait fait disparaitre --
+--    CharacterItemSlotDto attend 15 colonnes dans cet ordre exact (Container..Serial, puis XPos, YPos).
+CREATE OR ALTER PROCEDURE game.usp_Character_GetForWorldEntry @CharacterId INT
 AS
 BEGIN
     SET NOCOUNT ON;
-    -- RS0 : colonnes du personnage (CharacterWorldSnapshotDto — append seulement en queue)
+
     SELECT c.CharacterId,
+           c.AccountId,
+           c.Slot,
            c.Name,
            c.Tribe,
-           c.PreviousTribe,
            c.Gender,
            c.HeadType,
            c.FaceType,
            c.Level,
-           c.Level2,
-           c.Experience,
-           c.Exp2,
-           c.RebirthCount,
+           c.MapId,
+           c.PosX,
+           c.PosY,
+           c.PosZ,
+           c.Heading,
            c.Life,
            c.MaxLife,
            c.Mana,
            c.MaxMana,
+           c.FlushSequence,
+           c.Experience,
+           c.Level2,
            c.StatVit,
            c.StatStr,
            c.StatInt,
            c.StatDex,
            c.StatPoints,
            c.SkillPoints,
-           c.ContributionPoints,
-           c.MapId,
-           c.PosX,
-           c.PosY,
-           c.PosZ,
-           c.Heading,
+           c.Money,
+           c.BigMoney,
+           c.StoreMoney,
+           c.BigStoreMoney,
+           c.RebirthCount,
            c.Title,
            c.Halo,
-           c.TeacherPoint,
-           c.WarPoint,
-           c.BloodCoin,
-           c.AutoBuffTime,
-           c.AutoBuffSkill,
-           c.AutoTime,
-           c.AutoTime2,
-           c.DropItemTime,
-           c.M15PetLuckyBoxPity,
-           c.MountItemId,
-           c.MountExpActivity,
-           c.MountPower,
-           c.MountSlotIndex,
-           c.MountTime,
-           c.AnimalAbsorbTime,
-           c.AnimalAbsorbState,
-           c.CostumeIndex,
-           c.BonusItemLevel,
-           c.BonusItemValue,
-           c.VisibleState,
-           c.SpecialState,
-           c.UseOrnament,
+           c.ContributionPoints,
            c.EatLifePotion,
            c.EatManaPotion,
            c.EatStrPotion,
            c.EatDexPotion,
            c.EatElePotion,
-           c.ProtectForHalo,
-           c.ProtectForRefine,
+           c.ProtectForDeath,
            c.ProtectForDestroy,
-           c.ProtectForCostume,
-           c.ProtectForDestroy2,
+           c.DoubleExpTime1,
+           c.DoubleExpTime2,
+           c.DropItemTime,
+           c.InventoryDate,
+           c.StoreDate,
+           ISNULL(q.StepPermanent, 0) AS QuestStepPermanent,
+           ISNULL(q.ActiveQuestId, 0) AS QuestActiveId,
+           ISNULL(q.QSort, 0)         AS QuestSort,
+           ISNULL(q.TargetPhase, 0)   AS QuestTargetPhase,
+           ISNULL(q.KillCounter, 0)   AS QuestKillCounter,
+           c.JoinWar,
+           c.MissionKillOtherTribe,
+           c.MissionKillMonster,
+           c.MissionPlayTime,
+           c.AutoHuntEnabled,
+           c.AutoHuntConfig,
+           c.AutoLifeRatio,
+           c.AutoManaRatio,
+           c.PetGrowth,
+           c.PetActivity,
+           c.TeacherPoint,
+           c.AutoBuffTime,
+           c.PremiumExpireUtc,
+           c.Exp2,
+           c.PreviousTribe,
+           c.MountItemId,
+           c.MountExpActivity,
+           c.MountPower,
+           c.MountSlotIndex,
+           c.MountTime,
+           c.AutoTime2,
+           c.Zone241Time,
+           c.PetBagDate,
+           c.WarPoint,
+           c.M15PetLuckyBoxPity,
+           c.VisibleState,
+           c.SpecialState,
+           c.UseOrnament,
+           c.BloodCoin,
+           c.PetExpX2Time,
+           c.AnimalAbsorbTime,
+           c.AnimalAbsorbState,
+           c.CostumeIndex,
+           c.ProtectForHalo,
+           c.BonusItemLevel,
+           c.BonusItemValue,
+           c.TribeNotifyScrollCount,
+           c.TribeFourReturnAllowance,
+           c.BottleSlots,
+           c.DrunkBottleIndex,
+           c.AutoBuffSkill,
+           c.RankPointDate,
+           c.RankBuffType,
+           c.AutoTime,
+           c.BuffX2Time,
            c.ImproveItemValue,
            c.AddItemValue,
            c.HighItemValue,
            c.TaiyanKeyTimer,
            c.RankPoint,
-           c.RankPointDate,
-           c.RankBuffType,
            c.CloakLuckyBoxPity,
            c.CloakVariantBoxPity,
            c.MountVariantBoxPity,
-           c.Zone241Time,
+           c.ProtectForRefine,
+           c.ProtectForCostume,
+           c.ProtectForDestroy2,
            c.LodRounds,
-           c.TribeNotifyScrollCount,
-           c.TribeFourReturnAllowance,
-           c.BottleSlots,
-           c.DrunkBottleIndex,
            c.StellarCoreExpireDate,
            c.EliteDungeonTime,
            c.DungeonKeyTime,
            c.IvyHallTicketTime,
            c.ScrollOfSeekersTime,
            c.FightingGodForDestroy,
-           c.PetBagDate,
            c.PlayTime1,
            c.PlayTime3,
            c.HsbStoneRewardClaimed,
            c.TowerCpMilestoneCounter,
-           c.InventoryDate,
-           c.StoreDate,
            c.WarriorPill,
            c.WarriorScroll,
-           c.BuffX2Time,
-           c.PremiumExpireUtc,
-           c.PetGrowth,
-           c.PetActivity,
-           c.AutoHuntConfig,
-           c.AutoHuntEnabled,
-           c.AutoLifeRatio,
-           c.AutoManaRatio,
-           c.IsMuted,
-           c.UserSort,
-           c.AccountId,
-           c.TribeRole,
-           c.Zone241Time                 AS Zone241Time2,
-           c.AutoPotionLifeThreshold,
-           c.AutoPotionManaThreshold,
-           c.TaiyanKeyTimer              AS Zone125Time,
-           c.IvyHallTicketTime           AS Zone050Time2,
-           c.ProtectForDeath,
            c.SilverTime,
            c.GoldTime,
            c.DoubleKillNumTime,
            c.DoubleKillExpTime,
            c.DoubleKillNumTime2
-    FROM game.Characters c
-    WHERE c.AccountId = @AccountId
-      AND c.Slot = @Slot;
+    FROM game.Characters AS c
+             LEFT JOIN game.CharacterQuests AS q
+                       ON q.CharacterId = c.CharacterId
+    WHERE c.CharacterId = @CharacterId;
 
-    -- RS1-RS4 : items, skills, hotkeys, buffs (inchanges)
-    SELECT ci.Container, ci.Slot, ci.ItemId, ci.Quantity, ci.Enchant, ci.Combine, ci.Refine, ci.Socket, ci.Serial,
-           ci.XPos, ci.YPos
-    FROM game.CharacterItems ci
-    WHERE ci.CharacterId = (SELECT CharacterId FROM game.Characters WHERE AccountId = @AccountId AND Slot = @Slot);
+    SELECT Container,
+           Slot,
+           ItemId,
+           CAST(Quantity AS INT) AS Quantity, -- game.CharacterItems.Quantity is SMALLINT; widen back to INT
+           Enchant,                           -- here so CharacterItemSlotDto's existing int-typed ctor param
+           Combine,                           -- keeps reading it via SqlDataReader.GetInt32 without an
+           Refine,                            -- InvalidCastException (see CharacterItems.sql's own comment)
+           Socket,
+           SocketGem1,
+           SocketGem2,
+           SocketGem3,
+           ExpireDate,
+           Serial,
+           XPos,
+           YPos
+    FROM game.CharacterItems
+    WHERE CharacterId = @CharacterId
+    ORDER BY Container, Slot;
 
-    SELECT cs.Slot, cs.SkillId, cs.Grade
-    FROM game.CharacterSkills cs
-    WHERE cs.CharacterId = (SELECT CharacterId FROM game.Characters WHERE AccountId = @AccountId AND Slot = @Slot);
+    SELECT SlotIndex,
+           SkillId,
+           Grade
+    FROM game.CharacterSkills
+    WHERE CharacterId = @CharacterId
+    ORDER BY SlotIndex;
 
-    SELECT ck.Page, ck.SlotIndex, ck.Value1, ck.Value2, ck.Kind
-    FROM game.CharacterHotkeys ck
-    WHERE ck.CharacterId = (SELECT CharacterId FROM game.Characters WHERE AccountId = @AccountId AND Slot = @Slot);
+    SELECT Page,
+           KeyIndex,
+           Sort,
+           Value1,
+           Value2
+    FROM game.CharacterHotkeys
+    WHERE CharacterId = @CharacterId
+    ORDER BY Page, KeyIndex;
 
-    SELECT cb.Slot, cb.Value1, cb.Value2
-    FROM game.CharacterBuffs cb
-    WHERE cb.CharacterId = (SELECT CharacterId FROM game.Characters WHERE AccountId = @AccountId AND Slot = @Slot);
+    SELECT SlotIndex,
+           Value,
+           RemainingLegacyTicks
+    FROM game.CharacterBuffs
+    WHERE CharacterId = @CharacterId
+    ORDER BY SlotIndex;
 END;
 GO

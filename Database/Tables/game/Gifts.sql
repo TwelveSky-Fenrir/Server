@@ -12,7 +12,7 @@ CREATE TABLE game.Gifts
     CreatedAtUtc DATETIME2(3)       NOT NULL
         CONSTRAINT DF_Gifts_CreatedAtUtc DEFAULT SYSUTCDATETIME(),
     CONSTRAINT PK_Gifts PRIMARY KEY CLUSTERED (GiftId),
-    CONSTRAINT CK_Gifts_Quantity CHECK (Quantity BETWEEN 1 AND 999), -- MAX_ITEM_DUPLICATION_NUM (Server/Header/Protocol/DEFINE.h:609); usp_Gift_ClaimIntoVault copies this straight into AccountVaultItems.Quantity
+    CONSTRAINT CK_Gifts_Quantity CHECK (Quantity BETWEEN 1 AND 999), 
     CONSTRAINT CK_Gifts_Status CHECK (Status IN (0, 1)),
     CONSTRAINT FK_Gifts_Auth_Account FOREIGN KEY (AccountId) REFERENCES auth.Accounts (AccountId),
     INDEX IX_Gifts_Account_Status NONCLUSTERED (AccountId, Status)

@@ -60,7 +60,6 @@ public static class RegularWarMapCatalog
         {
             var mapId = servers[slot];
 
-            // No map gets a CpBonusRule: legacy's 120/295/296 bonus is #ifdef __GOD__, never defined in a shipped build.
             builder.Add(new RegularWarMapConfig(
                 mapId,
                 slot,

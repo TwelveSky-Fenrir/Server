@@ -14,7 +14,7 @@ CREATE TABLE game.OfflineShopItems
     SocketData   NVARCHAR(50) NULL,
     CONSTRAINT PK_OfflineShopItems PRIMARY KEY CLUSTERED (CharacterId, SlotIndex),
     CONSTRAINT CK_OfflineShopItems_SlotIndex CHECK (SlotIndex BETWEEN 0 AND 24),
-    CONSTRAINT CK_OfflineShopItems_Quantity CHECK (Quantity BETWEEN 1 AND 999), -- MAX_ITEM_DUPLICATION_NUM (Server/Header/Protocol/DEFINE.h:609)
+    CONSTRAINT CK_OfflineShopItems_Quantity CHECK (Quantity BETWEEN 1 AND 999), 
     CONSTRAINT FK_OfflineShopItems_Shop FOREIGN KEY (CharacterId) REFERENCES game.OfflineShops (CharacterId) ON DELETE CASCADE,
     CONSTRAINT FK_OfflineShopItems_World_Item FOREIGN KEY (ItemId) REFERENCES world.Items (ItemId)
 );

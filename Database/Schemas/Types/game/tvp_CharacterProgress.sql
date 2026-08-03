@@ -93,13 +93,6 @@ CREATE TYPE game.tvp_CharacterProgress AS TABLE
     DoubleKillExpTime                INT  NOT NULL,
     DoubleKillNumTime2          INT       NOT NULL,
     ProtectForDeath                INT    NOT NULL,
-    -- NEW: appended to close the AnimalDoubleExp/DmgBoost/HPBoost/CriBoost persistence gap. These 4 columns
-    -- exist on game.Characters (034_animal_double_exp_and_combat_boost_columns.sql) and are actively read/
-    -- written by combat/gameplay C# code (PlayerRuntimeState.TimedBuffs.cs, TimedBuffCountdownSystem.cs,
-    -- StatCalculator.AttackPower.cs, StatCalculator.CriticalAndLuck.cs) but were never wired into the
-    -- write-behind pipeline. Plain persisted int counters, no special semantics beyond round-tripping --
-    -- same pattern as GoldTime/SilverTime and DoubleKillNumTime*. Appended at the tail, not interleaved:
-    -- column order here is load-bearing (positional TVP binding from CharacterProgressTvp.cs).
     AnimalDoubleExp                  INT  NOT NULL,
     DmgBoost                    INT       NOT NULL,
     HPBoost                        INT    NOT NULL,

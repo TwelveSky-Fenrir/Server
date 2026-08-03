@@ -5,9 +5,6 @@ namespace Fenrir.Tools.DbMigrator;
 
 public static partial class SqlScriptBatcher
 {
-    // Recognizes "GO" and "GO <n>" (the T-SQL repeat-count form -- SSMS/sqlcmd re-execute the
-    // preceding batch n times). No live script in this repo uses the repeat form today, but a
-    // migration/seed script authored to bulk-generate rows could reasonably want it.
     [GeneratedRegex(@"^GO(?:\s+(?<count>\d+))?$", RegexOptions.IgnoreCase)]
     private static partial Regex GoLinePattern();
 
@@ -44,9 +41,6 @@ public static partial class SqlScriptBatcher
             yield return batch.ToString().Trim();
     }
 
-    // A "GO" line only counts as a batch separator when it isn't inside a block comment, a string
-    // literal carried over from a previous line, or (defensively) itself preceded by an unterminated
-    // line comment on the same physical line -- e.g. "-- GO" must never split a batch.
     private static bool IsStandaloneGoLine(string rawLine)
     {
         var trimmed = rawLine.TrimStart();
@@ -56,10 +50,6 @@ public static partial class SqlScriptBatcher
         return GoLinePattern().IsMatch(rawLine.Trim());
     }
 
-    // Cheap same-line state tracker: only needs to know whether a block comment or string literal is
-    // still open when the NEXT line begins, so a "GO" appearing on a continuation line of either is
-    // correctly ignored. Does not need to be a full T-SQL parser -- it only has to protect the one
-    // decision IsStandaloneGoLine makes.
     private static void ScanLineForCommentsAndStrings(string line, ref bool inBlockComment, ref bool inLineComment,
         ref char? stringDelimiter)
     {

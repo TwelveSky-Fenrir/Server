@@ -81,7 +81,6 @@ CREATE TABLE game.Characters
         CONSTRAINT DF_Characters_EatElePotion DEFAULT 0
         CONSTRAINT CK_Characters_EatElePotion CHECK (EatElePotion BETWEEN 0 AND 400),
 
-    -- 041_warriorpill_scroll_columns.sql
     WarriorPill              INT                                               NOT NULL
         CONSTRAINT DF_Characters_WarriorPill DEFAULT 0
         CONSTRAINT CK_Characters_WarriorPill CHECK (WarriorPill >= 0),
@@ -96,7 +95,6 @@ CREATE TABLE game.Characters
         CONSTRAINT DF_Characters_ProtectForDestroy DEFAULT 0
         CONSTRAINT CK_Characters_ProtectForDestroy CHECK (ProtectForDestroy >= 0),
 
-    -- 040_stellarcore_protect_charges_lodrounds_writeback.sql
     ProtectForRefine         INT                                               NOT NULL
         CONSTRAINT DF_Characters_ProtectForRefine DEFAULT 0
         CONSTRAINT CK_Characters_ProtectForRefine CHECK (ProtectForRefine >= 0),
@@ -118,7 +116,6 @@ CREATE TABLE game.Characters
     DoubleExpTime2           INT                                               NOT NULL
         CONSTRAINT DF_Characters_DoubleExpTime2 DEFAULT 0,
 
-    -- 034_animal_double_exp_and_combat_boost_columns.sql
     AnimalDoubleExp          INT                                               NOT NULL
         CONSTRAINT DF_Characters_AnimalDoubleExp DEFAULT 0
         CONSTRAINT CK_Characters_AnimalDoubleExp CHECK (AnimalDoubleExp >= 0),
@@ -135,11 +132,6 @@ CREATE TABLE game.Characters
     AutoBuffTime             INT                                               NOT NULL
         CONSTRAINT DF_Characters_AutoBuffTime DEFAULT 0,
 
-    -- 010_character_autobuff_and_rankbuff_writeback.sql
-    -- NOTE: source literal is 50 '0' characters against an NVARCHAR(48) column; SQL Server silently
-    -- right-truncates a too-long DEFAULT constant at apply time, so the effective stored default is 48
-    -- zero-characters, not 50. Reproduced verbatim from the migration, not "fixed" -- see journal entry for
-    -- why this is preserved rather than corrected (no cited legacy contract for the intended width).
     AutoBuffSkill            NVARCHAR(48)                                      NOT NULL
         CONSTRAINT DF_Characters_AutoBuffSkill DEFAULT
             N'000000000000000000000000000000000000000000000000',
@@ -152,7 +144,6 @@ CREATE TABLE game.Characters
     DropItemTime             INT                                               NOT NULL
         CONSTRAINT DF_Characters_DropItemTime DEFAULT 0,
 
-    -- 032_progress_writeback_reconciliation_and_item_value_counters.sql
     ImproveItemValue         INT                                               NOT NULL
         CONSTRAINT DF_Characters_ImproveItemValue DEFAULT 0
         CONSTRAINT CK_Characters_ImproveItemValue CHECK (ImproveItemValue >= 0),
@@ -171,7 +162,6 @@ CREATE TABLE game.Characters
     StoreDate                INT                                               NOT NULL
         CONSTRAINT DF_Characters_StoreDate DEFAULT 0,
 
-    -- 034_ticket_counters_and_fighting_god_writeback.sql
     EliteDungeonTime         INT                                               NOT NULL
         CONSTRAINT DF_Characters_EliteDungeonTime DEFAULT 0
         CONSTRAINT CK_Characters_EliteDungeonTime CHECK (EliteDungeonTime >= 0),
@@ -211,7 +201,6 @@ CREATE TABLE game.Characters
         CONSTRAINT DF_Characters_MissionPlayTime DEFAULT 0
         CONSTRAINT CK_Characters_MissionPlayTime CHECK (MissionPlayTime >= 0),
 
-    -- 032_playtime_petbagdate_hsbreward_writeback.sql
     PlayTime1                INT                                               NOT NULL
         CONSTRAINT DF_Characters_PlayTime1 DEFAULT 0
         CONSTRAINT CK_Characters_PlayTime1 CHECK (PlayTime1 >= 0),
@@ -257,7 +246,6 @@ CREATE TABLE game.Characters
     MountTime                 INT                                              NOT NULL
         CONSTRAINT DF_Characters_MountTime DEFAULT 0,
 
-    -- 007_costume_and_companion_timer_writeback.sql (also widens CK_Characters_CostumeIndex below)
     PetExpX2Time              INT                                              NOT NULL
         CONSTRAINT DF_Characters_PetExpX2Time DEFAULT 0,
     AnimalAbsorbTime          INT                                              NOT NULL
@@ -265,7 +253,6 @@ CREATE TABLE game.Characters
     AnimalAbsorbState         INT                                              NOT NULL
         CONSTRAINT DF_Characters_AnimalAbsorbState DEFAULT 0,
 
-    -- 008_autohunt_buffx2_premium_pet_writeback.sql
     AutoTime                  INT                                              NOT NULL
         CONSTRAINT DF_Characters_AutoTime DEFAULT 0
         CONSTRAINT CK_Characters_AutoTime CHECK (AutoTime >= 0),
@@ -274,7 +261,6 @@ CREATE TABLE game.Characters
         CONSTRAINT DF_Characters_AutoTime2 DEFAULT 0
         CONSTRAINT CK_Characters_AutoTime2 CHECK (AutoTime2 >= 0),
 
-    -- 008_autohunt_buffx2_premium_pet_writeback.sql
     BuffX2Time                INT                                              NOT NULL
         CONSTRAINT DF_Characters_BuffX2Time DEFAULT 0
         CONSTRAINT CK_Characters_BuffX2Time CHECK (BuffX2Time >= 0),
@@ -286,7 +272,6 @@ CREATE TABLE game.Characters
         CONSTRAINT DF_Characters_WarPoint DEFAULT 0
         CONSTRAINT CK_Characters_WarPoint CHECK (WarPoint >= 0),
 
-    -- 033_holystone_rankpoint_and_lootbox_pity_writeback.sql
     RankPoint                    INT                                           NOT NULL
         CONSTRAINT DF_Characters_RankPoint DEFAULT 0
         CONSTRAINT CK_Characters_RankPoint CHECK (RankPoint >= 0),
@@ -297,7 +282,6 @@ CREATE TABLE game.Characters
         CONSTRAINT DF_Characters_M15PetLuckyBoxPity DEFAULT 0
         CONSTRAINT CK_Characters_M15PetLuckyBoxPity CHECK (M15PetLuckyBoxPity BETWEEN 0 AND 200),
 
-    -- 033_holystone_rankpoint_and_lootbox_pity_writeback.sql
     CloakLuckyBoxPity               TINYINT                                    NOT NULL
         CONSTRAINT DF_Characters_CloakLuckyBoxPity DEFAULT 0
         CONSTRAINT CK_Characters_CloakLuckyBoxPity CHECK (CloakLuckyBoxPity BETWEEN 0 AND 100),
@@ -313,16 +297,13 @@ CREATE TABLE game.Characters
     SpecialState                        TINYINT                                NOT NULL
         CONSTRAINT DF_Characters_SpecialState DEFAULT 0,
 
-    -- 006_avatar_state_flags_writeback.sql
     UseOrnament                          BIT                                   NOT NULL
         CONSTRAINT DF_Characters_UseOrnament DEFAULT 0,
 
     CostumeIndex                          INT                                  NOT NULL
         CONSTRAINT DF_Characters_CostumeIndex DEFAULT -1
-        -- CHECK widened -1..9 -> -1..19 by 007_costume_and_companion_timer_writeback.sql
         CONSTRAINT CK_Characters_CostumeIndex CHECK (CostumeIndex BETWEEN -1 AND 19),
 
-    -- 011_avatar_counters_and_bottles_writeback.sql
     ProtectForHalo                         INT                                 NOT NULL
         CONSTRAINT DF_Characters_ProtectForHalo DEFAULT 0
         CONSTRAINT CK_Characters_ProtectForHalo CHECK (ProtectForHalo >= 0),
@@ -344,20 +325,15 @@ CREATE TABLE game.Characters
         CONSTRAINT DF_Characters_DrunkBottleIndex DEFAULT -1
         CONSTRAINT CK_Characters_DrunkBottleIndex CHECK (DrunkBottleIndex BETWEEN -1 AND 9),
 
-    -- 041_tower_cp_milestone_and_vault_date_writeback.sql (filename mentions "vault_date"; the migration
-    -- adds no vault-date column -- stale filename, not a missing implementation)
     TowerCpMilestoneCounter                        INT                         NOT NULL
         CONSTRAINT DF_Characters_TowerCpMilestoneCounter DEFAULT 0
         CONSTRAINT CK_Characters_TowerCpMilestoneCounter CHECK (TowerCpMilestoneCounter >= 0),
 
-    -- 046_ornament_silver_gold_time_columns.sql (source ALTER left the DEFAULT constraint unnamed --
-    -- explicitly named here to match this table's fully-named-constraint convention)
     SilverTime                                      INT                        NOT NULL
         CONSTRAINT DF_Characters_SilverTime DEFAULT 0,
     GoldTime                                         INT                       NOT NULL
         CONSTRAINT DF_Characters_GoldTime DEFAULT 0,
 
-    -- 047_kill_timer_columns.sql (same unnamed-constraint normalization as SilverTime/GoldTime above)
     DoubleKillNumTime                                 INT                      NOT NULL
         CONSTRAINT DF_Characters_DoubleKillNumTime DEFAULT 0,
     DoubleKillExpTime                                  INT                     NOT NULL
@@ -368,8 +344,6 @@ CREATE TABLE game.Characters
     FlushSequence             BIGINT                                           NOT NULL
         CONSTRAINT DF_Characters_FlushSequence DEFAULT 0,
 
-    -- 048_position_progress_flushsequence_split.sql (immediately after FlushSequence, before CreatedAtUtc,
-    -- per that migration's own placement instruction)
     PositionFlushSequence      BIGINT                                          NOT NULL
         CONSTRAINT DF_Characters_PositionFlushSequence DEFAULT 0,
     ProgressFlushSequence       BIGINT                                         NOT NULL
@@ -389,7 +363,6 @@ CREATE TABLE game.Characters
     CONSTRAINT FK_Characters_StudentCharacter FOREIGN KEY (StudentCharacterId) REFERENCES game.Characters (CharacterId),
     CONSTRAINT CK_Characters_TeacherNotSelf CHECK (TeacherCharacterId IS NULL OR TeacherCharacterId <> CharacterId),
     CONSTRAINT CK_Characters_StudentNotSelf CHECK (StudentCharacterId IS NULL OR StudentCharacterId <> CharacterId),
-    -- 043_characters_visiblestate_specialstate_domain_guard.sql
     CONSTRAINT CK_Characters_VisibleState_Domain CHECK (VisibleState IN (0, 1)),
     CONSTRAINT CK_Characters_SpecialState_Domain CHECK (SpecialState IN (0, 1, 2)),
     INDEX IX_Characters_Account NONCLUSTERED (AccountId) INCLUDE (Slot, Name, Tribe, Level),

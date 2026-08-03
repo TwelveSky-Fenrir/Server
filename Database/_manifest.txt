@@ -94,6 +94,7 @@ Tables/game/OfflineShopItems.sql
 Tables/game/ProxyShopNames.sql
 Tables/game/AccountVault.sql
 Tables/game/AccountVaultItems.sql
+Tables/game/AccountDailyRewards.sql
 
 Tables/game/CharacterItems.sql
 
@@ -102,6 +103,7 @@ Tables/game/TradeCommitLedger.sql
 Tables/game/CharacterPetBag.sql
 
 Tables/game/CharacterCostumes.sql
+Tables/game/CharacterCostumeSlots.sql
 
 Tables/game/CharacterFriends.sql
 Tables/game/CharacterSkills.sql
@@ -130,6 +132,8 @@ Schemas/Types/game/tvp_OfflineShopItemSlot.sql
 Schemas/Types/game/tvp_AccountVaultItemSlot.sql
 Schemas/Types/game/tvp_AccountVaultItemSlotV2.sql
 Schemas/Types/game/tvp_CharacterItemSlot.sql
+Schemas/Types/game/tvp_CharacterItemSlotV2.sql
+Schemas/Types/game/tvp_CharacterCostumeSlot.sql
 Schemas/Types/game/tvp_CharacterProgress.sql
 Schemas/Types/game/tvp_CharacterSkillSlot.sql
 Schemas/Types/game/tvp_CharacterHotkeySlot.sql
@@ -137,6 +141,7 @@ Schemas/Types/game/tvp_CharacterRuneSocket.sql
 Schemas/Types/game/tvp_CharacterLogoutState.sql
 Schemas/Types/game/tvp_EventLogEntry.sql
 Schemas/Types/runtime/tvp_AccountIdList.sql
+Schemas/Types/runtime/tvp_AccountSessionLease.sql
 Schemas/Types/admin/tvp_CharacterIdList.sql
 
 Views/world/vw_MonsterWithDropSummary.sql
@@ -179,11 +184,14 @@ StoredProcedures/game/usp_CharacterItem_GetIdAtSlot.sql
 StoredProcedures/game/usp_Character_GetIdByName.sql
 StoredProcedures/game/usp_Character_GetForWorldEntry.sql
 StoredProcedures/game/usp_Character_GetForWorldEntrySummary.sql
+StoredProcedures/game/usp_Character_GetCostumes.sql
 StoredProcedures/game/usp_Character_PersistProgressBatch.sql
 StoredProcedures/game/usp_Character_PersistBatch.sql
 StoredProcedures/game/usp_Character_PersistFinalFlush.sql
 StoredProcedures/game/usp_CharacterItems_ReplaceContainer.sql
 StoredProcedures/game/usp_CharacterItems_ReplaceTwoContainers.sql
+StoredProcedures/game/usp_CharacterItems_ReplaceContainerV2.sql
+StoredProcedures/game/usp_CharacterItems_ReplaceTwoContainersV2.sql
 StoredProcedures/game/usp_Character_AdjustMoney.sql
 StoredProcedures/game/usp_Character_AdjustMoneyAndReplaceContainer.sql
 StoredProcedures/game/usp_Character_AdjustMoneyAndReplaceTwoContainers.sql
@@ -213,6 +221,7 @@ StoredProcedures/game/usp_Character_CreateWithStarterKit.sql
 StoredProcedures/runtime/usp_SessionTicket_Create.sql
 StoredProcedures/runtime/usp_SessionTicket_Consume.sql
 StoredProcedures/runtime/usp_SessionTicket_Purge.sql
+StoredProcedures/runtime/usp_SessionTicket_Revoke.sql
 StoredProcedures/runtime/usp_GameServer_Heartbeat.sql
 StoredProcedures/runtime/usp_GameServer_GetDirectory.sql
 StoredProcedures/runtime/usp_GameServer_MarkUnreachable.sql
@@ -232,6 +241,7 @@ StoredProcedures/runtime/usp_AccountSession_GetActiveCount.sql
 
 StoredProcedures/runtime/usp_AccountSession_RecordDeviceSignature.sql
 StoredProcedures/runtime/usp_AccountSession_GetConcurrentDeviceCount.sql
+StoredProcedures/runtime/usp_AccountSession_RefreshAndGetHeldLeases.sql
 
 StoredProcedures/runtime/usp_GuildTribeBroadcastRelay_Publish.sql
 StoredProcedures/runtime/usp_GuildTribeBroadcastRelay_Poll.sql
@@ -373,6 +383,9 @@ StoredProcedures/game/usp_Character_AdjustBigMoneyConversion.sql
 
 StoredProcedures/game/usp_Character_GetRewardClaimState.sql
 StoredProcedures/game/usp_Character_ClaimDailyReward.sql
+StoredProcedures/game/usp_AccountDailyReward_GetState.sql
+StoredProcedures/game/usp_AccountDailyReward_Claim.sql
+StoredProcedures/game/usp_AccountDailyReward_ResetAll.sql
 StoredProcedures/game/usp_Character_SpendBloodCoinAndReplaceContainer.sql
 StoredProcedures/game/usp_Cash_DebitAndGrantItem.sql
 
@@ -411,6 +424,8 @@ StoredProcedures/game/usp_Guild_GetTopFourGuild.sql
 
 StoredProcedures/game/usp_WorldState_RecomputeTribeScores.sql
 StoredProcedures/game/usp_Character_ResetDailyRewardClaims.sql
+StoredProcedures/game/usp_Character_UpdateAppearance.sql
+StoredProcedures/game/usp_Character_UpdateGenderAndAppearance.sql
 
 StoredProcedures/game/usp_Guild_SetBuffTime.sql
 StoredProcedures/game/usp_Guild_SetBuffType.sql
@@ -459,34 +474,6 @@ StoredProcedures/admin/usp_TribeFourQuota_TryConsume.sql
 
 Schemas/002_roles.sql
 
-
-Migrations/001_sessiontickets_targetmapid.sql
-
-Migrations/002_character_progress_mount_writeback.sql
-
-Migrations/003_drop_usp_character_setmountprogression.sql
-
-Migrations/004_accountvault_sockets_expiry.sql
-
-Migrations/005_account_daily_reward_key.sql
-
-Migrations/006_avatar_state_flags_writeback.sql
-
-Migrations/006_character_progress_cosmetics_and_currency_grants.sql
-
-Migrations/007_costume_and_companion_timer_writeback.sql
-
-Migrations/008_autohunt_buffx2_premium_pet_writeback.sql
-
-Migrations/009_drop_usp_character_setpetgrowth.sql
-
-Migrations/010_character_autobuff_and_rankbuff_writeback.sql
-
-Migrations/011_avatar_counters_and_bottles_writeback.sql
-
-Migrations/012_autohunt_premium_pet_writeback_restore.sql
-
-Migrations/034_ticket_counters_and_fighting_god_writeback.sql
 
 Migrations/Seed/001_dev_account.sql
 
@@ -568,38 +555,4 @@ Migrations/Seed/admin/028_error_catalog_account_daily_reward.sql
 
 Migrations/Seed/admin/029_error_catalog_cash_credit_upper_bound.sql
 
-Migrations/030_accountsession_lease_verification.sql
-
-Migrations/031_sessionticket_revoke.sql
-
-Migrations/032_playtime_petbagdate_hsbreward_writeback.sql
-
-Migrations/032_progress_writeback_reconciliation_and_item_value_counters.sql
-
-Migrations/033_holystone_rankpoint_and_lootbox_pity_writeback.sql
-
-Migrations/034_animal_double_exp_and_combat_boost_columns.sql
-
-Migrations/040_stellarcore_protect_charges_lodrounds_writeback.sql
-
-Migrations/041_warriorpill_scroll_columns.sql
-
-Migrations/041_tower_cp_milestone_and_vault_date_writeback.sql
-
-Migrations/042_character_progress_tvp_full_reconciliation.sql
-
-Migrations/043_characters_visiblestate_specialstate_domain_guard.sql
-
-Migrations/044_characteritems_bag_position.sql
-
 Migrations/Seed/admin/030_error_catalog_characteritems_v2.sql
-
-Migrations/045_appearance_gender_scroll_procedures.sql
-
-Migrations/046_ornament_silver_gold_time_columns.sql
-
-Migrations/047_kill_timer_columns.sql
-
-Migrations/048_position_progress_flushsequence_split.sql
-
-Migrations/049_worldstatetribes_symbol_owner_writeback.sql

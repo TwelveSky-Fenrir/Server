@@ -21,7 +21,7 @@ BEGIN
            c.MaxLife,
            c.Mana,
            c.MaxMana,
-           c.FlushSequence
+           GREATEST(c.FlushSequence, c.PositionFlushSequence, c.ProgressFlushSequence) AS FlushSequence
     FROM game.Characters AS c
     WHERE c.CharacterId = @CharacterId;
 END;

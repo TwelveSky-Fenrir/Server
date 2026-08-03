@@ -24,12 +24,17 @@ CREATE TABLE game.CharacterItems
         CONSTRAINT DF_CharacterItems_ExpireDate DEFAULT 0,
     Serial      INT      NOT NULL
         CONSTRAINT DF_CharacterItems_Serial DEFAULT 0,
+    XPos        TINYINT  NOT NULL
+        CONSTRAINT DF_CharacterItems_XPos DEFAULT 0,
+    YPos        TINYINT  NOT NULL
+        CONSTRAINT DF_CharacterItems_YPos DEFAULT 0,
     CONSTRAINT PK_CharacterItems PRIMARY KEY CLUSTERED (CharacterId, Container, Slot),
-    CONSTRAINT CK_CharacterItems_Quantity CHECK (Quantity BETWEEN 1 AND 999), 
+    CONSTRAINT CK_CharacterItems_Quantity CHECK (Quantity BETWEEN 1 AND 999),
     CONSTRAINT CK_CharacterItems_ContainerSlot CHECK (
-        (Container IN (0, 1) AND Slot <= 63)                                  
-            OR (Container = 2 AND Slot <= 12)                                 
-            OR (Container IN (3, 4) AND Slot <= 27)),                         
+        (Container IN (0, 1) AND Slot <= 63)
+            OR (Container = 2 AND Slot <= 12)
+            OR (Container IN (3, 4) AND Slot <= 27)),
+    CONSTRAINT CK_CharacterItems_BagPosition CHECK (XPos BETWEEN 0 AND 7 AND YPos BETWEEN 0 AND 7),
     CONSTRAINT FK_CharacterItems_Character FOREIGN KEY (CharacterId) REFERENCES game.Characters (CharacterId),
     CONSTRAINT FK_CharacterItems_World_Item FOREIGN KEY (ItemId) REFERENCES world.Items (ItemId)
 );

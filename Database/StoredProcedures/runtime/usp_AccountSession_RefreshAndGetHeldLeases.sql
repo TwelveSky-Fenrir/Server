@@ -1,11 +1,3 @@
-
-CREATE TYPE runtime.tvp_AccountSessionLease AS TABLE
-(
-    AccountId    INT              NOT NULL,
-    SessionToken UNIQUEIDENTIFIER NOT NULL
-);
-GO
-
 CREATE PROCEDURE runtime.usp_AccountSession_RefreshAndGetHeldLeases @ServerKind TINYINT,
                                                                     @ShardId TINYINT NULL,
                                                                     @Leases runtime.tvp_AccountSessionLease READONLY
@@ -36,4 +28,3 @@ BEGIN
       AND (@ShardId IS NULL
         OR s.ShardId = @ShardId);
 END;
-GO

@@ -1,4 +1,3 @@
-
 CREATE PROCEDURE runtime.usp_SessionTicket_Revoke @AccountId INT
     WITH NATIVE_COMPILATION , SCHEMABINDING
 AS
@@ -9,4 +8,3 @@ BEGIN
     FROM runtime.SessionTickets
     WHERE AccountId = @AccountId;
 END;
-GO

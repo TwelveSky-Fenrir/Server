@@ -3,7 +3,8 @@ CREATE PROCEDURE runtime.usp_SessionTicket_Create @AccountId INT,
                                                   @ShardId TINYINT,
                                                   @TtlSeconds INT,
                                                   @SessionToken UNIQUEIDENTIFIER,
-                                                  @AccountGrade SMALLINT
+                                                  @AccountGrade SMALLINT,
+                                                  @TargetMapId SMALLINT
     WITH NATIVE_COMPILATION , SCHEMABINDING
 AS
 BEGIN
@@ -13,7 +14,8 @@ BEGIN
     FROM runtime.SessionTickets
     WHERE AccountId = @AccountId;
 
-    INSERT INTO runtime.SessionTickets (AccountId, CharacterId, ShardId, ExpiresAtUtc, SessionToken, AccountGrade)
-    VALUES (@AccountId, @CharacterId, @ShardId, DATEADD(SECOND, @TtlSeconds, SYSUTCDATETIME()), @SessionToken,
-            @AccountGrade);
+    INSERT INTO runtime.SessionTickets (AccountId, CharacterId, ShardId, TargetMapId, ExpiresAtUtc, SessionToken,
+                                        AccountGrade)
+    VALUES (@AccountId, @CharacterId, @ShardId, @TargetMapId, DATEADD(SECOND, @TtlSeconds, SYSUTCDATETIME()),
+            @SessionToken, @AccountGrade);
 END;

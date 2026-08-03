@@ -94,8 +94,6 @@ public sealed class GuildInviteRegistry
         }
     }
 
-    // Asker-only removal for the interactive Cancel flow; TryCancel above (dual removal) stays reserved
-    // for PendingSocialRequestAutoCancelSystem's disconnect sweep.
     public bool TryWithdrawAsk(int askerId, out int targetId)
     {
         lock (_lock)
@@ -127,8 +125,6 @@ public sealed class GuildInviteRegistry
         }
     }
 
-    // Target's own pending state always commits first; asker's own state only advances when
-    // askerBusyByZoneTransfer is false. guardBlocked distinguishes that gated rejection from "no pending invite".
     public bool TryAnswer(int targetId, bool accepted, bool askerBusyByZoneTransfer, out int askerId,
         out bool guardBlocked)
     {

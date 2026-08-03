@@ -337,8 +337,6 @@ public static class HotkeyActionResolver
             newQuantity = requestedQuantity;
         }
 
-        // Aliased from1/to1 (S04_MyWork05.cpp:2007-2008): the decrement and the re-increment above both
-        // land on the same slot and net to no change (S04_MyWork05.cpp:2050-2085).
         if (sourcePage == destinationPage && sourceIndex == destinationIndex)
             return new RearrangeResult(true, RearrangeFailure.None, source, destination);
 

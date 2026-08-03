@@ -131,8 +131,6 @@ public sealed class GmBasicCommandService(
                 $"Command=DIE;Sort={DieSort};ServerIndex={index};MonsterName={monster.Template.Name}",
                 cancellationToken);
 
-            // Mirrored through Zone's own tick (tribe-progress queue): TryDamageMonster touches
-            // single-writer, tick-thread-only AoiGrid/scratch-list state.
             if (!await zone.PostTribeProgressCommandAndWaitAsync(
                     new TribeProgressZoneCommand(state.CharacterId, GmForceKillMonsterServerIndex: index),
                     cancellationToken))

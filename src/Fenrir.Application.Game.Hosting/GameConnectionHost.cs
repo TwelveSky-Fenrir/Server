@@ -212,15 +212,12 @@ public sealed class GameConnectionHost(
 
             if (zoneSession is { CharacterId: { } characterId, CurrentZone: Zone zone })
             {
-                await FlushFinalCharacterStateAsync(characterId).ConfigureAwait(false);
-
-                zone.TryGetPlayer(characterId, out var departingState);
+                var departingState =
+                    await zone.PostLeaveCommandAndWaitAsync(characterId, CancellationToken.None).ConfigureAwait(false);
                 var wasMovingZone = departingState is not null && departingState.IsMovingZone;
 
-                if (!zone.Post(ZoneCommand.Leave(characterId)))
-                    logger.LogError(
-                        "Zone {MapId} inbox full: dropped Leave for character {CharacterId} on disconnect -- character remains a phantom in the zone until its next Move/handoff",
-                        zone.MapId, characterId);
+                if (departingState is not null)
+                    await FlushFinalCharacterStateAsync(departingState).ConfigureAwait(false);
 
                 writeBehindFlusher.RequestImmediateFlush();
 
@@ -243,17 +240,18 @@ public sealed class GameConnectionHost(
         }
     }
 
-    private async ValueTask FlushFinalCharacterStateAsync(int characterId)
+    private async ValueTask FlushFinalCharacterStateAsync(PlayerRuntimeState departingState)
     {
         try
         {
-            await writeBehindFlusher.FlushCharacterNowAsync(characterId, CancellationToken.None).ConfigureAwait(false);
+            await writeBehindFlusher.FlushCharacterSnapshotAsync(departingState, CancellationToken.None)
+                .ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             logger.LogError(ex,
                 "Unexpected failure attempting the final Position/Vitals/Progression flush for character {CharacterId} on disconnect",
-                characterId);
+                departingState.CharacterId);
         }
     }
 

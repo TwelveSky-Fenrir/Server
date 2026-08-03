@@ -67,6 +67,8 @@ public sealed partial class Zone
 
         monster.LastRebroadcastAt = _clock - SimulationClock.RebroadcastStaggerOffset(monster.ServerIndex,
             SimulationClock.MonsterRebroadcastInterval);
+
+        monster.DetectionThrottleTicks = -SimulationClock.DetectionThrottleStaggerOffsetTicks(monster.ServerIndex);
     }
 
     public void DespawnMonsterSilently(int serverIndex)
@@ -110,16 +112,13 @@ public sealed partial class Zone
         died = monster.TakeDamage(amount, out remainingLife);
         if (died)
         {
-            // Legacy A013 (S07_MyGame05.cpp:1531-1563): stays valid/present for FrameInfo5/30 sec (see
-            // MonsterAiSystem's Dead case) before InvalidateDeadMonster removes it; not removed here.
             var creditedCharacterId = SelectMonsterKillCredit(monster, attackerCharacterId);
 
             var killerX = attackerState?.PosX ?? monster.PosX;
             var killerZ = attackerState?.PosZ ?? monster.PosZ;
             MonsterDeathSequence.BeginCorpseCountdown(monster, killerX, killerZ, isCriticalHit, _random);
-            BroadcastMonsterDeath(monster);
 
-            _deadMonsters.Enqueue(new DeadMonsterEvent(monster, creditedCharacterId));
+            _deadMonsters.Enqueue(new DeadMonsterEvent(monster, attackerCharacterId, creditedCharacterId));
         }
 
         return true;

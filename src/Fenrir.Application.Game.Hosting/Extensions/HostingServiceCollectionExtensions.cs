@@ -55,17 +55,15 @@ public static class HostingServiceCollectionExtensions
 
         services.AddHostedService<ProxyShopBootReloadHost>();
 
-        // Registered before ZoneTickHost/GameConnectionHost so it stops after both -- tick-thread
-        // code still enqueues to IEventLogQueue while those drain (see Zone.PlayerLifecycle.cs).
         services.AddSingleton<EventLogFlushHost>();
         services.AddSingleton<IEventLogQueue>(sp => sp.GetRequiredService<EventLogFlushHost>());
         services.AddHostedService(sp => sp.GetRequiredService<EventLogFlushHost>());
 
-        services.AddHostedService<ZoneTickHost>();
         services.AddHostedService<MonsterLootFlushHost>();
         services.AddHostedService<ProxyShopExpiryFlushHost>();
-
         services.AddHostedService<DeathEventLogFlushHost>();
+
+        services.AddHostedService<ZoneTickHost>();
 
         services.AddSingleton<ProgressWriteBehindHost>();
 

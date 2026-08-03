@@ -15,12 +15,6 @@ public sealed class DeathEventLogFlushHost(
     {
         using var timer = new PeriodicTimer(FlushInterval);
 
-        // PeriodicTimer.WaitForNextTickAsync permits only one outstanding call at a time; a fresh call
-        // issued while a prior one is still pending throws InvalidOperationException. Every racing task
-        // below (the timer tick and each zone's wake signal) is therefore created ONCE and held across
-        // loop iterations, and only the task that actually won the race is ever replaced -- mirrors
-        // Zone.RunAsync (src/Fenrir.Application.Game/Domain/World/Zone.cs) and
-        // PositionWriteBehindHost.RetryPendingDisconnectFlushesAsync, which use the same idiom.
         var zoneList = zones.Zones.ToArray();
         var wake = new Task[zoneList.Length];
         for (var i = 0; i < zoneList.Length; i++)
@@ -28,38 +22,38 @@ public sealed class DeathEventLogFlushHost(
 
         var timerTick = timer.WaitForNextTickAsync(stoppingToken).AsTask();
 
-        while (!stoppingToken.IsCancellationRequested)
+        try
         {
-            await FlushAllZonesAsync(stoppingToken).ConfigureAwait(false);
-
-            Task woken;
-            try
+            while (!stoppingToken.IsCancellationRequested)
             {
+                await FlushAllZonesAsync(stoppingToken).ConfigureAwait(false);
+
                 var candidates = new Task[wake.Length + 1];
                 Array.Copy(wake, candidates, wake.Length);
                 candidates[wake.Length] = timerTick;
-                woken = await Task.WhenAny(candidates).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                return;
-            }
+                var woken = await Task.WhenAny(candidates).ConfigureAwait(false);
 
-            if (ReferenceEquals(woken, timerTick))
-            {
-                timerTick = timer.WaitForNextTickAsync(stoppingToken).AsTask();
-                continue;
-            }
-
-            for (var i = 0; i < wake.Length; i++)
-            {
-                if (!ReferenceEquals(wake[i], woken))
+                if (ReferenceEquals(woken, timerTick))
+                {
+                    timerTick = timer.WaitForNextTickAsync(stoppingToken).AsTask();
                     continue;
+                }
 
-                wake[i] = zoneList[i].WaitForDeathEventLogAsync(stoppingToken);
-                break;
+                for (var i = 0; i < wake.Length; i++)
+                {
+                    if (!ReferenceEquals(wake[i], woken))
+                        continue;
+
+                    wake[i] = zoneList[i].WaitForDeathEventLogAsync(stoppingToken);
+                    break;
+                }
             }
         }
+        catch (OperationCanceledException)
+        {
+        }
+
+        await FlushAllZonesAsync(CancellationToken.None).ConfigureAwait(false);
     }
 
     public async Task FlushAllZonesAsync(CancellationToken stoppingToken)

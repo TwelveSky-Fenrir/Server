@@ -8,7 +8,11 @@ public sealed class TimedBuffCountdownSystem : ISimulationSystem
 {
     private const int MaxMountExp = 100000;
 
-    private static readonly FrozenSet<short> GroupAExcludedMaps =
+    /// <summary>
+    ///     Server/ts25zone/S07_MyGame04.cpp:913-930 exclusion gate; shared with PetExpBoostCountdownSystem's
+    ///     pet-exp timer, nested in the same gate (S07_MyGame04.cpp:942-953/970).
+    /// </summary>
+    internal static readonly FrozenSet<short> GroupAExcludedMaps =
         new short[] { 1, 6, 11, 140, 38, 37, 119, 124, 49, 51, 53, 194, 195, 267 }.ToFrozenSet();
 
     private static readonly FrozenSet<short> GroupBIncludedMaps =
@@ -20,8 +24,24 @@ public sealed class TimedBuffCountdownSystem : ISimulationSystem
         var groupB = GroupBIncludedMaps.Contains(zone.MapId);
         var nowUnixSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
+        List<PlayerRuntimeState>? toDisconnect = null;
+
         foreach (var state in zone.Players)
+        {
             TickPlayer(zone, state, legacyTicksElapsed, groupA, groupB, nowUnixSeconds);
+
+            if (state.PaidZoneEvictionPending)
+                (toDisconnect ??= []).Add(state);
+        }
+
+        if (toDisconnect is null)
+            return;
+
+        foreach (var state in toDisconnect)
+        {
+            state.PaidZoneEvictionPending = false;
+            state.Session.Abort(DisconnectReason.TimedZoneExpired);
+        }
     }
 
     private static void TickPlayer(Zone zone, PlayerRuntimeState state, int legacyTicksElapsed, bool groupA,
@@ -66,8 +86,6 @@ public sealed class TimedBuffCountdownSystem : ISimulationSystem
         state.WarriorScroll = TickTimer(state, 87, state.WarriorScroll, minutesElapsed);
         state.SilverTime = TickTimer(state, 90, state.SilverTime, minutesElapsed);
         state.GoldTime = TickTimer(state, 101, state.GoldTime, minutesElapsed);
-        // Sort codes 4/5 (S004DOUBLE_PVP_CP/S005DOUBLE_PVP_EXP) per the unconditional enum at
-        // Server/Header/Protocol/STRUCT.h:1515-1545 — 28/29 collide with unrelated S028/S029 members.
         state.DoubleKillNumTime = TickTimer(state, 4, state.DoubleKillNumTime, minutesElapsed);
         state.DoubleKillExpTime = TickTimer(state, 5, state.DoubleKillExpTime, minutesElapsed);
     }

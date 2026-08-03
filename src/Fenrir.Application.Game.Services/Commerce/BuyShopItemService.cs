@@ -207,7 +207,7 @@ public sealed class BuyShopItemService(
         var sellerSoldNotification = BuildReply(6, slot.Price, packet.Page1, packet.Index1, newStack);
 
         await zone.PostPshopCommandAndWaitAsync(
-            new PshopZoneCommand(seller.CharacterId, packet.Page1, packet.Index1, !stillHasItems,
+            new PshopZoneCommand(seller.CharacterId, !stillHasItems, packet.Page1, packet.Index1,
                 sellerSoldNotification),
             cancellationToken);
 

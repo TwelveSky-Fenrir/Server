@@ -64,6 +64,9 @@ public static class CostumeImproveResolver
 
     public static CostumeSwapResult ResolveSwap(int improveA, int improveB)
     {
+        if (improveA >= improveB || improveB < 1)
+            return CostumeSwapResult.Rejected;
+
         return new CostumeSwapResult(CostumeSwapOutcome.Swapped, SwapMoneyCost, improveB, improveA);
     }
 
@@ -84,5 +87,8 @@ public static class CostumeImproveResolver
         CostumeSwapOutcome Outcome,
         int MoneyCost,
         int NewImproveA,
-        int NewImproveB);
+        int NewImproveB)
+    {
+        public static readonly CostumeSwapResult Rejected = new(CostumeSwapOutcome.Rejected, 0, 0, 0);
+    }
 }

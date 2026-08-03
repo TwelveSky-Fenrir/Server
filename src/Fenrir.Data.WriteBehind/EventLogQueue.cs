@@ -106,10 +106,24 @@ public sealed class EventLogQueue : IEventLogQueue, IAsyncDisposable
                 if (batch.Count > 0)
                     await FlushBatchAsync(batch, loopCt).ConfigureAwait(false);
             }
+
+            await DrainRemainingAsync(reader, CancellationToken.None).ConfigureAwait(false);
         }
         finally
         {
             _loopExited.TrySetResult();
+        }
+    }
+
+    private async ValueTask DrainRemainingAsync(ChannelReader<EventLogEntryTvp> reader, CancellationToken flushCt)
+    {
+        while (reader.TryRead(out var first))
+        {
+            var batch = new List<EventLogEntryTvp>(_batchSize) { first };
+            while (batch.Count < _batchSize && reader.TryRead(out var item))
+                batch.Add(item);
+
+            await FlushBatchAsync(batch, flushCt).ConfigureAwait(false);
         }
     }
 

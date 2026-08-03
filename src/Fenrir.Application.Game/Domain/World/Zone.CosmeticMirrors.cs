@@ -601,20 +601,21 @@ public sealed partial class Zone
                     MountStateResolver.AttributeIndex(deleteGarageSlot, statSlotIndex), 0);
         }
 
-        if (command.AttributeDeleteGarageSlot is { } attributeGarageSlot &&
-            command.AttributeDeleteStatSlotIndex is { } attributeStatSlotIndex)
+        if (command.RolledAttributeGarageSlot is { } rolledGarageSlot &&
+            command.RolledAttributeNewPower is { } rolledNewPower)
         {
-            var power = MountPowerCodec.EncodeSlot(state.MountRolledAttributes, attributeGarageSlot);
-            var newPower = MountAttributeRoller.Delete(power, attributeStatSlotIndex + 1);
-            var baseIndex = attributeGarageSlot * MountStateResolver.StatSlotCount;
+            var baseIndex = rolledGarageSlot * MountStateResolver.StatSlotCount;
             var rolled = state.MountRolledAttributes;
             for (var statSlotIndex = 0; statSlotIndex < MountStateResolver.StatSlotCount; statSlotIndex++)
                 rolled = rolled.SetItem(baseIndex + statSlotIndex,
-                    MountPowerCodec.DigitAtPlace(newPower, MountPowerCodec.DigitCount - 1 - statSlotIndex));
+                    MountPowerCodec.DigitAtPlace(rolledNewPower, MountPowerCodec.DigitCount - 1 - statSlotIndex));
             state.MountRolledAttributes = rolled;
             state.MountRolledAttributeTotal =
-                state.MountRolledAttributeTotal.SetItem(attributeGarageSlot, MountPowerCodec.DigitSum(newPower));
+                state.MountRolledAttributeTotal.SetItem(rolledGarageSlot, MountPowerCodec.DigitSum(rolledNewPower));
         }
+
+        if (command.ResetAccumulatedExpGarageSlot is { } expResetSlot)
+            state.MountAccumulatedExp = state.MountAccumulatedExp.SetItem(expResetSlot, 0);
 
         if (command.MountExpSlot is { } expSlot && command.MountExpNewValue is { } expNewValue)
         {
@@ -1069,17 +1070,21 @@ public sealed partial class Zone
 
     private void ApplyPshopCommand(in PshopZoneCommand command)
     {
-        if (!_players.TryGetValue(command.CharacterId, out var state) || state.PshopListing is not { } listing)
+        if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
 
-        var itemInfo = listing.ItemInfo;
-        var baseIndex = (command.Page * 5 + command.Slot) * 9;
-        for (var k = 0; k < 9; k++)
-            itemInfo[baseIndex + k] = 0;
+        if (command.Page is { } page && command.Slot is { } slot && state.PshopListing is { } listing)
+        {
+            var itemInfo = listing.ItemInfo;
+            var baseIndex = (page * 5 + slot) * 9;
+            for (var k = 0; k < 9; k++)
+                itemInfo[baseIndex + k] = 0;
 
-        state.Session.Send(command.SellerSoldNotification);
+            if (command.SellerSoldNotification is { } soldNotification)
+                state.Session.Send(soldNotification);
 
-        state.Session.Send(new ViewShopStallResponse { Result = 3, PshopInfo = listing });
+            state.Session.Send(new ViewShopStallResponse { Result = 3, PshopInfo = listing });
+        }
 
         if (!command.CloseShop)
             return;
@@ -1154,8 +1159,9 @@ public readonly record struct MountZoneCommand(
     EffectiveStats? UpdatedStats = null,
     MountBroadcastKind Broadcast = MountBroadcastKind.None,
     int? DeleteGarageSlot = null,
-    int? AttributeDeleteGarageSlot = null,
-    int? AttributeDeleteStatSlotIndex = null,
+    int? RolledAttributeGarageSlot = null,
+    int? RolledAttributeNewPower = null,
+    int? ResetAccumulatedExpGarageSlot = null,
     int? MountExpSlot = null,
     int? MountExpNewValue = null,
     TaskCompletionSource? Applied = null);

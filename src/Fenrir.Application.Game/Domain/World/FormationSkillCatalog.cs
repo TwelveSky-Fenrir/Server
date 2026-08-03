@@ -44,12 +44,16 @@ public static class FormationSkillCatalog
         return EmptyCaseSkillNumbers.Contains(skillNumber);
     }
 
-    public static bool IsFormationSkillZoneLocked(int skillNumber, short mapId, bool isRegularWarMap)
+    public static bool IsFormationSkillZoneLocked(int skillNumber, short mapId, bool isRegularWarMap,
+        bool isResumeAction)
     {
         if (!IsFormationSkill(skillNumber))
             return false;
 
-        return mapId == Zone124TypeMapId || isRegularWarMap;
+        if (isRegularWarMap)
+            return true;
+
+        return !isResumeAction && mapId == Zone124TypeMapId;
     }
 
     public static PartyBuffAction NextPartyBuffMarker(PartyBuffAction current, int skillNumber, int actionSort)

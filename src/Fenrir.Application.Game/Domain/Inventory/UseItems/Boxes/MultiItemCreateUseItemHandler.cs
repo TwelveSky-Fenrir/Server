@@ -8,66 +8,24 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.Inventory.UseItems.Boxes;
 
-/// <summary>
-///     Handles items that create a fixed set of multiple items simultaneously and notify the client
-///     via <c>B_MULTI_ITEM_CREATE_RECV</c> (opcode 119, <see cref="MultiItemCreateResponse" />).
-/// </summary>
-/// <remarks>
-///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:4671-4848.
-///     The items handled, their output lists, and their <c>Num</c> encoding:
-///     <list type="bullet">
-///         <item>
-///             <term>835</term>
-///             <description>Creates 8× item 1437 (upgrade stones). Num = 6008 (6000 + 8).</description>
-///         </item>
-///         <item>
-///             <term>8006</term>
-///             <description>Creates 3 items: 2138 (premium 30d), 1215 (auto-buff 30d), 1217 (auto-hunt 30d).
-///             Num = 6003 (6000 + 3).</description>
-///         </item>
-///         <item>
-///             <term>99102–99108</term>
-///             <description>Creates N× item 1437 where N = (itemId − 99100). Num = 8000 + N.</description>
-///         </item>
-///         <item>
-///             <term>2311</term>
-///             <description>Creates 8 items: 1437, 1437, 1103, 1103, 1126, 1126, 2397, 2397.
-///             Num = 6008 (6000 + 8).</description>
-///         </item>
-///     </list>
-///     The <c>Num</c> encoding: 6000 + count for standard multi-creates; 8000 + count for the 99xxx series.
-///     The source item is consumed (removed) as part of the same atomic inventory write that places the
-///     created items, so no partial state is ever left behind.
-///     On inventory-full, the source item is kept and no items are placed.
-/// </remarks>
 public sealed class MultiItemCreateUseItemHandler(
     WorldDataCache worldData,
     UseItemInventoryWriter inventoryWriter,
     ILogger<MultiItemCreateUseItemHandler> logger) : IUseItemHandler
 {
-    // Fixed array size on the wire packet.
     private const int ResponseSlots = 8;
 
-    // Num = base + item count (legacy encoding).
     private const int NumBaseStandard = 6000;
     private const int NumBase99Xxx = 8000;
 
-    /// <summary>
-    ///     Fixed output-item lists keyed by the source item ID.
-    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:4671-4848.
-    /// </summary>
-    private static readonly FrozenDictionary<int, int[]> ItemListById = new Dictionary<int, int[]>
+        private static readonly FrozenDictionary<int, int[]> ItemListById = new Dictionary<int, int[]>
     {
-        // Item 835 → 8× upgrade stones (1437). Réf. S04_MyWork03.cpp:~4671.
         [835] = [1437, 1437, 1437, 1437, 1437, 1437, 1437, 1437],
 
-        // Item 8006 → premium 30d + auto-buff 30d + auto-hunt 30d. Réf. S04_MyWork03.cpp:~4700.
         [8006] = [2138, 1215, 1217],
 
-        // Item 2311 → mixed 8-item grant. Réf. S04_MyWork03.cpp:~4800.
         [2311] = [1437, 1437, 1103, 1103, 1126, 1126, 2397, 2397],
 
-        // Items 99102–99108: N = (itemId − 99100) upgrade stones. Réf. S04_MyWork03.cpp:~4730.
         [99102] = [1437, 1437],
         [99103] = [1437, 1437, 1437],
         [99104] = [1437, 1437, 1437, 1437],
@@ -100,8 +58,6 @@ public sealed class MultiItemCreateUseItemHandler(
         var page1 = state.Inventory.GetContainer(ContainerMatrix.InventoryPage1);
         var secondPageAccessible = state.InventoryDate >= GameDate.Today();
 
-        // Build projected inventory with the source item removed first, so its slot is available
-        // for new items and doesn't confuse the merge-slot search in the placement resolver.
         var projectedPage0 = context.Page == ContainerMatrix.InventoryPage0
             ? page0.Remove(context.Index)
             : page0;
@@ -109,9 +65,7 @@ public sealed class MultiItemCreateUseItemHandler(
             ? page1.Remove(context.Index)
             : page1;
 
-        // Greedily place each created item into the projected state. If any item cannot be placed
-        // (inventory full), abort without touching persistence -- the source item stays.
-        var placedItemIds = new int[ResponseSlots]; // zero-padded to 8 for the wire packet
+        var placedItemIds = new int[ResponseSlots];
         for (var i = 0; i < itemsToCreate.Length; i++)
         {
             var rewardId = itemsToCreate[i];
@@ -140,7 +94,6 @@ public sealed class MultiItemCreateUseItemHandler(
                 placedItemIds[i] = rewardId;
         }
 
-        // Persist the source-item removal + all created items in one atomic inventory write.
         await inventoryWriter.ReplaceProjectedPagesAndMirrorAsync(
             context.Zone, context.CharacterId, page0, page1, projectedPage0, projectedPage1,
             null, cancellationToken);

@@ -10,37 +10,15 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.Inventory.UseItems;
 
-/// <summary>
-///     Handles item 864 (Skill Box) and item 889 (TEST Skill Box) — tribe-indexed skill-book loot boxes.
-/// </summary>
-/// <remarks>
-///     Legacy reference: Server/ts25zone/S04_MyWork03.cpp:4300-4333 — <c>WUSE_ITEM_864</c> / <c>WUSE_ITEM_889</c>
-///     blocks. Both items share the identical body.
-///     <para>
-///         The reward is chosen by <c>rand_mir() % 20</c>. Roll 0 produces a tribe-specific skill book:
-///         base ID 90317 + (rand%6) + (previousTribe × 6), yielding items 90317-90322 for tribe 0,
-///         90323-90328 for tribe 1, and 90329-90334 for tribe 2.
-///         Rolls 1-5 and 8 map to fixed skill-book IDs.
-///         Rolls 6 and 7 both yield item 90541: roll 6 falls through to roll 7 in the legacy
-///         C++ switch (a bug), so the effective weight for 90541 is 2/20.
-///         Rolls 9-19 hit the default branch and yield item 90568 (11/20 weight).
-///     </para>
-/// </remarks>
 public sealed class SkillBoxUseItemHandler(
     WorldDataCache worldData,
     UseItemInventoryWriter inventoryWriter,
     ILogger<SkillBoxUseItemHandler> logger) : IUseItemHandler
 {
-    // Dummy spec: reward is always determined by the override delegate below, not by the spec table.
     private static readonly BoxRewardSpec RewardDrawnDynamicallySpec =
         BoxRewardSpec.Uniform(0, ImmutableArray<int>.Empty);
 
-    /// <summary>Item IDs handled by this handler: 864 (Skill Box) and 889 (TEST Skill Box).</summary>
-    /// <remarks>
-    ///     Item 889 shares the identical handler body per
-    ///     Server/ts25zone/S04_MyWork03.cpp:4333 — the TEST item's case simply falls through to 864's block.
-    /// </remarks>
-    public static IEnumerable<int> HandledItemIds { get; } = [864, 889];
+        public static IEnumerable<int> HandledItemIds { get; } = [864, 889];
 
     public async ValueTask<UseInventoryItemResponse> HandleAsync(UseItemContext context,
         CancellationToken cancellationToken)
@@ -89,15 +67,7 @@ public sealed class SkillBoxUseItemHandler(
         return UseItemResponses.Success(context.Page, context.Index);
     }
 
-    /// <summary>
-    ///     Rolls the reward item ID using the legacy <c>rand_mir() % 20</c> distribution.
-    /// </summary>
-    /// <remarks>
-    ///     Réf. Server/ts25zone/S04_MyWork03.cpp:4300-4333.
-    ///     Case 6 falls through to case 7 in the original switch, doubling item 90541's probability (2/20).
-    ///     Cases 9-19 share the default branch, yielding item 90568 (11/20 total weight).
-    /// </remarks>
-    private static int RollReward(byte previousTribe)
+        private static int RollReward(byte previousTribe)
     {
         return Random.Shared.Next(20) switch
         {
@@ -107,9 +77,9 @@ public sealed class SkillBoxUseItemHandler(
             3 => 91299,
             4 => 91300,
             5 => 91323,
-            6 or 7 => 90541,   // legacy fall-through: case 6 drops to case 7, both yield 90541 (2/20 weight)
+            6 or 7 => 90541,
             8 => 90542,
-            _ => 90568          // cases 9-19 hit default (11/20 weight)
+            _ => 90568
         };
     }
 

@@ -15,7 +15,6 @@ public sealed class PalaceRankUpgradeUseItemHandler(
     public const int ItemIdPlus1 = 2193;
     public const int ItemIdPlus10 = 867;
 
-    // Legacy: item 2193 adds 1, item 867 adds 10. Both cap at 96. Server/ts25zone/S04_MyWork03.cpp:5066,5097.
     public static IEnumerable<int> HandledItemIds { get; } = [ItemIdPlus1, ItemIdPlus10];
 
     private const int RankCeiling = 96;

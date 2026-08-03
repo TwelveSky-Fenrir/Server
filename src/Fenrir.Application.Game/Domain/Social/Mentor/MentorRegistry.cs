@@ -103,8 +103,6 @@ public sealed class MentorRegistry
         }
     }
 
-    // Master-only removal for the interactive Cancel flow; TryCancel above (dual removal) stays reserved
-    // for PendingSocialRequestAutoCancelSystem's disconnect sweep.
     public bool TryWithdrawAsk(int masterId, out int studentId)
     {
         lock (_lock)
@@ -137,9 +135,6 @@ public sealed class MentorRegistry
         }
     }
 
-    // Student's own state always commits first; master's own state (and the counterpart notice) only
-    // advances once the master is confirmed still pointing back at this student AND masterBusyByZoneTransfer
-    // is false. guardBlocked distinguishes the zone-transfer rejection from a stale/mismatched negotiation.
     public bool TryAnswer(int studentId, bool accepted, bool masterBusyByZoneTransfer, out int masterId,
         out bool guardBlocked)
     {
@@ -171,8 +166,6 @@ public sealed class MentorRegistry
         }
     }
 
-    // Master-only removal for the interactive Start flow; the counterpart's own accepted entry is only
-    // cleared via TryAcknowledgeStart once it's confirmed reachable and not mid zone-transfer.
     public bool TryConsumeStart(int masterId, out int studentId)
     {
         lock (_lock)

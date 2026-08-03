@@ -22,14 +22,6 @@ public sealed class GameServerDirectoryHeartbeat(
             "runtime.GameServerDirectory as {Host}:{Port} follows (every {IntervalSeconds}s)", opts.ShardId,
             opts.PublicHost, opts.Port, opts.HeartbeatIntervalSeconds);
 
-        // Snapshot once, at ExecuteAsync start (which cannot run before ZoneRegistry.Initialize --
-        // see Program.cs). This is this shard's own ground truth of what it actually loaded at boot,
-        // and it deliberately never changes at runtime. ShardPartitionGuard.EnsureNoOverlapAsync's own
-        // boot-time call already used this exact hostedMaps value; re-passing that same frozen snapshot
-        // below (instead of re-querying this shard's own current admin.ShardMapAssignments row) is what
-        // lets the periodic re-check below catch a map reassigned away from this shard without a
-        // restart -- the one gap the one-shot boot guard cannot see for *other* shards. See
-        // ShardPartitionGuard's own remarks for the full reasoning and the concrete failure scenario.
         var hostedMapIds = zones.Zones.Select(static zone => zone.MapId).ToArray();
 
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(opts.HeartbeatIntervalSeconds));
@@ -59,11 +51,6 @@ public sealed class GameServerDirectoryHeartbeat(
 
             try
             {
-                // Re-runs the exact same disjoint-partition check ShardPartitionGuard ran once at boot,
-                // every heartbeat interval, so a map reassigned away from this still-running shard (without
-                // restarting it) is caught within one heartbeat interval instead of only at some other
-                // shard's own next boot (which cannot see this shard's stale in-memory state at all -- its
-                // own fresh admin.ShardMapAssignments read already agrees it doesn't own the map anymore).
                 await ShardPartitionGuard.EnsureNoOverlapAsync(opts.ShardId, hostedMapIds, directory,
                         shardMapAssignments, stoppingToken)
                     .ConfigureAwait(false);

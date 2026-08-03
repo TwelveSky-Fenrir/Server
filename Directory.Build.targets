@@ -5,7 +5,7 @@
     <PublishAot>true</PublishAot>
     <OptimizationPreference>Speed</OptimizationPreference>
     <StackTraceSupport>true</StackTraceSupport>
-    <EventSourcePublishSupport>true</EventSourcePublishSupport>
+    <EventSourceSupport>true</EventSourceSupport>
 
     <!-- Microsoft.Data.SqlClient (used directly by Fenrir.Tools.DbMigrator, transitively via CaeriusNet by
          Fenrir.Data-referencing servers) drags in System.Configuration.ConfigurationManager for a legacy

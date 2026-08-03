@@ -99,10 +99,34 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
                 return;
             }
 
-            var warPoint = state.WarPoint;
-            var bloodCoin = state.BloodCoin;
+            await PersistFinalFlushAsync(state, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            _flushGate.Release();
+        }
+    }
 
-            var progressRow = new CharacterProgressTvp(characterId, state.FlushSequence, state.Level, state.Level2,
+    public async ValueTask FlushCharacterSnapshotAsync(PlayerRuntimeState snapshot, CancellationToken ct)
+    {
+        await _flushGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            await PersistFinalFlushAsync(snapshot, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            _flushGate.Release();
+        }
+    }
+
+    private async ValueTask PersistFinalFlushAsync(PlayerRuntimeState state, CancellationToken ct)
+    {
+        var characterId = state.CharacterId;
+        var warPoint = state.WarPoint;
+        var bloodCoin = state.BloodCoin;
+
+        var progressRow = new CharacterProgressTvp(characterId, state.FlushSequence, state.Level, state.Level2,
                 state.Experience, state.Life, state.MaxLife, state.Mana, state.MaxMana, state.StatVit, state.StatStr,
                 state.StatInt, state.StatDex, state.StatPoints, state.SkillPoints, state.ContributionPoints,
                 state.Exp2, state.RebirthCount, state.EatLifePotion, state.EatManaPotion, state.EatStrPotion,
@@ -167,36 +191,31 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
                 DoubleKillNumTime2: state.DoubleKillNumTime2,
                 ProtectForDeath: state.ProtectForDeath);
 
-            var positionRow = new CharacterPositionTvp(characterId, state.FlushSequence, state.MapId, state.PosX,
-                state.PosY, state.PosZ, state.Heading);
+        var positionRow = new CharacterPositionTvp(characterId, state.FlushSequence, state.MapId, state.PosX,
+            state.PosY, state.PosZ, state.Heading);
 
-            var costumeRows = new List<CharacterCostumeSlotTvp>();
-            CostumePersistenceCodec.AppendOccupiedSlots(costumeRows, characterId, state);
+        var costumeRows = new List<CharacterCostumeSlotTvp>();
+        CostumePersistenceCodec.AppendOccupiedSlots(costumeRows, characterId, state);
 
-            try
-            {
-                await _characters.PersistFinalFlushAsync(progressRow, positionRow, costumeRows, ct)
-                    .ConfigureAwait(false);
-
-                state.PersistedWarPoint = warPoint;
-                state.PersistedBloodCoin = bloodCoin;
-
-                var logoutRow = new CharacterLogoutStateTvp(characterId, state.FlushSequence, state.MapId,
-                    (int)state.PosX, (int)state.PosY, (int)state.PosZ, state.Life, state.Mana);
-                await _logoutState.PersistBatchAsync([logoutRow], ct).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                _pendingDisconnectRetries[characterId] =
-                    (progressRow, positionRow, costumeRows, state, warPoint, bloodCoin);
-                _logger.LogError(ex,
-                    "Failed to persist final Position/Vitals/Progression state for character {CharacterId} on disconnect -- queued for retry until it succeeds",
-                    characterId);
-            }
-        }
-        finally
+        try
         {
-            _flushGate.Release();
+            await _characters.PersistFinalFlushAsync(progressRow, positionRow, costumeRows, ct)
+                .ConfigureAwait(false);
+
+            state.PersistedWarPoint = warPoint;
+            state.PersistedBloodCoin = bloodCoin;
+
+            var logoutRow = new CharacterLogoutStateTvp(characterId, state.FlushSequence, state.MapId,
+                (int)state.PosX, (int)state.PosY, (int)state.PosZ, state.Life, state.Mana);
+            await _logoutState.PersistBatchAsync([logoutRow], ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _pendingDisconnectRetries[characterId] =
+                (progressRow, positionRow, costumeRows, state, warPoint, bloodCoin);
+            _logger.LogError(ex,
+                "Failed to persist final Position/Vitals/Progression state for character {CharacterId} on disconnect -- queued for retry until it succeeds",
+                characterId);
         }
     }
 

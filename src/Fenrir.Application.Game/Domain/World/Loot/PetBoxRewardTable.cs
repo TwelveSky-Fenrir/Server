@@ -7,8 +7,6 @@ public static class PetBoxRewardTable
 {
     public const int BoxId = 602;
 
-    // No pre-roll jackpot in legacy RandomPet; band-then-pool only, 0-199.
-    // Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:829-881.
     public static readonly ImmutableArray<LootBoxRewardResolver.RewardPool> Pools =
     [
         new(20, [1178]),

@@ -147,11 +147,5 @@ public sealed class GameServerOptions
 
     public int CrossTribeXpRatio { get; set; } = 2;
 
-    /// <summary>
-    ///     Raw-integer (not fractional) death EXP-loss server multiplier, read once at process startup.
-    ///     Defaulted to the neutral 1 rather than the one shipped config file's contested 200 -- that value
-    ///     contradicts its own adjacent "default 1" comment and was not confirmed as production this
-    ///     session. Ref: Server/BuildEU33/ServerInfo.ini:151-154; H07_MyGame.h:77.
-    /// </summary>
-    public int GlobalExpDownRatio { get; set; } = 1;
+        public int GlobalExpDownRatio { get; set; } = 1;
 }

@@ -12,8 +12,6 @@ public sealed class LootBoxCatalog
     {
         var specs = new List<BoxRewardSpec>
         {
-            // Mount Box — no pre-roll jackpot in legacy RandomMount; band-then-pool only, 0-199.
-            // Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:770-827.
             BoxRewardSpec.RareBandThenPools(601,
                 ImmutableArray<LootBoxRewardResolver.RewardBand>.Empty,
                 [
@@ -53,8 +51,6 @@ public sealed class LootBoxCatalog
 
             BoxRewardSpec.Uniform(800, [801, 802, 803, 804, 805, 806]),
 
-            // New Upgrade Ticket — weighted upgrade-stone dispenser.
-            // Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:4261-4295 (total weight 600).
             BoxRewardSpec.Weighted(1043, [
                 new LootBoxRewardResolver.WeightedReward(699, 1),
                 new LootBoxRewardResolver.WeightedReward(1437, 1),
@@ -66,8 +62,6 @@ public sealed class LootBoxCatalog
                 new LootBoxRewardResolver.WeightedReward(1019, 200)
             ]),
 
-            // Premium Login Chest — one random item from a fixed pool of nine.
-            // Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:6025-6048.
             BoxRewardSpec.Uniform(76544, [8001, 8002, 8003, 8105, 8110, 1126, 8405, 8407, 8408])
         };
 

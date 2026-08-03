@@ -1,3 +1,3 @@
 namespace Fenrir.Application.Game.Domain.World.Monsters;
 
-public sealed record DeadMonsterEvent(MonsterEntity Monster, int? KillerCharacterId);
+public sealed record DeadMonsterEvent(MonsterEntity Monster, int? AttackerCharacterId, int? CreditedCharacterId);

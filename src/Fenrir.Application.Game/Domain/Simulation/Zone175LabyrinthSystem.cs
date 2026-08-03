@@ -26,6 +26,11 @@ public sealed class Zone175LabyrinthSystem(
             _timeProvider.GetUtcNow(), legacyTicksElapsed);
     }
 
+    public bool IsZone175Map(short mapId)
+    {
+        return config.TryGet(mapId, out _);
+    }
+
     public bool TryGetPhase(short mapId, out Zone175MissionPhase phase)
     {
         if (_runtimeByZone.TryGetValue(mapId, out var runtime))

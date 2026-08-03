@@ -138,8 +138,6 @@ public sealed partial class MonsterAiSystem(
                 if (!MonsterDeathSequence.IsCorpseCountdownComplete(monster))
                     break;
 
-                // InvalidateDeadMonster removes the monster's grid entry; the trailing SyncMonsterCell
-                // below would re-add it (AoiGrid.Move re-inserts on a from/to mismatch), so return here.
                 zone.InvalidateDeadMonster(monster);
                 return;
         }

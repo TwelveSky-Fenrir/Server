@@ -34,9 +34,17 @@ public sealed class TribeBankTaxSweepFlushHost(
     {
         using var timer = new PeriodicTimer(PollInterval);
 
-        do
+        try
         {
-            await FlushOnceAsync(stoppingToken).ConfigureAwait(false);
-        } while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false));
+            do
+            {
+                await FlushOnceAsync(stoppingToken).ConfigureAwait(false);
+            } while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false));
+        }
+        catch (OperationCanceledException)
+        {
+        }
+
+        await FlushOnceAsync(CancellationToken.None).ConfigureAwait(false);
     }
 }

@@ -33,9 +33,7 @@ public sealed class CloseShopStallHandler(ICloseShopStallService service, ILogge
         switch (packet.Sort)
         {
             case 1:
-                var response = service.CloseLiveShop(state);
-                if (response is { } r)
-                    session.Send(r);
+                await service.CloseLiveShopAsync(state, zone, cancellationToken);
                 break;
             case 2:
                 await service.CloseOfflineShopAsync(characterId, zone, cancellationToken);

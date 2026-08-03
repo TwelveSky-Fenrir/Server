@@ -176,7 +176,7 @@ public sealed class MountStateService(
 
         var newPower = MountAttributeRoller.Delete(power, statSlotIndex + 1);
 
-        ApplyRolledPower(state, garageSlot, newPower);
+        await PostRolledAttributeMirrorAsync(zone, characterId, garageSlot, newPower, null, cancellationToken);
 
         await eventLog.LogAsync(MountAttributeDeleteEventCode, EventLogCategory.MountAttribute, accountId,
             characterId, null, null, null, null, null, AttributeDeleteItemId, 1, 1, null, cancellationToken);
@@ -209,8 +209,8 @@ public sealed class MountStateService(
         if (!roll.Applied)
             return new MountStateResult(MountStateOutcome.Disconnect);
 
-        ApplyRolledPower(state, garageSlot, roll.NewPower);
-        state.MountAccumulatedExp = state.MountAccumulatedExp.SetItem(garageSlot, 0);
+        await PostRolledAttributeMirrorAsync(zone, characterId, garageSlot, roll.NewPower, garageSlot,
+            cancellationToken);
 
         await eventLog.LogAsync(MountAttributeConvertEventCode, EventLogCategory.MountAttribute, accountId, characterId,
             null, null, null, null, null, null, null, 1, null, cancellationToken);
@@ -234,7 +234,7 @@ public sealed class MountStateService(
         if (!roll.Applied)
             return new MountStateResult(MountStateOutcome.Disconnect);
 
-        ApplyRolledPower(state, garageSlot, roll.NewPower);
+        await PostRolledAttributeMirrorAsync(zone, characterId, garageSlot, roll.NewPower, null, cancellationToken);
 
         await eventLog.LogAsync(MountAttributeTransferEventCode, EventLogCategory.MountAttribute, accountId,
             characterId, null, null, null, null, null, null, null, 1, null, cancellationToken);
@@ -259,16 +259,17 @@ public sealed class MountStateService(
         return new MountStateResult(MountStateOutcome.NoReply);
     }
 
-    private static void ApplyRolledPower(PlayerRuntimeState state, int garageSlot, int newPower)
+    private async ValueTask PostRolledAttributeMirrorAsync(Zone zone, int characterId, int garageSlot, int newPower,
+        int? resetAccumulatedExpGarageSlot, CancellationToken cancellationToken)
     {
-        var baseIndex = garageSlot * MountStateResolver.StatSlotCount;
-        var rolled = state.MountRolledAttributes;
-        for (var statSlotIndex = 0; statSlotIndex < MountStateResolver.StatSlotCount; statSlotIndex++)
-            rolled = rolled.SetItem(baseIndex + statSlotIndex,
-                MountPowerCodec.DigitAtPlace(newPower, MountPowerCodec.DigitCount - 1 - statSlotIndex));
-        state.MountRolledAttributes = rolled;
-        state.MountRolledAttributeTotal =
-            state.MountRolledAttributeTotal.SetItem(garageSlot, MountPowerCodec.DigitSum(newPower));
+        if (!await zone.PostMountCommandAndWaitAsync(
+                new MountZoneCommand(characterId, RolledAttributeGarageSlot: garageSlot,
+                    RolledAttributeNewPower: newPower,
+                    ResetAccumulatedExpGarageSlot: resetAccumulatedExpGarageSlot),
+                cancellationToken))
+            logger.LogError(
+                "Zone {MapId} mount inbox full: dropped rolled-attribute mirror for character {CharacterId} (garage slot {GarageSlot})",
+                zone.MapId, characterId, garageSlot);
     }
 
     private async ValueTask RecomputeAndPostVitalsAsync(Zone zone, PlayerRuntimeState state, int characterId,

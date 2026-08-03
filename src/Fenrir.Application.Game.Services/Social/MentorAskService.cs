@@ -58,9 +58,6 @@ public sealed class MentorAskService(
         if (student is null)
             return await AskCrossShardAsync(master, targetAvatarName, cancellationToken).ConfigureAwait(false);
 
-        // Live check is master-relative, not a fixed ceiling: MG5ORIGIN is unconditionally #defined
-        // with no #undef anywhere under Server/, so the #else branch is what compiles.
-        // S04_MyWork02.cpp:9050-9058; DEFINE.h:18.
         if (student.Tribe != master.Tribe || student.Level >= master.Level)
         {
             logger.LogWarning(

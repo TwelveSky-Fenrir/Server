@@ -97,8 +97,6 @@ public sealed class FriendRegistry
         }
     }
 
-    // Asker-only removal for the interactive Cancel flow; TryCancel above (dual removal) stays reserved
-    // for PendingSocialRequestAutoCancelSystem's disconnect sweep.
     public bool TryWithdrawAsk(int askerId, out int targetId)
     {
         lock (_lock)
@@ -165,8 +163,6 @@ public sealed class FriendRegistry
         }
     }
 
-    // Target's own state always commits first; asker's own state only advances when askerBusyByZoneTransfer
-    // is false. guardBlocked distinguishes that gated rejection from "no pending ask at all".
     public bool TryAnswer(int targetId, bool accepted, bool askerBusyByZoneTransfer, out int askerId,
         out bool guardBlocked)
     {
@@ -215,7 +211,6 @@ public sealed class FriendRegistry
         }
     }
 
-    // Own-side-only reset for the interactive Make abort path; the counterpart's own mirror is left untouched.
     public bool ClearAcceptedSelf(int characterId)
     {
         lock (_lock)

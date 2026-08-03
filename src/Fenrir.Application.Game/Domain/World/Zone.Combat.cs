@@ -7,6 +7,7 @@ using Fenrir.Application.Game.Domain.Mounts;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Quests;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World.Monsters;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Core.Packets.Shared;
@@ -26,11 +27,9 @@ public sealed partial class Zone
 
     private const int BloodPointAvatarChangeInfoSort = 300;
 
-    /// <summary>Réf. C++ : Server/Header/Protocol/STRUCT.h:1515-1545 — <c>S004DOUBLE_PVP_CP = 4</c>.</summary>
-    private const int DoubleKillNumTimeChargeStatSort = 4;
+        private const int DoubleKillNumTimeChargeStatSort = 4;
 
-    /// <summary>Réf. C++ : Server/Header/Protocol/STRUCT.h:1515-1545 — <c>S005DOUBLE_PVP_EXP = 5</c>.</summary>
-    private const int DoubleKillExpTimeChargeStatSort = 5;
+        private const int DoubleKillExpTimeChargeStatSort = 5;
 
     private const int ExperienceStatSort = 13;
 
@@ -128,6 +127,9 @@ public sealed partial class Zone
 
     private readonly MonsterSpawnScheduler? _stoneSiegeAnnouncer =
         simulationSystems.OfType<MonsterSpawnScheduler>().FirstOrDefault();
+
+    private readonly Zone175LabyrinthSystem? _zone175LabyrinthSystem =
+        simulationSystems.OfType<Zone175LabyrinthSystem>().FirstOrDefault();
 
     public bool PostCombatCommand(in CombatCommand command)
     {
@@ -418,14 +420,7 @@ public sealed partial class Zone
         ApplyDoubleAwardCpGrant(attackerState, baseAmount);
     }
 
-    /// <summary>
-    ///     Grants <paramref name="baseAmount" /> once, then — while <c>DoubleKillNumTime</c> is still positive —
-    ///     grants the identical amount a second time, independently clamped. Each half is broadcast/tracked
-    ///     per its own rules: sort 4 (remaining charges) fires only on the doubled half, sort 3 (running total)
-    ///     fires at most once, covering either or both halves.
-    /// </summary>
-    /// <remarks>Réf. C++ : Server/ts25zone/S07_MyGame03.cpp:2871-2893.</remarks>
-    private void ApplyDoubleAwardCpGrant(PlayerRuntimeState attackerState, int baseAmount)
+        private void ApplyDoubleAwardCpGrant(PlayerRuntimeState attackerState, int baseAmount)
     {
         var firstGrant = PvpKillContributionPointCalculator.ClampGrant(attackerState.ContributionPoints,
             baseAmount, PvpKillContributionPointCalculator.ContributionPointHardCap);
@@ -505,10 +500,6 @@ public sealed partial class Zone
         if (gain > 0)
             ApplyCharacterExperienceGain(attackerState, gain);
 
-        // Unlike the CP double-award (two independent clamped additions), this is a single ×8 scaling of
-        // the EXP value itself (PvpKillExperienceCalculator.DoubleExpChargeMultiplier); the counter is
-        // decremented/broadcast whenever it was positive, independent of the resulting gain's magnitude.
-        // Réf. C++ : Server/ts25zone/S07_MyGame03.cpp:2906-2968.
         if (hasDoubleExpCharge)
         {
             attackerState.DoubleKillExpTime--;
@@ -558,18 +549,7 @@ public sealed partial class Zone
         attackerState.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
     }
 
-    /// <summary>
-    ///     Decrements <c>DoubleKillNumTime2</c> (Crushed Demon Scroll per-kill charge) by 1 on each PvP kill,
-    ///     broadcasts sort 30 with the new value, and marks progress dirty.
-    ///     No-op when the counter is already zero.
-    /// </summary>
-    /// <remarks>
-    ///     Unlike the minute-based DoubleKillNumTime/DoubleKillExpTime timers, this counter is
-    ///     decremented per kill (not per minute) and tracked separately — it does NOT go through
-    ///     <see cref="TimedBuffCountdownSystem"/>.
-    ///     Réf. C++: Server/ts25zone/S07_MyGame02.cpp:2445-2448 — <c>aDoubleKillNumTime2</c> decrement + S030 broadcast.
-    /// </remarks>
-    private void DecrementDoubleKillNumTime2OnKill(PlayerRuntimeState attackerState)
+        private void DecrementDoubleKillNumTime2OnKill(PlayerRuntimeState attackerState)
     {
         if (attackerState.DoubleKillNumTime2 <= 0)
             return;
@@ -762,6 +742,7 @@ public sealed partial class Zone
         }
 
         var attackerWeaponItemId = attackerState.Inventory.GetSlot(ContainerMatrix.Equipment, 7)?.ItemId ?? 0;
+        var zone175BossDamageEcho = ResolveZone175BossDamageWireEcho(attackerState, monster, outcome.DamageApplied);
         var response = new AttackResponse
         {
             AttackInfo = command.AttackInfo with
@@ -770,7 +751,8 @@ public sealed partial class Zone
                 AttackCriticalExist = outcome.Critical ? 1 : 0,
                 AttackElementDamage = outcome.ElementDamage,
                 AttackViewDamageValue = outcome.ViewDamage,
-                AttackRealDamageValue = outcome.DamageApplied
+                AttackRealDamageValue = outcome.DamageApplied,
+                AttackActionValue4 = zone175BossDamageEcho ?? command.AttackInfo.AttackActionValue4
             }
         };
 
@@ -802,6 +784,26 @@ public sealed partial class Zone
 
         if (isTowerGuardian)
             ApplyTowerGuardianHitSideEffects(towerIndex, attackerState);
+    }
+
+    /// <summary>
+    ///     Zone175 dungeon boss-damage echo (legacy <c>mAttack175BossDmg</c>, Server/ts25zone/S07_MyGame02.cpp:2079-2101).
+    ///     Returns null when Zone175 processing is inactive for this zone (leave AttackActionValue4 untouched --
+    ///     it is otherwise an inbound-only budget field, see AttackPacketBudget); returns 0 to mask the field on a
+    ///     hit against a non-boss monster; accumulates and echoes the running total on a hit against a Zone175
+    ///     stage-boss monster (special type 40-44).
+    /// </summary>
+    private int? ResolveZone175BossDamageWireEcho(PlayerRuntimeState attackerState, MonsterEntity monster,
+        int realDamage)
+    {
+        if (_zone175LabyrinthSystem is not { } zone175System || !zone175System.IsZone175Map(MapId))
+            return null;
+
+        if (!Zone175RewardTables.IsWaveBossSpecialType(monster.Template.SpecialType))
+            return 0;
+
+        attackerState.Zone175BossDamage += realDamage;
+        return unchecked((int)attackerState.Zone175BossDamage);
     }
 
     private void ApplyStoneFirstAttackSideEffects(MonsterEntity monster, PlayerRuntimeState attackerState)
@@ -1087,8 +1089,6 @@ public sealed partial class Zone
         if (!_players.TryGetValue(killerCharacterId, out var state))
             return;
 
-        // ZONE200-map XP suppression (maps 200/297/298/299): the whole grant below never runs.
-        // Legacy: Server/ts25zone/S07_MyGame05.cpp:3555-3560 (ProcessForExp early return).
         if (IsZone200TypeZone)
             return;
 
@@ -1100,8 +1100,6 @@ public sealed partial class Zone
         if (xpBonusRatio > 0f && monsterGeneralExperience >= 1)
             rawGain += (int)(monsterGeneralExperience * xpBonusRatio);
 
-        // EXP multipliers from premium content — applied to raw gain before rebirth divisor.
-        // Legacy: Server/ts25zone/S07_MyGame05.cpp:3597-3611
         if (state.FightingGodForDestroy > 0 && state.Level < ExperienceFormulas.RebirthDivisorLevelThreshold &&
             state.Level2 == 0)
             rawGain *= 2;
@@ -1114,16 +1112,11 @@ public sealed partial class Zone
         if (state.PremiumExpireUtc > DateTimeOffset.UtcNow.ToUnixTimeSeconds())
             rawGain *= 2;
 
-        // +10% XP bonus if the player's tribe holds Zone 038 (HolyStoneBattle).
-        // Legacy: Server/ts25zone/S07_MyGame05.cpp:3613-3616 — ReturnWinZone038 check + 10% of base XP.
         if (monsterGeneralExperience >= 1 && worldState?.World.Zone038WinTribe == state.Tribe)
             rawGain += (int)(monsterGeneralExperience * 0.1f);
 
         var finalGain = ExperienceFormulas.ApplyRebirthDivisor(rawGain, state.Level);
 
-        // Mentor (teacher) XP bonus: +50% when the student is solo, below level 113, and their bonded teacher
-        // is present in the same zone.  Ref. Server/ts25zone/S07_MyGame05.cpp:3644 -- the 50% multiplier is
-        // applied to the base gain and credited separately so it doesn't compound with other per-kill bonuses.
         const int MentorMaxStudentLevel = 113;
         if (partyMemberIds is null or { Count: 0 }
             && state.Level < MentorMaxStudentLevel

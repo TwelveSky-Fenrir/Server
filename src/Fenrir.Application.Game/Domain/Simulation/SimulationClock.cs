@@ -59,6 +59,15 @@ public static class SimulationClock
         return TimeSpan.FromTicks(interval.Ticks * bucket / bucketCount);
     }
 
+    public static int DetectionThrottleStaggerOffsetTicks(int entityId)
+    {
+        var bucketCount = MonsterDetectionThrottleLegacyTicks;
+        if (bucketCount <= 0)
+            return 0;
+
+        return (entityId % bucketCount + bucketCount) % bucketCount;
+    }
+
     public static int ToWholeLegacyTicks(TimeSpan duration)
     {
         return duration <= TimeSpan.Zero ? 0 : (int)(duration.Ticks / LegacyTick.Ticks);

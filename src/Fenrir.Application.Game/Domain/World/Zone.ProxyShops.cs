@@ -51,12 +51,7 @@ public sealed partial class Zone
         return true;
     }
 
-    /// <summary>
-    ///     Server/ts25zone/S07_MyGame09.cpp:525-549 -- GET_DEPUTY_PSHOP_SEND Sort 2/3 scans the live,
-    ///     open-only shop registry by name; entries here only ever exist while a shop is open (see
-    ///     <see cref="RemoveProxyShop" />), so membership alone is the open-state check.
-    /// </summary>
-    public bool TryFindProxyShopByName(string avatarName, [NotNullWhen(true)] out ProxyShopBroadcastEntry? entry)
+        public bool TryFindProxyShopByName(string avatarName, [NotNullWhen(true)] out ProxyShopBroadcastEntry? entry)
     {
         foreach (var candidate in _proxyShops.Values)
             if (string.Equals(candidate.OwnerName, avatarName, StringComparison.OrdinalIgnoreCase))

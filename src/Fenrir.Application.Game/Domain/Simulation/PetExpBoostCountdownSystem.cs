@@ -11,11 +11,13 @@ public sealed class PetExpBoostCountdownSystem : ISimulationSystem
 
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
+        var isExcluded = TimedBuffCountdownSystem.GroupAExcludedMaps.Contains(zone.MapId);
+
         foreach (var state in zone.Players)
-            TickPlayer(state, legacyTicksElapsed);
+            TickPlayer(state, legacyTicksElapsed, isExcluded);
     }
 
-    private static void TickPlayer(PlayerRuntimeState state, int legacyTicksElapsed)
+    private static void TickPlayer(PlayerRuntimeState state, int legacyTicksElapsed, bool isExcluded)
     {
         state.PetExpX2TimeAccrualTicks += legacyTicksElapsed;
         var minutesElapsed = state.PetExpX2TimeAccrualTicks / SimulationClock.PlayTimeAccrualLegacyTicks;
@@ -23,6 +25,10 @@ public sealed class PetExpBoostCountdownSystem : ISimulationSystem
             return;
 
         state.PetExpX2TimeAccrualTicks -= minutesElapsed * SimulationClock.PlayTimeAccrualLegacyTicks;
+
+        // Server/ts25zone/S07_MyGame04.cpp:913-930/970: pet-exp decrement is nested inside this same gate.
+        if (isExcluded)
+            return;
 
         if (state.PetExpX2Time < 1)
             return;

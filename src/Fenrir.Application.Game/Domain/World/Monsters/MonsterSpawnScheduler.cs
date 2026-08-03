@@ -236,16 +236,12 @@ public sealed class MonsterSpawnScheduler(
 
     private void DrainDeaths(Zone zone, MonsterZoneSpawnState state)
     {
-        // Loot/exp/quest-progress granting -- unrelated to the A013 corpse-countdown lifecycle, so this
-        // stays on the pre-existing immediate cadence (drained the same tick TryDamageMonster died).
         while (zone.TryDequeueDeadMonster(out var death))
             ProcessDeath(zone, state, death!);
     }
 
     private void DrainInvalidations(Zone zone, MonsterZoneSpawnState state)
     {
-        // Only reached once MonsterAiSystem's Dead case clears FrameInfo5/30 sec of corpse persistence
-        // (Zone.InvalidateDeadMonster) -- this is the single moment respawn eligibility starts.
         while (zone.TryDequeueInvalidatedMonster(out var monster))
         {
             var slot = state.Slots.Find(s => s.ServerIndex == monster!.ServerIndex);
@@ -287,56 +283,65 @@ public sealed class MonsterSpawnScheduler(
         return mapId == YangGokNormalBossZoneId && monsterId is >= 564 and <= 568;
     }
 
-    private void ProcessDeath(Zone zone, MonsterZoneSpawnState state, DeadMonsterEvent death)
+        private void ProcessDeath(Zone zone, MonsterZoneSpawnState state, DeadMonsterEvent death)
     {
         var monster = death.Monster;
-        if (!worldData.MonstersById.TryGetValue(monster.Template.MonsterId, out var monsterDefinition))
-            return;
 
-        PlayerRuntimeState? killer = null;
-        if (death.KillerCharacterId is { } killerId)
-            zone.TryGetPlayer(killerId, out killer);
+        PlayerRuntimeState? attacker = null;
+        if (death.AttackerCharacterId is { } attackerId)
+            zone.TryGetPlayer(attackerId, out attacker);
+
+        if (attacker is not null)
+        {
+            zone.ApplyQuestKillProgress(attacker.CharacterId, monster.Template.MonsterId,
+                partyRegistry?.GetMembers(attacker.CharacterId));
+
+            ApplyTowerCpForPvmMilestone(zone, attacker, monster.Template.RealLevel);
+        }
+
+        PlayerRuntimeState? creditedAvatar = null;
+        if (death.CreditedCharacterId is { } creditedId)
+            zone.TryGetPlayer(creditedId, out creditedAvatar);
 
         IReadOnlyList<int>? partyMemberIds = null;
         var killRaceInterceptsExperienceGrant = false;
-        if (killer is not null)
-            partyMemberIds = GrantKillLoot(zone, state, monster, monsterDefinition, killer,
+        if (creditedAvatar is not null &&
+            worldData.MonstersById.TryGetValue(monster.Template.MonsterId, out var monsterDefinition))
+            partyMemberIds = GrantKillLoot(zone, state, monster, monsterDefinition, creditedAvatar,
                 out killRaceInterceptsExperienceGrant);
 
-        if (killer is null)
-            return;
+        zone.BroadcastMonsterDeath(monster);
 
-        if (!killRaceInterceptsExperienceGrant)
-            zone.GrantMonsterKillExperience(killer.CharacterId, monster.Template.RealLevel,
+        if (creditedAvatar is not null && !killRaceInterceptsExperienceGrant)
+            zone.GrantMonsterKillExperience(creditedAvatar.CharacterId, monster.Template.RealLevel,
                 monster.Template.GeneralExperience, partyMemberIds,
                 monster.Template.PatExperience, monster.Template.Life);
-
-        zone.ApplyQuestKillProgress(killer.CharacterId, monster.Template.MonsterId, partyMemberIds);
-
-        ApplyTowerCpForPvmMilestone(zone, killer, monster.Template.RealLevel);
     }
 
     private IReadOnlyList<int>? GrantKillLoot(Zone zone, MonsterZoneSpawnState state, MonsterEntity monster,
-        MonsterDefinition monsterDefinition, PlayerRuntimeState killer, out bool killRaceInterceptsExperienceGrant)
+        MonsterDefinition monsterDefinition, PlayerRuntimeState creditedAvatar,
+        out bool killRaceInterceptsExperienceGrant)
     {
-        var dropEligible = MonsterDropRoller.IsEligible(monsterDefinition.Monster, killer.Level);
-        zone.NotifyPopupEventMonsterKill(killer, dropEligible);
+        var dropEligible = MonsterDropRoller.IsEligible(monsterDefinition.Monster, creditedAvatar.Level);
+        zone.NotifyPopupEventMonsterKill(creditedAvatar, dropEligible);
 
         killRaceInterceptsExperienceGrant =
-            valleyWarKillRegistry?.RegisterMonsterKill(zone.MapId, killer.Tribe) ?? false;
+            valleyWarKillRegistry?.RegisterMonsterKill(zone.MapId, creditedAvatar.Tribe) ?? false;
 
-        var partyMemberIds = partyRegistry?.GetMembers(killer.CharacterId);
+        var partyMemberIds = partyRegistry?.GetMembers(creditedAvatar.CharacterId);
 
-        bool KillerHasItem(int itemId)
+        bool CreditedAvatarHasItem(int itemId)
         {
-            return killer.Inventory.GetContainer(ContainerMatrix.InventoryPage0).Values.Any(s => s.ItemId == itemId) ||
-                   killer.Inventory.GetContainer(ContainerMatrix.InventoryPage1).Values.Any(s => s.ItemId == itemId);
+            return creditedAvatar.Inventory.GetContainer(ContainerMatrix.InventoryPage0).Values
+                       .Any(s => s.ItemId == itemId) ||
+                   creditedAvatar.Inventory.GetContainer(ContainerMatrix.InventoryPage1).Values
+                       .Any(s => s.ItemId == itemId);
         }
 
-        var killerQuest = new QuestProgress(killer.QuestStepPermanent, killer.QuestActiveFlag, killer.QuestSort,
-            killer.QuestTargetPhase, killer.QuestKillCounter);
+        var creditedAvatarQuest = new QuestProgress(creditedAvatar.QuestStepPermanent, creditedAvatar.QuestActiveFlag,
+            creditedAvatar.QuestSort, creditedAvatar.QuestTargetPhase, creditedAvatar.QuestKillCounter);
 
-        var luck = (killer.Stats?.Luck ?? 0) * 10;
+        var luck = (creditedAvatar.Stats?.Luck ?? 0) * 10;
 
         var demonLordKillTally = monster.Template.MonsterId == BossEventDropResolver.DemonLordMonsterId
             ? Interlocked.Increment(ref _demonLordKillTally)
@@ -344,7 +349,7 @@ public sealed class MonsterSpawnScheduler(
         var bossOutcome = BossEventDropResolver.Resolve(monster.Template.MonsterId, demonLordKillTally, state.Random,
             worldData, _bossDropCatalog);
 
-        ApplyBossDropSideEffects(zone, killer, bossOutcome);
+        ApplyBossDropSideEffects(zone, creditedAvatar, bossOutcome);
 
         long? money;
         IReadOnlyList<DroppedItem> genericItems;
@@ -355,12 +360,12 @@ public sealed class MonsterSpawnScheduler(
         }
         else
         {
-            var result = state.DropRoller.Roll(monsterDefinition, killer.Level, killer.Tribe, luck, killerQuest,
-                KillerHasItem, killer.PremiumExpireUtc > 0);
+            var result = state.DropRoller.Roll(monsterDefinition, creditedAvatar.Level, creditedAvatar.Tribe, luck,
+                creditedAvatarQuest, CreditedAvatarHasItem, creditedAvatar.PremiumExpireUtc > 0);
             money = result.Money;
 
             var cpGiftItems = MonsterDropTailResolver.ResolveCpGiftCard(dropEligible,
-                monster.Template.MonsterId, zone.IsZone241TypeZone, killer.Level2,
+                monster.Template.MonsterId, zone.IsZone241TypeZone, creditedAvatar.Level2,
                 zone.IsZone126TypeZone, state.Random);
             var rebirthItems = MonsterDropTailResolver.ResolveRebirthItem(monster.Template.MonsterId, state.Random);
 
@@ -371,12 +376,10 @@ public sealed class MonsterSpawnScheduler(
 
         if (money is { } amount)
         {
-            zone.QueueMoneyGrant(killer.CharacterId, amount);
+            zone.QueueMoneyGrant(creditedAvatar.CharacterId, amount);
 
-            // Tax base only (AddTribeBankInfo3, S07_MyGame01.cpp:2726-2729); killer still keeps the full
-            // amount since Fenrir credits the wallet directly instead of a reducible ground-pickup item.
             var tribeTaxBase = amount - (long)(amount * InventoryToWorldDropPolicy.MonsterMoneyGroundReductionRatio);
-            zone.CreditMonsterKillTribeTax(killer.Tribe, tribeTaxBase);
+            zone.CreditMonsterKillTribeTax(creditedAvatar.Tribe, tribeTaxBase);
         }
 
         foreach (var publicItem in bossOutcome.PublicItems)
@@ -385,57 +388,57 @@ public sealed class MonsterSpawnScheduler(
 
         if (bossOutcome.Items.Count > 0 || genericItems.Count > 0)
         {
-            var (partyName, dropSort) = ResolvePartyDrop(zone, killer, partyMemberIds);
+            var (partyName, dropSort) = ResolvePartyDrop(zone, creditedAvatar, partyMemberIds);
 
             foreach (var item in bossOutcome.Items.Concat(genericItems))
                 zone.SpawnGroundItem(item.ItemId, item.Quantity, monster.PosX, monster.PosY, monster.PosZ,
-                    killer.Name, partyName, dropSort, monster.InstanceId);
+                    creditedAvatar.Name, partyName, dropSort, monster.InstanceId);
         }
 
         return partyMemberIds;
     }
 
-    private static void ApplyBossDropSideEffects(Zone zone, PlayerRuntimeState killer, BossDropOutcome outcome)
+    private static void ApplyBossDropSideEffects(Zone zone, PlayerRuntimeState creditedAvatar, BossDropOutcome outcome)
     {
         if (outcome.ContributionPointsGranted != 0)
-            zone.GrantContributionPoints(killer.CharacterId, outcome.ContributionPointsGranted);
+            zone.GrantContributionPoints(creditedAvatar.CharacterId, outcome.ContributionPointsGranted);
 
         if (outcome.WarPointsGranted != 0)
-            zone.GrantWarPoints(killer.CharacterId, outcome.WarPointsGranted);
+            zone.GrantWarPoints(creditedAvatar.CharacterId, outcome.WarPointsGranted);
 
         if (outcome.BloodPointsGranted != 0)
-            zone.GrantBloodPoints(killer.CharacterId, outcome.BloodPointsGranted);
+            zone.GrantBloodPoints(creditedAvatar.CharacterId, outcome.BloodPointsGranted);
 
         if (outcome.AnnounceEliteBossDefeat)
-            zone.AnnounceEliteBossDefeated(killer.Tribe, killer.Name);
+            zone.AnnounceEliteBossDefeated(creditedAvatar.Tribe, creditedAvatar.Name);
     }
 
-    private static (string PartyName, int DropSort) ResolvePartyDrop(Zone zone, PlayerRuntimeState killer,
+    private static (string PartyName, int DropSort) ResolvePartyDrop(Zone zone, PlayerRuntimeState creditedAvatar,
         IReadOnlyList<int>? partyMemberIds)
     {
         if (partyMemberIds is not { Count: > 0 } members)
             return ("", 0);
 
         var leaderId = members[0];
-        if (leaderId == killer.CharacterId)
-            return (killer.Name, 1);
+        if (leaderId == creditedAvatar.CharacterId)
+            return (creditedAvatar.Name, 1);
 
         return zone.TryGetPlayer(leaderId, out var leader) && leader is not null
             ? (leader.Name, 1)
-            : (killer.Name, 1);
+            : (creditedAvatar.Name, 1);
     }
 
-    private void ApplyTowerCpForPvmMilestone(Zone zone, PlayerRuntimeState killer, int monsterRealLevel)
+    private void ApplyTowerCpForPvmMilestone(Zone zone, PlayerRuntimeState attacker, int monsterRealLevel)
     {
-        var registration = TowerCpForPvmMilestone.RegisterKill(killer.TowerCpMilestoneCounter, killer.Level,
-            killer.Level2, monsterRealLevel);
-        killer.TowerCpMilestoneCounter = registration.UpdatedCounter;
+        var registration = TowerCpForPvmMilestone.RegisterKill(attacker.TowerCpMilestoneCounter, attacker.Level,
+            attacker.Level2, monsterRealLevel);
+        attacker.TowerCpMilestoneCounter = registration.UpdatedCounter;
 
         if (!registration.MilestoneReached)
             return;
 
-        var towerBonus = towerWar?.GetTribeBonus(killer.Tribe).CpForPvmBonus ?? 0;
-        zone.GrantContributionPoints(killer.CharacterId, TowerCpForPvmMilestone.ComputeReward(towerBonus));
+        var towerBonus = towerWar?.GetTribeBonus(attacker.Tribe).CpForPvmBonus ?? 0;
+        zone.GrantContributionPoints(attacker.CharacterId, TowerCpForPvmMilestone.ComputeReward(towerBonus));
     }
 
     private static byte? TribeSymbolIndexOf(byte specialType)

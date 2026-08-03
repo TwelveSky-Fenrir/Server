@@ -4,8 +4,8 @@ namespace Fenrir.Application.Game.Domain.Social.Pshop;
 
 public readonly record struct PshopZoneCommand(
     int CharacterId,
-    int Page,
-    int Slot,
     bool CloseShop,
-    BuyShopItemResponse SellerSoldNotification,
+    int? Page = null,
+    int? Slot = null,
+    BuyShopItemResponse? SellerSoldNotification = null,
     TaskCompletionSource? Applied = null);

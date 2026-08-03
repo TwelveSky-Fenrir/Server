@@ -31,6 +31,14 @@ internal static class CenterRelayNoticeLog
             isWing ? 115 : 2001, tribe, characterName, enchantValue, isWing ? "wing" : "non-wing");
     }
 
+    public static void LogCostumeEnchantCap(ILogger logger, byte tribe, string characterName, int enchantValue)
+    {
+        logger.LogInformation(
+            "Enchant-cap notice (legacy relay sort 2101, not client-broadcast -- see CenterRelayNoticeLog " +
+            "remarks): tribe {Tribe} character {CharacterName} reached costume enchant {EnchantValue}",
+            tribe, characterName, enchantValue);
+    }
+
     public static void LogWarlordSwap(ILogger logger, byte tribe, string characterName, int replacementItemId)
     {
         logger.LogInformation(

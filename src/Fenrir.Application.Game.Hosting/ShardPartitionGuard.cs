@@ -4,13 +4,6 @@ namespace Fenrir.Application.Game.Hosting;
 
 public static class ShardPartitionGuard
 {
-    // Called twice: once at boot (Program.cs, thisShardId's own freshly-loaded hostedMaps, throws on
-    // conflict) and once per heartbeat tick thereafter (GameServerDirectoryHeartbeat, thisShardId's own
-    // FROZEN boot-time hostedMaps, caller logs instead of throwing). Only the second form can catch a map
-    // reassigned away from thisShardId without a restart: for every OTHER shard this method only ever
-    // trusts a fresh admin.ShardMapAssignments read (there is no cross-process channel today publishing
-    // what a shard actually loaded, only what it is currently assigned), so a shard whose assignment
-    // changed out from under it while still running is invisible to any OTHER shard's own boot-time check.
     public static async Task EnsureNoOverlapAsync(byte thisShardId, IReadOnlyCollection<short> hostedMaps,
         IGameServerDirectoryRepository directory, IShardMapAssignmentRepository shardMapAssignments,
         CancellationToken ct)

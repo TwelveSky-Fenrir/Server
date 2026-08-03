@@ -9,6 +9,9 @@ namespace Fenrir.Network.Transport;
 public sealed class FenrirTcpListener<TSession> : IAsyncDisposable
 {
     private const int Backlog = 512;
+
+    private static readonly TimeSpan AcceptFailureBackoff = TimeSpan.FromMilliseconds(200);
+
     private readonly bool _applyOsSocketBuffers;
     private readonly Socket _listenSocket;
 
@@ -54,6 +57,16 @@ public sealed class FenrirTcpListener<TSession> : IAsyncDisposable
             catch (SocketException ex)
             {
                 _logger?.AcceptPortScanSwallowed(ex, _listenSocket.LocalEndPoint);
+
+                try
+                {
+                    await Task.Delay(AcceptFailureBackoff, cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+
                 continue;
             }
 

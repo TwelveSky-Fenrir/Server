@@ -40,9 +40,10 @@ public partial class Zone
 {
     private bool IsWarZone049Type => RegularWarMapCatalog.TryGet(MapId, out _);
 
-    internal bool IsFormationSkillZoneLocked(int skillNumber)
+    internal bool IsFormationSkillZoneLocked(int skillNumber, bool isResumeAction)
     {
-        return FormationSkillCatalog.IsFormationSkillZoneLocked(skillNumber, MapId, IsWarZone049Type);
+        return FormationSkillCatalog.IsFormationSkillZoneLocked(skillNumber, MapId, IsWarZone049Type,
+            isResumeAction);
     }
 
     internal void AdvanceCasterPartyBuffMarker(PlayerRuntimeState state, int skillNumber, int actionSort)

@@ -23,6 +23,8 @@ public sealed class ProxyShopExpiryFlushHost(
         catch (OperationCanceledException)
         {
         }
+
+        await FlushOnceAsync(CancellationToken.None).ConfigureAwait(false);
     }
 
     public async Task FlushOnceAsync(CancellationToken ct)

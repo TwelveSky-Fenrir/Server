@@ -111,6 +111,33 @@ public sealed partial class Zone(
         return _inbox.Writer.TryWrite(command);
     }
 
+        public async Task<PlayerRuntimeState?> PostLeaveCommandAndWaitAsync(int characterId, CancellationToken ct,
+        TimeSpan? timeout = null)
+    {
+        var snapshotSignal =
+            new TaskCompletionSource<PlayerRuntimeState?>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        if (!Post(ZoneCommand.Leave(characterId, snapshotSignal)))
+        {
+            logger.LogError(
+                "Zone {MapId} inbox full: dropped Leave for character {CharacterId} on disconnect -- character remains a phantom in the zone until its next Move/handoff",
+                MapId, characterId);
+            return null;
+        }
+
+        try
+        {
+            return await snapshotSignal.Task.WaitAsync(timeout ?? TimeSpan.FromSeconds(2), ct).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            logger.LogWarning(
+                "Zone {MapId} Leave command for character {CharacterId} did not complete within the wait timeout -- terminal write-behind flush skipped for this disconnect",
+                MapId, characterId);
+            return null;
+        }
+    }
+
     public bool TryGetPlayer(int characterId, out PlayerRuntimeState? state)
     {
         return _players.TryGetValue(characterId, out state);
@@ -354,7 +381,7 @@ public sealed partial class Zone(
                         HandleEnter(command.CharacterId, command.EnterData!);
                         break;
                     case ZoneCommandKind.Leave:
-                        HandleLeave(command.CharacterId);
+                        HandleLeave(command.CharacterId, command.LeaveSnapshot);
                         break;
                     case ZoneCommandKind.Move:
                         var action = command.Action;

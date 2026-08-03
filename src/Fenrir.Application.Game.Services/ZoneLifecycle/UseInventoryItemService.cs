@@ -107,78 +107,26 @@ public sealed class UseInventoryItemService(
 
     private const int GoldScrollItemId = 1167;
 
-    /// <summary>
-    ///     Item 8110: War Point Box — grants a fixed lump of War Points on use.
-    /// </summary>
-    /// <remarks>
-    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:5813-5821 — case 8110 adds 5 to <c>aWarPoint</c>
-    ///     and broadcasts sort 905 (<c>S905UPDATE_WAR_POINT</c>), then decrements item quantity.
-    /// </remarks>
-    private const int WarPointBoxItemId = 8110;
+        private const int WarPointBoxItemId = 8110;
 
-    /// <summary>War Points granted per use of item <see cref="WarPointBoxItemId" />.</summary>
-    /// <remarks>Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:5814 — <c>wAvatar.aWarPoint += 5</c>.</remarks>
-    private const int WarPointBoxGrantAmount = 5;
+        private const int WarPointBoxGrantAmount = 5;
 
-    /// <summary>Item ID for the Buff Duration Pill — adds 60 minutes to <c>BuffX2Time</c> (sort 42).</summary>
-    /// <remarks>
-    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3063-3074 — <c>wAvatar.aBuffX2Time += 60</c> followed
-    ///     by <c>SetUserBonus2()</c> to refresh the buff-duration multiplier.
-    /// </remarks>
-    private const int BuffDurationPillItemId = 1132;
+        private const int BuffDurationPillItemId = 1132;
 
     private const int BuffX2TimeStatSort = 42;
 
-    /// <summary>
-    ///     Minutes added to <see cref="PlayerRuntimeState.SilverTime" /> per Silver Ornament scroll use.
-    /// </summary>
-    /// <remarks>
-    ///     Verified: Server/ts25zone/S04_MyWork03.cpp:3651 — <c>tAddTime = 180</c>.
-    /// </remarks>
-    private const int SilverScrollDurationMinutes = 180;
+        private const int SilverScrollDurationMinutes = 180;
 
-    /// <summary>
-    ///     Minutes added to <see cref="PlayerRuntimeState.GoldTime" /> per Gold Ornament scroll use.
-    /// </summary>
-    /// <remarks>
-    ///     Verified: Server/ts25zone/S04_MyWork03.cpp:3667 — <c>tAddTime = 240</c>.
-    /// </remarks>
-    private const int GoldScrollDurationMinutes = 240;
+        private const int GoldScrollDurationMinutes = 240;
 
-    // ──────────────────────────────────────────────────────────────────────────────
-    // PvP kill-timer scroll constants
-    // Réf. C++: Server/ts25zone/S04_MyWork03.cpp (item dispatch section)
-    // ──────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    ///     Sort code for <c>DoubleKillNumTime</c> progress broadcasts (Scroll of Loyalty / Scroll of the Gods timer).
-    /// </summary>
-    /// <remarks>
-    ///     Réf. C++ : Server/Header/Protocol/STRUCT.h:1515-1545 — unconditional, unguarded enum;
-    ///     <c>S004DOUBLE_PVP_CP = 4</c>. 28 and 29 (this constant's former value and
-    ///     <see cref="DoubleKillExpTimeSortCode" />'s) collide with the unrelated, unconditional
-    ///     <c>S028LUCKY_COMBINE</c>/<c>S029LUCKY_UPGRADE</c> members and were never live for this purpose.
-    /// </remarks>
-    private const int DoubleKillNumTimeSortCode = 4;
+        private const int DoubleKillNumTimeSortCode = 4;
 
-    /// <summary>
-    ///     Sort code for <c>DoubleKillExpTime</c> progress broadcasts (Scroll of Battle / Scroll of the Gods timer).
-    /// </summary>
-    /// <remarks>
-    ///     Réf. C++ : Server/Header/Protocol/STRUCT.h:1515-1545 — <c>S005DOUBLE_PVP_EXP = 5</c>. See
-    ///     <see cref="DoubleKillNumTimeSortCode" /> for why 28/29 were wrong.
-    /// </remarks>
-    private const int DoubleKillExpTimeSortCode = 5;
+        private const int DoubleKillExpTimeSortCode = 5;
 
-    /// <summary>Sort code for <c>DoubleKillNumTime2</c> per-kill counter broadcast. S030.</summary>
-    /// <remarks>Réf. C++: Server/ts25zone/S07_MyGame02.cpp:2445-2448 — explicit sort 30 in legacy.</remarks>
-    private const int DoubleKillNumTime2SortCode = 30;
+        private const int DoubleKillNumTime2SortCode = 30;
 
-    /// <summary>
-    ///     Per-use charge added to <c>DoubleKillNumTime2</c> by items 1155/8438 (Crushed Demon Scroll).
-    ///     Réf. C++: Server/ts25zone/S04_MyWork03.cpp — literal value 50.
-    /// </summary>
-    private const int DoubleKillNumTime2ChargeAmount = 50;
+        private const int DoubleKillNumTime2ChargeAmount = 50;
 
     private static readonly ImmutableHashSet<int> TribeConversionBookItemIds =
         ImmutableHashSet.Create(99014, 99015, 99016);
@@ -387,26 +335,22 @@ public sealed class UseInventoryItemService(
                 static (id, v) => new TribeProgressZoneCommand(id, GoldTime: v),
                 cancellationToken);
 
-        // DoubleKillNumTime+DoubleKillExpTime combined (Scroll of the Gods — adds minutes to both at once)
         if (ResolveDoubleKillBothAmount(item.ItemId) is { } dkBothAmount)
             return await ResolveDoubleKillBothScrollAsync(zone, state, characterId, page, index, item, dkBothAmount,
                 cancellationToken);
 
-        // DoubleKillNumTime only (Scroll of Loyalty)
         if (ResolveDoubleKillNumTimeAmount(item.ItemId) is { } dknAmount)
             return await ResolveTimedCounterItemAsync(zone, state, characterId, page, index, item,
                 dknAmount, DoubleKillNumTimeSortCode, static s => s.DoubleKillNumTime,
                 static (id, v) => new TribeProgressZoneCommand(id, DoubleKillNumTime: v),
                 cancellationToken);
 
-        // DoubleKillExpTime only (Scroll of Battle)
         if (ResolveDoubleKillExpTimeAmount(item.ItemId) is { } dkeAmount)
             return await ResolveTimedCounterItemAsync(zone, state, characterId, page, index, item,
                 dkeAmount, DoubleKillExpTimeSortCode, static s => s.DoubleKillExpTime,
                 static (id, v) => new TribeProgressZoneCommand(id, DoubleKillExpTime: v),
                 cancellationToken);
 
-        // DoubleKillNumTime2 (Crushed Demon Scroll — per-kill charge counter, NOT minutes)
         if (item.ItemId is 1155 or 8438)
             return await ResolveTimedCounterItemAsync(zone, state, characterId, page, index, item,
                 DoubleKillNumTime2ChargeAmount, DoubleKillNumTime2SortCode, static s => s.DoubleKillNumTime2,
@@ -421,11 +365,6 @@ public sealed class UseInventoryItemService(
 
         if (item.ItemId is 979 or 980 or 981)
         {
-            // Stats Convert Scroll: legacy sets mStatsConvertScroll = 1 then calls SetBasicAbilityFromEquip()
-            // and SetHPMP(). The flag is only checked in S07_MyGame04 - Copy.cpp (excluded from build) —
-            // dead feature in every production configuration. Effective observable behavior is:
-            // consume the item, return success. No stat broadcast needed because nothing actually changes.
-            // Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3353-3361.
             logger.LogInformation(
                 "Character {CharacterId} use-inventory-item (Stats Convert Scroll {ItemId}): dead feature — item consumed",
                 characterId, item.ItemId);
@@ -1243,17 +1182,7 @@ public sealed class UseInventoryItemService(
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
 
-    /// <summary>
-    ///     Item 1214 -- Appearance Change Scroll.
-    /// </summary>
-    /// <remarks>
-    ///     Ref. legacy: Server/ts25zone/S04_MyWork03.cpp:3163-3179.
-    ///     The client encodes the chosen appearance in <paramref name="packedValue" /> using two stacked decimal fields:
-    ///     head index = (packedValue % 100 / 10) - 1  (client sends 1-based, we store 0-based, valid 0-6)
-    ///     face index = (packedValue / 100) - 1        (client sends 1-based, we store 0-based, valid 0-2)
-    ///     The legacy broadcast to nearby players was commented out; only the requesting player's own entry is updated.
-    /// </remarks>
-    private async ValueTask<UseInventoryItemResponse> ResolveAppearanceChangeScrollAsync(Zone zone,
+        private async ValueTask<UseInventoryItemResponse> ResolveAppearanceChangeScrollAsync(Zone zone,
         PlayerRuntimeState state, int characterId, byte page, byte index, ItemStack item, int packedValue,
         CancellationToken cancellationToken)
     {
@@ -1276,9 +1205,6 @@ public sealed class UseInventoryItemService(
             return Fail(characterId, item, page, index);
         }
 
-        // Mirror the DB change into the zone's in-memory state.
-        // No broadcast to nearby players -- the legacy broadcast call is commented out at
-        // Server/ts25zone/S04_MyWork03.cpp:3173-3178.
         zone.PostCostumeCommand(new CostumeZoneCommand(characterId,
             NewHeadType: (byte)newHeadType,
             NewFaceType: (byte)newFaceType));
@@ -1290,22 +1216,7 @@ public sealed class UseInventoryItemService(
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
 
-    /// <summary>
-    ///     Item 1171 -- Gender Scroll.
-    /// </summary>
-    /// <remarks>
-    ///     Ref. legacy: Server/ts25zone/S04_MyWork03.cpp:3175-3193.
-    ///     Same packed-value encoding as item 1214 (Appearance Change Scroll) but the lowest decimal digit
-    ///     also carries the gender:
-    ///         gender   = (packedValue % 10) - 1        (1-based on wire, stored 0-based)
-    ///         headType = (packedValue % 100 / 10) - 1  (1-based on wire, stored 0-based, valid 0-6)
-    ///         faceType = (packedValue / 100) - 1       (1-based on wire, stored 0-based, valid 0-2)
-    ///     No range is enforced on gender in legacy (the field is stored verbatim) -- we only reject encoding
-    ///     values that decode to a negative index (i.e. the digit was 0, meaning no 1-based value was sent).
-    ///     No broadcast to nearby players -- the legacy broadcast call is commented out at
-    ///     Server/ts25zone/S04_MyWork03.cpp:3185-3192, matching item 1214 behavior.
-    /// </remarks>
-    private async ValueTask<UseInventoryItemResponse> ResolveGenderScrollAsync(Zone zone,
+        private async ValueTask<UseInventoryItemResponse> ResolveGenderScrollAsync(Zone zone,
         PlayerRuntimeState state, int characterId, byte page, byte index, ItemStack item, int packedValue,
         CancellationToken cancellationToken)
     {
@@ -1313,7 +1224,6 @@ public sealed class UseInventoryItemService(
         var newHeadType = packedValue % 100 / 10 - 1;
         var newFaceType = packedValue / 100 - 1;
 
-        // Gender: no legacy range check, but a decoded value < 0 means bad 1-based encoding.
         if (newGender < 0 || newHeadType is < 0 or > 6 || newFaceType is < 0 or > 2)
             return Fail(characterId, item, page, index);
 
@@ -1330,9 +1240,6 @@ public sealed class UseInventoryItemService(
             return Fail(characterId, item, page, index);
         }
 
-        // Mirror the DB change into the zone's in-memory state.
-        // No broadcast to nearby players -- the legacy broadcast call is commented out at
-        // Server/ts25zone/S04_MyWork03.cpp:3185-3192.
         zone.PostCostumeCommand(new CostumeZoneCommand(characterId,
             NewGender: (byte)newGender,
             NewHeadType: (byte)newHeadType,
@@ -1345,20 +1252,10 @@ public sealed class UseInventoryItemService(
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
 
-    /// <summary>
-    ///     Instant-EXP pills 649, 650, 1489, and 1490.
-    /// </summary>
-    /// <remarks>
-    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:4112-4220 (LNW33-gated block, always active in ReleaseEU33).
-    ///     Legacy also gates all four items on <c>wAuth.ExpFlag</c> (a server-side anti-cheat EXP lock).
-    ///     Fenrir has no equivalent flag — that gate is omitted as a deliberate Fenrir divergence.
-    ///     All formula logic is in <see cref="InstantExpPillFormulas" />.
-    /// </remarks>
-    private async ValueTask<UseInventoryItemResponse> ResolveInstantExpPillAsync(
+        private async ValueTask<UseInventoryItemResponse> ResolveInstantExpPillAsync(
         Zone zone, PlayerRuntimeState state, int characterId, byte page, byte index,
         ItemStack item, CancellationToken cancellationToken)
     {
-        // Per-item level/rebirth gates (Server/ts25zone/S04_MyWork03.cpp:4119-4140)
         switch (item.ItemId)
         {
             case 1489 when state.Level < 113 || state.Level2 != 0:
@@ -1367,8 +1264,6 @@ public sealed class UseInventoryItemService(
                 return Fail(characterId, item, page, index);
         }
 
-        // Absolute EXP ceiling: level 145 + main EXP == 2,000,000,000 means every pool is full
-        // (Server/ts25zone/S04_MyWork03.cpp:4150-4155)
         if (InstantExpPillFormulas.IsAtAbsoluteExpCeiling(state.Level, state.Experience))
             return Fail(characterId, item, page, index);
 
@@ -1618,47 +1513,26 @@ public sealed class UseInventoryItemService(
         };
     }
 
-    /// <summary>
-    ///     Returns the minutes to add to <c>DoubleKillNumTime</c> for Scroll of Loyalty items.
-    ///     Does NOT cover the combined Scroll-of-the-Gods items (see <see cref="ResolveDoubleKillBothAmount"/>).
-    ///     Réf. C++: Server/ts25zone/S04_MyWork03.cpp — items 1118/1454/8401 add 30 min to aDoubleKillNumTime.
-    /// </summary>
-    private static int? ResolveDoubleKillNumTimeAmount(int itemId) => itemId switch
+        private static int? ResolveDoubleKillNumTimeAmount(int itemId) => itemId switch
     {
         1118 or 1454 or 8401 => 30,
         _ => null
     };
 
-    /// <summary>
-    ///     Returns the minutes to add to <c>DoubleKillExpTime</c> for Scroll of Battle items.
-    ///     Does NOT cover the combined Scroll-of-the-Gods items (see <see cref="ResolveDoubleKillBothAmount"/>).
-    ///     Réf. C++: Server/ts25zone/S04_MyWork03.cpp — items 1119/1456/8402 add 30 min to aDoubleKillExpTime.
-    /// </summary>
-    private static int? ResolveDoubleKillExpTimeAmount(int itemId) => itemId switch
+        private static int? ResolveDoubleKillExpTimeAmount(int itemId) => itemId switch
     {
         1119 or 1456 or 8402 => 30,
         _ => null
     };
 
-    /// <summary>
-    ///     Returns the minutes to add to BOTH <c>DoubleKillNumTime</c> AND <c>DoubleKillExpTime</c>
-    ///     for the combined Scroll-of-the-Gods family.
-    ///     Réf. C++: Server/ts25zone/S04_MyWork03.cpp —
-    ///     items 1120/1163/1186 add 30 min to both; item 1228 adds 90 min to both.
-    /// </summary>
-    private static int? ResolveDoubleKillBothAmount(int itemId) => itemId switch
+        private static int? ResolveDoubleKillBothAmount(int itemId) => itemId switch
     {
         1120 or 1163 or 1186 => 30,
         1228 => 90,
         _ => null
     };
 
-    /// <summary>
-    ///     Applies a Scroll of the Gods variant that adds <paramref name="addAmount"/> minutes to both
-    ///     <c>DoubleKillNumTime</c> and <c>DoubleKillExpTime</c> atomically, then consumes the item.
-    ///     Fails (without consuming) if either counter would overflow <see cref="BankedCounterMath.AddNarrow"/>.
-    /// </summary>
-    private async ValueTask<UseInventoryItemResponse> ResolveDoubleKillBothScrollAsync(Zone zone,
+        private async ValueTask<UseInventoryItemResponse> ResolveDoubleKillBothScrollAsync(Zone zone,
         PlayerRuntimeState state, int characterId, byte page, byte index, ItemStack item, int addAmount,
         CancellationToken cancellationToken)
     {
@@ -1735,38 +1609,24 @@ public sealed class UseInventoryItemService(
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
 
-    /// <summary>
-    ///     Resolves item 99101 (CP Random Bag).
-    ///     Three outcome tiers are rolled from a uniform 0–99 range:
-    ///     <list type="bullet">
-    ///         <item>Roll 0 (1 %): jackpot — grants either 5 000 or 10 000 CP with equal probability.</item>
-    ///         <item>Roll 1–40 (40 %): grants 3 000 CP on sub-roll 0, 1 000 CP on sub-rolls 1–2, or 500 CP otherwise.</item>
-    ///         <item>Roll 41–99 (59 %): adds 30 minutes to both <c>DoubleKillNumTime</c> and <c>DoubleKillExpTime</c>.</item>
-    ///     </list>
-    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:5233-5374 (rand_mir() % 100 dispatch).
-    /// </summary>
-    private async ValueTask<UseInventoryItemResponse> ResolveCpRandomBagAsync(Zone zone, PlayerRuntimeState state,
+        private async ValueTask<UseInventoryItemResponse> ResolveCpRandomBagAsync(Zone zone, PlayerRuntimeState state,
         int characterId, byte page, byte index, ItemStack item, CancellationToken cancellationToken)
     {
         var roll = Random.Shared.Next(100);
 
         if (roll > 40)
         {
-            // 59 % — +30 min to both DoubleKill timers; delegates to the existing dual-counter method.
             return await ResolveDoubleKillBothScrollAsync(zone, state, characterId, page, index, item, 30,
                 cancellationToken);
         }
 
-        // CP outcome — determine amount then grant.
         int cpAmount;
         if (roll == 0)
         {
-            // 1 % jackpot: 50/50 between 5 000 and 10 000 CP.
             cpAmount = Random.Shared.Next(2) == 0 ? 5_000 : 10_000;
         }
         else
         {
-            // 40 % tier: sub-roll within 0–9.
             var subRoll = Random.Shared.Next(10);
             cpAmount = subRoll switch { 0 => 3_000, <= 2 => 1_000, _ => 500 };
         }
@@ -1864,9 +1724,6 @@ public sealed class UseInventoryItemService(
         PlayerRuntimeState state, int characterId, byte page, byte index, ItemStack item,
         int requestedSlot, CancellationToken cancellationToken)
     {
-        // Validate slot range [0, 39] — out-of-range is malformed; return Fail to avoid disconnecting
-        // legitimate retries but don't proceed (legacy calls Quit() here,
-        // Server/ts25zone/S04_MyWork03.cpp:2010-2013).
         if (requestedSlot is < 0 or >= SkillLearnResolver.MaxSlots)
         {
             logger.LogWarning(
@@ -1887,14 +1744,11 @@ public sealed class UseInventoryItemService(
         var skillId = learned.SkillId;
         var gradeRefund = learned.Grade;
 
-        // Collect hotkeys bound to this specific skill and clear them
-        // (HotkeySlot.Value1 carries the skill/item id for Skill-kind bindings)
         var hotkeyWrites = ImmutableArray.CreateBuilder<HotkeySlotWrite>();
         foreach (var ((hkPage, hkIndex), hkSlot) in state.Hotkeys)
             if (hkSlot.Kind == HotkeyBindingKind.Skill && hkSlot.Value1 == skillId)
                 hotkeyWrites.Add(new HotkeySlotWrite(hkPage, hkIndex, HotkeySlot.Empty));
 
-        // Persist DB changes: hotkey clears, then skill slot clear
         foreach (var write in hotkeyWrites)
             await characters.UpsertHotkeySlotAsync(characterId, write.Page, write.Index, 0, 0, 0,
                 cancellationToken);
@@ -1903,20 +1757,17 @@ public sealed class UseInventoryItemService(
 
         var newSkillPoints = state.SkillPoints + gradeRefund;
 
-        // Mirror skill-slot clear into zone — one slot only
         if (!zone.PostSkillCommand(new SkillZoneCommand(characterId, slot, new LearnedSkill(0, 0), newSkillPoints)))
             logger.LogError(
                 "Zone {MapId} skill inbox full: dropped reduction-sutra skill-clear mirror (slot {Slot}) for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, slot, characterId);
 
-        // Mirror SP refund
         if (!await zone.PostTribeProgressCommandAndWaitAsync(
                 new TribeProgressZoneCommand(characterId, SkillPoints: newSkillPoints), cancellationToken))
             logger.LogError(
                 "Zone {MapId} tribe-progress inbox full: dropped reduction-sutra SP mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
 
-        // Mirror hotkey clears
         if (hotkeyWrites.Count > 0)
             if (!await zone.PostHotkeyMoveCommandAndWaitAsync(
                     new HotkeyMoveZoneCommand(characterId, hotkeyWrites.ToImmutable(), null),
@@ -1925,7 +1776,6 @@ public sealed class UseInventoryItemService(
                     "Zone {MapId} hotkey-move inbox full: dropped reduction-sutra hotkey-clear mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                     zone.MapId, characterId);
 
-        // Clear auto-buff slots that reference this skill
         var newAutoBuffSkill = state.AutoBuffSkill;
         var autoBuffChanged = false;
         for (var i = 0; i < newAutoBuffSkill.Length; i++)
@@ -1948,19 +1798,7 @@ public sealed class UseInventoryItemService(
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
 
-    /// <summary>
-    ///     Premium-service consumables: items 2292/8420/8001 (+1 day), 8002 (+3 days),
-    ///     8421/8003 (+7 days), 2138 (+30 days).
-    /// </summary>
-    /// <remarks>
-    ///     Uses Unix-timestamp arithmetic (+86400 seconds per day), flooring the base to "now" when the
-    ///     character's current premium has already expired — matching the
-    ///     <c>USE_PREMIUM_LONGTIME</c>-branch behaviour from
-    ///     Server/ts25zone/S04_MyWork03.cpp:2480-2545.
-    ///     <c>USE_PREMIUM_LONGTIME</c> is defined unconditionally in the repository's one buildable
-    ///     configuration (see Server/Header/DEFINE.h).
-    /// </remarks>
-    private async ValueTask<UseInventoryItemResponse> ResolvePremiumServiceAsync(
+        private async ValueTask<UseInventoryItemResponse> ResolvePremiumServiceAsync(
         Zone zone, PlayerRuntimeState state, int characterId, byte page, byte index,
         ItemStack item, int days, CancellationToken cancellationToken)
     {
@@ -1993,14 +1831,7 @@ public sealed class UseInventoryItemService(
         };
     }
 
-    /// <summary>
-    ///     Maps auto-buff scroll item IDs to the number of calendar days they add to <c>AutoBuffTime</c>.
-    /// </summary>
-    /// <remarks>
-    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3136-3153 — <c>WUSE_ITEM_1201</c> block.
-    ///     Items 1201/2021/8406 add 7 days; 1215 adds 30 days; 1216/8405 add 1 day.
-    /// </remarks>
-    private static int? ResolveAutoBuffScrollDays(int itemId) => itemId switch
+        private static int? ResolveAutoBuffScrollDays(int itemId) => itemId switch
     {
         1201 or 2021 or 8406 => 7,
         1215 => 30,
@@ -2008,44 +1839,21 @@ public sealed class UseInventoryItemService(
         _ => null
     };
 
-    /// <summary>
-    ///     Maps mount-absorb scroll item IDs to the number of minutes they add to <c>AnimalAbsorbTime</c>.
-    /// </summary>
-    /// <remarks>
-    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3364-3377 — <c>WUSE_ITEM_613</c> block.
-    ///     Item 613 adds 60 min; item 1222 adds 180 min.
-    /// </remarks>
-    private static int? ResolveMountAbsorbMinutes(int itemId) => itemId switch
+        private static int? ResolveMountAbsorbMinutes(int itemId) => itemId switch
     {
         613 => 60,
         1222 => 180,
         _ => null
     };
 
-    /// <summary>
-    ///     Maps auto-hunt minute-budget scroll item IDs to the number of minutes they add to
-    ///     <c>AutoHuntPaidMinuteBudget</c> (<c>aAutoTime2</c>).
-    /// </summary>
-    /// <remarks>
-    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3740-3795 — <c>WUSE_ITEM_574</c> block.
-    ///     Items 574/2314/8403 add 300 minutes; item 722 adds 180 minutes.
-    /// </remarks>
-    private static int? ResolveAutoHuntMinutesAmount(int itemId) => itemId switch
+        private static int? ResolveAutoHuntMinutesAmount(int itemId) => itemId switch
     {
         574 or 2314 or 8403 => 300,
         722 => 180,
         _ => null
     };
 
-    /// <summary>
-    ///     Maps auto-hunt day-budget scroll item IDs to the number of days they add to
-    ///     <c>AutoHuntPaidDayBudget</c> (<c>aAutoTime</c>).
-    /// </summary>
-    /// <remarks>
-    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3740-3795 — <c>WUSE_ITEM_610</c> block.
-    ///     Items 610/686/8404 add 7 days; items 658/8105 add 1 day; item 687 adds 15 days; item 1217 adds 30 days.
-    /// </remarks>
-    private static int? ResolveAutoHuntDaysAmount(int itemId) => itemId switch
+        private static int? ResolveAutoHuntDaysAmount(int itemId) => itemId switch
     {
         610 or 686 or 8404 => 7,
         658 or 8105 => 1,
@@ -2054,17 +1862,7 @@ public sealed class UseInventoryItemService(
         _ => null
     };
 
-    /// <summary>
-    ///     Adds <paramref name="minutes" /> to the character's paid auto-hunt minute budget,
-    ///     capped at <see cref="BankedCounterMath.GlobalCeiling" />.
-    ///     The zone sends the updated value to the client via stat-update sort 62 inside the mirror handler.
-    /// </summary>
-    /// <remarks>
-    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3740-3795 — <c>WUSE_ITEM_574</c>/<c>WUSE_ITEM_722</c> blocks.
-    ///     <c>wCheckAdd</c> rejects when addition would overflow the global ceiling.
-    ///     Legacy sends <c>B_AVATAR_CHANGE_INFO_2(tUserInfo, 62, wAvatar.aAutoTime2)</c> immediately after update.
-    /// </remarks>
-    private async ValueTask<UseInventoryItemResponse> ResolveAutoHuntMinutesScrollAsync(
+        private async ValueTask<UseInventoryItemResponse> ResolveAutoHuntMinutesScrollAsync(
         Zone zone, PlayerRuntimeState state, int characterId, byte page, byte index,
         ItemStack item, int minutes, CancellationToken cancellationToken)
     {
@@ -2086,19 +1884,7 @@ public sealed class UseInventoryItemService(
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
 
-    /// <summary>
-    ///     Adds <paramref name="days" /> calendar days to the character's paid auto-hunt day budget.
-    ///     The base date is the later of today and the current <c>AutoHuntPaidDayBudget</c>, so
-    ///     consecutive uses always stack forward rather than overwriting an active subscription.
-    ///     The zone sends the updated value to the client via stat-update sort 61 inside the mirror handler.
-    /// </summary>
-    /// <remarks>
-    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3740-3795 — <c>WUSE_ITEM_610</c> block.
-    ///     <c>ReturnAddDate</c> returns -1 when the projected date overflows; that maps to a <c>Fail</c>
-    ///     here exactly as <c>wUseInvFail()</c> does in the legacy.
-    ///     Legacy sends <c>B_AVATAR_CHANGE_INFO_2(tUserInfo, 61, wAvatar.aAutoTime)</c> immediately after update.
-    /// </remarks>
-    private async ValueTask<UseInventoryItemResponse> ResolveAutoHuntDaysScrollAsync(
+        private async ValueTask<UseInventoryItemResponse> ResolveAutoHuntDaysScrollAsync(
         Zone zone, PlayerRuntimeState state, int characterId, byte page, byte index,
         ItemStack item, int days, CancellationToken cancellationToken)
     {
@@ -2122,31 +1908,13 @@ public sealed class UseInventoryItemService(
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
 
-    /// <summary>
-    ///     Maps double-mount-EXP scroll item IDs to the number of minutes they add to <c>AnimalDoubleExp</c>.
-    /// </summary>
-    /// <remarks>
-    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3379-3388 — <c>WUSE_ITEM_1221</c> block.
-    ///     All three item IDs add 180 min.
-    /// </remarks>
-    private static int? ResolveMountDoubleExpMinutes(int itemId) => itemId switch
+        private static int? ResolveMountDoubleExpMinutes(int itemId) => itemId switch
     {
         1221 or 17034 or 8412 => 180,
         _ => null
     };
 
-    /// <summary>
-    ///     Extends the character's auto-buff subscription by <paramref name="days" /> calendar days.
-    ///     The base date is the later of today and the current <c>AutoBuffTime</c>, so consecutive uses
-    ///     always stack forward. The new date is returned to the client as <c>UseInventoryItemResponse.Value</c>.
-    /// </summary>
-    /// <remarks>
-    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3136-3162 — <c>WUSE_ITEM_1201</c> block.
-    ///     <c>ReturnAddDate</c> returns -1 when the projected date overflows <see cref="GameDate.Invalid" />;
-    ///     that maps to a <c>Fail</c> here exactly as <c>wUseInvFail()</c> does in the legacy.
-    ///     The response carries <c>r-&gt;tValue = newDate</c>; no separate stat-update packet is sent.
-    /// </remarks>
-    private async ValueTask<UseInventoryItemResponse> ResolveAutoBuffScrollAsync(
+        private async ValueTask<UseInventoryItemResponse> ResolveAutoBuffScrollAsync(
         Zone zone, PlayerRuntimeState state, int characterId, byte page, byte index,
         ItemStack item, int days, CancellationToken cancellationToken)
     {
@@ -2164,8 +1932,6 @@ public sealed class UseInventoryItemService(
             "Character {CharacterId} auto-buff scroll applied: item {ItemId} +{Days} day(s), AutoBuffTime now {NewDate}",
             characterId, item.ItemId, days, newDate);
 
-        // Consume item and mirror to SQL/zone; build the response manually so Value carries the new date,
-        // matching the legacy r->tValue = newDate behaviour (Server/ts25zone/S04_MyWork03.cpp:3147).
         var remaining = item.Quantity - 1;
         var container = state.Inventory.GetContainer(page);
         var projected = remaining > 0
@@ -2185,16 +1951,7 @@ public sealed class UseInventoryItemService(
         return new UseInventoryItemResponse { Result = 0, Page = page, Index = index, Value = newDate, Value2 = 0 };
     }
 
-    /// <summary>
-    ///     Adds <paramref name="minutes" /> to the character's mount-absorb time counter,
-    ///     capped at <see cref="BankedCounterMath.GlobalCeiling" />.
-    ///     The zone broadcasts the updated value to the client via stat-update sort 78.
-    /// </summary>
-    /// <remarks>
-    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3364-3377 — <c>WUSE_ITEM_613</c> block.
-    ///     <c>wCheckAdd</c> rejects (legacy fail) when the addition would overflow the global ceiling.
-    /// </remarks>
-    private async ValueTask<UseInventoryItemResponse> ResolveMountAbsorbScrollAsync(
+        private async ValueTask<UseInventoryItemResponse> ResolveMountAbsorbScrollAsync(
         Zone zone, PlayerRuntimeState state, int characterId, byte page, byte index,
         ItemStack item, int minutes, CancellationToken cancellationToken)
     {
@@ -2215,17 +1972,7 @@ public sealed class UseInventoryItemService(
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
 
-    /// <summary>
-    ///     Adds 180 minutes to the character's double-mount-EXP counter,
-    ///     capped at <see cref="BankedCounterMath.GlobalCeiling" />.
-    ///     <c>AnimalDoubleExp</c> is in-memory only (not persisted), so no write-behind is triggered.
-    ///     <see cref="TimedBuffCountdownSystem" /> broadcasts sort-75 decrements during normal tick processing.
-    /// </summary>
-    /// <remarks>
-    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3379-3388 — <c>WUSE_ITEM_1221</c> block.
-    ///     Legacy has no B_AVATAR_CHANGE_INFO_2 call here; the client infers activation from the success response.
-    /// </remarks>
-    private async ValueTask<UseInventoryItemResponse> ResolveMountDoubleExpScrollAsync(
+        private async ValueTask<UseInventoryItemResponse> ResolveMountDoubleExpScrollAsync(
         Zone zone, PlayerRuntimeState state, int characterId, byte page, byte index,
         ItemStack item, int minutes, CancellationToken cancellationToken)
     {
@@ -2332,17 +2079,7 @@ public sealed class UseInventoryItemService(
         return response;
     }
 
-    /// <summary>
-    ///     Resolves item 8110 (War Point Box): grants <see cref="WarPointBoxGrantAmount" /> War Points and
-    ///     consumes the item.
-    /// </summary>
-    /// <remarks>
-    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:5813-5821 — adds 5 to <c>aWarPoint</c>, broadcasts
-    ///     <c>B_AVATAR_CHANGE_INFO_2</c> with sort 905 (<c>S905UPDATE_WAR_POINT</c>), then calls
-    ///     <c>DecreaseQuantity</c>. The sort-905 broadcast is handled by <see cref="Zone.GrantWarPoints" />;
-    ///     item removal is handled by <see cref="ConsumeAndMirrorAsync" />.
-    /// </remarks>
-    private ValueTask<UseInventoryItemResponse> ResolveWarPointBoxAsync(Zone zone, PlayerRuntimeState state,
+        private ValueTask<UseInventoryItemResponse> ResolveWarPointBoxAsync(Zone zone, PlayerRuntimeState state,
         int characterId, byte page, byte index, ItemStack item, CancellationToken cancellationToken)
     {
         zone.GrantWarPoints(characterId, WarPointBoxGrantAmount);

@@ -7,13 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Commerce;
 
-/// <summary>
-///     Server/ts25zone/S07_MyGame09.cpp:506-556 -- Sort 1 ("ask for open or close") loads the caller's own
-///     shop from the backing store and only succeeds while it is closed (ShopState 0); Sort 2/3 ("get
-///     self"/"get other", handled identically) scan the zone's own live open-shop registry by name instead.
-///     Response encoding follows Server/ts25zone/S05_MyTransfer.cpp:1719-1725: on success, Result echoes the
-///     request Sort and Sort carries 0; on failure, Result is always 0 and Sort carries the failure code.
-/// </summary>
 public sealed class GetProxyShopService(
     IOfflineShopRepository offlineShops,
     ILogger<GetProxyShopService> logger) : IGetProxyShopService

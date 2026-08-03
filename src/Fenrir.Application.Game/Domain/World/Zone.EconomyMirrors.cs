@@ -31,32 +31,15 @@ public sealed partial class Zone
 
     private const int TribeInboxCapacity = 512;
 
-    /// <summary>Sort code for the mount absorb time stat update sent to the client on scroll use.</summary>
-    /// <remarks>
-    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3376
-    ///     <c>mTRANSFER.B_AVATAR_CHANGE_INFO_2(tUserInfo, S078MOUNT_ABSORB_TIME, wAvatar.aAnimalAbsorbTime)</c>
-    /// </remarks>
-    private const int AnimalAbsorbTimeStatSort = 78;
+        private const int AnimalAbsorbTimeStatSort = 78;
 
-    /// <summary>Sort code for the paid auto-hunt day budget stat update sent to the client on scroll use.</summary>
-    /// <remarks>
-    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3740-3795 — <c>B_AVATAR_CHANGE_INFO_2(..., 61, aAutoTime)</c>
-    /// </remarks>
-    private const int AutoHuntPaidDayBudgetStatSort = 61;
+        private const int AutoHuntPaidDayBudgetStatSort = 61;
 
-    /// <summary>Sort code for the auto-hunt minute budget stat update.</summary>
-    /// <remarks>
-    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3740-3795 — <c>B_AVATAR_CHANGE_INFO_2(..., 62, aAutoTime2)</c>
-    /// </remarks>
-    private const int AutoHuntPaidMinuteBudgetStatSort = 62;
+        private const int AutoHuntPaidMinuteBudgetStatSort = 62;
 
-    /// <summary>Sort code for the Silver Ornament scroll time stat update.</summary>
-    /// <remarks>Réf. sort: S090 — <c>B_AVATAR_CHANGE_INFO_2(..., 90, aSilverTime)</c></remarks>
-    private const int SilverOrnamentStatSort = 90;
+        private const int SilverOrnamentStatSort = 90;
 
-    /// <summary>Sort code for the Gold Ornament scroll time stat update.</summary>
-    /// <remarks>Réf. sort: S101 — <c>B_AVATAR_CHANGE_INFO_2(..., 101, aGoldTime)</c></remarks>
-    private const int GoldOrnamentStatSort = 101;
+        private const int GoldOrnamentStatSort = 101;
 
     private readonly List<int> _gmTeleportNeighborScratch = [];
 
@@ -828,9 +811,6 @@ public sealed partial class Zone
             changed = true;
         }
 
-        // AutoHuntPaidDayBudget — compact date integer budget for paid auto-hunt day time.
-        // Persisted via ProgressWriteBehindHost. Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3740-3795
-        // Legacy sends B_AVATAR_CHANGE_INFO_2(tUserInfo, 61, wAvatar.aAutoTime) immediately after update.
         if (command.AutoHuntPaidDayBudget is { } newAutoHuntPaidDayBudget)
         {
             state.AutoHuntPaidDayBudget = newAutoHuntPaidDayBudget;
@@ -839,9 +819,6 @@ public sealed partial class Zone
             changed = true;
         }
 
-        // AutoHuntPaidMinuteBudget — minute counter for paid auto-hunt minute time.
-        // Persisted via ProgressWriteBehindHost. Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3740-3795
-        // Legacy sends B_AVATAR_CHANGE_INFO_2(tUserInfo, 62, wAvatar.aAutoTime2) immediately after update.
         if (command.AutoHuntPaidMinuteBudget is { } newAutoHuntPaidMinuteBudget)
         {
             state.AutoHuntPaidMinuteBudget = newAutoHuntPaidMinuteBudget;
@@ -850,18 +827,12 @@ public sealed partial class Zone
             changed = true;
         }
 
-        // AutoBuffTime — compact date integer (e.g. 20261231). Persisted via ProgressWriteBehindHost.
-        // Client learns the new value from the UseInventoryItemResponse.Value, not a stat-update packet.
-        // Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3147-3152
         if (command.AutoBuffTime is { } newAutoBuffTime)
         {
             state.AutoBuffTime = newAutoBuffTime;
             changed = true;
         }
 
-        // AnimalAbsorbTime — minute counter. Persisted via ProgressWriteBehindHost.
-        // Legacy broadcasts immediately via B_AVATAR_CHANGE_INFO_2 sort 78 after updating.
-        // Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3374-3376
         if (command.AnimalAbsorbTime is { } newAnimalAbsorbTime)
         {
             state.AnimalAbsorbTime = newAnimalAbsorbTime;
@@ -870,20 +841,9 @@ public sealed partial class Zone
             changed = true;
         }
 
-        // AnimalDoubleExp — in-memory minute counter only; not in write-behind pipeline and not loaded from DB
-        // on zone-enter, so no dirty flag is needed. Client receives the UseInventoryItemResponse success
-        // signal; TimedBuffCountdownSystem broadcasts sort 75 decrements as normal.
-        // Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3381-3387
         if (command.AnimalDoubleExp is { } newAnimalDoubleExp)
             state.AnimalDoubleExp = newAnimalDoubleExp;
 
-        // BuffX2Time — minute counter that doubles skill-buff durations via SupportSkillTimeUpRatio.
-        // Persisted via ProgressWriteBehindHost (DirtyFlags.Progression).
-        // The AvatarStatUpdateResponse (sort 42) is sent by the service before posting this command,
-        // matching the same split used by SilverTime/GoldTime — no re-broadcast here.
-        // RecomputeSupportSkillTimeUpRatio() must run whenever the counter changes, since it controls
-        // whether the x2 multiplier is active for any buff the character casts or receives.
-        // Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:3063-3074 — aBuffX2Time += 60; SetUserBonus2().
         if (command.BuffX2Time is { } newBuffX2Time)
         {
             state.BuffX2Time = newBuffX2Time;
@@ -944,8 +904,6 @@ public sealed partial class Zone
         if (command.GmSummonMonsterTemplateId is { } gmSummonMonsterTemplateId)
             SpawnGmSummonedMonster(gmSummonMonsterTemplateId, state);
 
-        // Re-read Life here (tick thread) rather than trusting a value read before the command was
-        // posted -- the monster may have taken further damage or already died in the interim.
         if (command.GmForceKillMonsterServerIndex is { } gmForceKillMonsterServerIndex &&
             TryGetMonster(gmForceKillMonsterServerIndex, out var gmForceKillMonster) &&
             gmForceKillMonster is not null)

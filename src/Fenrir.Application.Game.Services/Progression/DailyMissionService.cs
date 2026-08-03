@@ -17,8 +17,8 @@ public sealed class DailyMissionService(
     WorldDataCache worldData,
     ILogger<DailyMissionService> logger) : IDailyMissionService
 {
-    /// <summary>Base Level alone (aLevel1), never CombinedLevel -- Server/ts25zone/S04_MyWork02.cpp:14214.</summary>
-    private const int MinimumClaimLevel = ExperienceFormulas.RebirthDivisorLevelThreshold;
+
+        private const int MinimumClaimLevel = ExperienceFormulas.RebirthDivisorLevelThreshold;
 
     private const int RequiredJoinWar = 1;
     private const int RequiredKillOtherTribe = 10;

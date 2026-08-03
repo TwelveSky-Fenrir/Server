@@ -62,30 +62,10 @@ public sealed class LootBoxUseItemHandler(
     private static readonly BoxRewardSpec ChestBox720OverrideSpec =
         BoxRewardSpec.Uniform(ChestBox720RewardTable.BoxId, ImmutableArray<int>.Empty);
 
-    /// <summary>
-    ///     Item 512 -- Random Box (tribe-based loot).
-    /// </summary>
-    /// <remarks>
-    ///     Legacy calls <c>GetRandomBoxItem(tribe)</c> per Server/ts25zone/S04_MyWork03.cpp:4451-4460.
-    ///     Exact per-tribe reward pools are NOT documented in any contract supplied to this agent; the items
-    ///     below are a Fenrir fallback (Option B) using a shared pool from box 601 -- a
-    ///     legacy-behavior-translator contract is needed to establish the real pools.
-    /// </remarks>
-    private static readonly BoxRewardSpec RandomBox512FallbackSpec =
+        private static readonly BoxRewardSpec RandomBox512FallbackSpec =
         BoxRewardSpec.Uniform(512, [506, 507, 508, 509, 578, 579]);
 
-    /// <summary>
-    ///     Item 664 -- Costume Box (tribe-based random costume).
-    /// </summary>
-    /// <remarks>
-    ///     Legacy calls <c>GetRandomCostume(tribe)</c> per Server/ts25zone/S04_MyWork03.cpp:4462-4471.
-    ///     Exact per-tribe reward pools are NOT documented in any contract supplied to this agent; the items
-    ///     below are a Fenrir fallback (Option B) re-using the per-tribe costume IDs from
-    ///     <see cref="CostumeChest76543RewardTable" /> (76524/76525/76526) which are the only known
-    ///     tribe-keyed costume items in the codebase -- a legacy-behavior-translator contract is needed to
-    ///     confirm these are the correct IDs for item 664.
-    /// </remarks>
-    private static readonly FrozenDictionary<byte, BoxRewardSpec> CostumeBox664SpecByPreviousTribe =
+        private static readonly FrozenDictionary<byte, BoxRewardSpec> CostumeBox664SpecByPreviousTribe =
         new Dictionary<byte, BoxRewardSpec>
         {
             [0] = BoxRewardSpec.Uniform(664, [76524]),

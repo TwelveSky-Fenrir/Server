@@ -55,14 +55,19 @@ public readonly struct ZoneCommand
 
     public int DuelUniqueNumber { get; init; }
 
+        public TaskCompletionSource<PlayerRuntimeState?>? LeaveSnapshot { get; init; }
+
     public static ZoneCommand Enter(int characterId, PlayerEnterData data)
     {
         return new ZoneCommand { Kind = ZoneCommandKind.Enter, CharacterId = characterId, EnterData = data };
     }
 
-    public static ZoneCommand Leave(int characterId)
+    public static ZoneCommand Leave(int characterId, TaskCompletionSource<PlayerRuntimeState?>? snapshotSignal = null)
     {
-        return new ZoneCommand { Kind = ZoneCommandKind.Leave, CharacterId = characterId };
+        return new ZoneCommand
+        {
+            Kind = ZoneCommandKind.Leave, CharacterId = characterId, LeaveSnapshot = snapshotSignal
+        };
     }
 
     public static ZoneCommand Move(int characterId, in ActionInfo action, bool isResumeAction = false)
@@ -280,17 +285,11 @@ public sealed record PlayerEnterData(
     int WarriorScroll = 0,
     int SilverTime = 0,
     int GoldTime = 0,
-    /// <summary>Minutes remaining on the Scroll of Loyalty / Scroll of the Gods buff (bonus CP per PvP kill).</summary>
-    int DoubleKillNumTime = 0,
-    /// <summary>Minutes remaining on the Scroll of Battle / Scroll of the Gods buff (bonus EXP per PvP kill).</summary>
-    int DoubleKillExpTime = 0,
-    /// <summary>Per-kill charge count for the Crushed Demon Scroll — decremented per PvP kill, NOT per minute.</summary>
-    int DoubleKillNumTime2 = 0,
-    /// <summary>
-    ///     Death-protection shield stacks. Loaded from <c>CharacterProgressDto.ProtectForDeath</c> at zone
-    ///     entry; decremented in-zone when a death event is absorbed. Silently resets to 0 on
-    ///     zone-transfer if <c>ProtectForDeath</c> has not yet been added to
-    ///     <c>CharacterProgressTvp</c> — coordinate with <b>fenrir-database-engineer</b> before
-    ///     relying on this surviving zone changes.
-    /// </summary>
-    int ProtectForDeath = 0);
+
+        int DoubleKillNumTime = 0,
+
+        int DoubleKillExpTime = 0,
+
+        int DoubleKillNumTime2 = 0,
+
+        int ProtectForDeath = 0);

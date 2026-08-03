@@ -416,28 +416,37 @@ public sealed partial class Zone
             (byte)PartyResyncRelaySort.Request, options.ShardId, characterId, avatarName, avatarName));
     }
 
-    private void HandleLeave(int characterId)
+    private void HandleLeave(int characterId, TaskCompletionSource<PlayerRuntimeState?>? snapshotSignal = null)
     {
-        if (!_players.TryRemove(characterId, out var state))
-            return;
+        PlayerRuntimeState? state = null;
 
-        _grid.Remove(characterId, state.CurrentCell);
-
-        logger.LogInformation("Character {CharacterId} left zone {MapId}", characterId, MapId);
-
-        if (!state.IsMovingZone)
+        try
         {
-            BreakPartyOnDisconnect(characterId, state.Name);
+            if (!_players.TryRemove(characterId, out state))
+                return;
 
-            if (characterShardLocations is not null)
-                _ = CleanupShardLocationAsync(characterId);
+            _grid.Remove(characterId, state.CurrentCell);
+
+            logger.LogInformation("Character {CharacterId} left zone {MapId}", characterId, MapId);
+
+            if (!state.IsMovingZone)
+            {
+                BreakPartyOnDisconnect(characterId, state.Name);
+
+                if (characterShardLocations is not null)
+                    _ = CleanupShardLocationAsync(characterId);
+            }
+
+            ClearTradeOnDisconnect(characterId);
+
+            ClearAcceptedNegotiationsOnDisconnect(characterId);
+
+            ClearDungeonInstanceOnDisconnect(state);
         }
-
-        ClearTradeOnDisconnect(characterId);
-
-        ClearAcceptedNegotiationsOnDisconnect(characterId);
-
-        ClearDungeonInstanceOnDisconnect(state);
+        finally
+        {
+            snapshotSignal?.TrySetResult(state);
+        }
     }
 
     private void BreakPartyOnDisconnect(int characterId, string disconnectingName)
@@ -628,7 +637,6 @@ public sealed partial class Zone
 
         QueueDeathEventLog(CharacterDeathEventCode, characterId, (byte)cause, $"Cause={cause};Level={state.Level}");
 
-        // EXP/CP loss is MonsterKill-only; PlayerKill/Duel/StunLock never lose EXP in legacy (S07_MyGame02.cpp:1086-1100,1448-1508,2968-3212).
         if (cause == DeathCause.MonsterKill)
             ApplyDeathExperienceLoss(state);
 
@@ -724,9 +732,6 @@ public sealed partial class Zone
                 return;
 
             case >= ExperienceFormulas.MaxLimitLevel:
-                // Level-cap path: no EXP loss. Shield absorbs the CP penalty if available;
-                // otherwise 10 CP are deducted.
-                // Ref: Server/ts25zone/S07_MyGame02.cpp:2921-2964 (aProtectForDeath guard at level cap).
                 if (state.ProtectForDeath > 0)
                 {
                     state.ProtectForDeath--;
@@ -752,16 +757,12 @@ public sealed partial class Zone
         if (!worldData.LevelsByLevel.TryGetValue(state.Level, out var levelRow))
             return;
 
-        // personalExpDownRatio derives from the live premium-expiry timestamp; globalExpDownRatio is the
-        // per-process raw-integer config knob. Ref: S03_MyUser.cpp:524-541; S07_MyGame02.cpp:2943-2944.
         var personalExpDownRatio = ExperienceFormulas.ResolvePersonalExpDownRatio(state.PremiumExpireUtc);
         var loss = ExperienceFormulas.ComputeDeathExperienceLoss(state.Experience, levelRow.ExpRangeMin,
             personalExpDownRatio, options.GlobalExpDownRatio);
         if (loss <= 0)
             return;
 
-        // Shield absorbs EXP loss: decrement one stack instead of deducting EXP.
-        // Ref: Server/ts25zone/S07_MyGame02.cpp:2956-2962 (aProtectForDeath > 0 branch).
         if (state.ProtectForDeath > 0)
         {
             state.ProtectForDeath--;
@@ -828,7 +829,7 @@ public sealed partial class Zone
         if (!isResumeAction)
             MaybeResetRegularWarAfkTick(state, in action);
 
-        if (IsFormationSkillZoneLocked(action.SkillNumber))
+        if (IsFormationSkillZoneLocked(action.SkillNumber, isResumeAction))
             return;
 
         var motion = default(CharacterMotionEvaluation);

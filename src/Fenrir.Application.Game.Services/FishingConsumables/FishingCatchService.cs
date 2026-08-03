@@ -23,7 +23,7 @@ public sealed class FishingCatchService(
         var castAt = DateTime.UtcNow;
         var step = state.FishingStep;
 
-        if (step == 4)
+        if (step == 4 && state.FishingBiteWasHit)
         {
             var itemId = FishingRewardResolver.RollRewardItem(SystemRandomSource.Instance);
             var freeSlot = InventoryFreeSlotFinder.Find(state.Inventory, worldData, itemId, state.InventoryDate,
@@ -39,7 +39,7 @@ public sealed class FishingCatchService(
                     { Result = 2, ItemIndex = itemId, Page = -1, Index = -1, XY = -1 });
 
                 if (!await zone.PostFishingCommandAndWaitAsync(
-                        new FishingZoneCommand(characterId, 0, 0, state.CatchingFish, false, null, castAt),
+                        new FishingZoneCommand(characterId, 0, 0, false, false, null, castAt),
                         cancellationToken))
                     logger.LogError(
                         "Zone {MapId} fishing inbox full: dropped catch-abort mirror for character {CharacterId}",
@@ -65,7 +65,7 @@ public sealed class FishingCatchService(
                     { Result = 2, ItemIndex = itemId, Page = -1, Index = -1, XY = -1 });
 
                 if (!await zone.PostFishingCommandAndWaitAsync(
-                        new FishingZoneCommand(characterId, 0, 0, state.CatchingFish, false, null, castAt),
+                        new FishingZoneCommand(characterId, 0, 0, false, false, null, castAt),
                         cancellationToken))
                     logger.LogError(
                         "Zone {MapId} fishing inbox full: dropped catch-abort mirror for character {CharacterId}",
@@ -99,8 +99,11 @@ public sealed class FishingCatchService(
         });
 
         int? actionSort = step switch { 4 => 94, 5 => 95, _ => null };
+
+        // Stricter than legacy (S04_MyWork02.cpp:13568-13632, which resets neither): the reward opcode consumes the
+        // bite, so the next reward needs a fresh server-rolled bite instead of a replay of this opcode.
         if (!await zone.PostFishingCommandAndWaitAsync(
-                new FishingZoneCommand(characterId, state.FishingState, step, state.CatchingFish, true, actionSort,
+                new FishingZoneCommand(characterId, state.FishingState, 0, false, true, actionSort,
                     castAt), cancellationToken))
             logger.LogError("Zone {MapId} fishing inbox full: dropped catch mirror for character {CharacterId}",
                 zone.MapId, characterId);

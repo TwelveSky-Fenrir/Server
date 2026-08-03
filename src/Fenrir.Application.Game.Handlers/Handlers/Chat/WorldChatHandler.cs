@@ -12,7 +12,9 @@ public sealed class WorldChatHandler(IWorldChatService worldChatService) : IInli
     {
         var zoneSession = (IZoneSession)session;
 
-        if (ChatRouter.IsContentEmpty(packet.Content))
+        var content = ChatRouter.SafeContent(packet.Content);
+
+        if (ChatRouter.IsContentEmpty(content))
         {
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
@@ -25,8 +27,6 @@ public sealed class WorldChatHandler(IWorldChatService worldChatService) : IInli
         if (!zone.TryGetPlayer(characterId, out var sender) || sender is null)
             return;
 
-        var outcome = worldChatService.TrySendChat(sender, packet.Content);
-        if (outcome == WorldChatOutcome.LevelTooLow)
-            return;
+        worldChatService.TrySendChat(sender, content);
     }
 }

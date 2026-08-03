@@ -18,6 +18,7 @@ public abstract class ClientSession(
     private const int SlowConsumerBackpressureStreakLimit = 5;
     private const int LoginMaxPendingSendBytes = 40_960;
     private const int ZoneMaxPendingSendBytes = 1_024_000;
+    private const int SendLockDrainTimeoutMs = 5_000;
 
     private readonly int _maxPendingSendBytes = server switch
     {
@@ -184,7 +185,26 @@ public abstract class ClientSession(
     {
         while (true)
         {
-            var flush = Transport.Output.FlushAsync();
+            ValueTask<FlushResult> flush;
+
+            // FlushAsync throws synchronously once the TX reader completed with an exception (peer reset).
+            try
+            {
+                flush = Transport.Output.FlushAsync();
+            }
+            catch
+            {
+                try
+                {
+                    Abort(Core.Abstractions.DisconnectReason.Faulted);
+                }
+                finally
+                {
+                    _sendLock.Release();
+                }
+
+                throw;
+            }
 
             if (!flush.IsCompletedSuccessfully)
             {
@@ -275,9 +295,29 @@ public abstract class ClientSession(
 
     public async ValueTask CompleteAsync()
     {
+        Volatile.Write(ref _completed, 1);
+
+        // Cancel before waiting. A holder parked in ObserveFlushAsync keeps _sendLock across the await, and against
+        // a peer that stopped reading that flush cannot resolve on its own -- without this the drain timeout below
+        // becomes the normal path rather than a backstop.
+        Transport.Input.CancelPendingRead();
+        Transport.Output.CancelPendingFlush();
+
         await Transport.Input.CompleteAsync().ConfigureAwait(false);
 
-        await _sendLock.WaitAsync().ConfigureAwait(false);
+        var acquired = await _sendLock.WaitAsync(SendLockDrainTimeoutMs).ConfigureAwait(false);
+
+        if (!acquired)
+        {
+            // Completing the writer here would race a live GetSpan/Advance and hand its pooled segment back to the
+            // shared MemoryPool while another thread still writes into it. SocketConnection.DisposeAsync completes
+            // it after the socket is gone, so leaving it is safe; a leaked permit is not worth memory corruption.
+            logger?.LogWarning(
+                "Session {SessionId} ({Server}, {RemoteEndPoint}): send lock still held after {TimeoutMs} ms -- leaving the transport output for the connection teardown to complete",
+                SessionId, Server, RemoteEndPoint, SendLockDrainTimeoutMs);
+            return;
+        }
+
         try
         {
             await Transport.Output.CompleteAsync().ConfigureAwait(false);

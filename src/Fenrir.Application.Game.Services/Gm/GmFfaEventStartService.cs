@@ -20,7 +20,7 @@ public sealed class GmFfaEventStartService(
 
     private const int IdlePhase = 0;
 
-    private static readonly TimeSpan DefaultCountdown = TimeSpan.FromMinutes(10);
+    private const int MaxBattleDurationMinutes = 1440;
 
     public async ValueTask HandleAsync(GmFfaEventStartPayload packet, byte[] data, IZoneSession zoneSession,
         CancellationToken cancellationToken)
@@ -37,8 +37,10 @@ public sealed class GmFfaEventStartService(
         var accepted = siegeState.Zone335 == IdlePhase;
         if (accepted)
         {
-            var countdown = packet.Time > 0 ? TimeSpan.FromMinutes(packet.Time) : DefaultCountdown;
-            startTrigger.Request(SimulationClock.ToWholeLegacyTicks(countdown));
+            var requestedMinutes = Math.Clamp(packet.Time, 0, MaxBattleDurationMinutes);
+            startTrigger.Request(requestedMinutes > 0
+                ? requestedMinutes * 60 * SimulationClock.OneSecondGateLegacyTicks
+                : Zone335FfaEventCycleSystem.DefaultBattleDurationLegacyTicks);
         }
 
         await eventLog.LogAsync(GmActionEventCodes.FfaEventStart, EventLogCategory.GmAction, zoneSession.AccountId,

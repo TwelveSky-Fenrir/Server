@@ -19,12 +19,12 @@ public sealed class TribeVoteElectionCalendarHost(
     public bool IsArmed { get; } =
         zoneRegistry.TryGet(options.Value.VoteTribeMapId, out _) && options.Value.VoteTribeEnabled;
 
-    public async ValueTask TickAsync(DateTime utcNow, CancellationToken ct)
+    public async ValueTask TickAsync(DateTime localNow, CancellationToken ct)
     {
         if (!IsArmed)
             return;
 
-        var transition = TribeVoteElectionCalendar.Evaluate(election.Phase, utcNow.Day, utcNow.Hour, _testMode);
+        var transition = TribeVoteElectionCalendar.Evaluate(election.Phase, localNow.Day, localNow.Hour, _testMode);
 
         switch (transition)
         {
@@ -66,7 +66,7 @@ public sealed class TribeVoteElectionCalendarHost(
             while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
                 try
                 {
-                    await TickAsync(DateTime.UtcNow, stoppingToken).ConfigureAwait(false);
+                    await TickAsync(DateTime.Now, stoppingToken).ConfigureAwait(false);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {

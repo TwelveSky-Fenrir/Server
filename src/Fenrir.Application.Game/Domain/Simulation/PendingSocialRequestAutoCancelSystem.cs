@@ -79,7 +79,7 @@ public sealed class PendingSocialRequestAutoCancelSystem(
         if (isInviter)
             partyRegistry.TryCancel(characterId, out _);
         else
-            partyRegistry.TryAnswer(characterId, false, false, out _, out _, out _);
+            partyRegistry.TryAnswer(characterId, "", "", false, false, out _, out _, out _);
     }
 
     private void SweepGuildInvite(int characterId)

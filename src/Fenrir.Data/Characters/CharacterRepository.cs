@@ -248,7 +248,8 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
     }
 
     public async ValueTask PersistProgressAsync(IReadOnlyList<CharacterProgressTvp> rows,
-        IReadOnlyList<CharacterCostumeSlotTvp> costumes, CancellationToken ct)
+        IReadOnlyList<CharacterCostumeSlotTvp> costumes, IReadOnlyList<CharacterMountSlotTvp> mounts,
+        CancellationToken ct)
     {
         if (rows.Count == 0)
             return;
@@ -258,6 +259,9 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
 
         if (costumes.Count > 0)
             builder.AddTvpParameter("Costumes", costumes);
+
+        if (mounts.Count > 0)
+            builder.AddTvpParameter("Mounts", mounts);
 
         await Db.ExecuteAsync(builder.Build(), ct);
     }

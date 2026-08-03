@@ -1,5 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Chat;
 using Fenrir.Application.Game.Abstractions.Sessions;
+using Fenrir.Application.Game.Domain.Social.Chat;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -18,7 +19,9 @@ public sealed class GuildAnnouncementHandler(
             "Session {SessionId}: CZ_GUILD_NOTICE_SEND received (character {CharacterId}, content length {ContentLength})",
             session.SessionId, zoneSession.CharacterId, packet.Content.Length);
 
-        if (string.IsNullOrEmpty(packet.Content))
+        var content = ChatRouter.SafeContent(packet.Content);
+
+        if (ChatRouter.IsContentEmpty(content))
         {
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
@@ -31,6 +34,6 @@ public sealed class GuildAnnouncementHandler(
         if (!zone.TryGetPlayer(characterId, out var sender) || sender is null)
             return;
 
-        guildAnnouncementService.TrySendAnnouncement(sender, packet.Content);
+        guildAnnouncementService.TrySendAnnouncement(sender, content);
     }
 }

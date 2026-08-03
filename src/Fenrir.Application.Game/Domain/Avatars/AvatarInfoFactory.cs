@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Costumes;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Mounts;
@@ -28,13 +29,23 @@ public static class AvatarInfoFactory
     private const int HotkeyKeysPerPage = 14;
     private const int HotkeyWireIntsPerSlot = 3;
 
+    private const int MountSlotCount = MountPersistenceCodec.SlotCount;
+
     public static AvatarInfo CreateForCharacter(CharacterWorldSnapshotDto character,
         IReadOnlyList<CharacterItemSlotDto> items, AvatarSocialSnapshot? social = null,
         IReadOnlyList<CharacterSkillDto>? skills = null, IReadOnlyList<CharacterHotkeyDto>? hotkeys = null,
-        IReadOnlyList<CharacterCostumeSlotDto>? costumes = null)
+        IReadOnlyList<CharacterCostumeSlotDto>? costumes = null,
+        IReadOnlyList<CharacterMountSlotDto>? mounts = null)
     {
         var s = social ?? AvatarSocialSnapshot.Empty;
         var (wardrobe, costumeDate, costumeExpireDate) = CostumePersistenceCodec.Hydrate(costumes ?? []);
+
+        // game.Characters carries the fresher copy of garage slot 0; game.CharacterMounts carries slots 1-9.
+        var garage = MountPersistenceCodec
+            .Hydrate(mounts ?? [])
+            .SetItem(MountPersistenceCodec.PersistedGarageSlot,
+                (character.MountItemId, character.MountExpActivity, character.MountPower));
+        var (animal, animalExpActivity, animalPower) = BuildMountSlotArrays(garage);
 
         return AvatarInfoTemplates.Zeroed with
         {
@@ -93,11 +104,11 @@ public static class AvatarInfoFactory
             DoubleKillNumTime2 = character.DoubleKillNumTime2,
             AutoBuffTime = character.AutoBuffTime,
             Premium = character.PremiumExpireUtc,
-            Animal = BuildSingleMountSlotArray(character.MountItemId, character.MountSlotIndex),
+            Animal = animal,
             AnimalIndex = MountCatalog.ResolveDisplayedSlotMarker(character.MountItemId, character.MountSlotIndex),
             AnimalTime = character.MountTime,
-            AnimalPower = BuildSingleMountSlotArray(character.MountPower, character.MountSlotIndex),
-            AnimalExpActivity = BuildSingleMountSlotArray(character.MountExpActivity, character.MountSlotIndex),
+            AnimalPower = animalPower,
+            AnimalExpActivity = animalExpActivity,
             Equip = BuildEquipArrayFromRows(items, character.PetGrowth, character.PetActivity),
             Inventory = BuildInventoryArrayFromRows(items),
             StoreItem = BuildStoreItemArrayFromRows(items),
@@ -129,8 +140,15 @@ public static class AvatarInfoFactory
     public static AvatarInfo CreateForRuntimeState(PlayerRuntimeState state, short mapId, float posX, float posY,
         float posZ)
     {
+        var (animal, animalExpActivity, animalPower) = BuildMountSlotArrays(state);
+
         return AvatarInfoTemplates.Zeroed with
         {
+            Animal = animal,
+            AnimalExpActivity = animalExpActivity,
+            AnimalPower = animalPower,
+            AnimalIndex = state.AnimalIndex,
+            AnimalTime = state.AnimalTime,
             Costume = [.. state.CostumeWardrobe],
             CostumeDate = [.. state.CostumeDate],
             CostumeExpireDate = [.. state.CostumeExpireDate],
@@ -194,14 +212,38 @@ public static class AvatarInfoFactory
         };
     }
 
-    private static int[] BuildSingleMountSlotArray(int value, int slotIndex)
+    private static (int[] ItemIds, int[] ExpActivities, int[] Powers) BuildMountSlotArrays(
+        ImmutableArray<(int ItemId, int ExpActivity, int Power)> garage)
     {
-        var slots = new int[10];
+        var itemIds = new int[MountSlotCount];
+        var expActivities = new int[MountSlotCount];
+        var powers = new int[MountSlotCount];
 
-        if (slotIndex is >= 0 and < 10)
-            slots[slotIndex] = value;
+        for (var slot = 0; slot < MountSlotCount && slot < garage.Length; slot++)
+        {
+            itemIds[slot] = garage[slot].ItemId;
+            expActivities[slot] = garage[slot].ExpActivity;
+            powers[slot] = garage[slot].Power;
+        }
 
-        return slots;
+        return (itemIds, expActivities, powers);
+    }
+
+    private static (int[] ItemIds, int[] ExpActivities, int[] Powers) BuildMountSlotArrays(PlayerRuntimeState state)
+    {
+        var itemIds = new int[MountSlotCount];
+        var expActivities = new int[MountSlotCount];
+        var powers = new int[MountSlotCount];
+
+        for (var slot = 0; slot < MountSlotCount; slot++)
+        {
+            itemIds[slot] = state.MountGarage[slot];
+            expActivities[slot] =
+                MountActivityExpCodec.Pack(state.MountActivity[slot], state.MountAccumulatedExp[slot]);
+            powers[slot] = MountPowerCodec.EncodeSlot(state.MountRolledAttributes, slot);
+        }
+
+        return (itemIds, expActivities, powers);
     }
 
     private static int[] BuildEquipArrayFromRows(IReadOnlyList<CharacterItemSlotDto> items, int petGrowth,

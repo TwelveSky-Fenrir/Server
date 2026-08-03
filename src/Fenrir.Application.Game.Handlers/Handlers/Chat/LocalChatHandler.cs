@@ -13,7 +13,9 @@ public sealed class LocalChatHandler(ILocalChatService localChatService) : IAsyn
     {
         var zoneSession = (IZoneSession)session;
 
-        if (ChatRouter.IsContentEmpty(packet.Content))
+        var content = ChatRouter.SafeContent(packet.Content);
+
+        if (ChatRouter.IsContentEmpty(content))
         {
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
@@ -26,7 +28,7 @@ public sealed class LocalChatHandler(ILocalChatService localChatService) : IAsyn
         if (!zone.TryGetPlayer(characterId, out var state) || state is null)
             return;
 
-        await localChatService.TryPostChatAsync(zone, zoneSession, state, packet.Content, packet.Link,
+        await localChatService.TryPostChatAsync(zone, zoneSession, state, content, packet.Link,
             cancellationToken);
     }
 }

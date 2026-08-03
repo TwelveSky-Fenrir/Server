@@ -279,6 +279,14 @@ public sealed class GenericActionService(
             return GenericActionResult.Failed;
         }
 
+        if (TouchesLiveTradeReservation(characterId, fromContainer, move.Index1, toContainer, move.Index2))
+        {
+            logger.LogInformation(
+                "Character {CharacterId} container-move rejected: sort {Sort} touches an inventory slot ({FromContainer}:{Index1} or {ToContainer}:{Index2}) reserved by a live trade offer",
+                characterId, sort, fromContainer, move.Index1, toContainer, move.Index2);
+            return GenericActionResult.Failed;
+        }
+
         if (isInventoryToEquip && state.ActionSort != IdleActionSort)
         {
             logger.LogInformation(
@@ -1538,13 +1546,26 @@ public sealed class GenericActionService(
             return false;
 
         var liveStack = state.Inventory.GetSlot(originContainer, originSlot);
-        var stagedElsewhere = side.GetOriginStagedQuantity(originContainer, originSlot, move.Index2);
-        var effectiveSource = ReduceByAlreadyStaged(liveStack, stagedElsewhere);
 
-        var itemDefinition = effectiveSource is { } es &&
-                             worldData.ItemsById.TryGetValue(es.ItemId, out var def)
+        var itemDefinition = liveStack is { } ls && worldData.ItemsById.TryGetValue(ls.ItemId, out var def)
             ? def
             : null;
+
+        var isStackable = itemDefinition is not null && ContainerMatrix.IsStackableSort(itemDefinition.Item.Sort);
+
+        ItemStack? effectiveSource;
+        if (isStackable)
+        {
+            var stagedElsewhere = side.GetOriginStagedQuantity(originContainer, originSlot, move.Index2);
+            effectiveSource = ReduceByAlreadyStaged(liveStack, stagedElsewhere);
+        }
+        else
+        {
+            if (side.ReservesOrigin(originContainer, originSlot, move.Index2))
+                return false;
+
+            effectiveSource = liveStack;
+        }
 
         var resolved = TradeItemPlacementResolver.ResolveDeposit(effectiveSource, move.Quantity1,
             destinationEntry?.Stack, itemDefinition, false);
@@ -1631,6 +1652,21 @@ public sealed class GenericActionService(
             : null;
 
         return true;
+    }
+
+    private bool TouchesLiveTradeReservation(int characterId, byte fromContainer, int fromSlot, byte toContainer,
+        int toSlot)
+    {
+        if (!trades.TryGetSession(characterId, out var trade) || trade is null)
+            return false;
+
+        var offerSide = trade.SideOf(characterId);
+        return Reserves(offerSide, fromContainer, fromSlot) || Reserves(offerSide, toContainer, toSlot);
+
+        static bool Reserves(TradeOfferSide side, byte container, int slot)
+        {
+            return ContainerMatrix.IsValidSlot(container, slot) && side.ReservesOrigin(container, (byte)slot);
+        }
     }
 
     private static ItemStack? ReduceByAlreadyStaged(ItemStack? liveStack, long alreadyStagedQuantity)

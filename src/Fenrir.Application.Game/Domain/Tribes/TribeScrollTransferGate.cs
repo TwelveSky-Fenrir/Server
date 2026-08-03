@@ -15,6 +15,8 @@ public static class TribeScrollTransferGate
         if (ctx.Level < MinLevel)
             return TribeScrollTransferOutcome.LevelTooLow;
 
+        if (!ctx.DestinationTribeOpen)
+            return TribeScrollTransferOutcome.DestinationTribeClosed;
 
         if (!ctx.HomeZoneOnline)
             return TribeScrollTransferOutcome.HomeZoneOffline;
@@ -72,4 +74,5 @@ public readonly record struct TribeScrollTransferEligibilityContext(
     bool InParty,
     bool CapeEquipped,
     short MapId,
+    bool DestinationTribeOpen,
     bool HomeZoneOnline);

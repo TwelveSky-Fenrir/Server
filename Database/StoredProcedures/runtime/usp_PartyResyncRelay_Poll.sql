@@ -24,7 +24,17 @@ BEGIN
            SourceShardId,
            SourceCharacterId,
            PartyName,
-           AvatarName
+           AvatarName,
+           MemberId1,
+           MemberName1,
+           MemberId2,
+           MemberName2,
+           MemberId3,
+           MemberName3,
+           MemberId4,
+           MemberName4,
+           MemberId5,
+           MemberName5
     FROM runtime.PartyResyncRelay WITH (SNAPSHOT)
     WHERE RelayId > @LastRelayId
       AND SourceShardId <> @ShardId

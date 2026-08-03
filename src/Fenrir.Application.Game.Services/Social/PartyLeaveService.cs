@@ -16,7 +16,7 @@ public sealed class PartyLeaveService(PartyRegistry parties, ILogger<PartyLeaveS
             return new PartyLeaveResult(false);
         }
 
-        var remaining = disbanded ? [] : parties.GetMembers(membersBeforeLeave[0]);
+        var remaining = disbanded ? [] : parties.GetRoster(membersBeforeLeave[0].CharacterId);
 
         if (disbanded)
             logger.LogInformation(

@@ -83,15 +83,11 @@ public sealed class ValleyWarSchedule
 
     private readonly int[] _killRaceQuota = new int[TribeCount];
 
-    private int _bossWindowEvenTickCounter;
-    private int _bossWindowTickCounter;
     private int _bossWindowTicksArmed;
     private int _bossWindowTicksRemaining;
     private int _doorPendingTicksElapsed;
     private int _gateCountdownRemaining;
     private int _idleTicksElapsed;
-    private int _killRaceEvenTickCounter;
-    private int _killRaceTickCounter;
     private int _killRaceTicksRemaining;
     private int _minuteTicksElapsed;
     private int _postWinTicksElapsed;
@@ -273,8 +269,6 @@ public sealed class ValleyWarSchedule
 
         _killRaceTicksRemaining = KillRaceDurationTicks;
         _bossWindowTicksArmed = BossWindowDurationTicks;
-        _killRaceTickCounter = 0;
-        _killRaceEvenTickCounter = 0;
         Phase = ValleyWarPhase.KillRace;
     }
 
@@ -291,18 +285,23 @@ public sealed class ValleyWarSchedule
             return;
         }
 
-        if (_killRaceTicksRemaining > 0)
-            _killRaceTicksRemaining--;
+        _killRaceTicksRemaining--;
+        if (_killRaceTicksRemaining % 2 != 0)
+            return;
 
-        _killRaceTickCounter++;
-        if (_killRaceTickCounter % 2 == 0)
+        killRaceQuotas = ImmutableArray.Create(_killRaceQuota[0], _killRaceQuota[1], _killRaceQuota[2],
+            _killRaceQuota[3]);
+
+        if (_killRaceTicksRemaining % 10 == 0)
+            killRaceCountdownValue = _killRaceTicksRemaining / LegacyTicksPerRealSecond;
+
+        if (_killRaceTicksRemaining <= 0)
         {
-            killRaceQuotas = ImmutableArray.Create(_killRaceQuota[0], _killRaceQuota[1], _killRaceQuota[2],
-                _killRaceQuota[3]);
-
-            _killRaceEvenTickCounter++;
-            if (_killRaceEvenTickCounter % 5 == 0)
-                killRaceCountdownValue = _killRaceTicksRemaining;
+            killRaceEndedEmptyOrTimeout = true;
+            monstersShouldDespawn = true;
+            WinningTribe = null;
+            EnterPreReset();
+            return;
         }
 
         for (byte t = 0; t < TribeCount; t++)
@@ -315,14 +314,6 @@ public sealed class ValleyWarSchedule
                 Phase = ValleyWarPhase.ScrollPending;
                 return;
             }
-
-        if (_killRaceTicksRemaining <= 0)
-        {
-            killRaceEndedEmptyOrTimeout = true;
-            monstersShouldDespawn = true;
-            WinningTribe = null;
-            EnterPreReset();
-        }
     }
 
     private void TickScrollPending(ref bool battleScrollDeleted)
@@ -333,38 +324,32 @@ public sealed class ValleyWarSchedule
 
         battleScrollDeleted = true;
         _bossWindowTicksRemaining = _bossWindowTicksArmed;
-        _bossWindowTickCounter = 0;
-        _bossWindowEvenTickCounter = 0;
         Phase = ValleyWarPhase.BossWindow;
     }
 
     private void TickBossWindow(ValleyWarEnvironmentSnapshot snapshot, ref int? bossWindowCountdownValue,
         ref bool bossWindowTimeout, ref bool bossWin)
     {
-        if (_bossWindowTicksRemaining > 0)
-            _bossWindowTicksRemaining--;
-
-        _bossWindowTickCounter++;
-        if (_bossWindowTickCounter % 2 == 0)
-        {
-            _bossWindowEvenTickCounter++;
-            if (_bossWindowEvenTickCounter % 5 == 0)
-                bossWindowCountdownValue = _bossWindowTicksRemaining;
-        }
-
-        if (!snapshot.BossSlotOccupied)
-        {
-            bossWin = true;
-            _postWinTicksElapsed = 0;
-            Phase = ValleyWarPhase.PostWinCooldown;
+        _bossWindowTicksRemaining--;
+        if (_bossWindowTicksRemaining % 2 != 0)
             return;
-        }
+
+        if (_bossWindowTicksRemaining % 10 == 0)
+            bossWindowCountdownValue = _bossWindowTicksRemaining / LegacyTicksPerRealSecond;
 
         if (_bossWindowTicksRemaining <= 0)
         {
             bossWindowTimeout = true;
             EnterPreReset();
+            return;
         }
+
+        if (snapshot.BossSlotOccupied)
+            return;
+
+        bossWin = true;
+        _postWinTicksElapsed = 0;
+        Phase = ValleyWarPhase.PostWinCooldown;
     }
 
     private void TickPostWinCooldown(ref bool postWinReturnToTown, ref bool monstersShouldDespawn)
@@ -393,13 +378,9 @@ public sealed class ValleyWarSchedule
         _doorPendingTicksElapsed = 0;
         Array.Clear(_killRaceQuota);
         _killRaceTicksRemaining = 0;
-        _killRaceTickCounter = 0;
-        _killRaceEvenTickCounter = 0;
         _scrollPendingTicksElapsed = 0;
         _bossWindowTicksArmed = 0;
         _bossWindowTicksRemaining = 0;
-        _bossWindowTickCounter = 0;
-        _bossWindowEvenTickCounter = 0;
         _postWinTicksElapsed = 0;
         WinningTribe = null;
     }

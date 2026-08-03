@@ -26,22 +26,38 @@ BEGIN
         BigMoney     = BigMoney + @DeltaBigMoneyA,
         UpdatedAtUtc = SYSUTCDATETIME()
     WHERE CharacterId = @CharacterA
-      AND Money + @DeltaMoneyA >= 0
-      AND BigMoney + @DeltaBigMoneyA >= 0;
+      AND Money + @DeltaMoneyA BETWEEN 0 AND 2000000000
+      AND BigMoney + @DeltaBigMoneyA BETWEEN 0 AND 999;
 
     IF @@ROWCOUNT = 0
-        THROW 50268, N'Character A: unknown character or insufficient money balance for this trade.', 1;
+        BEGIN
+            IF EXISTS (SELECT 1
+                       FROM game.Characters
+                       WHERE CharacterId = @CharacterA
+                         AND (Money + @DeltaMoneyA > 2000000000 OR BigMoney + @DeltaBigMoneyA > 999))
+                THROW 50362, N'Character A: this trade would exceed the legacy money cap (MAX_NUMBER_SIZE = 2,000,000,000) or BigMoney cap (MAX_NUMBER_SIZE2 = 999).', 1;
+
+            THROW 50268, N'Character A: unknown character or insufficient money balance for this trade.', 1;
+        END;
 
     UPDATE game.Characters
     SET Money        = Money + @DeltaMoneyB,
         BigMoney     = BigMoney + @DeltaBigMoneyB,
         UpdatedAtUtc = SYSUTCDATETIME()
     WHERE CharacterId = @CharacterB
-      AND Money + @DeltaMoneyB >= 0
-      AND BigMoney + @DeltaBigMoneyB >= 0;
+      AND Money + @DeltaMoneyB BETWEEN 0 AND 2000000000
+      AND BigMoney + @DeltaBigMoneyB BETWEEN 0 AND 999;
 
     IF @@ROWCOUNT = 0
-        THROW 50269, N'Character B: unknown character or insufficient money balance for this trade.', 1;
+        BEGIN
+            IF EXISTS (SELECT 1
+                       FROM game.Characters
+                       WHERE CharacterId = @CharacterB
+                         AND (Money + @DeltaMoneyB > 2000000000 OR BigMoney + @DeltaBigMoneyB > 999))
+                THROW 50363, N'Character B: this trade would exceed the legacy money cap (MAX_NUMBER_SIZE = 2,000,000,000) or BigMoney cap (MAX_NUMBER_SIZE2 = 999).', 1;
+
+            THROW 50269, N'Character B: unknown character or insufficient money balance for this trade.', 1;
+        END;
 
     DELETE FROM game.CharacterItems WHERE CharacterId = @CharacterA AND Container = 0;
     INSERT INTO game.CharacterItems (CharacterId, Container, Slot, ItemId, Quantity, Enchant, Combine,

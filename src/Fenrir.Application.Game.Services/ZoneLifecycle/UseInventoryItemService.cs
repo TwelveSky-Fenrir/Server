@@ -39,6 +39,7 @@ public sealed class UseInventoryItemService(
     ILogger<UseInventoryItemService> logger,
     ITowerUpgradeService towerUpgrade,
     IWorldNoticeService worldNotice,
+    ZoneRegistry zones,
     UseItemHandlerRegistry? useItemRegistry = null) : IUseInventoryItemService
 {
     private const byte BottleSort = 26;
@@ -613,9 +614,10 @@ public sealed class UseInventoryItemService(
         if (guild is null)
             return Fail(characterId, item, page, index);
 
+        GuildBuffTopUp.Result topUp;
         try
         {
-            var topUp = GuildBuffTopUp.Apply(guild, minutes, DateTimeOffset.UtcNow);
+            topUp = GuildBuffTopUp.Apply(guild, minutes, DateTimeOffset.UtcNow);
             await guilds.SetBuffAsync(guildId, topUp.BuffType, topUp.BuffState, topUp.BuffTime,
                 topUp.BuffTimeForDiff, cancellationToken);
         }
@@ -625,6 +627,10 @@ public sealed class UseInventoryItemService(
                 "Character {CharacterId} guild scroll recharge failed for guild {GuildId}", characterId, guildId);
             return Fail(characterId, item, page, index);
         }
+
+        var activation = new GuildBuffActivationZoneCommand(guildId, topUp.BuffType, topUp.BuffState != 0);
+        foreach (var memberZone in zones.Zones)
+            memberZone.PostGuildBuffActivationCommand(in activation);
 
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }

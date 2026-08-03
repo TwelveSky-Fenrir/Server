@@ -101,14 +101,21 @@ public sealed class AutoHuntTickSystem(
             var requestedGrade = config.BuffStore[i * 2 + 1];
             var grade = Math.Min(requestedGrade, GetMaxLearnedGrade(skillId, state.LearnedSkills));
 
-            worldData.SkillsById.TryGetValue(skillId, out var skillDef);
-            var result = SkillCastResolver.TryCast(skillDef, grade, int.MaxValue, maxLife, weaponSort,
+            if (!worldData.SkillsById.TryGetValue(skillId, out var skillDef))
+                continue;
+
+            var bonusGrade = SkillGradeAuthority.GetBonusSkillValue(skillId, equipSlotItems, 0, skillDef,
+                state.GuildBuffType, state.GuildBuffActive);
+
+            var result = SkillCastResolver.TryCast(skillDef, grade + bonusGrade, int.MaxValue, maxLife, weaponSort,
                 state.SupportSkillTimeUpRatio, manaReductionRatioPercent);
 
             if (!result.Success || result.Kind != SkillEffectKind.SelfBuff)
                 continue;
 
-            if (state.Mana < result.ManaCost && isZone126)
+            var manaCost = ResolveManaCost(skillDef, grade, manaReductionRatioPercent);
+
+            if (state.Mana < manaCost && isZone126)
             {
                 EscalateNoMana(state);
                 return;
@@ -116,15 +123,43 @@ public sealed class AutoHuntTickSystem(
 
             state.NoManaCount = 0;
 
-            if (result.ManaCost > 0)
+            if (manaCost > 0)
             {
-                state.Mana -= result.ManaCost;
+                state.Mana -= manaCost;
                 state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
                 zone.ApplyBuffWrites(state, result.BuffWrites);
+
+                var (actionType, actionSort) = ResolveBuffCastMotion(skillId, weaponSort);
+                if (actionSort != 0)
+                    zone.BroadcastAutoHuntBuffCast(state, actionType, actionSort, skillId, grade, bonusGrade);
             }
 
             return;
         }
+    }
+
+    private static int ResolveManaCost(SkillDefinition skill, int gradePoints, int manaReductionRatioPercent)
+    {
+        var rawCost = (int)SkillCatalog.ReturnSkillValue(skill, gradePoints, SkillValueKind.ManaUse);
+        return manaReductionRatioPercent > 0
+            ? rawCost - rawCost * manaReductionRatioPercent / 100
+            : rawCost;
+    }
+
+    private static (int Type, int Sort) ResolveBuffCastMotion(int skillId, int? weaponSort)
+    {
+        return skillId switch
+        {
+            7 or 26 or 45 => (0, 41),
+            11 or 34 or 49 => weaponSort == 17 ? (5, 61) : (3, 60),
+            15 or 30 or 53 => weaponSort == 16 ? (3, 60) : (5, 61),
+            19 or 38 or 57 => (7, 62),
+            82 => (0, 66),
+            83 => (0, 67),
+            84 => (0, 68),
+            103 or 104 or 105 => (0, 75),
+            _ => (0, 0)
+        };
     }
 
     private void TryResupplyHotkeys(PlayerRuntimeState state, AutoHunt config)
@@ -309,7 +344,8 @@ public sealed class AutoHuntTickSystem(
                     { Sort = AutoHuntMinuteStatSort, Value = result.MinuteBudget, Value2 = 0 });
                 break;
             case AutoHuntBudgetPolicy.Signal.Exhausted:
-                state.Session.Send(new ReturnToHomeZoneResponse());
+                if (state.OneSecondGateOpenCount > 0)
+                    state.Session.Send(new ReturnToHomeZoneResponse());
                 break;
         }
     }

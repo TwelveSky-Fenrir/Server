@@ -21,7 +21,11 @@ public sealed record HolyStoneWarSite(
     float StoneX,
     float StoneZ,
     float CaptureRadius,
-    float ParticipationRadius);
+    float ParticipationRadius,
+    float StoneY = HolyStoneWarSite.LegacyStoneY)
+{
+    public const float LegacyStoneY = 200f;
+}
 
 public sealed class HolyStoneWarCycle(
     WorldStateService worldState,
@@ -95,6 +99,7 @@ public sealed class HolyStoneWarCycle(
             {
                 var remaining = OpeningCountdownMinutes + 1 - minute;
                 logger.LogInformation("HolyStoneWar: opens in {MinutesRemaining} minute(s)", remaining);
+                broadcaster.AnnounceHolyStoneOpeningCountdown(remaining);
                 continue;
             }
 
@@ -102,6 +107,7 @@ public sealed class HolyStoneWarCycle(
                 continue;
 
             logger.LogInformation("HolyStoneWar: war zone now open -- contest phase begins");
+            broadcaster.AnnounceHolyStoneWarZoneOpen();
             Phase = HolyStoneWarPhase.Contest;
             return;
         }
@@ -118,11 +124,13 @@ public sealed class HolyStoneWarCycle(
 
         foreach (var player in zone.Players)
         {
+            if (player.IsMovingZone || player.VisibleState == 0)
+                continue;
             if (player.IsDead)
                 continue;
             if (HolyStoneTribeMatch.Matches(player.Tribe, holderTribe, allyOfHolder))
                 continue;
-            if (DistanceSquared(player.PosX, player.PosZ, site.StoneX, site.StoneZ) > captureRadiusSq)
+            if (DistanceSquared(player, site) > captureRadiusSq)
                 continue;
 
             PendingCandidateCharacterId = player.CharacterId;
@@ -131,6 +139,7 @@ public sealed class HolyStoneWarCycle(
             logger.LogInformation(
                 "HolyStoneWar: challenger {CharacterId} (tribe {Tribe}) approaches -- {Minutes}-minute countdown begins",
                 player.CharacterId, player.Tribe, ChallengeCountdownMinutes);
+            broadcaster.AnnounceHolyStoneChallengerApproaching(player.Tribe, player.Name);
             return;
         }
     }
@@ -147,7 +156,8 @@ public sealed class HolyStoneWarCycle(
         var captureRadiusSq = site.CaptureRadius * site.CaptureRadius;
 
         if (!zone.TryGetPlayer(candidateId, out var candidate) || candidate is null || candidate.IsDead ||
-            DistanceSquared(candidate.PosX, candidate.PosZ, site.StoneX, site.StoneZ) > captureRadiusSq)
+            candidate.IsMovingZone || candidate.VisibleState == 0 ||
+            DistanceSquared(candidate, site) > captureRadiusSq)
         {
             CancelChallenge();
             return;
@@ -155,17 +165,26 @@ public sealed class HolyStoneWarCycle(
 
         var wholeMinutes = _minuteCountdown.Advance(elapsed);
         for (var i = 0; i < wholeMinutes; i++)
-            if (_minuteCountdown.MinutesElapsed >= ChallengeCountdownMinutes)
+        {
+            var minute = _minuteCountdown.MinutesElapsed;
+
+            if (minute is >= 1 and <= ChallengeCountdownMinutes)
+                broadcaster.AnnounceHolyStoneChallengeCountdown(ChallengeCountdownMinutes + 1 - minute);
+
+            if (minute >= ChallengeCountdownMinutes)
             {
                 ResolveCapture(zone, candidate);
                 return;
             }
+        }
     }
 
     private void CancelChallenge()
     {
         logger.LogInformation("HolyStoneWar: challenger {CharacterId} left/failed -- resuming scan",
             PendingCandidateCharacterId);
+
+        broadcaster.AnnounceHolyStoneChallengeCancelled();
 
         PendingCandidateCharacterId = null;
         Phase = HolyStoneWarPhase.Contest;
@@ -185,7 +204,7 @@ public sealed class HolyStoneWarCycle(
         logger.LogInformation(
             "HolyStoneWar: new holder tribe {WinningTribe}, captured by {CharacterName} ({CharacterId})",
             capturer.Tribe, capturer.Name, capturer.CharacterId);
-        broadcaster.AnnounceZone038Winner(capturer.Tribe);
+        broadcaster.AnnounceZone038Winner(capturer.Tribe, capturer.Name);
 
         var bonus = _random.NextInt32(3) + 1;
         EmitDtmValue(capturer.Tribe, bonus);
@@ -213,11 +232,11 @@ public sealed class HolyStoneWarCycle(
                 continue;
             if (player.Tribe != capturer.Tribe)
                 continue;
+            if (player.IsMovingZone)
+                continue;
             if (player.IsDead)
                 continue;
-            if (player.RebirthCount < 1)
-                continue;
-            if (DistanceSquared(player.PosX, player.PosZ, site.StoneX, site.StoneZ) > participationRadiusSq)
+            if (DistanceSquared(player, site) > participationRadiusSq)
                 continue;
 
             rewardGateway.GrantParticipationReward(player);
@@ -249,10 +268,11 @@ public sealed class HolyStoneWarCycle(
         siegeIngestor.Ingest(ZoneCenterBroadcastIngestor.DtmEventCode, payload);
     }
 
-    private static float DistanceSquared(float x1, float z1, float x2, float z2)
+    private static float DistanceSquared(PlayerRuntimeState player, HolyStoneWarSite site)
     {
-        var dx = x1 - x2;
-        var dz = z1 - z2;
-        return dx * dx + dz * dz;
+        var dx = player.PosX - site.StoneX;
+        var dy = player.PosY - site.StoneY;
+        var dz = player.PosZ - site.StoneZ;
+        return dx * dx + dy * dy + dz * dz;
     }
 }

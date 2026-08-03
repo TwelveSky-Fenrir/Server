@@ -914,9 +914,9 @@ public sealed partial class Zone
         }
 
         logger.LogDebug(
-            "Zone {MapId}: move ACCEPTED for character {CharacterId} -- Sort={Sort} Type={Type} Frame={Frame} " +
-            "To=({ToX},{ToY},{ToZ}) Front={Front}",
-            MapId, characterId, action.Sort, action.Type, action.Frame,
+            "Zone {MapId}: move ACCEPTED for character {CharacterId} -- Resume={Resume} Sort={Sort} Type={Type} " +
+            "Frame={Frame} Claimed=({ToX},{ToY},{ToZ}) Front={Front}",
+            MapId, characterId, isResumeAction, action.Sort, action.Type, action.Frame,
             action.Location[0], action.Location[1], action.Location[2], action.Front);
 
         if (isResumeAction && !EvaluateResumeActionSkillGradeGuard(state, in action))
@@ -943,9 +943,15 @@ public sealed partial class Zone
         var previousActionSkillGradeNum1 = state.ActionSkillGradeNum1;
         var previousActionSkillGradeNum2 = state.ActionSkillGradeNum2;
 
-        state.PosX = action.Location[0];
-        state.PosY = action.Location[1];
-        state.PosZ = action.Location[2];
+        // No AvatarActionResumeWhitelist sort is locomotion, so op16 never legitimately advances the position:
+        // its Location is discarded and the authoritative position stays where op15 last put it.
+        if (!isResumeAction)
+        {
+            state.PosX = action.Location[0];
+            state.PosY = action.Location[1];
+            state.PosZ = action.Location[2];
+        }
+
         state.Heading = action.Front;
         state.LastMoveUtc = now;
         state.FlushSequence++;
@@ -963,9 +969,12 @@ public sealed partial class Zone
             state.AttackSubPacketsUsed = 0;
         }
 
-        var newCell = _grid.CellOf(state.PosX, state.PosZ);
-        _grid.Move(characterId, state.CurrentCell, newCell, state.PosX, state.PosY, state.PosZ);
-        state.CurrentCell = newCell;
+        if (!isResumeAction)
+        {
+            var newCell = _grid.CellOf(state.PosX, state.PosZ);
+            _grid.Move(characterId, state.CurrentCell, newCell, state.PosX, state.PosY, state.PosZ);
+            state.CurrentCell = newCell;
+        }
 
         dirtyTracker.MarkDirty(characterId, DirtyFlags.Position);
 
@@ -975,7 +984,7 @@ public sealed partial class Zone
         if (!isResumeAction)
         {
             _moveNeighborScratch.Clear();
-            _grid.NeighborsExcludingSelf(_moveNeighborScratch, newCell, characterId, state.PosX, state.PosY,
+            _grid.NeighborsExcludingSelf(_moveNeighborScratch, state.CurrentCell, characterId, state.PosX, state.PosY,
                 state.PosZ);
             BroadcastAvatarAction(_moveNeighborScratch, state, action);
         }

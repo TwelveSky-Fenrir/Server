@@ -30,6 +30,16 @@ public sealed record PartyResyncRelayRepository(ICaeriusNetDbContext Db) : IPart
             .AddParameter("PartyName", entry.PartyName, SqlDbType.NVarChar)
             .AddParameter("AvatarName", entry.AvatarName, SqlDbType.NVarChar)
             .AddParameter("CorrelationId", entry.CorrelationId, SqlDbType.UniqueIdentifier)
+            .AddParameter("MemberId1", entry.MemberId1, SqlDbType.Int)
+            .AddParameter("MemberName1", entry.MemberName1, SqlDbType.NVarChar)
+            .AddParameter("MemberId2", entry.MemberId2, SqlDbType.Int)
+            .AddParameter("MemberName2", entry.MemberName2, SqlDbType.NVarChar)
+            .AddParameter("MemberId3", entry.MemberId3, SqlDbType.Int)
+            .AddParameter("MemberName3", entry.MemberName3, SqlDbType.NVarChar)
+            .AddParameter("MemberId4", entry.MemberId4, SqlDbType.Int)
+            .AddParameter("MemberName4", entry.MemberName4, SqlDbType.NVarChar)
+            .AddParameter("MemberId5", entry.MemberId5, SqlDbType.Int)
+            .AddParameter("MemberName5", entry.MemberName5, SqlDbType.NVarChar)
             .Build();
 
         await Db.ExecuteAsync(sp, ct);

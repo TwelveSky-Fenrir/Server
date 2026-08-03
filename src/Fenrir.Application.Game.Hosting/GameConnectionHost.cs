@@ -34,6 +34,10 @@ public sealed class GameConnectionHost(
 {
     private const short LogoutEventCode = 4;
 
+    private const int SocketAdmissionHeadroomFactor = 2;
+
+    private readonly SocketAdmissionGate _admissionGate = new(ResolveMaxConcurrentSockets(options.Value));
+
     private readonly SemaphoreSlim _disconnectSqlGate = new(1, 1);
 
     private readonly ConcurrentDictionary<Task, byte> _inFlightConnections = new();
@@ -62,7 +66,8 @@ public sealed class GameConnectionHost(
                     rateLimiter,
                     ipFloodGuard,
                     logger,
-                    applyOsSocketBuffers: true)));
+                    applyOsSocketBuffers: true,
+                    admissionGate: _admissionGate)));
 
                 logger.LogInformation("GameServer zone listener bound: map {MapId} on port {Port} (shard {ShardId})",
                     mapId, port, opts.ShardId);
@@ -81,9 +86,12 @@ public sealed class GameConnectionHost(
 
         logger.LogInformation(
             "GameServer zone listeners: {ArmedCount} armed / {HostedCount} hosted, on ZoneBasePort {BasePort} + " +
-            "mapId (shard {ShardId}); a client entering map N connects to {BasePort}+N. Maps [{Maps}]",
+            "mapId (shard {ShardId}); a client entering map N connects to {BasePort}+N. Maps [{Maps}]. " +
+            "Socket admission is capped shard-wide at {MaxConcurrentSockets} concurrent socket(s) " +
+            "(Game:Capacity {Capacity} x {HeadroomFactor}), shared by every listener above",
             armedCount, hostedMaps.Length, opts.ZoneBasePort, opts.ShardId, opts.ZoneBasePort,
-            string.Join(", ", hostedMaps));
+            string.Join(", ", hostedMaps), _admissionGate.MaxConcurrentSockets, opts.Capacity,
+            SocketAdmissionHeadroomFactor);
 
         if (failedBinds.Count > 0)
         {
@@ -106,6 +114,12 @@ public sealed class GameConnectionHost(
         catch (OperationCanceledException)
         {
         }
+    }
+
+    private static int ResolveMaxConcurrentSockets(GameServerOptions opts)
+    {
+        var cap = (long)Math.Max(1, opts.Capacity) * SocketAdmissionHeadroomFactor;
+        return (int)Math.Min(cap, int.MaxValue);
     }
 
     private static InvalidOperationException BuildIncompleteBindFailure(byte shardId, int armedCount, int hostedCount,

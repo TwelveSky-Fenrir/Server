@@ -188,6 +188,7 @@ public sealed partial class Zone
         }
         catch (TimeoutException)
         {
+            return false;
         }
 
         return true;
@@ -496,6 +497,7 @@ public sealed partial class Zone
         state.FishingState = command.NewFishingState;
         state.FishingStep = command.NewFishingStep;
         state.CatchingFish = command.CatchingFish;
+        state.FishingBiteWasHit = command.BiteWasHit;
 
         if (command.CastAtUtc is { } castAt)
             state.FishingCastAtUtc = castAt;
@@ -1139,7 +1141,8 @@ public readonly record struct FishingZoneCommand(
     bool Broadcast,
     int? ActionSort,
     DateTime? CastAtUtc = null,
-    TaskCompletionSource? Applied = null);
+    TaskCompletionSource? Applied = null,
+    bool BiteWasHit = false);
 
 public enum MountBroadcastKind : byte
 {

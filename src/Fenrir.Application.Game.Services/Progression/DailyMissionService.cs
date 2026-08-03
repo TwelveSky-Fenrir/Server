@@ -37,11 +37,17 @@ public sealed class DailyMissionService(
 
         var quantity = itemDefinition.Item.Sort == 99 ? 1 : 0;
 
-        if (!TryFindEmptySlot(state, out var container, out var slot))
+        var freeSlot = InventoryFreeSlotFinder.Find(state.Inventory, worldData, itemId, state.InventoryDate,
+            GameDate.Today());
+        if (freeSlot is not { } destination)
             return new DailyMissionClaimResult(DailyMissionClaimOutcome.InventoryFull, 0, 0);
 
+        var container = destination.Container;
+        var slot = destination.Slot;
+
         var projected = state.Inventory.GetContainer(container)
-            .SetItem(slot, new ItemStack(itemId, quantity, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+            .SetItem(slot,
+                new ItemStack(itemId, quantity, 0, 0, 0, 0, 0, 0, 0, 0, 0, destination.X, destination.Y));
 
         var newJoinWar = state.MissionJoinWar - RequiredJoinWar;
         var newKillOtherTribe = state.MissionKillOtherTribe - RequiredKillOtherTribe;
@@ -61,7 +67,7 @@ public sealed class DailyMissionService(
         {
             Page = container,
             Index = slot,
-            Value = [itemId, 0, 0, quantity, 0, 0]
+            Value = [itemId, destination.X, destination.Y, quantity, 0, 0]
         });
 
         if (state.Level2 == RebirthProgression.MaxHighLevel)
@@ -102,28 +108,6 @@ public sealed class DailyMissionService(
         logger.LogInformation(
             "Character {CharacterId} claimed daily-mission second-tier-level-cap Zone241Time bonus: new total {NewZone241Time}",
             characterId, newZone241Time);
-    }
-
-    private static bool TryFindEmptySlot(PlayerRuntimeState state, out byte container, out byte slot)
-    {
-        var pageCount = RentedInventoryPageGate.AccessiblePageCount(state.InventoryDate, GameDate.Today());
-
-        for (byte page = 0; page < pageCount; page++)
-        {
-            var occupied = state.Inventory.GetContainer(page);
-            for (var i = 0; i <= 63; i++)
-            {
-                if (occupied.ContainsKey((byte)i))
-                    continue;
-                container = page;
-                slot = (byte)i;
-                return true;
-            }
-        }
-
-        container = 0;
-        slot = 0;
-        return false;
     }
 
     private static List<CharacterItemSlotTvp> ToTvps(ImmutableDictionary<byte, ItemStack> container)

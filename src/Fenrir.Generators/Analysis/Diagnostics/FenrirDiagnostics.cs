@@ -215,6 +215,27 @@ internal static class FenrirDiagnostics
         DiagnosticSeverity.Error,
         true);
 
+    public static readonly DiagnosticDescriptor ObfuscationAttributeIgnoredOnShape = new(
+        "FEN019",
+        "Obfuscation attribute is ignored on this field shape",
+        "Field '{1}.{2}' carries {0}, but the emitter does not carry that attribute through a " +
+        "'{3}'-shaped field, so the obfuscation would silently not be applied; move it onto the scalar, " +
+        "string or primitive-array field it actually obfuscates (for a nested wire type, declare it on the " +
+        "nested type's own fields, which the nested type's generated Write applies itself)",
+        Category,
+        DiagnosticSeverity.Error,
+        true);
+
+    public static readonly DiagnosticDescriptor InvalidAvatarXorRowLength = new(
+        "FEN020",
+        "Invalid AvatarXorKind.Char2 row length",
+        "Field '{0}.{1}' declares [AvatarXorKind(AvatarXorKind.Char2, {2})] over {3} octets; the row length " +
+        "must be > 0 and must divide the field size exactly. A row length of 0 makes WireXor.XorChar2Rows " +
+        "loop forever, and a row length that does not divide the field throws on the trailing partial row.",
+        Category,
+        DiagnosticSeverity.Error,
+        true);
+
     public static readonly DiagnosticDescriptor PositionalRecordStructUnsupported = new(
         "FEN018",
         "Positional record struct syntax is unsupported",

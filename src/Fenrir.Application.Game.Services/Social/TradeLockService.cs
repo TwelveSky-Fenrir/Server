@@ -4,7 +4,9 @@ using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Domain.Game.GameData;
 using Fenrir.Protocol.Game;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Social;
@@ -13,8 +15,17 @@ public sealed class TradeLockService(
     TradeRegistry trades,
     ZoneRegistry zones,
     ITradeCommitRepository tradeCommits,
+    WorldDataCache worldData,
     ILogger<TradeLockService> logger) : ITradeLockService
 {
+    private const int InsufficientBalanceCharacterAError = 50268;
+
+    private const int InsufficientBalanceCharacterBError = 50269;
+
+    private const int CurrencyCapCharacterAError = 50362;
+
+    private const int CurrencyCapCharacterBError = 50363;
+
     public TradeLockAttempt TryLock(int characterId)
     {
         if (!trades.TryGetSession(characterId, out var trade) || trade is null)
@@ -62,20 +73,19 @@ public sealed class TradeLockService(
         var planA = TradeCommitPlanner.BuildFinalContainers(
             playerA.Inventory.GetContainer(ContainerMatrix.InventoryPage0),
             playerA.Inventory.GetContainer(ContainerMatrix.InventoryPage1),
-            trade.SideA.Slots, trade.SideB.Slots);
+            trade.SideA.Slots, trade.SideB.Slots, worldData);
 
         var planB = TradeCommitPlanner.BuildFinalContainers(
             playerB.Inventory.GetContainer(ContainerMatrix.InventoryPage0),
             playerB.Inventory.GetContainer(ContainerMatrix.InventoryPage1),
-            trade.SideB.Slots, trade.SideA.Slots);
+            trade.SideB.Slots, trade.SideA.Slots, worldData);
 
         if (planA.Overflowed || planB.Overflowed)
         {
             logger.LogInformation(
-                "Trade commit rejected: character {PlayerAId}/{PlayerBId} would overflow inventory (side A overflowed {PlanAOverflowed}, side B overflowed {PlanBOverflowed}) -- both menus reset to locked for retry",
-                trade.PlayerAId, trade.PlayerBId, planA.Overflowed, planB.Overflowed);
-            trade.SideA.MenuState = 1;
-            trade.SideB.MenuState = 1;
+                "Trade commit rejected: character {PlayerAId}/{PlayerBId} plan unusable (side A rejection {PlanARejection}, side B rejection {PlanBRejection}) -- both menus reset to locked for retry",
+                trade.PlayerAId, trade.PlayerBId, planA.Rejection, planB.Rejection);
+            AbortStagedTrade(trade, playerA, playerB);
             return;
         }
 
@@ -96,6 +106,25 @@ public sealed class TradeLockService(
                 ToTradedTvps(trade.SideA), ToTradedTvps(trade.SideB),
                 trade.SideA.Money, trade.SideA.BigMoney, trade.SideB.Money, trade.SideB.BigMoney);
         }
+        catch (Exception ex) when (TryGetRecoverableCommitError(ex, out var errorNumber))
+        {
+            logger.LogWarning(ex,
+                "Trade commit rejected by SQL error {ErrorNumber} ({Reason}): offender character {OffenderId} (character {PlayerAId} net {MoneyDeltaA}/{BigMoneyDeltaA}, character {PlayerBId} net {MoneyDeltaB}/{BigMoneyDeltaB}) -- transaction rolled back, both menus reset to locked",
+                errorNumber,
+                errorNumber is CurrencyCapCharacterAError or CurrencyCapCharacterBError
+                    ? "would exceed the legacy currency cap"
+                    : "staged more money than it owns",
+                errorNumber is InsufficientBalanceCharacterAError or CurrencyCapCharacterAError
+                    ? trade.PlayerAId
+                    : trade.PlayerBId,
+                trade.PlayerAId, moneyDeltaA, bigMoneyDeltaA, trade.PlayerBId, moneyDeltaB, bigMoneyDeltaB);
+
+            // The transaction rolled back, so nothing was persisted. End the session rather than resetting the
+            // menus: the clients hold their notch at confirmed and will not re-send a lock, so leaving the trade
+            // open strands both players with their staged BigMoney still in escrow.
+            AbortStagedTrade(trade, playerA, playerB);
+            return;
+        }
         catch (Exception ex)
         {
             logger.LogError(ex,
@@ -107,13 +136,18 @@ public sealed class TradeLockService(
         await PostMirrorAndWaitAsync(zoneA, playerA.CharacterId, planA, cancellationToken);
         await PostMirrorAndWaitAsync(zoneB, playerB.CharacterId, planB, cancellationToken);
 
-        if (bigMoneyDeltaA != 0)
+        // SQL takes the net delta, the zone mirror only the received side: staging already debited state.BigMoney
+        // into the escrow, so posting the net here would debit the staged amount a second time.
+        var bigMoneyReceivedByA = trade.SideB.BigMoney;
+        var bigMoneyReceivedByB = trade.SideA.BigMoney;
+
+        if (bigMoneyReceivedByA != 0)
             await zoneA.PostTribeProgressCommandAndWaitAsync(
-                new TribeProgressZoneCommand(playerA.CharacterId, BigMoneyDelta: bigMoneyDeltaA),
+                new TribeProgressZoneCommand(playerA.CharacterId, BigMoneyDelta: bigMoneyReceivedByA),
                 cancellationToken);
-        if (bigMoneyDeltaB != 0)
+        if (bigMoneyReceivedByB != 0)
             await zoneB.PostTribeProgressCommandAndWaitAsync(
-                new TribeProgressZoneCommand(playerB.CharacterId, BigMoneyDelta: bigMoneyDeltaB),
+                new TribeProgressZoneCommand(playerB.CharacterId, BigMoneyDelta: bigMoneyReceivedByB),
                 cancellationToken);
 
         trades.TryEnd(characterId, out _);
@@ -127,6 +161,51 @@ public sealed class TradeLockService(
         var result = new TradeEndResponse { Result = 0 };
         playerA.Session.Send(result);
         playerB.Session.Send(result);
+    }
+
+    private void AbortStagedTrade(TradeSession trade, PlayerRuntimeState playerA, PlayerRuntimeState playerB)
+    {
+        if (!trades.TryEnd(playerA.CharacterId, out _))
+            return;
+
+        RestoreStagedBigMoney(playerA, trade.SideA.BigMoney);
+        RestoreStagedBigMoney(playerB, trade.SideB.BigMoney);
+
+        var response = new TradeEndResponse { Result = 1 };
+        playerA.Session.Send(response);
+        playerB.Session.Send(response);
+    }
+
+    private void RestoreStagedBigMoney(PlayerRuntimeState player, int amount)
+    {
+        if (amount == 0)
+            return;
+
+        if (zones.TryGetPlayerAndZone(player.CharacterId, out _, out var zone))
+            zone.PostTribeProgressCommand(new TribeProgressZoneCommand(player.CharacterId, BigMoneyDelta: amount));
+    }
+
+    private static bool TryGetRecoverableCommitError(Exception exception, out int errorNumber)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is not SqlException sqlException)
+                continue;
+
+            for (var i = 0; i < sqlException.Errors.Count; i++)
+            {
+                var number = sqlException.Errors[i].Number;
+                if (number is not (InsufficientBalanceCharacterAError or InsufficientBalanceCharacterBError
+                    or CurrencyCapCharacterAError or CurrencyCapCharacterBError))
+                    continue;
+
+                errorNumber = number;
+                return true;
+            }
+        }
+
+        errorNumber = 0;
+        return false;
     }
 
     private static async Task PostMirrorAndWaitAsync(Zone zone, int characterId, TradeCommitPlanner.Plan plan,

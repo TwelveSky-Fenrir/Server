@@ -77,7 +77,8 @@ public interface ICharacterRepository
         CancellationToken ct);
 
     public ValueTask PersistProgressAsync(IReadOnlyList<CharacterProgressTvp> rows,
-        IReadOnlyList<CharacterCostumeSlotTvp> costumes, CancellationToken ct);
+        IReadOnlyList<CharacterCostumeSlotTvp> costumes, IReadOnlyList<CharacterMountSlotTvp> mounts,
+        CancellationToken ct);
 
     public ValueTask PersistFinalFlushAsync(CharacterProgressTvp progress, CharacterPositionTvp position,
         IReadOnlyList<CharacterCostumeSlotTvp> costumes, IReadOnlyList<CharacterBuffSlotTvp> buffs,

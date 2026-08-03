@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Diagnostics.Metrics;
+using System.Net;
 using Fenrir.Network.Dispatch.FloodProtection;
 using Microsoft.Extensions.Logging;
 
@@ -68,10 +69,17 @@ public sealed class SessionRegistry : IFloodKickSink
     public ImmutableArray<ClientSession> SnapshotByRemoteAddress(string ipAddress)
     {
         var builder = ImmutableArray.CreateBuilder<ClientSession>();
+        var parsed = IPAddress.TryParse(ipAddress, out var address) ? address : null;
 
         foreach (var session in _sessions.Values)
-            if (session.RemoteEndPoint?.Address.ToString() == ipAddress)
+        {
+            var remote = session.RemoteEndPoint?.Address;
+            if (remote is null)
+                continue;
+
+            if (parsed is not null ? remote.Equals(parsed) : remote.ToString() == ipAddress)
                 builder.Add(session);
+        }
 
         return builder.ToImmutable();
     }

@@ -38,6 +38,20 @@ public sealed class TradeOfferSide
 
         return total;
     }
+
+    public bool ReservesOrigin(byte container, byte slot, int excludingTradeSlotIndex = -1)
+    {
+        for (var i = 0; i < TradeLimits.SlotCount; i++)
+        {
+            if (i == excludingTradeSlotIndex)
+                continue;
+
+            if (Slots[i] is { } entry && entry.Container == container && entry.Slot == slot)
+                return true;
+        }
+
+        return false;
+    }
 }
 
 public sealed class TradeSession

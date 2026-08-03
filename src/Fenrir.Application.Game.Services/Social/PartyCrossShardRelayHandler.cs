@@ -12,6 +12,7 @@ public sealed class PartyCrossShardRelayHandler(
     ZoneRegistry zones,
     PartyRegistry parties,
     Lazy<ISocialCrossShardRelayQueue> crossShardRelay,
+    Lazy<IPartyResyncRelayQueue> partyResyncRelay,
     IOptions<GameServerOptions> options,
     ILogger<PartyCrossShardRelayHandler> logger) : ISocialCrossShardRelayHandler
 {
@@ -64,16 +65,28 @@ public sealed class PartyCrossShardRelayHandler(
             return ValueTask.CompletedTask;
         }
 
-        var joinOutcome = parties.TryCompleteCrossShardAnswer(inviterId, answer.SourceCharacterId, out var members);
+        if (inviter is null)
+        {
+            logger.LogInformation(
+                "Cross-shard party invite accepted but dropped: inviter {InviterId} left before invitee {InviteeId} answered",
+                inviterId, answer.SourceCharacterId);
+            return ValueTask.CompletedTask;
+        }
+
+        var joinOutcome = parties.TryCompleteCrossShardAnswer(
+            new PartyMember(inviterId, inviter.Name),
+            new PartyMember(answer.SourceCharacterId, answer.SourceAvatarName),
+            out var members);
+
         if (joinOutcome == PartyJoinOutcome.PartyWasFull)
         {
             logger.LogDebug(
                 "Cross-shard party invite accepted but not joined: inviter {InviterId}'s party was already full when invitee {InviteeId} answered",
                 inviterId, answer.SourceCharacterId);
 
-            var fullRoster = BuildRosterLocalOnly(2, members);
-            foreach (var memberId in members)
-                if (zones.TryGetPlayer(memberId, out var member))
+            var fullRoster = BuildRoster(2, members);
+            foreach (var current in members)
+                if (zones.TryGetPlayer(current.CharacterId, out var member))
                     member.Session.Send(fullRoster);
 
             return ValueTask.CompletedTask;
@@ -84,16 +97,51 @@ public sealed class PartyCrossShardRelayHandler(
             joinOutcome, answer.SourceCharacterId, answer.SourceShardId, inviterId, members.Count);
 
         var joinNotice = new PartyMemberJoinedResponse { AvatarName = answer.SourceAvatarName };
-        var roster = BuildRosterLocalOnly(joinOutcome == PartyJoinOutcome.Created ? 1 : 2, members);
+        var roster = BuildRoster(joinOutcome == PartyJoinOutcome.Created ? 1 : 2, members);
 
-        foreach (var memberId in members)
-            if (zones.TryGetPlayer(memberId, out var member))
+        foreach (var current in members)
+            if (zones.TryGetPlayer(current.CharacterId, out var member))
             {
                 member.Session.Send(joinNotice);
                 member.Session.Send(roster);
             }
 
+        PublishRosterToJoinerShard(answer.SourceCharacterId, answer.SourceAvatarName, members);
+
         return ValueTask.CompletedTask;
+    }
+
+    private void PublishRosterToJoinerShard(int joinerCharacterId, string joinerAvatarName,
+        IReadOnlyList<PartyMember> members)
+    {
+        partyResyncRelay.Value.Enqueue(new PartyResyncRelayEntry(
+            (byte)PartyResyncRelaySort.PartyInfoReply,
+            options.Value.ShardId,
+            joinerCharacterId,
+            members[0].Name,
+            joinerAvatarName)
+        {
+            MemberId1 = MemberIdAt(members, 0),
+            MemberName1 = MemberNameAt(members, 0),
+            MemberId2 = MemberIdAt(members, 1),
+            MemberName2 = MemberNameAt(members, 1),
+            MemberId3 = MemberIdAt(members, 2),
+            MemberName3 = MemberNameAt(members, 2),
+            MemberId4 = MemberIdAt(members, 3),
+            MemberName4 = MemberNameAt(members, 3),
+            MemberId5 = MemberIdAt(members, 4),
+            MemberName5 = MemberNameAt(members, 4)
+        });
+    }
+
+    private static int MemberIdAt(IReadOnlyList<PartyMember> members, int index)
+    {
+        return index < members.Count ? members[index].CharacterId : 0;
+    }
+
+    private static string MemberNameAt(IReadOnlyList<PartyMember> members, int index)
+    {
+        return index < members.Count ? members[index].Name : "";
     }
 
     private void PublishDecline(SocialCrossShardRelayDto ask, byte reasonCode)
@@ -111,12 +159,11 @@ public sealed class PartyCrossShardRelayHandler(
             ask.RelayId));
     }
 
-    private PartyRosterResponse BuildRosterLocalOnly(int sort, IReadOnlyList<int> memberIds)
+    private static PartyRosterResponse BuildRoster(int sort, IReadOnlyList<PartyMember> members)
     {
         Span<string> names = ["", "", "", "", ""];
-        for (var i = 0; i < memberIds.Count && i < 5; i++)
-            if (zones.TryGetPlayer(memberIds[i], out var member))
-                names[i] = member.Name;
+        for (var i = 0; i < members.Count && i < 5; i++)
+            names[i] = members[i].Name;
 
         return new PartyRosterResponse
         {

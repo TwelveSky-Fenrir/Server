@@ -100,7 +100,8 @@ public static class PshopPurchasePolicy
     }
 
     public static PurchaseResult ResolvePurchase(SlotView listing, ItemDefinition itemDefinition,
-        ItemStack? destinationSlot, int socketGem1 = 0, int socketGem2 = 0, int socketGem3 = 0)
+        ItemStack? destinationSlot, byte destinationX, byte destinationY, int socketGem1 = 0, int socketGem2 = 0,
+        int socketGem3 = 0)
     {
         var (enchant, combine, refine, socket) = ItemValueCodec.Decode(listing.Value);
 
@@ -113,11 +114,12 @@ public static class PshopPurchasePolicy
             if (merged > GroundItemPickupPolicy.MaxStackQuantity)
                 return new PurchaseResult(PurchaseOutcome.DestinationConflict, null);
 
-            return new PurchaseResult(PurchaseOutcome.Success, existing with { Quantity = merged });
+            return new PurchaseResult(PurchaseOutcome.Success,
+                existing with { Quantity = merged, XPos = destinationX, YPos = destinationY });
         }
 
         var newStack = new ItemStack(listing.ItemId, listing.Quantity, enchant, combine, refine, socket,
-            socketGem1, socketGem2, socketGem3, 0, listing.Serial);
+            socketGem1, socketGem2, socketGem3, 0, listing.Serial, destinationX, destinationY);
         return new PurchaseResult(PurchaseOutcome.Success, newStack);
     }
 

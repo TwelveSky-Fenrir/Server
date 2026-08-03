@@ -23,4 +23,7 @@ public static class Zone200GateBreachBossCatalog
     public static readonly ImmutableArray<short> EligibleServerNumbers = [200, 297, 298, 299];
 
     public static readonly ImmutableArray<int> BattleWinBonusFixedItemIds = [1072, 1103, 1449, 1422, 1145, 2249, 602];
+
+    public static readonly ImmutableArray<int> BattleWinBonusRandomAnimalPoolIds =
+        [1301, 1302, 1303, 1313, 1317, 1320, 1323, 1326];
 }

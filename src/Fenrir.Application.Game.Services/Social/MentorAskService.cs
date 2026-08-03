@@ -1,5 +1,4 @@
 using Fenrir.Application.Game.Abstractions.Social;
-using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Social;
 using Fenrir.Application.Game.Domain.Social.Duel;
@@ -9,7 +8,6 @@ using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Services.Social;
 
@@ -20,15 +18,17 @@ public sealed class MentorAskService(
     FriendRegistry friends,
     PartyRegistry parties,
     GuildInviteRegistry guildInvites,
-    ICharacterShardLocationRepository characterShardLocations,
-    ISocialCrossShardRelayQueue crossShardRelay,
-    IOptions<GameServerOptions> options,
     ILogger<MentorAskService> logger) : IMentorAskService
 {
     private const int MinimumMasterLevel = 113;
 
-    public async ValueTask<MentorAskResult> AskAsync(Zone zone, PlayerRuntimeState master, string targetAvatarName,
+    public ValueTask<MentorAskResult> AskAsync(Zone zone, PlayerRuntimeState master, string targetAvatarName,
         CancellationToken cancellationToken)
+    {
+        return ValueTask.FromResult(Ask(zone, master, targetAvatarName));
+    }
+
+    private MentorAskResult Ask(Zone zone, PlayerRuntimeState master, string targetAvatarName)
     {
         if (master.Level < MinimumMasterLevel || master.TeacherCharacterId is not null ||
             master.StudentCharacterId is not null)
@@ -49,14 +49,19 @@ public sealed class MentorAskService(
 
         PlayerRuntimeState? student = null;
         foreach (var candidate in zone.Players)
-            if (string.Equals(candidate.Name, targetAvatarName, StringComparison.OrdinalIgnoreCase))
+            if (candidate.CharacterId != master.CharacterId &&
+                string.Equals(candidate.Name, targetAvatarName, StringComparison.OrdinalIgnoreCase))
             {
                 student = candidate;
                 break;
             }
 
         if (student is null)
-            return await AskCrossShardAsync(master, targetAvatarName, cancellationToken).ConfigureAwait(false);
+        {
+            logger.LogDebug("Mentor ask rejected: character {MasterId} target {TargetAvatarName} is not in the zone",
+                master.CharacterId, targetAvatarName);
+            return new MentorAskResult(MentorAskResultKind.TargetNotFound);
+        }
 
         if (student.Tribe != master.Tribe || student.Level >= master.Level)
         {
@@ -67,7 +72,7 @@ public sealed class MentorAskService(
         }
 
         if (CommunityWorkGate.IsBusy(student, duels, trades, friends, parties, mentors, guildInvites) ||
-            student.IsStunned || student.IsDead)
+            student.IsMovingZone || student.IsStunned || student.IsDead)
         {
             logger.LogDebug("Mentor ask rejected: target character {TargetCharacterId} is busy",
                 student.CharacterId);
@@ -100,55 +105,5 @@ public sealed class MentorAskService(
                     master.CharacterId, master.Name, student.CharacterId, student.Name);
                 return new MentorAskResult(MentorAskResultKind.Sent, student.CharacterId, student.Name, master.Name);
         }
-    }
-
-    private async ValueTask<MentorAskResult> AskCrossShardAsync(PlayerRuntimeState master, string targetAvatarName,
-        CancellationToken cancellationToken)
-    {
-        var remote = await characterShardLocations.FindByNameAsync(targetAvatarName, cancellationToken)
-            .ConfigureAwait(false);
-
-        if (remote is null)
-        {
-            logger.LogDebug(
-                "Mentor ask rejected: character {MasterId} target {TargetAvatarName} not found on any shard",
-                master.CharacterId, targetAvatarName);
-            return new MentorAskResult(MentorAskResultKind.TargetNotFound);
-        }
-
-        if (remote.Tribe != master.Tribe)
-        {
-            logger.LogWarning(
-                "Mentor ask rejected: character {MasterId} (tribe {MasterTribe}) targeted cross-shard character {TargetCharacterId} (tribe {TargetTribe}) -- session will be disconnected",
-                master.CharacterId, master.Tribe, remote.CharacterId, remote.Tribe);
-            return new MentorAskResult(MentorAskResultKind.TargetMustDisconnect);
-        }
-
-        var outcome = mentors.TryAskCrossShard(master.CharacterId,
-            new CrossShardOutboundAsk(remote.ShardId, remote.CharacterId, remote.AvatarName));
-
-        if (outcome != MentorAskOutcome.Sent)
-        {
-            logger.LogDebug("Mentor ask rejected: character {MasterId} is busy (cross-shard registration)",
-                master.CharacterId);
-            return new MentorAskResult(MentorAskResultKind.AskerBusy);
-        }
-
-        crossShardRelay.Enqueue(new SocialCrossShardRelayEntry(
-            SocialCrossShardRelayKind.Mentor,
-            SocialCrossShardRelayMessageType.Ask,
-            null,
-            null,
-            options.Value.ShardId,
-            master.CharacterId,
-            master.Name,
-            remote.ShardId,
-            remote.CharacterId,
-            null));
-
-        logger.LogDebug(
-            "Mentor ask published cross-shard: character {MasterId} ({MasterName}) -> character {TargetCharacterId} on shard {TargetShardId} (never delivered today -- see MentorAskService's own remarks)",
-            master.CharacterId, master.Name, remote.CharacterId, remote.ShardId);
-        return new MentorAskResult(MentorAskResultKind.SentCrossShard);
     }
 }

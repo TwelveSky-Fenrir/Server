@@ -134,11 +134,27 @@ public sealed class LoginService(
                 return Failure(ResultIpBlocked, "", true);
             }
 
+            var sourceFailureCount = ipRateLimiter.RecentFailureCount(remoteEndPoint, packet.Id);
+
+            if (AccountBlockGate.EvaluateThrottle(sourceFailureCount, account?.FailedLoginCount ?? 0,
+                    account?.LockoutUntilUtc, DateTime.UtcNow) is AccountBlockOutcome.AutoLockedOut)
+            {
+                logger.LogWarning(
+                    "Login rejected before credential verification: IP {RemoteIp} is over its failed-attempt budget for login {Id}",
+                    remoteEndPoint, packet.Id);
+
+                if (account is not null && ipRateLimiter.TryClaimThrottleReport(remoteEndPoint, packet.Id))
+                    await LogThrottleRejectionAsync(account.AccountId, sourceFailureCount, remoteIp,
+                        cancellationToken);
+
+                return Failure(ResultCustomMessage, AccountLockedOutMessage, true);
+            }
+
             AuthenticationOutcome authentication;
             try
             {
-                authentication =
-                    await AuthenticateConstantTimeAsync(account, packet.Password, remoteIp, cancellationToken);
+                authentication = await AuthenticateConstantTimeAsync(account, packet.Id, packet.Password,
+                    remoteEndPoint, remoteIp, cancellationToken);
             }
             catch (CaeriusNetSqlException ex)
             {
@@ -160,11 +176,6 @@ public sealed class LoginService(
                     logger.LogWarning("Login failed: login {Id} rejected with result code {ResultCode}", packet.Id,
                         ResultBlocked);
                     return Failure(ResultBlocked, "", true);
-                case AuthenticationOutcome.AutoLockedOut:
-                    logger.LogWarning(
-                        "Login rejected: login {Id} is under the auto-lockout timer from repeated failed attempts",
-                        packet.Id);
-                    return Failure(ResultCustomMessage, AccountLockedOutMessage, true);
             }
 
             var accountId = account!.AccountId;
@@ -431,11 +442,12 @@ public sealed class LoginService(
     }
 
     private async ValueTask<AuthenticationOutcome> AuthenticateConstantTimeAsync(AuthenticateAccountDto? account,
-        string password, string? remoteIp, CancellationToken ct)
+        string loginName, string password, IPEndPoint? remoteEndPoint, string? remoteIp, CancellationToken ct)
     {
         if (account is null)
         {
             _ = PasswordHasher.Verify(password, DummyCredential.Hash, DummyCredential.Salt);
+            ipRateLimiter.RecordFailure(remoteEndPoint, loginName);
             return AuthenticationOutcome.UnknownAccount;
         }
 
@@ -443,30 +455,42 @@ public sealed class LoginService(
 
         if (!passwordOk)
         {
+            ipRateLimiter.RecordFailure(remoteEndPoint, loginName);
             await accounts.RecordLoginAttemptAsync(account.AccountId, false, ct);
-            var failureCount = (byte)Math.Min(account.FailedLoginCount + 1, byte.MaxValue);
+            var windowOpen = account.LockoutUntilUtc > DateTime.UtcNow;
+            var failureCount = windowOpen ? (byte)Math.Min(account.FailedLoginCount + 1, byte.MaxValue) : (byte)1;
             await eventLog.LogAsync(AccountSecurityEventCodes.LoginPasswordMismatch, EventLogCategory.AccountSecurity,
                 account.AccountId, null, null, null, null, null, null, null, null, failureCount,
                 remoteIp is null ? null : $"RemoteIp={remoteIp}", ct);
             return AuthenticationOutcome.WrongPassword;
         }
 
+        ipRateLimiter.ClearFailures(remoteEndPoint, loginName);
+
         var loggedBan = await bans.IsActiveForAccountAsync(account.AccountId, ct);
 
-        switch (AccountBlockGate.Evaluate(account.IsBanned, loggedBan, account.LockoutUntilUtc, DateTime.UtcNow))
-        {
-            case AccountBlockOutcome.AdminBanned:
-                return AuthenticationOutcome.AdminBanned;
-            case AccountBlockOutcome.AutoLockedOut:
-                await eventLog.LogAsync(AccountSecurityEventCodes.LoginPasswordAttemptRejectedLocked,
-                    EventLogCategory.AccountSecurity, account.AccountId, null, null, null, null, null, null, null,
-                    null, (byte)Math.Min(account.FailedLoginCount, byte.MaxValue),
-                    remoteIp is null ? null : $"RemoteIp={remoteIp}", ct);
-                return AuthenticationOutcome.AutoLockedOut;
-        }
+        if (AccountBlockGate.EvaluateAdminBan(account.IsBanned, loggedBan) is AccountBlockOutcome.AdminBanned)
+            return AuthenticationOutcome.AdminBanned;
 
         await accounts.RecordLoginAttemptAsync(account.AccountId, true, ct);
         return AuthenticationOutcome.Success;
+    }
+
+    private async ValueTask LogThrottleRejectionAsync(int accountId, int sourceFailureCount, string? remoteIp,
+        CancellationToken ct)
+    {
+        try
+        {
+            await eventLog.LogAsync(AccountSecurityEventCodes.LoginPasswordAttemptRejectedLocked,
+                EventLogCategory.AccountSecurity, accountId, null, null, null, null, null, null, null, null,
+                (byte)Math.Min(sourceFailureCount, byte.MaxValue),
+                remoteIp is null ? null : $"RemoteIp={remoteIp}", ct);
+        }
+        catch (CaeriusNetSqlException ex)
+        {
+            logger.LogWarning(ex, "Login: throttle-rejection event-log write failed for account {AccountId}",
+                accountId);
+        }
     }
 
     private static LoginResult Failure(int resultCode, string resultString, bool reArmVersionOk)
@@ -479,7 +503,6 @@ public sealed class LoginService(
         Success,
         UnknownAccount,
         WrongPassword,
-        AdminBanned,
-        AutoLockedOut
+        AdminBanned
     }
 }

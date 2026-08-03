@@ -60,6 +60,15 @@ public sealed class GuildTribeBroadcastRelayHost(
                     { TribeRole = dto.RoleField, AvatarName = dto.AvatarName, Content = dto.Content });
                 break;
 
+            case GuildTribeBroadcastKind.WorldChat:
+                DeliverToEveryone(new WorldChatResponse
+                    { TribeRole = dto.RoleField, AvatarName = dto.AvatarName, Content = dto.Content });
+                break;
+
+            case GuildTribeBroadcastKind.GlobalAnnouncement:
+                DeliverToEveryone(new GlobalAnnouncementResponse { Content = dto.Content });
+                break;
+
             default:
                 logger.LogWarning("Relayed broadcast {RelayId} has unrecognized Kind {Kind}; dropped",
                     dto.RelayId, dto.Kind);
@@ -87,6 +96,25 @@ public sealed class GuildTribeBroadcastRelayHost(
         foreach (var recipient in zone.Players)
             if (recipient.GuildId == id)
                 recipient.Session.Send(response);
+    }
+
+    private void DeliverToEveryone(WorldChatResponse response)
+    {
+        foreach (var zone in zones.Zones)
+        foreach (var recipient in zone.Players)
+            recipient.Session.Send(response);
+    }
+
+    private void DeliverToEveryone(GlobalAnnouncementResponse response)
+    {
+        foreach (var zone in zones.Zones)
+        foreach (var recipient in zone.Players)
+        {
+            if (recipient.IsMovingZone)
+                continue;
+
+            recipient.Session.Send(response);
+        }
     }
 
     private void DeliverToTribe(byte? tribe, TribeAnnouncementResponse response)

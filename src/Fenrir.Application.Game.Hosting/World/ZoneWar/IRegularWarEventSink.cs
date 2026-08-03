@@ -8,12 +8,18 @@ public interface IRegularWarEventSink
 {
     public void OnCountdownAnnounced(short mapId, int remainingMinutes);
 
+    public void OnCountdownFinished(short mapId);
+
+    public void OnGateOpened(short mapId);
+
     public void OnSmallestTribeFlagged(short mapId, byte tribeId);
 
-    public void OnActiveWarStarted(short mapId);
+    public void OnActiveWarStarted(short mapId, int durationLegacyTicks);
 
     public void OnWarConcluded(short mapId, RegularWarOutcome outcome, byte? winningTribe,
         ImmutableArray<RegularWarRewardGrant> rewards, bool bossMonstersShouldSpawn);
+
+    public void OnReturnToTownAnnounced(short mapId);
 
     public void OnMonstersShouldDespawn(short mapId);
 
@@ -28,15 +34,27 @@ public sealed class LoggingRegularWarEventSink(ILogger<LoggingRegularWarEventSin
             mapId, remainingMinutes);
     }
 
+    public void OnCountdownFinished(short mapId)
+    {
+        logger.LogInformation("RegularWar {MapId}: countdown finished -- gate-open wait started", mapId);
+    }
+
+    public void OnGateOpened(short mapId)
+    {
+        logger.LogInformation("RegularWar {MapId}: gate opened", mapId);
+    }
+
     public void OnSmallestTribeFlagged(short mapId, byte tribeId)
     {
         logger.LogInformation("RegularWar {MapId}: smallest present tribe flagged -- tribe {TribeId}", mapId,
             tribeId);
     }
 
-    public void OnActiveWarStarted(short mapId)
+    public void OnActiveWarStarted(short mapId, int durationLegacyTicks)
     {
-        logger.LogInformation("RegularWar {MapId}: active capture/score window started", mapId);
+        logger.LogInformation(
+            "RegularWar {MapId}: active capture/score window started for {DurationLegacyTicks} legacy tick(s)",
+            mapId, durationLegacyTicks);
     }
 
     public void OnWarConcluded(short mapId, RegularWarOutcome outcome, byte? winningTribe,
@@ -45,6 +63,11 @@ public sealed class LoggingRegularWarEventSink(ILogger<LoggingRegularWarEventSin
         logger.LogInformation(
             "RegularWar {MapId}: concluded -- outcome={Outcome} winningTribe={WinningTribe} participants={ParticipantCount} bossSpawnDue={BossSpawnDue}",
             mapId, outcome, winningTribe, rewards.Length, bossMonstersShouldSpawn);
+    }
+
+    public void OnReturnToTownAnnounced(short mapId)
+    {
+        logger.LogInformation("RegularWar {MapId}: return-to-town announced", mapId);
     }
 
     public void OnMonstersShouldDespawn(short mapId)

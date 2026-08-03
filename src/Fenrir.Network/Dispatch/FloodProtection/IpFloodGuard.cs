@@ -9,12 +9,16 @@ public sealed class IpFloodGuard(
     Func<string, CancellationToken, ValueTask> blockIpAsync,
     IFloodKickSink kickSink,
     Func<DateTime>? utcNowProvider = null,
-    ILogger<IpFloodGuard>? logger = null)
+    ILogger<IpFloodGuard>? logger = null,
+    Func<string, CancellationToken, ValueTask<bool>>? isOperatorAllowlistedAsync = null)
 {
     private readonly ConcurrentDictionary<string, int> _connectionCounts = new();
     private readonly ConcurrentDictionary<string, byte> _escalatedIps = new();
+    private readonly ConcurrentDictionary<string, long> _lastEscalationHour = new();
     private readonly Func<DateTime> _utcNowProvider = utcNowProvider ?? DefaultUtcNowProvider;
     private readonly ConcurrentDictionary<string, ViolationWindow> _violationWindows = new();
+
+    private long _lastPrunedHourBucket = long.MinValue;
 
     private static DateTime DefaultUtcNowProvider()
     {
@@ -46,14 +50,17 @@ public sealed class IpFloodGuard(
 
     public async ValueTask RecordProtocolViolationAsync(string ipAddress, CancellationToken ct)
     {
-        var currentHour = _utcNowProvider().Ticks / TimeSpan.TicksPerHour;
+        var currentHour = CurrentHourBucket();
 
         var window = _violationWindows.AddOrUpdate(
             ipAddress,
-            _ => new ViolationWindow(currentHour, 1),
-            (_, existing) => existing.HourBucket == currentHour
+            static (_, hour) => new ViolationWindow(hour, 1),
+            static (_, existing, hour) => existing.HourBucket == hour
                 ? existing with { Count = existing.Count + 1 }
-                : new ViolationWindow(currentHour, 1));
+                : new ViolationWindow(hour, 1),
+            currentHour);
+
+        PruneStaleTrackingState(currentHour);
 
         if (window.Count < maxProtocolViolationsPerIpPerHour)
             return;
@@ -61,8 +68,67 @@ public sealed class IpFloodGuard(
         await BlockAndKickAsync(ipAddress, ct).ConfigureAwait(false);
     }
 
+    public void Forget(string ipAddress)
+    {
+        _escalatedIps.TryRemove(ipAddress, out _);
+        _violationWindows.TryRemove(ipAddress, out _);
+        _lastEscalationHour.TryRemove(ipAddress, out _);
+        _connectionCounts.TryRemove(ipAddress, out _);
+    }
+
+    private long CurrentHourBucket()
+    {
+        return _utcNowProvider().Ticks / TimeSpan.TicksPerHour;
+    }
+
+    private bool TryClaimEscalation(string ipAddress, long currentHour)
+    {
+        while (true)
+        {
+            if (_lastEscalationHour.TryGetValue(ipAddress, out var recorded))
+            {
+                if (recorded == currentHour)
+                    return false;
+
+                if (_lastEscalationHour.TryUpdate(ipAddress, currentHour, recorded))
+                    return true;
+
+                continue;
+            }
+
+            if (_lastEscalationHour.TryAdd(ipAddress, currentHour))
+                return true;
+        }
+    }
+
+    private void PruneStaleTrackingState(long currentHour)
+    {
+        var lastPruned = Interlocked.Read(ref _lastPrunedHourBucket);
+
+        if (lastPruned == currentHour ||
+            Interlocked.CompareExchange(ref _lastPrunedHourBucket, currentHour, lastPruned) != lastPruned)
+            return;
+
+        foreach (var entry in _violationWindows)
+            if (entry.Value.HourBucket < currentHour)
+                _violationWindows.TryRemove(entry);
+
+        foreach (var entry in _lastEscalationHour)
+            if (entry.Value < currentHour)
+                _lastEscalationHour.TryRemove(entry);
+    }
+
     private async ValueTask BlockAndKickAsync(string ipAddress, CancellationToken ct)
     {
+        if (!TryClaimEscalation(ipAddress, CurrentHourBucket()))
+            return;
+
+        if (await IsOperatorAllowlistedAsync(ipAddress, ct).ConfigureAwait(false))
+        {
+            logger?.IpBlockSkippedForOperatorAllowlist(ipAddress);
+            return;
+        }
+
         try
         {
             await blockIpAsync(ipAddress, ct).ConfigureAwait(false);
@@ -74,6 +140,22 @@ public sealed class IpFloodGuard(
 
         var kicked = kickSink.KickByRemoteAddress(ipAddress);
         logger?.IpBlocked(ipAddress, kicked);
+    }
+
+    private async ValueTask<bool> IsOperatorAllowlistedAsync(string ipAddress, CancellationToken ct)
+    {
+        if (isOperatorAllowlistedAsync is null)
+            return false;
+
+        try
+        {
+            return await isOperatorAllowlistedAsync(ipAddress, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            logger?.OperatorAllowlistLookupFailed(ex, ipAddress);
+            return false;
+        }
     }
 
     private readonly record struct ViolationWindow(long HourBucket, int Count);

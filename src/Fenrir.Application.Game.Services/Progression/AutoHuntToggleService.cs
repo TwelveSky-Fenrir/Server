@@ -17,15 +17,15 @@ public sealed class AutoHuntToggleService(ICharacterRepository characters, ILogg
         AutoHuntToggleRequest packet, CancellationToken cancellationToken)
     {
         if (packet.Sort is not (0 or 1))
-            return new AutoHuntToggleResult(true, false);
+            return new AutoHuntToggleResult(AutoHuntToggleOutcome.Disconnect, false);
 
         var validation = AutoHuntConfigValidator.Validate(packet.AutoHunt);
         if (!validation.IsValid)
         {
             logger.LogWarning(
-                "Auto-hunt config rejected for character {CharacterId}: {Rejection} -- aborting session",
+                "Auto-hunt config rejected for character {CharacterId}: {Rejection}",
                 characterId, validation.Rejection);
-            return new AutoHuntToggleResult(true, false);
+            return new AutoHuntToggleResult(AutoHuntToggleOutcome.Ignored, false);
         }
 
         if (packet.Sort == 1)
@@ -42,7 +42,7 @@ public sealed class AutoHuntToggleService(ICharacterRepository characters, ILogg
                 logger.LogDebug(
                     "Auto-hunt enable rejected for character {CharacterId} on map {MapId}: enableBlocked={EnableBlocked} hasWeapon={HasWeapon} hasAttackSkill={HasAttackSkill}",
                     characterId, zone.MapId, enableBlocked, hasWeapon, hasAttackSkill);
-                return new AutoHuntToggleResult(true, false);
+                return new AutoHuntToggleResult(AutoHuntToggleOutcome.Disconnect, false);
             }
         }
 
@@ -55,6 +55,6 @@ public sealed class AutoHuntToggleService(ICharacterRepository characters, ILogg
         state.AutoHuntEnabled = enabled;
         state.AutoHuntConfig = packet.AutoHunt;
 
-        return new AutoHuntToggleResult(false, enabled);
+        return new AutoHuntToggleResult(AutoHuntToggleOutcome.Applied, enabled);
     }
 }

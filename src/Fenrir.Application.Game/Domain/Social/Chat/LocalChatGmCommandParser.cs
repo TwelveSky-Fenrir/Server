@@ -4,8 +4,8 @@ namespace Fenrir.Application.Game.Domain.Social.Chat;
 
 public static class LocalChatGmCommandParser
 {
-    private const string YgDropPrefix = "ygdrop";
-    private const string LabPrefix = "lab";
+    private const string YgDropName = "ygdrop";
+    private const string LabName = "lab";
     private const string BossPrefix = "boss ";
 
     public static bool TryParse(string content, out LocalChatGmCommand command)
@@ -17,24 +17,24 @@ public static class LocalChatGmCommandParser
             return true;
         }
 
-        if (content.StartsWith(YgDropPrefix, StringComparison.Ordinal))
+        if (TryMatchWholeWord(content, YgDropName, out var ygDropArgument))
         {
             command = new LocalChatGmCommand
             {
                 Kind = LocalChatGmCommandKind.YgDrop,
                 RequiredTier = GmCommandTier.Elevated,
-                Argument = TrimmedArgumentAfter(content, YgDropPrefix.Length)
+                Argument = ygDropArgument
             };
             return true;
         }
 
-        if (content.StartsWith(LabPrefix, StringComparison.Ordinal))
+        if (TryMatchWholeWord(content, LabName, out var labArgument))
         {
             command = new LocalChatGmCommand
             {
                 Kind = LocalChatGmCommandKind.Lab,
                 RequiredTier = GmCommandTier.Elevated,
-                Argument = TrimmedArgumentAfter(content, LabPrefix.Length)
+                Argument = labArgument
             };
             return true;
         }
@@ -66,6 +66,23 @@ public static class LocalChatGmCommandParser
 
         command = default;
         return false;
+    }
+
+    private static bool TryMatchWholeWord(string content, string name, out string? argument)
+    {
+        argument = null;
+
+        if (!content.StartsWith(name, StringComparison.Ordinal))
+            return false;
+
+        if (content.Length == name.Length)
+            return true;
+
+        if (content[name.Length] != ' ')
+            return false;
+
+        argument = TrimmedArgumentAfter(content, name.Length + 1);
+        return true;
     }
 
     private static string? TrimmedArgumentAfter(string content, int prefixLength)

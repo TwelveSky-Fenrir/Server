@@ -33,6 +33,12 @@ public sealed partial class Zone
 
     private const int ExperienceStatSort = 13;
 
+    private const int TeacherPointStatSort = 6;
+
+    private const long TeacherPointCeiling = 2_000_000_000L;
+
+    private const int MonsterKillExperienceLevelGapCap = 9;
+
     private const int LevelUpAvatarChangeInfoSort = 1;
 
     private const int BonusItemAvatarChangeInfoSort = 107;
@@ -1107,7 +1113,8 @@ public sealed partial class Zone
     }
 
     public void GrantMonsterKillExperience(int killerCharacterId, int monsterLevel, int monsterGeneralExperience,
-        IReadOnlyList<int>? partyMemberIds = null, int monsterPatExperience = 0, int monsterLifeValue = 0)
+        IReadOnlyList<int>? partyMemberIds = null, int monsterPatExperience = 0, int monsterLifeValue = 0,
+        int monsterItemLevel = 0)
     {
         if (!_players.TryGetValue(killerCharacterId, out var state))
             return;
@@ -1138,18 +1145,22 @@ public sealed partial class Zone
         if (monsterGeneralExperience >= 1 && worldState?.World.Zone038WinTribe == state.Tribe)
             rawGain += (int)(monsterGeneralExperience * 0.1f);
 
-        var finalGain = ExperienceFormulas.ApplyRebirthDivisor(rawGain, state.Level);
-
         const int MentorMaxStudentLevel = 113;
-        if (partyMemberIds is null or { Count: 0 }
+        if (monsterGeneralExperience >= 1
+            && fixedLevel - monsterLevel <= MonsterKillExperienceLevelGapCap
+            && partyMemberIds is null or { Count: 0 }
             && state.Level < MentorMaxStudentLevel
             && state.TeacherCharacterId is { } teacherId
-            && _players.ContainsKey(teacherId))
+            && _players.TryGetValue(teacherId, out var teacher)
+            && !teacher.IsMovingZone
+            && !teacher.IsDead
+            && teacher.StudentCharacterId == state.CharacterId)
         {
-            var mentorBonus = finalGain / 2;
-            if (mentorBonus > 0)
-                finalGain += mentorBonus;
+            rawGain += (int)(monsterGeneralExperience * 0.5f) * options.TeacherPointUpRatio;
+            CreditTeacherPointsFromStudentKill(teacher, monsterItemLevel);
         }
+
+        var finalGain = ExperienceFormulas.ApplyRebirthDivisor(rawGain, state.Level);
 
         if (MonsterKillExperienceGate.ShouldProcess(true, false, finalGain, monsterPatExperience))
         {
@@ -1184,6 +1195,18 @@ public sealed partial class Zone
 
         foreach (var member in present)
             ApplyCharacterExperienceGain(member, bonus);
+    }
+
+    private void CreditTeacherPointsFromStudentKill(PlayerRuntimeState teacher, int monsterItemLevel)
+    {
+        var credited = teacher.TeacherPoint + (long)monsterItemLevel * options.TeacherPointUpRatio;
+        if (credited >= TeacherPointCeiling)
+            return;
+
+        teacher.TeacherPoint = (int)credited;
+        teacher.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+        teacher.Session.Send(new AvatarStatUpdateResponse
+            { Sort = TeacherPointStatSort, Value = teacher.TeacherPoint, Value2 = 0 });
     }
 
     private void ApplyCharacterExperienceGain(PlayerRuntimeState target, int gain)

@@ -14,6 +14,25 @@ public sealed class FishingProgressHandler(
     public void Handle(in FishingProgressRequest packet, IPacketSession session)
     {
         var zoneSession = (IZoneSession)session;
+
+        if (packet.Sort is not (1 or 2 or 3))
+        {
+            logger.LogDebug(
+                "Fishing-progress request (op104) on session {SessionId}: malformed sort {Sort} -- legacy default disconnects, no response (S04_MyWork02.cpp:13552-13554)",
+                session.SessionId, packet.Sort);
+            zoneSession.Abort(DisconnectReason.Faulted);
+            return;
+        }
+
+        if (packet.Sort == 3 && packet.FishingStep is < 0 or > 5)
+        {
+            logger.LogDebug(
+                "Fishing-progress request (op104) on session {SessionId}: out-of-range step {FishingStep} -- legacy disconnects, no response (S04_MyWork02.cpp:13535-13539)",
+                session.SessionId, packet.FishingStep);
+            zoneSession.Abort(DisconnectReason.Faulted);
+            return;
+        }
+
         var characterId = zoneSession.CharacterId!.Value;
 
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
@@ -44,20 +63,10 @@ public sealed class FishingProgressHandler(
                 logger.LogInformation("Character {CharacterId} recast fishing line", characterId);
                 break;
             case 3:
-                if (packet.FishingStep is < 0 or > 5)
-                {
-                    logger.LogWarning(
-                        "Fishing-progress request ignored for character {CharacterId}: invalid step {FishingStep}",
-                        characterId, packet.FishingStep);
-                    return;
-                }
-
                 result = fishingProgressService.ForceStep(zone, state, characterId, packet.FishingStep);
                 break;
             default:
-                logger.LogWarning(
-                    "Fishing-progress request ignored for character {CharacterId}: invalid sort {Sort}",
-                    characterId, packet.Sort);
+                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
         }
 

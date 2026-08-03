@@ -15,8 +15,6 @@ public sealed class MentorRegistry
 
     private readonly Dictionary<int, int> _acceptedByStudent = new();
 
-    private readonly CrossShardNegotiationTracker _crossShard = new();
-
     private readonly Lock _lock = new();
     private readonly Dictionary<int, int> _pendingByMaster = new();
     private readonly Dictionary<int, int> _pendingByStudent = new();
@@ -26,8 +24,7 @@ public sealed class MentorRegistry
         lock (_lock)
         {
             return _pendingByMaster.ContainsKey(characterId) || _pendingByStudent.ContainsKey(characterId) ||
-                   _acceptedByMaster.ContainsKey(characterId) || _acceptedByStudent.ContainsKey(characterId) ||
-                   _crossShard.IsPending(characterId);
+                   _acceptedByMaster.ContainsKey(characterId) || _acceptedByStudent.ContainsKey(characterId);
         }
     }
 
@@ -49,17 +46,6 @@ public sealed class MentorRegistry
 
             isMaster = false;
             return false;
-        }
-    }
-
-    public MentorAskOutcome TryAskCrossShard(int masterId, CrossShardOutboundAsk ask)
-    {
-        lock (_lock)
-        {
-            if (IsNegotiating(masterId))
-                return MentorAskOutcome.AskerBusy;
-
-            return _crossShard.TryRegisterOutbound(masterId, ask) ? MentorAskOutcome.Sent : MentorAskOutcome.AskerBusy;
         }
     }
 
@@ -93,12 +79,6 @@ public sealed class MentorRegistry
                 return true;
             }
 
-            if (_crossShard.TryConsumeOutbound(masterId, out var crossShardAsk))
-            {
-                studentId = crossShardAsk.TargetCharacterId;
-                return true;
-            }
-
             return false;
         }
     }
@@ -107,16 +87,7 @@ public sealed class MentorRegistry
     {
         lock (_lock)
         {
-            if (_pendingByMaster.Remove(masterId, out studentId))
-                return true;
-
-            if (_crossShard.TryConsumeOutbound(masterId, out var crossShardAsk))
-            {
-                studentId = crossShardAsk.TargetCharacterId;
-                return true;
-            }
-
-            return false;
+            return _pendingByMaster.Remove(masterId, out studentId);
         }
     }
 

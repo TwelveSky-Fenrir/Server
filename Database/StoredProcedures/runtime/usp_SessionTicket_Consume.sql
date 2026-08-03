@@ -1,4 +1,5 @@
-CREATE PROCEDURE runtime.usp_SessionTicket_Consume @AccountId INT
+CREATE PROCEDURE runtime.usp_SessionTicket_Consume @AccountId INT,
+                                                   @SourceIpPrefix VARCHAR(45)
     WITH NATIVE_COMPILATION , SCHEMABINDING
 AS
 BEGIN
@@ -6,22 +7,31 @@ BEGIN
     WITH (TRANSACTION ISOLATION LEVEL = SNAPSHOT, LANGUAGE = N'us_english')
     DECLARE
         @CharacterId INT, @ShardId TINYINT, @Exp DATETIME2(3), @SessionToken UNIQUEIDENTIFIER,
-        @AccountGrade SMALLINT, @TargetMapId SMALLINT;
+        @AccountGrade SMALLINT, @TargetMapId SMALLINT, @BoundIpPrefix VARCHAR(45);
 
     SELECT @CharacterId = CharacterId,
            @ShardId = ShardId,
            @Exp = ExpiresAtUtc,
            @SessionToken = SessionToken,
            @AccountGrade = AccountGrade,
-           @TargetMapId = TargetMapId
+           @TargetMapId = TargetMapId,
+           @BoundIpPrefix = SourceIpPrefix
     FROM runtime.SessionTickets
     WHERE AccountId = @AccountId;
+
+    IF @Exp IS NULL
+        RETURN;
+
+    IF @Exp > SYSUTCDATETIME()
+        AND @BoundIpPrefix IS NOT NULL
+        AND (@SourceIpPrefix IS NULL OR @SourceIpPrefix <> @BoundIpPrefix)
+        RETURN;
 
     DELETE
     FROM runtime.SessionTickets
     WHERE AccountId = @AccountId;
 
-    IF @Exp IS NOT NULL AND @Exp > SYSUTCDATETIME()
+    IF @Exp > SYSUTCDATETIME()
         SELECT @CharacterId  AS CharacterId,
                @ShardId      AS ShardId,
                @SessionToken AS SessionToken,

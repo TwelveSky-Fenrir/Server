@@ -57,8 +57,11 @@ public sealed class PartyAnswerService(
         var inviterBusyByZoneTransfer =
             !zones.TryGetPlayer(pendingInviterId, out var pendingInviter) || pendingInviter.IsMovingZone;
 
-        if (!parties.TryAnswer(inviteeId, accepted, inviterBusyByZoneTransfer, out var inviterId,
-                out var joinOutcome, out var guardBlocked))
+        var answeringName = zones.TryGetPlayer(inviteeId, out var answering) ? answering.Name : "";
+        var pendingInviterName = pendingInviter?.Name ?? "";
+
+        if (!parties.TryAnswer(inviteeId, answeringName, pendingInviterName, accepted, inviterBusyByZoneTransfer,
+                out var inviterId, out var joinOutcome, out var guardBlocked))
         {
             if (guardBlocked)
                 logger.LogDebug(
@@ -83,10 +86,10 @@ public sealed class PartyAnswerService(
                 "Party invite accepted but not joined: inviter {InviterId}'s party was already full when character {InviteeId} answered",
                 inviterId, inviteeId);
             return new PartyAnswerResult(PartyAnswerResultKind.Answered, inviterId, true, joinOutcome,
-                parties.GetMembers(inviterId));
+                parties.GetRoster(inviterId));
         }
 
-        var members = parties.GetMembers(inviterId);
+        var members = parties.GetRoster(inviterId);
         logger.LogInformation(
             "Party {JoinOutcome}: character {InviteeId} joined inviter {InviterId}'s party ({MemberCount} members)",
             joinOutcome, inviteeId, inviterId, members.Count);

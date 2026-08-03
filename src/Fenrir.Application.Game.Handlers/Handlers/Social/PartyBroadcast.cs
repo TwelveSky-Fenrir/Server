@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Protocol.Game;
 
@@ -5,12 +6,11 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
 internal static class PartyBroadcast
 {
-    public static PartyRosterResponse BuildRoster(ZoneRegistry zones, int sort, IReadOnlyList<int> memberIds)
+    public static PartyRosterResponse BuildRoster(int sort, IReadOnlyList<PartyMember> members)
     {
         Span<string> names = ["", "", "", "", ""];
-        for (var i = 0; i < memberIds.Count && i < 5; i++)
-            if (zones.TryGetPlayer(memberIds[i], out var member))
-                names[i] = member.Name;
+        for (var i = 0; i < members.Count && i < 5; i++)
+            names[i] = members[i].Name;
 
         return new PartyRosterResponse
         {

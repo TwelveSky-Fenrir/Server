@@ -1,13 +1,18 @@
 using Fenrir.Application.Game.Abstractions.Chat;
 using Fenrir.Application.Game.Abstractions.Sessions;
+using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Services.Chat;
 
-public sealed class GlobalAnnouncementService(ZoneRegistry zones, ILogger<GlobalAnnouncementService> logger)
-    : IGlobalAnnouncementService
+public sealed class GlobalAnnouncementService(
+    ZoneRegistry zones,
+    IGuildTribeBroadcastRelayQueue relay,
+    IOptions<GameServerOptions> options,
+    ILogger<GlobalAnnouncementService> logger) : IGlobalAnnouncementService
 {
     public void TryAnnounce(IZoneSession zoneSession, string content)
     {
@@ -32,8 +37,24 @@ public sealed class GlobalAnnouncementService(ZoneRegistry zones, ILogger<Global
             recipientCount++;
         }
 
+        relay.Enqueue(new GuildTribeBroadcastRelayEntry(
+            GuildTribeBroadcastKind.GlobalAnnouncement,
+            options.Value.ShardId,
+            null,
+            null,
+            0,
+            string.Empty,
+            content,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null));
+
         logger.LogInformation(
-            "Character {CharacterId} broadcast a global announcement cluster-wide ({RecipientCount} recipients, {ContentLength} chars)",
+            "Character {CharacterId} broadcast a global announcement cluster-wide ({RecipientCount} same-shard recipients, {ContentLength} chars)",
             zoneSession.CharacterId, recipientCount, content.Length);
     }
 }

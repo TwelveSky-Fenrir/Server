@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Buffers.Binary;
+using System.Text;
 using Fenrir.Application.Game.Abstractions.World;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.World.WorldState;
@@ -21,10 +22,37 @@ public sealed class ZoneEventBroadcaster(
 {
     private const int DataSize = 130;
 
-    public void AnnounceZone038Winner(byte tribeId)
+    private const int NameFieldSize = 13;
+
+    public void AnnounceHolyStoneOpeningCountdown(int minutesRemaining)
+    {
+        Broadcast(33, minutesRemaining);
+    }
+
+    public void AnnounceHolyStoneWarZoneOpen()
+    {
+        Broadcast(34);
+    }
+
+    public void AnnounceHolyStoneChallengerApproaching(byte tribeId, string characterName)
+    {
+        BroadcastWithName(35, tribeId, characterName);
+    }
+
+    public void AnnounceHolyStoneChallengeCancelled()
+    {
+        Broadcast(36);
+    }
+
+    public void AnnounceHolyStoneChallengeCountdown(int minutesRemaining)
+    {
+        Broadcast(37, minutesRemaining);
+    }
+
+    public void AnnounceZone038Winner(byte tribeId, string? capturerName = null)
     {
         worldState.SetZone038Winner(tribeId);
-        var data = Broadcast(38, tribeId);
+        var data = BroadcastWithName(38, tribeId, capturerName ?? string.Empty);
 
         if (guardSpawner is not null)
             foreach (var zone in zones.Zones)
@@ -221,6 +249,22 @@ public sealed class ZoneEventBroadcaster(
         var data = new byte[DataSize];
         for (var i = 0; i < fields.Length; i++)
             BinaryPrimitives.WriteInt32LittleEndian(data.AsSpan(i * 4), fields[i]);
+
+        var response = new ZoneEventInfoResponse { Sort = sort, Data = data };
+
+        BroadcastToEveryZone(in response);
+
+        return data;
+    }
+
+    private byte[] BroadcastWithName(int sort, int value, string characterName)
+    {
+        var data = new byte[DataSize];
+        BinaryPrimitives.WriteInt32LittleEndian(data.AsSpan(0, 4), value);
+
+        var nameField = data.AsSpan(4, NameFieldSize);
+        var copyLength = Math.Min(characterName.Length, NameFieldSize);
+        Encoding.ASCII.GetBytes(characterName.AsSpan(0, copyLength), nameField);
 
         var response = new ZoneEventInfoResponse { Sort = sort, Data = data };
 

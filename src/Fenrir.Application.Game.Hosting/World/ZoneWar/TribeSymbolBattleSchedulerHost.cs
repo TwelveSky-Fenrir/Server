@@ -34,7 +34,7 @@ public sealed class TribeSymbolBattleSchedulerHost(
             while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
                 try
                 {
-                    scheduler.Tick(SimulationClock.LegacyTick, DateTime.UtcNow);
+                    scheduler.Tick(SimulationClock.LegacyTick, DateTime.Now);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {

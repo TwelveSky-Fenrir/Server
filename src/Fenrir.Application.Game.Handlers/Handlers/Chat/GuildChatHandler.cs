@@ -18,7 +18,9 @@ public sealed class GuildChatHandler(IGuildChatService guildChatService, ILogger
             "Session {SessionId}: CZ_GUILD_CHAT_SEND received (character {CharacterId}, content length {ContentLength})",
             session.SessionId, zoneSession.CharacterId, packet.Content.Length);
 
-        if (ChatRouter.IsContentEmpty(packet.Content))
+        var content = ChatRouter.SafeContent(packet.Content);
+
+        if (ChatRouter.IsContentEmpty(content))
         {
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
@@ -31,6 +33,6 @@ public sealed class GuildChatHandler(IGuildChatService guildChatService, ILogger
         if (!zone.TryGetPlayer(characterId, out var sender) || sender is null)
             return;
 
-        guildChatService.TrySendChat(sender, packet.Content, packet.Link);
+        guildChatService.TrySendChat(sender, content, packet.Link);
     }
 }

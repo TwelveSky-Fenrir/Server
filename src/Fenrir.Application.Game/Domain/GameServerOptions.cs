@@ -161,4 +161,6 @@ public sealed class GameServerOptions
     public int CrossTribeXpRatio { get; set; } = 2;
 
     public int GlobalExpDownRatio { get; set; } = 1;
+
+    public int TeacherPointUpRatio { get; set; } = 1;
 }

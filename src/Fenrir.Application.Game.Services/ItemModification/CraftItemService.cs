@@ -34,9 +34,6 @@ public sealed class CraftItemService(
     private static readonly CraftFamilyResult RejectedFamilyResult = new(CraftFamilyOutcome.Rejected, 0, 0, 0, null,
         0, 0);
 
-    private static readonly byte[] InventoryPagesInScanOrder =
-        [ContainerMatrix.InventoryPage0, ContainerMatrix.InventoryPage1];
-
     public async ValueTask<JadeUpgradeResult> ResolveJadeUpgradeAsync(CraftItemRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, int accountId, CancellationToken cancellationToken)
     {
@@ -154,7 +151,12 @@ public sealed class CraftItemService(
             return new AdvancedElixirResult(AdvancedElixirOutcome.Rejected, null, 0, 0, null);
         }
 
-        var hasFreeSlot = TryFindEmptySlot(state, out var resultPage, out var resultIndex);
+        // Every AdvancedElixirResultBaseItemId + k shares one item Sort, so the base id probes the whole range.
+        var freeSlot = InventoryFreeSlotFinder.Find(state.Inventory, worldData,
+            CraftRecipeCatalog.AdvancedElixirResultBaseItemId, state.InventoryDate, GameDate.Today());
+        var hasFreeSlot = freeSlot is not null;
+        var resultPage = freeSlot?.Container ?? (byte)0;
+        var resultIndex = freeSlot?.Slot ?? (byte)0;
 
         var resolved = CraftResolver.ResolveAdvancedElixir(material, hasFreeSlot, SystemRandomSource.Instance);
 
@@ -175,8 +177,9 @@ public sealed class CraftItemService(
 
         if (resolved.Outcome == CraftResolver.ElixirOutcome.Success)
         {
+            var destination = freeSlot!.Value;
             newItemStack = new ItemStack(resolved.ResultItemId!.Value, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-                unchecked((int)DateTime.UtcNow.Ticks));
+                unchecked((int)DateTime.UtcNow.Ticks), destination.X, destination.Y);
 
             if (resultPage == page1)
             {
@@ -792,7 +795,9 @@ public sealed class CraftItemService(
         }
         else
         {
-            if (!TryFindEmptySlot(state, out grantedPage, out grantedIndex))
+            var freeSlot = InventoryFreeSlotFinder.Find(state.Inventory, worldData, resolved.ResultItemId,
+                state.InventoryDate, GameDate.Today());
+            if (freeSlot is not { } destination)
             {
                 logger.LogInformation(
                     "Character {CharacterId} craft (dust-recycle) rejected: no free inventory slot for granted item",
@@ -800,11 +805,14 @@ public sealed class CraftItemService(
                 return RejectedFamilyResult;
             }
 
+            grantedPage = destination.Container;
+            grantedIndex = destination.Slot;
+
             var remainingMaterial = material with { Quantity = material.Quantity - threshold };
             working[(byte)packet.Page1] = working[(byte)packet.Page1].SetItem((byte)packet.Index1, remainingMaterial);
 
             var newStack = new ItemStack(resolved.ResultItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-                unchecked((int)DateTime.UtcNow.Ticks));
+                unchecked((int)DateTime.UtcNow.Ticks), destination.X, destination.Y);
             grantedItem = newStack;
 
             if (grantedPage == packet.Page1)
@@ -887,28 +895,6 @@ public sealed class CraftItemService(
                RentedInventoryPageGate.IsPageAccessible(page2, state.InventoryDate, today) &&
                RentedInventoryPageGate.IsPageAccessible(page3, state.InventoryDate, today) &&
                RentedInventoryPageGate.IsPageAccessible(page4, state.InventoryDate, today);
-    }
-
-    private static bool TryFindEmptySlot(PlayerRuntimeState state, out byte page, out byte index)
-    {
-        var accessiblePages = RentedInventoryPageGate.AccessiblePageCount(state.InventoryDate, GameDate.Today());
-
-        for (var i = 0; i < accessiblePages; i++)
-        {
-            var candidatePage = InventoryPagesInScanOrder[i];
-            ContainerMatrix.TryGetMaxSlot(candidatePage, out var maxSlot);
-            for (var slot = 0; slot <= maxSlot; slot++)
-                if (state.Inventory.GetSlot(candidatePage, (byte)slot) is null)
-                {
-                    page = candidatePage;
-                    index = (byte)slot;
-                    return true;
-                }
-        }
-
-        page = 0;
-        index = 0;
-        return false;
     }
 
     private static List<CharacterItemSlotTvp> ToTvps(ImmutableDictionary<byte, ItemStack> container)

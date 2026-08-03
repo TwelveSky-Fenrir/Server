@@ -3,7 +3,16 @@ using Fenrir.Protocol.Game;
 
 namespace Fenrir.Application.Game.Abstractions.Progression;
 
-public readonly record struct AutoHuntToggleResult(bool Aborted, bool Enabled);
+public enum AutoHuntToggleOutcome : byte
+{
+    Applied,
+
+    Ignored,
+
+    Disconnect
+}
+
+public readonly record struct AutoHuntToggleResult(AutoHuntToggleOutcome Outcome, bool Enabled);
 
 public interface IAutoHuntToggleService
 {

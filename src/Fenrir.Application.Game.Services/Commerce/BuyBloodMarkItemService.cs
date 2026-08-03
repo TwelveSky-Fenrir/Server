@@ -85,7 +85,7 @@ public sealed class BuyBloodMarkItemService(
         var destination = state.Inventory.GetSlot((byte)page, (byte)slot);
         var mergesIntoExisting = destination is { } d && d.ItemId == entry.ItemId;
 
-        int price;
+        long affordabilityCost;
         if (isStackable)
         {
             if (entry.Quantity < 1)
@@ -96,7 +96,7 @@ public sealed class BuyBloodMarkItemService(
                 return null;
             }
 
-            price = entry.Price * entry.Quantity;
+            affordabilityCost = (long)entry.Price * entry.Quantity;
 
             if (mergesIntoExisting &&
                 destination!.Value.Quantity + entry.Quantity > GroundItemPickupPolicy.MaxStackQuantity)
@@ -109,7 +109,7 @@ public sealed class BuyBloodMarkItemService(
         }
         else
         {
-            price = entry.Price;
+            affordabilityCost = entry.Price;
             if (destination is not null)
             {
                 logger.LogWarning(
@@ -119,15 +119,24 @@ public sealed class BuyBloodMarkItemService(
             }
         }
 
+        if (state.BloodCoin < affordabilityCost)
+        {
+            logger.LogWarning(
+                "Buy blood mark item rejected: character {CharacterId} cannot afford bloodIndex {BloodIndex} ({AffordabilityCost} BloodCoin) -- session will be disconnected",
+                characterId, packet.BloodIndex, affordabilityCost);
+            return null;
+        }
+
         var finalQuantity = mergesIntoExisting ? destination!.Value.Quantity + entry.Quantity : entry.Quantity;
-        var newStack = new ItemStack(entry.ItemId, finalQuantity, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        var newStack = new ItemStack(entry.ItemId, finalQuantity, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            (byte)packet.Value[1], (byte)packet.Value[2]);
         var projectedContainer = state.Inventory.GetContainer((byte)page).SetItem((byte)slot, newStack);
 
         int newBloodCoin;
         try
         {
-            newBloodCoin = await characters.SpendBloodCoinAndReplaceContainerAsync(characterId, -price, (byte)page,
-                ToTvps(projectedContainer), cancellationToken);
+            newBloodCoin = await characters.SpendBloodCoinAndReplaceContainerAsync(characterId, -entry.Price,
+                (byte)page, ToTvps(projectedContainer), cancellationToken);
         }
         catch (Exception ex)
         {

@@ -32,19 +32,15 @@ public sealed class Zone335FfaEventCycleSystem(
     Lazy<ZoneEventBroadcaster> broadcaster,
     ILogger<Zone335FfaEventCycleSystem> logger) : ISimulationSystem
 {
-    public const int IdleAutoStartLegacyTicks = 60 * SimulationClock.PlayTimeAccrualLegacyTicks;
-
     public const int PreStartCountdownMinutes = 10;
 
     public const int GateOpenWaitMinutes = 1;
 
-    public const int EntranceOpenWindowMinutes = 2;
+    public const int EntranceOpenWindowMinutes = 1;
 
     public const int BattlePrepWaitMinutes = 1;
 
-    public const int BattleDurationLegacyTicks = 1800;
-
-    public const int BattleMinimumElapsedLegacyTicksForLastManStanding = SimulationClock.PlayTimeAccrualLegacyTicks;
+    public const int DefaultBattleDurationLegacyTicks = 2400;
 
     public const int LiveCountdownBroadcastCadenceLegacyTicks = 10;
 
@@ -54,9 +50,8 @@ public sealed class Zone335FfaEventCycleSystem(
 
     private readonly MinuteCountdown _minuteCountdown = new();
 
-    private int _battleElapsedLegacyTicks;
+    private int _battleDurationLegacyTicks = DefaultBattleDurationLegacyTicks;
     private int _battleTicksRemaining;
-    private int _idleElapsedLegacyTicks;
     private int _liveCountdownTicksSinceLastBroadcast;
 
     public Zone335FfaPhase Phase { get; private set; } = Zone335FfaPhase.Idle;
@@ -71,7 +66,7 @@ public sealed class Zone335FfaEventCycleSystem(
         switch (Phase)
         {
             case Zone335FfaPhase.Idle:
-                AdvanceIdle(zone, legacyTicksElapsed);
+                AdvanceIdle(zone);
                 break;
             case Zone335FfaPhase.CountdownArmed:
                 AdvanceCountdownArmed();
@@ -100,25 +95,20 @@ public sealed class Zone335FfaEventCycleSystem(
         }
     }
 
-    private void AdvanceIdle(Zone zone, int legacyTicksElapsed)
+    private void AdvanceIdle(Zone zone)
     {
-        var skipWait = startTrigger.ConsumeStartRequest();
+        if (!startTrigger.TryConsumeStartRequest(out var requestedBattleTicks))
+            return;
 
-        if (!skipWait)
-        {
-            _idleElapsedLegacyTicks += legacyTicksElapsed;
-            if (_idleElapsedLegacyTicks < IdleAutoStartLegacyTicks)
-                return;
-        }
-
-        _idleElapsedLegacyTicks = 0;
+        _battleDurationLegacyTicks =
+            requestedBattleTicks > 0 ? requestedBattleTicks : DefaultBattleDurationLegacyTicks;
 
         zone.ClearKillFeedLeaderboard();
         siegeState.ResetTribeBonusFields();
 
         logger.LogInformation(
-            "Zone335Ffa: idle wait ended ({Reason}) -- countdown-arm phase entered",
-            skipWait ? "GM start request" : "60-minute automatic rollover");
+            "Zone335Ffa: GM start request accepted -- countdown-arm phase entered, battle timer {BattleDurationLegacyTicks} legacy tick(s)",
+            _battleDurationLegacyTicks);
 
         Phase = Zone335FfaPhase.CountdownArmed;
     }
@@ -190,10 +180,8 @@ public sealed class Zone335FfaEventCycleSystem(
             if (_minuteCountdown.MinutesElapsed < BattlePrepWaitMinutes)
                 continue;
 
-            _battleTicksRemaining = BattleDurationLegacyTicks;
-            _battleElapsedLegacyTicks = 0;
+            _battleTicksRemaining = _battleDurationLegacyTicks;
             _liveCountdownTicksSinceLastBroadcast = 0;
-
 
             broadcaster.Value.AnnounceFfaBattleStart(_battleTicksRemaining);
             Phase = Zone335FfaPhase.Battle;
@@ -203,24 +191,26 @@ public sealed class Zone335FfaEventCycleSystem(
 
     private void AdvanceBattle(Zone zone, int legacyTicksElapsed)
     {
-        _battleElapsedLegacyTicks += legacyTicksElapsed;
+        if (CountEligible(zone) == 0)
+        {
+            broadcaster.Value.AnnounceFfaClosedNotice();
+            _minuteCountdown.Reset();
+            Phase = Zone335FfaPhase.WindDown;
+            return;
+        }
+
         _battleTicksRemaining = Math.Max(0, _battleTicksRemaining - legacyTicksElapsed);
         _liveCountdownTicksSinceLastBroadcast += legacyTicksElapsed;
 
-        if (_battleTicksRemaining > 0 &&
-            _liveCountdownTicksSinceLastBroadcast >= LiveCountdownBroadcastCadenceLegacyTicks)
+        if (_battleTicksRemaining > 0)
         {
+            if (_liveCountdownTicksSinceLastBroadcast < LiveCountdownBroadcastCadenceLegacyTicks)
+                return;
+
             _liveCountdownTicksSinceLastBroadcast = 0;
             BroadcastLiveCountdown(zone, _battleTicksRemaining);
-        }
-
-        var pastOpeningGuard =
-            _battleElapsedLegacyTicks > BattleMinimumElapsedLegacyTicksForLastManStanding;
-        var lastManStanding = pastOpeningGuard && CountEligible(zone) <= 1;
-        var timerExpired = _battleTicksRemaining <= 0;
-
-        if (!lastManStanding && !timerExpired)
             return;
+        }
 
         zone.ApplyKillFeedEndOfBattleRewards(true, false);
         broadcaster.Value.AnnounceFfaBattleEnd();
@@ -237,7 +227,6 @@ public sealed class Zone335FfaEventCycleSystem(
             if (_minuteCountdown.MinutesElapsed < PostBattleCleanupWaitMinutes)
                 continue;
 
-
             broadcaster.Value.AnnounceFfaClosedNotice();
             _minuteCountdown.Reset();
             Phase = Zone335FfaPhase.WindDown;
@@ -251,10 +240,7 @@ public sealed class Zone335FfaEventCycleSystem(
         for (var i = 0; i < wholeMinutes; i++)
         {
             if (_minuteCountdown.MinutesElapsed < WindDownWaitMinutes)
-            {
-                broadcaster.Value.AnnounceFfaClosedNotice();
                 continue;
-            }
 
             FinalizeReset(zone);
             return;
@@ -270,9 +256,8 @@ public sealed class Zone335FfaEventCycleSystem(
         broadcaster.Value.AnnounceFfaReset();
 
         Phase = Zone335FfaPhase.Idle;
-        _idleElapsedLegacyTicks = 0;
         _battleTicksRemaining = 0;
-        _battleElapsedLegacyTicks = 0;
+        _battleDurationLegacyTicks = DefaultBattleDurationLegacyTicks;
         _liveCountdownTicksSinceLastBroadcast = 0;
         _minuteCountdown.Reset();
     }

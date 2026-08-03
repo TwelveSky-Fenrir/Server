@@ -12,6 +12,14 @@ public sealed class RegularWarRewardGrantSink(ZoneRegistry zones, ILogger<Regula
     {
     }
 
+    public void OnCountdownFinished(short mapId)
+    {
+    }
+
+    public void OnGateOpened(short mapId)
+    {
+    }
+
     public void OnSmallestTribeFlagged(short mapId, byte tribeId)
     {
         if (!zones.TryGet(mapId, out var zone))
@@ -27,7 +35,7 @@ public sealed class RegularWarRewardGrantSink(ZoneRegistry zones, ILogger<Regula
                 "RegularWar {MapId}: smallest-tribe flag ({TribeId}) dropped -- zone inbox full", mapId, tribeId);
     }
 
-    public void OnActiveWarStarted(short mapId)
+    public void OnActiveWarStarted(short mapId, int durationLegacyTicks)
     {
     }
 
@@ -61,6 +69,10 @@ public sealed class RegularWarRewardGrantSink(ZoneRegistry zones, ILogger<Regula
 
         if (!bossZone.Post(ZoneCommand.SummonRegularWarBoss()))
             logger.LogWarning("RegularWar {MapId}: boss-561 summon command dropped -- zone inbox full", mapId);
+    }
+
+    public void OnReturnToTownAnnounced(short mapId)
+    {
     }
 
     public void OnMonstersShouldDespawn(short mapId)

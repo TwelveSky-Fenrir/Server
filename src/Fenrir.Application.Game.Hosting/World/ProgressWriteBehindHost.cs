@@ -13,6 +13,7 @@ public sealed class ProgressWriteBehindHost(ZoneRegistry zones, ICharacterReposi
     {
         var rows = new List<CharacterProgressTvp>(dirty.Count);
         var costumes = new List<CharacterCostumeSlotTvp>();
+        var mounts = new List<CharacterMountSlotTvp>();
         List<(PlayerRuntimeState State, int WarPoint, int BloodCoin)>? credited = null;
 
         foreach (var (characterId, flags) in dirty)
@@ -99,9 +100,10 @@ public sealed class ProgressWriteBehindHost(ZoneRegistry zones, ICharacterReposi
                 CriBoost: state.CriBoost));
 
             CostumePersistenceCodec.AppendOccupiedSlots(costumes, characterId, state);
+            MountPersistenceCodec.AppendOccupiedSlots(mounts, characterId, state);
         }
 
-        await characters.PersistProgressAsync(rows, costumes, ct).ConfigureAwait(false);
+        await characters.PersistProgressAsync(rows, costumes, mounts, ct).ConfigureAwait(false);
 
         if (credited is not null)
             foreach (var (state, warPoint, bloodCoin) in credited)

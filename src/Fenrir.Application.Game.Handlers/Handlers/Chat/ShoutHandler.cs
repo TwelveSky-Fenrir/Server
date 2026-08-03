@@ -12,7 +12,9 @@ public sealed class ShoutHandler(IShoutService shoutService) : IInlinePacketHand
     {
         var zoneSession = (IZoneSession)session;
 
-        if (ChatRouter.IsContentEmpty(packet.Content))
+        var content = ChatRouter.SafeContent(packet.Content);
+
+        if (ChatRouter.IsContentEmpty(content))
         {
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
@@ -25,6 +27,6 @@ public sealed class ShoutHandler(IShoutService shoutService) : IInlinePacketHand
         if (!zone.TryGetPlayer(characterId, out var state) || state is null)
             return;
 
-        shoutService.TryPostShout(zone, state, packet.Content, packet.Link);
+        shoutService.TryPostShout(zone, state, content, packet.Link);
     }
 }

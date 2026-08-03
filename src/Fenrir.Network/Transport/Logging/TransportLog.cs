@@ -30,4 +30,13 @@ internal static partial class TransportLog
         Message =
             "Send loop faulted for connection {RemoteEndPoint} -- this connection can no longer send anything until an independent teardown path notices")]
     public static partial void SendLoopFaulted(this ILogger logger, Exception exception, EndPoint? remoteEndPoint);
+
+    [LoggerMessage(
+        EventId = 4204,
+        EventName = "AcceptRefusedAtSocketCap",
+        Level = LogLevel.Warning,
+        Message =
+            "Accept on {LocalEndPoint} refused for {RemoteEndPoint}: the process already holds its {MaxConcurrentSockets} concurrent socket(s) -- the socket was closed before any pipe, session or greeting was allocated")]
+    public static partial void AcceptRefusedAtSocketCap(this ILogger logger, EndPoint? localEndPoint,
+        EndPoint? remoteEndPoint, int maxConcurrentSockets);
 }

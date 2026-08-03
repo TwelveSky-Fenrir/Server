@@ -27,6 +27,7 @@ internal static class WellKnownNames
     public const string WireHeaderSizes = "global::Fenrir.Core.Wire.WireHeaderSizes";
     public const string MessageReader = "global::Fenrir.Core.Wire.MessageReader";
     public const string MessageWriter = "global::Fenrir.Core.Wire.MessageWriter";
+    public const string LegacyWireCodec = "global::Fenrir.Core.Wire.LegacyWireCodec";
     public const string WireObfuscationModeEnum = "global::Fenrir.Core.Wire.WireObfuscationMode";
     public const string FenrirServerEnum = "global::Fenrir.Core.Wire.FenrirServer";
     public const string FenrirDirectionEnum = "global::Fenrir.Core.Wire.FenrirDirection";

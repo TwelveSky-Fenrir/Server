@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.Abstractions.Chat;
+﻿using Fenrir.Application.Game.Abstractions.Chat;
 using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Application.Game.Domain.Social.Chat;
 using Fenrir.Application.Game.Domain.World;
@@ -18,7 +18,10 @@ public sealed class WhisperHandler(IWhisperService whisperService, ILogger<Whisp
     {
         var zoneSession = (IZoneSession)session;
 
-        if (ChatRouter.IsContentEmpty(packet.Content) || string.IsNullOrEmpty(packet.AvatarName))
+        var content = ChatRouter.SafeContent(packet.Content);
+        var targetName = ChatRouter.SafeAvatarName(packet.AvatarName);
+
+        if (ChatRouter.IsContentEmpty(content) || string.IsNullOrEmpty(targetName))
         {
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
@@ -32,7 +35,7 @@ public sealed class WhisperHandler(IWhisperService whisperService, ILogger<Whisp
             return;
 
         var resolution = await whisperService
-            .ResolveAsync(sender, packet.AvatarName, packet.Content, zoneSession.IsGm ? 1 : 0, cancellationToken)
+            .ResolveAsync(sender, targetName, content, zoneSession.IsGm ? 1 : 0, cancellationToken)
             .ConfigureAwait(false);
 
         switch (resolution.Outcome)
@@ -45,8 +48,8 @@ public sealed class WhisperHandler(IWhisperService whisperService, ILogger<Whisp
                 {
                     Result = 1,
                     ZoneNumber = 0,
-                    AvatarName = packet.AvatarName,
-                    Content = packet.Content,
+                    AvatarName = targetName,
+                    Content = content,
                     AuthType = 0,
                     Link = EmptyLink
                 });
@@ -55,13 +58,13 @@ public sealed class WhisperHandler(IWhisperService whisperService, ILogger<Whisp
             case WhisperOutcome.QueuedCrossShard:
                 logger.LogDebug(
                     "Whisper from {SenderName} to {TargetName} queued for cross-shard delivery to shard {ShardId} (map {MapId})",
-                    sender.Name, packet.AvatarName, resolution.OtherShardId, resolution.OtherMapId);
+                    sender.Name, targetName, resolution.OtherShardId, resolution.OtherMapId);
                 session.Send(new WhisperResponse
                 {
                     Result = 0,
                     ZoneNumber = resolution.OtherMapId ?? 0,
-                    AvatarName = packet.AvatarName,
-                    Content = packet.Content,
+                    AvatarName = targetName,
+                    Content = content,
                     AuthType = 0,
                     Link = packet.Link
                 });
@@ -76,7 +79,7 @@ public sealed class WhisperHandler(IWhisperService whisperService, ILogger<Whisp
                     Result = 0,
                     ZoneNumber = targetZone.MapId,
                     AvatarName = target.Name,
-                    Content = packet.Content,
+                    Content = content,
                     AuthType = 0,
                     Link = packet.Link
                 });
@@ -87,7 +90,7 @@ public sealed class WhisperHandler(IWhisperService whisperService, ILogger<Whisp
                         Result = 3,
                         ZoneNumber = 0,
                         AvatarName = sender.Name,
-                        Content = packet.Content,
+                        Content = content,
                         AuthType = zoneSession.IsGm ? 1 : 0,
                         Link = packet.Link
                     });

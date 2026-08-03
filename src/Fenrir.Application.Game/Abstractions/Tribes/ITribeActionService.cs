@@ -40,9 +40,6 @@ public interface ITribeActionService
     public ValueTask<TribeActionOutcome> SetOrnamentAsync(Zone zone, PlayerRuntimeState state, int characterId, bool on,
         CancellationToken ct);
 
-    public ValueTask<TribeActionOutcome> RebirthAsync(Zone zone, PlayerRuntimeState state, int characterId,
-        CancellationToken ct);
-
     public ValueTask<TribeActionOutcome> RedeemMapScrollAsync(Zone zone, PlayerRuntimeState state, int characterId,
         CancellationToken ct);
 

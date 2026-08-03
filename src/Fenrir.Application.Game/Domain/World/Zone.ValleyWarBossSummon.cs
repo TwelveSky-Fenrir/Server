@@ -27,6 +27,15 @@ public sealed partial class Zone
         SpawnMonster(monster);
     }
 
+    internal bool ValleyWarBossSlotOccupied()
+    {
+        for (var i = 0; i < ValleyWarBossPoolSize; i++)
+            if (_monsters.ContainsKey(ValleyWarBossPoolServerIndexBase + i))
+                return true;
+
+        return false;
+    }
+
     private bool ValleyWarBossAlreadyLive()
     {
         for (var i = 0; i < ValleyWarBossPoolSize; i++)

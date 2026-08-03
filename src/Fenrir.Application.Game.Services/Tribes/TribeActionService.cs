@@ -33,7 +33,6 @@ public sealed class TribeActionService(
     private const int HaloEnchantCpCost = 100;
     private const int MapScrollCpCost = 1;
     private const int AlertCharmCpCost = 10;
-    private const int RebirthCpCost = 10_000;
 
     private const int ProtectHaloStatSort = 31;
 
@@ -376,48 +375,6 @@ public sealed class TribeActionService(
         await zone.PostTribeProgressCommandAndWaitAsync(command, ct);
 
         logger.LogDebug("Character {CharacterId} set tribe ornament to {OnOff}", characterId, on ? "on" : "off");
-
-        return TribeActionOutcome.Ok();
-    }
-
-    public async ValueTask<TribeActionOutcome> RebirthAsync(Zone zone, PlayerRuntimeState state, int characterId,
-        CancellationToken ct)
-    {
-        if (state.RebirthCount >= RebirthProgression.MaxRebirthGeneration ||
-            state.Level + state.Level2 != RebirthProgression.CombinedLevelCap ||
-            !RebirthProgression.IsHighLevelExperienceFull(state.Level2, state.Exp2) ||
-            state.ContributionPoints < RebirthCpCost)
-            return TribeActionOutcome.Abort;
-
-        var newRebirthCount = state.RebirthCount + 1;
-        var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
-            state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo, newRebirthCount,
-            state.Level2);
-        var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
-        var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
-            pet: ComputePetContribution(state, equipmentContainer), runtimeState: state);
-
-        int newZone241Time;
-        try
-        {
-            newZone241Time = await characters.AdjustZone241TimeAsync(characterId, 10, ct);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Character {CharacterId} rebirth Zone241Time adjustment failed", characterId);
-            return TribeActionOutcome.Abort;
-        }
-
-        var reward = RebirthMilestoneRewards.Resolve(newRebirthCount, state.PreviousTribe);
-
-        await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
-            state.ContributionPoints - RebirthCpCost, RebirthCount: newRebirthCount, Exp2: 0,
-            Life: updatedStats.MaxLife, Mana: updatedStats.MaxMana, UpdatedStats: updatedStats,
-            RebirthBroadcast: true, Zone241Time: newZone241Time, DropItems: reward.Drops), ct);
-
-        logger.LogInformation(
-            "Character {CharacterId} completed Max Rebirth (Path B): generation {OldGeneration} -> {NewGeneration}",
-            characterId, state.RebirthCount, newRebirthCount);
 
         return TribeActionOutcome.Ok();
     }

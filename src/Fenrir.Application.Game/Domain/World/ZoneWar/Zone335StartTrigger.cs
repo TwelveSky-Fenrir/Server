@@ -37,13 +37,17 @@ public sealed class Zone335StartTrigger
         }
     }
 
-    public bool ConsumeStartRequest()
+    public bool TryConsumeStartRequest(out int battleDurationLegacyTicks)
     {
         lock (_lock)
         {
             if (!_startRequested)
+            {
+                battleDurationLegacyTicks = 0;
                 return false;
+            }
 
+            battleDurationLegacyTicks = _remainingTicks;
             _startRequested = false;
             _remainingTicks = 0;
             return true;

@@ -44,7 +44,11 @@ public readonly record struct RegularWarTickResult(
     byte? WinningTribe = null,
     bool MonstersShouldDespawn = false,
     bool BossMonstersShouldSpawn = false,
-    bool AllSessionsShouldDisconnect = false)
+    bool AllSessionsShouldDisconnect = false,
+    bool CountdownFinished = false,
+    bool GateOpened = false,
+    int? ActiveWarDurationTicks = null,
+    bool ReturnToTownAnnounced = false)
 {
     public bool EnteredActiveWar => PreviousPhase == RegularWarPhase.PreWar && Phase == RegularWarPhase.Active;
 }
@@ -112,19 +116,23 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
         var monstersShouldDespawn = false;
         var bossMonstersShouldSpawn = false;
         var allSessionsShouldDisconnect = false;
+        var countdownFinished = false;
+        var gateOpened = false;
+        int? activeWarDurationTicks = null;
+        var returnToTownAnnounced = false;
 
         switch (Phase)
         {
             case RegularWarPhase.Idle:
-                TickIdle(ref countdownAnnounceValue);
+                TickIdle(ref countdownAnnounceValue, ref countdownFinished);
                 break;
 
             case RegularWarPhase.OpenGate:
-                TickOpenGate();
+                TickOpenGate(ref gateOpened);
                 break;
 
             case RegularWarPhase.PreWar:
-                TickPreWar(snapshot, ref smallestPresentTribe);
+                TickPreWar(snapshot, ref smallestPresentTribe, ref activeWarDurationTicks);
                 break;
 
             case RegularWarPhase.Active:
@@ -133,7 +141,7 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
                 break;
 
             case RegularWarPhase.PostWarCleanup:
-                TickPostWarCleanup(snapshot, ref monstersShouldDespawn);
+                TickPostWarCleanup(snapshot, ref monstersShouldDespawn, ref returnToTownAnnounced);
                 break;
 
             case RegularWarPhase.ForcedReset:
@@ -150,7 +158,11 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
             outcome == RegularWarOutcome.TribeWin ? WinningTribe : null,
             monstersShouldDespawn,
             bossMonstersShouldSpawn,
-            allSessionsShouldDisconnect);
+            allSessionsShouldDisconnect,
+            countdownFinished,
+            gateOpened,
+            activeWarDurationTicks,
+            returnToTownAnnounced);
     }
 
     public void RegisterKill(byte killerTribe, int killerCharacterId)
@@ -186,7 +198,7 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
         ];
     }
 
-    private void TickIdle(ref int? countdownAnnounceValue)
+    private void TickIdle(ref int? countdownAnnounceValue, ref bool countdownFinished)
     {
         switch (_idleSubPhase)
         {
@@ -225,23 +237,26 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
                 if (_finalWaitTicksElapsed < FinalWaitTicks)
                     return;
 
+                countdownFinished = true;
                 Phase = RegularWarPhase.OpenGate;
                 _openGateTicksElapsed = 0;
                 return;
         }
     }
 
-    private void TickOpenGate()
+    private void TickOpenGate(ref bool gateOpened)
     {
         _openGateTicksElapsed++;
         if (_openGateTicksElapsed < OpenGateTicks)
             return;
 
+        gateOpened = true;
         Phase = RegularWarPhase.PreWar;
         _preWarTicksElapsed = 0;
     }
 
-    private void TickPreWar(RegularWarEnvironmentSnapshot snapshot, ref byte? smallestPresentTribe)
+    private void TickPreWar(RegularWarEnvironmentSnapshot snapshot, ref byte? smallestPresentTribe,
+        ref int? activeWarDurationTicks)
     {
         _preWarTicksElapsed++;
         if (_preWarTicksElapsed < PreWarTicks)
@@ -252,6 +267,7 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
 
         Array.Clear(_tribeKillTally);
         RemainingActiveWarTicks = ActiveWarDurationTicks;
+        activeWarDurationTicks = ActiveWarDurationTicks;
         _activeEvaluationTicksElapsed = 0;
         Phase = RegularWarPhase.Active;
     }
@@ -291,7 +307,8 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
         _bossPollTicksElapsed = 0;
     }
 
-    private void TickPostWarCleanup(RegularWarEnvironmentSnapshot snapshot, ref bool monstersShouldDespawn)
+    private void TickPostWarCleanup(RegularWarEnvironmentSnapshot snapshot, ref bool monstersShouldDespawn,
+        ref bool returnToTownAnnounced)
     {
         _postWarTicksElapsed++;
         if (_postWarTicksElapsed < PostWarCleanupTicks)
@@ -300,6 +317,7 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
         if (!config.IsBossWar)
         {
             monstersShouldDespawn = true;
+            returnToTownAnnounced = true;
             EnterForcedReset();
             return;
         }
@@ -309,6 +327,7 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
             return;
 
         monstersShouldDespawn = true;
+        returnToTownAnnounced = true;
         EnterForcedReset();
     }
 

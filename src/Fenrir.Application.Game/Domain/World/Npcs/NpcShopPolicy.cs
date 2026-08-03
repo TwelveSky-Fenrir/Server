@@ -179,7 +179,11 @@ public static class NpcShopPolicy
                     return new BuyResult(costFailure, 0, 0, null);
 
                 return new BuyResult(BuyOutcome.Success, moneyCost, cpCost,
-                    existing with { Quantity = mergedQuantity, Serial = 0 });
+                    existing with
+                    {
+                        Quantity = mergedQuantity, Enchant = 0, Combine = 0, Refine = 0, Socket = 0, Serial = 0,
+                        XPos = (byte)destinationX, YPos = (byte)destinationY
+                    });
             }
 
             if (!TryResolveCost(item, requestedQuantity, playerContributionPoints,

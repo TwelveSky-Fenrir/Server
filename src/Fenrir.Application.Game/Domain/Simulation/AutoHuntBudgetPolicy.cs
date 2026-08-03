@@ -17,7 +17,7 @@ public static class AutoHuntBudgetPolicy
         int todayDate)
     {
         if (dayBudget <= 0 && minuteBudget <= 0)
-            return new Result(0, 0, minuteAccrualTicks, Signal.None);
+            return new Result(0, 0, minuteAccrualTicks, Signal.Exhausted);
 
         if (dayBudget > 0)
         {

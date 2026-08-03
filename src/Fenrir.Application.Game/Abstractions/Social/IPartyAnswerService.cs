@@ -13,9 +13,9 @@ public readonly record struct PartyAnswerResult(
     int InviterId = 0,
     bool Accepted = false,
     PartyJoinOutcome JoinOutcome = default,
-    IReadOnlyList<int>? Members = null)
+    IReadOnlyList<PartyMember>? Members = null)
 {
-    public IReadOnlyList<int> Members { get; init; } = Members ?? [];
+    public IReadOnlyList<PartyMember> Members { get; init; } = Members ?? [];
 }
 
 public interface IPartyAnswerService

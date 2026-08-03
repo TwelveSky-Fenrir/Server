@@ -3,7 +3,17 @@ CREATE PROCEDURE runtime.usp_PartyResyncRelay_Publish @Sort TINYINT,
                                                       @SourceCharacterId INT,
                                                       @PartyName NVARCHAR(13),
                                                       @AvatarName NVARCHAR(13),
-                                                      @CorrelationId UNIQUEIDENTIFIER
+                                                      @CorrelationId UNIQUEIDENTIFIER,
+                                                      @MemberId1 INT,
+                                                      @MemberName1 NVARCHAR(13),
+                                                      @MemberId2 INT,
+                                                      @MemberName2 NVARCHAR(13),
+                                                      @MemberId3 INT,
+                                                      @MemberName3 NVARCHAR(13),
+                                                      @MemberId4 INT,
+                                                      @MemberName4 NVARCHAR(13),
+                                                      @MemberId5 INT,
+                                                      @MemberName5 NVARCHAR(13)
     WITH NATIVE_COMPILATION , SCHEMABINDING
 AS
 BEGIN
@@ -17,7 +27,12 @@ BEGIN
 
     IF @ExistingRelayId IS NULL
         INSERT INTO runtime.PartyResyncRelay
-        (Sort, SourceShardId, SourceCharacterId, PartyName, AvatarName, CorrelationId, CreatedAtUtc)
-        VALUES (@Sort, @SourceShardId, @SourceCharacterId, @PartyName, @AvatarName, @CorrelationId,
-                SYSUTCDATETIME());
+        (Sort, SourceShardId, SourceCharacterId, PartyName, AvatarName,
+         MemberId1, MemberName1, MemberId2, MemberName2, MemberId3, MemberName3,
+         MemberId4, MemberName4, MemberId5, MemberName5,
+         CorrelationId, CreatedAtUtc)
+        VALUES (@Sort, @SourceShardId, @SourceCharacterId, @PartyName, @AvatarName,
+                @MemberId1, @MemberName1, @MemberId2, @MemberName2, @MemberId3, @MemberName3,
+                @MemberId4, @MemberName4, @MemberId5, @MemberName5,
+                @CorrelationId, SYSUTCDATETIME());
 END;

@@ -10,6 +10,8 @@ public enum TribeScrollTransferOutcome
 
     LevelTooLow,
 
+    DestinationTribeClosed,
+
     HomeZoneOffline,
 
     WrongLocation,

@@ -31,8 +31,8 @@ public sealed class PartyDisbandHandler(
         var shardId = options.Value.ShardId;
 
         var notice = new PartyDisbandResponse { Sort = 1, AvatarName = "" };
-        foreach (var memberId in result.Members)
-            PartyBroadcast.SendOrRelayNotice(zones, partyResyncRelay, shardId, memberId, notice,
+        foreach (var member in result.Members)
+            PartyBroadcast.SendOrRelayNotice(zones, partyResyncRelay, shardId, member.CharacterId, notice,
                 PartyResyncRelaySort.DisbandNotice, "");
     }
 }

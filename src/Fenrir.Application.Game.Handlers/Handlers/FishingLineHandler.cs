@@ -14,6 +14,16 @@ public sealed class FishingLineHandler(IFishingLineService fishingLineService, I
     public void Handle(in FishingLineRequest packet, IPacketSession session)
     {
         var zoneSession = (IZoneSession)session;
+
+        if (packet.Sort is not (1 or 2))
+        {
+            logger.LogDebug(
+                "Fishing-line request (op103) on session {SessionId}: malformed sort {Sort} -- legacy default disconnects, no response (S04_MyWork02.cpp:13502-13504)",
+                session.SessionId, packet.Sort);
+            zoneSession.Abort(DisconnectReason.Faulted);
+            return;
+        }
+
         var characterId = zoneSession.CharacterId!.Value;
 
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
@@ -33,23 +43,17 @@ public sealed class FishingLineHandler(IFishingLineService fishingLineService, I
         }
 
         FishingLineResult result;
-        switch (packet.Sort)
+        if (packet.Sort == 1)
         {
-            case 1:
-                result = fishingLineService.Cast(zone, state, characterId);
-                logger.LogInformation("Character {CharacterId} cast fishing line (result {Result})", characterId,
-                    result.Result);
-                break;
-            case 2:
-                result = fishingLineService.Reel(zone, state, characterId);
-                logger.LogInformation("Character {CharacterId} reeled fishing line (result {Result})", characterId,
-                    result.Result);
-                break;
-            default:
-                logger.LogWarning(
-                    "Fishing-line request ignored for character {CharacterId}: invalid sort {Sort}",
-                    characterId, packet.Sort);
-                return;
+            result = fishingLineService.Cast(zone, state, characterId);
+            logger.LogInformation("Character {CharacterId} cast fishing line (result {Result})", characterId,
+                result.Result);
+        }
+        else
+        {
+            result = fishingLineService.Reel(zone, state, characterId);
+            logger.LogInformation("Character {CharacterId} reeled fishing line (result {Result})", characterId,
+                result.Result);
         }
 
         session.Send(new FishingLineResponse

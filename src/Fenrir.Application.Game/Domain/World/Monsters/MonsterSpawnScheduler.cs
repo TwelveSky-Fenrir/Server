@@ -335,7 +335,7 @@ public sealed class MonsterSpawnScheduler(
         if (creditedAvatar is not null && !killRaceInterceptsExperienceGrant)
             zone.GrantMonsterKillExperience(creditedAvatar.CharacterId, monster.Template.RealLevel,
                 monster.Template.GeneralExperience, partyMemberIds,
-                monster.Template.PatExperience, monster.Template.Life);
+                monster.Template.PatExperience, monster.Template.Life, monster.Template.ItemLevel);
     }
 
     private void ApplyTowerDrop(Zone zone, MonsterZoneSpawnState state, MonsterEntity monster)

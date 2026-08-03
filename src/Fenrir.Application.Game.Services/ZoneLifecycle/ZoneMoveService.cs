@@ -253,7 +253,7 @@ public sealed class ZoneMoveService(
                 {
                     Result = 1,
                     Ip = candidate.Host,
-                    Port = candidate.Port
+                    Port = options.Value.ZoneBasePort + targetZoneNumber
                 });
                 zoneSession.Send(new ReturnToHomeZoneResponse());
                 return;

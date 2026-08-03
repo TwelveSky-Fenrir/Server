@@ -8,7 +8,6 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 public sealed class ValleyWarSystem(
     ValleyWarKillRegistry killRegistry,
     Lazy<ZoneEventBroadcaster> broadcaster,
-    Lazy<ZoneRegistry> zoneRegistry,
     ILogger<ValleyWarSystem> logger) : ISimulationSystem
 {
     private const int DoorContextTag = 0;
@@ -42,7 +41,7 @@ public sealed class ValleyWarSystem(
             break;
         }
 
-        return new ValleyWarEnvironmentSnapshot(eligiblePresent);
+        return new ValleyWarEnvironmentSnapshot(eligiblePresent, zone.ValleyWarBossSlotOccupied());
     }
 
     private void React(Zone zone, ValleyWarSchedule schedule, ValleyWarTickResult result)
@@ -93,9 +92,10 @@ public sealed class ValleyWarSystem(
 
         if (result.BossWin)
         {
-            broadcaster.Value.AnnounceValleyWarBossDefeated();
             if (schedule.WinningTribe is { } winningTribe)
-                GrantRewardsToTribe(winningTribe);
+                GrantRewardsToTribe(zone, winningTribe);
+
+            broadcaster.Value.AnnounceValleyWarBossDefeated();
         }
 
         if (result.PostWinReturnToTown)
@@ -128,9 +128,8 @@ public sealed class ValleyWarSystem(
             zone.MapId, what);
     }
 
-    private void GrantRewardsToTribe(byte winningTribe)
+    private void GrantRewardsToTribe(Zone zone, byte winningTribe)
     {
-        foreach (var zone in zoneRegistry.Value.Zones)
         foreach (var player in zone.Players)
         {
             if (player.Tribe != winningTribe || player.IsMovingZone || player.IsDead)

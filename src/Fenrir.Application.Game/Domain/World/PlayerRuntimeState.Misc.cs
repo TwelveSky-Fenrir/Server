@@ -47,4 +47,6 @@ public partial class PlayerRuntimeState
     public DateTime? FishingCastAtUtc { get; set; }
 
     public bool CatchingFish { get; set; }
+
+    public bool FishingBiteWasHit { get; set; }
 }

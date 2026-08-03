@@ -86,13 +86,17 @@ public sealed class BuyCashItemService(
         var slot = packet.Index;
         if (page is not (ContainerMatrix.InventoryPage0 or ContainerMatrix.InventoryPage1) ||
             !ContainerMatrix.IsValidSlot((byte)page, slot) ||
-            (page == ContainerMatrix.InventoryPage1 && state.InventoryDate < GameDate.Today()))
+            (page == ContainerMatrix.InventoryPage1 && state.InventoryDate < GameDate.Today()) ||
+            packet.Value[1] is < 0 or > 7 || packet.Value[2] is < 0 or > 7)
         {
             logger.LogWarning(
                 "Buy cash item rejected: character {CharacterId} sent invalid or expired-premium-page destination slot {Page}/{Index} -- session will be disconnected",
                 characterId, page, slot);
             return null;
         }
+
+        var destinationX = (byte)packet.Value[1];
+        var destinationY = (byte)packet.Value[2];
 
         var isStackable = ContainerMatrix.IsStackableSort(itemDefinition.Item.Sort);
 
@@ -138,12 +142,16 @@ public sealed class BuyCashItemService(
                 };
             }
 
-            newStack = existing with { Quantity = existing.Quantity + grantQuantity, Serial = 0 };
+            newStack = existing with
+            {
+                Quantity = existing.Quantity + grantQuantity, Serial = 0, XPos = destinationX, YPos = destinationY
+            };
         }
         else
         {
             var serial = ItemSerialGenerator.Generate(ItemSerialGenerator.EliteItemType, DateTimeOffset.UtcNow);
-            newStack = new ItemStack(entry.ItemId, grantQuantity, 0, 0, 0, 0, 0, 0, 0, 0, serial);
+            newStack = new ItemStack(entry.ItemId, grantQuantity, 0, 0, 0, 0, 0, 0, 0, 0, serial, destinationX,
+                destinationY);
         }
 
         var projectedContainer = state.Inventory.GetContainer((byte)page).SetItem((byte)slot, newStack);
@@ -169,7 +177,7 @@ public sealed class BuyCashItemService(
         var response = new BuyCashItemResponse
         {
             Result = 0, CashSize = newBalance, Page = page, Index = slot,
-            Value = [newStack.ItemId, 0, 0, newStack.Quantity, 0, newStack.Serial]
+            Value = [newStack.ItemId, destinationX, destinationY, newStack.Quantity, 0, newStack.Serial]
         };
 
         var containers = ImmutableArray.Create(new InventoryContainerSnapshot((byte)page, projectedContainer));

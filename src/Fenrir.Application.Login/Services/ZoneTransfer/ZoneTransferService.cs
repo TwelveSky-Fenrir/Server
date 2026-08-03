@@ -1,7 +1,9 @@
 using System.Collections.Immutable;
+using System.Net;
 using Fenrir.Application.Login.Abstractions.ZoneTransfer;
 using Fenrir.Domain.Login;
 using Fenrir.Domain.Login.Avatars;
+using Fenrir.Network.Dispatch.Sessions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -13,6 +15,7 @@ public sealed class ZoneTransferService(
     IShardMapAssignmentRepository shardMapAssignments,
     ISessionTicketRepository tickets,
     IShardReachabilityProbe reachabilityProbe,
+    SessionRegistry sessions,
     IOptions<LoginServerOptions> options,
     ILogger<ZoneTransferService> logger) : IZoneTransferService
 {
@@ -68,13 +71,25 @@ public sealed class ZoneTransferService(
         }
 
         await tickets.CreateAsync(accountId, summary.CharacterId, shard.ShardId, options.Value.TicketTtlSeconds,
-            sessionToken, accountGrade, healedMapId, cancellationToken);
+            sessionToken, accountGrade, healedMapId, cancellationToken, ResolveLoginSourceAddress(accountId));
 
         logger.LogInformation(
             "Zone transfer ticket minted: account {AccountId} character {CharacterId} -> zone {MapId} at {Host}:{Port} (shard {ShardId})",
             accountId, character.CharacterId, healedMapId, shard.Host, zonePort, shard.ShardId);
 
         return new ZoneTransferResult(ZoneTransferOutcome.Success, shard.Host, zonePort, healedMapId);
+    }
+
+    private IPAddress? ResolveLoginSourceAddress(int accountId)
+    {
+        if (sessions.TryGetByAccount(accountId, out var session) && session?.RemoteEndPoint is { } endPoint)
+            return endPoint.Address;
+
+        logger.LogWarning(
+            "Zone transfer: account {AccountId} has no live login session endpoint; its handoff ticket is minted unbound " +
+            "and the zone will accept it from any source address",
+            accountId);
+        return null;
     }
 
     private async ValueTask ClampVitalsFloorIfNeededAsync(CharacterWorldEntryDto character,

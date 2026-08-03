@@ -40,13 +40,15 @@ public static class HostingServiceCollectionExtensions
             var opts = sp.GetRequiredService<IOptions<LoginServerOptions>>().Value;
             var firewallRules = sp.GetRequiredService<IFirewallRuleRepository>();
             var registry = sp.GetRequiredService<SessionRegistry>();
+            var gmAllowlist = sp.GetRequiredService<IGmAllowlistRepository>();
 
             return new IpFloodGuard(
                 opts.MaxConnectionsPerIp,
                 opts.MaxProtocolViolationsPerIpPerHour,
                 firewallRules.BlockAsync,
                 registry,
-                logger: sp.GetRequiredService<ILogger<IpFloodGuard>>());
+                logger: sp.GetRequiredService<ILogger<IpFloodGuard>>(),
+                isOperatorAllowlistedAsync: gmAllowlist.IsAllowedAsync);
         });
 
         services.AddSingleton(sp => new FirewallAllowlistReconcileService(

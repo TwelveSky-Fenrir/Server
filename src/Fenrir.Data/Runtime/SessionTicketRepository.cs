@@ -1,4 +1,5 @@
 using System.Data;
+using System.Net;
 using CaeriusNet.Abstractions;
 using CaeriusNet.Builders;
 using CaeriusNet.Commands.Reads;
@@ -20,8 +21,11 @@ public sealed record SessionTicketRepository(ICaeriusNetDbContext Db) : ISession
     private const int MaxWriteConflictAttempts = 3;
 
     public async ValueTask CreateAsync(int accountId, int characterId, byte shardId, int ttlSeconds,
-        Guid sessionToken, short accountGrade, short targetMapId, CancellationToken ct)
+        Guid sessionToken, short accountGrade, short targetMapId, CancellationToken ct,
+        IPAddress? sourceAddress = null)
     {
+        var sourceIpPrefix = SessionTicketBinding.PrefixOf(sourceAddress);
+
         for (var attempt = 1;; attempt++)
         {
             var parameters =
@@ -33,6 +37,7 @@ public sealed record SessionTicketRepository(ICaeriusNetDbContext Db) : ISession
                     .AddParameter("SessionToken", sessionToken, SqlDbType.UniqueIdentifier)
                     .AddParameter("AccountGrade", accountGrade, SqlDbType.SmallInt)
                     .AddParameter("TargetMapId", targetMapId, SqlDbType.SmallInt)
+                    .AddParameter("SourceIpPrefix", (object?)sourceIpPrefix ?? DBNull.Value, SqlDbType.VarChar)
                     .Build();
 
             try
@@ -49,13 +54,17 @@ public sealed record SessionTicketRepository(ICaeriusNetDbContext Db) : ISession
         }
     }
 
-    public async ValueTask<ConsumedTicketDto?> ConsumeAsync(int accountId, CancellationToken ct)
+    public async ValueTask<ConsumedTicketDto?> ConsumeAsync(int accountId, IPAddress? sourceAddress,
+        CancellationToken ct)
     {
+        var sourceIpPrefix = SessionTicketBinding.PrefixOf(sourceAddress);
+
         for (var attempt = 1;; attempt++)
         {
             var parameters =
                 new StoredProcedureParametersBuilder("runtime", "usp_SessionTicket_Consume", 1, CommandTimeoutSeconds)
                     .AddParameter("AccountId", accountId, SqlDbType.Int)
+                    .AddParameter("SourceIpPrefix", (object?)sourceIpPrefix ?? DBNull.Value, SqlDbType.VarChar)
                     .Build();
 
             try

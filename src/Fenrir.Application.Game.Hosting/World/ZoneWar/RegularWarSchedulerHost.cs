@@ -66,15 +66,25 @@ public sealed class RegularWarSchedulerHost(
             if (result.CountdownAnnounceValue is { } remaining)
                 sink.OnCountdownAnnounced(mapConfig.MapId, remaining);
 
+            if (result.CountdownFinished)
+                sink.OnCountdownFinished(mapConfig.MapId);
+
+            if (result.GateOpened)
+                sink.OnGateOpened(mapConfig.MapId);
+
             if (result.SmallestPresentTribe is { } smallestTribe)
                 sink.OnSmallestTribeFlagged(mapConfig.MapId, smallestTribe);
 
             if (result.EnteredActiveWar)
-                sink.OnActiveWarStarted(mapConfig.MapId);
+                sink.OnActiveWarStarted(mapConfig.MapId,
+                    result.ActiveWarDurationTicks ?? RegularWarSchedule.ActiveWarDurationTicks);
 
             if (result.Outcome is { } outcome)
                 HandleConclusion(mapConfig, zone, schedule, outcome, result.WinningTribe,
                     result.BossMonstersShouldSpawn);
+
+            if (result.ReturnToTownAnnounced)
+                sink.OnReturnToTownAnnounced(mapConfig.MapId);
 
             if (result.MonstersShouldDespawn)
                 sink.OnMonstersShouldDespawn(mapConfig.MapId);

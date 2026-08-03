@@ -1,3 +1,5 @@
+using Fenrir.Application.Game.Domain.Social.Party;
+
 namespace Fenrir.Application.Game.Abstractions.Social;
 
 public enum PartyKickResultKind
@@ -10,12 +12,12 @@ public enum PartyKickResultKind
 public readonly record struct PartyKickResult(
     PartyKickResultKind Kind,
     int TargetId = 0,
-    IReadOnlyList<int>? MembersBeforeKick = null,
+    IReadOnlyList<PartyMember>? MembersBeforeKick = null,
     bool Disbanded = false,
-    IReadOnlyList<int>? RemainingMembers = null)
+    IReadOnlyList<PartyMember>? RemainingMembers = null)
 {
-    public IReadOnlyList<int> MembersBeforeKick { get; init; } = MembersBeforeKick ?? [];
-    public IReadOnlyList<int> RemainingMembers { get; init; } = RemainingMembers ?? [];
+    public IReadOnlyList<PartyMember> MembersBeforeKick { get; init; } = MembersBeforeKick ?? [];
+    public IReadOnlyList<PartyMember> RemainingMembers { get; init; } = RemainingMembers ?? [];
 }
 
 public interface IPartyKickService

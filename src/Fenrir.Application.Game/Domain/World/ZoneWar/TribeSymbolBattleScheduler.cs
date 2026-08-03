@@ -35,12 +35,12 @@ public sealed class TribeSymbolBattleScheduler(
             ? 0
             : CountdownMinutes + 1 - _countdown.MinutesElapsed;
 
-    public void Tick(TimeSpan elapsed, DateTime utcNow)
+    public void Tick(TimeSpan elapsed, DateTime localNow)
     {
         switch (Phase)
         {
             case TribeSymbolBattleSchedulePhase.WaitingForHour:
-                EvaluateWaiting(utcNow);
+                EvaluateWaiting(localNow);
                 break;
             case TribeSymbolBattleSchedulePhase.Counting:
                 AdvanceCountdown(elapsed);
@@ -48,15 +48,15 @@ public sealed class TribeSymbolBattleScheduler(
         }
     }
 
-    private void EvaluateWaiting(DateTime utcNow)
+    private void EvaluateWaiting(DateTime localNow)
     {
         var closing = worldState.World.TribeSymbolBattle;
         var targetHour = closing ? CloseHour : OpenHour;
 
-        if (utcNow.Hour != targetHour)
+        if (localNow.Hour != targetHour)
             return;
 
-        if (!testMode && !AllowedDays.Contains(utcNow.DayOfWeek))
+        if (!testMode && !AllowedDays.Contains(localNow.DayOfWeek))
             return;
 
         Phase = TribeSymbolBattleSchedulePhase.Counting;

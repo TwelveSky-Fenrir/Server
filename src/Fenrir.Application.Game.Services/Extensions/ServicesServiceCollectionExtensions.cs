@@ -82,6 +82,7 @@ public static class ServicesServiceCollectionExtensions
         services.AddSingleton<ITribeActionService, TribeActionService>();
         services.AddSingleton<ITribeAnnouncementScrollService, TribeAnnouncementScrollService>();
         services.AddSingleton<ITribeBankService, TribeBankService>();
+        services.AddSingleton<ITribeChangeAvailabilityService, TribeChangeAvailabilityService>();
         services.AddSingleton<ITribePopulationService, TribePopulationService>();
         services.AddSingleton<ITribeVoteService, TribeVoteService>();
         services.AddSingleton<ITribeMigrationService, TribeMigrationService>();

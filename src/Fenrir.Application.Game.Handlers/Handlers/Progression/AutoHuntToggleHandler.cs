@@ -27,13 +27,17 @@ public sealed class AutoHuntToggleHandler(
 
         var result = await autoHuntToggleService.ToggleAsync(characterId, zone, state, packet, cancellationToken);
 
-        if (result.Aborted)
+        if (result.Outcome == AutoHuntToggleOutcome.Disconnect)
         {
             logger.LogDebug(
-                "Auto-hunt toggle rejected for character {CharacterId} on map {MapId}: sort {Sort} (zone blocked, missing weapon/skill, or invalid config)",
+                "Auto-hunt toggle (op99) for character {CharacterId} on map {MapId}: sort {Sort} rejected (blocked zone, missing weapon, no attack skill or malformed sort) -- legacy disconnects, no response (S04_MyWork02.cpp:13226, 13231, 13284)",
                 characterId, zone.MapId, packet.Sort);
+            zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
+
+        if (result.Outcome == AutoHuntToggleOutcome.Ignored)
+            return;
 
         logger.LogInformation("Character {CharacterId} set auto-hunt {Enabled}", characterId, result.Enabled);
 

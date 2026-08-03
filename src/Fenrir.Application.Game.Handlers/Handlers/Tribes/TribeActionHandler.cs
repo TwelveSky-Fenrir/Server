@@ -81,10 +81,6 @@ public sealed class TribeActionHandler(
                 Respond(session, packet, characterId,
                     await tribeActionService.SetOrnamentAsync(zone, state, characterId, false, ct));
                 return;
-            case 11:
-                Respond(session, packet, characterId,
-                    await tribeActionService.RebirthAsync(zone, state, characterId, ct));
-                return;
             case 12:
             case 13:
             case 14:

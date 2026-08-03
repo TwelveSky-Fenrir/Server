@@ -33,9 +33,9 @@ public sealed class PartyAnswerHandler(
 
         if (result.JoinOutcome == PartyJoinOutcome.PartyWasFull)
         {
-            var fullRoster = PartyBroadcast.BuildRoster(zones, 2, result.Members);
-            foreach (var memberId in result.Members)
-                if (zones.TryGetPlayer(memberId, out var member))
+            var fullRoster = PartyBroadcast.BuildRoster(2, result.Members);
+            foreach (var current in result.Members)
+                if (zones.TryGetPlayer(current.CharacterId, out var member))
                     member.Session.Send(fullRoster);
 
             return;
@@ -45,11 +45,11 @@ public sealed class PartyAnswerHandler(
             return;
 
         var joinNotice = new PartyMemberJoinedResponse { AvatarName = invitee.Name };
-        var roster = PartyBroadcast.BuildRoster(zones, result.JoinOutcome == PartyJoinOutcome.Created ? 1 : 2,
+        var roster = PartyBroadcast.BuildRoster(result.JoinOutcome == PartyJoinOutcome.Created ? 1 : 2,
             result.Members);
 
-        foreach (var memberId in result.Members)
-            if (zones.TryGetPlayer(memberId, out var member))
+        foreach (var current in result.Members)
+            if (zones.TryGetPlayer(current.CharacterId, out var member))
             {
                 member.Session.Send(joinNotice);
                 member.Session.Send(roster);

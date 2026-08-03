@@ -12,6 +12,8 @@ public sealed class FenrirTcpListener<TSession> : IAsyncDisposable
 
     private static readonly TimeSpan AcceptFailureBackoff = TimeSpan.FromMilliseconds(200);
 
+    private readonly SocketAdmissionGate? _admissionGate;
+
     private readonly bool _applyOsSocketBuffers;
     private readonly Socket _listenSocket;
 
@@ -20,11 +22,13 @@ public sealed class FenrirTcpListener<TSession> : IAsyncDisposable
     private readonly SessionIdAllocator _sessionIds;
 
     public FenrirTcpListener(IPEndPoint endpoint, Func<long, IDuplexPipe, IPEndPoint?, TSession> sessionFactory,
-        ILogger? logger = null, SessionIdAllocator? sessionIds = null, bool applyOsSocketBuffers = false)
+        ILogger? logger = null, SessionIdAllocator? sessionIds = null, bool applyOsSocketBuffers = false,
+        SocketAdmissionGate? admissionGate = null)
     {
         _sessionFactory = sessionFactory;
         _logger = logger;
         _applyOsSocketBuffers = applyOsSocketBuffers;
+        _admissionGate = admissionGate;
 
         _sessionIds = sessionIds ?? SessionIdAllocator.Shared;
 
@@ -70,6 +74,16 @@ public sealed class FenrirTcpListener<TSession> : IAsyncDisposable
                 continue;
             }
 
+            if (_admissionGate is not null && !_admissionGate.TryAcquire())
+            {
+                _logger?.AcceptRefusedAtSocketCap(_listenSocket.LocalEndPoint, TryReadRemoteEndPoint(accepted),
+                    _admissionGate.MaxConcurrentSockets);
+                accepted.Dispose();
+                continue;
+            }
+
+            var gateHeld = _admissionGate is not null;
+
             SocketConnection? connection = null;
             try
             {
@@ -77,11 +91,15 @@ public sealed class FenrirTcpListener<TSession> : IAsyncDisposable
                 var sessionId = _sessionIds.Next();
                 var session = _sessionFactory(sessionId, connection, connection.RemoteEndPoint);
 
-                _ = RunAcceptedAsync(session, connection, onAccepted, cancellationToken);
+                _ = RunAcceptedAsync(session, connection, onAccepted, _admissionGate, cancellationToken);
+                gateHeld = false;
             }
             catch (Exception ex)
             {
                 _logger?.ConnectionConstructionFailed(ex, _listenSocket.LocalEndPoint);
+
+                if (gateHeld)
+                    _admissionGate!.Release();
 
                 if (connection is not null)
                     await connection.DisposeAsync().ConfigureAwait(false);
@@ -91,10 +109,23 @@ public sealed class FenrirTcpListener<TSession> : IAsyncDisposable
         }
     }
 
+    private static EndPoint? TryReadRemoteEndPoint(Socket socket)
+    {
+        try
+        {
+            return socket.RemoteEndPoint;
+        }
+        catch (Exception ex) when (ex is SocketException or ObjectDisposedException)
+        {
+            return null;
+        }
+    }
+
     private static async Task RunAcceptedAsync(
         TSession session,
         SocketConnection connection,
         Func<TSession, SocketConnection, CancellationToken, Task> onAccepted,
+        SocketAdmissionGate? admissionGate,
         CancellationToken cancellationToken)
     {
         try
@@ -103,6 +134,10 @@ public sealed class FenrirTcpListener<TSession> : IAsyncDisposable
         }
         catch (Exception)
         {
+        }
+        finally
+        {
+            admissionGate?.Release();
         }
     }
 }

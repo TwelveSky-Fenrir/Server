@@ -156,6 +156,7 @@ public sealed class BuyShopItemService(
 
         var buyerDestination = buyer.Inventory.GetSlot((byte)packet.Page2, (byte)packet.Index2);
         var resolved = PshopPurchasePolicy.ResolvePurchase(slot, itemDefinition, buyerDestination,
+            (byte)packet.XPost2, (byte)packet.YPost2,
             liveStack.SocketGem1, liveStack.SocketGem2, liveStack.SocketGem3);
 
         if (!resolved.Succeeded)
@@ -250,6 +251,7 @@ public sealed class BuyShopItemService(
 
         var buyerDestination = buyer.Inventory.GetSlot((byte)packet.Page2, (byte)packet.Index2);
         var resolved = PshopPurchasePolicy.ResolvePurchase(slot, itemDefinition, buyerDestination,
+            (byte)packet.XPost2, (byte)packet.YPost2,
             slot.SocketGem1, slot.SocketGem2, slot.SocketGem3);
 
         if (!resolved.Succeeded)
@@ -395,7 +397,7 @@ public sealed class BuyShopItemService(
 
     private static BuyShopItemResponse BuildReply(int result, int cost, int page, int index, ItemStack? stack = null)
     {
-        var value = stack is { } s ? [s.ItemId, 0, 0, s.Quantity, s.Value(), s.Serial] : new int[6];
+        var value = stack is { } s ? [s.ItemId, s.XPos, s.YPos, s.Quantity, s.Value(), s.Serial] : new int[6];
         var socket = stack is { } s2 ? [s2.SocketGem1, s2.SocketGem2, s2.SocketGem3] : new int[3];
 
         return new BuyShopItemResponse

@@ -31,17 +31,17 @@ public sealed class PartyKickHandler(
         var shardId = options.Value.ShardId;
 
         var notice = new PartyKickResponse { AvatarName = packet.AvatarName };
-        foreach (var memberId in result.MembersBeforeKick)
-            PartyBroadcast.SendOrRelayNotice(zones, partyResyncRelay, shardId, memberId, notice,
+        foreach (var member in result.MembersBeforeKick)
+            PartyBroadcast.SendOrRelayNotice(zones, partyResyncRelay, shardId, member.CharacterId, notice,
                 PartyResyncRelaySort.KickNotice, packet.AvatarName);
 
         if (!result.Disbanded)
         {
             if (result.RemainingMembers.Count > 0)
             {
-                var roster = PartyBroadcast.BuildRoster(zones, 2, result.RemainingMembers);
-                foreach (var memberId in result.RemainingMembers)
-                    if (zones.TryGetPlayer(memberId, out var member))
+                var roster = PartyBroadcast.BuildRoster(2, result.RemainingMembers);
+                foreach (var remaining in result.RemainingMembers)
+                    if (zones.TryGetPlayer(remaining.CharacterId, out var member))
                         member.Session.Send(roster);
             }
 
@@ -49,9 +49,9 @@ public sealed class PartyKickHandler(
         }
 
         var disbandNotice = new PartyDisbandResponse { Sort = 1, AvatarName = "" };
-        foreach (var memberId in result.MembersBeforeKick)
-            if (memberId != result.TargetId)
-                PartyBroadcast.SendOrRelayNotice(zones, partyResyncRelay, shardId, memberId, disbandNotice,
+        foreach (var member in result.MembersBeforeKick)
+            if (member.CharacterId != result.TargetId)
+                PartyBroadcast.SendOrRelayNotice(zones, partyResyncRelay, shardId, member.CharacterId, disbandNotice,
                     PartyResyncRelaySort.DisbandNotice, "");
     }
 }

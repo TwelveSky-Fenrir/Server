@@ -52,7 +52,8 @@ public sealed class QuestProgressService(
                     out var container, out var slot))
                 return new QuestActionResult(false);
 
-            edits.Deposit(container, slot, new ItemStack(depositItemId, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+            edits.Deposit(container, slot,
+                new ItemStack(depositItemId, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, (byte)packet.XPost, (byte)packet.YPost));
         }
 
         await PersistAndMirrorAsync(zone, characterId, result.NewProgress, 0, 0, 0, 0, edits, ct);
@@ -103,7 +104,8 @@ public sealed class QuestProgressService(
 
             if (result.RewardItemId > 0)
                 edits.Deposit(container, slot,
-                    new ItemStack(result.RewardItemId, result.RewardItemQuantity, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+                    new ItemStack(result.RewardItemId, result.RewardItemQuantity, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        (byte)packet.XPost, (byte)packet.YPost));
         }
 
         if (result.DeleteItemId > 0)
@@ -156,7 +158,8 @@ public sealed class QuestProgressService(
                 out var container, out var slot))
             return new QuestActionResult(false);
 
-        edits.Deposit(container, slot, new ItemStack(depositItemId, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+        edits.Deposit(container, slot,
+            new ItemStack(depositItemId, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, (byte)packet.XPost, (byte)packet.YPost));
 
         var projected = edits.Get(container);
         await characters.ReplaceContainerAsync(characterId, container, ToTvps(projected), ct);
@@ -191,8 +194,8 @@ public sealed class QuestProgressService(
         if (!result.Success)
             return new QuestActionResult(false);
 
-        edits.TryReplaceFirstMatch(result.FromItemId, _ =>
-            new ItemStack(result.ToItemId, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+        edits.TryReplaceFirstMatch(result.FromItemId, previous =>
+            new ItemStack(result.ToItemId, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, previous.XPos, previous.YPos));
 
         await PersistAndMirrorAsync(zone, characterId, result.NewProgress, 0, 0, 0, 0, edits, ct);
 

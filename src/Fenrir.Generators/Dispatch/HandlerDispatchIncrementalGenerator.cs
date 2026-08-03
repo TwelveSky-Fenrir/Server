@@ -87,8 +87,7 @@ public sealed class HandlerDispatchIncrementalGenerator : IIncrementalGenerator
         if (handlers.IsEmpty)
             return;
 
-        ReportCollisions(context, handlers.Where(h => !h.IsAsync));
-        ReportCollisions(context, handlers.Where(h => h.IsAsync));
+        ReportCollisions(context, handlers);
 
         var server = handlers[0].Server;
 
@@ -161,8 +160,8 @@ public sealed class HandlerDispatchIncrementalGenerator : IIncrementalGenerator
     {
         var handlerTypes = handlers
             .Select(h => h.HandlerTypeFullName)
-            .Distinct()
-            .OrderBy(name => name)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(name => name, StringComparer.Ordinal)
             .ToList();
 
         writer.Line(
@@ -182,9 +181,9 @@ public sealed class HandlerDispatchIncrementalGenerator : IIncrementalGenerator
         writer.CloseBrace();
     }
 
-    private static void ReportCollisions(SourceProductionContext context, IEnumerable<HandlerModel> handlers)
+    private static void ReportCollisions(SourceProductionContext context, ImmutableArray<HandlerModel> handlers)
     {
-        var (_, diagnostics) = HandlerCollisionChecker.Check(handlers.ToImmutableArray());
+        var (_, diagnostics) = HandlerCollisionChecker.Check(handlers);
 
         foreach (var diagnostic in diagnostics)
             context.ReportDiagnostic(diagnostic.ToDiagnostic());

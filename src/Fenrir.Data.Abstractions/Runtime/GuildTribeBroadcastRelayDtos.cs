@@ -7,7 +7,9 @@ public enum GuildTribeBroadcastKind : byte
     GuildAnnouncement = 0,
     GuildChat = 1,
     TribeAnnouncement = 2,
-    TribeAnnouncementScroll = 3
+    TribeAnnouncementScroll = 3,
+    WorldChat = 4,
+    GlobalAnnouncement = 5
 }
 
 public sealed record GuildTribeBroadcastRelayEntry(

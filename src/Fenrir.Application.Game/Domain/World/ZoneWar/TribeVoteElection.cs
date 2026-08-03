@@ -43,7 +43,7 @@ public sealed class TribeVoteElection(
     ZoneRegistry zones,
     ILogger<TribeVoteElection> logger)
 {
-    public const int MinimumEligibilityLevel = 163;
+    public const int MinimumEligibilityLevel = 145;
 
     public const int MinimumContributionPoints = 1000;
 
@@ -143,7 +143,7 @@ public sealed class TribeVoteElection(
         if (Phase != TribeVotePhase.Voting)
             return TribeVoteCastOutcome.WindowClosed;
 
-        if (CombinedEligibilityLevel(player) < MinimumEligibilityLevel)
+        if (player.Level < MinimumEligibilityLevel)
             return TribeVoteCastOutcome.LevelTooLow;
 
         var candidates = await worldState.GetTribeVotesAsync(player.Tribe, ct).ConfigureAwait(false);

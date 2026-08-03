@@ -1,13 +1,15 @@
+using Fenrir.Application.Game.Domain.Social.Party;
+
 namespace Fenrir.Application.Game.Abstractions.Social;
 
 public readonly record struct PartyLeaveResult(
     bool Handled,
-    IReadOnlyList<int>? MembersBeforeLeave = null,
+    IReadOnlyList<PartyMember>? MembersBeforeLeave = null,
     bool Disbanded = false,
-    IReadOnlyList<int>? RemainingMembers = null)
+    IReadOnlyList<PartyMember>? RemainingMembers = null)
 {
-    public IReadOnlyList<int> MembersBeforeLeave { get; init; } = MembersBeforeLeave ?? [];
-    public IReadOnlyList<int> RemainingMembers { get; init; } = RemainingMembers ?? [];
+    public IReadOnlyList<PartyMember> MembersBeforeLeave { get; init; } = MembersBeforeLeave ?? [];
+    public IReadOnlyList<PartyMember> RemainingMembers { get; init; } = RemainingMembers ?? [];
 }
 
 public interface IPartyLeaveService

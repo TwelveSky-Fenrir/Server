@@ -18,7 +18,9 @@ public sealed class PartyChatHandler(IPartyChatService partyChatService, ILogger
             "PartyChat: session {SessionId} character {CharacterId} content length {ContentLength}",
             session.SessionId, zoneSession.CharacterId, packet.Content.Length);
 
-        if (ChatRouter.IsContentEmpty(packet.Content))
+        var content = ChatRouter.SafeContent(packet.Content);
+
+        if (ChatRouter.IsContentEmpty(content))
         {
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
@@ -31,6 +33,6 @@ public sealed class PartyChatHandler(IPartyChatService partyChatService, ILogger
         if (!zone.TryGetPlayer(characterId, out var sender) || sender is null)
             return;
 
-        partyChatService.TrySendChat(sender, packet.Content);
+        partyChatService.TrySendChat(sender, content);
     }
 }

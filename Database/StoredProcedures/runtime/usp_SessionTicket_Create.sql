@@ -4,7 +4,8 @@ CREATE PROCEDURE runtime.usp_SessionTicket_Create @AccountId INT,
                                                   @TtlSeconds INT,
                                                   @SessionToken UNIQUEIDENTIFIER,
                                                   @AccountGrade SMALLINT,
-                                                  @TargetMapId SMALLINT
+                                                  @TargetMapId SMALLINT,
+                                                  @SourceIpPrefix VARCHAR(45)
     WITH NATIVE_COMPILATION , SCHEMABINDING
 AS
 BEGIN
@@ -15,7 +16,7 @@ BEGIN
     WHERE AccountId = @AccountId;
 
     INSERT INTO runtime.SessionTickets (AccountId, CharacterId, ShardId, TargetMapId, ExpiresAtUtc, SessionToken,
-                                        AccountGrade)
+                                        AccountGrade, SourceIpPrefix)
     VALUES (@AccountId, @CharacterId, @ShardId, @TargetMapId, DATEADD(SECOND, @TtlSeconds, SYSUTCDATETIME()),
-            @SessionToken, @AccountGrade);
+            @SessionToken, @AccountGrade, @SourceIpPrefix);
 END;

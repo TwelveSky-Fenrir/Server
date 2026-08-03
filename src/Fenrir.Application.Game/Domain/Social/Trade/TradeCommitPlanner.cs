@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Domain.Game.GameData;
 
 namespace Fenrir.Application.Game.Domain.Social.Trade;
 
@@ -20,7 +21,8 @@ public static class TradeCommitPlanner
         ImmutableDictionary<byte, ItemStack> currentPage0,
         ImmutableDictionary<byte, ItemStack> currentPage1,
         IReadOnlyList<(byte Container, byte Slot, ItemStack Stack)?> ownOfferedSlots,
-        IReadOnlyList<(byte Container, byte Slot, ItemStack Stack)?> receivedSlots)
+        IReadOnlyList<(byte Container, byte Slot, ItemStack Stack)?> receivedSlots,
+        WorldDataCache worldData)
     {
         var page0 = currentPage0;
         var page1 = currentPage1;
@@ -30,14 +32,16 @@ public static class TradeCommitPlanner
             if (offered is not { } slot)
                 continue;
 
+            var stackable = IsStackable(worldData, slot.Stack.ItemId);
+
             if (slot.Container == ContainerMatrix.InventoryPage0)
             {
-                if (!TryConsumeReservation(ref page0, slot.Slot, slot.Stack))
+                if (!TryConsumeReservation(ref page0, slot.Slot, slot.Stack, stackable))
                     return Reject(currentPage0, currentPage1, CommitRejection.StaleReservation);
             }
             else if (slot.Container == ContainerMatrix.InventoryPage1)
             {
-                if (!TryConsumeReservation(ref page1, slot.Slot, slot.Stack))
+                if (!TryConsumeReservation(ref page1, slot.Slot, slot.Stack, stackable))
                     return Reject(currentPage0, currentPage1, CommitRejection.StaleReservation);
             }
             else
@@ -62,18 +66,47 @@ public static class TradeCommitPlanner
         return new Plan(page0, page1, CommitRejection.None);
     }
 
-    private static bool TryConsumeReservation(ref ImmutableDictionary<byte, ItemStack> page, byte slot,
-        ItemStack reserved)
+    private static bool IsStackable(WorldDataCache worldData, int itemId)
     {
-        if (reserved.Quantity <= 0 || !page.TryGetValue(slot, out var live))
+        return worldData.ItemsById.TryGetValue(itemId, out var definition) &&
+               ContainerMatrix.IsStackableSort(definition.Item.Sort);
+    }
+
+    private static bool TryConsumeReservation(ref ImmutableDictionary<byte, ItemStack> page, byte slot,
+        ItemStack reserved, bool stackable)
+    {
+        if (!page.TryGetValue(slot, out var live))
             return false;
 
-        if (live.ItemId != reserved.ItemId || live.Quantity < reserved.Quantity)
+        if (!stackable)
+        {
+            if (!IsSameUniqueItem(live, reserved))
+                return false;
+
+            page = page.Remove(slot);
+            return true;
+        }
+
+        if (reserved.Quantity <= 0 || live.ItemId != reserved.ItemId || live.Quantity < reserved.Quantity)
             return false;
 
         var remaining = live.Quantity - reserved.Quantity;
         page = remaining > 0 ? page.SetItem(slot, live with { Quantity = remaining }) : page.Remove(slot);
         return true;
+    }
+
+    private static bool IsSameUniqueItem(ItemStack live, ItemStack reserved)
+    {
+        // SocketGem1..3 and XPos/YPos are excluded on purpose: staging zeroes the gems (USE_SOCKET_GEM is off in
+        // both shipped legacy builds) and the grid coordinates carry no identity.
+        return live.ItemId == reserved.ItemId &&
+               live.Quantity == reserved.Quantity &&
+               live.Enchant == reserved.Enchant &&
+               live.Combine == reserved.Combine &&
+               live.Refine == reserved.Refine &&
+               live.Socket == reserved.Socket &&
+               live.ExpireDate == reserved.ExpireDate &&
+               live.Serial == reserved.Serial;
     }
 
     private static Plan Reject(ImmutableDictionary<byte, ItemStack> page0,

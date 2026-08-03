@@ -52,14 +52,17 @@ public sealed class ZoneHandshakeService(
             return new ZoneHandshakeResult(ZoneHandshakeOutcome.QuotaFull);
         }
 
-        var consumed = await tickets.ConsumeAsync(accountId, cancellationToken);
+        var sourceAddress = session.RemoteEndPoint?.Address;
+
+        var consumed = await tickets.ConsumeAsync(accountId, sourceAddress, cancellationToken);
 
         if (consumed is null || consumed.ShardId != options.Value.ShardId)
         {
             tribeQuota.Release(session.SessionId);
             logger?.LogWarning(
-                "Zone handshake rejected for account {AccountId}: session ticket absent, expired, or wrong shard",
-                accountId);
+                "Zone handshake rejected for account {AccountId} from {SourceAddress}: session ticket absent, expired, " +
+                "bound to a different source address, or minted for another shard",
+                accountId, sourceAddress);
             return new ZoneHandshakeResult(ZoneHandshakeOutcome.Rejected);
         }
 

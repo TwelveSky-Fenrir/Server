@@ -79,6 +79,47 @@ internal static class FieldScanner
         List<DiagnosticInfo> diagnostics,
         HashSet<INamedTypeSymbol> visiting)
     {
+        var field = BuildFieldCore(property, compilation, diagnostics, visiting);
+        if (field is not null)
+            ValidateObfuscation(property, field, diagnostics);
+
+        return field;
+    }
+
+    private static void ValidateObfuscation(
+        IPropertySymbol property,
+        FieldModel field,
+        List<DiagnosticInfo> diagnostics)
+    {
+        var propertyAttributes = property.GetAttributes();
+        var declaredXor = ReadAvatarXorKind(propertyAttributes.Find(WellKnownNames.AvatarXorKindAttribute), out _);
+        var declaredUid = propertyAttributes.Find(WellKnownNames.ObfuscatedUidFieldAttribute) is not null;
+
+        if (declaredXor != AvatarXorKind.None && field.AvatarXor == AvatarXorKind.None)
+            diagnostics.Add(DiagnosticInfo.Create(FenrirDiagnostics.ObfuscationAttributeIgnoredOnShape,
+                property.Locations.FirstOrDefault(),
+                "[AvatarXorKind]", property.ContainingType.Name, property.Name, field.Shape));
+
+        if (declaredUid && !field.IsLegacyUidField)
+            diagnostics.Add(DiagnosticInfo.Create(FenrirDiagnostics.ObfuscationAttributeIgnoredOnShape,
+                property.Locations.FirstOrDefault(),
+                "[ObfuscatedUidField]", property.ContainingType.Name, property.Name, field.Shape));
+
+        if (field.AvatarXor != AvatarXorKind.Char2)
+            return;
+
+        if (field.AvatarXorRowLength <= 0 || field.OwnSize % field.AvatarXorRowLength != 0)
+            diagnostics.Add(DiagnosticInfo.Create(FenrirDiagnostics.InvalidAvatarXorRowLength,
+                property.Locations.FirstOrDefault(),
+                property.ContainingType.Name, property.Name, field.AvatarXorRowLength, field.OwnSize));
+    }
+
+    private static FieldModel? BuildFieldCore(
+        IPropertySymbol property,
+        Compilation compilation,
+        List<DiagnosticInfo> diagnostics,
+        HashSet<INamedTypeSymbol> visiting)
+    {
         var propertyAttributes = property.GetAttributes();
 
         var reservedAttribute = propertyAttributes.Find(WellKnownNames.ReservedAttribute);

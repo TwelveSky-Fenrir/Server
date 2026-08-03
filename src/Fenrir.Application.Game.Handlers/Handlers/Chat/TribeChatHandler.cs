@@ -18,7 +18,9 @@ public sealed class TribeChatHandler(ITribeChatService tribeChatService, ILogger
             "Session {SessionId}: CZ_TRIBE_CHAT_SEND received (character {CharacterId}, content length {ContentLength})",
             session.SessionId, zoneSession.CharacterId, packet.Content.Length);
 
-        if (ChatRouter.IsContentEmpty(packet.Content))
+        var content = ChatRouter.SafeContent(packet.Content);
+
+        if (ChatRouter.IsContentEmpty(content))
         {
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
@@ -31,6 +33,6 @@ public sealed class TribeChatHandler(ITribeChatService tribeChatService, ILogger
         if (!zone.TryGetPlayer(characterId, out var state) || state is null)
             return;
 
-        tribeChatService.TryPostChat(zone, state, packet.Content, packet.Link);
+        tribeChatService.TryPostChat(zone, state, content, packet.Link);
     }
 }

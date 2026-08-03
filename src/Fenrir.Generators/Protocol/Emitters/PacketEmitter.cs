@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using Fenrir.Generators.Analysis.Model;
 using Fenrir.Generators.Analysis.Support;
@@ -88,16 +89,28 @@ internal static class PacketEmitter
                 FieldShape.Byte => () => writer.Line($"var {localName} = reader.ReadByte();"),
                 FieldShape.Single => () => writer.Line($"var {localName} = reader.ReadSingle();"),
                 FieldShape.Int64 => () => writer.Line($"var {localName} = reader.ReadInt64();"),
-                FieldShape.FixedString => () => writer.Line(
-                    $"var {localName} = reader.ReadFixedString({field.StringLength});"),
+                FieldShape.FixedString => () =>
+                {
+                    writer.Line($"var {localName} = reader.ReadFixedString({field.StringLength - 1});");
+                    writer.Line("reader.Skip(1);");
+                },
                 FieldShape.Int32Array => () => writer.Line(
                     $"var {localName} = reader.ReadInt32Array({field.OwnSize});"),
                 FieldShape.SingleArray => () => writer.Line(
                     $"var {localName} = reader.ReadSingleArray({field.OwnSize});"),
                 FieldShape.ByteArray => () => writer.Line(
                     $"var {localName} = reader.ReadByteArray({field.OwnSize});"),
-                FieldShape.FixedStringArray => () => writer.Line(
-                    $"var {localName} = reader.ReadFixedStringRows({field.OwnSize}, {field.StringLength});"),
+                FieldShape.FixedStringArray => () =>
+                {
+                    var rowIndex = localName + "_row";
+                    writer.Line($"var {localName}_rows = reader.ReadSlice({field.OwnSize});");
+                    writer.Line($"var {localName} = new string[{field.ElementCount}];");
+                    writer.Line($"for (var {rowIndex} = 0; {rowIndex} < {field.ElementCount}; {rowIndex}++)");
+                    writer.OpenBrace();
+                    writer.Line(
+                        $"{localName}[{rowIndex}] = {WellKnownNames.LegacyWireCodec}.ReadFixedString({localName}_rows.Slice({rowIndex} * {field.StringLength}, {field.StringLength - 1}));");
+                    writer.CloseBrace();
+                },
                 FieldShape.Nested => () =>
                 {
                     writer.Line(
@@ -155,7 +168,7 @@ internal static class PacketEmitter
         if (model.Fields.Length > 0)
             writer.Line($"var writer = new {WellKnownNames.MessageWriter}(destination);");
 
-        FieldModel? legacyUidField = null;
+        var legacyUidFields = new List<FieldModel>();
 
         foreach (var field in model.Fields)
         {
@@ -164,7 +177,9 @@ internal static class PacketEmitter
 
             var access = field.PropertyName;
 
-            var needsSliceLocal = field.AvatarXor != AvatarXorKind.None || field.IsLegacyUidField;
+            var isFixedStringShape = field.Shape is FieldShape.FixedString or FieldShape.FixedStringArray;
+            var needsSliceLocal =
+                field.AvatarXor != AvatarXorKind.None || field.IsLegacyUidField || isFixedStringShape;
             var localName = "v_" + field.PropertyName + "_slice";
             var assignPrefix = needsSliceLocal ? $"var {localName} = " : "";
 
@@ -192,10 +207,20 @@ internal static class PacketEmitter
                 },
                 FieldShape.NestedArray => () =>
                 {
+                    var countName = "v_" + field.PropertyName + "_count";
                     writer.Line($"var {localName} = writer.Reserve({field.OwnSize});");
-                    writer.Line($"for (var i = 0; i < {field.ElementCount}; i++)");
+                    writer.Line($"var {countName} = {access} is null ? 0 : {access}.Length;");
+                    writer.Line($"if ({countName} > {field.ElementCount})");
                     writer.OpenBrace();
-                    writer.Line($"{access}[i].Write({localName}.Slice(i * {field.NestedSize}, {field.NestedSize}));");
+                    writer.Line($"{countName} = {field.ElementCount};");
+                    writer.CloseBrace();
+                    writer.Line($"for (var i = 0; i < {countName}; i++)");
+                    writer.OpenBrace();
+                    writer.Line($"{access}![i].Write({localName}.Slice(i * {field.NestedSize}, {field.NestedSize}));");
+                    writer.CloseBrace();
+                    writer.Line($"if ({countName} < {field.ElementCount})");
+                    writer.OpenBrace();
+                    writer.Line($"{localName}.Slice({countName} * {field.NestedSize}).Clear();");
                     writer.CloseBrace();
                 },
                 _ => () => throw new NotSupportedException(
@@ -203,6 +228,8 @@ internal static class PacketEmitter
             };
 
             emitField();
+
+            EmitFixedStringTerminator(writer, field, localName);
 
             if (field.AvatarXor != AvatarXorKind.None)
                 switch (field.AvatarXor)
@@ -220,24 +247,46 @@ internal static class PacketEmitter
                         writer.Line(
                             $"{WellKnownNames.WireXor}.XorChar2Rows({localName}, {field.AvatarXorRowLength});");
                         break;
+                    default:
+                        throw new NotSupportedException(
+                            $"PacketEmitter.EmitWrite has no case for AvatarXorKind.{field.AvatarXor} (field '{field.PropertyName}').");
                 }
 
             if (field.IsLegacyUidField)
-                legacyUidField = field;
+                legacyUidFields.Add(field);
         }
 
-        if (legacyUidField is not null)
+        if (legacyUidFields.Count > 0)
         {
             writer.Line();
             writer.Line(
                 "// [ObfuscatedUidField] (§3.3): double-XOR of tID, independent of the global XOR_PACKET applied later by the send layer.");
-            writer.Line(
-                $"{WellKnownNames.WireXor}.ApplyUidXor(v_{legacyUidField.PropertyName}_slice);");
+            foreach (var field in legacyUidFields)
+                writer.Line($"{WellKnownNames.WireXor}.ApplyUidXor(v_{field.PropertyName}_slice);");
         }
 
         writer.Line();
         writer.Line($"return {sizeMember};");
         writer.CloseBrace();
+    }
+
+    private static void EmitFixedStringTerminator(IndentedWriter writer, FieldModel field, string localName)
+    {
+        var terminator = field.StringLength - 1;
+
+        switch (field.Shape)
+        {
+            case FieldShape.FixedString:
+                writer.Line($"{localName}[{terminator}] = 0;");
+                break;
+            case FieldShape.FixedStringArray:
+                var rowIndex = localName + "_row";
+                writer.Line($"for (var {rowIndex} = 0; {rowIndex} < {field.ElementCount}; {rowIndex}++)");
+                writer.OpenBrace();
+                writer.Line($"{localName}[{rowIndex} * {field.StringLength} + {terminator}] = 0;");
+                writer.CloseBrace();
+                break;
+        }
     }
 
     private static string FormatByteLiteral(byte value)

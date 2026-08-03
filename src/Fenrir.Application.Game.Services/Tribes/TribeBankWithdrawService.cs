@@ -18,7 +18,7 @@ public sealed class TribeBankWithdrawService(ITribeRepository tribes, ILogger<Tr
             logger.LogWarning(
                 "Character {CharacterId} tribe-bank withdraw rejected: slot {Slot} out of range or caller is not Force Leader",
                 characterId, slotValue);
-            return TribeBankResult.Aborted;
+            return TribeBankResult.Disconnected;
         }
 
         var subMasters = await tribes.GetSubMastersAsync(state.Tribe, ct);
@@ -27,7 +27,7 @@ public sealed class TribeBankWithdrawService(ITribeRepository tribes, ILogger<Tr
             logger.LogWarning(
                 "Character {CharacterId} tribe-bank withdraw rejected: tribe {Tribe} has only {SubMasterCount}/{RequiredSubMasterCount} sub-masters",
                 characterId, state.Tribe, subMasters.Count, RequiredSubMasterCount);
-            return TribeBankResult.Aborted;
+            return TribeBankResult.Disconnected;
         }
 
         long newMoney;

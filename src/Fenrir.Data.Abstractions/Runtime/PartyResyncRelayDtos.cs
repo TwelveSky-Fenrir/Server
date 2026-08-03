@@ -25,6 +25,26 @@ public sealed record PartyResyncRelayEntry(
     string AvatarName)
 {
     public Guid CorrelationId { get; init; } = Guid.NewGuid();
+
+    public int MemberId1 { get; init; }
+
+    public string MemberName1 { get; init; } = "";
+
+    public int MemberId2 { get; init; }
+
+    public string MemberName2 { get; init; } = "";
+
+    public int MemberId3 { get; init; }
+
+    public string MemberName3 { get; init; } = "";
+
+    public int MemberId4 { get; init; }
+
+    public string MemberName4 { get; init; } = "";
+
+    public int MemberId5 { get; init; }
+
+    public string MemberName5 { get; init; } = "";
 }
 
 [GenerateDto]
@@ -34,4 +54,14 @@ public sealed partial record PartyResyncRelayDto(
     byte SourceShardId,
     int SourceCharacterId,
     string PartyName,
-    string AvatarName);
+    string AvatarName,
+    int MemberId1,
+    string MemberName1,
+    int MemberId2,
+    string MemberName2,
+    int MemberId3,
+    string MemberName3,
+    int MemberId4,
+    string MemberName4,
+    int MemberId5,
+    string MemberName5);

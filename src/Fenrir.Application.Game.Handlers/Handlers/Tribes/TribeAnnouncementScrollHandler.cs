@@ -1,5 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Application.Game.Abstractions.Tribes;
+using Fenrir.Application.Game.Domain.Social.Chat;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -18,8 +19,13 @@ public sealed class TribeAnnouncementScrollHandler(
             "Session {SessionId}: CZ_TRIBE_NOTIFY_SEND received (character {CharacterId}, content length {ContentLength})",
             session.SessionId, zoneSession.CharacterId, packet.Content.Length);
 
-        if (string.IsNullOrEmpty(packet.Content))
+        var content = ChatRouter.SafeContent(packet.Content);
+
+        if (ChatRouter.IsContentEmpty(content))
+        {
+            zoneSession.Abort(DisconnectReason.Faulted);
             return;
+        }
 
         if (zoneSession.CurrentZone is not Zone zone)
             return;
@@ -28,7 +34,6 @@ public sealed class TribeAnnouncementScrollHandler(
         if (!zone.TryGetPlayer(characterId, out var sender) || sender is null)
             return;
 
-        if (!announcementService.TryBroadcast(zone, sender, characterId, session, packet.Content))
-            return;
+        announcementService.TryBroadcast(zone, sender, characterId, session, content);
     }
 }

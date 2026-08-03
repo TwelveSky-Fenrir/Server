@@ -1,8 +1,11 @@
 using System.Collections.Immutable;
+using Fenrir.Application.Game.Abstractions.Tribes;
+using Fenrir.Application.Game.Domain.Costumes;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Tribes;
+using Fenrir.Application.Game.Domain.World;
 using Fenrir.Domain.Game.GameData;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -12,6 +15,7 @@ namespace Fenrir.Application.Game.Domain.Inventory.UseItems;
 public sealed class TribeScrollTransferUseItemHandler(
     ITribeConversionRepository tribeConversion,
     TribeConversionResolver resolver,
+    ITribeChangeAvailabilityService changeAvailability,
     PartyRegistry partyRegistry,
     IGameServerDirectoryRepository directory,
     IShardMapAssignmentRepository shardMapAssignments,
@@ -34,7 +38,8 @@ public sealed class TribeScrollTransferUseItemHandler(
         var outcome = TribeScrollTransferGate.Evaluate(new TribeScrollTransferEligibilityContext(
             toTribe, state.Tribe, state.PreviousTribe, state.Level, state.TribeRole, state.GuildId,
             state.TeacherCharacterId, state.StudentCharacterId, !state.Friends.IsEmpty,
-            partyRegistry.IsInParty(context.CharacterId), cape is not null, context.Zone.MapId, homeZoneOnline));
+            partyRegistry.IsInParty(context.CharacterId), cape is not null, context.Zone.MapId,
+            changeAvailability.IsChangeToTribeAllowed(toTribe), homeZoneOnline));
 
         if (outcome != TribeScrollTransferOutcome.Success)
         {
@@ -83,6 +88,18 @@ public sealed class TribeScrollTransferUseItemHandler(
                 newSkillId != skill.SkillId)
                 skillChanges.Add((slot, skill with { SkillId = newSkillId }));
 
+        var costumeChanges = new List<(int Slot, int NewItemId)>();
+        for (var slot = 0; slot < CostumePersistenceCodec.SlotCount; slot++)
+        {
+            var costumeId = ValueAt(state.CostumeWardrobe, slot);
+            if (costumeId <= 0)
+                continue;
+
+            if (resolver.TryRemapCostume(fromTribe, toTribe, costumeId, out var newCostumeId) &&
+                newCostumeId != costumeId)
+                costumeChanges.Add((slot, newCostumeId));
+        }
+
         var projectedPage = state.Inventory.GetContainer(context.Page).Remove(context.Index);
         var items = ToTvps(projectedPage);
 
@@ -115,6 +132,21 @@ public sealed class TribeScrollTransferUseItemHandler(
                     "Zone {MapId} skill inbox full: dropped op23 faction-transfer skill-remap mirror (slot {Slot}) for character {CharacterId}",
                     context.Zone.MapId, context.CharacterId, slot);
 
+        var wornSlot = state.CostumeIndex >= CostumePersistenceCodec.SlotCount
+            ? state.CostumeIndex % CostumePersistenceCodec.SlotCount
+            : -1;
+
+        foreach (var (slot, newCostumeId) in costumeChanges)
+            if (!context.Zone.PostCostumeCommand(new CostumeZoneCommand(context.CharacterId,
+                    CostumeNumber: slot == wornSlot ? newCostumeId : (int?)null,
+                    WardrobeSlotGranted: slot,
+                    GrantedItemId: newCostumeId,
+                    GrantedCostumeDate: ValueAt(state.CostumeDate, slot),
+                    GrantedExpireDate: ValueAt(state.CostumeExpireDate, slot))))
+                logger.LogError(
+                    "Zone {MapId} costume inbox full: dropped op23 faction-transfer costume-remap mirror (slot {Slot}) for character {CharacterId}",
+                    context.Zone.MapId, context.CharacterId, slot);
+
         logger.LogInformation(
             "Character {CharacterId} op23 faction-transfer scroll ({ItemId}) applied: tribe {FromTribe}->{ToTribe}",
             context.CharacterId, context.Item.ItemId, fromTribe, toTribe);
@@ -122,6 +154,11 @@ public sealed class TribeScrollTransferUseItemHandler(
         state.Session.Send(new ReturnToHomeZoneResponse());
 
         return UseItemResponses.Success(context.Page, context.Index);
+    }
+
+    private static int ValueAt(ImmutableArray<int> slots, int slot)
+    {
+        return !slots.IsDefault && slot >= 0 && slot < slots.Length ? slots[slot] : 0;
     }
 
     private static List<CharacterItemSlotTvp> ToTvps(ImmutableDictionary<byte, ItemStack> container)

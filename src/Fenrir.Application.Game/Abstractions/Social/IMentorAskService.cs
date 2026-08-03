@@ -11,9 +11,7 @@ public enum MentorAskResultKind
     TargetBusy,
     TargetAlreadyHasTeacher,
     TargetAlreadyHasStudent,
-    Sent,
-
-    SentCrossShard
+    Sent
 }
 
 public readonly record struct MentorAskResult(

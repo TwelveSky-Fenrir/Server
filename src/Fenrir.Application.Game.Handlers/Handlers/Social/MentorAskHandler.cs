@@ -51,8 +51,6 @@ public sealed class MentorAskHandler(IMentorAskService mentorAskService, ILogger
                 zone.TryGetPlayer(result.TargetCharacterId, out var student);
                 student!.Session.Send(new MentorResponse { AvatarName = result.AskerName! });
                 return;
-            case MentorAskResultKind.SentCrossShard:
-                return;
         }
     }
 }

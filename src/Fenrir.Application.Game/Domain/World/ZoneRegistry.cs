@@ -24,6 +24,7 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed class ZoneRegistry
 {
+    private readonly IAccountSessionRepository? _accountSessions;
     private readonly ICharacterShardLocationRepository? _characterShardLocations;
     private readonly DirtyTracker<int> _dirtyTracker;
     private readonly DuelRegistry? _duelRegistry;
@@ -62,7 +63,8 @@ public sealed class ZoneRegistry
         IFourGuildKillPointQueue? fourGuildKillPointQueue = null,
         TribeSymbolCombatModifiers? tribeSymbolCombatModifiers = null,
         Zone195NokSanState? zone195NokSanState = null,
-        Lazy<IPartyResyncRelayQueue>? partyResyncRelayQueue = null)
+        Lazy<IPartyResyncRelayQueue>? partyResyncRelayQueue = null,
+        IAccountSessionRepository? accountSessions = null)
     {
         _options = options.Value;
         _movementRules = movementRules;
@@ -101,6 +103,8 @@ public sealed class ZoneRegistry
         _zone195NokSanState = zone195NokSanState;
 
         _partyResyncRelayQueue = partyResyncRelayQueue;
+
+        _accountSessions = accountSessions;
     }
 
     public ImmutableArray<Zone> Zones => _zones.Values;
@@ -147,7 +151,8 @@ public sealed class ZoneRegistry
                     fourGuildKillPointQueue: _fourGuildKillPointQueue,
                     tribeSymbolCombatModifiers: _tribeSymbolCombatModifiers,
                     zone195NokSanState: _zone195NokSanState,
-                    partyResyncRelayQueue: _partyResyncRelayQueue);
+                    partyResyncRelayQueue: _partyResyncRelayQueue,
+                    accountSessions: _accountSessions);
 
                 zone.PersonalDungeonBossCatalog = Zone241RebirthTierBossCatalog.Instance;
 

@@ -230,6 +230,7 @@ public static class ServicesServiceCollectionExtensions
         services.AddSingleton<IHeartbeatService, HeartbeatService>();
         services.AddSingleton<IUseHotkeyItemService, UseHotkeyItemService>();
         services.AddSingleton<IUseInventoryItemService, UseInventoryItemService>();
+        services.AddSingleton<IShardReachabilityProbe, TcpShardReachabilityProbe>();
         services.AddSingleton<IZoneHandshakeService, ZoneHandshakeService>();
         services.AddSingleton<IZoneMoveService, ZoneMoveService>();
         services.AddSingleton<IZoneTransferCancelService, ZoneTransferCancelService>();

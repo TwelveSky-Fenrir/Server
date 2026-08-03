@@ -19,7 +19,11 @@ public sealed class GuildChatHandler(IGuildChatService guildChatService, ILogger
             session.SessionId, zoneSession.CharacterId, packet.Content.Length);
 
         if (ChatRouter.IsContentEmpty(packet.Content))
+        {
+            // Server/ts25zone/S04_MyWork02.cpp:10461-10466 -- empty content is treated as a tampered client.
+            zoneSession.Abort(DisconnectReason.Faulted);
             return;
+        }
 
         if (zoneSession.CurrentZone is not Zone zone)
             return;

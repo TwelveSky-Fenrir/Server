@@ -52,9 +52,10 @@ public sealed class QuestProgressHandler(
 
         if (result is not { Success: true })
         {
-            logger.LogWarning(
-                "Quest action rejected for character {CharacterId}: sort {Sort} (1=Accept,2=Complete,3=Receive,4=Exchange,5=Abandon) returned no result or failure",
-                characterId, packet.Sort);
+            logger.LogInformation(
+                "Session {SessionId} character {CharacterId}: QuestProgressRequest sort {Sort} disconnected (rejected or unrecognized)",
+                zoneSession.SessionId, characterId, packet.Sort);
+            zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 

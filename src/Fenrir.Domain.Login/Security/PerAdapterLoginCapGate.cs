@@ -9,7 +9,7 @@ public enum PerAdapterLoginCapOutcome
 
 public static class PerAdapterLoginCapGate
 {
-    private const int DeadCodeLiveCountBaseline = 1;
+    public const int DeadCodeLiveCountBaseline = 1;
     private const int ImplicitDefaultLimit = 2;
 
     public static PerAdapterLoginCapOutcome Evaluate(int accountGrade, string macAddress,

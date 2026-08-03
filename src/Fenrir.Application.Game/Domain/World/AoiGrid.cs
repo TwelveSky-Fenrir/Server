@@ -8,7 +8,7 @@ public sealed class AoiGrid(float cellSize)
 
     public (int X, int Z) CellOf(float posX, float posZ)
     {
-        return ((int)MathF.Floor(posX / cellSize), (int)MathF.Floor(posZ / cellSize));
+        return ((int)(posX / cellSize), (int)(posZ / cellSize));
     }
 
     public void Add(int characterId, (int X, int Z) cell, float posX, float posY, float posZ)
@@ -66,11 +66,13 @@ public sealed class AoiGrid(float cellSize)
         float originX, float originY, float originZ, int scale = 1)
     {
         var radiusSquared = ExactRadiusSquared(scale);
+        var originCellY = CellY(originY);
         for (var dx = -scale; dx <= scale; dx++)
         for (var dz = -scale; dz <= scale; dz++)
             if (_cells.TryGetValue((cell.X + dx, cell.Z + dz), out var members))
                 foreach (var id in members)
-                    if (id != excludeCharacterId && WithinExactRadius(id, originX, originY, originZ, radiusSquared))
+                    if (id != excludeCharacterId &&
+                        WithinExactRadius(id, originX, originY, originZ, originCellY, scale, radiusSquared))
                         buffer.Add(id);
     }
 
@@ -87,17 +89,19 @@ public sealed class AoiGrid(float cellSize)
         int scale = 1)
     {
         var radiusSquared = ExactRadiusSquared(scale);
+        var originCellY = CellY(originY);
         for (var dx = -scale; dx <= scale; dx++)
         for (var dz = -scale; dz <= scale; dz++)
             if (_cells.TryGetValue((cell.X + dx, cell.Z + dz), out var members))
                 foreach (var id in members)
-                    if (WithinExactRadius(id, originX, originY, originZ, radiusSquared))
+                    if (WithinExactRadius(id, originX, originY, originZ, originCellY, scale, radiusSquared))
                         buffer.Add(id);
     }
 
     public bool IsWithinRadius(int characterId, float originX, float originY, float originZ, int scale)
     {
-        return WithinExactRadius(characterId, originX, originY, originZ, ExactRadiusSquared(scale));
+        return WithinExactRadius(characterId, originX, originY, originZ, CellY(originY), scale,
+            ExactRadiusSquared(scale));
     }
 
     private float ExactRadiusSquared(int scale)
@@ -106,10 +110,18 @@ public sealed class AoiGrid(float cellSize)
         return radius * radius;
     }
 
+    private int CellY(float posY)
+    {
+        return (int)(posY / cellSize);
+    }
+
     private bool WithinExactRadius(int characterId, float originX, float originY, float originZ,
-        float radiusSquared)
+        int originCellY, int scale, float radiusSquared)
     {
         if (!_positions.TryGetValue(characterId, out var position))
+            return false;
+
+        if (Math.Abs(CellY(position.Y) - originCellY) > scale)
             return false;
 
         var dx = position.X - originX;

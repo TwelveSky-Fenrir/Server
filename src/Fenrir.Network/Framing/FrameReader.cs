@@ -19,6 +19,9 @@ public static class FrameReader
         if (!registry.TryGetFrameSize(opcode, out var frameSize))
             throw new ProtocolViolationException(server, opcode);
 
+        if (frameSize < WireHeaderSizes.ClientPacketSize)
+            throw new ProtocolViolationException(server, opcode);
+
         if (buffer.Length < frameSize)
             return false;
 

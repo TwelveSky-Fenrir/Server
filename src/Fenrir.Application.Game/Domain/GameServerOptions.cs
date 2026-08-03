@@ -24,6 +24,8 @@ public sealed class GameServerOptions
 
     public int TicketTtlSeconds { get; set; } = 15;
 
+    public int ShardReachabilityProbeTimeoutMilliseconds { get; set; } = 750;
+
     public int TickRateHz { get; set; } = 20;
 
     public float AoiCellSize { get; set; } = 1000f;

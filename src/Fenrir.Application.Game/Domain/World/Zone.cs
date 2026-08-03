@@ -49,7 +49,8 @@ public sealed partial class Zone(
     IFourGuildKillPointQueue? fourGuildKillPointQueue = null,
     TribeSymbolCombatModifiers? tribeSymbolCombatModifiers = null,
     Zone195NokSanState? zone195NokSanState = null,
-    Lazy<IPartyResyncRelayQueue>? partyResyncRelayQueue = null) : IZoneActor
+    Lazy<IPartyResyncRelayQueue>? partyResyncRelayQueue = null,
+    IAccountSessionRepository? accountSessions = null) : IZoneActor
 {
     private const int InboxCapacity = 8192;
 
@@ -275,6 +276,16 @@ public sealed partial class Zone(
             catch (Exception ex)
             {
                 logger.LogError(ex, "Zone {MapId} tick stage {Stage} failed", MapId, nameof(RebroadcastAvatars));
+            }
+
+            try
+            {
+                SweepStuckZoneTransfers();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Zone {MapId} tick stage {Stage} failed", MapId,
+                    nameof(SweepStuckZoneTransfers));
             }
 
             if (hasPlayers)

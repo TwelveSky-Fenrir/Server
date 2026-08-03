@@ -34,6 +34,8 @@ public sealed class LoginConnectionHost(
 
     private readonly ConcurrentDictionary<Task, byte> _inFlightConnections = new();
 
+    private readonly SemaphoreSlim _disconnectSqlGate = new(1, 1);
+
     private TcpServer<LoginClientSession>? _server;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -168,6 +170,7 @@ public sealed class LoginConnectionHost(
 
     private async ValueTask TearDownAccountSessionAsync(int accountId, Guid? sessionToken)
     {
+        await _disconnectSqlGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
         try
         {
             var resolvedToken = sessionToken ?? default;
@@ -185,10 +188,15 @@ public sealed class LoginConnectionHost(
             logger.LogWarning(ex, "Failed to tear down runtime.AccountSessions row for account {AccountId}",
                 accountId);
         }
+        finally
+        {
+            _disconnectSqlGate.Release();
+        }
     }
 
     private async ValueTask LogLoginSessionEndedAsync(int accountId, LoginSessionState finalState)
     {
+        await _disconnectSqlGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
         try
         {
             var outcome = (byte)(finalState == LoginSessionState.HandoverIssued ? 1 : 0);
@@ -199,6 +207,10 @@ public sealed class LoginConnectionHost(
         {
             logger.LogWarning(ex,
                 "Failed to write game.EventLog row for login session end (account {AccountId})", accountId);
+        }
+        finally
+        {
+            _disconnectSqlGate.Release();
         }
     }
 
@@ -233,6 +245,7 @@ public sealed class LoginConnectionHost(
     public override void Dispose()
     {
         _server?.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        _disconnectSqlGate.Dispose();
         base.Dispose();
     }
 }

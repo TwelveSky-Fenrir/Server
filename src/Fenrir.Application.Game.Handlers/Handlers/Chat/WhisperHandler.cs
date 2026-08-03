@@ -19,7 +19,11 @@ public sealed class WhisperHandler(IWhisperService whisperService, ILogger<Whisp
         var zoneSession = (IZoneSession)session;
 
         if (ChatRouter.IsContentEmpty(packet.Content) || string.IsNullOrEmpty(packet.AvatarName))
+        {
+            // Server/ts25zone/S04_MyWork02.cpp:7736-7742 -- empty content OR avatar name is a tampered client.
+            zoneSession.Abort(DisconnectReason.Faulted);
             return;
+        }
 
         if (zoneSession.CurrentZone is not Zone zone)
             return;

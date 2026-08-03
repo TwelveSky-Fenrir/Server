@@ -20,6 +20,7 @@ public sealed class ZoneMoveService(
     TribeGuardCorridorState corridorState,
     IGameServerDirectoryRepository directory,
     IShardMapAssignmentRepository shardMapAssignments,
+    IShardReachabilityProbe reachabilityProbe,
     ISessionTicketRepository tickets,
     ICharacterShardLocationRepository characterShardLocations,
     IEventLogRepository eventLog,
@@ -118,6 +119,10 @@ public sealed class ZoneMoveService(
             return;
         }
 
+        // No reachability probe here: GameConnectionHost binds every one of this shard's hosted zone
+        // listeners atomically at boot (all-or-nothing), so this handler running at all already proves
+        // the target zone's own listener is bound and accepting.
+
         if (!worldData.ZonesByNumber.ContainsKey(targetZoneNumber))
         {
             logger.LogError(
@@ -209,6 +214,16 @@ public sealed class ZoneMoveService(
             var hostedMaps = await shardMapAssignments.GetHostedMapsAsync(candidate.ShardId, cancellationToken);
             if (!hostedMaps.Contains(targetZoneNumber))
                 continue;
+
+            var targetZonePort = options.Value.ZoneBasePort + targetZoneNumber;
+            if (!await reachabilityProbe.IsReachableAsync(candidate.Host, targetZonePort, cancellationToken))
+            {
+                logger.LogWarning(
+                    "Zone-move aborted for character {CharacterId}: zone endpoint {Host}:{Port} (MapId {TargetZoneNumber}, shard {ShardId}) failed a reachability probe -- rejecting the move, character stays on {SourceMapId}",
+                    characterId, candidate.Host, targetZonePort, targetZoneNumber, candidate.ShardId, originZoneId);
+                zoneSession.Send(new ZoneMoveResponse { Result = 1, Ip = "", Port = 0 });
+                return;
+            }
 
             var corridorOutcome = WrapCheckSpecialDestinationGate.Evaluate(
                 corridorCatalog,

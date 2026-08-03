@@ -87,7 +87,7 @@ public sealed class LoginService(
             return Failure(ResultIpBlocked, "", true);
         }
 
-        switch (LoginCapacityGate.Evaluate(capacity.MaxPlayers, capacity.CurrentPlayers))
+        switch (capacity.TryReserveSlot())
         {
             case LoginCapacityOutcome.Maintenance:
                 logger.LogWarning("Login rejected: server is under maintenance (login {Id})", packet.Id);
@@ -97,230 +97,272 @@ public sealed class LoginService(
                 return Failure(ResultServerFull, "", false);
         }
 
-        if (packet.Version != options.Value.ExpectedClientVersion)
-        {
-            logger.LogWarning("Login rejected: client version mismatch (login {Id}, version {Version})", packet.Id,
-                packet.Version);
-            return Failure(ResultVersionMismatch, "", false);
-        }
+        var reservationConsumed = false;
 
-        if (!AvatarNameValidator.HasOnlyWhitelistedCharacters(packet.Id) ||
-            !AvatarNameValidator.HasOnlyWhitelistedCharacters(packet.Password))
-        {
-            logger.LogWarning(
-                "Login rejected: login {Id} or its password contains characters outside the legacy whitelist",
-                packet.Id);
-            return Failure(ResultUnknownAccount, "", true);
-        }
-
-        var macAddress =
-            MacAddressFormatter.Format(packet.Adapter.PhysicalAddress, packet.Adapter.PhysicalAddressLength);
-
-        AuthenticateAccountDto? account;
         try
         {
-            account = await accounts.AuthenticateAsync(packet.Id, cancellationToken);
-        }
-        catch (CaeriusNetSqlException ex)
-        {
-            logger.LogError(ex, "Login failed: account lookup errored for login {Id}", packet.Id);
-            return Failure(ResultUnknownAccount, "", true);
-        }
-
-        var remoteIp = remoteEndPoint?.Address.ToString();
-
-        if (account is not null && account.AccountGrade >= DeviceSpoofingGuard.GmGradeThreshold &&
-            remoteIp is not null && !await IsGmLoginIpAllowedAsync(remoteIp, cancellationToken))
-        {
-            _ = PasswordHasher.Verify(packet.Password, account.PasswordHash, account.PasswordSalt);
-            logger.LogWarning(
-                "Login rejected: GM-tier account {AccountId} attempted login from non-allowlisted IP {RemoteIp}",
-                account.AccountId, remoteIp);
-            return Failure(ResultIpBlocked, "", true);
-        }
-
-        AuthenticationOutcome authentication;
-        try
-        {
-            authentication = await AuthenticateConstantTimeAsync(account, packet.Password, remoteIp, cancellationToken);
-        }
-        catch (CaeriusNetSqlException ex)
-        {
-            logger.LogError(ex, "Login failed: credential verification errored for login {Id}", packet.Id);
-            return Failure(ResultUnknownAccount, "", true);
-        }
-
-        switch (authentication)
-        {
-            case AuthenticationOutcome.UnknownAccount:
-                logger.LogWarning("Login failed: login {Id} rejected with result code {ResultCode}", packet.Id,
-                    ResultUnknownAccount);
-                return Failure(ResultUnknownAccount, "", true);
-            case AuthenticationOutcome.WrongPassword:
-                logger.LogWarning("Login failed: login {Id} rejected with result code {ResultCode}", packet.Id,
-                    ResultWrongPassword);
-                return Failure(ResultWrongPassword, "", true);
-            case AuthenticationOutcome.AdminBanned:
-                logger.LogWarning("Login failed: login {Id} rejected with result code {ResultCode}", packet.Id,
-                    ResultBlocked);
-                return Failure(ResultBlocked, "", true);
-            case AuthenticationOutcome.AutoLockedOut:
-                logger.LogWarning(
-                    "Login rejected: login {Id} is under the auto-lockout timer from repeated failed attempts",
-                    packet.Id);
-                return Failure(ResultCustomMessage, AccountLockedOutMessage, true);
-        }
-
-        var accountId = account!.AccountId;
-
-        if (options.Value.OnlyAdminCanLogin && account.AccountGrade < DeviceSpoofingGuard.GmGradeThreshold)
-        {
-            logger.LogWarning(
-                "Login rejected: only-admin lockdown is active and account {AccountId} is not GM-tier", accountId);
-            return Failure(ResultCustomMessage, OnlyAdminMessage, true);
-        }
-
-        if (string.IsNullOrEmpty(packet.Adapter.AdapterName))
-        {
-            logger.LogWarning("Login rejected: empty adapter name/GUID (login {Id}, account {AccountId})",
-                packet.Id, accountId);
-            return Failure(ResultCustomMessage, AdapterNameEmptyMessage, true);
-        }
-
-        var quotaGateApplies = macAddress.Length > 0 && account.AccountGrade < DeviceSpoofingGuard.GmGradeThreshold;
-
-        if (quotaGateApplies)
-        {
-            var configuredAccountLimit = await macRestrictions.GetConfiguredAccountLimitAsync(macAddress,
-                packet.Adapter.AdapterName, cancellationToken);
-
-            var concurrentDeviceSessionCount = configuredAccountLimit is null
-                ? await accountSessions.GetConcurrentDeviceSessionCountAsync(accountId, packet.Adapter.AdapterName,
-                    packet.Adapter.IPAddress, remoteIp ?? "", cancellationToken)
-                : 0;
-
-            switch (PerAdapterLoginCapGate.Evaluate(account.AccountGrade, macAddress, configuredAccountLimit,
-                        concurrentDeviceSessionCount))
+            if (packet.Version != options.Value.ExpectedClientVersion)
             {
-                case PerAdapterLoginCapOutcome.OutrightBanned:
-                    logger.LogWarning("Login rejected: MAC {MacAddress} is banned (login {Id}, account {AccountId})",
-                        macAddress, packet.Id, accountId);
-                    return Failure(ResultCustomMessage, MacBannedMessage, true);
-                case PerAdapterLoginCapOutcome.ConnectionLimitExceeded:
-                    logger.LogWarning(
-                        "Login rejected: per-adapter connection limit exceeded (login {Id}, account {AccountId})",
-                        packet.Id, accountId);
-                    return Failure(ResultCustomMessage, ConnectionLimitExceededMessage, true);
+                logger.LogWarning("Login rejected: client version mismatch (login {Id}, version {Version})", packet.Id,
+                    packet.Version);
+                return Failure(ResultVersionMismatch, "", false);
             }
-        }
 
-        if (DeviceSpoofingGuard.IsSpoofedDeviceTuple(account.AccountGrade, macAddress, packet.Adapter.AdapterName,
-                remoteIp))
-        {
-            logger.LogWarning("Login rejected: spoofed device tuple detected for account {AccountId}", accountId);
-            return Failure(ResultCustomMessage, InvalidDevicesMessage, true);
-        }
+            var macAddress =
+                MacAddressFormatter.Format(packet.Adapter.PhysicalAddress, packet.Adapter.PhysicalAddressLength);
 
-        var storedPin = await pins.GetAsync(accountId, cancellationToken);
-        var requirePin = options.Value.RequireSecondPassword;
-        var pinMask = storedPin is null ? "" : LoginTrain.ExistingPinMask;
+            AuthenticateAccountDto? account;
+            try
+            {
+                account = await accounts.AuthenticateAsync(packet.Id, cancellationToken);
+            }
+            catch (CaeriusNetSqlException ex)
+            {
+                logger.LogError(ex, "Login failed: account lookup errored for login {Id}", packet.Id);
+                return Failure(ResultUnknownAccount, "", true);
+            }
 
-        CharacterAccountRosterBundle roster;
-        ImmutableArray<AvatarRosterEntry> rosterEntries;
-        try
-        {
-            roster = await characters.GetAccountRosterAsync(accountId, cancellationToken);
-            rosterEntries = await ResolveRosterEntriesAsync(roster, cancellationToken);
-        }
-        catch (CaeriusNetSqlException ex)
-        {
-            logger.LogError(ex, "Login failed: avatar roster load errored for account {AccountId}", accountId);
-            return Failure(ResultAvatarLoadFailed, "", true);
-        }
+            var remoteIp = remoteEndPoint?.Address.ToString();
 
-        var newToken = Guid.NewGuid();
-        AccountSessionClaimDto claim;
-        try
-        {
-            claim = await accountSessions.ClaimOrSignalKickAsync(accountId, newToken, cancellationToken);
-        }
-        catch (CaeriusNetSqlException ex)
-        {
-            logger.LogError(ex,
-                "Login failed: account-session claim errored for account {AccountId} after authentication succeeded",
-                accountId);
-            return Failure(ResultSessionRegistrationFailed, "", true);
-        }
+            if (account is not null && account.AccountGrade >= DeviceSpoofingGuard.GmGradeThreshold &&
+                remoteIp is not null && !await IsGmLoginIpAllowedAsync(remoteIp, cancellationToken))
+            {
+                _ = PasswordHasher.Verify(packet.Password, account.PasswordHash, account.PasswordSalt);
+                logger.LogWarning(
+                    "Login rejected: GM-tier account {AccountId} attempted login from non-allowlisted IP {RemoteIp}",
+                    account.AccountId, remoteIp);
+                return Failure(ResultIpBlocked, "", true);
+            }
 
-        switch ((AccountSessionClaimOutcome)claim.Outcome)
-        {
-            case AccountSessionClaimOutcome.ConflictLogin:
-                if (registry.TryGetByAccount(accountId, out var existingLocal))
-                {
+            AuthenticationOutcome authentication;
+            try
+            {
+                authentication = await AuthenticateConstantTimeAsync(account, packet.Password, remoteIp, cancellationToken);
+            }
+            catch (CaeriusNetSqlException ex)
+            {
+                logger.LogError(ex, "Login failed: credential verification errored for login {Id}", packet.Id);
+                return Failure(ResultUnknownAccount, "", true);
+            }
+
+            switch (authentication)
+            {
+                case AuthenticationOutcome.UnknownAccount:
+                    logger.LogWarning("Login failed: login {Id} rejected with result code {ResultCode}", packet.Id,
+                        ResultUnknownAccount);
+                    return Failure(ResultUnknownAccount, "", true);
+                case AuthenticationOutcome.WrongPassword:
+                    logger.LogWarning("Login failed: login {Id} rejected with result code {ResultCode}", packet.Id,
+                        ResultWrongPassword);
+                    return Failure(ResultWrongPassword, "", true);
+                case AuthenticationOutcome.AdminBanned:
+                    logger.LogWarning("Login failed: login {Id} rejected with result code {ResultCode}", packet.Id,
+                        ResultBlocked);
+                    return Failure(ResultBlocked, "", true);
+                case AuthenticationOutcome.AutoLockedOut:
                     logger.LogWarning(
-                        "Login conflict: evicting stale local session for account {AccountId} (ConflictLogin)",
-                        accountId);
-                    existingLocal!.Abort(DisconnectReason.Evicted);
-                    return LoginResult.SilentDropResult;
+                        "Login rejected: login {Id} is under the auto-lockout timer from repeated failed attempts",
+                        packet.Id);
+                    return Failure(ResultCustomMessage, AccountLockedOutMessage, true);
+            }
+
+            var accountId = account!.AccountId;
+
+            if (string.IsNullOrEmpty(packet.Adapter.AdapterName))
+            {
+                logger.LogWarning("Login rejected: empty adapter name/GUID (login {Id}, account {AccountId})",
+                    packet.Id, accountId);
+                return Failure(ResultCustomMessage, AdapterNameEmptyMessage, true);
+            }
+
+            var quotaGateApplies = macAddress.Length > 0 && account.AccountGrade < DeviceSpoofingGuard.GmGradeThreshold;
+
+            if (quotaGateApplies)
+            {
+                int? configuredAccountLimit;
+                try
+                {
+                    configuredAccountLimit = await macRestrictions.GetConfiguredAccountLimitAsync(macAddress,
+                        packet.Adapter.AdapterName, cancellationToken);
+                }
+                catch (CaeriusNetSqlException ex)
+                {
+                    logger.LogWarning(ex,
+                        "Login: configured account-limit lookup failed for MAC {MacAddress} (account {AccountId}); treating as unconfigured, matching legacy's fail-open default",
+                        macAddress, accountId);
+                    configuredAccountLimit = null;
                 }
 
-                logger.LogWarning(
-                    "Login rejected: account {AccountId} already claimed by another Login session (ConflictLogin, no local socket)",
+                int concurrentDeviceSessionCount;
+                if (configuredAccountLimit is null)
+                {
+                    try
+                    {
+                        concurrentDeviceSessionCount = await accountSessions.GetConcurrentDeviceSessionCountAsync(
+                            accountId, packet.Adapter.AdapterName, packet.Adapter.IPAddress, remoteIp ?? "",
+                            cancellationToken);
+                    }
+                    catch (CaeriusNetSqlException ex)
+                    {
+                        logger.LogWarning(ex,
+                            "Login: concurrent device-session-count lookup failed for account {AccountId}; falling back to the legacy dead-code baseline",
+                            accountId);
+                        concurrentDeviceSessionCount = PerAdapterLoginCapGate.DeadCodeLiveCountBaseline;
+                    }
+                }
+                else
+                {
+                    concurrentDeviceSessionCount = 0;
+                }
+
+                switch (PerAdapterLoginCapGate.Evaluate(account.AccountGrade, macAddress, configuredAccountLimit,
+                            concurrentDeviceSessionCount))
+                {
+                    case PerAdapterLoginCapOutcome.OutrightBanned:
+                        logger.LogWarning("Login rejected: MAC {MacAddress} is banned (login {Id}, account {AccountId})",
+                            macAddress, packet.Id, accountId);
+                        return Failure(ResultCustomMessage, MacBannedMessage, true);
+                    case PerAdapterLoginCapOutcome.ConnectionLimitExceeded:
+                        logger.LogWarning(
+                            "Login rejected: per-adapter connection limit exceeded (login {Id}, account {AccountId})",
+                            packet.Id, accountId);
+                        return Failure(ResultCustomMessage, ConnectionLimitExceededMessage, true);
+                }
+            }
+
+            try
+            {
+                await accountSessions.RecordDeviceSignatureAsync(accountId,
+                    quotaGateApplies ? packet.Adapter.AdapterName : DeviceSpoofingGuard.PlaceholderAdapterGuid,
+                    quotaGateApplies ? packet.Adapter.IPAddress : DeviceSpoofingGuard.PlaceholderRemoteIp,
+                    quotaGateApplies ? remoteIp ?? "" : DeviceSpoofingGuard.PlaceholderRemoteIp, cancellationToken);
+            }
+            catch (CaeriusNetSqlException ex)
+            {
+                logger.LogWarning(ex,
+                    "Login: device signature update failed for account {AccountId}; the per-adapter cap will not see this session",
                     accountId);
-                return Failure(ResultAlreadyConnected, "", true);
-            case AccountSessionClaimOutcome.ConflictGameKicked:
-            case AccountSessionClaimOutcome.ConflictTearingDown:
+            }
+
+            if (DeviceSpoofingGuard.IsSpoofedDeviceTuple(account.AccountGrade, macAddress, packet.Adapter.AdapterName,
+                    remoteIp))
+            {
+                logger.LogWarning("Login rejected: spoofed device tuple detected for account {AccountId}", accountId);
+                return Failure(ResultCustomMessage, InvalidDevicesMessage, true);
+            }
+
+            if (options.Value.OnlyAdminCanLogin && account.AccountGrade < DeviceSpoofingGuard.GmGradeThreshold)
+            {
                 logger.LogWarning(
-                    "Login rejected: account {AccountId} has a live Game session ({Outcome}); retry once it clears",
-                    accountId, (AccountSessionClaimOutcome)claim.Outcome);
-                return Failure(ResultAlreadyConnected, "", true);
-            case AccountSessionClaimOutcome.ReclaimedDeadShard:
+                    "Login rejected: only-admin lockdown is active and account {AccountId} is not GM-tier", accountId);
+                return Failure(ResultCustomMessage, OnlyAdminMessage, true);
+            }
+
+            AccountPinDto? storedPin;
+            try
+            {
+                storedPin = await pins.GetAsync(accountId, cancellationToken);
+            }
+            catch (CaeriusNetSqlException ex)
+            {
+                logger.LogWarning(ex,
+                    "Login: stored-PIN lookup failed for account {AccountId}; continuing with no PIN mask hint (not legacy-verified, see fenrir-security-hardening-engineer contract)",
+                    accountId);
+                storedPin = null;
+            }
+
+            var requirePin = options.Value.RequireSecondPassword;
+            var pinMask = storedPin is null ? "" : LoginTrain.ExistingPinMask;
+
+            CharacterAccountRosterBundle roster;
+            ImmutableArray<AvatarRosterEntry> rosterEntries;
+            try
+            {
+                roster = await characters.GetAccountRosterAsync(accountId, cancellationToken);
+                rosterEntries = await ResolveRosterEntriesAsync(roster, cancellationToken);
+            }
+            catch (CaeriusNetSqlException ex)
+            {
+                logger.LogError(ex, "Login failed: avatar roster load errored for account {AccountId}", accountId);
+                return Failure(ResultAvatarLoadFailed, "", true);
+            }
+
+            var newToken = Guid.NewGuid();
+            AccountSessionClaimDto claim;
+            try
+            {
+                claim = await accountSessions.ClaimOrSignalKickAsync(accountId, newToken, cancellationToken);
+            }
+            catch (CaeriusNetSqlException ex)
+            {
+                logger.LogError(ex,
+                    "Login failed: account-session claim errored for account {AccountId} after authentication succeeded",
+                    accountId);
+                return Failure(ResultSessionRegistrationFailed, "", true);
+            }
+
+            switch ((AccountSessionClaimOutcome)claim.Outcome)
+            {
+                case AccountSessionClaimOutcome.ConflictLogin:
+                    if (registry.TryGetByAccount(accountId, out var existingLocal))
+                    {
+                        logger.LogWarning(
+                            "Login conflict: evicting stale local session for account {AccountId} (ConflictLogin)",
+                            accountId);
+                        existingLocal!.Abort(DisconnectReason.Evicted);
+                        return LoginResult.SilentDropResult;
+                    }
+
+                    logger.LogWarning(
+                        "Login rejected: account {AccountId} already claimed by another Login session (ConflictLogin, no local socket)",
+                        accountId);
+                    return Failure(ResultAlreadyConnected, "", true);
+                case AccountSessionClaimOutcome.ConflictGameKicked:
+                case AccountSessionClaimOutcome.ConflictTearingDown:
+                    logger.LogWarning(
+                        "Login rejected: account {AccountId} has a live Game session ({Outcome}); retry once it clears",
+                        accountId, (AccountSessionClaimOutcome)claim.Outcome);
+                    return Failure(ResultAlreadyConnected, "", true);
+                case AccountSessionClaimOutcome.ReclaimedDeadShard:
+                    logger.LogWarning(
+                        "Login reclaimed account {AccountId}: its previous shard {ShardId} had a stale/missing heartbeat and was treated as dead rather than waiting for the reap sweep",
+                        accountId, claim.PreviousShardId);
+                    break;
+            }
+
+            await retiredItems.PurgeAsync(roster.Items, cancellationToken);
+
+            if (registry.AssociateAccount(sessionId, accountId) is { } supersededLocal)
+            {
                 logger.LogWarning(
-                    "Login reclaimed account {AccountId}: its previous shard {ShardId} had a stale/missing heartbeat and was treated as dead rather than waiting for the reap sweep",
-                    accountId, claim.PreviousShardId);
-                break;
+                    "Login: evicting a superseded local session for account {AccountId} that the DB claim did not report",
+                    accountId);
+                supersededLocal.Abort(DisconnectReason.Evicted);
+            }
+
+            try
+            {
+                await eventLog.LogAsync(LoginSucceededEventCode, EventLogCategory.Session, accountId, null, null, null,
+                    null, null, null, null, null, 1, remoteIp is null ? null : $"RemoteIp={remoteIp}", cancellationToken);
+            }
+            catch (CaeriusNetSqlException ex)
+            {
+                logger.LogWarning(ex, "Login: succeeded-login event-log write failed for account {AccountId}", accountId);
+            }
+
+            logger.LogInformation(
+                "Login succeeded: account {AccountId} authenticated, {CharacterCount} character(s), PIN required {RequirePin}",
+                accountId, roster.Characters.Count, requirePin);
+
+            reservationConsumed = true;
+            return new LoginResult(LoginOutcome.Success, ResultSuccess, "", false, accountId, requirePin, pinMask,
+                rosterEntries, newToken, account.AccountGrade);
         }
-
-        await retiredItems.PurgeAsync(roster.Items, cancellationToken);
-
-        try
+        finally
         {
-            await accountSessions.RecordDeviceSignatureAsync(accountId,
-                quotaGateApplies ? packet.Adapter.AdapterName : DeviceSpoofingGuard.PlaceholderAdapterGuid,
-                quotaGateApplies ? packet.Adapter.IPAddress : DeviceSpoofingGuard.PlaceholderRemoteIp,
-                quotaGateApplies ? remoteIp ?? "" : DeviceSpoofingGuard.PlaceholderRemoteIp, cancellationToken);
+            if (!reservationConsumed)
+                capacity.ReleaseReservedSlot();
         }
-        catch (CaeriusNetSqlException ex)
-        {
-            logger.LogWarning(ex,
-                "Login: device signature update failed for account {AccountId}; the per-adapter cap will not see this session",
-                accountId);
-        }
-
-        if (registry.AssociateAccount(sessionId, accountId) is { } supersededLocal)
-        {
-            logger.LogWarning(
-                "Login: evicting a superseded local session for account {AccountId} that the DB claim did not report",
-                accountId);
-            supersededLocal.Abort(DisconnectReason.Evicted);
-        }
-
-        try
-        {
-            await eventLog.LogAsync(LoginSucceededEventCode, EventLogCategory.Session, accountId, null, null, null,
-                null, null, null, null, null, 1, remoteIp is null ? null : $"RemoteIp={remoteIp}", cancellationToken);
-        }
-        catch (CaeriusNetSqlException ex)
-        {
-            logger.LogWarning(ex, "Login: succeeded-login event-log write failed for account {AccountId}", accountId);
-        }
-
-        logger.LogInformation(
-            "Login succeeded: account {AccountId} authenticated, {CharacterCount} character(s), PIN required {RequirePin}",
-            accountId, roster.Characters.Count, requirePin);
-
-        return new LoginResult(LoginOutcome.Success, ResultSuccess, "", false, accountId, requirePin, pinMask,
-            rosterEntries, newToken, account.AccountGrade);
     }
 
     private async ValueTask<ImmutableArray<AvatarRosterEntry>> ResolveRosterEntriesAsync(

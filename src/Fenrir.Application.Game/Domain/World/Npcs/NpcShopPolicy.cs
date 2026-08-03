@@ -247,8 +247,5 @@ public static class NpcShopPolicy
         ItemStack? NewDestinationStack)
     {
         public bool Succeeded => Outcome == BuyOutcome.Success;
-
-        public bool IsCleanFailure => Outcome is BuyOutcome.NotSellableHere or BuyOutcome.InvalidQuantity
-            or BuyOutcome.RentItemNotPurchasable;
     }
 }

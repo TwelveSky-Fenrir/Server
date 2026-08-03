@@ -575,6 +575,37 @@ StoredProcedures/game/usp_Character_CreateWithStarterKit_MountFix.sql
 StoredProcedures/game/usp_Cash_Credit_UpperBoundGuard.sql
 StoredProcedures/game/usp_Cash_CreditAndConsumeItem_UpperBoundGuard.sql
 
+# First-credit-ever race (2026-08-03): the UpperBoundGuard pair's @@ROWCOUNT = 0 / no-existing-row branch
+# INSERTs INTO game.AccountCash (PK_AccountCash on AccountId, no bootstrap proc) with no TRY/CATCH, inside
+# an already-open BEGIN TRANSACTION under XACT_ABORT ON -- a losing 2627/2601 dooms the whole transaction
+# (XACT_STATE() = -1), so a bare TRY/CATCH is not sufficient. Same ROLLBACK-and-replay idiom as
+# usp_CharacterLogoutState_Upsert / usp_Character_ApplyTribeFourConversion. CREATE OR ALTER, additive: the
+# UpperBoundGuard scripts are not edited (SHA-256 journaling).
+StoredProcedures/game/usp_Cash_Credit_FirstCreditRaceGuard.sql
+StoredProcedures/game/usp_Cash_CreditAndConsumeItem_FirstCreditRaceGuard.sql
+
+# Concurrent-create TOCTOU fix: usp_Character_Create.sql and usp_Character_CreateWithStarterKit_MountFix.sql
+# only IF EXISTS-precheck the account+slot/name collisions before an unguarded INSERT, so two concurrent
+# creates for the same account+slot or the same name can both pass the precheck and the loser hits a raw
+# 2627/2601 instead of the documented 50201/50202 THROW. Same TRY/CATCH-translate shape auth.usp_Account_Create
+# already carries for the identical race. CREATE OR ALTER, additive: neither shipped script is edited
+# (SHA-256 journaling).
+StoredProcedures/game/usp_Character_Create_ConcurrentCreateGuard.sql
+StoredProcedures/game/usp_Character_CreateWithStarterKit_ConcurrentCreateGuard.sql
+
+# AccountVault auto-create race (2026-08-03): usp_AccountVault_TransferMoneyWithCharacter,
+# usp_AccountVault_TransferBigMoneyWithCharacter, usp_AccountVault_TransferItemWithCharacter, and
+# usp_Gift_ClaimIntoVault all share an IF NOT EXISTS(...) INSERT INTO game.AccountVault(AccountId) bootstrap
+# (PK_AccountVault on AccountId, no bootstrap proc pre-creates the row) with no TRY/CATCH, inside each proc's
+# own already-open BEGIN TRANSACTION under XACT_ABORT ON -- a losing 2627/2601 dooms the whole transaction
+# (XACT_STATE() = -1), not just the one statement. Same ROLLBACK-and-replay idiom as
+# usp_CharacterLogoutState_Upsert / usp_Character_ApplyTribeFourConversion / usp_Cash_Credit_FirstCreditRaceGuard.
+# CREATE OR ALTER, additive: none of the four shipped scripts are edited (SHA-256 journaling).
+StoredProcedures/game/usp_AccountVault_TransferMoneyWithCharacter_VaultCreateRaceGuard.sql
+StoredProcedures/game/usp_AccountVault_TransferBigMoneyWithCharacter_VaultCreateRaceGuard.sql
+StoredProcedures/game/usp_AccountVault_TransferItemWithCharacter_VaultCreateRaceGuard.sql
+StoredProcedures/game/usp_Gift_ClaimIntoVault_VaultCreateRaceGuard.sql
+
 StoredProcedures/admin/usp_Ban_Create.sql
 StoredProcedures/admin/usp_Ban_GetActiveForAccount.sql
 StoredProcedures/admin/usp_Ban_GetActiveForCharacter.sql

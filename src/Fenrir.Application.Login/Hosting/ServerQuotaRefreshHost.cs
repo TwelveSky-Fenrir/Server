@@ -51,6 +51,7 @@ public sealed class ServerQuotaRefreshHost(
         {
             var currentPlayers = await accountSessions.GetActiveSessionCountAsync(ct).ConfigureAwait(false);
             state.SetCurrentPlayers(currentPlayers);
+            state.ResetReservations();
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

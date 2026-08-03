@@ -43,9 +43,10 @@ public sealed class ZoneHandshakeService(
             return new ZoneHandshakeResult(ZoneHandshakeOutcome.ProtocolViolation);
         }
 
-        var populationForDeclaredTribe = tribeQuota.CountForTribe(declaredTribe);
-        if (TribeQuotaGate.Evaluate(quotaGroup, options.Value.Capacity, populationForDeclaredTribe) ==
-            TribeQuotaOutcome.QuotaFull)
+        // TryReserve checks-and-records atomically (see its own remarks); every rejection from here on must
+        // Release() the reservation so it doesn't permanently occupy a slot.
+        if (!tribeQuota.TryReserve(session, declaredTribe, accountId, DateTimeOffset.UtcNow, quotaGroup,
+                options.Value.Capacity, out var populationForDeclaredTribe))
         {
             logger?.LogWarning(
                 "Zone handshake rejected for account {AccountId}: tribe {DeclaredTribe} quota full ({Population})",
@@ -57,6 +58,7 @@ public sealed class ZoneHandshakeService(
 
         if (consumed is null || consumed.ShardId != options.Value.ShardId)
         {
+            tribeQuota.Release(session.SessionId);
             logger?.LogWarning(
                 "Zone handshake rejected for account {AccountId}: session ticket absent, expired, or wrong shard",
                 accountId);
@@ -69,6 +71,7 @@ public sealed class ZoneHandshakeService(
 
         if (!transitioned)
         {
+            tribeQuota.Release(session.SessionId);
             logger?.LogWarning(
                 "Zone handshake superseded for account {AccountId} character {CharacterId}: a newer login already claimed the session",
                 accountId, consumed.CharacterId);

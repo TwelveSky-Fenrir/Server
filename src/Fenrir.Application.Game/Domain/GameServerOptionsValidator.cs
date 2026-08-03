@@ -16,6 +16,9 @@ public sealed class GameServerOptionsValidator : IValidateOptions<GameServerOpti
         if (string.IsNullOrWhiteSpace(options.PublicHost)) errors.Add("Game:PublicHost must not be empty.");
         if (options.TicketTtlSeconds <= 0)
             errors.Add($"Game:TicketTtlSeconds must be positive (was {options.TicketTtlSeconds}).");
+        if (options.ShardReachabilityProbeTimeoutMilliseconds <= 0)
+            errors.Add(
+                $"Game:ShardReachabilityProbeTimeoutMilliseconds must be positive (was {options.ShardReachabilityProbeTimeoutMilliseconds}).");
         if (string.IsNullOrWhiteSpace(options.GameDataDirectory))
             errors.Add("Game:GameDataDirectory must not be empty.");
 

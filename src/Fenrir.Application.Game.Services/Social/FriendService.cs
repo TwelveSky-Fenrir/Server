@@ -43,8 +43,8 @@ public sealed class FriendService(
 
         if (asker.Friends.Count >= MaxFriends)
         {
-            logger.LogDebug(
-                "Friend ask rejected: character {AskerId} already has {FriendCount} friends",
+            logger.LogWarning(
+                "Friend ask rejected: character {AskerId} already has {FriendCount} friends -- session will be disconnected",
                 asker.CharacterId, asker.Friends.Count);
             return FriendAskResultKind.AlreadyFriendOrFull;
         }
@@ -54,8 +54,8 @@ public sealed class FriendService(
         {
             if (asker.Friends.Values.Contains(target.CharacterId))
             {
-                logger.LogDebug(
-                    "Friend ask rejected: character {AskerId} is already friends with {TargetCharacterId}",
+                logger.LogWarning(
+                    "Friend ask rejected: character {AskerId} is already friends with {TargetCharacterId} -- session will be disconnected",
                     asker.CharacterId, target.CharacterId);
                 return FriendAskResultKind.AlreadyFriendOrFull;
             }
@@ -325,8 +325,8 @@ public sealed class FriendService(
 
         if (asker.Friends.Values.Contains(remote.CharacterId))
         {
-            logger.LogDebug(
-                "Friend ask rejected: character {AskerId} is already friends with cross-shard character {TargetCharacterId}",
+            logger.LogWarning(
+                "Friend ask rejected: character {AskerId} is already friends with cross-shard character {TargetCharacterId} -- session will be disconnected",
                 asker.CharacterId, remote.CharacterId);
             return FriendAskResultKind.AlreadyFriendOrFull;
         }

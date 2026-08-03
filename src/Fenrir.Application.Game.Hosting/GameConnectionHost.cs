@@ -36,6 +36,8 @@ public sealed class GameConnectionHost(
 
     private readonly ConcurrentDictionary<Task, byte> _inFlightConnections = new();
 
+    private readonly SemaphoreSlim _disconnectSqlGate = new(1, 1);
+
     private readonly List<(short MapId, int Port, TcpServer<ZoneClientSession> Server)> _servers = [];
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -257,6 +259,7 @@ public sealed class GameConnectionHost(
 
     private async ValueTask TearDownAccountSessionAsync(int accountId, Guid? sessionToken)
     {
+        await _disconnectSqlGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
         try
         {
             var resolvedToken = sessionToken ?? default;
@@ -274,10 +277,15 @@ public sealed class GameConnectionHost(
             logger.LogWarning(ex, "Failed to tear down runtime.AccountSessions row for account {AccountId}",
                 accountId);
         }
+        finally
+        {
+            _disconnectSqlGate.Release();
+        }
     }
 
     private async ValueTask LogLogoutAsync(int? accountId, int characterId, short mapId)
     {
+        await _disconnectSqlGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
         try
         {
             await eventLog.LogAsync(LogoutEventCode, EventLogCategory.Session, accountId, characterId, null, null,
@@ -287,6 +295,10 @@ public sealed class GameConnectionHost(
         {
             logger.LogWarning(ex, "Failed to write game.EventLog row for logout (character {CharacterId})",
                 characterId);
+        }
+        finally
+        {
+            _disconnectSqlGate.Release();
         }
     }
 
@@ -303,6 +315,7 @@ public sealed class GameConnectionHost(
     public override void Dispose()
     {
         ReleaseArmedListeners();
+        _disconnectSqlGate.Dispose();
         base.Dispose();
     }
 }

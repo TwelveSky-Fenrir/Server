@@ -658,13 +658,20 @@ public sealed class GenericActionService(
     public async ValueTask<GenericActionResult> SellToNpcShopAsync(Zone zone, PlayerRuntimeState state,
         int accountId, int characterId, DefaultPData move, CancellationToken cancellationToken)
     {
-        if (!NpcShopPolicy.TownZoneNumbers.Contains(zone.MapId) ||
-            !worldData.ZonesByNumber.TryGetValue(zone.MapId, out var zoneDefinition) ||
+        if (!NpcShopPolicy.TownZoneNumbers.Contains(zone.MapId))
+        {
+            logger.LogInformation(
+                "Character {CharacterId} NPC-shop-sell disconnected: zone {MapId} is not a valid town server",
+                characterId, zone.MapId);
+            return GenericActionResult.Aborted;
+        }
+
+        if (!worldData.ZonesByNumber.TryGetValue(zone.MapId, out var zoneDefinition) ||
             !NpcFunctionGate.IsAvailable(zoneDefinition, worldData, NpcFunctionGate.NpcShop, state.PosX, state.PosY,
                 state.PosZ))
         {
             logger.LogInformation(
-                "Character {CharacterId} NPC-shop-sell aborted: shop unavailable (zone {MapId})", characterId,
+                "Character {CharacterId} NPC-shop-sell aborted: shop out of range (zone {MapId})", characterId,
                 zone.MapId);
             return GenericActionResult.Failed;
         }
@@ -676,34 +683,34 @@ public sealed class GenericActionService(
             !ContainerMatrix.IsValidSlot((byte)page1, index1))
         {
             logger.LogInformation(
-                "Character {CharacterId} NPC-shop-sell aborted: invalid slot ({Page1}:{Index1})", characterId,
+                "Character {CharacterId} NPC-shop-sell disconnected: invalid slot ({Page1}:{Index1})", characterId,
                 page1, index1);
-            return GenericActionResult.Failed;
+            return GenericActionResult.Aborted;
         }
 
         if (page1 == ContainerMatrix.InventoryPage1 && state.InventoryDate < GameDate.Today())
         {
             logger.LogInformation(
-                "Character {CharacterId} NPC-shop-sell aborted: dated-vault last page expired (InventoryDate {InventoryDate})",
+                "Character {CharacterId} NPC-shop-sell disconnected: dated-vault last page expired (InventoryDate {InventoryDate})",
                 characterId, state.InventoryDate);
-            return GenericActionResult.Failed;
+            return GenericActionResult.Aborted;
         }
 
         var sourceStack = state.Inventory.GetSlot((byte)page1, (byte)index1);
         if (sourceStack is not { } source || !worldData.ItemsById.TryGetValue(source.ItemId, out var itemDefinition))
         {
             logger.LogInformation(
-                "Character {CharacterId} NPC-shop-sell aborted: source slot empty/unresolvable", characterId);
-            return GenericActionResult.Failed;
+                "Character {CharacterId} NPC-shop-sell disconnected: source slot empty/unresolvable", characterId);
+            return GenericActionResult.Aborted;
         }
 
         var resolved = NpcShopPolicy.ResolveSell(itemDefinition, source, move.Quantity1);
         if (!resolved.Succeeded)
         {
             logger.LogInformation(
-                "Character {CharacterId} NPC-shop-sell aborted by resolver (item {ItemId} x{Quantity})",
+                "Character {CharacterId} NPC-shop-sell disconnected by resolver (item {ItemId} x{Quantity})",
                 characterId, source.ItemId, move.Quantity1);
-            return GenericActionResult.Failed;
+            return GenericActionResult.Aborted;
         }
 
         var currentContainer = state.Inventory.GetContainer((byte)page1);
@@ -726,9 +733,9 @@ public sealed class GenericActionService(
         catch (Exception ex)
         {
             logger.LogWarning(ex,
-                "Character {CharacterId} NPC-shop-sell AdjustMoneyAndReplaceContainerAsync failed (treated as money-cap breach)",
+                "Character {CharacterId} NPC-shop-sell disconnected: AdjustMoneyAndReplaceContainerAsync failed (treated as money-cap breach)",
                 characterId);
-            return GenericActionResult.Failed;
+            return GenericActionResult.Aborted;
         }
 
         var containers = ImmutableArray.Create(new InventoryContainerSnapshot((byte)page1, projectedContainer));
@@ -748,13 +755,20 @@ public sealed class GenericActionService(
     public async ValueTask<GenericActionResult> BuyFromNpcShopAsync(Zone zone, PlayerRuntimeState state,
         int accountId, int characterId, DefaultPData move, CancellationToken cancellationToken)
     {
-        if (!NpcShopPolicy.TownZoneNumbers.Contains(zone.MapId) ||
-            !worldData.ZonesByNumber.TryGetValue(zone.MapId, out var zoneDefinition) ||
+        if (!NpcShopPolicy.TownZoneNumbers.Contains(zone.MapId))
+        {
+            logger.LogInformation(
+                "Character {CharacterId} NPC-shop-buy disconnected: zone {MapId} is not a valid town server",
+                characterId, zone.MapId);
+            return GenericActionResult.Aborted;
+        }
+
+        if (!worldData.ZonesByNumber.TryGetValue(zone.MapId, out var zoneDefinition) ||
             !NpcFunctionGate.IsAvailable(zoneDefinition, worldData, NpcFunctionGate.NpcShop, state.PosX, state.PosY,
                 state.PosZ))
         {
             logger.LogInformation(
-                "Character {CharacterId} NPC-shop-buy aborted: shop unavailable (zone {MapId})", characterId,
+                "Character {CharacterId} NPC-shop-buy aborted: shop out of range (zone {MapId})", characterId,
                 zone.MapId);
             return GenericActionResult.Failed;
         }
@@ -763,9 +777,9 @@ public sealed class GenericActionService(
             !worldData.ItemsById.TryGetValue(move.Index1, out var itemDefinition))
         {
             logger.LogInformation(
-                "Character {CharacterId} NPC-shop-buy aborted: NPC {NpcId} or item {ItemId} not found", characterId,
-                move.Page1, move.Index1);
-            return GenericActionResult.Failed;
+                "Character {CharacterId} NPC-shop-buy disconnected: NPC {NpcId} or item {ItemId} not found",
+                characterId, move.Page1, move.Index1);
+            return GenericActionResult.Aborted;
         }
 
         var page2 = move.Page2;
@@ -775,17 +789,17 @@ public sealed class GenericActionService(
             move.XPost2 is < 0 or > 7 || move.YPost2 is < 0 or > 7)
         {
             logger.LogInformation(
-                "Character {CharacterId} NPC-shop-buy aborted: invalid destination slot ({Page2}:{Index2})",
+                "Character {CharacterId} NPC-shop-buy disconnected: invalid destination slot ({Page2}:{Index2})",
                 characterId, page2, index2);
-            return GenericActionResult.Failed;
+            return GenericActionResult.Aborted;
         }
 
         if (page2 == ContainerMatrix.InventoryPage1 && state.InventoryDate < GameDate.Today())
         {
             logger.LogInformation(
-                "Character {CharacterId} NPC-shop-buy aborted: dated-vault last page expired (InventoryDate {InventoryDate})",
+                "Character {CharacterId} NPC-shop-buy disconnected: dated-vault last page expired (InventoryDate {InventoryDate})",
                 characterId, state.InventoryDate);
-            return GenericActionResult.Failed;
+            return GenericActionResult.Aborted;
         }
 
         var destinationSlot = state.Inventory.GetSlot((byte)page2, (byte)index2);
@@ -797,17 +811,11 @@ public sealed class GenericActionService(
 
             switch (warPointResult.Status)
             {
-                case WarPointBuyStatus.Aborted:
+                case WarPointBuyStatus.Aborted or WarPointBuyStatus.SoftRejected:
                     logger.LogInformation(
-                        "Character {CharacterId} NPC-shop-buy aborted by War-Point routing (NPC {NpcId}, item {ItemId})",
-                        characterId, move.Page1, move.Index1);
-                    return GenericActionResult.Failed;
-
-                case WarPointBuyStatus.SoftRejected:
-                    logger.LogInformation(
-                        "Character {CharacterId} NPC-shop-buy soft-rejected by War-Point routing (NPC {NpcId}, item {ItemId})",
-                        characterId, move.Page1, move.Index1);
-                    return GenericActionResult.Failed;
+                        "Character {CharacterId} NPC-shop-buy disconnected by War-Point routing ({Status}, NPC {NpcId}, item {ItemId})",
+                        characterId, warPointResult.Status, move.Page1, move.Index1);
+                    return GenericActionResult.Aborted;
 
                 case WarPointBuyStatus.Succeeded:
                     return GenericActionResult.Succeeded;
@@ -823,9 +831,9 @@ public sealed class GenericActionService(
         if (!resolved.Succeeded)
         {
             logger.LogInformation(
-                "Character {CharacterId} NPC-shop-buy rejected by resolver (item {ItemId} x{Quantity}, cleanFailure={IsCleanFailure})",
-                characterId, move.Index1, move.Quantity1, resolved.IsCleanFailure);
-            return GenericActionResult.Failed;
+                "Character {CharacterId} NPC-shop-buy disconnected by resolver ({Outcome}, item {ItemId} x{Quantity})",
+                characterId, resolved.Outcome, move.Index1, move.Quantity1);
+            return GenericActionResult.Aborted;
         }
 
         var projectedContainer = state.Inventory.GetContainer((byte)page2)
@@ -848,9 +856,9 @@ public sealed class GenericActionService(
         catch (Exception ex)
         {
             logger.LogWarning(ex,
-                "Character {CharacterId} NPC-shop-buy aborted: AdjustMoneyAndReplaceContainerAsync failed (insufficient funds)",
+                "Character {CharacterId} NPC-shop-buy disconnected: AdjustMoneyAndReplaceContainerAsync failed (insufficient funds)",
                 characterId);
-            return GenericActionResult.Failed;
+            return GenericActionResult.Aborted;
         }
 
         var containers = ImmutableArray.Create(new InventoryContainerSnapshot((byte)page2, projectedContainer));

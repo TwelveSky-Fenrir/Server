@@ -29,12 +29,6 @@ public sealed class ZoneTransferCancelService(
             return;
         }
 
-        // Broker cross-check, PART 1 (same-shard leg): the source zone's own IsMovingZone flag alone never
-        // proves the handoff never completed elsewhere -- a client that keeps this OLD connection open while
-        // the target zone admits it live is exactly the character-duplication exploit this guards against.
-        // EnterWorldService runs the complementary check on admission (evicting a stale same-shard source
-        // registration); this is the defense-in-depth backstop for any timing window that check doesn't
-        // close in time, and the only signal available at all for the cross-shard leg below.
         if (zones.TryGetPlayerInOtherZone(characterId, zone, out _, out var liveZone))
         {
             logger.LogWarning(
@@ -45,15 +39,6 @@ public sealed class ZoneTransferCancelService(
             return;
         }
 
-        // Broker cross-check, PART 2 (cross-shard leg): a cross-shard handoff's target shard has no shared
-        // in-process ZoneRegistry the check above can see. runtime.AccountSessions is the one piece of state
-        // both shards actually share -- ZoneHandshakeService.ConsumeTicketAsync calls TransitionToGameAsync
-        // on the TARGET shard the instant its handshake succeeds, which overwrites this account's single
-        // AccountSessions row's ShardId to the target. If that already happened, this SOURCE shard no longer
-        // holds this account's lease under this session's own token, and resuming here would create a second
-        // live copy on two different shards. RefreshAndGetHeldLeasesAsync is the existing, non-destructive
-        // "do I still own this lease" primitive (already used by AccountSessionLivenessHost on the Login
-        // side) -- this call never mutates or consumes anything, unlike SessionTickets.ConsumeAsync.
         var accountId = zoneSession.AccountId!.Value;
         var sessionToken = zoneSession.AccountSessionToken!.Value;
 

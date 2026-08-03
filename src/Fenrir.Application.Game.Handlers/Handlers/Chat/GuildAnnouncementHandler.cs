@@ -19,7 +19,11 @@ public sealed class GuildAnnouncementHandler(
             session.SessionId, zoneSession.CharacterId, packet.Content.Length);
 
         if (string.IsNullOrEmpty(packet.Content))
+        {
+            // Server/ts25zone/S04_MyWork02.cpp:10425-10430 -- empty content is treated as a tampered client.
+            zoneSession.Abort(DisconnectReason.Faulted);
             return;
+        }
 
         if (zoneSession.CurrentZone is not Zone zone)
             return;

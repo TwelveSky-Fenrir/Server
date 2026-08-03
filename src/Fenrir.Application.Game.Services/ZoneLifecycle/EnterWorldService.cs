@@ -170,12 +170,6 @@ public sealed class EnterWorldService(
             return;
         }
 
-        // Positive cross-zone presence check (same-shard leg of the duplicate-admission guard, see
-        // ZoneTransferCancelService for the cross-shard/broker leg). A character can legitimately still be
-        // tracked in its OLD zone's _players here -- the normal zone-move handoff disconnects the old
-        // connection only AFTER the new one finishes entering, so this is expected to race. What must never
-        // happen is admitting this character into `zone` while it is ALSO live somewhere that is NOT
-        // mid-transfer, or leaving a stale mid-transfer registration behind once this admission wins.
         if (zones.TryGetPlayerInOtherZone(characterId, zone, out var existingState, out var existingZone))
         {
             if (!existingState.IsMovingZone)

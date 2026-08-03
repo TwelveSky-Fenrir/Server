@@ -48,7 +48,10 @@ BEGIN
     FROM game.CharacterRunes
     WHERE CharacterId = @CharacterId;
     DELETE
-    FROM game.CharacterCostumes
+    FROM game.CharacterCostumeSlots
+    WHERE CharacterId = @CharacterId;
+    DELETE
+    FROM game.CharacterMounts
     WHERE CharacterId = @CharacterId;
 
     DELETE

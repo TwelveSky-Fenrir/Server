@@ -70,21 +70,18 @@ public interface ICharacterRepository
         IReadOnlyList<CharacterItemSlotTvp> itemsA, byte containerB, IReadOnlyList<CharacterItemSlotTvp> itemsB,
         CancellationToken ct);
 
-    public ValueTask ReplaceContainerV2Async(int characterId, byte container,
-        IReadOnlyList<CharacterItemSlotV2Tvp> items, CancellationToken ct);
-
-    public ValueTask ReplaceTwoContainersV2Async(int characterId, byte containerA,
-        IReadOnlyList<CharacterItemSlotV2Tvp> itemsA, byte containerB, IReadOnlyList<CharacterItemSlotV2Tvp> itemsB,
+    public ValueTask<ReadOnlyCollection<CharacterCostumeSlotDto>> GetCostumesAsync(int characterId,
         CancellationToken ct);
 
-    public ValueTask<ReadOnlyCollection<CharacterCostumeSlotDto>> GetCostumesAsync(int characterId,
+    public ValueTask<ReadOnlyCollection<CharacterMountSlotDto>> GetMountsAsync(int characterId,
         CancellationToken ct);
 
     public ValueTask PersistProgressAsync(IReadOnlyList<CharacterProgressTvp> rows,
         IReadOnlyList<CharacterCostumeSlotTvp> costumes, CancellationToken ct);
 
     public ValueTask PersistFinalFlushAsync(CharacterProgressTvp progress, CharacterPositionTvp position,
-        IReadOnlyList<CharacterCostumeSlotTvp> costumes, CancellationToken ct);
+        IReadOnlyList<CharacterCostumeSlotTvp> costumes, IReadOnlyList<CharacterBuffSlotTvp> buffs,
+        IReadOnlyList<CharacterMountSlotTvp> mounts, CancellationToken ct);
 
     public ValueTask AdjustMoneyAsync(int characterId, long deltaMoney, int deltaBigMoney, CancellationToken ct);
 

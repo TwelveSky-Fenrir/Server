@@ -11,10 +11,17 @@ public sealed class MovementRules(IOptions<GameServerOptions> options)
 
     public bool IsPlausible(PlayerRuntimeState current, in ActionInfo intent, ZoneGeometry? geometry = null)
     {
-        var dx = intent.Location[0] - current.PosX;
-        var dy = intent.Location[1] - current.PosY;
-        var dz = intent.Location[2] - current.PosZ;
-        var maxDistance = options.Value.MaxPlausibleMoveDistance;
+        return IsPlausible(current.PosX, current.PosY, current.PosZ,
+            intent.Location[0], intent.Location[1], intent.Location[2], geometry);
+    }
+
+    public bool IsPlausible(float fromX, float fromY, float fromZ, float toX, float toY, float toZ,
+        ZoneGeometry? geometry = null, float? maxDistanceOverride = null)
+    {
+        var dx = toX - fromX;
+        var dy = toY - fromY;
+        var dz = toZ - fromZ;
+        var maxDistance = maxDistanceOverride ?? options.Value.MaxPlausibleMoveDistance;
 
         if (dx * dx + dy * dy + dz * dz > maxDistance * maxDistance)
             return false;
@@ -22,14 +29,12 @@ public sealed class MovementRules(IOptions<GameServerOptions> options)
         if (geometry is null)
             return true;
 
-        var targetY = intent.Location[1];
-
-        geometry.Resolve(intent.Location[0], intent.Location[2], out var walkable, out var groundY);
+        geometry.Resolve(toX, toZ, out var walkable, out var groundY);
 
         if (!walkable)
             return false;
 
-        if (targetY < groundY - MaxBelowGroundTolerance)
+        if (toY < groundY - MaxBelowGroundTolerance)
             return false;
 
         return true;

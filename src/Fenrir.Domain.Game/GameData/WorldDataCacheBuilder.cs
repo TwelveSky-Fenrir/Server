@@ -27,6 +27,14 @@ public static class WorldDataCacheBuilder
 
     private const int MaxItemDataNumber3D = 10000;
 
+    private const int MinItemLevel = 1;
+
+    private const int MaxItemMartialLevel = 25;
+
+    private const int MaxSearchableItemType = 4;
+
+    private const int MaxSearchableItemSort = 21;
+
     private const int PotionType1RestrictedValue = 9;
 
     private const int MinPotionType2Restricted = 1;
@@ -150,9 +158,13 @@ public static class WorldDataCacheBuilder
         var (zonesByNumber, stats) = BuildZones(
             rows.Zones, rows.ZonePortals, rows.ZoneSpawnPoints, rows.ZoneNpcSpawns, rows.MonsterSpawnRegions);
 
+        var (itemSearchBuckets, martialItemSearchBuckets) = BuildItemSearchBuckets(rows.Items);
+
         var cache = new WorldDataCache
         {
             ItemsById = BuildItems(rows.Items, rows.ItemBonusSkills),
+            ItemSearchBuckets = itemSearchBuckets,
+            MartialItemSearchBuckets = martialItemSearchBuckets,
             SkillsById = BuildSkills(rows.Skills, rows.SkillDescriptions, rows.SkillGrades),
             MonstersById = BuildMonsters(rows.Monsters, rows.MonsterDropMoney, rows.MonsterDropPotions,
                 rows.MonsterDropExtraItems, rows.MonsterDropCategoryRates, rows.MonsterDropQuestItems),
@@ -262,6 +274,17 @@ public static class WorldDataCacheBuilder
         {
             if (item.ItemId == 0)
                 continue;
+
+            if (item.Level is < MinItemLevel or > MaxLevelIndex)
+                throw new InvalidOperationException(
+                    $"world.Items row ItemId={item.ItemId} has Level={item.Level} outside the legacy " +
+                    $"{MinItemLevel}-{MaxLevelIndex} bound. The drop-search index is bucketed by Level, so an " +
+                    "out-of-range row would be unreachable instead of merely odd.");
+
+            if (item.MartialLevel > MaxItemMartialLevel)
+                throw new InvalidOperationException(
+                    $"world.Items row ItemId={item.ItemId} has MartialLevel={item.MartialLevel} outside the legacy " +
+                    $"0-{MaxItemMartialLevel} bound.");
 
             if (item.CheckDateItem is < 0 or > MaxItemCheckDateItem)
                 throw new InvalidOperationException(
@@ -789,6 +812,28 @@ public static class WorldDataCacheBuilder
         return result.ToFrozenDictionary();
     }
 
+    public static (FrozenDictionary<ItemBucketKey, ImmutableArray<ItemRowDto>> ItemSearchBuckets,
+        FrozenDictionary<MartialItemBucketKey, ImmutableArray<ItemRowDto>> MartialItemSearchBuckets)
+        BuildItemSearchBuckets(IReadOnlyList<ItemRowDto> items)
+    {
+        var buckets = new Dictionary<ItemBucketKey, List<ItemRowDto>>();
+        var martialBuckets = new Dictionary<MartialItemBucketKey, List<ItemRowDto>>();
+
+        foreach (var item in items)
+        {
+            if (item.ItemId == 0 || item.Type > MaxSearchableItemType || item.Sort > MaxSearchableItemSort)
+                continue;
+
+            AddToGroup(buckets, new ItemBucketKey(item.Level, item.Type, item.Sort), item);
+
+            if (item.Level == MaxLevelIndex)
+                AddToGroup(martialBuckets,
+                    new MartialItemBucketKey(item.Level, item.Type, item.Sort, item.MartialLevel), item);
+        }
+
+        return (FreezeGroups(buckets), FreezeGroups(martialBuckets));
+    }
+
     public static FrozenDictionary<int, SkillDefinition> BuildSkills(
         IReadOnlyList<SkillRowDto> skills,
         IReadOnlyList<SkillDescriptionRowDto> descriptions,
@@ -1014,6 +1059,17 @@ public static class WorldDataCacheBuilder
         }
 
         list.Add(row);
+    }
+
+    private static FrozenDictionary<TKey, ImmutableArray<TRow>> FreezeGroups<TKey, TRow>(
+        Dictionary<TKey, List<TRow>> groups)
+        where TKey : notnull
+    {
+        var result = new Dictionary<TKey, ImmutableArray<TRow>>(groups.Count);
+        foreach (var (key, list) in groups)
+            result.Add(key, ImmutableArray.CreateRange(list));
+
+        return result.ToFrozenDictionary();
     }
 
     private static ImmutableArray<TRow> TakeGroup<TKey, TRow>(Dictionary<TKey, List<TRow>> groups, TKey key)

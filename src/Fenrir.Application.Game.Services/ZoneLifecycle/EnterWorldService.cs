@@ -7,6 +7,7 @@ using Fenrir.Application.Game.Domain.Avatars;
 using Fenrir.Application.Game.Domain.Costumes;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Mounts;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Quests;
@@ -129,18 +130,6 @@ public sealed class EnterWorldService(
             {
                 MapId = ticketTargetMapId.Value, PosX = spawnX, PosY = spawnY, PosZ = spawnZ
             };
-        }
-
-        if (!WrapCheckSpecialDestinationCatalog.IsInstancedDestination(character.MapId))
-        {
-            var (healedMapId, healedPosX, healedPosY, healedPosZ) = ZoneTribeSelfHeal.Apply(character.Tribe,
-                character.MapId, character.PosX, character.PosY, character.PosZ);
-
-            if (healedMapId != character.MapId)
-                character = character with
-                {
-                    MapId = healedMapId, PosX = healedPosX, PosY = healedPosY, PosZ = healedPosZ
-                };
         }
 
         if (packet.AvatarName != character.Name)
@@ -274,9 +263,12 @@ public sealed class EnterWorldService(
 
             var costumeRowsTask = characters.GetCostumesAsync(characterId, cancellationToken);
 
+            var mountRowsTask = characters.GetMountsAsync(characterId, cancellationToken);
+
             await Task.WhenAll(isMutedTask.AsTask(), guildTask.AsTask(), tribeRoleTask.AsTask(),
                 friendsTask.AsTask(), mentorTask.AsTask(), heroRankPointsTask.AsTask(),
-                shardLocationUpsertTask.AsTask(), runeRowsTask.AsTask(), costumeRowsTask.AsTask());
+                shardLocationUpsertTask.AsTask(), runeRowsTask.AsTask(), costumeRowsTask.AsTask(),
+                mountRowsTask.AsTask());
 
             var isMuted = isMutedTask.Result;
             var guildMembership = guildTask.Result;
@@ -289,6 +281,11 @@ public sealed class EnterWorldService(
                 CostumePersistenceCodec.Hydrate(costumeRowsTask.Result);
             var costumeIndex = CostumePersistenceCodec.NormalizeIndexOnLoad(character.CostumeIndex, costumeWardrobe);
             var costumeNumber = CostumePersistenceCodec.ResolveWornNumber(costumeIndex, costumeWardrobe);
+            var mountGarageSlots = MountPersistenceCodec
+                .Hydrate(mountRowsTask.Result)
+                .SetItem(MountPersistenceCodec.PersistedGarageSlot,
+                    (character.MountItemId, character.MountExpActivity, character.MountPower));
+            var persistedBuffs = BuildBuffInfo(isTicketTransfer ? bundle.Buffs : []);
 
             var guildSummary = guildMembership is { } membership
                 ? await guilds.GetByIdAsync(membership.GuildId, cancellationToken)
@@ -311,7 +308,7 @@ public sealed class EnterWorldService(
             {
                 AvatarInfo = AvatarInfoFactory.CreateForCharacter(character, bundle.Items, socialSnapshot,
                     bundle.Skills, bundle.Hotkeys, costumeRowsTask.Result),
-                BuffInfo = BuildBuffInfo(bundle.Buffs)
+                BuffInfo = persistedBuffs
             };
             zoneSession.Send(in registerRecv);
 
@@ -557,7 +554,9 @@ public sealed class EnterWorldService(
                 AnimalDoubleExp: character.AnimalDoubleExp,
                 DmgBoost: character.DmgBoost,
                 HPBoost: character.HPBoost,
-                CriBoost: character.CriBoost)));
+                CriBoost: character.CriBoost,
+                MountGarageSlots: mountGarageSlots,
+                Buffs: persistedBuffs)));
 
             if (!entered)
             {

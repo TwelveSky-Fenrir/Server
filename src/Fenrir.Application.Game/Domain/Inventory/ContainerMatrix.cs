@@ -17,6 +17,8 @@ public static class ContainerMatrix
         DestinationOccupied
     }
 
+    public const int InventoryPageSlotCount = 64;
+
     public const byte InventoryPage0 = 0;
     public const byte InventoryPage1 = 1;
     public const byte Equipment = 2;

@@ -96,23 +96,22 @@ public static class GeneralItemDropResolver
 
     private static ItemRowDto? ReturnOne(WorldDataCache worldData, Random random, int level, int type, int sort)
     {
-        var overMartialCap = level > MaxLimitLevelNum;
-        var bucketLevel = overMartialCap ? MaxLimitLevelNum : level;
-        var martialLevel = overMartialCap ? level - MaxLimitLevelNum : 0;
+        if (level < 1 || (uint)type > byte.MaxValue || (uint)sort > byte.MaxValue)
+            return null;
 
-        List<ItemRowDto>? matches = null;
-        foreach (var definition in worldData.ItemsById.Values)
-        {
-            var item = definition.Item;
-            if (item.Level != bucketLevel || item.Type != type || item.Sort != sort)
-                continue;
+        if (level < MaxLimitLevelNum)
+            return worldData.ItemSearchBuckets.TryGetValue(
+                new ItemBucketKey((short)level, (byte)type, (byte)sort), out var bucket)
+                ? bucket[random.Next(bucket.Length)]
+                : null;
 
-            if (overMartialCap && item.MartialLevel != martialLevel)
-                continue;
+        var martialLevel = level - MaxLimitLevelNum;
 
-            (matches ??= []).Add(item);
-        }
-
-        return matches is null or { Count: 0 } ? null : matches[random.Next(matches.Count)];
+        return martialLevel <= byte.MaxValue &&
+               worldData.MartialItemSearchBuckets.TryGetValue(
+                   new MartialItemBucketKey(MaxLimitLevelNum, (byte)type, (byte)sort, (byte)martialLevel),
+                   out var martialBucket)
+            ? martialBucket[random.Next(martialBucket.Length)]
+            : null;
     }
 }

@@ -50,7 +50,7 @@ BEGIN
 
             INSERT INTO game.CharacterItems (CharacterId, Container, Slot, ItemId, Quantity,
                                              Enchant, Combine, Refine, Socket,
-                                             SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial)
+                                             SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial, XPos, YPos)
             SELECT @CharacterId,
                    @Container1,
                    Slot,
@@ -64,7 +64,9 @@ BEGIN
                    SocketGem2,
                    SocketGem3,
                    ExpireDate,
-                   Serial
+                   Serial,
+                   XPos,
+                   YPos
             FROM @Items1;
         END;
 
@@ -78,7 +80,7 @@ BEGIN
 
             INSERT INTO game.CharacterItems (CharacterId, Container, Slot, ItemId, Quantity,
                                              Enchant, Combine, Refine, Socket,
-                                             SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial)
+                                             SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial, XPos, YPos)
             SELECT @CharacterId,
                    @Container2,
                    Slot,
@@ -92,7 +94,9 @@ BEGIN
                    SocketGem2,
                    SocketGem3,
                    ExpireDate,
-                   Serial
+                   Serial,
+                   XPos,
+                   YPos
             FROM @Items2;
         END;
 

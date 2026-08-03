@@ -102,8 +102,9 @@ Tables/game/TradeCommitLedger.sql
 
 Tables/game/CharacterPetBag.sql
 
-Tables/game/CharacterCostumes.sql
 Tables/game/CharacterCostumeSlots.sql
+
+Tables/game/CharacterMounts.sql
 
 Tables/game/CharacterFriends.sql
 Tables/game/CharacterSkills.sql
@@ -132,8 +133,9 @@ Schemas/Types/game/tvp_OfflineShopItemSlot.sql
 Schemas/Types/game/tvp_AccountVaultItemSlot.sql
 Schemas/Types/game/tvp_AccountVaultItemSlotV2.sql
 Schemas/Types/game/tvp_CharacterItemSlot.sql
-Schemas/Types/game/tvp_CharacterItemSlotV2.sql
 Schemas/Types/game/tvp_CharacterCostumeSlot.sql
+Schemas/Types/game/tvp_CharacterBuffSlot.sql
+Schemas/Types/game/tvp_CharacterMountSlot.sql
 Schemas/Types/game/tvp_CharacterProgress.sql
 Schemas/Types/game/tvp_CharacterSkillSlot.sql
 Schemas/Types/game/tvp_CharacterHotkeySlot.sql
@@ -185,13 +187,12 @@ StoredProcedures/game/usp_Character_GetIdByName.sql
 StoredProcedures/game/usp_Character_GetForWorldEntry.sql
 StoredProcedures/game/usp_Character_GetForWorldEntrySummary.sql
 StoredProcedures/game/usp_Character_GetCostumes.sql
+StoredProcedures/game/usp_Character_GetMounts.sql
 StoredProcedures/game/usp_Character_PersistProgressBatch.sql
 StoredProcedures/game/usp_Character_PersistBatch.sql
 StoredProcedures/game/usp_Character_PersistFinalFlush.sql
 StoredProcedures/game/usp_CharacterItems_ReplaceContainer.sql
 StoredProcedures/game/usp_CharacterItems_ReplaceTwoContainers.sql
-StoredProcedures/game/usp_CharacterItems_ReplaceContainerV2.sql
-StoredProcedures/game/usp_CharacterItems_ReplaceTwoContainersV2.sql
 StoredProcedures/game/usp_Character_AdjustMoney.sql
 StoredProcedures/game/usp_Character_AdjustMoneyAndReplaceContainer.sql
 StoredProcedures/game/usp_Character_AdjustMoneyAndReplaceTwoContainers.sql
@@ -350,7 +351,6 @@ StoredProcedures/game/usp_GiftLog_GetByAccount.sql
 StoredProcedures/game/usp_HeroRanking_Upsert.sql
 StoredProcedures/game/usp_HeroRanking_GetByPeriod.sql
 StoredProcedures/game/usp_HeroRanking_Rollover.sql
-StoredProcedures/game/usp_HeroRanking_Rollover_SnapshotDeleteLockGuard.sql
 StoredProcedures/game/usp_HeroRanking_AddPoints.sql
 StoredProcedures/game/usp_HeroRanking_GetPoints.sql
 StoredProcedures/game/usp_HeroRanking_ClaimReward.sql
@@ -429,22 +429,6 @@ StoredProcedures/game/usp_Character_UpdateGenderAndAppearance.sql
 
 StoredProcedures/game/usp_Guild_SetBuffTime.sql
 StoredProcedures/game/usp_Guild_SetBuffType.sql
-
-StoredProcedures/game/usp_Character_CreateWithStarterKit_MountFix.sql
-
-StoredProcedures/game/usp_Cash_Credit_UpperBoundGuard.sql
-StoredProcedures/game/usp_Cash_CreditAndConsumeItem_UpperBoundGuard.sql
-
-StoredProcedures/game/usp_Cash_Credit_FirstCreditRaceGuard.sql
-StoredProcedures/game/usp_Cash_CreditAndConsumeItem_FirstCreditRaceGuard.sql
-
-StoredProcedures/game/usp_Character_Create_ConcurrentCreateGuard.sql
-StoredProcedures/game/usp_Character_CreateWithStarterKit_ConcurrentCreateGuard.sql
-
-StoredProcedures/game/usp_AccountVault_TransferMoneyWithCharacter_VaultCreateRaceGuard.sql
-StoredProcedures/game/usp_AccountVault_TransferBigMoneyWithCharacter_VaultCreateRaceGuard.sql
-StoredProcedures/game/usp_AccountVault_TransferItemWithCharacter_VaultCreateRaceGuard.sql
-StoredProcedures/game/usp_Gift_ClaimIntoVault_VaultCreateRaceGuard.sql
 
 StoredProcedures/admin/usp_Ban_Create.sql
 StoredProcedures/admin/usp_Ban_GetActiveForAccount.sql
@@ -556,3 +540,5 @@ Migrations/Seed/admin/028_error_catalog_account_daily_reward.sql
 Migrations/Seed/admin/029_error_catalog_cash_credit_upper_bound.sql
 
 Migrations/Seed/admin/030_error_catalog_characteritems_v2.sql
+
+Migrations/Seed/admin/031_error_catalog_retire_50361.sql

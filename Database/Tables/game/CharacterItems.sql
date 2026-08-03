@@ -29,7 +29,7 @@ CREATE TABLE game.CharacterItems
     YPos        TINYINT  NOT NULL
         CONSTRAINT DF_CharacterItems_YPos DEFAULT 0,
     CONSTRAINT PK_CharacterItems PRIMARY KEY CLUSTERED (CharacterId, Container, Slot),
-    CONSTRAINT CK_CharacterItems_Quantity CHECK (Quantity BETWEEN 1 AND 999),
+    CONSTRAINT CK_CharacterItems_Quantity CHECK (Quantity BETWEEN 0 AND 999),
     CONSTRAINT CK_CharacterItems_ContainerSlot CHECK (
         (Container IN (0, 1) AND Slot <= 63)
             OR (Container = 2 AND Slot <= 12)

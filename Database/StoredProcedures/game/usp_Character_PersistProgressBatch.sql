@@ -119,11 +119,11 @@ BEGIN
     FROM game.CharacterCostumeSlots AS ci
              JOIN @Applied AS a ON a.CharacterId = ci.CharacterId;
 
-    INSERT INTO game.CharacterCostumeSlots (CharacterId, Slot, ItemId, EnchantValue, ExpireDate)
+    INSERT INTO game.CharacterCostumeSlots (CharacterId, Slot, ItemId, ItemValue, ExpireDate)
     SELECT cs.CharacterId,
            cs.Slot,
            cs.ItemId,
-           cs.EnchantValue,
+           cs.ItemValue,
            cs.ExpireDate
     FROM @Costumes AS cs
              JOIN @Applied AS a ON a.CharacterId = cs.CharacterId;

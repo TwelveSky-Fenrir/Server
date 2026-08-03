@@ -68,7 +68,9 @@ public sealed partial record CharacterRosterItemDto(
     int SocketGem2,
     int SocketGem3,
     int ExpireDate,
-    int Serial);
+    int Serial,
+    byte XPos = 0,
+    byte YPos = 0);
 
 [GenerateDto]
 public sealed partial record CharacterRosterPetBagSlotDto(int CharacterId, byte Slot, int ItemId);
@@ -77,7 +79,7 @@ public sealed partial record CharacterRosterPetBagSlotDto(int CharacterId, byte 
 public sealed partial record CharacterRosterCostumeSlotDto(int CharacterId, byte Slot, int ItemId);
 
 [GenerateDto]
-public sealed partial record CharacterCostumeSlotDto(byte Slot, int ItemId, int ItemDate, int ExpireDate);
+public sealed partial record CharacterCostumeSlotDto(byte Slot, int ItemId, int ItemValue, int ExpireDate);
 
 public sealed record CharacterAccountRosterBundle(
     ReadOnlyCollection<CharacterRosterDto> Characters,

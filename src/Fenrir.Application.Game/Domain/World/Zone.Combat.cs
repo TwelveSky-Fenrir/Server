@@ -50,11 +50,9 @@ public sealed partial class Zone
 
     private const int PvpKillDropSort = 11;
 
-    private const int PvpKillDropMinimumCombinedLevel = 145;
+    private const int PvpKillDropMinimumLevel = 135;
 
     private const int YangGokPvpDropRatePercent = 35;
-
-    private const int RegularWarDropStreakRequirementFast = 3;
 
     private const int RegularWarDropStreakRequirement = 10;
 
@@ -74,7 +72,7 @@ public sealed partial class Zone
     private static readonly int[] KillDropAnimalTier10 = [1304, 1305, 1306, 1314, 1318, 1321, 1324, 1327];
 
     private static readonly KillDropEntry[] RegularWarDropTierA =
-        [KillDropEntry.Item(1379), KillDropEntry.Item(1378)];
+        [KillDropEntry.Item(720)];
 
     private static readonly KillDropEntry[] RegularWarDropTierB =
     [
@@ -84,8 +82,8 @@ public sealed partial class Zone
 
     private static readonly KillDropEntry[] RegularWarDropTierC =
     [
-        KillDropEntry.Item(1237), KillDropEntry.Item(694), KillDropEntry.Item(1103), KillDropEntry.Item(1124),
-        KillDropEntry.Item(1166), KillDropEntry.Item(8102), KillDropEntry.Item(1371)
+        KillDropEntry.Item(694), KillDropEntry.Item(1103), KillDropEntry.Item(1124),
+        KillDropEntry.Item(1166), KillDropEntry.Item(8102)
     ];
 
     private static readonly KillDropEntry[] RegularWarDropTierD =
@@ -154,9 +152,30 @@ public sealed partial class Zone
 
     private void ApplySenderLocation(PlayerRuntimeState state, AttackForProtocol attackInfo)
     {
-        state.PosX = attackInfo.SenderLocation[0];
-        state.PosY = attackInfo.SenderLocation[1];
-        state.PosZ = attackInfo.SenderLocation[2];
+        var claimedX = attackInfo.SenderLocation[0];
+        var claimedY = attackInfo.SenderLocation[1];
+        var claimedZ = attackInfo.SenderLocation[2];
+
+        if (movementRules.IsPlausible(state.DeclaredMoveAnchorX, state.DeclaredMoveAnchorY, state.DeclaredMoveAnchorZ,
+                claimedX, claimedY, claimedZ, Geometry, options.MaxAttackPacketPositionDelta))
+        {
+            state.PosX = claimedX;
+            state.PosY = claimedY;
+            state.PosZ = claimedZ;
+            state.ImplausibleAttackPositionStreak = 0;
+        }
+        else
+        {
+            state.ImplausibleAttackPositionStreak++;
+
+            logger.LogWarning(
+                "Zone {MapId}: character {CharacterId} claimed an implausible attack-packet position, REJECTED -- " +
+                "server position kept (consecutive={Streak}) Case={Case} Anchor=({AnchorX},{AnchorY},{AnchorZ}) " +
+                "To=({ToX},{ToY},{ToZ}) GeometryLoaded={GeometryLoaded}",
+                MapId, state.CharacterId, state.ImplausibleAttackPositionStreak, attackInfo.Case,
+                state.DeclaredMoveAnchorX, state.DeclaredMoveAnchorY, state.DeclaredMoveAnchorZ,
+                claimedX, claimedY, claimedZ, Geometry is not null);
+        }
 
         var newCell = _grid.CellOf(state.PosX, state.PosZ);
         _grid.Move(state.CharacterId, state.CurrentCell, newCell, state.PosX, state.PosY, state.PosZ);
@@ -338,7 +357,7 @@ public sealed partial class Zone
         DecrementDoubleKillNumTime2OnKill(attackerState);
 
         if (profile.GrantDrop)
-            DropItemsForKillOtherTribe(attackerState, defenderState, attackerCombinedLevel, defenderCombinedLevel);
+            DropItemsForKillOtherTribe(attackerState, defenderState);
     }
 
     private bool IsMap38DailyMissionKillWindowOpen(PlayerRuntimeState attackerState, bool symbolBattleActive)
@@ -567,11 +586,9 @@ public sealed partial class Zone
         attackerState.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
     }
 
-    private void DropItemsForKillOtherTribe(PlayerRuntimeState attackerState, PlayerRuntimeState defenderState,
-        int attackerCombinedLevel, int defenderCombinedLevel)
+    private void DropItemsForKillOtherTribe(PlayerRuntimeState attackerState, PlayerRuntimeState defenderState)
     {
-        if (attackerCombinedLevel < PvpKillDropMinimumCombinedLevel ||
-            defenderCombinedLevel < PvpKillDropMinimumCombinedLevel)
+        if (attackerState.Level < PvpKillDropMinimumLevel || defenderState.Level < PvpKillDropMinimumLevel)
             return;
 
         if (MapId == PvpKillExtendedRewardZones.DtmZoneId)
@@ -585,10 +602,7 @@ public sealed partial class Zone
         if (RegularWarMapCatalog.TryGet(MapId, out _))
         {
             var streak = _regularWarKillDropStreak.GetValueOrDefault(attackerState.CharacterId) + 1;
-            var requirement = MapId is 164 or PvpKillRewardZoneCatalog.FfaMapNumber
-                ? RegularWarDropStreakRequirementFast
-                : RegularWarDropStreakRequirement;
-            if (streak >= requirement)
+            if (streak >= RegularWarDropStreakRequirement)
             {
                 _regularWarKillDropStreak[attackerState.CharacterId] = 0;
                 var itemId = ResolveKillDropItemId(PickKillDropTierMember(
@@ -705,6 +719,9 @@ public sealed partial class Zone
         if (!_monsters.TryGetValue(command.AttackInfo.ServerIndex2, out var monster))
             return;
         if (monster.UniqueNumber != command.AttackInfo.UniqueNumber2)
+            return;
+
+        if (!AttackPacketBudget.TryConsume(attackerState, command.AttackInfo.AttackActionValue4))
             return;
 
         if (monster.AiState is MonsterAiState.Spawning or MonsterAiState.Dead or MonsterAiState.ReturnToSpawn)

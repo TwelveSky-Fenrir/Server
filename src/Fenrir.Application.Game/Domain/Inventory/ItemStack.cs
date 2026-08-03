@@ -26,12 +26,6 @@ public readonly record struct ItemStack(
     public CharacterItemSlotTvp ToTvp(byte slot)
     {
         return new CharacterItemSlotTvp(slot, ItemId, Quantity, Enchant, Combine, Refine, Socket, SocketGem1,
-            SocketGem2, SocketGem3, ExpireDate, Serial);
-    }
-
-    public CharacterItemSlotV2Tvp ToTvpV2(byte slot)
-    {
-        return new CharacterItemSlotV2Tvp(slot, ItemId, Quantity, Enchant, Combine, Refine, Socket, SocketGem1,
             SocketGem2, SocketGem3, ExpireDate, Serial, XPos, YPos);
     }
 

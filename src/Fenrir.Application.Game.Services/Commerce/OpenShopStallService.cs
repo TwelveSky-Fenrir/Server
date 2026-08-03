@@ -81,6 +81,7 @@ public sealed class OpenShopStallService(
             return Abort(state.CharacterId, "no occupied slots submitted");
 
         var offlineItems = new List<OfflineShopItemSlotTvp>();
+        var claimedSourceSlots = new HashSet<int>();
         for (var page = 0; page < PshopPurchasePolicy.MaxPages; page++)
         for (var slot = 0; slot < PshopPurchasePolicy.MaxSlots; slot++)
         {
@@ -92,6 +93,11 @@ public sealed class OpenShopStallService(
                 !ContainerMatrix.IsValidSlot((byte)view.InventoryPage, view.InventoryIndex) ||
                 view.PosX is < 0 or > 7 || view.PosY is < 0 or > 7)
                 return Abort(state.CharacterId, $"slot {page}/{slot} has invalid inventory coordinates");
+
+            if (!claimedSourceSlots.Add(view.InventoryPage * ContainerMatrix.InventoryPageSlotCount +
+                                        view.InventoryIndex))
+                return Abort(state.CharacterId,
+                    $"slot {page}/{slot} re-uses inventory {view.InventoryPage}/{view.InventoryIndex}");
 
             if (view.InventoryPage == ContainerMatrix.InventoryPage1 && state.InventoryDate < GameDate.Today())
                 return Abort(state.CharacterId, $"slot {page}/{slot} references the expired dated-vault last page");
@@ -105,7 +111,9 @@ public sealed class OpenShopStallService(
 
             if (isProxy)
                 offlineItems.Add(new OfflineShopItemSlotTvp((short)(page * PshopPurchasePolicy.MaxSlots + slot),
-                    view.ItemId, view.Quantity, view.Value, view.Serial, view.Price, null));
+                    view.ItemId, view.Quantity, view.Value, view.Serial, view.Price,
+                    PshopPurchasePolicy.EncodeSocketData(liveSlot!.Value.SocketGem1, liveSlot.Value.SocketGem2,
+                        liveSlot.Value.SocketGem3)));
         }
 
         var uniqueNumber = unchecked((uint)(state.CharacterId * 2 + (isProxy ? 1 : 0)));

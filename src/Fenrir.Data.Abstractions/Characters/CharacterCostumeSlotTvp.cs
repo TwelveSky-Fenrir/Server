@@ -7,5 +7,5 @@ public sealed partial record CharacterCostumeSlotTvp(
     int CharacterId,
     byte Slot,
     int ItemId,
-    int ItemDate,
+    int ItemValue,
     int ExpireDate);

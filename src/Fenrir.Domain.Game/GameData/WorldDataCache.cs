@@ -3,9 +3,21 @@ using System.Collections.Immutable;
 
 namespace Fenrir.Domain.Game.GameData;
 
+public readonly record struct ItemBucketKey(short Level, byte Type, byte Sort);
+
+public readonly record struct MartialItemBucketKey(short Level, byte Type, byte Sort, byte MartialLevel);
+
 public sealed class WorldDataCache
 {
     public required FrozenDictionary<int, ItemDefinition> ItemsById { get; init; }
+
+    public required FrozenDictionary<ItemBucketKey, ImmutableArray<ItemRowDto>> ItemSearchBuckets { get; init; }
+
+    public required FrozenDictionary<MartialItemBucketKey, ImmutableArray<ItemRowDto>> MartialItemSearchBuckets
+    {
+        get;
+        init;
+    }
 
     public required FrozenDictionary<int, SkillDefinition> SkillsById { get; init; }
 

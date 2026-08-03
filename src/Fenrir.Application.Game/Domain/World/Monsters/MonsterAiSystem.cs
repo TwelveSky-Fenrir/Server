@@ -39,6 +39,8 @@ public sealed partial class MonsterAiSystem(
 
     private const float LegacyFrameUnitsPerSecond = 30f;
 
+    private const int RangedAttackSubMode = 1;
+
     private readonly IRandomSource _random = random ?? SystemRandomSource.Instance;
 
     private readonly Lazy<ZoneCenterBroadcastIngestor>? _siegeIngestor = siegeIngestor;
@@ -88,17 +90,7 @@ public sealed partial class MonsterAiSystem(
                 break;
 
             case MonsterAiState.RangedAttackWindup:
-                if (monster.StateTicks++ == 0)
-                    monster.StateFrameAccumulator = 0f;
-
-                monster.StateFrameAccumulator += dt * LegacyFrameUnitsPerSecond;
-                if (monster.StateFrameAccumulator >= Math.Max(1, (int)monster.Template.FrameInfo4))
-                {
-                    monster.StateFrameAccumulator = 0f;
-                    monster.AiState = MonsterAiState.Decision;
-                    monster.StateTicks = 0;
-                }
-
+                RunRangedAttackWindup(zone, monster, dt);
                 break;
 
             case MonsterAiState.Flinch:
@@ -165,6 +157,24 @@ public sealed partial class MonsterAiSystem(
 
             monster.AttackPacketConfirmationArmed = false;
         }
+
+        monster.StateFrameAccumulator = 0f;
+        monster.AiState = MonsterAiState.Decision;
+        monster.StateTicks = 0;
+    }
+
+    private static void RunRangedAttackWindup(Zone zone, MonsterEntity monster, float dt)
+    {
+        if (monster.StateTicks++ == 0)
+        {
+            monster.StateFrameAccumulator = 0f;
+            if (monster.TargetCharacterId is { } rangedTargetId)
+                zone.ResolveMonsterAttack(monster, rangedTargetId, RangedAttackSubMode);
+        }
+
+        monster.StateFrameAccumulator += dt * LegacyFrameUnitsPerSecond;
+        if (monster.StateFrameAccumulator < Math.Max(1, (int)monster.Template.FrameInfo4))
+            return;
 
         monster.StateFrameAccumulator = 0f;
         monster.AiState = MonsterAiState.Decision;

@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.BuffsMountsCosmetics;
 using Fenrir.Application.Game.Domain.Costumes;
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Loot;
 using Fenrir.Domain.Game.GameData;
@@ -82,7 +83,8 @@ public sealed class CostumeStateService(
             return new CostumeStateResult(CostumeStateOutcome.Reply, 2);
         }
 
-        var freeSlot = FindFreeSlot(state.Inventory);
+        var freeSlot = InventoryFreeSlotFinder.Find(state.Inventory, worldData, result.GrantedItemId,
+            state.InventoryDate, GameDate.Today());
         if (freeSlot is not { } destination)
         {
             logger.LogInformation(
@@ -92,7 +94,7 @@ public sealed class CostumeStateService(
 
         var (enchant, combine, refine, socket) = ItemValueCodec.Decode(result.GrantedCostumeValue);
         var newStack = new ItemStack(result.GrantedItemId, 1, enchant, combine, refine, socket, 0, 0, 0,
-            result.GrantedExpireDate, 0);
+            result.GrantedExpireDate, 0, destination.X, destination.Y);
         var projectedContainer =
             state.Inventory.GetContainer(destination.Container).SetItem(destination.Slot, newStack);
 
@@ -119,20 +121,7 @@ public sealed class CostumeStateService(
             characterId, result.GrantedItemId, destination.Container, destination.Slot);
 
         return new CostumeStateResult(CostumeStateOutcome.Reply, 0, destination.Container,
-            0, 0, result.GrantedItemId);
-    }
-
-    private static (byte Container, byte Slot)? FindFreeSlot(InventoryState inventory)
-    {
-        for (byte slot = 0; slot <= 63; slot++)
-            if (inventory.GetSlot(ContainerMatrix.InventoryPage0, slot) is null)
-                return (ContainerMatrix.InventoryPage0, slot);
-
-        for (byte slot = 0; slot <= 63; slot++)
-            if (inventory.GetSlot(ContainerMatrix.InventoryPage1, slot) is null)
-                return (ContainerMatrix.InventoryPage1, slot);
-
-        return null;
+            destination.Slot, destination.GridIndex, result.GrantedItemId);
     }
 
     private static List<CharacterItemSlotTvp> ToTvps(ImmutableDictionary<byte, ItemStack> container)

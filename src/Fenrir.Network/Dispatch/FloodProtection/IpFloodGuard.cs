@@ -12,6 +12,7 @@ public sealed class IpFloodGuard(
     ILogger<IpFloodGuard>? logger = null)
 {
     private readonly ConcurrentDictionary<string, int> _connectionCounts = new();
+    private readonly ConcurrentDictionary<string, byte> _escalatedIps = new();
     private readonly Func<DateTime> _utcNowProvider = utcNowProvider ?? DefaultUtcNowProvider;
     private readonly ConcurrentDictionary<string, ViolationWindow> _violationWindows = new();
 
@@ -27,13 +28,18 @@ public sealed class IpFloodGuard(
         if (count <= maxConnectionsPerIp)
             return true;
 
-        await BlockAndKickAsync(ipAddress, ct).ConfigureAwait(false);
+        if (_escalatedIps.TryAdd(ipAddress, 0))
+            await BlockAndKickAsync(ipAddress, ct).ConfigureAwait(false);
+
         return false;
     }
 
     public void ReleaseConnection(string ipAddress)
     {
-        _connectionCounts.AddOrUpdate(ipAddress, 0, static (_, existing) => Math.Max(0, existing - 1));
+        var count = _connectionCounts.AddOrUpdate(ipAddress, 0, static (_, existing) => Math.Max(0, existing - 1));
+
+        if (count <= maxConnectionsPerIp)
+            _escalatedIps.TryRemove(ipAddress, out _);
 
         _connectionCounts.TryRemove(new KeyValuePair<string, int>(ipAddress, 0));
     }

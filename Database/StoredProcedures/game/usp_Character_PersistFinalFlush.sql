@@ -1,6 +1,8 @@
 CREATE PROCEDURE game.usp_Character_PersistFinalFlush @Progress game.tvp_CharacterProgress READONLY,
                                                       @Position game.tvp_CharacterPosition READONLY,
-                                                      @Costumes game.tvp_CharacterCostumeSlot READONLY
+                                                      @Costumes game.tvp_CharacterCostumeSlot READONLY,
+                                                      @Buffs game.tvp_CharacterBuffSlot READONLY,
+                                                      @Mounts game.tvp_CharacterMountSlot READONLY
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -126,14 +128,39 @@ BEGIN
     FROM game.CharacterCostumeSlots AS ci
              JOIN @Applied AS a ON a.CharacterId = ci.CharacterId;
 
-    INSERT INTO game.CharacterCostumeSlots (CharacterId, Slot, ItemId, EnchantValue, ExpireDate)
+    INSERT INTO game.CharacterCostumeSlots (CharacterId, Slot, ItemId, ItemValue, ExpireDate)
     SELECT cs.CharacterId,
            cs.Slot,
            cs.ItemId,
-           cs.EnchantValue,
+           cs.ItemValue,
            cs.ExpireDate
     FROM @Costumes AS cs
              JOIN @Applied AS a ON a.CharacterId = cs.CharacterId;
+
+    DELETE cb
+    FROM game.CharacterBuffs AS cb
+             JOIN @Applied AS a ON a.CharacterId = cb.CharacterId;
+
+    INSERT INTO game.CharacterBuffs (CharacterId, SlotIndex, Value, RemainingLegacyTicks)
+    SELECT bs.CharacterId,
+           bs.SlotIndex,
+           bs.Value,
+           bs.RemainingLegacyTicks
+    FROM @Buffs AS bs
+             JOIN @Applied AS a ON a.CharacterId = bs.CharacterId;
+
+    DELETE cm
+    FROM game.CharacterMounts AS cm
+             JOIN @Applied AS a ON a.CharacterId = cm.CharacterId;
+
+    INSERT INTO game.CharacterMounts (CharacterId, Slot, ItemId, ExpActivity, Power)
+    SELECT ms.CharacterId,
+           ms.Slot,
+           ms.ItemId,
+           ms.ExpActivity,
+           ms.Power
+    FROM @Mounts AS ms
+             JOIN @Applied AS a ON a.CharacterId = ms.CharacterId;
 
     COMMIT TRANSACTION;
 END;

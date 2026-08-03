@@ -11,6 +11,7 @@ namespace Fenrir.Application.Game.Services.Social;
 
 public sealed class TradeLockService(
     TradeRegistry trades,
+    ZoneRegistry zones,
     ITradeCommitRepository tradeCommits,
     ILogger<TradeLockService> logger) : ITradeLockService
 {
@@ -20,6 +21,15 @@ public sealed class TradeLockService(
         {
             logger.LogDebug("Trade lock ignored: character {CharacterId} has no active trade session",
                 characterId);
+            return new TradeLockAttempt(false, null);
+        }
+
+        var opponentId = trade.OpponentOf(characterId);
+        if (!zones.TryGetPlayer(opponentId, out var opponent) || opponent.IsMovingZone)
+        {
+            logger.LogDebug(
+                "Trade lock ignored: character {CharacterId}'s counterpart {OpponentId} is unreachable or mid zone-transfer -- no notch advanced",
+                characterId, opponentId);
             return new TradeLockAttempt(false, null);
         }
 
@@ -41,6 +51,14 @@ public sealed class TradeLockService(
     public async ValueTask CommitAsync(TradeSession trade, PlayerRuntimeState playerA, Zone zoneA,
         PlayerRuntimeState playerB, Zone zoneB, int characterId, CancellationToken cancellationToken)
     {
+        if (playerA.IsMovingZone || playerB.IsMovingZone)
+        {
+            logger.LogInformation(
+                "Trade commit aborted: character {PlayerAId} (moving zone {PlayerAMoving}) / character {PlayerBId} (moving zone {PlayerBMoving}) entered a zone transfer after both sides confirmed -- nothing written, session left for the disconnect path to tear down",
+                trade.PlayerAId, playerA.IsMovingZone, trade.PlayerBId, playerB.IsMovingZone);
+            return;
+        }
+
         var planA = TradeCommitPlanner.BuildFinalContainers(
             playerA.Inventory.GetContainer(ContainerMatrix.InventoryPage0),
             playerA.Inventory.GetContainer(ContainerMatrix.InventoryPage1),

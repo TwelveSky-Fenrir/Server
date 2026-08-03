@@ -50,7 +50,9 @@ BEGIN
            ci.SocketGem2,
            ci.SocketGem3,
            ci.ExpireDate,
-           ci.Serial
+           ci.Serial,
+           ci.XPos,
+           ci.YPos
     FROM game.CharacterItems AS ci
              JOIN game.Characters AS c ON c.CharacterId = ci.CharacterId
     WHERE c.AccountId = @AccountId
@@ -67,7 +69,7 @@ BEGIN
     SELECT cc.CharacterId,
            cc.Slot,
            cc.ItemId
-    FROM game.CharacterCostumes AS cc
+    FROM game.CharacterCostumeSlots AS cc
              JOIN game.Characters AS c ON c.CharacterId = cc.CharacterId
     WHERE c.AccountId = @AccountId
     ORDER BY cc.CharacterId, cc.Slot;

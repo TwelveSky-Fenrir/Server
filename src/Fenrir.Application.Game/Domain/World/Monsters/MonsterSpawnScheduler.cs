@@ -57,6 +57,20 @@ public sealed class MonsterSpawnScheduler(
 
     private const short YangGokNormalBossZoneId = 38;
 
+    private const int TowerDropCpGiftCard5ItemId = 691;
+
+    private const int TowerDropCpGiftCard10ItemId = 692;
+
+    private const int TowerDropCpGiftCard15ItemId = 693;
+
+    private const int TowerDropCpGiftCard20ItemId = 694;
+
+    private const int TowerDropBonusItemId = 666;
+
+    private const int TowerDropQuantity = 20;
+
+    private const string SystemDropMasterName = "-System-";
+
     private static readonly DateTime YangGokNormalBossAliveSentinelUtc = DateTime.MinValue;
 
     private readonly BossDropCatalog _bossDropCatalog = bossDropCatalog ?? BossDropCatalog.Default;
@@ -300,6 +314,9 @@ public sealed class MonsterSpawnScheduler(
                 partyRegistry?.GetMembers(attacker.CharacterId));
 
             ApplyTowerCpForPvmMilestone(zone, attacker, monster.Template.RealLevel);
+
+            if (monster.SpecialSort == MonsterSpecialSort.Tower)
+                ApplyTowerDrop(zone, state, monster);
         }
 
         PlayerRuntimeState? creditedAvatar = null;
@@ -321,11 +338,43 @@ public sealed class MonsterSpawnScheduler(
                 monster.Template.PatExperience, monster.Template.Life);
     }
 
+    private void ApplyTowerDrop(Zone zone, MonsterZoneSpawnState state, MonsterEntity monster)
+    {
+        if (towerWar is null)
+            return;
+
+        var towerIndex = TowerZoneIndexTable.GetTowerIndex(zone.MapId);
+        if (towerIndex < 0)
+            return;
+
+        var stateCode = TowerWarState.DecodeLevel(towerWar.GetPackedState(towerIndex));
+        var (itemId, bonusRate) = stateCode switch
+        {
+            2 => (TowerDropCpGiftCard5ItemId, 5),
+            4 => (TowerDropCpGiftCard10ItemId, 10),
+            6 => (TowerDropCpGiftCard15ItemId, 15),
+            8 => (TowerDropCpGiftCard20ItemId, 20),
+            _ => (0, 0)
+        };
+
+        if (itemId == 0)
+            return;
+
+        if (state.Random.Next(100) < bonusRate)
+            zone.SpawnGroundItem(TowerDropBonusItemId, 1, monster.PosX, monster.PosY, monster.PosZ,
+                SystemDropMasterName, "", 0, monster.InstanceId);
+
+        for (var i = 0; i < TowerDropQuantity; i++)
+            zone.SpawnGroundItem(itemId, 1, monster.PosX, monster.PosY, monster.PosZ, SystemDropMasterName, "", 0,
+                monster.InstanceId);
+    }
+
     private IReadOnlyList<int>? GrantKillLoot(Zone zone, MonsterZoneSpawnState state, MonsterEntity monster,
         MonsterDefinition monsterDefinition, PlayerRuntimeState creditedAvatar,
         out bool killRaceInterceptsExperienceGrant)
     {
-        var dropEligible = MonsterDropRoller.IsEligible(monsterDefinition.Monster, creditedAvatar.Level);
+        var dropEligible = MonsterDropRoller.IsEligible(monsterDefinition.Monster, creditedAvatar.Level,
+            creditedAvatar.Level2);
         zone.NotifyPopupEventMonsterKill(creditedAvatar, dropEligible);
 
         killRaceInterceptsExperienceGrant =
@@ -367,20 +416,18 @@ public sealed class MonsterSpawnScheduler(
             var tribeRareDropBonus = siegeState?.GetMyoungItemDropBonusRatio(creditedAvatar.Tribe) ?? 0f;
             var itemDropUpBuffActive = creditedAvatar.StateTimeEffect == ItemDropUpStateTimeEffect;
 
-            var result = state.DropRoller.Roll(monsterDefinition, creditedAvatar.Level, creditedAvatar.Tribe, luck,
-                creditedAvatarQuest, CreditedAvatarHasItem, creditedAvatar.PremiumExpireUtc > 0,
-                killerItemDropUpBuffActive: itemDropUpBuffActive, tribeItemDropBonus: tribeItemDropBonus,
+            var result = state.DropRoller.Roll(monsterDefinition, creditedAvatar.Level,
+                creditedAvatar.PreviousTribe, luck, creditedAvatarQuest, CreditedAvatarHasItem,
+                killerPremiumActive: creditedAvatar.PremiumExpireUtc > 0,
+                killerLevel2: creditedAvatar.Level2,
+                killerDropItemTimeActive: creditedAvatar.DropItemTime > 0,
+                isZone039TypeShard: zone.IsZone039TypeZone,
+                killerItemDropUpBuffActive: itemDropUpBuffActive,
+                tribeItemDropBonus: tribeItemDropBonus,
                 tribeRareDropBonus: tribeRareDropBonus);
+
             money = result.Money;
-
-            var cpGiftItems = MonsterDropTailResolver.ResolveCpGiftCard(dropEligible,
-                monster.Template.MonsterId, zone.IsZone241TypeZone, creditedAvatar.Level2,
-                zone.IsZone126TypeZone, state.Random);
-            var rebirthItems = MonsterDropTailResolver.ResolveRebirthItem(monster.Template.MonsterId, state.Random);
-
-            genericItems = cpGiftItems.Count == 0 && rebirthItems.Count == 0
-                ? result.Items
-                : [.. result.Items, .. cpGiftItems, .. rebirthItems];
+            genericItems = result.Items;
         }
 
         if (money is { } amount)

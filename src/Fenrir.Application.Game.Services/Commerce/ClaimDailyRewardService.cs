@@ -55,7 +55,7 @@ public sealed class ClaimDailyRewardService(
         if (itemId < 1 || !worldData.ItemsById.TryGetValue(itemId, out var itemDefinition))
             return new ClaimDailyRewardResult(false, null);
 
-        var freeSlot = FindFreeSlot(state.Inventory, state.InventoryDate, today);
+        var freeSlot = InventoryFreeSlotFinder.Find(state.Inventory, worldData, itemId, state.InventoryDate, today);
         if (freeSlot is not { } destination)
         {
             logger.LogInformation("Daily-reward claim denied for character {CharacterId}: inventory full",
@@ -65,7 +65,7 @@ public sealed class ClaimDailyRewardService(
         }
 
         var coupon = itemDefinition.Item.Sort == 99 ? 1 : 0;
-        var newStack = new ItemStack(itemId, coupon, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        var newStack = new ItemStack(itemId, coupon, 0, 0, 0, 0, 0, 0, 0, 0, 0, destination.X, destination.Y);
         var projectedContainer =
             state.Inventory.GetContainer(destination.Container).SetItem(destination.Slot, newStack);
 
@@ -88,8 +88,8 @@ public sealed class ClaimDailyRewardService(
             Result = 0,
             Value = [itemId, 0, 0, coupon, 0, 0],
             InvenPage = destination.Container,
-            InvenX = 0,
-            InvenY = 0
+            InvenX = destination.Slot,
+            InvenY = destination.GridIndex
         };
 
         var containers =
@@ -105,18 +105,6 @@ public sealed class ClaimDailyRewardService(
             accountId, day, characterId, itemId, destination.Container);
 
         return new ClaimDailyRewardResult(false, response);
-    }
-
-    private static (byte Container, byte Slot)? FindFreeSlot(InventoryState inventory, int inventoryDate, int today)
-    {
-        var pageCount = RentedInventoryPageGate.AccessiblePageCount(inventoryDate, today);
-
-        for (byte page = 0; page < pageCount; page++)
-        for (byte slot = 0; slot <= 63; slot++)
-            if (inventory.GetSlot(page, slot) is null)
-                return (page, slot);
-
-        return null;
     }
 
     private static List<CharacterItemSlotTvp> ToTvps(ImmutableDictionary<byte, ItemStack> container)

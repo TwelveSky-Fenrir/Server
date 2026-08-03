@@ -2,6 +2,8 @@ using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.Commerce;
 using Fenrir.Application.Game.Domain.Commerce;
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Simulation;
+using Fenrir.Application.Game.Domain.Social.Pshop;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Loot;
 using Fenrir.Domain.Game.GameData;
@@ -53,12 +55,29 @@ public sealed class UpdateProxyShopService(
         PlayerRuntimeState state, int characterId, int accountId, short slotIndex, ItemDefinition itemDefinition,
         CancellationToken cancellationToken)
     {
+        if (IsExpiredDatedPage(packet, state))
+        {
+            logger.LogWarning(
+                "Offline-shop retrieve rejected: character {CharacterId} targeted the expired dated last inventory page -- session will be disconnected",
+                characterId);
+            return null;
+        }
+
+        var (_, ownItems) = await offlineShops.GetByCharacterAsync(characterId, cancellationToken);
+        if (FindListing(ownItems, slotIndex, packet.SellItemIndex) is not { } listing)
+        {
+            logger.LogInformation(
+                "Offline-shop retrieve rejected: character {CharacterId} slot {SlotIndex} no longer matches the server-side listing",
+                characterId, slotIndex);
+            return BuildReply(1, packet.SelfPage, packet.SelfIndex, null, 0);
+        }
+
         var destination = state.Inventory.GetSlot((byte)packet.SelfPage, (byte)packet.SelfIndex);
         var isStackable = ContainerMatrix.IsStackableSort(itemDefinition.Item.Sort);
 
         if (destination is { } existing &&
             (existing.ItemId != packet.SellItemIndex || !isStackable ||
-             existing.Quantity + packet.Quantity > GroundItemPickupPolicy.MaxStackQuantity))
+             existing.Quantity + listing.Quantity > GroundItemPickupPolicy.MaxStackQuantity))
         {
             logger.LogWarning(
                 "Offline-shop retrieve rejected: character {CharacterId} destination slot {SelfPage}/{SelfIndex} cannot accept item {ItemId} -- session will be disconnected",
@@ -66,10 +85,11 @@ public sealed class UpdateProxyShopService(
             return null;
         }
 
-        var finalQuantity = destination is { } d ? d.Quantity + packet.Quantity : packet.Quantity;
-        var (enchant, combine, refine, socket) = ItemValueCodec.Decode(packet.Value);
+        var finalQuantity = destination is { } d ? d.Quantity + listing.Quantity : listing.Quantity;
+        var (enchant, combine, refine, socket) = ItemValueCodec.Decode(listing.Value);
+        var (gem1, gem2, gem3) = PshopPurchasePolicy.DecodeSocketData(listing.SocketData);
         var newStack = new ItemStack(packet.SellItemIndex, finalQuantity, enchant, combine, refine, socket,
-            packet.Socket[0], packet.Socket[1], packet.Socket[2], 0, packet.Serial);
+            gem1, gem2, gem3, 0, listing.SerialNumber);
 
         var projectedContainer = state.Inventory.GetContainer((byte)packet.SelfPage)
             .SetItem((byte)packet.SelfIndex, newStack);
@@ -77,23 +97,24 @@ public sealed class UpdateProxyShopService(
         try
         {
             await offlineShops.RetrieveItemAndReplaceContainerAsync(characterId, slotIndex, packet.SellItemIndex,
-                packet.Quantity, packet.Value, (byte)packet.SelfPage, ToTvps(projectedContainer), cancellationToken);
+                listing.Quantity, listing.Value, (byte)packet.SelfPage, ToTvps(projectedContainer),
+                cancellationToken);
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex,
                 "Character {CharacterId} offline-shop retrieve RetrieveItemAndReplaceContainerAsync failed",
                 characterId);
-            return BuildReply(1, packet.SelfPage, packet.SelfIndex, newStack, packet.Socket, 0);
+            return BuildReply(1, packet.SelfPage, packet.SelfIndex, newStack, 0);
         }
 
-        var response = BuildReply(0, packet.SelfPage, packet.SelfIndex, newStack, packet.Socket, 0);
+        var response = BuildReply(0, packet.SelfPage, packet.SelfIndex, newStack, 0);
 
         var (shopAfterRetrieve, _) = await offlineShops.GetByCharacterAsync(characterId, cancellationToken);
         await eventLog.LogAsync(ProxyShopRetrieveEventCode, EventLogCategory.ProxyShop, accountId, characterId,
-            null, null, null, 0, null, packet.SellItemIndex, packet.Quantity, 1,
-            $"Action=Retrieved;Value={packet.Value};Serial={packet.Serial};Socket1={packet.Socket[0]};" +
-            $"Socket2={packet.Socket[1]};Socket3={packet.Socket[2]};ShopOwnerName={state.Name};" +
+            null, null, null, 0, null, packet.SellItemIndex, listing.Quantity, 1,
+            $"Action=Retrieved;Value={listing.Value};Serial={listing.SerialNumber};Socket1={gem1};" +
+            $"Socket2={gem2};Socket3={gem3};ShopOwnerName={state.Name};" +
             $"ShopMoneyAfter={shopAfterRetrieve?.Money ?? 0};ShopBigMoneyAfter={shopAfterRetrieve?.BigMoney ?? 0}",
             cancellationToken);
 
@@ -107,7 +128,7 @@ public sealed class UpdateProxyShopService(
 
         logger.LogInformation(
             "Offline-shop item retrieved: character {CharacterId} retrieved item {ItemId} x{Quantity} from their own closed shop",
-            characterId, packet.SellItemIndex, packet.Quantity);
+            characterId, packet.SellItemIndex, listing.Quantity);
 
         return response;
     }
@@ -116,13 +137,21 @@ public sealed class UpdateProxyShopService(
         PlayerRuntimeState state, int characterId, int accountId, short slotIndex, ItemDefinition itemDefinition,
         CancellationToken cancellationToken)
     {
+        if (IsExpiredDatedPage(packet, state))
+        {
+            logger.LogWarning(
+                "Offline-shop purchase rejected: character {CharacterId} targeted the expired dated last inventory page -- session will be disconnected",
+                characterId);
+            return null;
+        }
+
         var sellerId = await characters.GetIdByNameAsync(packet.AvatarName, cancellationToken);
         if (sellerId is null)
         {
             logger.LogDebug(
                 "Offline-shop purchase rejected: character {CharacterId} seller {SellerAvatarName} does not exist",
                 characterId, packet.AvatarName);
-            return BuildReply(1, packet.SelfPage, packet.SelfIndex, null, packet.Socket, 0);
+            return BuildReply(1, packet.SelfPage, packet.SelfIndex, null, 0);
         }
 
         if (sellerId.Value == characterId)
@@ -133,12 +162,29 @@ public sealed class UpdateProxyShopService(
             return null;
         }
 
+        var (_, sellerItems) = await offlineShops.GetByCharacterAsync(sellerId.Value, cancellationToken);
+        if (FindListing(sellerItems, slotIndex, packet.SellItemIndex) is not { } listing)
+        {
+            logger.LogInformation(
+                "Offline-shop purchase rejected: character {CharacterId} seller {SellerId} slot {SlotIndex} no longer matches the server-side listing",
+                characterId, sellerId.Value, slotIndex);
+            return BuildReply(2, packet.SelfPage, packet.SelfIndex, null, 0);
+        }
+
+        if (packet.Price != listing.Price)
+        {
+            logger.LogInformation(
+                "Offline-shop purchase rejected: character {CharacterId} agreed price {ClientPrice} but listing is {ListingPrice}",
+                characterId, packet.Price, listing.Price);
+            return BuildReply(2, packet.SelfPage, packet.SelfIndex, null, 0);
+        }
+
         var destination = state.Inventory.GetSlot((byte)packet.SelfPage, (byte)packet.SelfIndex);
         var isStackable = ContainerMatrix.IsStackableSort(itemDefinition.Item.Sort);
 
         if (destination is { } existing &&
             (existing.ItemId != packet.SellItemIndex || !isStackable ||
-             existing.Quantity + packet.Quantity > GroundItemPickupPolicy.MaxStackQuantity))
+             existing.Quantity + listing.Quantity > GroundItemPickupPolicy.MaxStackQuantity))
         {
             logger.LogWarning(
                 "Offline-shop purchase rejected: character {CharacterId} destination slot {SelfPage}/{SelfIndex} cannot accept item {ItemId} -- session will be disconnected",
@@ -146,18 +192,19 @@ public sealed class UpdateProxyShopService(
             return null;
         }
 
-        var finalQuantity = destination is { } d ? d.Quantity + packet.Quantity : packet.Quantity;
-        var (enchant, combine, refine, socket) = ItemValueCodec.Decode(packet.Value);
+        var finalQuantity = destination is { } d ? d.Quantity + listing.Quantity : listing.Quantity;
+        var (enchant, combine, refine, socket) = ItemValueCodec.Decode(listing.Value);
+        var (gem1, gem2, gem3) = PshopPurchasePolicy.DecodeSocketData(listing.SocketData);
         var newStack = new ItemStack(packet.SellItemIndex, finalQuantity, enchant, combine, refine, socket,
-            packet.Socket[0], packet.Socket[1], packet.Socket[2], 0, packet.Serial);
+            gem1, gem2, gem3, 0, listing.SerialNumber);
 
         var projectedContainer = state.Inventory.GetContainer((byte)packet.SelfPage)
             .SetItem((byte)packet.SelfIndex, newStack);
 
         try
         {
-            await offlineShops.ExecutePurchaseAsync(sellerId.Value, slotIndex, packet.SellItemIndex, packet.Quantity,
-                packet.Value, packet.Price, characterId, (byte)packet.SelfPage, ToTvps(projectedContainer),
+            await offlineShops.ExecutePurchaseAsync(sellerId.Value, slotIndex, packet.SellItemIndex, listing.Quantity,
+                listing.Value, listing.Price, characterId, (byte)packet.SelfPage, ToTvps(projectedContainer),
                 cancellationToken);
         }
         catch (Exception ex) when (ProxyShopDeputyFailureClassifier.IsStaleListingFailure(ex))
@@ -171,16 +218,16 @@ public sealed class UpdateProxyShopService(
         {
             logger.LogWarning(ex, "Character {CharacterId} offline-shop purchase ExecutePurchaseAsync failed",
                 characterId);
-            return BuildReply(2, packet.SelfPage, packet.SelfIndex, null, packet.Socket, 0);
+            return BuildReply(2, packet.SelfPage, packet.SelfIndex, null, 0);
         }
 
-        var response = BuildReply(1000, packet.SelfPage, packet.SelfIndex, newStack, packet.Socket, packet.Price);
+        var response = BuildReply(1000, packet.SelfPage, packet.SelfIndex, newStack, listing.Price);
 
         var (shopAfterPurchase, _) = await offlineShops.GetByCharacterAsync(sellerId.Value, cancellationToken);
         await eventLog.LogAsync(ProxyShopPurchaseEventCode, EventLogCategory.ProxyShop, accountId, characterId,
-            null, sellerId.Value, null, packet.Price, null, packet.SellItemIndex, packet.Quantity, 1,
-            $"Action=Purchased;Value={packet.Value};Serial={packet.Serial};Socket1={packet.Socket[0]};" +
-            $"Socket2={packet.Socket[1]};Socket3={packet.Socket[2]};ShopOwnerName={packet.AvatarName};" +
+            null, sellerId.Value, null, listing.Price, null, packet.SellItemIndex, listing.Quantity, 1,
+            $"Action=Purchased;Value={listing.Value};Serial={listing.SerialNumber};Socket1={gem1};" +
+            $"Socket2={gem2};Socket3={gem3};ShopOwnerName={packet.AvatarName};" +
             $"ShopMoneyAfter={shopAfterPurchase?.Money ?? 0};ShopBigMoneyAfter={shopAfterPurchase?.BigMoney ?? 0}",
             cancellationToken);
 
@@ -194,19 +241,33 @@ public sealed class UpdateProxyShopService(
 
         logger.LogInformation(
             "Offline-shop purchase completed: buyer {BuyerId} bought item {ItemId} x{Quantity} from seller {SellerId} for {Price}",
-            characterId, packet.SellItemIndex, packet.Quantity, sellerId.Value, packet.Price);
+            characterId, packet.SellItemIndex, listing.Quantity, sellerId.Value, listing.Price);
 
         return response;
     }
 
-    private static UpdateProxyShopResponse BuildReply(int result, int page, int index, ItemStack? stack,
-        int[] requestSocket, int money)
+    private static bool IsExpiredDatedPage(UpdateProxyShopRequest packet, PlayerRuntimeState state)
+    {
+        return packet.SelfPage == ContainerMatrix.InventoryPage1 && state.InventoryDate < GameDate.Today();
+    }
+
+    private static OfflineShopItemRowDto? FindListing(IReadOnlyList<OfflineShopItemRowDto> items, short slotIndex,
+        int expectedItemId)
+    {
+        foreach (var row in items)
+            if (row.SlotIndex == slotIndex && row.ItemId == expectedItemId)
+                return row;
+
+        return null;
+    }
+
+    private static UpdateProxyShopResponse BuildReply(int result, int page, int index, ItemStack? stack, int money)
     {
         var value1 = stack is { } s
             ?
             [
                 s.ItemId, 0, 0, s.Quantity, ItemValueCodec.Encode(s.Enchant, s.Combine, s.Refine, s.Socket), s.Serial,
-                requestSocket[0], requestSocket[1], requestSocket[2]
+                s.SocketGem1, s.SocketGem2, s.SocketGem3
             ]
             : new int[9];
 

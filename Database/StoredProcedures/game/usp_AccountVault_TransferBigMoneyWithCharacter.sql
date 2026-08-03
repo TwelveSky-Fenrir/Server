@@ -13,7 +13,57 @@ BEGIN
     BEGIN TRANSACTION;
 
     IF NOT EXISTS (SELECT 1 FROM game.AccountVault WHERE AccountId = @AccountId)
-        INSERT INTO game.AccountVault (AccountId) VALUES (@AccountId);
+        BEGIN
+            BEGIN TRY
+                INSERT INTO game.AccountVault (AccountId) VALUES (@AccountId);
+            END TRY
+            BEGIN CATCH
+                IF ERROR_NUMBER() NOT IN (2627, 2601)
+                    THROW;
+
+                ROLLBACK TRANSACTION;
+
+                BEGIN TRANSACTION;
+
+                UPDATE game.Characters
+                SET BigMoney     = BigMoney + @DeltaCharacterBigMoney,
+                    UpdatedAtUtc = SYSUTCDATETIME()
+                WHERE CharacterId = @CharacterId
+                  AND BigMoney + @DeltaCharacterBigMoney BETWEEN 0 AND 999;
+
+                IF @@ROWCOUNT = 0
+                    BEGIN
+                        ROLLBACK TRANSACTION;
+                        THROW 50353, N'Unknown character or insufficient/over-cap BigMoney balance for this vault transfer (retry).', 1;
+                    END;
+
+                UPDATE game.AccountVault
+                SET BigMoney     = BigMoney + @DeltaVaultBigMoney,
+                    UpdatedAtUtc = SYSUTCDATETIME()
+                WHERE AccountId = @AccountId
+                  AND BigMoney + @DeltaVaultBigMoney BETWEEN 0 AND 999;
+
+                IF @@ROWCOUNT = 0
+                    BEGIN
+                        ROLLBACK TRANSACTION;
+                        THROW 50354, N'Insufficient/over-cap account vault BigMoney balance for this transfer (retry).', 1;
+                    END;
+
+                IF @AuditEventCode IS NOT NULL
+                    EXEC game.usp_EventLog_Insert
+                         @EventCode = @AuditEventCode,
+                         @Category = 25,
+                         @ActorAccountId = @AccountId,
+                         @ActorCharacterId = @CharacterId,
+                         @DeltaMoney = @AuditFromDelta,
+                         @DeltaBigMoney = @AuditToDelta,
+                         @Outcome = 1;
+
+                COMMIT TRANSACTION;
+
+                RETURN;
+            END CATCH;
+        END;
 
     UPDATE game.Characters
     SET BigMoney     = BigMoney + @DeltaCharacterBigMoney,

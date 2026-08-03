@@ -60,7 +60,7 @@ BEGIN
     WHERE CharacterId = @CharacterId
       AND Container = 0;
     INSERT INTO game.CharacterItems (CharacterId, Container, Slot, ItemId, Quantity, Enchant, Combine,
-                                     Refine, Socket, SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial)
+                                     Refine, Socket, SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial, XPos, YPos)
     SELECT @CharacterId,
            0,
            Slot,
@@ -74,7 +74,9 @@ BEGIN
            SocketGem2,
            SocketGem3,
            ExpireDate,
-           Serial
+           Serial,
+           XPos,
+           YPos
     FROM @InventoryPage0;
 
     DELETE
@@ -82,7 +84,7 @@ BEGIN
     WHERE CharacterId = @CharacterId
       AND Container = 1;
     INSERT INTO game.CharacterItems (CharacterId, Container, Slot, ItemId, Quantity, Enchant, Combine,
-                                     Refine, Socket, SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial)
+                                     Refine, Socket, SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial, XPos, YPos)
     SELECT @CharacterId,
            1,
            Slot,
@@ -96,7 +98,9 @@ BEGIN
            SocketGem2,
            SocketGem3,
            ExpireDate,
-           Serial
+           Serial,
+           XPos,
+           YPos
     FROM @InventoryPage1;
 
     COMMIT TRANSACTION;

@@ -61,6 +61,21 @@ public partial class PlayerRuntimeState
 
     public int ImplausibleMoveStreak { get; set; }
 
+    public int ImplausibleAttackPositionStreak { get; set; }
+
+    public float DeclaredMoveAnchorX { get; set; }
+
+    public float DeclaredMoveAnchorY { get; set; }
+
+    public float DeclaredMoveAnchorZ { get; set; }
+
+    public void SetDeclaredMoveAnchor(float x, float y, float z)
+    {
+        DeclaredMoveAnchorX = x;
+        DeclaredMoveAnchorY = y;
+        DeclaredMoveAnchorZ = z;
+    }
+
     public void ResetVolatileAntiCheatCountersOnEntry(TimeSpan zoneClockNow)
     {
         DarkAttackUseTick = 0;
@@ -87,6 +102,7 @@ public partial class PlayerRuntimeState
         DefenseHackPreviousPosY = 0f;
         DefenseHackPreviousPosZ = 0f;
         ImplausibleMoveStreak = 0;
+        ImplausibleAttackPositionStreak = 0;
 
         CpExchangeTick = zoneClockNow;
         CpRfcTick = zoneClockNow;

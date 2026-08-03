@@ -23,7 +23,7 @@ BEGIN
       AND Container = @InventoryContainer;
 
     INSERT INTO game.CharacterItems (CharacterId, Container, Slot, ItemId, Quantity, Enchant, Combine, Refine,
-                                     Socket, SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial)
+                                     Socket, SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial, XPos, YPos)
     SELECT @CharacterId,
            @InventoryContainer,
            Slot,
@@ -37,7 +37,9 @@ BEGIN
            SocketGem2,
            SocketGem3,
            ExpireDate,
-           Serial
+           Serial,
+           XPos,
+           YPos
     FROM @InventoryItems;
 
     COMMIT TRANSACTION;

@@ -236,6 +236,9 @@ public sealed partial class Zone
             if (MonsterCombatResolver.RollHolyShieldRemoval(monster.Template.SpecialType, attackSubMode, _random))
                 RemoveDefenderHolyShields(target);
 
+            if (MonsterCombatResolver.RollSpecialStun(monster.Template.SpecialType, attackSubMode, _random))
+                ApplyMonsterSpecialStun(target);
+
             (viewDamage, realDamage) =
                 ApplyHolyShieldAbsorption(target, outcome, HolyShieldHitByMonsterAvatarChangeInfoSort);
         }
@@ -253,7 +256,7 @@ public sealed partial class Zone
                 AttackActionValue1 = 1,
                 AttackActionValue2 = 0,
                 AttackActionValue3 = 0,
-                AttackActionValue4 = 0,
+                AttackActionValue4 = attackSubMode,
                 AttackResultValue = outcome.Hit ? 1 : 0,
                 AttackCriticalExist = outcome.Critical ? 1 : 0,
                 AttackElementDamage = outcome.ElementDamage,
@@ -284,6 +287,18 @@ public sealed partial class Zone
         if (target.Life <= 0)
             ApplyDeath(target.CharacterId, DeathCause.MonsterKill,
                 suppressExperienceLoss: monster.SpecialSort != MonsterSpecialSort.Standard);
+    }
+
+    private void ApplyMonsterSpecialStun(PlayerRuntimeState target)
+    {
+        if (target.IsDead || target.Life < 1)
+            return;
+
+        target.IsStunned = true;
+        target.StunDurationSeconds = MonsterCombatResolver.SpecialStunDurationSeconds;
+        target.CanUseConsumables = false;
+
+        BroadcastStunActionState(target, MonsterCombatResolver.SpecialStunDurationSeconds);
     }
 
     public void QueueMoneyGrant(int characterId, long amount)

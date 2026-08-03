@@ -26,6 +26,13 @@ BEGIN
     IF
         DATEDIFF(DAY, @LastRolloverAtUtc, SYSUTCDATETIME()) >= 7
         BEGIN
+            DECLARE
+                @LockGate INT;
+            SELECT @LockGate = COUNT(*)
+            FROM game.HeroRankings
+            WITH (UPDLOCK, HOLDLOCK)
+            WHERE PeriodKind = 0;
+
             DELETE
             FROM game.HeroRankings
             WHERE PeriodKind = 1;

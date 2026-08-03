@@ -60,17 +60,12 @@ public static class RegularWarRewardCalculator
             var money = isDraw ? 0 : isWinningSide ? baseMoney : baseMoney / 2;
             var experience = isDraw ? 0 : isWinningSide ? baseExperience : baseExperience / 2;
 
-            var cpBonus = 0;
-            if (!isDraw && config.CpBonusRule is { } rule &&
-                rule.IsSatisfiedBy(participant.RebirthTier, participant.RebirthCount))
-                cpBonus = isWinningSide ? rule.WinningSideAmount : rule.LosingSideAmount;
-
             builder.Add(new RegularWarRewardGrant(
                 participant.CharacterId,
                 isDraw ? null : isWinningSide,
                 money > 0 ? money : 0,
                 experience > 0 ? experience : 0,
-                cpBonus,
+                0,
                 isWinningSide ? WinningHeroRankPoints : LosingOrDrawHeroRankPoints,
                 leaderboardCp,
                 !isDraw));

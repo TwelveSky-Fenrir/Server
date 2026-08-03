@@ -15,4 +15,6 @@ public sealed partial record CharacterItemSlotTvp(
     int SocketGem2,
     int SocketGem3,
     int ExpireDate,
-    int Serial);
+    int Serial,
+    byte XPos = 0,
+    byte YPos = 0);

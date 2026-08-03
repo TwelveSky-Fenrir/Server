@@ -173,6 +173,8 @@ public sealed class ZoneMoveService(
             return;
         }
 
+        MarkHandoffInProgress(state);
+
         await writeBehindFlusher.FlushCharacterNowAsync(characterId, cancellationToken);
 
         await LogZoneDepartureAsync(zoneSession, characterId, sourceZone.MapId, targetZoneNumber,
@@ -268,6 +270,8 @@ public sealed class ZoneMoveService(
                 return;
             }
 
+            MarkHandoffInProgress(state);
+
             await writeBehindFlusher.FlushCharacterNowAsync(characterId, cancellationToken);
 
             await tickets.CreateAsync(zoneSession.AccountId!.Value, characterId, candidate.ShardId,
@@ -303,6 +307,12 @@ public sealed class ZoneMoveService(
             "Zone {TargetZoneNumber} is not hosted by any live shard -- refusing transfer for character {CharacterId}",
             targetZoneNumber, characterId);
         zoneSession.Send(new ZoneMoveResponse { Result = 1, Ip = "", Port = 0 });
+    }
+
+    private static void MarkHandoffInProgress(PlayerRuntimeState state)
+    {
+        state.ZoneTransferRegisteredAtUtc = DateTime.UtcNow;
+        state.IsMovingZone = true;
     }
 
     private async ValueTask LogZoneDepartureAsync(IZoneSession zoneSession, int characterId, short sourceMapId,

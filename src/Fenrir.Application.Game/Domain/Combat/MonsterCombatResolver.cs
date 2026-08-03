@@ -15,6 +15,12 @@ public static class MonsterCombatResolver
 
     public const int DamageUpBonusFlatPerIncrement = 500;
 
+    public const int SpecialStunDurationSeconds = 10;
+
+    private const int SpecialStunDenominator = 100;
+
+    private const int SpecialStunWideDenominator = 400;
+
     public static readonly TimeSpan OwnerNameLockExemptionCooldown = TimeSpan.FromMinutes(1);
 
     public static AttackOutcome ResolvePvmAttack(
@@ -211,6 +217,44 @@ public static class MonsterCombatResolver
     {
         var threshold = HolyShieldRemovalThreshold(monsterSpecialType, attackSubMode);
         return threshold > 0 && rng.NextInt32(100) < threshold;
+    }
+
+    public static bool RollSpecialStun(int monsterSpecialType, int attackSubMode, IRandomSource rng)
+    {
+        var (threshold, denominator) = SpecialStunOdds(monsterSpecialType, attackSubMode);
+        return threshold > 0 && rng.NextInt32(denominator) < threshold;
+    }
+
+    private static (int Threshold, int Denominator) SpecialStunOdds(int monsterSpecialType, int attackSubMode)
+    {
+        var threshold = attackSubMode switch
+        {
+            0 => monsterSpecialType switch
+            {
+                35 or 36 or 37 or 38 or 40 => 10,
+                41 => 15,
+                42 => 20,
+                43 => 25,
+                44 => 30,
+                _ => 0
+            },
+            1 => monsterSpecialType switch
+            {
+                35 or 36 or 37 or 38 or 40 => 50,
+                41 => 60,
+                42 => 70,
+                43 => 80,
+                44 => 90,
+                _ => 0
+            },
+            _ => 0
+        };
+
+        var denominator = monsterSpecialType is 35 or 36 or 37 or 38 or 40
+            ? SpecialStunWideDenominator
+            : SpecialStunDenominator;
+
+        return (threshold, denominator);
     }
 
     private static int HolyShieldRemovalThreshold(int monsterSpecialType, int attackSubMode)

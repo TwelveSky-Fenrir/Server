@@ -2,37 +2,11 @@ using System.Collections.Immutable;
 
 namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
-public enum RegularWarCpBonusCriterion : byte
-{
-    None = 0,
-
-    RebirthTierExactly11 = 1,
-
-    RebirthCountNonZero = 2
-}
-
-public readonly record struct RegularWarCpBonusRule(
-    int WinningSideAmount,
-    int LosingSideAmount,
-    RegularWarCpBonusCriterion Criterion)
-{
-    public bool IsSatisfiedBy(short rebirthTier, int rebirthCount)
-    {
-        return Criterion switch
-        {
-            RegularWarCpBonusCriterion.RebirthTierExactly11 => rebirthTier == 11,
-            RegularWarCpBonusCriterion.RebirthCountNonZero => rebirthCount != 0,
-            _ => false
-        };
-    }
-}
-
 public readonly record struct RegularWarMapConfig(
     short MapId,
     byte WarSlotIndex,
     bool IsBossWar,
-    bool AnnouncesSmallestPresentTribe,
-    RegularWarCpBonusRule? CpBonusRule);
+    bool AnnouncesSmallestPresentTribe);
 
 public static class RegularWarMapCatalog
 {
@@ -64,8 +38,7 @@ public static class RegularWarMapCatalog
                 mapId,
                 slot,
                 mapId == 295,
-                mapId == 160,
-                null));
+                mapId == 160));
         }
 
         return builder.MoveToImmutable();

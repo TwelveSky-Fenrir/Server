@@ -2,8 +2,10 @@ using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.ItemModification;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Runes;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Loot;
+using Fenrir.Domain.Game.GameData;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -12,6 +14,7 @@ namespace Fenrir.Application.Game.Services.ItemModification;
 public sealed class RuneSocketService(
     IRuneRepository runes,
     IEventLogQueue eventLogQueue,
+    WorldDataCache worldData,
     ILogger<RuneSocketService> logger)
     : IRuneSocketService
 {
@@ -72,22 +75,23 @@ public sealed class RuneSocketService(
     public async ValueTask<RuneRemoveResult> RemoveAsync(RuneSocketRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
     {
-        var destination = FindFreeSlot(state.Inventory);
+        var resolved = RuneSocketResolver.ResolveRemove(packet.RuneIndex, state.RuneSystem,
+            hasFreeInventorySlot: true);
+        if (resolved.Outcome == RuneSocketResolver.RemoveOutcome.Rejected ||
+            !worldData.ItemsById.ContainsKey(resolved.ItemId))
+            return new RuneRemoveResult(RuneSocketOutcome.Rejected, 0, 0, 0);
 
-        var resolved = RuneSocketResolver.ResolveRemove(packet.RuneIndex, state.RuneSystem, destination is not null);
-        switch (resolved.Outcome)
-        {
-            case RuneSocketResolver.RemoveOutcome.Rejected:
-                return new RuneRemoveResult(RuneSocketOutcome.Rejected, 0, 0, 0);
+        var destination = InventoryFreeSlotFinder.Find(state.Inventory, worldData, resolved.ItemId,
+            state.InventoryDate, GameDate.Today());
+        if (destination is not { } placement)
+            return new RuneRemoveResult(RuneSocketOutcome.InventoryFull, 0, 0, 0);
 
-            case RuneSocketResolver.RemoveOutcome.InventoryFull:
-                return new RuneRemoveResult(RuneSocketOutcome.InventoryFull, 0, 0, 0);
-        }
-
-        var (container, slot) = destination!.Value;
+        var container = placement.Container;
+        var slot = placement.Slot;
         var packedStat = state.RuneSystemStat[packet.RuneIndex];
         var (enchant, combine, refine, socket) = ItemValueCodec.Decode(packedStat);
-        var newStack = new ItemStack(resolved.ItemId, 0, enchant, combine, refine, socket, 0, 0, 0, 0, 0);
+        var newStack = new ItemStack(resolved.ItemId, 0, enchant, combine, refine, socket, 0, 0, 0, 0, 0,
+            placement.X, placement.Y);
         var projectedContainer = state.Inventory.GetContainer(container).SetItem(slot, newStack);
 
         var projectedRunes = state.RuneSystem.SetItem(packet.RuneIndex, 0);
@@ -117,19 +121,6 @@ public sealed class RuneSocketService(
                 zone.MapId, characterId);
 
         return new RuneRemoveResult(RuneSocketOutcome.Applied, container, slot, resolved.ItemId, newStack);
-    }
-
-    private static (byte Container, byte Slot)? FindFreeSlot(InventoryState inventory)
-    {
-        for (byte slot = 0; slot <= 63; slot++)
-            if (inventory.GetSlot(ContainerMatrix.InventoryPage0, slot) is null)
-                return (ContainerMatrix.InventoryPage0, slot);
-
-        for (byte slot = 0; slot <= 63; slot++)
-            if (inventory.GetSlot(ContainerMatrix.InventoryPage1, slot) is null)
-                return (ContainerMatrix.InventoryPage1, slot);
-
-        return null;
     }
 
     private static List<CharacterItemSlotTvp> ToTvps(ImmutableDictionary<byte, ItemStack> container)

@@ -10,6 +10,8 @@ namespace Fenrir.Application.Game.Hosting.World;
 
 public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWriteBehindFlusher
 {
+    private const int BuffSlotCount = 35;
+
     private readonly ICharacterRepository _characters;
     private readonly SemaphoreSlim _disconnectRetrySignal = new(0, 1);
 
@@ -21,7 +23,8 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
     private readonly ICharacterLogoutStateRepository _logoutState;
 
     private readonly Dictionary<int, (CharacterProgressTvp Progress, CharacterPositionTvp Position,
-            List<CharacterCostumeSlotTvp> Costumes, PlayerRuntimeState
+            List<CharacterCostumeSlotTvp> Costumes, List<CharacterBuffSlotTvp> Buffs,
+            List<CharacterMountSlotTvp> Mounts, PlayerRuntimeState
             CapturedState, int CapturedWarPoint, int CapturedBloodCoin)>
         _pendingDisconnectRetries = new();
 
@@ -203,9 +206,16 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
         var costumeRows = new List<CharacterCostumeSlotTvp>();
         CostumePersistenceCodec.AppendOccupiedSlots(costumeRows, characterId, state);
 
+        var mountRows = new List<CharacterMountSlotTvp>();
+        MountPersistenceCodec.AppendOccupiedSlots(mountRows, characterId, state);
+
+        var buffRows = new List<CharacterBuffSlotTvp>();
+        if (state.IsMovingZone)
+            AppendOccupiedBuffSlots(buffRows, characterId, state);
+
         try
         {
-            await _characters.PersistFinalFlushAsync(progressRow, positionRow, costumeRows, ct)
+            await _characters.PersistFinalFlushAsync(progressRow, positionRow, costumeRows, buffRows, mountRows, ct)
                 .ConfigureAwait(false);
 
             state.PersistedWarPoint = warPoint;
@@ -218,10 +228,27 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
         catch (Exception ex)
         {
             _pendingDisconnectRetries[characterId] =
-                (progressRow, positionRow, costumeRows, state, warPoint, bloodCoin);
+                (progressRow, positionRow, costumeRows, buffRows, mountRows, state, warPoint, bloodCoin);
             _logger.LogError(ex,
                 "Failed to persist final Position/Vitals/Progression state for character {CharacterId} on disconnect -- queued for retry until it succeeds",
                 characterId);
+        }
+    }
+
+    private static void AppendOccupiedBuffSlots(List<CharacterBuffSlotTvp> destination, int characterId,
+        PlayerRuntimeState state)
+    {
+        var buff = state.Buffs.Buff;
+
+        for (var slot = 0; slot < BuffSlotCount; slot++)
+        {
+            var value = buff[slot * 2];
+            var remainingTicks = buff[slot * 2 + 1];
+
+            if (value == 0 && remainingTicks <= 0)
+                continue;
+
+            destination.Add(new CharacterBuffSlotTvp(characterId, (byte)slot, value, Math.Max(0, remainingTicks)));
         }
     }
 
@@ -277,8 +304,8 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
 
             foreach (var characterId in _pendingDisconnectRetries.Keys.ToArray())
             {
-                var (progressRow, positionRow, costumeRows, capturedState, capturedWarPoint, capturedBloodCoin) =
-                    _pendingDisconnectRetries[characterId];
+                var (progressRow, positionRow, costumeRows, buffRows, mountRows, capturedState, capturedWarPoint,
+                    capturedBloodCoin) = _pendingDisconnectRetries[characterId];
 
                 if (_zones.TryGetPlayer(characterId, out var liveState) && !ReferenceEquals(liveState, capturedState))
                 {
@@ -291,7 +318,8 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
 
                 try
                 {
-                    await _characters.PersistFinalFlushAsync(progressRow, positionRow, costumeRows, ct)
+                    await _characters
+                        .PersistFinalFlushAsync(progressRow, positionRow, costumeRows, buffRows, mountRows, ct)
                         .ConfigureAwait(false);
 
                     capturedState.PersistedWarPoint = Math.Max(capturedState.PersistedWarPoint, capturedWarPoint);

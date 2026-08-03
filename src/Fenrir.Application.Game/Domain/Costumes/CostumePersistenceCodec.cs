@@ -39,7 +39,7 @@ public static class CostumePersistenceCodec
                 continue;
 
             wardrobe[row.Slot] = row.ItemId;
-            date[row.Slot] = row.ItemDate;
+            date[row.Slot] = row.ItemValue;
             expire[row.Slot] = row.ExpireDate;
         }
 

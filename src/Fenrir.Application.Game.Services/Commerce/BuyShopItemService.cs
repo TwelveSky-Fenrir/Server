@@ -3,6 +3,7 @@ using CaeriusNet.Exceptions;
 using Fenrir.Application.Game.Abstractions.Commerce;
 using Fenrir.Application.Game.Domain.Commerce;
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Social.Pshop;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Npcs;
@@ -37,6 +38,16 @@ public sealed class BuyShopItemService(
             logger.LogWarning(
                 "Buy shop item rejected: buyer {BuyerId} sent out-of-range destination coordinates -- session will be disconnected",
                 buyerId);
+            return new BuyShopItemSellerResult(BuyShopItemSellerOutcome.Abort, null, null, default);
+        }
+
+        if (packet.Page2 is not (ContainerMatrix.InventoryPage0 or ContainerMatrix.InventoryPage1) ||
+            !ContainerMatrix.IsValidSlot((byte)packet.Page2, packet.Index2) ||
+            (packet.Page2 == ContainerMatrix.InventoryPage1 && buyer.InventoryDate < GameDate.Today()))
+        {
+            logger.LogWarning(
+                "Buy shop item rejected: buyer {BuyerId} sent an invalid or expired-dated-page destination container {Page2}/{Index2} -- session will be disconnected",
+                buyerId, packet.Page2, packet.Index2);
             return new BuyShopItemSellerResult(BuyShopItemSellerOutcome.Abort, null, null, default);
         }
 
@@ -144,7 +155,8 @@ public sealed class BuyShopItemService(
         }
 
         var buyerDestination = buyer.Inventory.GetSlot((byte)packet.Page2, (byte)packet.Index2);
-        var resolved = PshopPurchasePolicy.ResolvePurchase(slot, itemDefinition, buyerDestination);
+        var resolved = PshopPurchasePolicy.ResolvePurchase(slot, itemDefinition, buyerDestination,
+            liveStack.SocketGem1, liveStack.SocketGem2, liveStack.SocketGem3);
 
         if (!resolved.Succeeded)
         {
@@ -237,7 +249,8 @@ public sealed class BuyShopItemService(
         }
 
         var buyerDestination = buyer.Inventory.GetSlot((byte)packet.Page2, (byte)packet.Index2);
-        var resolved = PshopPurchasePolicy.ResolvePurchase(slot, itemDefinition, buyerDestination);
+        var resolved = PshopPurchasePolicy.ResolvePurchase(slot, itemDefinition, buyerDestination,
+            slot.SocketGem1, slot.SocketGem2, slot.SocketGem3);
 
         if (!resolved.Succeeded)
         {
@@ -357,8 +370,9 @@ public sealed class BuyShopItemService(
             return new BuyShopItemSellerResult(BuyShopItemSellerOutcome.Abort, null, null, default);
         }
 
+        var (gem1, gem2, gem3) = PshopPurchasePolicy.DecodeSocketData(item.SocketData);
         var slot = new PshopPurchasePolicy.SlotView(itemId, item.Quantity, item.Value, item.SerialNumber,
-            item.Price, 0, 0, 0, 0);
+            item.Price, 0, 0, 0, 0, gem1, gem2, gem3);
         return new BuyShopItemSellerResult(BuyShopItemSellerOutcome.ProxyProceed, null, null, slot, sellerId.Value);
     }
 

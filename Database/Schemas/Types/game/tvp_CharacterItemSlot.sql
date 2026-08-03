@@ -11,5 +11,7 @@ CREATE TYPE game.tvp_CharacterItemSlot AS TABLE
     SocketGem2 INT     NOT NULL,
     SocketGem3 INT     NOT NULL,
     ExpireDate INT     NOT NULL,
-    Serial     INT     NOT NULL
+    Serial     INT     NOT NULL,
+    XPos       TINYINT NOT NULL,
+    YPos       TINYINT NOT NULL
 );

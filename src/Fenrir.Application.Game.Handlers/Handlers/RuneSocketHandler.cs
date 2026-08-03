@@ -91,7 +91,7 @@ public sealed class RuneSocketHandler(IRuneSocketService runeSocketService, ILog
                         ItemIndex = granted.ItemId,
                         Page = result.Page,
                         Index = result.Index,
-                        Xy = 0,
+                        Xy = granted.YPos * 8 + granted.XPos,
                         Quantity = granted.Quantity,
                         Value = 0,
                         Serial = granted.Serial,

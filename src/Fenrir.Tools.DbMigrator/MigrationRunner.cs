@@ -59,7 +59,7 @@ public static class MigrationRunner
             Console.Error.WriteLine(
                 "Warning: admin.SchemaVersions was never created by any script in the manifest -- nothing could be journaled, so every script above will be re-applied next run.");
 
-        await IndexedViewArithabortDiagnostics.ReportAsync(connection);
+        await IndexedViewSetOptionDiagnostics.ReportAsync(connection);
 
         Console.WriteLine(
             $"Migration complete: {scripts.Count} script(s) checked ({appliedCount} applied, {skippedCount} skipped) in {stopwatch.Elapsed.TotalSeconds:0.0}s.");
@@ -77,7 +77,7 @@ public static class MigrationRunner
             if (!appliedHash.AsSpan().SequenceEqual(hash))
             {
                 Console.Error.WriteLine(
-                    $"'{relativePath}' was already applied with a different hash. History must never be rewritten -- add a new corrective script instead of editing this one.");
+                    $"'{relativePath}' was already applied with a different hash. This database was migrated from an older version of that script, so its current state no longer matches the repository. Re-run with --recreate to drop and rebuild from scratch (the supported workflow for this project, which has no production database), or apply a corrective script if this instance must be preserved.");
                 return ScriptOutcome.Failed;
             }
 

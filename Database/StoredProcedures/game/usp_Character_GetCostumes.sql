@@ -5,9 +5,9 @@ BEGIN
 
     SELECT Slot,
            ItemId,
-           ItemDate,
+           ItemValue,
            ExpireDate
-    FROM game.CharacterCostumes
+    FROM game.CharacterCostumeSlots
     WHERE CharacterId = @CharacterId
     ORDER BY Slot;
 END;

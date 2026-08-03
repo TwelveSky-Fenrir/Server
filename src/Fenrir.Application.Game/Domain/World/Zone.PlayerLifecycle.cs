@@ -241,6 +241,7 @@ public sealed partial class Zone
         };
 
         state.ResetVolatileAntiCheatCountersOnEntry(_clock);
+        state.SetDeclaredMoveAnchor(state.PosX, state.PosY, state.PosZ);
 
         state.RecomputeSupportSkillTimeUpRatio();
 
@@ -382,20 +383,26 @@ public sealed partial class Zone
 
     private static void HydrateMountState(PlayerRuntimeState state, PlayerEnterData data)
     {
-        const int slot = MountPersistenceCodec.PersistedGarageSlot;
+        var slots = data.MountGarageSlots ??
+                    MountPersistenceCodec.SingleSlot(data.MountItemId, data.MountExpActivity, data.MountPower);
 
-        state.MountGarage = state.MountGarage.SetItem(slot, data.MountItemId);
-        state.MountActivity = state.MountActivity.SetItem(slot, MountActivityExpCodec.Activity(data.MountExpActivity));
-        state.MountAccumulatedExp =
-            state.MountAccumulatedExp.SetItem(slot, MountActivityExpCodec.Exp(data.MountExpActivity));
-        state.MountRolledAttributes =
-            MountPowerCodec.WithSlotDigits(state.MountRolledAttributes, slot, data.MountPower);
-        state.MountRolledAttributeTotal =
-            state.MountRolledAttributeTotal.SetItem(slot, MountPowerCodec.DigitSum(data.MountPower));
+        for (var slot = 0; slot < MountPersistenceCodec.SlotCount; slot++)
+        {
+            var (itemId, expActivity, power) = slots[slot];
+
+            state.MountGarage = state.MountGarage.SetItem(slot, itemId);
+            state.MountActivity = state.MountActivity.SetItem(slot, MountActivityExpCodec.Activity(expActivity));
+            state.MountAccumulatedExp = state.MountAccumulatedExp.SetItem(slot, MountActivityExpCodec.Exp(expActivity));
+            state.MountRolledAttributes = MountPowerCodec.WithSlotDigits(state.MountRolledAttributes, slot, power);
+            state.MountRolledAttributeTotal =
+                state.MountRolledAttributeTotal.SetItem(slot, MountPowerCodec.DigitSum(power));
+        }
 
         state.AnimalIndex = data.MountSlotIndex;
         state.AnimalTime = data.MountTime;
-        state.AnimalNumber = MountPersistenceCodec.IsMounted(data.MountSlotIndex) ? data.MountItemId : 0;
+        state.AnimalNumber = MountPersistenceCodec.IsMounted(data.MountSlotIndex)
+            ? state.MountGarage[data.MountSlotIndex - MountAnimalInfo.ActiveCompanionSlotBase]
+            : 0;
         state.AnimalAbsorbTime = data.AnimalAbsorbTime;
         state.AnimalAbsorbState = data.AnimalAbsorbState;
     }
@@ -901,7 +908,10 @@ public sealed partial class Zone
         }
 
         if (!isResumeAction)
+        {
             state.ImplausibleMoveStreak = 0;
+            state.SetDeclaredMoveAnchor(action.Location[0], action.Location[1], action.Location[2]);
+        }
 
         logger.LogDebug(
             "Zone {MapId}: move ACCEPTED for character {CharacterId} -- Sort={Sort} Type={Type} Frame={Frame} " +

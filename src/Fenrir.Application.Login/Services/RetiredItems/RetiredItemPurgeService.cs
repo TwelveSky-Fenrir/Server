@@ -26,7 +26,7 @@ public sealed class RetiredItemPurgeService(
                 .Where(item => !RetiredLoginItemCatalog.IsRetired(item.ItemId))
                 .Select(item => new CharacterItemSlotTvp(item.Slot, item.ItemId, item.Quantity, item.Enchant,
                     item.Combine, item.Refine, item.Socket, item.SocketGem1, item.SocketGem2, item.SocketGem3,
-                    item.ExpireDate, item.Serial))
+                    item.ExpireDate, item.Serial, item.XPos, item.YPos))
                 .ToArray();
 
             try

@@ -1,13 +1,30 @@
 using Fenrir.Application.Game.Abstractions.Social;
 using Fenrir.Application.Game.Domain.Social.Trade;
+using Fenrir.Application.Game.Domain.World;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Social;
 
-public sealed class TradeEndService(TradeRegistry trades, ILogger<TradeEndService> logger) : ITradeEndService
+public sealed class TradeEndService(TradeRegistry trades, ZoneRegistry zones, ILogger<TradeEndService> logger)
+    : ITradeEndService
 {
     public TradeEndResult End(int characterId)
     {
+        if (!trades.TryGetSession(characterId, out var pending) || pending is null)
+        {
+            logger.LogDebug("Trade end ignored: character {CharacterId} has no active trade session", characterId);
+            return new TradeEndResult(false, 0, 0);
+        }
+
+        var opponentId = pending.OpponentOf(characterId);
+        if (!zones.TryGetPlayer(opponentId, out var opponent) || opponent.IsMovingZone)
+        {
+            logger.LogDebug(
+                "Trade end deferred: character {CharacterId}'s counterpart {OpponentId} is unreachable or mid zone-transfer -- session left for the disconnect path to tear down",
+                characterId, opponentId);
+            return new TradeEndResult(false, 0, 0);
+        }
+
         if (!trades.TryEnd(characterId, out var trade) || trade is null)
         {
             logger.LogDebug("Trade end ignored: character {CharacterId} has no active trade session", characterId);

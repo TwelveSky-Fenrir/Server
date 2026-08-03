@@ -304,4 +304,5 @@ public sealed record PlayerEnterData(
     int AnimalDoubleExp = 0,
     int DmgBoost = 0,
     int HPBoost = 0,
-    int CriBoost = 0);
+    int CriBoost = 0,
+    ImmutableArray<(int ItemId, int ExpActivity, int Power)>? MountGarageSlots = null);

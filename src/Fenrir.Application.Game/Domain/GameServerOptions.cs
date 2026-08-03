@@ -66,11 +66,22 @@ public sealed class GameServerOptions
 
     public float AlliancePostRadius { get; set; } = 10f;
 
-    public ISet<short> Zone241DungeonMapIds { get; set; } = new HashSet<short>();
+    public float MaxAttackPacketPositionDelta { get; set; } = 185f;
 
-    public ISet<short> Zone126TypeMapIds { get; set; } = new HashSet<short>();
+    public ISet<short> Zone241DungeonMapIds { get; set; } = new HashSet<short>
+    {
+        241, 242, 243, 244, 245, 246, 247, 248, 249, 292,
+        293, 294, 311, 312, 325, 326, 327, 328, 329, 330
+    };
 
-    public ISet<short> Zone039TypeMapIds { get; set; } = new HashSet<short>();
+    public ISet<short> Zone126TypeMapIds { get; set; } = new HashSet<short>
+    {
+        126, 130, 134, 171, 127, 131, 135, 172, 128, 132, 136, 173, 129, 133, 137, 174,
+        210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221,
+        222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233
+    };
+
+    public ISet<short> Zone039TypeMapIds { get; set; } = new HashSet<short> { 39, 74, 144, 145, 313 };
 
     public bool HolyStoneBattleEnabled { get; set; }
 

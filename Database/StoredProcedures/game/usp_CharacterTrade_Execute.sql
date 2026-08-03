@@ -45,7 +45,7 @@ BEGIN
 
     DELETE FROM game.CharacterItems WHERE CharacterId = @CharacterA AND Container = 0;
     INSERT INTO game.CharacterItems (CharacterId, Container, Slot, ItemId, Quantity, Enchant, Combine,
-                                     Refine, Socket, SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial)
+                                     Refine, Socket, SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial, XPos, YPos)
     SELECT @CharacterA,
            0,
            Slot,
@@ -59,12 +59,14 @@ BEGIN
            SocketGem2,
            SocketGem3,
            ExpireDate,
-           Serial
+           Serial,
+           XPos,
+           YPos
     FROM @ItemsA0;
 
     DELETE FROM game.CharacterItems WHERE CharacterId = @CharacterA AND Container = 1;
     INSERT INTO game.CharacterItems (CharacterId, Container, Slot, ItemId, Quantity, Enchant, Combine,
-                                     Refine, Socket, SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial)
+                                     Refine, Socket, SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial, XPos, YPos)
     SELECT @CharacterA,
            1,
            Slot,
@@ -78,12 +80,14 @@ BEGIN
            SocketGem2,
            SocketGem3,
            ExpireDate,
-           Serial
+           Serial,
+           XPos,
+           YPos
     FROM @ItemsA1;
 
     DELETE FROM game.CharacterItems WHERE CharacterId = @CharacterB AND Container = 0;
     INSERT INTO game.CharacterItems (CharacterId, Container, Slot, ItemId, Quantity, Enchant, Combine,
-                                     Refine, Socket, SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial)
+                                     Refine, Socket, SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial, XPos, YPos)
     SELECT @CharacterB,
            0,
            Slot,
@@ -97,12 +101,14 @@ BEGIN
            SocketGem2,
            SocketGem3,
            ExpireDate,
-           Serial
+           Serial,
+           XPos,
+           YPos
     FROM @ItemsB0;
 
     DELETE FROM game.CharacterItems WHERE CharacterId = @CharacterB AND Container = 1;
     INSERT INTO game.CharacterItems (CharacterId, Container, Slot, ItemId, Quantity, Enchant, Combine,
-                                     Refine, Socket, SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial)
+                                     Refine, Socket, SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial, XPos, YPos)
     SELECT @CharacterB,
            1,
            Slot,
@@ -116,7 +122,9 @@ BEGIN
            SocketGem2,
            SocketGem3,
            ExpireDate,
-           Serial
+           Serial,
+           XPos,
+           YPos
     FROM @ItemsB1;
 
     DECLARE @AccountA INT, @AccountB INT;

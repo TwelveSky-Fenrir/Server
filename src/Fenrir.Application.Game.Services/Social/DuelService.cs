@@ -137,12 +137,23 @@ public sealed class DuelService(
             "Duel challenge {Outcome}: target {TargetId} answered challenger {ChallengerId} (code {AnswerCode})",
             accepted ? "accepted" : "declined", targetId, challengerId, answerCode);
 
-        if (zones.TryGetPlayer(challengerId, out var challenger))
-            challenger.Session.Send(new DuelAnswerResponse { Answer = answerCode });
-        else
+        if (!zones.TryGetPlayer(challengerId, out var challenger))
+        {
             logger.LogWarning(
                 "Duel answer for challenger {ChallengerId} could not be delivered: challenger not found in any zone on this shard",
                 challengerId);
+            return;
+        }
+
+        if (challenger.IsMovingZone)
+        {
+            logger.LogInformation(
+                "Duel answer for challenger {ChallengerId} withheld: challenger is mid zone-transfer",
+                challengerId);
+            return;
+        }
+
+        challenger.Session.Send(new DuelAnswerResponse { Answer = answerCode });
     }
 
     public void Cancel(int challengerId)
@@ -157,12 +168,22 @@ public sealed class DuelService(
             "Duel challenge canceled: challenger {ChallengerId} withdrew ask to target {TargetId}",
             challengerId, targetId);
 
-        if (zones.TryGetPlayer(targetId, out var target))
-            target.Session.Send(new DuelCancelResponse());
-        else
+        if (!zones.TryGetPlayer(targetId, out var target))
+        {
             logger.LogWarning(
                 "Duel cancel notification for target {TargetId} could not be delivered: target not found in any zone on this shard",
                 targetId);
+            return;
+        }
+
+        if (target.IsMovingZone)
+        {
+            logger.LogInformation(
+                "Duel cancel notification for target {TargetId} withheld: target is mid zone-transfer", targetId);
+            return;
+        }
+
+        target.Session.Send(new DuelCancelResponse());
     }
 
     public void Start(int callerId)
@@ -179,6 +200,15 @@ public sealed class DuelService(
             logger.LogWarning(
                 "Duel {UniqueNumber} start aborted: a participant was not found in any zone on this shard (playerA {PlayerA}, playerB {PlayerB})",
                 duel.UniqueNumber, duel.PlayerA, duel.PlayerB);
+            return;
+        }
+
+        if (playerA.IsMovingZone || playerB.IsMovingZone)
+        {
+            duels.TryEndActiveDuel(callerId, out _);
+            logger.LogInformation(
+                "Duel {UniqueNumber} start aborted and registration rolled back: participant {PlayerA} (moving zone {PlayerAMoving}) / {PlayerB} (moving zone {PlayerBMoving}) is mid zone-transfer",
+                duel.UniqueNumber, duel.PlayerA, playerA.IsMovingZone, duel.PlayerB, playerB.IsMovingZone);
             return;
         }
 

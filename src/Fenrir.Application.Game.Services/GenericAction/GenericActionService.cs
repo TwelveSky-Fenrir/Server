@@ -385,11 +385,11 @@ public sealed class GenericActionService(
         }
 
         if (toContainer == fromContainer)
-            await characters.ReplaceContainerV2Async(characterId, fromContainer, ToTvpsV2(projected.From),
+            await characters.ReplaceContainerAsync(characterId, fromContainer, ToTvps(projected.From),
                 cancellationToken);
         else
-            await characters.ReplaceTwoContainersV2Async(characterId, fromContainer, ToTvpsV2(projected.From),
-                toContainer, ToTvpsV2(projected.To), cancellationToken);
+            await characters.ReplaceTwoContainersAsync(characterId, fromContainer, ToTvps(projected.From),
+                toContainer, ToTvps(projected.To), cancellationToken);
 
         var containers = toContainer == fromContainer
             ? ImmutableArray.Create(new InventoryContainerSnapshot(fromContainer, projected.From))
@@ -491,7 +491,7 @@ public sealed class GenericActionService(
         var projectedContainer = state.Inventory.GetContainer(destinationContainer)
             .SetItem(destinationSlot, resolved.NewSlot!.Value);
 
-        await characters.ReplaceContainerV2Async(characterId, destinationContainer, ToTvpsV2(projectedContainer),
+        await characters.ReplaceContainerAsync(characterId, destinationContainer, ToTvps(projectedContainer),
             cancellationToken);
 
         var containers =
@@ -1947,14 +1947,6 @@ public sealed class GenericActionService(
         var list = new List<CharacterItemSlotTvp>(container.Count);
         foreach (var (slot, stack) in container)
             list.Add(stack.ToTvp(slot));
-        return list;
-    }
-
-    private static List<CharacterItemSlotV2Tvp> ToTvpsV2(ImmutableDictionary<byte, ItemStack> container)
-    {
-        var list = new List<CharacterItemSlotV2Tvp>(container.Count);
-        foreach (var (slot, stack) in container)
-            list.Add(stack.ToTvpV2(slot));
         return list;
     }
 }

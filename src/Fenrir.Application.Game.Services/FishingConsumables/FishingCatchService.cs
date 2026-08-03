@@ -3,13 +3,18 @@ using Fenrir.Application.Game.Abstractions.FishingConsumables;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Fishing;
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Domain.Game.GameData;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.FishingConsumables;
 
-public sealed class FishingCatchService(ICharacterRepository characters, ILogger<FishingCatchService> logger)
+public sealed class FishingCatchService(
+    ICharacterRepository characters,
+    WorldDataCache worldData,
+    ILogger<FishingCatchService> logger)
     : IFishingCatchService
 {
     public async ValueTask ResolveAndApplyAsync(Zone zone, PlayerRuntimeState state, int characterId,
@@ -21,7 +26,8 @@ public sealed class FishingCatchService(ICharacterRepository characters, ILogger
         if (step == 4)
         {
             var itemId = FishingRewardResolver.RollRewardItem(SystemRandomSource.Instance);
-            var freeSlot = FindFreeSlot(state.Inventory);
+            var freeSlot = InventoryFreeSlotFinder.Find(state.Inventory, worldData, itemId, state.InventoryDate,
+                GameDate.Today());
 
             if (freeSlot is not { } destination)
             {
@@ -41,7 +47,7 @@ public sealed class FishingCatchService(ICharacterRepository characters, ILogger
                 return;
             }
 
-            var newStack = new ItemStack(itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+            var newStack = new ItemStack(itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, destination.X, destination.Y);
             var projectedContainer =
                 state.Inventory.GetContainer(destination.Container).SetItem(destination.Slot, newStack);
 
@@ -67,12 +73,10 @@ public sealed class FishingCatchService(ICharacterRepository characters, ILogger
                 return;
             }
 
-            var rowPosition = destination.Slot / 8;
-
             session.Send(new FishingCatchResponse
             {
                 Result = 1, ItemIndex = itemId, Page = destination.Container, Index = destination.Slot,
-                XY = rowPosition
+                XY = destination.GridIndex
             });
 
             logger.LogInformation(
@@ -100,19 +104,6 @@ public sealed class FishingCatchService(ICharacterRepository characters, ILogger
                     castAt), cancellationToken))
             logger.LogError("Zone {MapId} fishing inbox full: dropped catch mirror for character {CharacterId}",
                 zone.MapId, characterId);
-    }
-
-    private static (byte Container, byte Slot)? FindFreeSlot(InventoryState inventory)
-    {
-        for (byte slot = 0; slot <= 63; slot++)
-            if (inventory.GetSlot(ContainerMatrix.InventoryPage0, slot) is null)
-                return (ContainerMatrix.InventoryPage0, slot);
-
-        for (byte slot = 0; slot <= 63; slot++)
-            if (inventory.GetSlot(ContainerMatrix.InventoryPage1, slot) is null)
-                return (ContainerMatrix.InventoryPage1, slot);
-
-        return null;
     }
 
     private static List<CharacterItemSlotTvp> ToTvps(ImmutableDictionary<byte, ItemStack> container)

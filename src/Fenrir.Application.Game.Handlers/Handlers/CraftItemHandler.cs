@@ -134,8 +134,7 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService, ILogger
                     session.Send(WingP1Response(result));
                     return;
                 }
-                case CraftRecipeCatalog.FeatherTierUpWhiteToBlackSort:
-                case CraftRecipeCatalog.FeatherTierUpBlackToGoldSort:
+                case CraftRecipeCatalog.FeatherTierUpSort:
                 {
                     var result = await craftItemService.ResolveFeatherTierUpAsync(packet, zone, state, characterId,
                         accountId, cancellationToken);
@@ -146,7 +145,6 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService, ILogger
                         return;
                     }
 
-                    SendGrantedItem(session, result);
                     session.Send(StandardResponse(result));
                     return;
                 }
@@ -164,6 +162,7 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService, ILogger
                     session.Send(WingP3Response(result));
                     return;
                 }
+                case CraftRecipeCatalog.WingFourthTierSort:
                 case CraftRecipeCatalog.WingFifthTierSort:
                 case CraftRecipeCatalog.WingSixthTierUnvalidatedSort:
                 {

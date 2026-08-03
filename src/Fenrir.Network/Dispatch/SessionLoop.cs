@@ -163,7 +163,8 @@ public static class SessionLoop
 
             try
             {
-                var dispatchStartTimestamp = debugEnabled ? Stopwatch.GetTimestamp() : 0L;
+                var metricsEnabled = DispatchMetrics.DispatchDurationMs.Enabled;
+                var dispatchStartTimestamp = debugEnabled || metricsEnabled ? Stopwatch.GetTimestamp() : 0L;
 
                 var dispatchOutcome = await dispatcher
                     .DispatchAsync(frameServer, frameOpcode, framePayload, session, cancellationToken)
@@ -175,6 +176,14 @@ public static class SessionLoop
                 if (debugEnabled)
                     logger!.PacketDispatched(session.SessionId, frameServer, frameOpcode,
                         Stopwatch.GetElapsedTime(dispatchStartTimestamp).TotalMicroseconds);
+
+                if (metricsEnabled)
+                    DispatchMetrics.DispatchDurationMs.Record(
+                        Stopwatch.GetElapsedTime(dispatchStartTimestamp).TotalMilliseconds,
+                        DispatchMetrics.ServerTag(frameServer));
+
+                if (DispatchMetrics.PacketsDispatched.Enabled)
+                    DispatchMetrics.PacketsDispatched.Add(1, DispatchMetrics.ServerTag(frameServer));
 
                 session.Touch();
             }

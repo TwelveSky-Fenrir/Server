@@ -1,4 +1,5 @@
 using Fenrir.Application.Game.Domain.Combat;
+using Fenrir.Application.Game.Domain.Economy;
 using Fenrir.Application.Game.Domain.Inventory;
 
 namespace Fenrir.Application.Game.Domain.Forge;
@@ -25,7 +26,7 @@ public static class CombineResolver
     public static CombineResult Resolve(
         ItemRowDto targetItem, ItemStack targetStack,
         ItemRowDto materialItem, ItemStack materialStack,
-        int luck, int luckyComboCharges, IRandomSource random)
+        int luck, int luckyComboCharges, bool premiumActive, IRandomSource random)
     {
         if (targetItem.Type is not (RareItemType or EliteItemType) || targetItem.Sort is < 7 or > 29 ||
             targetItem.CheckHighImprove != 2 || targetStack.Combine >= MaxCombine)
@@ -56,7 +57,7 @@ public static class CombineResolver
             }
         }
 
-        var cost = GetAddMoney(targetItem, targetStack.Combine);
+        var cost = GetAddMoney(targetItem, targetStack.Combine, premiumActive);
 
         int probability;
         var luckyChargeConsumed = false;
@@ -87,10 +88,12 @@ public static class CombineResolver
             : new CombineResult(1, cost, targetStack.Combine, false, luckyChargeConsumed);
     }
 
-    private static int GetAddMoney(ItemRowDto targetItem, int combine)
+    private static int GetAddMoney(ItemRowDto targetItem, int combine, bool premiumActive)
     {
-        var table = targetItem.CheckSetItem == 2 ? AddMoneySetItemTable : AddMoneyNormalTable;
-        return table[combine];
+        if (targetItem.CheckSetItem == 2)
+            return AddMoneySetItemTable[combine];
+
+        return PremiumPricing.ApplyPremiumDiscount(AddMoneyNormalTable[combine], premiumActive);
     }
 
     private static bool MatchesEliteTier(short eqLevel, short matLevel, byte matMartialLevel)

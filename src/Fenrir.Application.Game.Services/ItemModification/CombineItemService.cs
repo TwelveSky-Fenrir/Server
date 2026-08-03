@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Forge;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Simulation;
+using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Domain.Game.GameData;
 using Fenrir.Protocol.Game;
@@ -17,6 +18,8 @@ public sealed class CombineItemService(
     ILogger<CombineItemService> logger)
     : ICombineItemService
 {
+    private const int LuckyCombineStatSort = 28;
+
     public async ValueTask<CombineItemResult> CombineAsync(CombineItemRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
     {
@@ -30,7 +33,7 @@ public sealed class CombineItemService(
             logger.LogDebug(
                 "Character {CharacterId} combine-item rejected: invalid slot(s) ({Page1}:{Index1} / {Page2}:{Index2})",
                 characterId, page1, index1, page2, index2);
-            return new CombineItemResult(CombineItemOutcome.Rejected, 0, 0);
+            return new CombineItemResult(CombineItemOutcome.Disconnect, 0, 0);
         }
 
         var today = GameDate.Today();
@@ -40,7 +43,7 @@ public sealed class CombineItemService(
             logger.LogDebug(
                 "Character {CharacterId} combine-item rejected: rented inventory page expired (InventoryDate {InventoryDate})",
                 characterId, state.InventoryDate);
-            return new CombineItemResult(CombineItemOutcome.Rejected, 0, 0);
+            return new CombineItemResult(CombineItemOutcome.Disconnect, 0, 0);
         }
 
         var targetStack = state.Inventory.GetSlot((byte)page1, (byte)index1);
@@ -53,20 +56,21 @@ public sealed class CombineItemService(
             logger.LogDebug(
                 "Character {CharacterId} combine-item rejected: target or material slot empty/unresolvable",
                 characterId);
-            return new CombineItemResult(CombineItemOutcome.Rejected, 0, 0);
+            return new CombineItemResult(CombineItemOutcome.Disconnect, 0, 0);
         }
 
         var luck = state.Stats?.Luck ?? 0;
+        var premiumActive = state.PremiumExpireUtc >= DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
         var resolved = CombineResolver.Resolve(targetDefinition.Item, target, materialDefinition.Item, material,
-            luck, 0, SystemRandomSource.Instance);
+            luck, state.AddItemValue, premiumActive, SystemRandomSource.Instance);
 
         if (resolved.IsRejected)
         {
             logger.LogInformation(
                 "Character {CharacterId} combine-item rejected by resolver (target {TargetItemId}, material {MaterialItemId})",
                 characterId, target.ItemId, material.ItemId);
-            return new CombineItemResult(CombineItemOutcome.Rejected, 0, 0);
+            return new CombineItemResult(CombineItemOutcome.Disconnect, 0, 0);
         }
 
         var newTargetStack = target with { Combine = (byte)resolved.NewCombine };
@@ -109,10 +113,23 @@ public sealed class CombineItemService(
             logger.LogWarning(ex,
                 "Character {CharacterId} combine-item AdjustMoney...ReplaceContainer(s)Async failed (treated as insufficient funds)",
                 characterId);
-            return new CombineItemResult(CombineItemOutcome.Rejected, 0, 0);
+            return new CombineItemResult(CombineItemOutcome.Disconnect, 0, 0);
         }
 
         zone.CreditNpcServiceTribeTax(state.Tribe, resolved.Cost);
+
+        if (resolved.ConsumesLuckyCharge)
+        {
+            var newAddItemValue = state.AddItemValue - 1;
+            state.Session.Send(new AvatarStatUpdateResponse
+                { Sort = LuckyCombineStatSort, Value = newAddItemValue, Value2 = 0 });
+
+            if (!await zone.PostTribeProgressCommandAndWaitAsync(
+                    new TribeProgressZoneCommand(characterId, AddItemValue: newAddItemValue), cancellationToken))
+                logger.LogError(
+                    "Zone {MapId} tribe-progress inbox full: dropped lucky-combine charge mirror for character {CharacterId}",
+                    zone.MapId, characterId);
+        }
 
         var containers = page1 == page2
             ? ImmutableArray.Create(new InventoryContainerSnapshot((byte)page1, projectedTargetContainer))

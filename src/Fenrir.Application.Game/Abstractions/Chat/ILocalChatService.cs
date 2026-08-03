@@ -6,6 +6,6 @@ namespace Fenrir.Application.Game.Abstractions.Chat;
 
 public interface ILocalChatService
 {
-    public bool TryPostChat(Zone zone, IZoneSession zoneSession, PlayerRuntimeState sender, string content,
-        ItemLinkInfo link);
+    public ValueTask<bool> TryPostChatAsync(Zone zone, IZoneSession zoneSession, PlayerRuntimeState sender,
+        string content, ItemLinkInfo link, CancellationToken cancellationToken);
 }

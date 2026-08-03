@@ -15,6 +15,8 @@ public static class OpcodeRateLimiterPolicy
 
     private static readonly (int Capacity, double TokensPerSecond) Default = (5, 5d);
 
+    public static readonly (int Capacity, double TokensPerSecond) GmCommand = (3, 1d);
+
 
     public static (int Capacity, double TokensPerSecond) PolicyFor(FenrirServer server, byte opcode)
     {

@@ -39,8 +39,13 @@ public static class Extensions
                     metrics.AddRuntimeInstrumentation();
 
                     metrics.AddMeter("Fenrir.*");
+                    metrics.AddMeter("CaeriusNet");
                 })
-                .WithTracing(tracing => { tracing.AddSource("Fenrir.*"); });
+                .WithTracing(tracing =>
+                {
+                    tracing.AddSource("Fenrir.*");
+                    tracing.AddSource("CaeriusNet");
+                });
 
             builder.AddOpenTelemetryExporters();
 

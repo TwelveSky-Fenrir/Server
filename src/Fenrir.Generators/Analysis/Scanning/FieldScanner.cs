@@ -320,7 +320,15 @@ internal static class FieldScanner
         }
 
         if (!visiting.Add(nestedType))
+        {
+            diagnostics.Add(DiagnosticInfo.Create(
+                FenrirDiagnostics.NestedWireTypeCycle,
+                property.Locations.FirstOrDefault(),
+                nestedType.ToDisplayString(),
+                property.ContainingType.Name,
+                property.Name));
             return 0;
+        }
 
         try
         {

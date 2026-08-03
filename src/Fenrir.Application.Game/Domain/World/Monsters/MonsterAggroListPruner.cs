@@ -23,9 +23,9 @@ public static class MonsterAggroListPruner
         var leashRadiusSq = (float)leashRadius * leashRadius;
 
         var cellSize = zone.AoiCellSize;
-        var monsterCellX = MathF.Floor(monster.PosX / cellSize);
-        var monsterCellY = MathF.Floor(monster.PosY / cellSize);
-        var monsterCellZ = MathF.Floor(monster.PosZ / cellSize);
+        var monsterCellX = (int)(monster.PosX / cellSize);
+        var monsterCellY = (int)(monster.PosY / cellSize);
+        var monsterCellZ = (int)(monster.PosZ / cellSize);
 
         foreach (var entry in monster.SnapshotAttackDamage())
         {
@@ -42,7 +42,7 @@ public static class MonsterAggroListPruner
 
     private static bool TryEvaluateEntry(Zone zone, MonsterEntity monster, IEnumerable<MonsterEntity> allMonsters,
         MonsterAttackDamageEntry entry, float meleeRadiusSq, float leashRadiusSq,
-        float cellSize, float monsterCellX, float monsterCellY, float monsterCellZ, out float distanceSquared)
+        float cellSize, int monsterCellX, int monsterCellY, int monsterCellZ, out float distanceSquared)
     {
         distanceSquared = 0f;
 
@@ -59,9 +59,9 @@ public static class MonsterAggroListPruner
         if (player.ActionSort is 0 or 33)
             return false;
 
-        if (MathF.Abs(MathF.Floor(player.PosX / cellSize) - monsterCellX) > TrackedAttackerCellTolerance ||
-            MathF.Abs(MathF.Floor(player.PosY / cellSize) - monsterCellY) > TrackedAttackerCellTolerance ||
-            MathF.Abs(MathF.Floor(player.PosZ / cellSize) - monsterCellZ) > TrackedAttackerCellTolerance)
+        if (Math.Abs((int)(player.PosX / cellSize) - monsterCellX) > TrackedAttackerCellTolerance ||
+            Math.Abs((int)(player.PosY / cellSize) - monsterCellY) > TrackedAttackerCellTolerance ||
+            Math.Abs((int)(player.PosZ / cellSize) - monsterCellZ) > TrackedAttackerCellTolerance)
             return false;
 
         distanceSquared = DistanceSquared(monster.PosX, monster.PosZ, player.PosX, player.PosZ);

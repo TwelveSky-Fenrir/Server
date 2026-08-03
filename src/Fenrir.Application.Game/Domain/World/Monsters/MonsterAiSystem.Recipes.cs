@@ -130,9 +130,9 @@ public sealed partial class MonsterAiSystem
     private static bool HasNearbyReadyPlayer(Zone zone, MonsterEntity monster)
     {
         var cellSize = zone.AoiCellSize;
-        var monsterCellX = MathF.Floor(monster.PosX / cellSize);
-        var monsterCellY = MathF.Floor(monster.PosY / cellSize);
-        var monsterCellZ = MathF.Floor(monster.PosZ / cellSize);
+        var monsterCellX = (int)(monster.PosX / cellSize);
+        var monsterCellY = (int)(monster.PosY / cellSize);
+        var monsterCellZ = (int)(monster.PosZ / cellSize);
 
         foreach (var player in zone.Players)
         {
@@ -145,13 +145,13 @@ public sealed partial class MonsterAiSystem
             if (monster.InstanceId is { } requiredInstanceId && player.DungeonInstanceId != requiredInstanceId)
                 continue;
 
-            if (MathF.Abs(MathF.Floor(player.PosX / cellSize) - monsterCellX) > ThrowerWanderProximityCellTolerance)
+            if (Math.Abs((int)(player.PosX / cellSize) - monsterCellX) > ThrowerWanderProximityCellTolerance)
                 continue;
 
-            if (MathF.Abs(MathF.Floor(player.PosY / cellSize) - monsterCellY) > ThrowerWanderProximityCellTolerance)
+            if (Math.Abs((int)(player.PosY / cellSize) - monsterCellY) > ThrowerWanderProximityCellTolerance)
                 continue;
 
-            if (MathF.Abs(MathF.Floor(player.PosZ / cellSize) - monsterCellZ) > ThrowerWanderProximityCellTolerance)
+            if (Math.Abs((int)(player.PosZ / cellSize) - monsterCellZ) > ThrowerWanderProximityCellTolerance)
                 continue;
 
             return true;
@@ -179,9 +179,9 @@ public sealed partial class MonsterAiSystem
         var innerBand = ThrowCarInnerRadiusRatio * meleeRadius;
 
         var cellSize = zone.AoiCellSize;
-        var monsterCellX = MathF.Floor(monster.PosX / cellSize);
-        var monsterCellY = MathF.Floor(monster.PosY / cellSize);
-        var monsterCellZ = MathF.Floor(monster.PosZ / cellSize);
+        var monsterCellX = (int)(monster.PosX / cellSize);
+        var monsterCellY = (int)(monster.PosY / cellSize);
+        var monsterCellZ = (int)(monster.PosZ / cellSize);
 
         foreach (var characterId in zone.NeighborsOfPosition(monster.PosX, monster.PosZ))
         {
@@ -194,9 +194,9 @@ public sealed partial class MonsterAiSystem
             if (monster.InstanceId is { } requiredInstanceId && player.DungeonInstanceId != requiredInstanceId)
                 continue;
 
-            if (MathF.Abs(MathF.Floor(player.PosX / cellSize) - monsterCellX) > ThrowCarDetectionCellTolerance ||
-                MathF.Abs(MathF.Floor(player.PosY / cellSize) - monsterCellY) > ThrowCarDetectionCellTolerance ||
-                MathF.Abs(MathF.Floor(player.PosZ / cellSize) - monsterCellZ) > ThrowCarDetectionCellTolerance)
+            if (Math.Abs((int)(player.PosX / cellSize) - monsterCellX) > ThrowCarDetectionCellTolerance ||
+                Math.Abs((int)(player.PosY / cellSize) - monsterCellY) > ThrowCarDetectionCellTolerance ||
+                Math.Abs((int)(player.PosZ / cellSize) - monsterCellZ) > ThrowCarDetectionCellTolerance)
                 continue;
 
             var length = Distance3D(monster, player);
@@ -346,9 +346,9 @@ public sealed partial class MonsterAiSystem
         var meleeRadiusSq = (float)meleeRadius * meleeRadius;
 
         var cellSize = zone.AoiCellSize;
-        var monsterCellX = MathF.Floor(monster.PosX / cellSize);
-        var monsterCellY = MathF.Floor(monster.PosY / cellSize);
-        var monsterCellZ = MathF.Floor(monster.PosZ / cellSize);
+        var monsterCellX = (int)(monster.PosX / cellSize);
+        var monsterCellY = (int)(monster.PosY / cellSize);
+        var monsterCellZ = (int)(monster.PosZ / cellSize);
 
         foreach (var characterId in zone.NeighborsOfPosition(monster.PosX, monster.PosZ))
         {
@@ -361,9 +361,9 @@ public sealed partial class MonsterAiSystem
             if (player.ActionSort is 0 or 33)
                 continue;
 
-            if (MathF.Abs(MathF.Floor(player.PosX / cellSize) - monsterCellX) > GuardDetectionCellTolerance ||
-                MathF.Abs(MathF.Floor(player.PosY / cellSize) - monsterCellY) > GuardDetectionCellTolerance ||
-                MathF.Abs(MathF.Floor(player.PosZ / cellSize) - monsterCellZ) > GuardDetectionCellTolerance)
+            if (Math.Abs((int)(player.PosX / cellSize) - monsterCellX) > GuardDetectionCellTolerance ||
+                Math.Abs((int)(player.PosY / cellSize) - monsterCellY) > GuardDetectionCellTolerance ||
+                Math.Abs((int)(player.PosZ / cellSize) - monsterCellZ) > GuardDetectionCellTolerance)
                 continue;
 
             if (DistanceSquared(monster.PosX, monster.PosZ, player.PosX, player.PosZ) > meleeRadiusSq)

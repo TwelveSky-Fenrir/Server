@@ -18,6 +18,8 @@ public sealed class BuyCashItemService(
 {
     private const int ShopSpecificError = 60704;
 
+    private const int InternalFailureResult = 1;
+
     private static readonly TimeSpan PurchaseThrottleWindow = TimeSpan.FromMilliseconds(200);
 
     public async ValueTask<BuyCashItemResponse?> ResolveAndApplyAsync(BuyCashItemRequest packet, Zone zone,
@@ -57,19 +59,27 @@ public sealed class BuyCashItemService(
         var index = packet.CostInfoIndex;
         if (index < 0 || index >= costInfo.Length)
         {
-            logger.LogWarning(
-                "Buy cash item rejected: character {CharacterId} sent out-of-range costInfoIndex {CostInfoIndex} -- session will be disconnected",
+            logger.LogDebug(
+                "Buy cash item rejected: character {CharacterId} sent costInfoIndex {CostInfoIndex} outside catalog bounds",
                 characterId, index);
-            return null;
+            return new BuyCashItemResponse
+            {
+                Result = InternalFailureResult, CashSize = 0, Page = packet.Page, Index = packet.Index,
+                Value = packet.Value
+            };
         }
 
         var entry = costInfo[index];
         if (!entry.IsAssigned || !worldData.ItemsById.TryGetValue(entry.ItemId, out var itemDefinition))
         {
-            logger.LogWarning(
-                "Buy cash item rejected: character {CharacterId} costInfoIndex {CostInfoIndex} is unassigned or unresolvable -- session will be disconnected",
+            logger.LogDebug(
+                "Buy cash item rejected: character {CharacterId} costInfoIndex {CostInfoIndex} is unassigned or unresolvable",
                 characterId, index);
-            return null;
+            return new BuyCashItemResponse
+            {
+                Result = InternalFailureResult, CashSize = 0, Page = packet.Page, Index = packet.Index,
+                Value = packet.Value
+            };
         }
 
         var page = packet.Page;
@@ -108,7 +118,15 @@ public sealed class BuyCashItemService(
         ItemStack newStack;
         if (destination is { } existing)
         {
-            if (!isStackable || existing.ItemId != entry.ItemId ||
+            if (!isStackable)
+            {
+                logger.LogWarning(
+                    "Buy cash item rejected: character {CharacterId} non-stackable purchase targets already-occupied slot {Page}/{Index} -- session will be disconnected",
+                    characterId, page, slot);
+                return null;
+            }
+
+            if (existing.ItemId != entry.ItemId ||
                 existing.Quantity + grantQuantity > GroundItemPickupPolicy.MaxStackQuantity)
             {
                 logger.LogInformation(

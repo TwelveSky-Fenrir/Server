@@ -47,7 +47,7 @@ public sealed record WorldStateRepository(ICaeriusNetDbContext Db) : IWorldState
     }
 
     public async ValueTask UpdateTribeAsync(byte tribeId, DateTime? symbolDateUtc, bool hasSymbol, int points,
-        bool isClosed, CancellationToken ct)
+        bool isClosed, byte symbolOwnerTribeId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_WorldStateTribe_Update", 0)
             .AddParameter("TribeId", tribeId, SqlDbType.TinyInt)
@@ -55,19 +55,21 @@ public sealed record WorldStateRepository(ICaeriusNetDbContext Db) : IWorldState
             .AddParameter("HasSymbol", hasSymbol, SqlDbType.Bit)
             .AddParameter("Points", points, SqlDbType.Int)
             .AddParameter("IsClosed", isClosed, SqlDbType.Bit)
+            .AddParameter("SymbolOwnerTribeId", symbolOwnerTribeId, SqlDbType.TinyInt)
             .Build();
 
         await Db.ExecuteAsync(sp, ct);
     }
 
     public async ValueTask UpdateTribeSymbolStateAsync(byte tribeId, DateTime? symbolDateUtc, bool hasSymbol,
-        bool isClosed, CancellationToken ct)
+        bool isClosed, byte symbolOwnerTribeId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_WorldStateTribe_UpdateSymbolState", 0)
             .AddParameter("TribeId", tribeId, SqlDbType.TinyInt)
             .AddParameter("SymbolDateUtc", (object?)symbolDateUtc ?? DBNull.Value, SqlDbType.DateTime2)
             .AddParameter("HasSymbol", hasSymbol, SqlDbType.Bit)
             .AddParameter("IsClosed", isClosed, SqlDbType.Bit)
+            .AddParameter("SymbolOwnerTribeId", symbolOwnerTribeId, SqlDbType.TinyInt)
             .Build();
 
         await Db.ExecuteAsync(sp, ct);

@@ -40,6 +40,13 @@ public static class GmCommandCatalog
     public const short SetPvpPointAudit = 26;
     public const short CreateItemAudit = 27;
 
+    public const short ChatCommandWhereAudit = 28;
+    public const short ChatCommandYgDropAudit = 29;
+    public const short ChatCommandBossAudit = 30;
+    public const short ChatCommandKill200Audit = 31;
+    public const short ChatCommandLabAudit = 32;
+    public const short ChatCommandClearInventoryAudit = 33;
+
     public const byte OutcomeDenied = 0;
     public const byte OutcomeExecuted = 1;
     public const byte OutcomeRejected = 2;

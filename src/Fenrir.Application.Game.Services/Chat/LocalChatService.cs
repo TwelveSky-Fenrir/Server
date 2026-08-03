@@ -15,21 +15,23 @@ public sealed class LocalChatService(
     YangGokPvpDropEventState yangGokDropEvent,
     LabyrinthOperatorGate labyrinthGate,
     IWorldNoticeService worldNotice,
+    IEventLogRepository eventLog,
+    ISessionRateLimiter rateLimiter,
     ILogger<LocalChatService> logger) : ILocalChatService
 {
     private const string SystemSenderName = "SYSTEM";
 
     private static readonly ItemLinkInfo EmptyLink = new() { Index = 0, Activity = 0, Value = 0, Socket = new int[3] };
 
-    public bool TryPostChat(Zone zone, IZoneSession zoneSession, PlayerRuntimeState sender, string content,
-        ItemLinkInfo link)
+    public async ValueTask<bool> TryPostChatAsync(Zone zone, IZoneSession zoneSession, PlayerRuntimeState sender,
+        string content, ItemLinkInfo link, CancellationToken cancellationToken)
     {
         if (sender.IsMuted)
             return false;
 
         if (zoneSession.IsGm && LocalChatGmCommandParser.TryParse(content, out var command))
         {
-            HandleGmCommand(zone, zoneSession, sender, command);
+            await HandleGmCommandAsync(zone, zoneSession, sender, command, cancellationToken);
             return true;
         }
 
@@ -44,12 +46,25 @@ public sealed class LocalChatService(
         return true;
     }
 
-    private void HandleGmCommand(Zone zone, IZoneSession zoneSession, PlayerRuntimeState sender,
-        LocalChatGmCommand command)
+    private async ValueTask HandleGmCommandAsync(Zone zone, IZoneSession zoneSession, PlayerRuntimeState sender,
+        LocalChatGmCommand command, CancellationToken cancellationToken)
     {
+        if (!rateLimiter.TryConsumeGmCommand(zoneSession.SessionId))
+        {
+            logger.LogWarning(
+                "Character {CharacterId} ({Name}) exceeded the GM chat-command rate limit -- disconnecting",
+                sender.CharacterId, sender.Name);
+            await AuditAsync(command.Kind, zoneSession, GmCommandCatalog.OutcomeRejected,
+                $"Argument={command.Argument};Reason=RateLimited", cancellationToken);
+            zoneSession.Abort(DisconnectReason.RateLimited);
+            return;
+        }
+
         if (!zoneSession.MeetsGmTier(command.RequiredTier))
         {
             SendSystemChat(sender, "You do not have permission to use this command.");
+            await AuditAsync(command.Kind, zoneSession, GmCommandCatalog.OutcomeDenied,
+                $"RequiredTier={(short)command.RequiredTier}", cancellationToken);
             return;
         }
 
@@ -58,28 +73,32 @@ public sealed class LocalChatService(
             case LocalChatGmCommandKind.Where:
                 SendSystemChat(sender,
                     $"zone {sender.MapId} ({(int)sender.PosX}, {(int)sender.PosY}, {(int)sender.PosZ})");
+                await AuditAsync(command.Kind, zoneSession, GmCommandCatalog.OutcomeExecuted, null,
+                    cancellationToken);
                 return;
 
             case LocalChatGmCommandKind.YgDrop:
-                HandleYgDrop(sender, command.Argument);
+                await HandleYgDropAsync(zoneSession, sender, command.Argument, cancellationToken);
                 return;
 
             case LocalChatGmCommandKind.Boss:
-                HandleBoss(zone, sender, command.Argument);
+                await HandleBossAsync(zone, zoneSession, sender, command.Argument, cancellationToken);
                 return;
 
             case LocalChatGmCommandKind.Kill200:
-                HandleKill200(sender);
+                await HandleKill200Async(zoneSession, sender, cancellationToken);
                 return;
 
             case LocalChatGmCommandKind.Lab:
-                HandleLab(sender, command.Argument);
+                await HandleLabAsync(zoneSession, sender, command.Argument, cancellationToken);
                 return;
 
             case LocalChatGmCommandKind.ClearInventory:
                 logger.LogWarning(
                     "Character {CharacterId} ({Name}) invoked GM '?clear' -- inventory-wipe needs a durable stored-proc path and a persistence-authority decision; no effect (see workstream report)",
                     sender.CharacterId, sender.Name);
+                await AuditAsync(command.Kind, zoneSession, GmCommandCatalog.OutcomeRejected,
+                    "NotImplemented", cancellationToken);
                 return;
 
             default:
@@ -90,7 +109,8 @@ public sealed class LocalChatService(
         }
     }
 
-    private void HandleYgDrop(PlayerRuntimeState sender, string? argument)
+    private async ValueTask HandleYgDropAsync(IZoneSession zoneSession, PlayerRuntimeState sender, string? argument,
+        CancellationToken cancellationToken)
     {
         switch (argument)
         {
@@ -98,45 +118,62 @@ public sealed class LocalChatService(
                 yangGokDropEvent.Enable();
                 SendSystemChat(sender,
                     $"YangGok PvP drop event: ON {YangGokPvpDropEventState.EnabledDropRatePercent}%");
+                await AuditAsync(LocalChatGmCommandKind.YgDrop, zoneSession, GmCommandCatalog.OutcomeExecuted,
+                    "Argument=on", cancellationToken);
                 return;
 
             case "off":
                 yangGokDropEvent.Disable();
                 SendSystemChat(sender, "YangGok PvP drop event: OFF");
+                await AuditAsync(LocalChatGmCommandKind.YgDrop, zoneSession, GmCommandCatalog.OutcomeExecuted,
+                    "Argument=off", cancellationToken);
                 return;
 
             case "status":
                 SendSystemChat(sender, yangGokDropEvent.Enabled
                     ? $"YangGok PvP drop event: ON {yangGokDropEvent.DropRatePercent}%"
                     : "YangGok PvP drop event: OFF");
+                await AuditAsync(LocalChatGmCommandKind.YgDrop, zoneSession, GmCommandCatalog.OutcomeExecuted,
+                    "Argument=status", cancellationToken);
                 return;
 
             default:
                 SendSystemChat(sender, "Usage: ygdrop on|off|status");
+                await AuditAsync(LocalChatGmCommandKind.YgDrop, zoneSession, GmCommandCatalog.OutcomeRejected,
+                    $"Argument={argument}", cancellationToken);
                 return;
         }
     }
 
-    private void HandleLab(PlayerRuntimeState sender, string? argument)
+    private async ValueTask HandleLabAsync(IZoneSession zoneSession, PlayerRuntimeState sender, string? argument,
+        CancellationToken cancellationToken)
     {
         switch (argument)
         {
             case "on":
                 labyrinthGate.Enable();
                 SendSystemChat(sender, "Labyrinth R0-R12: ON");
+                await AuditAsync(LocalChatGmCommandKind.Lab, zoneSession, GmCommandCatalog.OutcomeExecuted,
+                    "Argument=on", cancellationToken);
                 return;
 
             case "off":
                 labyrinthGate.Disable();
                 SendSystemChat(sender, "Labyrinth R0-R12: OFF");
+                await AuditAsync(LocalChatGmCommandKind.Lab, zoneSession, GmCommandCatalog.OutcomeExecuted,
+                    "Argument=off", cancellationToken);
                 return;
 
             case "status":
                 SendSystemChat(sender, FormatLabStatus(labyrinthGate.Enabled));
+                await AuditAsync(LocalChatGmCommandKind.Lab, zoneSession, GmCommandCatalog.OutcomeExecuted,
+                    "Argument=status", cancellationToken);
                 return;
 
             default:
                 SendSystemChat(sender, "Usage: lab on|off|status");
+                await AuditAsync(LocalChatGmCommandKind.Lab, zoneSession, GmCommandCatalog.OutcomeRejected,
+                    $"Argument={argument}", cancellationToken);
                 return;
         }
     }
@@ -147,12 +184,15 @@ public sealed class LocalChatService(
         return $"Labyrinth R0-R12: ND={cellValue} RS={cellValue} GT={cellValue} NG={cellValue}";
     }
 
-    private void HandleBoss(Zone zone, PlayerRuntimeState sender, string? argument)
+    private async ValueTask HandleBossAsync(Zone zone, IZoneSession zoneSession, PlayerRuntimeState sender,
+        string? argument, CancellationToken cancellationToken)
     {
         if (!int.TryParse(argument, NumberStyles.Integer, CultureInfo.InvariantCulture, out var monsterId) ||
             monsterId < 1)
         {
             SendSystemChat(sender, "Usage: boss <monster id>");
+            await AuditAsync(LocalChatGmCommandKind.Boss, zoneSession, GmCommandCatalog.OutcomeRejected,
+                $"Argument={argument}", cancellationToken);
             return;
         }
 
@@ -163,14 +203,21 @@ public sealed class LocalChatService(
                 zone.MapId, sender.CharacterId, monsterId);
 
         worldNotice.Broadcast($"A boss (id {monsterId}) has been summoned.");
+
+        await AuditAsync(LocalChatGmCommandKind.Boss, zoneSession, GmCommandCatalog.OutcomeExecuted,
+            $"MonsterId={monsterId}", cancellationToken);
     }
 
-    private void HandleKill200(PlayerRuntimeState sender)
+    private async ValueTask HandleKill200Async(IZoneSession zoneSession, PlayerRuntimeState sender,
+        CancellationToken cancellationToken)
     {
         SendChatAs(sender, sender.Name, "kill200");
         logger.LogWarning(
             "Character {CharacterId} ({Name}) invoked GM 'kill200' -- the zone-200 battle-result reset is an unmodeled subsystem in Fenrir; only the self-echo was applied",
             sender.CharacterId, sender.Name);
+
+        await AuditAsync(LocalChatGmCommandKind.Kill200, zoneSession, GmCommandCatalog.OutcomeExecuted, null,
+            cancellationToken);
     }
 
     private static void SendSystemChat(PlayerRuntimeState recipient, string content)
@@ -186,5 +233,15 @@ public sealed class LocalChatService(
             Content = content,
             Link = EmptyLink
         });
+    }
+
+    private ValueTask AuditAsync(LocalChatGmCommandKind kind, IZoneSession zoneSession, byte outcome,
+        string? detail, CancellationToken cancellationToken)
+    {
+        var payload = detail is null ? $"Command={kind}" : $"Command={kind};{detail}";
+
+        return eventLog.LogAsync(LocalChatGmCommandAudit.EventCodeFor(kind), EventLogCategory.GmAction,
+            zoneSession.AccountId, zoneSession.CharacterId, null, null, null, null, null, null, null, outcome,
+            payload, cancellationToken);
     }
 }

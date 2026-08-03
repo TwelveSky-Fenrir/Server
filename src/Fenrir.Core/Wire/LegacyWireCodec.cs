@@ -29,6 +29,7 @@ public static class LegacyWireCodec
 
     public static void WriteFixedStringRows(Span<byte> destination, string[] values, int rowLength)
     {
+        destination.Clear();
         for (var i = 0; i < values.Length; i++)
             WriteFixedString(destination.Slice(i * rowLength, rowLength), values[i]);
     }
@@ -43,6 +44,7 @@ public static class LegacyWireCodec
 
     public static void WriteInt32Array(Span<byte> destination, int[] values)
     {
+        destination.Clear();
         for (var i = 0; i < values.Length; i++)
             BinaryPrimitives.WriteInt32LittleEndian(destination.Slice(i * 4, 4), values[i]);
     }
@@ -57,6 +59,7 @@ public static class LegacyWireCodec
 
     public static void WriteSingleArray(Span<byte> destination, float[] values)
     {
+        destination.Clear();
         for (var i = 0; i < values.Length; i++)
             BinaryPrimitives.WriteSingleLittleEndian(destination.Slice(i * 4, 4), values[i]);
     }
@@ -68,6 +71,7 @@ public static class LegacyWireCodec
 
     public static void WriteByteArray(Span<byte> destination, byte[] values)
     {
+        destination.Clear();
         values.AsSpan().CopyTo(destination);
     }
 }

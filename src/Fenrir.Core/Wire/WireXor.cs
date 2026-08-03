@@ -33,7 +33,7 @@ public static class WireXor
 
     public static void XorIntArray(Span<byte> buffer)
     {
-        if (buffer.Length == 0)
+        if (buffer.Length <= 2)
             return;
 
         buffer[0] ^= FirstKey;

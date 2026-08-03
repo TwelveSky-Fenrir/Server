@@ -36,7 +36,7 @@ public sealed class GetCashCatalogService(CommerceCatalogCache catalog, ILogger<
         {
             Result = 0,
             Version = version,
-            CashItemInfo = catalog.CashCatalog.DisplayGrid
+            CashItemInfo = catalog.CashCatalog.DisplayGrid.ToArray()
         };
     }
 }

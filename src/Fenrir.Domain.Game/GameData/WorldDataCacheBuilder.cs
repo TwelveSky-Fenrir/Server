@@ -337,7 +337,14 @@ public static class WorldDataCacheBuilder
 
     private static int GemSocketTypeValueKey(int type, int value02)
     {
-        return ((type & 0xFF) << 8) | (value02 & 0xFF);
+        if ((uint)type > byte.MaxValue || (uint)value02 > byte.MaxValue)
+            throw new InvalidOperationException(
+                $"world.GemSockets row has Type={type}, Value02={value02}, which does not fit the byte-packed " +
+                "lookup key (0-255 each). Type band 30-38 is validated as value-unconstrained, so a row landing " +
+                "here would silently collide with another entry instead of failing -- widen the key encoding if " +
+                "this band legitimately needs values outside 0-255.");
+
+        return (type << 8) | value02;
     }
 
     private static void ValidateMonsters(

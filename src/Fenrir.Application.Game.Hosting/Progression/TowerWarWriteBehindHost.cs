@@ -14,7 +14,10 @@ public sealed class TowerWarWriteBehindHost(TowerWarState towerWar, ITowerReposi
         try
         {
             while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
+            {
                 await towerWar.FlushDirtyAsync(towers, stoppingToken).ConfigureAwait(false);
+                await towerWar.ReconcileAsync(towers, stoppingToken).ConfigureAwait(false);
+            }
         }
         catch (OperationCanceledException)
         {

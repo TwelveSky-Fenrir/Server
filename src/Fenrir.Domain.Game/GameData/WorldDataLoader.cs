@@ -17,32 +17,66 @@ public sealed class WorldDataLoader(IWorldDataRepository repository, ILogger<Wor
 
         var stopwatch = Stopwatch.StartNew();
 
-        var (items, itemBonusSkills) = await repository.GetItemsAsync(ct);
-        var (skills, skillDescriptions, skillGrades) = await repository.GetSkillsAsync(ct);
-        var monsters = await repository.GetMonstersAsync(ct);
-        var (dropMoney, dropPotions, dropExtraItems, dropCategoryRates, dropQuestItems) =
-            await repository.GetMonsterDropsAsync(ct);
-        var npcs = await repository.GetNpcsAsync(ct);
-        var npcMenuOptions = await repository.GetNpcMenuOptionsAsync(ct);
-        var npcShopItems = await repository.GetNpcShopItemsAsync(ct);
-        var npcSkillOffers = await repository.GetNpcSkillOffersAsync(ct);
-        var npcSpeeches = await repository.GetNpcSpeechesAsync(ct);
-        var npcGambleCosts = await repository.GetNpcGambleCostsAsync(ct);
-        var quests = await repository.GetQuestsAsync(ct);
-        var questRewards = await repository.GetQuestRewardsAsync(ct);
-        var questSpeeches = await repository.GetQuestSpeechesAsync(ct);
-        var levels = await repository.GetLevelsAsync(ct);
-        var zones = await repository.GetZonesAsync(ct);
-        var zonePortals = await repository.GetZonePortalsAsync(ct);
-        var zoneSpawnPoints = await repository.GetZoneSpawnPointsAsync(ct);
-        var zoneNpcSpawns = await repository.GetZoneNpcSpawnsAsync(ct);
-        var monsterSpawnRegions = await repository.GetMonsterSpawnRegionsAsync(ct);
-        var gemSockets = await repository.GetGemSocketsAsync(ct);
-        var bloodExchangeCatalog = await repository.GetBloodExchangeCatalogAsync(ct);
-        var eventDefinitions = await repository.GetEventDefinitionsAsync(ct);
-        var itemMallProducts = await repository.GetItemMallProductsAsync(ct);
-        var rewardBundles = await repository.GetRewardBundlesAsync(ct);
-        var rewardBundleItems = await repository.GetRewardBundleItemsAsync(ct);
+        var itemsTask = repository.GetItemsAsync(ct);
+        var skillsTask = repository.GetSkillsAsync(ct);
+        var monstersTask = repository.GetMonstersAsync(ct);
+        var monsterDropsTask = repository.GetMonsterDropsAsync(ct);
+        var npcsTask = repository.GetNpcsAsync(ct);
+        var npcMenuOptionsTask = repository.GetNpcMenuOptionsAsync(ct);
+        var npcShopItemsTask = repository.GetNpcShopItemsAsync(ct);
+        var npcSkillOffersTask = repository.GetNpcSkillOffersAsync(ct);
+        var npcSpeechesTask = repository.GetNpcSpeechesAsync(ct);
+        var npcGambleCostsTask = repository.GetNpcGambleCostsAsync(ct);
+        var questsTask = repository.GetQuestsAsync(ct);
+        var questRewardsTask = repository.GetQuestRewardsAsync(ct);
+        var questSpeechesTask = repository.GetQuestSpeechesAsync(ct);
+        var levelsTask = repository.GetLevelsAsync(ct);
+        var zonesTask = repository.GetZonesAsync(ct);
+        var zonePortalsTask = repository.GetZonePortalsAsync(ct);
+        var zoneSpawnPointsTask = repository.GetZoneSpawnPointsAsync(ct);
+        var zoneNpcSpawnsTask = repository.GetZoneNpcSpawnsAsync(ct);
+        var monsterSpawnRegionsTask = repository.GetMonsterSpawnRegionsAsync(ct);
+        var gemSocketsTask = repository.GetGemSocketsAsync(ct);
+        var bloodExchangeCatalogTask = repository.GetBloodExchangeCatalogAsync(ct);
+        var eventDefinitionsTask = repository.GetEventDefinitionsAsync(ct);
+        var itemMallProductsTask = repository.GetItemMallProductsAsync(ct);
+        var rewardBundlesTask = repository.GetRewardBundlesAsync(ct);
+        var rewardBundleItemsTask = repository.GetRewardBundleItemsAsync(ct);
+
+        await Task.WhenAll(
+            itemsTask.AsTask(), skillsTask.AsTask(), monstersTask.AsTask(), monsterDropsTask.AsTask(),
+            npcsTask.AsTask(), npcMenuOptionsTask.AsTask(), npcShopItemsTask.AsTask(), npcSkillOffersTask.AsTask(),
+            npcSpeechesTask.AsTask(), npcGambleCostsTask.AsTask(), questsTask.AsTask(), questRewardsTask.AsTask(),
+            questSpeechesTask.AsTask(), levelsTask.AsTask(), zonesTask.AsTask(), zonePortalsTask.AsTask(),
+            zoneSpawnPointsTask.AsTask(), zoneNpcSpawnsTask.AsTask(), monsterSpawnRegionsTask.AsTask(),
+            gemSocketsTask.AsTask(), bloodExchangeCatalogTask.AsTask(), eventDefinitionsTask.AsTask(),
+            itemMallProductsTask.AsTask(), rewardBundlesTask.AsTask(), rewardBundleItemsTask.AsTask());
+
+        var (items, itemBonusSkills) = itemsTask.Result;
+        var (skills, skillDescriptions, skillGrades) = skillsTask.Result;
+        var monsters = monstersTask.Result;
+        var (dropMoney, dropPotions, dropExtraItems, dropCategoryRates, dropQuestItems) = monsterDropsTask.Result;
+        var npcs = npcsTask.Result;
+        var npcMenuOptions = npcMenuOptionsTask.Result;
+        var npcShopItems = npcShopItemsTask.Result;
+        var npcSkillOffers = npcSkillOffersTask.Result;
+        var npcSpeeches = npcSpeechesTask.Result;
+        var npcGambleCosts = npcGambleCostsTask.Result;
+        var quests = questsTask.Result;
+        var questRewards = questRewardsTask.Result;
+        var questSpeeches = questSpeechesTask.Result;
+        var levels = levelsTask.Result;
+        var zones = zonesTask.Result;
+        var zonePortals = zonePortalsTask.Result;
+        var zoneSpawnPoints = zoneSpawnPointsTask.Result;
+        var zoneNpcSpawns = zoneNpcSpawnsTask.Result;
+        var monsterSpawnRegions = monsterSpawnRegionsTask.Result;
+        var gemSockets = gemSocketsTask.Result;
+        var bloodExchangeCatalog = bloodExchangeCatalogTask.Result;
+        var eventDefinitions = eventDefinitionsTask.Result;
+        var itemMallProducts = itemMallProductsTask.Result;
+        var rewardBundles = rewardBundlesTask.Result;
+        var rewardBundleItems = rewardBundleItemsTask.Result;
 
         var rows = new WorldDataRows
         {

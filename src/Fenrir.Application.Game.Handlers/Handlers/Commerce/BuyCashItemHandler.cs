@@ -32,8 +32,9 @@ public sealed class BuyCashItemHandler(IBuyCashItemService service, ILogger<BuyC
             if (result is null)
             {
                 logger.LogWarning(
-                    "Buy cash item rejected: character {CharacterId} request failed structural validation",
+                    "Buy cash item rejected: character {CharacterId} request failed structural validation -- disconnecting",
                     characterId);
+                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             }
 

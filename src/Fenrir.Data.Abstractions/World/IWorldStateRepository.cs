@@ -14,10 +14,10 @@ public interface IWorldStateRepository
         byte? monsterSymbol, int? monsterSymbolEndTime, byte? highTribe, short updateTribePoint, CancellationToken ct);
 
     public ValueTask UpdateTribeAsync(byte tribeId, DateTime? symbolDateUtc, bool hasSymbol, int points, bool isClosed,
-        CancellationToken ct);
+        byte symbolOwnerTribeId, CancellationToken ct);
 
     public ValueTask UpdateTribeSymbolStateAsync(byte tribeId, DateTime? symbolDateUtc, bool hasSymbol, bool isClosed,
-        CancellationToken ct);
+        byte symbolOwnerTribeId, CancellationToken ct);
 
     public ValueTask AddTribePointsAsync(byte tribeId, int delta, CancellationToken ct);
 

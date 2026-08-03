@@ -9,6 +9,8 @@ public sealed class SessionRateLimiter : ISessionRateLimiter
     private readonly ConcurrentDictionary<long, ConcurrentDictionary<(FenrirServer Server, byte Opcode), TokenBucket>>
         _buckets = new();
 
+    private readonly ConcurrentDictionary<long, TokenBucket> _gmCommandBuckets = new();
+
     public bool TryConsume(long sessionId, FenrirServer server, byte opcode)
     {
         var sessionBuckets = _buckets.GetOrAdd(sessionId,
@@ -23,8 +25,17 @@ public sealed class SessionRateLimiter : ISessionRateLimiter
         return bucket.TryConsume();
     }
 
+    public bool TryConsumeGmCommand(long sessionId)
+    {
+        var bucket = _gmCommandBuckets.GetOrAdd(sessionId, static _ => new TokenBucket(
+            OpcodeRateLimiterPolicy.GmCommand.Capacity, OpcodeRateLimiterPolicy.GmCommand.TokensPerSecond));
+
+        return bucket.TryConsume();
+    }
+
     public void Remove(long sessionId)
     {
         _buckets.TryRemove(sessionId, out _);
+        _gmCommandBuckets.TryRemove(sessionId, out _);
     }
 }

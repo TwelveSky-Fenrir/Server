@@ -332,6 +332,14 @@ public sealed class GenericActionService(
         var sourceIsStackable = worldData.ItemsById.TryGetValue(sourceItem.ItemId, out var sourceDefinition) &&
                                 ContainerMatrix.IsStackableSort(sourceDefinition.Item.Sort);
 
+        if (move.XPost2 is < 0 or > 7 || move.YPost2 is < 0 or > 7)
+        {
+            logger.LogInformation(
+                "Character {CharacterId} container-move aborted: invalid destination grid position ({XPost2},{YPost2})",
+                characterId, move.XPost2, move.YPost2);
+            return GenericActionResult.Aborted;
+        }
+
         var requestedQuantity = touchesEquipment ? 0 : move.Quantity1;
 
         var resolved = ContainerMatrix.ResolveMove(fromContainer, move.Index1, requestedQuantity, toContainer,

@@ -46,6 +46,7 @@ public static class CraftRecipeCatalog
     public const int WingFeatherWhiteItemId = 695;
     public const int WingFeatherBlackItemId = 696;
     public const int WingFeatherGoldItemId = 698;
+    public const int WingFeatherBlessingItemId = 2397;
 
 
     public const int WingAssemblySort = 40;
@@ -53,9 +54,7 @@ public static class CraftRecipeCatalog
     public const int WingAssemblyContributionPointCost = 50;
 
 
-    public const int FeatherTierUpWhiteToBlackSort = 41;
-    public const int FeatherTierUpBlackToGoldSort = 43;
-    public const int FeatherTierUpRequiredQuantity = 10;
+    public const int FeatherTierUpSort = 41;
 
 
     public const int WingTierRerollSort = 42;
@@ -63,9 +62,15 @@ public static class CraftRecipeCatalog
     public const int WingTierRerollFailureDustQuantity = 3;
 
 
+    public const int WingFourthTierSort = 44;
     public const int WingFifthTierSort = 45;
 
     public const int WingSixthTierUnvalidatedSort = 46;
+
+    public const int WingFourthMaterialItemId = 1407;
+    public const int WingFourthCatalystItemId = 92289;
+    public const int WingFourthResultItemId = 1401;
+    public const int WingFourthFailureDustQuantity = 3;
 
     public const int WingFifthMaterialItemId = 1401;
     public const int WingFifthCatalystItemId = 92290;

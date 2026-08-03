@@ -59,6 +59,8 @@ public partial class PlayerRuntimeState
 
     public float DefenseHackPreviousPosZ { get; set; }
 
+    public int ImplausibleMoveStreak { get; set; }
+
     public void ResetVolatileAntiCheatCountersOnEntry(TimeSpan zoneClockNow)
     {
         DarkAttackUseTick = 0;
@@ -84,6 +86,7 @@ public partial class PlayerRuntimeState
         DefenseHackPreviousPosX = 0f;
         DefenseHackPreviousPosY = 0f;
         DefenseHackPreviousPosZ = 0f;
+        ImplausibleMoveStreak = 0;
 
         CpExchangeTick = zoneClockNow;
         CpRfcTick = zoneClockNow;

@@ -724,6 +724,12 @@ public sealed partial class Zone
             targetCategoryEligible,
             zone195NokSanState?.GetMonsterDamageBonus(attackerSnapshot.Tribe) ?? 0);
 
+        var attackReachedMonster = !outcome.Rejected || outcome.RejectReason is
+            AttackRejectReason.AntiCheatEchoMismatch or AttackRejectReason.InvalidAttackModeSelector
+            or AttackRejectReason.AttackerHasNoAttackSuccess;
+        if (attackReachedMonster)
+            monster.RegisterAcquisition(attackerState.CharacterId, attackerState);
+
         if (outcome.ChargeConsumed)
             ConsumeChargeBuff(attackerState);
 

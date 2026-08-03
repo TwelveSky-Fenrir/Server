@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using Fenrir.Application.Game.Abstractions.Tribes;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Inventory;
@@ -7,6 +8,7 @@ using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.WorldState;
+using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Domain.Game.GameData;
 using Fenrir.Domain.Game.Stats;
@@ -22,7 +24,8 @@ public sealed class TribeActionService(
     ICharacterRepository characters,
     WorldDataCache worldData,
     WorldStateService worldState,
-    ILogger<TribeActionService> logger) : ITribeActionService
+    ILogger<TribeActionService> logger,
+    ZoneCenterBroadcastIngestor? siegeIngestor = null) : ITribeActionService
 {
     private const int TribeWeaponMoneyCost = 100_000_000;
     private const int TowerScrollMoneyCost = 500_000_000;
@@ -213,7 +216,18 @@ public sealed class TribeActionService(
             return TribeActionOutcome.Abort;
 
         var formationCode = (byte)payload.TribeSkillSort;
-        worldState.SetTribeFormationAbility(state.Tribe, formationCode);
+
+        if (siegeIngestor is not null)
+        {
+            Span<byte> eventPayload = stackalloc byte[ZoneCenterBroadcastIngestor.PayloadSize];
+            BinaryPrimitives.WriteInt32LittleEndian(eventPayload[..4], state.Tribe);
+            BinaryPrimitives.WriteInt32LittleEndian(eventPayload[4..8], formationCode);
+            siegeIngestor.Ingest(ZoneCenterBroadcastIngestor.TribeMasterCallAbilityEventCode, eventPayload);
+        }
+        else
+        {
+            worldState.SetTribeFormationAbility(state.Tribe, formationCode);
+        }
 
         logger.LogInformation(
             "Character {CharacterId} (tribe {Tribe}) declared Formation ability code {FormationCode}",

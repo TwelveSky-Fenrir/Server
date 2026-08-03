@@ -20,7 +20,8 @@ public sealed partial record WorldStateTribeDto(
     DateTime? SymbolDateUtc,
     bool HasSymbol,
     int Points,
-    bool IsClosed);
+    bool IsClosed,
+    byte SymbolOwnerTribeId);
 
 [GenerateDto]
 public sealed partial record WorldStateAllianceOfferDto(

@@ -436,6 +436,10 @@ StoredProcedures/game/usp_GiftLog_GetByAccount.sql
 StoredProcedures/game/usp_HeroRanking_Upsert.sql
 StoredProcedures/game/usp_HeroRanking_GetByPeriod.sql
 StoredProcedures/game/usp_HeroRanking_Rollover.sql
+# Cross-shard-shared-state audit fix: locks every PeriodKind=0 row (UPDLOCK, HOLDLOCK) before the
+# snapshot-then-delete below, so a concurrent usp_HeroRanking_AddPoints for the same row blocks instead of
+# racing the gap between the CTE snapshot read and the unconditional DELETE -- see the procedure's own header.
+StoredProcedures/game/usp_HeroRanking_Rollover_SnapshotDeleteLockGuard.sql
 StoredProcedures/game/usp_HeroRanking_AddPoints.sql
 StoredProcedures/game/usp_HeroRanking_GetPoints.sql
 # Transaction-composition audit (2026-07-12): atomically bundles the RewardClaimed flag with the
@@ -1169,3 +1173,11 @@ Migrations/047_kill_timer_columns.sql
 # amorcer PlayerRuntimeState.FlushSequence via GREATEST() des trois colonnes. Supprime en parallele la
 # logique claim/defer devenue inutile dans PositionWriteBehindHost.cs/ProgressWriteBehindHost.cs.
 Migrations/048_position_progress_flushsequence_split.sql
+
+# Concurrency/legacy-parity audit fix: game.WorldStateTribes never persisted which tribe actually holds a
+# given symbol slot (only a per-slot HasSymbol boolean), so a captured slot reset to identity on every
+# GameServer restart (WorldStateService._tribeSymbolOwner was hard-reset in InitializeAsync, never loaded
+# from the DB row). Adds SymbolOwnerTribeId, backfills it to identity for the pre-existing singleton rows,
+# and redefines usp_WorldState_EnsureInitialized/usp_WorldState_Get/usp_WorldStateTribe_Update/
+# usp_WorldStateTribe_UpdateSymbolState via CREATE OR ALTER (none of the four base scripts are edited).
+Migrations/049_worldstatetribes_symbol_owner_writeback.sql

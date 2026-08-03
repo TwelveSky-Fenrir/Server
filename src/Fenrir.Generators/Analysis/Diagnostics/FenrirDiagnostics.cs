@@ -205,4 +205,24 @@ internal static class FenrirDiagnostics
         Category,
         DiagnosticSeverity.Error,
         true);
+
+    public static readonly DiagnosticDescriptor NestedWireTypeCycle = new(
+        "FEN017",
+        "Nested wire type cycle",
+        "Field '{1}.{2}' nests '{0}', whose field graph cycles back to a type already being resolved; the " +
+        "cycle is broken to avoid an infinite loop, but its size cannot be computed and would silently be 0",
+        Category,
+        DiagnosticSeverity.Error,
+        true);
+
+    public static readonly DiagnosticDescriptor PositionalRecordStructUnsupported = new(
+        "FEN018",
+        "Positional record struct syntax is unsupported",
+        "Type '{0}' carrying [FenrirPacket]/[FenrirWireType] uses positional record struct syntax (a primary " +
+        "constructor parameter list); FieldScanner only reads property/field declarations in the struct body, " +
+        "so every positional parameter would silently be excluded from the wire layout. Declare its fields as " +
+        "ordinary properties instead.",
+        Category,
+        DiagnosticSeverity.Error,
+        true);
 }

@@ -59,7 +59,7 @@ public static class CashCatalogBuilder
             }
         }
 
-        return new CashCatalog { CostInfoByIndex = [.. costInfo], DisplayGrid = grid };
+        return new CashCatalog { CostInfoByIndex = [.. costInfo], DisplayGrid = [.. grid] };
     }
 
     public static int ResolveVersion(IEnumerable<ItemMallProductRowDto> products)
@@ -98,6 +98,6 @@ public static class CashCatalogBuilder
     {
         public required ImmutableArray<CostInfoEntry> CostInfoByIndex { get; init; }
 
-        public required int[] DisplayGrid { get; init; }
+        public required ImmutableArray<int> DisplayGrid { get; init; }
     }
 }

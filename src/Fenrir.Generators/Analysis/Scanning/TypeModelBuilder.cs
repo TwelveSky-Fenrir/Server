@@ -138,11 +138,20 @@ internal static class TypeModelBuilder
         var isPartial = context.TargetNode is TypeDeclarationSyntax typeDeclaration &&
                         typeDeclaration.Modifiers.Any(SyntaxKind.PartialKeyword);
 
-        if (typeSymbol is { TypeKind: TypeKind.Struct, IsRecord: true, IsReadOnly: true } && isPartial)
-            return true;
+        if (typeSymbol is not { TypeKind: TypeKind.Struct, IsRecord: true, IsReadOnly: true } || !isPartial)
+        {
+            diagnostics.Add(DiagnosticInfo.Create(FenrirDiagnostics.NotReadonlyPartialRecordStruct,
+                typeSymbol.Locations.FirstOrDefault(), typeSymbol.Name));
+            return false;
+        }
 
-        diagnostics.Add(DiagnosticInfo.Create(FenrirDiagnostics.NotReadonlyPartialRecordStruct,
-            typeSymbol.Locations.FirstOrDefault(), typeSymbol.Name));
-        return false;
+        if (context.TargetNode is RecordDeclarationSyntax { ParameterList.Parameters.Count: > 0 })
+        {
+            diagnostics.Add(DiagnosticInfo.Create(FenrirDiagnostics.PositionalRecordStructUnsupported,
+                typeSymbol.Locations.FirstOrDefault(), typeSymbol.Name));
+            return false;
+        }
+
+        return true;
     }
 }

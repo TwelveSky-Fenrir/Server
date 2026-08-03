@@ -52,6 +52,8 @@ public sealed partial class Zone
 
     private const int RegularWarAfkResetSortCode = 2;
 
+    private const int ImplausibleMoveDisconnectThreshold = 5;
+
     private const string RegularWarAfkCheckerSenderName = "AFK Checker";
 
     private static readonly TimeSpan HolyShieldReapplyCooldown = TimeSpan.FromSeconds(10);
@@ -869,14 +871,33 @@ public sealed partial class Zone
         var now = DateTime.UtcNow;
 
         if (!isResumeAction && !movementRules.IsPlausible(state, in action, Geometry))
+        {
+            state.ImplausibleMoveStreak++;
+
             logger.LogWarning(
-                "Zone {MapId}: character {CharacterId} claimed an implausible position, accepting unconditionally " +
-                "-- Sort={Sort} Type={Type} From=({FromX},{FromY},{FromZ}) To=({ToX},{ToY},{ToZ}) " +
-                "GeometryLoaded={GeometryLoaded}",
-                MapId, characterId, action.Sort, action.Type,
+                "Zone {MapId}: character {CharacterId} claimed an implausible position, REJECTED " +
+                "(consecutive={Streak}) -- Sort={Sort} Type={Type} From=({FromX},{FromY},{FromZ}) " +
+                "To=({ToX},{ToY},{ToZ}) GeometryLoaded={GeometryLoaded}",
+                MapId, characterId, state.ImplausibleMoveStreak, action.Sort, action.Type,
                 state.PosX, state.PosY, state.PosZ,
                 action.Location[0], action.Location[1], action.Location[2],
                 Geometry is not null);
+
+            if (state.ImplausibleMoveStreak >= ImplausibleMoveDisconnectThreshold)
+            {
+                logger.LogWarning(
+                    "Zone {MapId}: character {CharacterId} DISCONNECTED (StateViolation) -- {Streak} consecutive " +
+                    "implausible-position claims",
+                    MapId, characterId, state.ImplausibleMoveStreak);
+                if (state.Session is { } offender)
+                    offender.Abort(DisconnectReason.StateViolation);
+            }
+
+            return;
+        }
+
+        if (!isResumeAction)
+            state.ImplausibleMoveStreak = 0;
 
         logger.LogDebug(
             "Zone {MapId}: move ACCEPTED for character {CharacterId} -- Sort={Sort} Type={Type} Frame={Frame} " +

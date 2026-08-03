@@ -6,9 +6,10 @@ using Fenrir.Protocol.Game;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Chat;
 
-public sealed class LocalChatHandler(ILocalChatService localChatService) : IInlinePacketHandler<LocalChatRequest>
+public sealed class LocalChatHandler(ILocalChatService localChatService) : IAsyncPacketHandler<LocalChatRequest>
 {
-    public void Handle(in LocalChatRequest packet, IPacketSession session)
+    public async ValueTask HandleAsync(LocalChatRequest packet, IPacketSession session,
+        CancellationToken cancellationToken)
     {
         var zoneSession = (IZoneSession)session;
 
@@ -26,6 +27,7 @@ public sealed class LocalChatHandler(ILocalChatService localChatService) : IInli
         if (!zone.TryGetPlayer(characterId, out var state) || state is null)
             return;
 
-        localChatService.TryPostChat(zone, zoneSession, state, packet.Content, packet.Link);
+        await localChatService.TryPostChatAsync(zone, zoneSession, state, packet.Content, packet.Link,
+            cancellationToken);
     }
 }

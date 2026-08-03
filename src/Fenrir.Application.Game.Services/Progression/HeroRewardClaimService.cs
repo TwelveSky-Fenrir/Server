@@ -1,8 +1,10 @@
+using CaeriusNet.Exceptions;
 using Fenrir.Application.Game.Abstractions.Progression;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Protocol.Game;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Progression;
@@ -11,6 +13,8 @@ public sealed class HeroRewardClaimService(IHeroRankingRepository heroRankings, 
     : IHeroRewardClaimService
 {
     private const int ContributionPointStatSort = 3;
+    private const int AlreadyClaimedOrNotRankedErrorNumber = 50357;
+    private const int UnknownCharacterErrorNumber = 50358;
 
     public async ValueTask<HeroRewardClaimResult> ClaimAsync(int characterId, Zone zone, PlayerRuntimeState state,
         CancellationToken cancellationToken)
@@ -26,7 +30,26 @@ public sealed class HeroRewardClaimService(IHeroRankingRepository heroRankings, 
         var points = HeroRewardResolver.PointsByRank[resolved.Rank];
         var newContributionPoints = Math.Max(0, state.ContributionPoints + points);
 
-        await heroRankings.ClaimRewardAsync(characterId, 1, points, cancellationToken);
+        try
+        {
+            await heroRankings.ClaimRewardAsync(characterId, 1, points, cancellationToken);
+        }
+        catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException
+                 { Number: AlreadyClaimedOrNotRankedErrorNumber })
+        {
+            logger.LogInformation(
+                "Character {CharacterId} hero-reward claim lost a cross-shard race: usp_HeroRanking_ClaimReward's guarded UPDATE found the reward already claimed",
+                characterId);
+            return new HeroRewardClaimResult(HeroRewardClaimOutcome.AlreadyClaimed);
+        }
+        catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException
+                 { Number: UnknownCharacterErrorNumber })
+        {
+            logger.LogWarning(ex,
+                "Character {CharacterId} hero-reward claim failed: usp_HeroRanking_ClaimReward found no matching character row for the contribution-points grant",
+                characterId);
+            return new HeroRewardClaimResult(HeroRewardClaimOutcome.NotRanked);
+        }
 
         if (!await zone.PostTribeProgressCommandAndWaitAsync(
                 new TribeProgressZoneCommand(characterId, newContributionPoints), cancellationToken))

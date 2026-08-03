@@ -493,13 +493,15 @@ public sealed class CraftItemService(
     public async ValueTask<CraftFamilyResult> ResolveFeatherTierUpAsync(CraftItemRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, int accountId, CancellationToken cancellationToken)
     {
-        if (!IsValidInventorySlot(packet.Page1, packet.Index1))
+        if (!IsValidInventorySlot(packet.Page1, packet.Index1) || !IsValidInventorySlot(packet.Page2, packet.Index2) ||
+            !IsValidInventorySlot(packet.Page3, packet.Index3) || !IsValidInventorySlot(packet.Page4, packet.Index4))
         {
-            logger.LogDebug("Character {CharacterId} craft (feather-tier-up) rejected: invalid slot", characterId);
+            logger.LogDebug("Character {CharacterId} craft (feather-tier-up) rejected: invalid slot(s)",
+                characterId);
             return RejectedFamilyResult;
         }
 
-        if (!ArePagesAccessible(state, packet.Page1))
+        if (!ArePagesAccessible(state, packet.Page1, packet.Page2, packet.Page3, packet.Page4))
         {
             logger.LogDebug(
                 "Character {CharacterId} craft (feather-tier-up) rejected: rented inventory page expired (InventoryDate {InventoryDate})",
@@ -507,82 +509,47 @@ public sealed class CraftItemService(
             return RejectedFamilyResult;
         }
 
-        if (state.Inventory.GetSlot((byte)packet.Page1, (byte)packet.Index1) is not { } material)
+        if (state.Inventory.GetSlot((byte)packet.Page1, (byte)packet.Index1) is not { } material1 ||
+            state.Inventory.GetSlot((byte)packet.Page2, (byte)packet.Index2) is not { } material2 ||
+            state.Inventory.GetSlot((byte)packet.Page3, (byte)packet.Index3) is not { } material3 ||
+            state.Inventory.GetSlot((byte)packet.Page4, (byte)packet.Index4) is not { } material4)
         {
-            logger.LogDebug("Character {CharacterId} craft (feather-tier-up) rejected: material slot empty",
+            logger.LogDebug("Character {CharacterId} craft (feather-tier-up) rejected: material slot(s) empty",
                 characterId);
             return RejectedFamilyResult;
         }
 
-        var resolved = CraftResolver.ResolveFeatherTierUp(packet.Sort, material.ItemId, material.Quantity);
+        var resolved = CraftResolver.ResolveFeatherTierUp(material1.ItemId, material1.Quantity, material2.ItemId,
+            material2.Quantity, material3.ItemId, material3.Quantity, material4.ItemId, material4.Quantity,
+            SystemRandomSource.Instance);
         if (!resolved.Succeeded)
         {
             logger.LogInformation(
-                "Character {CharacterId} craft (feather-tier-up) rejected by resolver (material {MaterialItemId} x{Quantity})",
-                characterId, material.ItemId, material.Quantity);
+                "Character {CharacterId} craft (feather-tier-up) rejected by resolver (materials {M1}/{M2}/{M3}/{M4})",
+                characterId, material1.ItemId, material2.ItemId, material3.ItemId, material4.ItemId);
             return RejectedFamilyResult;
         }
 
+        var resultStack = material1 with
+        {
+            ItemId = resolved.ResultItemId, Quantity = 0, Enchant = 0, Combine = 0, Refine = 0, Socket = 0
+        };
+
         var working = new Dictionary<byte, ImmutableDictionary<byte, ItemStack>>();
         EnsureContainer(working, state, (byte)packet.Page1);
+        EnsureContainer(working, state, (byte)packet.Page2);
+        EnsureContainer(working, state, (byte)packet.Page3);
+        EnsureContainer(working, state, (byte)packet.Page4);
 
-        ItemStack? grantedItem = null;
-        byte grantedPage = 0;
-        byte grantedIndex = 0;
-        int resultItemId;
-        int resultQuantity;
-        int serial;
-
-        if (material.Quantity == CraftRecipeCatalog.FeatherTierUpRequiredQuantity)
-        {
-            var resultStack = material with
-            {
-                ItemId = resolved.ResultItemId, Quantity = 0, Enchant = 0, Combine = 0, Refine = 0, Socket = 0
-            };
-            working[(byte)packet.Page1] = working[(byte)packet.Page1].SetItem((byte)packet.Index1, resultStack);
-            resultItemId = resultStack.ItemId;
-            resultQuantity = 0;
-            serial = resultStack.Serial;
-        }
-        else
-        {
-            if (!TryFindEmptySlot(state, out grantedPage, out grantedIndex))
-            {
-                logger.LogInformation(
-                    "Character {CharacterId} craft (feather-tier-up) rejected: no free inventory slot for granted item",
-                    characterId);
-                return RejectedFamilyResult;
-            }
-
-            var remainingMaterial = material with
-            {
-                Quantity = material.Quantity - CraftRecipeCatalog.FeatherTierUpRequiredQuantity
-            };
-            working[(byte)packet.Page1] = working[(byte)packet.Page1].SetItem((byte)packet.Index1, remainingMaterial);
-
-            var newStack = new ItemStack(resolved.ResultItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-                unchecked((int)DateTime.UtcNow.Ticks));
-            grantedItem = newStack;
-
-            if (grantedPage == packet.Page1)
-            {
-                working[(byte)packet.Page1] = working[(byte)packet.Page1].SetItem(grantedIndex, newStack);
-            }
-            else
-            {
-                EnsureContainer(working, state, grantedPage);
-                working[grantedPage] = working[grantedPage].SetItem(grantedIndex, newStack);
-            }
-
-            resultItemId = remainingMaterial.ItemId;
-            resultQuantity = remainingMaterial.Quantity;
-            serial = remainingMaterial.Serial;
-        }
+        working[(byte)packet.Page1] = working[(byte)packet.Page1].SetItem((byte)packet.Index1, resultStack);
+        working[(byte)packet.Page2] = working[(byte)packet.Page2].Remove((byte)packet.Index2);
+        working[(byte)packet.Page3] = working[(byte)packet.Page3].Remove((byte)packet.Index3);
+        working[(byte)packet.Page4] = working[(byte)packet.Page4].Remove((byte)packet.Index4);
 
         await PersistContainersAsync(characterId, working, cancellationToken);
 
         await eventLog.LogAsync(FeatherTierUpEventCode, EventLogCategory.ItemCreate, accountId, characterId,
-            null, null, null, null, null, resolved.ResultItemId, 1, 1, null, cancellationToken);
+            null, null, null, null, null, resultStack.ItemId, 1, 1, null, cancellationToken);
 
         if (!await zone.PostInventoryCommandAndWaitAsync(
                 new InventoryZoneCommand(characterId, SnapshotContainers(working), null), cancellationToken))
@@ -591,14 +558,14 @@ public sealed class CraftItemService(
                 zone.MapId, characterId);
 
         logger.LogInformation(
-            "Character {CharacterId} craft (feather-tier-up) applied: remaining {ResultItemId} x{ResultQuantity}, granted {GrantedItemId}",
-            characterId, resultItemId, resultQuantity, grantedItem?.ItemId);
+            "Character {CharacterId} craft (feather-tier-up) applied: result item {ResultItemId}",
+            characterId, resultStack.ItemId);
 
-        CenterRelayNoticeLog.LogNotableCraft(logger, worldData, state.Tribe, state.Name,
-            grantedItem?.ItemId ?? resultItemId, "feather-tier-up");
+        CenterRelayNoticeLog.LogNotableCraft(logger, worldData, state.Tribe, state.Name, resultStack.ItemId,
+            "feather-tier-up");
 
-        return new CraftFamilyResult(CraftFamilyOutcome.Applied, resultItemId, resultQuantity, serial, grantedItem,
-            grantedPage, grantedIndex);
+        return new CraftFamilyResult(CraftFamilyOutcome.Applied, resultStack.ItemId, 0, resultStack.Serial, null, 0,
+            0);
     }
 
     public async ValueTask<CraftFamilyResult> ResolveWingTierRerollAsync(CraftItemRequest packet, Zone zone,
@@ -726,7 +693,7 @@ public sealed class CraftItemService(
         }
 
         var quantity = resolved.Outcome == CraftResolver.WingFifthTierOutcome.DustConsolation
-            ? CraftRecipeCatalog.WingFifthFailureDustQuantity
+            ? CraftResolver.WingTierFailureDustQuantity(packet.Sort)
             : 0;
         var resultStack = material1 with
         {

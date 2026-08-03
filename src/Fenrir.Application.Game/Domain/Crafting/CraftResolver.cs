@@ -192,16 +192,25 @@ public static class CraftResolver
             CraftRecipeCatalog.WingTierItemId(tier, previousTribe));
     }
 
-    public static FeatherTierUpResult ResolveFeatherTierUp(int sort, int materialItemId, int materialQuantity)
+    public static FeatherTierUpResult ResolveFeatherTierUp(int material1ItemId, int material1Quantity,
+        int material2ItemId, int material2Quantity, int material3ItemId, int material3Quantity,
+        int material4ItemId, int material4Quantity, IRandomSource random)
     {
-        var (checkItemId, gainItemId) = sort == CraftRecipeCatalog.FeatherTierUpBlackToGoldSort
-            ? (CraftRecipeCatalog.WingFeatherBlackItemId, CraftRecipeCatalog.WingFeatherGoldItemId)
-            : (CraftRecipeCatalog.WingFeatherWhiteItemId, CraftRecipeCatalog.WingFeatherBlackItemId);
-
-        if (materialItemId != checkItemId || materialQuantity < CraftRecipeCatalog.FeatherTierUpRequiredQuantity)
+        if (material1ItemId != CraftRecipeCatalog.WingFeatherWhiteItemId || material1Quantity < 1 ||
+            material2ItemId != CraftRecipeCatalog.WingFeatherWhiteItemId || material2Quantity < 1 ||
+            material3ItemId != CraftRecipeCatalog.WingFeatherWhiteItemId || material3Quantity < 1 ||
+            material4ItemId != CraftRecipeCatalog.WingFeatherWhiteItemId || material4Quantity < 1)
             return new FeatherTierUpResult(FeatherTierUpOutcome.Rejected, 0);
 
-        return new FeatherTierUpResult(FeatherTierUpOutcome.Success, gainItemId);
+        var roll = random.NextInt32(100);
+        var resultItemId = roll switch
+        {
+            < 60 => CraftRecipeCatalog.WingFeatherBlackItemId,
+            < 90 => CraftRecipeCatalog.WingFeatherGoldItemId,
+            _ => CraftRecipeCatalog.WingFeatherBlessingItemId
+        };
+
+        return new FeatherTierUpResult(FeatherTierUpOutcome.Success, resultItemId);
     }
 
     public static WingTierRerollResult ResolveWingTierReroll(int material1ItemId, int material2ItemId,
@@ -231,25 +240,43 @@ public static class CraftResolver
     public static WingFifthTierResult ResolveWingFifthTier(int sort, int material1ItemId, int material2ItemId,
         int material3ItemId, int catalystItemId, IRandomSource random)
     {
-        if (sort != CraftRecipeCatalog.WingFifthTierSort)
+        if (sort != CraftRecipeCatalog.WingFourthTierSort && sort != CraftRecipeCatalog.WingFifthTierSort)
             return new WingFifthTierResult(WingFifthTierOutcome.Rejected, 0);
 
-        if (material1ItemId != CraftRecipeCatalog.WingFifthMaterialItemId ||
-            material2ItemId != CraftRecipeCatalog.WingFifthMaterialItemId ||
-            material3ItemId != CraftRecipeCatalog.WingFifthMaterialItemId ||
-            catalystItemId != CraftRecipeCatalog.WingFifthCatalystItemId)
+        var isFourthTier = sort == CraftRecipeCatalog.WingFourthTierSort;
+        var requiredMaterialItemId = isFourthTier
+            ? CraftRecipeCatalog.WingFourthMaterialItemId
+            : CraftRecipeCatalog.WingFifthMaterialItemId;
+        var requiredCatalystItemId = isFourthTier
+            ? CraftRecipeCatalog.WingFourthCatalystItemId
+            : CraftRecipeCatalog.WingFifthCatalystItemId;
+
+        if (material1ItemId != requiredMaterialItemId || material2ItemId != requiredMaterialItemId ||
+            material3ItemId != requiredMaterialItemId || catalystItemId != requiredCatalystItemId)
             return new WingFifthTierResult(WingFifthTierOutcome.Rejected, 0);
+
+        if (isFourthTier)
+            return random.NextInt32(100) < 20
+                ? new WingFifthTierResult(WingFifthTierOutcome.Success, CraftRecipeCatalog.WingFourthResultItemId)
+                : new WingFifthTierResult(WingFifthTierOutcome.DustConsolation, CraftRecipeCatalog.DustItemId);
 
         return random.NextInt32(500) < 50
             ? new WingFifthTierResult(WingFifthTierOutcome.Success, CraftRecipeCatalog.WingFifthResultItemId)
             : new WingFifthTierResult(WingFifthTierOutcome.DustConsolation, CraftRecipeCatalog.DustItemId);
     }
 
+    public static int WingTierFailureDustQuantity(int sort)
+    {
+        return sort == CraftRecipeCatalog.WingFourthTierSort
+            ? CraftRecipeCatalog.WingFourthFailureDustQuantity
+            : CraftRecipeCatalog.WingFifthFailureDustQuantity;
+    }
+
     public static DustRecycleResult ResolveDustRecycle(int sort, int materialItemId, int materialQuantity,
         byte previousTribe, IRandomSource random)
     {
         var threshold = DustRecycleThreshold(sort);
-        if (threshold == 0 || materialItemId != CraftRecipeCatalog.DustItemId || materialQuantity < threshold)
+        if (threshold == 0 || materialItemId != CraftRecipeCatalog.DustItemId || materialQuantity != threshold)
             return new DustRecycleResult(DustRecycleOutcome.Rejected, 0);
 
         var resultItemId = sort switch

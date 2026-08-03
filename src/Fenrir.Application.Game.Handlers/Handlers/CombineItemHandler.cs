@@ -34,9 +34,12 @@ public sealed class CombineItemHandler(ICombineItemService combineItemService, I
         {
             var result = await combineItemService.CombineAsync(packet, zone, state, characterId, cancellationToken);
 
-            if (result.Outcome != CombineItemOutcome.Applied)
+            if (result.Outcome == CombineItemOutcome.Disconnect)
             {
-                session.Send(new CombineItemResponse { Result = 1, Cost = 0 });
+                logger.LogInformation(
+                    "Session {SessionId} character {CharacterId}: CombineItemRequest failed structural validation -- disconnecting",
+                    zoneSession.SessionId, characterId);
+                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             }
 

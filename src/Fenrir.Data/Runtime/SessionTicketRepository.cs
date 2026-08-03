@@ -21,8 +21,8 @@ public sealed record SessionTicketRepository(ICaeriusNetDbContext Db) : ISession
     private const int MaxWriteConflictAttempts = 3;
 
     public async ValueTask CreateAsync(int accountId, int characterId, byte shardId, int ttlSeconds,
-        Guid sessionToken, short accountGrade, short targetMapId, CancellationToken ct,
-        IPAddress? sourceAddress = null)
+        Guid sessionToken, short accountGrade, short targetMapId, IPAddress? sourceAddress,
+        CancellationToken ct)
     {
         var sourceIpPrefix = SessionTicketBinding.PrefixOf(sourceAddress);
 

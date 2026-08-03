@@ -1,6 +1,5 @@
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
-using System.Text;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Quests;
@@ -8,6 +7,7 @@ using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.World.Loot;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
+using Fenrir.Core.Wire;
 using Fenrir.Domain.Game.GameData;
 
 namespace Fenrir.Application.Game.Domain.World.Monsters;
@@ -158,9 +158,7 @@ public sealed class MonsterSpawnScheduler(
         BinaryPrimitives.WriteInt32LittleEndian(payload, slotIndex);
         BinaryPrimitives.WriteInt32LittleEndian(payload[4..], attackerTribe);
 
-        var nameField = payload.Slice(FirstAttackNameOffset, FirstAttackNameSize);
-        var copied = Math.Min(attackerName.Length, FirstAttackNameSize - 1);
-        Encoding.ASCII.GetBytes(attackerName.AsSpan(0, copied), nameField);
+        LegacyWireCodec.WriteFixedString(payload.Slice(FirstAttackNameOffset, FirstAttackNameSize), attackerName);
 
         siegeIngestor.Value.Ingest(eventCode, payload);
     }

@@ -64,8 +64,6 @@ public sealed class GmBasicCommandService(
 
     private const int Tribe4SpecialValue = 3;
 
-    private const int MonsterInstanceCapacity = 3000;
-
     private const int GmDataSize = 100;
 
     private const int BaseLevelCap = 145;
@@ -121,8 +119,10 @@ public sealed class GmBasicCommandService(
 
         var result = FailureResult;
         var index = payload.MonsterIndex;
-        if (index is >= 0 and < MonsterInstanceCapacity && zone.TryGetMonster(index, out var monster) &&
-            monster is not null)
+
+        // Negative indices are tower-war guardians (TowerWarState.GuardianServerIndex); legacy rejects tValue < 0
+        // outright (S04_MyWork04.cpp:1169), so GM DIE must not reach them and bypass the tower engagement gates.
+        if (index >= 0 && zone.TryGetMonster(index, out var monster) && monster is not null)
         {
             await eventLog.LogAsync(GmCommandCatalog.Resolve(DieSort).AuditEventCode, EventLogCategory.GmAction,
                 zoneSession.AccountId, zoneSession.CharacterId, null, null, null, null, null,

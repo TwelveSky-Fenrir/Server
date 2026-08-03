@@ -18,6 +18,7 @@ using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Loot;
+using Fenrir.Core.Packets.Shared;
 using Fenrir.Domain.Game.GameData;
 using Fenrir.Domain.Game.Stats;
 using Fenrir.Domain.Game.Stats.Context;
@@ -128,6 +129,10 @@ public sealed class UseInventoryItemService(
     private const int DoubleKillNumTime2SortCode = 30;
 
     private const int DoubleKillNumTime2ChargeAmount = 50;
+
+    private const int AutoHuntBuffStoreLength = 16;
+
+    private const int AutoHuntAttackTypeLength = 4;
 
     private static readonly ImmutableHashSet<int> TribeConversionBookItemIds =
         ImmutableHashSet.Create(99014, 99015, 99016);
@@ -1812,10 +1817,18 @@ public sealed class UseInventoryItemService(
                 autoBuffChanged = true;
             }
 
-        if (autoBuffChanged)
-            if (!zone.PostAutoBuffCommand(new AutoBuffZoneCommand(characterId, newAutoBuffSkill)))
+        var newAutoHuntConfig = RemoveSkillFromAutoHuntConfig(state.AutoHuntConfig, skillId);
+        if (newAutoHuntConfig is { } clearedConfig)
+            await PersistAutoHuntConfigAsync(characterId, state.AutoHuntEnabled, clearedConfig, cancellationToken);
+
+        ImmutableArray<(int SkillId, int Grade)>? registeredAutoBuffSkills =
+            autoBuffChanged ? newAutoBuffSkill : null;
+
+        if (autoBuffChanged || newAutoHuntConfig is not null)
+            if (!zone.PostAutoBuffCommand(new AutoBuffZoneCommand(characterId, registeredAutoBuffSkills,
+                    NewAutoHuntConfig: newAutoHuntConfig)))
                 logger.LogError(
-                    "Zone {MapId} auto-buff inbox full: dropped reduction-sutra auto-buff clear for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
+                    "Zone {MapId} auto-buff inbox full: dropped reduction-sutra auto-buff/auto-hunt clear for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                     zone.MapId, characterId);
 
         logger.LogInformation(
@@ -2078,9 +2091,12 @@ public sealed class UseInventoryItemService(
                     "Zone {MapId} hotkey-move inbox full: dropped book-of-amnesia skill-hotkey-clear mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                     zone.MapId, characterId);
 
+        var clearedAutoHuntConfig = ClearAutoHuntSkillArrays(state.AutoHuntConfig ?? EmptyAutoHuntConfig());
+        await PersistAutoHuntConfigAsync(characterId, false, clearedAutoHuntConfig, cancellationToken);
+
         if (!zone.PostAutoBuffCommand(
                 new AutoBuffZoneCommand(characterId, AutoBuffSkillCodec.Empty,
-                    ClearAutoHuntConfig: true)))
+                    NewAutoHuntConfig: clearedAutoHuntConfig, DisableAutoHunt: true)))
             logger.LogError(
                 "Zone {MapId} auto-buff inbox full: dropped book-of-amnesia auto-buff/auto-hunt-clear mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
@@ -2090,6 +2106,70 @@ public sealed class UseInventoryItemService(
             characterId, totalRefund, newSkillPoints, state.LearnedSkills.Count, skillHotkeyWrites.Count);
 
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
+    }
+
+    private static AutoHunt EmptyAutoHuntConfig()
+    {
+        return new AutoHunt
+        {
+            BuffType = 0,
+            BuffStore = new int[AutoHuntBuffStoreLength],
+            HuntType = 0,
+            AttackType = new int[AutoHuntAttackTypeLength],
+            MonNum = 0,
+            ItemType = 0,
+            InvenCmd = 0,
+            DeathCmd = 0,
+            AnimalPreyCmd = 0,
+            AnimalFoodCmd = 0
+        };
+    }
+
+    private static AutoHunt ClearAutoHuntSkillArrays(AutoHunt config)
+    {
+        return config with
+        {
+            BuffStore = new int[AutoHuntBuffStoreLength], AttackType = new int[AutoHuntAttackTypeLength]
+        };
+    }
+
+    private static AutoHunt? RemoveSkillFromAutoHuntConfig(AutoHunt? config, int skillId)
+    {
+        if (config is not { } current || skillId < 1)
+            return null;
+
+        var buffStore = (int[])current.BuffStore.Clone();
+        var attackType = (int[])current.AttackType.Clone();
+        var changed = false;
+
+        for (var i = 0; i + 1 < buffStore.Length; i += 2)
+            if (buffStore[i] == skillId)
+            {
+                buffStore[i] = 0;
+                buffStore[i + 1] = 0;
+                changed = true;
+            }
+
+        for (var i = 0; i + 1 < attackType.Length; i += 2)
+            if (attackType[i] == skillId)
+            {
+                attackType[i] = 0;
+                attackType[i + 1] = 0;
+                changed = true;
+            }
+
+        if (!changed)
+            return null;
+
+        return current with { BuffStore = buffStore, AttackType = attackType };
+    }
+
+    private async ValueTask PersistAutoHuntConfigAsync(int characterId, bool enabled, AutoHunt config,
+        CancellationToken cancellationToken)
+    {
+        var configBytes = new byte[AutoHunt.WireSize];
+        config.Write(configBytes);
+        await characters.SetAutoHuntAsync(characterId, enabled, configBytes, cancellationToken);
     }
 
     private async ValueTask<UseInventoryItemResponse> ConsumeAndMirrorAsync(Zone zone, PlayerRuntimeState state,

@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.Gm;
 using Fenrir.Application.Game.Abstractions.Sessions;
+using Fenrir.Application.Game.Domain.Gm;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Core.Packets.Shared;
@@ -31,6 +32,10 @@ public sealed class GmClearInventoryService(
             logger.LogWarning(
                 "Character {CharacterId} attempted the Basic-tier GM_CLEAR_INVENTORY command (sort {Sort}) without sufficient privilege -- disconnecting, no reply",
                 zoneSession.CharacterId, Sort);
+            await eventLog.LogAsync(GmDuelAndInventoryActionEventCodes.ClearInventory, EventLogCategory.GmAction,
+                zoneSession.AccountId, zoneSession.CharacterId, null, null, null, null, null, null, null,
+                GmCommandCatalog.OutcomeDenied,
+                $"Command=CLEARINVEN;Sort={Sort};RequiredTier={(short)GmCommandTier.Basic}", cancellationToken);
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }

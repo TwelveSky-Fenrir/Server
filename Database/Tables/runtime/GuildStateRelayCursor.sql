@@ -1,0 +1,8 @@
+CREATE TABLE runtime.GuildStateRelayCursor
+(
+    ShardId     TINYINT NOT NULL,
+    LastRelayId BIGINT  NOT NULL,
+    CONSTRAINT PK_GuildStateRelayCursor PRIMARY KEY NONCLUSTERED HASH (ShardId)
+        WITH (BUCKET_COUNT = 64)
+)
+    WITH (MEMORY_OPTIMIZED = ON, DURABILITY = SCHEMA_ONLY);

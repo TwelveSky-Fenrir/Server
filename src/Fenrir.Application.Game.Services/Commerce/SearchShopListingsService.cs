@@ -59,6 +59,7 @@ public sealed class SearchShopListingsService(
 
             var page = row.SlotIndex / PshopPurchasePolicy.MaxSlots;
             var slot = row.SlotIndex % PshopPurchasePolicy.MaxSlots;
+            var (gem1, gem2, gem3) = PshopPurchasePolicy.DecodeSocketData(row.SocketData);
 
             results.Add(new SearchShopListingsResponse
             {
@@ -67,7 +68,7 @@ public sealed class SearchShopListingsService(
                 Page = page,
                 Index = slot,
                 PshopItemInfo = [row.ItemId, row.Quantity, row.Value, row.SerialNumber, row.Price, 0, 0, 0, 0],
-                SocketInfo = [0, 0, 0],
+                SocketInfo = [gem1, gem2, gem3],
                 CycleTick = cycleTick
             });
         }

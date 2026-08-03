@@ -56,4 +56,13 @@ public sealed class CrossShardNegotiationTracker
             return _inboundByTarget.Remove(targetId, out ask);
         }
     }
+
+    public void ClearForCharacter(int characterId)
+    {
+        lock (_lock)
+        {
+            _outboundByAsker.Remove(characterId);
+            _inboundByTarget.Remove(characterId);
+        }
+    }
 }

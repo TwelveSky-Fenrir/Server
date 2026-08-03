@@ -120,8 +120,12 @@ public sealed class IpFloodGuard(
 
     private async ValueTask BlockAndKickAsync(string ipAddress, CancellationToken ct)
     {
-        if (!TryClaimEscalation(ipAddress, CurrentHourBucket()))
+        var currentHour = CurrentHourBucket();
+
+        if (!TryClaimEscalation(ipAddress, currentHour))
             return;
+
+        PruneStaleTrackingState(currentHour);
 
         if (await IsOperatorAllowlistedAsync(ipAddress, ct).ConfigureAwait(false))
         {

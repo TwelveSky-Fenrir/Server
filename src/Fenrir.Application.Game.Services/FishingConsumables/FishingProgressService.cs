@@ -33,8 +33,6 @@ public sealed class FishingProgressService : IFishingProgressService
     private static FishingProgressResult Reply(Zone zone, PlayerRuntimeState state, int characterId,
         int resultSort, int newStep, DateTime? castAt, bool armCatch = false, bool biteWasHit = false)
     {
-        // Stricter than legacy (S04_MyWork02.cpp:13557-13564). The reward is gated on FishingBiteWasHit, latched
-        // only by a server-rolled bite here, because FishingStep is client-supplied via op104 sort 3.
         var caught = newStep is 4 or 5;
         zone.PostFishingCommand(new FishingZoneCommand(characterId, state.FishingState, newStep,
             state.CatchingFish || armCatch, caught, caught ? 93 : null, castAt, BiteWasHit: biteWasHit));

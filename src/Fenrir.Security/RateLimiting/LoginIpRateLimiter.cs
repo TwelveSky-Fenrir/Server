@@ -5,94 +5,160 @@ using System.Net.Sockets;
 
 namespace Fenrir.Security.RateLimiting;
 
+public readonly record struct LoginFailureSnapshot(
+    int SourceAccountFailureCount,
+    int SourceTotalFailureCount,
+    int DistinctOtherSourceCount);
+
 public sealed class LoginIpRateLimiter
 {
     private const int Capacity = 5;
     private const double TokensPerSecond = 1d / 10d;
 
-    private const int PurgeIntervalCalls = 500;
-
     private const int MaxTrackedFailureKeys = 50_000;
+    private const int MaxTrackedContendedAccounts = 50_000;
 
-    private static readonly long IdleTicksBeforePurge =
-        (long)(TimeSpan.FromMinutes(10).TotalSeconds * Stopwatch.Frequency);
+    private const int MaxCountedFailures = 64;
+    private const int MaxContentionSlots = 4;
 
-    private static readonly long FailureWindowTicks =
-        (long)(TimeSpan.FromMinutes(15).TotalSeconds * Stopwatch.Frequency);
+    private const double FailureDecaySeconds = 120d;
 
-    private readonly ConcurrentDictionary<string, Entry> _buckets = new();
+    private static readonly long PurgeIntervalTicks = Stopwatch.Frequency * 5;
 
-    private readonly ConcurrentDictionary<SourceLoginKey, FailureWindow> _failures = new();
+    private static readonly long IdleTicksBeforePurge = Stopwatch.Frequency * 600;
 
-    private long _callCounter;
+    private static readonly long ContentionTtlTicks = Stopwatch.Frequency * 900;
+
+    private static readonly long ReportIntervalTicks = Stopwatch.Frequency * 900;
+
+    private static readonly double FailureDecayTicks = Stopwatch.Frequency * FailureDecaySeconds;
+
+    private readonly ConcurrentDictionary<AccountSourceKey, DecayingFailureCounter> _accountFailures = new();
+
+    private readonly ConcurrentDictionary<int, ContentionLedger> _contention = new();
+
+    private readonly ConcurrentDictionary<string, SourceEntry> _sources = new();
+
+    private long _nextPurgeTimestamp;
 
     public bool TryConsume(IPEndPoint? remoteEndPoint)
     {
         if (remoteEndPoint is null)
             return true;
 
-        if (Interlocked.Increment(ref _callCounter) % PurgeIntervalCalls == 0)
-            PurgeStaleEntries();
+        PurgeIfDue();
 
-        var key = NormalizeSource(remoteEndPoint.Address);
-        var entry = _buckets.GetOrAdd(key, static _ => new Entry(new TokenBucket(Capacity, TokensPerSecond)));
+        var entry = GetOrAddSource(NormalizeSource(remoteEndPoint.Address));
         entry.Touch();
 
         return entry.Bucket.TryConsume();
     }
 
-    public int RecentFailureCount(IPEndPoint? remoteEndPoint, string loginName)
+    public LoginFailureSnapshot Snapshot(IPEndPoint? remoteEndPoint, int accountId)
     {
-        return TryBuildKey(remoteEndPoint, loginName, out var key) && _failures.TryGetValue(key, out var window)
-            ? window.CountWithinWindow(FailureWindowTicks)
+        if (remoteEndPoint is null)
+            return default;
+
+        var now = Stopwatch.GetTimestamp();
+        var source = NormalizeSource(remoteEndPoint.Address);
+
+        var sourceTotal = _sources.TryGetValue(source, out var entry) ? entry.Failures.Count(now) : 0;
+
+        var sourceAccount = accountId > 0 &&
+                            _accountFailures.TryGetValue(new AccountSourceKey(source, accountId), out var ledger)
+            ? ledger.Count(now)
             : 0;
+
+        var distinctOtherSources = accountId > 0 && _contention.TryGetValue(accountId, out var contention)
+            ? contention.DistinctOtherSourceCount(source, now)
+            : 0;
+
+        return new LoginFailureSnapshot(sourceAccount, sourceTotal, distinctOtherSources);
     }
 
-    public void RecordFailure(IPEndPoint? remoteEndPoint, string loginName)
+    public void RecordUnknownAccountFailure(IPEndPoint? remoteEndPoint)
     {
-        if (!TryBuildKey(remoteEndPoint, loginName, out var key))
+        if (remoteEndPoint is not null)
+            GetOrAddSource(NormalizeSource(remoteEndPoint.Address)).Failures.Increment(Stopwatch.GetTimestamp());
+    }
+
+    public void RecordFailure(IPEndPoint? remoteEndPoint, int accountId)
+    {
+        if (remoteEndPoint is null)
             return;
 
-        if (_failures.TryGetValue(key, out var existing))
-        {
-            existing.Increment(FailureWindowTicks);
+        var now = Stopwatch.GetTimestamp();
+        var source = NormalizeSource(remoteEndPoint.Address);
+
+        GetOrAddSource(source).Failures.Increment(now);
+
+        if (accountId <= 0)
             return;
-        }
 
-        if (_failures.Count >= MaxTrackedFailureKeys)
-        {
-            PurgeStaleFailures();
+        var key = new AccountSourceKey(source, accountId);
 
-            if (_failures.Count >= MaxTrackedFailureKeys)
-                return;
-        }
+        if (_accountFailures.TryGetValue(key, out var ledger))
+            ledger.Increment(now);
+        else if (HasRoomFor(_accountFailures, MaxTrackedFailureKeys))
+            _accountFailures.GetOrAdd(key, static _ => new DecayingFailureCounter()).Increment(now);
 
-        _failures.GetOrAdd(key, static _ => new FailureWindow()).Increment(FailureWindowTicks);
+        if (_contention.TryGetValue(accountId, out var contention))
+            contention.Observe(source, now);
+        else if (HasRoomFor(_contention, MaxTrackedContendedAccounts))
+            _contention.GetOrAdd(accountId, static _ => new ContentionLedger()).Observe(source, now);
     }
 
-    public void ClearFailures(IPEndPoint? remoteEndPoint, string loginName)
+    public void ClearFailures(IPEndPoint? remoteEndPoint, int accountId)
     {
-        if (TryBuildKey(remoteEndPoint, loginName, out var key))
-            _failures.TryRemove(key, out _);
+        if (remoteEndPoint is null || accountId <= 0)
+            return;
+
+        var now = Stopwatch.GetTimestamp();
+        var source = NormalizeSource(remoteEndPoint.Address);
+
+        if (_accountFailures.TryRemove(new AccountSourceKey(source, accountId), out var ledger) &&
+            _sources.TryGetValue(source, out var entry))
+            entry.Failures.Subtract(ledger.Count(now), now);
+
+        _contention.TryRemove(accountId, out _);
     }
 
-    public bool TryClaimThrottleReport(IPEndPoint? remoteEndPoint, string loginName)
+    public bool TryClaimThrottleReport(IPEndPoint? remoteEndPoint, int accountId)
     {
-        return TryBuildKey(remoteEndPoint, loginName, out var key) && _failures.TryGetValue(key, out var window) &&
-               window.TryClaimReport(FailureWindowTicks);
-    }
-
-    // SQL Server ignores trailing whitespace when matching NVARCHAR, so the key must too or padding forks the bucket.
-    private static bool TryBuildKey(IPEndPoint? remoteEndPoint, string loginName, out SourceLoginKey key)
-    {
-        if (remoteEndPoint is null || string.IsNullOrWhiteSpace(loginName))
-        {
-            key = default;
+        if (remoteEndPoint is null)
             return false;
-        }
 
-        key = new SourceLoginKey(NormalizeSource(remoteEndPoint.Address), loginName.TrimEnd());
-        return true;
+        var now = Stopwatch.GetTimestamp();
+        var source = NormalizeSource(remoteEndPoint.Address);
+
+        if (accountId > 0 && _accountFailures.TryGetValue(new AccountSourceKey(source, accountId), out var ledger))
+            return ledger.TryClaimReport(now);
+
+        return _sources.TryGetValue(source, out var entry) && entry.Failures.TryClaimReport(now);
+    }
+
+    public bool TryTakeRetrySlot(IPEndPoint? remoteEndPoint, double delaySeconds)
+    {
+        if (remoteEndPoint is null)
+            return true;
+
+        var entry = GetOrAddSource(NormalizeSource(remoteEndPoint.Address));
+
+        return entry.Failures.TryTakeRetrySlot(Stopwatch.GetTimestamp(), (long)(delaySeconds * Stopwatch.Frequency));
+    }
+
+    private SourceEntry GetOrAddSource(string source)
+    {
+        return _sources.GetOrAdd(source, static _ => new SourceEntry(new TokenBucket(Capacity, TokensPerSecond)));
+    }
+
+    private bool HasRoomFor<TKey, TValue>(ConcurrentDictionary<TKey, TValue> map, int cap) where TKey : notnull
+    {
+        if (map.Count < cap)
+            return true;
+
+        PurgeIfDue();
+        return map.Count < cap;
     }
 
     private static string NormalizeSource(IPAddress address)
@@ -112,41 +178,34 @@ public sealed class LoginIpRateLimiter
         return new IPAddress(octets).ToString();
     }
 
-    private void PurgeStaleEntries()
+    private void PurgeIfDue()
     {
         var now = Stopwatch.GetTimestamp();
+        var due = Interlocked.Read(ref _nextPurgeTimestamp);
 
-        foreach (var (key, entry) in _buckets)
-            if (now - Interlocked.Read(ref entry.LastAccessTimestamp) > IdleTicksBeforePurge)
-                _buckets.TryRemove(key, out _);
+        if (now < due || Interlocked.CompareExchange(ref _nextPurgeTimestamp, now + PurgeIntervalTicks, due) != due)
+            return;
 
-        PurgeStaleFailures();
+        foreach (var (source, entry) in _sources)
+            if (now - Interlocked.Read(ref entry.LastAccessTimestamp) > IdleTicksBeforePurge &&
+                entry.Failures.IsIdle(now))
+                _sources.TryRemove(source, out _);
+
+        foreach (var (key, ledger) in _accountFailures)
+            if (ledger.IsIdle(now))
+                _accountFailures.TryRemove(key, out _);
+
+        foreach (var (accountId, ledger) in _contention)
+            if (ledger.IsIdle(now))
+                _contention.TryRemove(accountId, out _);
     }
 
-    private void PurgeStaleFailures()
-    {
-        foreach (var (key, window) in _failures)
-            if (window.IsExpired(FailureWindowTicks))
-                _failures.TryRemove(key, out _);
-    }
+    private readonly record struct AccountSourceKey(string Source, int AccountId);
 
-    private readonly record struct SourceLoginKey(string Source, string LoginName)
-    {
-        public bool Equals(SourceLoginKey other)
-        {
-            return string.Equals(Source, other.Source, StringComparison.Ordinal) &&
-                   string.Equals(LoginName, other.LoginName, StringComparison.OrdinalIgnoreCase);
-        }
-
-        public override int GetHashCode()
-        {
-            return HashCode.Combine(Source, LoginName.GetHashCode(StringComparison.OrdinalIgnoreCase));
-        }
-    }
-
-    private sealed class Entry(TokenBucket bucket)
+    private sealed class SourceEntry(TokenBucket bucket)
     {
         public readonly TokenBucket Bucket = bucket;
+        public readonly DecayingFailureCounter Failures = new();
         public long LastAccessTimestamp = Stopwatch.GetTimestamp();
 
         public void Touch()
@@ -155,53 +214,136 @@ public sealed class LoginIpRateLimiter
         }
     }
 
-    private sealed class FailureWindow
+    private sealed class DecayingFailureCounter
     {
         private readonly Lock _gate = new();
-        private int _count;
-        private bool _reported;
-        private long _windowStartTimestamp = Stopwatch.GetTimestamp();
+        private long _nextReportTimestamp;
+        private long _nextRetryTimestamp;
+        private long _updatedTimestamp = Stopwatch.GetTimestamp();
+        private double _value;
+        private long _zeroTimestamp = Stopwatch.GetTimestamp();
 
-        public void Increment(long windowTicks)
+        public bool IsIdle(long now)
         {
-            var now = Stopwatch.GetTimestamp();
-
-            lock (_gate)
-            {
-                if (now - _windowStartTimestamp > windowTicks)
-                {
-                    _windowStartTimestamp = now;
-                    _count = 0;
-                    _reported = false;
-                }
-
-                if (_count < int.MaxValue)
-                    _count++;
-            }
+            return now >= Interlocked.Read(ref _zeroTimestamp);
         }
 
-        public int CountWithinWindow(long windowTicks)
+        public int Count(long now)
         {
+            if (IsIdle(now))
+                return 0;
+
             lock (_gate)
-                return Stopwatch.GetTimestamp() - _windowStartTimestamp > windowTicks ? 0 : _count;
+                return (int)DecayedValue(now);
         }
 
-        public bool TryClaimReport(long windowTicks)
+        public void Increment(long now)
+        {
+            lock (_gate)
+                Set(Math.Min(DecayedValue(now) + 1d, MaxCountedFailures), now);
+        }
+
+        public void Subtract(int amount, long now)
+        {
+            if (amount <= 0)
+                return;
+
+            lock (_gate)
+                Set(Math.Max(DecayedValue(now) - amount, 0d), now);
+        }
+
+        public bool TryClaimReport(long now)
         {
             lock (_gate)
             {
-                if (_reported || Stopwatch.GetTimestamp() - _windowStartTimestamp > windowTicks)
+                if (now < _nextReportTimestamp)
                     return false;
 
-                _reported = true;
+                _nextReportTimestamp = now + ReportIntervalTicks;
                 return true;
             }
         }
 
-        public bool IsExpired(long windowTicks)
+        public bool TryTakeRetrySlot(long now, long delayTicks)
         {
             lock (_gate)
-                return Stopwatch.GetTimestamp() - _windowStartTimestamp > windowTicks;
+            {
+                if (now < _nextRetryTimestamp)
+                    return false;
+
+                _nextRetryTimestamp = now + delayTicks;
+                return true;
+            }
+        }
+
+        private double DecayedValue(long now)
+        {
+            var elapsed = now - _updatedTimestamp;
+            return elapsed <= 0 ? _value : Math.Max(_value - elapsed / FailureDecayTicks, 0d);
+        }
+
+        private void Set(double value, long now)
+        {
+            _value = value;
+            _updatedTimestamp = now;
+            Interlocked.Exchange(ref _zeroTimestamp, now + (long)(value * FailureDecayTicks));
+        }
+    }
+
+    private sealed class ContentionLedger
+    {
+        private readonly Lock _gate = new();
+        private readonly long[] _seen = new long[MaxContentionSlots];
+        private readonly string?[] _slots = new string?[MaxContentionSlots];
+        private long _newestTimestamp = Stopwatch.GetTimestamp();
+
+        public bool IsIdle(long now)
+        {
+            return now - Interlocked.Read(ref _newestTimestamp) > ContentionTtlTicks;
+        }
+
+        public void Observe(string source, long now)
+        {
+            lock (_gate)
+            {
+                var free = -1;
+                var oldest = 0;
+
+                for (var i = 0; i < _slots.Length; i++)
+                {
+                    if (string.Equals(_slots[i], source, StringComparison.Ordinal))
+                    {
+                        _seen[i] = now;
+                        Interlocked.Exchange(ref _newestTimestamp, now);
+                        return;
+                    }
+
+                    if (_slots[i] is null || now - _seen[i] > ContentionTtlTicks)
+                        free = i;
+                    else if (_seen[i] < _seen[oldest])
+                        oldest = i;
+                }
+
+                var slot = free >= 0 ? free : oldest;
+                _slots[slot] = source;
+                _seen[slot] = now;
+                Interlocked.Exchange(ref _newestTimestamp, now);
+            }
+        }
+
+        public int DistinctOtherSourceCount(string excludedSource, long now)
+        {
+            var count = 0;
+
+            lock (_gate)
+            {
+                for (var i = 0; i < _slots.Length; i++)
+                    if (_slots[i] is not null && now - _seen[i] <= ContentionTtlTicks &&
+                        !string.Equals(_slots[i], excludedSource, StringComparison.Ordinal))
+                        count++;
+            }
+
+            return count;
         }
     }
 }

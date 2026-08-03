@@ -5,7 +5,7 @@ namespace Fenrir.Data.Abstractions.Runtime;
 public interface ISessionTicketRepository
 {
     public ValueTask CreateAsync(int accountId, int characterId, byte shardId, int ttlSeconds, Guid sessionToken,
-        short accountGrade, short targetMapId, CancellationToken ct, IPAddress? sourceAddress = null);
+        short accountGrade, short targetMapId, IPAddress? sourceAddress, CancellationToken ct);
 
     public ValueTask<ConsumedTicketDto?> ConsumeAsync(int accountId, IPAddress? sourceAddress, CancellationToken ct);
 

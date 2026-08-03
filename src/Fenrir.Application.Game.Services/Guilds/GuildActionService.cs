@@ -1,5 +1,6 @@
 using CaeriusNet.Exceptions;
 using Fenrir.Application.Game.Abstractions.Guilds;
+using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Social;
 using Fenrir.Application.Game.Domain.World;
@@ -7,6 +8,7 @@ using Fenrir.Core.Packets.Shared;
 using Fenrir.Protocol.Game;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Services.Guilds;
 
@@ -14,10 +16,13 @@ public sealed class GuildActionService(
     ZoneRegistry zones,
     IGuildRepository guilds,
     GuildInviteRegistry invites,
+    IGuildStateRelayQueue guildStateRelay,
+    IOptions<GameServerOptions> options,
     ILogger<GuildActionService> logger) : IGuildActionService
 {
     private const int CreateGuildMoneyCost = 10_000_000;
     private const int GuildNameTakenErrorNumber = 50230;
+    private const int GuildGradeCapErrorNumber = 50364;
     internal const int MaxSubMasters = 2;
 
     public async ValueTask<GuildActionResult> CreateGuildAsync(GuildActionRequest packet, Zone zone,
@@ -101,6 +106,16 @@ public sealed class GuildActionService(
         {
             await guilds.AddMemberAsync(guildId, inviteeId, ct);
         }
+        catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException
+                                                {
+                                                    Number: GuildGradeCapErrorNumber
+                                                })
+        {
+            logger.LogDebug(ex,
+                "Character {CharacterId} guild invite-finalize rejected by SQL: guild {GuildId} reached its grade member cap concurrently",
+                characterId, guildId);
+            return GuildActionResult.Success(3, GuildInfoProjection.Empty(), 2);
+        }
         catch (Exception ex)
         {
             logger.LogWarning(ex,
@@ -145,8 +160,8 @@ public sealed class GuildActionService(
             !GuildWorkNoticePayload.TryRead(packet.Data, out var payload))
             return GuildActionResult.Aborted;
 
-        for (byte i = 0; i < payload.Notices.Length; i++)
-            await guilds.SetNoticeAsync(guildId, i, payload.Notices[i].Trim(), ct);
+        await guilds.SetNoticeBoardAsync(guildId, payload.Notices[0].Trim(), payload.Notices[1].Trim(),
+            payload.Notices[2].Trim(), payload.Notices[3].Trim(), ct);
 
         var info = await BuildGuildInfoAsync(guildId, ct);
         GuildInfoBroadcaster.BroadcastGuildInfo(zones, guildId, 5, info, state.CharacterId);
@@ -252,6 +267,9 @@ public sealed class GuildActionService(
         if (zones.TryGetPlayerAndZone(target.CharacterId, out _, out var targetZone))
             targetZone.PostGuildCommand(new GuildMembershipZoneCommand(target.CharacterId, null, "", 0, ""));
 
+        guildStateRelay.Enqueue(new GuildStateRelayEntry(GuildStateRelayKind.MembershipRemoved,
+            options.Value.ShardId, guildId, target.CharacterId, null, "", 0, "", 0, false));
+
         logger.LogInformation("Character {CharacterId} kicked character {TargetCharacterId} from guild {GuildId}",
             state.CharacterId, target.CharacterId, guildId);
 
@@ -314,6 +332,9 @@ public sealed class GuildActionService(
             targetZone.PostGuildCommand(new GuildMembershipZoneCommand(target.CharacterId, guildId,
                 targetState.GuildName, newRole, ""));
 
+        guildStateRelay.Enqueue(new GuildStateRelayEntry(GuildStateRelayKind.MembershipRoleChanged,
+            options.Value.ShardId, guildId, target.CharacterId, guildId, state.GuildName, newRole, "", 0, false));
+
         logger.LogInformation(
             "Character {CharacterId} set character {TargetCharacterId}'s guild role to {NewRole} in guild {GuildId}",
             state.CharacterId, target.CharacterId, newRole == dbSubMaster ? "sub-master" : "member", guildId);
@@ -351,6 +372,10 @@ public sealed class GuildActionService(
         if (zones.TryGetPlayerAndZone(target.CharacterId, out var targetState, out var targetZone))
             targetZone.PostGuildCommand(new GuildMembershipZoneCommand(target.CharacterId, guildId,
                 targetState.GuildName, targetState.GuildRoleDb, callName));
+
+        guildStateRelay.Enqueue(new GuildStateRelayEntry(GuildStateRelayKind.MembershipTitleChanged,
+            options.Value.ShardId, guildId, target.CharacterId, guildId, state.GuildName, target.Role, callName, 0,
+            false));
 
         logger.LogInformation(
             "Character {CharacterId} set character {TargetCharacterId}'s guild title to {CallName} in guild {GuildId}",
@@ -404,6 +429,9 @@ public sealed class GuildActionService(
         var activation = new GuildBuffActivationZoneCommand(guildId, payload.GuildBuffType, true);
         foreach (var memberZone in zones.Zones)
             memberZone.PostGuildBuffActivationCommand(in activation);
+
+        guildStateRelay.Enqueue(new GuildStateRelayEntry(GuildStateRelayKind.BuffActivation, options.Value.ShardId,
+            guildId, null, null, "", 0, "", payload.GuildBuffType, true));
 
         logger.LogInformation("Character {CharacterId} set guild {GuildId}'s buff type to {BuffType}",
             state.CharacterId, guildId, payload.GuildBuffType);

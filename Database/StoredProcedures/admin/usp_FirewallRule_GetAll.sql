@@ -5,5 +5,7 @@ BEGIN
         NOCOUNT ON;
 
     SELECT FirewallRuleId, IpAddress, RuleType
-    FROM admin.FirewallRules;
+    FROM admin.FirewallRules
+    WHERE ExpiresAtUtc IS NULL
+       OR ExpiresAtUtc > SYSUTCDATETIME();
 END;

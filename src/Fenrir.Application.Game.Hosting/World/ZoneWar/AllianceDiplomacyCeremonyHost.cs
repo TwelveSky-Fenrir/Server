@@ -58,7 +58,7 @@ public sealed class AllianceDiplomacyCeremonyHost(
             return;
 
         var (postOne, postTwo) = AlliancePostOccupantScanner.Scan(zone, _site);
-        var result = ceremony.Tick(postOne, postTwo, DateOnly.FromDateTime(DateTime.UtcNow));
+        var result = ceremony.Tick(postOne, postTwo, DateOnly.FromDateTime(DateTime.Now));
 
         if (result.Notice == AllianceCeremonyNotice.None)
             return;

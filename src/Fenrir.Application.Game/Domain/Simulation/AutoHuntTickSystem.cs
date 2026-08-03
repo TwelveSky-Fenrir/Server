@@ -92,14 +92,22 @@ public sealed class AutoHuntTickSystem(
         for (var i = 0; i < slotCount; i++)
         {
             var skillId = config.BuffStore[i * 2];
-            if (skillId < 1 || !AutoCastGateSlots.TryGetValue(skillId, out var gateSlots))
+            if (skillId < 1)
+                continue;
+
+            var grade = config.BuffStore[i * 2 + 1];
+            var maxLearnedGrade = GetMaxLearnedGrade(skillId, state.LearnedSkills);
+            if (grade > maxLearnedGrade)
+            {
+                grade = maxLearnedGrade;
+                config.BuffStore[i * 2 + 1] = grade;
+            }
+
+            if (!AutoCastGateSlots.TryGetValue(skillId, out var gateSlots))
                 continue;
 
             if (IsAlreadyActive(state, gateSlots))
                 continue;
-
-            var requestedGrade = config.BuffStore[i * 2 + 1];
-            var grade = Math.Min(requestedGrade, GetMaxLearnedGrade(skillId, state.LearnedSkills));
 
             if (!worldData.SkillsById.TryGetValue(skillId, out var skillDef))
                 continue;

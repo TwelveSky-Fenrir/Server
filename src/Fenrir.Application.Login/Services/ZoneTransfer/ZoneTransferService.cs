@@ -71,7 +71,7 @@ public sealed class ZoneTransferService(
         }
 
         await tickets.CreateAsync(accountId, summary.CharacterId, shard.ShardId, options.Value.TicketTtlSeconds,
-            sessionToken, accountGrade, healedMapId, cancellationToken, ResolveLoginSourceAddress(accountId));
+            sessionToken, accountGrade, healedMapId, ResolveLoginSourceAddress(accountId), cancellationToken);
 
         logger.LogInformation(
             "Zone transfer ticket minted: account {AccountId} character {CharacterId} -> zone {MapId} at {Host}:{Port} (shard {ShardId})",

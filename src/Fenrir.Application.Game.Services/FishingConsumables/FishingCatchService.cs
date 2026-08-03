@@ -100,8 +100,6 @@ public sealed class FishingCatchService(
 
         int? actionSort = step switch { 4 => 94, 5 => 95, _ => null };
 
-        // Stricter than legacy (S04_MyWork02.cpp:13568-13632, which resets neither): the reward opcode consumes the
-        // bite, so the next reward needs a fresh server-rolled bite instead of a replay of this opcode.
         if (!await zone.PostFishingCommandAndWaitAsync(
                 new FishingZoneCommand(characterId, state.FishingState, 0, false, true, actionSort,
                     castAt), cancellationToken))

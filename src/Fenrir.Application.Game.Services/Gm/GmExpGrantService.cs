@@ -26,6 +26,9 @@ public sealed class GmExpGrantService(
             logger.LogWarning(
                 "Character {CharacterId} attempted the Elevated-tier grant-experience-to-self command (sort {Sort}) without sufficient privilege -- disconnecting, no reply",
                 zoneSession.CharacterId, Sort);
+            await eventLog.LogAsync(GmActionEventCodes.ExpGrant, EventLogCategory.GmAction, zoneSession.AccountId,
+                zoneSession.CharacterId, null, null, null, null, null, null, null, GmCommandCatalog.OutcomeDenied,
+                $"Command=EXP;Sort={Sort};RequiredTier={(short)GmCommandTier.Elevated}", cancellationToken);
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }

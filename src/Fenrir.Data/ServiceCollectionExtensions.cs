@@ -87,6 +87,8 @@ public static class FenrirDataServiceCollectionExtensions
 
         builder.Services.AddSingleton<IGuildBuffExpiryRelayRepository, GuildBuffExpiryRelayRepository>();
 
+        builder.Services.AddSingleton<IGuildStateRelayRepository, GuildStateRelayRepository>();
+
         builder.Services.AddSingleton<IRvrSiegeEventRelayRepository, RvrSiegeEventRelayRepository>();
 
         builder.Services.AddSingleton<IPartyResyncRelayRepository, PartyResyncRelayRepository>();

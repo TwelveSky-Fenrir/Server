@@ -1,4 +1,5 @@
 using Fenrir.Application.Game.Domain.Guilds;
+using Fenrir.Application.Game.Domain.Social;
 using Fenrir.Application.Game.Domain.Social.Friends;
 using Fenrir.Application.Game.Domain.Social.Mentor;
 using Fenrir.Application.Game.Domain.Social.Party;
@@ -13,8 +14,17 @@ public sealed class PendingSocialRequestAutoCancelSystem(
     MentorRegistry mentorRegistry,
     PartyRegistry partyRegistry,
     GuildInviteRegistry guildInviteRegistry,
-    Lazy<ZoneRegistry> zoneRegistry) : ISimulationSystem
+    Lazy<ZoneRegistry> zoneRegistry) : ISimulationSystem, ISocialWorldEntryReset
 {
+    public void ClearForWorldEntry(int characterId)
+    {
+        tradeRegistry.ClearForWorldEntry(characterId);
+        friendRegistry.ClearForWorldEntry(characterId);
+        mentorRegistry.ClearForWorldEntry(characterId);
+        partyRegistry.ClearForWorldEntry(characterId);
+        guildInviteRegistry.ClearForWorldEntry(characterId);
+    }
+
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
         foreach (var state in zone.Players)

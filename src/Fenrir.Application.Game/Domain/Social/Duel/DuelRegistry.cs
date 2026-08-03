@@ -72,7 +72,10 @@ public sealed class DuelRegistry
 
     public bool IsActivelyDueling(int characterId)
     {
-        return _activeByCharacter.ContainsKey(characterId);
+        lock (_lock)
+        {
+            return _activeByCharacter.ContainsKey(characterId);
+        }
     }
 
     public DuelAskOutcome TryAsk(int challengerId, int targetId, bool noPotions)
@@ -195,21 +198,39 @@ public sealed class DuelRegistry
 
     public void ForceClearOnZoneEntry(int characterId)
     {
+        ClearForWorldEntry(characterId);
+    }
+
+    public void ClearForWorldEntry(int characterId)
+    {
         lock (_lock)
         {
             if (_pendingByChallenger.Remove(characterId, out var pendingTarget))
-                _pendingByTarget.Remove(pendingTarget);
+                RemoveMirror(_pendingByTarget, pendingTarget, characterId);
+
             if (_pendingByTarget.Remove(characterId, out var pendingChallenger))
-                _pendingByChallenger.Remove(pendingChallenger);
+            {
+                RemoveMirror(_pendingByChallenger, pendingChallenger, characterId);
+                _noPotionsByChallenger.Remove(pendingChallenger);
+            }
 
             if (_acceptedPairs.Remove(characterId, out var acceptedPartner))
-                _acceptedPairs.Remove(acceptedPartner);
+            {
+                RemoveMirror(_acceptedPairs, acceptedPartner, characterId);
+                _noPotionsByChallenger.Remove(acceptedPartner);
+            }
 
             _noPotionsByChallenger.Remove(characterId);
 
             _activeByCharacter.Remove(characterId);
 
-            _crossShard.TryConsumeOutbound(characterId, out _);
+            _crossShard.ClearForCharacter(characterId);
         }
+    }
+
+    private static void RemoveMirror(Dictionary<int, int> map, int counterpartId, int expectedValue)
+    {
+        if (map.TryGetValue(counterpartId, out var mirror) && mirror == expectedValue)
+            map.Remove(counterpartId);
     }
 }

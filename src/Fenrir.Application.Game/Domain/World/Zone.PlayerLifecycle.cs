@@ -13,6 +13,7 @@ using Fenrir.Application.Game.Domain.Movement;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Skills;
+using Fenrir.Application.Game.Domain.Social;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.Tribes;
@@ -79,6 +80,9 @@ public sealed partial class Zone
 
     private readonly List<int> _reviveNeighborScratch = [];
 
+    private readonly ISocialWorldEntryReset? _socialWorldEntryReset =
+        simulationSystems.OfType<ISocialWorldEntryReset>().FirstOrDefault();
+
     private void QueueDeathEventLog(short eventCode, int characterId, byte? outcome, string? payload)
     {
         _pendingDeathEventLogs.Enqueue(new PendingDeathEventLog(eventCode, characterId, options.ShardId, outcome,
@@ -125,8 +129,6 @@ public sealed partial class Zone
 
     private void HandleEnter(int characterId, PlayerEnterData data)
     {
-        _duelRegistry.ForceClearOnZoneEntry(characterId);
-
         var state = new PlayerRuntimeState
         {
             CharacterId = characterId,
@@ -354,6 +356,13 @@ public sealed partial class Zone
             }
         }
 
+        // After the duplicate-Enter guard: a no-op duplicate must not wipe the negotiation state of a character who
+        // is still in the world. ClearTradeOnDisconnect first, so a session the Leave drain has not reached yet
+        // still restores its staged BigMoney and notifies the partner.
+        ClearTradeOnDisconnect(characterId);
+        _duelRegistry.ClearForWorldEntry(characterId);
+        _socialWorldEntryReset?.ClearForWorldEntry(characterId);
+
         _grid.Add(characterId, cell, state.PosX, state.PosY, state.PosZ);
 
         dirtyTracker.MarkDirty(characterId, DirtyFlags.Position);
@@ -490,6 +499,7 @@ public sealed partial class Zone
                 var roster = BuildPartyRoster(3, result.RemainingMembers);
                 foreach (var memberId in result.RemainingMembers)
                     SendToCharacter(memberId, roster);
+
                 return;
             }
 
@@ -943,8 +953,6 @@ public sealed partial class Zone
         var previousActionSkillGradeNum1 = state.ActionSkillGradeNum1;
         var previousActionSkillGradeNum2 = state.ActionSkillGradeNum2;
 
-        // No AvatarActionResumeWhitelist sort is locomotion, so op16 never legitimately advances the position:
-        // its Location is discarded and the authoritative position stays where op15 last put it.
         if (!isResumeAction)
         {
             state.PosX = action.Location[0];

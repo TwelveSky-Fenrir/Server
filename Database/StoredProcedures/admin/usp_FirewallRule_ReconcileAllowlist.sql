@@ -8,5 +8,6 @@ BEGIN
 
     DELETE
     FROM admin.FirewallRules
-    WHERE RuleType IN (0, 2, 4, 5);
+    WHERE RuleType IN (0, 2, 4, 5)
+       OR (ExpiresAtUtc IS NOT NULL AND ExpiresAtUtc <= SYSUTCDATETIME());
 END;

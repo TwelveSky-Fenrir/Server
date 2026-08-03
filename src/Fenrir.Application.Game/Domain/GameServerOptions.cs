@@ -96,6 +96,7 @@ public sealed class GameServerOptions
     public short HolyStoneMapId { get; set; } = 38;
 
     public float HolyStoneX { get; set; } = -40f;
+    public float HolyStoneY { get; set; } = 200f;
     public float HolyStoneZ { get; set; } = 6379f;
     public float HolyStoneCaptureRadius { get; set; } = 25f;
     public float HolyStoneParticipationRadius { get; set; } = 3500f;
@@ -146,6 +147,10 @@ public sealed class GameServerOptions
     public int GuildBuffExpiryRelayPollIntervalSeconds { get; set; } = 2;
 
     public int GuildBuffExpiryRelayRetentionSeconds { get; set; } = 30;
+
+    public int GuildStateRelayPollIntervalSeconds { get; set; } = 2;
+
+    public int GuildStateRelayRetentionSeconds { get; set; } = 30;
 
     public int PartyResyncRelayPollIntervalSeconds { get; set; } = 1;
 

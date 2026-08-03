@@ -52,5 +52,6 @@ public interface IGuildRepository
 
     public ValueTask SetBuffTypeAsync(int guildId, int buffType, int buffState, CancellationToken ct);
 
-    public ValueTask SetNoticeAsync(int guildId, byte noticeIndex, string text, CancellationToken ct);
+    public ValueTask SetNoticeBoardAsync(int guildId, string text0, string text1, string text2, string text3,
+        CancellationToken ct);
 }

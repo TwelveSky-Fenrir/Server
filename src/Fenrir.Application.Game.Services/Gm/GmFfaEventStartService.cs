@@ -1,5 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Gm;
 using Fenrir.Application.Game.Abstractions.Sessions;
+using Fenrir.Application.Game.Domain.Gm;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Core.Packets.Shared;
@@ -30,6 +31,10 @@ public sealed class GmFfaEventStartService(
             logger.LogWarning(
                 "Character {CharacterId} attempted the Elevated-tier zone-wide FFA-start command (sort {Sort}) without sufficient privilege -- disconnecting, no reply",
                 zoneSession.CharacterId, Sort);
+            await eventLog.LogAsync(GmActionEventCodes.FfaEventStart, EventLogCategory.GmAction,
+                zoneSession.AccountId, zoneSession.CharacterId, null, null, null, null, null, null, null,
+                GmCommandCatalog.OutcomeDenied,
+                $"Command=FFA-START;Sort={Sort};RequiredTier={(short)GmCommandTier.Elevated}", cancellationToken);
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }

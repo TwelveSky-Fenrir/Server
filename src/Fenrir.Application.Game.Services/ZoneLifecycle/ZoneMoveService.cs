@@ -1,3 +1,4 @@
+using System.Net;
 using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Application.Game.Abstractions.World;
 using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
@@ -182,7 +183,7 @@ public sealed class ZoneMoveService(
 
         await tickets.CreateAsync(zoneSession.AccountId!.Value, characterId, options.Value.ShardId,
             options.Value.TicketTtlSeconds, zoneSession.AccountSessionToken!.Value, zoneSession.AccountGrade,
-            targetZoneNumber, cancellationToken);
+            targetZoneNumber, ResolveHandoffSourceAddress(zoneSession, characterId), cancellationToken);
 
         zoneSession.MarkZoneTransferPending();
 
@@ -276,7 +277,7 @@ public sealed class ZoneMoveService(
 
             await tickets.CreateAsync(zoneSession.AccountId!.Value, characterId, candidate.ShardId,
                 options.Value.TicketTtlSeconds, zoneSession.AccountSessionToken!.Value, zoneSession.AccountGrade,
-                targetZoneNumber, cancellationToken);
+                targetZoneNumber, ResolveHandoffSourceAddress(zoneSession, characterId), cancellationToken);
 
             if (!sourceZone.Post(ZoneCommand.MarkZoneTransferPending(characterId)))
             {
@@ -307,6 +308,18 @@ public sealed class ZoneMoveService(
             "Zone {TargetZoneNumber} is not hosted by any live shard -- refusing transfer for character {CharacterId}",
             targetZoneNumber, characterId);
         zoneSession.Send(new ZoneMoveResponse { Result = 1, Ip = "", Port = 0 });
+    }
+
+    private IPAddress? ResolveHandoffSourceAddress(IZoneSession zoneSession, int characterId)
+    {
+        if (zoneSession.RemoteEndPoint?.Address is { } address)
+            return address;
+
+        logger.LogWarning(
+            "Zone-move: character {CharacterId} has no remote endpoint on its live zone session; its handoff ticket is " +
+            "minted unbound and the destination zone will accept it from any source address",
+            characterId);
+        return null;
     }
 
     private static void MarkHandoffInProgress(PlayerRuntimeState state)

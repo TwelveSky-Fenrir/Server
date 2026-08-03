@@ -1,5 +1,5 @@
 using System.Buffers.Binary;
-using System.Text;
+using Fenrir.Core.Wire;
 
 namespace Fenrir.Application.Game.Domain.Combat;
 
@@ -43,8 +43,6 @@ public static class KillFeedBroadcastEncoder
 
     private static void WriteFixedName(Span<byte> destination, string name)
     {
-        destination.Clear();
-        var sourceLength = Math.Min(name.Length, destination.Length);
-        Encoding.ASCII.GetBytes(name.AsSpan(0, sourceLength), destination);
+        LegacyWireCodec.WriteFixedString(destination, name);
     }
 }

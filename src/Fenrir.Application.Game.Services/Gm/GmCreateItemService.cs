@@ -1,4 +1,4 @@
-﻿using Fenrir.Application.Game.Abstractions.Gm;
+using Fenrir.Application.Game.Abstractions.Gm;
 using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Application.Game.Domain.Gm;
 using Fenrir.Application.Game.Domain.Inventory;
@@ -26,9 +26,6 @@ public sealed class GmCreateItemService(
     private const int MinItemId = 2;
     private const int MaxItemId = 99999;
 
-    // Legacy's own ceiling: the loop is unbounded but ProcessForDropItem fails once the per-zone ground-item
-    // pool MAX_ITEM_OBJECT_NUM (Server/ts25zone/H01_MainApplication.h:132) is full, so one invocation can never
-    // create more than 4000 objects. Fenrir's ground-item map has no pool, so the bound has to be explicit.
     private const int MaxGroundItemObjects = 4000;
 
     private const short ItemCreateEventCode = 1;

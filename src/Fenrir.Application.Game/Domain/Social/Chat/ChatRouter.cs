@@ -6,8 +6,6 @@ public static class ChatRouter
 
     public const int MaxAvatarNameLength = 13;
 
-    // Legacy SafeString (Server/Header/safestring.h:12) zeroes field[width-1] on receipt, so the widest
-    // string that can ever be re-emitted is width-1 bytes and the terminator is always inside the field.
     public static string SafeString(string value, int fieldWidth)
     {
         return value.Length < fieldWidth ? value : value[..(fieldWidth - 1)];

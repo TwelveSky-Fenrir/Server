@@ -1,6 +1,5 @@
 using System.Buffers;
 using System.Buffers.Binary;
-using System.Text;
 using Fenrir.Application.Game.Abstractions.World;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.World.WorldState;
@@ -262,9 +261,7 @@ public sealed class ZoneEventBroadcaster(
         var data = new byte[DataSize];
         BinaryPrimitives.WriteInt32LittleEndian(data.AsSpan(0, 4), value);
 
-        var nameField = data.AsSpan(4, NameFieldSize);
-        var copyLength = Math.Min(characterName.Length, NameFieldSize);
-        Encoding.ASCII.GetBytes(characterName.AsSpan(0, copyLength), nameField);
+        LegacyWireCodec.WriteFixedString(data.AsSpan(4, NameFieldSize), characterName);
 
         var response = new ZoneEventInfoResponse { Sort = sort, Data = data };
 

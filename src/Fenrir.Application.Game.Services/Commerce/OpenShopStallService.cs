@@ -109,6 +109,17 @@ public sealed class OpenShopStallService(
                 PshopPurchasePolicy.OpenSlotOutcome.Success)
                 return Abort(state.CharacterId, $"slot {page}/{slot} failed live-inventory validation");
 
+            if (liveSlot!.Value.XPos != view.PosX || liveSlot.Value.YPos != view.PosY)
+                return Abort(state.CharacterId,
+                    $"slot {page}/{slot} declared grid position ({view.PosX},{view.PosY}) does not match the live " +
+                    $"stack at inventory {view.InventoryPage}/{view.InventoryIndex} " +
+                    $"({liveSlot.Value.XPos},{liveSlot.Value.YPos})");
+
+            if (liveSlot.Value.SocketGem1 != view.SocketGem1 || liveSlot.Value.SocketGem2 != view.SocketGem2 ||
+                liveSlot.Value.SocketGem3 != view.SocketGem3)
+                return Abort(state.CharacterId,
+                    $"slot {page}/{slot} declared sockets that do not match the live stack");
+
             if (isProxy)
                 offlineItems.Add(new OfflineShopItemSlotTvp((short)(page * PshopPurchasePolicy.MaxSlots + slot),
                     view.ItemId, view.Quantity, view.Value, view.Serial, view.Price,

@@ -1,5 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Gm;
 using Fenrir.Application.Game.Abstractions.Sessions;
+using Fenrir.Application.Game.Domain.Gm;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Core.Packets.Shared;
@@ -26,6 +27,10 @@ public sealed class GmSummonMonsterService(
             logger.LogWarning(
                 "Character {CharacterId} attempted the Elevated-tier summon-monster command (sort {Sort}) without sufficient privilege -- disconnecting, no reply",
                 zoneSession.CharacterId, Sort);
+            await eventLog.LogAsync(GmActionEventCodes.SummonMonster, EventLogCategory.GmAction,
+                zoneSession.AccountId, zoneSession.CharacterId, null, null, null, null, null, null, null,
+                GmCommandCatalog.OutcomeDenied,
+                $"Command=MONCALL;Sort={Sort};RequiredTier={(short)GmCommandTier.Elevated}", cancellationToken);
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }

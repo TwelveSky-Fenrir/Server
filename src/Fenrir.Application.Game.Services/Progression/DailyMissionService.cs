@@ -24,6 +24,10 @@ public sealed class DailyMissionService(
 
     private const int Zone241TimeStatSort = 200;
 
+    private const int MultiItemCreateNumBase = 7001;
+
+    private const int RewardItemCount = 1;
+
     public async ValueTask<DailyMissionClaimResult> ClaimAsync(int characterId, Zone zone, PlayerRuntimeState state,
         CancellationToken cancellationToken)
     {
@@ -63,11 +67,16 @@ public sealed class DailyMissionService(
                 "Zone {MapId} mission inbox full: dropped claim mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
 
-        state.Session.Send(new SetInventorySlotResponse
+        state.Session.Send(new MultiItemCreateResponse
         {
+            Num = MultiItemCreateNumBase + RewardItemCount,
             Page = container,
-            Index = slot,
-            Value = [itemId, destination.X, destination.Y, quantity, 0, 0]
+            Index1 = slot,
+            Index2 = 0,
+            Xy1 = destination.GridIndex,
+            Xy2 = 0,
+            ItemIndex = [itemId, 0, 0, 0, 0, 0, 0, 0],
+            Value = [0, 0, 0, 0]
         });
 
         if (state.Level2 == RebirthProgression.MaxHighLevel)

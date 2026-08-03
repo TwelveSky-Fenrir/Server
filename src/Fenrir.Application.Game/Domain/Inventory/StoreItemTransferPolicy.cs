@@ -181,7 +181,10 @@ public static class StoreItemTransferPolicy
             if (destination is not null)
                 return Fail(TransferOutcome.DestinationConflict);
 
-            var moved = CopySocketAndExpiry(source, source, sourceSupportsSocket);
+            var moved = CopySocketAndExpiry(source, source, sourceSupportsSocket) with
+            {
+                XPos = destinationX, YPos = destinationY
+            };
             return new TransferResult(TransferOutcome.Success, null, moved, true);
         }
 

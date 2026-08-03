@@ -51,6 +51,10 @@ public static class HostingServiceCollectionExtensions
         services.AddSingleton<IGuildBuffExpiryRelayQueue>(sp => sp.GetRequiredService<GuildBuffExpiryRelayHost>());
         services.AddHostedService(sp => sp.GetRequiredService<GuildBuffExpiryRelayHost>());
 
+        services.AddSingleton<GuildStateRelayHost>();
+        services.AddSingleton<IGuildStateRelayQueue>(sp => sp.GetRequiredService<GuildStateRelayHost>());
+        services.AddHostedService(sp => sp.GetRequiredService<GuildStateRelayHost>());
+
         services.AddHostedService<CommerceCatalogRefreshHost>();
 
         services.AddHostedService<ProxyShopBootReloadHost>();
@@ -263,8 +267,8 @@ public static class HostingServiceCollectionExtensions
         services.AddSingleton(sp =>
         {
             var opts = sp.GetRequiredService<IOptions<GameServerOptions>>().Value;
-            var site = new HolyStoneWarSite(opts.HolyStoneMapId, opts.HolyStoneX, opts.HolyStoneZ,
-                opts.HolyStoneCaptureRadius, opts.HolyStoneParticipationRadius);
+            var site = new HolyStoneWarSite(opts.HolyStoneMapId, opts.HolyStoneX, opts.HolyStoneY,
+                opts.HolyStoneZ, opts.HolyStoneCaptureRadius, opts.HolyStoneParticipationRadius);
 
             return new HolyStoneWarCycle(
                 sp.GetRequiredService<WorldStateService>(),

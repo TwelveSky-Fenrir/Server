@@ -271,4 +271,29 @@ public sealed class TradeRegistry
             return TradeDisconnectResult.None;
         }
     }
+
+    public void ClearForWorldEntry(int characterId)
+    {
+        lock (_lock)
+        {
+            if (_pendingByAsker.Remove(characterId, out var pendingTarget))
+                RemoveMirror(_pendingByTarget, pendingTarget, characterId);
+            if (_pendingByTarget.Remove(characterId, out var pendingAsker))
+                RemoveMirror(_pendingByAsker, pendingAsker, characterId);
+
+            if (_acceptedPairs.Remove(characterId, out var acceptedPartner))
+                RemoveMirror(_acceptedPairs, acceptedPartner, characterId);
+
+            if (_sessionByCharacter.Remove(characterId, out var session))
+                _sessionByCharacter.Remove(session.OpponentOf(characterId));
+
+            _crossShard.ClearForCharacter(characterId);
+        }
+    }
+
+    private static void RemoveMirror(Dictionary<int, int> map, int counterpartId, int expectedValue)
+    {
+        if (map.TryGetValue(counterpartId, out var mirror) && mirror == expectedValue)
+            map.Remove(counterpartId);
+    }
 }

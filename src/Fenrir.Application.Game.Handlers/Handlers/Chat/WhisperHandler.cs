@@ -1,4 +1,4 @@
-﻿using Fenrir.Application.Game.Abstractions.Chat;
+using Fenrir.Application.Game.Abstractions.Chat;
 using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Application.Game.Domain.Social.Chat;
 using Fenrir.Application.Game.Domain.World;

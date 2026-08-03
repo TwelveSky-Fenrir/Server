@@ -1,5 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Gm;
 using Fenrir.Application.Game.Abstractions.Sessions;
+using Fenrir.Application.Game.Domain.Gm;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Protocol.Game;
@@ -26,6 +27,12 @@ public sealed class GmBlockAvatarService(
     {
         if (!zoneSession.IsGm)
         {
+            logger.LogWarning(
+                "Character {CharacterId} attempted the Basic-tier GM BLOCK command (sort {Sort}) without sufficient privilege -- disconnecting, no reply",
+                zoneSession.CharacterId, GmBlockSort);
+            await eventLog.LogAsync(GmActionEventCodes.Block, EventLogCategory.GmAction, zoneSession.AccountId,
+                zoneSession.CharacterId, null, null, null, null, null, null, null, GmCommandCatalog.OutcomeDenied,
+                $"Command=BLOCK;Sort={GmBlockSort};RequiredTier={(short)GmCommandTier.Basic}", cancellationToken);
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }

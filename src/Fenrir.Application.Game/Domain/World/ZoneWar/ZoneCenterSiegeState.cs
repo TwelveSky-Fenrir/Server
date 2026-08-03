@@ -337,7 +337,7 @@ public sealed class ZoneCenterSiegeState
 
     private static int NowAsLegacyHhMm()
     {
-        var now = DateTime.UtcNow;
+        var now = DateTime.Now;
         return now.Hour * 100 + now.Minute;
     }
 }

@@ -17,8 +17,6 @@ public sealed class TcpShardReachabilityProbe(
 
     private readonly ConcurrentDictionary<(string Host, int Port), CachedProbe> _cache = new();
 
-    // One shared probe serves every concurrent caller for an endpoint, so it must never observe a single
-    // caller's token: each caller applies its own via WaitAsync.
     public async ValueTask<bool> IsReachableAsync(string host, int port, CancellationToken ct)
     {
         var key = (host, port);

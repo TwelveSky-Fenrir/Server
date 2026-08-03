@@ -21,8 +21,11 @@ public sealed class GuildInviteRegistry
 
     public bool IsNegotiating(int characterId)
     {
-        return _pendingByAsker.ContainsKey(characterId) || _pendingByTarget.ContainsKey(characterId) ||
-               _crossShard.IsPending(characterId);
+        lock (_lock)
+        {
+            return _pendingByAsker.ContainsKey(characterId) || _pendingByTarget.ContainsKey(characterId) ||
+                   _crossShard.IsPending(characterId);
+        }
     }
 
     public bool TryPeekPending(int characterId, out int counterpartId, out bool isAsker)
@@ -191,5 +194,26 @@ public sealed class GuildInviteRegistry
         {
             _acceptedFor[askerId] = targetId;
         }
+    }
+
+    public void ClearForWorldEntry(int characterId)
+    {
+        lock (_lock)
+        {
+            if (_pendingByAsker.Remove(characterId, out var pendingTarget))
+                RemoveMirror(_pendingByTarget, pendingTarget, characterId);
+            if (_pendingByTarget.Remove(characterId, out var pendingAsker))
+                RemoveMirror(_pendingByAsker, pendingAsker, characterId);
+
+            _acceptedFor.Remove(characterId);
+
+            _crossShard.ClearForCharacter(characterId);
+        }
+    }
+
+    private static void RemoveMirror(Dictionary<int, int> map, int counterpartId, int expectedValue)
+    {
+        if (map.TryGetValue(counterpartId, out var mirror) && mirror == expectedValue)
+            map.Remove(counterpartId);
     }
 }

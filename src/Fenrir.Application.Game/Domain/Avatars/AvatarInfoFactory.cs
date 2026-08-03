@@ -40,7 +40,6 @@ public static class AvatarInfoFactory
         var s = social ?? AvatarSocialSnapshot.Empty;
         var (wardrobe, costumeDate, costumeExpireDate) = CostumePersistenceCodec.Hydrate(costumes ?? []);
 
-        // game.Characters carries the fresher copy of garage slot 0; game.CharacterMounts carries slots 1-9.
         var garage = MountPersistenceCodec
             .Hydrate(mounts ?? [])
             .SetItem(MountPersistenceCodec.PersistedGarageSlot,

@@ -1,5 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Gm;
 using Fenrir.Application.Game.Abstractions.Sessions;
+using Fenrir.Application.Game.Domain.Gm;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -22,13 +23,16 @@ public sealed class GmGrantMoneyService(
             logger.LogWarning(
                 "Character {CharacterId} attempted the Elevated-tier grant-money command (sort {Sort}) without sufficient privilege -- disconnecting, no reply",
                 zoneSession.CharacterId, Sort);
+            await eventLog.LogAsync(GmActionEventCodes.GrantMoney, EventLogCategory.GmAction, zoneSession.AccountId,
+                zoneSession.CharacterId, null, null, null, null, null, null, null, GmCommandCatalog.OutcomeDenied,
+                $"Command=MONEY;Sort={Sort};RequiredTier={(short)GmCommandTier.Elevated}", cancellationToken);
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 
         await eventLog.LogAsync(GmActionEventCodes.GrantMoney, EventLogCategory.GmAction, zoneSession.AccountId,
             zoneSession.CharacterId, null, null, null, null, null, null, null, NoOpOutcome,
-            "GM grant-money command invoked; legacy case 504 body is dead/commented-out code (Server/ts25zone/S04_MyWork04.cpp:1013-1033) -- no money granted",
+            "GM grant-money command invoked; legacy case 504 body is dead/commented-out code (Server/ts25zone/S04_MyWork04.cpp:1009-1029) -- no money granted",
             cancellationToken);
 
         logger.LogInformation(

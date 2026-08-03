@@ -1,5 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Gm;
 using Fenrir.Application.Game.Abstractions.Sessions;
+using Fenrir.Application.Game.Domain.Gm;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Microsoft.Extensions.Logging;
@@ -23,6 +24,10 @@ public sealed class GmMaxStatService(IEventLogRepository eventLog, ILogger<GmMax
             logger.LogWarning(
                 "Character {CharacterId} attempted the Admin-tier MAX stat-cheat without sufficient privilege -- forcing logout, no reply",
                 zoneSession.CharacterId);
+            await eventLog.LogAsync(GmActionEventCodes.MaxStatCheat, EventLogCategory.GmAction,
+                zoneSession.AccountId, zoneSession.CharacterId, null, null, null, null, null, null, null,
+                GmCommandCatalog.OutcomeDenied, $"Command=MAX;Sort=509;RequiredTier={(short)GmCommandTier.Admin}",
+                cancellationToken);
             zoneSession.Abort(DisconnectReason.GmCommandLogout);
             return;
         }

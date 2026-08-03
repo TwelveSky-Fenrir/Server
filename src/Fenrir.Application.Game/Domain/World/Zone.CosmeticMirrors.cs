@@ -990,10 +990,15 @@ public sealed partial class Zone
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
         }
 
-        if (command.ClearAutoHuntConfig)
+        if (command.NewAutoHuntConfig is { } newAutoHuntConfig)
+        {
+            state.AutoHuntConfig = newAutoHuntConfig;
+            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+        }
+
+        if (command.DisableAutoHunt)
         {
             state.AutoHuntEnabled = false;
-            state.AutoHuntConfig = null;
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
         }
 
@@ -1241,5 +1246,6 @@ public readonly record struct AutoBuffZoneCommand(
     bool ApplyRegisteredBuffs = false,
     int? ActionSort = null,
     bool Broadcast = false,
-    bool ClearAutoHuntConfig = false,
+    AutoHunt? NewAutoHuntConfig = null,
+    bool DisableAutoHunt = false,
     TaskCompletionSource? Applied = null);

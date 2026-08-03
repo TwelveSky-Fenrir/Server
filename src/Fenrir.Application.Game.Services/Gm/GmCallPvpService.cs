@@ -1,5 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Gm;
 using Fenrir.Application.Game.Abstractions.Sessions;
+using Fenrir.Application.Game.Domain.Gm;
 using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
@@ -30,6 +31,10 @@ public sealed class GmCallPvpService(
             logger.LogWarning(
                 "Character {CharacterId} attempted the Basic-tier GM-CALLPVP command (sort {Sort}) without sufficient privilege -- disconnecting, no reply",
                 zoneSession.CharacterId, Sort);
+            await eventLog.LogAsync(GmDuelAndInventoryActionEventCodes.CallPvpRelocate, EventLogCategory.GmAction,
+                zoneSession.AccountId, zoneSession.CharacterId, null, null, null, null, null, null, null,
+                GmCommandCatalog.OutcomeDenied,
+                $"Command=CALLPVP;Sort={Sort};RequiredTier={(short)GmCommandTier.Basic}", cancellationToken);
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }

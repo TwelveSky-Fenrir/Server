@@ -119,9 +119,6 @@ public sealed class TradeLockService(
                     : trade.PlayerBId,
                 trade.PlayerAId, moneyDeltaA, bigMoneyDeltaA, trade.PlayerBId, moneyDeltaB, bigMoneyDeltaB);
 
-            // The transaction rolled back, so nothing was persisted. End the session rather than resetting the
-            // menus: the clients hold their notch at confirmed and will not re-send a lock, so leaving the trade
-            // open strands both players with their staged BigMoney still in escrow.
             AbortStagedTrade(trade, playerA, playerB);
             return;
         }
@@ -136,8 +133,6 @@ public sealed class TradeLockService(
         await PostMirrorAndWaitAsync(zoneA, playerA.CharacterId, planA, cancellationToken);
         await PostMirrorAndWaitAsync(zoneB, playerB.CharacterId, planB, cancellationToken);
 
-        // SQL takes the net delta, the zone mirror only the received side: staging already debited state.BigMoney
-        // into the escrow, so posting the net here would debit the staged amount a second time.
         var bigMoneyReceivedByA = trade.SideB.BigMoney;
         var bigMoneyReceivedByB = trade.SideA.BigMoney;
 

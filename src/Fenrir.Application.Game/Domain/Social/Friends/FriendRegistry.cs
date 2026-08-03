@@ -198,7 +198,7 @@ public sealed class FriendRegistry
             if (!_acceptedFor.Remove(characterId, out otherId))
                 return false;
 
-            RemoveMirror(otherId, characterId);
+            RemoveMirror(_acceptedFor, otherId, characterId);
             return true;
         }
     }
@@ -226,14 +226,30 @@ public sealed class FriendRegistry
             if (!_acceptedFor.Remove(characterId, out partnerId))
                 return false;
 
-            RemoveMirror(partnerId, characterId);
+            RemoveMirror(_acceptedFor, partnerId, characterId);
             return true;
         }
     }
 
-    private void RemoveMirror(int partnerId, int counterpartId)
+    public void ClearForWorldEntry(int characterId)
     {
-        if (_acceptedFor.TryGetValue(partnerId, out var mirror) && mirror == counterpartId)
-            _acceptedFor.Remove(partnerId);
+        lock (_lock)
+        {
+            if (_pendingByAsker.Remove(characterId, out var pendingTarget))
+                RemoveMirror(_pendingByTarget, pendingTarget, characterId);
+            if (_pendingByTarget.Remove(characterId, out var pendingAsker))
+                RemoveMirror(_pendingByAsker, pendingAsker, characterId);
+
+            if (_acceptedFor.Remove(characterId, out var acceptedPartner))
+                RemoveMirror(_acceptedFor, acceptedPartner, characterId);
+
+            _crossShard.ClearForCharacter(characterId);
+        }
+    }
+
+    private static void RemoveMirror(Dictionary<int, int> map, int counterpartId, int expectedValue)
+    {
+        if (map.TryGetValue(counterpartId, out var mirror) && mirror == expectedValue)
+            map.Remove(counterpartId);
     }
 }

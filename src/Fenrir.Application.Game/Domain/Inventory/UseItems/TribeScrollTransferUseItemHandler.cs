@@ -137,15 +137,12 @@ public sealed class TribeScrollTransferUseItemHandler(
             : -1;
 
         foreach (var (slot, newCostumeId) in costumeChanges)
-            if (!context.Zone.PostCostumeCommand(new CostumeZoneCommand(context.CharacterId,
-                    CostumeNumber: slot == wornSlot ? newCostumeId : (int?)null,
-                    WardrobeSlotGranted: slot,
-                    GrantedItemId: newCostumeId,
-                    GrantedCostumeDate: ValueAt(state.CostumeDate, slot),
-                    GrantedExpireDate: ValueAt(state.CostumeExpireDate, slot))))
-                logger.LogError(
-                    "Zone {MapId} costume inbox full: dropped op23 faction-transfer costume-remap mirror (slot {Slot}) for character {CharacterId}",
-                    context.Zone.MapId, context.CharacterId, slot);
+            context.Zone.PostCostumeCommand(new CostumeZoneCommand(context.CharacterId,
+                CostumeNumber: slot == wornSlot ? newCostumeId : (int?)null,
+                WardrobeSlotGranted: slot,
+                GrantedItemId: newCostumeId,
+                GrantedCostumeDate: ValueAt(state.CostumeDate, slot),
+                GrantedExpireDate: ValueAt(state.CostumeExpireDate, slot)));
 
         logger.LogInformation(
             "Character {CharacterId} op23 faction-transfer scroll ({ItemId}) applied: tribe {FromTribe}->{ToTribe}",

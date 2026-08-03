@@ -102,8 +102,6 @@ public sealed class GuildInviteService(
         if (invites.TryConsumeCrossShardInbound(targetId, out var inbound))
         {
             var crossShardAccepted = answerCode == 0;
-            if (crossShardAccepted)
-                invites.MarkAccepted(inbound.SourceCharacterId, targetId);
 
             var targetName = zones.TryGetPlayer(targetId, out var targetState) ? targetState.Name : "";
 

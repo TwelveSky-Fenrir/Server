@@ -7,8 +7,6 @@ BEGIN
     SET
         XACT_ABORT ON;
 
-    -- LockoutUntilUtc is the end of the current failure-counting window, never a denial deadline: a failure
-    -- inside an open window increments the count but must never extend the window, or the account can be pinned.
     DECLARE @NowUtc DATETIME2(3) = SYSUTCDATETIME();
     DECLARE @WindowMinutes INT = 15;
 

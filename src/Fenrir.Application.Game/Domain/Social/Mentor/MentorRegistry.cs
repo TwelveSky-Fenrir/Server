@@ -113,25 +113,34 @@ public sealed class MentorRegistry
 
         lock (_lock)
         {
-            if (!_pendingByStudent.Remove(studentId, out masterId))
+            if (!_pendingByStudent.TryGetValue(studentId, out masterId))
                 return false;
-
-            if (accepted)
-                _acceptedByStudent[studentId] = masterId;
 
             if (!_pendingByMaster.TryGetValue(masterId, out var recordedStudentId) || recordedStudentId != studentId)
+            {
+                _pendingByStudent.Remove(studentId);
                 return false;
+            }
 
             if (masterBusyByZoneTransfer)
             {
+                // A decline always releases the answering side, matching every sibling registry: the student has no
+                // cancel opcode, and the sweep never fires once the master's transfer completes.
+                if (!accepted)
+                    _pendingByStudent.Remove(studentId);
+
                 guardBlocked = true;
                 return false;
             }
 
+            _pendingByStudent.Remove(studentId);
             _pendingByMaster.Remove(masterId);
 
             if (accepted)
+            {
+                _acceptedByStudent[studentId] = masterId;
                 _acceptedByMaster[masterId] = studentId;
+            }
 
             return true;
         }
@@ -178,5 +187,27 @@ public sealed class MentorRegistry
 
             return false;
         }
+    }
+
+    public void ClearForWorldEntry(int characterId)
+    {
+        lock (_lock)
+        {
+            if (_pendingByMaster.Remove(characterId, out var pendingStudent))
+                RemoveMirror(_pendingByStudent, pendingStudent, characterId);
+            if (_pendingByStudent.Remove(characterId, out var pendingMaster))
+                RemoveMirror(_pendingByMaster, pendingMaster, characterId);
+
+            if (_acceptedByMaster.Remove(characterId, out var acceptedStudent))
+                RemoveMirror(_acceptedByStudent, acceptedStudent, characterId);
+            if (_acceptedByStudent.Remove(characterId, out var acceptedMaster))
+                RemoveMirror(_acceptedByMaster, acceptedMaster, characterId);
+        }
+    }
+
+    private static void RemoveMirror(Dictionary<int, int> map, int counterpartId, int expectedValue)
+    {
+        if (map.TryGetValue(counterpartId, out var mirror) && mirror == expectedValue)
+            map.Remove(counterpartId);
     }
 }

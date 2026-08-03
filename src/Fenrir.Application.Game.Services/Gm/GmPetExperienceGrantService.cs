@@ -1,5 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Gm;
 using Fenrir.Application.Game.Abstractions.Sessions;
+using Fenrir.Application.Game.Domain.Gm;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.World;
@@ -33,6 +34,10 @@ public sealed class GmPetExperienceGrantService(
             logger.LogWarning(
                 "Character {CharacterId} attempted the Admin-tier grant-pet-experience command without sufficient privilege -- forcing logout, no reply",
                 zoneSession.CharacterId);
+            await eventLog.LogAsync(GmActionEventCodes.PetExperienceGrant, EventLogCategory.GmAction,
+                zoneSession.AccountId, zoneSession.CharacterId, null, null, null, null, null, null, null,
+                GmCommandCatalog.OutcomeDenied, $"Command=PETEXP;Sort=700;RequiredTier={(short)GmCommandTier.Admin}",
+                cancellationToken);
             zoneSession.Abort(DisconnectReason.GmCommandLogout);
             return;
         }

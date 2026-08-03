@@ -17,10 +17,16 @@ BEGIN
     UPDATE game.Guilds
     SET Grade        = @Grade,
         UpdatedAtUtc = SYSUTCDATETIME()
-    WHERE GuildId = @GuildId;
+    WHERE GuildId = @GuildId
+      AND Grade = @Grade - 1;
 
     IF @@ROWCOUNT = 0
-        THROW 50235, N'Guild not found.', 1;
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM game.Guilds WHERE GuildId = @GuildId)
+                THROW 50235, N'Guild not found.', 1;
+
+            THROW 50365, N'Guild grade changed between the caller''s read and this upgrade write.', 1;
+        END;
 
     UPDATE game.Characters
     SET Money        = Money + @DeltaMoney,

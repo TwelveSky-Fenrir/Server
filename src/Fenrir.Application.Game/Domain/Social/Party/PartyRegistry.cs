@@ -599,6 +599,25 @@ public sealed class PartyRegistry
         }
     }
 
+    public void ClearForWorldEntry(int characterId)
+    {
+        lock (_lock)
+        {
+            if (_pendingByInviter.Remove(characterId, out var pendingInvitee))
+                RemoveMirror(_pendingByInvitee, pendingInvitee, characterId);
+            if (_pendingByInvitee.Remove(characterId, out var pendingInviter))
+                RemoveMirror(_pendingByInviter, pendingInviter, characterId);
+
+            _crossShard.ClearForCharacter(characterId);
+        }
+    }
+
+    private static void RemoveMirror(Dictionary<int, int> map, int counterpartId, int expectedValue)
+    {
+        if (map.TryGetValue(counterpartId, out var mirror) && mirror == expectedValue)
+            map.Remove(counterpartId);
+    }
+
     private void DisbandLocked(Party party)
     {
         foreach (var member in party.Members)

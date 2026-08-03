@@ -78,6 +78,12 @@ public sealed class GameServerOptionsValidator : IValidateOptions<GameServerOpti
         if (options.GuildBuffExpiryRelayRetentionSeconds <= 0)
             errors.Add(
                 $"Game:GuildBuffExpiryRelayRetentionSeconds must be positive (was {options.GuildBuffExpiryRelayRetentionSeconds}).");
+        if (options.GuildStateRelayPollIntervalSeconds <= 0)
+            errors.Add(
+                $"Game:GuildStateRelayPollIntervalSeconds must be positive (was {options.GuildStateRelayPollIntervalSeconds}).");
+        if (options.GuildStateRelayRetentionSeconds <= 0)
+            errors.Add(
+                $"Game:GuildStateRelayRetentionSeconds must be positive (was {options.GuildStateRelayRetentionSeconds}).");
         if (options.RvrSiegeEventRelayPollIntervalSeconds <= 0)
             errors.Add(
                 $"Game:RvrSiegeEventRelayPollIntervalSeconds must be positive (was {options.RvrSiegeEventRelayPollIntervalSeconds}).");
@@ -109,6 +115,9 @@ public sealed class GameServerOptionsValidator : IValidateOptions<GameServerOpti
         if (options.GuildBuffExpiryRelayRetentionSeconds <= options.GuildBuffExpiryRelayPollIntervalSeconds)
             errors.Add(
                 $"Game:GuildBuffExpiryRelayRetentionSeconds ({options.GuildBuffExpiryRelayRetentionSeconds}) must be greater than Game:GuildBuffExpiryRelayPollIntervalSeconds ({options.GuildBuffExpiryRelayPollIntervalSeconds}).");
+        if (options.GuildStateRelayRetentionSeconds <= options.GuildStateRelayPollIntervalSeconds)
+            errors.Add(
+                $"Game:GuildStateRelayRetentionSeconds ({options.GuildStateRelayRetentionSeconds}) must be greater than Game:GuildStateRelayPollIntervalSeconds ({options.GuildStateRelayPollIntervalSeconds}).");
         if (options.PartyResyncRelayRetentionSeconds <= options.PartyResyncRelayPollIntervalSeconds)
             errors.Add(
                 $"Game:PartyResyncRelayRetentionSeconds ({options.PartyResyncRelayRetentionSeconds}) must be greater than Game:PartyResyncRelayPollIntervalSeconds ({options.PartyResyncRelayPollIntervalSeconds}).");

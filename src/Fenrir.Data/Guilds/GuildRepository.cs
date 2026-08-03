@@ -238,12 +238,15 @@ public sealed record GuildRepository(ICaeriusNetDbContext Db) : IGuildRepository
         await Db.ExecuteAsync(sp, ct);
     }
 
-    public async ValueTask SetNoticeAsync(int guildId, byte noticeIndex, string text, CancellationToken ct)
+    public async ValueTask SetNoticeBoardAsync(int guildId, string text0, string text1, string text2, string text3,
+        CancellationToken ct)
     {
-        var sp = new StoredProcedureParametersBuilder("game", "usp_GuildNotice_Set", 0)
+        var sp = new StoredProcedureParametersBuilder("game", "usp_GuildNotice_SetAll", 0)
             .AddParameter("GuildId", guildId, SqlDbType.Int)
-            .AddParameter("NoticeIndex", noticeIndex, SqlDbType.TinyInt)
-            .AddParameter("Text", text, SqlDbType.NVarChar, 50)
+            .AddParameter("Text0", text0, SqlDbType.NVarChar, 50)
+            .AddParameter("Text1", text1, SqlDbType.NVarChar, 50)
+            .AddParameter("Text2", text2, SqlDbType.NVarChar, 50)
+            .AddParameter("Text3", text3, SqlDbType.NVarChar, 50)
             .Build();
 
         await Db.ExecuteAsync(sp, ct);

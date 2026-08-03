@@ -39,6 +39,17 @@ if (args.Length > 0)
         return await AccountCommands.AllowGmIpAsync(commandArgs[0]);
     }
 
+    if (command == AccountCommands.ClearIpBlockKeyword)
+    {
+        if (commandArgs.Length != 1)
+        {
+            AccountCommands.PrintUsage();
+            return 1;
+        }
+
+        return await AccountCommands.ClearIpBlockAsync(commandArgs[0]);
+    }
+
     if (command == LegacyImportCommand.Keyword)
         return LegacyImportCommand.Run(commandArgs);
 }

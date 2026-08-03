@@ -187,7 +187,6 @@ public abstract class ClientSession(
         {
             ValueTask<FlushResult> flush;
 
-            // FlushAsync throws synchronously once the TX reader completed with an exception (peer reset).
             try
             {
                 flush = Transport.Output.FlushAsync();
@@ -297,9 +296,6 @@ public abstract class ClientSession(
     {
         Volatile.Write(ref _completed, 1);
 
-        // Cancel before waiting. A holder parked in ObserveFlushAsync keeps _sendLock across the await, and against
-        // a peer that stopped reading that flush cannot resolve on its own -- without this the drain timeout below
-        // becomes the normal path rather than a backstop.
         Transport.Input.CancelPendingRead();
         Transport.Output.CancelPendingFlush();
 
@@ -309,9 +305,6 @@ public abstract class ClientSession(
 
         if (!acquired)
         {
-            // Completing the writer here would race a live GetSpan/Advance and hand its pooled segment back to the
-            // shared MemoryPool while another thread still writes into it. SocketConnection.DisposeAsync completes
-            // it after the socket is gone, so leaving it is safe; a leaked permit is not worth memory corruption.
             logger?.LogWarning(
                 "Session {SessionId} ({Server}, {RemoteEndPoint}): send lock still held after {TimeoutMs} ms -- leaving the transport output for the connection teardown to complete",
                 SessionId, Server, RemoteEndPoint, SendLockDrainTimeoutMs);

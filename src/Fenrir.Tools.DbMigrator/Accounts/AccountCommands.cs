@@ -12,6 +12,7 @@ public static class AccountCommands
     public const string CreateKeyword = "create-account";
     public const string GrantGmKeyword = "grant-gm";
     public const string AllowGmIpKeyword = "allow-gm-ip";
+    public const string ClearIpBlockKeyword = "clear-ip-block";
 
     private const int MaxPasswordLength = 32;
 
@@ -22,6 +23,8 @@ public static class AccountCommands
             $"       Fenrir.Tools.DbMigrator {GrantGmKeyword} <loginName> <grade>   (grade: 1=Basic, 10=Elevated, 100=Admin, 0=revoke)");
         Console.Error.WriteLine(
             $"       Fenrir.Tools.DbMigrator {AllowGmIpKeyword} <ipAddress>       (required for ANY grade>=1 account to log in at all)");
+        Console.Error.WriteLine(
+            $"       Fenrir.Tools.DbMigrator {ClearIpBlockKeyword} <ipAddress>    (drops every admin.FirewallRules row for that IP, including a flood-guard block)");
     }
 
     public static async Task<int> CreateAsync(string loginName, string password)
@@ -107,6 +110,37 @@ public static class AccountCommands
         }
     }
 
+    public static async Task<int> ClearIpBlockAsync(string ipAddress)
+    {
+        var repository = CreateFirewallRuleRepositoryOrNull();
+        if (repository is null)
+            return 1;
+
+        try
+        {
+            var removed = await repository.RemoveAsync(ipAddress, CancellationToken.None);
+
+            if (removed == 0)
+            {
+                Console.WriteLine(
+                    $"No admin.FirewallRules row for IP '{ipAddress}'; nothing to clear. Flood-guard blocks also " +
+                    $"lapse on their own {FirewallRuleRepository.AutoBlockDuration.TotalHours:0.#}h after they are written.");
+                return 0;
+            }
+
+            Console.WriteLine($"Removed {removed} admin.FirewallRules row(s) for IP '{ipAddress}'.");
+            Console.WriteLine(
+                "Running servers re-read the rule set every 2s. The in-memory per-IP connection cap is unaffected: " +
+                "it decays on its own as that IP's sockets close.");
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Could not clear firewall rules for IP '{ipAddress}': {ex.Message}");
+            return 1;
+        }
+    }
+
     private static AccountRepository? CreateAccountRepositoryOrNull()
     {
         var db = CreateDbContextOrNull();
@@ -117,6 +151,12 @@ public static class AccountCommands
     {
         var db = CreateDbContextOrNull();
         return db is null ? null : new GmAllowlistRepository(db);
+    }
+
+    private static FirewallRuleRepository? CreateFirewallRuleRepositoryOrNull()
+    {
+        var db = CreateDbContextOrNull();
+        return db is null ? null : new FirewallRuleRepository(db);
     }
 
     private static ICaeriusNetDbContext? CreateDbContextOrNull()

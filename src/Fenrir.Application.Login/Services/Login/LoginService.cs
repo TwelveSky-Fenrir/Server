@@ -134,27 +134,41 @@ public sealed class LoginService(
                 return Failure(ResultIpBlocked, "", true);
             }
 
-            var sourceFailureCount = ipRateLimiter.RecentFailureCount(remoteEndPoint, packet.Id);
+            var throttle = ipRateLimiter.Snapshot(remoteEndPoint, account?.AccountId ?? 0);
 
-            if (AccountBlockGate.EvaluateThrottle(sourceFailureCount, account?.FailedLoginCount ?? 0,
-                    account?.LockoutUntilUtc, DateTime.UtcNow) is AccountBlockOutcome.AutoLockedOut)
+            if (AccountBlockGate.EvaluateThrottle(throttle.SourceAccountFailureCount,
+                    throttle.SourceTotalFailureCount, account?.FailedLoginCount ?? 0,
+                    throttle.DistinctOtherSourceCount, account?.LockoutUntilUtc, DateTime.UtcNow) is
+                AccountBlockOutcome.AutoLockedOut)
             {
-                logger.LogWarning(
-                    "Login rejected before credential verification: IP {RemoteIp} is over its failed-attempt budget for login {Id}",
+                var retryDelaySeconds = AccountBlockGate.RetryDelaySeconds(throttle.SourceAccountFailureCount,
+                    throttle.SourceTotalFailureCount);
+
+                if (!ipRateLimiter.TryTakeRetrySlot(remoteEndPoint, retryDelaySeconds))
+                {
+                    logger.LogWarning(
+                        "Login rejected before credential verification: IP {RemoteIp} is over its failed-attempt budget for login {Id}; next paced attempt in {RetryDelaySeconds}s",
+                        remoteEndPoint, packet.Id, retryDelaySeconds);
+
+                    if (account is not null &&
+                        ipRateLimiter.TryClaimThrottleReport(remoteEndPoint, account.AccountId))
+                        await LogThrottleRejectionAsync(account.AccountId,
+                            Math.Max(throttle.SourceAccountFailureCount, throttle.SourceTotalFailureCount), remoteIp,
+                            cancellationToken);
+
+                    return Failure(ResultCustomMessage, AccountLockedOutMessage, true);
+                }
+
+                logger.LogInformation(
+                    "Login: IP {RemoteIp} is over its failed-attempt budget for login {Id}; admitting one paced verification attempt",
                     remoteEndPoint, packet.Id);
-
-                if (account is not null && ipRateLimiter.TryClaimThrottleReport(remoteEndPoint, packet.Id))
-                    await LogThrottleRejectionAsync(account.AccountId, sourceFailureCount, remoteIp,
-                        cancellationToken);
-
-                return Failure(ResultCustomMessage, AccountLockedOutMessage, true);
             }
 
             AuthenticationOutcome authentication;
             try
             {
-                authentication = await AuthenticateConstantTimeAsync(account, packet.Id, packet.Password,
-                    remoteEndPoint, remoteIp, cancellationToken);
+                authentication = await AuthenticateConstantTimeAsync(account, packet.Password, remoteEndPoint,
+                    remoteIp, cancellationToken);
             }
             catch (CaeriusNetSqlException ex)
             {
@@ -442,12 +456,12 @@ public sealed class LoginService(
     }
 
     private async ValueTask<AuthenticationOutcome> AuthenticateConstantTimeAsync(AuthenticateAccountDto? account,
-        string loginName, string password, IPEndPoint? remoteEndPoint, string? remoteIp, CancellationToken ct)
+        string password, IPEndPoint? remoteEndPoint, string? remoteIp, CancellationToken ct)
     {
         if (account is null)
         {
             _ = PasswordHasher.Verify(password, DummyCredential.Hash, DummyCredential.Salt);
-            ipRateLimiter.RecordFailure(remoteEndPoint, loginName);
+            ipRateLimiter.RecordUnknownAccountFailure(remoteEndPoint);
             return AuthenticationOutcome.UnknownAccount;
         }
 
@@ -455,7 +469,7 @@ public sealed class LoginService(
 
         if (!passwordOk)
         {
-            ipRateLimiter.RecordFailure(remoteEndPoint, loginName);
+            ipRateLimiter.RecordFailure(remoteEndPoint, account.AccountId);
             await accounts.RecordLoginAttemptAsync(account.AccountId, false, ct);
             var windowOpen = account.LockoutUntilUtc > DateTime.UtcNow;
             var failureCount = windowOpen ? (byte)Math.Min(account.FailedLoginCount + 1, byte.MaxValue) : (byte)1;
@@ -465,7 +479,7 @@ public sealed class LoginService(
             return AuthenticationOutcome.WrongPassword;
         }
 
-        ipRateLimiter.ClearFailures(remoteEndPoint, loginName);
+        ipRateLimiter.ClearFailures(remoteEndPoint, account.AccountId);
 
         var loggedBan = await bans.IsActiveForAccountAsync(account.AccountId, ct);
 

@@ -97,8 +97,6 @@ public static class TradeCommitPlanner
 
     private static bool IsSameUniqueItem(ItemStack live, ItemStack reserved)
     {
-        // SocketGem1..3 and XPos/YPos are excluded on purpose: staging zeroes the gems (USE_SOCKET_GEM is off in
-        // both shipped legacy builds) and the grid coordinates carry no identity.
         return live.ItemId == reserved.ItemId &&
                live.Quantity == reserved.Quantity &&
                live.Enchant == reserved.Enchant &&

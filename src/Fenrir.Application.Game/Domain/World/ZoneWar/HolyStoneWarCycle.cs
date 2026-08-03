@@ -19,13 +19,10 @@ public enum HolyStoneWarPhase : byte
 public sealed record HolyStoneWarSite(
     short MapId,
     float StoneX,
+    float StoneY,
     float StoneZ,
     float CaptureRadius,
-    float ParticipationRadius,
-    float StoneY = HolyStoneWarSite.LegacyStoneY)
-{
-    public const float LegacyStoneY = 200f;
-}
+    float ParticipationRadius);
 
 public sealed class HolyStoneWarCycle(
     WorldStateService worldState,
@@ -169,13 +166,16 @@ public sealed class HolyStoneWarCycle(
             var minute = _minuteCountdown.MinutesElapsed;
 
             if (minute is >= 1 and <= ChallengeCountdownMinutes)
-                broadcaster.AnnounceHolyStoneChallengeCountdown(ChallengeCountdownMinutes + 1 - minute);
-
-            if (minute >= ChallengeCountdownMinutes)
             {
-                ResolveCapture(zone, candidate);
-                return;
+                broadcaster.AnnounceHolyStoneChallengeCountdown(ChallengeCountdownMinutes + 1 - minute);
+                continue;
             }
+
+            if (minute != ChallengeCountdownMinutes + 1)
+                continue;
+
+            ResolveCapture(zone, candidate);
+            return;
         }
     }
 

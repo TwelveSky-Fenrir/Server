@@ -151,7 +151,6 @@ public sealed class CraftItemService(
             return new AdvancedElixirResult(AdvancedElixirOutcome.Rejected, null, 0, 0, null);
         }
 
-        // Every AdvancedElixirResultBaseItemId + k shares one item Sort, so the base id probes the whole range.
         var freeSlot = InventoryFreeSlotFinder.Find(state.Inventory, worldData,
             CraftRecipeCatalog.AdvancedElixirResultBaseItemId, state.InventoryDate, GameDate.Today());
         var hasFreeSlot = freeSlot is not null;

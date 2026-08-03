@@ -1,6 +1,7 @@
 namespace Fenrir.Tools.DbMigrator;
 
-public sealed record MigratorOptions(string ConnectionString, string DatabaseDirectory, string EnvironmentName)
+public sealed record MigratorOptions(string ConnectionString, string DatabaseDirectory, string EnvironmentName,
+    bool Recreate = false)
 {
     public const string DevOnlySeedScriptPath = "Migrations/Seed/001_dev_account.sql";
 
@@ -11,10 +12,13 @@ public sealed record MigratorOptions(string ConnectionString, string DatabaseDir
 
     public static MigratorOptions? FromEnvironment(string[] args)
     {
+        var recreate = args.Contains("--recreate", StringComparer.OrdinalIgnoreCase);
+        var positionalArgs = args.Where(a => !a.Equals("--recreate", StringComparison.OrdinalIgnoreCase)).ToArray();
+
         var connectionString =
             Environment.GetEnvironmentVariable("ConnectionStrings__FenrirDb") ??
             Environment.GetEnvironmentVariable("FENRIR_DB_CONNECTION_STRING") ??
-            args.FirstOrDefault();
+            positionalArgs.FirstOrDefault();
 
         if (string.IsNullOrWhiteSpace(connectionString))
             return null;
@@ -26,6 +30,6 @@ public sealed record MigratorOptions(string ConnectionString, string DatabaseDir
 
         var databaseDirectory = Path.Combine(AppContext.BaseDirectory, "Database");
 
-        return new MigratorOptions(connectionString, databaseDirectory, environmentName);
+        return new MigratorOptions(connectionString, databaseDirectory, environmentName, recreate);
     }
 }

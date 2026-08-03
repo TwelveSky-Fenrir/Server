@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Data.SqlClient;
 
 namespace Fenrir.Tools.DbMigrator;
@@ -6,6 +7,8 @@ public static class MigrationRunner
 {
     public static async Task<int> RunAsync(MigratorOptions options)
     {
+        var stopwatch = Stopwatch.StartNew();
+
         if (!File.Exists(options.ManifestPath))
         {
             Console.Error.WriteLine($"Manifest not found: {options.ManifestPath}");
@@ -18,7 +21,7 @@ public static class MigrationRunner
         if (scripts is null)
             return 1;
 
-        if (!await DatabaseProvisioner.EnsureCreatedAsync(options.ConnectionString))
+        if (!await DatabaseProvisioner.EnsureCreatedAsync(options.ConnectionString, options.Recreate))
             return 1;
 
         await using var connection = new SqlConnection(options.ConnectionString);
@@ -31,6 +34,8 @@ public static class MigrationRunner
             : new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
 
         var pendingJournal = new List<(string RelativePath, byte[] Hash)>();
+        var appliedCount = 0;
+        var skippedCount = 0;
 
         foreach (var script in scripts)
         {
@@ -40,7 +45,14 @@ public static class MigrationRunner
                 return 1;
 
             if (outcome == ScriptOutcome.Applied)
+            {
+                appliedCount++;
                 journalReady = await FlushPendingJournalAsync(connection, journalReady, pendingJournal);
+            }
+            else
+            {
+                skippedCount++;
+            }
         }
 
         if (pendingJournal.Count > 0)
@@ -49,7 +61,8 @@ public static class MigrationRunner
 
         await IndexedViewArithabortDiagnostics.ReportAsync(connection);
 
-        Console.WriteLine($"Migration complete: {scripts.Count} script(s) checked.");
+        Console.WriteLine(
+            $"Migration complete: {scripts.Count} script(s) checked ({appliedCount} applied, {skippedCount} skipped) in {stopwatch.Elapsed.TotalSeconds:0.0}s.");
         return 0;
     }
 
@@ -82,10 +95,11 @@ public static class MigrationRunner
 
         Console.WriteLine($"apply  {relativePath}");
 
-        foreach (var batch in SqlScriptBatcher.SplitBatches(content))
+        var batches = SqlScriptBatcher.SplitBatches(content).Where(b => b.Length > 0).ToList();
+
+        for (var batchIndex = 0; batchIndex < batches.Count; batchIndex++)
         {
-            if (batch.Length == 0)
-                continue;
+            var batch = batches[batchIndex];
 
             try
             {
@@ -94,7 +108,7 @@ public static class MigrationRunner
             }
             catch (SqlException ex)
             {
-                Console.Error.WriteLine($"'{relativePath}' failed: {ex.Message}");
+                ReportBatchFailure(relativePath, batchIndex + 1, batches.Count, batch, ex);
                 return ScriptOutcome.Failed;
             }
         }
@@ -124,6 +138,23 @@ public static class MigrationRunner
 
         pendingJournal.Clear();
         return journalReady;
+    }
+
+    private static void ReportBatchFailure(string relativePath, int batchIndex, int batchCount, string batch,
+        SqlException ex)
+    {
+        Console.Error.WriteLine(
+            $"'{relativePath}' failed on batch {batchIndex}/{batchCount} (error {ex.Number}" +
+            (ex.LineNumber > 0 ? $", line {ex.LineNumber}" : "") +
+            (string.IsNullOrEmpty(ex.Procedure) ? "" : $", in '{ex.Procedure}'") +
+            $"): {ex.Message}");
+
+        var preview = batch.Length > 300 ? batch[..300] + " [...]" : batch;
+        Console.Error.WriteLine($"Failing batch text:\n{preview}");
+
+        if (ex.Errors.Count > 1)
+            foreach (SqlError error in ex.Errors)
+                Console.Error.WriteLine($"  - [{error.Number}] {error.Message}");
     }
 
     private enum ScriptOutcome

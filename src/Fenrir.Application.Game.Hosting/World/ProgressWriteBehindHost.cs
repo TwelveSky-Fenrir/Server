@@ -9,12 +9,10 @@ public sealed class ProgressWriteBehindHost(ZoneRegistry zones, ICharacterReposi
 {
     private const DirtyFlags ProgressFlags = DirtyFlags.Vitals | DirtyFlags.Progression;
 
-    public async ValueTask<IReadOnlySet<int>> FlushAsync(IReadOnlyDictionary<int, DirtyFlags> dirty,
-        CancellationToken ct)
+    public async ValueTask FlushAsync(IReadOnlyDictionary<int, DirtyFlags> dirty, CancellationToken ct)
     {
         var rows = new List<CharacterProgressTvp>(dirty.Count);
         var costumes = new List<CharacterCostumeSlotTvp>();
-        var claimed = new HashSet<int>();
         List<(PlayerRuntimeState State, int WarPoint, int BloodCoin)>? credited = null;
 
         foreach (var (characterId, flags) in dirty)
@@ -97,8 +95,6 @@ public sealed class ProgressWriteBehindHost(ZoneRegistry zones, ICharacterReposi
                 ProtectForDeath: state.ProtectForDeath));
 
             CostumePersistenceCodec.AppendOccupiedSlots(costumes, characterId, state);
-
-            claimed.Add(characterId);
         }
 
         await characters.PersistProgressAsync(rows, costumes, ct).ConfigureAwait(false);
@@ -109,7 +105,5 @@ public sealed class ProgressWriteBehindHost(ZoneRegistry zones, ICharacterReposi
                 state.PersistedWarPoint = warPoint;
                 state.PersistedBloodCoin = bloodCoin;
             }
-
-        return claimed;
     }
 }

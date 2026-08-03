@@ -195,6 +195,26 @@ public sealed class ZoneRegistry
         return false;
     }
 
+    public bool TryGetPlayerInOtherZone(int characterId, Zone excludeZone, [NotNullWhen(true)] out PlayerRuntimeState? state,
+        [NotNullWhen(true)] out Zone? zone)
+    {
+        foreach (var candidate in _zones.Values)
+        {
+            if (ReferenceEquals(candidate, excludeZone))
+                continue;
+
+            if (candidate.TryGetPlayer(characterId, out state) && state is not null)
+            {
+                zone = candidate;
+                return true;
+            }
+        }
+
+        state = null;
+        zone = null;
+        return false;
+    }
+
     public bool TryGetPlayerByName(string name, [NotNullWhen(true)] out PlayerRuntimeState? state)
     {
         foreach (var zone in _zones.Values)

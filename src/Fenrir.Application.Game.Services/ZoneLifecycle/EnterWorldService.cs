@@ -170,6 +170,33 @@ public sealed class EnterWorldService(
             return;
         }
 
+        // Positive cross-zone presence check (same-shard leg of the duplicate-admission guard, see
+        // ZoneTransferCancelService for the cross-shard/broker leg). A character can legitimately still be
+        // tracked in its OLD zone's _players here -- the normal zone-move handoff disconnects the old
+        // connection only AFTER the new one finishes entering, so this is expected to race. What must never
+        // happen is admitting this character into `zone` while it is ALSO live somewhere that is NOT
+        // mid-transfer, or leaving a stale mid-transfer registration behind once this admission wins.
+        if (zones.TryGetPlayerInOtherZone(characterId, zone, out var existingState, out var existingZone))
+        {
+            if (!existingState.IsMovingZone)
+            {
+                logger.LogError(
+                    "Enter-world rejected for character {CharacterId}: already live on zone {ExistingMapId} " +
+                    "without a pending transfer -- refusing duplicate admission on zone {MapId}",
+                    characterId, existingZone.MapId, zone.MapId);
+                zoneSession.Abort(DisconnectReason.StateViolation);
+                return;
+            }
+
+            logger.LogWarning(
+                "Character {CharacterId} entering zone {MapId} while a stale pending-transfer registration is " +
+                "still live on zone {StaleMapId} -- evicting the stale connection so it can never resume as a " +
+                "second live copy",
+                characterId, zone.MapId, existingZone.MapId);
+
+            existingState.Session.Abort(DisconnectReason.Evicted);
+        }
+
         if (WrapCheckSpecialDestinationCatalog.IsInstancedDestination(character.MapId))
         {
             if (character.Zone241Time < 1)

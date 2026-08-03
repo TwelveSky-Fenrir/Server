@@ -43,7 +43,12 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
                 await _flushGate.WaitAsync(ct).ConfigureAwait(false);
                 try
                 {
-                    var claimedByProgress = await progress.FlushAsync(dirty, ct).ConfigureAwait(false);
+                    // Progress and Position are guarded by their own independent game.Characters columns
+                    // (ProgressFlushSequence / PositionFlushSequence, Migrations/048) precisely so these two
+                    // writes can never race each other on the same idempotency guard column -- no ordering
+                    // or claim/defer dance needed between them any more. See usp_Character_PersistBatch /
+                    // usp_Character_PersistProgressBatch's own header comments for the guard split.
+                    await progress.FlushAsync(dirty, ct).ConfigureAwait(false);
 
                     var rows = new List<CharacterPositionTvp>(dirty.Count);
                     var logoutRows = new List<CharacterLogoutStateTvp>(dirty.Count);
@@ -58,12 +63,6 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
 
                         if ((flags & DirtyFlags.Position) == 0)
                             continue;
-
-                        if (claimedByProgress.Contains(characterId))
-                        {
-                            dirtyTracker.MarkDirty(characterId, DirtyFlags.Position);
-                            continue;
-                        }
 
                         rows.Add(new CharacterPositionTvp(characterId, state.FlushSequence, state.MapId, state.PosX,
                             state.PosY, state.PosZ, state.Heading));

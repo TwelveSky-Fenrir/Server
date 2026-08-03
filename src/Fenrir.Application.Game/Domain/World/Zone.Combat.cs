@@ -786,14 +786,7 @@ public sealed partial class Zone
             ApplyTowerGuardianHitSideEffects(towerIndex, attackerState);
     }
 
-    /// <summary>
-    ///     Zone175 dungeon boss-damage echo (legacy <c>mAttack175BossDmg</c>, Server/ts25zone/S07_MyGame02.cpp:2079-2101).
-    ///     Returns null when Zone175 processing is inactive for this zone (leave AttackActionValue4 untouched --
-    ///     it is otherwise an inbound-only budget field, see AttackPacketBudget); returns 0 to mask the field on a
-    ///     hit against a non-boss monster; accumulates and echoes the running total on a hit against a Zone175
-    ///     stage-boss monster (special type 40-44).
-    /// </summary>
-    private int? ResolveZone175BossDamageWireEcho(PlayerRuntimeState attackerState, MonsterEntity monster,
+        private int? ResolveZone175BossDamageWireEcho(PlayerRuntimeState attackerState, MonsterEntity monster,
         int realDamage)
     {
         if (_zone175LabyrinthSystem is not { } zone175System || !zone175System.IsZone175Map(MapId))

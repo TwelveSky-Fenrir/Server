@@ -1125,3 +1125,16 @@ Migrations/046_ornament_silver_gold_time_columns.sql
 # game.tvp_CharacterProgress (93 colonnes) et les procedures write-behind + GetForWorldEntry pour
 # les scrolls de kill-bonus PvP (items 1118/1119/1120/1155/1163/1186/1228 et variantes).
 Migrations/047_kill_timer_columns.sql
+
+# BUG FIX (livelock): game.Characters.FlushSequence etait une colonne de garde d'idempotence PARTAGEE
+# entre usp_Character_PersistBatch (Position) et usp_Character_PersistProgressBatch (Progress/Vitals),
+# deux ecrivains periodiques independants qui se disputaient la meme colonne "WHERE incoming > c.FlushSequence"
+# -- pour un personnage dirty sur les deux a la fois (cas courant en combat+deplacement), Progress gagnait
+# toujours la course et l'ecriture Position, avec la meme valeur, echouait silencieusement la garde. Le
+# contournement cote C# (defer + re-mark dirty) ne resolvait rien : la collision revenait au cycle suivant
+# des qu'un evenement Vitals/Progression fusionnait a nouveau dans l'entree dirty. Ajoute deux colonnes de
+# garde independantes (PositionFlushSequence/ProgressFlushSequence), redefinit les deux procedures pour
+# garder chacune sur la sienne, et redefinit usp_Character_GetForWorldEntry/GetForWorldEntrySummary pour
+# amorcer PlayerRuntimeState.FlushSequence via GREATEST() des trois colonnes. Supprime en parallele la
+# logique claim/defer devenue inutile dans PositionWriteBehindHost.cs/ProgressWriteBehindHost.cs.
+Migrations/048_position_progress_flushsequence_split.sql

@@ -8,11 +8,7 @@ public sealed class TimedBuffCountdownSystem : ISimulationSystem
 {
     private const int MaxMountExp = 100000;
 
-    /// <summary>
-    ///     Server/ts25zone/S07_MyGame04.cpp:913-930 exclusion gate; shared with PetExpBoostCountdownSystem's
-    ///     pet-exp timer, nested in the same gate (S07_MyGame04.cpp:942-953/970).
-    /// </summary>
-    internal static readonly FrozenSet<short> GroupAExcludedMaps =
+        internal static readonly FrozenSet<short> GroupAExcludedMaps =
         new short[] { 1, 6, 11, 140, 38, 37, 119, 124, 49, 51, 53, 194, 195, 267 }.ToFrozenSet();
 
     private static readonly FrozenSet<short> GroupBIncludedMaps =

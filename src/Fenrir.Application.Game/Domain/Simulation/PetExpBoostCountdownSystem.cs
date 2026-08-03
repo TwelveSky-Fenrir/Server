@@ -26,7 +26,6 @@ public sealed class PetExpBoostCountdownSystem : ISimulationSystem
 
         state.PetExpX2TimeAccrualTicks -= minutesElapsed * SimulationClock.PlayTimeAccrualLegacyTicks;
 
-        // Server/ts25zone/S07_MyGame04.cpp:913-930/970: pet-exp decrement is nested inside this same gate.
         if (isExcluded)
             return;
 

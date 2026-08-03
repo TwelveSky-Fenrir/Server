@@ -51,17 +51,6 @@ public sealed class LootBoxCatalog
 
             BoxRewardSpec.Uniform(800, [801, 802, 803, 804, 805, 806]),
 
-            BoxRewardSpec.Weighted(1043, [
-                new LootBoxRewardResolver.WeightedReward(699, 1),
-                new LootBoxRewardResolver.WeightedReward(1437, 1),
-                new LootBoxRewardResolver.WeightedReward(576, 8),
-                new LootBoxRewardResolver.WeightedReward(1023, 90),
-                new LootBoxRewardResolver.WeightedReward(1022, 100),
-                new LootBoxRewardResolver.WeightedReward(1021, 100),
-                new LootBoxRewardResolver.WeightedReward(1020, 100),
-                new LootBoxRewardResolver.WeightedReward(1019, 200)
-            ]),
-
             BoxRewardSpec.Uniform(76544, [8001, 8002, 8003, 8105, 8110, 1126, 8405, 8407, 8408])
         };
 

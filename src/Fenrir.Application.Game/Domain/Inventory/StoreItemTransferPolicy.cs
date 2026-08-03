@@ -104,7 +104,8 @@ public static class StoreItemTransferPolicy
         if (source is not { } src)
             return Fail(TransferOutcome.SourceEmpty);
 
-        return ResolveOneWayTransfer(requestedQuantity, src, destination, sourceIsStackable, sourceSupportsSocket);
+        return ResolveOneWayTransfer(requestedQuantity, src, destination, sourceIsStackable, sourceSupportsSocket,
+            (byte)destinationXPost, (byte)destinationYPost);
     }
 
     public static TransferResult ResolveRearrangeWithinStore(
@@ -172,7 +173,8 @@ public static class StoreItemTransferPolicy
 
     private static TransferResult ResolveOneWayTransfer(
         int requestedQuantity, ItemStack source, ItemStack? destination,
-        bool sourceIsStackable, bool sourceSupportsSocket)
+        bool sourceIsStackable, bool sourceSupportsSocket,
+        byte destinationX = 0, byte destinationY = 0)
     {
         if (!sourceIsStackable)
         {
@@ -210,7 +212,8 @@ public static class StoreItemTransferPolicy
                 CopySocketAndExpiry(mergedDestination, source, sourceSupportsSocket), false);
         }
 
-        var newDestination = new ItemStack(source.ItemId, requestedQuantity, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        var newDestination = new ItemStack(source.ItemId, requestedQuantity, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            destinationX, destinationY);
         var remaining = source.Quantity - requestedQuantity;
         if (remaining > 0)
             return new TransferResult(TransferOutcome.Success, source with { Quantity = remaining }, newDestination,

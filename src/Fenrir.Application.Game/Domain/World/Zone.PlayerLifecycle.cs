@@ -54,11 +54,11 @@ public sealed partial class Zone
 
     private const int ImplausibleMoveDisconnectThreshold = 5;
 
-    private const string RegularWarAfkCheckerSenderName = "AFK Checker";
+    internal const string RegularWarAfkCheckerSenderName = "AFK Checker";
 
     private static readonly TimeSpan HolyShieldReapplyCooldown = TimeSpan.FromSeconds(10);
 
-    private static readonly ItemLinkInfo RegularWarAfkCheckerLink =
+    internal static readonly ItemLinkInfo RegularWarAfkCheckerLink =
         new() { Index = 0, Activity = 0, Value = 0, Socket = new int[3] };
 
     private readonly List<int> _buffStateNeighborScratch = [];
@@ -614,7 +614,7 @@ public sealed partial class Zone
     }
 
     public void ApplyDeath(int characterId, DeathCause cause = DeathCause.Unknown,
-        (float X, float Z)? deathSourcePosition = null)
+        (float X, float Z)? deathSourcePosition = null, bool suppressExperienceLoss = false)
     {
         if (!_players.TryGetValue(characterId, out var state))
         {
@@ -631,7 +631,7 @@ public sealed partial class Zone
         state.IsDead = true;
         state.TicksSinceDeath = 0;
 
-        state.ReviveHackFlag = true;
+        state.ReviveHackFlag = cause != DeathCause.Duel;
         state.CanUseConsumables = false;
         state.DeathSubCounter = ReviveEligibilityRules.DeathSubCounterBaseline;
 
@@ -639,7 +639,7 @@ public sealed partial class Zone
 
         QueueDeathEventLog(CharacterDeathEventCode, characterId, (byte)cause, $"Cause={cause};Level={state.Level}");
 
-        if (cause == DeathCause.MonsterKill)
+        if (cause == DeathCause.MonsterKill && !suppressExperienceLoss)
             ApplyDeathExperienceLoss(state);
 
         if (state.IsStunned)
@@ -1002,7 +1002,7 @@ public sealed partial class Zone
             return;
 
         var fullUnits = isZone195 ? RegularWarAfkTickSystem.Zone195FullUnits : RegularWarAfkTickSystem.WarActiveFullUnits;
-        if (state.AfkTick >= fullUnits * RegularWarAfkTickSystem.UnitLegacyTicks)
+        if (state.AfkTick >= RegularWarAfkTickSystem.ResetNotificationLegacyTicks)
             state.Session.Send(new LocalChatResponse
             {
                 AvatarName = RegularWarAfkCheckerSenderName,

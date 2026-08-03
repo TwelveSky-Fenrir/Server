@@ -79,7 +79,8 @@ public static class SaveBankItemTransferPolicy
         if (source is not { } src)
             return Fail(TransferOutcome.SourceEmpty);
 
-        return ResolveTransfer(requestedQuantity, src, destination, sourceIsStackable, sourceSupportsSocket);
+        return ResolveTransfer(requestedQuantity, src, destination, sourceIsStackable, sourceSupportsSocket,
+            (byte)destinationXPost, (byte)destinationYPost);
     }
 
     public static TransferResult ResolveRearrangeWithinBank(
@@ -104,7 +105,8 @@ public static class SaveBankItemTransferPolicy
 
     private static TransferResult ResolveTransfer(
         int requestedQuantity, ItemStack source, ItemStack? destination,
-        bool sourceIsStackable, bool sourceSupportsSocket)
+        bool sourceIsStackable, bool sourceSupportsSocket,
+        byte destinationX = 0, byte destinationY = 0)
     {
         if (!sourceIsStackable)
         {
@@ -135,18 +137,29 @@ public static class SaveBankItemTransferPolicy
 
             var remainingAfterMerge = source.Quantity - requestedQuantity;
             if (remainingAfterMerge > 0)
+            {
+                if (remainingAfterMerge > GroundItemPickupPolicy.MaxStackQuantity)
+                    return Fail(TransferOutcome.InvalidQuantity);
+
                 return new TransferResult(TransferOutcome.Success, source with { Quantity = remainingAfterMerge },
                     mergedDestination, false);
+            }
 
             return new TransferResult(TransferOutcome.Success, null,
                 CopySocketAndExpiry(mergedDestination, source, sourceSupportsSocket), false);
         }
 
-        var newDestination = new ItemStack(source.ItemId, requestedQuantity, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        var newDestination = new ItemStack(source.ItemId, requestedQuantity, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            destinationX, destinationY);
         var remaining = source.Quantity - requestedQuantity;
         if (remaining > 0)
+        {
+            if (remaining > GroundItemPickupPolicy.MaxStackQuantity)
+                return Fail(TransferOutcome.InvalidQuantity);
+
             return new TransferResult(TransferOutcome.Success, source with { Quantity = remaining }, newDestination,
                 false);
+        }
 
         return new TransferResult(TransferOutcome.Success, null,
             CopySocketAndExpiry(newDestination, source, sourceSupportsSocket), false);

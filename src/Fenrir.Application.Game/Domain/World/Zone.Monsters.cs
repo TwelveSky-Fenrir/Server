@@ -282,7 +282,8 @@ public sealed partial class Zone
         BroadcastAttackResult(_mvpAttackRecipientScratch, response, target.DungeonInstanceId);
 
         if (target.Life <= 0)
-            ApplyDeath(target.CharacterId, DeathCause.MonsterKill);
+            ApplyDeath(target.CharacterId, DeathCause.MonsterKill,
+                suppressExperienceLoss: monster.SpecialSort != MonsterSpecialSort.Standard);
     }
 
     public void QueueMoneyGrant(int characterId, long amount)

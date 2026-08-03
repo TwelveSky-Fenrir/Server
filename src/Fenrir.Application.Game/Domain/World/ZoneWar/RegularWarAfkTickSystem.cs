@@ -16,6 +16,8 @@ public sealed class RegularWarAfkTickSystem(
 
     public const int UnitLegacyTicks = 60;
 
+    public const int ResetNotificationLegacyTicks = 60;
+
     public const int DisconnectGraceLegacyTicksPastFull = 2;
 
     public void Simulate(Zone zone, int legacyTicksElapsed)
@@ -45,20 +47,35 @@ public sealed class RegularWarAfkTickSystem(
             if (player.IsMovingZone)
                 continue;
 
+            if (IsHiding(player))
+            {
+                player.AfkTick = 0;
+                continue;
+            }
+
             var previousTicks = player.AfkTick;
             player.AfkTick += legacyTicksElapsed;
 
             var previousUnit = previousTicks / UnitLegacyTicks;
             var currentUnit = player.AfkTick / UnitLegacyTicks;
             if (currentUnit > previousUnit && player.AfkTick < fullTicks)
+            {
                 logger.LogInformation(
                     "RegularWarAfkTick: character {CharacterId} on zone {MapId} idle warning {Current}/{Full}",
                     player.CharacterId, zone.MapId, currentUnit, fullUnits);
 
+                player.Session.Send(new LocalChatResponse
+                {
+                    AvatarName = Zone.RegularWarAfkCheckerSenderName,
+                    Content = $"Start {currentUnit}/{fullUnits}",
+                    Link = Zone.RegularWarAfkCheckerLink
+                });
+            }
+
             if (previousTicks < fullTicks && player.AfkTick >= fullTicks)
                 (toAutoReturn ??= []).Add(player);
 
-            if (player.AfkTick >= fullTicks + DisconnectGraceLegacyTicksPastFull)
+            if (player.AfkTick > fullTicks + DisconnectGraceLegacyTicksPastFull)
                 (toDisconnect ??= []).Add(player);
         }
 
@@ -79,5 +96,10 @@ public sealed class RegularWarAfkTickSystem(
         foreach (var player in zone.Players)
             if (player.AfkTick != 0)
                 player.AfkTick = 0;
+    }
+
+    private static bool IsHiding(PlayerRuntimeState player)
+    {
+        return player.VisibleState == 0;
     }
 }

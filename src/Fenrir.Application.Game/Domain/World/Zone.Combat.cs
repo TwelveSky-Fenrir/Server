@@ -21,6 +21,8 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
+    private byte? _regularWarSmallestPresentTribe;
+
     private const int CombinedLevelGapCap = 13;
 
     private const int WarPointStatSort = 905;
@@ -412,7 +414,7 @@ public sealed partial class Zone
         var serverHomeTribe = TryGetCityOwningTribe(MapId, out var owningTribe) ? owningTribe : -1;
         baseAmount += PvpKillContributionPointBonuses.ComputeConditionalBonuses(
             MapId, attackerState.Tribe,
-            -1,
+            _regularWarSmallestPresentTribe ?? -1,
             attackerState.Level,
             worldState?.World.TribeSymbolBattle ?? false,
             serverHomeTribe);
@@ -460,6 +462,11 @@ public sealed partial class Zone
         GrantWarPoints(attackerState.CharacterId, PvpKillContributionPointCalculator.RegularWarOverrideWarPointAmount);
         GrantBloodPoints(attackerState.CharacterId,
             PvpKillContributionPointCalculator.RegularWarOverrideBloodPointAmount);
+    }
+
+    private void HandleSetRegularWarSmallestTribe(byte tribeId)
+    {
+        _regularWarSmallestPresentTribe = tribeId;
     }
 
     private void ApplyPvpKillHeroPoints(PlayerRuntimeState attackerState, PvpKillZoneRewardProfile profile,

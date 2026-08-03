@@ -26,6 +26,15 @@ public sealed class PalaceRankUpgradeUseItemHandler(
     public async ValueTask<UseInventoryItemResponse> HandleAsync(UseItemContext context,
         CancellationToken cancellationToken)
     {
+        if (context.Item.ItemId == ItemIdPlus10)
+        {
+            logger.LogDebug(
+                "Character {CharacterId} op23 palace-rank +10 (867, \"Palace Rank +10 Ticket\"): dead legacy feature (WUSE_ITEM_867 " +
+                "never #define'd, and nested inside __REBIRTH__, itself never #define'd in any shipped build) — no-op, no consumption, no state change",
+                context.CharacterId);
+            return UseItemResponses.Fail(context.Page, context.Index);
+        }
+
         var state = context.State;
 
         if (context.Item.Quantity < 1 || state.Halo >= RankCeiling)

@@ -111,7 +111,8 @@ public static class PetBagItemTransferPolicy
         if (destination is not null)
             return WithdrawFail(TransferOutcome.DestinationOccupied);
 
-        var newSlot = new ItemStack(itemId, 0, 0, 0, 0, 0, 0, 0, 0, 0, newSerialNumber);
+        var newSlot = new ItemStack(itemId, 0, 0, 0, 0, 0, 0, 0, 0, 0, newSerialNumber,
+            (byte)destinationX, (byte)destinationY);
         return new WithdrawResult(TransferOutcome.Success, null, newSlot, true);
     }
 

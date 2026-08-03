@@ -60,20 +60,13 @@ public static class RegularWarMapCatalog
         {
             var mapId = servers[slot];
 
-            RegularWarCpBonusRule? cpBonus = mapId switch
-            {
-                120 => new RegularWarCpBonusRule(50, 25, RegularWarCpBonusCriterion.RebirthTierExactly11),
-                295 or 296 => new RegularWarCpBonusRule(100, 50,
-                    RegularWarCpBonusCriterion.RebirthCountNonZero),
-                _ => null
-            };
-
+            // No map gets a CpBonusRule: legacy's 120/295/296 bonus is #ifdef __GOD__, never defined in a shipped build.
             builder.Add(new RegularWarMapConfig(
                 mapId,
                 slot,
                 mapId == 295,
                 mapId == 160,
-                cpBonus));
+                null));
         }
 
         return builder.MoveToImmutable();

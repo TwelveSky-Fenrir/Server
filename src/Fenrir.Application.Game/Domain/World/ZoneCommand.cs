@@ -31,7 +31,9 @@ public enum ZoneCommandKind : byte
 
     SummonRegularWarBoss,
 
-    BroadcastDuelStart
+    BroadcastDuelStart,
+
+    SetRegularWarSmallestTribe
 }
 
 public readonly struct ZoneCommand
@@ -48,6 +50,8 @@ public readonly struct ZoneCommand
     public bool Muted { get; init; }
 
     public byte WinningTribe { get; init; }
+
+    public byte SmallestPresentTribe { get; init; }
 
     public RegularWarRewardGrant RegularWarReward { get; init; }
 
@@ -136,6 +140,14 @@ public readonly struct ZoneCommand
     public static ZoneCommand SummonRegularWarBoss()
     {
         return new ZoneCommand { Kind = ZoneCommandKind.SummonRegularWarBoss, CharacterId = 0 };
+    }
+
+    public static ZoneCommand SetRegularWarSmallestTribe(byte tribeId)
+    {
+        return new ZoneCommand
+        {
+            Kind = ZoneCommandKind.SetRegularWarSmallestTribe, CharacterId = 0, SmallestPresentTribe = tribeId
+        };
     }
 
     public static ZoneCommand BroadcastDuelStart(int requesterCharacterId, int opponentCharacterId,

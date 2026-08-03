@@ -14,6 +14,17 @@ public sealed class RegularWarRewardGrantSink(ZoneRegistry zones, ILogger<Regula
 
     public void OnSmallestTribeFlagged(short mapId, byte tribeId)
     {
+        if (!zones.TryGet(mapId, out var zone))
+        {
+            logger.LogWarning(
+                "RegularWar {MapId}: smallest-tribe flag ({TribeId}) computed but this shard no longer hosts the map -- dropped",
+                mapId, tribeId);
+            return;
+        }
+
+        if (!zone.Post(ZoneCommand.SetRegularWarSmallestTribe(tribeId)))
+            logger.LogWarning(
+                "RegularWar {MapId}: smallest-tribe flag ({TribeId}) dropped -- zone inbox full", mapId, tribeId);
     }
 
     public void OnActiveWarStarted(short mapId)

@@ -433,6 +433,9 @@ public sealed partial class Zone(
                         HandleBroadcastDuelStart(command.CharacterId, command.DuelOpponentCharacterId,
                             command.DuelUniqueNumber);
                         break;
+                    case ZoneCommandKind.SetRegularWarSmallestTribe:
+                        HandleSetRegularWarSmallestTribe(command.SmallestPresentTribe);
+                        break;
                 }
             }
             catch (Exception ex)

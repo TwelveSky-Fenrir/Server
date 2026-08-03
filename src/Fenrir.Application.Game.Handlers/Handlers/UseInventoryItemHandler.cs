@@ -61,10 +61,9 @@ public sealed class UseInventoryItemHandler(IUseInventoryItemService service, IL
         if (page == ContainerMatrix.InventoryPage1 && state.InventoryDate < GameDate.Today())
         {
             logger.LogInformation(
-                "Session {SessionId} character {CharacterId}: UseInventoryItemRequest rejected, dated-vault page expired (InventoryDate {InventoryDate})",
+                "Session {SessionId} character {CharacterId}: UseInventoryItemRequest aborted, dated-vault page expired (InventoryDate {InventoryDate}) -- Server/ts25zone/S04_MyWork03.cpp:1000-1006",
                 zoneSession.SessionId, characterId, state.InventoryDate);
-            session.Send(new UseInventoryItemResponse
-                { Result = 1, Page = page, Index = index, Value = packet.Value, Value2 = 0 });
+            zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 

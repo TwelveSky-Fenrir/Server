@@ -62,17 +62,6 @@ public sealed class LootBoxUseItemHandler(
     private static readonly BoxRewardSpec ChestBox720OverrideSpec =
         BoxRewardSpec.Uniform(ChestBox720RewardTable.BoxId, ImmutableArray<int>.Empty);
 
-        private static readonly BoxRewardSpec RandomBox512FallbackSpec =
-        BoxRewardSpec.Uniform(512, [506, 507, 508, 509, 578, 579]);
-
-        private static readonly FrozenDictionary<byte, BoxRewardSpec> CostumeBox664SpecByPreviousTribe =
-        new Dictionary<byte, BoxRewardSpec>
-        {
-            [0] = BoxRewardSpec.Uniform(664, [76524]),
-            [1] = BoxRewardSpec.Uniform(664, [76525]),
-            [2] = BoxRewardSpec.Uniform(664, [76526])
-        }.ToFrozenDictionary();
-
     public static ImmutableArray<int> HandledItemIds { get; } = LootBoxCatalog.Default.RegisteredBoxIds
         .Add(CostumeChest76543RewardTable.BoxItemId)
         .Add(WarlordChestRewardTable.SkyChestBoxItemId)
@@ -82,7 +71,8 @@ public sealed class LootBoxUseItemHandler(
         .Add(LoyKrathongBoxId)
         .Add(ChestBox720RewardTable.BoxId)
         .Add(512)
-        .Add(664);
+        .Add(664)
+        .Add(1043);
 
     public async ValueTask<UseInventoryItemResponse> HandleAsync(UseItemContext context,
         CancellationToken cancellationToken)
@@ -132,10 +122,6 @@ public sealed class LootBoxUseItemHandler(
             HeavenlyJadeChest1236RewardTable.BoxId => HeavenlyJadeChestOverrideSpec,
             LoyKrathongBoxId => LoyKrathongBoxSpec,
             ChestBox720RewardTable.BoxId => ChestBox720OverrideSpec,
-            512 => RandomBox512FallbackSpec,
-            664 => CostumeBox664SpecByPreviousTribe.TryGetValue(previousTribe, out var costumeSpec)
-                ? costumeSpec
-                : null,
             _ => null
         };
     }

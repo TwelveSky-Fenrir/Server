@@ -36,8 +36,9 @@ public sealed class DuelService(
         if (duels.TryGetActiveDuel(challenger.CharacterId, out _))
         {
             logger.LogInformation(
-                "Duel ask rejected and challenger {ChallengerId}'s session will be terminated: challenger is already actively dueling (desynced state)",
+                "Duel ask rejected and challenger {ChallengerId}'s session terminated: challenger is already actively dueling (desynced client)",
                 challenger.CharacterId);
+            challenger.Session.Abort(DisconnectReason.StateViolation);
             return ValueTask.FromResult(DuelAskResultKind.ChallengerAlreadyDueling);
         }
 
@@ -45,6 +46,14 @@ public sealed class DuelService(
         {
             logger.LogInformation(
                 "Duel ask rejected: challenger {ChallengerId} is already negotiating another duel",
+                challenger.CharacterId);
+            return ValueTask.FromResult(DuelAskResultKind.ChallengerBusy);
+        }
+
+        if (challenger.IsStunned || challenger.IsDead)
+        {
+            logger.LogInformation(
+                "Duel ask rejected: challenger {ChallengerId} is stunned or dead",
                 challenger.CharacterId);
             return ValueTask.FromResult(DuelAskResultKind.ChallengerBusy);
         }
@@ -61,15 +70,23 @@ public sealed class DuelService(
         if (!interTribeAllowed && challenger.Tribe != target.Tribe)
         {
             logger.LogInformation(
-                "Duel ask rejected and challenger {ChallengerId}'s session will be terminated: cross-tribe duel with target {TargetId} not allowed on map {MapId}",
+                "Duel ask rejected and challenger {ChallengerId}'s session terminated: cross-tribe duel with target {TargetId} not allowed on map {MapId} (desynced client)",
                 challenger.CharacterId, target.CharacterId, zone.MapId);
+            challenger.Session.Abort(DisconnectReason.StateViolation);
             return ValueTask.FromResult(DuelAskResultKind.TribeMismatch);
         }
 
-        if (CommunityWorkGate.IsBusy(target, duels, trades, friends, parties, mentors, guildInvites))
+        if (CommunityWorkGate.IsBusy(target, duels, trades, friends, parties, mentors, guildInvites) ||
+            target.IsMovingZone)
         {
-            logger.LogInformation("Duel ask rejected: target {TargetId} is busy (community-work gate)",
+            logger.LogInformation("Duel ask rejected: target {TargetId} is busy (community-work gate or zone transfer)",
                 target.CharacterId);
+            return ValueTask.FromResult(DuelAskResultKind.TargetBusy);
+        }
+
+        if (target.IsStunned || target.IsDead)
+        {
+            logger.LogInformation("Duel ask rejected: target {TargetId} is stunned or dead", target.CharacterId);
             return ValueTask.FromResult(DuelAskResultKind.TargetBusy);
         }
 
@@ -77,8 +94,9 @@ public sealed class DuelService(
         {
             case DuelAskOutcome.ChallengerAlreadyDueling:
                 logger.LogInformation(
-                    "Duel ask rejected and challenger {ChallengerId}'s session will be terminated: challenger is already actively dueling (desynced state, caught at registration)",
+                    "Duel ask rejected and challenger {ChallengerId}'s session terminated: challenger is already actively dueling (desynced client, caught at registration)",
                     challenger.CharacterId);
+                challenger.Session.Abort(DisconnectReason.StateViolation);
                 return ValueTask.FromResult(DuelAskResultKind.ChallengerAlreadyDueling);
             case DuelAskOutcome.ChallengerBusy:
                 logger.LogInformation(

@@ -133,8 +133,8 @@ public static class NpcShopPolicy
     }
 
     public static BuyResult ResolveBuy(NpcDefinition npc, ItemDefinition itemDefinition, int requestedQuantity,
-        ItemStack? destinationSlot, short playerLevel, int playerContributionPoints,
-        DateTimeOffset? purchaseInstant = null)
+        ItemStack? destinationSlot, int destinationX, int destinationY, short playerLevel,
+        int playerContributionPoints, DateTimeOffset? purchaseInstant = null)
     {
         var item = itemDefinition.Item;
 
@@ -186,7 +186,8 @@ public static class NpcShopPolicy
                     out var newMoneyCost, out var newCpCost, out var newCostFailure))
                 return new BuyResult(newCostFailure, 0, 0, null);
 
-            var newStack = new ItemStack(item.ItemId, requestedQuantity, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+            var newStack = new ItemStack(item.ItemId, requestedQuantity, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                (byte)destinationX, (byte)destinationY);
             return new BuyResult(BuyOutcome.Success, newMoneyCost, newCpCost, newStack);
         }
 
@@ -201,7 +202,7 @@ public static class NpcShopPolicy
             purchaseInstant ?? DateTimeOffset.UtcNow);
 
         return new BuyResult(BuyOutcome.Success, singleMoneyCost, singleCpCost,
-            new ItemStack(item.ItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, serial));
+            new ItemStack(item.ItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, serial, (byte)destinationX, (byte)destinationY));
     }
 
     private static bool TryResolveCost(ItemRowDto item, int quantity, int playerContributionPoints,

@@ -833,8 +833,8 @@ public sealed class GenericActionService(
             }
         }
 
-        var resolved = NpcShopPolicy.ResolveBuy(npc, itemDefinition, move.Quantity1, destinationSlot, state.Level,
-            state.ContributionPoints);
+        var resolved = NpcShopPolicy.ResolveBuy(npc, itemDefinition, move.Quantity1, destinationSlot, move.XPost2,
+            move.YPost2, state.Level, state.ContributionPoints);
 
         if (!resolved.Succeeded)
         {

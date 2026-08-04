@@ -8,7 +8,7 @@ public interface IRuneStoneCraftService
     public ValueTask<RuneStoneCraftResult> CraftAsync(
         int sourcePage, int sourceSlot,
         int destinationPage, int destinationSlot,
-        int statSlotSelector, int destinationPackedStat,
+        int statSlotSelector,
         bool secondInventoryPageAccessible,
         Zone zone, PlayerRuntimeState state, int characterId,
         CancellationToken cancellationToken);

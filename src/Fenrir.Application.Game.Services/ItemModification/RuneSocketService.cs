@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.ItemModification;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Runes;
 using Fenrir.Application.Game.Domain.Simulation;
@@ -44,8 +45,26 @@ public sealed class RuneSocketService(
         var projectedRunes = state.RuneSystem.SetItem(packet.RuneIndex, packet.ItemIndex);
         var projectedRuneStats = state.RuneSystemStat.SetItem(packet.RuneIndex, packedStat);
 
-        await runes.PersistRunesAsync(characterId, ToRuneTvps(projectedRunes, projectedRuneStats),
-            (byte)packet.Page, ToTvps(projectedContainer), cancellationToken);
+        try
+        {
+            await runes.PersistRunesAsync(characterId, ToRuneTvps(projectedRunes, projectedRuneStats),
+                (byte)packet.Page, ToTvps(projectedContainer), cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            return AbortInsertAfterUncertainPersistence(state, characterId, "rune insert", ex);
+        }
+
+        var containers = ImmutableArray.Create(new InventoryContainerSnapshot((byte)packet.Page, projectedContainer));
+        var inventoryResult = await zone.PostInventoryCommandAndWaitForResultAsync(
+            new InventoryZoneCommand(characterId, containers, null), cancellationToken);
+        if (inventoryResult.Kind != ZoneCommandResultKind.Applied)
+            return AbortInsertAfterDurableMutation(state, characterId, "rune-insert inventory", inventoryResult);
+
+        var runeResult = await zone.PostRuneSocketCommandAndWaitForResultAsync(
+            new RuneSocketZoneCommand(characterId, packet.RuneIndex, packet.ItemIndex, packedStat), cancellationToken);
+        if (runeResult.Kind != ZoneCommandResultKind.Applied)
+            return AbortInsertAfterDurableMutation(state, characterId, "rune-insert socket", runeResult);
 
         if (!eventLogQueue.Enqueue(new EventLogEntryTvp(RuneInsertEventCode, (byte)EventLogCategory.Enchant, null,
                 characterId, null, null, null, null, null, sourceStack.ItemId, 1, 0,
@@ -54,20 +73,6 @@ public sealed class RuneSocketService(
             logger.LogWarning(
                 "game.EventLog write-behind queue full: dropped rune-insert audit row for character {CharacterId}",
                 characterId);
-
-        if (!await zone.PostRuneSocketCommandAndWaitAsync(
-                new RuneSocketZoneCommand(characterId, packet.RuneIndex, packet.ItemIndex, packedStat),
-                cancellationToken))
-            logger.LogError(
-                "Zone {MapId} rune-socket inbox full: dropped insert mirror for character {CharacterId}",
-                zone.MapId, characterId);
-
-        var containers = ImmutableArray.Create(new InventoryContainerSnapshot((byte)packet.Page, projectedContainer));
-        if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
-                cancellationToken))
-            logger.LogError(
-                "Zone {MapId} inventory inbox full: dropped rune-insert inventory mirror for character {CharacterId}",
-                zone.MapId, characterId);
 
         return new RuneInsertResult(RuneSocketOutcome.Applied);
     }
@@ -97,8 +102,26 @@ public sealed class RuneSocketService(
         var projectedRunes = state.RuneSystem.SetItem(packet.RuneIndex, 0);
         var projectedRuneStats = state.RuneSystemStat.SetItem(packet.RuneIndex, 0);
 
-        await runes.PersistRunesAsync(characterId, ToRuneTvps(projectedRunes, projectedRuneStats), container,
-            ToTvps(projectedContainer), cancellationToken);
+        try
+        {
+            await runes.PersistRunesAsync(characterId, ToRuneTvps(projectedRunes, projectedRuneStats), container,
+                ToTvps(projectedContainer), cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            return AbortRemoveAfterUncertainPersistence(state, characterId, "rune remove", ex);
+        }
+
+        var containers = ImmutableArray.Create(new InventoryContainerSnapshot(container, projectedContainer));
+        var inventoryResult = await zone.PostInventoryCommandAndWaitForResultAsync(
+            new InventoryZoneCommand(characterId, containers, null), cancellationToken);
+        if (inventoryResult.Kind != ZoneCommandResultKind.Applied)
+            return AbortRemoveAfterDurableMutation(state, characterId, "rune-remove inventory", inventoryResult);
+
+        var runeResult = await zone.PostRuneSocketCommandAndWaitForResultAsync(
+            new RuneSocketZoneCommand(characterId, packet.RuneIndex, null, null), cancellationToken);
+        if (runeResult.Kind != ZoneCommandResultKind.Applied)
+            return AbortRemoveAfterDurableMutation(state, characterId, "rune-remove socket", runeResult);
 
         if (!eventLogQueue.Enqueue(new EventLogEntryTvp(RuneRemoveEventCode, (byte)EventLogCategory.Enchant, null,
                 characterId, null, null, null, null, null, resolved.ItemId, 1, 0,
@@ -107,20 +130,52 @@ public sealed class RuneSocketService(
                 "game.EventLog write-behind queue full: dropped rune-remove audit row for character {CharacterId}",
                 characterId);
 
-        if (!await zone.PostRuneSocketCommandAndWaitAsync(
-                new RuneSocketZoneCommand(characterId, packet.RuneIndex, null, null), cancellationToken))
-            logger.LogError(
-                "Zone {MapId} rune-socket inbox full: dropped remove mirror for character {CharacterId}",
-                zone.MapId, characterId);
-
-        var containers = ImmutableArray.Create(new InventoryContainerSnapshot(container, projectedContainer));
-        if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
-                cancellationToken))
-            logger.LogError(
-                "Zone {MapId} inventory inbox full: dropped rune-remove inventory mirror for character {CharacterId}",
-                zone.MapId, characterId);
-
         return new RuneRemoveResult(RuneSocketOutcome.Applied, container, slot, resolved.ItemId, newStack);
+    }
+
+    private RuneInsertResult AbortInsertAfterUncertainPersistence(PlayerRuntimeState state, int characterId,
+        string mutation, Exception exception)
+    {
+        AbortWithoutSuccess(state, characterId, mutation, exception);
+        return new RuneInsertResult(RuneSocketOutcome.Disconnected);
+    }
+
+    private RuneRemoveResult AbortRemoveAfterUncertainPersistence(PlayerRuntimeState state, int characterId,
+        string mutation, Exception exception)
+    {
+        AbortWithoutSuccess(state, characterId, mutation, exception);
+        return new RuneRemoveResult(RuneSocketOutcome.Disconnected, 0, 0, 0);
+    }
+
+    private RuneInsertResult AbortInsertAfterDurableMutation(PlayerRuntimeState state, int characterId,
+        string mutation, ZoneCommandResult result)
+    {
+        AbortWithoutSuccess(state, characterId, mutation, result);
+        return new RuneInsertResult(RuneSocketOutcome.Disconnected);
+    }
+
+    private RuneRemoveResult AbortRemoveAfterDurableMutation(PlayerRuntimeState state, int characterId,
+        string mutation, ZoneCommandResult result)
+    {
+        AbortWithoutSuccess(state, characterId, mutation, result);
+        return new RuneRemoveResult(RuneSocketOutcome.Disconnected, 0, 0, 0);
+    }
+
+    private void AbortWithoutSuccess(PlayerRuntimeState state, int characterId, string mutation, Exception exception)
+    {
+        logger.LogError(exception,
+            "Character {CharacterId} {Mutation} persistence failed after submission; durability is uncertain, disconnecting without success response",
+            characterId, mutation);
+        ((IZoneSession)state.Session).Abort(DisconnectReason.Faulted);
+    }
+
+    private void AbortWithoutSuccess(PlayerRuntimeState state, int characterId, string mutation,
+        ZoneCommandResult result)
+    {
+        logger.LogError(
+            "Character {CharacterId} persisted rune-socket mutation but {Mutation} actor mutation was not acknowledged as applied ({Kind}: {Cause}); disconnecting without success response",
+            characterId, mutation, result.Kind, result.Cause);
+        ((IZoneSession)state.Session).Abort(DisconnectReason.Faulted);
     }
 
     private static List<CharacterItemSlotTvp> ToTvps(ImmutableDictionary<byte, ItemStack> container)

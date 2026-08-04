@@ -1,7 +1,6 @@
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Domain.World.WorldState;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -12,7 +11,6 @@ public sealed class HeroRankingRolloverHost(
     IHeroRankingRepository heroRankings,
     HeroRankPointAccumulator heroRankPoints,
     ZoneRegistry zones,
-    FavoredTribeRankBonusLadderService favoredTribeLadder,
     IOptions<GameServerOptions> options,
     ILogger<HeroRankingRolloverHost> logger) : BackgroundService
 {
@@ -34,8 +32,6 @@ public sealed class HeroRankingRolloverHost(
                         "Hero ranking rollover: Current period flipped into Previous (7-day sentinel elapsed)");
 
                     NotifyConnectedSessions();
-
-                    await favoredTribeLadder.RotateToNextFavoredTribeAsync(stoppingToken).ConfigureAwait(false);
                 }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)

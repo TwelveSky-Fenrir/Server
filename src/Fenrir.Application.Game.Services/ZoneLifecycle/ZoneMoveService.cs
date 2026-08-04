@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Application.Game.Abstractions.World;
 using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 using Fenrir.Application.Game.Domain;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
@@ -30,6 +31,30 @@ public sealed class ZoneMoveService(
     ILogger<ZoneMoveService> logger) : IZoneMoveService
 {
     private const short ZoneDepartureEventCode = 5;
+
+    private const int HandoffCapabilityLength = 43;
+
+    private static readonly TimeSpan ZoneActorCommandCompletionTimeout = TimeSpan.FromSeconds(2);
+
+    private enum HandoffBeginOutcomeKind : byte
+    {
+        Applied = 1,
+
+        NotApplied,
+
+        Unknown
+    }
+
+    private readonly record struct HandoffBeginOutcome(HandoffBeginOutcomeKind Kind,
+        ZoneTransferHandoffSnapshot? Snapshot)
+    {
+        public static HandoffBeginOutcome Applied(ZoneTransferHandoffSnapshot snapshot) =>
+            new(HandoffBeginOutcomeKind.Applied, snapshot);
+
+        public static HandoffBeginOutcome NotApplied() => new(HandoffBeginOutcomeKind.NotApplied, null);
+
+        public static HandoffBeginOutcome Unknown() => new(HandoffBeginOutcomeKind.Unknown, null);
+    }
 
     public async ValueTask HandleAsync(ZoneMoveRequest packet, IZoneSession zoneSession,
         CancellationToken cancellationToken)
@@ -103,6 +128,23 @@ public sealed class ZoneMoveService(
             return;
         }
 
+        if (state.IsDead || state.Life <= 0)
+        {
+            logger.LogInformation(
+                "Zone-move rejected for character {CharacterId}: a dead character cannot transfer before a validated resurrection",
+                characterId);
+            zoneSession.Send(RejectedZoneMoveResponse());
+            return;
+        }
+
+        if (state.IsMovingZone)
+        {
+            logger.LogDebug(
+                "Zone-move ignored for character {CharacterId}: a zone transfer is already pending",
+                characterId);
+            return;
+        }
+
         if (TribeSymbolBattleZoneLockout.IsLockedOut(sourceZone.MapId, targetZoneNumber,
                 worldState.World.TribeSymbolBattle))
         {
@@ -126,7 +168,7 @@ public sealed class ZoneMoveService(
             logger.LogError(
                 "Zone {TargetZoneNumber} is hosted by this shard but absent from WorldDataCache -- refusing transfer for character {CharacterId}",
                 targetZoneNumber, characterId);
-            zoneSession.Send(new ZoneMoveResponse { Result = 1, Ip = "", Port = 0 });
+            zoneSession.Send(RejectedZoneMoveResponse());
             return;
         }
 
@@ -157,48 +199,52 @@ public sealed class ZoneMoveService(
                 {
                     Result = 1,
                     Ip = options.Value.PublicHost,
-                    Port = options.Value.ZoneBasePort + targetZoneNumber
+                    Port = options.Value.ZoneBasePort + targetZoneNumber,
+                    Capability = string.Empty
                 });
                 zoneSession.Send(new ReturnToHomeZoneResponse());
                 return;
         }
 
-        ZoneTransferBuffRules.ClearIfDestinationRequiresIt(state.Buffs, targetZoneNumber);
-
-        if (!sourceZone.Post(ZoneCommand.MarkZoneTransferPending(characterId)))
+        if (zoneSession.RemoteEndPoint?.Address is not { } sourceAddress)
         {
-            logger.LogError(
-                "Zone {SourceMapId} inbox full: character {CharacterId}'s pending-transfer marker could not be queued before its handoff to zone {TargetZoneNumber} -- aborting session",
-                sourceZone.MapId, characterId, targetZoneNumber);
-            zoneSession.Abort(DisconnectReason.Faulted);
+            logger.LogWarning(
+                "Zone-move rejected for character {CharacterId}: the source address is unavailable, so its handoff capability cannot be IP-bound",
+                characterId);
+            zoneSession.Send(RejectedZoneMoveResponse());
             return;
         }
 
-        MarkHandoffInProgress(state);
+        var begin = await BeginHandoffAsync(sourceZone, characterId, targetZoneNumber, cancellationToken)
+            .ConfigureAwait(false);
+        if (begin.Kind != HandoffBeginOutcomeKind.Applied)
+        {
+            HandleUnsuccessfulHandoffBegin(zoneSession, characterId, sourceZone.MapId, targetZoneNumber, begin.Kind);
+            return;
+        }
 
-        await writeBehindFlusher.FlushCharacterNowAsync(characterId, cancellationToken);
-
-        await LogZoneDepartureAsync(zoneSession, characterId, sourceZone.MapId, targetZoneNumber,
-            cancellationToken);
-
-        await tickets.CreateAsync(zoneSession.AccountId!.Value, characterId, options.Value.ShardId,
-            options.Value.TicketTtlSeconds, zoneSession.AccountSessionToken!.Value, zoneSession.AccountGrade,
-            targetZoneNumber, ResolveHandoffSourceAddress(zoneSession, characterId), cancellationToken);
-
-        zoneSession.MarkZoneTransferPending();
+        var capability = await CompleteHandoffAsync(sourceZone, zoneSession, characterId, sourceZone.MapId,
+                options.Value.ShardId, targetZoneNumber, sourceAddress, begin.Snapshot!, cancellationToken)
+            .ConfigureAwait(false);
+        if (capability is null)
+        {
+            zoneSession.Send(RejectedZoneMoveResponse());
+            return;
+        }
 
         logger.LogInformation(
             "Character {CharacterId} transferring same-shard: {SourceMapId} -> {TargetMapId} (sort {Sort}) -- handoff ticket minted, awaiting reconnection",
             characterId, sourceZone.MapId, targetZoneNumber, packet.Sort);
 
-        await characterShardLocations.UpsertAsync(characterId, options.Value.ShardId, targetZoneNumber, state.Name,
-            state.Tribe, cancellationToken);
+        await LogZoneDepartureAsync(zoneSession, characterId, sourceZone.MapId, targetZoneNumber,
+            cancellationToken);
 
         zoneSession.Send(new ZoneMoveResponse
         {
             Result = 0,
             Ip = options.Value.PublicHost,
-            Port = options.Value.ZoneBasePort + targetZoneNumber
+            Port = options.Value.ZoneBasePort + targetZoneNumber,
+            Capability = capability
         });
     }
 
@@ -221,7 +267,7 @@ public sealed class ZoneMoveService(
                 logger.LogWarning(
                     "Zone-move aborted for character {CharacterId}: zone endpoint {Host}:{Port} (MapId {TargetZoneNumber}, shard {ShardId}) failed a reachability probe -- rejecting the move, character stays on {SourceMapId}",
                     characterId, candidate.Host, targetZonePort, targetZoneNumber, candidate.ShardId, originZoneId);
-                zoneSession.Send(new ZoneMoveResponse { Result = 1, Ip = "", Port = 0 });
+                zoneSession.Send(RejectedZoneMoveResponse());
                 return;
             }
 
@@ -254,13 +300,12 @@ public sealed class ZoneMoveService(
                 {
                     Result = 1,
                     Ip = candidate.Host,
-                    Port = options.Value.ZoneBasePort + targetZoneNumber
+                    Port = options.Value.ZoneBasePort + targetZoneNumber,
+                    Capability = string.Empty
                 });
                 zoneSession.Send(new ReturnToHomeZoneResponse());
                 return;
             }
-
-            ZoneTransferBuffRules.ClearIfDestinationRequiresIt(state.Buffs, targetZoneNumber);
 
             if (zoneSession.CurrentZone is not Zone sourceZone)
             {
@@ -271,24 +316,32 @@ public sealed class ZoneMoveService(
                 return;
             }
 
-            MarkHandoffInProgress(state);
-
-            await writeBehindFlusher.FlushCharacterNowAsync(characterId, cancellationToken);
-
-            await tickets.CreateAsync(zoneSession.AccountId!.Value, characterId, candidate.ShardId,
-                options.Value.TicketTtlSeconds, zoneSession.AccountSessionToken!.Value, zoneSession.AccountGrade,
-                targetZoneNumber, ResolveHandoffSourceAddress(zoneSession, characterId), cancellationToken);
-
-            if (!sourceZone.Post(ZoneCommand.MarkZoneTransferPending(characterId)))
+            if (zoneSession.RemoteEndPoint?.Address is not { } sourceAddress)
             {
-                logger.LogError(
-                    "Zone {SourceMapId} inbox full: character {CharacterId}'s pending-transfer marker could not be queued after its cross-shard handoff ticket was minted for zone {TargetZoneNumber} -- aborting session",
-                    sourceZone.MapId, characterId, targetZoneNumber);
-                zoneSession.Abort(DisconnectReason.Faulted);
+                logger.LogWarning(
+                    "Zone-move rejected for character {CharacterId}: the source address is unavailable, so its cross-shard handoff capability cannot be IP-bound",
+                    characterId);
+                zoneSession.Send(RejectedZoneMoveResponse());
                 return;
             }
 
-            zoneSession.MarkZoneTransferPending();
+            var begin = await BeginHandoffAsync(sourceZone, characterId, targetZoneNumber, cancellationToken)
+                .ConfigureAwait(false);
+            if (begin.Kind != HandoffBeginOutcomeKind.Applied)
+            {
+                HandleUnsuccessfulHandoffBegin(zoneSession, characterId, sourceZone.MapId, targetZoneNumber,
+                    begin.Kind);
+                return;
+            }
+
+            var capability = await CompleteHandoffAsync(sourceZone, zoneSession, characterId, originZoneId,
+                    candidate.ShardId, targetZoneNumber, sourceAddress, begin.Snapshot!, cancellationToken)
+                .ConfigureAwait(false);
+            if (capability is null)
+            {
+                zoneSession.Send(RejectedZoneMoveResponse());
+                return;
+            }
 
             logger.LogInformation(
                 "Zone {TargetZoneNumber} resolved to shard {ShardId} ({Host}:{Port}) for character {CharacterId} -- cross-shard handoff ticket minted",
@@ -296,36 +349,168 @@ public sealed class ZoneMoveService(
 
             await LogZoneDepartureAsync(zoneSession, characterId, originZoneId, targetZoneNumber, cancellationToken);
 
-            await characterShardLocations.UpsertAsync(characterId, candidate.ShardId, targetZoneNumber, state.Name,
-                state.Tribe, cancellationToken);
-
             zoneSession.Send(new ZoneMoveResponse
-                { Result = 0, Ip = candidate.Host, Port = options.Value.ZoneBasePort + targetZoneNumber });
+            {
+                Result = 0,
+                Ip = candidate.Host,
+                Port = options.Value.ZoneBasePort + targetZoneNumber,
+                Capability = capability
+            });
             return;
         }
 
         logger.LogWarning(
             "Zone {TargetZoneNumber} is not hosted by any live shard -- refusing transfer for character {CharacterId}",
             targetZoneNumber, characterId);
-        zoneSession.Send(new ZoneMoveResponse { Result = 1, Ip = "", Port = 0 });
+        zoneSession.Send(RejectedZoneMoveResponse());
     }
 
-    private IPAddress? ResolveHandoffSourceAddress(IZoneSession zoneSession, int characterId)
+    private async ValueTask<HandoffBeginOutcome> BeginHandoffAsync(Zone sourceZone, int characterId,
+        short targetZoneNumber, CancellationToken cancellationToken)
     {
-        if (zoneSession.RemoteEndPoint?.Address is { } address)
-            return address;
+        cancellationToken.ThrowIfCancellationRequested();
 
-        logger.LogWarning(
-            "Zone-move: character {CharacterId} has no remote endpoint on its live zone session; its handoff ticket is " +
-            "minted unbound and the destination zone will accept it from any source address",
-            characterId);
-        return null;
+        var snapshotSignal = new TaskCompletionSource<ZoneTransferHandoffSnapshot?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var completion = new TaskCompletionSource<ZoneCommandResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        if (!sourceZone.Post(ZoneCommand.BeginZoneTransfer(characterId, targetZoneNumber, snapshotSignal, completion)))
+        {
+            logger.LogError(
+                "Zone {SourceMapId} inbox full: BeginZoneTransfer for character {CharacterId} could not be queued before handoff to zone {TargetZoneNumber}",
+                sourceZone.MapId, characterId, targetZoneNumber);
+            return HandoffBeginOutcome.NotApplied();
+        }
+
+        ZoneCommandResult result;
+        try
+        {
+            result = await completion.Task.WaitAsync(ZoneActorCommandCompletionTimeout, CancellationToken.None)
+                .ConfigureAwait(false);
+        }
+        catch (TimeoutException ex)
+        {
+            logger.LogWarning(ex,
+                "Zone {SourceMapId} BeginZoneTransfer for character {CharacterId} timed out before handoff to zone {TargetZoneNumber}; reconciling actor state",
+                sourceZone.MapId, characterId, targetZoneNumber);
+            return await ResolveUncertainHandoffBeginAsync(sourceZone, characterId, targetZoneNumber)
+                .ConfigureAwait(false);
+        }
+
+        if (result.Kind != ZoneCommandResultKind.Applied)
+        {
+            logger.LogWarning(
+                "Zone {SourceMapId} BeginZoneTransfer for character {CharacterId} completed as {ResultKind} ({Cause}) before handoff to zone {TargetZoneNumber}",
+                sourceZone.MapId, characterId, result.Kind, result.Cause, targetZoneNumber);
+            return HandoffBeginOutcome.NotApplied();
+        }
+
+        try
+        {
+            var snapshot = await snapshotSignal.Task.WaitAsync(ZoneActorCommandCompletionTimeout, CancellationToken.None)
+                .ConfigureAwait(false);
+            if (snapshot is not null)
+                return HandoffBeginOutcome.Applied(snapshot);
+        }
+        catch (Exception ex) when (ex is TimeoutException or InvalidOperationException)
+        {
+            logger.LogError(ex,
+                "Zone {SourceMapId} BeginZoneTransfer for character {CharacterId} completed without a handoff snapshot",
+                sourceZone.MapId, characterId);
+        }
+
+        return await ResolveUncertainHandoffBeginAsync(sourceZone, characterId, targetZoneNumber)
+            .ConfigureAwait(false);
     }
 
-    private static void MarkHandoffInProgress(PlayerRuntimeState state)
+    private async ValueTask<HandoffBeginOutcome> ResolveUncertainHandoffBeginAsync(Zone sourceZone, int characterId,
+        short targetZoneNumber)
     {
-        state.ZoneTransferRegisteredAtUtc = DateTime.UtcNow;
-        state.IsMovingZone = true;
+        if (await RollbackHandoffAsync(sourceZone, characterId, null).ConfigureAwait(false))
+            return HandoffBeginOutcome.NotApplied();
+
+        logger.LogError(
+            "Zone {SourceMapId} BeginZoneTransfer for character {CharacterId} toward zone {TargetZoneNumber} remains unknown after its bounded rollback observation; the session must close so source cleanup can converge through the actor",
+            sourceZone.MapId, characterId, targetZoneNumber);
+        return HandoffBeginOutcome.Unknown();
+    }
+
+    private void HandleUnsuccessfulHandoffBegin(IZoneSession zoneSession, int characterId, short sourceMapId,
+        short targetZoneNumber, HandoffBeginOutcomeKind outcome)
+    {
+        if (outcome is HandoffBeginOutcomeKind.NotApplied)
+        {
+            zoneSession.Send(RejectedZoneMoveResponse());
+            return;
+        }
+
+        logger.LogError(
+            "Zone-move actor outcome is unknown for character {CharacterId} ({SourceMapId} -> {TargetZoneNumber}); aborting rather than presenting a retry response that could race an eventual actor mutation",
+            characterId, sourceMapId, targetZoneNumber);
+        zoneSession.Abort(DisconnectReason.ProcessingFault);
+    }
+
+    private static ZoneMoveResponse RejectedZoneMoveResponse(string ip = "", int port = 0)
+    {
+        return new ZoneMoveResponse { Result = 1, Ip = ip, Port = port, Capability = string.Empty };
+    }
+
+    private async ValueTask<string?> CompleteHandoffAsync(Zone sourceZone, IZoneSession zoneSession, int characterId,
+        short sourceZoneNumber, byte targetShardId, short targetZoneNumber, IPAddress sourceAddress,
+        ZoneTransferHandoffSnapshot handoff, CancellationToken cancellationToken)
+    {
+        var ticketMayExist = false;
+        var restoreSourceDirectory = false;
+
+        try
+        {
+            if (!await writeBehindFlusher.FlushCharacterNowAsync(characterId, cancellationToken, false)
+                    .ConfigureAwait(false))
+            {
+                logger.LogWarning(
+                    "Zone-move rejected for character {CharacterId}: final durable flush failed before handoff to zone {TargetZoneNumber}",
+                    characterId, targetZoneNumber);
+                await CompensateFailedHandoffAsync(sourceZone, zoneSession, characterId, sourceZoneNumber, handoff,
+                        false, false)
+                    .ConfigureAwait(false);
+                return null;
+            }
+
+            ticketMayExist = true;
+            var ticket = await tickets.CreateAsync(zoneSession.AccountId!.Value, characterId, targetShardId,
+                    options.Value.TicketTtlSeconds, zoneSession.AccountSessionToken!.Value, zoneSession.AccountGrade,
+                    targetZoneNumber, sourceAddress, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (ticket.Capability is not { Length: HandoffCapabilityLength })
+            {
+                logger.LogError(
+                    "Zone-move rejected for character {CharacterId}: the handoff ticket repository returned an invalid capability",
+                    characterId);
+                await CompensateFailedHandoffAsync(sourceZone, zoneSession, characterId, sourceZoneNumber, handoff,
+                        true, false)
+                    .ConfigureAwait(false);
+                return null;
+            }
+
+            restoreSourceDirectory = true;
+            await characterShardLocations.UpsertAsync(characterId, targetShardId, targetZoneNumber,
+                    handoff.CharacterName, handoff.Tribe, cancellationToken)
+                .ConfigureAwait(false);
+
+            zoneSession.ConfirmZoneTransferHandoff();
+            return ticket.Capability;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex,
+                "Zone-move rejected for character {CharacterId}: handoff preparation failed for zone {TargetZoneNumber} on shard {TargetShardId}",
+                characterId, targetZoneNumber, targetShardId);
+            await CompensateFailedHandoffAsync(sourceZone, zoneSession, characterId, sourceZoneNumber, handoff,
+                    ticketMayExist, restoreSourceDirectory)
+                .ConfigureAwait(false);
+            return null;
+        }
     }
 
     private async ValueTask LogZoneDepartureAsync(IZoneSession zoneSession, int characterId, short sourceMapId,
@@ -337,11 +522,92 @@ public sealed class ZoneMoveService(
                 characterId, null, null, options.Value.ShardId, null, null, null, null, 1,
                 $"SourceMapId={sourceMapId},TargetMapId={targetMapId}", cancellationToken);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex)
         {
             logger.LogWarning(ex,
                 "Failed to write game.EventLog row for zone departure (character {CharacterId}, {SourceMapId} -> {TargetMapId})",
                 characterId, sourceMapId, targetMapId);
         }
+    }
+
+    private async ValueTask CompensateFailedHandoffAsync(Zone sourceZone, IZoneSession zoneSession, int characterId,
+        short sourceZoneNumber, ZoneTransferHandoffSnapshot handoff, bool revokeTicket, bool restoreSourceDirectory)
+    {
+        if (revokeTicket)
+            try
+            {
+                await tickets.RevokeAsync(zoneSession.AccountId!.Value, CancellationToken.None).ConfigureAwait(false);
+                zoneSession.RevokeZoneTransferHandoffCommitment();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex,
+                    "Zone-move compensation for character {CharacterId} could not revoke the handoff ticket; keeping the source actor frozen",
+                    characterId);
+                zoneSession.Abort(DisconnectReason.ProcessingFault);
+                return;
+            }
+
+        if (restoreSourceDirectory)
+            try
+            {
+                await characterShardLocations.UpsertAsync(characterId, options.Value.ShardId, sourceZoneNumber,
+                        handoff.CharacterName, handoff.Tribe, CancellationToken.None)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex,
+                    "Zone-move compensation for character {CharacterId} could not restore the source shard directory; keeping the source actor frozen",
+                    characterId);
+                zoneSession.Abort(DisconnectReason.ProcessingFault);
+                return;
+            }
+
+        if (!await RollbackHandoffAsync(sourceZone, characterId, handoff.PendingRegisteredAtUtc).ConfigureAwait(false))
+        {
+            zoneSession.Abort(DisconnectReason.ProcessingFault);
+            return;
+        }
+
+        zoneSession.ClearZoneTransferPending();
+    }
+
+    private async ValueTask<bool> RollbackHandoffAsync(Zone sourceZone, int characterId,
+        DateTime? pendingRegisteredAtUtc)
+    {
+        var completion = new TaskCompletionSource<ZoneCommandResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var command = pendingRegisteredAtUtc is { } pendingRegisteredAt
+            ? ZoneCommand.RollbackZoneTransfer(characterId, pendingRegisteredAt, completion)
+            : ZoneCommand.ClearZoneTransferPending(characterId, completion);
+        if (!sourceZone.Post(command))
+        {
+            logger.LogError(
+                "Zone {SourceMapId} inbox full: ClearZoneTransferPending for character {CharacterId} could not be queued during handoff compensation",
+                sourceZone.MapId, characterId);
+            return false;
+        }
+
+        ZoneCommandResult result;
+        try
+        {
+            result = await completion.Task.WaitAsync(ZoneActorCommandCompletionTimeout, CancellationToken.None)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex,
+                "Zone {SourceMapId} ClearZoneTransferPending for character {CharacterId} did not complete during handoff compensation",
+                sourceZone.MapId, characterId);
+            return false;
+        }
+
+        if (result.Kind == ZoneCommandResultKind.Applied)
+            return true;
+
+        logger.LogError(
+            "Zone {SourceMapId} ClearZoneTransferPending for character {CharacterId} completed as {ResultKind} ({Cause}) during handoff compensation",
+            sourceZone.MapId, characterId, result.Kind, result.Cause);
+        return false;
     }
 }

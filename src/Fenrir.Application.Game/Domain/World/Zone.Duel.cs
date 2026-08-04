@@ -24,10 +24,12 @@ public sealed partial class Zone
         if (!_players.TryGetValue(command.AttackerCharacterId, out var attackerState))
             return;
 
-        ApplySenderLocation(attackerState, command.AttackInfo);
-
         if (!_players.TryGetValue(command.AttackInfo.ServerIndex2, out var defenderState))
             return;
+        if (defenderState.IsMovingZone)
+            return;
+
+        ApplySenderLocation(attackerState, command.AttackInfo);
 
         if (!AttackPacketBudget.TryConsume(attackerState, command.AttackInfo.AttackActionValue4))
             return;
@@ -51,27 +53,20 @@ public sealed partial class Zone
             zone124OverrideActive, attackerState.AttackBudgetEnforced, attackerState.ActionSkillNumber,
             attackerState.ActionSkillGradeNum1 + attackerState.ActionSkillGradeNum2);
 
-        if (outcome.Rejected)
-            return;
-
         if (outcome.ChargeConsumed)
             ConsumeChargeBuff(attackerState);
 
+        if (outcome.Rejected)
+            return;
+
         var viewDamage = outcome.ViewDamage;
         var realDamage = outcome.DamageApplied;
-        var reflectFired = false;
         if (outcome.Hit)
         {
             if (TryApplyReflectAndDestroyer(attackerState, defenderState, outcome, CrossAvatarAttackKind.Duel))
-            {
-                reflectFired = true;
-                viewDamage = 0;
-                realDamage = 0;
-            }
-            else
-            {
-                (viewDamage, realDamage) = ApplyHolyShieldAbsorption(defenderState, outcome);
-            }
+                return;
+
+            (viewDamage, realDamage) = ApplyHolyShieldAbsorption(defenderState, outcome);
         }
 
         var attackerWeaponItemId = attackerState.Inventory.GetSlot(ContainerMatrix.Equipment, 7)?.ItemId ?? 0;
@@ -81,23 +76,27 @@ public sealed partial class Zone
             {
                 AttackResultValue = outcome.Hit ? 1 + attackerWeaponItemId : 0,
                 AttackCriticalExist = outcome.Critical ? 1 : 0,
-                AttackElementDamage = reflectFired ? 0 : outcome.ElementDamage,
+                AttackElementDamage = outcome.ElementDamage,
                 AttackViewDamageValue = viewDamage,
                 AttackRealDamageValue = realDamage
             }
         };
 
+        if (!outcome.Hit)
+        {
+            attackerState.Session.Send(response);
+            return;
+        }
+
         var recipients = CombatRecipients(attackerState, defenderState);
         BroadcastAttackResult(recipients, response);
-
-        if (!outcome.Hit || reflectFired)
-            return;
 
         defenderState.Life -= realDamage;
         defenderState.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
 
         if (defenderState.Life <= 0)
-            ApplyDeath(defenderState.CharacterId, DeathCause.Duel, (attackerState.PosX, attackerState.PosZ));
+            ApplyDeath(defenderState.CharacterId, DeathCause.Duel, (attackerState.PosX, attackerState.PosZ),
+                originSort: 2, deathSkillNumber: 2);
     }
 
     public void EndActiveDuel(PlayerRuntimeState state, DuelEndReason reason)

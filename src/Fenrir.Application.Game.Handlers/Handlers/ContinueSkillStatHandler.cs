@@ -9,9 +9,10 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 public sealed class ContinueSkillStatHandler(
     IContinueSkillStatService service,
     ILogger<ContinueSkillStatHandler> logger)
-    : IInlinePacketHandler<ContinueSkillStatRequest>
+    : IAsyncPacketHandler<ContinueSkillStatRequest>
 {
-    public void Handle(in ContinueSkillStatRequest packet, IPacketSession session)
+    public async ValueTask HandleAsync(ContinueSkillStatRequest packet, IPacketSession session,
+        CancellationToken cancellationToken)
     {
         var zoneSession = (IZoneSession)session;
         if (zoneSession.CurrentZone is not Zone zone)
@@ -25,7 +26,13 @@ public sealed class ContinueSkillStatHandler(
             "Session {SessionId}: ContinueSkillStatRequest (op94) received for character {CharacterId}",
             session.SessionId, characterId);
 
-        service.RegisterAutoBuffs(zone, characterId, state, packet.Skill);
+        if (!await service.RegisterAutoBuffsAsync(zone, characterId, state, packet.Skill, cancellationToken))
+        {
+            logger.LogWarning(
+                "Character {CharacterId} auto-buff registration was rejected by the zone actor", characterId);
+            return;
+        }
+
         logger.LogInformation("Character {CharacterId} registered auto-buff skill slots", characterId);
         session.Send(new AutoBuffRegisterResponse { Value = 0 });
     }

@@ -44,6 +44,10 @@ public sealed class SocialCrossShardRelayHost(
                 await handler.HandleAnswerAsync(dto, ct).ConfigureAwait(false);
                 break;
 
+            case SocialCrossShardRelayMessageType.Cancel:
+                await handler.HandleCancelAsync(dto, ct).ConfigureAwait(false);
+                break;
+
             default:
                 logger.LogWarning("Relayed social row {RelayId} has unrecognized MessageType {MessageType}; dropped",
                     dto.RelayId, dto.MessageType);

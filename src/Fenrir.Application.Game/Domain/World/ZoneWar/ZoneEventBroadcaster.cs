@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Buffers.Binary;
+using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.World;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.World.WorldState;
@@ -50,8 +51,12 @@ public sealed class ZoneEventBroadcaster(
 
     public void AnnounceZone038Winner(byte tribeId, string? capturerName = null)
     {
+        var data = CreateDataWithName(tribeId, capturerName ?? string.Empty);
+        if (!TryEnqueueForOtherShards(38, data))
+            return;
+
         worldState.SetZone038Winner(tribeId);
-        var data = BroadcastWithName(38, tribeId, capturerName ?? string.Empty);
+        BroadcastPrepared(38, data);
 
         if (guardSpawner is not null)
             foreach (var zone in zones.Zones)
@@ -59,12 +64,15 @@ public sealed class ZoneEventBroadcaster(
 
         zone039Reactor?.Apply(zones);
 
-        EnqueueForOtherShards(38, data);
     }
 
     public void AnnounceTribeSymbolBattleCountdown()
     {
-        var data = Broadcast(39);
+        var data = CreateData();
+        if (!TryEnqueueForOtherShards(39, data))
+            return;
+
+        BroadcastPrepared(39, data);
 
         if (guardSpawner is not null)
             foreach (var zone in zones.Zones)
@@ -73,15 +81,18 @@ public sealed class ZoneEventBroadcaster(
         foreach (var zone in zones.Zones)
             zone.PostHolyStoneCountdownEviction();
 
-        EnqueueForOtherShards(39, data);
     }
 
     public void AnnounceTribeSymbolBattleStarted()
     {
         using var scope = logger.BeginScope("SymbolBattle {SymbolBattlePhase}", "Started");
 
+        var data = CreateData();
+        if (!TryEnqueueForOtherShards(40, data))
+            return;
+
         worldState.StartTribeSymbolBattle();
-        var data = Broadcast(40);
+        BroadcastPrepared(40, data);
 
         if (symbolSpawner is not null)
             foreach (var zone in zones.Zones)
@@ -97,8 +108,6 @@ public sealed class ZoneEventBroadcaster(
         foreach (var zone in zones.Zones)
             zone.PostHolyStoneBattleRankReset();
 
-        EnqueueForOtherShards(40, data);
-
         logger.LogInformation("Tribe symbol battle opened; every tribe reset to its own symbol");
     }
 
@@ -106,9 +115,12 @@ public sealed class ZoneEventBroadcaster(
     {
         using var scope = logger.BeginScope("SymbolBattle {SymbolBattlePhase}", "Ended");
 
+        var data = CreateData();
+        if (!TryEnqueueForOtherShards(45, data))
+            return;
+
         worldState.EndTribeSymbolBattle();
-        var data = Broadcast(45);
-        EnqueueForOtherShards(45, data);
+        BroadcastPrepared(45, data);
 
         logger.LogInformation("Tribe symbol battle closed");
     }
@@ -117,29 +129,38 @@ public sealed class ZoneEventBroadcaster(
     {
         using var scope = logger.BeginScope("SymbolBattle {SymbolIndex} {WinnerTribeId}", symbolIndex, winnerTribeId);
 
+        var data = CreateData(symbolIndex, winnerTribeId);
+        if (!TryEnqueueForOtherShards(42, data))
+            return;
+
         if (symbolIndex == WorldStateService.TribeCount)
             worldState.ResolveMonsterSymbol(winnerTribeId);
         else
             worldState.ResolveTribeSymbol(symbolIndex, winnerTribeId);
 
-        var data = Broadcast(42, symbolIndex, winnerTribeId);
-        EnqueueForOtherShards(42, data);
+        BroadcastPrepared(42, data);
 
         logger.LogInformation("Symbol {SymbolIndex} resolved to tribe {WinnerTribeId}", symbolIndex, winnerTribeId);
     }
 
     public void AnnounceAllianceOffer(byte fromTribeId, byte toTribeId, bool isAccepted)
     {
+        var data = CreateData(fromTribeId, toTribeId, isAccepted ? 1 : 0);
+        if (!TryEnqueueForOtherShards(46, data))
+            return;
+
         worldState.SetAllianceOffer(fromTribeId, toTribeId, isAccepted);
-        var data = Broadcast(46, fromTribeId, toTribeId, isAccepted ? 1 : 0);
-        EnqueueForOtherShards(46, data);
+        BroadcastPrepared(46, data);
     }
 
     public void AnnounceAllianceDissolved(byte tribeA, byte tribeB)
     {
+        var data = CreateData(tribeA, tribeB);
+        if (!TryEnqueueForOtherShards(47, data))
+            return;
+
         worldState.DissolveAlliance(tribeA, tribeB);
-        var data = Broadcast(47, tribeA, tribeB);
-        EnqueueForOtherShards(47, data);
+        BroadcastPrepared(47, data);
     }
 
     public void AnnounceMonsterSymbolAttackWindow()
@@ -159,120 +180,299 @@ public sealed class ZoneEventBroadcaster(
     {
         var response = towerWar.BuildStatusSnapshot();
 
+        if (!KnownTSortRegistry.IsKnown(TowerWarEventCodes.TowerState))
+        {
+            logger.LogError(
+                "Tower status tSort {Sort} is absent from the known-sort allowlist; remote fan-out suppressed",
+                TowerWarEventCodes.TowerState);
+            return;
+        }
+
+        var snapshot = TowerStatusRelaySnapshot.FromResponse(in response);
+        if (!TryEnqueueForOtherShards(TowerWarEventCodes.TowerState, snapshot.ToPayload()))
+            return;
+
         BroadcastToEveryZone(in response);
     }
 
     public void AnnounceFfaCountdown(int minutesRemaining)
     {
-        Broadcast(1501, minutesRemaining);
+        var data = CreateData(minutesRemaining);
+        if (TryEnqueueForOtherShards(1501, data))
+            BroadcastPrepared(1501, data);
     }
 
     public void AnnounceFfaGateOpen()
     {
+        var data = CreateData();
+        if (!TryEnqueueForOtherShards(1502, data))
+            return;
+
         siegeState?.SetZone335(1);
-        Broadcast(1502);
+        BroadcastPrepared(1502, data);
     }
 
     public void AnnounceFfaEntranceOpen()
     {
+        var data = CreateData();
+        if (!TryEnqueueForOtherShards(1503, data))
+            return;
+
         siegeState?.SetZone335(2);
-        Broadcast(1503);
+        BroadcastPrepared(1503, data);
     }
 
     public void AnnounceFfaBattleStart(int battleTimerLegacyTicks)
     {
+        var data = CreateData(battleTimerLegacyTicks);
+        if (!TryEnqueueForOtherShards(1504, data))
+            return;
+
         siegeState?.SetZone335(3);
-        Broadcast(1504, battleTimerLegacyTicks);
+        BroadcastPrepared(1504, data);
     }
 
     public void AnnounceFfaBattleEnd()
     {
+        var data = CreateData();
+        if (!TryEnqueueForOtherShards(1505, data))
+            return;
+
         siegeState?.SetZone335(4);
-        Broadcast(1505);
+        BroadcastPrepared(1505, data);
     }
 
     public void AnnounceFfaClosedNotice()
     {
+        var data = CreateData();
+        if (!TryEnqueueForOtherShards(1506, data))
+            return;
+
         siegeState?.SetZone335(5);
-        Broadcast(1506);
+        BroadcastPrepared(1506, data);
     }
 
     public void AnnounceFfaReset()
     {
+        var data = CreateData();
+        if (!TryEnqueueForOtherShards(1507, data))
+            return;
+
         siegeState?.ResetZone335();
-        Broadcast(1507);
+        BroadcastPrepared(1507, data);
     }
 
-    public void AnnounceValleyWarGateCountdown(int remainingCount)
+    public bool AnnounceValleyWarGateCountdown(int remainingCount)
     {
-        Broadcast(659, remainingCount);
+        return BroadcastValleyWar(659, remainingCount);
     }
 
-    public void AnnounceValleyWarGateOpened()
+    public bool AnnounceValleyWarGateOpened()
     {
-        Broadcast(660);
+        return BroadcastValleyWar(660);
     }
 
-    public void AnnounceValleyWarGateClosed()
+    public bool AnnounceValleyWarGateClosed()
     {
-        Broadcast(662);
+        return BroadcastValleyWar(662);
     }
 
-    public void AnnounceValleyWarDoorOpened()
+    public bool AnnounceValleyWarDoorOpened()
     {
-        Broadcast(663);
+        return BroadcastValleyWar(663);
     }
 
-    public void AnnounceValleyWarTribeWin(byte winningTribe)
+    public bool AnnounceValleyWarTribeWin(byte winningTribe)
     {
-        Broadcast(666, winningTribe);
+        return BroadcastValleyWar(666, winningTribe);
     }
 
-    public void AnnounceValleyWarBattleScrollDeleted()
+    public bool AnnounceValleyWarBattleScrollDeleted()
     {
-        Broadcast(667);
+        return BroadcastValleyWar(667);
     }
 
-    public void AnnounceValleyWarBossDefeated()
+    public bool AnnounceValleyWarBossDefeated()
     {
-        Broadcast(668);
+        return BroadcastValleyWar(668);
     }
 
-    public void AnnounceValleyWarReturnToTown()
+    public bool AnnounceValleyWarReturnToTown()
     {
-        Broadcast(669);
+        return BroadcastValleyWar(669);
+    }
+
+    public ValleyWarEnvironmentSnapshot GetValleyWarEnvironmentSnapshot()
+    {
+        var eligiblePlayerPresent = false;
+        var bossSlotOccupied = false;
+
+        foreach (var zone in zones.Zones)
+        {
+            if (!ValleyWarMapCatalog.Contains(zone.MapId))
+                continue;
+
+            bossSlotOccupied |= zone.ValleyWarBossSlotOccupied();
+
+            foreach (var player in zone.Players)
+            {
+                if (player.IsMovingZone || player.VisibleState == 0)
+                    continue;
+
+                eligiblePlayerPresent = true;
+                break;
+            }
+        }
+
+        return new ValleyWarEnvironmentSnapshot(eligiblePlayerPresent, bossSlotOccupied);
+    }
+
+    public bool HasCompleteValleyWarCampaignOwnership()
+    {
+        foreach (var mapId in ValleyWarMapCatalog.ConfiguredMaps)
+            if (!zones.TryGet(mapId, out _))
+                return false;
+
+        return true;
+    }
+
+    public void AnnounceValleyWarCountdown(int contextTag, int value)
+    {
+        var response = new ZoneWar297StatusResponse { Value00 = contextTag, Value01 = contextTag, Value02 = value };
+        BroadcastToValleyWarCampaign(in response);
+    }
+
+    public void AnnounceValleyWarKillRaceQuotas(ImmutableArray<int> quotas)
+    {
+        if (quotas.Length != ValleyWarSchedule.TribeCount)
+            throw new ArgumentException($"Expected exactly {ValleyWarSchedule.TribeCount} quotas.", nameof(quotas));
+
+        var response = new ZoneWar297MonsterCountResponse { MonsterNum = [.. quotas] };
+        BroadcastToValleyWarCampaign(in response);
+    }
+
+    public void GrantValleyWarRewardsToTribe(byte winningTribe)
+    {
+        foreach (var zone in zones.Zones)
+        {
+            if (!ValleyWarMapCatalog.Contains(zone.MapId))
+                continue;
+
+            foreach (var player in zone.Players)
+            {
+                if (player.Tribe != winningTribe || player.IsMovingZone || player.IsDead)
+                    continue;
+
+                if (!zone.Post(ZoneCommand.GrantValleyWarRewardDrop(player.CharacterId)))
+                    logger.LogWarning(
+                        "Zone {MapId} inbox full: dropped valley-war reward drop grant for character {CharacterId}",
+                        zone.MapId, player.CharacterId);
+            }
+        }
+    }
+
+    public void DisconnectValleyWarCampaign()
+    {
+        foreach (var zone in zones.Zones)
+        {
+            if (!ValleyWarMapCatalog.Contains(zone.MapId))
+                continue;
+
+            foreach (var player in zone.Players)
+                if (player.Session is { } client)
+                    client.Abort(DisconnectReason.ValleyWarForcedReset);
+        }
     }
 
     private byte[] Broadcast(int sort, params ReadOnlySpan<int> fields)
     {
-        var data = new byte[DataSize];
-        for (var i = 0; i < fields.Length; i++)
-            BinaryPrimitives.WriteInt32LittleEndian(data.AsSpan(i * 4), fields[i]);
-
-        var response = new ZoneEventInfoResponse { Sort = sort, Data = data };
-
-        BroadcastToEveryZone(in response);
+        var data = CreateData(fields);
+        BroadcastPrepared(sort, data);
 
         return data;
+    }
+
+    private bool BroadcastValleyWar(int sort, params ReadOnlySpan<int> fields)
+    {
+        var data = CreateData(fields);
+        if (!TryEnqueueForOtherShards(sort, data))
+            return false;
+
+        BroadcastValleyWarPrepared(sort, data);
+        return true;
     }
 
     private byte[] BroadcastWithName(int sort, int value, string characterName)
     {
+        var data = CreateDataWithName(value, characterName);
+        BroadcastPrepared(sort, data);
+        return data;
+    }
+
+    private static byte[] CreateData(params ReadOnlySpan<int> fields)
+    {
         var data = new byte[DataSize];
-        BinaryPrimitives.WriteInt32LittleEndian(data.AsSpan(0, 4), value);
-
-        LegacyWireCodec.WriteFixedString(data.AsSpan(4, NameFieldSize), characterName);
-
-        var response = new ZoneEventInfoResponse { Sort = sort, Data = data };
-
-        BroadcastToEveryZone(in response);
+        for (var i = 0; i < fields.Length; i++)
+            BinaryPrimitives.WriteInt32LittleEndian(data.AsSpan(i * sizeof(int)), fields[i]);
 
         return data;
     }
 
-    private void EnqueueForOtherShards(int sort, byte[] data)
+    private static byte[] CreateDataWithName(int value, string characterName)
     {
-        uplink?.Publish(sort, data);
+        var data = CreateData(value);
+
+        LegacyWireCodec.WriteFixedString(data.AsSpan(4, NameFieldSize), characterName);
+
+        return data;
+    }
+
+    private void BroadcastPrepared(int sort, byte[] data)
+    {
+        var response = new ZoneEventInfoResponse { Sort = sort, Data = data };
+        BroadcastToEveryZone(in response);
+    }
+
+    private void BroadcastValleyWarPrepared(int sort, byte[] data)
+    {
+        var response = new ZoneEventInfoResponse { Sort = sort, Data = data };
+        BroadcastToValleyWarCampaign(in response);
+    }
+
+    private bool TryEnqueueForOtherShards(int sort, ReadOnlySpan<byte> data)
+    {
+        if (!KnownTSortRegistry.CrossesShardBoundary(sort))
+            return true;
+
+        if (uplink is null)
+        {
+            logger.LogError(
+                "RvR event sort {Sort} rejected before local state mutation or fan-out: durable relay services are unavailable",
+                sort);
+            return false;
+        }
+
+        var identity = WorldEventPublicationIdentity.Create();
+        WorldEventUplinkResult result;
+        try
+        {
+            result = uplink.Publish(sort, data, identity);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex,
+                "RvR event sort {Sort} operation {OperationId} faulted before local state mutation or fan-out",
+                sort, identity.OperationId);
+            return false;
+        }
+
+        if (result.IsEnqueued)
+            return true;
+
+        logger.LogWarning(
+            "RvR event sort {Sort} operation {OperationId} rejected before local state mutation or fan-out: durable relay returned {Result}",
+            sort, result.Identity.OperationId, result.Kind);
+        return false;
     }
 
     public void ApplyRelayedStateAndReactions(int sort, ReadOnlySpan<byte> data)
@@ -358,6 +558,17 @@ public sealed class ZoneEventBroadcaster(
 
     private void BroadcastToEveryZone<TPacket>(in TPacket response) where TPacket : struct, IOutgoingPacket
     {
+        BroadcastToZones(in response, valleyWarOnly: false);
+    }
+
+    private void BroadcastToValleyWarCampaign<TPacket>(in TPacket response) where TPacket : struct, IOutgoingPacket
+    {
+        BroadcastToZones(in response, valleyWarOnly: true);
+    }
+
+    private void BroadcastToZones<TPacket>(in TPacket response, bool valleyWarOnly)
+        where TPacket : struct, IOutgoingPacket
+    {
         var total = FrameWriter.FrameSizeOf<TPacket>();
         var rented = ArrayPool<byte>.Shared.Rent(total);
 
@@ -367,18 +578,23 @@ public sealed class ZoneEventBroadcaster(
             FrameWriter.WriteFrame(in response, span);
 
             foreach (var zone in zones.Zones)
-            foreach (var player in zone.Players)
-                try
-                {
-                    if (player.Session is { } clientSession)
-                        clientSession.SendRaw(span);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex,
-                        "Cluster-wide RvR broadcast to character {RecipientId} (zone {MapId}) failed",
-                        player.CharacterId, zone.MapId);
-                }
+            {
+                if (valleyWarOnly && !ValleyWarMapCatalog.Contains(zone.MapId))
+                    continue;
+
+                foreach (var player in zone.Players)
+                    try
+                    {
+                        if (player.Session is { } clientSession)
+                            clientSession.SendRaw(span);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex,
+                            "Cluster-wide RvR broadcast to character {RecipientId} (zone {MapId}) failed",
+                            player.CharacterId, zone.MapId);
+                    }
+            }
         }
         finally
         {

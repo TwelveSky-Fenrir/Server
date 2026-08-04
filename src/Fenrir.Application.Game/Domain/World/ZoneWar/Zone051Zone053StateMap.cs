@@ -24,6 +24,7 @@ public static class Zone051Zone053StateMap
     {
         state = selector switch
         {
+            19 => 100,
             20 => 1,
             21 => 2,
             22 => 3,

@@ -1,4 +1,5 @@
 using Fenrir.Application.Game.Abstractions.Sessions;
+using Fenrir.Application.Game.Domain.World.Runtime;
 using Fenrir.Protocol.Game;
 
 namespace Fenrir.Application.Game.Domain.World.Monsters;
@@ -7,8 +8,7 @@ public static class MonsterAggroListPruner
 {
     private const int TrackedAttackerCellTolerance = 1;
 
-    public static Result Prune(Zone zone, MonsterEntity monster, IEnumerable<MonsterEntity> allMonsters,
-        List<Survivor>? resultBuffer = null)
+    public static Result Prune(Zone zone, MonsterEntity monster, List<Survivor>? resultBuffer = null)
     {
         var survivors = resultBuffer ?? [];
         survivors.Clear();
@@ -29,25 +29,25 @@ public static class MonsterAggroListPruner
 
         foreach (var entry in monster.SnapshotAttackDamage())
         {
-            if (!TryEvaluateEntry(zone, monster, allMonsters, entry, meleeRadiusSq, leashRadiusSq,
+            if (!TryEvaluateEntry(zone, monster, entry, meleeRadiusSq, leashRadiusSq,
                     cellSize, monsterCellX, monsterCellY, monsterCellZ, out var distanceSquared))
                 continue;
 
-            survivors.Add(new Survivor(entry.CharacterId, entry.SessionToken, entry.CumulativeDamage,
+            survivors.Add(new Survivor(entry.CharacterId, entry.Incarnation, entry.CumulativeDamage,
                 distanceSquared));
         }
 
         return new Result(survivors);
     }
 
-    private static bool TryEvaluateEntry(Zone zone, MonsterEntity monster, IEnumerable<MonsterEntity> allMonsters,
-        MonsterAttackDamageEntry entry, float meleeRadiusSq, float leashRadiusSq,
+    private static bool TryEvaluateEntry(Zone zone, MonsterEntity monster, MonsterAttackDamageEntry entry,
+        float meleeRadiusSq, float leashRadiusSq,
         float cellSize, int monsterCellX, int monsterCellY, int monsterCellZ, out float distanceSquared)
     {
         distanceSquared = 0f;
 
         if (!zone.TryGetPlayer(entry.CharacterId, out var player) || player is null ||
-            !ReferenceEquals(player, entry.SessionToken))
+            player.Incarnation != entry.Incarnation)
             return false;
 
         if (player.Session is not IZoneSession { State: ZoneSessionState.InWorld })
@@ -71,7 +71,7 @@ public static class MonsterAggroListPruner
 
         if (distanceSquared > meleeRadiusSq)
         {
-            var otherPursuers = CountOtherPursuers(allMonsters, monster, entry.CharacterId);
+            var otherPursuers = zone.CountOtherMonsterPursuers(monster, entry.CharacterId, entry.Incarnation);
             return otherPursuers < monster.PursuerCapacity;
         }
 
@@ -83,26 +83,6 @@ public static class MonsterAggroListPruner
         return player.VisibleState == 0;
     }
 
-    private static int CountOtherPursuers(IEnumerable<MonsterEntity> allMonsters, MonsterEntity monster,
-        int candidateCharacterId)
-    {
-        var count = 0;
-        foreach (var other in allMonsters)
-        {
-            if (other.ServerIndex == monster.ServerIndex)
-                continue;
-
-            if (other.AiState is not (MonsterAiState.Chase or MonsterAiState.AttackWindup
-                or MonsterAiState.RangedAttackWindup))
-                continue;
-
-            if (other.TargetCharacterId == candidateCharacterId)
-                count++;
-        }
-
-        return count;
-    }
-
     private static float DistanceSquared(float x1, float z1, float x2, float z2)
     {
         var dx = x1 - x2;
@@ -112,7 +92,7 @@ public static class MonsterAggroListPruner
 
     public readonly record struct Survivor(
         int CharacterId,
-        object SessionToken,
+        RuntimeIncarnation Incarnation,
         long CumulativeDamage,
         float DistanceSquared);
 

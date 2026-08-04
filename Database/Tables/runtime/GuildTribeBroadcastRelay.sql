@@ -3,6 +3,8 @@ CREATE TABLE runtime.GuildTribeBroadcastRelay
     RelayId          BIGINT IDENTITY (1,1) NOT NULL,
     Kind             TINYINT               NOT NULL,
     SourceShardId    TINYINT               NOT NULL,
+    SourceCharacterId INT                  NULL,
+    SystemCause      TINYINT               NULL,
     GuildId          INT                   NULL,
     Tribe            TINYINT               NULL,
     RoleField        TINYINT               NOT NULL,
@@ -19,6 +21,8 @@ CREATE TABLE runtime.GuildTribeBroadcastRelay
     CreatedAtUtc     DATETIME2(3)          NOT NULL,
     CONSTRAINT PK_GuildTribeBroadcastRelay PRIMARY KEY NONCLUSTERED (RelayId),
     CONSTRAINT UQ_GuildTribeBroadcastRelay_CorrelationId UNIQUE NONCLUSTERED (CorrelationId),
+    CONSTRAINT CK_GuildTribeBroadcastRelay_CorrelationId CHECK
+        (CorrelationId <> '00000000-0000-0000-0000-000000000000'),
     INDEX IX_GuildTribeBroadcastRelay_CreatedAtUtc NONCLUSTERED (CreatedAtUtc)
 )
-    WITH (MEMORY_OPTIMIZED = ON, DURABILITY = SCHEMA_ONLY);
+    WITH (MEMORY_OPTIMIZED = ON, DURABILITY = SCHEMA_AND_DATA);

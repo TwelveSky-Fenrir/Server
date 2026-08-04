@@ -27,7 +27,10 @@ public sealed record SocialCrossShardRelayRepository(ICaeriusNetDbContext Db) : 
             .AddParameter("Kind", (byte)entry.Kind, SqlDbType.TinyInt)
             .AddParameter("MessageType", (byte)entry.MessageType, SqlDbType.TinyInt)
             .AddParameter("Accepted", (object?)entry.Accepted ?? DBNull.Value, SqlDbType.Bit)
-            .AddParameter("ReasonCode", (object?)entry.ReasonCode ?? DBNull.Value, SqlDbType.TinyInt)
+            .AddParameter("ReasonCode", (object?)(entry.Kind == SocialCrossShardRelayKind.Party &&
+                                                  entry.MessageType == SocialCrossShardRelayMessageType.Ask
+                ? entry.SourceCombinedLevel
+                : entry.ReasonCode) ?? DBNull.Value, SqlDbType.TinyInt)
             .AddParameter("SourceShardId", entry.SourceShardId, SqlDbType.TinyInt)
             .AddParameter("SourceCharacterId", entry.SourceCharacterId, SqlDbType.Int)
             .AddParameter("SourceAvatarName", entry.SourceAvatarName, SqlDbType.NVarChar)

@@ -3,7 +3,9 @@ namespace Fenrir.Application.Game.Domain.Social;
 public readonly record struct CrossShardOutboundAsk(
     byte TargetShardId,
     int TargetCharacterId,
-    string TargetAvatarName);
+    string TargetAvatarName,
+    int SourceCombinedLevel = 0,
+    long CorrelationToken = 0);
 
 public readonly record struct CrossShardInboundAsk(
     long RelayId,
@@ -33,6 +35,40 @@ public sealed class CrossShardNegotiationTracker
         }
     }
 
+    public bool TryConsumeOutbound(int askerId, byte targetShardId, int targetCharacterId,
+        long correlationToken,
+        out CrossShardOutboundAsk ask)
+    {
+        lock (_lock)
+        {
+            if (!_outboundByAsker.TryGetValue(askerId, out ask) ||
+                ask.TargetShardId != targetShardId || ask.TargetCharacterId != targetCharacterId ||
+                ask.CorrelationToken != correlationToken)
+            {
+                ask = default;
+                return false;
+            }
+
+            return _outboundByAsker.Remove(askerId);
+        }
+    }
+
+    public bool TryConsumeOutbound(int askerId, byte targetShardId, int targetCharacterId,
+        out CrossShardOutboundAsk ask)
+    {
+        lock (_lock)
+        {
+            if (!_outboundByAsker.TryGetValue(askerId, out ask) ||
+                ask.TargetShardId != targetShardId || ask.TargetCharacterId != targetCharacterId)
+            {
+                ask = default;
+                return false;
+            }
+
+            return _outboundByAsker.Remove(askerId);
+        }
+    }
+
     public bool TryConsumeOutbound(int askerId, out CrossShardOutboundAsk ask)
     {
         lock (_lock)
@@ -54,6 +90,18 @@ public sealed class CrossShardNegotiationTracker
         lock (_lock)
         {
             return _inboundByTarget.Remove(targetId, out ask);
+        }
+    }
+
+    public bool TryClearInbound(int targetId, byte sourceShardId, int sourceCharacterId)
+    {
+        lock (_lock)
+        {
+            if (!_inboundByTarget.TryGetValue(targetId, out var ask) ||
+                ask.SourceShardId != sourceShardId || ask.SourceCharacterId != sourceCharacterId)
+                return false;
+
+            return _inboundByTarget.Remove(targetId);
         }
     }
 

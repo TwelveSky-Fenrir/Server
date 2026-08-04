@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Fenrir.Application.Game.Abstractions.Social;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Guilds;
@@ -208,8 +209,10 @@ public sealed class GuildInviteService(
             return GuildInviteAskResultKind.TribeMismatch;
         }
 
+        var correlationToken = CreateCorrelationToken();
         var outcome = invites.TryAskCrossShard(asker.CharacterId,
-            new CrossShardOutboundAsk(remote.ShardId, remote.CharacterId, remote.AvatarName));
+            new CrossShardOutboundAsk(remote.ShardId, remote.CharacterId, remote.AvatarName,
+                CorrelationToken: correlationToken));
 
         if (outcome != GuildInviteAskOutcome.Sent)
         {
@@ -229,11 +232,19 @@ public sealed class GuildInviteService(
             asker.Name,
             remote.ShardId,
             remote.CharacterId,
-            null));
+            correlationToken));
 
         logger.LogInformation(
             "Character {CharacterId} published a guild invite cross-shard to character {TargetCharacterId} on shard {TargetShardId}",
             asker.CharacterId, remote.CharacterId, remote.ShardId);
         return GuildInviteAskResultKind.SentCrossShard;
+    }
+
+    private static long CreateCorrelationToken()
+    {
+        Span<byte> bytes = stackalloc byte[sizeof(long)];
+        RandomNumberGenerator.Fill(bytes);
+        var token = BitConverter.ToInt64(bytes) & long.MaxValue;
+        return token == 0 ? 1 : token;
     }
 }

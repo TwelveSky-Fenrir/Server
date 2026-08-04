@@ -5,6 +5,7 @@ using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Loot;
+using Fenrir.Core.Packets.Shared;
 using Fenrir.Domain.Game.GameData;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -27,7 +28,7 @@ public sealed class UpdateProxyShopService(
         if (packet.BuySort is not (1 or 2))
         {
             logger.LogDebug("Update proxy shop validation failed: invalid buySort {BuySort}", packet.BuySort);
-            return new UpdateProxyShopValidation(true, 0, null);
+            return new UpdateProxyShopValidation(true, false, 0, null);
         }
 
         var slotIndex = (short)(packet.SellPage * 5 + packet.SellIndex);
@@ -37,17 +38,24 @@ public sealed class UpdateProxyShopService(
             packet.SelfX is < 0 or > 7 || packet.SelfY is < 0 or > 7)
         {
             logger.LogDebug("Update proxy shop validation failed: out-of-range slot coordinates");
-            return new UpdateProxyShopValidation(true, 0, null);
+            return new UpdateProxyShopValidation(false, true, 0, null);
         }
 
         if (!worldData.ItemsById.TryGetValue(packet.SellItemIndex, out var itemDefinition))
         {
             logger.LogDebug("Update proxy shop validation failed: item {ItemId} is unresolvable",
                 packet.SellItemIndex);
-            return new UpdateProxyShopValidation(true, 0, null);
+            return new UpdateProxyShopValidation(false, true, 0, null);
         }
 
-        return new UpdateProxyShopValidation(false, slotIndex, itemDefinition);
+        return new UpdateProxyShopValidation(false, false, slotIndex, itemDefinition);
+    }
+
+    public async ValueTask<UpdateProxyShopResponse> BuildBusinessFailureAsync(UpdateProxyShopRequest packet,
+        PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
+    {
+        var proxyUser = await LoadProxyUserAsync(packet, state, characterId, cancellationToken);
+        return BuildReply(1, packet.SelfPage, packet.SelfIndex, null, packet.Price, proxyUser);
     }
 
     public async ValueTask<UpdateProxyShopResponse?> RetrieveAsync(UpdateProxyShopRequest packet, Zone zone,
@@ -62,13 +70,14 @@ public sealed class UpdateProxyShopService(
             return null;
         }
 
-        var (_, ownItems) = await offlineShops.GetByCharacterAsync(characterId, cancellationToken);
+        var (ownShop, ownItems) = await offlineShops.GetByCharacterAsync(characterId, cancellationToken);
+        var ownProxyUser = ProxyShopWireMapper.Build(state.Name, ownShop, ownItems);
         if (FindListing(ownItems, slotIndex, packet.SellItemIndex) is not { } listing)
         {
             logger.LogInformation(
                 "Offline-shop retrieve rejected: character {CharacterId} slot {SlotIndex} no longer matches the server-side listing",
                 characterId, slotIndex);
-            return BuildReply(1, packet.SelfPage, packet.SelfIndex, null, 0);
+            return BuildReply(1, packet.SelfPage, packet.SelfIndex, null, packet.Price, ownProxyUser);
         }
 
         var destination = state.Inventory.GetSlot((byte)packet.SelfPage, (byte)packet.SelfIndex);
@@ -81,7 +90,7 @@ public sealed class UpdateProxyShopService(
             logger.LogWarning(
                 "Offline-shop retrieve rejected: character {CharacterId} destination slot {SelfPage}/{SelfIndex} cannot accept item {ItemId} -- session will be disconnected",
                 characterId, packet.SelfPage, packet.SelfIndex, packet.SellItemIndex);
-            return null;
+            return BuildReply(5, packet.SelfPage, packet.SelfIndex, null, packet.Price, ownProxyUser);
         }
 
         var finalQuantity = destination is { } d ? d.Quantity + listing.Quantity : listing.Quantity;
@@ -107,7 +116,7 @@ public sealed class UpdateProxyShopService(
             logger.LogWarning(ex,
                 "Character {CharacterId} offline-shop retrieve RetrieveItemAndReplaceContainerAsync failed",
                 characterId);
-            return BuildReply(1, packet.SelfPage, packet.SelfIndex, null, 0);
+            return BuildReply(1, packet.SelfPage, packet.SelfIndex, null, packet.Price, ownProxyUser);
         }
 
         if (!applied)
@@ -115,12 +124,13 @@ public sealed class UpdateProxyShopService(
             logger.LogInformation(
                 "Offline-shop retrieve rejected: character {CharacterId} slot {SlotIndex} changed between read and delete (shop reopened or slot already emptied)",
                 characterId, slotIndex);
-            return BuildReply(1, packet.SelfPage, packet.SelfIndex, null, 0);
+            return BuildReply(1, packet.SelfPage, packet.SelfIndex, null, packet.Price, ownProxyUser);
         }
 
-        var response = BuildReply(0, packet.SelfPage, packet.SelfIndex, newStack, 0);
-
-        var (shopAfterRetrieve, _) = await offlineShops.GetByCharacterAsync(characterId, cancellationToken);
+        var (shopAfterRetrieve, itemsAfterRetrieve) = await offlineShops.GetByCharacterAsync(characterId,
+            cancellationToken);
+        var response = BuildReply(0, packet.SelfPage, packet.SelfIndex, newStack, 0,
+            ProxyShopWireMapper.Build(state.Name, shopAfterRetrieve, itemsAfterRetrieve), packet.SelfX, packet.SelfY);
         await eventLog.LogAsync(ProxyShopRetrieveEventCode, EventLogCategory.ProxyShop, accountId, characterId,
             null, null, null, 0, null, packet.SellItemIndex, listing.Quantity, 1,
             $"Action=Retrieved;Value={listing.Value};Serial={listing.SerialNumber};Socket1={gem1};" +
@@ -161,7 +171,8 @@ public sealed class UpdateProxyShopService(
             logger.LogDebug(
                 "Offline-shop purchase rejected: character {CharacterId} seller {SellerAvatarName} does not exist",
                 characterId, packet.AvatarName);
-            return BuildReply(1, packet.SelfPage, packet.SelfIndex, null, 0);
+            return BuildReply(1, packet.SelfPage, packet.SelfIndex, null, packet.Price,
+                ProxyShopWireMapper.Build(string.Empty, null, []));
         }
 
         if (sellerId.Value == characterId)
@@ -172,13 +183,14 @@ public sealed class UpdateProxyShopService(
             return null;
         }
 
-        var (_, sellerItems) = await offlineShops.GetByCharacterAsync(sellerId.Value, cancellationToken);
+        var (sellerShop, sellerItems) = await offlineShops.GetByCharacterAsync(sellerId.Value, cancellationToken);
+        var sellerProxyUser = ProxyShopWireMapper.Build(packet.AvatarName, sellerShop, sellerItems);
         if (FindListing(sellerItems, slotIndex, packet.SellItemIndex) is not { } listing)
         {
             logger.LogInformation(
                 "Offline-shop purchase rejected: character {CharacterId} seller {SellerId} slot {SlotIndex} no longer matches the server-side listing",
                 characterId, sellerId.Value, slotIndex);
-            return BuildReply(2, packet.SelfPage, packet.SelfIndex, null, 0);
+            return BuildReply(2, packet.SelfPage, packet.SelfIndex, null, packet.Price, sellerProxyUser);
         }
 
         if (packet.Price != listing.Price)
@@ -186,7 +198,7 @@ public sealed class UpdateProxyShopService(
             logger.LogInformation(
                 "Offline-shop purchase rejected: character {CharacterId} agreed price {ClientPrice} but listing is {ListingPrice}",
                 characterId, packet.Price, listing.Price);
-            return BuildReply(2, packet.SelfPage, packet.SelfIndex, null, 0);
+            return BuildReply(2, packet.SelfPage, packet.SelfIndex, null, packet.Price, sellerProxyUser);
         }
 
         var destination = state.Inventory.GetSlot((byte)packet.SelfPage, (byte)packet.SelfIndex);
@@ -199,7 +211,7 @@ public sealed class UpdateProxyShopService(
             logger.LogWarning(
                 "Offline-shop purchase rejected: character {CharacterId} destination slot {SelfPage}/{SelfIndex} cannot accept item {ItemId} -- session will be disconnected",
                 characterId, packet.SelfPage, packet.SelfIndex, packet.SellItemIndex);
-            return null;
+            return BuildReply(5, packet.SelfPage, packet.SelfIndex, null, packet.Price, sellerProxyUser);
         }
 
         var finalQuantity = destination is { } d ? d.Quantity + listing.Quantity : listing.Quantity;
@@ -224,7 +236,7 @@ public sealed class UpdateProxyShopService(
         {
             logger.LogWarning(ex, "Character {CharacterId} offline-shop purchase ExecutePurchaseAsync failed",
                 characterId);
-            return BuildReply(2, packet.SelfPage, packet.SelfIndex, null, 0);
+            return BuildReply(2, packet.SelfPage, packet.SelfIndex, null, packet.Price, sellerProxyUser);
         }
 
         if (!applied)
@@ -232,12 +244,17 @@ public sealed class UpdateProxyShopService(
             logger.LogInformation(
                 "Offline-shop purchase rejected: character {CharacterId} seller {SellerId} slot {SlotIndex} changed between read and delete (lost the race)",
                 characterId, sellerId.Value, slotIndex);
-            return BuildReply(2, packet.SelfPage, packet.SelfIndex, null, 0);
+            return BuildReply(2, packet.SelfPage, packet.SelfIndex, null, packet.Price, sellerProxyUser);
         }
 
-        var response = BuildReply(1000, packet.SelfPage, packet.SelfIndex, newStack, listing.Price);
+        var (shopAfterPurchase, itemsAfterPurchase) = await offlineShops.GetByCharacterAsync(sellerId.Value,
+            cancellationToken);
+        var response = BuildReply(1000, packet.SelfPage, packet.SelfIndex, newStack, listing.Price,
+            ProxyShopWireMapper.Build(packet.AvatarName, shopAfterPurchase, itemsAfterPurchase), packet.SelfX,
+            packet.SelfY);
+        if (!itemsAfterPurchase.Any(item => item.ItemId is > 0))
+            zone.RemoveProxyShop(sellerId.Value);
 
-        var (shopAfterPurchase, _) = await offlineShops.GetByCharacterAsync(sellerId.Value, cancellationToken);
         await eventLog.LogAsync(ProxyShopPurchaseEventCode, EventLogCategory.ProxyShop, accountId, characterId,
             null, sellerId.Value, null, listing.Price, null, packet.SellItemIndex, listing.Quantity, 1,
             $"Action=Purchased;Value={listing.Value};Serial={listing.SerialNumber};Socket1={gem1};" +
@@ -275,12 +292,39 @@ public sealed class UpdateProxyShopService(
         return null;
     }
 
-    private static UpdateProxyShopResponse BuildReply(int result, int page, int index, ItemStack? stack, int money)
+    private async ValueTask<ProxyShopUserInfo> LoadProxyUserAsync(UpdateProxyShopRequest packet,
+        PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (packet.BuySort == 1)
+            {
+                var (shop, items) = await offlineShops.GetByCharacterAsync(characterId, cancellationToken);
+                return ProxyShopWireMapper.Build(state.Name, shop, items);
+            }
+
+            var sellerId = await characters.GetIdByNameAsync(packet.AvatarName, cancellationToken);
+            if (sellerId is null)
+                return ProxyShopWireMapper.Build(string.Empty, null, []);
+
+            var (sellerShop, sellerItems) = await offlineShops.GetByCharacterAsync(sellerId.Value,
+                cancellationToken);
+            return ProxyShopWireMapper.Build(packet.AvatarName, sellerShop, sellerItems);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Update proxy shop failed to load the reply snapshot");
+            return ProxyShopWireMapper.Build(string.Empty, null, []);
+        }
+    }
+
+    private static UpdateProxyShopResponse BuildReply(int result, int page, int index, ItemStack? stack, int money,
+        ProxyShopUserInfo proxyUser, int x = 0, int y = 0)
     {
         var value1 = stack is { } s
             ?
             [
-                s.ItemId, 0, 0, s.Quantity, ItemValueCodec.Encode(s.Enchant, s.Combine, s.Refine, s.Socket), s.Serial,
+                s.ItemId, x, y, s.Quantity, ItemValueCodec.Encode(s.Enchant, s.Combine, s.Refine, s.Socket), s.Serial,
                 s.SocketGem1, s.SocketGem2, s.SocketGem3
             ]
             : new int[9];
@@ -288,7 +332,7 @@ public sealed class UpdateProxyShopService(
         return new UpdateProxyShopResponse
         {
             Result = result,
-            ProxyUser = ProxyShopWireMapper.Build(string.Empty, null, []),
+            ProxyUser = proxyUser,
             Page = page,
             Index = index,
             Value1 = value1,

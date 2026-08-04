@@ -6,7 +6,7 @@ namespace Fenrir.Application.Game.Abstractions.ItemModification;
 
 public enum JadeUpgradeOutcome
 {
-    Rejected,
+    StructuralInvalid,
     Applied
 }
 
@@ -14,7 +14,8 @@ public readonly record struct JadeUpgradeResult(JadeUpgradeOutcome Outcome, int 
 
 public enum AdvancedElixirOutcome
 {
-    Rejected,
+    StructuralInvalid,
+    InventoryFull,
     Success,
     Failed
 }
@@ -59,7 +60,7 @@ public interface ICraftItemService
 
 public enum CraftFamilyOutcome
 {
-    Rejected,
+    StructuralInvalid,
     Applied
 }
 

@@ -10,5 +10,7 @@ public partial class PlayerRuntimeState
 
     public int MountExpiryCountdownAccrualTicks { get; set; }
 
+    public int MountActivityDecayAccrualTicks { get; set; }
+
     public bool MountAutoDismountPending { get; set; }
 }

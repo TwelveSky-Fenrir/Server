@@ -44,7 +44,7 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService, ILogger
 
                     if (result.Outcome != JadeUpgradeOutcome.Applied)
                     {
-                        session.Send(new CraftItemResponse { Result = 1, Value = [0, 0, 0, 0, 0, 0] });
+                        zoneSession.Abort(DisconnectReason.Faulted);
                         return;
                     }
 
@@ -59,7 +59,13 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService, ILogger
                     var result = await craftItemService.ResolveAdvancedElixirAsync(packet, zone, state, characterId,
                         accountId, cancellationToken);
 
-                    if (result.Outcome == AdvancedElixirOutcome.Rejected)
+                    if (result.Outcome == AdvancedElixirOutcome.StructuralInvalid)
+                    {
+                        zoneSession.Abort(DisconnectReason.Faulted);
+                        return;
+                    }
+
+                    if (result.Outcome == AdvancedElixirOutcome.InventoryFull)
                     {
                         session.Send(new CraftItemResponse { Result = 1, Value = [0, 0, 0, 0, 0, 0] });
                         return;
@@ -98,7 +104,7 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService, ILogger
 
                     if (!result.Applied)
                     {
-                        session.Send(new CraftItemResponse { Result = 1, Value = [0, 0, 0, 0, 0, 0] });
+                        zoneSession.Abort(DisconnectReason.Faulted);
                         return;
                     }
 
@@ -113,7 +119,7 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService, ILogger
 
                     if (!result.Applied)
                     {
-                        session.Send(new CraftItemResponse { Result = 1, Value = [0, 0, 0, 0, 0, 0] });
+                        zoneSession.Abort(DisconnectReason.Faulted);
                         return;
                     }
 
@@ -127,7 +133,7 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService, ILogger
 
                     if (!result.Applied)
                     {
-                        session.Send(new CraftItemResponse { Result = 1, Value = [0, 0, 0, 0, 0, 0] });
+                        zoneSession.Abort(DisconnectReason.Faulted);
                         return;
                     }
 
@@ -141,11 +147,11 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService, ILogger
 
                     if (!result.Applied)
                     {
-                        session.Send(new CraftItemResponse { Result = 1, Value = [0, 0, 0, 0, 0, 0] });
+                        zoneSession.Abort(DisconnectReason.Faulted);
                         return;
                     }
 
-                    session.Send(StandardResponse(result));
+                    session.Send(new CraftItemResponse { Result = 0, Value = ResponseValue(result) });
                     return;
                 }
                 case CraftRecipeCatalog.WingTierRerollSort:
@@ -155,7 +161,7 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService, ILogger
 
                     if (!result.Applied)
                     {
-                        session.Send(new CraftItemResponse { Result = 1, Value = [0, 0, 0, 0, 0, 0] });
+                        zoneSession.Abort(DisconnectReason.Faulted);
                         return;
                     }
 
@@ -164,14 +170,13 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService, ILogger
                 }
                 case CraftRecipeCatalog.WingFourthTierSort:
                 case CraftRecipeCatalog.WingFifthTierSort:
-                case CraftRecipeCatalog.WingSixthTierUnvalidatedSort:
                 {
                     var result = await craftItemService.ResolveWingFifthTierAsync(packet, zone, state, characterId,
                         accountId, cancellationToken);
 
                     if (!result.Applied)
                     {
-                        session.Send(new CraftItemResponse { Result = 1, Value = [0, 0, 0, 0, 0, 0] });
+                        zoneSession.Abort(DisconnectReason.Faulted);
                         return;
                     }
 
@@ -189,11 +194,9 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService, ILogger
 
                     if (!result.Applied)
                     {
-                        session.Send(new CraftItemResponse { Result = 1, Value = [0, 0, 0, 0, 0, 0] });
+                        zoneSession.Abort(DisconnectReason.Faulted);
                         return;
                     }
-
-                    SendGrantedItem(session, result);
 
                     var response = packet.Sort == CraftRecipeCatalog.DustRecycleWingSort && result.GrantedItem is null
                         ? WingP3Response(result)
@@ -203,8 +206,9 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService, ILogger
                 }
                 default:
                     logger.LogInformation(
-                        "Session {SessionId} character {CharacterId}: CraftItemRequest ignored, unrecognized recipe sort {Sort}",
+                        "Session {SessionId} character {CharacterId}: CraftItemRequest rejected, inactive recipe sort {Sort}",
                         zoneSession.SessionId, characterId, packet.Sort);
+                    zoneSession.Abort(DisconnectReason.Faulted);
                     return;
             }
         }
@@ -247,25 +251,5 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService, ILogger
     private static int[] ResponseValue(CraftFamilyResult result)
     {
         return [result.ResultItemId, 0, 0, result.ResultQuantity, 0, result.Serial];
-    }
-
-    private static void SendGrantedItem(IPacketSession session, CraftFamilyResult result)
-    {
-        if (result.GrantedItem is not { } granted)
-            return;
-
-        session.Send(new AddInventoryItemResponse
-        {
-            Result = 0,
-            ItemIndex = granted.ItemId,
-            Page = result.GrantedPage,
-            Index = result.GrantedIndex,
-            Xy = 0,
-            Quantity = granted.Quantity,
-            Value = 0,
-            Serial = granted.Serial,
-            Socket = [0, 0, 0],
-            Expire = 0
-        });
     }
 }

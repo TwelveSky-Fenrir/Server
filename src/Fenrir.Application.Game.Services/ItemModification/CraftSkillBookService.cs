@@ -1,8 +1,8 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.ItemModification;
-using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Crafting;
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Domain.Game.GameData;
 using Fenrir.Protocol.Game;
@@ -19,10 +19,26 @@ public sealed class CraftSkillBookService(
     public async ValueTask<CraftSkillBookResult> ResolveAsync(CraftSkillBookRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
     {
+        if (packet.Sort is < SkillBookCraftCatalog.Recipe1Sort or > SkillBookCraftCatalog.Recipe3Sort)
+            return new CraftSkillBookResult(CraftSkillBookOutcome.Rejected, 0, 0);
+
         if (!IsValidSlot(packet.Page1, packet.Index1) || !IsValidSlot(packet.Page2, packet.Index2) ||
-            !IsValidSlot(packet.Page3, packet.Index3) || !IsValidSlot(packet.Page4, packet.Index4))
+            !IsValidSlot(packet.Page3, packet.Index3) || !IsValidSlot(packet.Page4, packet.Index4) ||
+            !AreDistinctSlots(packet.Page1, packet.Index1, packet.Page2, packet.Index2, packet.Page3,
+                packet.Index3, packet.Page4, packet.Index4))
         {
             logger.LogDebug("Character {CharacterId} craft-skill-book rejected: invalid slot(s)", characterId);
+            return new CraftSkillBookResult(CraftSkillBookOutcome.Rejected, 0, 0);
+        }
+
+        var today = GameDate.Today();
+        if (!RentedInventoryPageGate.IsPageAccessible(packet.Page1, state.InventoryDate, today) ||
+            !RentedInventoryPageGate.IsPageAccessible(packet.Page2, state.InventoryDate, today) ||
+            !RentedInventoryPageGate.IsPageAccessible(packet.Page3, state.InventoryDate, today) ||
+            !RentedInventoryPageGate.IsPageAccessible(packet.Page4, state.InventoryDate, today))
+        {
+            logger.LogDebug("Character {CharacterId} craft-skill-book rejected: rented inventory page expired",
+                characterId);
             return new CraftSkillBookResult(CraftSkillBookOutcome.Rejected, 0, 0);
         }
 
@@ -32,17 +48,16 @@ public sealed class CraftSkillBookService(
         var material4 = state.Inventory.GetSlot((byte)packet.Page4, (byte)packet.Index4);
 
         if (material1 is not { } m1 || material2 is not { } m2 || material3 is not { } m3 ||
-            material4 is not { } m4)
+            material4 is not { } m4 || !IsWholeSlotIngredient(m1) || !IsWholeSlotIngredient(m2) ||
+            !IsWholeSlotIngredient(m3) || !IsWholeSlotIngredient(m4))
         {
             logger.LogDebug(
                 "Character {CharacterId} craft-skill-book rejected: one or more material slots empty", characterId);
             return new CraftSkillBookResult(CraftSkillBookOutcome.Rejected, 0, 0);
         }
 
-        var resolved = packet.Sort == SkillBookCraftCatalog.WarGodSort
-            ? SkillBookCraftResolver.ResolveWarGod(m1.ItemId, m2.ItemId, m3.ItemId, m4.ItemId, state.PreviousTribe,
-                SystemRandomSource.Instance)
-            : SkillBookCraftResolver.ResolveFragments(packet.Sort, m1.ItemId, m2.ItemId, m3.ItemId, m4.ItemId);
+        var resolved = SkillBookCraftResolver.ResolveFragments(packet.Sort, m1.ItemId, m2.ItemId, m3.ItemId,
+            m4.ItemId);
 
         if (!resolved.Succeeded)
         {
@@ -52,10 +67,8 @@ public sealed class CraftSkillBookService(
             return new CraftSkillBookResult(CraftSkillBookOutcome.Rejected, 0, 0);
         }
 
-        var newBook = m1 with
-        {
-            ItemId = resolved.ResultItemId, Quantity = 0, Enchant = 0, Combine = 0, Refine = 0, Socket = 0
-        };
+        if (!TryCreateResultBook(m1, resolved.ResultItemId, out var newBook))
+            return new CraftSkillBookResult(CraftSkillBookOutcome.Rejected, 0, 0);
 
         var working = new Dictionary<byte, ImmutableDictionary<byte, ItemStack>>();
         EnsureContainer(working, state, (byte)packet.Page1);
@@ -78,19 +91,19 @@ public sealed class CraftSkillBookService(
 
         var containers = pages.Select(page => new InventoryContainerSnapshot(page, working[page]))
             .ToImmutableArray();
-        if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
-                cancellationToken))
+        if ((await zone.PostInventoryCommandAndWaitForResultAsync(
+                new InventoryZoneCommand(characterId, containers, null), cancellationToken)).Kind !=
+            ZoneCommandResultKind.Applied)
+        {
             logger.LogError(
                 "Zone {MapId} inventory inbox full: dropped craft-skill-book mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
+            return new CraftSkillBookResult(CraftSkillBookOutcome.Rejected, 0, 0);
+        }
 
         logger.LogInformation(
             "Character {CharacterId} craft-skill-book applied: result item {ResultItemId}", characterId,
             resolved.ResultItemId);
-
-        if (packet.Sort == SkillBookCraftCatalog.WarGodSort)
-            CenterRelayNoticeLog.LogNotableCraft(logger, worldData, state.Tribe, state.Name, resolved.ResultItemId,
-                "craft-skill-book (War God)");
 
         return new CraftSkillBookResult(CraftSkillBookOutcome.Applied, resolved.ResultItemId, newBook.Serial);
     }
@@ -106,6 +119,55 @@ public sealed class CraftSkillBookService(
     {
         return page is ContainerMatrix.InventoryPage0 or ContainerMatrix.InventoryPage1 &&
                ContainerMatrix.IsValidSlot((byte)page, index);
+    }
+
+    private bool HasValidStoredQuantity(ItemStack stack)
+    {
+        return worldData.ItemsById.TryGetValue(stack.ItemId, out var definition) &&
+               ItemQuantityPolicy.IsWithinLegalRange(definition.Item.Sort, stack.Quantity);
+    }
+
+    private bool IsWholeSlotIngredient(ItemStack stack)
+    {
+        return worldData.ItemsById.TryGetValue(stack.ItemId, out var definition) &&
+               ItemQuantityPolicy.IsWithinLegalRange(definition.Item.Sort, stack.Quantity) &&
+               (!ItemQuantityPolicy.IsStackableSort(definition.Item.Sort) ||
+                stack.Quantity == ItemQuantityPolicy.MinStackQuantity);
+    }
+
+    private bool TryCreateResultBook(ItemStack material, int resultItemId, out ItemStack result)
+    {
+        if (!worldData.ItemsById.TryGetValue(resultItemId, out var definition))
+        {
+            result = default;
+            return false;
+        }
+
+        var quantity = ItemQuantityPolicy.IsStackableSort(definition.Item.Sort)
+            ? ItemQuantityPolicy.MinStackQuantity
+            : 0;
+        if (!ItemQuantityPolicy.IsWithinLegalRange(definition.Item.Sort, quantity))
+        {
+            result = default;
+            return false;
+        }
+
+        result = material with
+        {
+            ItemId = resultItemId, Quantity = quantity, Enchant = 0, Combine = 0, Refine = 0, Socket = 0
+        };
+        return true;
+    }
+
+    private static bool AreDistinctSlots(int page1, int index1, int page2, int index2, int page3, int index3,
+        int page4, int index4)
+    {
+        return (page1 != page2 || index1 != index2) &&
+               (page1 != page3 || index1 != index3) &&
+               (page1 != page4 || index1 != index4) &&
+               (page2 != page3 || index2 != index3) &&
+               (page2 != page4 || index2 != index4) &&
+               (page3 != page4 || index3 != index4);
     }
 
     private static List<CharacterItemSlotTvp> ToTvps(ImmutableDictionary<byte, ItemStack> container)

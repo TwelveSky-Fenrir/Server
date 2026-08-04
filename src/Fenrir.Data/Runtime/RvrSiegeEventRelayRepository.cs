@@ -57,6 +57,30 @@ public sealed record RvrSiegeEventRelayRepository(ICaeriusNetDbContext Db) : IRv
         }
     }
 
+    public async ValueTask AcknowledgeAsync(byte shardId, long relayId, CancellationToken ct)
+    {
+        for (var attempt = 1;; attempt++)
+        {
+            var sp = new StoredProcedureParametersBuilder("runtime", "usp_RvrSiegeEventRelay_Acknowledge", 0,
+                    CommandTimeoutSeconds)
+                .AddParameter("ShardId", shardId, SqlDbType.TinyInt)
+                .AddParameter("RelayId", relayId, SqlDbType.BigInt)
+                .Build();
+
+            try
+            {
+                await Db.ExecuteAsync(sp, ct);
+                return;
+            }
+            catch (CaeriusNetSqlException ex)
+                when (attempt < MaxWriteConflictAttempts &&
+                      ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                      IsWriteConflict(sqlErrorNumber))
+            {
+            }
+        }
+    }
+
     private static bool IsWriteConflict(int errorNumber)
     {
         return errorNumber is ErrorWriteConflict or ErrorDependencyFailure or ErrorCommitDependencyAborted;

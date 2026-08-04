@@ -12,6 +12,7 @@ BEGIN
            MonsterSymbolEndTime,
            HighTribe,
            UpdateTribePoint,
+           Revision,
            UpdatedAtUtc
     FROM game.WorldState;
 

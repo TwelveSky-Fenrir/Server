@@ -29,6 +29,14 @@ public sealed class GuildCrossShardRelayHandler(
 
     public ValueTask HandleAskAsync(SocialCrossShardRelayDto ask, CancellationToken ct)
     {
+        if (ask.AskRelayId is not { } correlationToken || correlationToken <= 0)
+        {
+            logger.LogInformation(
+                "Cross-shard guild invite from character {SourceCharacterId} on shard {SourceShardId} has no correlation token; dropped",
+                ask.SourceCharacterId, ask.SourceShardId);
+            return ValueTask.CompletedTask;
+        }
+
         if (!zones.TryGetPlayer(ask.TargetCharacterId, out var target))
         {
             PublishDecline(ask, 4);
@@ -49,7 +57,7 @@ public sealed class GuildCrossShardRelayHandler(
         }
 
         if (!guildInvites.TryRegisterCrossShardInbound(target.CharacterId,
-                new CrossShardInboundAsk(ask.RelayId, ask.SourceShardId, ask.SourceCharacterId,
+                new CrossShardInboundAsk(correlationToken, ask.SourceShardId, ask.SourceCharacterId,
                     ask.SourceAvatarName)))
         {
             PublishDecline(ask, 5);
@@ -65,10 +73,12 @@ public sealed class GuildCrossShardRelayHandler(
 
     public ValueTask HandleAnswerAsync(SocialCrossShardRelayDto answer, CancellationToken ct)
     {
-        if (!guildInvites.TryConsumeCrossShardOutbound(answer.TargetCharacterId, out _))
+        if (answer.AskRelayId is not { } correlationToken || correlationToken <= 0 ||
+            !guildInvites.TryConsumeCrossShardOutbound(answer.TargetCharacterId, answer.SourceShardId,
+                answer.SourceCharacterId, correlationToken, out _))
         {
             logger.LogInformation(
-                "Cross-shard guild invite answer for asker {AskerId} has no matching pending ask -- asker already cancelled/disconnected, or a stale/duplicate Answer",
+                "Cross-shard guild invite answer for asker {AskerId} has no matching pending invitee, shard, and correlation -- cancelled, stale, or mismatched Answer",
                 answer.TargetCharacterId);
             return ValueTask.CompletedTask;
         }
@@ -100,6 +110,6 @@ public sealed class GuildCrossShardRelayHandler(
             "",
             ask.SourceShardId,
             ask.SourceCharacterId,
-            ask.RelayId));
+            ask.AskRelayId));
     }
 }

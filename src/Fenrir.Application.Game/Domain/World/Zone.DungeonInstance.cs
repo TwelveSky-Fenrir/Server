@@ -28,9 +28,13 @@ public sealed partial class Zone
     public IPersonalDungeonBossCatalog PersonalDungeonBossCatalog { get; set; } =
         NullPersonalDungeonBossCatalog.Instance;
 
-    public bool IsZone241TypeZone =>
-        options.Zone241DungeonMapIds.Contains(MapId) ||
-        WrapCheckSpecialDestinationCatalog.IsInstancedDestination(MapId);
+    public bool ChallengeContentEnabled => options.ChallengeContentEnabled;
+
+    public bool IsTimedChallengeMap => ChallengeContentEnabled && MapId is >= 234 and <= 240;
+
+    public bool IsZone241TypeZone => ChallengeContentEnabled &&
+                                      (options.Zone241DungeonMapIds.Contains(MapId) ||
+                                       WrapCheckSpecialDestinationCatalog.IsInstancedDestination(MapId));
 
     public DungeonInstanceEntryOutcome TryEnterZone241PersonalInstance(int characterId)
     {
@@ -59,7 +63,7 @@ public sealed partial class Zone
 
     public DungeonInstanceEntryOutcome TryEnterLegendsOfDarknessInstance(int characterId)
     {
-        if (!WrapCheckSpecialDestinationCatalog.IsInstancedDestination(MapId))
+        if (!ChallengeContentEnabled || !WrapCheckSpecialDestinationCatalog.IsInstancedDestination(MapId))
             return DungeonInstanceEntryOutcome.NotZone241Type;
 
         if (!_players.TryGetValue(characterId, out var state) || state is null)
@@ -91,7 +95,10 @@ public sealed partial class Zone
         var serverIndex = state.CharacterId;
 
         if (_monsters.TryRemove(serverIndex, out var displaced))
+        {
+            _monsterPursuers.Untrack(displaced);
             RemoveMonsterFromGrid(displaced);
+        }
 
         var boss = MonsterEntity.Create(serverIndex, NextMonsterUniqueNumber(), template, serverIndex,
             spawnPosition.X, spawnPosition.Y, spawnPosition.Z, serverIndex);
@@ -126,9 +133,19 @@ public sealed partial class Zone
         if (state.DungeonInstanceId is not { } instanceId)
             return;
 
+        var monstersRemoved = false;
         foreach (var (index, monster) in _monsters)
-            if (monster.InstanceId == instanceId && _monsters.TryRemove(index, out _))
-                RemoveMonsterFromGrid(monster);
+        {
+            if (monster.InstanceId != instanceId || !_monsters.TryRemove(index, out var removedMonster))
+                continue;
+
+            _monsterPursuers.Untrack(removedMonster);
+            RemoveMonsterFromGrid(removedMonster);
+            monstersRemoved = true;
+        }
+
+        if (monstersRemoved)
+            RefreshMonsterOrder();
 
         foreach (var (index, item) in _groundItems)
             if (item.InstanceId == instanceId)

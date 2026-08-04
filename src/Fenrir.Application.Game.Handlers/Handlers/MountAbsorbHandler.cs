@@ -12,6 +12,15 @@ public sealed class MountAbsorbHandler(IMountAbsorbService service, ILogger<Moun
     public void Handle(in MountAbsorbRequest packet, IPacketSession session)
     {
         var zoneSession = (IZoneSession)session;
+        if (packet.Sort is not (1 or 2))
+        {
+            logger.LogWarning(
+                "Session {SessionId}: MountAbsorbRequest (op113) carried invalid sort {Sort}; aborting",
+                session.SessionId, packet.Sort);
+            zoneSession.Abort(DisconnectReason.Faulted);
+            return;
+        }
+
         if (zoneSession.CurrentZone is not Zone zone)
             return;
 
@@ -28,9 +37,10 @@ public sealed class MountAbsorbHandler(IMountAbsorbService service, ILogger<Moun
             case 1:
                 if (!service.TryAbsorb(zone, state, characterId))
                 {
-                    logger.LogDebug(
-                        "Mount-absorb ignored for character {CharacterId}: absorb not available (not mounted, or absorb time depleted)",
+                    logger.LogWarning(
+                        "Mount-absorb rejected for character {CharacterId}: absorb state is invalid; aborting",
                         characterId);
+                    zoneSession.Abort(DisconnectReason.Faulted);
                     return;
                 }
 
@@ -40,12 +50,6 @@ public sealed class MountAbsorbHandler(IMountAbsorbService service, ILogger<Moun
             case 2:
                 service.Release(zone, state, characterId);
                 logger.LogInformation("Character {CharacterId} released absorbed mount", characterId);
-                return;
-
-            default:
-                logger.LogWarning(
-                    "Mount-absorb ignored for character {CharacterId}: invalid sort {Sort}",
-                    characterId, packet.Sort);
                 return;
         }
     }

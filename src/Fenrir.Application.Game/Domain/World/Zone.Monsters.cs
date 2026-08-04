@@ -1,8 +1,10 @@
 using System.Buffers;
 using System.Collections.Concurrent;
 using Fenrir.Application.Game.Domain.Combat;
+using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World.Monsters;
+using Fenrir.Application.Game.Domain.World.Runtime;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Core.Wire;
 using Fenrir.Data.WriteBehind;
@@ -15,9 +17,9 @@ public sealed partial class Zone
 {
     private const float FlinchDamageThresholdRatio = 0.10f;
 
-    private const int GmSummonPoolServerIndexBase = 1_003_000;
+    private const int MonsterMoneyChangeSort = 23;
 
-    private const int GmSummonPoolSize = 1_000;
+    private static readonly float[] ZeroMonsterPresentation = new float[3];
 
     private readonly ConcurrentQueue<DeadMonsterEvent> _deadMonsters = new();
 
@@ -31,11 +33,17 @@ public sealed partial class Zone
 
     private readonly ConcurrentDictionary<int, MonsterEntity> _monsters = new();
 
+    private readonly MonsterPursuerIndex _monsterPursuers = new();
+
+    private readonly Lock _monsterOrderLock = new();
+
+    private MonsterEntity[] _monstersInServerIndexOrder = [];
+
     private readonly List<int> _mvpAttackNeighborScratch = [];
 
     private readonly HashSet<int> _mvpAttackRecipientScratch = [];
 
-    private readonly ConcurrentQueue<(int CharacterId, long Amount)> _pendingMoneyGrants = new();
+    private readonly ConcurrentQueue<PendingMoneyGrant> _pendingMoneyGrants = new();
 
     private readonly List<int> _sendExistingMonstersScratch = [];
 
@@ -43,7 +51,9 @@ public sealed partial class Zone
 
     public int MonsterCount => _monsters.Count;
 
-    public IEnumerable<MonsterEntity> MonstersSnapshot => _monsters.Values;
+    internal TimeSpan MonsterRuntimeClock => _clock;
+
+        public IEnumerable<MonsterEntity> MonstersSnapshot => Volatile.Read(ref _monstersInServerIndexOrder);
 
     public bool TryGetMonster(int serverIndex, out MonsterEntity? monster)
     {
@@ -57,11 +67,16 @@ public sealed partial class Zone
 
     public void SpawnMonster(MonsterEntity monster)
     {
+        if (_monsters.TryGetValue(monster.ServerIndex, out var displaced) && !ReferenceEquals(displaced, monster))
+            _monsterPursuers.Untrack(displaced);
+
         _monsters[monster.ServerIndex] = monster;
+        _monsterPursuers.Track(monster);
 
         var cell = _grid.CellOf(monster.PosX, monster.PosZ);
         monster.CurrentCell = cell;
         _monsterGrid.Add(monster.ServerIndex, cell, monster.PosX, monster.PosY, monster.PosZ);
+        RefreshMonsterOrder();
 
         BroadcastMonsterAction(monster, 1);
 
@@ -74,7 +89,11 @@ public sealed partial class Zone
     public void DespawnMonsterSilently(int serverIndex)
     {
         if (_monsters.TryRemove(serverIndex, out var monster))
+        {
+            _monsterPursuers.Untrack(monster);
             RemoveMonsterFromGrid(monster);
+            RefreshMonsterOrder();
+        }
     }
 
     public void RemoveMonsterFromGrid(MonsterEntity monster)
@@ -107,7 +126,7 @@ public sealed partial class Zone
 
         PlayerRuntimeState? attackerState = null;
         if (attackerCharacterId is { } attackerId && _players.TryGetValue(attackerId, out attackerState))
-            monster.RegisterAttackDamage(attackerId, attackerState, amount);
+            monster.RegisterAttackDamage(attackerId, attackerState.Incarnation, amount);
 
         died = monster.TakeDamage(amount, out remainingLife);
         if (died)
@@ -121,7 +140,12 @@ public sealed partial class Zone
             var killerZ = attackerState?.PosZ ?? monster.PosZ;
             MonsterDeathSequence.BeginCorpseCountdown(monster, killerX, killerZ, isCriticalHit, _random);
 
-            _deadMonsters.Enqueue(new DeadMonsterEvent(monster, attackerCharacterId, creditedCharacterId));
+            _deadMonsters.Enqueue(new DeadMonsterEvent(monster, attackerCharacterId, creditedCharacterId, _clock,
+                DateTime.UtcNow));
+        }
+        else if (attackerState is not null)
+        {
+            monster.Heading = WireHeading.Between(monster.PosX, monster.PosZ, attackerState.PosX, attackerState.PosZ);
         }
 
         return true;
@@ -129,16 +153,24 @@ public sealed partial class Zone
 
     public void InvalidateDeadMonster(MonsterEntity monster)
     {
-        if (!_monsters.TryRemove(monster.ServerIndex, out _))
+        if (!_monsters.TryRemove(monster.ServerIndex, out var removedMonster))
             return;
 
-        RemoveMonsterFromGrid(monster);
+        _monsterPursuers.Untrack(removedMonster);
+        RemoveMonsterFromGrid(removedMonster);
+        RefreshMonsterOrder();
         _invalidatedMonsters.Enqueue(monster);
     }
 
     public bool TryDequeueInvalidatedMonster(out MonsterEntity? monster)
     {
         return _invalidatedMonsters.TryDequeue(out monster);
+    }
+
+    internal int CountOtherMonsterPursuers(MonsterEntity subject, int candidateCharacterId,
+        RuntimeIncarnation candidateIncarnation)
+    {
+        return _monsterPursuers.CountOther(subject, candidateCharacterId, candidateIncarnation);
     }
 
     private int? SelectMonsterKillCredit(MonsterEntity monster, int? killingBlowAttackerId)
@@ -162,7 +194,7 @@ public sealed partial class Zone
             if (!_players.TryGetValue(entry.CharacterId, out var candidate))
                 continue;
 
-            if (!ReferenceEquals(candidate, entry.SessionToken))
+            if (candidate.Incarnation != entry.Incarnation)
                 continue;
 
             if (candidate.IsDead)
@@ -211,6 +243,7 @@ public sealed partial class Zone
 
         monster.AiState = MonsterAiState.Flinch;
         monster.StateTicks = 0;
+        monster.StateFrameAccumulator = 0f;
         BroadcastMonsterAction(monster, 1);
     }
 
@@ -221,9 +254,10 @@ public sealed partial class Zone
             killerTribe, killerName, MapId);
     }
 
-    public void ResolveMonsterAttack(MonsterEntity monster, int targetCharacterId, int attackSubMode = 0)
+    public void ResolveMonsterAttack(MonsterEntity monster, PlayerRuntimeState target, int attackActionValue4)
     {
-        if (!_players.TryGetValue(targetCharacterId, out var target) || target is null)
+        if (target.ActionSort is 0 or 12 || target.IsMovingZone || target.IsDead || target.PshopOpen ||
+            target.VisibleState == 0)
             return;
 
         var defenderSnapshot = ToCombatantSnapshot(target);
@@ -236,10 +270,10 @@ public sealed partial class Zone
         var realDamage = outcome.DamageApplied;
         if (outcome.Hit)
         {
-            if (MonsterCombatResolver.RollHolyShieldRemoval(monster.Template.SpecialType, attackSubMode, _random))
+            if (MonsterCombatResolver.RollHolyShieldRemoval(monster.Template.SpecialType, attackActionValue4, _random))
                 RemoveDefenderHolyShields(target);
 
-            if (MonsterCombatResolver.RollSpecialStun(monster.Template.SpecialType, attackSubMode, _random))
+            if (MonsterCombatResolver.RollSpecialStun(monster.Template.SpecialType, attackActionValue4, _random))
                 ApplyMonsterSpecialStun(target);
 
             (viewDamage, realDamage) =
@@ -259,7 +293,7 @@ public sealed partial class Zone
                 AttackActionValue1 = 1,
                 AttackActionValue2 = 0,
                 AttackActionValue3 = 0,
-                AttackActionValue4 = attackSubMode,
+                AttackActionValue4 = attackActionValue4,
                 AttackResultValue = outcome.Hit ? 1 : 0,
                 AttackCriticalExist = outcome.Critical ? 1 : 0,
                 AttackElementDamage = outcome.ElementDamage,
@@ -289,7 +323,7 @@ public sealed partial class Zone
 
         if (target.Life <= 0)
             ApplyDeath(target.CharacterId, DeathCause.MonsterKill, (monster.PosX, monster.PosZ),
-                monster.SpecialSort != MonsterSpecialSort.Standard);
+                monster.SpecialSort != MonsterSpecialSort.Standard, originSort: 1, deathSkillNumber: 5);
     }
 
     private void ApplyMonsterSpecialStun(PlayerRuntimeState target)
@@ -298,16 +332,48 @@ public sealed partial class Zone
             return;
 
         target.IsStunned = true;
-        target.StunDurationSeconds = MonsterCombatResolver.SpecialStunDurationSeconds;
-        target.CanUseConsumables = false;
+        target.StunDurationTicks = MonsterCombatResolver.SpecialStunDurationTicks;
 
-        BroadcastStunActionState(target, MonsterCombatResolver.SpecialStunDurationSeconds);
+        BroadcastStunActionState(target, MonsterCombatResolver.SpecialStunDurationTicks);
     }
 
     public void QueueMoneyGrant(int characterId, long amount)
     {
-        _pendingMoneyGrants.Enqueue((characterId, amount));
+        _pendingMoneyGrants.Enqueue(new PendingMoneyGrant(characterId, amount,
+            MoneyGrantPersistenceMode.CharacterAdjustment));
         _moneyGrantSignal.Release();
+    }
+
+    private void QueueMonsterMoneyGrant(int characterId, long amount)
+    {
+        _pendingMoneyGrants.Enqueue(new PendingMoneyGrant(characterId, amount,
+            MoneyGrantPersistenceMode.MonsterLootIdempotent, Guid.NewGuid()));
+        _moneyGrantSignal.Release();
+    }
+
+        public bool TryGrantMonsterMoney(PlayerRuntimeState state, long amount)
+    {
+        if (amount <= 0 || state.Money is < 0 or > StoreMoneyPolicy.MaxMoney ||
+            amount > StoreMoneyPolicy.MaxMoney - state.Money)
+            return false;
+
+        state.Money += amount;
+
+        try
+        {
+            state.Session.Send(new AvatarStatUpdateResponse
+            {
+                Sort = MonsterMoneyChangeSort,
+                Value = (int)amount,
+                Value2 = 0
+            });
+        }
+        finally
+        {
+            QueueMonsterMoneyGrant(state.CharacterId, amount);
+        }
+
+        return true;
     }
 
     public Task WaitForMoneyGrantAsync(CancellationToken ct)
@@ -315,16 +381,18 @@ public sealed partial class Zone
         return _moneyGrantSignal.WaitAsync(ct);
     }
 
-    public IReadOnlyList<(int CharacterId, long Amount)> DrainPendingMoneyGrants()
+    public int PendingMoneyGrantCount => _pendingMoneyGrants.Count;
+
+    public IReadOnlyList<PendingMoneyGrant> DrainPendingMoneyGrants()
     {
         if (_pendingMoneyGrants.IsEmpty)
             return [];
 
-        List<(int CharacterId, long Amount)>? grants = null;
+        List<PendingMoneyGrant>? grants = null;
         while (_pendingMoneyGrants.TryDequeue(out var grant))
             (grants ??= []).Add(grant);
 
-        return (IReadOnlyList<(int CharacterId, long Amount)>?)grants ?? [];
+        return (IReadOnlyList<PendingMoneyGrant>?)grants ?? [];
     }
 
     private void SendExistingMonstersTo(PlayerRuntimeState state)
@@ -364,7 +432,7 @@ public sealed partial class Zone
 
     private void RebroadcastMonsters()
     {
-        foreach (var monster in _monsters.Values)
+        foreach (var monster in MonstersSnapshot)
         {
             if (_clock - monster.LastRebroadcastAt < SimulationClock.MonsterRebroadcastInterval)
                 continue;
@@ -384,6 +452,9 @@ public sealed partial class Zone
 
         _monsterBroadcastNeighborScratch.Clear();
         _grid.Neighbors(_monsterBroadcastNeighborScratch, cell, monster.PosX, monster.PosY, monster.PosZ, scale);
+        if (!HasMonsterBroadcastRecipient(monster))
+            return;
+
         var packet = BuildMonsterActionRecv(monster, checkChangeActionState);
         var total = FrameWriter.FrameSizeOf<MonsterReplicationResponse>();
         var rented = ArrayPool<byte>.Shared.Rent(total);
@@ -412,34 +483,20 @@ public sealed partial class Zone
         }
     }
 
-    private void SpawnGmSummonedMonster(int monsterId, PlayerRuntimeState state)
+    private bool HasMonsterBroadcastRecipient(MonsterEntity monster)
     {
-        if (!worldData.MonstersById.TryGetValue(monsterId, out var definition))
-            return;
+        foreach (var id in _monsterBroadcastNeighborScratch)
+            if (TryGetBroadcastRecipient(id, out var recipient, out _) &&
+                IsVisibleAcrossDungeonInstance(monster.InstanceId, recipient.DungeonInstanceId))
+                return true;
 
-        if (!TryFindFreeGmSummonSlot(out var serverIndex))
-            return;
-
-        var monster = MonsterEntity.Create(serverIndex, NextMonsterUniqueNumber(), definition.Monster, serverIndex,
-            state.PosX, state.PosY, state.PosZ);
-
-        SpawnMonster(monster);
+        return false;
     }
 
-    private bool TryFindFreeGmSummonSlot(out int serverIndex)
+    private bool SpawnGmSummonedMonster(int monsterId, PlayerRuntimeState state)
     {
-        for (var i = 0; i < GmSummonPoolSize; i++)
-        {
-            var candidate = GmSummonPoolServerIndexBase + i;
-            if (!_monsters.ContainsKey(candidate))
-            {
-                serverIndex = candidate;
-                return true;
-            }
-        }
-
-        serverIndex = 0;
-        return false;
+        return TrySummonSpecialMonster(monsterId, state.PosX, state.PosY, state.PosZ,
+            false);
     }
 
     private static MonsterReplicationResponse BuildMonsterActionRecv(MonsterEntity monster,
@@ -463,14 +520,14 @@ public sealed partial class Zone
                     TargetLocation = [monster.TargetLocationX, monster.TargetLocationY, monster.TargetLocationZ],
                     Front = monster.Heading,
                     TargetFront = monster.Heading,
-                    PetLocation = new float[3],
-                    PetTargetLocation = new float[3],
+                    PetLocation = ZeroMonsterPresentation,
+                    PetTargetLocation = ZeroMonsterPresentation,
                     PetFront = 0,
                     PetSort = 0,
                     TargetObjectSort = 0,
                     TargetObjectIndex = targetIndex,
                     TargetObjectUniqueNumber = targetUniqueNumber,
-                    SkillNumber = 0,
+                    SkillNumber = monster.AiState == MonsterAiState.Dead ? monster.DeathSkillNumber : 0,
                     SkillGradeNum1 = 0,
                     SkillGradeNum2 = 0,
                     SkillValue = 0
@@ -479,5 +536,17 @@ public sealed partial class Zone
             },
             CheckChangeActionState = checkChangeActionState
         };
+    }
+
+    private void RefreshMonsterOrder()
+    {
+        lock (_monsterOrderLock)
+        {
+            var ordered = _monsters
+                .OrderBy(static entry => entry.Key)
+                .Select(static entry => entry.Value)
+                .ToArray();
+            Volatile.Write(ref _monstersInServerIndexOrder, ordered);
+        }
     }
 }

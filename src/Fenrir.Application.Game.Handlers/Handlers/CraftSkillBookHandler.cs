@@ -1,5 +1,6 @@
 using Fenrir.Application.Game.Abstractions.ItemModification;
 using Fenrir.Application.Game.Abstractions.Sessions;
+using Fenrir.Application.Game.Domain.Crafting;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -31,6 +32,12 @@ public sealed class CraftSkillBookHandler(
             return;
         }
 
+        if (packet.Sort is < SkillBookCraftCatalog.Recipe1Sort or > SkillBookCraftCatalog.Recipe3Sort)
+        {
+            zoneSession.Abort(DisconnectReason.Faulted);
+            return;
+        }
+
         await state.EconomyActionLock.WaitAsync(cancellationToken);
         try
         {
@@ -39,7 +46,7 @@ public sealed class CraftSkillBookHandler(
 
             if (result.Outcome != CraftSkillBookOutcome.Applied)
             {
-                session.Send(new CraftSkillBookResponse { Result = 1, Value = [0, 0, 0, 0, 0, 0] });
+                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             }
 

@@ -54,7 +54,10 @@ public static class FenrirDataServiceCollectionExtensions
         builder.Services.AddSingleton<IAccountRepository, AccountRepository>();
         builder.Services.AddSingleton<IAccountPinRepository, AccountPinRepository>();
         builder.Services.AddSingleton<ICharacterRepository, CharacterRepository>();
+        builder.Services.AddSingleton<IRelaySourceIdentityRepository, RelaySourceIdentityRepository>();
         builder.Services.AddSingleton<ICharacterRenameRepository, CharacterRenameRepository>();
+        builder.Services.AddSingleton<IMonsterMoneyGrantRepository, MonsterMoneyGrantRepository>();
+        builder.Services.AddSingleton<IPvpKillCooldownRepository, PvpKillCooldownRepository>();
 
         builder.Services.AddSingleton<IPetBagRepository, PetBagRepository>();
 
@@ -90,6 +93,13 @@ public static class FenrirDataServiceCollectionExtensions
         builder.Services.AddSingleton<IGuildStateRelayRepository, GuildStateRelayRepository>();
 
         builder.Services.AddSingleton<IRvrSiegeEventRelayRepository, RvrSiegeEventRelayRepository>();
+        builder.Services.AddSingleton<IZoneEventRelayOutboxRepository, ZoneEventRelayOutboxRepository>();
+
+        builder.Services.AddSingleton<IPopupEventLeaseRepository, PopupEventLeaseRepository>();
+
+        builder.Services.AddSingleton<IWorldEventOutboxRepository, WorldEventOutboxRepository>();
+        builder.Services.AddSingleton<IWorldEventInboxRepository, WorldEventInboxRepository>();
+        builder.Services.AddSingleton<IWorldEventLocalEffectRepository, WorldEventLocalEffectRepository>();
 
         builder.Services.AddSingleton<IPartyResyncRelayRepository, PartyResyncRelayRepository>();
         builder.Services.AddSingleton<IShardMapAssignmentRepository, ShardMapAssignmentRepository>();
@@ -113,6 +123,9 @@ public static class FenrirDataServiceCollectionExtensions
         builder.Services.AddSingleton<IMentorRepository, MentorRepository>();
 
         builder.Services.AddSingleton<IWorldStateRepository, WorldStateRepository>();
+        builder.Services.AddSingleton<IWorldEventSnapshotRepository, WorldEventSnapshotRepository>();
+        builder.Services.AddSingleton<IZone195NokSanStateRepository, Zone195NokSanStateRepository>();
+        builder.Services.AddSingleton<ITribeVoteElectionRepository, TribeVoteElectionRepository>();
 
         builder.Services.AddSingleton<IHeroRankingRepository, HeroRankingRepository>();
         builder.Services.AddSingleton<ITowerRepository, TowerRepository>();

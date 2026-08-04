@@ -4,9 +4,12 @@ public sealed class TribeGuardCorridorState
 {
     public const int TribeCount = 4;
     public const int SegmentCount = 4;
+    public const int PassageOpenedEventCode = 31;
+    public const int PassageBlockedEventCode = 32;
+
     private readonly Lock _lock = new();
 
-    private readonly bool[,] _open = new bool[TribeCount, SegmentCount];
+    private readonly bool[,] _open = CreateInitiallyOpenMatrix();
 
     public bool IsOpen(byte tribeId, byte segmentIndex)
     {
@@ -32,6 +35,16 @@ public sealed class TribeGuardCorridorState
             _open[tribeId, segmentIndex] = isOpen;
             return true;
         }
+    }
+
+    private static bool[,] CreateInitiallyOpenMatrix()
+    {
+        var matrix = new bool[TribeCount, SegmentCount];
+        for (var tribeId = 0; tribeId < TribeCount; tribeId++)
+        for (var segmentIndex = 0; segmentIndex < SegmentCount; segmentIndex++)
+            matrix[tribeId, segmentIndex] = true;
+
+        return matrix;
     }
 
     private static void ValidateTribeId(byte tribeId)

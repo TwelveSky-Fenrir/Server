@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.ItemModification;
 using Fenrir.Application.Game.Abstractions.Sessions;
+using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Enchant;
 using Fenrir.Application.Game.Domain.Inventory;
@@ -18,6 +19,7 @@ public sealed partial class EnchantItemService(
     ICharacterRepository characters,
     WorldDataCache worldData,
     IEventLogQueue eventLogQueue,
+    GameServerOptions gameOptions,
     ILogger<EnchantItemService> logger)
     : IEnchantItemService
 {
@@ -39,7 +41,7 @@ public sealed partial class EnchantItemService(
             logger.LogInformation(
                 "Character {CharacterId} enchant rejected: not in a town zone (zone {MapId})", characterId,
                 zone.MapId);
-            return new EnchantItemResult(EnchantItemOutcome.Rejected, 0, 0, 0);
+            return AbortAndDisconnect(state, characterId, "not in a town zone");
         }
 
         var now = DateTime.UtcNow;
@@ -47,10 +49,8 @@ public sealed partial class EnchantItemService(
         {
             logger.LogInformation(
                 "Character {CharacterId} enchant rejected: same-tick repeat request", characterId);
-            return new EnchantItemResult(EnchantItemOutcome.Rejected, 0, 0, 0);
+            return AbortAndDisconnect(state, characterId, "same-tick repeat request");
         }
-
-        state.LastEnchantAttemptUtc = now;
 
         if (packet.Page1 is not (ContainerMatrix.InventoryPage0 or ContainerMatrix.InventoryPage1) ||
             !ContainerMatrix.IsValidSlot((byte)packet.Page1, packet.Index1) ||
@@ -60,7 +60,7 @@ public sealed partial class EnchantItemService(
             logger.LogDebug(
                 "Character {CharacterId} enchant rejected: invalid slot(s) ({Page1}:{Index1} / {Page2}:{Index2})",
                 characterId, packet.Page1, packet.Index1, packet.Page2, packet.Index2);
-            return new EnchantItemResult(EnchantItemOutcome.Rejected, 0, 0, 0);
+            return AbortAndDisconnect(state, characterId, "invalid inventory slot");
         }
 
         var slots = new EnchantSlots((byte)packet.Page1, (byte)packet.Index1, (byte)packet.Page2,
@@ -73,20 +73,21 @@ public sealed partial class EnchantItemService(
             logger.LogDebug(
                 "Character {CharacterId} enchant rejected: rented inventory page expired (InventoryDate {InventoryDate})",
                 characterId, state.InventoryDate);
-            return new EnchantItemResult(EnchantItemOutcome.Rejected, 0, 0, 0);
+            return AbortAndDisconnect(state, characterId, "expired inventory page");
         }
 
         var targetStack = state.Inventory.GetSlot(slots.Page1, slots.Index1);
         var materialStack = state.Inventory.GetSlot(slots.Page2, slots.Index2);
 
         if (targetStack is not { } target || materialStack is not { } material ||
+            target.Quantity <= 0 || material.Quantity <= 0 ||
             !worldData.ItemsById.TryGetValue(target.ItemId, out var targetDefinition) ||
             !worldData.ItemsById.TryGetValue(material.ItemId, out var materialDefinition))
         {
             logger.LogDebug(
                 "Character {CharacterId} enchant rejected: target or material slot empty/unresolvable",
                 characterId);
-            return new EnchantItemResult(EnchantItemOutcome.Rejected, 0, 0, 0);
+            return AbortAndDisconnect(state, characterId, "missing or invalid target/material item");
         }
 
         if (NpcShopPolicy.IsRentItem(target.ItemId) || NpcShopPolicy.IsRentItem(material.ItemId))
@@ -94,7 +95,7 @@ public sealed partial class EnchantItemService(
             logger.LogDebug(
                 "Character {CharacterId} enchant rejected: rent-listed item in target or material slot",
                 characterId);
-            return new EnchantItemResult(EnchantItemOutcome.Rejected, 0, 0, 0);
+            return AbortAndDisconnect(state, characterId, "rent-listed item");
         }
 
         var subPath = EnchantDispatchClassifier.Classify(target.ItemId, material.ItemId);
@@ -102,38 +103,47 @@ public sealed partial class EnchantItemService(
         return subPath switch
         {
             EnchantSubPath.CostumeSwap =>
-                await EnchantCostumeSwapAsync(zone, state, characterId, slots, target, material, cancellationToken),
+                await EnchantCostumeSwapAsync(zone, state, characterId, now, slots, target, material,
+                    cancellationToken),
             EnchantSubPath.CostumeEnchant =>
-                await EnchantCostumeEnchantAsync(zone, state, characterId, slots, target, material,
+                await EnchantCostumeEnchantAsync(zone, state, characterId, now, slots, target, material,
                     cancellationToken),
             EnchantSubPath.StellarCoreUpgrade =>
-                await EnchantStellarCoreAsync(zone, state, characterId, slots, target, targetDefinition, material,
+                await EnchantStellarCoreAsync(zone, state, characterId, now, slots, target, targetDefinition, material,
                     materialDefinition, cancellationToken),
             EnchantSubPath.Standard =>
-                await EnchantStandardAsync(zone, state, characterId, slots, target, targetDefinition, material,
+                await EnchantStandardAsync(zone, state, characterId, now, slots, target, targetDefinition, material,
                     materialDefinition, cancellationToken),
-            _ => new EnchantItemResult(EnchantItemOutcome.Rejected, 0, 0, 0)
+            _ => AbortAndDisconnect(state, characterId, "unrecognized enchant path")
         };
     }
 
     private async ValueTask<EnchantItemResult> EnchantStandardAsync(Zone zone, PlayerRuntimeState state,
-        int characterId, EnchantSlots slots, ItemStack target, ItemDefinition targetDefinition, ItemStack material,
+        int characterId, DateTime attemptUtc, EnchantSlots slots, ItemStack target, ItemDefinition targetDefinition,
+        ItemStack material,
         ItemDefinition materialDefinition, CancellationToken cancellationToken)
     {
         var luck = state.Stats?.Luck ?? 0;
 
         var premiumActive = state.PremiumExpireUtc >= DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
+        if (!GameRulesetRules.TryParse(gameOptions.Ruleset, out var ruleset))
+            throw new InvalidOperationException("Game:Ruleset was not validated before enchant resolution.");
+
         var resolved = EnchantResolver.Resolve(targetDefinition, target, materialDefinition, luck,
             state.ProtectForDestroy, state.ImproveItemValue, SystemRandomSource.Instance,
-            state.ProtectForDestroy2, state.ProtectForWing, premiumActive);
+            ruleset, state.ProtectForDestroy2, state.ProtectForWing, premiumActive);
+
+        if (resolved.Outcome == EnchantResolver.EnchantOutcome.Disconnect)
+            return AbortAndDisconnect(state, characterId,
+                $"ruleset {ruleset} enchant cap reached ({target.Enchant})");
 
         if (resolved.Outcome == EnchantResolver.EnchantOutcome.Rejected)
         {
             logger.LogInformation(
                 "Character {CharacterId} enchant rejected by resolver (target {TargetItemId}, material {MaterialItemId})",
                 characterId, target.ItemId, material.ItemId);
-            return new EnchantItemResult(EnchantItemOutcome.Rejected, 0, 0, 0);
+            return AbortAndDisconnect(state, characterId, "invalid enchant eligibility");
         }
 
         if (resolved.IsWing && state.ContributionPoints < resolved.Cost)
@@ -141,7 +151,7 @@ public sealed partial class EnchantItemService(
             logger.LogInformation(
                 "Character {CharacterId} enchant rejected: insufficient CP for wing enchant (have {ContributionPoints}, need {Cost})",
                 characterId, state.ContributionPoints, resolved.Cost);
-            return new EnchantItemResult(EnchantItemOutcome.Rejected, 0, 0, 0);
+            return AbortAndDisconnect(state, characterId, "insufficient contribution points");
         }
 
         var remainingMaterialQuantity = material.Quantity - 1;
@@ -158,41 +168,55 @@ public sealed partial class EnchantItemService(
 
         var moneyDelta = resolved.IsWing ? 0 : -resolved.Cost;
 
-        if (!await TryPersistContainersAsync(characterId, moneyDelta, slots, projectedTargetContainer,
-                projectedMaterialContainer, cancellationToken))
-            return new EnchantItemResult(EnchantItemOutcome.Rejected, 0, 0, 0);
+        try
+        {
+            await PersistContainersAsync(characterId, moneyDelta, slots, projectedTargetContainer,
+                projectedMaterialContainer, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            return AbortAfterUncertainPersistence(state, characterId, "enchant", ex);
+        }
 
         int? newProtectForDestroy = resolved.ConsumesProtectCharge ? state.ProtectForDestroy - 1 : null;
         int? newProtectForDestroy2 = resolved.ConsumesProtectCharge2 ? state.ProtectForDestroy2 - 1 : null;
         int? newProtectForWing = resolved.ConsumesWingProtectCharge ? state.ProtectForWing - 1 : null;
         int? newImproveItemValue = resolved.ConsumesImproveCharge ? state.ImproveItemValue - 1 : null;
 
+        var inventoryResult = await PostInventoryMirrorAsync(zone, characterId, slots, projectedTargetContainer,
+            projectedMaterialContainer, cancellationToken);
+        if (inventoryResult.Kind != ZoneCommandResultKind.Applied)
+            return AbortAfterDurableMutation(state, characterId, "enchant inventory", inventoryResult);
+
         if (resolved.IsWing)
         {
             var newContributionPoints = state.ContributionPoints - resolved.Cost;
-            if (!await zone.PostTribeProgressCommandAndWaitAsync(
+            var tribeResult = await zone.PostTribeProgressCommandAndWaitForResultAsync(
                     new TribeProgressZoneCommand(characterId, newContributionPoints,
                         ProtectForDestroy: newProtectForDestroy, ProtectForDestroy2: newProtectForDestroy2,
                         ProtectForWing: newProtectForWing, ImproveItemValue: newImproveItemValue),
-                    cancellationToken))
-                logger.LogError(
-                    "Zone {MapId} tribe-progress inbox full: dropped CP/charge mirror for character {CharacterId} after wing enchant -- SQL write-behind will retry on next dirty flush",
-                    zone.MapId, characterId);
+                    cancellationToken);
+            if (tribeResult.Kind != ZoneCommandResultKind.Applied)
+                return AbortAfterDurableMutation(state, characterId, "wing-enchant progress", tribeResult);
         }
         else
         {
-            zone.CreditNpcServiceTribeTax(state.Tribe, resolved.Cost);
-
             if (newProtectForDestroy is not null || newProtectForDestroy2 is not null ||
                 newImproveItemValue is not null)
-                if (!await zone.PostTribeProgressCommandAndWaitAsync(
+            {
+                var tribeResult = await zone.PostTribeProgressCommandAndWaitForResultAsync(
                         new TribeProgressZoneCommand(characterId, ProtectForDestroy: newProtectForDestroy,
                             ProtectForDestroy2: newProtectForDestroy2, ImproveItemValue: newImproveItemValue),
-                        cancellationToken))
-                    logger.LogError(
-                        "Zone {MapId} tribe-progress inbox full: dropped protect/sweet-potato charge mirror for character {CharacterId}",
-                        zone.MapId, characterId);
+                        cancellationToken);
+                if (tribeResult.Kind != ZoneCommandResultKind.Applied)
+                    return AbortAfterDurableMutation(state, characterId, "enchant charge", tribeResult);
+            }
         }
+
+        state.LastEnchantAttemptUtc = attemptUtc;
+
+        if (!resolved.IsWing)
+            zone.CreditNpcServiceTribeTax(state.Tribe, resolved.Cost);
 
         if (newImproveItemValue is { } remainingSweetPotatoCharges)
             state.Session.Send(new AvatarStatUpdateResponse
@@ -237,9 +261,6 @@ public sealed partial class EnchantItemService(
                 "game.EventLog write-behind queue full: dropped enchant-attempt audit row for character {CharacterId}",
                 characterId);
 
-        await PostInventoryMirrorAsync(zone, characterId, slots, projectedTargetContainer,
-            projectedMaterialContainer, cancellationToken);
-
         logger.LogInformation(
             "Character {CharacterId} enchant applied: target {TargetItemId} outcome {Outcome} -> enchant {NewEnchant}, cost {Cost}",
             characterId, target.ItemId, resolved.Outcome, resolved.NewEnchant, resolved.Cost);
@@ -262,11 +283,31 @@ public sealed partial class EnchantItemService(
         };
     }
 
-    private EnchantItemResult AbortAndRejectSilently(PlayerRuntimeState state, int characterId, string reason)
+    private EnchantItemResult AbortAndDisconnect(PlayerRuntimeState state, int characterId, string reason)
     {
         logger.LogInformation("Character {CharacterId} enchant disconnected: {Reason}", characterId, reason);
         ((IZoneSession)state.Session).Abort(DisconnectReason.Faulted);
-        return new EnchantItemResult(EnchantItemOutcome.Rejected, 0, 0, 0);
+        return new EnchantItemResult(EnchantItemOutcome.Disconnected, 0, 0, 0);
+    }
+
+    private EnchantItemResult AbortAfterUncertainPersistence(PlayerRuntimeState state, int characterId,
+        string mutation, Exception exception)
+    {
+        logger.LogError(exception,
+            "Character {CharacterId} {Mutation} persistence failed after submission; durability is uncertain, disconnecting without success response",
+            characterId, mutation);
+        ((IZoneSession)state.Session).Abort(DisconnectReason.Faulted);
+        return new EnchantItemResult(EnchantItemOutcome.Disconnected, 0, 0, 0);
+    }
+
+    private EnchantItemResult AbortAfterDurableMutation(PlayerRuntimeState state, int characterId,
+        string mutation, ZoneCommandResult result)
+    {
+        logger.LogError(
+            "Character {CharacterId} enchant persisted but {Mutation} actor mutation was not acknowledged as applied ({Kind}: {Cause}); disconnecting without success response",
+            characterId, mutation, result.Kind, result.Cause);
+        ((IZoneSession)state.Session).Abort(DisconnectReason.Faulted);
+        return new EnchantItemResult(EnchantItemOutcome.Disconnected, 0, 0, 0);
     }
 
     private static (ImmutableDictionary<byte, ItemStack> Target, ImmutableDictionary<byte, ItemStack> Material)
@@ -285,31 +326,20 @@ public sealed partial class EnchantItemService(
         return (target, material);
     }
 
-    private async ValueTask<bool> TryPersistContainersAsync(int characterId, long moneyDelta, EnchantSlots slots,
+    private async ValueTask PersistContainersAsync(int characterId, long moneyDelta, EnchantSlots slots,
         ImmutableDictionary<byte, ItemStack> projectedTargetContainer,
         ImmutableDictionary<byte, ItemStack> projectedMaterialContainer, CancellationToken cancellationToken)
     {
-        try
-        {
-            if (slots.Page1 == slots.Page2)
-                await characters.AdjustMoneyAndReplaceContainerAsync(characterId, moneyDelta, 0, slots.Page1,
-                    ToTvps(projectedTargetContainer), cancellationToken);
-            else
-                await characters.AdjustMoneyAndReplaceTwoContainersAsync(characterId, moneyDelta, 0, slots.Page1,
-                    ToTvps(projectedTargetContainer), slots.Page2, ToTvps(projectedMaterialContainer),
-                    cancellationToken);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex,
-                "Character {CharacterId} enchant AdjustMoney...ReplaceContainer(s)Async failed (treated as insufficient funds)",
-                characterId);
-            return false;
-        }
+        if (slots.Page1 == slots.Page2)
+            await characters.AdjustMoneyAndReplaceContainerAsync(characterId, moneyDelta, 0, slots.Page1,
+                ToTvps(projectedTargetContainer), cancellationToken);
+        else
+            await characters.AdjustMoneyAndReplaceTwoContainersAsync(characterId, moneyDelta, 0, slots.Page1,
+                ToTvps(projectedTargetContainer), slots.Page2, ToTvps(projectedMaterialContainer),
+                cancellationToken);
     }
 
-    private async ValueTask PostInventoryMirrorAsync(Zone zone, int characterId, EnchantSlots slots,
+    private async ValueTask<ZoneCommandResult> PostInventoryMirrorAsync(Zone zone, int characterId, EnchantSlots slots,
         ImmutableDictionary<byte, ItemStack> projectedTargetContainer,
         ImmutableDictionary<byte, ItemStack> projectedMaterialContainer, CancellationToken cancellationToken)
     {
@@ -319,11 +349,8 @@ public sealed partial class EnchantItemService(
                 new InventoryContainerSnapshot(slots.Page1, projectedTargetContainer),
                 new InventoryContainerSnapshot(slots.Page2, projectedMaterialContainer));
 
-        if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
-                cancellationToken))
-            logger.LogError(
-                "Zone {MapId} inventory inbox full: dropped enchant mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
+        return await zone.PostInventoryCommandAndWaitForResultAsync(
+            new InventoryZoneCommand(characterId, containers, null), cancellationToken);
     }
 
     private static ImmutableDictionary<byte, ItemStack> ApplySlotChange(

@@ -12,7 +12,9 @@ public enum ZoneHandshakeOutcome
 
     ProtocolViolation,
 
-    QuotaFull
+    QuotaFull,
+
+    TargetMapMismatch
 }
 
 public readonly record struct ZoneHandshakeResult(

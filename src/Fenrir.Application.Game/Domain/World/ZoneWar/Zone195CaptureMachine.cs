@@ -27,6 +27,22 @@ public sealed class Zone195CaptureMachine
 
     public int PhaseAccumulatorTicks { get; set; }
 
+        public Zone195NokSanCaptureSnapshot Snapshot(short mapId)
+    {
+        return new Zone195NokSanCaptureSnapshot(mapId, Phase, CapturerCharacterId, CapturerTribe, CapturerName,
+            RemainingTime, PhaseAccumulatorTicks);
+    }
+
+    public void Restore(in Zone195NokSanCaptureSnapshot snapshot)
+    {
+        Phase = snapshot.Phase;
+        CapturerCharacterId = snapshot.CapturerCharacterId;
+        CapturerTribe = snapshot.CapturerTribe;
+        CapturerName = snapshot.CapturerName;
+        RemainingTime = snapshot.RemainingTime;
+        PhaseAccumulatorTicks = snapshot.PhaseAccumulatorTicks;
+    }
+
     public void ResetToIdle()
     {
         Phase = Zone195CapturePhase.IdleSearching;
@@ -36,4 +52,29 @@ public sealed class Zone195CaptureMachine
         RemainingTime = 0;
         PhaseAccumulatorTicks = 0;
     }
+}
+
+public readonly record struct Zone195NokSanCaptureSnapshot(
+    short MapId,
+    Zone195CapturePhase Phase,
+    int CapturerCharacterId,
+    byte CapturerTribe,
+    string CapturerName,
+    int RemainingTime,
+    int PhaseAccumulatorTicks)
+{
+    public bool HasExpectedShape =>
+        Zone195NokSanSiteCatalog.IsActiveMapId(MapId)
+        && Phase is Zone195CapturePhase.IdleSearching or Zone195CapturePhase.Settle or Zone195CapturePhase.Countdown
+        && CapturerCharacterId >= Zone195CaptureMachine.NoCapturer
+        && CapturerTribe < Zone195NokSanState.TribeCount
+        && CapturerName is not null
+        && CapturerName.Length <= Zone195NokSanState.MaximumAvatarNameLength
+        && RemainingTime >= 0
+        && PhaseAccumulatorTicks >= 0
+        && (Phase != Zone195CapturePhase.IdleSearching ||
+            (CapturerCharacterId == Zone195CaptureMachine.NoCapturer && CapturerTribe == 0 &&
+             CapturerName.Length == 0 && RemainingTime == 0 && PhaseAccumulatorTicks == 0))
+        && (Phase == Zone195CapturePhase.IdleSearching ||
+            (CapturerCharacterId > 0 && CapturerName.Length > 0));
 }

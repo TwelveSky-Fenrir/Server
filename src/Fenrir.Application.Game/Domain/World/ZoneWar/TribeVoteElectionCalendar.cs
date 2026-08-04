@@ -20,22 +20,10 @@ public static class TribeVoteElectionCalendar
     public static TribeVoteCalendarTransition Evaluate(TribeVotePhase currentPhase, int dayOfMonth, int hourOfDay,
         bool testMode)
     {
-        if (testMode)
-            return TribeVoteCalendarTransition.None;
-
+        _ = currentPhase;
+        _ = dayOfMonth;
         _ = hourOfDay;
-
-        if (dayOfMonth >= 1)
-            return currentPhase == TribeVotePhase.Candidacy
-                ? TribeVoteCalendarTransition.None
-                : TribeVoteCalendarTransition.OpenRegistration;
-
-        if (dayOfMonth <= 2)
-            return TribeVoteCalendarTransition.OpenVoting;
-
-        if (dayOfMonth <= 3)
-            return TribeVoteCalendarTransition.None;
-
+        _ = testMode;
         return TribeVoteCalendarTransition.None;
     }
 }

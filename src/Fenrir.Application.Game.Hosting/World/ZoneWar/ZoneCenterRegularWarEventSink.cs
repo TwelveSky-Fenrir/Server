@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Collections.Immutable;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Microsoft.Extensions.Logging;
 
@@ -27,6 +28,8 @@ public sealed class ZoneCenterRegularWarEventSink(
 
     private const int WarEndedToIdleSubCode = 9;
 
+    private const int PopupPvpRequirement = 10;
+
     public void OnCountdownAnnounced(short mapId, int remainingMinutes)
     {
         IngestForSlot(mapId, CountdownAnnounceSubCode, remainingMinutes);
@@ -49,6 +52,7 @@ public sealed class ZoneCenterRegularWarEventSink(
     public void OnActiveWarStarted(short mapId, int durationLegacyTicks)
     {
         IngestForSlot(mapId, ActiveWarStartedSubCode, durationLegacyTicks);
+        SendPopupState(mapId, true);
     }
 
     public void OnWarConcluded(short mapId, RegularWarOutcome outcome, byte? winningTribe,
@@ -58,6 +62,7 @@ public sealed class ZoneCenterRegularWarEventSink(
         {
             case RegularWarOutcome.AbortedEmptyMap:
                 IngestForSlot(mapId, AbortedEmptyMapSubCode);
+                SendPopupState(mapId, false);
                 return;
 
             case RegularWarOutcome.TribeWin when winningTribe is { } winner:
@@ -73,6 +78,7 @@ public sealed class ZoneCenterRegularWarEventSink(
     public void OnReturnToTownAnnounced(short mapId)
     {
         IngestForSlot(mapId, ReturnToTownSubCode);
+        SendPopupState(mapId, false);
     }
 
     public void OnMonstersShouldDespawn(short mapId)
@@ -96,6 +102,20 @@ public sealed class ZoneCenterRegularWarEventSink(
             WriteInt32(payload, 4, value);
 
         ingestor.Ingest(subCode, payload);
+    }
+
+    private void SendPopupState(short mapId, bool enabled)
+    {
+        if (mapId != PopupEventZoneCatalog.RegularWarMapId)
+            return;
+
+        Span<byte> payload = stackalloc byte[ZoneCenterBroadcastIngestor.PayloadSize];
+        payload.Clear();
+        WriteInt32(payload, 0, enabled ? 1 : 0);
+        WriteInt32(payload, 4, (int)PopupEventType.RegularWar);
+        WriteInt32(payload, 8, enabled ? PopupPvpRequirement : 0);
+        WriteInt32(payload, 12, 0);
+        ingestor.Ingest(ZoneCenterBroadcastIngestor.PopupStateEventCode, payload);
     }
 
     private bool TryResolveSlot(short mapId, out int slot)

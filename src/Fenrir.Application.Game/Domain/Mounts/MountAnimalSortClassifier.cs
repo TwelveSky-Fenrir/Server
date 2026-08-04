@@ -11,11 +11,24 @@ public static class MountAnimalSortClassifier
 
     public const int NewMountItemSort = 30;
 
+    public static bool TryResolveAuthoritativeItemSort(int animalItemId,
+        FrozenDictionary<int, ItemDefinition> itemsById, out int itemSort)
+    {
+        if (itemsById.TryGetValue(animalItemId, out var item))
+        {
+            itemSort = item.Item.Sort;
+            return true;
+        }
+
+        itemSort = default;
+        return false;
+    }
+
     public static int Classify(int animalItemId, FrozenDictionary<int, ItemDefinition> itemsById)
     {
-        if (!itemsById.TryGetValue(animalItemId, out var item))
+        if (!TryResolveAuthoritativeItemSort(animalItemId, itemsById, out var itemSort))
             return NoItem;
 
-        return item.Item.Sort == NewMountItemSort ? NewMountItemSort : GenericMount;
+        return itemSort == NewMountItemSort ? NewMountItemSort : GenericMount;
     }
 }

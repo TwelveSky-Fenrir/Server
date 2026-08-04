@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
@@ -13,161 +12,223 @@ public sealed class Zone195NokSanSystem(
     Lazy<IZone195NokSanBroadcaster> broadcaster,
     HeroRankPointAccumulator heroRankPoints,
     ILogger<Zone195NokSanSystem> logger,
-    Func<DateTime>? utcNow = null) : ISimulationSystem
+    TimeProvider? timeProvider = null) : ISimulationSystem
 {
     public const int CaptureRemainingStart = 5;
-
     public const int SettleLegacyTicks = 12;
-
     public const int CountdownIntervalLegacyTicks = 120;
-
     public const int DisqualifyingActionSort = 33;
-
     public const int CapturerContributionPoints = 50;
-
     public const int CapturerHeroPoints = 50;
-
     public const int AllyContributionPoints = 10;
-
     public const int AllyHeroPoints = 10;
-
     public const float AllyRewardRadius = 1000f;
-
     public const int HeroRankPointMinimumCombinedLevel = 113;
-
-    public const int RewardWindowStartHour = 20;
-
-    public const int RewardWindowEndHour = 21;
 
     private const int HeroRankPointStatSort = 904;
 
-    private readonly ConcurrentDictionary<short, Zone195CaptureMachine> _machines = new();
-    private readonly Func<DateTime> _utcNow = utcNow ?? DefaultNowUtc;
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
 
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
-        if (legacyTicksElapsed <= 0 || !sites.TryGet(zone.MapId, out var site) || site is null)
+        if (legacyTicksElapsed <= 0 || !stoneState.IsInitialized || !sites.TryGet(zone.MapId, out var site) ||
+            site is null)
             return;
 
-        var machine = _machines.GetOrAdd(zone.MapId, static _ => new Zone195CaptureMachine());
+        if (stoneState.TryDequeueConfirmedCapture(zone.MapId, out var confirmedCapture))
+        {
+            PublishConfirmedCapture(zone, site, confirmedCapture);
+            return;
+        }
 
-        switch (machine.Phase)
+        if (!stoneState.TryGetCaptureSnapshot(zone.MapId, out var capture))
+            return;
+
+        switch (capture.Phase)
         {
             case Zone195CapturePhase.IdleSearching:
-                ScanForChallenger(zone, site, machine);
+                ScanForChallenger(zone, site);
                 break;
             case Zone195CapturePhase.Settle:
-                AdvanceSettle(zone, site, machine, legacyTicksElapsed);
+                AdvanceSettle(zone, site, capture, legacyTicksElapsed);
                 break;
             case Zone195CapturePhase.Countdown:
-                AdvanceCountdown(zone, site, machine, legacyTicksElapsed);
+                AdvanceCountdown(zone, site, capture, legacyTicksElapsed);
                 break;
             case Zone195CapturePhase.Commit:
-                logger.LogWarning("Zone195 Nok-San map {MapId} observed in transient Commit phase; resetting",
-                    zone.MapId);
-                machine.ResetToIdle();
+                logger.LogWarning("Zone195 Nok-San map {MapId} persisted an invalid transient Commit phase", zone.MapId);
                 break;
         }
     }
 
-    private void ScanForChallenger(Zone zone, Zone195NokSanSite site, Zone195CaptureMachine machine)
+    private void ScanForChallenger(Zone zone, Zone195NokSanSite site)
     {
         var holderTribe = stoneState.GetOwningTribe(site.StoneSlotIndex);
         var captureRadiusSq = site.CaptureRadius * site.CaptureRadius;
 
         foreach (var player in zone.Players)
         {
-            if (!IsEligibleCandidate(player, site, captureRadiusSq))
-                continue;
-            if (holderTribe is { } holder && player.Tribe == holder)
+            if (!IsEligibleCandidate(player, site, captureRadiusSq) ||
+                holderTribe is { } holder && player.Tribe == holder)
                 continue;
 
-            machine.Phase = Zone195CapturePhase.Settle;
-            machine.CapturerCharacterId = player.CharacterId;
-            machine.CapturerTribe = player.Tribe;
-            machine.CapturerName = player.Name;
-            machine.RemainingTime = CaptureRemainingStart;
-            machine.PhaseAccumulatorTicks = 0;
+            var appeared = false;
+            stoneState.TryMutateCapture(zone.MapId, machine =>
+            {
+                if (machine.Phase != Zone195CapturePhase.IdleSearching)
+                    return false;
 
-            broadcaster.Value.AnnounceChallengerAppeared(player.Tribe, player.Name);
+                machine.Phase = Zone195CapturePhase.Settle;
+                machine.CapturerCharacterId = player.CharacterId;
+                machine.CapturerTribe = player.Tribe;
+                machine.CapturerName = player.Name;
+                machine.RemainingTime = CaptureRemainingStart;
+                machine.PhaseAccumulatorTicks = 0;
+                appeared = true;
+                return true;
+            });
+
+            if (appeared)
+                broadcaster.Value.AnnounceChallengerAppeared(player.Tribe, player.Name);
+
             return;
         }
     }
 
-    private void AdvanceSettle(Zone zone, Zone195NokSanSite site, Zone195CaptureMachine machine, int legacyTicksElapsed)
-    {
-        if (!RevalidateCapturer(zone, site, machine))
-            return;
-
-        machine.PhaseAccumulatorTicks += legacyTicksElapsed;
-        if (machine.PhaseAccumulatorTicks < SettleLegacyTicks)
-            return;
-
-        machine.PhaseAccumulatorTicks -= SettleLegacyTicks;
-        broadcaster.Value.AnnounceCountdown(machine.RemainingTime, site.LegacyServerNumber);
-        machine.RemainingTime--;
-        machine.Phase = Zone195CapturePhase.Countdown;
-
-        ProcessCountdownIntervals(zone, site, machine);
-    }
-
-    private void AdvanceCountdown(Zone zone, Zone195NokSanSite site, Zone195CaptureMachine machine,
+    private void AdvanceSettle(Zone zone, Zone195NokSanSite site, Zone195NokSanCaptureSnapshot capture,
         int legacyTicksElapsed)
     {
-        if (!RevalidateCapturer(zone, site, machine))
-            return;
-
-        machine.PhaseAccumulatorTicks += legacyTicksElapsed;
-        ProcessCountdownIntervals(zone, site, machine);
-    }
-
-    private void ProcessCountdownIntervals(Zone zone, Zone195NokSanSite site, Zone195CaptureMachine machine)
-    {
-        while (machine.PhaseAccumulatorTicks >= CountdownIntervalLegacyTicks)
+        if (!RevalidateCapturer(zone, site, capture))
         {
-            machine.PhaseAccumulatorTicks -= CountdownIntervalLegacyTicks;
-
-            if (machine.RemainingTime > 0)
-            {
-                broadcaster.Value.AnnounceCountdown(machine.RemainingTime, site.LegacyServerNumber);
-                machine.RemainingTime--;
-                continue;
-            }
-
-            CommitCapture(zone, site, machine);
+            CancelCapture(zone.MapId, site, capture);
             return;
         }
+
+        AdvanceCaptureClock(zone, site, capture, legacyTicksElapsed, Zone195CapturePhase.Settle);
     }
 
-    private void CommitCapture(Zone zone, Zone195NokSanSite site, Zone195CaptureMachine machine)
+    private void AdvanceCountdown(Zone zone, Zone195NokSanSite site, Zone195NokSanCaptureSnapshot capture,
+        int legacyTicksElapsed)
     {
-        machine.Phase = Zone195CapturePhase.Commit;
-        var winningTribe = machine.CapturerTribe;
+        if (capture.RemainingTime == 0 && stoneState.GetOwningTribe(site.StoneSlotIndex) == capture.CapturerTribe)
+            return;
 
-        broadcaster.Value.AnnounceCaptureSucceeded(winningTribe, site.LegacyServerNumber, machine.CapturerName);
+        if (!RevalidateCapturer(zone, site, capture))
+        {
+            CancelCapture(zone.MapId, site, capture);
+            return;
+        }
 
-        if (IsRewardWindowOpen(site))
-            GrantTimeBonusRewards(zone, site, machine.CapturerCharacterId, winningTribe);
-
-        stoneState.CommitCapture(site.StoneSlotIndex, winningTribe);
-        broadcaster.Value.AnnounceNokSanState(winningTribe, site.LegacyServerNumber, stoneState.Snapshot());
-
-        machine.ResetToIdle();
+        AdvanceCaptureClock(zone, site, capture, legacyTicksElapsed, Zone195CapturePhase.Countdown);
     }
 
-    private bool RevalidateCapturer(Zone zone, Zone195NokSanSite site, Zone195CaptureMachine machine)
+    private void AdvanceCaptureClock(Zone zone, Zone195NokSanSite site, Zone195NokSanCaptureSnapshot capture,
+        int legacyTicksElapsed, Zone195CapturePhase expectedPhase)
     {
-        var captureRadiusSq = site.CaptureRadius * site.CaptureRadius;
+        List<int>? countdowns = null;
+        var shouldComplete = false;
 
-        if (machine.CapturerCharacterId != Zone195CaptureMachine.NoCapturer
-            && zone.TryGetPlayer(machine.CapturerCharacterId, out var capturer)
-            && capturer is not null
-            && IsEligibleCandidate(capturer, site, captureRadiusSq))
+        stoneState.TryMutateCapture(zone.MapId, machine =>
+        {
+            if (!Matches(capture, machine, expectedPhase))
+                return false;
+
+            machine.PhaseAccumulatorTicks = checked(machine.PhaseAccumulatorTicks + legacyTicksElapsed);
+            if (machine.Phase == Zone195CapturePhase.Settle)
+            {
+                if (machine.PhaseAccumulatorTicks < SettleLegacyTicks)
+                    return true;
+
+                machine.PhaseAccumulatorTicks -= SettleLegacyTicks;
+                (countdowns ??= []).Add(machine.RemainingTime);
+                machine.RemainingTime--;
+                machine.Phase = Zone195CapturePhase.Countdown;
+            }
+
+            while (machine.PhaseAccumulatorTicks >= CountdownIntervalLegacyTicks)
+            {
+                machine.PhaseAccumulatorTicks -= CountdownIntervalLegacyTicks;
+                if (machine.RemainingTime > 0)
+                {
+                    (countdowns ??= []).Add(machine.RemainingTime);
+                    machine.RemainingTime--;
+                    continue;
+                }
+
+                shouldComplete = true;
+                break;
+            }
+
             return true;
+        });
 
-        broadcaster.Value.AnnounceCaptureCancelled(site.LegacyServerNumber);
-        machine.ResetToIdle();
-        return false;
+        if (countdowns is not null)
+            foreach (var remainingTime in countdowns)
+                broadcaster.Value.AnnounceCountdown(remainingTime, site.LegacyServerNumber);
+
+        if (shouldComplete)
+            CompleteCapture(zone, site, capture.CapturerCharacterId);
+    }
+
+    private void CompleteCapture(Zone zone, Zone195NokSanSite site, int expectedCapturerCharacterId)
+    {
+        if (!stoneState.TryCompleteCapture(zone.MapId, site.StoneSlotIndex, expectedCapturerCharacterId,
+                out _, out _))
+            return;
+    }
+
+    private void PublishConfirmedCapture(Zone zone, Zone195NokSanSite site,
+        in Zone195NokSanConfirmedCapture confirmedCapture)
+    {
+        var winningTribe = confirmedCapture.CapturerTribe;
+        broadcaster.Value.AnnounceCaptureSucceeded(winningTribe, site.LegacyServerNumber,
+            confirmedCapture.CapturerName);
+
+        if (site.IsRewardWindowShard && Zone195TimeEventGate.IsOpenAt(_timeProvider))
+            GrantTimeBonusRewards(zone, site, confirmedCapture.CapturerCharacterId, winningTribe);
+
+        broadcaster.Value.AnnounceNokSanState(winningTribe, site.LegacyServerNumber, confirmedCapture.State);
+        logger.LogWarning(
+            "Zone195 Nok-San capture on map {MapId} was committed locally but has no idempotent durable world-event delivery contract; cross-shard publication is disabled.",
+            zone.MapId);
+    }
+
+    private void CancelCapture(short mapId, Zone195NokSanSite site, Zone195NokSanCaptureSnapshot capture)
+    {
+        var cancelled = false;
+        stoneState.TryMutateCapture(mapId, machine =>
+        {
+            if (!Matches(capture, machine, capture.Phase))
+                return false;
+
+            machine.ResetToIdle();
+            cancelled = true;
+            return true;
+        });
+
+        if (cancelled)
+            broadcaster.Value.AnnounceCaptureCancelled(site.LegacyServerNumber);
+    }
+
+    private static bool Matches(in Zone195NokSanCaptureSnapshot expected, Zone195CaptureMachine actual,
+        Zone195CapturePhase expectedPhase)
+    {
+        return actual.Phase == expectedPhase && actual.CapturerCharacterId == expected.CapturerCharacterId &&
+               actual.CapturerTribe == expected.CapturerTribe && actual.CapturerName == expected.CapturerName &&
+               actual.RemainingTime == expected.RemainingTime &&
+               actual.PhaseAccumulatorTicks == expected.PhaseAccumulatorTicks;
+    }
+
+    private bool RevalidateCapturer(Zone zone, Zone195NokSanSite site,
+        in Zone195NokSanCaptureSnapshot capture)
+    {
+        if (stoneState.GetOwningTribe(site.StoneSlotIndex) is { } holder && holder == capture.CapturerTribe)
+            return false;
+
+        var captureRadiusSq = site.CaptureRadius * site.CaptureRadius;
+        return capture.CapturerCharacterId != Zone195CaptureMachine.NoCapturer &&
+               zone.TryGetPlayer(capture.CapturerCharacterId, out var capturer) && capturer is not null &&
+               capturer.Tribe == capture.CapturerTribe && IsEligibleCandidate(capturer, site, captureRadiusSq);
     }
 
     private void GrantTimeBonusRewards(Zone zone, Zone195NokSanSite site, int capturerId, byte winningTribe)
@@ -178,63 +239,35 @@ public sealed class Zone195NokSanSystem(
         var allyRadiusSq = AllyRewardRadius * AllyRewardRadius;
         foreach (var player in zone.Players)
         {
-            if (player.CharacterId == capturerId)
-                continue;
-            if (player.Tribe != winningTribe)
-                continue;
-            if (player.IsMovingZone || player.IsDead)
+            if (player.CharacterId == capturerId || player.Tribe != winningTribe || player.IsMovingZone || player.IsDead)
                 continue;
 
             var dx = player.PosX - site.PostX;
             var dz = player.PosZ - site.PostZ;
-            if (dx * dx + dz * dz > allyRadiusSq)
-                continue;
-
-            GrantReward(zone, player, AllyContributionPoints, AllyHeroPoints);
+            if (dx * dx + dz * dz <= allyRadiusSq)
+                GrantReward(zone, player, AllyContributionPoints, AllyHeroPoints);
         }
     }
 
     private void GrantReward(Zone zone, PlayerRuntimeState player, int contributionPoints, int heroPoints)
     {
         zone.GrantContributionPoints(player.CharacterId, contributionPoints);
-
         if (player.CombinedLevel < HeroRankPointMinimumCombinedLevel)
             return;
 
         player.HeroRankPoints += heroPoints;
         heroRankPoints.AddPending(player.CharacterId, heroPoints, player.Tribe, player.Level);
-
         player.Session.Send(new AvatarStatUpdateResponse
             { Sort = HeroRankPointStatSort, Value = player.HeroRankPoints, Value2 = 0 });
     }
 
-    private bool IsRewardWindowOpen(Zone195NokSanSite site)
-    {
-        if (!site.IsRewardWindowShard)
-            return false;
-
-        var now = _utcNow();
-        return now.DayOfWeek == DayOfWeek.Sunday
-               && now.Hour >= RewardWindowStartHour
-               && now.Hour <= RewardWindowEndHour;
-    }
-
     private static bool IsEligibleCandidate(PlayerRuntimeState player, Zone195NokSanSite site, float captureRadiusSq)
     {
-        if (player.IsMovingZone)
-            return false;
-        if (player.IsDead)
-            return false;
-        if (player.ActionSort == DisqualifyingActionSort)
+        if (player.IsMovingZone || player.IsDead || player.ActionSort == DisqualifyingActionSort)
             return false;
 
         var dx = player.PosX - site.PostX;
         var dz = player.PosZ - site.PostZ;
         return dx * dx + dz * dz <= captureRadiusSq;
-    }
-
-    private static DateTime DefaultNowUtc()
-    {
-        return DateTime.UtcNow;
     }
 }

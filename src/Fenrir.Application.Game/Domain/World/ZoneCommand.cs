@@ -1,5 +1,7 @@
 using System.Collections.Immutable;
+using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Quests;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Domain.Game.Stats;
@@ -9,13 +11,18 @@ namespace Fenrir.Application.Game.Domain.World;
 public enum ZoneCommandKind : byte
 {
     Enter,
+
+    AcknowledgeEnterBootstrap,
+
     Leave,
     Move,
     PetAction,
 
-    MarkZoneTransferPending,
+    BeginZoneTransfer,
 
     ClearZoneTransferPending,
+
+    RollbackZoneTransfer,
 
     RefreshZoneTransferRegistrationTimestamp,
 
@@ -31,10 +38,57 @@ public enum ZoneCommandKind : byte
 
     SummonRegularWarBoss,
 
+    DespawnRegularWarBosses,
+
     BroadcastDuelStart,
 
-    SetRegularWarSmallestTribe
+    SetRegularWarSmallestTribe,
+
+    ApplyPvpKillRewardClaim,
+
+    ApplyZone38TribeEffects
 }
+
+public sealed record ZoneTransferHandoffSnapshot(
+    string CharacterName,
+    byte Tribe,
+    bool WasMovingZone,
+    DateTime PreviousRegisteredAtUtc,
+    DateTime PendingRegisteredAtUtc,
+    int[]? PreviousBuffs);
+
+public enum ZoneLeaveResultKind : byte
+{
+    Applied = 1,
+
+    Rejected,
+
+    Faulted,
+
+    Unknown,
+
+    Cancelled
+}
+
+public readonly record struct ZoneLeaveResult(
+    ZoneLeaveResultKind Kind,
+    PlayerRuntimeState? DepartingState,
+    string? Cause = null)
+{
+    public static ZoneLeaveResult Applied(PlayerRuntimeState state) => new(ZoneLeaveResultKind.Applied, state);
+
+    public static ZoneLeaveResult Rejected(string? cause = null) => new(ZoneLeaveResultKind.Rejected, null, cause);
+
+    public static ZoneLeaveResult Faulted(PlayerRuntimeState? departingState, string? cause = null) =>
+        new(ZoneLeaveResultKind.Faulted, departingState, cause);
+
+    public static ZoneLeaveResult Unknown(string? cause = null) => new(ZoneLeaveResultKind.Unknown, null, cause);
+
+    public static ZoneLeaveResult Cancelled(string? cause = null) =>
+        new(ZoneLeaveResultKind.Cancelled, null, cause);
+}
+
+public readonly record struct ZoneLeaveSubmission(ZoneLeaveResult Result, Task<ZoneLeaveResult>? PendingResult);
 
 public readonly struct ZoneCommand
 {
@@ -49,28 +103,64 @@ public readonly struct ZoneCommand
 
     public bool Muted { get; init; }
 
+    public DateTime ZoneTransferRegisteredAtUtc { get; init; }
+
+    public short ZoneTransferTargetMapId { get; init; }
+
     public byte WinningTribe { get; init; }
 
     public byte SmallestPresentTribe { get; init; }
 
     public RegularWarRewardGrant RegularWarReward { get; init; }
 
+    public PvpKillCooldownClaim PvpKillCooldownClaim { get; init; }
+
+    public Zone38TribeEffectSnapshot Zone38TribeEffects { get; init; }
+
     public int DuelOpponentCharacterId { get; init; }
 
     public int DuelUniqueNumber { get; init; }
 
-    public TaskCompletionSource<PlayerRuntimeState?>? LeaveSnapshot { get; init; }
+    public long ExpectedSessionId { get; init; }
 
-    public static ZoneCommand Enter(int characterId, PlayerEnterData data)
-    {
-        return new ZoneCommand { Kind = ZoneCommandKind.Enter, CharacterId = characterId, EnterData = data };
-    }
+    public TaskCompletionSource<ZoneLeaveResult>? LeaveCompletion { get; init; }
 
-    public static ZoneCommand Leave(int characterId, TaskCompletionSource<PlayerRuntimeState?>? snapshotSignal = null)
+    public TaskCompletionSource<PlayerRuntimeState?>? EnterSnapshot { get; init; }
+
+    public TaskCompletionSource<ZoneCommandResult>? Completion { get; init; }
+
+    public TaskCompletionSource<ZoneTransferHandoffSnapshot?>? ZoneTransferSnapshot { get; init; }
+
+    public static ZoneCommand Enter(int characterId, PlayerEnterData data,
+        TaskCompletionSource<PlayerRuntimeState?>? snapshotSignal = null)
     {
         return new ZoneCommand
         {
-            Kind = ZoneCommandKind.Leave, CharacterId = characterId, LeaveSnapshot = snapshotSignal
+            Kind = ZoneCommandKind.Enter, CharacterId = characterId, EnterData = data, EnterSnapshot = snapshotSignal
+        };
+    }
+
+    public static ZoneCommand AcknowledgeEnterBootstrap(int characterId, long expectedSessionId,
+        TaskCompletionSource<ZoneCommandResult> completion)
+    {
+        return new ZoneCommand
+        {
+            Kind = ZoneCommandKind.AcknowledgeEnterBootstrap,
+            CharacterId = characterId,
+            ExpectedSessionId = expectedSessionId,
+            Completion = completion
+        };
+    }
+
+    public static ZoneCommand Leave(int characterId, long expectedSessionId,
+        TaskCompletionSource<ZoneLeaveResult> completion)
+    {
+        return new ZoneCommand
+        {
+            Kind = ZoneCommandKind.Leave,
+            CharacterId = characterId,
+            ExpectedSessionId = expectedSessionId,
+            LeaveCompletion = completion
         };
     }
 
@@ -88,14 +178,55 @@ public readonly struct ZoneCommand
         return new ZoneCommand { Kind = ZoneCommandKind.PetAction, CharacterId = characterId, Action = action };
     }
 
-    public static ZoneCommand MarkZoneTransferPending(int characterId)
+    public static ZoneCommand BeginZoneTransfer(int characterId, short targetMapId,
+        TaskCompletionSource<ZoneTransferHandoffSnapshot?> snapshot,
+        TaskCompletionSource<ZoneCommandResult> completion)
     {
-        return new ZoneCommand { Kind = ZoneCommandKind.MarkZoneTransferPending, CharacterId = characterId };
+        return new ZoneCommand
+        {
+            Kind = ZoneCommandKind.BeginZoneTransfer,
+            CharacterId = characterId,
+            ZoneTransferTargetMapId = targetMapId,
+            ZoneTransferSnapshot = snapshot,
+            Completion = completion
+        };
     }
 
-    public static ZoneCommand ClearZoneTransferPending(int characterId)
+    public static ZoneCommand ClearZoneTransferPending(int characterId, DateTime zoneTransferRegisteredAtUtc = default)
     {
-        return new ZoneCommand { Kind = ZoneCommandKind.ClearZoneTransferPending, CharacterId = characterId };
+        return new ZoneCommand
+        {
+            Kind = ZoneCommandKind.ClearZoneTransferPending, CharacterId = characterId,
+            ZoneTransferRegisteredAtUtc = zoneTransferRegisteredAtUtc
+        };
+    }
+
+    public static ZoneCommand ClearZoneTransferPending(int characterId,
+        TaskCompletionSource<ZoneCommandResult> completion)
+    {
+        return ClearZoneTransferPending(characterId, default, completion);
+    }
+
+    public static ZoneCommand ClearZoneTransferPending(int characterId, DateTime zoneTransferRegisteredAtUtc,
+        TaskCompletionSource<ZoneCommandResult> completion)
+    {
+        return new ZoneCommand
+        {
+            Kind = ZoneCommandKind.ClearZoneTransferPending, CharacterId = characterId,
+            ZoneTransferRegisteredAtUtc = zoneTransferRegisteredAtUtc, Completion = completion
+        };
+    }
+
+    public static ZoneCommand RollbackZoneTransfer(int characterId, DateTime pendingRegisteredAtUtc,
+        TaskCompletionSource<ZoneCommandResult> completion)
+    {
+        return new ZoneCommand
+        {
+            Kind = ZoneCommandKind.RollbackZoneTransfer,
+            CharacterId = characterId,
+            ZoneTransferRegisteredAtUtc = pendingRegisteredAtUtc,
+            Completion = completion
+        };
     }
 
     public static ZoneCommand RefreshZoneTransferRegistrationTimestamp(int characterId)
@@ -103,6 +234,16 @@ public readonly struct ZoneCommand
         return new ZoneCommand
         {
             Kind = ZoneCommandKind.RefreshZoneTransferRegistrationTimestamp, CharacterId = characterId
+        };
+    }
+
+    public static ZoneCommand RefreshZoneTransferRegistrationTimestamp(int characterId,
+        TaskCompletionSource<ZoneCommandResult> completion)
+    {
+        return new ZoneCommand
+        {
+            Kind = ZoneCommandKind.RefreshZoneTransferRegistrationTimestamp, CharacterId = characterId,
+            Completion = completion
         };
     }
 
@@ -137,9 +278,37 @@ public readonly struct ZoneCommand
         };
     }
 
+    public static ZoneCommand ApplyPvpKillRewardClaim(in PvpKillCooldownClaim claim)
+    {
+        return new ZoneCommand
+        {
+            Kind = ZoneCommandKind.ApplyPvpKillRewardClaim,
+            CharacterId = claim.AttackerCharacterId,
+            PvpKillCooldownClaim = claim
+        };
+    }
+
+    public static ZoneCommand ApplyZone38TribeEffects(Zone38TribeEffectSnapshot snapshot)
+    {
+        return new ZoneCommand
+        {
+            Kind = ZoneCommandKind.ApplyZone38TribeEffects,
+            CharacterId = 0,
+            Zone38TribeEffects = snapshot
+        };
+    }
+
     public static ZoneCommand SummonRegularWarBoss()
     {
         return new ZoneCommand { Kind = ZoneCommandKind.SummonRegularWarBoss, CharacterId = 0 };
+    }
+
+    public static ZoneCommand DespawnRegularWarBosses(TaskCompletionSource<ZoneCommandResult> completion)
+    {
+        return new ZoneCommand
+        {
+            Kind = ZoneCommandKind.DespawnRegularWarBosses, CharacterId = 0, Completion = completion
+        };
     }
 
     public static ZoneCommand SetRegularWarSmallestTribe(byte tribeId)
@@ -164,6 +333,8 @@ public readonly struct ZoneCommand
 public sealed record PlayerEnterData(
     IPacketSession Session,
     string Name,
+    short AccountGrade,
+    int UserSort,
     byte Tribe,
     byte Gender,
     byte HeadType,
@@ -317,9 +488,12 @@ public sealed record PlayerEnterData(
     int ProtectForCostume = 0,
     int ProtectForDestroy2 = 0,
     int LodRounds = 0,
+    int StellarCoreIndex = -1,
+    ImmutableArray<int>? StellarCoreWardrobe = null,
     ImmutableArray<int>? StellarCoreExpireDate = null,
     int EliteDungeonTime = 0,
     int DungeonKeyTime = 0,
     int IvyHallTicketTime = 0,
     int ScrollOfSeekersTime = 0,
-    int FightingGodForDestroy = 0);
+    int FightingGodForDestroy = 0,
+    long Money = 0);

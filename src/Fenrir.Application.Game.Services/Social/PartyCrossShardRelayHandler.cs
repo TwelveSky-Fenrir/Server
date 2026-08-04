@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Social;
@@ -26,6 +27,8 @@ public sealed class PartyCrossShardRelayHandler(
     IOptions<GameServerOptions> options,
     ILogger<PartyCrossShardRelayHandler> logger) : ISocialCrossShardRelayHandler
 {
+    private const byte LevelGapDisconnectReason = 7;
+
     public SocialCrossShardRelayKind Kind => SocialCrossShardRelayKind.Party;
 
     public ValueTask HandleAskAsync(SocialCrossShardRelayDto ask, CancellationToken ct)
@@ -33,6 +36,13 @@ public sealed class PartyCrossShardRelayHandler(
         if (!zones.TryGetPlayer(ask.TargetCharacterId, out var target))
         {
             PublishDecline(ask, 4);
+            return ValueTask.CompletedTask;
+        }
+
+        if (ask.SourceCombinedLevel is not { } inviterCombinedLevel || inviterCombinedLevel == 0 ||
+            Math.Abs(inviterCombinedLevel - target.CombinedLevel) > PartyRegistry.MaxLevelGap)
+        {
+            PublishDecline(ask, LevelGapDisconnectReason);
             return ValueTask.CompletedTask;
         }
 
@@ -66,18 +76,32 @@ public sealed class PartyCrossShardRelayHandler(
 
     public ValueTask HandleAnswerAsync(SocialCrossShardRelayDto answer, CancellationToken ct)
     {
-        if (!parties.TryConsumeCrossShardOutbound(answer.TargetCharacterId, out _))
+        if (!parties.TryConsumeCrossShardOutbound(answer.TargetCharacterId, answer.SourceShardId,
+                answer.SourceCharacterId, out _))
         {
             logger.LogInformation(
-                "Cross-shard party answer for inviter {InviterId} has no matching pending invite -- inviter already cancelled/disconnected, or a stale/duplicate Answer",
-                answer.TargetCharacterId);
+                "Cross-shard party answer for inviter {InviterId} has no matching pending invite from character {InviteeId} on shard {InviteeShardId} -- cancelled, stale, or mismatched Answer",
+                answer.TargetCharacterId, answer.SourceCharacterId, answer.SourceShardId);
             return ValueTask.CompletedTask;
         }
 
         var inviterId = answer.TargetCharacterId;
         var accepted = answer.Accepted == true;
 
-        if (zones.TryGetPlayer(inviterId, out var inviter))
+        zones.TryGetPlayer(inviterId, out var inviter);
+
+        if (answer.ReasonCode == LevelGapDisconnectReason)
+        {
+            if (inviter is not null)
+                ((IZoneSession)inviter.Session).Abort(DisconnectReason.Faulted);
+
+            logger.LogWarning(
+                "Cross-shard party invite rejected for level gap: inviter {InviterId}, invitee {InviteeId} on shard {InviteeShardId}",
+                inviterId, answer.SourceCharacterId, answer.SourceShardId);
+            return ValueTask.CompletedTask;
+        }
+
+        if (inviter is not null)
             inviter.Session.Send(new PartyAnswerResponse { Answer = accepted ? 0 : answer.ReasonCode ?? 1 });
 
         if (!accepted)
@@ -112,6 +136,8 @@ public sealed class PartyCrossShardRelayHandler(
                 if (zones.TryGetPlayer(current.CharacterId, out var member))
                     member.Session.Send(fullRoster);
 
+            PublishRosterToJoinerShard(answer.SourceCharacterId, answer.SourceAvatarName, members);
+
             return ValueTask.CompletedTask;
         }
 
@@ -129,20 +155,54 @@ public sealed class PartyCrossShardRelayHandler(
                 member.Session.Send(roster);
             }
 
-        PublishRosterToJoinerShard(answer.SourceCharacterId, answer.SourceAvatarName, members);
+        PublishRostersToRemoteMembers(members);
 
+        return ValueTask.CompletedTask;
+    }
+
+    public ValueTask HandleCancelAsync(SocialCrossShardRelayDto cancel, CancellationToken ct)
+    {
+        if (!zones.TryGetPlayer(cancel.TargetCharacterId, out var invitee) || invitee.IsMovingZone)
+            return ValueTask.CompletedTask;
+
+        if (!parties.TryClearCrossShardInbound(invitee.CharacterId, cancel.SourceShardId,
+                cancel.SourceCharacterId))
+        {
+            logger.LogDebug(
+                "Cross-shard party cancel ignored for invitee {InviteeId}: no matching pending invite from character {InviterId} on shard {InviterShardId}",
+                invitee.CharacterId, cancel.SourceCharacterId, cancel.SourceShardId);
+            return ValueTask.CompletedTask;
+        }
+
+        invitee.Session.Send(new PartyCancelResponse());
+        logger.LogDebug(
+            "Cross-shard party invite cancelled for invitee {InviteeId} by character {InviterId} on shard {InviterShardId}",
+            invitee.CharacterId, cancel.SourceCharacterId, cancel.SourceShardId);
         return ValueTask.CompletedTask;
     }
 
     private void PublishRosterToJoinerShard(int joinerCharacterId, string joinerAvatarName,
         IReadOnlyList<PartyMember> members)
     {
+        PublishRoster(joinerCharacterId, joinerAvatarName, members);
+    }
+
+    private void PublishRostersToRemoteMembers(IReadOnlyList<PartyMember> members)
+    {
+        foreach (var member in members)
+            if (!zones.TryGetPlayer(member.CharacterId, out _))
+                PublishRoster(member.CharacterId, member.Name, members);
+    }
+
+    private void PublishRoster(int recipientCharacterId, string recipientAvatarName,
+        IReadOnlyList<PartyMember> members)
+    {
         partyResyncRelay.Value.Enqueue(new PartyResyncRelayEntry(
             (byte)PartyResyncRelaySort.PartyInfoReply,
             options.Value.ShardId,
-            joinerCharacterId,
+            recipientCharacterId,
             members[0].Name,
-            joinerAvatarName)
+            recipientAvatarName)
         {
             MemberId1 = MemberIdAt(members, 0),
             MemberName1 = MemberNameAt(members, 0),

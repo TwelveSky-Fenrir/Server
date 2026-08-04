@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -8,10 +9,9 @@ public sealed class MixSkillUseHandler(ILogger<MixSkillUseHandler> logger)
 {
     public void Handle(in MixSkillUseRequest packet, IPacketSession session)
     {
+        var zoneSession = (IZoneSession)session;
         logger.LogWarning(
-            "Session {SessionId}: MixSkillUseRequest received — op128 P_MIXSKILL_USE_SEND has no REGWORK1 line in " +
-            "legacy MyWork::Init (Server/ts25zone/S04_MyWork01.cpp:6-266), so the legacy server logs Unknown Header " +
-            "and quits the session (:292-301); silently ignored",
-            session.SessionId);
+            "Session {SessionId}: rejected unregistered opcode {Opcode}", session.SessionId, 128);
+        zoneSession.Abort(DisconnectReason.Faulted);
     }
 }

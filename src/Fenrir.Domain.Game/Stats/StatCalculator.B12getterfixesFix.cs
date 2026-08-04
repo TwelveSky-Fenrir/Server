@@ -4,31 +4,8 @@ namespace Fenrir.Domain.Game.Stats;
 
 public static partial class StatCalculator
 {
-    public const short FreeForAllZoneNumber = 335;
-
-    public const int FreeForAllMaxLife = 100000;
-
-    public const int FreeForAllMaxMana = 30000;
-
-
     private static readonly FrozenSet<short> BalanceStatZoneNumbers =
         new short[] { 19, 20, 21, 34, 49, 120, 154, 175, 176, 177, 190, 191, 192, 193 }.ToFrozenSet();
-
-    public static bool IsFreeForAllZone(short zoneNumber)
-    {
-        return zoneNumber == FreeForAllZoneNumber;
-    }
-
-    public static int ApplyFreeForAllMaxLife(int computedMaxLife, short zoneNumber)
-    {
-        return IsFreeForAllZone(zoneNumber) ? FreeForAllMaxLife : computedMaxLife;
-    }
-
-    public static int ApplyFreeForAllMaxMana(int computedMaxMana, short zoneNumber)
-    {
-        return IsFreeForAllZone(zoneNumber) ? FreeForAllMaxMana : computedMaxMana;
-    }
-
 
     public static bool IsBalanceStatZone(short zoneNumber)
     {

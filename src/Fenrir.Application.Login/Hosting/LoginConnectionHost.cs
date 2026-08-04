@@ -16,6 +16,7 @@ namespace Fenrir.Application.Login.Hosting;
 
 public sealed class LoginConnectionHost(
     IOptions<LoginServerOptions> options,
+    IOptions<LoginSocketAdmissionOptions> admissionOptions,
     IFrameDispatcher dispatcher,
     IOpcodeFrameSizeProvider opcodeRegistry,
     ISessionRateLimiter rateLimiter,
@@ -25,7 +26,6 @@ public sealed class LoginConnectionHost(
     IAccountSessionRepository accountSessions,
     IEventLogRepository eventLog,
     IpFloodGuard ipFloodGuard,
-    LoginSocketAdmissionGate admissionGate,
     ILogger<LoginConnectionHost> logger) : BackgroundService
 {
     private const short LoginSessionEndedEventCode = 2;
@@ -49,7 +49,9 @@ public sealed class LoginConnectionHost(
             opcodeRegistry,
             rateLimiter,
             ipFloodGuard,
-            logger);
+            logger,
+            admissionGate: new SocketAdmissionGate(
+                admissionOptions.Value.MaxConcurrentConnections));
 
         logger.LogInformation("LoginServer listening on port {Port}", opts.Port);
 
@@ -100,16 +102,6 @@ public sealed class LoginConnectionHost(
         CancellationToken ct)
     {
         var remoteIp = loginSession.RemoteEndPoint?.Address.ToString();
-
-        if (!admissionGate.TryAcquire())
-        {
-            logger.LogWarning(
-                "Login connection refused: session {SessionId} from {RemoteIp} -- the server already holds its {MaxConcurrentConnections} concurrent sockets",
-                loginSession.SessionId, remoteIp, admissionGate.MaxConcurrentConnections);
-
-            await connection.DisposeAsync().ConfigureAwait(false);
-            return;
-        }
 
         registry.Register(loginSession);
         idleClock.Arm(loginSession, DateTimeOffset.UtcNow);
@@ -163,7 +155,6 @@ public sealed class LoginConnectionHost(
             registry.Unregister(loginSession.SessionId);
             idleClock.Release(loginSession.SessionId);
             rateLimiter.Remove(loginSession.SessionId);
-            admissionGate.Release();
             await connection.DisposeAsync().ConfigureAwait(false);
         }
     }

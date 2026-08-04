@@ -6,6 +6,5 @@ public interface IBanRepository
 
     public ValueTask<bool> IsActiveForCharacterAsync(int characterId, CancellationToken ct);
 
-    public ValueTask<int> CreateAsync(int? accountId, int? characterId, BanReason reason, DateTime? expiresAtUtc,
-        CancellationToken ct, int? actorAccountId = null, int? actorCharacterId = null);
+    public ValueTask<int> CreateAsync(BanCreationRequest request, CancellationToken ct);
 }

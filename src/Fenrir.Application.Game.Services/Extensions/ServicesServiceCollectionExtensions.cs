@@ -14,8 +14,6 @@ using Fenrir.Application.Game.Abstractions.Social;
 using Fenrir.Application.Game.Abstractions.Tribes;
 using Fenrir.Application.Game.Abstractions.WarPoint;
 using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
-using Fenrir.Application.Game.Domain.Forge;
-using Fenrir.Application.Game.Domain.Gm;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Services.BuffsMountsCosmetics;
 using Fenrir.Application.Game.Services.Chat;
@@ -109,8 +107,6 @@ public static class ServicesServiceCollectionExtensions
         services.AddSingleton<IGuildAnnouncementService, GuildAnnouncementService>();
         services.AddSingleton<IGuildChatService, GuildChatService>();
         services.AddSingleton<ILocalChatService, LocalChatService>();
-        services.AddSingleton<YangGokPvpDropEventState>();
-        services.AddSingleton<LabyrinthOperatorGate>();
         services.AddSingleton<IPartyChatService, PartyChatService>();
         services.AddSingleton<IShoutService, ShoutService>();
         services.AddSingleton<ITribeAnnouncementService, TribeAnnouncementService>();
@@ -198,7 +194,6 @@ public static class ServicesServiceCollectionExtensions
         services.AddSingleton<IRuneStoneCraftService, RuneStoneCraftService>();
         services.AddSingleton<ISkyUpgradeItemService, SkyUpgradeItemService>();
         services.AddSingleton<IUpgradeCapeService, UpgradeCapeService>();
-        services.AddSingleton<WarlordPityLockState>();
         services.AddSingleton<IUpgradeItemRankService, UpgradeItemRankService>();
     }
 

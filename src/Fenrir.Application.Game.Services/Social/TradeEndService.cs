@@ -17,24 +17,45 @@ public sealed class TradeEndService(TradeRegistry trades, ZoneRegistry zones, IL
         }
 
         var opponentId = pending.OpponentOf(characterId);
-        if (!zones.TryGetPlayer(opponentId, out var opponent) || opponent.IsMovingZone)
+        var expected = pending;
+        var transition = trades.TryEnterTransition(characterId, opponentId);
+        if (transition is null)
         {
             logger.LogDebug(
-                "Trade end deferred: character {CharacterId}'s counterpart {OpponentId} is unreachable or mid zone-transfer -- session left for the disconnect path to tear down",
+                "Trade end ignored: character {CharacterId} / counterpart {OpponentId} already have an in-flight transition",
                 characterId, opponentId);
             return new TradeEndResult(false, 0, 0);
         }
 
-        if (!trades.TryEnd(characterId, out var trade) || trade is null)
+        using (transition)
         {
-            logger.LogDebug("Trade end ignored: character {CharacterId} has no active trade session", characterId);
-            return new TradeEndResult(false, 0, 0);
-        }
+            if (!trades.TryGetSession(characterId, out pending) || pending is null ||
+                !ReferenceEquals(pending, expected))
+            {
+                logger.LogDebug("Trade end ignored: character {CharacterId} has no active trade session", characterId);
+                return new TradeEndResult(false, 0, 0);
+            }
 
-        logger.LogDebug(
-            "Trade abandoned (nothing committed): character {CharacterId} ended session with character {PlayerAId}/{PlayerBId}",
-            characterId, trade.PlayerAId, trade.PlayerBId);
-        return new TradeEndResult(true, trade.PlayerAId, trade.PlayerBId, trade.SideA.BigMoney,
-            trade.SideB.BigMoney);
+            opponentId = pending.OpponentOf(characterId);
+            if (!zones.TryGetPlayer(opponentId, out var opponent) || opponent.IsMovingZone)
+            {
+                logger.LogDebug(
+                    "Trade end deferred: character {CharacterId}'s counterpart {OpponentId} is unreachable or mid zone-transfer -- session left for the disconnect path to tear down",
+                    characterId, opponentId);
+                return new TradeEndResult(false, 0, 0);
+            }
+
+            if (!trades.TryEnd(characterId, out var trade) || trade is null)
+            {
+                logger.LogDebug("Trade end ignored: character {CharacterId} has no active trade session", characterId);
+                return new TradeEndResult(false, 0, 0);
+            }
+
+            logger.LogDebug(
+                "Trade abandoned (nothing committed): character {CharacterId} ended session with character {PlayerAId}/{PlayerBId}",
+                characterId, trade.PlayerAId, trade.PlayerBId);
+            return new TradeEndResult(true, trade.PlayerAId, trade.PlayerBId, trade.SideA.BigMoney,
+                trade.SideB.BigMoney);
+        }
     }
 }

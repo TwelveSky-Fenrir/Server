@@ -14,7 +14,7 @@ public static class LevelProgressionCalculator
 
     private const int MaxLevelMilestoneSkillBonus = 2000;
     private const int IntermediateMilestoneSkillBonus = 1000;
-    private const short LvM1 = 113;
+    private const short IntermediateMilestoneOffset = 113;
 
     public static LevelUpResult ResolveLevelUp(long currentExperience, long experienceGain,
         FrozenDictionary<short, LevelRowDto> levels)
@@ -44,7 +44,7 @@ public static class LevelProgressionCalculator
         skillPoints += presentLevel switch
         {
             MaxLevel - 1 => MaxLevelMilestoneSkillBonus,
-            MaxLevel - LvM1 => IntermediateMilestoneSkillBonus,
+            MaxLevel - IntermediateMilestoneOffset => IntermediateMilestoneSkillBonus,
             _ => 0
         };
 

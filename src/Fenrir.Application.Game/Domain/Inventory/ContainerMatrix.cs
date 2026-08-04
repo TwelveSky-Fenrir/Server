@@ -128,7 +128,7 @@ public static class ContainerMatrix
         byte fromContainer, int fromSlot, int requestedQuantity,
         byte toContainer, int toSlot, byte toX, byte toY,
         ItemStack? source, ItemStack? destination,
-        bool sourceIsStackable)
+        byte sourceItemSort)
     {
         if (!IsValidSlot(fromContainer, fromSlot))
             return new MoveOutcomeResult(MoveOutcome.SourceOutOfRange, source, destination);
@@ -139,39 +139,67 @@ public static class ContainerMatrix
         if (source is not { } src)
             return new MoveOutcomeResult(MoveOutcome.SourceEmpty, source, destination);
 
+        var sourceIsStackable = IsStackableSort(sourceItemSort);
+        var quantity = ResolveMovedQuantity(src, requestedQuantity, sourceItemSort, sourceIsStackable);
+        if (quantity is null)
+            return new MoveOutcomeResult(MoveOutcome.InvalidQuantity, source, destination);
+
+        var movedQuantity = quantity.Value;
+
         if (fromContainer == toContainer && fromSlot == toSlot)
             return new MoveOutcomeResult(MoveOutcome.NoOp, source, destination);
 
-        var quantity = src.Quantity;
-
-        if (sourceIsStackable)
-        {
-            if (requestedQuantity < 0 || requestedQuantity > ItemQuantityPolicy.MaxStackQuantity)
-                return new MoveOutcomeResult(MoveOutcome.InvalidQuantity, source, destination);
-
-            quantity = requestedQuantity == 0 ? src.Quantity : requestedQuantity;
-            if (quantity > src.Quantity)
-                return new MoveOutcomeResult(MoveOutcome.InsufficientQuantity, source, destination);
-        }
+        if (sourceIsStackable && movedQuantity > src.Quantity)
+            return new MoveOutcomeResult(MoveOutcome.InsufficientQuantity, source, destination);
 
         if (destination is not { } dst)
         {
             var moved = toContainer is InventoryPage0 or InventoryPage1
-                ? src with { Quantity = quantity, XPos = toX, YPos = toY }
-                : src with { Quantity = quantity };
-            var remaining = src.Quantity - quantity;
+                ? src with { Quantity = movedQuantity, XPos = toX, YPos = toY }
+                : src with { Quantity = movedQuantity };
+            var remaining = src.Quantity - movedQuantity;
             ItemStack? newSource = remaining > 0 ? src with { Quantity = remaining } : null;
             return new MoveOutcomeResult(MoveOutcome.Success, newSource, moved);
         }
 
         if (!sourceIsStackable || dst.ItemId != src.ItemId ||
-            dst.Quantity + quantity > ItemQuantityPolicy.MaxStackQuantity)
+            dst.Quantity is < ItemQuantityPolicy.MinStackQuantity or > ItemQuantityPolicy.MaxStackQuantity ||
+            dst.Quantity + movedQuantity > ItemQuantityPolicy.MaxStackQuantity)
             return new MoveOutcomeResult(MoveOutcome.DestinationOccupied, source, destination);
 
-        var merged = dst with { Quantity = dst.Quantity + quantity };
-        var remainingAfterMerge = src.Quantity - quantity;
+        var merged = toContainer is InventoryPage0 or InventoryPage1
+            ? dst with { Quantity = dst.Quantity + movedQuantity, XPos = toX, YPos = toY }
+            : dst with { Quantity = dst.Quantity + movedQuantity };
+        var remainingAfterMerge = src.Quantity - movedQuantity;
         ItemStack? newSourceAfterMerge = remainingAfterMerge > 0 ? src with { Quantity = remainingAfterMerge } : null;
         return new MoveOutcomeResult(MoveOutcome.Success, newSourceAfterMerge, merged);
+    }
+
+    private static int? ResolveMovedQuantity(ItemStack source, int requestedQuantity, byte sourceItemSort,
+        bool sourceIsStackable)
+    {
+        if (requestedQuantity <= 0)
+            return null;
+
+        if (sourceIsStackable)
+        {
+            return source.Quantity is >= ItemQuantityPolicy.MinStackQuantity and <= ItemQuantityPolicy.MaxStackQuantity &&
+                   requestedQuantity <= ItemQuantityPolicy.MaxStackQuantity
+                ? requestedQuantity
+                : null;
+        }
+
+        if (requestedQuantity != 1)
+            return null;
+
+        return sourceItemSort switch
+        {
+            ItemQuantityPolicy.PetSort when source.Quantity is >= ItemQuantityPolicy.MinStackQuantity and <=
+                ItemQuantityPolicy.MaxPetActivity => source.Quantity,
+            _ when ItemQuantityPolicy.CarriesNoQuantity(sourceItemSort) && source.Quantity is 0 or 1 =>
+                source.Quantity,
+            _ => null
+        };
     }
 
     public static ProjectedContainers ApplyMove(
@@ -181,6 +209,9 @@ public static class ContainerMatrix
     {
         if (fromContainer == toContainer)
         {
+            if (fromSlot == toSlot)
+                return new ProjectedContainers(fromCurrent, fromCurrent);
+
             var updated = ApplySlotChange(fromCurrent, (byte)fromSlot, move.NewSource);
             updated = ApplySlotChange(updated, (byte)toSlot, move.NewDestination);
             return new ProjectedContainers(updated, updated);

@@ -4,6 +4,7 @@ using Fenrir.Protocol.Game;
 namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public sealed record TribeQuotaEntry(
+    short MapId,
     IZoneSession Session,
     int Tribe,
     int AccountId,
@@ -12,7 +13,7 @@ public sealed record TribeQuotaEntry(
 
 public sealed class TribeQuotaRegistry
 {
-    private readonly Dictionary<long, TribeQuotaEntry> _entries = new();
+    private readonly Dictionary<TribeQuotaKey, TribeQuotaEntry> _entries = new();
     private readonly Lock _lock = new();
 
     public int Count
@@ -26,11 +27,11 @@ public sealed class TribeQuotaRegistry
         }
     }
 
-    public int CountForTribe(int tribe)
+    public int CountForTribe(short mapId, int tribe)
     {
         lock (_lock)
         {
-            return CountForTribeCore(tribe);
+            return CountForTribeCore(mapId, tribe);
         }
     }
 
@@ -39,11 +40,12 @@ public sealed class TribeQuotaRegistry
     {
         lock (_lock)
         {
-            population = CountForTribeCore(tribe);
+            var key = new TribeQuotaKey(session.ListenerMapId, session.SessionId);
+            population = CountForTribeCore(key.MapId, tribe);
             if (TribeQuotaGate.Evaluate(quotaGroup, capacity, population) == TribeQuotaOutcome.QuotaFull)
                 return false;
 
-            _entries[session.SessionId] = new TribeQuotaEntry(session, tribe, accountId, 0, registeredAtUtc);
+            _entries[key] = new TribeQuotaEntry(key.MapId, session, tribe, accountId, 0, registeredAtUtc);
             return true;
         }
     }
@@ -53,16 +55,16 @@ public sealed class TribeQuotaRegistry
     {
         lock (_lock)
         {
-            _entries[session.SessionId] =
-                new TribeQuotaEntry(session, tribe, accountId, characterId, registeredAtUtc);
+            var key = new TribeQuotaKey(session.ListenerMapId, session.SessionId);
+            _entries[key] = new TribeQuotaEntry(key.MapId, session, tribe, accountId, characterId, registeredAtUtc);
         }
     }
 
-    public bool Release(long sessionId)
+    public bool Release(IZoneSession session)
     {
         lock (_lock)
         {
-            return _entries.Remove(sessionId, out _);
+            return _entries.Remove(new TribeQuotaKey(session.ListenerMapId, session.SessionId), out _);
         }
     }
 
@@ -80,13 +82,15 @@ public sealed class TribeQuotaRegistry
         }
     }
 
-    private int CountForTribeCore(int tribe)
+    private int CountForTribeCore(short mapId, int tribe)
     {
         var count = 0;
         foreach (var entry in _entries.Values)
-            if (entry.Tribe == tribe)
+            if (entry.MapId == mapId && entry.Tribe == tribe)
                 count++;
 
         return count;
     }
+
+    private readonly record struct TribeQuotaKey(short MapId, long SessionId);
 }

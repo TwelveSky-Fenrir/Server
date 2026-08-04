@@ -12,8 +12,11 @@ public sealed class TribeSymbolBattleSchedulerHost(
     IOptions<GameServerOptions> options,
     ZoneRegistry zoneRegistry,
     TribeSymbolBattleScheduler scheduler,
-    ILogger<TribeSymbolBattleSchedulerHost> logger) : BackgroundService
+    ILogger<TribeSymbolBattleSchedulerHost> logger,
+    TimeProvider? timeProvider = null) : BackgroundService
 {
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
+
     public bool IsArmed { get; } =
         zoneRegistry.TryGet(options.Value.TribeSymbolBattleMapId, out _) && options.Value.HolyStoneBattleEnabled;
 
@@ -34,7 +37,7 @@ public sealed class TribeSymbolBattleSchedulerHost(
             while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
                 try
                 {
-                    scheduler.Tick(SimulationClock.LegacyTick, DateTime.Now);
+                    scheduler.Tick(SimulationClock.LegacyTick, _timeProvider.GetLocalNow().LocalDateTime);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {

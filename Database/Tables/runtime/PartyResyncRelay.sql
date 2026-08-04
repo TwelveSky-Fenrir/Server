@@ -4,6 +4,7 @@ CREATE TABLE runtime.PartyResyncRelay
     Sort              TINYINT               NOT NULL,
     SourceShardId     TINYINT               NOT NULL,
     SourceCharacterId INT                   NOT NULL,
+    RecipientCharacterId INT                NOT NULL,
     PartyName         NVARCHAR(13)          NOT NULL,
     AvatarName        NVARCHAR(13)          NOT NULL,
     MemberId1         INT                   NOT NULL,
@@ -17,9 +18,10 @@ CREATE TABLE runtime.PartyResyncRelay
     MemberId5         INT                   NOT NULL,
     MemberName5       NVARCHAR(13)          NOT NULL,
     CorrelationId     UNIQUEIDENTIFIER      NOT NULL,
+    RequestCorrelationId UNIQUEIDENTIFIER   NOT NULL,
     CreatedAtUtc      DATETIME2(3)          NOT NULL,
     CONSTRAINT PK_PartyResyncRelay PRIMARY KEY NONCLUSTERED (RelayId),
     CONSTRAINT UQ_PartyResyncRelay_CorrelationId UNIQUE NONCLUSTERED (CorrelationId),
     INDEX IX_PartyResyncRelay_CreatedAtUtc NONCLUSTERED (CreatedAtUtc)
 )
-    WITH (MEMORY_OPTIMIZED = ON, DURABILITY = SCHEMA_ONLY);
+    WITH (MEMORY_OPTIMIZED = ON, DURABILITY = SCHEMA_AND_DATA);

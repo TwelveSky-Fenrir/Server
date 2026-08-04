@@ -13,7 +13,7 @@ public static class MonsterCombatResolver
 
     public const int DamageUpBonusFlatPerIncrement = 500;
 
-    public const int SpecialStunDurationSeconds = 10;
+    public const int SpecialStunDurationTicks = 10;
 
     private const int SpecialStunDenominator = 100;
 

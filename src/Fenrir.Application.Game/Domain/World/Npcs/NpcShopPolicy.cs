@@ -216,7 +216,7 @@ public static class NpcShopPolicy
         var rawMoneyCost = isStackable ? (long)item.BuyCost * quantity : item.BuyCost;
         var rawCpCost = isStackable ? (long)item.BuyCost2 * quantity : item.BuyCost2;
 
-        if (rawMoneyCost > MaxTradeableCost || rawCpCost > MaxTradeableCost)
+        if (rawMoneyCost is < 0 or > MaxTradeableCost || rawCpCost is < 0 or > MaxTradeableCost)
         {
             moneyCost = 0;
             cpCost = 0;

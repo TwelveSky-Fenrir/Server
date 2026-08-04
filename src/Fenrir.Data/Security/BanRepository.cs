@@ -31,16 +31,19 @@ public sealed record BanRepository(ICaeriusNetDbContext Db) : IBanRepository
         return rows.Count > 0;
     }
 
-    public async ValueTask<int> CreateAsync(int? accountId, int? characterId, BanReason reason,
-        DateTime? expiresAtUtc, CancellationToken ct, int? actorAccountId = null, int? actorCharacterId = null)
+    public async ValueTask<int> CreateAsync(BanCreationRequest request, CancellationToken ct)
     {
+        request.EnsureValid();
+
         var sp = new StoredProcedureParametersBuilder("admin", "usp_Ban_Create", 1)
-            .AddParameter("AccountId", (object?)accountId ?? DBNull.Value, SqlDbType.Int)
-            .AddParameter("CharacterId", (object?)characterId ?? DBNull.Value, SqlDbType.Int)
-            .AddParameter("Reason", (byte)reason, SqlDbType.TinyInt)
-            .AddParameter("ExpiresAtUtc", (object?)expiresAtUtc ?? DBNull.Value, SqlDbType.DateTime2)
-            .AddParameter("ActorAccountId", (object?)actorAccountId ?? DBNull.Value, SqlDbType.Int)
-            .AddParameter("ActorCharacterId", (object?)actorCharacterId ?? DBNull.Value, SqlDbType.Int)
+            .AddParameter("AccountId", (object?)request.TargetAccountId ?? DBNull.Value, SqlDbType.Int)
+            .AddParameter("CharacterId", (object?)request.TargetCharacterId ?? DBNull.Value, SqlDbType.Int)
+            .AddParameter("Reason", (byte)request.Reason, SqlDbType.TinyInt)
+            .AddParameter("ExpiresAtUtc", (object?)request.ExpiresAtUtc ?? DBNull.Value, SqlDbType.DateTime2)
+            .AddParameter("ActorAccountId", request.ActorAccountId, SqlDbType.Int)
+            .AddParameter("ActorCharacterId", request.ActorCharacterId, SqlDbType.Int)
+            .AddParameter("CorrelationId", request.CorrelationId, SqlDbType.UniqueIdentifier)
+            .AddParameter("AuditPayload", request.AuditPayload, SqlDbType.NVarChar)
             .Build();
 
         return await Db.ExecuteScalarAsync<int>(sp, ct);

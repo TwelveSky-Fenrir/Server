@@ -201,4 +201,20 @@ public static partial class StatCalculator
 
         return total;
     }
+
+    private static int SumEquippedGemSocketContribution(GemSocketStatKind statKind,
+        ReadOnlySpan<EquippedItemSlot?> equipment, FrozenDictionary<int, GemSocketRowDto> effectTable)
+    {
+        var total = 0;
+        foreach (var slot in equipment)
+        {
+            if (slot is not { } equipped)
+                continue;
+
+            total += SumGemSocketContribution(statKind, equipped.SocketGem1, equipped.SocketGem2,
+                equipped.SocketGem3, effectTable);
+        }
+
+        return total;
+    }
 }

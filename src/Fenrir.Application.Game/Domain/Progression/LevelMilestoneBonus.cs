@@ -6,21 +6,22 @@ namespace Fenrir.Application.Game.Domain.Progression;
 
 public static class LevelMilestoneBonus
 {
-    public const int LvM2 = 114;
-    public const int LvM8 = 120;
-    public const int LvM14 = 126;
-    public const int LvM20 = 132;
-    public const int LvM26 = 138;
-    public const int LvM32 = 144;
-    public const int LvM33 = 145;
+    public const int Level114 = 114;
+    public const int Level120 = 120;
+    public const int Level126 = 126;
+    public const int Level132 = 132;
+    public const int Level138 = 138;
+    public const int Level144 = 144;
+    public const int MaximumLevel = 145;
 
     public static readonly FrozenSet<int> ArmableMilestoneLevels =
-        new[] { 45, 65, 85, 105, LvM2, LvM8, LvM14, LvM20, LvM26, LvM32, LvM33 }.ToFrozenSet();
+        new[] { 45, 65, 85, 105, Level114, Level120, Level126, Level132, Level138, Level144, MaximumLevel }
+            .ToFrozenSet();
 
     public static readonly FrozenSet<int> DeferredMilestoneLevels = FrozenSet<int>.Empty;
 
     private static readonly int[] ArmableMilestoneLevelsAscending =
-        [45, 65, 85, 105, LvM2, LvM8, LvM14, LvM20, LvM26, LvM32, LvM33];
+        [45, 65, 85, 105, Level114, Level120, Level126, Level132, Level138, Level144, MaximumLevel];
 
     public static bool IsArmableMilestone(int level)
     {
@@ -54,38 +55,38 @@ public static class LevelMilestoneBonus
             case 105:
                 drops = [new TribeGroundItemDrop(845, 1), new TribeGroundItemDrop(539, 2)];
                 return true;
-            case LvM2:
+            case Level114:
                 drops = [new TribeGroundItemDrop(847, 1), new TribeGroundItemDrop(539, 2)];
                 return true;
-            case LvM8:
+            case Level120:
                 drops = [new TribeGroundItemDrop(846, 1), new TribeGroundItemDrop(539, 2)];
                 return true;
-            case LvM14:
+            case Level126:
                 drops = [new TribeGroundItemDrop(848, 1), new TribeGroundItemDrop(539, 2)];
                 return true;
-            case LvM20:
+            case Level132:
                 drops =
                 [
                     new TribeGroundItemDrop(850, 1), new TribeGroundItemDrop(539, 2),
                     new TribeGroundItemDrop(1458, 1)
                 ];
                 return true;
-            case LvM26:
+            case Level138:
                 drops =
                 [
                     new TribeGroundItemDrop(99699, 1), new TribeGroundItemDrop(539, 2),
                     new TribeGroundItemDrop(1458, 1)
                 ];
                 return true;
-            case LvM32:
+            case Level144:
                 drops =
                 [
                     new TribeGroundItemDrop(99698, 1), new TribeGroundItemDrop(539, 2),
                     new TribeGroundItemDrop(1458, 1)
                 ];
                 return true;
-            case LvM33:
-                drops = BuildM33ClaimDrops(previousTribe);
+            case MaximumLevel:
+                drops = BuildMaximumLevelClaimDrops(previousTribe);
                 return true;
             default:
                 drops = default;
@@ -93,7 +94,7 @@ public static class LevelMilestoneBonus
         }
     }
 
-    private static ImmutableArray<TribeGroundItemDrop> BuildM33ClaimDrops(byte previousTribe)
+    private static ImmutableArray<TribeGroundItemDrop> BuildMaximumLevelClaimDrops(byte previousTribe)
     {
         var tribeItemId = previousTribe switch
         {

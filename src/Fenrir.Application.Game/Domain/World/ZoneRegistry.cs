@@ -25,6 +25,7 @@ namespace Fenrir.Application.Game.Domain.World;
 public sealed class ZoneRegistry
 {
     private readonly IAccountSessionRepository? _accountSessions;
+    private readonly CharacterPresenceOwnership? _characterPresenceOwnership;
     private readonly ICharacterShardLocationRepository? _characterShardLocations;
     private readonly DirtyTracker<int> _dirtyTracker;
     private readonly DuelRegistry? _duelRegistry;
@@ -32,19 +33,23 @@ public sealed class ZoneRegistry
     private readonly IFourGuildKillPointQueue? _fourGuildKillPointQueue;
     private readonly FriendRegistry? _friendRegistry;
     private readonly HeroRankPointAccumulator? _heroRankPointAccumulator;
-    private readonly KillCooldownTracker _killCooldownTracker;
     private readonly MovementRules _movementRules;
     private readonly GameServerOptions _options;
     private readonly PartyRegistry? _partyRegistry;
     private readonly Lazy<IPartyResyncRelayQueue>? _partyResyncRelayQueue;
+    private readonly Lazy<IPvpKillCooldownClaimQueue>? _pvpKillCooldownClaims;
     private readonly QuestCatalog _questCatalog;
     private readonly RegularWarActiveMapTracker? _regularWarActiveMapTracker;
+    private readonly ISessionTicketRepository? _sessionTickets;
+    private readonly Lazy<ZoneCenterBroadcastIngestor>? _siegeIngestor;
+    private readonly ZoneCenterSiegeState? _siegeState;
     private readonly ImmutableArray<ISimulationSystem> _systems;
     private readonly TowerWarState? _towerWar;
     private readonly TradeRegistry? _tradeRegistry;
     private readonly TribeSymbolCombatModifiers? _tribeSymbolCombatModifiers;
     private readonly WorldDataCache _worldData;
     private readonly WorldStateService? _worldState;
+    private readonly Zone051Zone053SiegeState? _zone051Zone053SiegeState;
     private readonly Zone195NokSanState? _zone195NokSanState;
     private readonly ILogger<Zone> _zoneLogger;
     private FrozenDictionary<short, Zone> _zones = FrozenDictionary<short, Zone>.Empty;
@@ -52,7 +57,7 @@ public sealed class ZoneRegistry
     public ZoneRegistry(IOptions<GameServerOptions> options, MovementRules movementRules,
         DirtyTracker<int> dirtyTracker, ILogger<Zone> zoneLogger, WorldDataCache worldData,
         IEnumerable<ISimulationSystem> simulationSystems, QuestCatalog? questCatalog = null,
-        KillCooldownTracker? killCooldownTracker = null, TowerWarState? towerWar = null,
+        TowerWarState? towerWar = null,
         WorldStateService? worldState = null, PartyRegistry? partyRegistry = null,
         DuelRegistry? duelRegistry = null, HeroRankPointAccumulator? heroRankPointAccumulator = null,
         ICharacterShardLocationRepository? characterShardLocations = null,
@@ -64,7 +69,13 @@ public sealed class ZoneRegistry
         TribeSymbolCombatModifiers? tribeSymbolCombatModifiers = null,
         Zone195NokSanState? zone195NokSanState = null,
         Lazy<IPartyResyncRelayQueue>? partyResyncRelayQueue = null,
-        IAccountSessionRepository? accountSessions = null)
+        IAccountSessionRepository? accountSessions = null,
+        ISessionTicketRepository? sessionTickets = null,
+        CharacterPresenceOwnership? characterPresenceOwnership = null,
+        ZoneCenterSiegeState? siegeState = null,
+        Zone051Zone053SiegeState? zone051Zone053SiegeState = null,
+        Lazy<ZoneCenterBroadcastIngestor>? siegeIngestor = null,
+        Lazy<IPvpKillCooldownClaimQueue>? pvpKillCooldownClaims = null)
     {
         _options = options.Value;
         _movementRules = movementRules;
@@ -75,8 +86,6 @@ public sealed class ZoneRegistry
         _systems = simulationSystems.ToImmutableArray();
 
         _questCatalog = questCatalog ?? new QuestCatalog(worldData);
-
-        _killCooldownTracker = killCooldownTracker ?? new KillCooldownTracker();
 
         _towerWar = towerWar;
 
@@ -91,8 +100,11 @@ public sealed class ZoneRegistry
         _heroRankPointAccumulator = heroRankPointAccumulator;
 
         _characterShardLocations = characterShardLocations;
+        _characterPresenceOwnership = characterPresenceOwnership;
 
         _regularWarActiveMapTracker = regularWarActiveMapTracker;
+
+        _siegeState = siegeState;
 
         _eventLogQueue = eventLogQueue;
 
@@ -102,12 +114,29 @@ public sealed class ZoneRegistry
 
         _zone195NokSanState = zone195NokSanState;
 
+        _zone051Zone053SiegeState = zone051Zone053SiegeState;
+
         _partyResyncRelayQueue = partyResyncRelayQueue;
 
         _accountSessions = accountSessions;
+
+        _sessionTickets = sessionTickets;
+
+        _siegeIngestor = siegeIngestor;
+
+        _pvpKillCooldownClaims = pvpKillCooldownClaims;
     }
 
     public ImmutableArray<Zone> Zones => _zones.Values;
+
+    public void ApplyZone38TribeEffects(Zone38TribeEffectSnapshot snapshot)
+    {
+        foreach (var zone in _zones.Values)
+            if (!zone.Post(ZoneCommand.ApplyZone38TribeEffects(snapshot)))
+                _zoneLogger.LogError(
+                    "Zone {MapId} rejected the Zone38 tribe-effect snapshot; the actor must be reconciled before combat proceeds",
+                    zone.MapId);
+    }
 
     public Zone this[short mapId] => _zones[mapId];
 
@@ -125,8 +154,14 @@ public sealed class ZoneRegistry
     public void Initialize(IReadOnlyCollection<short> maps)
     {
         var sw = Stopwatch.StartNew();
-        var geometries = new ConcurrentDictionary<short, ZoneGeometry?>();
-        Parallel.ForEach(maps, mapId => geometries[mapId] = Zone.TryLoadGeometry(mapId, _options, _zoneLogger));
+        var canonicalGeometrySources = maps
+            .GroupBy(ZoneCanonicalGeometryMap.ResolveCanonicalMapId)
+            .Select(static group => (CanonicalMapId: group.Key, PhysicalMapId: group.First()))
+            .ToArray();
+        var geometries = new ConcurrentDictionary<short, ZoneGeometry>();
+        Parallel.ForEach(canonicalGeometrySources,
+            new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
+            source => geometries[source.CanonicalMapId] = Zone.LoadGeometry(source.PhysicalMapId, _options));
 
         Func<byte, byte>? resolveTribeBankBeneficiary =
             _worldState is null ? null : _worldState.GetTribeSymbolOwner;
@@ -135,9 +170,9 @@ public sealed class ZoneRegistry
             mapId => mapId,
             mapId =>
             {
-                geometries.TryGetValue(mapId, out var geometry);
+                var geometry = geometries[ZoneCanonicalGeometryMap.ResolveCanonicalMapId(mapId)];
                 var zone = new Zone(mapId, _options, _movementRules, _dirtyTracker, _systems, _zoneLogger, _worldData,
-                    questCatalog: _questCatalog, killCooldownTracker: _killCooldownTracker, towerWar: _towerWar,
+                    questCatalog: _questCatalog, towerWar: _towerWar,
                     worldState: _worldState, partyRegistry: _partyRegistry, duelRegistry: _duelRegistry,
                     friendRegistry: _friendRegistry,
                     tradeRegistry: _tradeRegistry,
@@ -152,21 +187,24 @@ public sealed class ZoneRegistry
                     tribeSymbolCombatModifiers: _tribeSymbolCombatModifiers,
                     zone195NokSanState: _zone195NokSanState,
                     partyResyncRelayQueue: _partyResyncRelayQueue,
-                    accountSessions: _accountSessions);
+                    accountSessions: _accountSessions,
+                    sessionTickets: _sessionTickets,
+                    characterPresenceOwnership: _characterPresenceOwnership,
+                    siegeState: _siegeState,
+                    zone051Zone053SiegeState: _zone051Zone053SiegeState,
+                    siegeIngestor: _siegeIngestor,
+                    pvpKillCooldownClaims: _pvpKillCooldownClaims);
 
-                zone.PersonalDungeonBossCatalog = Zone241RebirthTierBossCatalog.Instance;
+                if (_options.ChallengeContentEnabled)
+                    zone.PersonalDungeonBossCatalog = Zone241RebirthTierBossCatalog.Instance;
 
                 return zone;
             });
 
-        var loaded = 0;
-        foreach (var geometry in geometries.Values)
-            if (geometry is not null)
-                loaded++;
-
         _zoneLogger.LogInformation(
-            "ZoneRegistry ready: {ZoneCount} zone(s) built; navmesh (.WM) parsed for {Loaded}/{Total} map(s) in " +
-            "{ElapsedMs} ms (parallel pre-load, off the boot critical path)", _zones.Count, loaded, maps.Count,
+            "ZoneRegistry ready: {ZoneCount} zone(s) built; required navmesh (.WM) parsed from {GeometryAssetCount} " +
+            "canonical asset(s) for every hosted map in {ElapsedMs} ms (bounded parallel pre-load, off the boot " +
+            "critical path)", _zones.Count, canonicalGeometrySources.Length,
             sw.ElapsedMilliseconds);
     }
 

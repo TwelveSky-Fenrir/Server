@@ -10,4 +10,7 @@ public readonly record struct ZoneContext(
     int RageGauge = 0,
     int DrunkStateId = 0,
     bool GuildBuffActive = false,
-    int GuildId = 0);
+    int GuildBuffType = 0,
+    int GuildId = 0,
+    int BalanceControl = 0,
+    int Zone38TribeEffect = 0);

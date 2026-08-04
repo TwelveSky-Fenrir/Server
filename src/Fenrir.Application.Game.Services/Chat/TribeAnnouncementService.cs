@@ -15,6 +15,13 @@ public sealed class TribeAnnouncementService(
 {
     public bool TrySendAnnouncement(PlayerRuntimeState sender, string content)
     {
+        if (sender.IsMuted)
+        {
+            logger.LogInformation("Character {CharacterId} tribe announcement dropped: caller is muted",
+                sender.CharacterId);
+            return false;
+        }
+
         if (sender.TribeRole == 0)
         {
             logger.LogDebug(
@@ -49,7 +56,10 @@ public sealed class TribeAnnouncementService(
             null,
             null,
             null,
-            null));
+            null)
+        {
+            SourceCharacterId = sender.CharacterId
+        });
 
         logger.LogInformation(
             "Character {CharacterId} (tribe role {TribeRole}) broadcast a tribe announcement to tribe {Tribe} ({RecipientCount} same-shard recipients, {ContentLength} chars)",

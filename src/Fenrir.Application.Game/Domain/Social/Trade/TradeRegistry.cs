@@ -27,6 +27,44 @@ public readonly record struct TradeDisconnectResult(
 
 public sealed class TradeRegistry
 {
+    internal readonly record struct PairKey(int LowerCharacterId, int HigherCharacterId)
+    {
+        internal static PairKey Create(int firstCharacterId, int secondCharacterId)
+        {
+            return firstCharacterId < secondCharacterId
+                ? new PairKey(firstCharacterId, secondCharacterId)
+                : new PairKey(secondCharacterId, firstCharacterId);
+        }
+    }
+
+    internal sealed class PairGate
+    {
+        public int LeaseCount;
+
+        public SemaphoreSlim Semaphore { get; } = new(1, 1);
+    }
+
+    public sealed class TransitionLease : IDisposable
+    {
+        private TradeRegistry? _owner;
+        private readonly PairKey _pair;
+        private readonly PairGate _gate;
+
+        internal TransitionLease(TradeRegistry owner, PairKey pair, PairGate gate)
+        {
+            _owner = owner;
+            _pair = pair;
+            _gate = gate;
+        }
+
+        public void Dispose()
+        {
+            var owner = Interlocked.Exchange(ref _owner, null);
+            if (owner is not null)
+                owner.ReleaseTransition(_pair, _gate);
+        }
+    }
+
     private readonly Dictionary<int, int> _acceptedPairs = new();
 
     private readonly CrossShardNegotiationTracker _crossShard = new();
@@ -34,7 +72,36 @@ public sealed class TradeRegistry
     private readonly Lock _lock = new();
     private readonly Dictionary<int, int> _pendingByAsker = new();
     private readonly Dictionary<int, int> _pendingByTarget = new();
+    private readonly Dictionary<PairKey, PairGate> _pairGates = new();
     private readonly Dictionary<int, TradeSession> _sessionByCharacter = new();
+
+    public TransitionLease? TryEnterTransition(int firstCharacterId, int secondCharacterId)
+    {
+        if (firstCharacterId <= 0 || secondCharacterId <= 0 || firstCharacterId == secondCharacterId)
+            return null;
+
+        var pair = PairKey.Create(firstCharacterId, secondCharacterId);
+        PairGate gate;
+
+        lock (_lock)
+        {
+            if (!_pairGates.TryGetValue(pair, out gate!))
+            {
+                gate = new PairGate();
+                _pairGates.Add(pair, gate);
+            }
+
+            gate.LeaseCount++;
+        }
+
+        if (!gate.Semaphore.Wait(0))
+        {
+            ReleaseLeaseReference(pair, gate);
+            return null;
+        }
+
+        return new TransitionLease(this, pair, gate);
+    }
 
     public bool IsBusy(int characterId)
     {
@@ -105,8 +172,18 @@ public sealed class TradeRegistry
     {
         lock (_lock)
         {
-            if (_pendingByAsker.Remove(askerId, out targetId))
+            if (_pendingByAsker.TryGetValue(askerId, out targetId))
+            {
+                if (!_pendingByTarget.TryGetValue(targetId, out var recordedAskerId) || recordedAskerId != askerId)
+                {
+                    targetId = 0;
+                    return false;
+                }
+
+                _pendingByAsker.Remove(askerId);
+                _pendingByTarget.Remove(targetId);
                 return true;
+            }
 
             if (_crossShard.TryConsumeOutbound(askerId, out var crossShardAsk))
             {
@@ -115,16 +192,6 @@ public sealed class TradeRegistry
             }
 
             return false;
-        }
-    }
-
-    public bool ClearTargetAfterCancel(int targetId, int askerId)
-    {
-        lock (_lock)
-        {
-            return _pendingByTarget.TryGetValue(targetId, out var recordedAskerId) &&
-                   recordedAskerId == askerId &&
-                   _pendingByTarget.Remove(targetId);
         }
     }
 
@@ -162,14 +229,11 @@ public sealed class TradeRegistry
 
         lock (_lock)
         {
-            if (!_pendingByTarget.Remove(targetId, out askerId))
+            if (!_pendingByTarget.TryGetValue(targetId, out askerId))
                 return false;
 
             if (!_pendingByAsker.TryGetValue(askerId, out var recordedTargetId) || recordedTargetId != targetId)
                 return false;
-
-            if (accepted)
-                _acceptedPairs[targetId] = askerId;
 
             if (askerBusyByZoneTransfer)
             {
@@ -177,10 +241,14 @@ public sealed class TradeRegistry
                 return false;
             }
 
+            _pendingByTarget.Remove(targetId);
             _pendingByAsker.Remove(askerId);
 
             if (accepted)
+            {
+                _acceptedPairs[targetId] = askerId;
                 _acceptedPairs[askerId] = targetId;
+            }
 
             return true;
         }
@@ -193,12 +261,14 @@ public sealed class TradeRegistry
         {
             session = null!;
 
-            if (!_acceptedPairs.TryGetValue(callerId, out var opponentId) || opponentId != expectedOpponentId)
+            if (!_acceptedPairs.TryGetValue(callerId, out var opponentId) || opponentId != expectedOpponentId ||
+                !_acceptedPairs.TryGetValue(opponentId, out var recordedCallerId) || recordedCallerId != callerId)
                 return false;
 
             if (opponentBusyByZoneTransfer)
             {
                 _acceptedPairs.Remove(callerId);
+                _acceptedPairs.Remove(opponentId);
                 return false;
             }
 
@@ -224,9 +294,10 @@ public sealed class TradeRegistry
     {
         lock (_lock)
         {
-            if (!_sessionByCharacter.Remove(characterId, out session))
+            if (!_sessionByCharacter.TryGetValue(characterId, out session) || !session.TryClose())
                 return false;
 
+            _sessionByCharacter.Remove(characterId);
             _sessionByCharacter.Remove(session.OpponentOf(characterId));
             return true;
         }
@@ -236,8 +307,46 @@ public sealed class TradeRegistry
     {
         lock (_lock)
         {
-            return _sessionByCharacter.Remove(callerId);
+            if (!_sessionByCharacter.TryGetValue(callerId, out var session) || !session.TryClose())
+                return false;
+
+            _sessionByCharacter.Remove(callerId);
+            _sessionByCharacter.Remove(session.OpponentOf(callerId));
+            return true;
         }
+    }
+
+    public bool TryBeginCommit(TradeSession session)
+    {
+        lock (_lock)
+        {
+            return _sessionByCharacter.TryGetValue(session.PlayerAId, out var fromA) &&
+                   _sessionByCharacter.TryGetValue(session.PlayerBId, out var fromB) &&
+                   ReferenceEquals(fromA, session) && ReferenceEquals(fromB, session) &&
+                   session.TryBeginCommit();
+        }
+    }
+
+    public bool TryAbortCommit(TradeSession session)
+    {
+        lock (_lock)
+        {
+            if (!_sessionByCharacter.TryGetValue(session.PlayerAId, out var fromA) ||
+                !_sessionByCharacter.TryGetValue(session.PlayerBId, out var fromB) ||
+                !ReferenceEquals(fromA, session) || !ReferenceEquals(fromB, session) ||
+                !session.IsCommitInProgress)
+                return false;
+
+            session.CompleteCommit();
+            _sessionByCharacter.Remove(session.PlayerAId);
+            _sessionByCharacter.Remove(session.PlayerBId);
+            return true;
+        }
+    }
+
+    public bool TryCompleteCommit(TradeSession session)
+    {
+        return TryAbortCommit(session);
     }
 
     public TradeDisconnectResult ClearForDisconnect(int characterId)
@@ -262,8 +371,12 @@ public sealed class TradeRegistry
                 return new TradeDisconnectResult(TradeDisconnectNotification.Cancel, acceptedPartner);
             }
 
-            if (_sessionByCharacter.Remove(characterId, out var session))
+            if (_sessionByCharacter.TryGetValue(characterId, out var session))
             {
+                if (session.IsCommitInProgress || !session.TryClose())
+                    return TradeDisconnectResult.None;
+
+                _sessionByCharacter.Remove(characterId);
                 var opponentId = session.OpponentOf(characterId);
                 _sessionByCharacter.Remove(opponentId);
                 return new TradeDisconnectResult(TradeDisconnectNotification.End, opponentId,
@@ -287,8 +400,11 @@ public sealed class TradeRegistry
             if (_acceptedPairs.Remove(characterId, out var acceptedPartner))
                 RemoveMirror(_acceptedPairs, acceptedPartner, characterId);
 
-            if (_sessionByCharacter.Remove(characterId, out var session))
+            if (_sessionByCharacter.TryGetValue(characterId, out var session) && session.TryClose())
+            {
+                _sessionByCharacter.Remove(characterId);
                 _sessionByCharacter.Remove(session.OpponentOf(characterId));
+            }
 
             _crossShard.ClearForCharacter(characterId);
         }
@@ -298,5 +414,42 @@ public sealed class TradeRegistry
     {
         if (map.TryGetValue(counterpartId, out var mirror) && mirror == expectedValue)
             map.Remove(counterpartId);
+    }
+
+    private void ReleaseTransition(PairKey pair, PairGate gate)
+    {
+        gate.Semaphore.Release();
+        ReleaseLeaseReference(pair, gate);
+    }
+
+    private void ReleaseLeaseReference(PairKey pair, PairGate gate)
+    {
+        lock (_lock)
+        {
+            gate.LeaseCount--;
+            if (gate.LeaseCount == 0 && !IsTracked(pair))
+                _pairGates.Remove(pair);
+        }
+    }
+
+    private bool IsTracked(PairKey pair)
+    {
+        return HasPair(_pendingByAsker, pair) || HasPair(_pendingByTarget, pair) ||
+               HasPair(_acceptedPairs, pair) || HasPair(_sessionByCharacter, pair);
+    }
+
+    private static bool HasPair<T>(Dictionary<int, T> map, PairKey pair)
+        where T : class
+    {
+        return map.TryGetValue(pair.LowerCharacterId, out _) &&
+               map.ContainsKey(pair.HigherCharacterId);
+    }
+
+    private static bool HasPair(Dictionary<int, int> map, PairKey pair)
+    {
+        return map.TryGetValue(pair.LowerCharacterId, out var lowerCounterpart) &&
+               lowerCounterpart == pair.HigherCharacterId &&
+               map.TryGetValue(pair.HigherCharacterId, out var higherCounterpart) &&
+               higherCounterpart == pair.LowerCharacterId;
     }
 }

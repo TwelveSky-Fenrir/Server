@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.Progression;
+using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Progression;
@@ -9,12 +10,14 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Domain.Game.GameData;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Services.Progression;
 
 public sealed class DailyMissionService(
     ICharacterRepository characters,
     WorldDataCache worldData,
+    IOptions<GameServerOptions> options,
     ILogger<DailyMissionService> logger) : IDailyMissionService
 {
     private const int MinimumClaimLevel = ExperienceFormulas.RebirthDivisorLevelThreshold;
@@ -79,7 +82,7 @@ public sealed class DailyMissionService(
             Value = [0, 0, 0, 0]
         });
 
-        if (state.Level2 == RebirthProgression.MaxHighLevel)
+        if (options.Value.ChallengeContentEnabled && state.Level2 == RebirthProgression.MaxHighLevel)
             await GrantSecondTierZone241TimeBonusAsync(zone, state, characterId, cancellationToken);
 
         logger.LogInformation(

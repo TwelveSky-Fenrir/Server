@@ -25,10 +25,22 @@ public sealed class FriendCrossShardRelayHandler(
     IOptions<GameServerOptions> options,
     ILogger<FriendCrossShardRelayHandler> logger) : ISocialCrossShardRelayHandler
 {
+    private const byte CrossShardUnavailableReason = 5;
+
     public SocialCrossShardRelayKind Kind => SocialCrossShardRelayKind.Friend;
 
     public ValueTask HandleAskAsync(SocialCrossShardRelayDto ask, CancellationToken ct)
     {
+        if (IsCrossShard(ask.SourceShardId))
+        {
+            friends.TryConsumeCrossShardInbound(ask.TargetCharacterId, out _);
+            PublishDecline(ask, CrossShardUnavailableReason);
+            logger.LogInformation(
+                "Cross-shard friend ask declined: character {TargetId} <- asker {SourceCharacterId} on shard {SourceShardId}; a durable bilateral friendship transaction is unavailable",
+                ask.TargetCharacterId, ask.SourceCharacterId, ask.SourceShardId);
+            return ValueTask.CompletedTask;
+        }
+
         if (!zones.TryGetPlayer(ask.TargetCharacterId, out var target))
         {
             PublishDecline(ask, 4);
@@ -69,6 +81,19 @@ public sealed class FriendCrossShardRelayHandler(
         var askerId = answer.TargetCharacterId;
         var accepted = answer.Accepted == true;
 
+        if (IsCrossShard(answer.SourceShardId))
+        {
+            friends.ClearAcceptedSelf(askerId);
+
+            if (zones.TryGetPlayer(askerId, out var crossShardAsker))
+                crossShardAsker.Session.Send(new FriendAnswerResponse { Answer = CrossShardUnavailableReason });
+
+            logger.LogInformation(
+                "Cross-shard friend answer declined: asker {AskerId} <- target {TargetId} on shard {TargetShardId}; pending state cleared without a local acceptance",
+                askerId, answer.SourceCharacterId, answer.SourceShardId);
+            return ValueTask.CompletedTask;
+        }
+
         if (zones.TryGetPlayer(askerId, out var asker))
             asker.Session.Send(new FriendAnswerResponse { Answer = accepted ? 0 : answer.ReasonCode ?? 1 });
 
@@ -78,6 +103,25 @@ public sealed class FriendCrossShardRelayHandler(
         logger.LogDebug(
             "Cross-shard friend answer delivered: asker {AskerId} <- target {TargetId} on shard {TargetShardId} (accepted={Accepted})",
             askerId, answer.SourceCharacterId, answer.SourceShardId, accepted);
+        return ValueTask.CompletedTask;
+    }
+
+    public ValueTask HandleCancelAsync(SocialCrossShardRelayDto cancel, CancellationToken ct)
+    {
+        if (!IsCrossShard(cancel.SourceShardId))
+            return ValueTask.CompletedTask;
+
+        if (!friends.TryConsumeCrossShardInbound(cancel.TargetCharacterId, out _))
+        {
+            logger.LogDebug(
+                "Cross-shard friend cancel ignored for target {TargetId}: no pending inbound ask remains",
+                cancel.TargetCharacterId);
+            return ValueTask.CompletedTask;
+        }
+
+        logger.LogDebug(
+            "Cross-shard friend pending ask cleared for target {TargetId} after cancellation from character {SourceCharacterId} on shard {SourceShardId}",
+            cancel.TargetCharacterId, cancel.SourceCharacterId, cancel.SourceShardId);
         return ValueTask.CompletedTask;
     }
 
@@ -94,6 +138,11 @@ public sealed class FriendCrossShardRelayHandler(
             ask.SourceShardId,
             ask.SourceCharacterId,
             ask.RelayId));
+    }
+
+    private bool IsCrossShard(byte sourceShardId)
+    {
+        return sourceShardId != options.Value.ShardId;
     }
 
     private bool IsExcludedByCommunityWork(PlayerRuntimeState player)

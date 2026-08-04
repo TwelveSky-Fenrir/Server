@@ -246,6 +246,23 @@ internal static class FenrirDiagnostics
         DiagnosticSeverity.Error,
         true);
 
+    public static readonly DiagnosticDescriptor PacketDirectionInterfaceMismatch = new(
+        "FEN022",
+        "Packet direction does not match its interface contract",
+        "Packet '{0}' declares Direction={1}, but Incoming packets must implement IIncomingPacket<TSelf> and not " +
+        "IOutgoingPacket, while Outgoing packets must implement IOutgoingPacket and not IIncomingPacket<T>",
+        Category,
+        DiagnosticSeverity.Error,
+        true);
+
+    public static readonly DiagnosticDescriptor IncomingPacketTransform = new(
+        "FEN023",
+        "Incoming packet declares an outgoing-only transform",
+        "Incoming packet '{0}' declares {1}; Compressed and Obfuscation are outgoing-only transforms",
+        Category,
+        DiagnosticSeverity.Error,
+        true);
+
     public static readonly DiagnosticDescriptor PositionalRecordStructUnsupported = new(
         "FEN018",
         "Positional record struct syntax is unsupported",

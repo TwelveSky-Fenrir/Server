@@ -88,7 +88,8 @@ public sealed class QuestProgressService(
             return worldData.ItemsById.TryGetValue(itemId, out var def) ? def.Item.Sort : null;
         }
 
-        var result = QuestStateMachine.Complete(progress, state.Tribe, state.Level, questCatalog, HasItem, ItemSort);
+        var result = QuestStateMachine.Complete(progress, state.Tribe, state.Level, questCatalog, HasItem, ItemSort,
+            state.Money);
         if (!result.Success)
             return new QuestActionResult(false);
 
@@ -120,6 +121,12 @@ public sealed class QuestProgressService(
         var mirrored = await PersistAndMirrorAsync(zone, characterId, result.NewProgress, result.MoneyReward,
             result.ExperienceReward, result.KillOtherTribeCountReward, result.TeacherPointReward, edits, ct);
 
+        if (!mirrored)
+        {
+            LogDroppedQuestMirror(zone, characterId, "complete", result.NewProgress.StepPermanent);
+            return new QuestActionResult(false);
+        }
+
         var hasNumericReward = result.MoneyReward != 0 || result.ExperienceReward != 0 ||
                                result.KillOtherTribeCountReward != 0 || result.TeacherPointReward != 0;
 
@@ -139,12 +146,6 @@ public sealed class QuestProgressService(
             "Character {CharacterId} completed quest step {StepPermanent}: money {MoneyReward}, experience {ExperienceReward}, item {RewardItemId}x{RewardItemQuantity} declared={ItemRewardDeclared}",
             characterId, result.NewProgress.StepPermanent, result.MoneyReward, result.ExperienceReward,
             result.RewardItemId, result.RewardItemQuantity, itemRewardDeclared);
-
-        if (!mirrored)
-        {
-            LogDroppedQuestMirror(zone, characterId, "complete", result.NewProgress.StepPermanent);
-            return new QuestActionResult(false);
-        }
 
         return new QuestActionResult(true);
     }
@@ -178,9 +179,12 @@ public sealed class QuestProgressService(
 
         var containers = ImmutableArray.Create(new InventoryContainerSnapshot(container, projected));
         if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null), ct))
+        {
             logger.LogError(
-                "Zone {MapId} inventory inbox full: dropped quest-receive mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
+                "Zone {MapId} inventory inbox full: dropped quest-receive mirror for character {CharacterId} after the SQL commit -- tearing the session down so the client reloads the committed quest state instead of replaying the transition against stale in-memory progress",
                 zone.MapId, characterId);
+            return new QuestActionResult(false);
+        }
 
         logger.LogInformation(
             "Character {CharacterId} received quest item {ItemId} into container {Container} slot {Slot}",
@@ -273,7 +277,7 @@ public sealed class QuestProgressService(
 
         return await zone.PostQuestCommandAndWaitAsync(
             new QuestZoneCommand(characterId, newProgress, experienceDelta, killOtherTribeCountDelta,
-                edits.ToSnapshots(), TeacherPointDelta: teacherPointDelta), ct);
+                edits.ToSnapshots(), TeacherPointDelta: teacherPointDelta, MoneyDelta: deltaMoney), ct);
     }
 
     private void LogDroppedQuestMirror(Zone zone, int characterId, string transition, int stepPermanent)

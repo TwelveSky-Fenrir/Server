@@ -5,7 +5,7 @@ namespace Fenrir.Application.Game.Abstractions.ItemModification;
 
 public enum UpgradeItemRankOutcome
 {
-    Rejected,
+    Disconnected,
     NoCandidate,
     Applied
 }

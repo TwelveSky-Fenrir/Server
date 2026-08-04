@@ -18,8 +18,6 @@ public sealed partial class Zone
 
     private readonly ConcurrentQueue<int> _pendingProxyShopCloses = new();
 
-    private readonly List<int> _proxyShopNeighborScratch = [];
-
     private readonly ConcurrentDictionary<int, ProxyShopBroadcastEntry> _proxyShops = new();
 
     public int ProxyShopCount => _proxyShops.Count;
@@ -28,6 +26,7 @@ public sealed partial class Zone
     {
         entry.LastBroadcastAt = _clock;
         _proxyShops[entry.CharacterId] = entry;
+        BroadcastProxyShopState(entry, 2);
     }
 
     public void RemoveProxyShop(int characterId)
@@ -36,9 +35,9 @@ public sealed partial class Zone
             _closedProxyShopBroadcasts.Enqueue(entry);
     }
 
-    private void DrainClosedProxyShopBroadcasts()
+    private void DrainClosedProxyShopBroadcasts(int maximum)
     {
-        while (_closedProxyShopBroadcasts.TryDequeue(out var entry))
+        for (var processed = 0; processed < maximum && _closedProxyShopBroadcasts.TryDequeue(out var entry); processed++)
             BroadcastProxyShopState(entry, 3);
     }
 
@@ -99,7 +98,7 @@ public sealed partial class Zone
                 continue;
             }
 
-            BroadcastProxyShopState(entry, 0);
+            BroadcastProxyShopState(entry, 2);
         }
     }
 
@@ -111,8 +110,8 @@ public sealed partial class Zone
         if (!_grid.HasAnyNeighbor(cell))
             return;
 
-        _proxyShopNeighborScratch.Clear();
-        _grid.Neighbors(_proxyShopNeighborScratch, cell, entry.PosX, entry.PosY, entry.PosZ);
+        var recipients = new List<int>();
+        _grid.Neighbors(recipients, cell, entry.PosX, entry.PosY, entry.PosZ);
         var packet = new ProxyShopStallStateResponse
         {
             ServerIndex = entry.CharacterId,
@@ -134,7 +133,7 @@ public sealed partial class Zone
             var span = rented.AsSpan(0, total);
             FrameWriter.WriteFrame(in packet, span);
 
-            foreach (var id in _proxyShopNeighborScratch)
+            foreach (var id in recipients)
                 try
                 {
                     if (TryGetBroadcastRecipient(id, out _, out var clientSession))

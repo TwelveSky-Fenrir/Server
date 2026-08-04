@@ -1,4 +1,5 @@
 using System.Collections.Frozen;
+using Fenrir.Domain.Game.GameData;
 
 namespace Fenrir.Application.Game.Domain.World.Configuration;
 
@@ -19,6 +20,15 @@ public sealed class ZoneConfigCatalog
         ArgumentNullException.ThrowIfNull(entries);
 
         var staging = new Dictionary<int, ZoneConfig>();
+        foreach (var (mapId, policy) in ZonePolicyCatalog.Entries)
+            staging.Add(mapId, new ZoneConfig
+            {
+                MinLevel = policy.MinimumLevel,
+                MaxLevel = policy.MaximumLevel,
+                OwnerTribe = policy.PrimaryAccessCode,
+                SecondaryClassification = policy.SecondaryAccessCode
+            });
+
         foreach (var (mapId, config) in entries)
             staging[mapId] = config;
 

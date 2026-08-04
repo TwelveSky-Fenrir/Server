@@ -1,6 +1,7 @@
 using Fenrir.Application.Game.Abstractions.World;
 using Fenrir.Application.Game.Domain.Costumes;
 using Fenrir.Application.Game.Domain.Mounts;
+using Fenrir.Application.Game.Domain.StellarCores;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Data.WriteBehind;
 using Microsoft.Extensions.Hosting;
@@ -23,9 +24,11 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
     private readonly ICharacterLogoutStateRepository _logoutState;
 
     private readonly Dictionary<int, (CharacterProgressTvp Progress, CharacterPositionTvp Position,
+            CharacterLogoutStateTvp LogoutState,
             List<CharacterCostumeSlotTvp> Costumes, List<CharacterBuffSlotTvp> Buffs,
-            List<CharacterMountSlotTvp> Mounts, PlayerRuntimeState
-            CapturedState, int CapturedWarPoint, int CapturedBloodCoin)>
+            List<CharacterMountSlotTvp> Mounts, List<CharacterStellarCoreSlotTvp> StellarCores, PlayerRuntimeState
+            CapturedState, PlayerLogoutSnapshot? CapturedLogoutSnapshot, int CapturedWarPoint, int CapturedBloodCoin,
+            TaskCompletionSource Completion)>
         _pendingDisconnectRetries = new();
 
     private readonly ZoneRegistry _zones;
@@ -50,14 +53,17 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
 
                     var rows = new List<CharacterPositionTvp>(dirty.Count);
                     var logoutRows = new List<CharacterLogoutStateTvp>(dirty.Count);
+                    var capturedLogoutSnapshots = new List<(PlayerRuntimeState State, PlayerLogoutSnapshot Snapshot)>();
 
                     foreach (var (characterId, flags) in dirty)
                     {
                         if (!zones.TryGetPlayer(characterId, out var state))
                             continue;
 
-                        logoutRows.Add(new CharacterLogoutStateTvp(characterId, state.FlushSequence, state.MapId,
-                            (int)state.PosX, (int)state.PosY, (int)state.PosZ, state.Life, state.Mana));
+                        var logoutSnapshot = state.LogoutSnapshot;
+                        logoutRows.Add(CreateLogoutStateRow(state, logoutSnapshot));
+                        if (logoutSnapshot is { } capturedSnapshot)
+                            capturedLogoutSnapshots.Add((state, capturedSnapshot));
 
                         if ((flags & DirtyFlags.Position) == 0)
                             continue;
@@ -68,6 +74,9 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
 
                     await characters.PersistPositionsAsync(rows, ct).ConfigureAwait(false);
                     await logoutState.PersistBatchAsync(logoutRows, ct).ConfigureAwait(false);
+
+                    foreach (var (state, snapshot) in capturedLogoutSnapshots)
+                        state.AcknowledgePersistedLogoutSnapshot(snapshot);
                 }
                 finally
                 {
@@ -83,7 +92,8 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
         ReleaseDisconnectRetrySignal();
     }
 
-    public async ValueTask FlushCharacterNowAsync(int characterId, CancellationToken ct)
+    public async ValueTask<bool> FlushCharacterNowAsync(int characterId, CancellationToken ct,
+        bool queueOnFailure = true)
     {
         await _flushGate.WaitAsync(ct).ConfigureAwait(false);
         try
@@ -93,10 +103,11 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
                 _logger.LogDebug(
                     "FlushCharacterNowAsync({CharacterId}): character not found in any zone's live registry -- nothing to persist",
                     characterId);
-                return;
+                return false;
             }
 
-            await PersistFinalFlushAsync(state, ct).ConfigureAwait(false);
+            var persistence = await PersistFinalFlushAsync(state, ct, queueOnFailure).ConfigureAwait(false);
+            return persistence.IsDurablyPersisted;
         }
         finally
         {
@@ -104,12 +115,13 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
         }
     }
 
-    public async ValueTask FlushCharacterSnapshotAsync(PlayerRuntimeState snapshot, CancellationToken ct)
+    public async ValueTask<CharacterSnapshotPersistence> FlushCharacterSnapshotAsync(PlayerRuntimeState snapshot,
+        CancellationToken ct)
     {
         await _flushGate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            await PersistFinalFlushAsync(snapshot, ct).ConfigureAwait(false);
+            return await PersistFinalFlushAsync(snapshot, ct, true).ConfigureAwait(false);
         }
         finally
         {
@@ -125,11 +137,14 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
         _disconnectRetrySignal.Dispose();
     }
 
-    private async ValueTask PersistFinalFlushAsync(PlayerRuntimeState state, CancellationToken ct)
+    private async ValueTask<CharacterSnapshotPersistence> PersistFinalFlushAsync(PlayerRuntimeState state, CancellationToken ct,
+        bool queueOnFailure)
     {
         var characterId = state.CharacterId;
         var warPoint = state.WarPoint;
         var bloodCoin = state.BloodCoin;
+        var logoutSnapshot = state.LogoutSnapshot;
+        var logoutRow = CreateLogoutStateRow(state, logoutSnapshot);
 
         var progressRow = new CharacterProgressTvp(characterId, state.FlushSequence, state.Level, state.Level2,
             state.Experience, state.Life, state.MaxLife, state.Mana, state.MaxMana, state.StatVit, state.StatStr,
@@ -198,7 +213,8 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
             AnimalDoubleExp: state.AnimalDoubleExp,
             DmgBoost: state.DmgBoost,
             HPBoost: state.HPBoost,
-            CriBoost: state.CriBoost);
+            CriBoost: state.CriBoost,
+            StellarCoreIndex: state.StellarCoreIndex);
 
         var positionRow = new CharacterPositionTvp(characterId, state.FlushSequence, state.MapId, state.PosX,
             state.PosY, state.PosZ, state.Heading);
@@ -209,30 +225,81 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
         var mountRows = new List<CharacterMountSlotTvp>();
         MountPersistenceCodec.AppendOccupiedSlots(mountRows, characterId, state);
 
+        var stellarCoreRows = new List<CharacterStellarCoreSlotTvp>();
+        StellarCorePersistenceCodec.AppendOccupiedSlots(stellarCoreRows, characterId, state);
+
         var buffRows = new List<CharacterBuffSlotTvp>();
         if (state.IsMovingZone)
             AppendOccupiedBuffSlots(buffRows, characterId, state);
 
         try
         {
-            await _characters.PersistFinalFlushAsync(progressRow, positionRow, costumeRows, buffRows, mountRows, ct)
+            var flushResult = await _characters
+                .PersistFinalFlushAsync(progressRow, positionRow, costumeRows, buffRows, mountRows, ct, stellarCoreRows)
                 .ConfigureAwait(false);
+
+            if (!flushResult.WasApplied && !flushResult.WasAlreadyApplied)
+            {
+                var queued = queueOnFailure
+                    ? QueueDisconnectRetry(characterId, progressRow, positionRow, logoutRow, costumeRows, buffRows,
+                        mountRows, stellarCoreRows, state, logoutSnapshot, warPoint, bloodCoin)
+                    : null;
+                _logger.LogError(
+                    "Final flush for character {CharacterId} was rejected because a newer flush sequence is already durable",
+                    characterId);
+                return queued is null ? new CharacterSnapshotPersistence(Task.FromException(new InvalidOperationException(
+                    $"Final flush for character {characterId} was rejected."))) : new CharacterSnapshotPersistence(queued.Task);
+            }
 
             state.PersistedWarPoint = warPoint;
             state.PersistedBloodCoin = bloodCoin;
 
-            var logoutRow = new CharacterLogoutStateTvp(characterId, state.FlushSequence, state.MapId,
-                (int)state.PosX, (int)state.PosY, (int)state.PosZ, state.Life, state.Mana);
-            await _logoutState.PersistBatchAsync([logoutRow], ct).ConfigureAwait(false);
+            try
+            {
+                await _logoutState.PersistBatchAsync([logoutRow], ct).ConfigureAwait(false);
+                if (logoutSnapshot is { } capturedSnapshot)
+                    state.AcknowledgePersistedLogoutSnapshot(capturedSnapshot);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException && !queueOnFailure)
+            {
+                _logger.LogError(ex,
+                    "Character {CharacterId} handoff state was persisted, but its auxiliary logout row could not be updated",
+                    characterId);
+            }
+
+            return CharacterSnapshotPersistence.Persisted;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _pendingDisconnectRetries[characterId] =
-                (progressRow, positionRow, costumeRows, buffRows, mountRows, state, warPoint, bloodCoin);
+            var queued = queueOnFailure
+                ? QueueDisconnectRetry(characterId, progressRow, positionRow, logoutRow, costumeRows, buffRows,
+                    mountRows, stellarCoreRows, state, logoutSnapshot, warPoint, bloodCoin)
+                : null;
             _logger.LogError(ex,
-                "Failed to persist final Position/Vitals/Progression state for character {CharacterId} on disconnect -- queued for retry until it succeeds",
+                queueOnFailure
+                    ? "Failed to persist final Position/Vitals/Progression state for character {CharacterId} on disconnect -- queued for retry until it succeeds"
+                    : "Failed to persist final Position/Vitals/Progression state for character {CharacterId} during zone handoff -- caller must roll back",
                 characterId);
+            return queued is null ? new CharacterSnapshotPersistence(Task.FromException(ex)) :
+                new CharacterSnapshotPersistence(queued.Task);
         }
+    }
+
+    private TaskCompletionSource QueueDisconnectRetry(int characterId, CharacterProgressTvp progress,
+        CharacterPositionTvp position, CharacterLogoutStateTvp logoutState,
+        List<CharacterCostumeSlotTvp> costumes, List<CharacterBuffSlotTvp> buffs,
+        List<CharacterMountSlotTvp> mounts, List<CharacterStellarCoreSlotTvp> stellarCores,
+        PlayerRuntimeState state, PlayerLogoutSnapshot? logoutSnapshot, int warPoint, int bloodCoin)
+    {
+        if (_pendingDisconnectRetries.TryGetValue(characterId, out var existing))
+            return existing.Completion;
+
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _pendingDisconnectRetries.Add(characterId,
+            (progress, position, logoutState, costumes, buffs, mounts, stellarCores, state, logoutSnapshot, warPoint,
+                bloodCoin, completion));
+        ReleaseDisconnectRetrySignal();
+        return completion;
     }
 
     private static void AppendOccupiedBuffSlots(List<CharacterBuffSlotTvp> destination, int characterId,
@@ -250,6 +317,16 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
 
             destination.Add(new CharacterBuffSlotTvp(characterId, (byte)slot, value, Math.Max(0, remainingTicks)));
         }
+    }
+
+    private static CharacterLogoutStateTvp CreateLogoutStateRow(PlayerRuntimeState state,
+        PlayerLogoutSnapshot? snapshot)
+    {
+        return snapshot is { } captured
+            ? new CharacterLogoutStateTvp(state.CharacterId, captured.FlushSequence, captured.MapId,
+                captured.PosX, captured.PosY, captured.PosZ, captured.Life, captured.Mana)
+            : new CharacterLogoutStateTvp(state.CharacterId, state.FlushSequence, state.MapId,
+                (int)state.PosX, (int)state.PosY, (int)state.PosZ, state.Life, state.Mana);
     }
 
     private void ReleaseDisconnectRetrySignal()
@@ -304,28 +381,34 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
 
             foreach (var characterId in _pendingDisconnectRetries.Keys.ToArray())
             {
-                var (progressRow, positionRow, costumeRows, buffRows, mountRows, capturedState, capturedWarPoint,
-                    capturedBloodCoin) = _pendingDisconnectRetries[characterId];
-
-                if (_zones.TryGetPlayer(characterId, out var liveState) && !ReferenceEquals(liveState, capturedState))
-                {
-                    _pendingDisconnectRetries.Remove(characterId);
-                    _logger.LogWarning(
-                        "Discarding stale queued disconnect-time flush for character {CharacterId} -- a new session's live state now supersedes the queued snapshot",
-                        characterId);
-                    continue;
-                }
+                var (progressRow, positionRow, logoutRow, costumeRows, buffRows, mountRows, stellarCoreRows,
+                    capturedState, capturedLogoutSnapshot, capturedWarPoint, capturedBloodCoin, completion) =
+                    _pendingDisconnectRetries[characterId];
 
                 try
                 {
-                    await _characters
-                        .PersistFinalFlushAsync(progressRow, positionRow, costumeRows, buffRows, mountRows, ct)
+                    var flushResult = await _characters
+                        .PersistFinalFlushAsync(progressRow, positionRow, costumeRows, buffRows, mountRows, ct,
+                            stellarCoreRows)
                         .ConfigureAwait(false);
+
+                    if (!flushResult.WasApplied && !flushResult.WasAlreadyApplied)
+                    {
+                        _logger.LogError(
+                            "Queued final flush for character {CharacterId} was rejected because a newer flush sequence is already durable",
+                            characterId);
+                        continue;
+                    }
+
+                    await _logoutState.PersistBatchAsync([logoutRow], ct).ConfigureAwait(false);
+                    if (capturedLogoutSnapshot is { } snapshot)
+                        capturedState.AcknowledgePersistedLogoutSnapshot(snapshot);
 
                     capturedState.PersistedWarPoint = Math.Max(capturedState.PersistedWarPoint, capturedWarPoint);
                     capturedState.PersistedBloodCoin = Math.Max(capturedState.PersistedBloodCoin, capturedBloodCoin);
 
                     _pendingDisconnectRetries.Remove(characterId);
+                    completion.TrySetResult();
                 }
                 catch (Exception ex)
                 {

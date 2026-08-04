@@ -18,9 +18,9 @@ public sealed partial class Zone
         return _holyStoneForcedReturnInbox.Writer.TryWrite(new HolyStoneForcedReturnZoneCommand(characterId));
     }
 
-    private void DrainHolyStoneForcedReturnCommands()
+    private void DrainHolyStoneForcedReturnCommands(int maximum)
     {
-        while (_holyStoneForcedReturnInbox.Reader.TryRead(out var command))
+        for (var processed = 0; processed < maximum && _holyStoneForcedReturnInbox.Reader.TryRead(out var command); processed++)
             try
             {
                 ApplyHolyStoneForcedReturn(command.CharacterId);

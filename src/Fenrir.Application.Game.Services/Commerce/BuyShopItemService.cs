@@ -6,6 +6,7 @@ using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Social.Pshop;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Domain.World.Loot;
 using Fenrir.Application.Game.Domain.World.Npcs;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Domain.Game.GameData;
@@ -23,6 +24,8 @@ public sealed class BuyShopItemService(
     ILogger<BuyShopItemService> logger) : IBuyShopItemService
 {
     private const int SellerMoneyCapExceededErrorNumber = 50275;
+
+    private const int BuyerInsufficientFundsErrorNumber = 50222;
 
     private const int ProxyBigMoneyCapExceededErrorNumber = 50273;
 
@@ -134,9 +137,38 @@ public sealed class BuyShopItemService(
         PlayerRuntimeState buyer, PlayerRuntimeState seller, PshopPurchasePolicy.SlotView slot,
         CancellationToken cancellationToken)
     {
+        using var shopLease = await PersonalShopBusinessLock.AcquireAsync(seller.CharacterId, cancellationToken);
+
+        if (!seller.PshopOpen || seller.PshopListing is not { } currentListing)
+        {
+            logger.LogInformation("Buy shop item rejected: seller {SellerId} closed the shop before commit",
+                seller.CharacterId);
+            return new BuyShopItemCommitResult(false, BuildReply(2, 0, 0, 0), null);
+        }
+
+        if (currentListing.UniqueNumber != packet.UniqueNumber ||
+            PshopPurchasePolicy.ReadSlot(currentListing, packet.Page1, packet.Index1) != slot)
+        {
+            logger.LogInformation(
+                "Buy shop item rejected: seller {SellerId} listing changed before commit for slot {Page1}/{Index1}",
+                seller.CharacterId, packet.Page1, packet.Index1);
+            return new BuyShopItemCommitResult(false, BuildReply(4, 0, 0, 0), null);
+        }
+
+        if (slot.Price is < 1 or > PshopPurchasePolicy.MaxSellPrice || buyer.Money < slot.Price)
+        {
+            logger.LogInformation(
+                "Buy shop item rejected: buyer {BuyerId} has insufficient funds for seller {SellerId} price {Price}",
+                buyer.CharacterId, seller.CharacterId, slot.Price);
+            return new BuyShopItemCommitResult(false, BuildReply(5, 0, 0, 0), null);
+        }
+
         var liveSellerStack = seller.Inventory.GetSlot((byte)slot.InventoryPage, (byte)slot.InventoryIndex);
         if (liveSellerStack is not { } liveStack || liveStack.ItemId != slot.ItemId ||
-            liveStack.Quantity != slot.Quantity || liveStack.Value() != slot.Value)
+            liveStack.Quantity != slot.Quantity || liveStack.Value() != slot.Value || liveStack.Serial != slot.Serial ||
+            liveStack.XPos != slot.PosX || liveStack.YPos != slot.PosY ||
+            liveStack.SocketGem1 != slot.SocketGem1 || liveStack.SocketGem2 != slot.SocketGem2 ||
+            liveStack.SocketGem3 != slot.SocketGem3)
         {
             logger.LogInformation(
                 "Buy shop item rejected: buyer {BuyerId}/seller {SellerId} slot {Page1}/{Index1} changed since it was listed (stale purchase)",
@@ -149,6 +181,15 @@ public sealed class BuyShopItemService(
             logger.LogWarning(
                 "Buy shop item rejected: buyer {BuyerId}/seller {SellerId} item {ItemId} is unresolvable in the world data catalog",
                 buyer.CharacterId, seller.CharacterId, slot.ItemId);
+            return new BuyShopItemCommitResult(true, null, null);
+        }
+
+        if (ContainerMatrix.IsStackableSort(itemDefinition.Item.Sort) &&
+            slot.Quantity is < 1 or > GroundItemPickupPolicy.MaxStackQuantity)
+        {
+            logger.LogWarning(
+                "Buy shop item rejected: seller {SellerId} listing has an invalid stack quantity {Quantity}",
+                seller.CharacterId, slot.Quantity);
             return new BuyShopItemCommitResult(true, null, null);
         }
 
@@ -178,12 +219,13 @@ public sealed class BuyShopItemService(
         }
         catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException
                                                 {
-                                                    Number: SellerMoneyCapExceededErrorNumber
+                                                    Number: SellerMoneyCapExceededErrorNumber or
+                                                        BuyerInsufficientFundsErrorNumber
                                                 })
         {
             logger.LogInformation(
-                "PShop purchase blocked: crediting {Price} to seller {SellerId} would exceed the maximum money value (buyer {BuyerId})",
-                slot.Price, seller.CharacterId, buyer.CharacterId);
+                "PShop purchase blocked: seller {SellerId} cannot be credited or buyer {BuyerId} cannot be debited by {Price}",
+                seller.CharacterId, buyer.CharacterId, slot.Price);
             return new BuyShopItemCommitResult(false, BuildReply(5, 0, 0, 0), null);
         }
         catch (Exception ex)
@@ -216,14 +258,9 @@ public sealed class BuyShopItemService(
                 "Zone {MapId} inventory inbox full: dropped PShop-buy seller mirror for character {CharacterId}",
                 zone.MapId, seller.CharacterId);
 
-        var stillHasItems = HasAnyOtherOccupiedSlot(seller.PshopListing, packet.Page1, packet.Index1);
-
         var sellerSoldNotification = BuildReply(6, slot.Price, packet.Page1, packet.Index1, newStack);
 
-        await zone.PostPshopCommandAndWaitAsync(
-            new PshopZoneCommand(seller.CharacterId, !stillHasItems, packet.Page1, packet.Index1,
-                sellerSoldNotification),
-            cancellationToken);
+        var stillHasItems = HasAnyOtherOccupiedSlot(seller.PshopListing, packet.Page1, packet.Index1);
 
         logger.LogInformation(
             "PShop purchase completed: buyer {BuyerId} bought item {ItemId} x{Quantity} from seller {SellerId} for {Price} (seller shop {SellerShopState})",
@@ -232,18 +269,38 @@ public sealed class BuyShopItemService(
 
         var listingRefresh = new ViewShopStallResponse { Result = 0, PshopInfo = seller.PshopListing!.Value };
 
-        return new BuyShopItemCommitResult(false, response, listingRefresh);
+        return new BuyShopItemCommitResult(false, response, listingRefresh, seller.CharacterId,
+            sellerSoldNotification, !stillHasItems);
     }
 
     public async ValueTask<BuyShopItemCommitResult> CommitProxyPurchaseAsync(BuyShopItemRequest packet, Zone zone,
         PlayerRuntimeState buyer, int sellerId, int accountId, PshopPurchasePolicy.SlotView slot,
         CancellationToken cancellationToken)
     {
+        using var shopLease = await PersonalShopBusinessLock.AcquireAsync(sellerId, cancellationToken);
+
+        if (slot.Price is < 1 or > PshopPurchasePolicy.MaxSellPrice || buyer.Money < slot.Price)
+        {
+            logger.LogInformation(
+                "Proxy PShop purchase blocked: buyer {BuyerId} has insufficient funds for seller {SellerId} price {Price}",
+                buyer.CharacterId, sellerId, slot.Price);
+            return new BuyShopItemCommitResult(false, BuildReply(5, 0, 0, 0), null);
+        }
+
         if (!worldData.ItemsById.TryGetValue(slot.ItemId, out var itemDefinition))
         {
             logger.LogWarning(
                 "Buy shop item rejected: buyer {BuyerId}/proxy seller {SellerId} item {ItemId} is unresolvable in the world data catalog",
                 buyer.CharacterId, sellerId, slot.ItemId);
+            return new BuyShopItemCommitResult(true, null, null);
+        }
+
+        if (ContainerMatrix.IsStackableSort(itemDefinition.Item.Sort) &&
+            slot.Quantity is < 1 or > GroundItemPickupPolicy.MaxStackQuantity)
+        {
+            logger.LogWarning(
+                "Proxy PShop purchase rejected: seller {SellerId} listing has an invalid stack quantity {Quantity}",
+                sellerId, slot.Quantity);
             return new BuyShopItemCommitResult(true, null, null);
         }
 
@@ -275,7 +332,8 @@ public sealed class BuyShopItemService(
         }
         catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException
                                                 {
-                                                    Number: ProxyBigMoneyCapExceededErrorNumber
+                                                    Number: ProxyBigMoneyCapExceededErrorNumber or
+                                                        BuyerInsufficientFundsErrorNumber
                                                 })
         {
             logger.LogInformation(
@@ -312,7 +370,8 @@ public sealed class BuyShopItemService(
                 "Zone {MapId} inventory inbox full: dropped proxy PShop-buy buyer mirror for character {CharacterId}",
                 zone.MapId, buyer.CharacterId);
 
-        var (shopAfterPurchase, _) = await offlineShops.GetByCharacterAsync(sellerId, cancellationToken);
+        var (shopAfterPurchase, itemsAfterPurchase) = await offlineShops.GetByCharacterAsync(sellerId,
+            cancellationToken);
         await eventLog.LogAsync(ProxyShopPurchaseEventCode, EventLogCategory.ProxyShop, accountId, buyer.CharacterId,
             null, sellerId, null, slot.Price, null, slot.ItemId, slot.Quantity, 1,
             $"Action=Purchased;Value={slot.Value};Serial={slot.Serial};ShopOwnerName={packet.AvatarName};" +
@@ -323,7 +382,8 @@ public sealed class BuyShopItemService(
             "Proxy PShop purchase completed: buyer {BuyerId} bought item {ItemId} x{Quantity} from proxy seller {SellerId} for {Price}",
             buyer.CharacterId, slot.ItemId, slot.Quantity, sellerId, slot.Price);
 
-        return new BuyShopItemCommitResult(false, response, null);
+        var removeProxyShop = !itemsAfterPurchase.Any(item => item.ItemId is > 0);
+        return new BuyShopItemCommitResult(false, response, null, ProxyShopToRemove: removeProxyShop ? sellerId : null);
     }
 
     private async ValueTask<BuyShopItemSellerResult?> TryResolveProxySellerAsync(BuyShopItemRequest packet,

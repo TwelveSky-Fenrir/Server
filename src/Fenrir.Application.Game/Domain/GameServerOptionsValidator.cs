@@ -14,6 +14,9 @@ public sealed class GameServerOptionsValidator : IValidateOptions<GameServerOpti
                 $"Game:ZoneBasePort must be between 1 and 65000 (leaving headroom for ZoneBasePort + mapId; was {options.ZoneBasePort}).");
         if (options.ShardId == 0) errors.Add("Game:ShardId must be non-zero.");
         if (string.IsNullOrWhiteSpace(options.PublicHost)) errors.Add("Game:PublicHost must not be empty.");
+        if (!GameRulesetRules.TryParse(options.Ruleset, out _))
+            errors.Add(
+                $"Game:Ruleset must be configured as Standard or ExtendedUpgrade (was '{options.Ruleset ?? "<null>"}').");
         if (options.TicketTtlSeconds <= 0)
             errors.Add($"Game:TicketTtlSeconds must be positive (was {options.TicketTtlSeconds}).");
         if (options.ShardReachabilityProbeTimeoutMilliseconds <= 0)

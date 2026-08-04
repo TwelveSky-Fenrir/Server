@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.ItemModification;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Forge;
 using Fenrir.Application.Game.Domain.Inventory;
@@ -17,7 +18,6 @@ public sealed class UpgradeItemRankService(
     ICharacterRepository characters,
     WorldDataCache worldData,
     IEventLogQueue eventLogQueue,
-    WarlordPityLockState warlordPityLock,
     ILogger<UpgradeItemRankService> logger)
     : IUpgradeItemRankService
 {
@@ -42,7 +42,7 @@ public sealed class UpgradeItemRankService(
             logger.LogDebug(
                 "Character {CharacterId} upgrade-item-rank rejected: invalid slot(s) ({Page1}:{Index1} / {Page2}:{Index2})",
                 characterId, page1, index1, page2, index2);
-            return new UpgradeItemRankResult(UpgradeItemRankOutcome.Rejected, false, 0, [0, 0, 0, 0, 0, 0]);
+            return AbortAndDisconnect(state, characterId, "invalid inventory slot");
         }
 
         var today = GameDate.Today();
@@ -52,20 +52,21 @@ public sealed class UpgradeItemRankService(
             logger.LogDebug(
                 "Character {CharacterId} upgrade-item-rank rejected: rented inventory page expired (InventoryDate {InventoryDate})",
                 characterId, state.InventoryDate);
-            return new UpgradeItemRankResult(UpgradeItemRankOutcome.Rejected, false, 0, [0, 0, 0, 0, 0, 0]);
+            return AbortAndDisconnect(state, characterId, "expired inventory page");
         }
 
         var targetStack = state.Inventory.GetSlot((byte)page1, (byte)index1);
         var materialStack = state.Inventory.GetSlot((byte)page2, (byte)index2);
 
         if (targetStack is not { } target || materialStack is not { } material ||
+            target.Quantity <= 0 || material.Quantity <= 0 ||
             !worldData.ItemsById.TryGetValue(target.ItemId, out var targetDefinition) ||
             !worldData.ItemsById.TryGetValue(material.ItemId, out var materialDefinition))
         {
             logger.LogDebug(
                 "Character {CharacterId} upgrade-item-rank rejected: target or material slot empty/unresolvable",
                 characterId);
-            return new UpgradeItemRankResult(UpgradeItemRankOutcome.Rejected, false, 0, [0, 0, 0, 0, 0, 0]);
+            return AbortAndDisconnect(state, characterId, "missing or invalid target/material item");
         }
 
         var luck = state.Stats?.Luck ?? 0;
@@ -80,7 +81,7 @@ public sealed class UpgradeItemRankService(
             logger.LogInformation(
                 "Character {CharacterId} upgrade-item-rank rejected by resolver (target {TargetItemId}, material {MaterialItemId})",
                 characterId, target.ItemId, material.ItemId);
-            return new UpgradeItemRankResult(UpgradeItemRankOutcome.Rejected, false, 0, [0, 0, 0, 0, 0, 0]);
+            return AbortAndDisconnect(state, characterId, "invalid rank-upgrade eligibility");
         }
 
         if (resolved.Outcome == RankChangeResolver.RankChangeOutcome.NoCandidate)
@@ -97,21 +98,8 @@ public sealed class UpgradeItemRankService(
         var resultItemId = resolved.ResultItemId;
         var resultCombine = resolved.NewCombine;
 
-        if (succeeded && resolved.WarlordRerollEligible)
-        {
-            var warlordDraw = WarlordRerollBonusTable.TryDrawReplacement(
-                targetDefinition.Item.Sort, targetDefinition.Item.Type, state.PreviousTribe,
-                warlordPityLock, SystemRandomSource.Instance);
-
-            if (warlordDraw.Outcome != WarlordRerollBonusTable.WarlordRerollOutcome.NoCandidate)
-            {
-                resultItemId = warlordDraw.ReplacementItemId;
-                resultCombine = 1;
-
-                if (WarlordRerollBonusTable.NoticeReachesRecipients(targetDefinition.Item.Type))
-                    CenterRelayNoticeLog.LogWarlordSwap(logger, state.Tribe, state.Name, warlordDraw.ReplacementItemId);
-            }
-        }
+        if (succeeded && !worldData.ItemsById.ContainsKey(resultItemId))
+            return AbortAndDisconnect(state, characterId, "rank-upgrade result item is missing");
 
         var newTargetStack = succeeded
             ? target with
@@ -154,40 +142,13 @@ public sealed class UpgradeItemRankService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex,
-                "Character {CharacterId} upgrade-item-rank AdjustMoney...ReplaceContainer(s)Async failed (treated as insufficient funds)",
-                characterId);
-            return new UpgradeItemRankResult(UpgradeItemRankOutcome.Rejected, false, 0, [0, 0, 0, 0, 0, 0]);
+            return AbortAfterUncertainPersistence(state, characterId, ex);
         }
-
-        zone.CreditNpcServiceTribeTax(state.Tribe, resolved.Cost);
-
-        if (resolved.ConsumesLuckyCharge)
-        {
-            var newHighItemValue = state.HighItemValue - 1;
-            state.Session.Send(new AvatarStatUpdateResponse
-                { Sort = LuckyUpgradeStatSort, Value = newHighItemValue, Value2 = 0 });
-
-            if (!await zone.PostTribeProgressCommandAndWaitAsync(
-                    new TribeProgressZoneCommand(characterId, HighItemValue: newHighItemValue), cancellationToken))
-                logger.LogError(
-                    "Zone {MapId} tribe-progress inbox full: dropped lucky-upgrade charge mirror for character {CharacterId}",
-                    zone.MapId, characterId);
-        }
-
-        if (!eventLogQueue.Enqueue(new EventLogEntryTvp(UpgradeItemRankEventCode, (byte)EventLogCategory.Enchant,
-                null, characterId, null, null, null, -(long)resolved.Cost, null, target.ItemId, target.Quantity,
-                succeeded ? SuccessOutcome : FailedOutcome,
-                $"Serial={target.Serial};Material={material.ItemId};ResultItemId={(succeeded ? resultItemId : target.ItemId)}",
-                DateTime.UtcNow)))
-            logger.LogWarning(
-                "game.EventLog write-behind queue full: dropped upgrade-item-rank audit row for character {CharacterId}",
-                characterId);
 
         var value = succeeded
             ? new[]
             {
-                resultItemId, 0, 0, target.Quantity,
+                resultItemId, target.XPos, target.YPos, target.Quantity,
                 ItemValueCodec.Encode((byte)resolved.NewEnchant, (byte)resultCombine, target.Refine,
                     target.Socket),
                 target.Serial
@@ -200,11 +161,33 @@ public sealed class UpgradeItemRankService(
                 new InventoryContainerSnapshot((byte)page1, projectedTargetContainer),
                 new InventoryContainerSnapshot((byte)page2, projectedMaterialContainer));
 
-        if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
-                cancellationToken))
-            logger.LogError(
-                "Zone {MapId} inventory inbox full: dropped upgrade-item-rank mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
+        var inventoryResult = await zone.PostInventoryCommandAndWaitForResultAsync(
+            new InventoryZoneCommand(characterId, containers, null), cancellationToken);
+        if (inventoryResult.Kind != ZoneCommandResultKind.Applied)
+            return AbortAfterDurableMutation(state, characterId, "rank-upgrade inventory", inventoryResult);
+
+        if (resolved.ConsumesLuckyCharge)
+        {
+            var newHighItemValue = state.HighItemValue - 1;
+            var tribeResult = await zone.PostTribeProgressCommandAndWaitForResultAsync(
+                new TribeProgressZoneCommand(characterId, HighItemValue: newHighItemValue), cancellationToken);
+            if (tribeResult.Kind != ZoneCommandResultKind.Applied)
+                return AbortAfterDurableMutation(state, characterId, "rank-upgrade lucky-charge", tribeResult);
+
+            state.Session.Send(new AvatarStatUpdateResponse
+                { Sort = LuckyUpgradeStatSort, Value = newHighItemValue, Value2 = 0 });
+        }
+
+        zone.CreditNpcServiceTribeTax(state.Tribe, resolved.Cost);
+
+        if (!eventLogQueue.Enqueue(new EventLogEntryTvp(UpgradeItemRankEventCode, (byte)EventLogCategory.Enchant,
+                null, characterId, null, null, null, -(long)resolved.Cost, null, target.ItemId, target.Quantity,
+                succeeded ? SuccessOutcome : FailedOutcome,
+                $"Serial={target.Serial};Material={material.ItemId};ResultItemId={(succeeded ? resultItemId : target.ItemId)}",
+                DateTime.UtcNow)))
+            logger.LogWarning(
+                "game.EventLog write-behind queue full: dropped upgrade-item-rank audit row for character {CharacterId}",
+                characterId);
 
         logger.LogInformation(
             "Character {CharacterId} upgrade-item-rank applied: target {TargetItemId} succeeded={Succeeded}, cost {Cost}",
@@ -217,6 +200,33 @@ public sealed class UpgradeItemRankService(
     {
         return page is ContainerMatrix.InventoryPage0 or ContainerMatrix.InventoryPage1 &&
                ContainerMatrix.IsValidSlot((byte)page, index);
+    }
+
+    private UpgradeItemRankResult AbortAndDisconnect(PlayerRuntimeState state, int characterId, string reason)
+    {
+        logger.LogInformation("Character {CharacterId} rank-upgrade disconnected: {Reason}", characterId, reason);
+        ((IZoneSession)state.Session).Abort(DisconnectReason.Faulted);
+        return new UpgradeItemRankResult(UpgradeItemRankOutcome.Disconnected, false, 0, [0, 0, 0, 0, 0, 0]);
+    }
+
+    private UpgradeItemRankResult AbortAfterUncertainPersistence(PlayerRuntimeState state, int characterId,
+        Exception exception)
+    {
+        logger.LogError(exception,
+            "Character {CharacterId} upgrade-item-rank persistence failed after submission; durability is uncertain, disconnecting without success response",
+            characterId);
+        ((IZoneSession)state.Session).Abort(DisconnectReason.Faulted);
+        return new UpgradeItemRankResult(UpgradeItemRankOutcome.Disconnected, false, 0, [0, 0, 0, 0, 0, 0]);
+    }
+
+    private UpgradeItemRankResult AbortAfterDurableMutation(PlayerRuntimeState state, int characterId,
+        string mutation, ZoneCommandResult result)
+    {
+        logger.LogError(
+            "Character {CharacterId} upgrade-item-rank persisted but {Mutation} actor mutation was not acknowledged as applied ({Kind}: {Cause}); disconnecting without success response",
+            characterId, mutation, result.Kind, result.Cause);
+        ((IZoneSession)state.Session).Abort(DisconnectReason.Faulted);
+        return new UpgradeItemRankResult(UpgradeItemRankOutcome.Disconnected, false, 0, [0, 0, 0, 0, 0, 0]);
     }
 
     private static ImmutableDictionary<byte, ItemStack> ApplySlotChange(

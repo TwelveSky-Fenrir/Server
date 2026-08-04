@@ -38,9 +38,9 @@ public sealed partial class Zone
         return true;
     }
 
-    private void DrainPetBagCommands()
+    private void DrainPetBagCommands(int maximum)
     {
-        while (_petBagInbox.Reader.TryRead(out var command))
+        for (var processed = 0; processed < maximum && _petBagInbox.Reader.TryRead(out var command); processed++)
             try
             {
                 ApplyPetBagCommand(in command);

@@ -10,7 +10,7 @@ public sealed class PartyResyncRelayHost(
     IPartyResyncRelayRepository relay,
     IOptions<GameServerOptions> options,
     ILogger<PartyResyncRelayHost> logger)
-    : ClusterRelayPumpBase<PartyResyncRelayEntry, PartyResyncRelayDto>(
+    : AcknowledgedClusterRelayPumpBase<PartyResyncRelayEntry, PartyResyncRelayDto>(
             relay,
             options.Value.ShardId,
             QueueCapacity,
@@ -22,15 +22,20 @@ public sealed class PartyResyncRelayHost(
 
     private readonly IReadOnlyList<IPartyResyncRelayHandler> _handlers = handlers.ToArray();
 
+    protected override long GetRelayId(PartyResyncRelayDto dto)
+    {
+        return dto.RelayId;
+    }
+
     protected override async ValueTask DeliverAsync(PartyResyncRelayDto dto, CancellationToken ct)
     {
         if (_handlers.Count == 0)
         {
-            logger.LogWarning(
+            logger.LogError(
                 "Relayed party-resync row {RelayId} (sort {Sort}, party {PartyName}) has no registered " +
-                "IPartyResyncRelayHandler in this composition; dropped -- same-shard party membership is unaffected",
+                "IPartyResyncRelayHandler in this composition; it remains unacknowledged",
                 dto.RelayId, dto.Sort, dto.PartyName);
-            return;
+            throw new InvalidOperationException("No party-resync relay handler is registered.");
         }
 
         foreach (var handler in _handlers)
@@ -64,11 +69,11 @@ public sealed class PartyResyncRelayHost(
             entry.Sort, entry.PartyName, entry.SourceCharacterId, options.Value.ShardId);
     }
 
-    protected override void OnDeliveryFailed(PartyResyncRelayDto dto, Exception ex)
+    protected override void OnDeliveryOrAcknowledgementFailed(PartyResyncRelayDto dto, Exception ex)
     {
         logger.LogError(ex,
-            "Failed to reconcile relayed party-resync row {RelayId} (sort {Sort}, party {PartyName}) on " +
-            "shard {ShardId}",
+            "Failed to reconcile or acknowledge relayed party-resync row {RelayId} (sort {Sort}, party " +
+            "{PartyName}) on shard {ShardId}; the cursor was not advanced",
             dto.RelayId, dto.Sort, dto.PartyName, options.Value.ShardId);
     }
 }

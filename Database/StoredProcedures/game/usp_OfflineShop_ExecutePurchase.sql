@@ -78,15 +78,17 @@ BEGIN
                                 THEN CAST(Money AS BIGINT) + CAST(@Price AS BIGINT) - 2000000000
                             ELSE CAST(Money AS BIGINT) + CAST(@Price AS BIGINT)
         END AS INT),
-        BigMoney = CASE
-                       WHEN CAST(Money AS BIGINT) + CAST(@Price AS BIGINT) > 2000000000 THEN BigMoney + 2
-                       ELSE BigMoney
-            END
+        BigMoney = CAST(CASE
+                            WHEN CAST(Money AS BIGINT) + CAST(@Price AS BIGINT) > 2000000000
+                                THEN CAST(BigMoney AS BIGINT) + 1
+                            ELSE CAST(BigMoney AS BIGINT)
+            END AS INT)
     WHERE CharacterId = @SellerCharacterId
       AND (CASE
-               WHEN CAST(Money AS BIGINT) + CAST(@Price AS BIGINT) > 2000000000 THEN BigMoney + 2
-               ELSE BigMoney
-        END) <= 999;
+               WHEN CAST(Money AS BIGINT) + CAST(@Price AS BIGINT) > 2000000000
+                   THEN CAST(BigMoney AS BIGINT) + 1
+               ELSE CAST(BigMoney AS BIGINT)
+        END) BETWEEN 0 AND 999;
 
     IF @@ROWCOUNT = 0
         THROW 50273, N'Crediting the seller''s offline-shop earnings would exceed the BigMoney cap (999).', 1;

@@ -36,9 +36,10 @@ public static class DomainServiceCollectionExtensions
         services.AddSingleton<DirtyTracker<int>>();
 
         services.AddSingleton<QuestCatalog>();
-        services.AddSingleton<KillCooldownTracker>();
-
         services.AddSingleton(BossDropCatalog.Default);
+
+        services.AddSingleton<IGroundItemSerialGenerator, ProcessWideGroundItemSerialGenerator>();
+        services.AddSingleton<GroundItemFactory>();
 
         services.AddSingleton(WarPointShopCatalog.Production);
 
@@ -47,14 +48,15 @@ public static class DomainServiceCollectionExtensions
         services.AddSingleton<ISimulationSystem, AntiCampingForcedReturnSystem>();
 
         services.AddSingleton<ISimulationSystem, AvatarOneSecondGateSystem>();
+        services.AddSingleton<ISimulationSystem, AutoHuntTickSystem>();
         services.AddSingleton<ISimulationSystem, BuffExpirySystem>();
         services.AddSingleton<ISimulationSystem, StunCountdownSystem>();
         services.AddSingleton<ISimulationSystem, DarkAttackPotionDebuffExpirySystem>();
-        services.AddSingleton<ISimulationSystem, AutoHuntTickSystem>();
         services.AddSingleton<ISimulationSystem, MeditationRegenSystem>();
         services.AddSingleton<ISimulationSystem, MonsterAiSystem>();
         services.AddSingleton<MonsterSpawnScheduler>();
         services.AddSingleton<ISimulationSystem>(static sp => sp.GetRequiredService<MonsterSpawnScheduler>());
+        services.AddSingleton<ISimulationSystem, SpecialMonsterLifetimeSystem>();
 
         services.AddSingleton(static provider =>
             MonsterBossSummonCatalog.BuildFrom(provider.GetRequiredService<WorldDataCache>()));
@@ -106,12 +108,15 @@ public static class DomainServiceCollectionExtensions
 
         services.AddSingleton<ISimulationSystem, TribeSymbolDamageModifierSystem>();
 
-        services.AddSingleton(Zone175LabyrinthConfig.Disabled);
+        services.AddSingleton(static provider =>
+            Zone175LabyrinthConfig.Create(provider.GetRequiredService<IOptions<GameServerOptions>>().Value.Zones));
         services.AddSingleton<ISimulationSystem, Zone175LabyrinthSystem>();
 
         services.AddSingleton<ISimulationSystem, DeathGateTickSystem>();
 
         services.AddSingleton<ZoneRegistry>();
+
+        services.AddSingleton<CharacterPresenceOwnership>();
 
         services.AddSingleton<RegularWarActiveMapTracker>();
 

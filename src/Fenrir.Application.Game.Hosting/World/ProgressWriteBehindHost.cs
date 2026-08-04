@@ -1,5 +1,6 @@
 using Fenrir.Application.Game.Domain.Costumes;
 using Fenrir.Application.Game.Domain.Mounts;
+using Fenrir.Application.Game.Domain.StellarCores;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Data.WriteBehind;
 
@@ -14,6 +15,7 @@ public sealed class ProgressWriteBehindHost(ZoneRegistry zones, ICharacterReposi
         var rows = new List<CharacterProgressTvp>(dirty.Count);
         var costumes = new List<CharacterCostumeSlotTvp>();
         var mounts = new List<CharacterMountSlotTvp>();
+        var stellarCores = new List<CharacterStellarCoreSlotTvp>();
         List<(PlayerRuntimeState State, int WarPoint, int BloodCoin)>? credited = null;
 
         foreach (var (characterId, flags) in dirty)
@@ -97,13 +99,15 @@ public sealed class ProgressWriteBehindHost(ZoneRegistry zones, ICharacterReposi
                 AnimalDoubleExp: state.AnimalDoubleExp,
                 DmgBoost: state.DmgBoost,
                 HPBoost: state.HPBoost,
-                CriBoost: state.CriBoost));
+                CriBoost: state.CriBoost,
+                StellarCoreIndex: state.StellarCoreIndex));
 
             CostumePersistenceCodec.AppendOccupiedSlots(costumes, characterId, state);
             MountPersistenceCodec.AppendOccupiedSlots(mounts, characterId, state);
+            StellarCorePersistenceCodec.AppendOccupiedSlots(stellarCores, characterId, state);
         }
 
-        await characters.PersistProgressAsync(rows, costumes, mounts, ct).ConfigureAwait(false);
+        await characters.PersistProgressAsync(rows, costumes, mounts, ct, stellarCores).ConfigureAwait(false);
 
         if (credited is not null)
             foreach (var (state, warPoint, bloodCoin) in credited)

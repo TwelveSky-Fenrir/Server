@@ -10,4 +10,4 @@ CREATE TABLE runtime.RvrSiegeEventRelay
     CONSTRAINT UQ_RvrSiegeEventRelay_CorrelationId UNIQUE NONCLUSTERED (CorrelationId),
     INDEX IX_RvrSiegeEventRelay_CreatedAtUtc NONCLUSTERED (CreatedAtUtc)
 )
-    WITH (MEMORY_OPTIMIZED = ON, DURABILITY = SCHEMA_ONLY);
+    WITH (MEMORY_OPTIMIZED = ON, DURABILITY = SCHEMA_AND_DATA);

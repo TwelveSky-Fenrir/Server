@@ -9,7 +9,6 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Game.Services.Gm;
 
 public sealed class GmBlockAvatarService(
-    ZoneRegistry zones,
     IBanRepository bans,
     IEventLogRepository eventLog,
     ILogger<GmBlockAvatarService> logger) : IGmBlockAvatarService
@@ -23,7 +22,7 @@ public sealed class GmBlockAvatarService(
     private static readonly TimeSpan BlockDuration = TimeSpan.FromDays(365 * 30);
 
     public async ValueTask HandleAsync(GmBlockAvatarPayload packet, IZoneSession zoneSession,
-        CancellationToken cancellationToken)
+        Zone zone, CancellationToken cancellationToken)
     {
         if (!zoneSession.IsGm)
         {
@@ -37,9 +36,14 @@ public sealed class GmBlockAvatarService(
             return;
         }
 
-        var callerCharacterId = zoneSession.CharacterId!.Value;
+        if (zoneSession.AccountId is not { } callerAccountId || zoneSession.CharacterId is not { } callerCharacterId)
+        {
+            logger.LogError("GM BLOCK command arrived without authenticated actor provenance");
+            zoneSession.Abort(DisconnectReason.Faulted);
+            return;
+        }
 
-        var found = zones.TryGetPlayerAndZoneByName(packet.AvatarName, out var target, out _);
+        var found = zone.TryGetPlayerByName(packet.AvatarName, out var target);
         if (!found || target!.CharacterId == callerCharacterId)
         {
             zoneSession.Send(new GenericActionResponse
@@ -50,13 +54,28 @@ public sealed class GmBlockAvatarService(
         }
 
         var targetAccountId = ((IZoneSession)target.Session).AccountId;
+        if (targetAccountId is null)
+        {
+            logger.LogError("GM BLOCK command found target character {TargetCharacterId} without an account",
+                target.CharacterId);
+            zoneSession.Abort(DisconnectReason.Faulted);
+            return;
+        }
 
-        await eventLog.LogAsync(GmActionEventCodes.Block, EventLogCategory.GmAction, zoneSession.AccountId,
-            callerCharacterId, targetAccountId, target.CharacterId, null, null, null, null, null, 1,
-            $"TargetName={target.Name}", cancellationToken);
-
-        await bans.CreateAsync(targetAccountId, target.CharacterId, BanReason.GmManualBlock,
-            DateTime.UtcNow.Add(BlockDuration), cancellationToken);
+        try
+        {
+            await bans.CreateAsync(new BanCreationRequest(targetAccountId, target.CharacterId,
+                BanReason.GmManualBlock, DateTime.UtcNow.Add(BlockDuration), callerAccountId, callerCharacterId,
+                Guid.NewGuid(), $"Command=BLOCK;Sort={GmBlockSort};TargetName={target.Name}"), cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex,
+                "GM character {GmCharacterId} could not atomically record a BLOCK ban for target {TargetCharacterId}",
+                callerCharacterId, target.CharacterId);
+            zoneSession.Abort(DisconnectReason.ProcessingFault);
+            return;
+        }
 
         logger.LogWarning(
             "GM character {GmCharacterId} blocked avatar {TargetCharacterId} ({TargetName})",

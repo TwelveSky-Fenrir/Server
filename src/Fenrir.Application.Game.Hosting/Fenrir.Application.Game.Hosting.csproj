@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Fenrir.Application.Game\Fenrir.Application.Game.csproj"/>
+    <ProjectReference Include="..\Fenrir.Application.Game.Services\Fenrir.Application.Game.Services.csproj"/>
     <ProjectReference Include="..\Fenrir.Core\Fenrir.Core.csproj"/>
     <ProjectReference Include="..\Fenrir.Protocol.Game\Fenrir.Protocol.Game.csproj"/>
     <ProjectReference Include="..\Fenrir.Network\Fenrir.Network.csproj"/>

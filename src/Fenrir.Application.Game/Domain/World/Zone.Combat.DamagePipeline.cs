@@ -48,16 +48,20 @@ public sealed partial class Zone
             switch (kind)
             {
                 case CrossAvatarAttackKind.EnemyTribe:
-                    ApplyPvpKillRewards(defenderState, attackerState);
-                    RegisterRegularWarKill(defenderState, false);
-                    RecordEnemyKillForFeed(defenderState, attackerState, false,
-                        regularWarActiveMapTracker?.IsBattleInProgress(MapId) == true ||
-                        MapId == KillFeedZoneCatalog.FfaMapNumber);
+                    if (QueuePvpKillRewardClaim(defenderState, attackerState) == PvpKillRewardOutcome.Granted)
+                    {
+                        RegisterRegularWarKill(defenderState, false);
+                        RecordEnemyKillForFeed(defenderState, attackerState, false,
+                            regularWarActiveMapTracker?.IsBattleInProgress(MapId) == true ||
+                            MapId == KillFeedZoneCatalog.FfaMapNumber);
+                    }
+
                     ApplyDeath(attackerState.CharacterId, DeathCause.PlayerKill,
-                        (defenderState.PosX, defenderState.PosZ));
+                        (defenderState.PosX, defenderState.PosZ), originSort: 1, deathSkillNumber: 3);
                     break;
                 case CrossAvatarAttackKind.Duel:
-                    ApplyDeath(attackerState.CharacterId, DeathCause.Duel, (defenderState.PosX, defenderState.PosZ));
+                    ApplyDeath(attackerState.CharacterId, DeathCause.Duel, (defenderState.PosX, defenderState.PosZ),
+                        originSort: 2, deathSkillNumber: 1);
                     break;
             }
 

@@ -1,5 +1,7 @@
+using Fenrir.Application.Game.Abstractions.Chat;
 using Fenrir.Application.Game.Abstractions.World;
 using Fenrir.Application.Game.Domain;
+using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Configuration;
@@ -12,9 +14,11 @@ using Fenrir.Application.Game.Hosting.Guilds;
 using Fenrir.Application.Game.Hosting.Progression;
 using Fenrir.Application.Game.Hosting.Simulation;
 using Fenrir.Application.Game.Hosting.World;
+using Fenrir.Application.Game.Hosting.World.DurableEvents;
 using Fenrir.Application.Game.Hosting.World.Monsters;
 using Fenrir.Application.Game.Hosting.World.WorldState;
 using Fenrir.Application.Game.Hosting.World.ZoneWar;
+using Fenrir.Application.Game.Services.ZoneWar;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Domain.Game.GameData;
 using Fenrir.Network.Dispatch.FloodProtection;
@@ -64,6 +68,11 @@ public static class HostingServiceCollectionExtensions
         services.AddHostedService(sp => sp.GetRequiredService<EventLogFlushHost>());
 
         services.AddHostedService<MonsterLootFlushHost>();
+        services.AddSingleton<PvpKillCooldownClaimHost>();
+        services.AddSingleton<IPvpKillCooldownClaimQueue>(sp => sp.GetRequiredService<PvpKillCooldownClaimHost>());
+        services.AddHostedService(sp => sp.GetRequiredService<PvpKillCooldownClaimHost>());
+        services.AddSingleton(sp => new Lazy<IPvpKillCooldownClaimQueue>(
+            sp.GetRequiredService<IPvpKillCooldownClaimQueue>));
         services.AddHostedService<ProxyShopExpiryFlushHost>();
         services.AddHostedService<DeathEventLogFlushHost>();
 
@@ -76,6 +85,10 @@ public static class HostingServiceCollectionExtensions
         services.AddSingleton<ICharacterWriteBehindFlusher>(sp => sp.GetRequiredService<PositionWriteBehindHost>());
         services.AddHostedService(sp => sp.GetRequiredService<PositionWriteBehindHost>());
 
+        services.TryAddSingleton<IWorldEventLocalDeliveryPort, WorldStateWorldEventLocalDeliveryPort>();
+        services.AddHostedService<WorldOutboxDispatcherHost>();
+
+        services.AddSingleton<GameConnectionReadiness>();
         services.AddHostedService<GameServerDirectoryHeartbeat>();
         services.AddHostedService<HeroRankingRolloverHost>();
         services.AddHostedService<GameConnectionHost>();
@@ -148,24 +161,27 @@ public static class HostingServiceCollectionExtensions
         services.TryAddSingleton<ITribePointRosterGateway, LoggingOnlyTribePointRosterGateway>();
         services.AddSingleton<TribePointLevelRecomputeService>();
 
-        services.AddSingleton<FavoredTribeRankBonusLadderService>();
         services.AddHostedService<TribePointRecomputeHost>();
     }
 
     private static void AddZoneWar(IServiceCollection services)
     {
         services.AddSingleton<TribeVoteElection>();
+        services.AddSingleton<IZoneEventRelayOutboxWakeSignal, ZoneEventRelayOutboxWakeSignal>();
         services.AddSingleton<IWorldEventUplink, WorldEventUplink>();
         services.AddSingleton<ZoneEventBroadcaster>();
 
         services.AddSingleton<ZoneCenterSiegeState>();
         services.AddSingleton<Zone051Zone053SiegeState>();
+        services.AddSingleton(sp => new SecondarySiegeEventAdmission(
+            sp.GetRequiredService<IOptions<GameServerOptions>>().Value.SecondarySiegeContentEnabled));
         services.AddSingleton<AllianceProposalCenterState>();
         services.AddSingleton<ZoneCenterBroadcastIngestor>();
 
 
         services.TryAddSingleton<IZone039MonsterSummonResetGateway, Zone039MonsterSummonResetGateway>();
         services.AddSingleton<Zone039ArmingReactor>();
+        services.AddSingleton<IDailyResetZoneEventPublisher, DailyResetZoneEventPublisher>();
         services.AddSingleton<DailyResetBroadcaster>();
         services.AddHostedService<DailyResetBroadcastHost>();
         services.AddHostedService<PopupEventScheduleHost>();
@@ -173,6 +189,12 @@ public static class HostingServiceCollectionExtensions
         services.AddSingleton<Zone335StartTrigger>();
 
         services.AddSingleton<ISimulationSystem, Zone335FfaEventCycleSystem>();
+
+        services.AddSingleton<Zone38BossSchedule>();
+        services.AddSingleton(sp =>
+            new Lazy<IWorldNoticeService>(sp.GetRequiredService<IWorldNoticeService>()));
+        services.AddSingleton<IZone38BossScheduleEffects, Zone38BossScheduleEffects>();
+        services.AddSingleton<ISimulationSystem, Zone38BossScheduleSystem>();
 
         services.AddSingleton(sp => new Lazy<ZoneEventBroadcaster>(sp.GetRequiredService<ZoneEventBroadcaster>));
 
@@ -182,7 +204,13 @@ public static class HostingServiceCollectionExtensions
         services.AddSingleton(sp => new Lazy<ZoneRegistry>(sp.GetRequiredService<ZoneRegistry>));
 
         services.AddSingleton<Zone195NokSanState>();
-        services.AddSingleton(Zone195NokSanSiteCatalog.Legacy);
+        services.AddSingleton<Zone195NokSanStateService>();
+        services.AddSingleton<Zone195NokSanWriteBehindHost>();
+        services.AddHostedService(static provider => provider.GetRequiredService<Zone195NokSanWriteBehindHost>());
+        services.AddSingleton<ValleyWarCampaignStateService>();
+        services.AddSingleton<ValleyWarCampaignWriteBehindHost>();
+        services.AddHostedService(static provider => provider.GetRequiredService<ValleyWarCampaignWriteBehindHost>());
+        services.AddSingleton(Zone195NokSanSiteCatalog.Default);
         services.AddSingleton<Zone195NokSanBroadcaster>();
         services.AddSingleton<IZone195NokSanBroadcaster>(sp => sp.GetRequiredService<Zone195NokSanBroadcaster>());
         services.AddSingleton(sp =>
@@ -192,7 +220,6 @@ public static class HostingServiceCollectionExtensions
         services.AddSingleton<WorldInfoBootResetVerifier>();
 
         services.AddSingleton<RvrSiegeEventRelayHost>();
-        services.AddSingleton<IRvrSiegeEventRelayQueue>(sp => sp.GetRequiredService<RvrSiegeEventRelayHost>());
         services.AddHostedService(sp => sp.GetRequiredService<RvrSiegeEventRelayHost>());
 
         services.AddSingleton<ZoneWarTickService>();
@@ -280,6 +307,7 @@ public static class HostingServiceCollectionExtensions
                 testMode: opts.HolyStoneTestMode,
                 siegeIngestor: sp.GetRequiredService<ZoneCenterBroadcastIngestor>());
         });
+        services.AddSingleton<HolyStoneWarCycleStateService>();
         services.AddHostedService<HolyStoneWarCycleHost>();
 
         services.AddSingleton(sp => new HolyStoneTerritoryEvictionSweep(

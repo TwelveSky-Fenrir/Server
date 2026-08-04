@@ -56,9 +56,9 @@ public sealed partial class Zone
         return true;
     }
 
-    private void DrainGmExperienceCommands()
+    private void DrainGmExperienceCommands(int maximum)
     {
-        while (_gmExperienceInbox.Reader.TryRead(out var command))
+        for (var processed = 0; processed < maximum && _gmExperienceInbox.Reader.TryRead(out var command); processed++)
             try
             {
                 ApplyGmSelfExperienceGrantCommand(in command);
@@ -106,12 +106,9 @@ public sealed partial class Zone
             if (toCap > 0)
                 ApplyCharacterExperienceGain(state, (int)Math.Min(toCap, int.MaxValue));
 
-            if (state.Level2 == 0)
-            {
-                var toMax = GmMaxExperience - state.Experience;
-                if (toMax > 0)
-                    ApplyCharacterExperienceGain(state, (int)Math.Min(toMax, int.MaxValue));
-            }
+            var toMax = GmMaxExperience - state.Experience;
+            if (toMax > 0)
+                ApplyCharacterExperienceGain(state, (int)Math.Min(toMax, int.MaxValue));
 
             return;
         }
@@ -147,9 +144,9 @@ public sealed partial class Zone
         }
     }
 
-    private void DrainGmZone124PartyPullCommands()
+    private void DrainGmZone124PartyPullCommands(int maximum)
     {
-        while (_gmZone124PartyPullInbox.Reader.TryRead(out var command))
+        for (var processed = 0; processed < maximum && _gmZone124PartyPullInbox.Reader.TryRead(out var command); processed++)
             try
             {
                 var pulled = ApplyGmZone124PartyPullCommand(in command);

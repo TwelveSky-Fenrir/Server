@@ -7,6 +7,22 @@ public static class PetExperienceCreditResolver
 {
     private const byte PetItemCategory = 22;
 
+    public static PetExperienceCreditResult ResolveWithZoneMultiplier(
+        int petItemId,
+        int currentGrowth,
+        int currentActivity,
+        int requestedPetExperience,
+        float zoneExperienceMultiplier,
+        FrozenDictionary<int, ItemDefinition> itemsById,
+        float growUpValue = 0f)
+    {
+        if (!float.IsFinite(zoneExperienceMultiplier) || zoneExperienceMultiplier <= 0f)
+            return PetExperienceCreditResult.Ineligible;
+
+        var scaledExperience = ApplyZoneMultiplier(requestedPetExperience, zoneExperienceMultiplier);
+        return Resolve(petItemId, currentGrowth, currentActivity, scaledExperience, itemsById, growUpValue);
+    }
+
     public static PetExperienceCreditResult Resolve(
         int petItemId,
         int currentGrowth,
@@ -32,5 +48,14 @@ public static class PetExperienceCreditResolver
 
         return new PetExperienceCreditResult(true, false, currentActivity, creditedAmount, newGrowth,
             tierIncreased);
+    }
+
+    private static int ApplyZoneMultiplier(int requestedExperience, float multiplier)
+    {
+        if (requestedExperience <= 0)
+            return requestedExperience;
+
+        var scaled = requestedExperience * (double)multiplier;
+        return scaled >= int.MaxValue ? int.MaxValue : (int)scaled;
     }
 }

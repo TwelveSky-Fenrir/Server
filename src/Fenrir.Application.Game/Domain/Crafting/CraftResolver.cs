@@ -73,7 +73,7 @@ public static class CraftResolver
             material2.ItemId != CraftRecipeCatalog.PurpleJadeItemId)
             return new JadeResult(JadeOutcome.Rejected, null);
 
-        if (material1.Quantity > 1 || material2.Quantity > 1)
+        if (material1.Quantity != 1 || material2.Quantity != 1)
             return new JadeResult(JadeOutcome.Rejected, null);
 
         var result = material1 with
@@ -118,7 +118,7 @@ public static class CraftResolver
             material4.ItemId != CraftRecipeCatalog.StoneMatMaterialItemId)
             return new StoneMatResult(StoneMatOutcome.Rejected, 0);
 
-        if (material1.Quantity > 1 || material2.Quantity > 1 || material3.Quantity > 1 || material4.Quantity > 1)
+        if (material1.Quantity != 1 || material2.Quantity != 1 || material3.Quantity != 1 || material4.Quantity != 1)
             return new StoneMatResult(StoneMatOutcome.Rejected, 0);
 
         var pool = CraftRecipeCatalog.StoneMatResultPool;
@@ -196,10 +196,10 @@ public static class CraftResolver
         int material2ItemId, int material2Quantity, int material3ItemId, int material3Quantity,
         int material4ItemId, int material4Quantity, IRandomSource random)
     {
-        if (material1ItemId != CraftRecipeCatalog.WingFeatherWhiteItemId || material1Quantity < 1 ||
-            material2ItemId != CraftRecipeCatalog.WingFeatherWhiteItemId || material2Quantity < 1 ||
-            material3ItemId != CraftRecipeCatalog.WingFeatherWhiteItemId || material3Quantity < 1 ||
-            material4ItemId != CraftRecipeCatalog.WingFeatherWhiteItemId || material4Quantity < 1)
+        if (material1ItemId != CraftRecipeCatalog.WingFeatherWhiteItemId || material1Quantity != 1 ||
+            material2ItemId != CraftRecipeCatalog.WingFeatherWhiteItemId || material2Quantity != 1 ||
+            material3ItemId != CraftRecipeCatalog.WingFeatherWhiteItemId || material3Quantity != 1 ||
+            material4ItemId != CraftRecipeCatalog.WingFeatherWhiteItemId || material4Quantity != 1)
             return new FeatherTierUpResult(FeatherTierUpOutcome.Rejected, 0);
 
         var roll = random.NextInt32(100);

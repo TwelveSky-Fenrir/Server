@@ -1,4 +1,3 @@
-using Fenrir.Application.Game.Domain.Mounts;
 using Fenrir.Application.Game.Domain.World;
 
 namespace Fenrir.Application.Game.Domain.Simulation;
@@ -8,11 +7,19 @@ public sealed class MountExpiryCountdownSystem : ISimulationSystem
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
         foreach (var state in zone.Players)
-            TickPlayer(state, legacyTicksElapsed);
+            TickPlayer(zone, state, legacyTicksElapsed);
     }
 
-    private static void TickPlayer(PlayerRuntimeState state, int legacyTicksElapsed)
+    private static void TickPlayer(Zone zone, PlayerRuntimeState state, int legacyTicksElapsed)
     {
+        state.MountActivityDecayAccrualTicks += legacyTicksElapsed;
+        var activityPulses = state.MountActivityDecayAccrualTicks / SimulationClock.MountActivityDecayLegacyTicks;
+        if (activityPulses > 0)
+        {
+            state.MountActivityDecayAccrualTicks -= activityPulses * SimulationClock.MountActivityDecayLegacyTicks;
+            zone.AdvanceMountActivity(state, activityPulses);
+        }
+
         state.MountExpiryCountdownAccrualTicks += legacyTicksElapsed;
         var minutesElapsed = state.MountExpiryCountdownAccrualTicks / SimulationClock.PlayTimeAccrualLegacyTicks;
         if (minutesElapsed <= 0)
@@ -20,12 +27,6 @@ public sealed class MountExpiryCountdownSystem : ISimulationSystem
 
         state.MountExpiryCountdownAccrualTicks -= minutesElapsed * SimulationClock.PlayTimeAccrualLegacyTicks;
 
-        if (!MountExpiryPolicy.IsExpiredWhileMounted(state.AnimalIndex, state.AnimalTime))
-            return;
-
-        state.AnimalIndex = MountExpiryPolicy.Dismounted(state.AnimalIndex);
-        state.AnimalNumber = 0;
-        state.AnimalAbsorbState = 0;
-        state.MountAutoDismountPending = true;
+        zone.AdvanceMountExpiry(state, minutesElapsed);
     }
 }

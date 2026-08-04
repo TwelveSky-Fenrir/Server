@@ -1,5 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Commerce;
 using Fenrir.Application.Game.Abstractions.Sessions;
+using Fenrir.Application.Game.Domain.Social.Pshop;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -30,6 +31,7 @@ public sealed class BuyShopItemHandler(IBuyShopItemService service, ILogger<BuyS
                 logger.LogWarning(
                     "Buy shop item rejected: character {CharacterId} request failed structural validation",
                     buyerId);
+                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             case BuyShopItemSellerOutcome.Reply:
                 logger.LogDebug(
@@ -60,12 +62,28 @@ public sealed class BuyShopItemHandler(IBuyShopItemService service, ILogger<BuyS
                     logger.LogWarning(
                         "Buy shop item rejected: buyer {BuyerId}/seller {SellerId} commit failed structural validation",
                         buyer.CharacterId, seller.CharacterId);
+                    zoneSession.Abort(DisconnectReason.Faulted);
                     return;
                 }
 
                 session.Send(commit.Response!.Value);
+
+                if (commit.SellerCharacterId is { } sellerCharacterId && commit.SellerSoldNotification is { } sold)
+                    if (!await zone.PostPshopCommandAndWaitAsync(new PshopZoneCommand(sellerCharacterId, false,
+                            packet.Page1, packet.Index1, sold), cancellationToken))
+                        logger.LogError(
+                            "Zone {MapId} pshop inbox full: dropped seller sale notification for character {CharacterId}",
+                            zone.MapId, sellerCharacterId);
+
                 if (commit.ListingRefresh is { } listingRefresh)
                     session.Send(listingRefresh);
+
+                if (commit.SellerCharacterId is { } sellerToRefresh)
+                    if (!await zone.PostPshopCommandAndWaitAsync(new PshopZoneCommand(sellerToRefresh,
+                            commit.CloseSellerShop, SendSellerListingRefresh: true), cancellationToken))
+                        logger.LogError(
+                            "Zone {MapId} pshop inbox full: dropped seller listing refresh for character {CharacterId}",
+                            zone.MapId, sellerToRefresh);
             }
             finally
             {
@@ -92,10 +110,13 @@ public sealed class BuyShopItemHandler(IBuyShopItemService service, ILogger<BuyS
                 logger.LogWarning(
                     "Buy shop item rejected: buyer {BuyerId}/proxy seller {SellerId} commit failed structural validation",
                     buyer.CharacterId, lookup.ProxySellerId);
+                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             }
 
             zoneSession.Send(commit.Response!.Value);
+            if (commit.ProxyShopToRemove is { } sellerId)
+                zone.RemoveProxyShop(sellerId);
         }
         finally
         {

@@ -65,8 +65,6 @@ public static class CraftRecipeCatalog
     public const int WingFourthTierSort = 44;
     public const int WingFifthTierSort = 45;
 
-    public const int WingSixthTierUnvalidatedSort = 46;
-
     public const int WingFourthMaterialItemId = 1407;
     public const int WingFourthCatalystItemId = 92289;
     public const int WingFourthResultItemId = 1401;
@@ -86,7 +84,7 @@ public static class CraftRecipeCatalog
 
     public const int DustRecycleWingThreshold = 15;
     public const int DustRecycleCloakThreshold = 45;
-    public const int DustRecycleAnimalThreshold = 45;
+    public const int DustRecycleAnimalThreshold = 15;
     public const int DustRecyclePet1Threshold = 15;
     public const int DustRecyclePet2Threshold = 300;
 

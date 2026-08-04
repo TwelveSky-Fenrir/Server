@@ -1,5 +1,7 @@
 using System.Buffers;
+using System.Buffers.Binary;
 using System.Threading.Channels;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Application.Game.Domain.AntiCheat;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Inventory;
@@ -53,6 +55,7 @@ public sealed partial class Zone
 
     private const int AllianceStoneFirstAttackEventCode = 48;
 
+    private const int SiegeCombatClosedPhase = 4;
 
     private const int PvpKillDropSort = 11;
 
@@ -63,6 +66,18 @@ public sealed partial class Zone
     private const int RegularWarDropStreakRequirement = 10;
 
     private const float Map38TelebornKillRadius = 1000f;
+
+    private static readonly HashSet<short> DungeonMonsterIndexMaps =
+    [
+        16, 17, 18, 22, 23, 24, 28, 29, 30, 39, 40, 41, 42, 46, 47, 48, 59, 60, 61, 62, 63, 64, 65, 66, 67,
+        68, 69, 70, 74, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117,
+        126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 144, 145, 167, 168, 169, 171, 172, 173,
+        174, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 251, 252, 253, 254, 255, 256, 257,
+        258, 259, 260, 261, 262, 263, 264, 265, 266, 313
+    ];
+
+    private static readonly HashSet<short> CompactMonsterIndexMaps =
+        [241, 242, 243, 244, 245, 246, 247, 248, 249, 292, 293, 294, 311, 312, 325, 326, 327, 328, 329, 330];
 
     private static readonly (float X, float Y, float Z)[] Map38TelebornKillControlPoints =
     [
@@ -117,7 +132,9 @@ public sealed partial class Zone
 
     private readonly HashSet<int> _combatRecipientScratch = [];
 
-    private readonly KillCooldownTracker _killCooldownTracker = killCooldownTracker ?? new KillCooldownTracker();
+    private readonly HashSet<Guid> _appliedPvpKillCooldownClaims = [];
+
+    private readonly Lazy<IPvpKillCooldownClaimQueue>? _pvpKillCooldownClaims = pvpKillCooldownClaims;
 
     private readonly HashSet<int> _pvmAttackRecipientScratch = [];
 
@@ -125,11 +142,16 @@ public sealed partial class Zone
 
     private readonly Dictionary<int, int> _regularWarKillDropStreak = new();
 
+    private readonly Lazy<ZoneCenterBroadcastIngestor>? _siegeIngestor = siegeIngestor;
+
     private readonly MonsterSpawnScheduler? _stoneSiegeAnnouncer =
         simulationSystems.OfType<MonsterSpawnScheduler>().FirstOrDefault();
 
     private readonly Zone175LabyrinthSystem? _zone175LabyrinthSystem =
         simulationSystems.OfType<Zone175LabyrinthSystem>().FirstOrDefault();
+
+    private readonly Zone335FfaEventCycleSystem? _zone335FfaEventCycle =
+        simulationSystems.OfType<Zone335FfaEventCycleSystem>().FirstOrDefault();
 
     private int _lastObservedRegularWarCycle;
 
@@ -140,9 +162,9 @@ public sealed partial class Zone
         return _combatInbox.Writer.TryWrite(command);
     }
 
-    private void DrainCombatCommands()
+    private void DrainCombatCommands(int maximum)
     {
-        while (_combatInbox.Reader.TryRead(out var command))
+        for (var processed = 0; processed < maximum && _combatInbox.Reader.TryRead(out var command); processed++)
             try
             {
                 ApplyCombatCommand(in command);
@@ -163,9 +185,6 @@ public sealed partial class Zone
         if (movementRules.IsPlausible(state.DeclaredMoveAnchorX, state.DeclaredMoveAnchorY, state.DeclaredMoveAnchorZ,
                 claimedX, claimedY, claimedZ, Geometry, options.MaxAttackPacketPositionDelta))
         {
-            state.PosX = claimedX;
-            state.PosY = claimedY;
-            state.PosZ = claimedZ;
             state.ImplausibleAttackPositionStreak = 0;
         }
         else
@@ -175,20 +194,34 @@ public sealed partial class Zone
             logger.LogWarning(
                 "Zone {MapId}: character {CharacterId} claimed an implausible attack-packet position, REJECTED -- " +
                 "server position kept (consecutive={Streak}) Case={Case} Anchor=({AnchorX},{AnchorY},{AnchorZ}) " +
-                "To=({ToX},{ToY},{ToZ}) GeometryLoaded={GeometryLoaded}",
+                "To=({ToX},{ToY},{ToZ})",
                 MapId, state.CharacterId, state.ImplausibleAttackPositionStreak, attackInfo.Case,
                 state.DeclaredMoveAnchorX, state.DeclaredMoveAnchorY, state.DeclaredMoveAnchorZ,
-                claimedX, claimedY, claimedZ, Geometry is not null);
+                claimedX, claimedY, claimedZ);
         }
-
-        var newCell = _grid.CellOf(state.PosX, state.PosZ);
-        _grid.Move(state.CharacterId, state.CurrentCell, newCell, state.PosX, state.PosY, state.PosZ);
-        state.CurrentCell = newCell;
     }
 
     private void ApplyCombatCommand(in CombatCommand command)
     {
-        if (_players.TryGetValue(command.AttackerCharacterId, out var sender) && sender.IsMovingZone)
+        if (!_players.TryGetValue(command.AttackerCharacterId, out var sender) || !IsCurrentCombatParticipant(sender))
+            return;
+
+        if (command.AttackInfo.Case != 4 && !sender.CanIssueGameplayActions)
+            return;
+
+        if (IsBlockedBySiegeCombatPhase(command.AttackInfo.Case))
+            return;
+
+        if (command.AttackInfo.Case is 1 or 2 or 3 or 5 or 6 &&
+            (command.AttackInfo.ServerIndex1 != sender.CharacterId ||
+             command.AttackInfo.UniqueNumber1 != sender.UniqueNumber))
+            return;
+
+        if (command.AttackInfo.Case is 1 or 2 or 5 or 6 &&
+            !HasCurrentPlayerTarget(command.AttackInfo))
+            return;
+
+        if (command.AttackInfo.Case is 1 or 2 or 5 && !IsActivePvpPhase())
             return;
 
         if (command.AttackInfo.Case == 1)
@@ -200,6 +233,12 @@ public sealed partial class Zone
         if (command.AttackInfo.Case == 3)
         {
             ApplyPvmAttack(command);
+            return;
+        }
+
+        if (command.AttackInfo.Case == 4)
+        {
+            ApplyMonsterAttack(command, sender);
             return;
         }
 
@@ -221,12 +260,14 @@ public sealed partial class Zone
         if (!_players.TryGetValue(command.AttackerCharacterId, out var attackerState))
             return;
 
+        if (!_players.TryGetValue(command.AttackInfo.ServerIndex2, out var defenderState))
+            return;
+        if (defenderState.IsMovingZone)
+            return;
+
         ApplySenderLocation(attackerState, command.AttackInfo);
 
         if (regularWarActiveMapTracker?.IsFightClosed(MapId) == true)
-            return;
-
-        if (!_players.TryGetValue(command.AttackInfo.ServerIndex2, out var defenderState))
             return;
 
         if (!AttackPacketBudget.TryConsume(attackerState, command.AttackInfo.AttackActionValue4))
@@ -243,7 +284,7 @@ public sealed partial class Zone
 
         var outcome = CombatResolver.ResolveEnemyTribeAttack(attackerSnapshot, defenderSnapshot,
             command.AttackInfo, _clock, attackSkill, _random,
-            ZonePvpZoneCatalog.AllowsEnemyTribeAttack(MapId),
+            AllowsEnemyTribeAttack(),
             ZonePvpZoneCatalog.IsSameTribeAttackExempt(MapId),
             ZonePvpZoneCatalog.IsNewbieProtectionZone(MapId),
             defenderState.PshopOpen, defenderState.ActionSort,
@@ -253,27 +294,20 @@ public sealed partial class Zone
             attackerState.AttackBudgetEnforced, attackerState.ActionSkillNumber,
             attackerState.ActionSkillGradeNum1 + attackerState.ActionSkillGradeNum2);
 
-        if (outcome.Rejected)
-            return;
-
         if (outcome.ChargeConsumed)
             ConsumeChargeBuff(attackerState);
 
+        if (outcome.Rejected)
+            return;
+
         var viewDamage = outcome.ViewDamage;
         var realDamage = outcome.DamageApplied;
-        var reflectFired = false;
         if (outcome.Hit)
         {
             if (TryApplyReflectAndDestroyer(attackerState, defenderState, outcome, CrossAvatarAttackKind.EnemyTribe))
-            {
-                reflectFired = true;
-                viewDamage = 0;
-                realDamage = 0;
-            }
-            else
-            {
-                (viewDamage, realDamage) = ApplyHolyShieldAbsorption(defenderState, outcome);
-            }
+                return;
+
+            (viewDamage, realDamage) = ApplyHolyShieldAbsorption(defenderState, outcome);
 
             TryApplyDarkAttackPotionProc(attackerState, defenderState);
         }
@@ -285,7 +319,7 @@ public sealed partial class Zone
             {
                 AttackResultValue = outcome.Hit ? 1 + attackerWeaponItemId : 0,
                 AttackCriticalExist = outcome.Critical ? 1 : 0,
-                AttackElementDamage = reflectFired ? 0 : outcome.ElementDamage,
+                AttackElementDamage = outcome.ElementDamage,
                 AttackViewDamageValue = viewDamage,
                 AttackRealDamageValue = realDamage
             }
@@ -300,23 +334,75 @@ public sealed partial class Zone
         var recipients = CombatRecipients(attackerState, defenderState);
         BroadcastAttackResult(recipients, response);
 
-        if (reflectFired)
-            return;
-
         defenderState.Life -= realDamage;
         defenderState.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
 
         if (defenderState.Life <= 0)
         {
             var killType = ClassifyPvpKillType(command.AttackInfo.AttackActionValue2, false);
-            ApplyPvpKillRewards(attackerState, defenderState, killType == KillCpType.Stun);
-            RegisterRegularWarKill(attackerState, killType == KillCpType.Stun);
-            RecordEnemyKillForFeed(attackerState, defenderState, killType == KillCpType.Stun,
-                regularWarActiveMapTracker?.IsBattleInProgress(MapId) == true ||
-                MapId == KillFeedZoneCatalog.FfaMapNumber);
+            var rewardOutcome = QueuePvpKillRewardClaim(attackerState, defenderState, killType == KillCpType.Stun);
+            if (rewardOutcome == PvpKillRewardOutcome.Granted)
+            {
+                RegisterRegularWarKill(attackerState, killType == KillCpType.Stun);
+                RecordEnemyKillForFeed(attackerState, defenderState, killType == KillCpType.Stun,
+                    regularWarActiveMapTracker?.IsBattleInProgress(MapId) == true ||
+                    MapId == KillFeedZoneCatalog.FfaMapNumber);
+            }
+
             ApplyDeath(defenderState.CharacterId, DeathCause.PlayerKill,
-                (attackerState.PosX, attackerState.PosZ));
+                (attackerState.PosX, attackerState.PosZ), originSort: 1, deathSkillNumber: 4);
         }
+    }
+
+    private bool HasCurrentPlayerTarget(in AttackForProtocol attackInfo)
+    {
+        return _players.TryGetValue(attackInfo.ServerIndex2, out var target) &&
+               target.UniqueNumber == attackInfo.UniqueNumber2 &&
+               IsCurrentCombatParticipant(target);
+    }
+
+    private bool IsCurrentCombatParticipant(PlayerRuntimeState state)
+    {
+        return state.Incarnation.IsValid &&
+               state.MapId == MapId &&
+               state.VisibleState != 0 &&
+               state.Stats is not null &&
+               !state.IsMovingZone &&
+               state.Session is IZoneSession
+               {
+                   State: ZoneSessionState.InWorld,
+                   CharacterId: var sessionCharacterId
+               } &&
+               sessionCharacterId == state.CharacterId;
+    }
+
+    private bool IsActivePvpPhase()
+    {
+        return MapId != PvpKillRewardZoneCatalog.FfaMapNumber ||
+               _zone335FfaEventCycle?.Phase == Zone335FfaPhase.Battle;
+    }
+
+    private bool AllowsEnemyTribeAttack()
+    {
+        return MapId == PvpKillRewardZoneCatalog.FfaMapNumber
+            ? IsActivePvpPhase()
+            : ZonePvpZoneCatalog.AllowsEnemyTribeAttack(MapId);
+    }
+
+    private bool IsBlockedBySiegeCombatPhase(int attackCase)
+    {
+        if (attackCase is not (2 or 5))
+            return false;
+
+        return MapId switch
+        {
+            49 => siegeState is { } state && state.GetZone049State(0) >= SiegeCombatClosedPhase,
+            51 => zone051Zone053SiegeState is { } state && state.GetZone051(0) >= SiegeCombatClosedPhase,
+            53 => zone051Zone053SiegeState is { } state && state.GetZone053(0) >= SiegeCombatClosedPhase,
+            194 => attackCase == 2 && siegeState is { } state && state.Zone194State >= SiegeCombatClosedPhase,
+            267 => siegeState is { } state && state.GetZone267(0) >= SiegeCombatClosedPhase,
+            _ => false
+        };
     }
 
     private void RegisterRegularWarKill(PlayerRuntimeState attackerState, bool isStunTrigger)
@@ -345,25 +431,69 @@ public sealed partial class Zone
         ClearKillFeedLeaderboard();
     }
 
-    private void ApplyPvpKillRewards(PlayerRuntimeState attackerState, PlayerRuntimeState defenderState,
+    private PvpKillRewardOutcome QueuePvpKillRewardClaim(PlayerRuntimeState attackerState, PlayerRuntimeState defenderState,
         bool isStunTrigger = false)
     {
-        if (attackerState.CharacterId == defenderState.CharacterId)
-            return;
-
-        if (PvpKillCreditGuard.IsSameOrigin(attackerState.SourceIp, defenderState.SourceIp))
-            return;
+        if (attackerState.CharacterId == defenderState.CharacterId ||
+            !IsCurrentCombatParticipant(attackerState) ||
+            !IsCurrentCombatParticipant(defenderState) ||
+            !IsActivePvpPhase())
+            return PvpKillRewardOutcome.Ineligible;
 
         var attackerCombinedLevel = attackerState.Level + attackerState.Level2;
         var defenderCombinedLevel = defenderState.Level + defenderState.Level2;
         if (attackerCombinedLevel - defenderCombinedLevel > CombinedLevelGapCap)
+            return PvpKillRewardOutcome.Ineligible;
+
+        if (PvpKillCreditGuard.IsSameOrigin(attackerState.SourceIp, defenderState.SourceIp))
+            return PvpKillRewardOutcome.Ineligible;
+
+        if (!attackerState.Incarnation.IsValid || !defenderState.Incarnation.IsValid)
+            return PvpKillRewardOutcome.RejectedNoAuthoritativeCooldown;
+
+        var claim = new PvpKillCooldownClaim(Guid.NewGuid(), MapId, attackerState.CharacterId,
+            attackerState.Incarnation.Value, defenderState.CharacterId, defenderState.Incarnation.Value,
+            isStunTrigger);
+        if (_pvpKillCooldownClaims is null || !_pvpKillCooldownClaims.Value.TryEnqueue(in claim))
+            return PvpKillRewardOutcome.RejectedNoAuthoritativeCooldown;
+
+        return PvpKillRewardOutcome.PendingAuthoritativeCooldown;
+    }
+
+    private void HandlePvpKillCooldownClaim(in PvpKillCooldownClaim claim)
+    {
+        if (!claim.IsValid || claim.MapId != MapId)
             return;
+
+        if (!_players.TryGetValue(claim.AttackerCharacterId, out var attackerState) ||
+            !_players.TryGetValue(claim.DefenderCharacterId, out var defenderState) ||
+            !attackerState.Incarnation.IsValid || !defenderState.Incarnation.IsValid ||
+            attackerState.Incarnation.Value != claim.AttackerIncarnation ||
+            defenderState.Incarnation.Value != claim.DefenderIncarnation ||
+            !defenderState.IsDead || defenderState.Life != 0 ||
+            !IsCurrentCombatParticipant(attackerState) || !IsCurrentCombatParticipant(defenderState))
+            return;
+
+        if (!_appliedPvpKillCooldownClaims.Add(claim.ClaimId))
+            return;
+
+        if (ApplyPvpKillRewardEffects(attackerState, defenderState, claim.IsStunTrigger) !=
+            PvpKillRewardOutcome.Granted)
+            return;
+
+        RegisterRegularWarKill(attackerState, claim.IsStunTrigger);
+        RecordEnemyKillForFeed(attackerState, defenderState, claim.IsStunTrigger,
+            regularWarActiveMapTracker?.IsBattleInProgress(MapId) == true ||
+            MapId == KillFeedZoneCatalog.FfaMapNumber);
+    }
+
+    private PvpKillRewardOutcome ApplyPvpKillRewardEffects(PlayerRuntimeState attackerState,
+        PlayerRuntimeState defenderState, bool isStunTrigger)
+    {
+        var attackerCombinedLevel = attackerState.Level + attackerState.Level2;
+        var defenderCombinedLevel = defenderState.Level + defenderState.Level2;
 
         NotifyPopupEventPvpKill(attackerState, defenderState);
-
-        if (!_killCooldownTracker.TryRegisterKill(attackerState.CharacterId, defenderState.CharacterId,
-                DateTime.UtcNow))
-            return;
 
         var symbolBattleActive = worldState?.World.TribeSymbolBattle ?? false;
 
@@ -389,8 +519,9 @@ public sealed partial class Zone
 
         if (profile.GrantDrop)
             DropItemsForKillOtherTribe(attackerState, defenderState);
-    }
 
+        return PvpKillRewardOutcome.Granted;
+    }
     private bool IsMap38DailyMissionKillWindowOpen(PlayerRuntimeState attackerState, bool symbolBattleActive)
     {
         if (MapId != PvpKillExtendedRewardZones.DtmZoneId)
@@ -538,24 +669,30 @@ public sealed partial class Zone
 
     private void ApplyPvpKillMountExperience(PlayerRuntimeState attackerState)
     {
-        if (attackerState.AnimalIndex is < 10 or > 19)
+        if (!MountStateResolver.TryResolveActiveMountedMount(attackerState.AnimalIndex, attackerState.AnimalNumber,
+                attackerState.MountGarage, out var slot))
             return;
 
-        var slot = attackerState.AnimalIndex % 10;
-        var mountActivity = attackerState.MountActivity[slot];
-        var mountExperience = attackerState.MountAccumulatedExp[slot];
-
-        var gain = MountKillExperienceCalculator.ComputeGain(
-            true, mountActivity, mountExperience,
-            attackerState.AnimalDoubleExp > 0, attackerState.MountExpUp,
-            options.MountKillExperiencePerKill);
-
-        if (gain <= 0)
+        if (!options.Zones.TryGetValue(MapId, out var zoneConfig))
             return;
 
-        attackerState.MountAccumulatedExp = attackerState.MountAccumulatedExp.SetItem(slot,
-            MountActivityExpCodec.ClampExp(mountExperience + gain));
-        attackerState.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+        var mountItemId = attackerState.MountGarage[slot];
+        int? authoritativeItemSort =
+            MountAnimalSortClassifier.TryResolveAuthoritativeItemSort(mountItemId, worldData.ItemsById,
+                out var itemSort)
+                ? itemSort
+                : null;
+        var credit = MountExperienceCreditResolver.Resolve(new MountExperienceCreditRequest(
+            IsMounted: true,
+            Activity: attackerState.MountActivity[slot],
+            CurrentExperience: attackerState.MountAccumulatedExp[slot],
+            DoubleExperienceActive: attackerState.AnimalDoubleExp > 0,
+            SessionExperienceUpActive: attackerState.MountExpUp,
+            BaseExperience: options.MountKillExperiencePerKill,
+            ZoneExperienceMultiplier: zoneConfig.MountExperienceRatio,
+            AuthoritativeItemSort: authoritativeItemSort));
+
+        ApplyMountExperienceCredit(attackerState, slot, in credit);
     }
 
     private void DecrementDoubleKillNumTime2OnKill(PlayerRuntimeState attackerState)
@@ -735,7 +872,7 @@ public sealed partial class Zone
             AttackRejectReason.AntiCheatEchoMismatch or AttackRejectReason.InvalidAttackModeSelector
             or AttackRejectReason.AttackerHasNoAttackSuccess;
         if (attackReachedMonster)
-            monster.RegisterAcquisition(attackerState.CharacterId, attackerState);
+            monster.RegisterAcquisition(attackerState.CharacterId, attackerState.Incarnation);
 
         if (outcome.ChargeConsumed)
             ConsumeChargeBuff(attackerState);
@@ -797,6 +934,40 @@ public sealed partial class Zone
 
         if (isTowerGuardian)
             ApplyTowerGuardianHitSideEffects(towerIndex, attackerState);
+    }
+
+    private void ApplyMonsterAttack(in CombatCommand command, PlayerRuntimeState target)
+    {
+        var attackInfo = command.AttackInfo;
+        if (attackInfo.ServerIndex2 != target.CharacterId || attackInfo.UniqueNumber2 != target.UniqueNumber)
+        {
+            target.Session.Abort(DisconnectReason.Faulted);
+            return;
+        }
+
+        if (attackInfo.ServerIndex1 < 0 || attackInfo.ServerIndex1 >= MonsterServerIndexExclusiveForMap())
+        {
+            target.Session.Abort(DisconnectReason.Faulted);
+            return;
+        }
+
+        if (!_monsters.TryGetValue(attackInfo.ServerIndex1, out var monster) ||
+            monster.UniqueNumber != attackInfo.UniqueNumber1)
+            return;
+
+        monster.ClearAttackPacketConfirmation();
+        ResolveMonsterAttack(monster, target, attackInfo.AttackActionValue4);
+    }
+
+    private int MonsterServerIndexExclusiveForMap()
+    {
+        if (MapId == 335)
+            return 1;
+
+        if (CompactMonsterIndexMaps.Contains(MapId))
+            return 1_000;
+
+        return DungeonMonsterIndexMaps.Contains(MapId) ? 8_000 : 4_000;
     }
 
     private int? ResolveZone175BossDamageWireEcho(PlayerRuntimeState attackerState, MonsterEntity monster,
@@ -982,6 +1153,14 @@ public sealed partial class Zone
             "Tower siege started (Center broadcast 754): towerType={TowerType} attackerTribe={AttackerTribe} zoneServerNumber={ZoneServerNumber} attackerName={AttackerName}",
             TowerWarState.DecodeType(packedState), attackerState.Tribe, MapId, attackerState.Name);
 
+        Span<byte> payload = stackalloc byte[ZoneCenterBroadcastIngestor.PayloadSize];
+        payload.Clear();
+        BinaryPrimitives.WriteInt32LittleEndian(payload, TowerWarState.DecodeType(packedState) - 1);
+        BinaryPrimitives.WriteInt32LittleEndian(payload[4..], attackerState.Tribe);
+        BinaryPrimitives.WriteInt32LittleEndian(payload[8..], MapId);
+        LegacyWireCodec.WriteFixedString(payload.Slice(12, 13), attackerState.Name);
+        _siegeIngestor?.Value.Ingest(TowerWarEventCodes.TowerFirstHit, payload);
+
         BroadcastTowerStatus();
     }
 
@@ -1093,7 +1272,7 @@ public sealed partial class Zone
         IReadOnlyList<int>? partyMemberIds = null, int monsterPatExperience = 0, int monsterLifeValue = 0,
         int monsterItemLevel = 0)
     {
-        if (!_players.TryGetValue(killerCharacterId, out var state))
+        if (!_players.TryGetValue(killerCharacterId, out var state) || !IsReadyForExperience(state))
             return;
 
         if (monsterGeneralExperience < 1)
@@ -1144,12 +1323,14 @@ public sealed partial class Zone
             CreditTeacherPointsFromStudentKill(teacher, monsterItemLevel);
         }
 
-        if (options.GeneralExpUpRatio > 1f)
-            rawGain = (int)(rawGain * options.GeneralExpUpRatio);
+        var generalExperienceMultiplier = options.GeneralExpUpRatio * 0.1f;
+        if (float.IsFinite(generalExperienceMultiplier) && generalExperienceMultiplier > 1f)
+            rawGain = (int)(rawGain * generalExperienceMultiplier);
 
         var finalGain = ExperienceFormulas.ApplyRebirthDivisor(rawGain, state.Level);
 
-        if (MonsterKillExperienceGate.ShouldProcess(true, false, finalGain, monsterPatExperience))
+        if (MonsterKillExperienceGate.ShouldProcess(IsReadyForExperience(state), state.IsMovingZone, finalGain,
+                monsterPatExperience))
         {
             if (finalGain > 0)
                 ApplyCharacterExperienceGain(state, finalGain);
@@ -1170,7 +1351,7 @@ public sealed partial class Zone
 
         List<PlayerRuntimeState>? present = null;
         foreach (var memberId in partyMemberIds)
-            if (_players.TryGetValue(memberId, out var member) && !member.IsDead)
+            if (_players.TryGetValue(memberId, out var member) && IsReadyForExperience(member) && !member.IsDead)
                 (present ??= []).Add(member);
 
         if (present is not { Count: >= 2 })
@@ -1198,17 +1379,33 @@ public sealed partial class Zone
 
     private void ApplyCharacterExperienceGain(PlayerRuntimeState target, int gain)
     {
+        var priorExperience = Math.Clamp(target.Experience, 0, HighLevelExperienceResolver.MaxMainExperience);
+        if (target.Experience != priorExperience)
+        {
+            target.Experience = priorExperience;
+            target.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+        }
+
+        if (gain < 1 || priorExperience >= HighLevelExperienceResolver.MaxMainExperience)
+            return;
+
+        var remainingCapacity = HighLevelExperienceResolver.MaxMainExperience - priorExperience;
+        var appliedGain = (int)Math.Min(gain, remainingCapacity);
+        if (appliedGain < 1)
+            return;
+
         if (HighLevelExperienceResolver.AppliesAt(target.Level))
         {
-            ApplyHighLevelExperienceGain(target, gain);
+            ApplyHighLevelExperienceGain(target, appliedGain);
             return;
         }
 
-        var previousExperience = target.Experience;
-        target.Experience += gain;
+        var previousExperience = priorExperience;
+        target.Experience = previousExperience + appliedGain;
         target.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
 
-        var levelUp = LevelProgressionCalculator.ResolveLevelUp(previousExperience, gain, worldData.LevelsByLevel);
+        var levelUp = LevelProgressionCalculator.ResolveLevelUp(previousExperience, appliedGain,
+            worldData.LevelsByLevel);
         if (levelUp.LeveledUp)
         {
             var previousLevel = target.Level;
@@ -1256,6 +1453,11 @@ public sealed partial class Zone
             { Sort = ExperienceStatSort, Value = (int)target.Experience, Value2 = 0 });
     }
 
+    private static bool IsReadyForExperience(PlayerRuntimeState state)
+    {
+        return state.Session is IZoneSession { State: ZoneSessionState.InWorld } && !state.IsMovingZone;
+    }
+
     private void CreditPetGrowthFromMonsterKill(PlayerRuntimeState target, int monsterPatExperience)
     {
         var scaledPetExperience = PetKillExperienceScalingCalculator.ComputeScaledAmount(
@@ -1280,20 +1482,21 @@ public sealed partial class Zone
 
     private void CreditPetGrowth(PlayerRuntimeState target, int requestedPetExperience)
     {
+        if (!options.Zones.TryGetValue(MapId, out var zoneConfig))
+            return;
+
         var equipmentContainer = target.Inventory.GetContainer(ContainerMatrix.Equipment);
         var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
             ? petStack.ItemId
             : 0;
 
-        var credited = PetExperienceCreditResolver.Resolve(petItemId, target.PetGrowth, target.PetActivity,
-            requestedPetExperience, worldData.ItemsById);
+        var zoneExperienceMultiplier = Math.Max(1f, zoneConfig.PetExperienceRatio * 0.1f);
+        var credited = PetExperienceCreditResolver.ResolveWithZoneMultiplier(petItemId, target.PetGrowth,
+            target.PetActivity, requestedPetExperience, zoneExperienceMultiplier, worldData.ItemsById);
+        var transition = PetLifecycleTransitionResolver.ResolveExperience(target.PetGrowth, target.PetActivity,
+            in credited);
 
-        if (!credited.IsEligible || (credited.CreditedAmount == 0 && !credited.ReactivationApplied))
-            return;
-
-        target.PetGrowth = credited.NewGrowth;
-        target.PetActivity = (byte)credited.NewActivity;
-        target.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+        ApplyPetLifecycleTransition(target, in transition);
     }
 
     public void ApplyQuestKillProgress(int killerCharacterId, int monsterId,

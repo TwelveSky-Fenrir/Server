@@ -6,3 +6,8 @@ public interface ISimulationSystem
 {
     public void Simulate(Zone zone, int legacyTicksElapsed);
 }
+
+public interface IZoneClockSystem : ISimulationSystem
+{
+    public void AdvanceClock(Zone zone);
+}

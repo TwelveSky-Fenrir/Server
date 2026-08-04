@@ -200,10 +200,8 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
     {
         var builder = new StoredProcedureParametersBuilder("game", "usp_CharacterItems_ReplaceContainer", 0)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
-            .AddParameter("Container", container, SqlDbType.TinyInt);
-
-        if (items.Count > 0)
-            builder.AddTvpParameter("Items", items);
+            .AddParameter("Container", container, SqlDbType.TinyInt)
+            .AddTvpParameter("Items", items);
 
         await Db.ExecuteAsync(builder.Build(), ct);
     }
@@ -214,15 +212,10 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
     {
         var builder = new StoredProcedureParametersBuilder("game", "usp_CharacterItems_ReplaceTwoContainers", 0)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
-            .AddParameter("ContainerA", containerA, SqlDbType.TinyInt);
-
-        if (itemsA.Count > 0)
-            builder.AddTvpParameter("ItemsA", itemsA);
-
-        builder.AddParameter("ContainerB", containerB, SqlDbType.TinyInt);
-
-        if (itemsB.Count > 0)
-            builder.AddTvpParameter("ItemsB", itemsB);
+            .AddParameter("ContainerA", containerA, SqlDbType.TinyInt)
+            .AddTvpParameter("ItemsA", itemsA)
+            .AddParameter("ContainerB", containerB, SqlDbType.TinyInt)
+            .AddTvpParameter("ItemsB", itemsB);
 
         await Db.ExecuteAsync(builder.Build(), ct);
     }
@@ -265,21 +258,15 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
             return;
 
         var builder = new StoredProcedureParametersBuilder("game", "usp_Character_PersistProgressBatch", 0)
-            .AddTvpParameter("Progress", rows);
-
-        if (costumes.Count > 0)
-            builder.AddTvpParameter("Costumes", costumes);
-
-        if (mounts.Count > 0)
-            builder.AddTvpParameter("Mounts", mounts);
-
-        if (stellarCores is { Count: > 0 })
-            builder.AddTvpParameter("StellarCores", stellarCores);
+            .AddTvpParameter("Progress", rows)
+            .AddTvpParameter("Costumes", costumes)
+            .AddTvpParameter("Mounts", mounts)
+            .AddTvpParameter("StellarCores", stellarCores ?? Array.Empty<CharacterStellarCoreSlotTvp>());
 
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-    public async ValueTask PersistFinalFlushAsync(CharacterProgressTvp progress, CharacterPositionTvp position,
+    public async ValueTask<CharacterFinalFlushResultDto> PersistFinalFlushAsync(CharacterProgressTvp progress, CharacterPositionTvp position,
         IReadOnlyList<CharacterCostumeSlotTvp> costumes, IReadOnlyList<CharacterBuffSlotTvp> buffs,
         IReadOnlyList<CharacterMountSlotTvp> mounts, CancellationToken ct,
         IReadOnlyList<CharacterStellarCoreSlotTvp>? stellarCores = null)
@@ -289,21 +276,14 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
 
         var builder = new StoredProcedureParametersBuilder("game", "usp_Character_PersistFinalFlush", 0)
             .AddTvpParameter("Progress", progressRows)
-            .AddTvpParameter("Position", positionRows);
+            .AddTvpParameter("Position", positionRows)
+            .AddTvpParameter("Costumes", costumes)
+            .AddTvpParameter("Buffs", buffs)
+            .AddTvpParameter("Mounts", mounts)
+            .AddTvpParameter("StellarCores", stellarCores ?? Array.Empty<CharacterStellarCoreSlotTvp>());
 
-        if (costumes.Count > 0)
-            builder.AddTvpParameter("Costumes", costumes);
-
-        if (buffs.Count > 0)
-            builder.AddTvpParameter("Buffs", buffs);
-
-        if (mounts.Count > 0)
-            builder.AddTvpParameter("Mounts", mounts);
-
-        if (stellarCores is { Count: > 0 })
-            builder.AddTvpParameter("StellarCores", stellarCores);
-
-        await Db.ExecuteAsync(builder.Build(), ct);
+        return await Db.FirstQueryAsync<CharacterFinalFlushResultDto>(builder.Build(), ct) ??
+               throw new InvalidOperationException("usp_Character_PersistFinalFlush always returns a flush result.");
     }
 
     public async ValueTask AdjustMoneyAsync(int characterId, long deltaMoney, int deltaBigMoney, CancellationToken ct)
@@ -584,12 +564,16 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
     }
 
     public async ValueTask<int> SpendBloodCoinAndReplaceContainerAsync(int characterId, int deltaBloodCoin,
-        byte container, IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
+        byte container, byte targetSlot, int catalogItemId, int catalogQuantity,
+        IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
     {
         var builder = new StoredProcedureParametersBuilder("game", "usp_Character_SpendBloodCoinAndReplaceContainer", 1)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
             .AddParameter("DeltaBloodCoin", deltaBloodCoin, SqlDbType.Int)
-            .AddParameter("Container", container, SqlDbType.TinyInt);
+            .AddParameter("Container", container, SqlDbType.TinyInt)
+            .AddParameter("TargetSlot", targetSlot, SqlDbType.TinyInt)
+            .AddParameter("CatalogItemId", catalogItemId, SqlDbType.Int)
+            .AddParameter("CatalogQuantity", catalogQuantity, SqlDbType.Int);
 
         if (items.Count > 0)
             builder.AddTvpParameter("Items", items);

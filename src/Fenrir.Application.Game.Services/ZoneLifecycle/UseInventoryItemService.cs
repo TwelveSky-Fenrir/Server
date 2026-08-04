@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using Fenrir.Application.Game.Abstractions.Chat;
 using Fenrir.Application.Game.Abstractions.Progression;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Commerce;
@@ -18,6 +19,7 @@ using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Loot;
+using Fenrir.Core.Abstractions;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Domain.Game.GameData;
 using Fenrir.Domain.Game.Stats;
@@ -139,10 +141,6 @@ public sealed class UseInventoryItemService(
     private const int DoubleKillNumTime2SortCode = 30;
 
     private const int DoubleKillNumTime2ChargeAmount = 50;
-
-    private const int AutoHuntBuffStoreLength = 16;
-
-    private const int AutoHuntAttackTypeLength = 4;
 
     private const int PetInventoryRenewalItemId = 829;
 
@@ -278,7 +276,7 @@ public sealed class UseInventoryItemService(
         if (RebirthOnlyStatBoostItemIds.Contains(item.ItemId))
         {
             logger.LogInformation(
-                "Character {CharacterId} use-inventory-item (stat-boost scroll {ItemId}): dead feature -- WUSE_ITEM_1191/WUSE_ITEM_626 are guarded by __REBIRTH__ (Server/Header/use_inventory.h:104-107), which has its only #define inside the dead #else of #ifdef M33 (Server/Header/Protocol/DEFINE.h:28); the legacy drops the session here, so the four counters are permanently 0 -- item kept",
+                "Character {CharacterId} use-inventory-item (stat-boost scroll {ItemId}): unavailable feature -- WUSE_ITEM_1191/WUSE_ITEM_626 are guarded by __REBIRTH__ (Server/Header/use_inventory.h:104-107), defined only in a configuration branch excluded by the shipped build (Server/Header/Protocol/DEFINE.h:28); the source server drops the session here, so the four counters are permanently 0 -- item kept",
                 characterId, item.ItemId);
             return Fail(characterId, item, page, index);
         }
@@ -411,10 +409,7 @@ public sealed class UseInventoryItemService(
         PlayerRuntimeState state, int characterId, byte page, byte index, ItemStack item,
         int potionType1, int potionType2, CancellationToken cancellationToken)
     {
-        if (state.IsStunned || state.IsDead)
-            return Fail(characterId, item, page, index);
-
-        if (!state.CanUseConsumables)
+        if (!state.CanUseConsumableEffects)
             return Fail(characterId, item, page, index);
 
         var maxLife = state.Stats?.MaxLife ?? state.MaxLife;
@@ -563,13 +558,28 @@ public sealed class UseInventoryItemService(
         var newSkillPoints = state.SkillPoints - resolved.Cost;
         var learned = new LearnedSkill(resolved.SkillId, resolved.Cost);
 
+        var remaining = item.Quantity - 1;
+        var container = state.Inventory.GetContainer(page);
+        var projected = remaining > 0
+            ? container.SetItem(index, item with { Quantity = remaining })
+            : container.Remove(index);
+
+        var inventoryResult = await zone.PostInventoryCommandAndWaitForResultAsync(
+            new InventoryZoneCommand(characterId,
+                ImmutableArray.Create(new InventoryContainerSnapshot(page, projected)), null,
+                SkillChanges: [new InventorySkillChange(resolved.Slot, learned)], SkillPoints: newSkillPoints),
+            cancellationToken);
+        if (inventoryResult.Kind != ZoneCommandResultKind.Applied)
+        {
+            logger.LogWarning(
+                "Character {CharacterId} skill-grimoire rejected by zone actor: item {ItemId}, outcome {Outcome}",
+                characterId, item.ItemId, inventoryResult.Kind);
+            return Fail(characterId, item, page, index);
+        }
+
         await characters.UpsertSkillSlotAsync(characterId, resolved.Slot, resolved.SkillId, resolved.Cost,
             cancellationToken);
-
-        if (!zone.PostSkillCommand(new SkillZoneCommand(characterId, resolved.Slot, learned, newSkillPoints)))
-            logger.LogError(
-                "Zone {MapId} skill inbox full: dropped skill-grimoire learn mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
+        await characters.ReplaceContainerAsync(characterId, page, ToTvps(projected), cancellationToken);
 
         await eventLog.LogAsync(SkillGrimoireItemConsumedEventCode, EventLogCategory.ItemUse, accountId, characterId,
             null, null, null, null, null, item.ItemId, item.Quantity, SkillGrimoireLearnSuccessOutcome,
@@ -580,7 +590,7 @@ public sealed class UseInventoryItemService(
             $"Slot={resolved.Slot};SkillId={resolved.SkillId};Cost={resolved.Cost};SkillPoints={newSkillPoints}",
             cancellationToken);
 
-        return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
+        return new UseInventoryItemResponse { Result = 0, Page = page, Index = index, Value = 0, Value2 = 0 };
     }
 
     private async ValueTask<UseInventoryItemResponse> ResolveGpTicketAsync(Zone zone, PlayerRuntimeState state,
@@ -588,6 +598,17 @@ public sealed class UseInventoryItemService(
         CancellationToken cancellationToken)
     {
         var projected = state.Inventory.GetContainer(page).Remove(index);
+        var containers = ImmutableArray.Create(new InventoryContainerSnapshot(page, projected));
+
+        var mirrorResult = await zone.PostInventoryCommandAndWaitForResultAsync(
+            new InventoryZoneCommand(characterId, containers, null), cancellationToken).ConfigureAwait(false);
+        if (mirrorResult.Kind != ZoneCommandResultKind.Applied)
+        {
+            logger.LogWarning(
+                "Zone {MapId} refused GP-ticket inventory mutation for character {CharacterId} ({Outcome}); no cash credit was attempted",
+                zone.MapId, characterId, mirrorResult.Kind);
+            return Fail(characterId, item, page, index);
+        }
 
         try
         {
@@ -596,9 +617,10 @@ public sealed class UseInventoryItemService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex,
-                "Account {AccountId} GP ticket credit-and-consume failed for item {ItemId} (character {CharacterId}); no cash credited and item left untouched",
+            logger.LogCritical(ex,
+                "Account {AccountId} GP ticket credit-and-consume has an unknown durable outcome for item {ItemId} (character {CharacterId}); the session is being terminated before the item can be retried",
                 accountId, item.ItemId, characterId);
+            state.Session.Abort(DisconnectReason.Faulted);
             return Fail(characterId, item, page, index);
         }
 
@@ -606,14 +628,6 @@ public sealed class UseInventoryItemService(
             null, null, null, creditAmount, null, item.ItemId, item.Quantity, 1, null, cancellationToken);
 
         var response = new UseInventoryItemResponse { Result = 0, Page = page, Index = index, Value = 0, Value2 = 0 };
-
-        var containers = ImmutableArray.Create(new InventoryContainerSnapshot(page, projected));
-
-        if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
-                cancellationToken))
-            logger.LogError(
-                "Zone {MapId} inventory inbox full: dropped use-inventory-item (GP ticket) mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
 
         logger.LogInformation(
             "Account {AccountId} use-inventory-item (GP ticket) applied: item {ItemId} credited {CreditAmount} to character {CharacterId}",
@@ -968,9 +982,7 @@ public sealed class UseInventoryItemService(
                 StatVit: resolved.NewStatVit, StatStr: resolved.NewStatStr, StatInt: resolved.NewStatInt,
                 StatDex: resolved.NewStatDex, StatPoints: state.StatPoints + resolved.RefundedPoints,
                 Life: 1, Mana: 0, UpdatedStats: updatedStats), cancellationToken))
-            logger.LogError(
-                "Zone {MapId} tribe-progress inbox full: dropped Stats-Clear mirror for character {CharacterId}",
-                zone.MapId, characterId);
+            return Fail(characterId, item, page, index);
 
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
@@ -1025,9 +1037,7 @@ public sealed class UseInventoryItemService(
                 StatVit: newVit, StatStr: newStr, StatInt: newInt, StatDex: newDex,
                 StatPoints: state.StatPoints + resolved.RefundedPoints, Life: 1, Mana: 0,
                 UpdatedStats: updatedStats), cancellationToken))
-            logger.LogError(
-                "Zone {MapId} tribe-progress inbox full: dropped Stat-Cleanse mirror for character {CharacterId}",
-                zone.MapId, characterId);
+            return Fail(characterId, item, page, index);
 
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
@@ -1185,9 +1195,7 @@ public sealed class UseInventoryItemService(
         };
 
         if (!await zone.PostTribeProgressCommandAndWaitAsync(command, cancellationToken))
-            logger.LogError(
-                "Zone {MapId} tribe-progress inbox full: dropped protection-scroll mirror for character {CharacterId}",
-                zone.MapId, characterId);
+            return Fail(characterId, item, page, index);
 
         var consumed = await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
 
@@ -1832,9 +1840,7 @@ public sealed class UseInventoryItemService(
                 EatDexPotion: newEatDex, EatElePotion: newEatEle,
                 EliteDungeonTime: newEliteDungeonTime,
                 UpdatedStats: updatedStats), cancellationToken))
-            logger.LogError(
-                "Zone {MapId} tribe-progress inbox full: dropped rebirth-reset-scroll mirror for character {CharacterId}",
-                zone.MapId, characterId);
+            return Fail(characterId, item, page, index);
 
         logger.LogInformation(
             "Character {CharacterId} rebirth-reset-scroll applied: level2={Level2} spCost={SpCost} eliteDungeonTime {Old}->{New}",
@@ -1872,32 +1878,7 @@ public sealed class UseInventoryItemService(
             if (hkSlot.Kind == HotkeyBindingKind.Skill && hkSlot.Value1 == skillId)
                 hotkeyWrites.Add(new HotkeySlotWrite(hkPage, hkIndex, HotkeySlot.Empty));
 
-        foreach (var write in hotkeyWrites)
-            await characters.UpsertHotkeySlotAsync(characterId, write.Page, write.Index, 0, 0, 0,
-                cancellationToken);
-
-        await characters.UpsertSkillSlotAsync(characterId, slot, 0, 0, cancellationToken);
-
         var newSkillPoints = state.SkillPoints + gradeRefund;
-
-        if (!zone.PostSkillCommand(new SkillZoneCommand(characterId, slot, new LearnedSkill(0, 0), newSkillPoints)))
-            logger.LogError(
-                "Zone {MapId} skill inbox full: dropped reduction-sutra skill-clear mirror (slot {Slot}) for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, slot, characterId);
-
-        if (!await zone.PostTribeProgressCommandAndWaitAsync(
-                new TribeProgressZoneCommand(characterId, SkillPoints: newSkillPoints), cancellationToken))
-            logger.LogError(
-                "Zone {MapId} tribe-progress inbox full: dropped reduction-sutra SP mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
-
-        if (hotkeyWrites.Count > 0)
-            if (!await zone.PostHotkeyMoveCommandAndWaitAsync(
-                    new HotkeyMoveZoneCommand(characterId, hotkeyWrites.ToImmutable(), null),
-                    cancellationToken))
-                logger.LogError(
-                    "Zone {MapId} hotkey-move inbox full: dropped reduction-sutra hotkey-clear mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                    zone.MapId, characterId);
 
         var newAutoBuffSkill = state.AutoBuffSkill;
         var autoBuffChanged = false;
@@ -1908,25 +1889,60 @@ public sealed class UseInventoryItemService(
                 autoBuffChanged = true;
             }
 
-        var newAutoHuntConfig = RemoveSkillFromAutoHuntConfig(state.AutoHuntConfig, skillId);
-        if (newAutoHuntConfig is { } clearedConfig)
-            await PersistAutoHuntConfigAsync(characterId, state.AutoHuntEnabled, clearedConfig, cancellationToken);
+        AutoHunt? newAutoHuntConfig = AutoHuntSkillSelectionCleanup.TryRemoveSkill(state.AutoHuntConfig, skillId,
+            out var clearedAutoHuntSelection)
+            ? clearedAutoHuntSelection
+            : null;
 
         ImmutableArray<(int SkillId, int Grade)>? registeredAutoBuffSkills =
             autoBuffChanged ? newAutoBuffSkill : null;
 
+        if (hotkeyWrites.Count > 0)
+        {
+            var hotkeyResult = await zone.PostHotkeyMoveCommandAndWaitForResultAsync(
+                new HotkeyMoveZoneCommand(characterId, hotkeyWrites.ToImmutable(), null), cancellationToken);
+            if (hotkeyResult.Kind != ZoneCommandResultKind.Applied)
+                return Fail(characterId, item, page, index);
+        }
+
         if (autoBuffChanged || newAutoHuntConfig is not null)
-            if (!zone.PostAutoBuffCommand(new AutoBuffZoneCommand(characterId, registeredAutoBuffSkills,
-                    NewAutoHuntConfig: newAutoHuntConfig)))
-                logger.LogError(
-                    "Zone {MapId} auto-buff inbox full: dropped reduction-sutra auto-buff/auto-hunt clear for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                    zone.MapId, characterId);
+        {
+            var autoBuffResult = await zone.PostAutoBuffCommandAndWaitForResultAsync(
+                new AutoBuffZoneCommand(characterId, registeredAutoBuffSkills, NewAutoHuntConfig: newAutoHuntConfig),
+                cancellationToken);
+            if (autoBuffResult.Kind != ZoneCommandResultKind.Applied)
+                return Fail(characterId, item, page, index);
+        }
+
+        var remaining = item.Quantity - 1;
+        var container = state.Inventory.GetContainer(page);
+        var projected = remaining > 0
+            ? container.SetItem(index, item with { Quantity = remaining })
+            : container.Remove(index);
+
+        var inventoryResult = await zone.PostInventoryCommandAndWaitForResultAsync(
+            new InventoryZoneCommand(characterId,
+                ImmutableArray.Create(new InventoryContainerSnapshot(page, projected)), null,
+                SkillChanges: [new InventorySkillChange(slot, new LearnedSkill(0, 0))],
+                SkillPoints: newSkillPoints), cancellationToken);
+        if (inventoryResult.Kind != ZoneCommandResultKind.Applied)
+            return Fail(characterId, item, page, index);
+
+        await characters.UpsertSkillSlotAsync(characterId, slot, 0, 0, cancellationToken);
+        await characters.ReplaceContainerAsync(characterId, page, ToTvps(projected), cancellationToken);
+
+        foreach (var write in hotkeyWrites)
+            await characters.UpsertHotkeySlotAsync(characterId, write.Page, write.Index, 0, 0, 0,
+                cancellationToken);
+
+        if (newAutoHuntConfig is { } clearedConfig)
+            await PersistAutoHuntConfigAsync(characterId, state.AutoHuntEnabled, clearedConfig, cancellationToken);
 
         logger.LogInformation(
             "Character {CharacterId} reduction-sutra applied: cleared skill slot {Slot} (skillId {SkillId}), refunded {Grade} SP (total now {Total}), cleared {HotkeyCount} hotkey(s)",
             characterId, slot, skillId, gradeRefund, newSkillPoints, hotkeyWrites.Count);
 
-        return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
+        return new UseInventoryItemResponse { Result = 0, Page = page, Index = index, Value = 0, Value2 = 0 };
     }
 
     private async ValueTask<UseInventoryItemResponse> ResolvePremiumServiceAsync(
@@ -1939,9 +1955,7 @@ public sealed class UseInventoryItemService(
 
         if (!await zone.PostTribeProgressCommandAndWaitAsync(
                 new TribeProgressZoneCommand(characterId, PremiumExpireUtc: newExpiry), cancellationToken))
-            logger.LogError(
-                "Zone {MapId} tribe-progress inbox full: dropped premium-service mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
+            return Fail(characterId, item, page, index);
 
         logger.LogInformation(
             "Character {CharacterId} premium-service item {ItemId} applied: +{Days} day(s), expiry now {Expiry} (UTC)",
@@ -2021,9 +2035,7 @@ public sealed class UseInventoryItemService(
         if (!await zone.PostTribeProgressCommandAndWaitAsync(
                 new TribeProgressZoneCommand(characterId, AutoHuntPaidMinuteBudget: added.NewValue),
                 cancellationToken))
-            logger.LogError(
-                "Zone {MapId} tribe-progress inbox full: dropped auto-hunt-minutes-scroll mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
+            return Fail(characterId, item, page, index);
 
         logger.LogInformation(
             "Character {CharacterId} auto-hunt minute scroll applied: item {ItemId} +{Minutes} min, AutoHuntPaidMinuteBudget now {NewValue}",
@@ -2045,9 +2057,7 @@ public sealed class UseInventoryItemService(
         if (!await zone.PostTribeProgressCommandAndWaitAsync(
                 new TribeProgressZoneCommand(characterId, AutoHuntPaidDayBudget: newBudget),
                 cancellationToken))
-            logger.LogError(
-                "Zone {MapId} tribe-progress inbox full: dropped auto-hunt-days-scroll mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
+            return Fail(characterId, item, page, index);
 
         logger.LogInformation(
             "Character {CharacterId} auto-hunt day scroll applied: item {ItemId} +{Days} day(s), AutoHuntPaidDayBudget now {NewBudget}",
@@ -2073,15 +2083,10 @@ public sealed class UseInventoryItemService(
         if (!GameDate.TryAddDays(baseDate, days, out var newDate))
             return Fail(characterId, item, page, index);
 
-        if (!await zone.PostTribeProgressCommandAndWaitAsync(
-                new TribeProgressZoneCommand(characterId, AutoBuffTime: newDate), cancellationToken))
-            logger.LogError(
-                "Zone {MapId} tribe-progress inbox full: dropped auto-buff-scroll mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
-
-        logger.LogInformation(
-            "Character {CharacterId} auto-buff scroll applied: item {ItemId} +{Days} day(s), AutoBuffTime now {NewDate}",
-            characterId, item.ItemId, days, newDate);
+        var progressResult = await zone.PostTribeProgressCommandAndWaitForResultAsync(
+            new TribeProgressZoneCommand(characterId, AutoBuffTime: newDate), cancellationToken);
+        if (progressResult.Kind != ZoneCommandResultKind.Applied)
+            return Fail(characterId, item, page, index);
 
         var remaining = item.Quantity - 1;
         var container = state.Inventory.GetContainer(page);
@@ -2089,15 +2094,17 @@ public sealed class UseInventoryItemService(
             ? container.SetItem(index, item with { Quantity = remaining })
             : container.Remove(index);
 
+        var inventoryResult = await zone.PostInventoryCommandAndWaitForResultAsync(
+            new InventoryZoneCommand(characterId,
+                ImmutableArray.Create(new InventoryContainerSnapshot(page, projected)), null), cancellationToken);
+        if (inventoryResult.Kind != ZoneCommandResultKind.Applied)
+            return Fail(characterId, item, page, index);
+
         await characters.ReplaceContainerAsync(characterId, page, ToTvps(projected), cancellationToken);
 
-        if (!await zone.PostInventoryCommandAndWaitAsync(
-                new InventoryZoneCommand(characterId,
-                    ImmutableArray.Create(new InventoryContainerSnapshot(page, projected)), null),
-                cancellationToken))
-            logger.LogError(
-                "Zone {MapId} inventory inbox full: dropped auto-buff-scroll inventory mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
+        logger.LogInformation(
+            "Character {CharacterId} auto-buff scroll applied: item {ItemId} +{Days} day(s), AutoBuffTime now {NewDate}",
+            characterId, item.ItemId, days, newDate);
 
         return new UseInventoryItemResponse { Result = 0, Page = page, Index = index, Value = newDate, Value2 = 0 };
     }
@@ -2112,9 +2119,7 @@ public sealed class UseInventoryItemService(
 
         if (!await zone.PostTribeProgressCommandAndWaitAsync(
                 new TribeProgressZoneCommand(characterId, AnimalAbsorbTime: added.NewValue), cancellationToken))
-            logger.LogError(
-                "Zone {MapId} tribe-progress inbox full: dropped mount-absorb-scroll mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
+            return Fail(characterId, item, page, index);
 
         logger.LogInformation(
             "Character {CharacterId} mount-absorb scroll applied: item {ItemId} +{Minutes} min, AnimalAbsorbTime now {NewValue}",
@@ -2133,9 +2138,7 @@ public sealed class UseInventoryItemService(
 
         if (!await zone.PostTribeProgressCommandAndWaitAsync(
                 new TribeProgressZoneCommand(characterId, AnimalDoubleExp: added.NewValue), cancellationToken))
-            logger.LogError(
-                "Zone {MapId} tribe-progress inbox full: dropped mount-double-exp-scroll mirror for character {CharacterId}",
-                zone.MapId, characterId);
+            return Fail(characterId, item, page, index);
 
         logger.LogInformation(
             "Character {CharacterId} mount-double-exp scroll applied: item {ItemId} +{Minutes} min, AnimalDoubleExp now {NewValue}",
@@ -2148,63 +2151,68 @@ public sealed class UseInventoryItemService(
         PlayerRuntimeState state, int characterId, byte page, byte index, ItemStack item,
         CancellationToken cancellationToken)
     {
+        var learnedSkills = state.LearnedSkills.ToImmutableArray();
         var totalRefund = 0;
-        foreach (var (_, skill) in state.LearnedSkills)
+        foreach (var (_, skill) in learnedSkills)
             totalRefund += skill.Grade;
 
         var newSkillPoints = state.SkillPoints + totalRefund;
-
-        foreach (var (slot, _) in state.LearnedSkills)
-            await characters.UpsertSkillSlotAsync(characterId, slot, 0, 0, cancellationToken);
 
         var skillHotkeyWrites = ImmutableArray.CreateBuilder<HotkeySlotWrite>();
         foreach (var ((hkPage, hkIndex), hkSlot) in state.Hotkeys)
             if (hkSlot.Kind == HotkeyBindingKind.Skill)
                 skillHotkeyWrites.Add(new HotkeySlotWrite(hkPage, hkIndex, HotkeySlot.Empty));
 
+        var clearedAutoHuntConfig = state.AutoHuntConfig is { } currentAutoHuntConfig
+            ? AutoHuntSkillSelectionCleanup.ClearAll(currentAutoHuntConfig)
+            : EmptyAutoHuntConfig();
+
+        if (skillHotkeyWrites.Count > 0)
+        {
+            var hotkeyResult = await zone.PostHotkeyMoveCommandAndWaitForResultAsync(
+                new HotkeyMoveZoneCommand(characterId, skillHotkeyWrites.ToImmutable(), null), cancellationToken);
+            if (hotkeyResult.Kind != ZoneCommandResultKind.Applied)
+                return Fail(characterId, item, page, index);
+        }
+
+        var autoBuffResult = await zone.PostAutoBuffCommandAndWaitForResultAsync(
+            new AutoBuffZoneCommand(characterId, AutoBuffSkillCodec.Empty,
+                NewAutoHuntConfig: clearedAutoHuntConfig), cancellationToken);
+        if (autoBuffResult.Kind != ZoneCommandResultKind.Applied)
+            return Fail(characterId, item, page, index);
+
+        var remaining = item.Quantity - 1;
+        var container = state.Inventory.GetContainer(page);
+        var projected = remaining > 0
+            ? container.SetItem(index, item with { Quantity = remaining })
+            : container.Remove(index);
+        var skillChanges = learnedSkills.Select(entry =>
+            new InventorySkillChange(entry.Key, new LearnedSkill(0, 0))).ToImmutableArray();
+
+        var inventoryResult = await zone.PostInventoryCommandAndWaitForResultAsync(
+            new InventoryZoneCommand(characterId,
+                ImmutableArray.Create(new InventoryContainerSnapshot(page, projected)), null,
+                SkillChanges: skillChanges, SkillPoints: newSkillPoints), cancellationToken);
+        if (inventoryResult.Kind != ZoneCommandResultKind.Applied)
+            return Fail(characterId, item, page, index);
+
+        foreach (var (slot, _) in learnedSkills)
+            await characters.UpsertSkillSlotAsync(characterId, slot, 0, 0, cancellationToken);
+
+        await characters.ReplaceContainerAsync(characterId, page, ToTvps(projected), cancellationToken);
+
         foreach (var write in skillHotkeyWrites)
             await characters.UpsertHotkeySlotAsync(characterId, write.Page, write.Index, 0, 0, 0,
                 cancellationToken);
 
-        foreach (var (slot, _) in state.LearnedSkills)
-            if (!zone.PostSkillCommand(new SkillZoneCommand(characterId, slot, new LearnedSkill(0, 0),
-                    newSkillPoints)))
-                logger.LogError(
-                    "Zone {MapId} skill inbox full: dropped book-of-amnesia skill-clear mirror (slot {Slot}) for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                    zone.MapId, slot, characterId);
-
-        if (!await zone.PostTribeProgressCommandAndWaitAsync(
-                new TribeProgressZoneCommand(characterId, SkillPoints: newSkillPoints), cancellationToken))
-            logger.LogError(
-                "Zone {MapId} tribe-progress inbox full: dropped book-of-amnesia skill-points mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
-
-        if (skillHotkeyWrites.Count > 0)
-            if (!await zone.PostHotkeyMoveCommandAndWaitAsync(
-                    new HotkeyMoveZoneCommand(characterId, skillHotkeyWrites.ToImmutable(), null),
-                    cancellationToken))
-                logger.LogError(
-                    "Zone {MapId} hotkey-move inbox full: dropped book-of-amnesia skill-hotkey-clear mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                    zone.MapId, characterId);
-
-        var clearedAutoHuntConfig = state.AutoHuntConfig is { } currentAutoHuntConfig
-            ? ClearAutoHuntSkillArrays(currentAutoHuntConfig)
-            : EmptyAutoHuntConfig();
         await PersistAutoHuntConfigAsync(characterId, state.AutoHuntEnabled, clearedAutoHuntConfig,
             cancellationToken);
 
-        if (!zone.PostAutoBuffCommand(
-                new AutoBuffZoneCommand(characterId, AutoBuffSkillCodec.Empty,
-                    NewAutoHuntConfig: clearedAutoHuntConfig)))
-            logger.LogError(
-                "Zone {MapId} auto-buff inbox full: dropped book-of-amnesia auto-buff/auto-hunt-clear mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
-
         logger.LogInformation(
             "Character {CharacterId} book-of-amnesia applied: refunded {Refund} skill points (total now {Total}), cleared {SkillCount} skill slots, {HotkeyCount} skill hotkeys",
-            characterId, totalRefund, newSkillPoints, state.LearnedSkills.Count, skillHotkeyWrites.Count);
+            characterId, totalRefund, newSkillPoints, learnedSkills.Length, skillHotkeyWrites.Count);
 
-        return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
+        return new UseInventoryItemResponse { Result = 0, Page = page, Index = index, Value = 0, Value2 = 0 };
     }
 
     private static AutoHunt EmptyAutoHuntConfig()
@@ -2212,9 +2220,9 @@ public sealed class UseInventoryItemService(
         return new AutoHunt
         {
             BuffType = 0,
-            BuffStore = new int[AutoHuntBuffStoreLength],
+            BuffStore = new int[AutoBuffSkillResolver.SlotCount * 2],
             HuntType = 0,
-            AttackType = new int[AutoHuntAttackTypeLength],
+            AttackType = new int[AutoHuntSkillSelectionCleanup.AttackSlotCount * 2],
             MonNum = 0,
             ItemType = 0,
             InvenCmd = 0,
@@ -2222,45 +2230,6 @@ public sealed class UseInventoryItemService(
             AnimalPreyCmd = 0,
             AnimalFoodCmd = 0
         };
-    }
-
-    private static AutoHunt ClearAutoHuntSkillArrays(AutoHunt config)
-    {
-        return config with
-        {
-            BuffStore = new int[AutoHuntBuffStoreLength], AttackType = new int[AutoHuntAttackTypeLength]
-        };
-    }
-
-    private static AutoHunt? RemoveSkillFromAutoHuntConfig(AutoHunt? config, int skillId)
-    {
-        if (config is not { } current || skillId < 1)
-            return null;
-
-        var buffStore = (int[])current.BuffStore.Clone();
-        var attackType = (int[])current.AttackType.Clone();
-        var changed = false;
-
-        for (var i = 0; i + 1 < buffStore.Length; i += 2)
-            if (buffStore[i] == skillId)
-            {
-                buffStore[i] = 0;
-                buffStore[i + 1] = 0;
-                changed = true;
-            }
-
-        for (var i = 0; i + 1 < attackType.Length; i += 2)
-            if (attackType[i] == skillId)
-            {
-                attackType[i] = 0;
-                attackType[i + 1] = 0;
-                changed = true;
-            }
-
-        if (!changed)
-            return null;
-
-        return current with { BuffStore = buffStore, AttackType = attackType };
     }
 
     private async ValueTask PersistAutoHuntConfigAsync(int characterId, bool enabled, AutoHunt config,
@@ -2281,17 +2250,21 @@ public sealed class UseInventoryItemService(
             ? container.SetItem(index, item with { Quantity = remaining })
             : container.Remove(index);
 
+        var containers = ImmutableArray.Create(new InventoryContainerSnapshot(page, projected));
+
+        var actorResult = await zone.PostInventoryCommandAndWaitForResultAsync(
+            new InventoryZoneCommand(characterId, containers, null), cancellationToken);
+        if (actorResult.Kind != ZoneCommandResultKind.Applied)
+        {
+            logger.LogWarning(
+                "Character {CharacterId} item consumption rejected by zone actor in {Resolver}: item {ItemId}, outcome {Outcome}",
+                characterId, resolver, item.ItemId, actorResult.Kind);
+            return Fail(characterId, item, page, index);
+        }
+
         await characters.ReplaceContainerAsync(characterId, page, ToTvps(projected), cancellationToken);
 
         var response = new UseInventoryItemResponse { Result = 0, Page = page, Index = index, Value = 0, Value2 = 0 };
-
-        var containers = ImmutableArray.Create(new InventoryContainerSnapshot(page, projected));
-
-        if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
-                cancellationToken))
-            logger.LogError(
-                "Zone {MapId} inventory inbox full: dropped use-inventory-item mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
 
         logger.LogInformation(
             "Character {CharacterId} use-inventory-item applied in {Resolver}: item {ItemId} consumed from slot {Page}:{Index} (remaining {Remaining})",
@@ -2338,7 +2311,7 @@ public sealed class UseInventoryItemService(
             return new UseInventoryItemResponse
                 { Result = MountExpAlreadyMaxedResult, Page = page, Index = index, Value = 0, Value2 = 0 };
 
-        if (requiresVip && state.UserSort < 1)
+        if (requiresVip && state.AccountGrade < (short)GmCommandTier.Basic)
             return Fail(characterId, item, page, index);
 
         var newExp = Math.Min(currentExp + expAmount, MountStateResolver.MaxMountExp);

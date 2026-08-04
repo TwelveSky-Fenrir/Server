@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -8,11 +9,9 @@ public sealed class SkyUpgradeItemHandler(ILogger<SkyUpgradeItemHandler> logger)
 {
     public void Handle(in SkyUpgradeItemRequest packet, IPacketSession session)
     {
+        var zoneSession = (IZoneSession)session;
         logger.LogWarning(
-            "Session {SessionId}: SkyUpgradeItemRequest received — op93 P_SKY_UP_ITEM_SEND has its REGWORK1 line " +
-            "wrapped in #ifdef __REBIRTH__ (Server/ts25zone/S04_MyWork01.cpp:97-99), and __REBIRTH__ is defined only " +
-            "at Server/Header/Protocol/DEFINE.h:28 inside the dead #else of #ifdef M33, so W_FUNCTION[93].PROC stays " +
-            "NULL and the legacy server logs Unknown Header then quits the session (:292-301); silently ignored",
-            session.SessionId);
+            "Session {SessionId}: rejected unregistered opcode {Opcode}", session.SessionId, 93);
+        zoneSession.Abort(DisconnectReason.Faulted);
     }
 }

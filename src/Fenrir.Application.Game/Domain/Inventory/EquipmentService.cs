@@ -85,7 +85,9 @@ public static class EquipmentService
             state.TribeRole,
             DrunkStateId: ResolveDrunkStateId(state),
             GuildBuffActive: state.GuildBuffActive,
-            GuildId: state.GuildId ?? 0);
+            GuildBuffType: state.GuildBuffType,
+            GuildId: state.GuildId ?? 0,
+            Zone38TribeEffect: state.Zone38TribeEffect);
 
         var consumable = new ConsumableContext(
             state.EatLifePotion,
@@ -98,20 +100,20 @@ public static class EquipmentService
             state.DmgBoost > 0,
             state.CriBoost > 0);
 
-        var mount = BuildMountContext(state);
+        var mount = BuildMountContext(state, worldData.ItemsById);
 
         return (cosmetic, zone, consumable, mount);
     }
 
-    public static MountContext BuildMountContext(PlayerRuntimeState state)
+    public static MountContext BuildMountContext(PlayerRuntimeState state,
+        FrozenDictionary<int, ItemDefinition> itemsById)
     {
-        var mountedSlot = state.AnimalIndex >= MountAnimalInfo.ActiveCompanionSlotBase &&
-                          state.AnimalIndex <
-                          MountAnimalInfo.ActiveCompanionSlotBase + MountAnimalInfo.ActiveCompanionSlotCount
-            ? state.AnimalIndex - MountAnimalInfo.ActiveCompanionSlotBase
-            : -1;
+        if (!MountStateResolver.TryResolveActiveMountedMount(state.AnimalIndex, state.AnimalNumber,
+                state.MountGarage, out var mountedSlot))
+            return default;
 
-        if (mountedSlot < 0 || state.AnimalNumber == 0)
+        if (!MountAnimalSortClassifier.TryResolveAuthoritativeItemSort(state.AnimalNumber, itemsById,
+                out _))
             return default;
 
         var absorbValue = StatCalculator.TryGetMountBaseRow(state.AnimalNumber, out var row) ? row.AbsorbValue : 0;

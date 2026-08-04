@@ -25,12 +25,12 @@ public static class MountActivityExpCodec
 
     public static int Activity(int packed)
     {
-        return packed / ActivityScale;
+        return ClampActivity(packed / ActivityScale);
     }
 
     public static int Exp(int packed)
     {
-        return packed % ActivityScale;
+        return ClampExp(packed % ActivityScale);
     }
 
     public static int FeedActivity(int currentActivity, int addedActivity)

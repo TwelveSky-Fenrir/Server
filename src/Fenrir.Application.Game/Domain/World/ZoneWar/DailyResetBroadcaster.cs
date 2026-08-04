@@ -1,99 +1,114 @@
-using System.Buffers;
-using Fenrir.Core.Wire;
-using Fenrir.Protocol.Game;
+using Fenrir.Data.Abstractions.Characters;
+using Fenrir.Application.Game.Domain;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public sealed class DailyResetBroadcaster(
-    ZoneRegistry zones,
     IDailyRewardResetRepository dailyRewardReset,
+    IDailyResetZoneEventPublisher publisher,
+    IOptions<GameServerOptions> serverOptions,
     ILogger<DailyResetBroadcaster> logger)
 {
-    private const int PayloadSize = 130;
+    private const int BroadcastLeaseDurationSeconds = 60;
 
     private readonly DailyResetBroadcastScheduler _scheduler = new();
+    private readonly byte _shardId = serverOptions.Value.ShardId;
 
     public async ValueTask TickAsync(DateTimeOffset localNow, CancellationToken ct)
     {
         if (!_scheduler.IsDue(localNow))
             return;
 
-        if (_scheduler.AllowsEagerReset(localNow))
+        var occurrenceDate = DateOnly.FromDateTime(localNow.DateTime);
+        var clearWeeklyDayCounter = localNow.DayOfWeek == DayOfWeek.Monday;
+        try
         {
-            var clearWeeklyDayCounter = localNow.DayOfWeek == DayOfWeek.Monday;
-
-            try
-            {
-                await dailyRewardReset.ResetDailyRewardClaimsAsync(clearWeeklyDayCounter, ct).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                logger.LogWarning(
-                    "Daily reward-claim reset cancelled mid-flight during shutdown -- not marked as fired, the " +
-                    "next start retries as soon as it boots inside the reset window");
-                throw;
-            }
-            catch (Exception ex)
-            {
-                logger.LogCritical(ex,
-                    "Daily reward-claim reset FAILED (clearWeeklyDayCounter {ClearWeekly}) -- retrying until the " +
-                    "reset window closes, after which the lazy per-character path is the only fallback",
-                    clearWeeklyDayCounter);
-                return;
-            }
+            await dailyRewardReset.ApplyDailyRewardResetAsync(occurrenceDate, clearWeeklyDayCounter, ct)
+                .ConfigureAwait(false);
         }
-        else
+        catch (OperationCanceledException)
         {
-            logger.LogWarning(
-                "Daily reset for {LocalDate} fired late at {LocalTime} (process down or stalled at 00:01) -- " +
-                "broadcasting only, the bulk reward-claim reset is deliberately skipped",
-                DateOnly.FromDateTime(localNow.DateTime), localNow.TimeOfDay);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogCritical(ex,
+                "Daily reward-claim reset occurrence was not durably applied for {OccurrenceDate}", occurrenceDate);
+            return;
         }
 
-        _scheduler.MarkFired(localNow);
-        Broadcast();
-    }
-
-    private void Broadcast()
-    {
-        var data = new byte[PayloadSize];
-        var response = new ZoneEventInfoResponse
-            { Sort = ScheduledZoneCenterEventCodes.DailyResetEventCode, Data = data };
-
-        BroadcastToEveryZone(in response);
-
-        logger.LogInformation("Autonomous daily-reset broadcast sent (sort {Sort})",
-            ScheduledZoneCenterEventCodes.DailyResetEventCode);
-    }
-
-    private void BroadcastToEveryZone<TPacket>(in TPacket response) where TPacket : struct, IOutgoingPacket
-    {
-        var total = FrameWriter.FrameSizeOf<TPacket>();
-        var rented = ArrayPool<byte>.Shared.Rent(total);
+        var leaseId = Guid.NewGuid();
+        DailyRewardResetBroadcastClaimState broadcastClaimState;
 
         try
         {
-            var span = rented.AsSpan(0, total);
-            FrameWriter.WriteFrame(in response, span);
-
-            foreach (var zone in zones.Zones)
-            foreach (var player in zone.Players)
-                try
-                {
-                    if (player.Session is { } clientSession)
-                        clientSession.SendRaw(span);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex,
-                        "Daily-reset broadcast to character {RecipientId} (zone {MapId}) failed",
-                        player.CharacterId, zone.MapId);
-                }
+            broadcastClaimState = await dailyRewardReset.TryClaimDailyRewardResetBroadcastAsync(occurrenceDate,
+                _shardId, leaseId, BroadcastLeaseDurationSeconds, ct).ConfigureAwait(false);
         }
-        finally
+        catch (OperationCanceledException)
         {
-            ArrayPool<byte>.Shared.Return(rented);
+            throw;
         }
+        catch (Exception ex)
+        {
+            logger.LogCritical(ex,
+                "Daily reward-claim reset broadcast occurrence could not be claimed for {OccurrenceDate}", occurrenceDate);
+            return;
+        }
+
+        if (broadcastClaimState == DailyRewardResetBroadcastClaimState.Completed)
+        {
+            _scheduler.MarkCompleted(occurrenceDate);
+            return;
+        }
+
+        if (broadcastClaimState != DailyRewardResetBroadcastClaimState.Claimed)
+            return;
+
+        try
+        {
+            await publisher.PublishAsync(ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex,
+                "Daily reward-claim reset broadcast failed for {OccurrenceDate}; its durable lease will be retried",
+                occurrenceDate);
+            return;
+        }
+
+        bool broadcastCompleted;
+
+        try
+        {
+            broadcastCompleted = await dailyRewardReset.TryCompleteDailyRewardResetBroadcastAsync(occurrenceDate,
+                _shardId, leaseId, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogCritical(ex,
+                "Daily reward-claim reset broadcast completion could not be persisted for {OccurrenceDate}", occurrenceDate);
+            return;
+        }
+
+        if (!broadcastCompleted)
+        {
+            logger.LogWarning(
+                "Daily reward-claim reset broadcast lease was not current for {OccurrenceDate}; retry remains pending",
+                occurrenceDate);
+            return;
+        }
+
+        _scheduler.MarkCompleted(occurrenceDate);
     }
 }

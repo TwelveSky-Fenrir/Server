@@ -44,12 +44,12 @@ public sealed class BuyBloodMarkItemService(
             return null;
         }
 
-        var buyQuantity = packet.Value[3];
-        if (buyQuantity is < 1 or > GroundItemPickupPolicy.MaxStackQuantity)
+        var requestedQuantity = packet.Value[3];
+        if (requestedQuantity is < 1 or > GroundItemPickupPolicy.MaxStackQuantity)
         {
             logger.LogInformation(
-                "Buy blood mark item rejected: character {CharacterId} sent out-of-range quantity {BuyQuantity}",
-                characterId, buyQuantity);
+                "Buy blood mark item rejected: character {CharacterId} sent out-of-range quantity {RequestedQuantity}",
+                characterId, requestedQuantity);
             return new BuyBloodMarkItemResponse
                 { Result = ShopSpecificError, BloodCoin = 0, Page1 = page, Index1 = slot, Value = packet.Value };
         }
@@ -63,11 +63,11 @@ public sealed class BuyBloodMarkItemService(
         }
 
         var isStackable = ContainerMatrix.IsStackableSort(itemDefinition.Item.Sort);
-        if (buyQuantity > 1 && !isStackable)
+        if (requestedQuantity > 1 && !isStackable)
         {
             logger.LogInformation(
-                "Buy blood mark item rejected: character {CharacterId} requested quantity {BuyQuantity} for non-stackable item {ItemId}",
-                characterId, buyQuantity, packet.Value[0]);
+                "Buy blood mark item rejected: character {CharacterId} requested quantity {RequestedQuantity} for non-stackable item {ItemId}",
+                characterId, requestedQuantity, packet.Value[0]);
             return new BuyBloodMarkItemResponse
                 { Result = ShopSpecificError, BloodCoin = 0, Page1 = page, Index1 = slot, Value = packet.Value };
         }
@@ -82,24 +82,38 @@ public sealed class BuyBloodMarkItemService(
                 { Result = 2, BloodCoin = 0, Page1 = page, Index1 = slot, Value = packet.Value };
         }
 
+        var bundleCost = entry.Price;
+        var bundleQuantity = entry.Quantity;
+        if (bundleCost < 1)
+        {
+            logger.LogWarning(
+                "Buy blood mark item rejected: character {CharacterId} bloodIndex {BloodIndex} has a non-positive catalog bundle cost -- session will be disconnected",
+                characterId, packet.BloodIndex);
+            return null;
+        }
+
         var destination = state.Inventory.GetSlot((byte)page, (byte)slot);
         var mergesIntoExisting = destination is { } d && d.ItemId == entry.ItemId;
-
-        long affordabilityCost;
         if (isStackable)
         {
-            if (entry.Quantity < 1)
+            if (bundleQuantity is < 1 or > GroundItemPickupPolicy.MaxStackQuantity)
             {
                 logger.LogWarning(
-                    "Buy blood mark item rejected: character {CharacterId} bloodIndex {BloodIndex} has a non-positive catalog quantity -- session will be disconnected",
-                    characterId, packet.BloodIndex);
+                    "Buy blood mark item rejected: character {CharacterId} bloodIndex {BloodIndex} has an out-of-range catalog bundle quantity {BundleQuantity} -- session will be disconnected",
+                    characterId, packet.BloodIndex, bundleQuantity);
                 return null;
             }
 
-            affordabilityCost = (long)entry.Price * entry.Quantity;
+            if (destination is not null && !mergesIntoExisting)
+            {
+                logger.LogWarning(
+                    "Buy blood mark item rejected: character {CharacterId} destination slot {Page}/{Index} contains another item -- session will be disconnected",
+                    characterId, page, slot);
+                return null;
+            }
 
             if (mergesIntoExisting &&
-                destination!.Value.Quantity + entry.Quantity > GroundItemPickupPolicy.MaxStackQuantity)
+                destination!.Value.Quantity + bundleQuantity > GroundItemPickupPolicy.MaxStackQuantity)
             {
                 logger.LogWarning(
                     "Buy blood mark item rejected: character {CharacterId} destination slot {Page}/{Index} would overflow the max stack quantity -- session will be disconnected",
@@ -109,7 +123,20 @@ public sealed class BuyBloodMarkItemService(
         }
         else
         {
-            affordabilityCost = entry.Price;
+            var quantityIsValid = itemDefinition.Item.Sort switch
+            {
+                ItemQuantityPolicy.PetSort => bundleQuantity is >= ItemQuantityPolicy.MinStackQuantity and <=
+                    ItemQuantityPolicy.MaxPetActivity,
+                _ => bundleQuantity is 0 or 1
+            };
+            if (!quantityIsValid)
+            {
+                logger.LogWarning(
+                    "Buy blood mark item rejected: character {CharacterId} bloodIndex {BloodIndex} has an invalid non-stackable catalog bundle quantity {BundleQuantity} -- session will be disconnected",
+                    characterId, packet.BloodIndex, bundleQuantity);
+                return null;
+            }
+
             if (destination is not null)
             {
                 logger.LogWarning(
@@ -119,15 +146,15 @@ public sealed class BuyBloodMarkItemService(
             }
         }
 
-        if (state.BloodCoin < affordabilityCost)
+        if (state.BloodCoin < bundleCost)
         {
             logger.LogWarning(
-                "Buy blood mark item rejected: character {CharacterId} cannot afford bloodIndex {BloodIndex} ({AffordabilityCost} BloodCoin) -- session will be disconnected",
-                characterId, packet.BloodIndex, affordabilityCost);
+                "Buy blood mark item rejected: character {CharacterId} cannot afford bloodIndex {BloodIndex} ({BundleCost} BloodCoin) -- session will be disconnected",
+                characterId, packet.BloodIndex, bundleCost);
             return null;
         }
 
-        var finalQuantity = mergesIntoExisting ? destination!.Value.Quantity + entry.Quantity : entry.Quantity;
+        var finalQuantity = mergesIntoExisting ? destination!.Value.Quantity + bundleQuantity : bundleQuantity;
         var newStack = new ItemStack(entry.ItemId, finalQuantity, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             (byte)packet.Value[1], (byte)packet.Value[2]);
         var projectedContainer = state.Inventory.GetContainer((byte)page).SetItem((byte)slot, newStack);
@@ -135,8 +162,9 @@ public sealed class BuyBloodMarkItemService(
         int newBloodCoin;
         try
         {
-            newBloodCoin = await characters.SpendBloodCoinAndReplaceContainerAsync(characterId, -entry.Price,
-                (byte)page, ToTvps(projectedContainer), cancellationToken);
+            newBloodCoin = await characters.SpendBloodCoinAndReplaceContainerAsync(characterId, -bundleCost,
+                (byte)page, (byte)slot, entry.ItemId, bundleQuantity, ToTvps(projectedContainer),
+                cancellationToken);
         }
         catch (Exception ex)
         {

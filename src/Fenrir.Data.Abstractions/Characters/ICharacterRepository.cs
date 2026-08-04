@@ -83,7 +83,7 @@ public interface ICharacterRepository
         IReadOnlyList<CharacterCostumeSlotTvp> costumes, IReadOnlyList<CharacterMountSlotTvp> mounts,
         CancellationToken ct, IReadOnlyList<CharacterStellarCoreSlotTvp>? stellarCores = null);
 
-    public ValueTask PersistFinalFlushAsync(CharacterProgressTvp progress, CharacterPositionTvp position,
+    public ValueTask<CharacterFinalFlushResultDto> PersistFinalFlushAsync(CharacterProgressTvp progress, CharacterPositionTvp position,
         IReadOnlyList<CharacterCostumeSlotTvp> costumes, IReadOnlyList<CharacterBuffSlotTvp> buffs,
         IReadOnlyList<CharacterMountSlotTvp> mounts, CancellationToken ct,
         IReadOnlyList<CharacterStellarCoreSlotTvp>? stellarCores = null);
@@ -150,7 +150,8 @@ public interface ICharacterRepository
         IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct);
 
     public ValueTask<int> SpendBloodCoinAndReplaceContainerAsync(int characterId, int deltaBloodCoin,
-        byte container, IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct);
+        byte container, byte targetSlot, int catalogItemId, int catalogQuantity,
+        IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct);
 
     public ValueTask ExecutePshopPurchaseAsync(int sellerCharacterId, byte sellerContainer,
         IReadOnlyList<CharacterItemSlotTvp> sellerItems, int buyerCharacterId, byte buyerContainer,

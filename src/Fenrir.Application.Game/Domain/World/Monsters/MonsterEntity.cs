@@ -1,5 +1,5 @@
-using System.Numerics;
 using Fenrir.Application.Game.Domain.Combat;
+using Fenrir.Application.Game.Domain.World.Runtime;
 
 namespace Fenrir.Application.Game.Domain.World.Monsters;
 
@@ -45,7 +45,19 @@ public sealed class MonsterEntity
 
     public int MaxLife { get; init; }
 
-    public MonsterAiState AiState { get; set; } = MonsterAiState.Spawning;
+    private MonsterAiState _aiState = MonsterAiState.Spawning;
+
+    internal Action<MonsterEntity>? PursuitStateChanged { get; set; }
+
+    public MonsterAiState AiState
+    {
+        get => _aiState;
+        set
+        {
+            _aiState = value;
+            PursuitStateChanged?.Invoke(this);
+        }
+    }
 
     public int StateTicks { get; set; }
 
@@ -55,7 +67,11 @@ public sealed class MonsterEntity
 
     public uint TargetUniqueNumber { get; private set; }
 
-    public bool AttackPacketConfirmationArmed { get; set; }
+    public RuntimeIncarnation TargetIncarnation { get; private set; }
+
+    public bool AttackPacketConfirmationArmed { get; private set; }
+
+    public float AttackPacketConfirmationElapsedSeconds { get; private set; }
 
     public float TargetLocationX { get; set; }
 
@@ -63,15 +79,9 @@ public sealed class MonsterEntity
 
     public float TargetLocationZ { get; set; }
 
+        public int DeathSkillNumber { get; private set; }
+
     public TimeSpan LastRebroadcastAt { get; set; }
-
-    public List<Vector2> PathWaypoints { get; } = [];
-
-    public int WaypointCursor { get; set; }
-
-    public float PathGoalX { get; set; }
-
-    public float PathGoalZ { get; set; }
 
     public int DetectionThrottleTicks { get; set; }
 
@@ -113,25 +123,53 @@ public sealed class MonsterEntity
         LastAttackerName = name;
     }
 
-    public void ClearPath()
-    {
-        PathWaypoints.Clear();
-        WaypointCursor = 0;
-    }
-
-    public void AssignTarget(int characterId, uint uniqueNumber, float x, float y, float z)
+    public void AssignTarget(int characterId, RuntimeIncarnation incarnation, uint uniqueNumber, float x, float y,
+        float z)
     {
         TargetCharacterId = characterId;
+        TargetIncarnation = incarnation;
         TargetUniqueNumber = uniqueNumber;
         TargetLocationX = x;
         TargetLocationY = y;
         TargetLocationZ = z;
+        PursuitStateChanged?.Invoke(this);
     }
 
     public void ReleaseTarget()
     {
         TargetCharacterId = null;
+        TargetIncarnation = default;
         TargetUniqueNumber = 0;
+        ClearAttackPacketConfirmation();
+        PursuitStateChanged?.Invoke(this);
+    }
+
+    public void ArmAttackPacketConfirmation()
+    {
+        AttackPacketConfirmationArmed = Template.AttackType is 1 or 2;
+        AttackPacketConfirmationElapsedSeconds = 0f;
+    }
+
+    public void AdvanceAttackPacketConfirmation(float elapsedSeconds)
+    {
+        if (!AttackPacketConfirmationArmed || elapsedSeconds <= 0f)
+            return;
+
+        AttackPacketConfirmationElapsedSeconds += elapsedSeconds;
+    }
+
+    public void ClearAttackPacketConfirmation()
+    {
+        AttackPacketConfirmationArmed = false;
+        AttackPacketConfirmationElapsedSeconds = 0f;
+    }
+
+    public void RecordDeathAction(int deathSkillNumber)
+    {
+        DeathSkillNumber = deathSkillNumber;
+        AiState = MonsterAiState.Dead;
+        StateTicks = 0;
+        StateFrameAccumulator = 0f;
     }
 
     public static MonsterEntity Create(int serverIndex, uint uniqueNumber, MonsterRowDto template, int spawnSlotId,
@@ -145,6 +183,7 @@ public sealed class MonsterEntity
         var pursuerCapacity = maxPursuers > minPursuers
             ? minPursuers + rng.NextInt32(maxPursuers - minPursuers + 1)
             : minPursuers;
+        var heading = rng.NextInt32(360);
 
         var entity = new MonsterEntity
         {
@@ -159,6 +198,7 @@ public sealed class MonsterEntity
             PosX = homeX,
             PosY = homeY,
             PosZ = homeZ,
+            Heading = heading,
             TargetLocationX = homeX,
             TargetLocationY = homeY,
             TargetLocationZ = homeZ,
@@ -264,25 +304,25 @@ public sealed class MonsterEntity
         return false;
     }
 
-    internal void RegisterAttackDamage(int attackerCharacterId, object sessionToken, int damage)
+    internal void RegisterAttackDamage(int attackerCharacterId, RuntimeIncarnation incarnation, int damage)
     {
         if (damage <= 0)
             return;
 
-        WriteAttackDamageSlot(attackerCharacterId, sessionToken, damage);
+        WriteAttackDamageSlot(attackerCharacterId, incarnation, damage);
     }
 
-    internal void RegisterAcquisition(int characterId, object sessionToken)
+    internal void RegisterAcquisition(int characterId, RuntimeIncarnation incarnation)
     {
-        WriteAttackDamageSlot(characterId, sessionToken, 0);
+        WriteAttackDamageSlot(characterId, incarnation, 0);
     }
 
-    private void WriteAttackDamageSlot(int characterId, object sessionToken, int damage)
+    private void WriteAttackDamageSlot(int characterId, RuntimeIncarnation incarnation, int damage)
     {
         lock (_attackDamageLock)
         {
             var existing = _attackDamage.Find(e =>
-                e.CharacterId == characterId && ReferenceEquals(e.SessionToken, sessionToken));
+                e.CharacterId == characterId && e.Incarnation == incarnation);
 
             if (existing is not null)
             {
@@ -296,7 +336,7 @@ public sealed class MonsterEntity
             _attackDamage.Add(new MonsterAttackDamageEntry
             {
                 CharacterId = characterId,
-                SessionToken = sessionToken,
+                Incarnation = incarnation,
                 CumulativeDamage = damage
             });
         }
@@ -327,9 +367,17 @@ public sealed class MonsterEntity
                 _attackDamage.Add(new MonsterAttackDamageEntry
                 {
                     CharacterId = survivor.CharacterId,
-                    SessionToken = survivor.SessionToken,
+                    Incarnation = survivor.Incarnation,
                     CumulativeDamage = survivor.CumulativeDamage
                 });
         }
+    }
+}
+
+internal sealed class RandomSourceAdapter(Random random) : IRandomSource
+{
+    public int NextInt32(int exclusiveUpperBound)
+    {
+        return random.Next(exclusiveUpperBound);
     }
 }

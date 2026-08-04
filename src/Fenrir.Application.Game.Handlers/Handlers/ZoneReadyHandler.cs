@@ -17,11 +17,12 @@ public sealed class ZoneReadyHandler(IZoneReadyService service, ILogger<ZoneRead
             "Session {SessionId}: ZoneReadyRequest (op13) received for character {CharacterId}, current state {State}, claimed tribe {ClaimedTribe}",
             session.SessionId, zoneSession.CharacterId, zoneSession.State, packet.Tribe);
 
-        if (zoneSession.State == ZoneSessionState.InWorld)
+        if (zoneSession.State != ZoneSessionState.Registering)
         {
-            logger?.LogDebug(
-                "Zone-ready request ignored for character {CharacterId} (session {SessionId}): session is already InWorld",
-                zoneSession.CharacterId, session.SessionId);
+            logger?.LogWarning(
+                "Zone-ready request aborted for character {CharacterId} (session {SessionId}): invalid session state {State}",
+                zoneSession.CharacterId, session.SessionId, zoneSession.State);
+            zoneSession.Abort(DisconnectReason.StateViolation);
             return;
         }
 
@@ -31,16 +32,19 @@ public sealed class ZoneReadyHandler(IZoneReadyService service, ILogger<ZoneRead
             if (service.Validate(state, packet.Tribe, packet.AutoState) == ZoneReadyOutcome.Rejected)
             {
                 logger?.LogWarning(
-                    "Zone-ready handshake rejected for character {CharacterId} (session {SessionId}) -- ignoring (may be stale reconnect state)",
+                    "Zone-ready handshake rejected for character {CharacterId} (session {SessionId}) -- aborting session",
                     characterId, session.SessionId);
+                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             }
         }
         else
         {
-            logger?.LogDebug(
-                "Zone-ready validation skipped for session {SessionId}: player state not yet ticked into the zone (benign staleness window)",
+            logger?.LogWarning(
+                "Zone-ready handshake aborted for session {SessionId}: the registered character has no current player state",
                 session.SessionId);
+            zoneSession.Abort(DisconnectReason.Faulted);
+            return;
         }
 
         zoneSession.MarkInWorld();

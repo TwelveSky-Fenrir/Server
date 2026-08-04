@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -8,11 +9,9 @@ public sealed class AddAbilityHandler(ILogger<AddAbilityHandler> logger)
 {
     public void Handle(in AddAbilityRequest packet, IPacketSession session)
     {
+        var zoneSession = (IZoneSession)session;
         logger.LogWarning(
-            "Session {SessionId}: AddAbilityRequest received — op132 P_ADD_ABILITY_SEND has no REGWORK1 line in " +
-            "legacy MyWork::Init (Server/ts25zone/S04_MyWork01.cpp:6-266) and is superseded by GenericAction sort " +
-            "206 [STAT+] (Server/ts25zone/S04_MyWork04.cpp:420), so the legacy server logs Unknown Header and quits " +
-            "the session (:292-301); silently ignored",
-            session.SessionId);
+            "Session {SessionId}: rejected unregistered opcode {Opcode}", session.SessionId, 132);
+        zoneSession.Abort(DisconnectReason.Faulted);
     }
 }

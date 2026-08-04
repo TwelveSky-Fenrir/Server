@@ -14,9 +14,14 @@ const int maxZoneNumber = 349;
 var gamePublicHost = Environment.GetEnvironmentVariable("FENRIR_PUBLIC_HOST") is { Length: > 0 } configuredHost
     ? configuredHost
     : ResolvePrimaryLanIPv4();
+var ruleset = Environment.GetEnvironmentVariable("FENRIR_GAME_RULESET") is { Length: > 0 } configuredRuleset
+    ? configuredRuleset
+    : "ExtendedUpgrade";
 Console.WriteLine(
     $"[Fenrir.AppHost] Game__PublicHost = {gamePublicHost} (override with the FENRIR_PUBLIC_HOST env var). " +
     "Clients receive this host to reach zones; it MUST be reachable from the client machine.");
+Console.WriteLine(
+    $"[Fenrir.AppHost] Game__Ruleset = {ruleset} (override with the FENRIR_GAME_RULESET env var).");
 
 var sql = builder.AddSqlServer("sqlserver", sqlPassword)
     .WithImageTag("2025-latest")
@@ -39,28 +44,22 @@ builder.AddProject<Fenrir_LoginServer>("login-server", launchProfileName: null)
     .WithEnvironment("Login__Port", loginPort.ToString())
     .WithEnvironment("Login__ZoneBasePort", zoneBasePort.ToString());
 
-var reservedPorts = loginPort.ToString();
+const byte gameServerId = 1;
+var gameServerPort = zoneBasePort + gameServerId;
 
-byte[] shardIds = [1];
-
-foreach (var shardId in shardIds)
-{
-    var anchorZonePort = zoneBasePort + shardId;
-
-    builder.AddProject<Fenrir_GameServer>($"game-server", launchProfileName: null)
-        .WithReference(fenrirDb)
-        .WaitForCompletion(migrator)
-        .WithEndpoint(name: "zone-anchor-tcp", scheme: "tcp", port: anchorZonePort, targetPort: anchorZonePort,
-            isProxied: false)
-        .WithEnvironment("Game__ShardId", shardId.ToString())
-        .WithEnvironment("Game__Port", anchorZonePort.ToString())
-        .WithEnvironment("Game__ZoneBasePort", zoneBasePort.ToString())
-        .WithEnvironment("Game__ZonePortRangeStart", (zoneBasePort + 1).ToString())
-        .WithEnvironment("Game__ZonePortRangeEnd", (zoneBasePort + maxZoneNumber).ToString())
-        .WithEnvironment("Game__ReservedPorts", reservedPorts)
-        .WithEnvironment("Game__PublicHost", gamePublicHost);
-    ;
-}
+builder.AddProject<Fenrir_GameServer>("game-server", launchProfileName: null)
+    .WithReference(fenrirDb)
+    .WaitForCompletion(migrator)
+    .WithEndpoint(name: "zone-anchor-tcp", scheme: "tcp", port: gameServerPort, targetPort: gameServerPort,
+        isProxied: false)
+    .WithEnvironment("Game__ShardId", gameServerId.ToString())
+    .WithEnvironment("Game__Port", gameServerPort.ToString())
+    .WithEnvironment("Game__ZoneBasePort", zoneBasePort.ToString())
+    .WithEnvironment("Game__ZonePortRangeStart", (zoneBasePort + 1).ToString())
+    .WithEnvironment("Game__ZonePortRangeEnd", (zoneBasePort + maxZoneNumber).ToString())
+    .WithEnvironment("Game__ReservedPorts", loginPort.ToString())
+    .WithEnvironment("Game__PublicHost", gamePublicHost)
+    .WithEnvironment("Game__Ruleset", ruleset);
 
 builder.Build().Run();
 return;

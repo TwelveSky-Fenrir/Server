@@ -38,6 +38,9 @@ public sealed class DestroyItemHandler(IDestroyItemService destroyItemService, I
 
             if (result.Outcome != DestroyItemOutcome.Applied)
             {
+                if (result.Outcome == DestroyItemOutcome.Disconnected)
+                    return;
+
                 session.Send(new DestroyItemResponse { Result = 1, Money = 0, Value = [0, 0, 0, 0, 0, 0] });
                 return;
             }

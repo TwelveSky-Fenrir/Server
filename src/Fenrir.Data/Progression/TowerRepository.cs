@@ -22,13 +22,14 @@ public sealed record TowerRepository(ICaeriusNetDbContext Db) : ITowerRepository
         return await Db.QueryAsReadOnlyCollectionAsync<TowerStateRowDto>(sp, ct);
     }
 
-    public async ValueTask SetProgressAsync(byte towerIndex, byte level, byte towerType, byte? controllingTribeId,
-        CancellationToken ct)
+    public async ValueTask SetProgressAsync(byte towerIndex, byte level, byte towerType, short attackState,
+        byte? controllingTribeId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_TowerState_SetController", 0)
             .AddParameter("TowerIndex", towerIndex, SqlDbType.TinyInt)
             .AddParameter("Level", level, SqlDbType.TinyInt)
             .AddParameter("TowerType", towerType, SqlDbType.TinyInt)
+            .AddParameter("AttackState", attackState, SqlDbType.SmallInt)
             .AddParameter("ControllingTribeId", (object?)controllingTribeId ?? DBNull.Value, SqlDbType.TinyInt)
             .Build();
 

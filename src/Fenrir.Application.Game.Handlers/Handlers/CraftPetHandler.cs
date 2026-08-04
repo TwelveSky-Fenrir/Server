@@ -42,24 +42,21 @@ public sealed class CraftPetHandler(ICraftPetService craftPetService, ILogger<Cr
         CancellationToken cancellationToken)
     {
         CraftPetResult result;
-
         switch (packet.Sort)
         {
+            case PetCraftRecipeCatalog.Recipe0Sort:
             case PetCraftRecipeCatalog.Recipe1Sort:
             case PetCraftRecipeCatalog.Recipe2Sort:
-            case PetCraftRecipeCatalog.Recipe3Sort:
-                result = await craftPetService.ResolveFourSlotRecipeAsync(packet, zone, state, characterId,
-                    accountId, cancellationToken);
+                result = await craftPetService.ResolveFourSlotRecipeAsync(packet, zone, state, characterId, accountId,
+                    cancellationToken);
                 break;
-            case PetCraftRecipeCatalog.Recipe4Sort:
-            case PetCraftRecipeCatalog.Recipe5Sort:
-            case PetCraftRecipeCatalog.Recipe6Sort:
-                result = await craftPetService.ResolveTwoSlotRecipeAsync(packet, zone, state, characterId,
-                    accountId, cancellationToken);
+            case PetCraftRecipeCatalog.Recipe3Sort:
+                result = await craftPetService.ResolveTwoSlotRecipeAsync(packet, zone, state, characterId, accountId,
+                    cancellationToken);
                 break;
             default:
                 logger.LogInformation(
-                    "Craft-pet request failed structural validation for character {CharacterId}: invalid sort {Sort} -- disconnecting",
+                    "Craft-pet request failed structural validation for character {CharacterId}: inactive sort {Sort} -- disconnecting",
                     characterId, packet.Sort);
                 zoneSession.Abort(DisconnectReason.Faulted);
                 return;

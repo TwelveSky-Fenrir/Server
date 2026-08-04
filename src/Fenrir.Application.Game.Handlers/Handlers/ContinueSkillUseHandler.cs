@@ -8,9 +8,10 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
 public sealed class ContinueSkillUseHandler(IContinueSkillUseService service, ILogger<ContinueSkillUseHandler> logger)
-    : IInlinePacketHandler<ContinueSkillUseRequest>
+    : IAsyncPacketHandler<ContinueSkillUseRequest>
 {
-    public void Handle(in ContinueSkillUseRequest packet, IPacketSession session)
+    public async ValueTask HandleAsync(ContinueSkillUseRequest packet, IPacketSession session,
+        CancellationToken cancellationToken)
     {
         var zoneSession = (IZoneSession)session;
 
@@ -35,12 +36,13 @@ public sealed class ContinueSkillUseHandler(IContinueSkillUseService service, IL
                 "Session {SessionId}: ContinueSkillUseRequest (op95) received for character {CharacterId}, sort {Sort}",
                 session.SessionId, characterId, packet.Sort);
 
-        var result = service.Activate(zone, characterId, state, packet.Sort);
+        var result = await service.ActivateAsync(zone, characterId, state, packet.Sort, cancellationToken);
 
         switch (result.Kind)
         {
             case AutoBuffActivationResolver.ResultKind.NoReply:
             case AutoBuffActivationResolver.ResultKind.Tick:
+            case AutoBuffActivationResolver.ResultKind.Rejected:
                 return;
 
             case AutoBuffActivationResolver.ResultKind.Disconnect:

@@ -6,9 +6,13 @@ CREATE PROCEDURE runtime.usp_AccountSession_ClaimOrSignalKick @AccountId INT,
 BEGIN
     ATOMIC
     WITH (TRANSACTION ISOLATION LEVEL = SNAPSHOT, LANGUAGE = N'us_english')
-    DECLARE @ServerKind TINYINT, @ShardId TINYINT, @SessionState TINYINT, @ShardHeartbeatUtc DATETIME2(3) = NULL;
+    DECLARE @ServerKind TINYINT, @ShardId TINYINT, @SessionState TINYINT, @CurrentSessionToken UNIQUEIDENTIFIER,
+        @ShardHeartbeatUtc DATETIME2(3) = NULL;
 
-    SELECT @ServerKind = ServerKind, @ShardId = ShardId, @SessionState = SessionState
+    SELECT @ServerKind = ServerKind,
+           @ShardId = ShardId,
+           @SessionState = SessionState,
+           @CurrentSessionToken = SessionToken
     FROM runtime.AccountSessions
     WHERE AccountId = @AccountId;
 
@@ -31,39 +35,45 @@ BEGIN
                 SELECT CAST(3 AS TINYINT) AS Outcome, CAST(NULL AS TINYINT) AS PreviousShardId;
             END
         ELSE
-            IF @ServerKind = 0 AND @AttemptNumber = 1
+            IF @ServerKind = 0
                 BEGIN
-                    DELETE
-                    FROM runtime.AccountSessions
-                    WHERE AccountId = @AccountId;
-
                     SELECT CAST(1 AS TINYINT) AS Outcome, CAST(NULL AS TINYINT) AS PreviousShardId;
                 END
             ELSE
-                IF @ServerKind = 0
+                IF @ShardHeartbeatUtc IS NULL OR @ShardHeartbeatUtc <= DATEADD(SECOND, -60, SYSUTCDATETIME())
                     BEGIN
-                        SELECT CAST(1 AS TINYINT) AS Outcome, CAST(NULL AS TINYINT) AS PreviousShardId;
+                        UPDATE runtime.AccountSessions
+                        SET ServerKind       = 0,
+                            ShardId          = NULL,
+                            SessionToken     = @NewSessionToken,
+                            SessionState     = 0,
+                            KickRequested    = 0,
+                            ConnectedAtUtc   = SYSUTCDATETIME(),
+                            LastRefreshedUtc = SYSUTCDATETIME()
+                        WHERE AccountId = @AccountId
+                          AND ServerKind = 1
+                          AND ShardId = @ShardId
+                          AND SessionToken = @CurrentSessionToken
+                          AND SessionState = 0;
+
+                        IF @@ROWCOUNT = 1
+                            SELECT CAST(4 AS TINYINT) AS Outcome, @ShardId AS PreviousShardId;
+                        ELSE
+                            SELECT CAST(2 AS TINYINT) AS Outcome, CAST(NULL AS TINYINT) AS PreviousShardId;
                     END
                 ELSE
-                    IF @ShardHeartbeatUtc IS NULL OR @ShardHeartbeatUtc <= DATEADD(SECOND, -60, SYSUTCDATETIME())
-                        BEGIN
-                            DELETE
-                            FROM runtime.AccountSessions
-                            WHERE AccountId = @AccountId;
+                    BEGIN
+                        UPDATE runtime.AccountSessions
+                        SET KickRequested = 1
+                        WHERE AccountId = @AccountId
+                          AND ServerKind = 1
+                          AND ShardId = @ShardId
+                          AND SessionToken = @CurrentSessionToken
+                          AND SessionState = 0;
 
-                            INSERT INTO runtime.AccountSessions
-                            (AccountId, ServerKind, ShardId, SessionToken, SessionState, KickRequested, ConnectedAtUtc,
-                             LastRefreshedUtc)
-                            VALUES (@AccountId, 0, NULL, @NewSessionToken, 0, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
-
-                            SELECT CAST(4 AS TINYINT) AS Outcome, @ShardId AS PreviousShardId;
-                        END
-                    ELSE
-                        BEGIN
-                            UPDATE runtime.AccountSessions
-                            SET KickRequested = 1
-                            WHERE AccountId = @AccountId;
-
+                        IF @@ROWCOUNT = 1
                             SELECT CAST(2 AS TINYINT) AS Outcome, @ShardId AS PreviousShardId;
-                        END
+                        ELSE
+                            SELECT CAST(2 AS TINYINT) AS Outcome, CAST(NULL AS TINYINT) AS PreviousShardId;
+                    END
 END;

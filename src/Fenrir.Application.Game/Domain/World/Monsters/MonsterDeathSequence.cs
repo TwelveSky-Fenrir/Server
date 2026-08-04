@@ -10,9 +10,7 @@ public static class MonsterDeathSequence
         var knockback = MonsterDeathKnockback.Compute(killerX, killerZ, monster.PosX, monster.PosZ,
             monster.Template.DamageType, isCriticalHit, random);
 
-        monster.AiState = MonsterAiState.Dead;
-        monster.StateTicks = 0;
-        monster.StateFrameAccumulator = 0f;
+        monster.RecordDeathAction(random.NextInt32(2));
 
         monster.TargetLocationX = knockback.X;
         monster.TargetLocationY = 0f;

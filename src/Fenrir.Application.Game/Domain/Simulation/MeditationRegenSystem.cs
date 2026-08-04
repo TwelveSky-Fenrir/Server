@@ -20,10 +20,10 @@ public sealed class MeditationRegenSystem(WorldDataCache worldData, DirtyTracker
         foreach (var state in zone.Players)
         {
             if (state.IsMovingZone || state.ActionSort != MeditationActionSort || state.IsDead ||
-                state.OneSecondGateOpenCount <= 0)
+                legacyTicksElapsed <= 0)
                 continue;
 
-            var periodsElapsed = state.OneSecondGateOpenCount;
+            var periodsElapsed = legacyTicksElapsed;
 
             if (!worldData.SkillsById.TryGetValue(state.ActionSkillNumber, out var skill))
                 continue;

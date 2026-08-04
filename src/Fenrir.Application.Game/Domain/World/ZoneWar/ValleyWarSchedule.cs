@@ -49,6 +49,22 @@ public readonly record struct ValleyWarTickResult(
     bool MonstersShouldDespawn = false,
     bool AllSessionsShouldDisconnect = false);
 
+public sealed record ValleyWarScheduleState(
+    ValleyWarPhase Phase,
+    byte? WinningTribe,
+    int[] KillRaceQuotas,
+    bool BossObservedPresent,
+    int BossWindowTicksArmed,
+    int BossWindowTicksRemaining,
+    int DoorPendingTicksElapsed,
+    int GateCountdownRemaining,
+    int IdleTicksElapsed,
+    int KillRaceTicksRemaining,
+    int MinuteTicksElapsed,
+    int PostWinTicksElapsed,
+    int PreResetTicksElapsed,
+    int ScrollPendingTicksElapsed);
+
 public sealed class ValleyWarSchedule
 {
     public const int TribeCount = 4;
@@ -81,6 +97,8 @@ public sealed class ValleyWarSchedule
 
     public const int BossMonsterId = 756;
 
+    private readonly object _sync = new();
+
     private readonly int[] _killRaceQuota = new int[TribeCount];
 
     private bool _bossObservedPresent;
@@ -96,11 +114,37 @@ public sealed class ValleyWarSchedule
     private int _preResetTicksElapsed;
     private int _scrollPendingTicksElapsed;
 
-    public ValleyWarPhase Phase { get; private set; } = ValleyWarPhase.Idle;
+    public ValleyWarPhase Phase
+    {
+        get
+        {
+            lock (_sync)
+                return _phase;
+        }
+        private set => _phase = value;
+    }
 
-    public byte? WinningTribe { get; private set; }
+    public byte? WinningTribe
+    {
+        get
+        {
+            lock (_sync)
+                return _winningTribe;
+        }
+        private set => _winningTribe = value;
+    }
+
+    private ValleyWarPhase _phase = ValleyWarPhase.Idle;
+
+    private byte? _winningTribe;
 
     public ValleyWarTickResult Tick(ValleyWarEnvironmentSnapshot snapshot)
+    {
+        lock (_sync)
+            return TickCore(snapshot);
+    }
+
+    private ValleyWarTickResult TickCore(ValleyWarEnvironmentSnapshot snapshot)
     {
         var previousPhase = Phase;
 
@@ -185,26 +229,79 @@ public sealed class ValleyWarSchedule
 
     public bool RegisterMonsterKill(byte tribeId)
     {
-        if (Phase != ValleyWarPhase.KillRace || tribeId >= TribeCount)
-            return false;
+        lock (_sync)
+        {
+            if (Phase != ValleyWarPhase.KillRace || tribeId >= TribeCount)
+                return false;
 
-        if (_killRaceQuota[tribeId] > 0)
-            _killRaceQuota[tribeId]--;
+            if (_killRaceQuota[tribeId] > 0)
+                _killRaceQuota[tribeId]--;
 
-        return true;
+            return true;
+        }
     }
 
     public void ForceZeroTribeQuota(byte tribeId)
     {
-        if (Phase != ValleyWarPhase.KillRace || tribeId >= TribeCount)
-            return;
+        lock (_sync)
+        {
+            if (Phase != ValleyWarPhase.KillRace || tribeId >= TribeCount)
+                return;
 
-        _killRaceQuota[tribeId] = 0;
+            _killRaceQuota[tribeId] = 0;
+        }
     }
 
     public int GetKillQuota(byte tribeId)
     {
-        return tribeId < TribeCount ? _killRaceQuota[tribeId] : 0;
+        lock (_sync)
+            return tribeId < TribeCount ? _killRaceQuota[tribeId] : 0;
+    }
+
+    public ValleyWarScheduleState Snapshot()
+    {
+        lock (_sync)
+        {
+            return new ValleyWarScheduleState(
+                _phase,
+                _winningTribe,
+                (int[])_killRaceQuota.Clone(),
+                _bossObservedPresent,
+                _bossWindowTicksArmed,
+                _bossWindowTicksRemaining,
+                _doorPendingTicksElapsed,
+                _gateCountdownRemaining,
+                _idleTicksElapsed,
+                _killRaceTicksRemaining,
+                _minuteTicksElapsed,
+                _postWinTicksElapsed,
+                _preResetTicksElapsed,
+                _scrollPendingTicksElapsed);
+        }
+    }
+
+    public void Restore(ValleyWarScheduleState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ValidateState(state);
+
+        lock (_sync)
+        {
+            _phase = state.Phase;
+            _winningTribe = state.WinningTribe;
+            state.KillRaceQuotas.CopyTo(_killRaceQuota, 0);
+            _bossObservedPresent = state.BossObservedPresent;
+            _bossWindowTicksArmed = state.BossWindowTicksArmed;
+            _bossWindowTicksRemaining = state.BossWindowTicksRemaining;
+            _doorPendingTicksElapsed = state.DoorPendingTicksElapsed;
+            _gateCountdownRemaining = state.GateCountdownRemaining;
+            _idleTicksElapsed = state.IdleTicksElapsed;
+            _killRaceTicksRemaining = state.KillRaceTicksRemaining;
+            _minuteTicksElapsed = state.MinuteTicksElapsed;
+            _postWinTicksElapsed = state.PostWinTicksElapsed;
+            _preResetTicksElapsed = state.PreResetTicksElapsed;
+            _scrollPendingTicksElapsed = state.ScrollPendingTicksElapsed;
+        }
     }
 
     private void TickIdle()
@@ -402,5 +499,22 @@ public sealed class ValleyWarSchedule
     {
         Phase = ValleyWarPhase.PreReset;
         _preResetTicksElapsed = 0;
+    }
+
+    private static void ValidateState(ValleyWarScheduleState state)
+    {
+        if (!Enum.IsDefined(state.Phase) || state.WinningTribe is { } winner && winner >= TribeCount ||
+            state.KillRaceQuotas is not { Length: TribeCount })
+            throw new ArgumentException("The valley-war schedule snapshot has an invalid shape.", nameof(state));
+
+        foreach (var quota in state.KillRaceQuotas)
+            if (quota is < 0 or > KillQuotaPerTribeStart)
+                throw new ArgumentException("The valley-war schedule snapshot has an invalid quota.", nameof(state));
+
+        if (state.BossWindowTicksArmed < 0 || state.BossWindowTicksRemaining < 0 ||
+            state.DoorPendingTicksElapsed < 0 || state.GateCountdownRemaining is < 0 or > GateCountdownStartValue ||
+            state.IdleTicksElapsed < 0 || state.KillRaceTicksRemaining < 0 || state.MinuteTicksElapsed < 0 ||
+            state.PostWinTicksElapsed < 0 || state.PreResetTicksElapsed < 0 || state.ScrollPendingTicksElapsed < 0)
+            throw new ArgumentException("The valley-war schedule snapshot contains a negative counter.", nameof(state));
     }
 }

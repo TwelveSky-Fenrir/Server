@@ -41,12 +41,9 @@ public sealed class PartyLeaveHandler(
         if (!result.Disbanded)
         {
             if (result.RemainingMembers.Count > 0)
-            {
-                var roster = PartyBroadcast.BuildRoster(3, result.RemainingMembers);
                 foreach (var remaining in result.RemainingMembers)
-                    if (zones.TryGetPlayer(remaining.CharacterId, out var member))
-                        member.Session.Send(roster);
-            }
+                    PartyBroadcast.SendOrRelayRoster(zones, partyResyncRelay, shardId, remaining, 3,
+                        result.RemainingMembers);
 
             return;
         }

@@ -14,18 +14,19 @@ public sealed class WorldChatService(
     ILogger<WorldChatService> logger) : IWorldChatService
 {
     private const int MinimumLevel = 10;
+    private const byte WorldChatWireRole = 1;
 
     public WorldChatOutcome TrySendChat(PlayerRuntimeState sender, string content)
     {
-        if (sender.Level < MinimumLevel)
-            return WorldChatOutcome.LevelTooLow;
-
         if (sender.IsMuted)
             return WorldChatOutcome.Muted;
 
+        if (sender.Level < MinimumLevel)
+            return WorldChatOutcome.LevelTooLow;
+
         var response = new WorldChatResponse
         {
-            TribeRole = sender.Tribe,
+            TribeRole = WorldChatWireRole,
             AvatarName = sender.Name,
             Content = content
         };
@@ -43,7 +44,7 @@ public sealed class WorldChatService(
             options.Value.ShardId,
             null,
             sender.Tribe,
-            sender.Tribe,
+            WorldChatWireRole,
             sender.Name,
             content,
             false,
@@ -52,7 +53,10 @@ public sealed class WorldChatService(
             null,
             null,
             null,
-            null));
+            null)
+        {
+            SourceCharacterId = sender.CharacterId
+        });
 
         logger.LogDebug(
             "Character {CharacterId} broadcast world chat cluster-wide ({RecipientCount} same-shard recipients, {ContentLength} chars)",

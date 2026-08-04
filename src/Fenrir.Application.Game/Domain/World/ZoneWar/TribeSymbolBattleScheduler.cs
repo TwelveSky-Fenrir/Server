@@ -17,7 +17,7 @@ public sealed class TribeSymbolBattleScheduler(
     IReadOnlySet<DayOfWeek>? allowedDays = null,
     bool testMode = false)
 {
-    public const int OpenHour = 20;
+    public const int OpenHour = 19;
 
     public const int CloseHour = 22;
 

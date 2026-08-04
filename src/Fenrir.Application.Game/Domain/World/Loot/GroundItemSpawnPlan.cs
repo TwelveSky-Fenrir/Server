@@ -11,7 +11,8 @@ public readonly record struct GroundItemSpawnPlan(
     float PosX,
     float PosY,
     float PosZ,
-    string Owner,
+    string Master,
+    string PartyName,
     int DropSort);
 
 public enum GroundItemSpawnEligibility

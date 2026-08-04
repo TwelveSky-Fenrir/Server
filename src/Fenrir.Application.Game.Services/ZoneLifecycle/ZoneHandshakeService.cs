@@ -2,6 +2,7 @@ using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
+using Fenrir.Application.Game.ZoneLifecycle;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -11,6 +12,7 @@ public sealed class ZoneHandshakeService(
     ISessionTicketRepository tickets,
     IAccountSessionRepository accountSessions,
     ICharacterRepository characters,
+    IBanRepository bans,
     IEventLogRepository eventLog,
     TribeQuotaRegistry tribeQuota,
     IOptions<GameServerOptions> options,
@@ -18,52 +20,99 @@ public sealed class ZoneHandshakeService(
 {
     private const short ZoneTransferAcceptedEventCode = 3;
 
-    public async ValueTask<ZoneHandshakeResult> ConsumeTicketAsync(string obfuscatedId, int declaredTribe,
+    public async ValueTask<ZoneHandshakeResult> ConsumeTicketAsync(string capability, int declaredTribe,
         IZoneSession session, CancellationToken cancellationToken)
     {
-        if (!ObfuscatedUidCodec.TryDecodeAccountId(obfuscatedId, out var accountId))
-        {
-            logger?.LogWarning("Zone handshake rejected: malformed obfuscated id");
-            return new ZoneHandshakeResult(ZoneHandshakeOutcome.Rejected);
-        }
-
-        if (accountId <= 0)
-        {
-            logger?.LogWarning("Zone handshake protocol violation: decoded account id {AccountId} is out of range",
-                accountId);
-            return new ZoneHandshakeResult(ZoneHandshakeOutcome.ProtocolViolation);
-        }
-
-        var quotaGroup = options.Value.TribeQuotaGroup;
+        var quotaGroup = TribeQuotaGroupPolicy.ForMap(session.ListenerMapId);
         if (!TribeQuotaGate.IsDeclaredTribeInRange(quotaGroup, declaredTribe))
         {
             logger?.LogWarning(
-                "Zone handshake protocol violation for account {AccountId}: declared tribe {DeclaredTribe} outside quota group {QuotaGroup}",
-                accountId, declaredTribe, quotaGroup);
+                "Zone handshake protocol violation: declared tribe {DeclaredTribe} outside quota group {QuotaGroup}",
+                declaredTribe, quotaGroup);
             return new ZoneHandshakeResult(ZoneHandshakeOutcome.ProtocolViolation);
         }
 
-        if (!tribeQuota.TryReserve(session, declaredTribe, accountId, DateTimeOffset.UtcNow, quotaGroup,
-                options.Value.Capacity, out var populationForDeclaredTribe))
+        if (session.RemoteEndPoint?.Address is not { } sourceAddress)
         {
-            logger?.LogWarning(
-                "Zone handshake rejected for account {AccountId}: tribe {DeclaredTribe} quota full ({Population})",
-                accountId, declaredTribe, populationForDeclaredTribe);
-            return new ZoneHandshakeResult(ZoneHandshakeOutcome.QuotaFull);
+            logger?.LogWarning("Zone handshake rejected: the source address is unavailable");
+            return new ZoneHandshakeResult(ZoneHandshakeOutcome.Rejected);
         }
 
-        var sourceAddress = session.RemoteEndPoint?.Address;
+        var consumed = await tickets.ConsumeAsync(capability, options.Value.ShardId, session.ListenerMapId,
+            sourceAddress, cancellationToken);
 
-        var consumed = await tickets.ConsumeAsync(accountId, sourceAddress, cancellationToken);
-
-        if (consumed is null || consumed.ShardId != options.Value.ShardId)
+        if (consumed is null)
         {
-            tribeQuota.Release(session.SessionId);
+            tribeQuota.Release(session);
             logger?.LogWarning(
-                "Zone handshake rejected for account {AccountId} from {SourceAddress}: session ticket absent, expired, " +
-                "bound to a different source address, or minted for another shard",
-                accountId, sourceAddress);
+                "Zone handshake rejected from {SourceAddress}: session ticket absent, expired, or bound to a different capability, source address, shard, or map",
+                sourceAddress);
             return new ZoneHandshakeResult(ZoneHandshakeOutcome.Rejected);
+        }
+
+        var accountId = consumed.AccountId;
+
+        var character = await characters.GetForWorldEntryAsync(consumed.CharacterId, cancellationToken);
+        if (character is null)
+        {
+            tribeQuota.Release(session);
+            logger?.LogWarning(
+                "Zone handshake rejected for account {AccountId}: ticket character {CharacterId} was not found",
+                accountId, consumed.CharacterId);
+            return new ZoneHandshakeResult(ZoneHandshakeOutcome.Rejected);
+        }
+
+        if (character.AccountId != accountId)
+        {
+            tribeQuota.Release(session);
+            logger?.LogWarning(
+                "Zone handshake rejected for account {AccountId}: ticket character {CharacterId} belongs to account {CharacterAccountId}",
+                accountId, consumed.CharacterId, character.AccountId);
+            return new ZoneHandshakeResult(ZoneHandshakeOutcome.Rejected);
+        }
+
+        bool banIsActive;
+        try
+        {
+            banIsActive = await BanAdmissionPolicy.IsBlockedAsync(bans, accountId, consumed.CharacterId,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            tribeQuota.Release(session);
+            logger?.LogError(ex,
+                "Zone handshake rejected for account {AccountId} character {CharacterId}: ban status could not be verified",
+                accountId, consumed.CharacterId);
+            return new ZoneHandshakeResult(ZoneHandshakeOutcome.Rejected);
+        }
+
+        if (banIsActive)
+        {
+            tribeQuota.Release(session);
+            logger?.LogWarning(
+                "Zone handshake rejected for account {AccountId} character {CharacterId}: ban is active",
+                accountId, consumed.CharacterId);
+            return new ZoneHandshakeResult(ZoneHandshakeOutcome.Rejected);
+        }
+
+        var canonicalTribe = (int)character.Tribe;
+        if (!TribeQuotaGate.IsDeclaredTribeInRange(quotaGroup, canonicalTribe))
+        {
+            tribeQuota.Release(session);
+            logger?.LogWarning(
+                "Zone handshake protocol violation for account {AccountId}: character {CharacterId} has tribe {Tribe} " +
+                "outside quota group {QuotaGroup}",
+                accountId, consumed.CharacterId, canonicalTribe, quotaGroup);
+            return new ZoneHandshakeResult(ZoneHandshakeOutcome.ProtocolViolation);
+        }
+
+        if (!tribeQuota.TryReserve(session, canonicalTribe, accountId, DateTimeOffset.UtcNow, quotaGroup,
+                options.Value.Capacity, out var populationForCanonicalTribe))
+        {
+            logger?.LogWarning(
+                "Zone handshake rejected for account {AccountId}: tribe {Tribe} quota full ({Population})",
+                accountId, canonicalTribe, populationForCanonicalTribe);
+            return new ZoneHandshakeResult(ZoneHandshakeOutcome.QuotaFull);
         }
 
         var transitioned = await accountSessions
@@ -72,7 +121,7 @@ public sealed class ZoneHandshakeService(
 
         if (!transitioned)
         {
-            tribeQuota.Release(session.SessionId);
+            tribeQuota.Release(session);
             logger?.LogWarning(
                 "Zone handshake superseded for account {AccountId} character {CharacterId}: a newer login already claimed the session",
                 accountId, consumed.CharacterId);
@@ -83,10 +132,7 @@ public sealed class ZoneHandshakeService(
             consumed.CharacterId, null, null, options.Value.ShardId, null, null, null, null, 1, null,
             cancellationToken);
 
-        var character = await characters.GetForWorldEntryAsync(consumed.CharacterId, cancellationToken);
-        var recordedTribe = (int?)character?.Tribe ?? declaredTribe;
-
-        tribeQuota.Record(session, recordedTribe, accountId, consumed.CharacterId, DateTimeOffset.UtcNow);
+        tribeQuota.Record(session, canonicalTribe, accountId, consumed.CharacterId, DateTimeOffset.UtcNow);
 
         return new ZoneHandshakeResult(ZoneHandshakeOutcome.Accepted, accountId, consumed.CharacterId,
             consumed.SessionToken, consumed.AccountGrade, consumed.TargetMapId);

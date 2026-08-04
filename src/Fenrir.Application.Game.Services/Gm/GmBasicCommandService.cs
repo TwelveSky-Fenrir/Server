@@ -254,7 +254,7 @@ public sealed class GmBasicCommandService(
             return;
         }
 
-        var found = zones.TryGetPlayerAndZoneByName(payload.TargetName, out var target, out var targetZone);
+        var found = zone.TryGetPlayerByName(payload.TargetName, out var target);
         if (!found || target!.CharacterId == state.CharacterId)
         {
             await AuditAsync(CallSort, zoneSession, null, null, GmCommandCatalog.OutcomeRejected,
@@ -265,19 +265,18 @@ public sealed class GmBasicCommandService(
 
         if (zone.MapId == Zone124DuelOverrideResolver.Zone124MapId)
         {
-            await HandleZone124PartyPullAsync(data, zoneSession, state, zone, target, targetZone!,
-                cancellationToken);
+            await HandleZone124PartyPullAsync(data, zoneSession, state, zone, target, cancellationToken);
             return;
         }
 
         var destination = (state.PosX, state.PosY, state.PosZ);
-        if (!await targetZone!.PostTribeProgressCommandAndWaitAsync(
+        if (!await zone.PostTribeProgressCommandAndWaitAsync(
                 new TribeProgressZoneCommand(target.CharacterId, TeleportTo: destination,
                     NeighborActionBroadcast: true),
                 cancellationToken))
             logger.LogError(
                 "Zone {MapId} tribe-progress inbox full: dropped CALL mirror for target character {CharacterId}",
-                targetZone.MapId, target.CharacterId);
+                zone.MapId, target.CharacterId);
 
         await AuditAsync(CallSort, zoneSession, ((IZoneSession)target.Session).AccountId, target.CharacterId,
             GmCommandCatalog.OutcomeExecuted, $"TargetName={target.Name}", cancellationToken);
@@ -302,7 +301,7 @@ public sealed class GmBasicCommandService(
             return;
         }
 
-        var found = zones.TryGetPlayerAndZoneByName(payload.TargetName, out var target, out _);
+        var found = zone.TryGetPlayerByName(payload.TargetName, out var target);
         if (!found || target!.CharacterId == state.CharacterId)
         {
             await AuditAsync(MoveToTargetSort, zoneSession, null, null, GmCommandCatalog.OutcomeRejected,
@@ -330,7 +329,7 @@ public sealed class GmBasicCommandService(
     }
 
     public async ValueTask HandleTargetSpecialStateAsync(int sort, byte[] data, IZoneSession zoneSession,
-        PlayerRuntimeState state, CancellationToken cancellationToken)
+        PlayerRuntimeState state, Zone zone, CancellationToken cancellationToken)
     {
         if (!await MeetsTierOrAbortAsync(zoneSession, sort, cancellationToken))
             return;
@@ -341,7 +340,7 @@ public sealed class GmBasicCommandService(
             return;
         }
 
-        var found = zones.TryGetPlayerAndZoneByName(payload.TargetName, out var target, out var targetZone);
+        var found = zone.TryGetPlayerByName(payload.TargetName, out var target);
         if (!found || target!.CharacterId == state.CharacterId)
         {
             await AuditAsync(sort, zoneSession, null, null, GmCommandCatalog.OutcomeRejected,
@@ -356,15 +355,15 @@ public sealed class GmBasicCommandService(
             GmCommandCatalog.OutcomeExecuted, $"TargetName={target.Name};SpecialState={newSpecialState}",
             cancellationToken);
 
-        if (!await targetZone!.PostTribeProgressCommandAndWaitAsync(
+        if (!await zone.PostTribeProgressCommandAndWaitAsync(
                 new TribeProgressZoneCommand(target.CharacterId, SpecialState: newSpecialState), cancellationToken))
             logger.LogError(
                 "Zone {MapId} tribe-progress inbox full: dropped NCHAT/YCHAT mirror for target character {CharacterId} (sort {Sort})",
-                targetZone.MapId, target.CharacterId, sort);
+                zone.MapId, target.CharacterId, sort);
     }
 
     public async ValueTask HandleKickAsync(byte[] data, IZoneSession zoneSession, PlayerRuntimeState state,
-        CancellationToken cancellationToken)
+        Zone zone, CancellationToken cancellationToken)
     {
         if (!await MeetsTierOrAbortAsync(zoneSession, KickSort, cancellationToken))
             return;
@@ -375,7 +374,7 @@ public sealed class GmBasicCommandService(
             return;
         }
 
-        var found = zones.TryGetPlayerAndZoneByName(payload.TargetName, out var target, out _);
+        var found = zone.TryGetPlayerByName(payload.TargetName, out var target);
         if (!found || target!.CharacterId == state.CharacterId)
         {
             await AuditAsync(KickSort, zoneSession, null, null, GmCommandCatalog.OutcomeRejected,
@@ -530,11 +529,11 @@ public sealed class GmBasicCommandService(
     }
 
     private async ValueTask HandleZone124PartyPullAsync(byte[] data, IZoneSession zoneSession,
-        PlayerRuntimeState state, Zone zone, PlayerRuntimeState target, Zone targetZone,
+        PlayerRuntimeState state, Zone zone, PlayerRuntimeState target,
         CancellationToken cancellationToken)
     {
         var targetPartyName = PartyIdentityResolver.ResolveCurrentPartyName(partyRegistry, target.CharacterId,
-            target.Name, memberId => targetZone.TryGetPlayer(memberId, out var member) ? member?.Name : null);
+            target.Name, memberId => zone.TryGetPlayer(memberId, out var member) ? member?.Name : null);
 
         var pulled = await zone.PostGmZone124PartyPullCommandAndWaitAsync(
             new GmZone124PartyPullZoneCommand(target.CharacterId, targetPartyName, state.PosX, state.PosY,

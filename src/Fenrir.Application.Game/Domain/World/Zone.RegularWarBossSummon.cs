@@ -27,6 +27,12 @@ public sealed partial class Zone
         }
     }
 
+    private void HandleDespawnRegularWarBosses()
+    {
+        for (var i = 0; i < RegularWarBossPoolSize; i++)
+            DespawnMonsterSilently(RegularWarBossPoolServerIndexBase + i);
+    }
+
     private bool TryFindFreeRegularWarBossSlot(out int serverIndex)
     {
         for (var i = 0; i < RegularWarBossPoolSize; i++)

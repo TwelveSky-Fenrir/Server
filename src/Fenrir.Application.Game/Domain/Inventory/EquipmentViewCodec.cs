@@ -18,8 +18,8 @@ public static class EquipmentViewCodec
 
             view[item.Slot * 2] = item.ItemId;
             view[item.Slot * 2 + 1] = item.Slot == PetSlots.EquipmentSlot
-                ? ItemValueCodec.Encode(item.Enchant, item.Combine, item.Refine, item.Socket)
-                : item.Enchant;
+                ? PetItemState.Growth(item.Enchant, item.Combine, item.Refine, item.Socket)
+                : ItemValueCodec.Encode(item.Enchant, item.Combine, item.Refine, item.Socket);
         }
 
         return view;
@@ -36,8 +36,8 @@ public static class EquipmentViewCodec
 
             view[slot * 2] = stack.ItemId;
             view[slot * 2 + 1] = slot == PetSlots.EquipmentSlot
-                ? ItemValueCodec.Encode(stack.Enchant, stack.Combine, stack.Refine, stack.Socket)
-                : stack.Enchant;
+                ? PetItemState.Growth(stack)
+                : ItemValueCodec.Encode(stack.Enchant, stack.Combine, stack.Refine, stack.Socket);
         }
 
         return view;

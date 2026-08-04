@@ -44,7 +44,7 @@ public static class ZoneCenterSiegeProjection
         for (byte tribeId = 0; tribeId < TribeGuardCorridorState.TribeCount; tribeId++)
         for (byte segment = 0; segment < TribeGuardCorridorState.SegmentCount; segment++)
             tribeGuardState[tribeId * TribeGuardCorridorState.SegmentCount + segment] =
-                tribeGuard.IsOpen(tribeId, segment) ? 1 : 0;
+                tribeGuard.IsOpen(tribeId, segment) ? 0 : 1;
 
         return template with
         {

@@ -34,15 +34,16 @@ public sealed class TribeBankHandler(
             var result = packet.Sort switch
             {
                 1 => await bankService.ViewAsync(zoneSession, state, cancellationToken),
-                2 => await withdrawService.WithdrawAsync(packet.Value, state, characterId, cancellationToken),
+                2 => await withdrawService.WithdrawAsync(zone, packet.Value, state, characterId, cancellationToken),
                 _ => TribeBankResult.Aborted
             };
 
             if (!result.Success)
             {
-                if (result.Disconnect)
-                    session.Abort(DisconnectReason.Faulted);
-
+                logger?.LogWarning(
+                    "Character {CharacterId} tribe-bank sort {Sort} precondition/authorization gate failed; disconnecting with no response sent (session {SessionId})",
+                    characterId, packet.Sort, session.SessionId);
+                session.Abort(DisconnectReason.Faulted);
                 return;
             }
 

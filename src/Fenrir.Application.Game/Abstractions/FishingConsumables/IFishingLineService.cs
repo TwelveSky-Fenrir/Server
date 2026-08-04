@@ -4,9 +4,11 @@ namespace Fenrir.Application.Game.Abstractions.FishingConsumables;
 
 public interface IFishingLineService
 {
-    public FishingLineResult Cast(Zone zone, PlayerRuntimeState state, int characterId);
+    public ValueTask<FishingLineResult?> CastAsync(Zone zone, PlayerRuntimeState state, int characterId,
+        CancellationToken cancellationToken);
 
-    public FishingLineResult Reel(Zone zone, PlayerRuntimeState state, int characterId);
+    public ValueTask<FishingLineResult?> ReelAsync(Zone zone, PlayerRuntimeState state, int characterId,
+        CancellationToken cancellationToken);
 }
 
 public sealed record FishingLineResult(int Result, int FishingState, int FishingStep);

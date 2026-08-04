@@ -8,13 +8,12 @@ public sealed class MountAbsorbService : IMountAbsorbService
 {
     public bool TryAbsorb(Zone zone, PlayerRuntimeState state, int characterId)
     {
-        if (state.AnimalIndex < MountStateResolver.SlotCount ||
-            state.AnimalIndex > MountStateResolver.MountedMax || state.AnimalAbsorbTime < 1)
+        if (!MountStateResolver.TryResolveActiveMountedMount(state.AnimalIndex, state.AnimalNumber,
+                state.MountGarage, out _) || state.AnimalTime < 1 || state.AnimalAbsorbTime < 1)
             return false;
 
-        zone.PostMountCommand(new MountZoneCommand(characterId, AnimalAbsorbState: 1,
+        return zone.PostMountCommand(new MountZoneCommand(characterId, AnimalAbsorbState: 1,
             Broadcast: MountBroadcastKind.AbsorbToggle));
-        return true;
     }
 
     public void Release(Zone zone, PlayerRuntimeState state, int characterId)

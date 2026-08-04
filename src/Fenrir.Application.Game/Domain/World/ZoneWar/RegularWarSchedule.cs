@@ -53,6 +53,28 @@ public readonly record struct RegularWarTickResult(
     public bool EnteredActiveWar => PreviousPhase == RegularWarPhase.PreWar && Phase == RegularWarPhase.Active;
 }
 
+public readonly record struct RegularWarKillerState(int CharacterId, int KillCount);
+
+public readonly record struct RegularWarScheduleState(
+    RegularWarPhase Phase,
+    byte IdleSubPhase,
+    int ActiveEvaluationTicksElapsed,
+    int BossPollTicksElapsed,
+    int CooldownTicksElapsed,
+    int CountdownAnnounceTicksElapsed,
+    int CountdownAnnounceValue,
+    int FinalWaitTicksElapsed,
+    int ForcedResetTicksElapsed,
+    bool ForcedResetEffectPending,
+    int OpenGateTicksElapsed,
+    int PostWarTicksElapsed,
+    int PreWarTicksElapsed,
+    int RemainingActiveWarTicks,
+    int WarCycleNumber,
+    byte? WinningTribe,
+    ImmutableArray<int> TribeKillTally,
+    ImmutableArray<RegularWarKillerState> KillersInOrder);
+
 public sealed class RegularWarSchedule(RegularWarMapConfig config)
 {
     public const int TribeCount = WorldStateService.TribeCount;
@@ -93,6 +115,7 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
     private int _countdownAnnounceValue;
     private int _finalWaitTicksElapsed;
     private int _forcedResetTicksElapsed;
+    private bool _forcedResetEffectPending;
 
     private RegularWarIdleSubPhase _idleSubPhase = RegularWarIdleSubPhase.Cooldown;
     private int _openGateTicksElapsed;
@@ -106,6 +129,65 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
     public int WarCycleNumber { get; private set; } = 1;
 
     public byte? WinningTribe { get; private set; }
+
+    public RegularWarScheduleState CaptureState()
+    {
+        var killers = ImmutableArray.CreateBuilder<RegularWarKillerState>(_killOrderSeen.Count);
+        foreach (var characterId in _killOrderSeen)
+            killers.Add(new RegularWarKillerState(characterId, _killCountByCharacter[characterId]));
+
+        return new RegularWarScheduleState(
+            Phase,
+            (byte)_idleSubPhase,
+            _activeEvaluationTicksElapsed,
+            _bossPollTicksElapsed,
+            _cooldownTicksElapsed,
+            _countdownAnnounceTicksElapsed,
+            _countdownAnnounceValue,
+            _finalWaitTicksElapsed,
+            _forcedResetTicksElapsed,
+            _forcedResetEffectPending,
+            _openGateTicksElapsed,
+            _postWarTicksElapsed,
+            _preWarTicksElapsed,
+            RemainingActiveWarTicks,
+            WarCycleNumber,
+            WinningTribe,
+            [.. _tribeKillTally],
+            killers.MoveToImmutable());
+    }
+
+    public void RestoreState(in RegularWarScheduleState state)
+    {
+        ValidateState(state);
+
+        _activeEvaluationTicksElapsed = state.ActiveEvaluationTicksElapsed;
+        _bossPollTicksElapsed = state.BossPollTicksElapsed;
+        _cooldownTicksElapsed = state.CooldownTicksElapsed;
+        _countdownAnnounceTicksElapsed = state.CountdownAnnounceTicksElapsed;
+        _countdownAnnounceValue = state.CountdownAnnounceValue;
+        _finalWaitTicksElapsed = state.FinalWaitTicksElapsed;
+        _forcedResetTicksElapsed = state.ForcedResetTicksElapsed;
+        _forcedResetEffectPending = state.ForcedResetEffectPending;
+        _idleSubPhase = (RegularWarIdleSubPhase)state.IdleSubPhase;
+        _openGateTicksElapsed = state.OpenGateTicksElapsed;
+        _postWarTicksElapsed = state.PostWarTicksElapsed;
+        _preWarTicksElapsed = state.PreWarTicksElapsed;
+        Phase = state.Phase;
+        RemainingActiveWarTicks = state.RemainingActiveWarTicks;
+        WarCycleNumber = state.WarCycleNumber;
+        WinningTribe = state.WinningTribe;
+
+        _killCountByCharacter.Clear();
+        _killOrderSeen.Clear();
+        foreach (var killer in state.KillersInOrder)
+        {
+            _killOrderSeen.Add(killer.CharacterId);
+            _killCountByCharacter.Add(killer.CharacterId, killer.KillCount);
+        }
+
+        state.TribeKillTally.CopyTo(_tribeKillTally);
+    }
 
     public RegularWarTickResult Tick(RegularWarEnvironmentSnapshot snapshot)
     {
@@ -333,23 +415,29 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
 
     private void TickForcedReset(ref bool allSessionsShouldDisconnect)
     {
+        if (_forcedResetEffectPending)
+        {
+            Phase = RegularWarPhase.Idle;
+            _idleSubPhase = RegularWarIdleSubPhase.Cooldown;
+            _cooldownTicksElapsed = 0;
+            _forcedResetEffectPending = false;
+            RemainingActiveWarTicks = 0;
+            return;
+        }
+
         _forcedResetTicksElapsed++;
         if (_forcedResetTicksElapsed < ForcedResetDisconnectAtTicks)
             return;
 
         allSessionsShouldDisconnect = true;
-
-        Phase = RegularWarPhase.Idle;
-        _idleSubPhase = RegularWarIdleSubPhase.Cooldown;
-        _cooldownTicksElapsed = 0;
-
-        RemainingActiveWarTicks = 0;
+        _forcedResetEffectPending = true;
     }
 
     private void EnterForcedReset()
     {
         Phase = RegularWarPhase.ForcedReset;
         _forcedResetTicksElapsed = 0;
+        _forcedResetEffectPending = false;
     }
 
     private RegularWarOutcome DetermineTimeoutOutcome()
@@ -423,6 +511,38 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
         }
 
         return smallestTribe;
+    }
+
+    private static void ValidateState(in RegularWarScheduleState state)
+    {
+        if (!Enum.IsDefined(state.Phase) || state.IdleSubPhase > (byte)RegularWarIdleSubPhase.FinalWait)
+            throw new InvalidOperationException("Regular War durable state contains an unknown phase.");
+
+        if (state.WarCycleNumber < 1 || state.RemainingActiveWarTicks < 0 ||
+            state.RemainingActiveWarTicks > ActiveWarDurationTicks ||
+            (state.WinningTribe is { } winningTribe && winningTribe >= TribeCount) ||
+            (state.ForcedResetEffectPending && state.Phase != RegularWarPhase.ForcedReset) ||
+            state.TribeKillTally.Length != TribeCount ||
+            state.KillersInOrder.Length > RegularWarActiveMapTracker.PendingKillQueueCap)
+            throw new InvalidOperationException("Regular War durable state contains invalid counters.");
+
+        if (state.ActiveEvaluationTicksElapsed is < 0 or >= ActiveEvaluationCadenceTicks ||
+            state.BossPollTicksElapsed is < 0 or > BossPollMaxTicks ||
+            state.CooldownTicksElapsed is < 0 or > CooldownTicks ||
+            state.CountdownAnnounceTicksElapsed is < 0 or > CountdownAnnounceIntervalTicks ||
+            state.CountdownAnnounceValue is < 0 or > CountdownAnnounceStartValue ||
+            state.FinalWaitTicksElapsed is < 0 or > FinalWaitTicks ||
+            state.ForcedResetTicksElapsed is < 0 or > ForcedResetDisconnectAtTicks ||
+            state.OpenGateTicksElapsed is < 0 or > OpenGateTicks ||
+            state.PostWarTicksElapsed is < 0 or > PostWarCleanupTicks ||
+            state.PreWarTicksElapsed is < 0 or > PreWarTicks ||
+            state.TribeKillTally.Any(static tally => tally < 0))
+            throw new InvalidOperationException("Regular War durable state contains invalid timer counters.");
+
+        var seenCharacters = new HashSet<int>();
+        foreach (var killer in state.KillersInOrder)
+            if (killer.CharacterId <= 0 || killer.KillCount <= 0 || !seenCharacters.Add(killer.CharacterId))
+                throw new InvalidOperationException("Regular War durable state contains invalid killer counts.");
     }
 
     private enum RegularWarIdleSubPhase : byte

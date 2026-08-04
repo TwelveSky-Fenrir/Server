@@ -7,6 +7,15 @@ namespace Fenrir.Data.Abstractions.Characters;
 public sealed partial record CharacterIdDto(int CharacterId);
 
 [GenerateDto]
+public sealed partial record CharacterFinalFlushResultDto(bool WasApplied, bool WasAlreadyApplied);
+
+[GenerateDto]
+public sealed partial record MonsterMoneyGrantResultDto(bool WasApplied, bool WasAlreadyApplied);
+
+[GenerateDto]
+public sealed partial record PvpKillCooldownClaimResultDto(bool WasAccepted, bool WasAlreadyAccepted);
+
+[GenerateDto]
 public sealed partial record CharacterItemIdDto(int ItemId);
 
 [GenerateDto]

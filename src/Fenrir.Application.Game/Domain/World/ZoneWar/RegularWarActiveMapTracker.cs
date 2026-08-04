@@ -62,5 +62,10 @@ public sealed class RegularWarActiveMapTracker
             schedule.RegisterKill(kill.KillerTribe, kill.KillerCharacterId);
     }
 
+    public void ClearPendingKills(short mapId)
+    {
+        _pendingKillsByMapId.TryRemove(mapId, out _);
+    }
+
     private readonly record struct PendingRegularWarKill(byte KillerTribe, int KillerCharacterId);
 }

@@ -2,6 +2,8 @@ namespace Fenrir.Application.Game.Domain.Consumables;
 
 public static class StatPotionResolver
 {
+    private const int TenStackAmount = 10;
+
     public enum Outcome
     {
         Success,
@@ -18,6 +20,19 @@ public static class StatPotionResolver
 
     public static OrdinaryResult ResolveOrdinary(int currentCount, int perUnitAmount, int requestedBulkCount)
     {
+        if (perUnitAmount == TenStackAmount)
+        {
+            if (currentCount >= OrdinaryTierCap)
+                return new OrdinaryResult(Outcome.AlreadyMaxed, currentCount, 0);
+
+            var availableUnits = (OrdinaryTierCap - currentCount) / TenStackAmount;
+            if (requestedBulkCount <= 0 || requestedBulkCount > availableUnits)
+                return new OrdinaryResult(Outcome.PreconditionFailed, currentCount, 0);
+
+            return new OrdinaryResult(Outcome.Success, currentCount + TenStackAmount * requestedBulkCount,
+                requestedBulkCount);
+        }
+
         var coercedCount =
             BankedCounterMath.CoerceBulkToHeadroom(currentCount, OrdinaryTierCap, perUnitAmount, requestedBulkCount);
 

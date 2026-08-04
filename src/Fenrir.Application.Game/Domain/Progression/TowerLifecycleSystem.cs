@@ -66,7 +66,10 @@ public sealed class TowerLifecycleSystem(
         }
 
         if (towerWar.IsCreateCooldownElapsed(towerIndex, now))
+        {
             towerWar.CompleteConstructionCooldown(towerIndex);
+            zoneEventBroadcaster?.Value.AnnounceTowerStatus(towerWar);
+        }
     }
 
     private void TrySpawnConstructionGuardian(Zone zone, int towerIndex, int constructKind, DateTime now)

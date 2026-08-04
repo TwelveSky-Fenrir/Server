@@ -4,11 +4,14 @@ namespace Fenrir.Application.Game.Abstractions.FishingConsumables;
 
 public interface IFishingProgressService
 {
-    public FishingProgressResult? PollBite(Zone zone, PlayerRuntimeState state, int characterId);
+    public ValueTask<FishingProgressResult?> PollBiteAsync(Zone zone, PlayerRuntimeState state, int characterId,
+        CancellationToken cancellationToken);
 
-    public FishingProgressResult Recast(Zone zone, PlayerRuntimeState state, int characterId);
+    public ValueTask<FishingProgressResult?> RecastAsync(Zone zone, PlayerRuntimeState state, int characterId,
+        CancellationToken cancellationToken);
 
-    public FishingProgressResult ForceStep(Zone zone, PlayerRuntimeState state, int characterId, int step);
+    public ValueTask<FishingProgressResult?> ForceStepAsync(Zone zone, PlayerRuntimeState state, int characterId,
+        int step, CancellationToken cancellationToken);
 }
 
-public sealed record FishingProgressResult(int ResultSort, int FishingState, int FishingStep);
+public sealed record FishingProgressResult(int ResultSort, int FishingState, int FishingStep, bool BroadcastCapture);

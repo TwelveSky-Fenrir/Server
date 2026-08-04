@@ -4,5 +4,6 @@ namespace Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 
 public interface IContinueSkillStatService
 {
-    public void RegisterAutoBuffs(Zone zone, int characterId, PlayerRuntimeState state, int[] skill);
+    public ValueTask<bool> RegisterAutoBuffsAsync(Zone zone, int characterId, PlayerRuntimeState state, int[] skill,
+        CancellationToken cancellationToken);
 }

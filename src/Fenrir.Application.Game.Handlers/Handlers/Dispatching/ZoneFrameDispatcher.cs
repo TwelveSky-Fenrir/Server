@@ -25,18 +25,24 @@ public sealed class ZoneFrameDispatcher(ILogger<ZoneFrameDispatcher> logger) : I
             return FrameDispatchOutcome.Handled;
 
         logger.LogWarning(
-            "No handler registered for {Server} opcode {Opcode}, or handler present but payload failed to parse ({PayloadLength} bytes)",
-            server, opcode, memory.Length);
+            "Zone session {SessionId}: closing after unhandled framed {Server} opcode {Opcode}; no handler accepted its {PayloadLength}-byte payload",
+            session.SessionId, server, opcode, memory.Length);
 
-        return FrameDispatchOutcome.Handled;
+        session.Abort(DisconnectReason.UnknownOpcode);
+        return FrameDispatchOutcome.Terminated;
     }
 
     private static bool IsWithheldByPendingZoneTransfer(IPacketSession session, byte opcode)
     {
-        return session is IZoneSession { CurrentZone: Zone zone, CharacterId: { } characterId } &&
-               zone.TryGetPlayer(characterId, out var state) && state is not null &&
-               ZoneTransferFreezeGate.ShouldWithhold(state.IsMovingZone, opcode,
-                   Opcodes.Zone.Incoming.ZoneTransferCancel, Opcodes.Zone.Incoming.ZoneHandshake,
-                   Opcodes.Zone.Incoming.EnterWorld);
+        if (session is not IZoneSession zoneSession)
+            return false;
+
+        var actorTransferPending = zoneSession is { CurrentZone: Zone zone, CharacterId: { } characterId } &&
+                                   zone.TryGetPlayer(characterId, out var state) && state is not null &&
+                                   state.IsMovingZone;
+
+        return ZoneTransferFreezeGate.ShouldWithhold(zoneSession.IsZoneTransferPending || actorTransferPending,
+            opcode, Opcodes.Zone.Incoming.ZoneTransferCancel, Opcodes.Zone.Incoming.ZoneHandshake,
+            Opcodes.Zone.Incoming.EnterWorld);
     }
 }

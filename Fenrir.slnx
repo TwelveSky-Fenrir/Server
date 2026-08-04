@@ -41,6 +41,13 @@
     <Project Path="src/Fenrir.ServiceDefaults/Fenrir.ServiceDefaults.csproj"/>
   </Folder>
 
+  <Folder Name="/80_Tests/">
+    <Project Path="tests/Fenrir.Game.Tests/Fenrir.Game.Tests.csproj"/>
+    <Project Path="tests/Fenrir.Login.Tests/Fenrir.Login.Tests.csproj"/>
+    <Project Path="tests/Fenrir.Protocol.Tests/Fenrir.Protocol.Tests.csproj"/>
+    <Project Path="tests/Fenrir.Simulation.Tests/Fenrir.Simulation.Tests.csproj"/>
+  </Folder>
+
   <Folder Name="/90_Solution Items/">
     <File Path=".editorconfig"/>
     <File Path=".gitattributes"/>

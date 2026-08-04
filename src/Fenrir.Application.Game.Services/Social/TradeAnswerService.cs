@@ -52,22 +52,49 @@ public sealed class TradeAnswerService(
             return new TradeAnswerResult(false, 0);
         }
 
-        var askerBusyByZoneTransfer = !zones.TryGetPlayer(pendingAskerId, out var asker) || asker.IsMovingZone;
-
-        if (!trades.TryAnswer(targetId, answer == 0, askerBusyByZoneTransfer, out var askerId, out var guardBlocked))
+        var transition = trades.TryEnterTransition(targetId, pendingAskerId);
+        if (transition is null)
         {
-            if (guardBlocked)
-                logger.LogDebug(
-                    "Trade answer: character {TargetId} answered but asker {AskerId} is unreachable or mid zone-transfer -- no notice sent, asker's own record left as-is",
-                    targetId, askerId);
-            else
-                logger.LogDebug("Trade answer ignored: character {TargetId} has no pending ask", targetId);
-
+            logger.LogDebug(
+                "Trade answer ignored: character {TargetId}'s pair with asker {AskerId} already has an in-flight transition",
+                targetId, pendingAskerId);
             return new TradeAnswerResult(false, 0);
         }
 
-        logger.LogDebug("Trade ask {Outcome}: character {TargetId} answered asker {AskerId}",
-            answer == 0 ? "accepted" : "declined", targetId, askerId);
-        return new TradeAnswerResult(true, askerId);
+        using (transition)
+        {
+            if (!trades.TryPeekPending(targetId, out pendingAskerId, out isAsker) || isAsker)
+            {
+                logger.LogDebug("Trade answer ignored: character {TargetId} has no pending ask", targetId);
+                return new TradeAnswerResult(false, 0);
+            }
+
+            if (!zones.TryGetPlayer(targetId, out var target) || target.IsMovingZone)
+            {
+                logger.LogDebug(
+                    "Trade answer rejected: character {TargetId} is unreachable or mid zone-transfer -- pending pair left unchanged",
+                    targetId);
+                return new TradeAnswerResult(false, 0);
+            }
+
+            var askerBusyByZoneTransfer = !zones.TryGetPlayer(pendingAskerId, out var asker) || asker.IsMovingZone;
+
+            if (!trades.TryAnswer(targetId, answer == 0, askerBusyByZoneTransfer, out var askerId,
+                    out var guardBlocked))
+            {
+                if (guardBlocked)
+                    logger.LogDebug(
+                        "Trade answer rejected: character {TargetId} answered but asker {AskerId} is unreachable or mid zone-transfer -- pending pair left unchanged",
+                        targetId, askerId);
+                else
+                    logger.LogDebug("Trade answer ignored: character {TargetId} has no pending ask", targetId);
+
+                return new TradeAnswerResult(false, 0);
+            }
+
+            logger.LogDebug("Trade ask {Outcome}: character {TargetId} answered asker {AskerId}",
+                answer == 0 ? "accepted" : "declined", targetId, askerId);
+            return new TradeAnswerResult(true, askerId);
+        }
     }
 }

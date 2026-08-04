@@ -17,6 +17,16 @@ public sealed class GuildActionHandler(IGuildActionService service, ILogger<Guil
         logger?.LogDebug("Session {SessionId}: CZ_GUILD_WORK_SEND received (character {CharacterId}, sort {Sort})",
             session.SessionId, zoneSession.CharacterId, packet.Sort);
 
+        if (packet.Sort is 11 or
+            not (1 or 2 or 3 or 4 or 5 or 6 or 7 or 8 or 9 or 10 or 12 or 13 or 14 or 17 or 1001))
+        {
+            logger?.LogWarning(
+                "Session {SessionId}: CZ_GUILD_WORK_SEND carried invalid sort {Sort}; aborting",
+                session.SessionId, packet.Sort);
+            zoneSession.Abort(DisconnectReason.Faulted);
+            return;
+        }
+
         if (zoneSession.CurrentZone is not Zone zone)
             return;
 
@@ -45,6 +55,15 @@ public sealed class GuildActionHandler(IGuildActionService service, ILogger<Guil
                     await service.CreateGuildAsync(packet, zone, state, characterId, ct));
                 return;
             case 2:
+                if (state.GuildId is null)
+                {
+                    logger?.LogWarning(
+                        "Character {CharacterId} requested guild info without a guild; aborting session {SessionId}",
+                        characterId, session.SessionId);
+                    session.Abort(DisconnectReason.Faulted);
+                    return;
+                }
+
                 Respond(session, characterId, packet.Sort, await service.GetGuildInfoAsync(state, ct));
                 return;
             case 3:
@@ -79,12 +98,6 @@ public sealed class GuildActionHandler(IGuildActionService service, ILogger<Guil
                 Respond(session, characterId, packet.Sort,
                     await service.SetMemberTitleAsync(packet, state, ct));
                 return;
-            case 11:
-                logger?.LogInformation(
-                    "Character {CharacterId} sent CZ_GUILD_WORK_SEND sort 11 (GuildMark) -- unconditional disconnect, no response sent (Server/ts25zone/S04_MyWork02.cpp:10230-10232), session {SessionId}",
-                    characterId, session.SessionId);
-                session.Abort(DisconnectReason.Faulted);
-                return;
             case 12:
             case 13:
                 return;
@@ -102,8 +115,9 @@ public sealed class GuildActionHandler(IGuildActionService service, ILogger<Guil
                 return;
             default:
                 logger?.LogWarning(
-                    "Character {CharacterId} sent CZ_GUILD_WORK_SEND with unrecognized sort {Sort} -- ignoring session {SessionId}",
+                    "Character {CharacterId} sent CZ_GUILD_WORK_SEND with invalid sort {Sort}; aborting session {SessionId}",
                     characterId, packet.Sort, session.SessionId);
+                session.Abort(DisconnectReason.Faulted);
                 return;
         }
     }

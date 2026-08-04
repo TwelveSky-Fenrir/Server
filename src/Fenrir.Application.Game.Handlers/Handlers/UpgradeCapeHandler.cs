@@ -21,20 +21,17 @@ public sealed class UpgradeCapeHandler(IUpgradeCapeService upgradeCapeService, I
 
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
+        {
+            zoneSession.Abort(DisconnectReason.Faulted);
             return;
+        }
 
         await state.EconomyActionLock.WaitAsync(cancellationToken);
         try
         {
             var result = await upgradeCapeService.UpgradeAsync(packet, zone, state, characterId, cancellationToken);
 
-            if (result.Outcome != UpgradeCapeOutcome.Applied)
-            {
-                logger.LogWarning(
-                    "Cape-upgrade rejected for character {CharacterId}", characterId);
-                session.Send(new UpgradeCapeResponse { Result = 1, Value = [0, 0, 0, 0, 0, 0], Padding = 0 });
-                return;
-            }
+            if (result.Outcome == UpgradeCapeOutcome.Disconnected) return;
 
             logger.LogInformation("Character {CharacterId} cape-upgrade resolved: succeeded={Succeeded}",
                 characterId, result.Succeeded);

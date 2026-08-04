@@ -183,11 +183,13 @@ public sealed class GuildInviteRegistry
         }
     }
 
-    public bool TryConsumeCrossShardOutbound(int askerId, out CrossShardOutboundAsk ask)
+    public bool TryConsumeCrossShardOutbound(int askerId, byte targetShardId, int targetCharacterId,
+        long correlationToken, out CrossShardOutboundAsk ask)
     {
         lock (_lock)
         {
-            return _crossShard.TryConsumeOutbound(askerId, out ask);
+            return _crossShard.TryConsumeOutbound(askerId, targetShardId, targetCharacterId, correlationToken,
+                out ask);
         }
     }
 

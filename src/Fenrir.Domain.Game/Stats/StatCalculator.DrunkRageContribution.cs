@@ -30,8 +30,6 @@ public static partial class StatCalculator
         [10] = 140
     }.ToFrozenDictionary();
 
-    private static bool RageBuffStateActive => false;
-
     public static int ScaleByPercent(int value, int percent)
     {
         return percent == 100 ? value : (int)((long)value * percent / 100);
@@ -113,9 +111,6 @@ public static partial class StatCalculator
 
     public static int ApplyRageAttackMultiplier(int baseAttack, ZoneContext zone)
     {
-        if (!RageBuffStateActive)
-            return baseAttack;
-
         return ScaleByPercent(baseAttack, ResolveRageBuffPercent(zone.RageGauge));
     }
 }

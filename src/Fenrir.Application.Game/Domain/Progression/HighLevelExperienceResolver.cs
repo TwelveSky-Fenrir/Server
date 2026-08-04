@@ -96,42 +96,7 @@ public static class HighLevelExperienceResolver
         if (input.MainExperience < MaxMainExperience)
             return ResolveMainPoolFill(input.MainExperience, input.MainExperienceFloor, input.AwardedExperience);
 
-
-        var gain = input.AntiCheatExperienceFlagged ? 0 : input.AwardedExperience;
-
-        if (gain < 1)
-            return HighLevelExperienceOutcome.None;
-
-        if (input.Level2 > RebirthProgression.MaxHighLevel)
-            return HighLevelExperienceOutcome.None;
-
-        if (input.Exp2 + (long)gain > RebirthTierExperienceCeiling)
-            gain = RebirthTierExperienceCeiling - input.Exp2;
-        if (gain < 0)
-            gain = 0;
-
-        var threshold = RebirthTierThreshold(input.Level2);
-
-        if (input.Level2 < RebirthProgression.MaxHighLevel && input.Exp2 >= threshold)
-        {
-            var zone101 = input.Level2 == 0 ? Zone101TimeGrantOnFirstRebirthTier : 0;
-            return HighLevelExperienceOutcome.LevelUp((short)(input.Level2 + 1), RebirthTierLevelUpSkillPoints,
-                zone101);
-        }
-
-        if (input.Exp2 + (long)gain > threshold)
-            gain = threshold - input.Exp2;
-        if (gain < 1)
-            return HighLevelExperienceOutcome.None;
-
-        var presentPercent = PercentOfThreshold(input.Exp2, threshold);
-        var newExp2 = input.Exp2 + gain;
-        var nextPercent = PercentOfThreshold(newExp2, threshold);
-        var statPoints = nextPercent - presentPercent;
-        if (statPoints < 0)
-            statPoints = 0;
-
-        return HighLevelExperienceOutcome.Accrual(newExp2, statPoints);
+        return HighLevelExperienceOutcome.None;
     }
 
     public static int RebirthTierThreshold(short level2)

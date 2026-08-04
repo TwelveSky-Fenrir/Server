@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.Inventory;
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Loot;
@@ -40,11 +41,25 @@ public sealed class InventoryToWorldDropService(
             ? definition
             : null;
 
+        var hasLegacySingleQuantity = source is { } sourceItem && itemDefinition is { } resolvedDefinition &&
+                                       (resolvedDefinition.Item.Sort switch
+                                       {
+                                           ItemQuantityPolicy.PetSort => sourceItem.Quantity is >=
+                                               ItemQuantityPolicy.MinStackQuantity and <=
+                                               ItemQuantityPolicy.MaxPetActivity,
+                                           _ when ItemQuantityPolicy.CarriesNoQuantity(resolvedDefinition.Item.Sort) =>
+                                               sourceItem.Quantity is 0 or 1,
+                                           _ => false
+                                       });
+        var requestedQuantity = move.Quantity1 == 0 && hasLegacySingleQuantity
+            ? 1
+            : move.Quantity1;
+
         var partyName = PartyIdentityResolver.ResolveCurrentPartyName(partyRegistry, characterId, state.Name,
             memberId => zone.TryGetPlayer(memberId, out var member) ? member?.Name : null);
 
         var resolved = InventoryToWorldDropPolicy.Resolve(
-            sourcePage, sourceSlot, move.Quantity1, premiumPageAccessAllowed,
+            sourcePage, sourceSlot, requestedQuantity, premiumPageAccessAllowed,
             source, itemDefinition,
             itemDefinition is null || itemDefinition.Item.CheckAvatarDrop != NonDroppableFlagValue,
             static _ => GroundItemSpawnEligibility.Eligible,
@@ -60,11 +75,25 @@ public sealed class InventoryToWorldDropService(
 
         var container = (byte)sourcePage;
         var slot = (byte)sourceSlot;
+        var original = state.Inventory.GetContainer(container);
         var projected = resolved.NewSource is { } newStack
             ? state.Inventory.GetContainer(container).SetItem(slot, newStack)
             : state.Inventory.GetContainer(container).Remove(slot);
 
         await characters.ReplaceContainerAsync(characterId, container, ToTvps(projected), cancellationToken);
+
+        var containers = ImmutableArray.Create(new InventoryContainerSnapshot(container, projected));
+
+        if ((await zone.PostInventoryAndGroundItemCommandAndWaitForResultAsync(
+                new InventoryZoneCommand(characterId, containers, null, GroundItemSpawn: resolved.Spawn),
+                cancellationToken)).Kind != ZoneCommandResultKind.Applied)
+        {
+            await characters.ReplaceContainerAsync(characterId, container, ToTvps(original), cancellationToken);
+            logger.LogWarning(
+                "Zone {MapId} rejected inventory-to-world drop for character {CharacterId}; restored the persisted inventory container",
+                zone.MapId, characterId);
+            return InventoryToWorldDropResult.Failed;
+        }
 
         if (source is { } droppedStack && !ContainerMatrix.IsStackableSort(itemDefinition!.Item.Sort))
             await eventLog.LogAsync(ManualDropItemEventCode, EventLogCategory.ItemDrop, accountId, characterId,
@@ -72,14 +101,6 @@ public sealed class InventoryToWorldDropService(
                 $"Serial={droppedStack.Serial};Enchant={droppedStack.Enchant};Combine={droppedStack.Combine};" +
                 $"Refine={droppedStack.Refine};Socket={droppedStack.Socket}",
                 cancellationToken);
-
-        var containers = ImmutableArray.Create(new InventoryContainerSnapshot(container, projected));
-
-        if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
-                cancellationToken))
-            logger.LogError(
-                "Zone {MapId} inventory inbox full: dropped inventory-to-world mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
 
         return new InventoryToWorldDropResult(InventoryToWorldDropStatus.Succeeded, resolved.Spawn);
     }

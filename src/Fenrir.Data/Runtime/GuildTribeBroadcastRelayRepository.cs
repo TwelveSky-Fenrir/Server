@@ -23,10 +23,18 @@ public sealed record GuildTribeBroadcastRelayRepository(ICaeriusNetDbContext Db)
 
     public async ValueTask PublishAsync(GuildTribeBroadcastRelayEntry entry, CancellationToken ct)
     {
+        ArgumentNullException.ThrowIfNull(entry);
+
+        if (entry.CorrelationId == Guid.Empty)
+            throw new ArgumentException("A guild/tribe relay requires a correlation identifier.", nameof(entry));
+
         var sp = new StoredProcedureParametersBuilder("runtime", "usp_GuildTribeBroadcastRelay_Publish", 0,
                 CommandTimeoutSeconds)
             .AddParameter("Kind", (byte)entry.Kind, SqlDbType.TinyInt)
             .AddParameter("SourceShardId", entry.SourceShardId, SqlDbType.TinyInt)
+            .AddParameter("SourceCharacterId", (object?)entry.SourceCharacterId ?? DBNull.Value, SqlDbType.Int)
+            .AddParameter("SystemCause", entry.SystemCause is { } cause ? (byte)cause : DBNull.Value,
+                SqlDbType.TinyInt)
             .AddParameter("GuildId", (object?)entry.GuildId ?? DBNull.Value, SqlDbType.Int)
             .AddParameter("Tribe", (object?)entry.Tribe ?? DBNull.Value, SqlDbType.TinyInt)
             .AddParameter("RoleField", entry.RoleField, SqlDbType.TinyInt)
@@ -59,6 +67,30 @@ public sealed record GuildTribeBroadcastRelayRepository(ICaeriusNetDbContext Db)
             try
             {
                 return await Db.QueryAsImmutableArrayAsync<GuildTribeBroadcastRelayDto>(sp, ct);
+            }
+            catch (CaeriusNetSqlException ex)
+                when (attempt < MaxWriteConflictAttempts &&
+                      ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                      IsWriteConflict(sqlErrorNumber))
+            {
+            }
+        }
+    }
+
+    public async ValueTask AcknowledgeAsync(byte shardId, long relayId, CancellationToken ct)
+    {
+        for (var attempt = 1;; attempt++)
+        {
+            var sp = new StoredProcedureParametersBuilder("runtime", "usp_GuildTribeBroadcastRelay_Acknowledge", 0,
+                    CommandTimeoutSeconds)
+                .AddParameter("ShardId", shardId, SqlDbType.TinyInt)
+                .AddParameter("RelayId", relayId, SqlDbType.BigInt)
+                .Build();
+
+            try
+            {
+                await Db.ExecuteAsync(sp, ct);
+                return;
             }
             catch (CaeriusNetSqlException ex)
                 when (attempt < MaxWriteConflictAttempts &&

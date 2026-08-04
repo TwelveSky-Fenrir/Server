@@ -39,6 +39,8 @@ public sealed class DowngradeItemRankHandler(
 
             switch (result.Outcome)
             {
+                case DowngradeItemRankOutcome.Disconnected:
+                    return;
                 case DowngradeItemRankOutcome.Rejected:
                     session.Send(new DowngradeItemRankResponse { Result = 1, Cost = 0, Value = new int[6] });
                     return;

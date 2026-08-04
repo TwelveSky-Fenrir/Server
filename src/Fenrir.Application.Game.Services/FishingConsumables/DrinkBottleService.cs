@@ -37,7 +37,7 @@ public sealed class DrinkBottleService(WorldDataCache worldData) : IDrinkBottleS
 
         var zoneOverride = new ZoneContext(state.MapId, state.UseOrnament, RankBuffType: state.RankBuffType,
             TribeRole: state.TribeRole, DrunkStateId: drunkItemId, GuildBuffActive: state.GuildBuffActive,
-            GuildId: state.GuildId ?? 0);
+            GuildBuffType: state.GuildBuffType, GuildId: state.GuildId ?? 0);
 
         var petContribution = PetGrowthCalculator.Compute(petItemId, state.PetGrowth, state.PetActivity,
             worldData.ItemsById);

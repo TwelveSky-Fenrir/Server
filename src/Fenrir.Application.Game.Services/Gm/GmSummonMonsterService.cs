@@ -1,6 +1,7 @@
 using Fenrir.Application.Game.Abstractions.Gm;
 using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Application.Game.Domain.Gm;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Core.Packets.Shared;
@@ -16,6 +17,8 @@ public sealed class GmSummonMonsterService(
     private const int Sort = 506;
 
     private const int AcceptedResult = 0;
+
+    private const int RejectedResult = 1;
 
     private const byte SuccessOutcome = 1;
 
@@ -35,12 +38,23 @@ public sealed class GmSummonMonsterService(
             return;
         }
 
-        if (!await zone.PostTribeProgressCommandAndWaitAsync(
-                new TribeProgressZoneCommand(state.CharacterId, GmSummonMonsterTemplateId: packet.Value),
-                cancellationToken))
-            logger.LogError(
-                "Zone {MapId} tribe-progress inbox full: dropped summon-monster mirror for character {CharacterId} (monster {MonsterId}) -- reporting accepted regardless, matching legacy's own unconditional success result",
-                zone.MapId, state.CharacterId, packet.Value);
+        var actorResult = await zone.PostTribeProgressCommandAndWaitForResultAsync(
+            new TribeProgressZoneCommand(state.CharacterId, GmSummonMonsterTemplateId: packet.Value),
+            cancellationToken);
+        if (actorResult.Kind != ZoneCommandResultKind.Applied)
+        {
+            logger.LogWarning(
+                "Character {CharacterId} summon-monster command was not applied (monster {MonsterId}, map {MapId}, result {Result}, cause {Cause})",
+                state.CharacterId, packet.Value, zone.MapId, actorResult.Kind, actorResult.Cause);
+            await eventLog.LogAsync(GmActionEventCodes.SummonMonster, EventLogCategory.GmAction,
+                zoneSession.AccountId, zoneSession.CharacterId, null, null, null, null, null, null, null,
+                GmCommandCatalog.OutcomeRejected,
+                $"MonsterId={packet.Value};MapId={zone.MapId};Result={actorResult.Kind};Cause={actorResult.Cause}",
+                cancellationToken);
+            zoneSession.Send(new GenericActionResponse
+                { Result = RejectedResult, Sort = Sort, Data = data, RuneValue = 0 });
+            return;
+        }
 
         await eventLog.LogAsync(GmActionEventCodes.SummonMonster, EventLogCategory.GmAction, zoneSession.AccountId,
             zoneSession.CharacterId, null, null, null, null, null, null, null, SuccessOutcome,

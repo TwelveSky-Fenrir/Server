@@ -1,11 +1,16 @@
 using System.Collections.Concurrent;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Domain.World.Monsters;
+using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.Simulation;
 
 public sealed class Zone175LabyrinthSystem(
     Zone175LabyrinthConfig config,
+    ZoneCenterSiegeState siegeState,
+    MonsterSpawnScheduler monsterSpawnScheduler,
+    Lazy<ZoneCenterBroadcastIngestor> centerBroadcastIngestor,
     ILogger<Zone175LabyrinthSystem> logger,
     TimeProvider? timeProvider = null) : ISimulationSystem
 {
@@ -20,10 +25,12 @@ public sealed class Zone175LabyrinthSystem(
         if (!_runtimeByZone.TryGetValue(zone.MapId, out var runtime))
             runtime = _runtimeByZone.GetOrAdd(zone.MapId,
                 new Zone175ZoneRuntime(new Zone175MissionState(),
-                    new ZoneZone175MissionEffects(zone, instanceConfig, logger)));
+                    new ZoneZone175MissionEffects(zone, instanceConfig, monsterSpawnScheduler, centerBroadcastIngestor,
+                        logger)));
 
         Zone175MissionCore.Advance(runtime.State, in instanceConfig, runtime.Effects,
-            _timeProvider.GetUtcNow(), legacyTicksElapsed);
+            _timeProvider.GetLocalNow(), siegeState.GetZone175(instanceConfig.Index1, instanceConfig.Index2),
+            legacyTicksElapsed);
     }
 
     public bool IsZone175Map(short mapId)

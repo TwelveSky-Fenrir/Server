@@ -125,6 +125,8 @@ public static class CombatResolver
                 defender.PosZ, MaxAttackDistance))
             return AttackOutcome.Reject(AttackRejectReason.OutOfRange);
 
+        var chargeConsumed = attacker.ChargeBuffPercent > 0;
+
         var isSkillAttack = request.AttackActionValue1 == 2;
         switch (request.AttackActionValue1)
         {
@@ -134,17 +136,15 @@ public static class CombatResolver
                 if (attackerAttackBudgetEnforced &&
                     (request.AttackActionValue2 != attackerActionSkillNumber ||
                      request.AttackActionValue3 != attackerActionSkillGradePoints))
-                    return AttackOutcome.Reject(AttackRejectReason.AntiCheatEchoMismatch);
+                    return AttackOutcome.Reject(AttackRejectReason.AntiCheatEchoMismatch, chargeConsumed);
                 break;
             default:
-                return AttackOutcome.Reject(AttackRejectReason.InvalidAttackModeSelector);
+                return AttackOutcome.Reject(AttackRejectReason.InvalidAttackModeSelector, chargeConsumed);
         }
 
         var attackSuccess = attacker.Stats.AttackSuccess;
         if (attackSuccess < 1)
-            return AttackOutcome.Reject(AttackRejectReason.AttackerHasNoAttackSuccess);
-
-        var chargeConsumed = attacker.ChargeBuffPercent > 0;
+            return AttackOutcome.Reject(AttackRejectReason.AttackerHasNoAttackSuccess, chargeConsumed);
 
         var attackBlock = defender.Stats.AttackBlock;
         if (attackBlock > 0)

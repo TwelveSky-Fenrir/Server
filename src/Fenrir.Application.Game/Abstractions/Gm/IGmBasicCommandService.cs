@@ -34,10 +34,10 @@ public interface IGmBasicCommandService
         Zone zone, CancellationToken cancellationToken);
 
     public ValueTask HandleTargetSpecialStateAsync(int sort, byte[] data, IZoneSession zoneSession,
-        PlayerRuntimeState state, CancellationToken cancellationToken);
+        PlayerRuntimeState state, Zone zone, CancellationToken cancellationToken);
 
     public ValueTask HandleKickAsync(byte[] data, IZoneSession zoneSession, PlayerRuntimeState state,
-        CancellationToken cancellationToken);
+        Zone zone, CancellationToken cancellationToken);
 
     public ValueTask HandleTribeBankAsync(byte[] data, IZoneSession zoneSession,
         CancellationToken cancellationToken);

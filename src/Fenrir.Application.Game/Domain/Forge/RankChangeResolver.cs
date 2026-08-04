@@ -20,10 +20,6 @@ public static class RankChangeResolver
     private const int MaxBaseLevel = 145;
     private const int MaxMartialLevel = 12;
 
-    private const int WarlordRerollEncodedLevel = MaxBaseLevel + MaxMartialLevel;
-
-    private const byte CapeSort = 8;
-
     private const int LuckyUpgradeBonusP1000 = 50;
 
     private const int LuckyDowngradeBonusP100 = 5;
@@ -122,12 +118,8 @@ public static class RankChangeResolver
             return new RankChangeResult(RankChangeOutcome.Failed, cost, 0, targetStack.Enchant, targetStack.Combine,
                 luckyChargeConsumed);
 
-        var warlordEligible = false;
-        if (encodedLevel == WarlordRerollEncodedLevel && target.Sort != CapeSort)
-            warlordEligible = random.NextInt32(4) != 0;
-
         return new RankChangeResult(RankChangeOutcome.Success, cost, replacement.Item.ItemId,
-            targetStack.Enchant - 4, targetStack.Combine - 1, luckyChargeConsumed, warlordEligible);
+            targetStack.Enchant - 4, targetStack.Combine - 1, luckyChargeConsumed);
     }
 
     public static RankChangeResult ResolveDowngrade(
@@ -305,6 +297,5 @@ public static class RankChangeResolver
         int ResultItemId,
         int NewEnchant,
         int NewCombine,
-        bool ConsumesLuckyCharge,
-        bool WarlordRerollEligible = false);
+        bool ConsumesLuckyCharge);
 }

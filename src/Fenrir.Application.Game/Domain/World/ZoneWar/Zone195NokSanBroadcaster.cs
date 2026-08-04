@@ -42,7 +42,15 @@ public sealed class Zone195NokSanBroadcaster(
 
     public void AnnounceNokSanState(byte owningTribe, short serverNumber, Zone195NokSanStateSnapshot snapshot)
     {
-        var fields = new int[2 + snapshot.StonesHeld.Length + snapshot.Owners.Length];
+        if (!snapshot.HasExpectedWireShape)
+        {
+            logger.LogError(
+                "Zone195 Nok-San state snapshot has invalid wire shape: {TribeCount} tribe counters and {SlotCount} stone owners",
+                snapshot.StonesHeld.Length, snapshot.Owners.Length);
+            return;
+        }
+
+        Span<int> fields = stackalloc int[2 + Zone195NokSanState.TribeCount + Zone195NokSanState.StoneSlotCount];
         fields[0] = owningTribe;
         fields[1] = serverNumber;
 
@@ -64,6 +72,14 @@ public sealed class Zone195NokSanBroadcaster(
 
     private void Broadcast(int sort, params ReadOnlySpan<int> fields)
     {
+        if (fields.Length > DataSize / sizeof(int))
+        {
+            logger.LogError(
+                "Zone195 Nok-San tSort {Sort} has {FieldCount} fields, exceeding its {DataSize}-byte payload",
+                sort, fields.Length, DataSize);
+            return;
+        }
+
         var data = new byte[DataSize];
         for (var i = 0; i < fields.Length; i++)
             BinaryPrimitives.WriteInt32LittleEndian(data.AsSpan(i * 4), fields[i]);

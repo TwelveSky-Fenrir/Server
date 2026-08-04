@@ -57,7 +57,7 @@ public sealed class AutoHuntTickSystem(
         if (!state.AutoHuntEnabled || state.AutoHuntConfig is not { } config)
             return;
 
-        if (!state.PshopOpen && !state.IsStunned && !state.IsDead && !IsSuppressedByZoneServerType(zone))
+        if (!state.PshopOpen && state.CanIssueGameplayActions && !IsSuppressedByZoneServerType(zone))
         {
             TryAutoCastBuff(zone, state, config);
             TryResupplyHotkeys(state, config);
@@ -92,25 +92,26 @@ public sealed class AutoHuntTickSystem(
         for (var i = 0; i < slotCount; i++)
         {
             var skillId = config.BuffStore[i * 2];
-            if (skillId < 1)
-                continue;
-
-            var grade = config.BuffStore[i * 2 + 1];
-            var maxLearnedGrade = GetMaxLearnedGrade(skillId, state.LearnedSkills);
-
-            if (grade > maxLearnedGrade)
+            var requestedGrade = config.BuffStore[i * 2 + 1];
+            if (!worldData.SkillsById.TryGetValue(skillId, out var skillDef) ||
+                !AutoBuffSkillResolver.TryResolveOwnedSkill(skillId, requestedGrade, state.LearnedSkills,
+                    out var selection))
             {
-                grade = maxLearnedGrade;
+                ClearRejectedAutoBuffSelection(state, config, i);
+                continue;
+            }
+
+            var grade = selection.BaseGrade;
+            if (requestedGrade != grade)
+            {
                 config.BuffStore[i * 2 + 1] = grade;
+                state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
             }
 
             if (!AutoCastGateSlots.TryGetValue(skillId, out var gateSlots))
                 continue;
 
             if (IsAlreadyActive(state, gateSlots))
-                continue;
-
-            if (!worldData.SkillsById.TryGetValue(skillId, out var skillDef))
                 continue;
 
             var bonusGrade = SkillGradeAuthority.GetBonusSkillValue(skillId, equipSlotItems, 0, skillDef,
@@ -136,12 +137,13 @@ public sealed class AutoHuntTickSystem(
             {
                 state.Mana -= manaCost;
                 state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
-                zone.ApplyBuffWrites(state, result.BuffWrites);
-
-                var (actionType, actionSort) = ResolveBuffCastMotion(skillId, weaponSort);
-                if (actionSort != 0)
-                    zone.BroadcastAutoHuntBuffCast(state, actionType, actionSort, skillId, grade, bonusGrade);
             }
+
+            zone.ApplyBuffWrites(state, result.BuffWrites);
+
+            var (actionType, actionSort) = ResolveBuffCastMotion(skillId, weaponSort);
+            if (actionSort != 0)
+                zone.BroadcastAutoHuntBuffCast(state, actionType, actionSort, skillId, grade, bonusGrade);
 
             return;
         }
@@ -394,12 +396,14 @@ public sealed class AutoHuntTickSystem(
         return false;
     }
 
-    private static int GetMaxLearnedGrade(int skillId, ImmutableDictionary<byte, LearnedSkill> learnedSkills)
+    private void ClearRejectedAutoBuffSelection(PlayerRuntimeState state, AutoHunt config, int slot)
     {
-        foreach (var (_, learned) in learnedSkills)
-            if (learned.SkillId == skillId)
-                return learned.Grade;
+        var offset = slot * 2;
+        if (config.BuffStore[offset] == 0 && config.BuffStore[offset + 1] == 0)
+            return;
 
-        return -1;
+        config.BuffStore[offset] = 0;
+        config.BuffStore[offset + 1] = 0;
+        state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
     }
 }

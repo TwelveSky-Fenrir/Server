@@ -25,9 +25,9 @@ public sealed partial class Zone
         return _chatInbox.Writer.TryWrite(command);
     }
 
-    private void DrainChatCommands()
+    private void DrainChatCommands(int maximum)
     {
-        while (_chatInbox.Reader.TryRead(out var command))
+        for (var processed = 0; processed < maximum && _chatInbox.Reader.TryRead(out var command); processed++)
             try
             {
                 ApplyChatCommand(in command);

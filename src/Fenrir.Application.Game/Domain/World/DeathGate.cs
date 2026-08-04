@@ -45,6 +45,25 @@ public enum ReviveClearOutcome
     ClearDeathWindowAndLock
 }
 
+public readonly record struct DeathGateState(
+    bool IsDead,
+    int Life,
+    bool CanUseConsumables,
+    int DeathSubCounter,
+    bool ReviveHackFlag)
+{
+    public DeathGateState ReleaseEligibilityWindow(bool clearReviveHackFlag)
+    {
+        return !IsDead
+            ? this
+            : this with
+            {
+                DeathSubCounter = ReviveEligibilityRules.DeathSubCounterBaseline,
+                ReviveHackFlag = clearReviveHackFlag ? false : ReviveHackFlag
+            };
+    }
+}
+
 public static class ReviveEligibilityRules
 {
     public const int DeathSubCounterBaseline = 0;

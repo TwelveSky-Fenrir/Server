@@ -7,12 +7,9 @@ public readonly record struct TribeBankResult(
     bool Success,
     int Sort,
     int[]? TribeBankInfo,
-    int Money,
-    bool Disconnect = false)
+    int Money)
 {
     public static readonly TribeBankResult Aborted = new(false, 0, null, 0);
-
-    public static readonly TribeBankResult Disconnected = new(false, 0, null, 0, true);
 }
 
 public interface ITribeBankService

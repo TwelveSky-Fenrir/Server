@@ -4,6 +4,8 @@ using System.Threading.Channels;
 using Fenrir.Application.Game.Domain.Consumables;
 using Fenrir.Application.Game.Domain.Hotkeys;
 using Fenrir.Application.Game.Domain.Mounts;
+using Fenrir.Application.Game.Domain.Pets;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Social.Pshop;
 using Fenrir.Core.Packets.Shared;
@@ -57,10 +59,16 @@ public sealed partial class Zone
 
     private const int AvatarNameLength = 13;
 
+    private const int MountRideTimeStatSort = 26;
+
+    private const int MountAbsorbTimeStatSort = 78;
+
+    private const int MountAbsorbStateStatSort = 79;
+
     private readonly Channel<AutoBuffZoneCommand> _autoBuffInbox =
         Channel.CreateBounded<AutoBuffZoneCommand>(
             new BoundedChannelOptions(AutoBuffInboxCapacity)
-                { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+                { SingleReader = true, FullMode = BoundedChannelFullMode.Wait });
 
     private readonly List<int> _autoBuffNeighborScratch = [];
 
@@ -86,7 +94,7 @@ public sealed partial class Zone
     private readonly Channel<FishingZoneCommand> _fishingInbox =
         Channel.CreateBounded<FishingZoneCommand>(
             new BoundedChannelOptions(FishingInboxCapacity)
-                { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+                { SingleReader = true, FullMode = BoundedChannelFullMode.Wait });
 
     private readonly List<int> _fishingNeighborScratch = [];
 
@@ -147,6 +155,7 @@ public sealed partial class Zone
         }
         catch (TimeoutException)
         {
+            return false;
         }
 
         return true;
@@ -174,28 +183,35 @@ public sealed partial class Zone
 
     public bool PostFishingCommand(in FishingZoneCommand command)
     {
-        return _fishingInbox.Writer.TryWrite(command);
+        if (_fishingInbox.Writer.TryWrite(command))
+            return true;
+
+        command.Applied?.TrySetResult(ZoneCommandResult.Backpressured("Fishing inbox is full."));
+        return false;
     }
 
-    public async Task<bool> PostFishingCommandAndWaitAsync(FishingZoneCommand command, CancellationToken ct,
+    public async Task<ZoneCommandResult> PostFishingCommandAndWaitForResultAsync(FishingZoneCommand command,
+        CancellationToken ct,
         TimeSpan? timeout = null)
     {
-        var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var applied = new TaskCompletionSource<ZoneCommandResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         var withSignal = command with { Applied = applied };
 
         if (!PostFishingCommand(in withSignal))
-            return false;
+            return ZoneCommandResult.Backpressured("Fishing inbox is full.");
 
         try
         {
-            await applied.Task.WaitAsync(timeout ?? TimeSpan.FromSeconds(2), ct).ConfigureAwait(false);
+            return await applied.Task.WaitAsync(timeout ?? TimeSpan.FromSeconds(2), ct).ConfigureAwait(false);
         }
         catch (TimeoutException)
         {
-            return false;
+            return ZoneCommandResult.Cancelled("Fishing command timed out.");
         }
-
-        return true;
+        catch (OperationCanceledException)
+        {
+            return ZoneCommandResult.Cancelled("Fishing command wait was cancelled.");
+        }
     }
 
     public bool PostMountCommand(in MountZoneCommand command)
@@ -240,37 +256,78 @@ public sealed partial class Zone
 
     public bool PostRuneSocketCommand(in RuneSocketZoneCommand command)
     {
-        return _runeInbox.Writer.TryWrite(command);
+        if (_runeInbox.Writer.TryWrite(command))
+            return true;
+
+        command.Applied?.TrySetResult(ZoneCommandResult.Backpressured("Rune-socket inbox is full."));
+        return false;
     }
 
     public async Task<bool> PostRuneSocketCommandAndWaitAsync(RuneSocketZoneCommand command, CancellationToken ct,
         TimeSpan? timeout = null)
     {
-        var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        return (await PostRuneSocketCommandAndWaitForResultAsync(command, ct, timeout).ConfigureAwait(false)).Kind ==
+               ZoneCommandResultKind.Applied;
+    }
+
+    public async Task<ZoneCommandResult> PostRuneSocketCommandAndWaitForResultAsync(
+        RuneSocketZoneCommand command, CancellationToken ct, TimeSpan? timeout = null)
+    {
+        var applied = new TaskCompletionSource<ZoneCommandResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         var withSignal = command with { Applied = applied };
 
         if (!PostRuneSocketCommand(in withSignal))
-            return false;
+            return ZoneCommandResult.Backpressured("Rune-socket inbox is full.");
 
         try
         {
-            await applied.Task.WaitAsync(timeout ?? TimeSpan.FromSeconds(2), ct).ConfigureAwait(false);
+            return await applied.Task.WaitAsync(timeout ?? TimeSpan.FromSeconds(2), ct).ConfigureAwait(false);
         }
         catch (TimeoutException)
         {
+            return ZoneCommandResult.Cancelled("Rune-socket command timed out.");
         }
-
-        return true;
+        catch (OperationCanceledException)
+        {
+            return ZoneCommandResult.Cancelled("Rune-socket command wait was cancelled.");
+        }
     }
 
     public bool PostAutoBuffCommand(in AutoBuffZoneCommand command)
     {
-        return _autoBuffInbox.Writer.TryWrite(command);
+        if (_autoBuffInbox.Writer.TryWrite(command))
+            return true;
+
+        command.Applied?.TrySetResult(ZoneCommandResult.Backpressured("Auto-buff inbox is full."));
+        return false;
     }
 
-    private void DrainDrinkBottleCommands()
+    public async Task<ZoneCommandResult> PostAutoBuffCommandAndWaitForResultAsync(AutoBuffZoneCommand command,
+        CancellationToken ct, TimeSpan? timeout = null)
     {
-        while (_bottleInbox.Reader.TryRead(out var command))
+        var applied = new TaskCompletionSource<ZoneCommandResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var withSignal = command with { Applied = applied };
+
+        if (!PostAutoBuffCommand(in withSignal))
+            return ZoneCommandResult.Backpressured("Auto-buff inbox is full.");
+
+        try
+        {
+            return await applied.Task.WaitAsync(timeout ?? TimeSpan.FromSeconds(2), ct).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            return ZoneCommandResult.Cancelled("Auto-buff command timed out.");
+        }
+        catch (OperationCanceledException)
+        {
+            return ZoneCommandResult.Cancelled("Auto-buff command wait was cancelled.");
+        }
+    }
+
+    private void DrainDrinkBottleCommands(int maximum)
+    {
+        for (var processed = 0; processed < maximum && _bottleInbox.Reader.TryRead(out var command); processed++)
             try
             {
                 ApplyDrinkBottleCommand(in command);
@@ -318,9 +375,9 @@ public sealed partial class Zone
         state.Session.Send(new AvatarStatUpdateResponse { Sort = DrunkDurationStatSort, Value = 0, Value2 = 0 });
     }
 
-    private void DrainHotkeySlotMirrorCommands()
+    private void DrainHotkeySlotMirrorCommands(int maximum)
     {
-        while (_hotkeySlotInbox.Reader.TryRead(out var command))
+        for (var processed = 0; processed < maximum && _hotkeySlotInbox.Reader.TryRead(out var command); processed++)
             try
             {
                 ApplyHotkeySlotMirrorCommand(in command);
@@ -349,6 +406,7 @@ public sealed partial class Zone
         {
             state.PetActivity = (byte)Math.Clamp(state.PetActivity + petActivityGain, 0,
                 MountActivityExpCodec.MaxActivity);
+            PetItemState.SynchronizeEquippedState(state.Inventory, state.PetGrowth, state.PetActivity);
             RecomputeDerivedStats(state);
             state.Session.Send(new AvatarStatUpdateResponse
                 { Sort = PetActivityStatSort, Value = state.PetActivity, Value2 = 0 });
@@ -416,9 +474,9 @@ public sealed partial class Zone
         }
     }
 
-    private void DrainHeroRankingQueryCommands()
+    private void DrainHeroRankingQueryCommands(int maximum)
     {
-        while (_heroRankingInbox.Reader.TryRead(out var command))
+        for (var processed = 0; processed < maximum && _heroRankingInbox.Reader.TryRead(out var command); processed++)
             try
             {
                 ApplyHeroRankingQueryCommand(in command);
@@ -441,9 +499,9 @@ public sealed partial class Zone
             state.LastHeroRankingCurrentQueryAtZoneClock = command.QueriedAtZoneClock;
     }
 
-    private void DrainHeroRankingRolloverCommands()
+    private void DrainHeroRankingRolloverCommands(int maximum)
     {
-        while (_heroRankingRolloverInbox.Reader.TryRead(out _))
+        for (var processed = 0; processed < maximum && _heroRankingRolloverInbox.Reader.TryRead(out _); processed++)
             try
             {
                 ApplyHeroRankingRolloverReset();
@@ -466,40 +524,45 @@ public sealed partial class Zone
         }
     }
 
-    private void DrainFishingCommands()
+    private void DrainFishingCommands(int maximum)
     {
-        while (_fishingInbox.Reader.TryRead(out var command))
+        for (var processed = 0; processed < maximum && _fishingInbox.Reader.TryRead(out var command); processed++)
             try
             {
-                ApplyFishingCommand(in command);
-                command.Applied?.TrySetResult();
+                var result = ApplyFishingCommand(in command)
+                    ? ZoneCommandResult.Applied()
+                    : ZoneCommandResult.Rejected("Fishing command could not be applied.");
+                command.Applied?.TrySetResult(result);
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Zone {MapId} fishing command for character {CharacterId} failed", MapId,
                     command.CharacterId);
-                command.Applied?.TrySetException(ex);
+                command.Applied?.TrySetResult(ZoneCommandResult.Faulted(ex.Message));
             }
     }
 
-    private void ApplyFishingCommand(in FishingZoneCommand command)
+    private bool ApplyFishingCommand(in FishingZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
-            return;
+            return false;
 
-        state.FishingState = command.NewFishingState;
-        state.FishingStep = command.NewFishingStep;
-        state.CatchingFish = command.CatchingFish;
-        state.FishingBiteWasHit = command.BiteWasHit;
+        if (command.ApplyState)
+        {
+            state.FishingState = command.NewFishingState;
+            state.FishingStep = command.NewFishingStep;
+            state.CatchingFish = command.CatchingFish;
+            state.FishingBiteWasHit = command.BiteWasHit;
 
-        if (command.CastAtUtc is { } castAt)
-            state.FishingCastAtUtc = castAt;
-
-        if (!command.Broadcast)
-            return;
+            if (command.CastAtUtc is { } castAt)
+                state.FishingCastAtUtc = castAt;
+        }
 
         if (command.ActionSort is { } sort)
             state.ActionSort = sort;
+
+        if (!command.Broadcast)
+            return true;
 
         var fishingPet = PetActionFieldsOf(state);
         var action = new ActionInfo
@@ -530,11 +593,12 @@ public sealed partial class Zone
             state.PosZ);
         _fishingNeighborScratch.Add(fisherId);
         BroadcastAvatarAction(_fishingNeighborScratch, state, action);
+        return true;
     }
 
-    private void DrainMountCommands()
+    private void DrainMountCommands(int maximum)
     {
-        while (_mountInbox.Reader.TryRead(out var command))
+        for (var processed = 0; processed < maximum && _mountInbox.Reader.TryRead(out var command); processed++)
             try
             {
                 ApplyMountCommand(in command);
@@ -553,7 +617,6 @@ public sealed partial class Zone
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
 
-        var wasAbsorbed = state.AnimalAbsorbState != 0;
         var changed = false;
         var garageChanged = false;
 
@@ -625,37 +688,48 @@ public sealed partial class Zone
         if (command.MountExpSlot is { } expSlot && command.MountExpNewValue is { } expNewValue)
         {
             garageChanged = true;
-            state.MountAccumulatedExp = state.MountAccumulatedExp.SetItem(expSlot, expNewValue);
-            var activity = state.MountActivity[expSlot];
+            var activity = MountActivityExpCodec.ClampActivity(state.MountActivity[expSlot]);
+            var experience = MountActivityExpCodec.ClampExp(expNewValue);
+            state.MountActivity = state.MountActivity.SetItem(expSlot, activity);
+            state.MountAccumulatedExp = state.MountAccumulatedExp.SetItem(expSlot, experience);
             state.Session.Send(new AvatarStatUpdateResponse
             {
                 Sort = MountActivityExpStatSort,
-                Value = MountActivityExpCodec.Pack(activity, expNewValue),
+                Value = MountActivityExpCodec.Pack(activity, experience),
                 Value2 = 0
             });
         }
 
+        if (command.Broadcast is MountBroadcastKind.Mount or MountBroadcastKind.Dismount)
+        {
+            if (state.AnimalAbsorbState != 0)
+            {
+                state.AnimalAbsorbState = 0;
+                changed = true;
+            }
+
+            if (command.Broadcast == MountBroadcastKind.Dismount && state.AnimalNumber != 0)
+            {
+                state.AnimalNumber = 0;
+                changed = true;
+            }
+        }
+
         var mountDirtyFlags = (changed ? DirtyFlags.Vitals : DirtyFlags.None) |
                               (garageChanged ? DirtyFlags.Progression : DirtyFlags.None);
-        if (mountDirtyFlags != DirtyFlags.None)
-            state.MarkProgressDirty(dirtyTracker, mountDirtyFlags);
 
         switch (command.Broadcast)
         {
             case MountBroadcastKind.Mount:
                 state.MountExpiryCountdownAccrualTicks = 0;
+                state.MountActivityDecayAccrualTicks = 0;
                 RecomputeAndPublish(state);
                 BroadcastAvatarStateFlag(state, 12, state.AnimalNumber, 0, 0);
-                BroadcastAvatarStateFlag(state, 26, 0, 0, 0);
+                PublishMountAbsorptionCleared(state);
                 break;
             case MountBroadcastKind.Dismount:
                 RecomputeAndPublish(state);
-                if (wasAbsorbed)
-                {
-                    state.Session.Send(new AvatarStatUpdateResponse { Sort = 79, Value = 0, Value2 = 0 });
-                    BroadcastMountAbsorbAura(state, 0);
-                }
-
+                PublishMountAbsorptionCleared(state);
                 BroadcastAvatarStateFlag(state, 13, 0, 0, 0);
                 break;
             case MountBroadcastKind.AbsorbToggle:
@@ -666,6 +740,144 @@ public sealed partial class Zone
                 BroadcastMountAbsorbAura(state, state.AnimalAbsorbState);
                 break;
         }
+
+        if (mountDirtyFlags != DirtyFlags.None)
+            state.MarkProgressDirty(dirtyTracker, mountDirtyFlags);
+    }
+
+    private void ApplyPetLifecycleTransition(PlayerRuntimeState state, in PetLifecycleTransition transition)
+    {
+        if (transition.Effects == PetLifecycleEffect.None)
+            return;
+
+        state.PetGrowth = transition.NewGrowth;
+        state.PetActivity = transition.NewActivity;
+
+        if ((transition.Effects & PetLifecycleEffect.SynchronizeEquippedItem) != 0)
+            PetItemState.SynchronizeEquippedState(state.Inventory, state.PetGrowth, state.PetActivity);
+
+        if ((transition.Effects & PetLifecycleEffect.MarkProgressionDirty) != 0)
+            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+
+        if (transition.RequiresStatRecalculation)
+            RecomputeAndPublish(state);
+
+        if ((transition.Effects & PetLifecycleEffect.SendActivityResponse) != 0)
+            state.Session.Send(new AvatarStatUpdateResponse
+                { Sort = PetActivityStatSort, Value = transition.NewActivity, Value2 = 0 });
+
+        if (transition.RequiresGrowthTierBroadcast)
+            BroadcastAvatarStateFlag(state, PetGrowStepAvatarChangeInfoSort, 0, 0, 0);
+    }
+
+    private void ApplyMountExperienceCredit(PlayerRuntimeState state, int garageSlot,
+        in MountExperienceCreditResult credit)
+    {
+        if (!credit.IsApplied)
+            return;
+
+        state.MountAccumulatedExp = state.MountAccumulatedExp.SetItem(garageSlot, credit.NewExperience);
+
+        if ((credit.Effects & MountLifecycleEffect.MarkProgressionDirty) != 0)
+            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+
+        if ((credit.Effects & MountLifecycleEffect.SendActivityExperienceResponse) != 0)
+        {
+            var activity = state.MountActivity[garageSlot];
+            state.Session.Send(new AvatarStatUpdateResponse
+            {
+                Sort = MountActivityExpStatSort,
+                Value = MountActivityExpCodec.Pack(activity, credit.NewExperience),
+                Value2 = 0
+            });
+        }
+
+        if (credit.RequiresStatRecalculation)
+            RecomputeAndPublish(state);
+    }
+
+    internal void AdvanceMountExpiry(PlayerRuntimeState state, int minutesElapsed)
+    {
+        for (var elapsedMinute = 0; elapsedMinute < minutesElapsed; elapsedMinute++)
+        {
+            if (!MountStateResolver.TryResolveActiveMountedMount(state.AnimalIndex, state.AnimalNumber,
+                    state.MountGarage, out var garageSlot))
+                return;
+
+            var wasAbsorbing = state.AnimalAbsorbState != 0;
+            var transition = MountExpiryPolicy.AdvanceMinute(new MountMinuteState(
+                state.AnimalIndex,
+                state.AnimalNumber,
+                state.AnimalTime,
+                state.AnimalAbsorbState,
+                state.AnimalAbsorbTime));
+
+            state.AnimalIndex = transition.AnimalIndex;
+            state.AnimalNumber = transition.AnimalNumber;
+            state.AnimalTime = transition.RideTime;
+            state.AnimalAbsorbState = transition.AbsorbState;
+            state.AnimalAbsorbTime = transition.AbsorbTime;
+
+            if (wasAbsorbing)
+                state.Session.Send(new AvatarStatUpdateResponse
+                    { Sort = MountAbsorbTimeStatSort, Value = state.AnimalAbsorbTime, Value2 = 0 });
+
+            state.Session.Send(new AvatarStatUpdateResponse
+                { Sort = MountRideTimeStatSort, Value = state.AnimalTime, Value2 = 0 });
+
+            if (transition.RideExpired)
+                state.MountAutoDismountPending = true;
+
+            if (transition.AbsorptionExpired || transition.RideExpired)
+                RecomputeAndPublish(state);
+
+            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals | DirtyFlags.Progression);
+
+            if (transition.AbsorptionExpired || transition.RideExpired)
+                PublishMountAbsorptionCleared(state);
+
+            if (transition.RideExpired)
+                BroadcastAvatarStateFlag(state, 13, 0, 0, 0);
+
+            if (transition.RideExpired)
+                return;
+        }
+    }
+
+    internal void AdvanceMountActivity(PlayerRuntimeState state, int activityPulses)
+    {
+        for (var pulse = 0; pulse < activityPulses; pulse++)
+        {
+            if (!MountStateResolver.TryResolveActiveMountedMount(state.AnimalIndex, state.AnimalNumber,
+                    state.MountGarage, out var garageSlot))
+                return;
+
+            var transition = MountExpiryPolicy.AdvanceThirtySeconds(new MountActivityState(
+                state.AnimalIndex,
+                state.AnimalNumber,
+                state.MountActivity[garageSlot],
+                state.AnimalDoubleExp > 0));
+
+            if (!transition.ActivityChanged)
+                continue;
+
+            state.MountActivity = state.MountActivity.SetItem(garageSlot, transition.Activity);
+            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+            state.Session.Send(new AvatarStatUpdateResponse
+            {
+                Sort = MountActivityExpStatSort,
+                Value = MountActivityExpCodec.Pack(transition.Activity, state.MountAccumulatedExp[garageSlot]),
+                Value2 = 0
+            });
+            RecomputeAndPublish(state);
+        }
+    }
+
+    private void PublishMountAbsorptionCleared(PlayerRuntimeState state)
+    {
+        BroadcastAvatarStateFlag(state, 26, 0, 0, 0);
+        state.Session.Send(new AvatarStatUpdateResponse { Sort = MountAbsorbStateStatSort, Value = 0, Value2 = 0 });
+        BroadcastMountAbsorbAura(state, 0);
     }
 
     private void BroadcastAvatarStateFlag(PlayerRuntimeState state, int sort, int value01, int value02, int value03)
@@ -763,9 +975,9 @@ public sealed partial class Zone
         }
     }
 
-    private void DrainCostumeCommands()
+    private void DrainCostumeCommands(int maximum)
     {
-        while (_costumeInbox.Reader.TryRead(out var command))
+        for (var processed = 0; processed < maximum && _costumeInbox.Reader.TryRead(out var command); processed++)
             try
             {
                 ApplyCostumeCommand(in command);
@@ -868,9 +1080,9 @@ public sealed partial class Zone
         BroadcastAvatarAction(_costumeFullActionNeighborScratch, state);
     }
 
-    private void DrainStellarCoreCommands()
+    private void DrainStellarCoreCommands(int maximum)
     {
-        while (_stellarCoreInbox.Reader.TryRead(out var command))
+        for (var processed = 0; processed < maximum && _stellarCoreInbox.Reader.TryRead(out var command); processed++)
             try
             {
                 ApplyStellarCoreCommand(in command);
@@ -964,9 +1176,9 @@ public sealed partial class Zone
         return builder.MoveToImmutable();
     }
 
-    private void DrainAvatarBuffCommands()
+    private void DrainAvatarBuffCommands(int maximum)
     {
-        while (_avatarBuffInbox.Reader.TryRead(out var command))
+        for (var processed = 0; processed < maximum && _avatarBuffInbox.Reader.TryRead(out var command); processed++)
             try
             {
                 ApplyAvatarBuffCommand(in command);
@@ -1004,53 +1216,60 @@ public sealed partial class Zone
             RecomputeAndPublish(state);
     }
 
-    private void DrainRuneSocketCommands()
+    private void DrainRuneSocketCommands(int maximum)
     {
-        while (_runeInbox.Reader.TryRead(out var command))
+        for (var processed = 0; processed < maximum && _runeInbox.Reader.TryRead(out var command); processed++)
             try
             {
-                ApplyRuneSocketCommand(in command);
-                command.Applied?.TrySetResult();
+                var result = ApplyRuneSocketCommand(in command)
+                    ? ZoneCommandResult.Applied()
+                    : ZoneCommandResult.Rejected("Rune-socket command could not be applied.");
+                command.Applied?.TrySetResult(result);
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Zone {MapId} rune-socket command for character {CharacterId} failed", MapId,
                     command.CharacterId);
-                command.Applied?.TrySetException(ex);
+                command.Applied?.TrySetResult(ZoneCommandResult.Faulted(ex.Message));
             }
     }
 
-    private void ApplyRuneSocketCommand(in RuneSocketZoneCommand command)
+    private bool ApplyRuneSocketCommand(in RuneSocketZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
-            return;
+            return false;
 
         state.RuneSystem = state.RuneSystem.SetItem(command.RuneIndex, command.RuneItemId ?? 0);
         state.RuneSystemStat = state.RuneSystemStat.SetItem(command.RuneIndex, command.RuneStat ?? 0);
 
         RecomputeAndPublish(state);
+        return true;
     }
 
-    private void DrainAutoBuffCommands()
+    private void DrainAutoBuffCommands(int maximum)
     {
-        while (_autoBuffInbox.Reader.TryRead(out var command))
+        for (var processed = 0; processed < maximum && _autoBuffInbox.Reader.TryRead(out var command); processed++)
             try
             {
-                ApplyAutoBuffCommand(in command);
-                command.Applied?.TrySetResult();
+                command.Applied?.TrySetResult(ApplyAutoBuffCommand(in command)
+                    ? ZoneCommandResult.Applied()
+                    : ZoneCommandResult.Rejected("Auto-buff command could not be applied."));
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Zone {MapId} auto-buff command for character {CharacterId} failed", MapId,
                     command.CharacterId);
-                command.Applied?.TrySetException(ex);
+                command.Applied?.TrySetResult(ZoneCommandResult.Faulted(ex.Message));
             }
     }
 
-    private void ApplyAutoBuffCommand(in AutoBuffZoneCommand command)
+    private bool ApplyAutoBuffCommand(in AutoBuffZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
-            return;
+            return false;
+
+        if ((command.ApplyRegisteredBuffs || command.ActivateAutoBuff) && !state.CanIssueGameplayActions)
+            return false;
 
         if (command.RegisteredSkills is { } registered)
         {
@@ -1087,7 +1306,7 @@ public sealed partial class Zone
         }
 
         if (!command.Broadcast)
-            return;
+            return true;
 
         if (command.ActionSort is { } sort)
             state.ActionSort = sort;
@@ -1125,11 +1344,12 @@ public sealed partial class Zone
             state.PosZ);
         _autoBuffNeighborScratch.Add(casterId);
         BroadcastAvatarAction(_autoBuffNeighborScratch, state, action);
+        return true;
     }
 
-    private void DrainPshopCommands()
+    private void DrainPshopCommands(int maximum)
     {
-        while (_pshopInbox.Reader.TryRead(out var command))
+        for (var processed = 0; processed < maximum && _pshopInbox.Reader.TryRead(out var command); processed++)
             try
             {
                 ApplyPshopCommand(in command);
@@ -1148,6 +1368,24 @@ public sealed partial class Zone
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
 
+        if (command.OpenListing is { } openListing)
+        {
+            state.PshopOpen = true;
+            state.PshopListing = openListing;
+
+            if (command.DisableAutoHunt && state.AutoHuntEnabled)
+            {
+                state.AutoHuntEnabled = false;
+                state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+                state.Session.Send(new AutoHuntToggleResponse
+                {
+                    ServerIndex = state.CharacterId,
+                    UniqueNumber = state.UniqueNumber,
+                    AutoState = 0
+                });
+            }
+        }
+
         if (command.Page is { } page && command.Slot is { } slot && state.PshopListing is { } listing)
         {
             var itemInfo = listing.ItemInfo;
@@ -1157,8 +1395,19 @@ public sealed partial class Zone
 
             if (command.SellerSoldNotification is { } soldNotification)
                 state.Session.Send(soldNotification);
+        }
 
-            state.Session.Send(new ViewShopStallResponse { Result = 3, PshopInfo = listing });
+        if (command.SendSellerListingRefresh && state.PshopListing is { } refreshedListing)
+            state.Session.Send(new ViewShopStallResponse { Result = 3, PshopInfo = refreshedListing });
+
+        if (command.BroadcastOpenAction)
+        {
+            var openingCharacterId = command.CharacterId;
+            SendAvatarAction(state.Session, state);
+            _pshopCloseFullActionNeighborScratch.Clear();
+            _grid.NeighborsExcludingSelf(_pshopCloseFullActionNeighborScratch, state.CurrentCell, openingCharacterId,
+                state.PosX, state.PosY, state.PosZ);
+            BroadcastAvatarAction(_pshopCloseFullActionNeighborScratch, state);
         }
 
         if (!command.CloseShop)
@@ -1214,8 +1463,9 @@ public readonly record struct FishingZoneCommand(
     bool Broadcast,
     int? ActionSort,
     DateTime? CastAtUtc = null,
-    TaskCompletionSource? Applied = null,
-    bool BiteWasHit = false);
+    TaskCompletionSource<ZoneCommandResult>? Applied = null,
+    bool BiteWasHit = false,
+    bool ApplyState = true);
 
 public enum MountBroadcastKind : byte
 {
@@ -1304,7 +1554,7 @@ public readonly record struct RuneSocketZoneCommand(
     int RuneIndex,
     int? RuneItemId,
     int? RuneStat,
-    TaskCompletionSource? Applied = null);
+    TaskCompletionSource<ZoneCommandResult>? Applied = null);
 
 public readonly record struct AutoBuffZoneCommand(
     int CharacterId,
@@ -1315,4 +1565,4 @@ public readonly record struct AutoBuffZoneCommand(
     bool Broadcast = false,
     AutoHunt? NewAutoHuntConfig = null,
     bool DisableAutoHunt = false,
-    TaskCompletionSource? Applied = null);
+    TaskCompletionSource<ZoneCommandResult>? Applied = null);

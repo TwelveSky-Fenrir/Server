@@ -16,6 +16,7 @@ public readonly record struct RuneStoneCraftRequest(
     int SourcePage,
     int SourceSlot,
     int SourceItemId,
+    int SourceQuantity,
     int DestinationPage,
     int DestinationSlot,
     int DestinationItemId,
@@ -40,7 +41,8 @@ public static class RuneStoneCraftResolver
     public static RuneStoneCraftResult Resolve(RuneStoneCraftRequest request, IRandomSource random)
     {
         if (!IsValidInventorySlot(request.SourcePage, request.SourceSlot) ||
-            !IsValidInventorySlot(request.DestinationPage, request.DestinationSlot))
+            !IsValidInventorySlot(request.DestinationPage, request.DestinationSlot) ||
+            request.SourcePage == request.DestinationPage && request.SourceSlot == request.DestinationSlot)
             return RuneStoneCraftResult.Disconnect;
 
         if ((request.SourcePage == ContainerMatrix.InventoryPage1 ||
@@ -49,6 +51,9 @@ public static class RuneStoneCraftResolver
             return RuneStoneCraftResult.Disconnect;
 
         if (!RuneStoneCraftCatalog.IsSourceItem(request.SourceItemId))
+            return RuneStoneCraftResult.Disconnect;
+
+        if (request.SourceQuantity < ItemQuantityPolicy.MinStackQuantity)
             return RuneStoneCraftResult.Disconnect;
 
         if (request.SourceItemId == RuneStoneCraftCatalog.RerollOneStatItemId &&

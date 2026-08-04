@@ -13,6 +13,7 @@ using Fenrir.Application.Game.Handlers.Extensions;
 using Fenrir.Application.Game.Hosting;
 using Fenrir.Application.Game.Hosting.Extensions;
 using Fenrir.Application.Game.Hosting.World.ZoneWar;
+using Fenrir.Application.Game.Services.ZoneWar;
 using Fenrir.Application.Game.Services.Extensions;
 using Fenrir.Core.Abstractions;
 using Fenrir.Data;
@@ -82,6 +83,12 @@ try
     bootStep = "WorldStateService.InitializeAsync";
     await host.Services.GetRequiredService<WorldStateService>().InitializeAsync(bootCts.Token);
 
+    bootStep = "Zone195NokSanStateService.InitializeAsync";
+    await host.Services.GetRequiredService<Zone195NokSanStateService>().InitializeAsync(bootCts.Token);
+
+    bootStep = "ValleyWarCampaignStateService.InitializeAsync";
+    await host.Services.GetRequiredService<ValleyWarCampaignStateService>().InitializeAsync(bootCts.Token);
+
     bootStep = "GuildRankingCache.RefreshAsync";
     await host.Services.GetRequiredService<GuildRankingCache>()
         .RefreshAsync(host.Services.GetRequiredService<IGuildRepository>(), bootCts.Token);
@@ -103,6 +110,10 @@ try
     if (hostedMaps.Count == 0)
         throw new InvalidOperationException(
             $"No maps assigned to shard {shardId} in admin.ShardMapAssignments -- a GameServer hosting no world is always a configuration mistake.");
+
+    bootStep = "WorldMapOwnershipGuard.EnsureComplete";
+    WorldMapOwnershipGuard.EnsureComplete(shardId, hostedMaps,
+        host.Services.GetRequiredService<WorldDataCache>().ZonesByNumber.Keys);
 
     bootStep = "ZonePortRangeGuard.EnsureAllPortsWithinReservedBlock";
     var portOptions = host.Services.GetRequiredService<IOptions<GameServerOptions>>().Value;
@@ -165,20 +176,6 @@ foreach (var gap in unclaimedDesignatedMaps)
 
 var zoneRegistry = host.Services.GetRequiredService<ZoneRegistry>();
 zoneRegistry.Initialize(hostedMaps);
-
-var mapsMissingGeometry = new List<short>();
-foreach (var zone in zoneRegistry.Zones)
-    if (zone.Geometry is null)
-        mapsMissingGeometry.Add(zone.MapId);
-
-if (mapsMissingGeometry.Count > 0)
-    bootLogger.LogWarning(
-        "{MissingCount} of {HostedCount} hosted map(s) loaded without navmesh (.WM) data: [{MapIds}] -- on these " +
-        "maps, monster pathing (MonsterAiSystem.MoveToward) is unconstrained by terrain/obstacles and " +
-        "player-movement validation (MovementRules.IsPlausible) degrades to its per-move distance check only, until real " +
-        ".WM assets are deployed for them. See the per-map warning/error already logged above by " +
-        "Zone.TryLoadGeometry for each map's specific cause (missing file vs. parse failure).",
-        mapsMissingGeometry.Count, hostedMaps.Count, string.Join(", ", mapsMissingGeometry));
 
 bootLogger.LogInformation(
     "GameServer preload complete; entering host.RunAsync() now -- zone listeners and the directory heartbeat " +

@@ -4,7 +4,7 @@ namespace Fenrir.Domain.Game.Stats;
 
 public static partial class StatCalculator
 {
-    private static int ComputeAttackSuccess(int strength, LevelRowDto levelRow, int setNumber,
+    private static int ComputeAttackSuccess(int strength, LevelRowDto levelRow, int setNumber, byte avatarTribe,
         EquippedItemSlot?[] bySlot, MountContext mount = default, ZoneContext zone = default,
         ConsumableContext consumable = default)
     {
@@ -26,7 +26,10 @@ public static partial class StatCalculator
         if (bySlot[7] is { } weaponIu3 && weaponIu3.Item.CheckSetItem != 2)
             hit += IUEffectSlotContribution(3, weaponIu3.Item.Sort, weaponIu3.Item.Level, weaponIu3.Combine);
 
-        hit += AccuracyElixirContributionWithOverride(consumable, zone);
+        hit += AccuracyElixirContributionWithOverride(consumable, zone, avatarTribe: avatarTribe,
+            eventTribe: consumable.EventTribe);
+
+        hit = ApplyGuildBuffAttackSuccess(hit, zone);
 
         hit = MountGradeHit(hit, mount);
 
@@ -68,7 +71,7 @@ public static partial class StatCalculator
 
 
     private static int ComputeAttackBlock(int wisdom, int vitality, LevelRowDto levelRow, int setNumber,
-        EquippedItemSlot?[] bySlot, MountContext mount = default, ZoneContext zone = default,
+        byte avatarTribe, EquippedItemSlot?[] bySlot, MountContext mount = default, ZoneContext zone = default,
         ConsumableContext consumable = default)
     {
         var dodge = (int)(wisdom * 1.67f) + (int)(vitality * 0.90f);
@@ -93,7 +96,10 @@ public static partial class StatCalculator
 
         dodge += DecorationStatContribution(DecorationStatKind.AttackBlock, bySlot);
 
-        dodge += BlockElixirContributionWithOverride(consumable, zone);
+        dodge += BlockElixirContributionWithOverride(consumable, zone, avatarTribe: avatarTribe,
+            eventTribe: consumable.EventTribe);
+
+        dodge = ApplyGuildBuffAttackBlock(dodge, zone);
 
         dodge = MountGradeDodge(dodge, mount);
 

@@ -2,6 +2,7 @@ using System.Globalization;
 using Fenrir.Application.Game.Abstractions.Chat;
 using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Application.Game.Domain.Gm;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Social.Chat;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
@@ -12,8 +13,6 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Game.Services.Chat;
 
 public sealed class LocalChatService(
-    YangGokPvpDropEventState yangGokDropEvent,
-    LabyrinthOperatorGate labyrinthGate,
     IWorldNoticeService worldNotice,
     IEventLogRepository eventLog,
     ISessionRateLimiter rateLimiter,
@@ -115,26 +114,18 @@ public sealed class LocalChatService(
         switch (argument)
         {
             case "on":
-                yangGokDropEvent.Enable();
-                SendSystemChat(sender,
-                    $"YangGok PvP drop event: ON {YangGokPvpDropEventState.EnabledDropRatePercent}%");
-                await AuditAsync(LocalChatGmCommandKind.YgDrop, zoneSession, GmCommandCatalog.OutcomeExecuted,
-                    "Argument=on", cancellationToken);
-                return;
-
             case "off":
-                yangGokDropEvent.Disable();
-                SendSystemChat(sender, "YangGok PvP drop event: OFF");
-                await AuditAsync(LocalChatGmCommandKind.YgDrop, zoneSession, GmCommandCatalog.OutcomeExecuted,
-                    "Argument=off", cancellationToken);
+                SendSystemChat(sender,
+                    "YangGok PvP drop event is unavailable: no durable world authority is configured.");
+                await AuditAsync(LocalChatGmCommandKind.YgDrop, zoneSession, GmCommandCatalog.OutcomeRejected,
+                    $"Argument={argument};Reason=ProcessLocalState", cancellationToken);
                 return;
 
             case "status":
-                SendSystemChat(sender, yangGokDropEvent.Enabled
-                    ? $"YangGok PvP drop event: ON {yangGokDropEvent.DropRatePercent}%"
-                    : "YangGok PvP drop event: OFF");
-                await AuditAsync(LocalChatGmCommandKind.YgDrop, zoneSession, GmCommandCatalog.OutcomeExecuted,
-                    "Argument=status", cancellationToken);
+                SendSystemChat(sender,
+                    "YangGok PvP drop event status is unavailable: it is not globally authoritative.");
+                await AuditAsync(LocalChatGmCommandKind.YgDrop, zoneSession, GmCommandCatalog.OutcomeRejected,
+                    "Argument=status;Reason=ProcessLocalState", cancellationToken);
                 return;
 
             default:
@@ -151,23 +142,18 @@ public sealed class LocalChatService(
         switch (argument)
         {
             case "on":
-                labyrinthGate.Enable();
-                SendSystemChat(sender, "Labyrinth R0-R12: ON");
-                await AuditAsync(LocalChatGmCommandKind.Lab, zoneSession, GmCommandCatalog.OutcomeExecuted,
-                    "Argument=on", cancellationToken);
-                return;
-
             case "off":
-                labyrinthGate.Disable();
-                SendSystemChat(sender, "Labyrinth R0-R12: OFF");
-                await AuditAsync(LocalChatGmCommandKind.Lab, zoneSession, GmCommandCatalog.OutcomeExecuted,
-                    "Argument=off", cancellationToken);
+                SendSystemChat(sender,
+                    "Labyrinth control is unavailable: no durable world authority is configured.");
+                await AuditAsync(LocalChatGmCommandKind.Lab, zoneSession, GmCommandCatalog.OutcomeRejected,
+                    $"Argument={argument};Reason=ProcessLocalState", cancellationToken);
                 return;
 
             case "status":
-                SendSystemChat(sender, FormatLabStatus(labyrinthGate.Enabled));
-                await AuditAsync(LocalChatGmCommandKind.Lab, zoneSession, GmCommandCatalog.OutcomeExecuted,
-                    "Argument=status", cancellationToken);
+                SendSystemChat(sender,
+                    "Labyrinth control status is unavailable: it is not globally authoritative.");
+                await AuditAsync(LocalChatGmCommandKind.Lab, zoneSession, GmCommandCatalog.OutcomeRejected,
+                    "Argument=status;Reason=ProcessLocalState", cancellationToken);
                 return;
 
             default:
@@ -176,12 +162,6 @@ public sealed class LocalChatService(
                     $"Argument={argument}", cancellationToken);
                 return;
         }
-    }
-
-    private static string FormatLabStatus(bool enabled)
-    {
-        var cellValue = enabled ? 1 : 0;
-        return $"Labyrinth R0-R12: ND={cellValue} RS={cellValue} GT={cellValue} NG={cellValue}";
     }
 
     private async ValueTask HandleBossAsync(Zone zone, IZoneSession zoneSession, PlayerRuntimeState sender,
@@ -196,11 +176,18 @@ public sealed class LocalChatService(
             return;
         }
 
-        if (!zone.PostTribeProgressCommand(
-                new TribeProgressZoneCommand(sender.CharacterId, GmSummonMonsterTemplateId: monsterId)))
-            logger.LogError(
-                "Zone {MapId} tribe-progress inbox full: dropped GM 'boss' spawn for character {CharacterId} (monster {MonsterId})",
-                zone.MapId, sender.CharacterId, monsterId);
+        var result = await zone.PostTribeProgressCommandAndWaitForResultAsync(
+            new TribeProgressZoneCommand(sender.CharacterId, GmSummonMonsterTemplateId: monsterId), cancellationToken);
+        if (result.Kind != ZoneCommandResultKind.Applied)
+        {
+            logger.LogWarning(
+                "Zone {MapId} rejected GM 'boss' spawn for character {CharacterId} (monster {MonsterId}, result {Result}, cause {Cause})",
+                zone.MapId, sender.CharacterId, monsterId, result.Kind, result.Cause);
+            SendSystemChat(sender, "Boss summon was not applied.");
+            await AuditAsync(LocalChatGmCommandKind.Boss, zoneSession, GmCommandCatalog.OutcomeRejected,
+                $"MonsterId={monsterId};Result={result.Kind};Cause={result.Cause}", cancellationToken);
+            return;
+        }
 
         worldNotice.Broadcast($"A boss (id {monsterId}) has been summoned.");
 

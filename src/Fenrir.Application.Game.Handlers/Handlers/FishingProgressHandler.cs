@@ -1,5 +1,6 @@
 using Fenrir.Application.Game.Abstractions.FishingConsumables;
 using Fenrir.Application.Game.Abstractions.Sessions;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -9,16 +10,31 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 public sealed class FishingProgressHandler(
     IFishingProgressService fishingProgressService,
     ILogger<FishingProgressHandler> logger)
-    : IInlinePacketHandler<FishingProgressRequest>
+    : IAsyncPacketHandler<FishingProgressRequest>
 {
-    public void Handle(in FishingProgressRequest packet, IPacketSession session)
+    public async ValueTask HandleAsync(FishingProgressRequest packet, IPacketSession session,
+        CancellationToken cancellationToken)
     {
         var zoneSession = (IZoneSession)session;
+        var characterId = zoneSession.CharacterId!.Value;
+
+        if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
+            state is null)
+            return;
+
+        if (zone.MapId != FishingLineHandler.FishingZoneNumber)
+        {
+            logger.LogDebug(
+                "Fishing-progress request on character {CharacterId}: map {MapId} does not accept op104",
+                characterId, zone.MapId);
+            zoneSession.Abort(DisconnectReason.Faulted);
+            return;
+        }
 
         if (packet.Sort is not (1 or 2 or 3))
         {
             logger.LogDebug(
-                "Fishing-progress request (op104) on session {SessionId}: malformed sort {Sort} -- legacy default disconnects, no response (S04_MyWork02.cpp:13552-13554)",
+                "Fishing-progress request (op104) on session {SessionId}: malformed sort {Sort}; closing without a response",
                 session.SessionId, packet.Sort);
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
@@ -27,43 +43,28 @@ public sealed class FishingProgressHandler(
         if (packet.Sort == 3 && packet.FishingStep is < 0 or > 5)
         {
             logger.LogDebug(
-                "Fishing-progress request (op104) on session {SessionId}: out-of-range step {FishingStep} -- legacy disconnects, no response (S04_MyWork02.cpp:13535-13539)",
+                "Fishing-progress request (op104) on session {SessionId}: out-of-range step {FishingStep}; closing without a response",
                 session.SessionId, packet.FishingStep);
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 
-        var characterId = zoneSession.CharacterId!.Value;
-
-        if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
-            state is null)
-            return;
-
-        if (logger.IsEnabled(LogLevel.Debug))
-            logger.LogDebug(
-                "Session {SessionId}: FishingProgressRequest (op104) received for character {CharacterId}, sort {Sort}",
-                session.SessionId, characterId, packet.Sort);
-
-        if (zone.MapId != FishingLineHandler.FishingZoneNumber)
-        {
-            logger.LogDebug(
-                "Fishing-progress request ignored for character {CharacterId}: map {MapId} is not the fishing zone",
-                characterId, zone.MapId);
-            return;
-        }
-
         FishingProgressResult? result;
+        var responseIsRequired = packet.Sort is 2 or 3 ||
+                                 (state.FishingState != 0 && state.FishingStep == 3 &&
+                                  state.FishingCastAtUtc is { } castAt &&
+                                  DateTime.UtcNow - castAt >= TimeSpan.FromMinutes(1));
         switch (packet.Sort)
         {
             case 1:
-                result = fishingProgressService.PollBite(zone, state, characterId);
+                result = await fishingProgressService.PollBiteAsync(zone, state, characterId, cancellationToken);
                 break;
             case 2:
-                result = fishingProgressService.Recast(zone, state, characterId);
-                logger.LogInformation("Character {CharacterId} recast fishing line", characterId);
+                result = await fishingProgressService.RecastAsync(zone, state, characterId, cancellationToken);
                 break;
             case 3:
-                result = fishingProgressService.ForceStep(zone, state, characterId, packet.FishingStep);
+                result = await fishingProgressService.ForceStepAsync(zone, state, characterId, packet.FishingStep,
+                    cancellationToken);
                 break;
             default:
                 zoneSession.Abort(DisconnectReason.Faulted);
@@ -71,16 +72,28 @@ public sealed class FishingProgressHandler(
         }
 
         if (result is not { } value)
-            return;
+        {
+            if (responseIsRequired)
+            {
+                logger.LogError("Zone {MapId} did not acknowledge fishing-progress state for character {CharacterId}",
+                    zone.MapId, characterId);
+                zoneSession.Abort(DisconnectReason.Faulted);
+            }
 
-        if (value.FishingStep is 4 or 5)
-            logger.LogInformation("Character {CharacterId} fishing bite at step {FishingStep}", characterId,
-                value.FishingStep);
+            return;
+        }
 
         session.Send(new FishingProgressResponse
         {
             ServerIndex = characterId, UniqueNumber = state.UniqueNumber, Result = value.ResultSort,
             FishingState = value.FishingState, FishingStep = value.FishingStep
         });
+
+        if (value.BroadcastCapture &&
+            (await zone.PostFishingCommandAndWaitForResultAsync(
+                new FishingZoneCommand(characterId, 0, 0, false, true, 93, ApplyState: false), cancellationToken)).Kind !=
+            ZoneCommandResultKind.Applied)
+            logger.LogError("Zone {MapId} did not acknowledge fishing-capture action for character {CharacterId}",
+                zone.MapId, characterId);
     }
 }

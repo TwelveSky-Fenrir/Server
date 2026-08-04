@@ -10,6 +10,8 @@ public static class SimulationClock
 
     public const int PetActivityDecayLegacyTicks = 60;
 
+    public const int MountActivityDecayLegacyTicks = 60;
+
     public const int MonsterIdleReturnHomeLegacyTicks = 120;
 
     public const int MonsterIdleWanderLegacyTicks = 80;

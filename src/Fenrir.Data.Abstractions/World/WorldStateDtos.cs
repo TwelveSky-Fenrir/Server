@@ -12,6 +12,7 @@ public sealed partial record WorldStateRowDto(
     int? MonsterSymbolEndTime,
     byte? HighTribe,
     short UpdateTribePoint,
+    long Revision,
     DateTime UpdatedAtUtc);
 
 [GenerateDto]

@@ -23,6 +23,8 @@ public sealed class WorldStateWriteBehindHost(WorldStateService worldState) : Ba
         {
         }
 
-        await worldState.FlushIfDirtyAsync(CancellationToken.None).ConfigureAwait(false);
+        var flushed = await worldState.FlushIfDirtyAsync(CancellationToken.None).ConfigureAwait(false);
+        if (!flushed || worldState.IsDirty)
+            throw new InvalidOperationException("WorldState shutdown flush left retained mutations unpersisted.");
     }
 }

@@ -37,7 +37,7 @@ public sealed class TribeGuardSpawner(
 
     private const int FullEvaluationCadenceLegacyTicks = 20;
 
-    private const int OrdinaryPoolServerIndexBase = 1_000_000;
+    public const int OrdinaryPoolServerIndexBase = 1_000_000;
     private const int Zone038WinnerPoolServerIndexBase = 1_001_000;
 
     public static readonly IReadOnlySet<short> OrdinaryEligibleMapIds =

@@ -25,9 +25,9 @@ public static class PopupEventZoneCatalog
 
     public const int MonsterKillThreshold = 400;
 
-    public const short LnwTestShard = 164;
+    public const short RegularWarMapId = 160;
 
-    private static readonly FrozenSet<short> RegularWarMaps = new short[] { 146, 160 }.ToFrozenSet();
+    private static readonly FrozenSet<short> RegularWarMaps = new[] { RegularWarMapId }.ToFrozenSet();
 
     private static readonly FrozenSet<short> YanggokMaps = new short[] { 38 }.ToFrozenSet();
 
@@ -79,8 +79,7 @@ public static class PopupEventZoneCatalog
     {
         return type switch
         {
-            PopupEventType.RegularWar or PopupEventType.RuinsPvp =>
-                mapId == LnwTestShard ? 1 : WarKillThreshold,
+            PopupEventType.RegularWar or PopupEventType.RuinsPvp => WarKillThreshold,
             PopupEventType.YanggokPvp => YanggokKillThreshold,
             PopupEventType.InvasionPvp => InvasionKillThreshold,
             PopupEventType.MonsterPve => MonsterKillThreshold,
@@ -96,15 +95,49 @@ public static class PopupEventZoneCatalog
 
 public sealed class PopupEventState
 {
-    private readonly bool[] _enabled = new bool[5];
+    private readonly int[] _countdowns = new int[5];
+    private readonly int[] _enabled = new int[5];
+
+    private readonly int[] _pvmRequirements = new int[5];
+
+    private readonly int[] _pvpRequirements = new int[5];
 
     public bool IsEnabled(PopupEventType type)
     {
-        return Volatile.Read(ref _enabled[(int)type]);
+        return Volatile.Read(ref _enabled[(int)type]) != 0;
     }
 
     public void SetEnabled(PopupEventType type, bool enabled)
     {
-        Volatile.Write(ref _enabled[(int)type], enabled);
+        Volatile.Write(ref _enabled[(int)type], enabled ? 1 : 0);
+    }
+
+    public void ApplyState(PopupEventType type, bool enabled, int pvpRequirement, int pvmRequirement)
+    {
+        var index = (int)type;
+        Volatile.Write(ref _pvpRequirements[index], pvpRequirement);
+        Volatile.Write(ref _pvmRequirements[index], pvmRequirement);
+        Volatile.Write(ref _enabled[index], enabled ? 1 : 0);
+    }
+
+    public void SetCountdown(PopupEventType type, int remainingMinutes)
+    {
+        Volatile.Write(ref _countdowns[(int)type], remainingMinutes);
+    }
+
+    public PopupEventWorldSnapshot GetSnapshot(PopupEventType type)
+    {
+        var index = (int)type;
+        return new PopupEventWorldSnapshot(
+            Volatile.Read(ref _enabled[index]) != 0,
+            Volatile.Read(ref _pvpRequirements[index]),
+            Volatile.Read(ref _pvmRequirements[index]),
+            Volatile.Read(ref _countdowns[index]));
     }
 }
+
+public readonly record struct PopupEventWorldSnapshot(
+    bool Enabled,
+    int PvpRequirement,
+    int PvmRequirement,
+    int CountdownMinutes);

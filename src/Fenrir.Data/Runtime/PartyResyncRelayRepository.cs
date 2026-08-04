@@ -27,9 +27,13 @@ public sealed record PartyResyncRelayRepository(ICaeriusNetDbContext Db) : IPart
             .AddParameter("Sort", entry.Sort, SqlDbType.TinyInt)
             .AddParameter("SourceShardId", entry.SourceShardId, SqlDbType.TinyInt)
             .AddParameter("SourceCharacterId", entry.SourceCharacterId, SqlDbType.Int)
+            .AddParameter("RecipientCharacterId", entry.RecipientCharacterId == 0
+                ? entry.SourceCharacterId
+                : entry.RecipientCharacterId, SqlDbType.Int)
             .AddParameter("PartyName", entry.PartyName, SqlDbType.NVarChar)
             .AddParameter("AvatarName", entry.AvatarName, SqlDbType.NVarChar)
             .AddParameter("CorrelationId", entry.CorrelationId, SqlDbType.UniqueIdentifier)
+            .AddParameter("RequestCorrelationId", entry.RequestCorrelationId, SqlDbType.UniqueIdentifier)
             .AddParameter("MemberId1", entry.MemberId1, SqlDbType.Int)
             .AddParameter("MemberName1", entry.MemberName1, SqlDbType.NVarChar)
             .AddParameter("MemberId2", entry.MemberId2, SqlDbType.Int)
@@ -50,7 +54,7 @@ public sealed record PartyResyncRelayRepository(ICaeriusNetDbContext Db) : IPart
     {
         for (var attempt = 1;; attempt++)
         {
-            var sp = new StoredProcedureParametersBuilder("runtime", "usp_PartyResyncRelay_Poll", 16,
+            var sp = new StoredProcedureParametersBuilder("runtime", "usp_PartyResyncRelay_Poll", 19,
                     CommandTimeoutSeconds)
                 .AddParameter("ShardId", shardId, SqlDbType.TinyInt)
                 .AddParameter("RetentionSeconds", retentionSeconds, SqlDbType.Int)
@@ -59,6 +63,30 @@ public sealed record PartyResyncRelayRepository(ICaeriusNetDbContext Db) : IPart
             try
             {
                 return await Db.QueryAsImmutableArrayAsync<PartyResyncRelayDto>(sp, ct);
+            }
+            catch (CaeriusNetSqlException ex)
+                when (attempt < MaxWriteConflictAttempts &&
+                      ex.InnerException is SqlException { Number: var sqlErrorNumber } &&
+                      IsWriteConflict(sqlErrorNumber))
+            {
+            }
+        }
+    }
+
+    public async ValueTask AcknowledgeAsync(byte shardId, long relayId, CancellationToken ct)
+    {
+        for (var attempt = 1;; attempt++)
+        {
+            var sp = new StoredProcedureParametersBuilder("runtime", "usp_PartyResyncRelay_Acknowledge", 0,
+                    CommandTimeoutSeconds)
+                .AddParameter("ShardId", shardId, SqlDbType.TinyInt)
+                .AddParameter("RelayId", relayId, SqlDbType.BigInt)
+                .Build();
+
+            try
+            {
+                await Db.ExecuteAsync(sp, ct);
+                return;
             }
             catch (CaeriusNetSqlException ex)
                 when (attempt < MaxWriteConflictAttempts &&

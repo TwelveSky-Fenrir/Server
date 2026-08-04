@@ -33,3 +33,59 @@ IF
     INSERT INTO admin.ErrorCatalog (ErrorNumber, SchemaName, Description)
     VALUES (50305, 'admin',
             N'usp_MacRestriction_Add: a restriction already exists for this MAC address / machine GUID pair.');
+
+IF
+    NOT EXISTS (SELECT 1
+                FROM admin.ErrorCatalog
+                WHERE ErrorNumber = 50375)
+    INSERT INTO admin.ErrorCatalog (ErrorNumber, SchemaName, Description)
+    VALUES (50375, 'admin', N'usp_Ban_Create: ban actor provenance is missing or invalid.');
+
+IF
+    NOT EXISTS (SELECT 1
+                FROM admin.ErrorCatalog
+                WHERE ErrorNumber = 50376)
+    INSERT INTO admin.ErrorCatalog (ErrorNumber, SchemaName, Description)
+    VALUES (50376, 'admin', N'usp_Ban_Create: ban correlation identifier is empty.');
+
+IF
+    NOT EXISTS (SELECT 1
+                FROM admin.ErrorCatalog
+                WHERE ErrorNumber = 50377)
+    INSERT INTO admin.ErrorCatalog (ErrorNumber, SchemaName, Description)
+    VALUES (50377, 'admin', N'usp_Ban_Create: ban audit payload is missing.');
+
+IF
+    NOT EXISTS (SELECT 1
+                FROM admin.ErrorCatalog
+                WHERE ErrorNumber = 50378)
+    INSERT INTO admin.ErrorCatalog (ErrorNumber, SchemaName, Description)
+    VALUES (50378, 'admin', N'usp_Ban_Create: ban reason is outside the supported range.');
+
+IF
+    NOT EXISTS (SELECT 1
+                FROM admin.ErrorCatalog
+                WHERE ErrorNumber = 50379)
+    INSERT INTO admin.ErrorCatalog (ErrorNumber, SchemaName, Description)
+    VALUES (50379, 'admin', N'usp_Ban_Create: actor provenance is not a current Basic-tier GM account and character.');
+
+IF
+    NOT EXISTS (SELECT 1
+                FROM admin.ErrorCatalog
+                WHERE ErrorNumber = 50380)
+    INSERT INTO admin.ErrorCatalog (ErrorNumber, SchemaName, Description)
+    VALUES (50380, 'admin', N'usp_Ban_Create: target character ownership does not match target account.');
+
+IF
+    NOT EXISTS (SELECT 1
+                FROM admin.ErrorCatalog
+                WHERE ErrorNumber = 50381)
+    INSERT INTO admin.ErrorCatalog (ErrorNumber, SchemaName, Description)
+    VALUES (50381, 'admin', N'usp_Ban_Create: correlation identifier was reused with different command data.');
+
+IF
+    NOT EXISTS (SELECT 1
+                FROM admin.ErrorCatalog
+                WHERE ErrorNumber = 50382)
+    INSERT INTO admin.ErrorCatalog (ErrorNumber, SchemaName, Description)
+    VALUES (50382, 'admin', N'usp_Ban_Create: existing ban audit does not match the correlation.');

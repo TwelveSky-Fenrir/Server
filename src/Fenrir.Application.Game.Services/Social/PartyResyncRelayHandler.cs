@@ -59,6 +59,17 @@ public sealed class PartyResyncRelayHandler(
 
     private void HandleRequest(PartyResyncRelayDto row)
     {
+        if (row.CorrelationId == Guid.Empty || row.RequestCorrelationId != Guid.Empty ||
+            row.SourceShardId == options.Value.ShardId ||
+            row.RecipientCharacterId != row.SourceCharacterId || string.IsNullOrWhiteSpace(row.AvatarName) ||
+            !string.Equals(row.PartyName, row.AvatarName, StringComparison.OrdinalIgnoreCase))
+        {
+            logger.LogWarning(
+                "Relayed party-resync request {RelayId} rejected: its recipient, source, shard, avatar, or correlation binding was invalid",
+                row.RelayId);
+            return;
+        }
+
         if (!parties.IsInParty(row.SourceCharacterId))
         {
             logger.LogDebug(
@@ -78,15 +89,35 @@ public sealed class PartyResyncRelayHandler(
             return;
         }
 
-        var leaderName = roster[0].Name;
+        PartyMember requester = default;
+        var requesterFound = false;
+        foreach (var member in roster)
+            if (member.CharacterId == row.SourceCharacterId)
+            {
+                requester = member;
+                requesterFound = true;
+                break;
+            }
+
+        if (!requesterFound || !string.Equals(requester.Name, row.AvatarName, StringComparison.OrdinalIgnoreCase))
+        {
+            logger.LogWarning(
+                "Relayed party-resync request {RelayId} rejected: source character {SourceCharacterId} is not bound to its claimed avatar",
+                row.RelayId, row.SourceCharacterId);
+            return;
+        }
+
+        var leader = roster[0];
 
         relay.Value.Enqueue(new PartyResyncRelayEntry(
             (byte)PartyResyncRelaySort.PartyInfoReply,
             options.Value.ShardId,
-            row.SourceCharacterId,
-            leaderName,
+            leader.CharacterId,
+            leader.Name,
             row.AvatarName)
         {
+            RecipientCharacterId = row.SourceCharacterId,
+            RequestCorrelationId = row.CorrelationId,
             MemberId1 = MemberIdAt(roster, 0),
             MemberName1 = MemberNameAt(roster, 0),
             MemberId2 = MemberIdAt(roster, 1),
@@ -102,28 +133,50 @@ public sealed class PartyResyncRelayHandler(
         logger.LogDebug(
             "Relayed party-resync request {RelayId} for character {SourceCharacterId} confirmed on shard " +
             "{ShardId} ({MemberCount} members); leader {LeaderName} republished",
-            row.RelayId, row.SourceCharacterId, options.Value.ShardId, roster.Count, leaderName);
+            row.RelayId, row.SourceCharacterId, options.Value.ShardId, roster.Count, leader.Name);
     }
 
     private void HandlePartyInfoReply(PartyResyncRelayDto row)
     {
-        if (!zones.TryGetPlayer(row.SourceCharacterId, out _))
-            return;
-
-        var roster = ReadRoster(row);
-
-        if (!parties.TryAdoptRoster(roster, row.SourceCharacterId, out var evicted))
+        if (row.CorrelationId == Guid.Empty || row.RequestCorrelationId == Guid.Empty ||
+            row.SourceShardId == options.Value.ShardId ||
+            row.RecipientCharacterId <= 0 || row.SourceCharacterId <= 0)
         {
-            logger.LogDebug(
-                "Relayed party-resync reply {RelayId} for character {SourceCharacterId} carried a roster of " +
-                "{MemberCount} that does not include it; local party state left untouched on shard {ShardId}",
-                row.RelayId, row.SourceCharacterId, roster.Count, options.Value.ShardId);
+            logger.LogWarning(
+                "Relayed party-resync reply {RelayId} rejected: its recipient, source, shard, or correlation binding was invalid",
+                row.RelayId);
             return;
         }
 
-        var breakNotice = new PartyDisbandResponse { Sort = 1, AvatarName = "" };
-        foreach (var evictedId in evicted)
-            DeliverIfLocal(evictedId, breakNotice, row.RelayId, "party-info-reply-evict");
+        if (!zones.TryGetPlayer(row.RecipientCharacterId, out var recipient))
+            return;
+
+        if (!string.Equals(row.AvatarName, recipient.Name, StringComparison.OrdinalIgnoreCase) ||
+            !TryReadRoster(row, out var roster))
+        {
+            logger.LogWarning(
+                "Relayed party-resync reply {RelayId} rejected: its roster did not authenticate the addressed recipient or source",
+                row.RelayId);
+            return;
+        }
+
+        if (row.SourceCharacterId != roster[0].CharacterId ||
+            !string.Equals(row.PartyName, roster[0].Name, StringComparison.OrdinalIgnoreCase))
+        {
+            logger.LogWarning(
+                "Relayed party-resync reply {RelayId} rejected: its party leader does not bind its authenticated source",
+                row.RelayId);
+            return;
+        }
+
+        if (!parties.TryApplyResyncRoster(row.RecipientCharacterId, recipient.Name, row.RequestCorrelationId,
+                roster))
+        {
+            logger.LogInformation(
+                "Relayed party-resync reply {RelayId} for character {RecipientCharacterId} was not attached to a pending local request or would replace local membership",
+                row.RelayId, row.RecipientCharacterId);
+            return;
+        }
 
         var packet = new PartyRosterResponse
         {
@@ -140,26 +193,40 @@ public sealed class PartyResyncRelayHandler(
 
         logger.LogInformation(
             "Relayed party-resync reply {RelayId} re-registered a {MemberCount}-member party led by " +
-            "{LeaderName} on shard {ShardId} for character {SourceCharacterId}",
-            row.RelayId, roster.Count, roster[0].Name, options.Value.ShardId, row.SourceCharacterId);
+            "{LeaderName} on shard {ShardId} for character {RecipientCharacterId}",
+            row.RelayId, roster.Count, roster[0].Name, options.Value.ShardId, row.RecipientCharacterId);
     }
 
-    private static List<PartyMember> ReadRoster(PartyResyncRelayDto row)
+    private static bool TryReadRoster(PartyResyncRelayDto row, out List<PartyMember> roster)
     {
-        var roster = new List<PartyMember>(PartyRegistry.MaxMembers);
+        roster = new List<PartyMember>(PartyRegistry.MaxMembers);
 
-        Append(roster, row.MemberId1, row.MemberName1);
-        Append(roster, row.MemberId2, row.MemberName2);
-        Append(roster, row.MemberId3, row.MemberName3);
-        Append(roster, row.MemberId4, row.MemberName4);
-        Append(roster, row.MemberId5, row.MemberName5);
+        if (!Append(roster, row.MemberId1, row.MemberName1) ||
+            !Append(roster, row.MemberId2, row.MemberName2) ||
+            !Append(roster, row.MemberId3, row.MemberName3) ||
+            !Append(roster, row.MemberId4, row.MemberName4) ||
+            !Append(roster, row.MemberId5, row.MemberName5) ||
+            roster.Count is < 2 or > PartyRegistry.MaxMembers)
+            return false;
 
-        return roster;
+        var memberIds = new HashSet<int>();
+        var memberNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var member in roster)
+            if (!memberIds.Add(member.CharacterId) || !memberNames.Add(member.Name))
+                return false;
 
-        static void Append(List<PartyMember> target, int characterId, string name)
+        return true;
+
+        static bool Append(List<PartyMember> target, int characterId, string name)
         {
-            if (characterId != 0)
-                target.Add(new PartyMember(characterId, name));
+            if (characterId == 0)
+                return string.IsNullOrEmpty(name);
+
+            if (characterId < 0 || string.IsNullOrWhiteSpace(name))
+                return false;
+
+            target.Add(new PartyMember(characterId, name));
+            return true;
         }
     }
 

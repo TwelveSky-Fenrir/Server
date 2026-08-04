@@ -4,7 +4,7 @@ BEGIN
     SET
         NOCOUNT ON;
 
-    SELECT TowerIndex, Level, TowerType, ControllingTribeId, CapturedAtUtc
+    SELECT TowerIndex, Level, TowerType, AttackState, ControllingTribeId, CapturedAtUtc
     FROM game.TowerState
     ORDER BY TowerIndex;
 END;

@@ -38,13 +38,4 @@ internal static class CenterRelayNoticeLog
             "remarks): tribe {Tribe} character {CharacterName} reached costume enchant {EnchantValue}",
             tribe, characterName, enchantValue);
     }
-
-    public static void LogWarlordSwap(ILogger logger, byte tribe, string characterName, int replacementItemId)
-    {
-        logger.LogInformation(
-            "Warlord-swap notice (legacy MakeNotice, Center relay sort 2000, not client-broadcast -- see " +
-            "CenterRelayNoticeLog remarks): tribe {Tribe} character {CharacterName} received replacement item " +
-            "{ReplacementItemId}",
-            tribe, characterName, replacementItemId);
-    }
 }

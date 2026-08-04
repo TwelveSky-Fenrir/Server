@@ -45,7 +45,10 @@ public sealed class WorldNoticeService(
             null,
             null,
             null,
-            null));
+            null)
+        {
+            SystemCause = GuildTribeBroadcastSystemCause.WorldNotice
+        });
 
         logger.LogInformation(
             "System world notice broadcast cluster-wide ({RecipientCount} same-shard recipients, {ContentLength} chars): {Content}",

@@ -35,4 +35,45 @@ internal static class PartyBroadcast
 
         relay.Enqueue(new PartyResyncRelayEntry((byte)remoteSort, shardId, memberId, "", actorAvatarName));
     }
+
+    public static void SendOrRelayRoster(ZoneRegistry zones, IPartyResyncRelayQueue relay, byte shardId,
+        PartyMember recipient, int sort, IReadOnlyList<PartyMember> members)
+    {
+        var roster = BuildRoster(sort, members);
+
+        if (zones.TryGetPlayer(recipient.CharacterId, out var localRecipient))
+        {
+            localRecipient.Session.Send(roster);
+            return;
+        }
+
+        relay.Enqueue(new PartyResyncRelayEntry(
+            (byte)PartyResyncRelaySort.PartyInfoReply,
+            shardId,
+            recipient.CharacterId,
+            members[0].Name,
+            recipient.Name)
+        {
+            MemberId1 = MemberIdAt(members, 0),
+            MemberName1 = MemberNameAt(members, 0),
+            MemberId2 = MemberIdAt(members, 1),
+            MemberName2 = MemberNameAt(members, 1),
+            MemberId3 = MemberIdAt(members, 2),
+            MemberName3 = MemberNameAt(members, 2),
+            MemberId4 = MemberIdAt(members, 3),
+            MemberName4 = MemberNameAt(members, 3),
+            MemberId5 = MemberIdAt(members, 4),
+            MemberName5 = MemberNameAt(members, 4)
+        });
+    }
+
+    private static int MemberIdAt(IReadOnlyList<PartyMember> members, int index)
+    {
+        return index < members.Count ? members[index].CharacterId : 0;
+    }
+
+    private static string MemberNameAt(IReadOnlyList<PartyMember> members, int index)
+    {
+        return index < members.Count ? members[index].Name : "";
+    }
 }

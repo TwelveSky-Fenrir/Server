@@ -141,6 +141,10 @@ public sealed class PartyRegistry
 
     private readonly Dictionary<int, int> _pendingByInviter = new();
 
+    private readonly Dictionary<int, PartyResyncRequest> _pendingResyncByCharacter = new();
+
+    private static readonly TimeSpan PartyResyncRequestLifetime = TimeSpan.FromSeconds(30);
+
     public bool IsInParty(int characterId)
     {
         lock (_lock)
@@ -209,7 +213,7 @@ public sealed class PartyRegistry
     {
         evictedMemberIds = [];
 
-        if (roster.Count is < 2 or > MaxMembers)
+        if (!IsWellFormedRoster(roster))
             return false;
 
         lock (_lock)
@@ -227,42 +231,118 @@ public sealed class PartyRegistry
             if (!carries)
                 return false;
 
-            List<int>? evicted = null;
-
             foreach (var member in roster)
-            {
-                if (!_leaderByMember.TryGetValue(member.CharacterId, out var priorLeaderId) ||
-                    !_partiesByLeader.TryGetValue(priorLeaderId, out var priorParty))
-                    continue;
+                if (_leaderByMember.ContainsKey(member.CharacterId))
+                    return false;
 
-                foreach (var priorMember in priorParty.Members)
-                    if (!ContainsMember(roster, priorMember.CharacterId))
-                        (evicted ??= []).Add(priorMember.CharacterId);
-
-                DisbandLocked(priorParty);
-            }
-
-            var party = new Party(leaderId, [..roster]);
-            _partiesByLeader[leaderId] = party;
-
-            foreach (var member in roster)
-                _leaderByMember[member.CharacterId] = leaderId;
-
-            if (evicted is not null)
-                evictedMemberIds = evicted;
+            RegisterRosterLocked(leaderId, roster);
 
             return true;
         }
     }
 
-    private static bool ContainsMember(IReadOnlyList<PartyMember> roster, int characterId)
+    public bool TryRegisterResyncRequest(int characterId, string avatarName, Guid correlationId)
     {
-        foreach (var member in roster)
-            if (member.CharacterId == characterId)
-                return true;
+        if (characterId <= 0 || string.IsNullOrWhiteSpace(avatarName) || correlationId == Guid.Empty)
+            return false;
 
-        return false;
+        lock (_lock)
+        {
+            RemoveExpiredResyncRequestsLocked(DateTime.UtcNow);
+
+            if (_leaderByMember.ContainsKey(characterId) || _pendingResyncByCharacter.ContainsKey(characterId))
+                return false;
+
+            _pendingResyncByCharacter[characterId] = new PartyResyncRequest(correlationId, avatarName,
+                DateTime.UtcNow + PartyResyncRequestLifetime);
+            return true;
+        }
     }
+
+    public void CancelResyncRequest(int characterId, Guid correlationId)
+    {
+        lock (_lock)
+        {
+            if (_pendingResyncByCharacter.TryGetValue(characterId, out var pending) &&
+                pending.CorrelationId == correlationId)
+                _pendingResyncByCharacter.Remove(characterId);
+        }
+    }
+
+    public bool TryApplyResyncRoster(int recipientCharacterId, string recipientAvatarName, Guid correlationId,
+        IReadOnlyList<PartyMember> roster)
+    {
+        if (!IsWellFormedRoster(roster) || correlationId == Guid.Empty)
+            return false;
+
+        lock (_lock)
+        {
+            RemoveExpiredResyncRequestsLocked(DateTime.UtcNow);
+
+            if (!_pendingResyncByCharacter.TryGetValue(recipientCharacterId, out var pending) ||
+                pending.CorrelationId != correlationId ||
+                !string.Equals(pending.AvatarName, recipientAvatarName, StringComparison.OrdinalIgnoreCase) ||
+                _leaderByMember.ContainsKey(recipientCharacterId))
+                return false;
+
+            var carriesRecipient = false;
+            foreach (var member in roster)
+            {
+                if (member.CharacterId == recipientCharacterId &&
+                    string.Equals(member.Name, recipientAvatarName, StringComparison.OrdinalIgnoreCase))
+                    carriesRecipient = true;
+
+                if (_leaderByMember.ContainsKey(member.CharacterId))
+                    return false;
+            }
+
+            if (!carriesRecipient)
+                return false;
+
+            RegisterRosterLocked(roster[0].CharacterId, roster);
+            _pendingResyncByCharacter.Remove(recipientCharacterId);
+            return true;
+        }
+    }
+
+    private static bool IsWellFormedRoster(IReadOnlyList<PartyMember> roster)
+    {
+        if (roster.Count is < 2 or > MaxMembers)
+            return false;
+
+        var memberIds = new HashSet<int>();
+        var memberNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var member in roster)
+            if (member.CharacterId <= 0 || string.IsNullOrWhiteSpace(member.Name) ||
+                !memberIds.Add(member.CharacterId) || !memberNames.Add(member.Name))
+                return false;
+
+        return true;
+    }
+
+    private void RegisterRosterLocked(int leaderId, IReadOnlyList<PartyMember> roster)
+    {
+        var party = new Party(leaderId, [..roster]);
+        _partiesByLeader[leaderId] = party;
+
+        foreach (var member in roster)
+            _leaderByMember[member.CharacterId] = leaderId;
+    }
+
+    private void RemoveExpiredResyncRequestsLocked(DateTime nowUtc)
+    {
+        List<int>? expiredCharacterIds = null;
+        foreach (var entry in _pendingResyncByCharacter)
+            if (entry.Value.ExpiresAtUtc <= nowUtc)
+                (expiredCharacterIds ??= []).Add(entry.Key);
+
+        if (expiredCharacterIds is not null)
+            foreach (var characterId in expiredCharacterIds)
+                _pendingResyncByCharacter.Remove(characterId);
+    }
+
+    private readonly record struct PartyResyncRequest(Guid CorrelationId, string AvatarName, DateTime ExpiresAtUtc);
 
     public bool TryRemoveMemberByName(int anchorCharacterId, string avatarName, out int removedCharacterId)
     {
@@ -388,21 +468,29 @@ public sealed class PartyRegistry
         }
     }
 
-    public bool TryCancel(int inviterId, out int inviteeId)
+    public bool TryCancel(int inviterId, out int inviteeId, out CrossShardOutboundAsk? crossShardAsk)
     {
         lock (_lock)
         {
+            crossShardAsk = null;
+
             if (_pendingByInviter.Remove(inviterId, out inviteeId))
                 return true;
 
-            if (_crossShard.TryConsumeOutbound(inviterId, out var crossShardAsk))
+            if (_crossShard.TryConsumeOutbound(inviterId, out var outboundAsk))
             {
-                inviteeId = crossShardAsk.TargetCharacterId;
+                inviteeId = outboundAsk.TargetCharacterId;
+                crossShardAsk = outboundAsk;
                 return true;
             }
 
             return false;
         }
+    }
+
+    public bool TryCancel(int inviterId, out int inviteeId)
+    {
+        return TryCancel(inviterId, out inviteeId, out _);
     }
 
     public bool ClearInviteeAfterCancel(int inviteeId, int inviterId)
@@ -439,6 +527,23 @@ public sealed class PartyRegistry
         lock (_lock)
         {
             return _crossShard.TryConsumeOutbound(inviterId, out ask);
+        }
+    }
+
+    public bool TryConsumeCrossShardOutbound(int inviterId, byte inviteeShardId, int inviteeId,
+        out CrossShardOutboundAsk ask)
+    {
+        lock (_lock)
+        {
+            return _crossShard.TryConsumeOutbound(inviterId, inviteeShardId, inviteeId, out ask);
+        }
+    }
+
+    public bool TryClearCrossShardInbound(int inviteeId, byte inviterShardId, int inviterId)
+    {
+        lock (_lock)
+        {
+            return _crossShard.TryClearInbound(inviteeId, inviterShardId, inviterId);
         }
     }
 

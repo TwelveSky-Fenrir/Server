@@ -18,8 +18,12 @@ internal sealed class MonsterSpawnSlot
     public required MonsterRowDto Monster { get; init; }
     public required int ServerIndex { get; init; }
     public bool Alive { get; set; }
+    public bool CorpsePending { get; set; }
     public int RespawnTicksRemaining { get; set; }
+    public TimeSpan? RespawnDueAtZoneClock { get; set; }
     public bool HasPersistedDeadline { get; set; }
+    public bool IsZone175MissionMonster { get; init; }
+    public bool IsZone175WaveBoss { get; init; }
 }
 
 internal sealed class MonsterZoneSpawnState
@@ -33,12 +37,14 @@ internal sealed class MonsterZoneSpawnState
     public required Dictionary<int, MonsterSpawnSlot> SlotsByServerIndex { get; init; }
     public required MonsterDropRoller DropRoller { get; init; }
     public required Random Random { get; init; }
+    public int NextServerIndex { get; set; }
     public bool InitialPopDone { get; set; }
     public int TicksSinceLastScan { get; set; }
 }
 
 public sealed class MonsterSpawnScheduler(
     WorldDataCache worldData,
+    GroundItemFactory groundItemFactory,
     Func<Random>? randomFactory = null,
     PartyRegistry? partyRegistry = null,
     Lazy<ZoneEventBroadcaster>? zoneEventBroadcaster = null,
@@ -86,34 +92,42 @@ public sealed class MonsterSpawnScheduler(
 
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
+        if (legacyTicksElapsed <= 0)
+            return;
+
+        const int elapsedLegacyTicks = 1;
         var state = _stateByZone.GetOrAdd(zone.MapId, _ => BuildState(zone.MapId, zone.IsDungeonServerZone));
 
         if (!state.InitialPopDone)
         {
             state.InitialPopDone = true;
             foreach (var slot in state.Slots)
-                if (!slot.Alive && (!slot.HasPersistedDeadline || slot.RespawnTicksRemaining <= 0))
+                if (!slot.Alive && !slot.CorpsePending &&
+                    (!slot.HasPersistedDeadline || IsRespawnDue(slot, zone.MonsterRuntimeClock)))
                     Spawn(zone, slot);
         }
 
         DrainDeaths(zone, state);
-        DrainInvalidations(zone, state);
 
         if (Interlocked.Exchange(ref state.SummonStateResetPending, 0) != 0)
             ApplySummonStateReset(zone, state);
 
         foreach (var slot in state.Slots)
-            if (!slot.Alive)
-                slot.RespawnTicksRemaining = Math.Max(0, slot.RespawnTicksRemaining - legacyTicksElapsed);
+            if (!slot.Alive && !slot.CorpsePending && slot.RespawnDueAtZoneClock is null &&
+                !slot.IsZone175WaveBoss)
+                slot.RespawnTicksRemaining = Math.Max(0, slot.RespawnTicksRemaining - elapsedLegacyTicks);
 
-        state.TicksSinceLastScan += legacyTicksElapsed;
+        DrainInvalidations(zone, state);
+
+        state.TicksSinceLastScan += elapsedLegacyTicks;
         if (state.TicksSinceLastScan < SimulationClock.MonsterRespawnScanLegacyTicks)
             return;
 
         state.TicksSinceLastScan = 0;
         var ignoreRespawnDelay = Interlocked.Exchange(ref state.IgnoreRespawnDelayPending, 0) != 0;
         foreach (var slot in state.Slots)
-            if (!slot.Alive && (ignoreRespawnDelay || slot.RespawnTicksRemaining <= 0))
+            if (!slot.Alive && !slot.CorpsePending && !slot.IsZone175WaveBoss &&
+                (ignoreRespawnDelay || IsRespawnDue(slot, zone.MonsterRuntimeClock)))
                 Spawn(zone, slot);
     }
 
@@ -123,6 +137,87 @@ public sealed class MonsterSpawnScheduler(
 
         var state = _stateByZone.GetOrAdd(zone.MapId, _ => BuildState(zone.MapId, zone.IsDungeonServerZone));
         Interlocked.Exchange(ref state.SummonStateResetPending, 1);
+    }
+
+    public bool TryLoadZone175MissionStage(Zone zone, int stage)
+    {
+        ArgumentNullException.ThrowIfNull(zone);
+
+        if (stage is < 1 or > Zone175RewardTables.WaveCount ||
+            !worldData.ZonesByNumber.TryGetValue(zone.MapId, out var zoneDefinition))
+            return false;
+
+        var state = _stateByZone.GetOrAdd(zone.MapId, _ => BuildState(zone.MapId, zone.IsDungeonServerZone));
+        if (state.Slots.Any(static slot => slot.IsZone175MissionMonster))
+            return false;
+
+        var resolved = new List<(MonsterSpawnRegionRowDto Region, MonsterRowDto Monster, int Count)>();
+        var totalRequested = 0;
+        var containsExpectedBoss = false;
+        foreach (var region in zoneDefinition.Zone175MissionSpawnRegions)
+        {
+            if (!Zone175MissionSpawnRegionFile.TryGetStage(region.SourceFileName, out var sourceStage) ||
+                sourceStage != stage || region.MonsterId is not { } monsterId ||
+                !worldData.MonstersById.TryGetValue(monsterId, out var definition))
+                continue;
+
+            var count = Math.Max(0, region.Number);
+            if (count == 0)
+                continue;
+
+            containsExpectedBoss |= definition.Monster.SpecialType == Zone175RewardTables.WaveBossSpecialType(stage);
+            resolved.Add((region, definition.Monster, count));
+            totalRequested += count;
+        }
+
+        if (resolved.Count == 0 || !containsExpectedBoss ||
+            state.Slots.Count + totalRequested > RegularMonsterTableCapacity)
+            return false;
+
+        var added = new List<MonsterSpawnSlot>(totalRequested);
+        foreach (var (region, monster, count) in resolved)
+            for (var slotIndex = 0; slotIndex < count; slotIndex++)
+            {
+                var slot = new MonsterSpawnSlot
+                {
+                    Region = region,
+                    Monster = monster,
+                    ServerIndex = state.NextServerIndex++,
+                    IsZone175MissionMonster = true,
+                    IsZone175WaveBoss = Zone175RewardTables.IsWaveBossSpecialType(monster.SpecialType)
+                };
+                state.Slots.Add(slot);
+                state.SlotsByServerIndex.Add(slot.ServerIndex, slot);
+                added.Add(slot);
+            }
+
+        foreach (var slot in added)
+            if (!Spawn(zone, slot))
+            {
+                ClearZone175MissionStage(zone);
+                return false;
+            }
+
+        return true;
+    }
+
+    public void ClearZone175MissionStage(Zone zone)
+    {
+        ArgumentNullException.ThrowIfNull(zone);
+
+        if (!_stateByZone.TryGetValue(zone.MapId, out var state))
+            return;
+
+        for (var index = state.Slots.Count - 1; index >= 0; index--)
+        {
+            var slot = state.Slots[index];
+            if (!slot.IsZone175MissionMonster)
+                continue;
+
+            zone.DespawnMonsterSilently(slot.ServerIndex);
+            state.SlotsByServerIndex.Remove(slot.ServerIndex);
+            state.Slots.RemoveAt(index);
+        }
     }
 
     private void ApplySummonStateReset(Zone zone, MonsterZoneSpawnState state)
@@ -136,6 +231,9 @@ public sealed class MonsterSpawnScheduler(
 
             zone.DespawnMonsterSilently(slot.ServerIndex);
             slot.Alive = false;
+            slot.CorpsePending = false;
+            slot.RespawnDueAtZoneClock = null;
+            slot.RespawnTicksRemaining = 0;
         }
 
         Interlocked.Exchange(ref state.IgnoreRespawnDelayPending, 1);
@@ -188,7 +286,7 @@ public sealed class MonsterSpawnScheduler(
 
         var random = _randomFactory();
         var slots = new List<MonsterSpawnSlot>();
-        var nextServerIndex = 1;
+        var nextServerIndex = 0;
         var now = DateTime.UtcNow;
 
         var capacity = DungeonSpawnDensityPolicy.ResolveTableCapacity(isDungeonZone, RegularMonsterTableCapacity);
@@ -226,11 +324,12 @@ public sealed class MonsterSpawnScheduler(
             Slots = slots,
             SlotsByServerIndex = slotsByServerIndex,
             DropRoller = new MonsterDropRoller(worldData, random),
-            Random = random
+            Random = random,
+            NextServerIndex = nextServerIndex
         };
     }
 
-    private void Spawn(Zone zone, MonsterSpawnSlot slot)
+    private bool Spawn(Zone zone, MonsterSpawnSlot slot)
     {
         var state = _stateByZone[zone.MapId];
         var region = slot.Region;
@@ -240,21 +339,23 @@ public sealed class MonsterSpawnScheduler(
         var z = region.LocationZ + (float)(Math.Sin(angle) * scatter);
         var y = (float)region.LocationY;
 
-        if (zone.Geometry is { } geometry)
-        {
-            if (!geometry.TryGetGroundHeight(x, z, out var groundY))
-                return;
-            y = groundY;
-        }
+        if (!zone.Geometry.TryGetGroundHeight(x, z, out var groundY))
+            return false;
+        y = groundY;
 
         var entity = MonsterEntity.Create(slot.ServerIndex, zone.NextMonsterUniqueNumber(), slot.Monster,
-            slot.ServerIndex, x, y, z);
+            slot.ServerIndex, x, y, z, random: new RandomSourceAdapter(state.Random));
 
         zone.SpawnMonster(entity);
         slot.Alive = true;
+        slot.CorpsePending = false;
+        slot.RespawnDueAtZoneClock = null;
+        slot.RespawnTicksRemaining = 0;
 
         if (IsPersistedBossMonster(zone.MapId, slot.Monster.MonsterId) && bossRespawnTracker is { } tracker)
             tracker.SetNextSpawnUtc(slot.Region.MonsterSpawnRegionId, YangGokNormalBossAliveSentinelUtc);
+
+        return true;
     }
 
     private void DrainDeaths(Zone zone, MonsterZoneSpawnState state)
@@ -270,12 +371,13 @@ public sealed class MonsterSpawnScheduler(
             if (state.SlotsByServerIndex.TryGetValue(monster!.ServerIndex, out var slot))
             {
                 slot.Alive = false;
-                var respawnTicks = RollRespawnTicks(slot.Monster, state.Random);
-                slot.RespawnTicksRemaining = respawnTicks;
-
-                if (IsPersistedBossMonster(zone.MapId, slot.Monster.MonsterId) && bossRespawnTracker is { } tracker)
-                    tracker.SetNextSpawnUtc(slot.Region.MonsterSpawnRegionId,
-                        DateTime.UtcNow + SimulationClock.ToTimeSpan(respawnTicks));
+                slot.CorpsePending = false;
+                if (slot.IsZone175WaveBoss)
+                {
+                    slot.RespawnTicksRemaining = int.MaxValue;
+                    slot.RespawnDueAtZoneClock = null;
+                    continue;
+                }
             }
 
             if (monster!.SpecialSort == MonsterSpecialSort.TribeSymbolStone &&
@@ -310,9 +412,37 @@ public sealed class MonsterSpawnScheduler(
         return mapId == YangGokNormalBossZoneId && monsterId is >= 564 and <= 568;
     }
 
+    private static bool IsRespawnDue(MonsterSpawnSlot slot, TimeSpan zoneClock)
+    {
+        return slot.RespawnDueAtZoneClock is { } dueAt ? zoneClock >= dueAt : slot.RespawnTicksRemaining <= 0;
+    }
+
+    private void ArmRespawnDeadline(Zone zone, MonsterZoneSpawnState state, DeadMonsterEvent death)
+    {
+        if (!state.SlotsByServerIndex.TryGetValue(death.Monster.ServerIndex, out var slot))
+            return;
+
+        slot.CorpsePending = true;
+        if (slot.IsZone175WaveBoss)
+        {
+            slot.RespawnTicksRemaining = int.MaxValue;
+            slot.RespawnDueAtZoneClock = null;
+            return;
+        }
+
+        var respawnTicks = RollRespawnTicks(slot.Monster, state.Random);
+        var respawnDelay = SimulationClock.ToTimeSpan(respawnTicks);
+        slot.RespawnTicksRemaining = respawnTicks;
+        slot.RespawnDueAtZoneClock = death.DiedAtZoneClock + respawnDelay;
+
+        if (IsPersistedBossMonster(zone.MapId, slot.Monster.MonsterId) && bossRespawnTracker is { } tracker)
+            tracker.SetNextSpawnUtc(slot.Region.MonsterSpawnRegionId, death.DiedAtUtc + respawnDelay);
+    }
+
     private void ProcessDeath(Zone zone, MonsterZoneSpawnState state, DeadMonsterEvent death)
     {
         var monster = death.Monster;
+        ArmRespawnDeadline(zone, state, death);
 
         PlayerRuntimeState? attacker = null;
         if (death.AttackerCharacterId is { } attackerId)
@@ -371,12 +501,12 @@ public sealed class MonsterSpawnScheduler(
             return;
 
         if (state.Random.Next(100) < bonusRate)
-            zone.SpawnGroundItem(TowerDropBonusItemId, 1, monster.PosX, monster.PosY, monster.PosZ,
-                SystemDropMasterName, "", 0, monster.InstanceId);
+            TrySpawnMonsterDrop(zone, new DroppedItem(TowerDropBonusItemId, 1), monster.PosX, monster.PosY,
+                monster.PosZ, SystemDropMasterName, "", 0, monster.InstanceId);
 
         for (var i = 0; i < TowerDropQuantity; i++)
-            zone.SpawnGroundItem(itemId, 1, monster.PosX, monster.PosY, monster.PosZ, SystemDropMasterName, "", 0,
-                monster.InstanceId);
+            TrySpawnMonsterDrop(zone, new DroppedItem(itemId, 1), monster.PosX, monster.PosY, monster.PosZ,
+                SystemDropMasterName, "", 0, monster.InstanceId);
     }
 
     private IReadOnlyList<int>? GrantKillLoot(Zone zone, MonsterZoneSpawnState state, MonsterEntity monster,
@@ -394,6 +524,11 @@ public sealed class MonsterSpawnScheduler(
         zone.NotifyPopupEventMonsterKill(creditedAvatar, dropEligible);
 
         var partyMemberIds = partyRegistry?.GetMembers(creditedAvatar.CharacterId);
+        var partyName = partyMemberIds is { Count: > 0 } && partyRegistry is not null
+            ? PartyIdentityResolver.ResolveCurrentPartyName(partyRegistry, creditedAvatar.CharacterId,
+                creditedAvatar.Name,
+                memberId => zone.TryGetPlayer(memberId, out var member) ? member?.Name : null)
+            : "";
 
         bool CreditedAvatarHasItem(int itemId)
         {
@@ -449,25 +584,24 @@ public sealed class MonsterSpawnScheduler(
         }
 
         if (money is { } amount)
-            zone.QueueMoneyGrant(creditedAvatar.CharacterId, amount);
+            zone.TryGrantMonsterMoney(creditedAvatar, amount);
 
         var (dropX, dropY, dropZ) = ResolveKillDropLocation(monster, creditedAvatar);
 
         foreach (var publicItem in bossOutcome.PublicItems)
-            zone.SpawnGroundItem(publicItem.ItemId, publicItem.Quantity, dropX, dropY, dropZ,
-                "", "", 0, monster.InstanceId);
+            TrySpawnMonsterDrop(zone, publicItem, dropX, dropY, dropZ, "", "", 0, monster.InstanceId);
 
         if (bossOutcome.Items.Count > 0 || genericItems.Count > 0)
         {
             var dropSort = ResolveMonsterDropSort(partyMemberIds);
 
             foreach (var item in bossOutcome.Items)
-                zone.SpawnGroundItem(item.ItemId, item.Quantity, dropX, dropY, dropZ,
-                    creditedAvatar.Name, "", dropSort, monster.InstanceId);
+                TrySpawnMonsterDrop(zone, item, dropX, dropY, dropZ, creditedAvatar.Name, partyName, dropSort,
+                    monster.InstanceId);
 
             foreach (var item in genericItems)
-                zone.SpawnGroundItem(item.ItemId, item.Quantity, dropX, dropY, dropZ,
-                    creditedAvatar.Name, "", dropSort, monster.InstanceId);
+                TrySpawnMonsterDrop(zone, item, dropX, dropY, dropZ, creditedAvatar.Name, partyName,
+                    dropSort, monster.InstanceId);
         }
 
         return partyMemberIds;
@@ -499,6 +633,54 @@ public sealed class MonsterSpawnScheduler(
     private static int ResolveMonsterDropSort(IReadOnlyList<int>? partyMemberIds)
     {
         return partyMemberIds is { Count: > 0 } ? GroundItemEntity.MonsterKillDropSort : 0;
+    }
+
+    private void TrySpawnMonsterDrop(Zone zone, in DroppedItem item, float dropX, float dropY, float dropZ,
+        string ownerName, string partyName, int dropSort, int? instanceId)
+    {
+        if (!worldData.ItemsById.TryGetValue(item.ItemId, out var definition))
+        {
+            zone.SpawnGroundItem(item.ItemId, item.Quantity, dropX, dropY, dropZ, ownerName, partyName, dropSort,
+                instanceId);
+            return;
+        }
+
+        var itemType = definition.Item.Type;
+        if (itemType is not (ItemSerialGenerator.UniqueItemType or ItemSerialGenerator.RareItemType or
+            ItemSerialGenerator.EliteItemType))
+        {
+            zone.SpawnGroundItem(item.ItemId, item.Quantity, dropX, dropY, dropZ, ownerName, partyName, dropSort,
+                instanceId);
+            return;
+        }
+
+        var request = new GroundItemDropRequest(
+            new GroundItemReference(item.ItemId, itemType),
+            item.Quantity,
+            GroundItemOrigin.Monster,
+            new GroundItemReplicationState(
+                new GroundItemState(0, 0, 0, 0),
+                new GroundItemSocketGems(0, 0, 0),
+                0));
+        var result = groundItemFactory.Create(in request);
+        if (result.Drop is not { } drop)
+            return;
+
+        var plan = new GroundItemSpawnPlan(
+            drop.Item.ItemId,
+            drop.Quantity,
+            drop.Replication.PackedValue,
+            drop.SerialNumber,
+            drop.Replication.SocketGems.First,
+            drop.Replication.SocketGems.Second,
+            drop.Replication.SocketGems.Third,
+            dropX,
+            dropY,
+            dropZ,
+            ownerName,
+            partyName,
+            dropSort);
+        zone.SpawnGroundItem(in plan, instanceId);
     }
 
     private void ApplyTowerCpForPvmMilestone(Zone zone, PlayerRuntimeState attacker, int monsterRealLevel)

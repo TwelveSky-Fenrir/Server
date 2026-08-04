@@ -28,4 +28,9 @@ public static class ValleyWarCenterRelayCodes
     {
         return eventCode is >= MonsterSiegeClusterStart and <= MonsterSiegeClusterEnd;
     }
+
+    public static bool IsValleyWarCampaignEvent(int eventCode)
+    {
+        return eventCode is >= 659 and <= 669;
+    }
 }

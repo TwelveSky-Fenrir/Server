@@ -1,9 +1,12 @@
+using System.Buffers.Binary;
 using System.Collections.Frozen;
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Consumables;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World.Loot;
+using Fenrir.Application.Game.Domain.World.ZoneWar;
+using Fenrir.Core.Wire;
 using Fenrir.Domain.Game.GameData;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -14,7 +17,8 @@ public sealed class LootBoxUseItemHandler(
     WorldDataCache worldData,
     ICharacterRepository characters,
     IEventLogRepository eventLog,
-    ILogger<LootBoxUseItemHandler> logger) : IUseItemHandler
+    ILogger<LootBoxUseItemHandler> logger,
+    ZoneCenterBroadcastIngestor? centerIngestor = null) : IUseItemHandler
 {
     private const short BoxOpenBeforeEventCode = 5;
 
@@ -157,8 +161,9 @@ public sealed class LootBoxUseItemHandler(
 
         await LogBoxOpenBeforeAsync(context, cancellationToken);
 
-        await PersistAndMirrorAsync(context, page0, page1, plan.ProjectedPage0, plan.ProjectedPage1,
-            cancellationToken);
+        if (!await PersistAndMirrorAsync(context, page0, page1, plan.ProjectedPage0, plan.ProjectedPage1,
+                cancellationToken))
+            return UseItemResponses.Fail(context.Page, context.Index);
 
         await LogBoxRewardAsync(context, plan.RewardItemId, plan.RewardQuantity, plan.RewardContainer,
             plan.RewardSlot, cancellationToken);
@@ -197,8 +202,9 @@ public sealed class LootBoxUseItemHandler(
 
         await LogBoxOpenBeforeAsync(context, cancellationToken);
 
-        await PersistAndMirrorAsync(context, page0, page1, plan.ProjectedPage0, plan.ProjectedPage1,
-            cancellationToken);
+        if (!await PersistAndMirrorAsync(context, page0, page1, plan.ProjectedPage0, plan.ProjectedPage1,
+                cancellationToken))
+            return UseItemResponses.Fail(context.Page, context.Index);
 
         foreach (var reward in plan.Rewards)
         {
@@ -214,7 +220,7 @@ public sealed class LootBoxUseItemHandler(
         return UseItemResponses.Success(context.Page, context.Index);
     }
 
-    private async ValueTask PersistAndMirrorAsync(UseItemContext context,
+    private async ValueTask<bool> PersistAndMirrorAsync(UseItemContext context,
         ImmutableDictionary<byte, ItemStack> originalPage0, ImmutableDictionary<byte, ItemStack> originalPage1,
         ImmutableDictionary<byte, ItemStack> projectedPage0, ImmutableDictionary<byte, ItemStack> projectedPage1,
         CancellationToken cancellationToken)
@@ -241,27 +247,51 @@ public sealed class LootBoxUseItemHandler(
             containers = ImmutableArray.Create(new InventoryContainerSnapshot(container, projected));
         }
 
-        if (!await context.Zone.PostInventoryCommandAndWaitAsync(
-                new InventoryZoneCommand(context.CharacterId, containers, null), cancellationToken))
+        if ((await context.Zone.PostInventoryCommandAndWaitForResultAsync(
+                new InventoryZoneCommand(context.CharacterId, containers, null), cancellationToken)).Kind !=
+            ZoneCommandResultKind.Applied)
+        {
+            if (page0Changed && page1Changed)
+                await characters.ReplaceTwoContainersAsync(context.CharacterId,
+                    ContainerMatrix.InventoryPage0, ToTvps(originalPage0),
+                    ContainerMatrix.InventoryPage1, ToTvps(originalPage1), cancellationToken);
+            else
+            {
+                var container = page1Changed ? ContainerMatrix.InventoryPage1 : ContainerMatrix.InventoryPage0;
+                var original = page1Changed ? originalPage1 : originalPage0;
+                await characters.ReplaceContainerAsync(context.CharacterId, container, ToTvps(original),
+                    cancellationToken);
+            }
+
             logger.LogError(
                 "Zone {MapId} inventory inbox full: dropped op23 loot-box mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 context.Zone.MapId, context.CharacterId);
+            return false;
+        }
+
+        return true;
     }
 
     private async ValueTask AttemptNoticeAsync(UseItemContext context, int rewardItemId, int rewardQuantity,
         CancellationToken cancellationToken)
     {
-        var rewardType = worldData.ItemsById.TryGetValue(rewardItemId, out var def) ? def.Item.Type : (byte)0;
-        var decision = NoticeForBoxResolver.Decide(context.Item.ItemId, rewardItemId, rewardType);
+        var decision = NoticeForBoxResolver.Decide(rewardItemId);
 
         if (decision.WriteEliteGainAudit)
             await eventLog.LogBoxOpenEliteGainAsync(context.AccountId, context.CharacterId, context.Item.ItemId,
                 rewardItemId, rewardQuantity, cancellationToken);
 
-        if (decision.ShouldBroadcast)
-            logger.LogInformation(
-                "Loot-box elite notice (legacy NoticeForBox center relay, not client-broadcast -- deferred, see LootBoxUseItemHandler remarks): character {CharacterId} box {BoxId} reward {RewardId}",
-                context.CharacterId, context.Item.ItemId, rewardItemId);
+        if (!decision.ShouldBroadcast)
+            return;
+
+        Span<byte> payload = stackalloc byte[ZoneCenterBroadcastIngestor.PayloadSize];
+        payload.Clear();
+        BinaryPrimitives.WriteInt32LittleEndian(payload, 9);
+        BinaryPrimitives.WriteInt32LittleEndian(payload[4..], context.State.Tribe);
+        BinaryPrimitives.WriteInt32LittleEndian(payload[8..], rewardItemId);
+        BinaryPrimitives.WriteInt32LittleEndian(payload[12..], context.Item.ItemId);
+        LegacyWireCodec.WriteFixedString(payload.Slice(16, 13), context.State.Name);
+        centerIngestor?.Ingest(2000, payload);
     }
 
     private byte? ResolveRewardSort(int rewardItemId)

@@ -14,9 +14,19 @@ public sealed class TribeAnnouncementScrollService(
     IOptions<GameServerOptions> options,
     ILogger<TribeAnnouncementScrollService> logger) : ITribeAnnouncementScrollService
 {
+    private const byte ActiveSourceWireRole = 1;
+
     public bool TryBroadcast(Zone zone, PlayerRuntimeState sender, int characterId, IPacketSession session,
         string content)
     {
+        if (sender.IsMuted)
+        {
+            logger.LogDebug(
+                "Character {CharacterId} tribe-notify-scroll broadcast rejected: sender is muted",
+                characterId);
+            return false;
+        }
+
         if (sender.TribeNotifyScrollCount < 1)
         {
             logger.LogDebug(
@@ -30,7 +40,7 @@ public sealed class TribeAnnouncementScrollService(
         session.Send(new AvatarStatUpdateResponse { Sort = 69, Value = newCount, Value2 = 0 });
 
         var response = new TribeAnnouncementScrollResponse
-            { TribeRole = sender.Tribe, AvatarName = sender.Name, Content = content };
+            { TribeRole = ActiveSourceWireRole, AvatarName = sender.Name, Content = content };
 
         var recipientCount = 0;
         foreach (var target in zones.Zones)
@@ -46,7 +56,7 @@ public sealed class TribeAnnouncementScrollService(
             options.Value.ShardId,
             null,
             sender.Tribe,
-            sender.Tribe,
+            ActiveSourceWireRole,
             sender.Name,
             content,
             false,
@@ -55,7 +65,10 @@ public sealed class TribeAnnouncementScrollService(
             null,
             null,
             null,
-            null));
+            null)
+        {
+            SourceCharacterId = sender.CharacterId
+        });
 
         zone.PostTribeProgressCommand(new TribeProgressZoneCommand(characterId, TribeNotifyScrollCount: newCount));
 

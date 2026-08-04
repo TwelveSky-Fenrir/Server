@@ -28,12 +28,14 @@ public sealed partial class Zone
         if (!_players.TryGetValue(command.AttackerCharacterId, out var attackerState))
             return;
 
-        ApplySenderLocation(attackerState, command.AttackInfo);
-
         if (!_players.TryGetValue(command.AttackInfo.ServerIndex2, out var defenderState))
+            return;
+        if (defenderState.IsMovingZone)
             return;
         if (defenderState.UniqueNumber != command.AttackInfo.UniqueNumber2)
             return;
+
+        ApplySenderLocation(attackerState, command.AttackInfo);
 
         if (!AttackPacketBudget.TryConsume(attackerState, command.AttackInfo.AttackActionValue4, false))
             return;
@@ -74,10 +76,9 @@ public sealed partial class Zone
             return;
 
         defenderState.IsStunned = true;
-        defenderState.StunDurationSeconds = outcome.ResolvedDurationSeconds;
-        defenderState.CanUseConsumables = false;
+        defenderState.StunDurationTicks = outcome.ResolvedDurationTicks;
 
-        BroadcastStunActionState(defenderState, outcome.ResolvedDurationSeconds);
+        BroadcastStunActionState(defenderState, outcome.ResolvedDurationTicks);
 
         if (outcome.IsTeamStunSkill)
             ApplyTeamStunSubMechanic(attackerState, defenderState);
@@ -88,12 +89,14 @@ public sealed partial class Zone
         if (!_players.TryGetValue(command.AttackerCharacterId, out var curerState))
             return;
 
-        ApplySenderLocation(curerState, command.AttackInfo);
-
         if (!_players.TryGetValue(command.AttackInfo.ServerIndex2, out var targetState))
+            return;
+        if (targetState.IsMovingZone)
             return;
         if (targetState.UniqueNumber != command.AttackInfo.UniqueNumber2)
             return;
+
+        ApplySenderLocation(curerState, command.AttackInfo);
 
         if (!AttackPacketBudget.TryConsume(curerState, command.AttackInfo.AttackActionValue4))
             return;
@@ -128,8 +131,7 @@ public sealed partial class Zone
             return;
 
         state.IsStunned = false;
-        state.StunDurationSeconds = 0;
-        state.CanUseConsumables = true;
+        state.StunDurationTicks = 0;
         state.RepeatedStunCount = 0;
 
         BroadcastIdleActionState(state);
@@ -161,13 +163,20 @@ public sealed partial class Zone
                     if (!memberHasCriticalBuff)
                         continue;
 
-                    ApplyPvpKillRewards(member, defenderState, true);
+                    defenderState.TeamStunRewardCandidateIds.Add(member.CharacterId);
                 }
         }
 
         if (defenderState.RepeatedStunCount >= TeamStunLockDeathThreshold)
+        {
+            foreach (var memberId in defenderState.TeamStunRewardCandidateIds)
+                if (_players.TryGetValue(memberId, out var member))
+                    QueuePvpKillRewardClaim(member, defenderState, true);
+
+            defenderState.TeamStunRewardCandidateIds.Clear();
             ApplyDeath(defenderState.CharacterId, DeathCause.StunLock,
-                (attackerState.PosX, attackerState.PosZ));
+                (attackerState.PosX, attackerState.PosZ), originSort: 1, deathSkillNumber: 4);
+        }
     }
 
     private bool SharesActiveDuel(int attackerId, int defenderId)
@@ -193,7 +202,7 @@ public sealed partial class Zone
         return 0;
     }
 
-    private void BroadcastStunActionState(PlayerRuntimeState state, int durationSeconds)
+    internal void BroadcastStunActionState(PlayerRuntimeState state, int durationTicks)
     {
         state.ActionSort = StunActionSort;
         state.ActionType = 0;
@@ -201,7 +210,7 @@ public sealed partial class Zone
         state.ActionSkillGradeNum1 = 0;
         state.ActionSkillGradeNum2 = 0;
 
-        var action = BuildActionForPose(state, StunActionSort, durationSeconds);
+        var action = BuildActionForPose(state, StunActionSort, durationTicks);
         state.Session.Send(BuildAvatarActionRecv(state, action));
 
         _stunNeighborScratch.Clear();

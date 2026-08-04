@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Quests;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Domain.Game.Stats;
 
 namespace Fenrir.Application.Game.Domain.Tribes;
@@ -86,7 +87,7 @@ public readonly record struct TribeProgressZoneCommand(
     int? AutoBuffTime = null,
     int? AnimalAbsorbTime = null,
     int? AnimalDoubleExp = null,
-    TaskCompletionSource? Applied = null,
+    TaskCompletionSource<ZoneCommandResult>? Applied = null,
     int? SilverTime = null,
     int? GoldTime = null,
     int? DmgBoost = null,
@@ -97,6 +98,7 @@ public readonly record struct TribeProgressZoneCommand(
     int? DoubleKillNumTime = null,
     int? DoubleKillExpTime = null,
     int? DoubleKillNumTime2 = null,
-    int? BuffX2Time = null);
+    int? BuffX2Time = null,
+    long? Money = null);
 
 public readonly record struct TribeGroundItemDrop(int ItemId, int Quantity, int DropSort = 0);

@@ -14,7 +14,7 @@ public sealed class GuildBuffDecayHost(
     IOptions<GameServerOptions> options,
     ILogger<GuildBuffDecayHost> logger) : BackgroundService
 {
-    public static readonly TimeSpan Interval = TimeSpan.FromSeconds(30);
+    public static readonly TimeSpan Interval = TimeSpan.FromSeconds(10);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {

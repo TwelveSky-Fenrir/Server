@@ -28,6 +28,7 @@ public sealed class UpgradeItemRankHandler(
             logger.LogDebug(
                 "Session {SessionId} character {CharacterId}: UpgradeItemRankRequest dropped, no live zone/player state",
                 zoneSession.SessionId, characterId);
+            zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 
@@ -39,8 +40,7 @@ public sealed class UpgradeItemRankHandler(
 
             switch (result.Outcome)
             {
-                case UpgradeItemRankOutcome.Rejected:
-                    session.Send(new UpgradeItemRankResponse { Result = 1, Cost = 0, Value = new int[6] });
+                case UpgradeItemRankOutcome.Disconnected:
                     return;
                 case UpgradeItemRankOutcome.NoCandidate:
                     session.Send(new UpgradeItemRankResponse

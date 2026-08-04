@@ -138,18 +138,6 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         return packedState < 1 ? 0 : packedState % 100;
     }
 
-    public static int NormalizeToBuiltState(int stateCode)
-    {
-        return stateCode switch
-        {
-            1 or 2 => 2,
-            3 or 4 => 4,
-            5 or 6 => 6,
-            7 or 8 => 8,
-            _ => 0
-        };
-    }
-
     public void RecomputeTribeBonuses()
     {
         lock (_lock)
@@ -211,8 +199,10 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
     {
         lock (_lock)
         {
+            var attackStateChanged = _attackState[towerIndex] != AttackStateUnderAttack;
             _attackState[towerIndex] = AttackStateUnderAttack;
             _lastAttackAtUtc[towerIndex] = utcNow;
+            _dirty[towerIndex] |= attackStateChanged;
 
             if (_firstAttackRecorded[towerIndex])
                 return false;
@@ -223,12 +213,25 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-    public void SetTowerState(int towerIndex, int packedState, bool valid)
+    public void ApplyStatusSnapshot(ReadOnlySpan<int> packedStates, ReadOnlySpan<int> attackStates)
     {
+        if (packedStates.Length != TowerCount || attackStates.Length != TowerCount)
+            throw new ArgumentException("Tower status snapshot has an unexpected length.");
+
         lock (_lock)
         {
-            _packedState[towerIndex] = packedState;
-            _valid[towerIndex] = valid;
+            for (var towerIndex = 0; towerIndex < TowerCount; towerIndex++)
+            {
+                var packedState = packedStates[towerIndex];
+                var attackState = attackStates[towerIndex];
+                if (_packedState[towerIndex] == packedState && _attackState[towerIndex] == attackState)
+                    continue;
+
+                _packedState[towerIndex] = packedState;
+                _attackState[towerIndex] = attackState;
+                _valid[towerIndex] = IsBuiltPackedState(packedState);
+                _dirty[towerIndex] = true;
+            }
         }
     }
 
@@ -276,6 +279,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
             _attackState[towerIndex] = AttackStateUnderAttack;
             _valid[towerIndex] = false;
             _siegeStartedAtUtc[towerIndex] = utcNow;
+            _dirty[towerIndex] = true;
         }
     }
 
@@ -302,6 +306,10 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
             _constructKind[towerIndex] = 0;
             _createCooldownStartedAtUtc[towerIndex] = null;
             _guardianHealPending[towerIndex] = false;
+            _attackState[towerIndex] = AttackStateIdle;
+            _firstAttackRecorded[towerIndex] = false;
+            _firstAttackAtUtc[towerIndex] = null;
+            _lastAttackAtUtc[towerIndex] = null;
         }
     }
 
@@ -433,6 +441,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
 
             _attackState[towerIndex] = AttackStateIdle;
             _lastAttackAtUtc[towerIndex] = utcNow;
+            _dirty[towerIndex] = true;
             return true;
         }
     }
@@ -488,19 +497,20 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
 
         lock (_lock)
         {
+            Array.Clear(_packedState);
+            Array.Clear(_valid);
+            Array.Fill(_attackState, AttackStateIdle);
+
             foreach (var row in rows)
             {
                 if (row.TowerIndex >= TowerCount)
                     continue;
 
                 _controllingTribe[row.TowerIndex] = row.ControllingTribeId;
-
-                var builtState = NormalizeToBuiltState(row.Level);
-                if (builtState > 0)
-                {
-                    _packedState[row.TowerIndex] = builtState * 100 + row.TowerType;
-                    _valid[row.TowerIndex] = true;
-                }
+                var packedState = ComposePackedState(row.Level, row.TowerType);
+                _packedState[row.TowerIndex] = packedState;
+                _attackState[row.TowerIndex] = row.AttackState;
+                _valid[row.TowerIndex] = IsBuiltPackedState(packedState);
             }
         }
     }
@@ -510,6 +520,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         for (var i = 0; i < TowerCount; i++)
         {
             int packed;
+            int attackState;
             byte? tribe;
 
             lock (_lock)
@@ -518,14 +529,15 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
                     continue;
 
                 packed = _packedState[i];
+                attackState = _attackState[i];
                 tribe = _controllingTribe[i];
                 _dirty[i] = false;
             }
 
             try
             {
-                var builtState = NormalizeToBuiltState(DecodeLevel(packed));
-                await towers.SetProgressAsync((byte)i, (byte)builtState, (byte)DecodeType(packed), tribe, ct)
+                await towers.SetProgressAsync((byte)i, (byte)DecodeLevel(packed), (byte)DecodeType(packed),
+                        (short)attackState, tribe, ct)
                     .ConfigureAwait(false);
             }
             catch (Exception ex)
@@ -565,14 +577,24 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
                     _createCooldownStartedAtUtc[row.TowerIndex] is not null)
                     continue;
 
-                var builtState = NormalizeToBuiltState(row.Level);
-                var packed = builtState > 0 ? builtState * 100 + row.TowerType : 0;
+                var packed = ComposePackedState(row.Level, row.TowerType);
 
                 _packedState[row.TowerIndex] = packed;
+                _attackState[row.TowerIndex] = row.AttackState;
                 _controllingTribe[row.TowerIndex] = row.ControllingTribeId;
-                _valid[row.TowerIndex] = packed > 0;
+                _valid[row.TowerIndex] = IsBuiltPackedState(packed);
             }
         }
+    }
+
+    private static int ComposePackedState(byte stateCode, byte towerType)
+    {
+        return stateCode == 0 ? 0 : stateCode * 100 + towerType;
+    }
+
+    private static bool IsBuiltPackedState(int packedState)
+    {
+        return DecodeLevel(packedState) is 2 or 4 or 6 or 8;
     }
 
     private TowerSiegePhase PhaseOf(int towerIndex)

@@ -26,6 +26,7 @@ public sealed class EnchantItemHandler(IEnchantItemService enchantItemService, I
             logger.LogDebug(
                 "Session {SessionId} character {CharacterId}: EnchantItemRequest dropped, no live zone/player state",
                 zoneSession.SessionId, characterId);
+            zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 
@@ -34,11 +35,8 @@ public sealed class EnchantItemHandler(IEnchantItemService enchantItemService, I
         {
             var result = await enchantItemService.EnchantAsync(packet, zone, state, characterId, cancellationToken);
 
-            if (result.Outcome == EnchantItemOutcome.Rejected)
-            {
-                session.Send(new EnchantItemResponse { Result = 1, Cost = 0, Value = 0 });
+            if (result.Outcome != EnchantItemOutcome.Applied)
                 return;
-            }
 
             session.Send(new EnchantItemResponse
             {

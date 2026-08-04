@@ -39,12 +39,19 @@ public sealed class UpdateProxyShopHandler(IUpdateProxyShopService service, ILog
             logger.LogWarning(
                 "Update proxy shop rejected: character {CharacterId} request failed structural validation",
                 characterId);
+            zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 
         await state.EconomyActionLock.WaitAsync(cancellationToken);
         try
         {
+            if (validation.BusinessFailure)
+            {
+                session.Send(await service.BuildBusinessFailureAsync(packet, state, characterId, cancellationToken));
+                return;
+            }
+
             var result = packet.BuySort == 1
                 ? await service.RetrieveAsync(packet, zone, state, characterId, accountId, validation.SlotIndex,
                     validation.ItemDefinition!, cancellationToken)
@@ -56,6 +63,7 @@ public sealed class UpdateProxyShopHandler(IUpdateProxyShopService service, ILog
                 logger.LogWarning(
                     "Update proxy shop rejected: character {CharacterId} buySort {BuySort} failed structural validation post-lock",
                     characterId, packet.BuySort);
+                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             }
 

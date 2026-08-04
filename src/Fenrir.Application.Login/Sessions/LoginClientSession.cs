@@ -14,7 +14,15 @@ public sealed class LoginClientSession(
     ILogger? logger = null)
     : ClientSession(sessionId, transport, FenrirServer.Login, remoteEndPoint, logger)
 {
+    private const int PreAuthenticationPending = 0;
+    private const int PreAuthenticationComplete = 1;
+    private const int PreAuthenticationExpired = 2;
+
+    private int _preAuthenticationStatus;
+
     public LoginSessionState State { get; private set; } = LoginSessionState.Connected;
+
+    public bool IsPreAuthentication => Volatile.Read(ref _preAuthenticationStatus) == PreAuthenticationPending;
 
     public int? AccountId { get; private set; }
 
@@ -43,11 +51,25 @@ public sealed class LoginClientSession(
 
     public void MarkAuthenticated(int accountId, short accountGrade = 0)
     {
+        if (Interlocked.CompareExchange(ref _preAuthenticationStatus, PreAuthenticationComplete,
+                PreAuthenticationPending) != PreAuthenticationPending)
+            return;
+
         var previous = State;
         AccountId = accountId;
         AccountGrade = accountGrade;
         State = LoginSessionState.Authenticated;
         LogSessionStateChanged(previous, State);
+    }
+
+    public bool TryExpirePreAuthentication()
+    {
+        if (Interlocked.CompareExchange(ref _preAuthenticationStatus, PreAuthenticationExpired,
+                PreAuthenticationPending) != PreAuthenticationPending)
+            return false;
+
+        Abort(Core.Abstractions.DisconnectReason.IdleTimeout);
+        return true;
     }
 
     public void MarkAccountSessionToken(Guid token)

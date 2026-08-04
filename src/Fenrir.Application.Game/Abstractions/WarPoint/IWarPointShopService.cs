@@ -25,5 +25,5 @@ public interface IWarPointShopService
 {
     public ValueTask<WarPointBuyServiceResult> TryBuyAsync(Zone zone, PlayerRuntimeState state, int accountId,
         int characterId, int npcId, int itemId, int requestedQuantity, byte destinationPage, byte destinationSlot,
-        CancellationToken ct);
+        byte destinationX, byte destinationY, CancellationToken ct);
 }

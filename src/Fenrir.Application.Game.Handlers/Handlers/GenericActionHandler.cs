@@ -136,7 +136,9 @@ public sealed class GenericActionHandler(
                     zoneSession.SessionId, characterId, sort, nameof(IInventoryToWorldDropService.DropToWorldAsync));
 
             var dropResult = await inventoryToWorldDropService.DropToWorldAsync(zone, state, characterId,
-                zoneSession.AccountId!.Value, dropMove, true, cancellationToken);
+                zoneSession.AccountId!.Value, dropMove,
+                InventoryToWorldDropPolicy.IsPremiumPageAccessAllowed(
+                    state.PremiumExpireUtc, DateTimeOffset.UtcNow.ToUnixTimeSeconds()), cancellationToken);
             RespondDrop(session, zoneSession, sort, packet.Data, dropResult);
             return;
         }
@@ -273,7 +275,7 @@ public sealed class GenericActionHandler(
                     zoneSession.SessionId, characterId, sort, nameof(IRuneStoneCraftService.CraftAsync));
 
             var runeResult = await runeStoneCraftService.CraftAsync(runeMove.Page1, runeMove.Index1,
-                runeMove.Page2, runeMove.Index2, runeMove.XPost2, 0,
+                runeMove.Page2, runeMove.Index2, runeMove.XPost2,
                 true, zone, state, characterId, cancellationToken);
             RespondRune(session, zoneSession, sort, packet.Data, runeResult);
             return;
@@ -508,7 +510,7 @@ public sealed class GenericActionHandler(
                 logger.LogDebug(
                     "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
                     zoneSession.SessionId, characterId, sort, nameof(IGmBlockAvatarService.HandleAsync));
-            await gmBlockAvatarService.HandleAsync(gmBlockPayload, zoneSession, cancellationToken);
+            await gmBlockAvatarService.HandleAsync(gmBlockPayload, zoneSession, zone, cancellationToken);
             return;
         }
 
@@ -620,7 +622,7 @@ public sealed class GenericActionHandler(
                     zoneSession.SessionId, characterId, sort,
                     nameof(IGmBasicCommandService.HandleTargetSpecialStateAsync));
             await gmBasicCommandService.HandleTargetSpecialStateAsync(sort, packet.Data, zoneSession, state,
-                cancellationToken);
+                zone, cancellationToken);
             return;
         }
 
@@ -630,7 +632,7 @@ public sealed class GenericActionHandler(
                 logger.LogDebug(
                     "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
                     zoneSession.SessionId, characterId, sort, nameof(IGmBasicCommandService.HandleKickAsync));
-            await gmBasicCommandService.HandleKickAsync(packet.Data, zoneSession, state, cancellationToken);
+            await gmBasicCommandService.HandleKickAsync(packet.Data, zoneSession, state, zone, cancellationToken);
             return;
         }
 
@@ -749,7 +751,7 @@ public sealed class GenericActionHandler(
                 logger.LogDebug(
                     "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
                     zoneSession.SessionId, characterId, sort, nameof(IGmPetExperienceGrantService.HandleAsync));
-            await gmPetExperienceGrantService.HandleAsync(packet.Data, zoneSession, state, cancellationToken);
+            await gmPetExperienceGrantService.HandleAsync(packet.Data, zoneSession, state, zone, cancellationToken);
             return;
         }
 

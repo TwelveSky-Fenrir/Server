@@ -6,6 +6,7 @@ namespace Fenrir.Application.Game.Hosting.World.ZoneWar;
 
 public sealed class DailyResetBroadcastHost(
     DailyResetBroadcaster broadcaster,
+    TimeProvider timeProvider,
     ILogger<DailyResetBroadcastHost> logger) : BackgroundService
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(15);
@@ -19,7 +20,7 @@ public sealed class DailyResetBroadcastHost(
             while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
                 try
                 {
-                    await broadcaster.TickAsync(DateTimeOffset.Now, stoppingToken).ConfigureAwait(false);
+                    await broadcaster.TickAsync(timeProvider.GetLocalNow(), stoppingToken).ConfigureAwait(false);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {

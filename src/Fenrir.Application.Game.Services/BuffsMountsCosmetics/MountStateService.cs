@@ -8,7 +8,6 @@ using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Domain.Game.GameData;
 using Fenrir.Domain.Game.Stats;
-using Fenrir.Domain.Game.Stats.Context;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -73,47 +72,24 @@ public sealed class MountStateService(
                 return new MountStateResult(MountStateOutcome.Disconnect);
 
             case MountStateResolver.ResultKind.Select:
-                zone.PostMountCommand(new MountZoneCommand(characterId, result.NewAnimalIndex));
-                return new MountStateResult(MountStateOutcome.Select);
+                return await PostMountStateAsync(zone,
+                    new MountZoneCommand(characterId, result.NewAnimalIndex), MountStateOutcome.Select,
+                    cancellationToken);
 
             case MountStateResolver.ResultKind.Deselect:
-                zone.PostMountCommand(new MountZoneCommand(characterId, result.NewAnimalIndex));
-                return new MountStateResult(MountStateOutcome.Deselect);
+                return await PostMountStateAsync(zone,
+                    new MountZoneCommand(characterId, result.NewAnimalIndex), MountStateOutcome.Deselect,
+                    cancellationToken);
 
             case MountStateResolver.ResultKind.Mount:
-            {
-                var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
-                var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt,
-                    state.StatDex, state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo,
-                    state.RebirthCount, state.Level2);
-                var mountedSlot = result.NewAnimalIndex - MountStateResolver.SlotCount;
-                var inRange = mountedSlot is >= 0 and < MountStateResolver.SlotCount;
-                var absorbValue =
-                    StatCalculator.TryGetMountBaseRow(result.NewAnimalNumber, out var baseRow)
-                        ? baseRow.AbsorbValue
-                        : 0;
-                var mountOverride = new MountContext(result.NewAnimalNumber,
-                    state.AnimalAbsorbState != 0,
-                    absorbValue,
-                    inRange ? MountPowerCodec.EncodeSlot(state.MountRolledAttributes, mountedSlot) : 0,
-                    inRange ? state.MountActivity[mountedSlot] : 0);
-                var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
-                    state.Buffs, ComputePetContribution(state, equipmentContainer), state,
-                    mountOverride: mountOverride);
-
-                var newLife = Math.Min(state.Life, updatedStats.MaxLife);
-                var newMana = Math.Min(state.Mana, updatedStats.MaxMana);
-
-                zone.PostMountCommand(new MountZoneCommand(characterId, result.NewAnimalIndex,
-                    result.NewAnimalNumber, 0, newLife, newMana, updatedStats,
-                    MountBroadcastKind.Mount));
-                return new MountStateResult(MountStateOutcome.Mount);
-            }
+                return await PostMountStateAsync(zone,
+                    new MountZoneCommand(characterId, result.NewAnimalIndex, result.NewAnimalNumber, 0,
+                        Broadcast: MountBroadcastKind.Mount), MountStateOutcome.Mount, cancellationToken);
 
             case MountStateResolver.ResultKind.Dismount:
-                zone.PostMountCommand(new MountZoneCommand(characterId, result.NewAnimalIndex,
-                    0, 0, Broadcast: MountBroadcastKind.Dismount));
-                return new MountStateResult(MountStateOutcome.Dismount);
+                return await PostMountStateAsync(zone,
+                    new MountZoneCommand(characterId, result.NewAnimalIndex, 0, 0,
+                        Broadcast: MountBroadcastKind.Dismount), MountStateOutcome.Dismount, cancellationToken);
 
             case MountStateResolver.ResultKind.DeleteMount:
                 await ApplyDeleteMountAsync(zone, state, characterId, accountId, result.GarageSlot,
@@ -135,6 +111,14 @@ public sealed class MountStateService(
             default:
                 return new MountStateResult(MountStateOutcome.NoReply);
         }
+    }
+
+    private static async ValueTask<MountStateResult> PostMountStateAsync(Zone zone, MountZoneCommand command,
+        MountStateOutcome appliedOutcome, CancellationToken cancellationToken)
+    {
+        return await zone.PostMountCommandAndWaitAsync(command, cancellationToken).ConfigureAwait(false)
+            ? new MountStateResult(appliedOutcome)
+            : new MountStateResult(MountStateOutcome.NoReply);
     }
 
     private async ValueTask ApplyDeleteMountAsync(Zone zone, PlayerRuntimeState state, int characterId,

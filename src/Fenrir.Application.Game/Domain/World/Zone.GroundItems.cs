@@ -12,36 +12,65 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
+    private const int GroundItemSlotCapacity = 4000;
+
     private readonly ConcurrentQueue<GroundItemEntity> _claimedGroundItemDespawns = new();
 
     private readonly List<int> _groundItemBroadcastNeighborScratch = [];
 
     private readonly Dictionary<int, TimeSpan> _groundItemLastRebroadcast = new();
 
+    private readonly Dictionary<int, uint> _groundItemReservations = [];
+
     private readonly ConcurrentDictionary<int, GroundItemEntity> _groundItems = new();
 
-    private int _groundItemServerIndexSeed;
+    private readonly object _groundItemSlotGate = new();
 
     private int _groundItemUniqueNumberSeed;
 
     public int GroundItemCount => _groundItems.Count;
 
-    public void SpawnGroundItem(int itemId, int quantity, float posX, float posY, float posZ, string master,
+    public bool SpawnGroundItem(int itemId, int quantity, float posX, float posY, float posZ, string master,
         string partyName, int dropSort, int? instanceId = null)
     {
-        var index = Interlocked.Increment(ref _groundItemServerIndexSeed);
+        return SpawnGroundItem(new GroundItemSpawnPlan(itemId, quantity, 0, 0, 0, 0, 0, posX, posY, posZ, master,
+            partyName, dropSort), instanceId);
+    }
+
+    public bool SpawnGroundItem(in GroundItemSpawnPlan plan, int? instanceId = null)
+    {
         var uniqueNumber = unchecked((uint)Interlocked.Increment(ref _groundItemUniqueNumberSeed));
+        GroundItemEntity? entity = null;
 
-        var entity = new GroundItemEntity(index, uniqueNumber, itemId, quantity, 0, 0, posX,
-            posY, posZ, TruncateName(master), TruncateName(partyName), dropSort, _clock, 0,
-            0, 0, instanceId);
+        lock (_groundItemSlotGate)
+        {
+            for (var index = 0; index < GroundItemSlotCapacity; index++)
+            {
+                if (_groundItems.ContainsKey(index))
+                    continue;
 
-        _groundItems[index] = entity;
+                var candidate = new GroundItemEntity(index, uniqueNumber, plan.ItemId, plan.Quantity, plan.Value,
+                    plan.SerialNumber, plan.PosX, plan.PosY, plan.PosZ, TruncateName(plan.Master),
+                    TruncateName(plan.PartyName), plan.DropSort, _clock, plan.SocketGem1, plan.SocketGem2,
+                    plan.SocketGem3, instanceId);
+
+                if (!_groundItems.TryAdd(index, candidate))
+                    continue;
+
+                entity = candidate;
+                break;
+            }
+        }
+
+        if (entity is null)
+            return false;
 
         BroadcastGroundItemAction(entity, 1);
 
-        _groundItemLastRebroadcast[index] =
-            _clock - SimulationClock.RebroadcastStaggerOffset(index, SimulationClock.GroundItemRebroadcastInterval);
+        _groundItemLastRebroadcast[entity.ServerIndex] =
+            _clock - SimulationClock.RebroadcastStaggerOffset(entity.ServerIndex,
+                SimulationClock.GroundItemRebroadcastInterval);
+        return true;
     }
 
     private static string TruncateName(string name)
@@ -49,49 +78,77 @@ public sealed partial class Zone
         return name.Length <= 13 ? name : name[..13];
     }
 
-    public GroundItemClaimOutcome TryClaimGroundItem(int serverIndex, uint expectedUniqueNumber, string claimantName,
+    public GroundItemClaimOutcome TryReserveGroundItem(int serverIndex, uint expectedUniqueNumber, string claimantName,
         string? claimantPartyName, float claimantX, float claimantY, float claimantZ, out GroundItemEntity? item,
         int? claimantInstanceId = null)
     {
-        if (!_groundItems.TryGetValue(serverIndex, out var snapshot) ||
-            snapshot.UniqueNumber != expectedUniqueNumber)
+        lock (_groundItemSlotGate)
         {
-            item = null;
-            return GroundItemClaimOutcome.NotFound;
+            if (!_groundItems.TryGetValue(serverIndex, out var snapshot) ||
+                snapshot.UniqueNumber != expectedUniqueNumber || snapshot.IsExpired(_clock) ||
+                _groundItemReservations.ContainsKey(serverIndex))
+            {
+                item = null;
+                return GroundItemClaimOutcome.NotFound;
+            }
+
+            if (!IsVisibleAcrossDungeonInstance(snapshot.InstanceId, claimantInstanceId))
+            {
+                item = null;
+                return GroundItemClaimOutcome.NotFound;
+            }
+
+            if (!snapshot.IsClaimableBy(claimantName, claimantPartyName, _clock))
+            {
+                item = null;
+                return GroundItemClaimOutcome.NotOwned;
+            }
+
+            var dx = snapshot.PosX - claimantX;
+            var dy = snapshot.PosY - claimantY;
+            var dz = snapshot.PosZ - claimantZ;
+            if (dx * dx + dy * dy + dz * dz >
+                GroundItemPickupPolicy.MaxPickupDistance * GroundItemPickupPolicy.MaxPickupDistance)
+            {
+                item = null;
+                return GroundItemClaimOutcome.TooFar;
+            }
+
+            _groundItemReservations.Add(serverIndex, snapshot.UniqueNumber);
+            item = snapshot;
+            return GroundItemClaimOutcome.Success;
+        }
+    }
+
+    public void ReleaseGroundItemReservation(int serverIndex, uint uniqueNumber)
+    {
+        lock (_groundItemSlotGate)
+        {
+            if (_groundItemReservations.TryGetValue(serverIndex, out var reservedUniqueNumber) &&
+                reservedUniqueNumber == uniqueNumber)
+                _groundItemReservations.Remove(serverIndex);
+        }
+    }
+
+    public bool TryFinalizeGroundItemReservation(int serverIndex, uint uniqueNumber)
+    {
+        GroundItemEntity item;
+
+        lock (_groundItemSlotGate)
+        {
+            if (!_groundItemReservations.TryGetValue(serverIndex, out var reservedUniqueNumber) ||
+                reservedUniqueNumber != uniqueNumber || !_groundItems.TryGetValue(serverIndex, out var snapshot) ||
+                snapshot.UniqueNumber != uniqueNumber ||
+                !((ICollection<KeyValuePair<int, GroundItemEntity>>)_groundItems).Remove(
+                    new KeyValuePair<int, GroundItemEntity>(serverIndex, snapshot)))
+                return false;
+
+            _groundItemReservations.Remove(serverIndex);
+            item = snapshot;
         }
 
-        if (!IsVisibleAcrossDungeonInstance(snapshot.InstanceId, claimantInstanceId))
-        {
-            item = null;
-            return GroundItemClaimOutcome.NotFound;
-        }
-
-        if (!snapshot.IsClaimableBy(claimantName, claimantPartyName, _clock))
-        {
-            item = null;
-            return GroundItemClaimOutcome.NotOwned;
-        }
-
-        var dx = snapshot.PosX - claimantX;
-        var dy = snapshot.PosY - claimantY;
-        var dz = snapshot.PosZ - claimantZ;
-        if (dx * dx + dy * dy + dz * dz >
-            GroundItemPickupPolicy.MaxPickupDistance * GroundItemPickupPolicy.MaxPickupDistance)
-        {
-            item = null;
-            return GroundItemClaimOutcome.TooFar;
-        }
-
-        if (!((ICollection<KeyValuePair<int, GroundItemEntity>>)_groundItems).Remove(
-                new KeyValuePair<int, GroundItemEntity>(serverIndex, snapshot)))
-        {
-            item = null;
-            return GroundItemClaimOutcome.NotFound;
-        }
-
-        _claimedGroundItemDespawns.Enqueue(snapshot);
-        item = snapshot;
-        return GroundItemClaimOutcome.Success;
+        _claimedGroundItemDespawns.Enqueue(item);
+        return true;
     }
 
     private void RebroadcastGroundItems()
@@ -102,7 +159,7 @@ public sealed partial class Zone
             if (_clock - last < SimulationClock.GroundItemRebroadcastInterval)
                 continue;
 
-            BroadcastGroundItemAction(item, 0);
+            BroadcastGroundItemAction(item, 2);
         }
     }
 
@@ -117,16 +174,29 @@ public sealed partial class Zone
             return;
 
         foreach (var (index, item) in expired)
-            if (_groundItems.TryRemove(index, out _))
+        {
+            GroundItemEntity? expiredItem = null;
+
+            lock (_groundItemSlotGate)
             {
-                BroadcastGroundItemAction(item, 3);
+                if (_groundItemReservations.ContainsKey(index) ||
+                    !_groundItems.TryGetValue(index, out var current) || current.UniqueNumber != item.UniqueNumber ||
+                    !((ICollection<KeyValuePair<int, GroundItemEntity>>)_groundItems).Remove(
+                        new KeyValuePair<int, GroundItemEntity>(index, current)))
+                    continue;
+
                 _groundItemLastRebroadcast.Remove(index);
+                expiredItem = current;
             }
+
+            if (expiredItem is not null)
+                BroadcastGroundItemAction(expiredItem, 3);
+        }
     }
 
-    private void DrainClaimedGroundItemDespawns()
+    private void DrainClaimedGroundItemDespawns(int maximum)
     {
-        while (_claimedGroundItemDespawns.TryDequeue(out var item))
+        for (var processed = 0; processed < maximum && _claimedGroundItemDespawns.TryDequeue(out var item); processed++)
         {
             BroadcastGroundItemAction(item, 3);
             _groundItemLastRebroadcast.Remove(item.ServerIndex);
@@ -171,7 +241,7 @@ public sealed partial class Zone
         }
     }
 
-    private static GroundItemReplicationResponse BuildItemActionRecv(GroundItemEntity item,
+    private GroundItemReplicationResponse BuildItemActionRecv(GroundItemEntity item,
         int checkChangeActionState)
     {
         return new GroundItemReplicationResponse
@@ -188,9 +258,9 @@ public sealed partial class Zone
                 Master = item.Master,
                 PartyName = item.PartyName,
                 DropSort = item.DropSort,
-                CreateTime = 0,
-                PresentTime = 0,
-                CreateState = 1,
+                CreateTime = item.CreateTime,
+                PresentTime = item.PresentTimeAt(_clock),
+                CreateState = item.CreateStateAt(_clock),
                 SocketGem = [item.SocketGem1, item.SocketGem2, item.SocketGem3]
             },
             CheckChangeActionState = checkChangeActionState

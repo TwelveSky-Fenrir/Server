@@ -2,183 +2,288 @@ namespace Fenrir.Application.Game.Domain.Simulation;
 
 public static class Zone175MissionCore
 {
+    private const int CountdownTicks = SimulationClock.PlayTimeAccrualLegacyTicks;
+    private const int OpenGateTicks = 3 * SimulationClock.PlayTimeAccrualLegacyTicks;
+    private const int StageOpenTicks = SimulationClock.PlayTimeAccrualLegacyTicks;
+    private const int StageCloseTicks = 2 * SimulationClock.PlayTimeAccrualLegacyTicks;
+    private const int StageSummonTicks = SimulationClock.PlayTimeAccrualLegacyTicks;
+    private const int WaveTimeoutTicks = 60 * SimulationClock.PlayTimeAccrualLegacyTicks;
+
     public static void Advance(Zone175MissionState state, in Zone175InstanceConfig config,
-        IZone175MissionEffects effects, DateTimeOffset nowUtc, int legacyTicksElapsed)
+        IZone175MissionEffects effects, DateTimeOffset nowLocal, int sharedState, int legacyTicksElapsed)
     {
         if (legacyTicksElapsed <= 0)
             return;
 
-        state.SubTick += legacyTicksElapsed;
+        for (var tick = 0; tick < legacyTicksElapsed; tick++)
+            AdvanceOneTick(state, in config, effects, nowLocal, sharedState);
+    }
 
-        switch (state.Phase)
+    public static bool IsOpenMoment(DateTimeOffset nowLocal)
+    {
+        return nowLocal.DayOfWeek is DayOfWeek.Monday or DayOfWeek.Thursday or DayOfWeek.Sunday &&
+               nowLocal.Hour == 22 && nowLocal.Minute == 0;
+    }
+
+    private static void AdvanceOneTick(Zone175MissionState state, in Zone175InstanceConfig config,
+        IZone175MissionEffects effects, DateTimeOffset nowLocal, int sharedState)
+    {
+        if (sharedState is < 0 or > 23)
+            return;
+
+        if (state.SharedState != sharedState)
         {
-            case Zone175MissionPhase.Idle:
-                AdvanceIdle(state, effects, nowUtc);
-                break;
-            case Zone175MissionPhase.PreOpen:
-                AdvancePreOpen(state, in config, effects, legacyTicksElapsed);
-                break;
-            case Zone175MissionPhase.WaveBossSummon:
-                AdvanceBossSummon(state, effects);
-                break;
-            case Zone175MissionPhase.WaveCombat:
-                AdvanceCombat(state, in config, effects, legacyTicksElapsed);
-                break;
-            case Zone175MissionPhase.Terminal:
-                AdvanceTerminal(state, effects, legacyTicksElapsed);
-                break;
+            state.SharedState = sharedState;
+            state.StateTicks = 0;
+            state.StageLoadBlocked = false;
+            if (sharedState is not (5 or 9 or 13 or 17 or 21))
+            {
+                state.StageLoaded = false;
+                state.LoadedStage = 0;
+            }
+        }
+
+        state.SubTick++;
+        state.StateTicks++;
+        state.Phase = ToPhase(sharedState, state.IdleBattleState);
+
+        switch (sharedState)
+        {
+            case 0:
+                AdvanceIdle(state, effects, nowLocal);
+                return;
+            case 1:
+                AdvanceAfterDelay(state, effects, OpenGateTicks, 65);
+                return;
+            case 2:
+                AdvanceAfterDelay(state, effects, StageOpenTicks, 66);
+                return;
+            case 3:
+                AdvanceAfterDelay(state, effects, StageCloseTicks, 67);
+                return;
+            case 4:
+                BeginStage(state, effects, 1, 68);
+                return;
+            case 5:
+                AdvanceWave(state, effects, 1, 69, 70, 71);
+                return;
+            case 6:
+                AdvanceDepthGate(state, in config, effects, 1, 72, 73);
+                return;
+            case 7:
+                AdvanceAfterDelay(state, effects, StageCloseTicks, 74);
+                return;
+            case 8:
+                BeginStage(state, effects, 2, 75);
+                return;
+            case 9:
+                AdvanceWave(state, effects, 2, 76, 77, 78);
+                return;
+            case 10:
+                AdvanceDepthGate(state, in config, effects, 2, 79, 80);
+                return;
+            case 11:
+                AdvanceAfterDelay(state, effects, StageCloseTicks, 81);
+                return;
+            case 12:
+                BeginStage(state, effects, 3, 82);
+                return;
+            case 13:
+                AdvanceWave(state, effects, 3, 83, 84, 85);
+                return;
+            case 14:
+                AdvanceDepthGate(state, in config, effects, 3, 86, 87);
+                return;
+            case 15:
+                AdvanceAfterDelay(state, effects, StageCloseTicks, 88);
+                return;
+            case 16:
+                BeginStage(state, effects, 4, 89);
+                return;
+            case 17:
+                AdvanceWave(state, effects, 4, 90, 91, 92);
+                return;
+            case 18:
+                AdvanceDepthGate(state, in config, effects, 4, 93, 94);
+                return;
+            case 19:
+                AdvanceAfterDelay(state, effects, StageCloseTicks, 95);
+                return;
+            case 20:
+                BeginStage(state, effects, 5, 96);
+                return;
+            case 21:
+                AdvanceWave(state, effects, 5, 97, 98, 99);
+                return;
+            case 22:
+                AdvanceAfterDelay(state, effects, StageOpenTicks, 100);
+                return;
+            case 23:
+                AdvanceTerminal(state, effects);
+                return;
         }
     }
 
-    public static bool IsOpenMoment(DateTimeOffset nowUtc)
+    private static void AdvanceIdle(Zone175MissionState state, IZone175MissionEffects effects,
+        DateTimeOffset nowLocal)
     {
-        return nowUtc.DayOfWeek == DayOfWeek.Sunday && nowUtc.Hour == 21 && nowUtc.Minute == 0;
-    }
-
-    private static void AdvanceIdle(Zone175MissionState state, IZone175MissionEffects effects, DateTimeOffset nowUtc)
-    {
-        if (!IsOpenMoment(nowUtc))
-            return;
-
-        var today = DateOnly.FromDateTime(nowUtc.UtcDateTime);
-        if (state.LastOpenedDateUtc == today)
-            return;
-
-        state.LastOpenedDateUtc = today;
-        state.SubTick = 0;
-        state.CurrentWave = 0;
-        state.PreOpenRemaining = Zone175RewardTables.PreOpenCountStart;
-        state.PhaseAccumulatorTicks = 0;
-        state.TrickleAccumulatorTicks = 0;
-        state.Phase = Zone175MissionPhase.PreOpen;
-
-        effects.Notify(Zone175MissionEvent.MissionOpen, 0, state.PreOpenRemaining);
-    }
-
-    private static void AdvancePreOpen(Zone175MissionState state, in Zone175InstanceConfig config,
-        IZone175MissionEffects effects, int legacyTicksElapsed)
-    {
-        state.PhaseAccumulatorTicks += legacyTicksElapsed;
-
-        while (state.PreOpenRemaining > 0 &&
-               state.PhaseAccumulatorTicks >= Zone175RewardTables.PreOpenCountdownCadenceTicks)
+        switch (state.IdleBattleState)
         {
-            state.PhaseAccumulatorTicks -= Zone175RewardTables.PreOpenCountdownCadenceTicks;
-            state.PreOpenRemaining--;
-            effects.Notify(Zone175MissionEvent.PreOpenCountdown, 0, state.PreOpenRemaining);
+            case 0:
+            {
+                var today = DateOnly.FromDateTime(nowLocal.DateTime);
+                if (!IsOpenMoment(nowLocal) || state.LastScheduledDateLocal == today)
+                    return;
+
+                state.LastScheduledDateLocal = today;
+                state.IdleBattleState = 1;
+                state.CountdownRemaining = 10;
+                state.StateTicks = CountdownTicks;
+                effects.Notify(Zone175MissionEvent.MissionOpen, 0, state.CountdownRemaining);
+                return;
+            }
+            case 1:
+                if (state.StateTicks < CountdownTicks)
+                    return;
+
+                state.StateTicks = 0;
+                if (state.CountdownRemaining > 0)
+                    effects.PublishStateChange(63, state.CountdownRemaining);
+                state.CountdownRemaining--;
+                if (state.CountdownRemaining < 1)
+                    state.IdleBattleState = 2;
+                return;
+            case 2:
+                if (state.StateTicks < CountdownTicks)
+                    return;
+
+                state.StateTicks = 0;
+                state.IdleBattleState = 0;
+                effects.PublishStateChange(64);
+                return;
+        }
+    }
+
+    private static void AdvanceAfterDelay(Zone175MissionState state, IZone175MissionEffects effects,
+        int requiredTicks, int eventCode)
+    {
+        if (state.StateTicks < requiredTicks)
+            return;
+
+        state.StateTicks = 0;
+        effects.PublishStateChange(eventCode);
+    }
+
+    private static void BeginStage(Zone175MissionState state, IZone175MissionEffects effects, int stage,
+        int eventCode)
+    {
+        if (state.StateTicks < StageSummonTicks || state.StageLoadBlocked)
+            return;
+
+        if (!effects.TryLoadWaveStage(stage))
+        {
+            state.StageLoadBlocked = true;
+            return;
         }
 
-        if (state.PreOpenRemaining <= 0)
-            BeginWave(state, in config, effects, 1);
+        state.StageLoaded = true;
+        state.LoadedStage = stage;
+        state.StateTicks = 0;
+        effects.Notify(Zone175MissionEvent.WaveBossSummon, stage, 0);
+        effects.PublishStateChange(eventCode);
     }
 
-    private static void BeginWave(Zone175MissionState state, in Zone175InstanceConfig config,
-        IZone175MissionEffects effects, int wave)
+    private static void AdvanceWave(Zone175MissionState state, IZone175MissionEffects effects, int stage,
+        int emptyEventCode, int timeoutEventCode, int clearedEventCode)
     {
-        _ = config;
-        state.CurrentWave = wave;
-        state.Phase = Zone175MissionPhase.WaveBossSummon;
-        state.PhaseAccumulatorTicks = 0;
-        state.TrickleAccumulatorTicks = 0;
-        effects.Notify(Zone175MissionEvent.WaveGateOpen, wave, 0);
-    }
-
-    private static void AdvanceBossSummon(Zone175MissionState state, IZone175MissionEffects effects)
-    {
-        effects.Notify(Zone175MissionEvent.WaveBossSummon, state.CurrentWave, 0);
-        effects.SummonWaveBoss(state.CurrentWave);
-        state.Phase = Zone175MissionPhase.WaveCombat;
-        state.PhaseAccumulatorTicks = 0;
-        state.TrickleAccumulatorTicks = 0;
-    }
-
-    private static void AdvanceCombat(Zone175MissionState state, in Zone175InstanceConfig config,
-        IZone175MissionEffects effects, int legacyTicksElapsed)
-    {
-        state.PhaseAccumulatorTicks += legacyTicksElapsed;
+        if (!EnsureWaveLoaded(state, effects, stage))
+            return;
 
         if (!effects.AnyQualifyingPlayerPresent())
         {
-            AbortWave(state, effects, Zone175MissionEvent.EmptyAbort);
+            EndWave(state, effects, stage, emptyEventCode, Zone175MissionEvent.EmptyAbort, false);
             return;
         }
 
-        if (state.PhaseAccumulatorTicks >= Zone175RewardTables.WaveTimeoutLegacyTicks)
+        if (state.StateTicks == WaveTimeoutTicks)
         {
-            AbortWave(state, effects, Zone175MissionEvent.WaveTimeout);
+            EndWave(state, effects, stage, timeoutEventCode, Zone175MissionEvent.WaveTimeout, false);
             return;
         }
 
-        if (effects.CountLivingWaveBosses(state.CurrentWave) == 0)
-        {
-            ClearWave(state, in config, effects);
-            return;
-        }
+        if (state.StateTicks % SimulationClock.MonsterRespawnScanLegacyTicks == 0)
+            effects.MaintainWaveStage();
 
-        state.TrickleAccumulatorTicks += legacyTicksElapsed;
-        while (state.TrickleAccumulatorTicks >= Zone175RewardTables.TrickleCadenceSubTicks)
-        {
-            state.TrickleAccumulatorTicks -= Zone175RewardTables.TrickleCadenceSubTicks;
-            effects.SummonTrickle(state.CurrentWave);
-        }
+        if (effects.CountLivingWaveBosses(stage) != 0)
+            return;
+
+        EndWave(state, effects, stage, clearedEventCode, Zone175MissionEvent.WaveCleared, true);
     }
 
-    private static void ClearWave(Zone175MissionState state, in Zone175InstanceConfig config,
-        IZone175MissionEffects effects)
+    private static bool EnsureWaveLoaded(Zone175MissionState state, IZone175MissionEffects effects, int stage)
     {
-        var clearedWave = state.CurrentWave;
-        effects.RemoveMissionMonsters();
-        effects.RewardQualifyingPlayers(clearedWave);
-        effects.Notify(Zone175MissionEvent.WaveCleared, clearedWave, 0);
+        if (state.StageLoaded && state.LoadedStage == stage)
+            return true;
 
-        if (clearedWave >= Zone175RewardTables.WaveCount)
+        if (state.StageLoadBlocked)
+            return false;
+
+        if (!effects.TryLoadWaveStage(stage))
         {
-            effects.Notify(Zone175MissionEvent.MissionEnd, clearedWave, 0);
-            EnterTerminal(state, effects);
-            return;
+            state.StageLoadBlocked = true;
+            return false;
         }
 
-        if (Zone175RewardTables.CanAdvanceToNextWave(clearedWave, config.Index2))
-        {
-            BeginWave(state, in config, effects, clearedWave + 1);
-        }
-        else
-        {
-            effects.Notify(Zone175MissionEvent.DepthGateStop, clearedWave, 0);
-            EnterTerminal(state, effects);
-        }
+        state.StageLoaded = true;
+        state.LoadedStage = stage;
+        effects.Notify(Zone175MissionEvent.WaveBossSummon, stage, 0);
+        return true;
     }
 
-    private static void AbortWave(Zone175MissionState state, IZone175MissionEffects effects,
-        Zone175MissionEvent reason)
+    private static void EndWave(Zone175MissionState state, IZone175MissionEffects effects, int stage,
+        int eventCode, Zone175MissionEvent missionEvent, bool award)
     {
         effects.RemoveMissionMonsters();
-        effects.Notify(reason, state.CurrentWave, 0);
-        EnterTerminal(state, effects);
+        if (award)
+            effects.RewardQualifyingPlayers(stage);
+        state.StageLoaded = false;
+        state.LoadedStage = 0;
+        state.StateTicks = 0;
+        effects.Notify(missionEvent, stage, 0);
+        effects.PublishStateChange(eventCode);
     }
 
-    private static void EnterTerminal(Zone175MissionState state, IZone175MissionEffects effects)
+    private static void AdvanceDepthGate(Zone175MissionState state, in Zone175InstanceConfig config,
+        IZone175MissionEffects effects, int completedStage, int deniedEventCode, int continuedEventCode)
     {
-        state.Phase = Zone175MissionPhase.Terminal;
-        state.PhaseAccumulatorTicks = 0;
-        effects.Notify(Zone175MissionEvent.TerminalEnter, state.CurrentWave, 0);
-    }
-
-    private static void AdvanceTerminal(Zone175MissionState state, IZone175MissionEffects effects,
-        int legacyTicksElapsed)
-    {
-        state.PhaseAccumulatorTicks += legacyTicksElapsed;
-        if (state.PhaseAccumulatorTicks < Zone175RewardTables.TerminalHoldLegacyTicks)
+        if (state.StateTicks < StageOpenTicks)
             return;
 
+        state.StateTicks = 0;
+        effects.PublishStateChange(config.Index2 < completedStage ? deniedEventCode : continuedEventCode);
+    }
+
+    private static void AdvanceTerminal(Zone175MissionState state, IZone175MissionEffects effects)
+    {
+        if (state.StateTicks < WaveTimeoutTicks)
+            return;
+
+        state.StateTicks = 0;
         effects.ForceDisconnectAll();
-        effects.Notify(Zone175MissionEvent.TerminalKickReset, state.CurrentWave, 0);
+        effects.Notify(Zone175MissionEvent.TerminalKickReset, 0, 0);
+        effects.PublishStateChange(110);
+    }
 
-        state.Phase = Zone175MissionPhase.Idle;
-        state.CurrentWave = 0;
-        state.SubTick = 0;
-        state.PreOpenRemaining = 0;
-        state.PhaseAccumulatorTicks = 0;
-        state.TrickleAccumulatorTicks = 0;
+    private static Zone175MissionPhase ToPhase(int sharedState, int idleBattleState)
+    {
+        if (sharedState == 0)
+            return idleBattleState == 0 ? Zone175MissionPhase.Idle : Zone175MissionPhase.PreOpen;
+
+        return sharedState switch
+        {
+            5 or 9 or 13 or 17 or 21 => Zone175MissionPhase.WaveCombat,
+            23 => Zone175MissionPhase.Terminal,
+            _ => Zone175MissionPhase.WaveBossSummon
+        };
     }
 }

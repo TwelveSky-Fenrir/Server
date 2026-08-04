@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Crafting;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Domain.World.Loot;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.ItemModification;
@@ -19,7 +20,7 @@ public sealed class RuneStoneCraftService(
     public async ValueTask<RuneStoneCraftResult> CraftAsync(
         int sourcePage, int sourceSlot,
         int destinationPage, int destinationSlot,
-        int statSlotSelector, int destinationPackedStat,
+        int statSlotSelector,
         bool secondInventoryPageAccessible,
         Zone zone, PlayerRuntimeState state, int characterId,
         CancellationToken cancellationToken)
@@ -31,8 +32,10 @@ public sealed class RuneStoneCraftService(
             ? state.Inventory.GetSlot((byte)destinationPage, (byte)destinationSlot)
             : null;
 
+        var destinationPackedStat = ItemValueCodec.Encode(destinationStack?.Enchant ?? 0,
+            destinationStack?.Combine ?? 0, destinationStack?.Refine ?? 0, destinationStack?.Socket ?? 0);
         var request = new RuneStoneCraftRequest(
-            sourcePage, sourceSlot, sourceStack?.ItemId ?? 0,
+            sourcePage, sourceSlot, sourceStack?.ItemId ?? 0, sourceStack?.Quantity ?? 0,
             destinationPage, destinationSlot, destinationStack?.ItemId ?? 0, destinationPackedStat,
             statSlotSelector, secondInventoryPageAccessible);
 
@@ -42,24 +45,52 @@ public sealed class RuneStoneCraftService(
             return resolved;
 
         var source = sourceStack!.Value;
-        var destinationItemId = destinationStack!.Value.ItemId;
+        var destination = destinationStack!.Value;
+        var destinationItemId = destination.ItemId;
 
         var consumed = RuneStoneCraftResolver.ConsumeOneUnit(source);
-        var projectedContainer = consumed is { } remaining
-            ? state.Inventory.GetContainer((byte)sourcePage).SetItem((byte)sourceSlot, remaining)
-            : state.Inventory.GetContainer((byte)sourcePage).Remove((byte)sourceSlot);
+        var (enchant, combine, refine, socket) = ItemValueCodec.Decode(resolved.NewPackedStat);
+        var updatedDestination = destination with
+        {
+            Enchant = enchant, Combine = combine, Refine = refine, Socket = socket
+        };
 
-        await characters.ReplaceContainerAsync(characterId, (byte)sourcePage, ToTvps(projectedContainer),
-            cancellationToken);
+        var sourceContainer = state.Inventory.GetContainer((byte)sourcePage);
+        var projectedSource = consumed is { } remaining
+            ? sourceContainer.SetItem((byte)sourceSlot, remaining)
+            : sourceContainer.Remove((byte)sourceSlot);
+
+        ImmutableArray<InventoryContainerSnapshot> containers;
+        if (sourcePage == destinationPage)
+        {
+            projectedSource = projectedSource.SetItem((byte)destinationSlot, updatedDestination);
+            await characters.ReplaceContainerAsync(characterId, (byte)sourcePage, ToTvps(projectedSource),
+                cancellationToken);
+            containers = [new InventoryContainerSnapshot((byte)sourcePage, projectedSource)];
+        }
+        else
+        {
+            var projectedDestination = state.Inventory.GetContainer((byte)destinationPage)
+                .SetItem((byte)destinationSlot, updatedDestination);
+            await characters.ReplaceTwoContainersAsync(characterId, (byte)sourcePage, ToTvps(projectedSource),
+                (byte)destinationPage, ToTvps(projectedDestination), cancellationToken);
+            containers =
+            [
+                new InventoryContainerSnapshot((byte)sourcePage, projectedSource),
+                new InventoryContainerSnapshot((byte)destinationPage, projectedDestination)
+            ];
+        }
 
         LogCraftAttempt(characterId, source.ItemId, destinationItemId, destinationPackedStat, resolved);
 
-        var containers = ImmutableArray.Create(new InventoryContainerSnapshot((byte)sourcePage, projectedContainer));
         if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
-                cancellationToken))
+                cancellationToken, Timeout.InfiniteTimeSpan))
+        {
             logger.LogError(
-                "Zone {MapId} inventory inbox full: dropped rune-stone-craft source mirror for character {CharacterId}",
+                "Zone {MapId} inventory inbox full: dropped rune-stone-craft mirror for character {CharacterId}",
                 zone.MapId, characterId);
+            return RuneStoneCraftResult.Disconnect;
+        }
 
         return resolved;
     }

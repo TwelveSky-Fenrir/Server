@@ -1,4 +1,3 @@
-using System.Collections.Frozen;
 using Fenrir.Domain.Game.Stats.Context;
 
 namespace Fenrir.Domain.Game.Stats;
@@ -7,10 +6,9 @@ public static partial class StatCalculator
 {
     private const float AttackBoostMultiplier = 1.1f;
 
-    private static int ComputeAttackPower(int strength, int ki, LevelRowDto levelRow, int setNumber,
+    private static int ComputeAttackPower(int strength, int ki, LevelRowDto levelRow, int setNumber, byte avatarTribe,
         EquippedItemSlot?[] bySlot, CosmeticContext cosmetic = default, ZoneContext zone = default,
-        MountContext mount = default, ConsumableContext consumable = default,
-        FrozenDictionary<int, GemSocketRowDto>? gemSocketsByTypeAndValue = null)
+        MountContext mount = default, ConsumableContext consumable = default)
     {
         var weaponSlot = bySlot[7];
         var coefficients = ResolveWeaponAttackCoefficients(weaponSlot);
@@ -25,9 +23,6 @@ public static partial class StatCalculator
             if (i != 8)
                 atk += (int)(slot.Item.AttackPower *
                              SetBonusTables.GetCoefficients(setNumber, i, IsLegendary(slot.Item)).AttackPower);
-            if (gemSocketsByTypeAndValue is not null)
-                atk += SumGemSocketContribution(GemSocketStatKind.AttackPower, slot.SocketGem1, slot.SocketGem2,
-                    slot.SocketGem3, gemSocketsByTypeAndValue);
         }
 
         if (bySlot[1] is { } capeSlot && capeSlot.Item.Sort == 29)
@@ -44,7 +39,8 @@ public static partial class StatCalculator
             atk += PetAmuletAttackBonus(petAmulet.Item.ItemId, petAmulet.Item.Sort);
         }
 
-        atk += StrengthElixirAttackContributionWithOverride(consumable, zone);
+        atk += StrengthElixirAttackContributionWithOverride(consumable, zone, avatarTribe: avatarTribe,
+            eventTribe: consumable.EventTribe);
 
         atk = ApplyAttackBoostMultiplier(atk, consumable, zone);
 
@@ -53,6 +49,8 @@ public static partial class StatCalculator
         atk += SetBonusTables.GetBaseFlatAttackPowerBonus(setNumber);
 
         atk += MountFlatAttack(mount);
+
+        atk = ApplyZone38TribeEffect(atk, zone, 2, 5);
 
         atk += StellarCoreAttackPowerContribution(cosmetic);
 

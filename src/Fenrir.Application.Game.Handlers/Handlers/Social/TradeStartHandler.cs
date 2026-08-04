@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
 public sealed class TradeStartHandler(
-    ZoneRegistry zones,
     ITradeStartService tradeStartService,
     ILogger<TradeStartHandler> logger) : IInlinePacketHandler<TradeStartRequest>
 {
@@ -19,14 +18,17 @@ public sealed class TradeStartHandler(
 
         logger.LogDebug("TradeStart: session {SessionId} character {CharacterId}", session.SessionId, callerId);
 
+        if (zoneSession.CurrentZone is not Zone zone)
+            return;
+
         var result = tradeStartService.Start(callerId);
         if (!result.Handled)
             return;
 
         var trade = result.Trade!;
 
-        if (!zones.TryGetPlayer(trade.PlayerAId, out var playerA) ||
-            !zones.TryGetPlayer(trade.PlayerBId, out var playerB))
+        if (!zone.TryGetPlayer(trade.PlayerAId, out var playerA) || playerA is null || playerA.IsMovingZone ||
+            !zone.TryGetPlayer(trade.PlayerBId, out var playerB) || playerB is null || playerB.IsMovingZone)
         {
             tradeStartService.AbortStart(callerId);
             return;

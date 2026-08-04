@@ -6,8 +6,15 @@ public static class GameDate
 
     public static int Today()
     {
-        var now = DateTime.UtcNow;
-        return now.Year * 10000 + now.Month * 100 + now.Day;
+        return Today(TimeProvider.System);
+    }
+
+    public static int Today(TimeProvider timeProvider)
+    {
+        ArgumentNullException.ThrowIfNull(timeProvider);
+
+        var today = timeProvider.GetLocalNow();
+        return today.Year * 10000 + today.Month * 100 + today.Day;
     }
 
     public static bool TryAddDays(int compactDate, int days, out int result)

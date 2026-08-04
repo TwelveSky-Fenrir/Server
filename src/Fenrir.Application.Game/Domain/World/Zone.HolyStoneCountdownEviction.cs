@@ -19,9 +19,9 @@ public sealed partial class Zone
         return _holyStoneCountdownEvictionInbox.Writer.TryWrite(default);
     }
 
-    private void DrainHolyStoneCountdownEvictionCommands()
+    private void DrainHolyStoneCountdownEvictionCommands(int maximum)
     {
-        while (_holyStoneCountdownEvictionInbox.Reader.TryRead(out _))
+        for (var processed = 0; processed < maximum && _holyStoneCountdownEvictionInbox.Reader.TryRead(out _); processed++)
             try
             {
                 ApplyHolyStoneCountdownEviction();

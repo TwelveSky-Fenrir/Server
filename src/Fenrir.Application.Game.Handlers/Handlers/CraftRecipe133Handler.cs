@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -8,11 +9,9 @@ public sealed class CraftRecipe133Handler(ILogger<CraftRecipe133Handler> logger)
 {
     public void Handle(in CraftRecipe133Request packet, IPacketSession session)
     {
+        var zoneSession = (IZoneSession)session;
         logger.LogWarning(
-            "Session {SessionId}: CraftRecipe133Request received — op133 P_MAKE_ITEM133_SEND has no REGWORK1 line in " +
-            "legacy MyWork::Init (Server/ts25zone/S04_MyWork01.cpp:6-266); only P_MAKE_ITEM2_SEND op131 is " +
-            "registered (:138), so the legacy server logs Unknown Header and quits the session (:292-301); silently " +
-            "ignored",
-            session.SessionId);
+            "Session {SessionId}: rejected unregistered opcode {Opcode}", session.SessionId, 133);
+        zoneSession.Abort(DisconnectReason.Faulted);
     }
 }

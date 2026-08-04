@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using Fenrir.Generators.Analysis.Model;
@@ -9,6 +10,7 @@ namespace Fenrir.Generators.Protocol.Emitters;
 internal static class SessionStateGateEmitter
 {
     public const string HintName = "SessionStateGate.g.cs";
+    private const byte ZoneInWorldState = 3;
 
     public static string Emit(ImmutableArray<TypeModel> packets, string namespaceName)
     {
@@ -22,7 +24,8 @@ internal static class SessionStateGateEmitter
         };
 
         var entries = packets
-            .Where(p => p is { Direction: FenrirDirection.Incoming, AllowedStates.Length: > 0 })
+            .Where(p => p.Direction == FenrirDirection.Incoming &&
+                        (server == FenrirServer.Zone || p.AllowedStates.Length > 0))
             .OrderBy(p => p.Opcode)
             .ToImmutableArray();
 
@@ -32,21 +35,17 @@ internal static class SessionStateGateEmitter
         writer.Line();
         writer.Line($"namespace {namespaceName};");
         writer.Line();
-        writer.Line("/// <summary>");
-        writer.Line(
-            "/// An opcode with no declared [FenrirPacket(AllowedStates = [...])] is legal in any session state");
-        writer.Line("/// (e.g. handshake op 0): <c>Allows</c> then always returns <c>true</c> for that opcode.");
-        writer.Line("/// </summary>");
         writer.Line($"public static class {className}");
         writer.OpenBrace();
 
-        EmitAllows(writer, stateEnum, entries);
+        EmitAllows(writer, server, stateEnum, entries);
 
         writer.CloseBrace();
         return writer.ToString();
     }
 
-    private static void EmitAllows(IndentedWriter writer, string stateEnum, ImmutableArray<TypeModel> entries)
+    private static void EmitAllows(IndentedWriter writer, FenrirServer server, string stateEnum,
+        ImmutableArray<TypeModel> entries)
     {
         writer.Line($"public static bool Allows({stateEnum} state, byte opcode)");
         writer.OpenBrace();
@@ -55,11 +54,15 @@ internal static class SessionStateGateEmitter
 
         foreach (var packet in entries)
         {
-            var condition = string.Join(" || ", packet.AllowedStates.Select(s => $"state == ({stateEnum}){s}"));
+            IEnumerable<byte> allowedStates = server == FenrirServer.Zone &&
+                                             packet.AllowedStates.Contains(ZoneInWorldState)
+                ? [ZoneInWorldState]
+                : packet.AllowedStates;
+            var condition = string.Join(" || ", allowedStates.Select(s => $"state == ({stateEnum}){s}"));
             writer.Line($"{packet.Opcode} => {condition},");
         }
 
-        writer.Line("_ => true,");
+        writer.Line(server == FenrirServer.Zone ? "_ => false," : "_ => true,");
         writer.CloseBraceSemicolon();
         writer.CloseBrace();
     }

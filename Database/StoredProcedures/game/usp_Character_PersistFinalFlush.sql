@@ -13,9 +13,41 @@ BEGIN
                      (
                          CharacterId INT NOT NULL PRIMARY KEY
                      );
+    DECLARE @CharacterId INT;
+    DECLARE @FlushSequence BIGINT;
+    DECLARE @PersistedFlushSequence BIGINT;
+    DECLARE @WasApplied BIT = 0;
+    DECLARE @WasAlreadyApplied BIT = 0;
+
+    IF (SELECT COUNT_BIG(*) FROM @Progress) <> 1 OR (SELECT COUNT_BIG(*) FROM @Position) <> 1
+        THROW 50715, N'A final character flush requires exactly one progress and position snapshot.', 1;
+
+    SELECT @CharacterId = CharacterId,
+           @FlushSequence = FlushSequence
+    FROM @Progress;
+
+    IF @FlushSequence < 0
+        THROW 50716, N'A final character flush sequence cannot be negative.', 1;
+
+    IF NOT EXISTS (SELECT 1
+                   FROM @Position
+                   WHERE CharacterId = @CharacterId
+                     AND FlushSequence = @FlushSequence)
+        THROW 50717, N'A final character flush progress and position snapshots must have the same sequence.', 1;
 
     BEGIN TRANSACTION;
 
+    SELECT @PersistedFlushSequence = c.FlushSequence
+    FROM game.Characters AS c WITH (UPDLOCK, HOLDLOCK)
+    WHERE c.CharacterId = @CharacterId;
+
+    IF @PersistedFlushSequence IS NULL
+    BEGIN
+        ROLLBACK TRANSACTION;
+        THROW 50718, N'A final character flush requires an existing character.', 1;
+    END
+
+    IF @FlushSequence > @PersistedFlushSequence
     UPDATE c
     SET c.FlushSequence            = p.FlushSequence,
         c.Level                    = p.Level,
@@ -124,7 +156,13 @@ BEGIN
     FROM game.Characters AS c
              JOIN @Progress AS p ON p.CharacterId = c.CharacterId
              JOIN @Position AS q ON q.CharacterId = c.CharacterId
-    WHERE p.FlushSequence >= c.FlushSequence;
+    WHERE c.CharacterId = @CharacterId
+      AND p.FlushSequence > c.FlushSequence;
+
+    IF EXISTS (SELECT 1 FROM @Applied)
+        SET @WasApplied = 1;
+    ELSE IF @FlushSequence = @PersistedFlushSequence
+        SET @WasAlreadyApplied = 1;
 
     DELETE ci
     FROM game.CharacterCostumeSlots AS ci
@@ -176,4 +214,7 @@ BEGIN
              JOIN @Applied AS a ON a.CharacterId = sc.CharacterId;
 
     COMMIT TRANSACTION;
+
+    SELECT WasApplied = @WasApplied,
+           WasAlreadyApplied = @WasAlreadyApplied;
 END;

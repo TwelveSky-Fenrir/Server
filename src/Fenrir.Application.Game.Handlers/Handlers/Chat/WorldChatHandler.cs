@@ -27,6 +27,7 @@ public sealed class WorldChatHandler(IWorldChatService worldChatService) : IInli
         if (!zone.TryGetPlayer(characterId, out var sender) || sender is null)
             return;
 
-        worldChatService.TrySendChat(sender, content);
+        if (worldChatService.TrySendChat(sender, content) == WorldChatOutcome.LevelTooLow)
+            zoneSession.Abort(DisconnectReason.Faulted);
     }
 }

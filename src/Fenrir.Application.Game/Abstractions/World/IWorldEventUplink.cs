@@ -2,5 +2,6 @@ namespace Fenrir.Application.Game.Abstractions.World;
 
 public interface IWorldEventUplink
 {
-    public void Publish(int sort, ReadOnlySpan<byte> data);
+    public WorldEventUplinkResult Publish(int sort, ReadOnlySpan<byte> data,
+        WorldEventPublicationIdentity? identity = null);
 }

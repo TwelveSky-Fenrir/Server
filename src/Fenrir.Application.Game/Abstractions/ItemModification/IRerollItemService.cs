@@ -6,6 +6,9 @@ namespace Fenrir.Application.Game.Abstractions.ItemModification;
 public enum RerollItemOutcome
 {
     Rejected,
+
+    Disconnected,
+
     NoCandidate,
     Applied
 }

@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.ItemModification;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Forge;
 using Fenrir.Application.Game.Domain.Inventory;
@@ -127,35 +128,8 @@ public sealed class DowngradeItemRankService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex,
-                "Character {CharacterId} downgrade-item-rank AdjustMoney...ReplaceContainer(s)Async failed (treated as insufficient funds)",
-                characterId);
-            return new DowngradeItemRankResult(DowngradeItemRankOutcome.Rejected, false, 0, [0, 0, 0, 0, 0, 0]);
+            return AbortAfterUncertainPersistence(state, characterId, ex);
         }
-
-        zone.CreditNpcServiceTribeTax(state.Tribe, resolved.Cost);
-
-        if (resolved.ConsumesLuckyCharge)
-        {
-            var newHighItemValue = state.HighItemValue - 1;
-            state.Session.Send(new AvatarStatUpdateResponse
-                { Sort = LuckyUpgradeStatSort, Value = newHighItemValue, Value2 = 0 });
-
-            if (!await zone.PostTribeProgressCommandAndWaitAsync(
-                    new TribeProgressZoneCommand(characterId, HighItemValue: newHighItemValue), cancellationToken))
-                logger.LogError(
-                    "Zone {MapId} tribe-progress inbox full: dropped lucky-upgrade charge mirror for character {CharacterId}",
-                    zone.MapId, characterId);
-        }
-
-        if (!eventLogQueue.Enqueue(new EventLogEntryTvp(DowngradeItemRankEventCode, (byte)EventLogCategory.Enchant,
-                null, characterId, null, null, null, -(long)resolved.Cost, null, target.ItemId, target.Quantity,
-                succeeded ? SuccessOutcome : FailedOutcome,
-                $"Serial={target.Serial};Material={material.ItemId};ResultItemId={(succeeded ? resolved.ResultItemId : target.ItemId)}",
-                DateTime.UtcNow)))
-            logger.LogWarning(
-                "game.EventLog write-behind queue full: dropped downgrade-item-rank audit row for character {CharacterId}",
-                characterId);
 
         var value = succeeded
             ? new[]
@@ -172,17 +146,61 @@ public sealed class DowngradeItemRankService(
                 new InventoryContainerSnapshot((byte)page1, projectedTargetContainer),
                 new InventoryContainerSnapshot((byte)page2, projectedMaterialContainer));
 
-        if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
-                cancellationToken))
-            logger.LogError(
-                "Zone {MapId} inventory inbox full: dropped downgrade-item-rank mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
+        var inventoryResult = await zone.PostInventoryCommandAndWaitForResultAsync(
+            new InventoryZoneCommand(characterId, containers, null), cancellationToken);
+        if (inventoryResult.Kind != ZoneCommandResultKind.Applied)
+            return AbortAfterDurableMutation(state, characterId, "downgrade inventory", inventoryResult);
+
+        if (resolved.ConsumesLuckyCharge)
+        {
+            var newHighItemValue = state.HighItemValue - 1;
+            var tribeResult = await zone.PostTribeProgressCommandAndWaitForResultAsync(
+                new TribeProgressZoneCommand(characterId, HighItemValue: newHighItemValue), cancellationToken);
+            if (tribeResult.Kind != ZoneCommandResultKind.Applied)
+                return AbortAfterDurableMutation(state, characterId, "downgrade lucky-charge", tribeResult);
+
+            state.Session.Send(new AvatarStatUpdateResponse
+                { Sort = LuckyUpgradeStatSort, Value = newHighItemValue, Value2 = 0 });
+        }
+
+        zone.CreditNpcServiceTribeTax(state.Tribe, resolved.Cost);
+
+        if (!eventLogQueue.Enqueue(new EventLogEntryTvp(DowngradeItemRankEventCode, (byte)EventLogCategory.Enchant,
+                null, characterId, null, null, null, -(long)resolved.Cost, null, target.ItemId, target.Quantity,
+                succeeded ? SuccessOutcome : FailedOutcome,
+                $"Serial={target.Serial};Material={material.ItemId};ResultItemId={(succeeded ? resolved.ResultItemId : target.ItemId)}",
+                DateTime.UtcNow)))
+            logger.LogWarning(
+                "game.EventLog write-behind queue full: dropped downgrade-item-rank audit row for character {CharacterId}",
+                characterId);
 
         logger.LogInformation(
             "Character {CharacterId} downgrade-item-rank applied: target {TargetItemId} succeeded={Succeeded}, cost {Cost}",
             characterId, target.ItemId, succeeded, resolved.Cost);
 
         return new DowngradeItemRankResult(DowngradeItemRankOutcome.Applied, succeeded, resolved.Cost, value);
+    }
+
+    private DowngradeItemRankResult AbortAfterUncertainPersistence(PlayerRuntimeState state, int characterId,
+        Exception exception)
+    {
+        logger.LogError(exception,
+            "Character {CharacterId} downgrade-item-rank persistence failed after submission; durability is uncertain, disconnecting without success response",
+            characterId);
+        ((IZoneSession)state.Session).Abort(DisconnectReason.Faulted);
+        return new DowngradeItemRankResult(DowngradeItemRankOutcome.Disconnected, false, 0,
+            [0, 0, 0, 0, 0, 0]);
+    }
+
+    private DowngradeItemRankResult AbortAfterDurableMutation(PlayerRuntimeState state, int characterId,
+        string mutation, ZoneCommandResult result)
+    {
+        logger.LogError(
+            "Character {CharacterId} downgrade-item-rank persisted but {Mutation} actor mutation was not acknowledged as applied ({Kind}: {Cause}); disconnecting without success response",
+            characterId, mutation, result.Kind, result.Cause);
+        ((IZoneSession)state.Session).Abort(DisconnectReason.Faulted);
+        return new DowngradeItemRankResult(DowngradeItemRankOutcome.Disconnected, false, 0,
+            [0, 0, 0, 0, 0, 0]);
     }
 
     private static bool IsValidInventorySlot(int page, int index)

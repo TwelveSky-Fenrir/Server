@@ -39,8 +39,6 @@ public partial class PlayerRuntimeState
     public int Zone050Time2 { get; set; }
 
 
-    public int UserSort { get; set; }
-
     public int TimedBuffCountdownAccrualTicks { get; set; }
 
     public bool PaidZoneEvictionPending { get; set; }

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.Sessions;
+using Fenrir.Application.Game.Domain.Simulation;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.World;
@@ -40,13 +41,13 @@ public sealed partial class Zone
                 return;
             }
 
-            if (accountSessions is null || state.Session is not IZoneSession zoneSession ||
+            if (accountSessions is null || _sessionTickets is null || state.Session is not IZoneSession zoneSession ||
                 zoneSession.AccountId is not { } accountId ||
                 zoneSession.AccountSessionToken is not { } sessionToken)
             {
                 logger.LogWarning(
                     "Zone {MapId}: character {CharacterId} stuck mid-zone-transfer past {ThresholdSeconds}s, but the " +
-                    "broker cross-check is unavailable -- leaving it stuck rather than resuming unverified; will " +
+                    "broker cross-check or ticket revocation is unavailable -- leaving it stuck rather than resuming unverified; will " +
                     "retry on the next sweep", MapId, characterId, ZoneTransferStuckThreshold.TotalSeconds);
                 return;
             }
@@ -80,12 +81,30 @@ public sealed partial class Zone
                 return;
             }
 
-            if (!Post(ZoneCommand.ClearZoneTransferPending(characterId)))
-                logger.LogError(
-                    "Zone {MapId} inbox full: dropped ClearZoneTransferPending for character {CharacterId} while " +
-                    "auto-resolving a stuck zone transfer", MapId, characterId);
+            try
+            {
+                await _sessionTickets.RevokeAsync(accountId, CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex,
+                    "Zone {MapId}: failed to revoke the handoff ticket while resolving character {CharacterId}'s stuck zone transfer -- leaving it pending; will retry on the next sweep",
+                    MapId, characterId);
+                return;
+            }
 
-            zoneSession.ClearZoneTransferPending();
+            if (!state.IsMovingZone)
+                return;
+
+            if (_zoneRegistry is not null &&
+                _zoneRegistry.TryGetPlayerInOtherZone(characterId, this, out _, out var resumedZone))
+            {
+                logger.LogWarning(
+                    "Zone {MapId}: character {CharacterId}'s transfer completed on zone {LiveMapId} while its source timeout was resolving -- evicting the source copy instead of resuming it",
+                    MapId, characterId, resumedZone.MapId);
+                zoneSession.Abort(DisconnectReason.StateViolation);
+                return;
+            }
 
             if (characterShardLocations is not null)
                 try
@@ -99,13 +118,56 @@ public sealed partial class Zone
                 {
                     logger.LogWarning(ex,
                         "Zone {MapId}: failed to refresh the shard-location directory for character {CharacterId} " +
-                        "after auto-resuming its stuck zone transfer", MapId, characterId);
+                        "while auto-resolving its stuck zone transfer; leaving it pending for the next sweep", MapId,
+                        characterId);
+                    return;
                 }
 
-            if (!Post(ZoneCommand.RefreshZoneTransferRegistrationTimestamp(characterId)))
+            var clearCompletion =
+                new TaskCompletionSource<ZoneCommandResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            if (!Post(ZoneCommand.ClearZoneTransferPending(characterId, clearCompletion)))
+            {
                 logger.LogError(
-                    "Zone {MapId} inbox full: dropped RefreshZoneTransferRegistrationTimestamp for character " +
-                    "{CharacterId} while auto-resolving a stuck zone transfer", MapId, characterId);
+                    "Zone {MapId} inbox full: ClearZoneTransferPending for character {CharacterId} could not be " +
+                    "queued while auto-resolving a stuck zone transfer; leaving it pending for the next sweep",
+                    MapId, characterId);
+                return;
+            }
+
+            ZoneCommandResult clearResult;
+            try
+            {
+                clearResult = await clearCompletion.Task.WaitAsync(TimeSpan.FromSeconds(2), CancellationToken.None)
+                    .ConfigureAwait(false);
+            }
+            catch (TimeoutException ex)
+            {
+                logger.LogWarning(ex,
+                    "Zone {MapId} ClearZoneTransferPending for character {CharacterId} did not complete while " +
+                    "auto-resolving a stuck zone transfer; observing its unknown eventual result", MapId,
+                    characterId);
+                _ = CompleteStuckZoneTransferClearAsync(characterId, zoneSession, clearCompletion.Task);
+                return;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex,
+                    "Zone {MapId} ClearZoneTransferPending for character {CharacterId} faulted while " +
+                    "auto-resolving a stuck zone transfer; leaving it pending for the next sweep", MapId,
+                    characterId);
+                return;
+            }
+
+            if (clearResult.Kind != ZoneCommandResultKind.Applied)
+            {
+                logger.LogError(
+                    "Zone {MapId} ClearZoneTransferPending for character {CharacterId} completed as {ResultKind} " +
+                    "({Cause}) while auto-resolving a stuck zone transfer; leaving it pending for the next sweep",
+                    MapId, characterId, clearResult.Kind, clearResult.Cause);
+                return;
+            }
+
+            zoneSession.ClearZoneTransferPending();
 
             logger.LogInformation(
                 "Zone {MapId}: character {CharacterId} was stuck mid-zone-transfer past {ThresholdSeconds}s with no " +
@@ -121,6 +183,33 @@ public sealed partial class Zone
         finally
         {
             _stuckZoneTransferResolutionsInFlight.TryRemove(characterId, out _);
+        }
+    }
+
+    private async Task CompleteStuckZoneTransferClearAsync(int characterId, IZoneSession zoneSession,
+        Task<ZoneCommandResult> completion)
+    {
+        try
+        {
+            var result = await completion.ConfigureAwait(false);
+            if (result.Kind != ZoneCommandResultKind.Applied)
+            {
+                logger.LogError(
+                    "Zone {MapId} deferred ClearZoneTransferPending for character {CharacterId} completed as {ResultKind} ({Cause})",
+                    MapId, characterId, result.Kind, result.Cause);
+                return;
+            }
+
+            zoneSession.ClearZoneTransferPending();
+            logger.LogInformation(
+                "Zone {MapId}: deferred clear completed for stuck zone transfer character {CharacterId}", MapId,
+                characterId);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex,
+                "Zone {MapId} deferred ClearZoneTransferPending faulted for character {CharacterId}", MapId,
+                characterId);
         }
     }
 }

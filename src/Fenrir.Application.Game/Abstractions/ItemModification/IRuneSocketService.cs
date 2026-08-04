@@ -7,6 +7,9 @@ namespace Fenrir.Application.Game.Abstractions.ItemModification;
 public enum RuneSocketOutcome
 {
     Rejected,
+
+    Disconnected,
+
     InventoryFull,
     Applied
 }

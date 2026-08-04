@@ -22,7 +22,7 @@ public static partial class StatCalculator
     ]).ToFrozenSet();
 
     private static int ComputeMaxLife(int vitality, LevelRowDto levelRow, int setNumber, bool isLegendarySet,
-        byte previousTribe, EquippedItemSlot?[] bySlot, int petLife,
+        byte avatarTribe, byte previousTribe, EquippedItemSlot?[] bySlot, int petLife,
         ZoneContext zone = default, ConsumableContext consumable = default, MountContext mount = default,
         CosmeticContext cosmetic = default)
     {
@@ -31,7 +31,8 @@ public static partial class StatCalculator
 
         hp += OrnamentLifeContribution(zone, bySlot);
         hp += DecorationStatContribution(DecorationStatKind.MaxLife, bySlot);
-        hp += LifeElixirContributionWithOverride(consumable, zone);
+        hp += LifeElixirContributionWithOverride(consumable, zone, avatarTribe: avatarTribe,
+            eventTribe: consumable.EventTribe);
 
         hp = ApplyLifeBoostMultiplier(hp, consumable, zone);
 
@@ -67,7 +68,7 @@ public static partial class StatCalculator
 
         hp += MountFlatMaxLife(mount);
 
-        return ApplyFreeForAllMaxLife(hp, zone.ZoneNumber);
+        return hp;
     }
 
     private static int ApplyLifeBoostMultiplier(int hp, ConsumableContext consumable, ZoneContext zone)
@@ -138,15 +139,17 @@ public static partial class StatCalculator
     }
 
 
-    private static int ComputeMaxMana(int ki, LevelRowDto levelRow, int setNumber, EquippedItemSlot?[] bySlot,
-        int petMana, ZoneContext zone = default, ConsumableContext consumable = default, MountContext mount = default)
+    private static int ComputeMaxMana(int ki, LevelRowDto levelRow, int setNumber, byte avatarTribe,
+        EquippedItemSlot?[] bySlot, int petMana, ZoneContext zone = default, ConsumableContext consumable = default,
+        MountContext mount = default)
     {
         var mp = (int)(ki * 15.3100004196167f);
         mp += levelRow.Mana;
 
         mp += OrnamentManaContribution(zone, bySlot);
         mp += DecorationStatContribution(DecorationStatKind.MaxMana, bySlot);
-        mp += ManaElixirContributionWithOverride(consumable, zone);
+        mp += ManaElixirContributionWithOverride(consumable, zone, avatarTribe: avatarTribe,
+            eventTribe: consumable.EventTribe);
 
         mp = MountGradeMaxMana(mp, mount);
 
@@ -163,7 +166,7 @@ public static partial class StatCalculator
 
         mp += MountFlatMaxMana(mount);
 
-        return ApplyFreeForAllMaxMana(mp, zone.ZoneNumber);
+        return mp;
     }
 
     private static bool IsElixirEligibleZone(short zoneNumber)

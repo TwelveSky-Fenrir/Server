@@ -8,6 +8,9 @@ CREATE TABLE game.AccountVault
     BigMoney     INT          NOT NULL
         CONSTRAINT DF_AccountVault_BigMoney DEFAULT 0
         CONSTRAINT CK_AccountVault_BigMoney CHECK (BigMoney >= 0),
+    Revision     BIGINT       NOT NULL
+        CONSTRAINT DF_AccountVault_Revision DEFAULT 0
+        CONSTRAINT CK_AccountVault_Revision CHECK (Revision >= 0),
     UpdatedAtUtc DATETIME2(3) NOT NULL
         CONSTRAINT DF_AccountVault_UpdatedAtUtc DEFAULT SYSUTCDATETIME(),
     CONSTRAINT PK_AccountVault PRIMARY KEY CLUSTERED (AccountId),

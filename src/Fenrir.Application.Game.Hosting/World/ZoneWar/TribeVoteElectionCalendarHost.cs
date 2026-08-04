@@ -32,10 +32,10 @@ public sealed class TribeVoteElectionCalendarHost(
                 await election.OpenCandidacyWindowAsync(ct).ConfigureAwait(false);
                 break;
             case TribeVoteCalendarTransition.OpenVoting:
-                election.OpenVotingWindow();
+                await election.OpenVotingWindowAsync(ct).ConfigureAwait(false);
                 break;
             case TribeVoteCalendarTransition.CloseVoting:
-                election.CloseVotingWindow();
+                await election.CloseVotingWindowAsync(ct).ConfigureAwait(false);
                 break;
             case TribeVoteCalendarTransition.AnnounceResults:
                 await election.AnnounceResultsAsync(ct).ConfigureAwait(false);
@@ -58,6 +58,8 @@ public sealed class TribeVoteElectionCalendarHost(
                 options.Value.VoteTribeMapId, options.Value.VoteTribeEnabled);
             return;
         }
+
+        await election.LoadDurableSnapshotAsync(stoppingToken).ConfigureAwait(false);
 
         using var timer = new PeriodicTimer(SimulationClock.LegacyTick);
 

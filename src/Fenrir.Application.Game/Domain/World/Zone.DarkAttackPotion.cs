@@ -21,7 +21,6 @@ public sealed partial class Zone
 
         defenderState.IsUnderDarkAttackPotionDebuff = true;
         defenderState.DarkAttackDebuffActivatedAtUtc = DateTime.UtcNow;
-        defenderState.CanUseConsumables = false;
 
         BroadcastDarkAttackDebuffState(defenderState);
     }
@@ -32,7 +31,6 @@ public sealed partial class Zone
             return;
 
         state.IsUnderDarkAttackPotionDebuff = false;
-        state.CanUseConsumables = true;
 
         BroadcastDarkAttackDebuffState(state);
     }

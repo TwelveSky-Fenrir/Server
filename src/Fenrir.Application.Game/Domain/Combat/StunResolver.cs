@@ -20,14 +20,16 @@ public enum StunRejectReason
 
     AntiCheatEchoMismatch,
 
-    NoStunSuccessValue
+    NoStunSuccessValue,
+
+    OutOfRange
 }
 
 public readonly record struct StunAttemptOutcome(
     bool Rejected,
     StunRejectReason RejectReason,
     bool Success,
-    int ResolvedDurationSeconds,
+    int ResolvedDurationTicks,
     bool IsTeamStunSkill)
 {
     public static StunAttemptOutcome Reject(StunRejectReason reason)
@@ -102,6 +104,10 @@ public static class StunResolver
         if (!authorized)
             return StunAttemptOutcome.Reject(StunRejectReason.NotAuthorized);
 
+        if (!CombatMath.IsInRange(attacker.PosX, attacker.PosY, attacker.PosZ, defender.PosX, defender.PosY,
+                defender.PosZ, CombatResolver.MaxAttackDistance))
+            return StunAttemptOutcome.Reject(StunRejectReason.OutOfRange);
+
         if (request.AttackerVerifiesEchoedActionState &&
             (request.UsedSkillId != request.AttackerAnimatingSkillNumber ||
              request.UsedSkillGradePoints != request.AttackerAnimatingGradePoints))
@@ -135,12 +141,12 @@ public static class StunResolver
         if (!success)
             return StunAttemptOutcome.Fail(isTeamStunSkill);
 
-        var durationSeconds =
+        var durationTicks =
             (int)SkillCatalog.ReturnSkillValue(request.UsedSkill, request.UsedSkillGradePoints,
                 SkillValueKind.RunTime);
-        if (durationSeconds < 1)
+        if (durationTicks < 1)
             return StunAttemptOutcome.Fail(isTeamStunSkill);
 
-        return new StunAttemptOutcome(false, StunRejectReason.None, true, durationSeconds, isTeamStunSkill);
+        return new StunAttemptOutcome(false, StunRejectReason.None, true, durationTicks, isTeamStunSkill);
     }
 }

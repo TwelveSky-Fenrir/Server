@@ -19,6 +19,12 @@ public sealed class LoginServerOptionsValidator : IValidateOptions<LoginServerOp
                 $"Login:ShardReachabilityProbeTimeoutMilliseconds must be positive (was {options.ShardReachabilityProbeTimeoutMilliseconds}).");
         if (options.IdleSweepIntervalSeconds <= 0)
             errors.Add($"Login:IdleSweepIntervalSeconds must be positive (was {options.IdleSweepIntervalSeconds}).");
+        if (options.PreAuthenticationHandshakeTimeoutSeconds is < 1 or > 30)
+            errors.Add(
+                $"Login:PreAuthenticationHandshakeTimeoutSeconds must be between 1 and 30 (was {options.PreAuthenticationHandshakeTimeoutSeconds}).");
+        if (options.IdleSweepIntervalSeconds > options.PreAuthenticationHandshakeTimeoutSeconds)
+            errors.Add(
+                $"Login:IdleSweepIntervalSeconds must not exceed Login:PreAuthenticationHandshakeTimeoutSeconds (was {options.IdleSweepIntervalSeconds} and {options.PreAuthenticationHandshakeTimeoutSeconds}).");
         if (options.MaxConnectionsPerIp <= 0)
             errors.Add($"Login:MaxConnectionsPerIp must be positive (was {options.MaxConnectionsPerIp}).");
         if (options.MaxProtocolViolationsPerIpPerHour <= 0)

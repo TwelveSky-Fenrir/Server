@@ -36,7 +36,8 @@ public static class WarPointShopPolicy
     }
 
     public static BuyResolution ResolveBuy(WarPointShopCatalog catalog, int npcId, ItemDefinition itemDefinition,
-        int requestedQuantity, ItemStack? destinationSlot, int playerContributionPoints)
+        int requestedQuantity, ItemStack? destinationSlot, byte destinationX, byte destinationY,
+        int playerContributionPoints)
     {
         var item = itemDefinition.Item;
 
@@ -51,10 +52,10 @@ public static class WarPointShopPolicy
 
         if (ContainerMatrix.IsStackableSort(item.Sort))
         {
-            var quantity = requestedQuantity < 1 ? 1 : requestedQuantity;
-
-            if (quantity > GroundItemPickupPolicy.MaxStackQuantity)
+            if (requestedQuantity is < 1 or > GroundItemPickupPolicy.MaxStackQuantity)
                 return new BuyResolution(BuyOutcome.InvalidQuantity, 0, 0, null);
+
+            var quantity = requestedQuantity;
 
             if (destinationSlot is { } existing)
             {
@@ -65,19 +66,33 @@ public static class WarPointShopPolicy
                 if (merged > GroundItemPickupPolicy.MaxStackQuantity)
                     return new BuyResolution(BuyOutcome.DestinationConflict, 0, 0, null);
 
-                return Cost(price, quantity, playerContributionPoints, existing with { Quantity = merged });
+                return Cost(price, quantity, playerContributionPoints, existing with
+                {
+                    Quantity = merged,
+                    Enchant = 0,
+                    Combine = 0,
+                    Refine = 0,
+                    Socket = 0,
+                    Serial = 0,
+                    XPos = destinationX,
+                    YPos = destinationY
+                });
             }
 
             return Cost(price, quantity, playerContributionPoints,
-                new ItemStack(item.ItemId, quantity, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+                new ItemStack(item.ItemId, quantity, 0, 0, 0, 0, 0, 0, 0, 0, 0, destinationX, destinationY));
         }
 
         if (destinationSlot is not null)
             return new BuyResolution(BuyOutcome.DestinationConflict, 0, 0, null);
 
         var grantedStack = IsFixedStateStampItem(item.ItemId)
-            ? new ItemStack(item.ItemId, 1, FixedStateStampEnchant, FixedStateStampCombine, 0, 0, 0, 0, 0, 0, 0)
-            : new ItemStack(item.ItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+            ? new ItemStack(item.ItemId, 1, FixedStateStampEnchant, FixedStateStampCombine, 0, 0, 0, 0, 0, 0,
+                ItemSerialGenerator.Generate(ItemSerialGenerator.UnconditionalItemType, DateTimeOffset.UtcNow),
+                destinationX, destinationY)
+            : new ItemStack(item.ItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+                ItemSerialGenerator.Generate(ItemSerialGenerator.UnconditionalItemType, DateTimeOffset.UtcNow),
+                destinationX, destinationY);
 
         return Cost(price, requestedQuantity, playerContributionPoints, grantedStack);
     }

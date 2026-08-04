@@ -91,14 +91,12 @@ public static class SetBonusTables
 
     public static int CapeDefenseByCombine(byte combine)
     {
-        var clamped = Math.Min((int)combine, 12);
-        return CapeDefenseByCombineTable[clamped];
+        return combine < CapeDefenseByCombineTable.Length ? CapeDefenseByCombineTable[combine] : 0;
     }
 
     public static int WeaponIuSet3AttackPowerBonus(byte enchant)
     {
-        var clamped = Math.Min((int)enchant, 12);
-        return WeaponIuSet3Table[clamped];
+        return enchant < WeaponIuSet3Table.Length ? WeaponIuSet3Table[enchant] : 0;
     }
 
     public static int CapeIuBonus(EquippedItemSlot? capeSlot, int sort, float perUnit)

@@ -26,9 +26,9 @@ public sealed partial class Zone
         return _holyStoneBattleRankResetInbox.Writer.TryWrite(default);
     }
 
-    private void DrainHolyStoneBattleRankResetCommands()
+    private void DrainHolyStoneBattleRankResetCommands(int maximum)
     {
-        while (_holyStoneBattleRankResetInbox.Reader.TryRead(out _))
+        for (var processed = 0; processed < maximum && _holyStoneBattleRankResetInbox.Reader.TryRead(out _); processed++)
             try
             {
                 ApplyHolyStoneBattleRankReset();

@@ -45,6 +45,12 @@ public sealed class ZoneHandshakeHandler(
                     session.SessionId);
                 zoneSession.Abort(DisconnectReason.Malformed);
                 return;
+            case ZoneHandshakeOutcome.TargetMapMismatch:
+                logger?.LogWarning(
+                    "Zone handshake aborted for session {SessionId}: ticket target map does not match listener map {ListenerMapId}",
+                    session.SessionId, zoneSession.ListenerMapId);
+                zoneSession.Abort(DisconnectReason.Faulted);
+                return;
         }
 
         zoneSession.MarkTicketConsumed(result.AccountId, result.CharacterId, result.SessionToken,

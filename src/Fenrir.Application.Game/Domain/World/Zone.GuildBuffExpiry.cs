@@ -21,9 +21,9 @@ public sealed partial class Zone
         return _guildBuffExpiryInbox.Writer.TryWrite(command);
     }
 
-    private void DrainGuildBuffExpiryCommands()
+    private void DrainGuildBuffExpiryCommands(int maximum)
     {
-        while (_guildBuffExpiryInbox.Reader.TryRead(out var command))
+        for (var processed = 0; processed < maximum && _guildBuffExpiryInbox.Reader.TryRead(out var command); processed++)
             try
             {
                 ApplyGuildBuffExpiryCommand(in command);

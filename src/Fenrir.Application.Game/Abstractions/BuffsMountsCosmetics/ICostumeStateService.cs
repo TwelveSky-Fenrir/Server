@@ -21,4 +21,5 @@ public readonly record struct CostumeStateResult(
     int Page = -1,
     int PosX = -1,
     int PosY = -1,
-    int ItemIndex = -1);
+    int ItemIndex = -1,
+    int CostumeDate = 0);

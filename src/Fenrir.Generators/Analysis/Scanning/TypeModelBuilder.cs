@@ -27,6 +27,32 @@ internal static class TypeModelBuilder
         var compressed = attribute.GetNamedBool("Compressed", false);
         var expectedSize = attribute.GetNamedInt32("ExpectedSize", -1);
         var allowedStates = attribute.GetNamedByteArray("AllowedStates", out var unreadableAllowedState);
+        var implementsIncoming = ImplementsIncomingPacket(typeSymbol);
+        var implementsAnyIncoming = typeSymbol.AllInterfaces.Any(i =>
+            SymbolNameHelpers.IsClosedGenericOf(i, WellKnownNames.IIncomingPacket));
+        var implementsOutgoing = typeSymbol.AllInterfaces.Any(i =>
+            SymbolNameHelpers.Is(i, WellKnownNames.IOutgoingPacket));
+        var hasDirectionInterfaceMismatch = direction switch
+        {
+            FenrirDirection.Incoming => !implementsIncoming || implementsOutgoing,
+            FenrirDirection.Outgoing => !implementsOutgoing || implementsAnyIncoming,
+            _ => true
+        };
+
+        if (hasDirectionInterfaceMismatch)
+            diagnostics.Add(DiagnosticInfo.Create(
+                FenrirDiagnostics.PacketDirectionInterfaceMismatch,
+                typeSymbol.Locations.FirstOrDefault(),
+                typeSymbol.Name,
+                direction));
+
+        var incomingTransform = direction == FenrirDirection.Incoming && (compressed || obfuscation != WireObfuscationMode.None);
+        if (incomingTransform)
+            diagnostics.Add(DiagnosticInfo.Create(
+                FenrirDiagnostics.IncomingPacketTransform,
+                typeSymbol.Locations.FirstOrDefault(),
+                typeSymbol.Name,
+                DescribeIncomingTransforms(compressed, obfuscation)));
 
         if (unreadableAllowedState)
             diagnostics.Add(DiagnosticInfo.Create(
@@ -58,13 +84,9 @@ internal static class TypeModelBuilder
                 expectedSize,
                 computedTotal));
 
-        if (fieldDiagnostics.Count > 0 || (expectedSize != -1 && expectedSize != computedTotal))
+        if (hasDirectionInterfaceMismatch || incomingTransform || fieldDiagnostics.Count > 0 ||
+            (expectedSize != -1 && expectedSize != computedTotal))
             return new GeneratedTypeResult { Model = null, Diagnostics = diagnostics.ToImmutable() };
-
-        var implementsIncoming =
-            typeSymbol.AllInterfaces.Any(i => SymbolNameHelpers.IsClosedGenericOf(i, WellKnownNames.IIncomingPacket));
-        var implementsOutgoing =
-            typeSymbol.AllInterfaces.Any(i => SymbolNameHelpers.Is(i, WellKnownNames.IOutgoingPacket));
 
         var model = new TypeModel
         {
@@ -87,6 +109,22 @@ internal static class TypeModelBuilder
         };
 
         return new GeneratedTypeResult { Model = model, Diagnostics = diagnostics.ToImmutable() };
+    }
+
+    private static bool ImplementsIncomingPacket(INamedTypeSymbol typeSymbol)
+    {
+        return typeSymbol.AllInterfaces.Any(i =>
+            SymbolNameHelpers.IsClosedGenericOf(i, WellKnownNames.IIncomingPacket) &&
+            i.TypeArguments.Length == 1 &&
+            SymbolEqualityComparer.Default.Equals(i.TypeArguments[0], typeSymbol));
+    }
+
+    private static string DescribeIncomingTransforms(bool compressed, WireObfuscationMode obfuscation)
+    {
+        if (compressed && obfuscation != WireObfuscationMode.None)
+            return $"Compressed = true and Obfuscation = {obfuscation}";
+
+        return compressed ? "Compressed = true" : $"Obfuscation = {obfuscation}";
     }
 
     public static GeneratedTypeResult BuildWireType(GeneratorAttributeSyntaxContext context)

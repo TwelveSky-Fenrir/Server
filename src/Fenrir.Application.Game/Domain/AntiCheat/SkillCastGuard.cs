@@ -51,14 +51,7 @@ public static class SkillCastGuard
         if (context.ClaimedSkillNumber == 0)
             return SkillCastVerdict.Passed;
 
-        var isAutoLearnedBranch = context.SkillCategoryCode == SkillEffectCategoryCode && context.IsAutoState;
-
-        if (isAutoLearnedBranch)
-        {
-            if (!HasMatchingLearnedSkill(context.LearnedSkills, context.ClaimedSkillNumber))
-                return new SkillCastVerdict(SkillCastOffense.LearnedSkillMissing, SkillCastEnforcement.Disconnect);
-        }
-        else if (!HasMatchingActiveHotkey(context.Hotkeys, context.ClaimedSkillNumber, context.ClaimedInvestedGrade))
+        if (!HasMatchingActiveHotkey(context.Hotkeys, context.ClaimedSkillNumber, context.ClaimedInvestedGrade))
         {
             return new SkillCastVerdict(SkillCastOffense.HotkeyMismatch, SkillCastEnforcement.Disconnect);
         }
@@ -70,6 +63,11 @@ public static class SkillCastGuard
                 : SkillCastEnforcement.SilentDrop;
             return new SkillCastVerdict(SkillCastOffense.BonusGradeMismatch, enforcement);
         }
+
+        if (context.IsRealSkillCast &&
+            (context.ClaimedInvestedGrade > context.ServerMaxGrade ||
+             context.ClaimedBonusGrade > context.ServerBonusGrade))
+            return new SkillCastVerdict(SkillCastOffense.SkillHack1, SkillCastEnforcement.Disconnect);
 
         return SkillCastVerdict.Passed;
     }
@@ -101,20 +99,10 @@ public static class SkillCastGuard
         return false;
     }
 
-    private static bool HasMatchingLearnedSkill(ImmutableDictionary<byte, LearnedSkill> learnedSkills,
-        int claimedSkillNumber)
-    {
-        foreach (var entry in learnedSkills)
-            if (entry.Value.SkillId == claimedSkillNumber)
-                return true;
-
-        return false;
-    }
 }
 
 public readonly record struct SkillCastGuardContext(
     int SkillCategoryCode,
-    bool IsAutoState,
     int ClaimedSkillNumber,
     int ClaimedInvestedGrade,
     int ClaimedBonusGrade,

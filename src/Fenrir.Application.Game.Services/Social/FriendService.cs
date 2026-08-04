@@ -30,6 +30,7 @@ public sealed class FriendService(
     : IFriendService
 {
     private const int MaxFriends = 10;
+    private const byte CrossShardUnavailableReason = 5;
 
     public async ValueTask<FriendAskResultKind> AskAsync(Zone zone, PlayerRuntimeState asker, string targetAvatarName,
         CancellationToken cancellationToken)
@@ -129,11 +130,39 @@ public sealed class FriendService(
     {
         if (friends.TryConsumeCrossShardInbound(targetId, out var inbound))
         {
+            if (IsCrossShard(inbound.SourceShardId))
+            {
+                friends.ClearAcceptedSelf(targetId);
+
+                var crossShardTargetName = zones.TryGetPlayer(targetId, out var crossShardTargetState)
+                    ? crossShardTargetState.Name
+                    : "";
+
+                crossShardRelay.Enqueue(new SocialCrossShardRelayEntry(
+                    SocialCrossShardRelayKind.Friend,
+                    SocialCrossShardRelayMessageType.Answer,
+                    false,
+                    CrossShardUnavailableReason,
+                    options.Value.ShardId,
+                    targetId,
+                    crossShardTargetName,
+                    inbound.SourceShardId,
+                    inbound.SourceCharacterId,
+                    inbound.RelayId));
+
+                logger.LogInformation(
+                    "Cross-shard friend answer declined: character {TargetId} answered {AnswerCode} to asker {AskerId} on shard {AskerShardId}; pending state cleared without a local acceptance",
+                    targetId, answerCode, inbound.SourceCharacterId, inbound.SourceShardId);
+                return;
+            }
+
             var accepted = answerCode == 0;
             if (accepted)
                 friends.MarkAccepted(targetId, inbound.SourceCharacterId);
 
-            var targetName = zones.TryGetPlayer(targetId, out var targetState) ? targetState.Name : "";
+            var sameShardTargetName = zones.TryGetPlayer(targetId, out var sameShardTargetState)
+                ? sameShardTargetState.Name
+                : "";
 
             crossShardRelay.Enqueue(new SocialCrossShardRelayEntry(
                 SocialCrossShardRelayKind.Friend,
@@ -142,7 +171,7 @@ public sealed class FriendService(
                 null,
                 options.Value.ShardId,
                 targetId,
-                targetName,
+                sameShardTargetName,
                 inbound.SourceShardId,
                 inbound.SourceCharacterId,
                 inbound.RelayId));
@@ -354,6 +383,14 @@ public sealed class FriendService(
             return FriendAskResultKind.TribeMismatch;
         }
 
+        if (IsCrossShard(remote.ShardId))
+        {
+            logger.LogInformation(
+                "Cross-shard friend ask declined: character {AskerId} targeted character {TargetCharacterId} on shard {TargetShardId}; a durable bilateral friendship transaction is unavailable",
+                asker.CharacterId, remote.CharacterId, remote.ShardId);
+            return FriendAskResultKind.TargetBusy;
+        }
+
         var outcome = friends.TryAskCrossShard(asker.CharacterId,
             new CrossShardOutboundAsk(remote.ShardId, remote.CharacterId, remote.AvatarName));
 
@@ -380,6 +417,11 @@ public sealed class FriendService(
             "Friend ask published cross-shard: character {AskerId} ({AskerName}) -> character {TargetCharacterId} on shard {TargetShardId}",
             asker.CharacterId, asker.Name, remote.CharacterId, remote.ShardId);
         return FriendAskResultKind.SentCrossShard;
+    }
+
+    private bool IsCrossShard(byte shardId)
+    {
+        return shardId != options.Value.ShardId;
     }
 
     private static PlayerRuntimeState? FindPlayerByName(Zone zone, string avatarName)

@@ -23,9 +23,29 @@ public sealed class FishingCatchService(
         var castAt = DateTime.UtcNow;
         var step = state.FishingStep;
 
-        if (step == 4 && state.FishingBiteWasHit)
+        if ((await zone.PostFishingCommandAndWaitForResultAsync(
+                new FishingZoneCommand(characterId, state.FishingState, step, state.CatchingFish, false, null,
+                    castAt, BiteWasHit: state.FishingBiteWasHit), cancellationToken)).Kind != ZoneCommandResultKind.Applied)
+        {
+            logger.LogError("Zone {MapId} did not acknowledge fishing-catch state for character {CharacterId}",
+                zone.MapId, characterId);
+            session.Abort(DisconnectReason.Faulted);
+            return;
+        }
+
+        if (step == 4)
         {
             var itemId = FishingRewardResolver.RollRewardItem(SystemRandomSource.Instance);
+            if (!worldData.ItemsById.TryGetValue(itemId, out var itemDefinition))
+            {
+                logger.LogError("Fishing reward {ItemId} is not defined", itemId);
+
+                if (!await ResetFishingAsync(zone, characterId, castAt, cancellationToken))
+                    session.Abort(DisconnectReason.Faulted);
+
+                return;
+            }
+
             var freeSlot = InventoryFreeSlotFinder.Find(state.Inventory, worldData, itemId, state.InventoryDate,
                 GameDate.Today());
 
@@ -35,19 +55,22 @@ public sealed class FishingCatchService(
                     "Fishing catch denied for character {CharacterId}: inventory full (item {ItemId})",
                     characterId, itemId);
 
+                if (!await ResetFishingAsync(zone, characterId, castAt, cancellationToken))
+                {
+                    logger.LogError("Zone {MapId} did not acknowledge fishing-catch reset for character {CharacterId}",
+                        zone.MapId, characterId);
+                    session.Abort(DisconnectReason.Faulted);
+                    return;
+                }
+
                 session.Send(new FishingCatchResponse
                     { Result = 2, ItemIndex = itemId, Page = -1, Index = -1, XY = -1 });
-
-                if (!await zone.PostFishingCommandAndWaitAsync(
-                        new FishingZoneCommand(characterId, 0, 0, false, false, null, castAt),
-                        cancellationToken))
-                    logger.LogError(
-                        "Zone {MapId} fishing inbox full: dropped catch-abort mirror for character {CharacterId}",
-                        zone.MapId, characterId);
                 return;
             }
 
-            var newStack = new ItemStack(itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, destination.X, destination.Y);
+            var rewardQuantity = FishingRewardResolver.NormalizeRewardQuantity(itemDefinition.Item.Sort);
+            var newStack = new ItemStack(itemId, rewardQuantity, 0, 0, 0, 0, 0, 0, 0, 0, 0, destination.X,
+                destination.Y);
             var projectedContainer =
                 state.Inventory.GetContainer(destination.Container).SetItem(destination.Slot, newStack);
 
@@ -61,15 +84,27 @@ public sealed class FishingCatchService(
                 logger.LogWarning(ex,
                     "Character {CharacterId} fishing-catch ReplaceContainerAsync failed (treated as inventory full)",
                     characterId);
+                if (!await ResetFishingAsync(zone, characterId, castAt, cancellationToken))
+                {
+                    logger.LogError("Zone {MapId} did not acknowledge fishing-catch reset for character {CharacterId}",
+                        zone.MapId, characterId);
+                    session.Abort(DisconnectReason.Faulted);
+                    return;
+                }
+
                 session.Send(new FishingCatchResponse
                     { Result = 2, ItemIndex = itemId, Page = -1, Index = -1, XY = -1 });
+                return;
+            }
 
-                if (!await zone.PostFishingCommandAndWaitAsync(
-                        new FishingZoneCommand(characterId, 0, 0, false, false, null, castAt),
-                        cancellationToken))
-                    logger.LogError(
-                        "Zone {MapId} fishing inbox full: dropped catch-abort mirror for character {CharacterId}",
-                        zone.MapId, characterId);
+            var containers =
+                ImmutableArray.Create(new InventoryContainerSnapshot(destination.Container, projectedContainer));
+            if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
+                    cancellationToken))
+            {
+                logger.LogError("Zone {MapId} did not acknowledge fishing-catch inventory for character {CharacterId}",
+                    zone.MapId, characterId);
+                session.Abort(DisconnectReason.Faulted);
                 return;
             }
 
@@ -78,18 +113,6 @@ public sealed class FishingCatchService(
                 Result = 1, ItemIndex = itemId, Page = destination.Container, Index = destination.Slot,
                 XY = destination.GridIndex
             });
-
-            logger.LogInformation(
-                "Character {CharacterId} caught fish reward item {ItemId} into container {Container} slot {Slot}",
-                characterId, itemId, destination.Container, destination.Slot);
-
-            var containers =
-                ImmutableArray.Create(new InventoryContainerSnapshot(destination.Container, projectedContainer));
-            if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
-                    cancellationToken))
-                logger.LogError(
-                    "Zone {MapId} inventory inbox full: dropped fishing-catch mirror for character {CharacterId}",
-                    zone.MapId, characterId);
         }
 
         session.Send(new FishingProgressResponse
@@ -100,10 +123,10 @@ public sealed class FishingCatchService(
 
         int? actionSort = step switch { 4 => 94, 5 => 95, _ => null };
 
-        if (!await zone.PostFishingCommandAndWaitAsync(
-                new FishingZoneCommand(characterId, state.FishingState, 0, false, true, actionSort,
-                    castAt), cancellationToken))
-            logger.LogError("Zone {MapId} fishing inbox full: dropped catch mirror for character {CharacterId}",
+        if ((await zone.PostFishingCommandAndWaitForResultAsync(
+                new FishingZoneCommand(characterId, 0, 0, false, true, actionSort, ApplyState: false),
+                cancellationToken)).Kind != ZoneCommandResultKind.Applied)
+            logger.LogError("Zone {MapId} did not acknowledge fishing-catch action for character {CharacterId}",
                 zone.MapId, characterId);
     }
 
@@ -113,5 +136,13 @@ public sealed class FishingCatchService(
         foreach (var (slot, stack) in container)
             list.Add(stack.ToTvp(slot));
         return list;
+    }
+
+    private static async ValueTask<bool> ResetFishingAsync(Zone zone, int characterId, DateTime castAt,
+        CancellationToken cancellationToken)
+    {
+        return (await zone.PostFishingCommandAndWaitForResultAsync(
+            new FishingZoneCommand(characterId, 0, 0, false, false, null, castAt), cancellationToken)).Kind ==
+               ZoneCommandResultKind.Applied;
     }
 }

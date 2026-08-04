@@ -7,5 +7,6 @@ public sealed partial record TowerStateRowDto(
     byte TowerIndex,
     byte Level,
     byte TowerType,
+    short AttackState,
     byte? ControllingTribeId,
     DateTime? CapturedAtUtc);

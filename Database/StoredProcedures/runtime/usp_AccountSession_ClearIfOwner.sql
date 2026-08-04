@@ -11,6 +11,7 @@ BEGIN
     FROM runtime.AccountSessions
     WHERE AccountId = @AccountId
       AND ServerKind = @ServerKind
-      AND (@ShardId IS NULL OR ShardId = @ShardId)
-      AND SessionToken = @SessionToken;
+      AND SessionToken = @SessionToken
+      AND ((@ServerKind = 0 AND @ShardId IS NULL AND ShardId IS NULL)
+        OR (@ServerKind = 1 AND ShardId = @ShardId));
 END;

@@ -16,6 +16,10 @@ public sealed class ZoneGeometry(WorldTriangle[] triangles, QuadtreeNode[] quadt
         bool firstHitOnly = true)
     {
         y = 0f;
+        if (!float.IsFinite(x) || !float.IsFinite(z) ||
+            (ceiling is { } ceilingValue && !float.IsFinite(ceilingValue)))
+            return false;
+
         if (quadtree.Length == 0 || !TryDescend(x, z, out var nodeIndex))
             return false;
 
@@ -29,6 +33,9 @@ public sealed class ZoneGeometry(WorldTriangle[] triangles, QuadtreeNode[] quadt
                 continue;
 
             if (!TryGetHeightFromPlane(triangle, x, z, out var candidateY))
+                continue;
+
+            if (!float.IsFinite(candidateY))
                 continue;
 
             if (candidateY > ceilingY)

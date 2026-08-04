@@ -1,11 +1,12 @@
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Core.Packets.Shared;
 
 namespace Fenrir.Application.Game.Abstractions.Chat;
 
 public interface IWhisperService
 {
     public ValueTask<WhisperResolution> ResolveAsync(PlayerRuntimeState sender, string targetAvatarName,
-        string content, int senderAuthType, CancellationToken cancellationToken);
+        string content, ItemLinkInfo link, int senderAuthType, CancellationToken cancellationToken);
 }
 
 public enum WhisperOutcome

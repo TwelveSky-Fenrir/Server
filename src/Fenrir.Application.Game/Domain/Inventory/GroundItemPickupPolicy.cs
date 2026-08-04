@@ -26,7 +26,10 @@ public static class GroundItemPickupPolicy
         var sort = itemDefinition.Item.Sort;
 
         if (sort == 1)
-            return new Result(Outcome.Money, null, groundItem.Quantity);
+            return groundItem.Quantity is >= ItemQuantityPolicy.MinStackQuantity and <=
+                (int)InventoryToWorldDropPolicy.MaxNumberSentinel
+                ? new Result(Outcome.Money, null, groundItem.Quantity)
+                : new Result(Outcome.Rejected, null, 0);
 
         var (enchant, combine, refine, socket) = ItemValueCodec.Decode(groundItem.Value);
 
@@ -38,7 +41,8 @@ public static class GroundItemPickupPolicy
 
             if (destinationSlot is { } existingStack)
             {
-                if (existingStack.ItemId != groundItem.ItemId)
+                if (existingStack.ItemId != groundItem.ItemId ||
+                    existingStack.Quantity is < ItemQuantityPolicy.MinStackQuantity or > MaxStackQuantity)
                     return new Result(Outcome.Rejected, null, 0);
 
                 var merged = existingStack.Quantity + groundItem.Quantity;
@@ -52,15 +56,26 @@ public static class GroundItemPickupPolicy
                     requestedY), 0);
         }
 
-        var placedQuantity = ItemQuantityPolicy.IsPetSort(sort)
-            ? ItemQuantityPolicy.Normalize(sort, groundItem.Quantity)
-            : 1;
+        var placedQuantity = ResolveNonStackableQuantity(sort, groundItem.Quantity);
+        if (placedQuantity is null)
+            return new Result(Outcome.Rejected, null, 0);
 
         return destinationSlot is not null
             ? new Result(Outcome.Rejected, null, 0)
             : new Result(Outcome.Placed,
-                BuildStack(groundItem, placedQuantity, enchant, combine, refine, socket, requestedX,
+                BuildStack(groundItem, placedQuantity.Value, enchant, combine, refine, socket, requestedX,
                     requestedY), 0);
+    }
+
+    private static int? ResolveNonStackableQuantity(byte itemSort, int quantity)
+    {
+        return itemSort switch
+        {
+            ItemQuantityPolicy.PetSort when quantity is >= ItemQuantityPolicy.MinStackQuantity and <=
+                ItemQuantityPolicy.MaxPetActivity => quantity,
+            _ when quantity == 1 => 1,
+            _ => null
+        };
     }
 
     private static ItemStack BuildStack(GroundItemEntity groundItem, int quantity, byte enchant, byte combine,

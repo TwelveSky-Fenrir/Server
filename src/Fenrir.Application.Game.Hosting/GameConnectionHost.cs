@@ -30,17 +30,29 @@ public sealed class GameConnectionHost(
     IEventLogRepository eventLog,
     IpFloodGuard ipFloodGuard,
     TribeQuotaRegistry tribeQuota,
+    GameConnectionReadiness readiness,
     ILogger<GameConnectionHost> logger) : BackgroundService
 {
     private const short LogoutEventCode = 4;
 
+    private const int GreetingRandomModulus = 1001;
+
     private const int SocketAdmissionHeadroomFactor = 2;
 
+    private const int MaxProcessPendingOutboundFrames = 65_536;
+
+    private const int MaxProcessPendingOutboundBytes = 64 * 1024 * 1024;
+
     private readonly SocketAdmissionGate _admissionGate = new(ResolveMaxConcurrentSockets(options.Value));
+
+    private readonly OutboundBufferAdmissionGate _outboundAdmissionGate = new(MaxProcessPendingOutboundFrames,
+        MaxProcessPendingOutboundBytes);
 
     private readonly SemaphoreSlim _disconnectSqlGate = new(1, 1);
 
     private readonly ConcurrentDictionary<Task, byte> _inFlightConnections = new();
+
+    private readonly ConcurrentDictionary<Task, byte> _deferredLeaveFinalizations = new();
 
     private readonly List<(short MapId, int Port, TcpServer<ZoneClientSession> Server)> _servers = [];
 
@@ -60,7 +72,8 @@ public sealed class GameConnectionHost(
                 _servers.Add((mapId, port, new TcpServer<ZoneClientSession>(
                     new IPEndPoint(IPAddress.Any, port),
                     (sessionId, transport, remoteEndPoint) =>
-                        new ZoneClientSession(sessionId, transport, remoteEndPoint, logger),
+                        new ZoneClientSession(sessionId, transport, mapId, remoteEndPoint, logger,
+                            _outboundAdmissionGate),
                     dispatcher,
                     opcodeRegistry,
                     rateLimiter,
@@ -87,17 +100,23 @@ public sealed class GameConnectionHost(
         logger.LogInformation(
             "GameServer zone listeners: {ArmedCount} armed / {HostedCount} hosted, on ZoneBasePort {BasePort} + " +
             "mapId (shard {ShardId}); a client entering map N connects to {BasePort}+N. Maps [{Maps}]. " +
-            "Socket admission is capped shard-wide at {MaxConcurrentSockets} concurrent socket(s) " +
-            "(Game:Capacity {Capacity} x {HeadroomFactor}), shared by every listener above",
+            "Socket admission is capped GameServer-process-wide at {MaxConcurrentSockets} concurrent socket(s) " +
+            "(Game:Capacity {Capacity} x {HeadroomFactor}), shared by every listener above. Pending outbound " +
+            "frames and bytes are also capped process-wide at {MaxPendingFrames} frames and {MaxPendingBytes} bytes",
             armedCount, hostedMaps.Length, opts.ZoneBasePort, opts.ShardId, opts.ZoneBasePort,
             string.Join(", ", hostedMaps), _admissionGate.MaxConcurrentSockets, opts.Capacity,
-            SocketAdmissionHeadroomFactor);
+            SocketAdmissionHeadroomFactor, _outboundAdmissionGate.MaxPendingFrames,
+            _outboundAdmissionGate.MaxPendingBytes);
 
         if (failedBinds.Count > 0)
         {
             ReleaseArmedListeners();
-            throw BuildIncompleteBindFailure(opts.ShardId, armedCount, hostedMaps.Length, failedBinds);
+            var failure = BuildIncompleteBindFailure(opts.ShardId, armedCount, hostedMaps.Length, failedBinds);
+            readiness.MarkFailed(failure);
+            throw failure;
         }
+
+        readiness.MarkReady();
 
         var acceptLoops = new List<Task>(_servers.Count);
         foreach (var entry in _servers)
@@ -156,7 +175,7 @@ public sealed class GameConnectionHost(
     {
         await base.StopAsync(cancellationToken).ConfigureAwait(false);
 
-        var outstanding = _inFlightConnections.Keys.ToArray();
+        var outstanding = _inFlightConnections.Keys.Concat(_deferredLeaveFinalizations.Keys).ToArray();
         if (outstanding.Length == 0)
             return;
 
@@ -167,7 +186,7 @@ public sealed class GameConnectionHost(
         catch (OperationCanceledException)
         {
             logger.LogWarning(
-                "GameServer shutdown proceeding with zone connection teardown still in flight (of {Count} originally outstanding)",
+                "GameServer shutdown proceeding with zone connection or deferred leave cleanup still in flight (of {Count} originally outstanding)",
                 outstanding.Length);
         }
         catch (Exception ex)
@@ -226,29 +245,37 @@ public sealed class GameConnectionHost(
             if (remoteIp is not null)
                 ipFloodGuard.ReleaseConnection(remoteIp);
 
+            var completedHandoff = zoneSession.IsZoneTransferPending &&
+                zoneSession.IsZoneTransferHandoffCommitted;
+
             if (zoneSession is { CharacterId: { } characterId, CurrentZone: Zone zone })
             {
-                var departingState =
-                    await zone.PostLeaveCommandAndWaitAsync(characterId, CancellationToken.None).ConfigureAwait(false);
-                var wasMovingZone = departingState is not null && departingState.IsMovingZone;
+                var leave =
+                    await zone.PostLeaveCommandAndWaitAsync(characterId, zoneSession.SessionId,
+                            CancellationToken.None)
+                        .ConfigureAwait(false);
 
-                if (departingState is not null)
-                    await FlushFinalCharacterStateAsync(departingState).ConfigureAwait(false);
+                var finalization = leave.PendingResult is { } pendingLeave
+                    ? FinalizeDeferredLeaveAsync(pendingLeave, zoneSession, characterId, zone.MapId, completedHandoff)
+                    : FinalizeLeaveAndReleaseSessionAsync(leave.Result, zoneSession, characterId, zone.MapId,
+                        completedHandoff);
 
-                writeBehindFlusher.RequestImmediateFlush();
-
-                if (!wasMovingZone)
-                    await LogLogoutAsync(zoneSession.AccountId, characterId, zone.MapId).ConfigureAwait(false);
-
-                logger.LogInformation(
-                    "Zone session {SessionId} for character {CharacterId} left map {MapId}", zoneSession.SessionId,
-                    characterId, zone.MapId);
+                if (finalization.IsCompleted)
+                {
+                    await finalization.ConfigureAwait(false);
+                }
+                else
+                {
+                    logger.LogWarning(
+                        "Zone {MapId} leave for closed session {SessionId}, character {CharacterId} remains pending; its account lease will stay held until the actor decision and terminal snapshot are durable",
+                        zone.MapId, zoneSession.SessionId, characterId);
+                    TrackDeferredLeaveFinalization(finalization);
+                }
             }
-
-            if (zoneSession is { AccountId: { } accountId, IsZoneTransferPending: false })
+            else if (zoneSession is { AccountId: { } accountId } && !completedHandoff)
                 await TearDownAccountSessionAsync(accountId, zoneSession.AccountSessionToken).ConfigureAwait(false);
 
-            tribeQuota.Release(zoneSession.SessionId);
+            tribeQuota.Release(zoneSession);
 
             registry.Unregister(zoneSession.SessionId);
             rateLimiter.Remove(zoneSession.SessionId);
@@ -256,22 +283,83 @@ public sealed class GameConnectionHost(
         }
     }
 
-    private async ValueTask FlushFinalCharacterStateAsync(PlayerRuntimeState departingState)
+    private async Task FinalizeDeferredLeaveAsync(Task<ZoneLeaveResult> pendingLeave, ZoneClientSession zoneSession,
+        int characterId, short mapId, bool completedHandoff)
     {
         try
         {
-            await writeBehindFlusher.FlushCharacterSnapshotAsync(departingState, CancellationToken.None)
+            var result = await pendingLeave.ConfigureAwait(false);
+            await FinalizeLeaveAndReleaseSessionAsync(result, zoneSession, characterId, mapId, completedHandoff)
                 .ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             logger.LogError(ex,
-                "Unexpected failure attempting the final Position/Vitals/Progression flush for character {CharacterId} on disconnect",
-                departingState.CharacterId);
+                "Deferred zone leave finalization faulted for closed session {SessionId}, character {CharacterId} on map {MapId}",
+                zoneSession.SessionId, characterId, mapId);
         }
     }
 
+    private async Task FinalizeLeaveAndReleaseSessionAsync(ZoneLeaveResult leave, ZoneClientSession zoneSession,
+        int characterId,
+        short mapId, bool completedHandoff)
+    {
+        var requiresTerminalPersistence = leave.DepartingState is not null;
+
+        if (requiresTerminalPersistence && !completedHandoff && zoneSession.AccountId is { } accountId)
+            await MarkAccountSessionTearingDownAsync(accountId, zoneSession.AccountSessionToken).ConfigureAwait(false);
+
+        await FinalizeLeaveAsync(leave, zoneSession, characterId, mapId, completedHandoff).ConfigureAwait(false);
+
+        if (!completedHandoff && zoneSession.AccountId is { } releasableAccountId)
+            await ClearAccountSessionAsync(releasableAccountId, zoneSession.AccountSessionToken).ConfigureAwait(false);
+    }
+
+    private async ValueTask FinalizeLeaveAsync(ZoneLeaveResult leave, ZoneClientSession zoneSession, int characterId,
+        short mapId, bool completedHandoff)
+    {
+        if (leave.DepartingState is null)
+        {
+            logger.LogWarning(
+                "Zone leave for closed session {SessionId}, character {CharacterId} on map {MapId} completed as {LeaveKind} ({Cause}); the actor did not remove this session, so no terminal snapshot flush is required",
+                zoneSession.SessionId, characterId, mapId, leave.Kind, leave.Cause);
+            return;
+        }
+
+        var persistence = await writeBehindFlusher.FlushCharacterSnapshotAsync(leave.DepartingState,
+            CancellationToken.None).ConfigureAwait(false);
+
+        if (!persistence.IsDurablyPersisted)
+        {
+            logger.LogWarning(
+                "Final snapshot for character {CharacterId} is retained for retry; account-session release waits for durable completion",
+                characterId);
+            await persistence.Completion.ConfigureAwait(false);
+        }
+
+        writeBehindFlusher.RequestImmediateFlush();
+        if (!completedHandoff)
+            await LogLogoutAsync(zoneSession.AccountId, characterId, mapId).ConfigureAwait(false);
+
+        logger.LogInformation(
+            "Zone session {SessionId} for character {CharacterId} leave on map {MapId} completed as {LeaveKind}",
+            zoneSession.SessionId, characterId, mapId, leave.Kind);
+    }
+
+    private void TrackDeferredLeaveFinalization(Task finalization)
+    {
+        _deferredLeaveFinalizations[finalization] = 0;
+        _ = finalization.ContinueWith(task => _deferredLeaveFinalizations.TryRemove(task, out _),
+            TaskScheduler.Default);
+    }
+
     private async ValueTask TearDownAccountSessionAsync(int accountId, Guid? sessionToken)
+    {
+        await MarkAccountSessionTearingDownAsync(accountId, sessionToken).ConfigureAwait(false);
+        await ClearAccountSessionAsync(accountId, sessionToken).ConfigureAwait(false);
+    }
+
+    private async ValueTask MarkAccountSessionTearingDownAsync(int accountId, Guid? sessionToken)
     {
         await _disconnectSqlGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
         try
@@ -281,6 +369,24 @@ public sealed class GameConnectionHost(
                 .MarkTearingDownAsync(accountId, AccountSessionServerKind.Game, options.Value.ShardId,
                     resolvedToken, CancellationToken.None)
                 .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to mark runtime.AccountSessions row as tearing down for account {AccountId}",
+                accountId);
+        }
+        finally
+        {
+            _disconnectSqlGate.Release();
+        }
+    }
+
+    private async ValueTask ClearAccountSessionAsync(int accountId, Guid? sessionToken)
+    {
+        await _disconnectSqlGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+        try
+        {
+            var resolvedToken = sessionToken ?? default;
             await accountSessions
                 .ClearIfOwnerAsync(accountId, AccountSessionServerKind.Game, options.Value.ShardId,
                     resolvedToken, CancellationToken.None)
@@ -288,8 +394,7 @@ public sealed class GameConnectionHost(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to tear down runtime.AccountSessions row for account {AccountId}",
-                accountId);
+            logger.LogWarning(ex, "Failed to clear runtime.AccountSessions row for account {AccountId}", accountId);
         }
         finally
         {
@@ -318,12 +423,18 @@ public sealed class GameConnectionHost(
 
     private static void Greet(ZoneClientSession session, SocketConnection connection)
     {
-        var randomNumber = RandomNumberGenerator.GetInt32(int.MinValue, int.MaxValue);
+        var randomNumber = GenerateGreetingRandomNumber();
 
         session.InboundStreamXorKey = unchecked((byte)randomNumber);
         connection.GetInboundXorKey = () => session.InboundStreamXorKey;
 
         session.Send(new ZoneGreetingResponse { RandomNumber = randomNumber });
+    }
+
+    private static int GenerateGreetingRandomNumber()
+    {
+        return RandomNumberGenerator.GetInt32(GreetingRandomModulus) *
+               RandomNumberGenerator.GetInt32(GreetingRandomModulus);
     }
 
     public override void Dispose()

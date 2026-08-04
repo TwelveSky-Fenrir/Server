@@ -1,10 +1,9 @@
 using System.Diagnostics.CodeAnalysis;
-using System.Numerics;
 using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World.Geometry;
-using Fenrir.Application.Game.Domain.World.Pathfinding;
+using Fenrir.Application.Game.Domain.World.Runtime;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Protocol.Game;
@@ -20,8 +19,6 @@ public sealed partial class MonsterAiSystem(
     private const float TickSeconds = SimulationClock.LegacyTickMilliseconds / 1000f;
 
     private const float ArrivalEpsilon = 1f;
-
-    private const float PathReplanGoalMoveThreshold = 40f;
 
     private const float WanderMinRadius = 50f;
 
@@ -39,7 +36,7 @@ public sealed partial class MonsterAiSystem(
 
     private const float LegacyFrameUnitsPerSecond = 30f;
 
-    private const int RangedAttackSubMode = 1;
+    private const float AttackPacketConfirmationTimeoutSeconds = 1f;
 
     private readonly IRandomSource _random = random ?? SystemRandomSource.Instance;
 
@@ -49,16 +46,17 @@ public sealed partial class MonsterAiSystem(
 
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
-        var dt = TickSeconds * legacyTicksElapsed;
+        if (legacyTicksElapsed <= 0)
+            return;
 
-        var monsters = zone.MonstersSnapshot;
+        const int elapsedLegacyTicks = 1;
+        var dt = TickSeconds;
 
-        foreach (var monster in monsters)
-            Update(zone, monster, dt, legacyTicksElapsed, monsters);
+        foreach (var monster in zone.MonstersSnapshot)
+            Update(zone, monster, dt, elapsedLegacyTicks);
     }
 
-    private void Update(Zone zone, MonsterEntity monster, float dt, int legacyTicksElapsed,
-        IEnumerable<MonsterEntity> allMonsters)
+    private void Update(Zone zone, MonsterEntity monster, float dt, int legacyTicksElapsed)
     {
         switch (monster.AiState)
         {
@@ -74,11 +72,11 @@ public sealed partial class MonsterAiSystem(
                 break;
 
             case MonsterAiState.Decision:
-                RunDecision(zone, monster, legacyTicksElapsed, allMonsters);
+                RunDecision(zone, monster, legacyTicksElapsed);
                 break;
 
             case MonsterAiState.Patrol:
-                RunPatrol(zone, monster, dt, legacyTicksElapsed, allMonsters);
+                RunPatrol(zone, monster, dt, legacyTicksElapsed);
                 break;
 
             case MonsterAiState.Chase:
@@ -86,11 +84,11 @@ public sealed partial class MonsterAiSystem(
                 break;
 
             case MonsterAiState.AttackWindup:
-                RunAttackWindup(zone, monster, dt);
+                RunAttackWindup(monster, dt, monster.Template.FrameInfo3);
                 break;
 
             case MonsterAiState.RangedAttackWindup:
-                RunRangedAttackWindup(zone, monster, dt);
+                RunAttackWindup(monster, dt, monster.Template.FrameInfo4);
                 break;
 
             case MonsterAiState.Flinch:
@@ -137,55 +135,30 @@ public sealed partial class MonsterAiSystem(
         zone.SyncMonsterCell(monster);
     }
 
-    private static void RunAttackWindup(Zone zone, MonsterEntity monster, float dt)
+    private static void RunAttackWindup(MonsterEntity monster, float dt, short frameInfo)
     {
         if (monster.StateTicks++ == 0)
-        {
             monster.StateFrameAccumulator = 0f;
-            if (monster.TargetCharacterId is { } attackTargetId)
-                zone.ResolveMonsterAttack(monster, attackTargetId);
-        }
 
         monster.StateFrameAccumulator += dt * LegacyFrameUnitsPerSecond;
-        if (monster.StateFrameAccumulator < Math.Max(1, (int)monster.Template.FrameInfo3))
+        monster.AdvanceAttackPacketConfirmation(dt);
+        if (monster.StateFrameAccumulator < Math.Max(1, (int)frameInfo))
             return;
 
-        if (monster.AttackPacketConfirmationArmed)
-        {
-            if (monster.StateTicks < SimulationClock.OneSecondGateLegacyTicks)
-                return;
+        if (monster.AttackPacketConfirmationArmed &&
+            monster.AttackPacketConfirmationElapsedSeconds < AttackPacketConfirmationTimeoutSeconds)
+            return;
 
-            monster.AttackPacketConfirmationArmed = false;
-        }
-
+        monster.ClearAttackPacketConfirmation();
         monster.StateFrameAccumulator = 0f;
         monster.AiState = MonsterAiState.Decision;
         monster.StateTicks = 0;
     }
 
-    private static void RunRangedAttackWindup(Zone zone, MonsterEntity monster, float dt)
-    {
-        if (monster.StateTicks++ == 0)
-        {
-            monster.StateFrameAccumulator = 0f;
-            if (monster.TargetCharacterId is { } rangedTargetId)
-                zone.ResolveMonsterAttack(monster, rangedTargetId, RangedAttackSubMode);
-        }
-
-        monster.StateFrameAccumulator += dt * LegacyFrameUnitsPerSecond;
-        if (monster.StateFrameAccumulator < Math.Max(1, (int)monster.Template.FrameInfo4))
-            return;
-
-        monster.StateFrameAccumulator = 0f;
-        monster.AiState = MonsterAiState.Decision;
-        monster.StateTicks = 0;
-    }
-
-    private void RunPatrol(Zone zone, MonsterEntity monster, float dt, int legacyTicksElapsed,
-        IEnumerable<MonsterEntity> allMonsters)
+    private void RunPatrol(Zone zone, MonsterEntity monster, float dt, int legacyTicksElapsed)
     {
         if (monster.SpecialSort == MonsterSpecialSort.Standard &&
-            HasActiveOrFreshlyAcquiredAttacker(zone, monster, legacyTicksElapsed, allMonsters))
+            HasActiveOrFreshlyAcquiredAttacker(zone, monster, legacyTicksElapsed))
         {
             monster.AiState = MonsterAiState.Decision;
             monster.StateTicks = 0;
@@ -213,15 +186,13 @@ public sealed partial class MonsterAiSystem(
         }
     }
 
-    private bool HasActiveOrFreshlyAcquiredAttacker(Zone zone, MonsterEntity monster, int legacyTicksElapsed,
-        IEnumerable<MonsterEntity> allMonsters)
+    private bool HasActiveOrFreshlyAcquiredAttacker(Zone zone, MonsterEntity monster, int legacyTicksElapsed)
     {
         return monster.HasTrackedAttackers() ||
-               TryAcquireTarget(zone, monster, legacyTicksElapsed, allMonsters, false);
+               TryAcquireTarget(zone, monster, legacyTicksElapsed, false);
     }
 
-    private void RunDecision(Zone zone, MonsterEntity monster, int legacyTicksElapsed,
-        IEnumerable<MonsterEntity> allMonsters)
+    private void RunDecision(Zone zone, MonsterEntity monster, int legacyTicksElapsed)
     {
         if (IsZone175TypeBoss(monster.Template.SpecialType))
         {
@@ -232,7 +203,7 @@ public sealed partial class MonsterAiSystem(
         switch (monster.SpecialSort)
         {
             case MonsterSpecialSort.Standard:
-                RunStandardDecision(zone, monster, legacyTicksElapsed, allMonsters);
+                RunStandardDecision(zone, monster, legacyTicksElapsed);
                 break;
 
             case MonsterSpecialSort.CarThrower:
@@ -260,12 +231,11 @@ public sealed partial class MonsterAiSystem(
         }
     }
 
-    private void RunStandardDecision(Zone zone, MonsterEntity monster, int legacyTicksElapsed,
-        IEnumerable<MonsterEntity> allMonsters)
+    private void RunStandardDecision(Zone zone, MonsterEntity monster, int legacyTicksElapsed)
     {
         if (!monster.HasTrackedAttackers())
         {
-            if (!TryAcquireTarget(zone, monster, legacyTicksElapsed, allMonsters, false))
+            if (!TryAcquireTarget(zone, monster, legacyTicksElapsed, false))
             {
                 RunIdleWanderOrReturnHome(zone, monster, legacyTicksElapsed);
                 return;
@@ -274,7 +244,7 @@ public sealed partial class MonsterAiSystem(
             monster.IdleWanderElapsedTicks = 0;
         }
 
-        RunPrunedAttackerEngagement(zone, monster, allMonsters);
+        RunPrunedAttackerEngagement(zone, monster);
     }
 
     private void RunIdleWanderOrReturnHome(Zone zone, MonsterEntity monster, int legacyTicksElapsed)
@@ -335,13 +305,7 @@ public sealed partial class MonsterAiSystem(
         var destY = monster.HomeY;
         var destZ = monster.HomeZ;
 
-        if (zone.Geometry is not { } geometry)
-        {
-            resolvedX = destX;
-            resolvedY = destY;
-            resolvedZ = destZ;
-            return;
-        }
+        var geometry = zone.Geometry;
 
         var speed = (float)monster.Template.WalkSpeed;
         if (speed <= 0f)
@@ -354,6 +318,7 @@ public sealed partial class MonsterAiSystem(
 
         var stepLength = speed * HomeReturnRaycastStepSeconds;
         var currentX = monster.PosX;
+        var currentY = monster.PosY;
         var currentZ = monster.PosZ;
 
         while (true)
@@ -366,7 +331,8 @@ public sealed partial class MonsterAiSystem(
             var candidateX = reachedDestination ? destX : currentX + dx / remaining * stepLength;
             var candidateZ = reachedDestination ? destZ : currentZ + dz / remaining * stepLength;
 
-            if (!geometry.IsWalkable(candidateX, candidateZ))
+            if (!geometry.IsWalkable(candidateX, candidateZ) ||
+                !geometry.TryGetGroundHeight(candidateX, candidateZ, out currentY))
                 break;
 
             currentX = candidateX;
@@ -376,23 +342,14 @@ public sealed partial class MonsterAiSystem(
                 break;
         }
 
-        if (geometry.TryGetGroundHeight(currentX, currentZ, out var groundY))
-        {
-            resolvedX = currentX;
-            resolvedY = groundY;
-            resolvedZ = currentZ;
-        }
-        else
-        {
-            resolvedX = monster.PosX;
-            resolvedY = monster.PosY;
-            resolvedZ = monster.PosZ;
-        }
+        resolvedX = currentX;
+        resolvedY = currentY;
+        resolvedZ = currentZ;
     }
 
-    private void RunPrunedAttackerEngagement(Zone zone, MonsterEntity monster, IEnumerable<MonsterEntity> allMonsters)
+    private void RunPrunedAttackerEngagement(Zone zone, MonsterEntity monster)
     {
-        var pruneResult = MonsterAggroListPruner.Prune(zone, monster, allMonsters);
+        var pruneResult = MonsterAggroListPruner.Prune(zone, monster);
         monster.ReplaceAttackDamage(pruneResult.Survivors);
 
         if (!pruneResult.HasValidAttackers)
@@ -421,12 +378,13 @@ public sealed partial class MonsterAiSystem(
         var pick = chosen.Value;
 
         if (!zone.TryGetPlayer(pick.CharacterId, out var target) || target is null ||
-            !ReferenceEquals(target, pick.SessionToken))
+            target.Incarnation != pick.Incarnation)
             return;
 
         if (pick.DistanceSquared <= meleeRadiusSq)
         {
-            monster.AssignTarget(pick.CharacterId, target.UniqueNumber, target.PosX, target.PosY, target.PosZ);
+            monster.AssignTarget(pick.CharacterId, target.Incarnation, target.UniqueNumber, target.PosX,
+                target.PosY, target.PosZ);
             CommitMeleeEngagement(zone, monster, target);
             return;
         }
@@ -438,17 +396,18 @@ public sealed partial class MonsterAiSystem(
         ComputeArcApproachPoint(monster, target.PosX, target.PosZ, meleeRadius, out var approachX,
             out var approachZ);
 
-        if (CanReachPoint(zone, monster, approachX, approachZ))
-        {
-            monster.AssignTarget(pick.CharacterId, target.UniqueNumber, approachX, monster.PosY, approachZ);
-            monster.AiState = MonsterAiState.Chase;
-            monster.StateTicks = 0;
-            zone.BroadcastMonsterActionChange(monster);
-        }
-        else
+        if (!TrySampleTerrainSegment(zone.Geometry, monster.PosX, monster.PosZ, approachX, approachZ,
+                chaseSpeed, out _))
         {
             AbandonChaseAndReturnHome(zone, monster);
+            return;
         }
+
+        monster.AssignTarget(pick.CharacterId, target.Incarnation, target.UniqueNumber, approachX, monster.PosY,
+            approachZ);
+        monster.AiState = MonsterAiState.Chase;
+        monster.StateTicks = 0;
+        zone.BroadcastMonsterActionChange(monster);
     }
 
     private static void AbandonChaseAndReturnHome(Zone zone, MonsterEntity monster)
@@ -488,18 +447,6 @@ public sealed partial class MonsterAiSystem(
         approachZ = monster.PosZ + (dx * sin + dz * cos);
     }
 
-    private static bool CanReachPoint(Zone zone, MonsterEntity monster, float destX, float destZ)
-    {
-        if (zone.Geometry is not { } geometry)
-            return true;
-
-        if (zone.Pathfinder is { } pathfinder)
-            return pathfinder.TryFindPath(new Vector3(monster.PosX, monster.PosY, monster.PosZ),
-                new Vector3(destX, monster.PosY, destZ), []);
-
-        return geometry.IsWalkable(destX, destZ);
-    }
-
     private bool TryComputeWanderDestination(Zone zone, MonsterEntity monster, out float destX, out float destZ)
     {
         var dirX = (float)(_random.NextInt32(WanderDirectionRollSpan) - WanderDirectionRollHalfSpan);
@@ -518,9 +465,8 @@ public sealed partial class MonsterAiSystem(
         destX = candidateX;
         destZ = candidateZ;
 
-        if (zone.Geometry is { } geometry)
-            SweepToFurthestWalkablePoint(geometry, monster.PosX, monster.PosZ, candidateX, candidateZ,
-                monster.Template.WalkSpeed, out destX, out destZ);
+        SweepToFurthestWalkablePoint(zone.Geometry, monster.PosX, monster.PosZ, candidateX, candidateZ,
+            monster.Template.WalkSpeed, out destX, out destZ);
 
         return DistanceSquared(monster.PosX, monster.PosZ, destX, destZ) >=
                WanderMinDisplacement * WanderMinDisplacement;
@@ -545,7 +491,7 @@ public sealed partial class MonsterAiSystem(
 
             if (remaining <= stepLength)
             {
-                if (geometry.IsWalkable(destX, destZ))
+                if (geometry.IsWalkable(destX, destZ) && geometry.TryGetGroundHeight(destX, destZ, out _))
                 {
                     resultX = destX;
                     resultZ = destZ;
@@ -557,7 +503,7 @@ public sealed partial class MonsterAiSystem(
             var nextX = resultX + stepLength * dx / remaining;
             var nextZ = resultZ + stepLength * dz / remaining;
 
-            if (!geometry.IsWalkable(nextX, nextZ))
+            if (!geometry.IsWalkable(nextX, nextZ) || !geometry.TryGetGroundHeight(nextX, nextZ, out _))
                 return;
 
             resultX = nextX;
@@ -566,7 +512,7 @@ public sealed partial class MonsterAiSystem(
     }
 
     private bool TryAcquireTarget(Zone zone, MonsterEntity monster, int legacyTicksElapsed,
-        IEnumerable<MonsterEntity> allMonsters, bool transitionToChaseOnAcquire = true)
+        bool transitionToChaseOnAcquire = true)
     {
         if (monster.Template.AttackType is not (1 or 3 or 6))
             return false;
@@ -584,7 +530,7 @@ public sealed partial class MonsterAiSystem(
         var detectionRadiusSq = (float)detectionRadius * detectionRadius;
         var monsterCellY = MathF.Floor(monster.PosY / zone.AoiCellSize);
 
-        foreach (var characterId in zone.NeighborsOfPosition(monster.PosX, monster.PosZ))
+        foreach (var characterId in StableNeighborsOfPosition(zone, monster.PosX, monster.PosZ))
         {
             if (!zone.TryGetPlayer(characterId, out var player) || !IsCandidateValid(player))
                 continue;
@@ -601,15 +547,17 @@ public sealed partial class MonsterAiSystem(
             if (DistanceSquared(monster.PosX, monster.PosZ, player.PosX, player.PosZ) > detectionRadiusSq)
                 continue;
 
-            if (CountOtherPursuers(allMonsters, monster, characterId) > monster.PursuerCapacity - 1)
+            if (zone.CountOtherMonsterPursuers(monster, characterId, player.Incarnation) > monster.PursuerCapacity -
+                1)
                 continue;
 
             if (_random.NextInt32(2) != 0)
                 continue;
 
-            monster.AssignTarget(characterId, player.UniqueNumber, player.PosX, player.PosY, player.PosZ);
+            monster.AssignTarget(characterId, player.Incarnation, player.UniqueNumber, player.PosX, player.PosY,
+                player.PosZ);
 
-            monster.RegisterAcquisition(characterId, player);
+            monster.RegisterAcquisition(characterId, player.Incarnation);
 
             if (transitionToChaseOnAcquire)
             {
@@ -623,25 +571,6 @@ public sealed partial class MonsterAiSystem(
         }
 
         return false;
-    }
-
-    private static int CountOtherPursuers(IEnumerable<MonsterEntity> allMonsters, MonsterEntity monster,
-        int candidateCharacterId)
-    {
-        var count = 0;
-        foreach (var other in allMonsters)
-        {
-            if (other.ServerIndex == monster.ServerIndex)
-                continue;
-
-            if (other.AiState is not (MonsterAiState.Chase or MonsterAiState.AttackWindup))
-                continue;
-
-            if (other.TargetCharacterId == candidateCharacterId)
-                count++;
-        }
-
-        return count;
     }
 
     private static bool IsCandidateValid([NotNullWhen(true)] PlayerRuntimeState? player)
@@ -677,7 +606,7 @@ public sealed partial class MonsterAiSystem(
         var heightHalfExtent = (float)monster.Template.Size2;
         var monsterCellY = MathF.Floor(monster.PosY / zone.AoiCellSize);
 
-        foreach (var characterId in zone.NeighborsOfPosition(monster.PosX, monster.PosZ))
+        foreach (var characterId in StableNeighborsOfPosition(zone, monster.PosX, monster.PosZ))
         {
             if (!zone.TryGetPlayer(characterId, out var candidate) || !IsCandidateValid(candidate))
                 continue;
@@ -701,9 +630,8 @@ public sealed partial class MonsterAiSystem(
             if (_random.NextInt32(2) != 0)
                 continue;
 
-            monster.AssignTarget(characterId, candidate.UniqueNumber, candidate.PosX, candidate.PosY,
-                candidate.PosZ);
-            monster.RegisterAcquisition(characterId, candidate);
+            monster.AssignTarget(characterId, candidate.Incarnation, candidate.UniqueNumber, candidate.PosX,
+                candidate.PosY, candidate.PosZ);
             retargeted = candidate;
             return true;
         }
@@ -719,7 +647,8 @@ public sealed partial class MonsterAiSystem(
     private void RunChase(Zone zone, MonsterEntity monster, float dt, int legacyTicksElapsed)
     {
         if (monster.TargetCharacterId is not { } targetId || !zone.TryGetPlayer(targetId, out var target) ||
-            !IsCandidateValid(target))
+            !IsCandidateValid(target) || target.Incarnation != monster.TargetIncarnation ||
+            target.UniqueNumber != monster.TargetUniqueNumber)
         {
             ReleaseAndReturnToDecision(zone, monster);
             return;
@@ -738,9 +667,8 @@ public sealed partial class MonsterAiSystem(
             return;
         }
 
-        if (MoveToward(zone, monster, monster.TargetLocationX, monster.TargetLocationZ, monster.Template.RunSpeed, dt,
-                out var arrived,
-                (new Vector2(target.PosX, target.PosZ), monster.Template.RadiusInfo1)))
+        if (MoveToward(zone, monster, monster.TargetLocationX, monster.TargetLocationZ, monster.Template.RunSpeed,
+                dt, out var arrived))
         {
             ReleaseAndReturnToDecision(zone, monster);
             return;
@@ -770,7 +698,6 @@ public sealed partial class MonsterAiSystem(
         monster.AiState = MonsterAiState.Decision;
         monster.StateTicks = 0;
         monster.StateFrameAccumulator = 0f;
-        monster.ClearPath();
     }
 
     private static void ReleaseAndReturnToDecision(Zone zone, MonsterEntity monster)
@@ -785,11 +712,9 @@ public sealed partial class MonsterAiSystem(
     private static void CommitMeleeEngagement(Zone zone, MonsterEntity monster, PlayerRuntimeState target)
     {
         monster.Heading = WireHeading.Between(monster.PosX, monster.PosZ, target.PosX, target.PosZ);
+        monster.ArmAttackPacketConfirmation();
         monster.AiState = MonsterAiState.AttackWindup;
         monster.StateTicks = 0;
-
-        if (monster.Template.AttackType is 1 or 2)
-            monster.AttackPacketConfirmationArmed = true;
 
         zone.BroadcastMonsterActionChange(monster);
     }
@@ -814,107 +739,39 @@ public sealed partial class MonsterAiSystem(
         return specialType is >= 40 and <= 44;
     }
 
-    private static bool MoveToward(Zone zone, MonsterEntity monster, float targetX, float targetZ, float speed,
-        float dt, out bool arrived, (Vector2 Anchor, float Radius)? tether = null)
+        private static bool MoveToward(Zone zone, MonsterEntity monster, float targetX, float targetZ, float speed,
+        float dt, out bool arrived)
     {
-        if (zone.Geometry is not { } geometry)
-        {
-            var freeOutcome = StepToward(monster, targetX, targetZ, speed, dt, null, false);
-            arrived = freeOutcome == MonsterStepOutcome.Arrived;
-            return freeOutcome == MonsterStepOutcome.Blocked;
-        }
-
-        if (zone.Pathfinder is { } pathfinder)
-            return MoveAlongPath(pathfinder, geometry, monster, targetX, targetZ, speed, dt, tether, out arrived);
-
-        var outcome = StepToward(monster, targetX, targetZ, speed, dt, geometry, true);
+        var outcome = StepToward(monster, targetX, targetZ, speed, dt, zone.Geometry);
         arrived = outcome == MonsterStepOutcome.Arrived;
         return outcome == MonsterStepOutcome.Blocked;
     }
 
-    private static bool MoveAlongPath(MonsterPathfinder pathfinder, ZoneGeometry geometry, MonsterEntity monster,
-        float targetX, float targetZ, float speed, float dt, (Vector2 Anchor, float Radius)? tether, out bool arrived)
-    {
-        var exhausted = monster.WaypointCursor >= monster.PathWaypoints.Count;
-        var needReplan = exhausted
-                         || PathGoalMoved(monster, targetX, targetZ)
-                         || NextStepBlocked(monster, geometry, speed, dt);
-
-        if (needReplan)
-        {
-            var from = new Vector3(monster.PosX, monster.PosY, monster.PosZ);
-            var to = new Vector3(targetX, monster.PosY, targetZ);
-            var found = tether is { } pursuit
-                ? pathfinder.TryFindPursuitPath(from, to, pursuit.Anchor, pursuit.Radius, monster.PathWaypoints)
-                : pathfinder.TryFindPathClamped(from, to, monster.PathWaypoints);
-            if (found)
-            {
-                monster.WaypointCursor = 0;
-                monster.PathGoalX = targetX;
-                monster.PathGoalZ = targetZ;
-            }
-            else
-            {
-                monster.ClearPath();
-                var fallbackOutcome = StepToward(monster, targetX, targetZ, speed, dt, geometry, true);
-                arrived = fallbackOutcome == MonsterStepOutcome.Arrived;
-                return fallbackOutcome == MonsterStepOutcome.Blocked;
-            }
-        }
-
-        FollowWaypoints(monster, geometry, speed, dt);
-        arrived = monster.WaypointCursor >= monster.PathWaypoints.Count;
-        return false;
-    }
-
-    private static void FollowWaypoints(MonsterEntity monster, ZoneGeometry geometry, float speed, float dt)
-    {
-        var remainingStep = speed * dt;
-        if (remainingStep <= 0f)
-            return;
-
-        while (monster.WaypointCursor < monster.PathWaypoints.Count)
-        {
-            var waypoint = monster.PathWaypoints[monster.WaypointCursor];
-            var dx = waypoint.X - monster.PosX;
-            var dz = waypoint.Y - monster.PosZ;
-            var distance = MathF.Sqrt(dx * dx + dz * dz);
-
-            if (distance <= ArrivalEpsilon)
-            {
-                monster.WaypointCursor++;
-                continue;
-            }
-
-            monster.Heading = WireHeading.FromDelta(dx, dz);
-
-            if (remainingStep >= distance)
-            {
-                CommitPosition(monster, geometry, waypoint.X, waypoint.Y);
-                remainingStep -= distance;
-                monster.WaypointCursor++;
-                continue;
-            }
-
-            var newX = monster.PosX + dx / distance * remainingStep;
-            var newZ = monster.PosZ + dz / distance * remainingStep;
-            CommitPosition(monster, geometry, newX, newZ);
-            return;
-        }
-    }
-
     private static MonsterStepOutcome StepToward(MonsterEntity monster, float destX, float destZ, float speed,
-        float dt, ZoneGeometry? geometry, bool refuseBlockedStep)
+        float dt, ZoneGeometry geometry)
     {
+        if (!float.IsFinite(monster.PosX) || !float.IsFinite(monster.PosY) || !float.IsFinite(monster.PosZ) ||
+            !float.IsFinite(destX) || !float.IsFinite(destZ) || !float.IsFinite(speed) || !float.IsFinite(dt) ||
+            speed <= 0f || dt <= 0f)
+            return MonsterStepOutcome.Blocked;
+
         var dx = destX - monster.PosX;
         var dz = destZ - monster.PosZ;
         var distance = MathF.Sqrt(dx * dx + dz * dz);
+        if (!float.IsFinite(distance))
+            return MonsterStepOutcome.Blocked;
+
         if (distance <= 0.0001f)
-            return MonsterStepOutcome.Arrived;
+        {
+            return geometry.IsWalkable(monster.PosX, monster.PosZ) &&
+                   geometry.TryGetGroundHeight(monster.PosX, monster.PosZ, out _)
+                ? MonsterStepOutcome.Arrived
+                : MonsterStepOutcome.Blocked;
+        }
 
         var step = speed * dt;
-        if (step <= 0f)
-            return MonsterStepOutcome.Moved;
+        if (!float.IsFinite(step) || step <= 0f)
+            return MonsterStepOutcome.Blocked;
 
         float newX, newZ;
         bool arrived;
@@ -931,55 +788,60 @@ public sealed partial class MonsterAiSystem(
             arrived = false;
         }
 
-        if (geometry is { } g)
-        {
-            if (refuseBlockedStep && !g.IsWalkable(newX, newZ))
-                return MonsterStepOutcome.Blocked;
-
-            if (g.TryGetGroundHeight(newX, newZ, out var groundY))
-                monster.PosY = groundY;
-        }
+        if (!TrySampleTerrainSegment(geometry, monster.PosX, monster.PosZ, newX, newZ, speed, out var groundY))
+            return MonsterStepOutcome.Blocked;
 
         monster.PosX = newX;
+        monster.PosY = groundY;
         monster.PosZ = newZ;
         monster.Heading = WireHeading.FromDelta(dx, dz);
         return arrived ? MonsterStepOutcome.Arrived : MonsterStepOutcome.Moved;
     }
 
-    private static void CommitPosition(MonsterEntity monster, ZoneGeometry geometry, float x, float z)
+    private static List<int> StableNeighborsOfPosition(Zone zone, float x, float z, int scale = 1)
     {
-        monster.PosX = x;
-        monster.PosZ = z;
-        if (geometry.TryGetGroundHeight(x, z, out var groundY))
-            monster.PosY = groundY;
+        var neighbors = zone.NeighborsOfPosition(x, z, scale);
+        neighbors.Sort();
+        return neighbors;
     }
 
-    private static bool PathGoalMoved(MonsterEntity monster, float targetX, float targetZ)
+    private static bool TrySampleTerrainSegment(ZoneGeometry geometry, float startX, float startZ, float destX,
+        float destZ, float speed, out float groundY)
     {
-        var dx = targetX - monster.PathGoalX;
-        var dz = targetZ - monster.PathGoalZ;
-        return dx * dx + dz * dz > PathReplanGoalMoveThreshold * PathReplanGoalMoveThreshold;
-    }
+        groundY = 0f;
 
-    private static bool NextStepBlocked(MonsterEntity monster, ZoneGeometry geometry, float speed, float dt)
-    {
-        if (monster.WaypointCursor >= monster.PathWaypoints.Count)
+        if (!float.IsFinite(startX) || !float.IsFinite(startZ) || !float.IsFinite(destX) ||
+            !float.IsFinite(destZ) || !float.IsFinite(speed) || speed <= 0f)
             return false;
 
-        var waypoint = monster.PathWaypoints[monster.WaypointCursor];
-        var dx = waypoint.X - monster.PosX;
-        var dz = waypoint.Y - monster.PosZ;
-        var distance = MathF.Sqrt(dx * dx + dz * dz);
-        if (distance <= ArrivalEpsilon)
+        var stepLength = speed * WanderPathStepIntervalSeconds;
+        if (!float.IsFinite(stepLength) || stepLength <= 0f)
             return false;
 
-        var step = MathF.Min(speed * dt, distance);
-        if (step <= 0f)
-            return false;
+        var currentX = startX;
+        var currentZ = startZ;
+        while (true)
+        {
+            var dx = destX - currentX;
+            var dz = destZ - currentZ;
+            var remaining = MathF.Sqrt(dx * dx + dz * dz);
+            if (!float.IsFinite(remaining))
+                return false;
 
-        var newX = monster.PosX + dx / distance * step;
-        var newZ = monster.PosZ + dz / distance * step;
-        return !geometry.IsWalkable(newX, newZ);
+            var reachedDestination = remaining <= stepLength;
+            var candidateX = reachedDestination ? destX : currentX + dx / remaining * stepLength;
+            var candidateZ = reachedDestination ? destZ : currentZ + dz / remaining * stepLength;
+
+            if (!geometry.IsWalkable(candidateX, candidateZ) ||
+                !geometry.TryGetGroundHeight(candidateX, candidateZ, out groundY))
+                return false;
+
+            if (reachedDestination)
+                return true;
+
+            currentX = candidateX;
+            currentZ = candidateZ;
+        }
     }
 
     private static float DistanceSquared(float x1, float z1, float x2, float z2)

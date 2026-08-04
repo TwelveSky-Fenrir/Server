@@ -20,11 +20,29 @@ public sealed class TribeVoteHandler(ITribeVoteService voteService, ILogger<Trib
             "Session {SessionId}: CZ_TRIBE_VOTE_SEND received (character {CharacterId}, sort {Sort}, value {Value})",
             session.SessionId, zoneSession.CharacterId, packet.Sort, packet.Value);
 
-        if (packet.Sort is not (1 or 3) || packet.Value is < 0 or >= SlotCount)
+        if (packet.Sort is not (1 or 3))
         {
             logger?.LogWarning(
-                "Session {SessionId}: CZ_TRIBE_VOTE_SEND malformed (sort {Sort}, value {Value}) -- ignoring",
-                session.SessionId, packet.Sort, packet.Value);
+                "Session {SessionId}: CZ_TRIBE_VOTE_SEND carried invalid sort {Sort}; aborting",
+                session.SessionId, packet.Sort);
+            zoneSession.Abort(DisconnectReason.Faulted);
+            return;
+        }
+
+        if (packet.Sort == 3 && packet.Value is < 0 or >= SlotCount)
+        {
+            logger?.LogWarning(
+                "Session {SessionId}: CZ_TRIBE_VOTE_SEND vote carried invalid value {Value}; aborting",
+                session.SessionId, packet.Value);
+            zoneSession.Abort(DisconnectReason.Faulted);
+            return;
+        }
+
+        if (packet.Sort == 1 && packet.Value is < 0 or >= SlotCount)
+        {
+            logger?.LogWarning(
+                "Session {SessionId}: CZ_TRIBE_VOTE_SEND candidacy carried invalid value {Value}; ignoring",
+                session.SessionId, packet.Value);
             return;
         }
 
@@ -37,9 +55,16 @@ public sealed class TribeVoteHandler(ITribeVoteService voteService, ILogger<Trib
 
         var slot = (byte)packet.Value;
 
-        var result = packet.Sort == 1
-            ? await voteService.RegisterCandidacyAsync(player, slot, cancellationToken)
-            : await voteService.CastVoteAsync(player, slot, cancellationToken);
+        if (packet.Sort == 1)
+        {
+            var candidacyResult = await voteService.RegisterCandidacyAsync(player, slot, cancellationToken);
+            if (candidacyResult.Action is TribeVoteAction.Accept or TribeVoteAction.RejectNoAbort)
+                session.Send(new TribeVoteResponse
+                    { Result = candidacyResult.Result, Sort = packet.Sort, Value = packet.Value });
+            return;
+        }
+
+        var result = await voteService.CastVoteAsync(player, slot, cancellationToken);
 
         switch (result.Action)
         {
@@ -49,6 +74,7 @@ public sealed class TribeVoteHandler(ITribeVoteService voteService, ILogger<Trib
                     { Result = result.Result, Sort = packet.Sort, Value = packet.Value });
                 return;
             default:
+                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
         }
     }

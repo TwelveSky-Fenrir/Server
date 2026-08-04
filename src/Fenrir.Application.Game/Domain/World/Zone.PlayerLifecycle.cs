@@ -17,6 +17,7 @@ using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Social;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
+using Fenrir.Application.Game.Domain.StellarCores;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Core.Packets.Shared;
@@ -39,6 +40,10 @@ public sealed partial class Zone
     private const byte ContributionPointsLossOutcome = 1;
 
     private const int RestActionSort = 0;
+
+    private const int DeathActionSort = 12;
+
+    private const int DeathSubCounterOnDeath = 4;
 
     private const int SkillEffectConfirmActionSort = 1;
 
@@ -75,6 +80,8 @@ public sealed partial class Zone
 
     private readonly List<int> _enterNeighborScratch = [];
 
+    private readonly Dictionary<int, long> _pendingEnterBootstrapSessions = [];
+
     private readonly List<int> _healTargetNeighborScratch = [];
 
     private readonly List<int> _moveNeighborScratch = [];
@@ -83,7 +90,7 @@ public sealed partial class Zone
 
     private readonly List<int> _rebroadcastNeighborScratch = [];
 
-    private readonly List<int> _reviveNeighborScratch = [];
+    private readonly Dictionary<int, ZoneTransferHandoffSnapshot> _zoneTransferSnapshots = [];
 
     private readonly ISocialWorldEntryReset? _socialWorldEntryReset =
         simulationSystems.OfType<ISocialWorldEntryReset>().FirstOrDefault();
@@ -136,13 +143,22 @@ public sealed partial class Zone
         }
     }
 
-    private void HandleEnter(int characterId, PlayerEnterData data)
+    private void HandleEnter(int characterId, PlayerEnterData data,
+        TaskCompletionSource<PlayerRuntimeState?>? snapshotSignal = null)
     {
+        if (data.IsDead || data.Life <= 0)
+        {
+            snapshotSignal?.TrySetResult(null);
+            return;
+        }
+
         var state = new PlayerRuntimeState
         {
             CharacterId = characterId,
             Session = data.Session,
             Name = data.Name,
+            AccountGrade = data.AccountGrade,
+            UserSort = data.UserSort,
             Tribe = data.Tribe,
             Gender = data.Gender,
             HeadType = data.HeadType,
@@ -187,6 +203,7 @@ public sealed partial class Zone
             Halo = data.Halo,
             RebirthCount = data.RebirthCount,
             Experience = data.Experience,
+            Money = data.Money,
             ContributionPoints = data.ContributionPoints,
             TeacherPoint = data.TeacherPoint,
             Level2 = data.Level2,
@@ -199,6 +216,7 @@ public sealed partial class Zone
             GuildCallName = data.GuildCallName,
             GuildBuffType = data.GuildBuffType,
             GuildBuffActive = data.GuildBuffActive,
+            GuildBuffActiveMirror = data.GuildBuffActive,
             TribeRole = data.TribeRole,
             PreviousTribe = data.PreviousTribe,
             ZoneEntryAtZoneClock = _clock,
@@ -267,9 +285,6 @@ public sealed partial class Zone
             FightingGodForDestroy = data.FightingGodForDestroy
         };
 
-        if (data.StellarCoreExpireDate is { } stellarCoreExpireDate)
-            state.StellarCoreExpireDate = stellarCoreExpireDate;
-
         state.ResetVolatileAntiCheatCountersOnEntry(_clock);
         state.SetDeclaredMoveAnchor(state.PosX, state.PosY, state.PosZ);
 
@@ -322,9 +337,17 @@ public sealed partial class Zone
         state.PetGrowth = data.PetGrowth;
         state.PetActivity = data.PetActivity;
         state.PetExpX2Time = data.PetExpX2Time;
-        state.LastSeenPetItemId = data.Items is { } petScanItems
-            ? PetSlots.ResolveEquippedPetItemId(petScanItems)
-            : 0;
+        if (state.Inventory.GetSlot(ContainerMatrix.Equipment, PetSlots.EquipmentSlot) is { } equippedPet)
+        {
+            state.LastSeenPetItemId = equippedPet.ItemId;
+            PetItemState.SynchronizeEquippedState(state.Inventory, state.PetGrowth, state.PetActivity);
+        }
+        else
+        {
+            state.PetGrowth = 0;
+            state.PetActivity = 0;
+            state.LastSeenPetItemId = 0;
+        }
 
         if (data.RuneSystem is { } runeSystem)
             state.RuneSystem = runeSystem;
@@ -350,6 +373,8 @@ public sealed partial class Zone
 
         HydrateMountState(state, data);
         HydrateCostumeState(state, data);
+        HydrateStellarCoreState(state, data);
+        state.Zone38TribeEffect = _zone38TribeEffects.GetEffect(state.Tribe);
 
         RecomputeAndPublish(state);
 
@@ -368,6 +393,7 @@ public sealed partial class Zone
 
                 _grid.Remove(characterId, existing.CurrentCell);
                 _players[characterId] = state;
+                _pendingEnterBootstrapSessions.Remove(characterId);
 
                 if (existing.Session is IZoneSession staleZoneSession)
                     staleZoneSession.CurrentZone = null;
@@ -380,6 +406,7 @@ public sealed partial class Zone
                 logger.LogWarning(
                     "Character {CharacterId} entered zone {MapId} while already tracked -- ignoring duplicate Enter",
                     characterId, MapId);
+                snapshotSignal?.TrySetResult(existing);
                 return;
             }
         }
@@ -390,12 +417,40 @@ public sealed partial class Zone
 
         _grid.Add(characterId, cell, state.PosX, state.PosY, state.PosZ);
 
+        if (snapshotSignal is not null)
+            _pendingEnterBootstrapSessions[characterId] = state.Session.SessionId;
+
+        snapshotSignal?.TrySetResult(state);
+
         dirtyTracker.MarkDirty(characterId, DirtyFlags.Position);
 
         logger.LogInformation("Character {CharacterId} entered zone {MapId}", characterId, MapId);
 
+        if (snapshotSignal is not null)
+            return;
+
+        FanOutEnteredPlayer(characterId, state);
+    }
+
+    private ZoneCommandResult HandleEnterBootstrapAcknowledgement(int characterId, long expectedSessionId)
+    {
+        if (!_pendingEnterBootstrapSessions.TryGetValue(characterId, out var pendingSessionId) ||
+            pendingSessionId != expectedSessionId)
+            return ZoneCommandResult.Rejected("Character entry bootstrap is no longer pending for this session.");
+
+        if (!_players.TryGetValue(characterId, out var state) || state.Session.SessionId != expectedSessionId)
+            return ZoneCommandResult.Rejected("Character entry session is no longer active in this zone.");
+
+        _pendingEnterBootstrapSessions.Remove(characterId);
+        FanOutEnteredPlayer(characterId, state);
+        return ZoneCommandResult.Applied();
+    }
+
+    private void FanOutEnteredPlayer(int characterId, PlayerRuntimeState state)
+    {
         _enterNeighborScratch.Clear();
-        _grid.NeighborsExcludingSelf(_enterNeighborScratch, cell, characterId, state.PosX, state.PosY, state.PosZ);
+        _grid.NeighborsExcludingSelf(_enterNeighborScratch, state.CurrentCell, characterId, state.PosX, state.PosY,
+            state.PosZ);
 
         foreach (var otherId in _enterNeighborScratch)
             if (_players.TryGetValue(otherId, out var other) &&
@@ -409,7 +464,7 @@ public sealed partial class Zone
 
         SendExistingMonstersTo(state);
 
-        if (WrapCheckSpecialDestinationCatalog.IsInstancedDestination(MapId))
+        if (ChallengeContentEnabled && WrapCheckSpecialDestinationCatalog.IsInstancedDestination(MapId))
             TryEnterLegendsOfDarknessInstance(characterId);
         else if (IsZone241TypeZone)
             TryEnterZone241PersonalInstance(characterId);
@@ -437,7 +492,8 @@ public sealed partial class Zone
         state.AnimalIndex = data.MountSlotIndex;
         state.AnimalTime = data.MountTime;
         state.AnimalNumber = MountPersistenceCodec.IsMounted(data.MountSlotIndex)
-            ? state.MountGarage[data.MountSlotIndex - MountAnimalInfo.ActiveCompanionSlotBase]
+            ? MountCatalog.ResolveActiveMountItemId(
+                state.MountGarage[data.MountSlotIndex - MountAnimalInfo.ActiveCompanionSlotBase], data.MountSlotIndex)
             : 0;
         state.AnimalAbsorbTime = data.AnimalAbsorbTime;
         state.AnimalAbsorbState = data.AnimalAbsorbState;
@@ -456,45 +512,74 @@ public sealed partial class Zone
         state.CostumeNumber = CostumePersistenceCodec.ResolveWornNumber(state.CostumeIndex, state.CostumeWardrobe);
     }
 
+    private static void HydrateStellarCoreState(PlayerRuntimeState state, PlayerEnterData data)
+    {
+        if (data.StellarCoreWardrobe is { } wardrobe)
+            state.StellarCoreWardrobe = wardrobe;
+        if (data.StellarCoreExpireDate is { } expireDate)
+            state.StellarCoreExpireDate = expireDate;
+
+        state.StellarCoreIndex = StellarCorePersistenceCodec.NormalizeIndexOnLoad(data.StellarCoreIndex,
+            state.StellarCoreWardrobe);
+        state.StellarCoreNumber = StellarCorePersistenceCodec.ResolveWornNumber(state.StellarCoreIndex,
+            state.StellarCoreWardrobe);
+    }
+
     private void TryPublishPartyResyncRequest(int characterId, string avatarName)
     {
         if (_partyResyncRelayQueue is null || _partyRegistry.IsInParty(characterId))
             return;
 
-        _partyResyncRelayQueue.Value.Enqueue(new PartyResyncRelayEntry(
-            (byte)PartyResyncRelaySort.Request, options.ShardId, characterId, avatarName, avatarName));
+        var correlationId = Guid.NewGuid();
+        if (!_partyRegistry.TryRegisterResyncRequest(characterId, avatarName, correlationId))
+            return;
+
+        if (!_partyResyncRelayQueue.Value.Enqueue(new PartyResyncRelayEntry(
+                (byte)PartyResyncRelaySort.Request, options.ShardId, characterId, avatarName, avatarName)
+            {
+                RecipientCharacterId = characterId,
+                CorrelationId = correlationId
+            }))
+            _partyRegistry.CancelResyncRequest(characterId, correlationId);
     }
 
-    private void HandleLeave(int characterId, TaskCompletionSource<PlayerRuntimeState?>? snapshotSignal = null)
+    private ZoneLeaveResult HandleLeave(int characterId, long expectedSessionId)
     {
-        PlayerRuntimeState? state = null;
+        if (!_players.TryGetValue(characterId, out var state))
+            return ZoneLeaveResult.Rejected("Character is not present in this zone.");
+
+        if (state.Session.SessionId != expectedSessionId)
+            return ZoneLeaveResult.Rejected("Character is now represented by a newer session.");
+
+        if (!_players.TryRemove(characterId, out state))
+            return ZoneLeaveResult.Rejected("Character left this zone before its leave command was applied.");
 
         try
         {
-            if (!_players.TryRemove(characterId, out state))
-                return;
-
+            _pendingEnterBootstrapSessions.Remove(characterId);
+            _zoneTransferSnapshots.Remove(characterId);
             _grid.Remove(characterId, state.CurrentCell);
 
             logger.LogInformation("Character {CharacterId} left zone {MapId}", characterId, MapId);
 
-            if (!state.IsMovingZone)
-            {
-                BreakPartyOnDisconnect(characterId, state.Name);
+            BreakPartyOnDisconnect(characterId, state.Name);
 
-                if (characterShardLocations is not null)
-                    _ = CleanupShardLocationAsync(characterId);
-            }
+            if (characterShardLocations is not null)
+                _ = CleanupShardLocationAsync(characterId, state.Session.SessionId);
 
             ClearTradeOnDisconnect(characterId);
 
             ClearAcceptedNegotiationsOnDisconnect(characterId);
 
             ClearDungeonInstanceOnDisconnect(state);
+
+            return ZoneLeaveResult.Applied(state);
         }
-        finally
+        catch (Exception ex)
         {
-            snapshotSignal?.TrySetResult(state);
+            logger.LogError(ex, "Zone {MapId} leave cleanup for character {CharacterId} faulted after removal", MapId,
+                characterId);
+            return ZoneLeaveResult.Faulted(state, ex.Message);
         }
     }
 
@@ -512,7 +597,7 @@ public sealed partial class Zone
                 var disbandNotice = new PartyDisbandResponse { Sort = 1, AvatarName = "" };
                 foreach (var memberId in result.MembersBeforeLeave)
                     if (memberId != characterId)
-                        SendToCharacter(memberId, disbandNotice);
+                        SendOrRelayPartyNotice(memberId, disbandNotice, PartyResyncRelaySort.DisbandNotice, "");
                 return;
             }
 
@@ -521,11 +606,13 @@ public sealed partial class Zone
                 var leaveNotice = new PartyLeaveResponse { AvatarName = disconnectingName };
                 foreach (var memberId in result.MembersBeforeLeave)
                     if (memberId != characterId)
-                        SendToCharacter(memberId, leaveNotice);
+                        SendOrRelayPartyNotice(memberId, leaveNotice, PartyResyncRelaySort.LeaveNotice,
+                            disconnectingName);
 
+                var remainingPartyMembers = _partyRegistry.GetRoster(result.RemainingMembers[0]);
                 var roster = BuildPartyRoster(3, result.RemainingMembers);
                 foreach (var memberId in result.RemainingMembers)
-                    SendToCharacter(memberId, roster);
+                    SendOrRelayPartyRoster(memberId, roster, remainingPartyMembers);
 
                 return;
             }
@@ -539,8 +626,9 @@ public sealed partial class Zone
                     if (memberId == characterId)
                         continue;
 
-                    SendToCharacter(memberId, leaveNotice);
-                    SendToCharacter(memberId, disbandNotice);
+                    SendOrRelayPartyNotice(memberId, leaveNotice, PartyResyncRelaySort.LeaveNotice,
+                        disconnectingName);
+                    SendOrRelayPartyNotice(memberId, disbandNotice, PartyResyncRelaySort.DisbandNotice, "");
                 }
 
                 return;
@@ -593,6 +681,8 @@ public sealed partial class Zone
         for (var i = 0; i < memberIds.Count && i < 5; i++)
             if (TryFindPlayer(memberIds[i], out var member))
                 names[i] = member.Name;
+            else if (_partyRegistry.TryGetMemberName(memberIds[i], out var name))
+                names[i] = name;
 
         return new PartyRosterResponse
         {
@@ -611,6 +701,68 @@ public sealed partial class Zone
             member.Session.Send(packet);
     }
 
+    private void SendOrRelayPartyNotice<TPacket>(int characterId, in TPacket packet, PartyResyncRelaySort relaySort,
+        string avatarName) where TPacket : struct, IOutgoingPacket
+    {
+        if (TryFindPlayer(characterId, out var member))
+        {
+            member.Session.Send(packet);
+            return;
+        }
+
+        _partyResyncRelayQueue?.Value.Enqueue(new PartyResyncRelayEntry(
+            (byte)relaySort, options.ShardId, characterId, "", avatarName));
+    }
+
+    private void SendOrRelayPartyRoster(int characterId, in PartyRosterResponse packet,
+        IReadOnlyList<PartyMember> members)
+    {
+        if (TryFindPlayer(characterId, out var member))
+        {
+            member.Session.Send(packet);
+            return;
+        }
+
+        if (_partyResyncRelayQueue is null || members.Count == 0)
+            return;
+
+        foreach (var recipient in members)
+        {
+            if (recipient.CharacterId != characterId)
+                continue;
+
+            _partyResyncRelayQueue.Value.Enqueue(new PartyResyncRelayEntry(
+                (byte)PartyResyncRelaySort.PartyInfoReply,
+                options.ShardId,
+                characterId,
+                members[0].Name,
+                recipient.Name)
+            {
+                MemberId1 = MemberIdAt(members, 0),
+                MemberName1 = MemberNameAt(members, 0),
+                MemberId2 = MemberIdAt(members, 1),
+                MemberName2 = MemberNameAt(members, 1),
+                MemberId3 = MemberIdAt(members, 2),
+                MemberName3 = MemberNameAt(members, 2),
+                MemberId4 = MemberIdAt(members, 3),
+                MemberName4 = MemberNameAt(members, 3),
+                MemberId5 = MemberIdAt(members, 4),
+                MemberName5 = MemberNameAt(members, 4)
+            });
+            return;
+        }
+    }
+
+    private static int MemberIdAt(IReadOnlyList<PartyMember> members, int index)
+    {
+        return index < members.Count ? members[index].CharacterId : 0;
+    }
+
+    private static string MemberNameAt(IReadOnlyList<PartyMember> members, int index)
+    {
+        return index < members.Count ? members[index].Name : "";
+    }
+
     private bool TryFindPlayer(int characterId, [NotNullWhen(true)] out PlayerRuntimeState? state)
     {
         if (_players.TryGetValue(characterId, out state))
@@ -619,25 +771,96 @@ public sealed partial class Zone
         return _zoneRegistry is not null && _zoneRegistry.TryGetPlayer(characterId, out state);
     }
 
-    private void HandleMarkZoneTransferPending(int characterId)
+    private ZoneTransferHandoffSnapshot? HandleBeginZoneTransfer(int characterId, short targetMapId)
     {
         if (!_players.TryGetValue(characterId, out var state))
-            return;
+            return null;
 
-        state.IsMovingZone = true;
-        state.ZoneTransferRegisteredAtUtc = DateTime.UtcNow;
+        if (state.IsDead || state.Life <= 0)
+            return null;
+
+        if (state.IsMovingZone)
+            return null;
+
+        if (state.Session is not IZoneSession zoneSession)
+            return null;
+
+        var pendingRegisteredAtUtc = DateTime.UtcNow;
+        var previousBuffs = targetMapId == ZoneTransferBuffRules.BuffClearDestinationZoneId
+            ? (int[])state.Buffs.Buff.Clone()
+            : null;
+        var snapshot = new ZoneTransferHandoffSnapshot(
+            state.Name,
+            state.Tribe,
+            state.IsMovingZone,
+            state.ZoneTransferRegisteredAtUtc,
+            pendingRegisteredAtUtc,
+            previousBuffs);
+
+        try
+        {
+            ZoneTransferBuffRules.ClearIfDestinationRequiresIt(state.Buffs, targetMapId);
+            state.IsMovingZone = true;
+            state.ZoneTransferRegisteredAtUtc = pendingRegisteredAtUtc;
+            _zoneTransferSnapshots[characterId] = snapshot;
+            zoneSession.MarkZoneTransferPending();
+            return snapshot;
+        }
+        catch
+        {
+            _zoneTransferSnapshots.Remove(characterId);
+            previousBuffs?.CopyTo(state.Buffs.Buff, 0);
+            state.IsMovingZone = snapshot.WasMovingZone;
+            state.ZoneTransferRegisteredAtUtc = snapshot.PreviousRegisteredAtUtc;
+            throw;
+        }
     }
 
-    private void HandleClearZoneTransferPending(int characterId)
+    private ZoneCommandResult HandleClearZoneTransferPending(int characterId, DateTime zoneTransferRegisteredAtUtc)
     {
-        if (_players.TryGetValue(characterId, out var state))
+        if (!_players.TryGetValue(characterId, out var state))
+            return ZoneCommandResult.Rejected("Character is not present in this zone.");
+
+        ClearZoneTransferPending(state, characterId, zoneTransferRegisteredAtUtc);
+        return ZoneCommandResult.Applied();
+    }
+
+    private ZoneCommandResult HandleRollbackZoneTransfer(int characterId, DateTime pendingRegisteredAtUtc)
+    {
+        if (!_players.TryGetValue(characterId, out var state))
+            return ZoneCommandResult.Rejected("Character is not present in this zone.");
+
+        if (!_zoneTransferSnapshots.TryGetValue(characterId, out var snapshot) ||
+            snapshot.PendingRegisteredAtUtc != pendingRegisteredAtUtc)
+            return ZoneCommandResult.Rejected("Zone transfer no longer matches the handoff being rolled back.");
+
+        ClearZoneTransferPending(state, characterId, snapshot.PreviousRegisteredAtUtc);
+        return ZoneCommandResult.Applied();
+    }
+
+    private void ClearZoneTransferPending(PlayerRuntimeState state, int characterId, DateTime registeredAtUtc)
+    {
+        if (_zoneTransferSnapshots.Remove(characterId, out var snapshot))
+        {
+            snapshot.PreviousBuffs?.CopyTo(state.Buffs.Buff, 0);
+            state.IsMovingZone = snapshot.WasMovingZone;
+            state.ZoneTransferRegisteredAtUtc = snapshot.PreviousRegisteredAtUtc;
+        }
+        else
+        {
             state.IsMovingZone = false;
+            state.ZoneTransferRegisteredAtUtc = registeredAtUtc;
+        }
+
     }
 
-    private void HandleRefreshZoneTransferRegistrationTimestamp(int characterId)
+    private ZoneCommandResult HandleRefreshZoneTransferRegistrationTimestamp(int characterId)
     {
-        if (_players.TryGetValue(characterId, out var state))
-            state.ZoneTransferRegisteredAtUtc = DateTime.UtcNow;
+        if (!_players.TryGetValue(characterId, out var state))
+            return ZoneCommandResult.Rejected("Character is not present in this zone.");
+
+        state.ZoneTransferRegisteredAtUtc = DateTime.UtcNow;
+        return ZoneCommandResult.Applied();
     }
 
     private void HandleSetMuted(int characterId, bool muted)
@@ -646,12 +869,17 @@ public sealed partial class Zone
             state.IsMuted = muted;
     }
 
-    private async Task CleanupShardLocationAsync(int characterId)
+    private async Task CleanupShardLocationAsync(int characterId, long ownerSessionId)
     {
         try
         {
-            await characterShardLocations!.RemoveAsync(characterId, options.ShardId, CancellationToken.None)
-                .ConfigureAwait(false);
+            if (characterPresenceOwnership is not null)
+                await characterPresenceOwnership.RemoveIfOwnerAsync(characterId, ownerSessionId,
+                    cancellationToken => characterShardLocations!.RemoveAsync(characterId, options.ShardId,
+                        cancellationToken), CancellationToken.None).ConfigureAwait(false);
+            else
+                await characterShardLocations!.RemoveAsync(characterId, options.ShardId, CancellationToken.None)
+                    .ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -662,7 +890,8 @@ public sealed partial class Zone
     }
 
     public void ApplyDeath(int characterId, DeathCause cause = DeathCause.Unknown,
-        (float X, float Z)? deathSourcePosition = null, bool suppressExperienceLoss = false)
+        (float X, float Z)? deathSourcePosition = null, bool suppressExperienceLoss = false,
+        int originSort = 0, int deathSkillNumber = 0)
     {
         if (!_players.TryGetValue(characterId, out var state))
         {
@@ -672,35 +901,24 @@ public sealed partial class Zone
             return;
         }
 
-        if (state.IsDead)
-            return;
-
-        state.Life = 0;
-        state.IsDead = true;
-        state.TicksSinceDeath = 0;
-
-        state.ReviveHackFlag = cause != DeathCause.Duel;
-        state.CanUseConsumables = false;
-        state.DeathSubCounter = ReviveEligibilityRules.DeathSubCounterBaseline;
-
-        state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
-
-        QueueDeathEventLog(CharacterDeathEventCode, characterId, (byte)cause, $"Cause={cause};Level={state.Level}");
-
-        if (cause == DeathCause.MonsterKill && !suppressExperienceLoss)
-            ApplyDeathExperienceLoss(state);
-
-        if (state.IsStunned)
+        if (!state.CanIssueGameplayActions)
         {
-            state.IsStunned = false;
-            state.StunDurationSeconds = 0;
+            if (state.IsStunned)
+                BroadcastStunActionState(state, state.StunDurationTicks);
+
+            return;
         }
 
-        ClearAllBuffs(state);
-
-        ExpireDrunkBottleEffect(state);
-
-        ResetPartyBuffMarker(state);
+        state.CanUseConsumables = false;
+        state.IsStunned = false;
+        state.StunDurationTicks = 0;
+        state.IsDead = true;
+        state.DeathSubCounter = DeathSubCounterOnDeath;
+        state.TicksSinceDeath = 0;
+        state.ReviveHackFlag = originSort == 1;
+        state.RepeatedStunCount = 0;
+        state.TeamStunRewardCandidateIds.Clear();
+        state.Life = 0;
 
         var deathDirection = deathSourcePosition is { } source
             ? AvatarDeathDirection.FromPositions(state.PosX, state.PosZ, source.X, source.Z)
@@ -710,12 +928,12 @@ public sealed partial class Zone
         var deathAction = new ActionInfo
         {
             Type = 0,
-            Sort = 12,
+            Sort = DeathActionSort,
             Frame = 0,
             Location = [state.PosX, state.PosY, state.PosZ],
             TargetLocation = deathDirection is { } direction
                 ? [direction.DirectionX, 0f, direction.DirectionZ]
-                : [state.PosX, state.PosY, state.PosZ],
+                : [0f, 0f, 0f],
             Front = deathDirection?.FacingAngle ?? state.Heading,
             TargetFront = deathDirection?.FacingAngle ?? state.Heading,
             PetLocation = deathPet.PetLocation,
@@ -725,16 +943,28 @@ public sealed partial class Zone
             TargetObjectSort = 0,
             TargetObjectIndex = 0,
             TargetObjectUniqueNumber = 0,
-            SkillNumber = 0,
+            SkillNumber = deathSkillNumber,
             SkillGradeNum1 = 0,
             SkillGradeNum2 = 0,
             SkillValue = 0
         };
 
         _deathNeighborScratch.Clear();
-        _grid.NeighborsExcludingSelf(_deathNeighborScratch, state.CurrentCell, characterId, state.PosX, state.PosY,
-            state.PosZ);
+        _grid.Neighbors(_deathNeighborScratch, state.CurrentCell, state.PosX, state.PosY, state.PosZ);
         BroadcastAvatarAction(_deathNeighborScratch, state, deathAction);
+
+        state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
+
+        QueueDeathEventLog(CharacterDeathEventCode, characterId, (byte)cause, $"Cause={cause};Level={state.Level}");
+
+        if (cause == DeathCause.MonsterKill && !suppressExperienceLoss)
+            ApplyDeathExperienceLoss(state);
+
+        ClearAllBuffs(state);
+
+        ExpireDrunkBottleEffect(state);
+
+        ResetPartyBuffMarker(state);
     }
 
     private void ClearAllBuffs(PlayerRuntimeState state)
@@ -829,40 +1059,18 @@ public sealed partial class Zone
             $"Kind=Experience;Loss={loss};Level={state.Level}");
     }
 
-    public void GrantReviveEligibility(PlayerRuntimeState state)
+        public void ReleaseDeathGateWindow(PlayerRuntimeState state, bool clearReviveHackFlag)
     {
-        ClearDeathWindow(state, true);
-    }
+        var released = new DeathGateState(
+                state.IsDead,
+                state.Life,
+                state.CanUseConsumables,
+                state.DeathSubCounter,
+                state.ReviveHackFlag)
+            .ReleaseEligibilityWindow(clearReviveHackFlag);
 
-    public void ClearDeathWindowKeepLockArmed(PlayerRuntimeState state)
-    {
-        ClearDeathWindow(state, false);
-    }
-
-    private void ClearDeathWindow(PlayerRuntimeState state, bool clearLock)
-    {
-        if (!state.IsDead)
-            return;
-
-        state.IsDead = false;
-        state.Life = 1;
-        state.CanUseConsumables = true;
-        state.DeathSubCounter = ReviveEligibilityRules.DeathSubCounterBaseline;
-
-        if (clearLock)
-        {
-            state.ReviveHackFlag = false;
-            state.TicksSinceDeath = 0;
-        }
-
-        state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
-
-        SendAvatarAction(state.Session, state);
-
-        _reviveNeighborScratch.Clear();
-        _grid.NeighborsExcludingSelf(_reviveNeighborScratch, state.CurrentCell, state.CharacterId, state.PosX,
-            state.PosY, state.PosZ);
-        BroadcastAvatarAction(_reviveNeighborScratch, state);
+        state.DeathSubCounter = released.DeathSubCounter;
+        state.ReviveHackFlag = released.ReviveHackFlag;
     }
 
     private void HandleMove(int characterId, in ActionInfo action, bool isResumeAction = false)
@@ -870,19 +1078,18 @@ public sealed partial class Zone
         if (!_players.TryGetValue(characterId, out var state))
             return;
 
-        if (state.IsStunned && action.Sort != StunActionSort)
+        if (state.IsMovingZone)
+            return;
+
+        if (state.IsDead)
+            return;
+
+        if (state.IsStunned)
         {
-            BroadcastStunActionState(state, state.StunDurationSeconds);
+            BroadcastStunActionState(state, state.StunDurationTicks);
             return;
         }
 
-        if (!isResumeAction)
-            MaybeResetRegularWarAfkTick(state, in action);
-
-        if (IsFormationSkillZoneLocked(action.SkillNumber, isResumeAction))
-            return;
-
-        var motion = default(CharacterMotionEvaluation);
         if (isResumeAction)
         {
             if (!AvatarActionResumeWhitelist.IsLegal(action.Sort, action.Type))
@@ -896,16 +1103,15 @@ public sealed partial class Zone
                 return;
             }
 
-            state.DefenseHackPreviousPosX = state.PosX;
-            state.DefenseHackPreviousPosY = state.PosY;
-            state.DefenseHackPreviousPosZ = state.PosZ;
-
-            if (action.Sort == StunActionSort)
-                state.AfkTick = 0;
-            else if (AvatarActionResumeWhitelist.ClearsFishingProgress(action.Sort))
-                state.FishingState = 0;
+            if (!EvaluateResumeActionSkillGradeGuard(state, in action))
+                return;
         }
-        else if (!CharacterMotionWhitelist.TryEvaluate(action.Sort, action.Type, out motion))
+
+        if (IsFormationSkillZoneLocked(action.SkillNumber, isResumeAction))
+            return;
+
+        var motion = default(CharacterMotionEvaluation);
+        if (!isResumeAction && !CharacterMotionWhitelist.TryEvaluate(action.Sort, action.Type, out motion))
         {
             logger.LogWarning(
                 "Zone {MapId}: character {CharacterId} DISCONNECTED (Faulted) -- op15 Sort={Sort} Type={Type} " +
@@ -918,18 +1124,17 @@ public sealed partial class Zone
 
         var now = DateTime.UtcNow;
 
-        if (!isResumeAction && !movementRules.IsPlausible(state, in action, Geometry))
+        if (!movementRules.IsPlausible(state, in action, Geometry))
         {
             state.ImplausibleMoveStreak++;
 
             logger.LogWarning(
                 "Zone {MapId}: character {CharacterId} claimed an implausible position, REJECTED " +
                 "(consecutive={Streak}) -- Sort={Sort} Type={Type} From=({FromX},{FromY},{FromZ}) " +
-                "To=({ToX},{ToY},{ToZ}) GeometryLoaded={GeometryLoaded}",
+                "To=({ToX},{ToY},{ToZ})",
                 MapId, characterId, state.ImplausibleMoveStreak, action.Sort, action.Type,
                 state.PosX, state.PosY, state.PosZ,
-                action.Location[0], action.Location[1], action.Location[2],
-                Geometry is not null);
+                action.Location[0], action.Location[1], action.Location[2]);
 
             if (state.ImplausibleMoveStreak >= ImplausibleMoveDisconnectThreshold)
             {
@@ -944,9 +1149,22 @@ public sealed partial class Zone
             return;
         }
 
-        if (!isResumeAction)
+        state.ImplausibleMoveStreak = 0;
+
+        if (isResumeAction)
         {
-            state.ImplausibleMoveStreak = 0;
+            state.DefenseHackPreviousPosX = state.PosX;
+            state.DefenseHackPreviousPosY = state.PosY;
+            state.DefenseHackPreviousPosZ = state.PosZ;
+
+            if (action.Sort == StunActionSort)
+                state.AfkTick = 0;
+            else if (AvatarActionResumeWhitelist.EndsFishCapture(action.Sort))
+                state.CatchingFish = false;
+        }
+        else
+        {
+            MaybeResetRegularWarAfkTick(state, in action);
             state.SetDeclaredMoveAnchor(action.Location[0], action.Location[1], action.Location[2]);
         }
 
@@ -955,9 +1173,6 @@ public sealed partial class Zone
             "Frame={Frame} Claimed=({ToX},{ToY},{ToZ}) Front={Front}",
             MapId, characterId, isResumeAction, action.Sort, action.Type, action.Frame,
             action.Location[0], action.Location[1], action.Location[2], action.Front);
-
-        if (isResumeAction && !EvaluateResumeActionSkillGradeGuard(state, in action))
-            return;
 
         var isGuardedSkillCast = !isResumeAction &&
                                  motion.SkillCategoryCode is SkillCastGuard.HotkeyBoundCategoryCode
@@ -979,22 +1194,25 @@ public sealed partial class Zone
         var previousActionSkillNumber = state.ActionSkillNumber;
         var previousActionSkillGradeNum1 = state.ActionSkillGradeNum1;
         var previousActionSkillGradeNum2 = state.ActionSkillGradeNum2;
+        var previousActionTargetObjectIndex = state.ActionTargetObjectIndex;
+        var previousActionTargetObjectUniqueNumber = state.ActionTargetObjectUniqueNumber;
 
-        if (!isResumeAction)
-        {
-            state.PosX = action.Location[0];
-            state.PosY = action.Location[1];
-            state.PosZ = action.Location[2];
-        }
+        state.PosX = action.Location[0];
+        state.PosY = action.Location[1];
+        state.PosZ = action.Location[2];
 
         state.Heading = action.Front;
         state.LastMoveUtc = now;
         state.FlushSequence++;
 
         state.ActionSort = action.Sort;
+        state.ActionType = action.Type;
+        state.LastAcceptedAction = action;
         state.ActionSkillNumber = action.SkillNumber;
         state.ActionSkillGradeNum1 = action.SkillGradeNum1;
         state.ActionSkillGradeNum2 = action.SkillGradeNum2;
+        state.ActionTargetObjectIndex = action.TargetObjectIndex;
+        state.ActionTargetObjectUniqueNumber = action.TargetObjectUniqueNumber;
 
         if (!isResumeAction)
         {
@@ -1004,12 +1222,9 @@ public sealed partial class Zone
             state.AttackSubPacketsUsed = 0;
         }
 
-        if (!isResumeAction)
-        {
-            var newCell = _grid.CellOf(state.PosX, state.PosZ);
-            _grid.Move(characterId, state.CurrentCell, newCell, state.PosX, state.PosY, state.PosZ);
-            state.CurrentCell = newCell;
-        }
+        var newCell = _grid.CellOf(state.PosX, state.PosZ);
+        _grid.Move(characterId, state.CurrentCell, newCell, state.PosX, state.PosY, state.PosZ);
+        state.CurrentCell = newCell;
 
         dirtyTracker.MarkDirty(characterId, DirtyFlags.Position);
 
@@ -1024,6 +1239,7 @@ public sealed partial class Zone
             BroadcastAvatarAction(_moveNeighborScratch, state, action);
         }
 
+        state.CaptureLogoutSnapshot();
 
         if (!isResumeAction)
         {
@@ -1038,7 +1254,7 @@ public sealed partial class Zone
         else if (action.Sort == SkillEffectConfirmActionSort)
         {
             ApplySkillEffectConfirm(state, action, previousActionSkillNumber, previousActionSkillGradeNum1,
-                previousActionSkillGradeNum2);
+                previousActionSkillGradeNum2, previousActionTargetObjectIndex, previousActionTargetObjectUniqueNumber);
         }
         else if (PartyBuffMarkerDispatchRules.ShouldAdvancePartyBuffMarker(isResumeAction, action.Sort))
         {
@@ -1098,7 +1314,6 @@ public sealed partial class Zone
 
         return new SkillCastGuardContext(
             skillCategoryCode,
-            state.AutoHuntEnabled,
             action.SkillNumber,
             action.SkillGradeNum1,
             action.SkillGradeNum2,
@@ -1266,7 +1481,8 @@ public sealed partial class Zone
     }
 
     private void ApplySkillEffectConfirm(PlayerRuntimeState state, ActionInfo action, int previousSkillNumber,
-        int previousGradeNum1, int previousGradeNum2)
+        int previousGradeNum1, int previousGradeNum2, int previousTargetObjectIndex,
+        int previousTargetObjectUniqueNumber)
     {
         if (action.SkillNumber != previousSkillNumber ||
             action.SkillGradeNum1 != previousGradeNum1 ||
@@ -1297,7 +1513,11 @@ public sealed partial class Zone
                 return;
         }
 
-        DispatchSkillEffect(state, result, action.SkillNumber, action);
+        DispatchSkillEffect(state, result, action.SkillNumber, action with
+        {
+            TargetObjectIndex = previousTargetObjectIndex,
+            TargetObjectUniqueNumber = previousTargetObjectUniqueNumber
+        });
     }
 
     private void ApplyRegisteredAutoBuffs(PlayerRuntimeState state)
@@ -1309,13 +1529,33 @@ public sealed partial class Zone
             : null;
         var maxLife = state.Stats?.MaxLife ?? state.MaxLife;
 
-        foreach (var (skillId, registeredGrade) in state.AutoBuffSkill)
-        {
-            if (skillId == 0)
-                continue;
+        var normalized = state.AutoBuffSkill;
+        var changed = false;
 
-            worldData.SkillsById.TryGetValue(skillId, out var skillDef);
-            var gradePoints = registeredGrade +
+        for (var index = 0; index < normalized.Length; index++)
+        {
+            var (skillId, registeredGrade) = normalized[index];
+
+            if (!worldData.SkillsById.TryGetValue(skillId, out var skillDef) ||
+                !AutoBuffSkillResolver.TryResolveOwnedAutoBuff(skillId, registeredGrade, state.LearnedSkills,
+                    worldData.SkillsById.ContainsKey, out var selection))
+            {
+                if (skillId != 0 || registeredGrade != 0)
+                {
+                    normalized = normalized.SetItem(index, (0, 0));
+                    changed = true;
+                }
+
+                continue;
+            }
+
+            if (registeredGrade != selection.BaseGrade)
+            {
+                normalized = normalized.SetItem(index, (selection.SkillId, selection.BaseGrade));
+                changed = true;
+            }
+
+            var gradePoints = selection.BaseGrade +
                               SkillGradeAuthority.GetBonusSkillValue(skillId, equipSlotItems, 0, skillDef,
                                   state.GuildBuffType, state.GuildBuffActive);
 
@@ -1326,6 +1566,12 @@ public sealed partial class Zone
 
             DispatchSkillEffect(state, result, skillId, default);
         }
+
+        if (!changed)
+            return;
+
+        state.AutoBuffSkill = normalized;
+        state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
     }
 
     private void DispatchSkillEffect(PlayerRuntimeState state, SkillCastResolver.Result result, int skillNumber,
@@ -1674,9 +1920,9 @@ public sealed partial class Zone
                 SpecialState = state.SpecialState,
                 KillOtherTribe = 0,
                 GoodFellow = 0,
-                GuildName = "",
-                GuildRole = 0,
-                CallName = "",
+                GuildName = state.GuildName,
+                GuildRole = GuildRoleCodec.DbRoleToWire(state.GuildRoleDb),
+                CallName = state.GuildCallName,
                 GuildMarkEffect = 0,
                 Name = state.Name,
                 Tribe = state.Tribe,
@@ -1688,7 +1934,7 @@ public sealed partial class Zone
                 Level2 = state.Level2,
                 EquipForView =
                     EquipmentViewCodec.BuildEquipForView(state.Inventory.GetContainer(ContainerMatrix.Equipment)),
-                AnimalNumber = 0,
+                AnimalNumber = state.AnimalNumber,
                 Title = state.Title,
                 Halo = state.Halo,
                 RebirthNum = state.RebirthCount,
@@ -1722,7 +1968,7 @@ public sealed partial class Zone
                 UniqueSkillNumber = 0,
                 UniqueSkillBuffTime = 0,
                 CostumeState = state.CostumeState,
-                StellarCoreNumber = 0
+                StellarCoreNumber = state.StellarCoreNumber
             },
             CheckChangeActionState = checkChangeActionState
         };

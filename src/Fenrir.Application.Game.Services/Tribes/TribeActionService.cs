@@ -9,6 +9,7 @@ using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
+using Fenrir.Core.Abstractions;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Core.Wire;
 using Fenrir.Domain.Game.GameData;
@@ -56,9 +57,10 @@ public sealed class TribeActionService(
         var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
             pet: ComputePetContribution(state, equipmentContainer), runtimeState: state);
 
-        await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
+        if (!await ApplyRequiredActorMutationAsync(zone, state, new TribeProgressZoneCommand(characterId,
             StatVit: 1, StatStr: 1, StatInt: 1, StatDex: 1, StatPoints: newStatPoints,
-            Life: 1, Mana: 0, UpdatedStats: updatedStats), ct);
+            Life: 1, Mana: 0, UpdatedStats: updatedStats), "stat reset", false, ct))
+            return TribeActionOutcome.Abort;
 
         logger.LogInformation("Character {CharacterId} reset base stats, refunding {Refund} points", characterId,
             refund);
@@ -108,6 +110,14 @@ public sealed class TribeActionService(
             return TribeActionOutcome.Ok(1);
         }
 
+        if (target.IsMovingZone)
+        {
+            logger.LogDebug(
+                "Tribe {Tribe} sub-master appointment rejected: target {TargetCharacterId} is changing zone",
+                state.Tribe, target.CharacterId);
+            return TribeActionOutcome.Ok(1);
+        }
+
         if (target.Level < 113)
         {
             logger.LogDebug(
@@ -132,9 +142,23 @@ public sealed class TribeActionService(
             return TribeActionOutcome.Ok(4);
         }
 
-        await tribes.SetSubMasterAsync(state.Tribe, (byte)freeSlot, target.CharacterId, ct);
+        try
+        {
+            await tribes.SetSubMasterAsync(state.Tribe, (byte)freeSlot, target.CharacterId, ct);
+        }
+        catch (Exception ex)
+        {
+            AbortAfterUncertainPersistence(state, target, "sub-master appointment", ex);
+            return TribeActionOutcome.Abort;
+        }
 
-        zone.PostTribeProgressCommand(new TribeProgressZoneCommand(target.CharacterId, TribeRole: 2));
+        if (!await ApplyRequiredActorMutationAsync(zone, target,
+                new TribeProgressZoneCommand(target.CharacterId, TribeRole: 2), "sub-master appointment", true,
+                ct))
+        {
+            state.Session.Abort(DisconnectReason.Faulted);
+            return TribeActionOutcome.Abort;
+        }
 
         logger.LogInformation("Tribe {Tribe} appointed character {TargetCharacterId} as sub-master (slot {Slot})",
             state.Tribe, target.CharacterId, freeSlot);
@@ -156,10 +180,27 @@ public sealed class TribeActionService(
         if (targetId is null || subMasters.All(s => s.CharacterId != targetId.Value))
             return TribeActionOutcome.Abort;
 
-        await tribes.ClearSubMasterAsync(state.Tribe, targetId.Value, ct);
+        PlayerRuntimeState? onlineTarget = null;
+        Zone? targetZone = null;
+        zones.TryGetPlayerAndZone(targetId.Value, out onlineTarget, out targetZone);
 
-        if (zones.TryGetPlayerAndZone(targetId.Value, out _, out var targetZone))
-            targetZone.PostTribeProgressCommand(new TribeProgressZoneCommand(targetId.Value, TribeRole: 0));
+        try
+        {
+            await tribes.ClearSubMasterAsync(state.Tribe, targetId.Value, ct);
+        }
+        catch (Exception ex)
+        {
+            AbortAfterUncertainPersistence(state, onlineTarget, "sub-master removal", ex);
+            return TribeActionOutcome.Abort;
+        }
+
+        if (onlineTarget is not null && targetZone is not null &&
+            !await ApplyRequiredActorMutationAsync(targetZone, onlineTarget,
+                new TribeProgressZoneCommand(targetId.Value, TribeRole: 0), "sub-master removal", true, ct))
+        {
+            state.Session.Abort(DisconnectReason.Faulted);
+            return TribeActionOutcome.Abort;
+        }
 
         logger.LogInformation("Tribe {Tribe} removed character {TargetCharacterId} as sub-master", state.Tribe,
             targetId.Value);
@@ -181,16 +222,20 @@ public sealed class TribeActionService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Character {CharacterId} tribe-weapon money debit failed (insufficient funds)",
+            logger.LogError(ex,
+                "Character {CharacterId} tribe-weapon debit outcome is uncertain; closing for reload",
                 characterId);
+            state.Session.Abort(DisconnectReason.Faulted);
             return TribeActionOutcome.Abort;
         }
 
         logger.LogInformation("Character {CharacterId} purchased tribe weapon (item {ItemId}) for tribe {Tribe}",
             characterId, itemId, state.Tribe);
 
-        await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
-            DropItems: [new TribeGroundItemDrop(itemId, 1)]), ct);
+        if (!await ApplyRequiredActorMutationAsync(zone, state,
+                new TribeProgressZoneCommand(characterId, DropItems: [new TribeGroundItemDrop(itemId, 1)]),
+                "tribe weapon grant", true, ct))
+            return TribeActionOutcome.Abort;
 
         return TribeActionOutcome.Ok();
     }
@@ -263,9 +308,11 @@ public sealed class TribeActionService(
         var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
             pet: ComputePetContribution(state, equipmentContainer), runtimeState: state);
 
-        await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
+        if (!await ApplyRequiredActorMutationAsync(zone, state, new TribeProgressZoneCommand(characterId,
             state.ContributionPoints - cost, Title: newTitle,
-            Life: updatedStats.MaxLife, Mana: updatedStats.MaxMana, UpdatedStats: updatedStats), ct);
+            Life: updatedStats.MaxLife, Mana: updatedStats.MaxMana, UpdatedStats: updatedStats), "title purchase",
+            false, ct))
+            return TribeActionOutcome.Abort;
 
         logger.LogInformation(
             "Character {CharacterId} purchased title tier, new title {NewTitle} (spent {Cost} CP)", characterId,
@@ -296,8 +343,10 @@ public sealed class TribeActionService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Character {CharacterId} halo-enchant money debit failed (insufficient funds)",
+            logger.LogError(ex,
+                "Character {CharacterId} halo-enchant debit outcome is uncertain; closing for reload",
                 characterId);
+            state.Session.Abort(DisconnectReason.Faulted);
             return TribeActionOutcome.Abort;
         }
 
@@ -320,14 +369,17 @@ public sealed class TribeActionService(
             var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
                 pet: ComputePetContribution(state, equipmentContainer), runtimeState: state);
 
-            await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
+            if (!await ApplyRequiredActorMutationAsync(zone, state, new TribeProgressZoneCommand(characterId,
                 state.ContributionPoints - HaloEnchantCpCost, Halo: newHalo,
-                ProtectForHalo: newProtect, UpdatedStats: updatedStats), ct);
+                ProtectForHalo: newProtect, UpdatedStats: updatedStats), "halo enchant", true, ct))
+                return TribeActionOutcome.Abort;
         }
         else
         {
-            await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
-                state.ContributionPoints - HaloEnchantCpCost, ProtectForHalo: newProtect), ct);
+            if (!await ApplyRequiredActorMutationAsync(zone, state, new TribeProgressZoneCommand(characterId,
+                    state.ContributionPoints - HaloEnchantCpCost, ProtectForHalo: newProtect), "halo enchant", true,
+                    ct))
+                return TribeActionOutcome.Abort;
         }
 
         if (outcome == TribeHaloEnchantOutcome.ProtectionConsumed)
@@ -351,8 +403,9 @@ public sealed class TribeActionService(
 
         var claimedTier = state.BonusItemLevel;
 
-        await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
-            BonusItemLevel: 0, BonusItemValue: false, DropItems: drops), ct);
+        if (!await ApplyRequiredActorMutationAsync(zone, state, new TribeProgressZoneCommand(characterId,
+                BonusItemLevel: 0, BonusItemValue: false, DropItems: drops), "level bonus claim", false, ct))
+            return TribeActionOutcome.Abort;
 
         logger.LogInformation(
             "Character {CharacterId} claimed level-milestone bonus for tier {Tier} ({DropCount} items)",
@@ -370,7 +423,8 @@ public sealed class TribeActionService(
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
 
         var zoneOverride = new ZoneContext(state.MapId, on, RankBuffType: state.RankBuffType,
-            TribeRole: state.TribeRole, GuildBuffActive: state.GuildBuffActive, GuildId: state.GuildId ?? 0);
+            TribeRole: state.TribeRole, GuildBuffActive: state.GuildBuffActive,
+            GuildBuffType: state.GuildBuffType, GuildId: state.GuildId ?? 0);
 
         var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
             pet: ComputePetContribution(state, equipmentContainer), runtimeState: state, zoneOverride: zoneOverride);
@@ -380,7 +434,8 @@ public sealed class TribeActionService(
             : new TribeProgressZoneCommand(characterId, UseOrnament: false, Life: updatedStats.MaxLife,
                 Mana: updatedStats.MaxMana, UpdatedStats: updatedStats);
 
-        await zone.PostTribeProgressCommandAndWaitAsync(command, ct);
+        if (!await ApplyRequiredActorMutationAsync(zone, state, command, "ornament update", false, ct))
+            return TribeActionOutcome.Abort;
 
         logger.LogDebug("Character {CharacterId} set tribe ornament to {OnOff}", characterId, on ? "on" : "off");
 
@@ -411,13 +466,17 @@ public sealed class TribeActionService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Character {CharacterId} tower-scroll money debit failed (insufficient funds)",
+            logger.LogError(ex,
+                "Character {CharacterId} tower-scroll debit outcome is uncertain; closing for reload",
                 characterId);
+            state.Session.Abort(DisconnectReason.Faulted);
             return TribeActionOutcome.Abort;
         }
 
-        await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
-            DropItems: [new TribeGroundItemDrop(665, 1)]), ct);
+        if (!await ApplyRequiredActorMutationAsync(zone, state,
+                new TribeProgressZoneCommand(characterId, DropItems: [new TribeGroundItemDrop(665, 1)]),
+                "tower scroll grant", true, ct))
+            return TribeActionOutcome.Abort;
 
         logger.LogInformation("Character {CharacterId} purchased a tower-construction scroll for tribe {Tribe}",
             characterId, state.Tribe);
@@ -431,9 +490,10 @@ public sealed class TribeActionService(
         if (state.TribeRole is not (1 or 2) || state.ContributionPoints < cpCost)
             return TribeActionOutcome.Abort;
 
-        await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
+        if (!await ApplyRequiredActorMutationAsync(zone, state, new TribeProgressZoneCommand(characterId,
             state.ContributionPoints - cpCost,
-            DropItems: [new TribeGroundItemDrop(itemId, 1)]), ct);
+            DropItems: [new TribeGroundItemDrop(itemId, 1)]), "tribe scroll redemption", false, ct))
+            return TribeActionOutcome.Abort;
 
         logger.LogInformation("Character {CharacterId} redeemed item {ItemId} for {CpCost} CP", characterId, itemId,
             cpCost);
@@ -447,6 +507,32 @@ public sealed class TribeActionService(
         BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(0, 4), tribe);
         LegacyWireCodec.WriteFixedString(payload.AsSpan(4, BroadcastNameFieldSize), avatarName);
         return payload;
+    }
+
+    private async ValueTask<bool> ApplyRequiredActorMutationAsync(Zone zone, PlayerRuntimeState state,
+        TribeProgressZoneCommand command, string operation, bool persistedBeforeActorMutation, CancellationToken ct)
+    {
+        var result = await zone.PostTribeProgressCommandAndWaitForResultAsync(command, ct).ConfigureAwait(false);
+        if (result.Kind == ZoneCommandResultKind.Applied)
+            return true;
+
+        logger.LogError(
+            persistedBeforeActorMutation
+                ? "Character {CharacterId} {Operation} committed before its actor mutation, which was {ResultKind} ({Cause}); closing for reload"
+                : "Character {CharacterId} {Operation} actor mutation was {ResultKind} ({Cause}); closing without success response",
+            state.CharacterId, operation, result.Kind, result.Cause);
+        state.Session.Abort(DisconnectReason.Faulted);
+        return false;
+    }
+
+    private void AbortAfterUncertainPersistence(PlayerRuntimeState requester, PlayerRuntimeState? target,
+        string operation, Exception exception)
+    {
+        logger.LogError(exception,
+            "Character {CharacterId} {Operation} persistence outcome is uncertain; closing affected sessions for reload",
+            requester.CharacterId, operation);
+        requester.Session.Abort(DisconnectReason.Faulted);
+        target?.Session.Abort(DisconnectReason.Faulted);
     }
 
     private static bool IsValidTown(byte tribe, short mapId)

@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Network.Transport;
 
-public sealed class SocketConnection : IDuplexPipe, IAsyncDisposable
+public sealed class SocketConnection : IBufferedDuplexPipe, IAsyncDisposable
 {
     private const int ReceiveBufferSize = 4096;
 
@@ -19,6 +19,11 @@ public sealed class SocketConnection : IDuplexPipe, IAsyncDisposable
 
     private readonly Socket _socket;
     private readonly Pipe _txPipe;
+    private readonly PipeWriter _txWriter;
+
+    private long _bufferedOutputBytes;
+    private int _disposed;
+    private int _faultReported;
 
     public SocketConnection(Socket socket, ILogger? logger = null, bool applyOsSocketBuffers = false)
     {
@@ -36,25 +41,35 @@ public sealed class SocketConnection : IDuplexPipe, IAsyncDisposable
 
         _rxPipe = new Pipe(PipeOptionsFactory.Rx);
         _txPipe = new Pipe(PipeOptionsFactory.Tx);
+        _txWriter = new CountingPipeWriter(_txPipe.Writer, OnOutputBytesWritten);
     }
 
     public IPEndPoint? RemoteEndPoint { get; }
 
     public Func<byte> GetInboundXorKey { get; set; } = static () => 0;
 
+    public long BufferedOutputBytes => Volatile.Read(ref _bufferedOutputBytes);
+
+    public event Action<long>? OutputBytesConsumed;
+
     public async ValueTask DisposeAsync()
     {
-        _socket.Dispose();
-        _abortCts.Dispose();
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
 
-        await _rxPipe.Reader.CompleteAsync().ConfigureAwait(false);
-        await _rxPipe.Writer.CompleteAsync().ConfigureAwait(false);
-        await _txPipe.Reader.CompleteAsync().ConfigureAwait(false);
-        await _txPipe.Writer.CompleteAsync().ConfigureAwait(false);
+        Abort();
+        _socket.Dispose();
+
+        await CompleteQuietlyAsync(_rxPipe.Reader).ConfigureAwait(false);
+        await CompleteQuietlyAsync(_rxPipe.Writer).ConfigureAwait(false);
+        await CompleteQuietlyAsync(_txPipe.Reader).ConfigureAwait(false);
+        await CompleteQuietlyAsync(_txPipe.Writer).ConfigureAwait(false);
+
+        _abortCts.Dispose();
     }
 
     public PipeReader Input => _rxPipe.Reader;
-    public PipeWriter Output => _txPipe.Writer;
+    public PipeWriter Output => _txWriter;
 
     public async Task RunIoAsync(CancellationToken cancellationToken)
     {
@@ -100,6 +115,9 @@ public sealed class SocketConnection : IDuplexPipe, IAsyncDisposable
         catch (Exception ex)
         {
             failure = ex;
+
+            if (!cancellationToken.IsCancellationRequested)
+                ReportFault(ex);
         }
         finally
         {
@@ -137,6 +155,7 @@ public sealed class SocketConnection : IDuplexPipe, IAsyncDisposable
                 }
 
                 reader.AdvanceTo(buffer.End);
+                ReportOutputBytesConsumed(buffer.Length);
 
                 if (result.IsCompleted || result.IsCanceled)
                     break;
@@ -147,11 +166,135 @@ public sealed class SocketConnection : IDuplexPipe, IAsyncDisposable
             failure = ex;
 
             if (ex is not OperationCanceledException)
+            {
                 _logger?.SendLoopFaulted(ex, RemoteEndPoint);
+                ReportFault(ex);
+            }
         }
         finally
         {
             await reader.CompleteAsync(failure).ConfigureAwait(false);
+        }
+    }
+
+    private static async ValueTask CompleteQuietlyAsync(PipeReader reader)
+    {
+        try
+        {
+            await reader.CompleteAsync().ConfigureAwait(false);
+        }
+        catch (InvalidOperationException)
+        {
+        }
+    }
+
+    private static async ValueTask CompleteQuietlyAsync(PipeWriter writer)
+    {
+        try
+        {
+            await writer.CompleteAsync().ConfigureAwait(false);
+        }
+        catch (InvalidOperationException)
+        {
+        }
+    }
+
+    private void OnOutputBytesWritten(int bytes)
+    {
+        if (bytes > 0)
+            Interlocked.Add(ref _bufferedOutputBytes, bytes);
+    }
+
+    private void ReportOutputBytesConsumed(long bytes)
+    {
+        if (bytes <= 0)
+            return;
+
+        Interlocked.Add(ref _bufferedOutputBytes, -bytes);
+        try
+        {
+            OutputBytesConsumed?.Invoke(bytes);
+        }
+        catch
+        {
+        }
+    }
+
+    private void ReportFault(Exception exception)
+    {
+        if (Interlocked.CompareExchange(ref _faultReported, 1, 0) != 0)
+            return;
+
+        try
+        {
+            TransportFaulted?.Invoke(exception);
+        }
+        catch
+        {
+        }
+    }
+
+    public event Action<Exception>? TransportFaulted;
+
+    private sealed class CountingPipeWriter(PipeWriter inner, Action<int> onAdvance) : PipeWriter
+    {
+        public override bool CanGetUnflushedBytes => inner.CanGetUnflushedBytes;
+
+        public override long UnflushedBytes => inner.UnflushedBytes;
+
+        public override void Advance(int bytes)
+        {
+            inner.Advance(bytes);
+            onAdvance(bytes);
+        }
+
+        public override Stream AsStream(bool leaveOpen = false)
+        {
+            return inner.AsStream(leaveOpen);
+        }
+
+        public override void CancelPendingFlush()
+        {
+            inner.CancelPendingFlush();
+        }
+
+        public override void Complete(Exception? exception = null)
+        {
+            inner.Complete(exception);
+        }
+
+        public override ValueTask CompleteAsync(Exception? exception = null)
+        {
+            return inner.CompleteAsync(exception);
+        }
+
+        public override ValueTask<FlushResult> FlushAsync(CancellationToken cancellationToken = default)
+        {
+            return inner.FlushAsync(cancellationToken);
+        }
+
+        public override Memory<byte> GetMemory(int sizeHint = 0)
+        {
+            return inner.GetMemory(sizeHint);
+        }
+
+        public override Span<byte> GetSpan(int sizeHint = 0)
+        {
+            return inner.GetSpan(sizeHint);
+        }
+
+        [Obsolete]
+        public override void OnReaderCompleted(Action<Exception?, object?> callback, object? state)
+        {
+            inner.OnReaderCompleted(callback, state);
+        }
+
+        public override ValueTask<FlushResult> WriteAsync(ReadOnlyMemory<byte> source,
+            CancellationToken cancellationToken = default)
+        {
+            source.CopyTo(GetMemory(source.Length));
+            Advance(source.Length);
+            return FlushAsync(cancellationToken);
         }
     }
 }

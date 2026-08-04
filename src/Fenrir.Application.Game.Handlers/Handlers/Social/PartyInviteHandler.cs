@@ -31,6 +31,7 @@ public sealed class PartyInviteHandler(IPartyInviteService partyInviteService, I
         switch (result.Kind)
         {
             case PartyInviteResultKind.InviterMustDisconnect:
+                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             case PartyInviteResultKind.TargetNotFound:
                 session.Send(new PartyAnswerResponse { Answer = 4 });

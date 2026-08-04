@@ -21,7 +21,7 @@ public static class WorldStateProjection
             if (tribe.TribeId >= WorldStateService.TribeCount)
                 continue;
 
-            tribeSymbol[tribe.TribeId] = tribe.HasSymbol ? tribe.TribeId : 0;
+            tribeSymbol[tribe.TribeId] = worldState.GetTribeSymbolOwner(tribe.TribeId);
             tribePoint[tribe.TribeId] = tribe.Points;
         }
 

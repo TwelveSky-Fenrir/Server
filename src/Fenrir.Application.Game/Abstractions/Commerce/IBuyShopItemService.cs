@@ -25,7 +25,11 @@ public readonly record struct BuyShopItemSellerResult(
 public readonly record struct BuyShopItemCommitResult(
     bool Abort,
     BuyShopItemResponse? Response,
-    ViewShopStallResponse? ListingRefresh);
+    ViewShopStallResponse? ListingRefresh,
+    int? SellerCharacterId = null,
+    BuyShopItemResponse? SellerSoldNotification = null,
+    bool CloseSellerShop = false,
+    int? ProxyShopToRemove = null);
 
 public interface IBuyShopItemService
 {

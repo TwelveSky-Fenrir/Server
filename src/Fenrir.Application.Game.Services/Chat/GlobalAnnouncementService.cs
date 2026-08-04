@@ -44,7 +44,7 @@ public sealed class GlobalAnnouncementService(
             options.Value.ShardId,
             null,
             null,
-            0,
+            (byte)Math.Clamp(zoneSession.AccountGrade, (short)0, byte.MaxValue),
             string.Empty,
             content,
             false,
@@ -53,7 +53,10 @@ public sealed class GlobalAnnouncementService(
             null,
             null,
             null,
-            null));
+            null)
+        {
+            SourceCharacterId = zoneSession.CharacterId
+        });
 
         Audit(zoneSession, GmCommandCatalog.OutcomeExecuted,
             $"Command=NOTICE;RecipientCount={recipientCount};Content={content}");

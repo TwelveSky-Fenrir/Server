@@ -1,7 +1,7 @@
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Domain.World.ZoneWar;
+using Fenrir.Application.Game.Services.ZoneWar;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -11,7 +11,7 @@ namespace Fenrir.Application.Game.Hosting.World.ZoneWar;
 public sealed class HolyStoneWarCycleHost(
     IOptions<GameServerOptions> options,
     ZoneRegistry zoneRegistry,
-    HolyStoneWarCycle cycle,
+    HolyStoneWarCycleStateService stateService,
     ILogger<HolyStoneWarCycleHost> logger) : BackgroundService
 {
     public bool IsArmed { get; } =
@@ -27,6 +27,16 @@ public sealed class HolyStoneWarCycleHost(
             return;
         }
 
+        try
+        {
+            await stateService.InitializeAsync(stoppingToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogCritical(ex, "HolyStoneWarCycleHost remains disabled because its durable state is unavailable");
+            return;
+        }
+
         using var timer = new PeriodicTimer(SimulationClock.LegacyTick);
 
         try
@@ -34,7 +44,7 @@ public sealed class HolyStoneWarCycleHost(
             while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
                 try
                 {
-                    cycle.Tick(SimulationClock.LegacyTick);
+                    await stateService.TickAsync(SimulationClock.LegacyTick, stoppingToken).ConfigureAwait(false);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
@@ -43,6 +53,15 @@ public sealed class HolyStoneWarCycleHost(
         }
         catch (OperationCanceledException)
         {
+        }
+
+        try
+        {
+            await stateService.FlushAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Holy Stone cycle shutdown flush failed");
         }
     }
 }

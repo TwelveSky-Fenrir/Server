@@ -27,6 +27,24 @@ public static class TribeGuardCorridorCatalogFactory
         return new TribeGuardCorridorCatalog(
             HubZoneId,
             chains,
-            ImmutableDictionary<(byte TribeId, byte SegmentIndex), ImmutableArray<int>>.Empty);
+            BuildGuardPostSlots());
+    }
+
+    private static ImmutableDictionary<(byte TribeId, byte SegmentIndex), ImmutableArray<int>> BuildGuardPostSlots()
+    {
+        var builder = ImmutableDictionary.CreateBuilder<(byte TribeId, byte SegmentIndex), ImmutableArray<int>>();
+
+        for (byte tribeId = 0; tribeId < TribeGuardCorridorState.TribeCount; tribeId++)
+        for (byte segmentIndex = 0; segmentIndex < TribeGuardCorridorState.SegmentCount; segmentIndex++)
+        {
+            var firstSlot = tribeId * GuardPostDefinition.SlotsPerPost;
+            var slots = ImmutableArray.CreateBuilder<int>(GuardPostDefinition.SlotsPerPost);
+            for (var offset = 0; offset < GuardPostDefinition.SlotsPerPost; offset++)
+                slots.Add(TribeGuardSpawner.OrdinaryPoolServerIndexBase + firstSlot + offset);
+
+            builder[(tribeId, segmentIndex)] = slots.MoveToImmutable();
+        }
+
+        return builder.ToImmutable();
     }
 }

@@ -112,7 +112,7 @@ public static class StoreItemTransferPolicy
         byte fromContainer, int fromSlot, int requestedQuantity,
         byte toContainer, int toSlot,
         ItemStack? source, ItemStack? destination,
-        bool sourceIsStackable,
+        bool sourceIsStackable, bool sourceSupportsSocket,
         bool secondStorePageAccessible)
     {
         if (!ContainerMatrix.IsValidSlot(fromContainer, fromSlot))
@@ -132,7 +132,12 @@ public static class StoreItemTransferPolicy
             return Fail(TransferOutcome.SourceEmpty);
 
         if (!sourceIsStackable)
-            return new TransferResult(TransferOutcome.Success, destination, src, false);
+        {
+            if (destination is not null)
+                return Fail(TransferOutcome.DestinationConflict);
+
+            return new TransferResult(TransferOutcome.Success, null, src, true);
+        }
 
         if (requestedQuantity < 0 || requestedQuantity > GroundItemPickupPolicy.MaxStackQuantity)
             return Fail(TransferOutcome.InvalidQuantity);
@@ -142,12 +147,7 @@ public static class StoreItemTransferPolicy
             return Fail(TransferOutcome.InvalidQuantity);
 
         if (destination is { } dst && dst.ItemId != src.ItemId)
-        {
-            if (effectiveQuantity != src.Quantity)
-                return Fail(TransferOutcome.DestinationConflict);
-
-            return new TransferResult(TransferOutcome.Success, dst, src, false);
-        }
+            return Fail(TransferOutcome.DestinationConflict);
 
         var mergedQuantity = (destination?.Quantity ?? 0) + effectiveQuantity;
         if (mergedQuantity > GroundItemPickupPolicy.MaxStackQuantity)
@@ -161,14 +161,16 @@ public static class StoreItemTransferPolicy
             Combine = 0,
             Refine = 0,
             Socket = 0,
-            Serial = 0,
-            ExpireDate = src.ExpireDate
+            Serial = 0
         };
 
         var remaining = src.Quantity - effectiveQuantity;
-        var newSource = remaining == 0 ? (ItemStack?)null : src with { Quantity = remaining };
+        if (remaining > 0)
+            return new TransferResult(TransferOutcome.Success, src with { Quantity = remaining }, newDestination,
+                false);
 
-        return new TransferResult(TransferOutcome.Success, newSource, newDestination, false);
+        return new TransferResult(TransferOutcome.Success, null,
+            CopySocketAndExpiry(newDestination, src, sourceSupportsSocket), false);
     }
 
     private static TransferResult ResolveOneWayTransfer(

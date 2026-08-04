@@ -27,24 +27,41 @@ public static partial class StatCalculator
         FrozenDictionary<int, GemSocketRowDto>? gemSocketsByTypeAndValue = null)
     {
         var bySlot = BuildSlotLookup(equipment);
-        var setNumber = SetBonusTables.ResolveEffectiveSetNumber(attributes.PreviousTribe, equipment, legacySetNumber);
+        var hasActiveBalanceControl = IsBalanceStatZone(zone.ZoneNumber) && zone.BalanceControl > 0;
+        var balanceAttributes = hasActiveBalanceControl ? BalanceAttributes(attributes.Level) : default;
+        var calculationAttributes = hasActiveBalanceControl
+            ? attributes with
+            {
+                Vitality = balanceAttributes.Vitality,
+                Strength = balanceAttributes.Strength,
+                Intelligence = balanceAttributes.Intelligence,
+                Dexterity = balanceAttributes.Dexterity
+            }
+            : attributes;
+        var setNumber = SetBonusTables.ResolveEffectiveSetNumber(calculationAttributes.PreviousTribe, equipment,
+            legacySetNumber);
         var isLegendarySet = AnyLegendary(bySlot);
-        var levelRow = GetLevelRow(levels, attributes.CombinedLevel);
+        var levelRow = GetLevelRow(levels, hasActiveBalanceControl
+            ? (short)BalanceLevelTerm(attributes.Level)
+            : calculationAttributes.CombinedLevel);
 
-        var vitality = ComputeVitality(attributes, bySlot, cosmetic, consumable, mount);
-        var strength = ComputeStrength(attributes, bySlot, cosmetic, consumable, mount);
-        var ki = ComputeKi(attributes, bySlot, cosmetic, consumable, mount);
-        var wisdom = ComputeWisdom(attributes, bySlot, cosmetic, consumable, mount);
+        var vitality = ComputeVitality(calculationAttributes, bySlot, cosmetic, consumable, mount);
+        var strength = ComputeStrength(calculationAttributes, bySlot, cosmetic, consumable, mount);
+        var ki = ComputeKi(calculationAttributes, bySlot, cosmetic, consumable, mount);
+        var wisdom = ComputeWisdom(calculationAttributes, bySlot, cosmetic, consumable, mount);
 
         return new EffectiveStats(
-            ComputeMaxLife(vitality, levelRow, setNumber, isLegendarySet, attributes.PreviousTribe, bySlot, pet.Life,
-                zone, consumable, mount, cosmetic),
-            ComputeMaxMana(ki, levelRow, setNumber, bySlot, pet.Mana, zone, consumable, mount),
-            ComputeAttackPower(strength, ki, levelRow, setNumber, bySlot, cosmetic, zone, mount, consumable,
-                gemSocketsByTypeAndValue),
+            ComputeMaxLife(vitality, levelRow, setNumber, isLegendarySet, calculationAttributes.Tribe,
+                calculationAttributes.PreviousTribe, bySlot, pet.Life, zone, consumable, mount, cosmetic),
+            ComputeMaxMana(ki, levelRow, setNumber, calculationAttributes.Tribe, bySlot, pet.Mana, zone, consumable,
+                mount),
+            ComputeAttackPower(strength, ki, levelRow, setNumber, calculationAttributes.Tribe, bySlot, cosmetic,
+                zone, mount, consumable),
             ComputeDefensePower(wisdom, levelRow, setNumber, bySlot, cosmetic, zone, mount),
-            ComputeAttackSuccess(strength, levelRow, setNumber, bySlot, mount, zone, consumable),
-            ComputeAttackBlock(wisdom, vitality, levelRow, setNumber, bySlot, mount, zone, consumable),
+            ComputeAttackSuccess(strength, levelRow, setNumber, calculationAttributes.Tribe, bySlot, mount, zone,
+                consumable),
+            ComputeAttackBlock(wisdom, vitality, levelRow, setNumber, calculationAttributes.Tribe, bySlot, mount,
+                zone, consumable),
             ComputeCritical(setNumber, bySlot, cosmetic, mount, consumable, zone),
             ComputeCriticalDefence(setNumber, attributes.RebirthCount, attributes.Halo, bySlot, cosmetic, mount, zone),
             ComputeLuck(setNumber, bySlot, cosmetic),
@@ -71,8 +88,12 @@ public static partial class StatCalculator
         var setNumber = SetBonusTables.ResolveEffectiveSetNumber(attributes.PreviousTribe, equipment, legacySetNumber);
         var titleRank = attributes.Title % 100;
 
-        var attackPower = ApplyBuffPercent(baseStats.AttackPower, GetBuffPercent(buffs, 0));
+        var attackPower = ApplyRageAttackMultiplier(baseStats.AttackPower, zone);
+        attackPower = ApplyBuffPercent(attackPower, GetBuffPercent(buffs, 0));
         attackPower = ApplyPetDoubleRule(attackPower, pet.AttackPower);
+        if (gemSocketsByTypeAndValue is not null)
+            attackPower += SumEquippedGemSocketContribution(GemSocketStatKind.AttackPower, bySlot,
+                gemSocketsByTypeAndValue);
         attackPower += RankBuffAttackPowerBonus(zone);
         attackPower += pet.SteppedAttackBonus;
         attackPower = ApplyDrunkAttackPower(attackPower, zone);
@@ -81,6 +102,7 @@ public static partial class StatCalculator
 
         var defensePower = ApplyBuffPercent(baseStats.DefensePower, GetBuffPercent(buffs, 1));
         defensePower = ApplyPetDoubleRule(defensePower, pet.DefensePower);
+        defensePower = ApplyGuildBuffDefensePower(defensePower, zone);
         defensePower += RankBuffDefensePowerBonus(zone);
         defensePower = ApplyDrunkDefensePower(defensePower, zone);
         defensePower += TribeRoleDefensePowerBonus(zone);
@@ -113,6 +135,7 @@ public static partial class StatCalculator
         var critical = ApplyBuffPercent(baseStats.Critical, GetBuffPercent(buffs, 10));
         critical += RebirthCriticalWrapperBonus(attributes.RebirthCount);
         critical += SetBonusTables.GetWrapperCriticalBonus(setNumber);
+        critical = ApplyGuildBuffCritical(critical, zone);
         critical += TribeRoleCriticalBonus(zone);
         critical = ApplyDrunkCritical(critical, zone);
         critical += SetBonusTables.CapeIuBonus(bySlot[1], 7, 0.5f);
@@ -121,11 +144,12 @@ public static partial class StatCalculator
 
         return baseStats with
         {
+            MaxLife = ApplyZone38TribeEffect(baseStats.MaxLife, zone, 3, 5),
             AttackPower = attackPower,
             DefensePower = defensePower,
             AttackSuccess = attackSuccess,
             AttackBlock = attackBlock,
-            Critical = critical,
+            Critical = ApplyZone38TribeEffect(critical, zone, 1, 2),
             Luck = luck,
             ElementAttackPower = elementAttackPower,
             ElementDefensePower = elementDefensePower
@@ -169,7 +193,16 @@ public static partial class StatCalculator
 
     private static int ApplyBuffPercent(int value, int? buffPercent)
     {
-        return buffPercent is not { } pct || pct == 0 ? value : (int)(value * (pct + 100) * 0.01f);
+        return buffPercent is > 0
+            ? (int)(value * (buffPercent.Value + 100) * 0.01f)
+            : value;
+    }
+
+    private static int ApplyZone38TribeEffect(int value, ZoneContext zone, int effect, int percentage)
+    {
+        return zone.Zone38TribeEffect == effect
+            ? (int)(value * (percentage + 100) * 0.01f)
+            : value;
     }
 
     private static int? GetBuffPercent(BuffInfo? buffs, int slotIndex)

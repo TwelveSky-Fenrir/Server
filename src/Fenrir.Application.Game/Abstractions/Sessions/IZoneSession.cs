@@ -13,6 +13,8 @@ public interface IZoneActor;
 
 public interface IZoneSession : IPacketSession
 {
+    public short ListenerMapId { get; }
+
     public ZoneSessionState State { get; }
 
     public int? AccountId { get; }
@@ -31,6 +33,8 @@ public interface IZoneSession : IPacketSession
 
     public bool IsZoneTransferPending { get; }
 
+        public bool IsZoneTransferHandoffCommitted { get; }
+
     public bool MeetsGmTier(GmCommandTier tier);
 
     public void MarkTicketConsumed(int accountId, int characterId, Guid? sessionToken = null, short accountGrade = 0,
@@ -41,6 +45,10 @@ public interface IZoneSession : IPacketSession
     public void MarkInWorld();
 
     public void MarkZoneTransferPending();
+
+    public void ConfirmZoneTransferHandoff();
+
+    public void RevokeZoneTransferHandoffCommitment();
 
     public void ClearZoneTransferPending();
 }

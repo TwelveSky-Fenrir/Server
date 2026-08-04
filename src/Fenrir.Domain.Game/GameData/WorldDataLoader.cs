@@ -77,10 +77,12 @@ public sealed class WorldDataLoader(IWorldDataRepository repository, ILogger<Wor
         var itemMallProducts = itemMallProductsTask.Result;
         var rewardBundles = rewardBundlesTask.Result;
         var rewardBundleItems = rewardBundleItemsTask.Result;
+        var effectiveItems = WorldDataOverlay.ApplyItems(items);
+        var effectiveZoneNpcSpawns = WorldDataOverlay.ApplyNpcSpawns(zoneNpcSpawns);
 
         var rows = new WorldDataRows
         {
-            Items = items,
+            Items = effectiveItems,
             ItemBonusSkills = itemBonusSkills,
             Skills = skills,
             SkillDescriptions = skillDescriptions,
@@ -104,7 +106,7 @@ public sealed class WorldDataLoader(IWorldDataRepository repository, ILogger<Wor
             Zones = zones,
             ZonePortals = zonePortals,
             ZoneSpawnPoints = zoneSpawnPoints,
-            ZoneNpcSpawns = zoneNpcSpawns,
+            ZoneNpcSpawns = effectiveZoneNpcSpawns,
             MonsterSpawnRegions = monsterSpawnRegions,
             GemSockets = gemSockets,
             BloodExchangeCatalog = bloodExchangeCatalog,
@@ -138,7 +140,7 @@ public sealed class WorldDataLoader(IWorldDataRepository repository, ILogger<Wor
             cache.ZonesByNumber.Count,
             zonePortals.Count - stats.PortalsWithoutDestination,
             zoneSpawnPoints.Count,
-            zoneNpcSpawns.Count - stats.NpcPlacementsWithoutNpc,
+            effectiveZoneNpcSpawns.Length - stats.NpcPlacementsWithoutNpc,
             monsterSpawnRegions.Count - stats.SpawnRegionsWithoutZone - stats.SpawnRegionsWithoutMonster);
         logger.LogInformation("World dataset loaded: {Count} gem sockets", cache.GemSocketsById.Count);
         logger.LogInformation(

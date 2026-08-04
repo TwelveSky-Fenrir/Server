@@ -28,7 +28,10 @@ public sealed class TowerGuardianSystem(
             case TowerSiegePhase.Active:
                 if (!zone.TryGetMonster(guardianIndex, out var activeGuardian) || activeGuardian is null ||
                     activeGuardian.Life <= 0)
+                {
                     towerWar.BeginSiege(towerIndex, DateTime.UtcNow);
+                    zoneEventBroadcaster?.Value.AnnounceTowerStatus(towerWar);
+                }
                 break;
 
             case TowerSiegePhase.Sieged:

@@ -1,8 +1,10 @@
 using System.IO.Pipelines;
 using System.Net;
 using Fenrir.Application.Game.Abstractions.Sessions;
+using Fenrir.Application.Game.Domain.World;
 using Fenrir.Core.Wire;
 using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Transport;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -11,10 +13,14 @@ namespace Fenrir.Application.Game.Hosting.Sessions;
 public sealed class ZoneClientSession(
     long sessionId,
     IDuplexPipe transport,
+    short listenerMapId,
     IPEndPoint? remoteEndPoint = null,
-    ILogger? logger = null)
-    : ClientSession(sessionId, transport, FenrirServer.Zone, remoteEndPoint, logger), IZoneSession
+    ILogger? logger = null,
+    OutboundBufferAdmissionGate? outboundAdmissionGate = null)
+    : ClientSession(sessionId, transport, FenrirServer.Zone, remoteEndPoint, logger, outboundAdmissionGate), IZoneSession
 {
+    public short ListenerMapId { get; } = listenerMapId;
+
     public ZoneSessionState State { get; private set; } = ZoneSessionState.Connected;
 
     public int? AccountId { get; private set; }
@@ -32,6 +38,8 @@ public sealed class ZoneClientSession(
     public IZoneActor? CurrentZone { get; set; }
 
     public bool IsZoneTransferPending { get; private set; }
+
+    public bool IsZoneTransferHandoffCommitted { get; private set; }
 
     public bool MeetsGmTier(GmCommandTier tier)
     {
@@ -67,16 +75,42 @@ public sealed class ZoneClientSession(
 
     public void MarkZoneTransferPending()
     {
+        var previous = State;
         IsZoneTransferPending = true;
+        IsZoneTransferHandoffCommitted = false;
+        State = ZoneSessionState.Leaving;
+        LogSessionStateChanged(previous, State);
+    }
+
+    public void ConfirmZoneTransferHandoff()
+    {
+        if (IsZoneTransferPending)
+            IsZoneTransferHandoffCommitted = true;
+    }
+
+    public void RevokeZoneTransferHandoffCommitment()
+    {
+        IsZoneTransferHandoffCommitted = false;
     }
 
     public void ClearZoneTransferPending()
     {
+        var previous = State;
         IsZoneTransferPending = false;
+        IsZoneTransferHandoffCommitted = false;
+        State = ZoneSessionState.InWorld;
+        LogSessionStateChanged(previous, State);
     }
 
     public override bool IsOpcodeAllowed(byte opcode)
     {
         return ZoneSessionStateGate.Allows(State, opcode);
+    }
+
+    public override bool ShouldWithholdOpcode(byte opcode)
+    {
+        return ZoneTransferFreezeGate.ShouldWithhold(IsZoneTransferPending, opcode,
+            Opcodes.Zone.Incoming.ZoneTransferCancel, Opcodes.Zone.Incoming.ZoneHandshake,
+            Opcodes.Zone.Incoming.EnterWorld);
     }
 }

@@ -1,11 +1,49 @@
 using Fenrir.Application.Game.Domain.Mounts;
 using Fenrir.Application.Game.Domain.World.Configuration;
-using Fenrir.Application.Game.Domain.World.ZoneWar;
 
 namespace Fenrir.Application.Game.Domain;
 
+public enum GameRuleset
+{
+    Standard,
+
+    ExtendedUpgrade
+}
+
+public static class GameRulesetRules
+{
+    public const int StandardMaxEnchant = 40;
+
+    public const int ExtendedUpgradeMaxEnchant = 50;
+
+    public static bool TryParse(string? value, out GameRuleset ruleset)
+    {
+        if (Enum.TryParse(value, true, out GameRuleset parsed) &&
+            parsed is GameRuleset.Standard or GameRuleset.ExtendedUpgrade)
+        {
+            ruleset = parsed;
+            return true;
+        }
+
+        ruleset = default;
+        return false;
+    }
+
+    public static int MaxEnchant(GameRuleset ruleset)
+    {
+        return ruleset switch
+        {
+            GameRuleset.Standard => StandardMaxEnchant,
+            GameRuleset.ExtendedUpgrade => ExtendedUpgradeMaxEnchant,
+            _ => throw new ArgumentOutOfRangeException(nameof(ruleset), ruleset, "Unsupported game ruleset.")
+        };
+    }
+}
+
 public sealed class GameServerOptions
 {
+    public string Ruleset { get; set; } = "";
+
     public int Port { get; set; } = 1100;
 
     public int ZoneBasePort { get; set; } = 1100;
@@ -68,6 +106,10 @@ public sealed class GameServerOptions
 
     public float MaxAttackPacketPositionDelta { get; set; } = 185f;
 
+    public bool ChallengeContentEnabled { get; set; }
+
+    public bool SecondarySiegeContentEnabled { get; set; }
+
     public ISet<short> Zone241DungeonMapIds { get; set; } = new HashSet<short>
     {
         241, 242, 243, 244, 245, 246, 247, 248, 249, 292,
@@ -102,8 +144,6 @@ public sealed class GameServerOptions
     public float HolyStoneParticipationRadius { get; set; } = 3500f;
 
     public ISet<short> HolyStoneTerritoryMapIds { get; set; } = new HashSet<short>();
-
-    public TribeQuotaGroup TribeQuotaGroup { get; set; } = TribeQuotaGroup.None;
 
     public int TempRegistrationIdleSweepIntervalSeconds { get; set; } = 30;
 

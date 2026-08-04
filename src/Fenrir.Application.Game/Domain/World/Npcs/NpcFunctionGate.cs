@@ -31,18 +31,10 @@ public static class NpcFunctionGate
 
         foreach (var spawn in zone.NpcSpawns)
         {
-            if (!worldData.NpcsById.TryGetValue(spawn.NpcId!.Value, out var npc))
+            if (spawn.NpcId is not int npcId || !worldData.NpcsById.TryGetValue(npcId, out var npc))
                 continue;
 
-            var offersFunction = false;
-            foreach (var option in npc.MenuOptions)
-                if (option.SlotIndex == functionId && option.OptionId == 2)
-                {
-                    offersFunction = true;
-                    break;
-                }
-
-            if (!offersFunction)
+            if (!OffersFunction(npc, functionId))
                 continue;
 
             var dx = spawn.PosX - posX;
@@ -53,6 +45,14 @@ public static class NpcFunctionGate
         }
 
         return false;
+    }
+
+    public static bool IsAvailableAtNpc(ZoneDefinition zone, NpcDefinition npc, int functionId, float posX,
+        float posY, float posZ)
+    {
+        return functionId is >= 0 and <= 100 &&
+               OffersFunction(npc, functionId) &&
+               CheckNpcProximity(zone, npc.Npc.NpcId, posX, posY, posZ) == NpcProximity.Near;
     }
 
     public static NpcProximity CheckNpcProximity(ZoneDefinition zone, int npcNumber, float posX, float posY,
@@ -75,5 +75,14 @@ public static class NpcFunctionGate
         }
 
         return placed ? NpcProximity.Far : NpcProximity.NpcNotInZone;
+    }
+
+    private static bool OffersFunction(NpcDefinition npc, int functionId)
+    {
+        foreach (var option in npc.MenuOptions)
+            if (option.SlotIndex == functionId && option.OptionId == 2)
+                return true;
+
+        return false;
     }
 }

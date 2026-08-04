@@ -16,6 +16,13 @@ public sealed class GuildAnnouncementService(
 {
     public bool TrySendAnnouncement(PlayerRuntimeState sender, string content)
     {
+        if (sender.IsMuted)
+        {
+            logger.LogInformation("Character {CharacterId} guild announcement dropped: caller is muted",
+                sender.CharacterId);
+            return false;
+        }
+
         if (sender.GuildId is not { } guildId || !GuildRoleCodec.IsMaster(sender.GuildRoleDb))
         {
             logger.LogDebug(
@@ -49,7 +56,10 @@ public sealed class GuildAnnouncementService(
             null,
             null,
             null,
-            null));
+            null)
+        {
+            SourceCharacterId = sender.CharacterId
+        });
 
         logger.LogInformation(
             "Character {CharacterId} broadcast a guild announcement to guild {GuildId} ({RecipientCount} same-shard recipients, {ContentLength} chars)",

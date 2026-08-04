@@ -1,5 +1,7 @@
 CREATE PROCEDURE runtime.usp_GuildTribeBroadcastRelay_Publish @Kind TINYINT,
                                                               @SourceShardId TINYINT,
+                                                              @SourceCharacterId INT NULL,
+                                                              @SystemCause TINYINT NULL,
                                                               @GuildId INT NULL,
                                                               @Tribe TINYINT NULL,
                                                               @RoleField TINYINT,
@@ -26,10 +28,10 @@ BEGIN
 
     IF @ExistingRelayId IS NULL
         INSERT INTO runtime.GuildTribeBroadcastRelay
-        (Kind, SourceShardId, GuildId, Tribe, RoleField, AvatarName, Content, HasItemLink,
+        (Kind, SourceShardId, SourceCharacterId, SystemCause, GuildId, Tribe, RoleField, AvatarName, Content, HasItemLink,
          ItemLinkIndex, ItemLinkActivity, ItemLinkValue, ItemLinkSocket0, ItemLinkSocket1, ItemLinkSocket2,
          CorrelationId, CreatedAtUtc)
-        VALUES (@Kind, @SourceShardId, @GuildId, @Tribe, @RoleField, @AvatarName, @Content, @HasItemLink,
+        VALUES (@Kind, @SourceShardId, @SourceCharacterId, @SystemCause, @GuildId, @Tribe, @RoleField, @AvatarName, @Content, @HasItemLink,
                 @ItemLinkIndex, @ItemLinkActivity, @ItemLinkValue, @ItemLinkSocket0, @ItemLinkSocket1,
                 @ItemLinkSocket2, @CorrelationId, SYSUTCDATETIME());
 END;

@@ -28,34 +28,16 @@ public static class CombineResolver
         ItemRowDto materialItem, ItemStack materialStack,
         int luck, int luckyComboCharges, bool premiumActive, IRandomSource random)
     {
-        if (targetItem.Type is not (RareItemType or EliteItemType) || targetItem.Sort is < 7 or > 29 ||
+        if (!MatchesStackDefinition(targetItem, targetStack) ||
+            !MatchesStackDefinition(materialItem, materialStack) ||
+            targetItem.Type is not (RareItemType or EliteItemType) || targetItem.Sort is < 7 or > 29 ||
             targetItem.CheckHighImprove != 2 || targetStack.Combine >= MaxCombine)
             return CombineResult.Rejected;
 
         var isScroll = materialItem.ItemId is 2001 or 2002 or 2003;
 
-        if (!isScroll)
-        {
-            if (materialItem.Type is not (RareItemType or EliteItemType) || materialItem.Sort is < 7 or > 29 ||
-                materialItem.CheckHighImprove != 2 || (materialItem.CheckSetItem != 2 &&
-                                                       (materialStack.Enchant > 0 || materialStack.Combine > 0)))
-                return CombineResult.Rejected;
-
-            if (targetItem.CheckSetItem == 2 || materialItem.CheckSetItem == 2)
-                if (targetItem.CheckSetItem != materialItem.CheckSetItem || targetItem.Type != materialItem.Type ||
-                    targetStack.Enchant < RequiredSetItemImprove || materialStack.Combine > 0)
-                    return CombineResult.Rejected;
-
-            if (targetItem.Type == RareItemType)
-            {
-                if (materialItem.Level + materialItem.MartialLevel != targetItem.Level + targetItem.MartialLevel)
-                    return CombineResult.Rejected;
-            }
-            else if (!MatchesEliteTier(targetItem.Level, materialItem.Level, materialItem.MartialLevel))
-            {
-                return CombineResult.Rejected;
-            }
-        }
+        if (!isScroll && !IsCompatibleEquipmentMaterial(targetItem, targetStack, materialItem, materialStack))
+            return CombineResult.Rejected;
 
         var cost = GetAddMoney(targetItem, targetStack.Combine, premiumActive);
 
@@ -96,24 +78,68 @@ public static class CombineResolver
         return PremiumPricing.ApplyPremiumDiscount(AddMoneyNormalTable[combine], premiumActive);
     }
 
-    private static bool MatchesEliteTier(short eqLevel, short matLevel, byte matMartialLevel)
+    private static bool MatchesStackDefinition(ItemRowDto item, ItemStack stack)
     {
-        return eqLevel switch
+        return item.ItemId > 0 && stack.ItemId == item.ItemId;
+    }
+
+    private static bool IsCompatibleEquipmentMaterial(ItemRowDto targetItem, ItemStack targetStack,
+        ItemRowDto materialItem, ItemStack materialStack)
+    {
+        if (materialItem.Type is not (RareItemType or EliteItemType) || materialItem.Sort is < 7 or > 29 ||
+            materialItem.CheckHighImprove != 2 || targetItem.Sort != materialItem.Sort ||
+            targetItem.Type != materialItem.Type || targetItem.CheckSetItem != materialItem.CheckSetItem ||
+            !IsUnmodified(materialStack))
+            return false;
+
+        if (targetItem.CheckSetItem == 2 && targetStack.Enchant < RequiredSetItemImprove)
+            return false;
+
+        return targetItem.Type switch
         {
-            100 => matLevel == 95,
-            110 => matLevel == 105,
-            113 or 115 => matLevel == 114,
-            118 => matLevel == 117,
-            121 => matLevel == 120,
-            124 => matLevel == 123,
-            127 => matLevel == 126,
-            130 => matLevel == 129,
-            133 => matLevel == 132,
-            136 => matLevel == 135,
-            139 => matLevel == 138,
-            142 => matLevel == 141,
-            145 => matMartialLevel >= 1 || matLevel is 144 or 145,
-            _ => true
+            RareItemType => EffectiveLevel(targetItem) == EffectiveLevel(materialItem),
+            EliteItemType => MatchesEliteTier(targetItem, materialItem),
+            _ => false
+        };
+    }
+
+    private static bool IsUnmodified(ItemStack materialStack)
+    {
+        return materialStack is
+        {
+            Enchant: 0,
+            Combine: 0,
+            Refine: 0,
+            Socket: 0,
+            SocketGem1: 0,
+            SocketGem2: 0,
+            SocketGem3: 0
+        };
+    }
+
+    private static int EffectiveLevel(ItemRowDto item)
+    {
+        return item.Level + item.MartialLevel;
+    }
+
+    private static bool MatchesEliteTier(ItemRowDto targetItem, ItemRowDto materialItem)
+    {
+        return (EffectiveLevel(targetItem), EffectiveLevel(materialItem)) switch
+        {
+            (100, 95) => true,
+            (110, 105) => true,
+            (113 or 115, 114) => true,
+            (118, 117) => true,
+            (121, 120) => true,
+            (124, 123) => true,
+            (127, 126) => true,
+            (130, 129) => true,
+            (133, 132) => true,
+            (136, 135) => true,
+            (139, 138) => true,
+            (142, 141) => true,
+            (145, 144 or 145) => true,
+            _ => false
         };
     }
 

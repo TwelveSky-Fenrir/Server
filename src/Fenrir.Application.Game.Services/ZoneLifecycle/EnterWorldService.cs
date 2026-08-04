@@ -13,9 +13,12 @@ using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Social;
+using Fenrir.Application.Game.Domain.Social.Party;
+using Fenrir.Application.Game.Domain.StellarCores;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
+using Fenrir.Application.Game.ZoneLifecycle;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Domain.Game.GameData;
 using Fenrir.Domain.Game.Stats;
@@ -40,12 +43,16 @@ public sealed class EnterWorldService(
     IMentorRepository mentors,
     IHeroRankingRepository heroRankings,
     IRuneRepository runes,
+    PartyRegistry partyRegistry,
     ICharacterShardLocationRepository characterShardLocations,
+    CharacterPresenceOwnership characterPresenceOwnership,
     ICharacterLogoutStateRepository logoutState,
     WorldStateService worldState,
     TowerWarState towerWar,
     ZoneCenterSiegeState zoneCenterSiegeState,
     TribeGuardCorridorState tribeGuardCorridorState,
+    PopupEventState popupEventState,
+    ValleyWarKillRegistry valleyWarCampaign,
     IOptions<GameServerOptions> options,
     ILogger<EnterWorldService> logger) : IEnterWorldService
 {
@@ -70,6 +77,28 @@ public sealed class EnterWorldService(
     {
         var accountId = zoneSession.AccountId!.Value;
         var characterId = zoneSession.CharacterId!.Value;
+        var presencePublished = false;
+
+        async ValueTask RemovePublishedPresenceAsync()
+        {
+            if (!presencePublished)
+                return;
+
+            presencePublished = false;
+
+            try
+            {
+                await characterPresenceOwnership.RemoveIfOwnerAsync(characterId, zoneSession.SessionId,
+                    cancellationToken => characterShardLocations.RemoveAsync(characterId, options.Value.ShardId,
+                        cancellationToken), CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex,
+                    "Failed to remove the published cross-shard location for character {CharacterId} during aborted world entry",
+                    characterId);
+            }
+        }
 
         if (!await firewall.IsAllowedAsync(zoneSession.RemoteEndPoint, cancellationToken))
         {
@@ -80,10 +109,25 @@ public sealed class EnterWorldService(
             return;
         }
 
-        if (await bans.IsActiveForCharacterAsync(characterId, cancellationToken))
+        bool banIsActive;
+        try
         {
-            logger.LogWarning("Enter-world rejected for character {CharacterId}: character is GM-banned",
-                characterId);
+            banIsActive = await BanAdmissionPolicy.IsBlockedAsync(bans, accountId, characterId, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex,
+                "Enter-world rejected for account {AccountId} character {CharacterId}: ban status could not be verified",
+                accountId, characterId);
+            zoneSession.Abort(DisconnectReason.ProcessingFault);
+            return;
+        }
+
+        if (banIsActive)
+        {
+            logger.LogWarning("Enter-world rejected for account {AccountId} character {CharacterId}: ban is active",
+                accountId, characterId);
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
@@ -117,6 +161,15 @@ public sealed class EnterWorldService(
         }
 
         var character = bundle.Character;
+
+        if (character.Life <= 0)
+        {
+            logger.LogInformation(
+                "Enter-world deferred for character {CharacterId}: the durable life state is dead and no validated resurrection has completed",
+                characterId);
+            zoneSession.Abort(DisconnectReason.StateViolation);
+            return;
+        }
 
         var ticketTargetMapId = zoneSession.TargetMapId;
         var isTicketTransfer = ticketTargetMapId is { } tmid && tmid != character.MapId;
@@ -182,7 +235,10 @@ public sealed class EnterWorldService(
             existingState.Session.Abort(DisconnectReason.Evicted);
         }
 
-        if (WrapCheckSpecialDestinationCatalog.IsInstancedDestination(character.MapId))
+        int? adjustedZone241TimeForEntry = null;
+
+        if (options.Value.ChallengeContentEnabled &&
+            WrapCheckSpecialDestinationCatalog.IsInstancedDestination(character.MapId))
         {
             if (character.Zone241Time < 1)
             {
@@ -208,6 +264,7 @@ public sealed class EnterWorldService(
             }
 
             character = character with { Zone241Time = adjustedZone241Time };
+            adjustedZone241TimeForEntry = adjustedZone241Time;
 
             if (!worldData.MonstersById.ContainsKey(PersonalDungeonBossTables.ResolveCatalogD(character.MapId)))
             {
@@ -217,36 +274,12 @@ public sealed class EnterWorldService(
                 zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             }
-
-            zoneSession.Send(new AvatarStateFlagResponse
-            {
-                ServerIndex = characterId,
-                UniqueNumber = unchecked((uint)characterId),
-                Sort = Zone241TimeAvatarChangeInfoSort,
-                Value01 = character.ContributionPoints,
-                Value02 = character.RebirthCount,
-                Value03 = adjustedZone241Time
-            });
         }
 
         async ValueTask CompleteWorldEntryAsync()
         {
-            var (claimedPosX, claimedPosY, claimedPosZ) = isTicketTransfer
-                ? (character.PosX, character.PosY, character.PosZ)
-                : (packet.Action.Location[0], packet.Action.Location[1], packet.Action.Location[2]);
-            var claimedFront = packet.Action.Front;
-
-            var equipmentContainer = BuildEquipmentContainer(bundle.Items);
-            var attributes = new CharacterBaseAttributes(character.StatVit, character.StatStr, character.StatInt,
-                character.StatDex, character.Level, character.Tribe, character.PreviousTribe, character.Title,
-                character.Halo, character.RebirthCount, character.Level2);
-
-            var petItemId = PetSlots.ResolveEquippedPetItemId(bundle.Items);
-            var petContribution = PetGrowthCalculator.Compute(petItemId, character.PetGrowth, character.PetActivity,
-                worldData.ItemsById);
-
-            var stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
-                pet: petContribution);
+            var (entryPosX, entryPosY, entryPosZ) = (character.PosX, character.PosY, character.PosZ);
+            var entryHeading = character.Heading;
 
             var isMutedTask = mutes.IsActiveForCharacterAsync(characterId, cancellationToken);
             var guildTask = guilds.GetByCharacterAsync(characterId, cancellationToken);
@@ -258,19 +291,18 @@ public sealed class EnterWorldService(
                 HeroRankPointAccumulator.CurrentPeriodKind,
                 cancellationToken);
 
-            var shardLocationUpsertTask = characterShardLocations.UpsertAsync(characterId, options.Value.ShardId,
-                character.MapId, character.Name, character.Tribe, cancellationToken);
-
             var runeRowsTask = runes.GetRunesAsync(characterId, cancellationToken);
 
             var costumeRowsTask = characters.GetCostumesAsync(characterId, cancellationToken);
 
             var mountRowsTask = characters.GetMountsAsync(characterId, cancellationToken);
 
+            var stellarCoreRowsTask = characters.GetStellarCoresAsync(characterId, cancellationToken);
+
             await Task.WhenAll(isMutedTask.AsTask(), guildTask.AsTask(), tribeRoleTask.AsTask(),
                 friendsTask.AsTask(), mentorTask.AsTask(), heroRankPointsTask.AsTask(),
-                shardLocationUpsertTask.AsTask(), runeRowsTask.AsTask(), costumeRowsTask.AsTask(),
-                mountRowsTask.AsTask());
+                runeRowsTask.AsTask(), costumeRowsTask.AsTask(),
+                mountRowsTask.AsTask(), stellarCoreRowsTask.AsTask());
 
             var isMuted = isMutedTask.Result;
             var guildMembership = guildTask.Result;
@@ -279,15 +311,70 @@ public sealed class EnterWorldService(
             var mentorBond = mentorTask.Result;
             var heroRankPoints = heroRankPointsTask.Result ?? 0;
             var (runeSystem, runeSystemStat) = BuildRuneArrays(runeRowsTask.Result);
-            var (costumeWardrobe, costumeDate, costumeExpireDate) =
-                CostumePersistenceCodec.Hydrate(costumeRowsTask.Result);
-            var costumeIndex = CostumePersistenceCodec.NormalizeIndexOnLoad(character.CostumeIndex, costumeWardrobe);
-            var costumeNumber = CostumePersistenceCodec.ResolveWornNumber(costumeIndex, costumeWardrobe);
+            var today = GameDate.Today();
+            var entrySanitization = PlayerEnterDataSanitizer.Sanitize(bundle.Items, bundle.Hotkeys,
+                costumeRowsTask.Result, stellarCoreRowsTask.Result, worldData.ItemsById, today, character.Life,
+                character.Mana);
+            var entryItems = entrySanitization.Items;
+
+            foreach (var container in entrySanitization.CleanedContainers)
+                await characters.ReplaceContainerAsync(characterId, container,
+                    BuildContainerSlots(entryItems, container), cancellationToken);
+
+            foreach (var hotkey in entrySanitization.ClearedHotkeys)
+                await characters.UpsertHotkeySlotAsync(characterId, hotkey.Page, hotkey.KeyIndex, hotkey.Sort,
+                    hotkey.Value1, hotkey.Value2, cancellationToken);
+
+            if (entrySanitization.Life != character.Life || entrySanitization.Mana != character.Mana)
+            {
+                character = character with
+                {
+                    Life = entrySanitization.Life,
+                    Mana = entrySanitization.Mana,
+                    FlushSequence = checked(character.FlushSequence + 1)
+                };
+                await characters.ClampVitalsFloorAsync(characterId, character.FlushSequence, entrySanitization.Life,
+                    entrySanitization.Mana, cancellationToken);
+            }
+
+            var (loadedCostumeWardrobe, loadedCostumeDate, loadedCostumeExpireDate) =
+                CostumePersistenceCodec.Hydrate(entrySanitization.Costumes);
+            var loadedCostumeIndex = CostumePersistenceCodec.NormalizeIndexOnLoad(character.CostumeIndex,
+                loadedCostumeWardrobe);
+            var costumeSweep = CostumePersistenceCodec.SweepExpiredRentSlots(loadedCostumeWardrobe,
+                loadedCostumeDate, loadedCostumeExpireDate, loadedCostumeIndex, today);
+            var costumeWardrobe = costumeSweep.Wardrobe;
+            var costumeDate = costumeSweep.Date;
+            var costumeExpireDate = costumeSweep.ExpireDate;
+            var costumeIndex = costumeSweep.CostumeIndex;
+
+            var loadedStellarCoreWardrobe = StellarCorePersistenceCodec.Hydrate(entrySanitization.StellarCores);
+            var loadedStellarCoreExpireDate = StellarCoreExpireDateCodec.Decode(character.StellarCoreExpireDate);
+            var loadedStellarCoreIndex = StellarCorePersistenceCodec.NormalizeIndexOnLoad(character.StellarCoreIndex,
+                loadedStellarCoreWardrobe);
+            var stellarCoreSweep = StellarCorePersistenceCodec.SweepExpiredRentSlots(loadedStellarCoreWardrobe,
+                loadedStellarCoreExpireDate, loadedStellarCoreIndex, today);
+            var stellarCoreWardrobe = stellarCoreSweep.Wardrobe;
+            var stellarCoreExpireDate = stellarCoreSweep.ExpireDate;
+            var stellarCoreIndex = stellarCoreSweep.CoreIndex;
             var mountGarageSlots = MountPersistenceCodec
                 .Hydrate(mountRowsTask.Result)
                 .SetItem(MountPersistenceCodec.PersistedGarageSlot,
                     (character.MountItemId, character.MountExpActivity, character.MountPower));
-            var persistedBuffs = BuildBuffInfo(isTicketTransfer ? bundle.Buffs : []);
+            var costumeSlots = BuildCostumeSlots(costumeWardrobe, costumeDate, costumeExpireDate);
+            var mountSlots = BuildMountSlots(characterId, mountGarageSlots);
+            var stellarCoreSlots = BuildStellarCoreSlots(characterId, stellarCoreWardrobe);
+
+            if (entrySanitization.CostumesChanged || entrySanitization.StellarCoresChanged || costumeSweep.Changed ||
+                stellarCoreSweep.Changed)
+            {
+                character = character with { FlushSequence = checked(character.FlushSequence + 1) };
+                await characters.PersistProgressAsync(
+                    [BuildEntryProgress(character, costumeIndex, stellarCoreIndex, stellarCoreExpireDate)],
+                    BuildCostumeSlotTvps(characterId, costumeSlots), mountSlots, cancellationToken, stellarCoreSlots);
+            }
+
+            var persistedBuffs = BuildBuffInfo(bundle.Buffs);
 
             var guildSummary = guildMembership is { } membership
                 ? await guilds.GetByIdAsync(membership.GuildId, cancellationToken)
@@ -306,141 +393,33 @@ public sealed class EnterWorldService(
                 guildRoleWire,
                 guildMembership?.CallName ?? "");
 
-            var registerRecv = new EnterWorldResponse
-            {
-                AvatarInfo = AvatarInfoFactory.CreateForCharacter(character, bundle.Items, socialSnapshot,
-                    bundle.Skills, bundle.Hotkeys, costumeRowsTask.Result),
-                BuffInfo = persistedBuffs
-            };
-            zoneSession.Send(in registerRecv);
-
-            var broadcastWorldInfo = new WorldSnapshotResponse
-            {
-                WorldInfo = ZoneCenterSiegeProjection.Apply(
-                    WorldStateProjection.Apply(
-                        GuildRankingProjection.Apply(WorldStateTemplates.ZeroedWorldInfo, guildRanking.Top),
-                        worldState),
-                    zoneCenterSiegeState, tribeGuardCorridorState),
-                TribeInfo = WorldStateTemplates.ZeroedTribeInfo
-            };
-            zoneSession.Send(in broadcastWorldInfo);
-
-            zoneSession.Send(new AvatarActionResponse
-            {
-                ServerIndex = characterId,
-                UniqueNumber = unchecked((uint)characterId),
-                Data = new ObjectForAvatar
-                {
-                    VisibleState = character.VisibleState,
-                    SpecialState = character.SpecialState,
-                    KillOtherTribe = 0,
-                    GoodFellow = 0,
-                    GuildName = socialSnapshot.GuildName,
-                    GuildRole = socialSnapshot.GuildRoleWire,
-                    CallName = socialSnapshot.CallName,
-                    GuildMarkEffect = 0,
-                    Name = character.Name,
-                    Tribe = character.Tribe,
-                    PreviousTribe = character.PreviousTribe,
-                    Gender = character.Gender,
-                    HeadType = character.HeadType,
-                    FaceType = character.FaceType,
-                    Level1 = character.Level,
-                    Level2 = character.Level2,
-                    EquipForView = EquipmentViewCodec.BuildEquipForView(bundle.Items),
-                    AnimalNumber = 0,
-                    Title = character.Title,
-                    Halo = character.Halo,
-                    RebirthNum = character.RebirthCount,
-                    BattleTeam = 0,
-                    Action = new ActionInfo
-                    {
-                        Type = 0,
-                        Sort = 0,
-                        Frame = 0,
-                        Location = [claimedPosX, claimedPosY, claimedPosZ],
-                        TargetLocation = [claimedPosX, claimedPosY, claimedPosZ],
-                        Front = claimedFront,
-                        TargetFront = claimedFront,
-                        PetLocation = new float[3],
-                        PetTargetLocation = new float[3],
-                        PetFront = 0,
-                        PetSort = 0,
-                        TargetObjectSort = 0,
-                        TargetObjectIndex = 0,
-                        TargetObjectUniqueNumber = 0,
-                        SkillNumber = 0,
-                        SkillGradeNum1 = 0,
-                        SkillGradeNum2 = 0,
-                        SkillValue = 0
-                    },
-                    MaxLifeValue = character.MaxLife,
-                    LifeValue = character.Life,
-                    MaxManaValue = character.MaxMana,
-                    ManaValue = character.Mana,
-                    EffectValueForView = BuildEffectValueForView(persistedBuffs),
-                    PartyName = "",
-                    DuelState = new int[3],
-                    PShopState = 0,
-                    PShopName = "",
-                    CostumeNumber = costumeNumber,
-                    BufEffectTimeState = 0,
-                    BufSort = 0,
-                    AutoState = 0,
-                    FishingState = 0,
-                    FishingStep = 0,
-                    FishingPoint = new float[3],
-                    RankPoint = 0,
-                    TargetState = 0,
-                    AnimalAbsorbState = character.AnimalAbsorbState,
-                    PetValid = 0,
-                    Unk1 = 0,
-                    PetLocation = [claimedPosX, claimedPosY, claimedPosZ],
-                    PetFrame = 0,
-                    Unk624 = 0,
-                    Unk625 = 0,
-                    UniqueSkillNumber = 0,
-                    UniqueSkillBuffTime = 0,
-                    CostumeState = 0,
-                    StellarCoreNumber = 0
-                },
-                CheckChangeActionState = EnterWorldAvatarActionState
-            });
-
-            SendRatioEventMessages(zoneSession, zone);
-
-            if (heroRankPoints > 0)
-                zoneSession.Send(new AvatarStatUpdateResponse
-                {
-                    Sort = HeroRankPointStatSort,
-                    Value = heroRankPoints,
-                    Value2 = 0
-                });
-
             var rankResetDate = GameDate.Today();
             var rankBuffType = character.RankPointDate == rankResetDate ? character.RankBuffType : 0;
             var rankPoint = character.RankPointDate == rankResetDate ? character.RankPoint : 0;
 
+            var enterSnapshot = new TaskCompletionSource<PlayerRuntimeState?>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
             var entered = zone.Post(ZoneCommand.Enter(characterId, new PlayerEnterData(
                 zoneSession,
                 character.Name,
+                zoneSession.AccountGrade,
+                zoneSession.AccountGrade,
                 character.Tribe,
                 character.Gender,
                 character.HeadType,
                 character.FaceType,
                 character.Level,
                 character.MapId,
-                claimedPosX,
-                claimedPosY,
-                claimedPosZ,
-                claimedFront,
-                character.Life,
+                entryPosX,
+                entryPosY,
+                entryPosZ,
+                entryHeading,
+                entrySanitization.Life,
                 character.MaxLife,
-                character.Mana,
+                entrySanitization.Mana,
                 character.MaxMana,
                 character.FlushSequence,
-                Items: bundle.Items,
-                Stats: stats,
+                Items: entryItems,
                 IsMuted: isMuted,
                 GuildId: guildMembership?.GuildId,
                 GuildName: socialSnapshot.GuildName,
@@ -450,6 +429,7 @@ public sealed class EnterWorldService(
                 TribeRole: tribeRole,
                 FriendsBySlot: friendIdBySlot,
                 Skills: bundle.Skills,
+                Hotkeys: entrySanitization.Hotkeys,
                 TeacherCharacterId: mentorBond?.TeacherCharacterId,
                 StudentCharacterId: mentorBond?.StudentCharacterId,
                 QuestProgress: new QuestProgress(character.QuestStepPermanent, character.QuestActiveId,
@@ -458,7 +438,7 @@ public sealed class EnterWorldService(
                 MissionKillOtherTribe: character.MissionKillOtherTribe,
                 MissionKillMonster: character.MissionKillMonster,
                 MissionPlayTime: character.MissionPlayTime,
-                AutoHuntEnabled: character.AutoHuntEnabled,
+                AutoHuntEnabled: false,
                 AutoHuntConfig: character.AutoHuntConfig is { } configBytes &&
                                 AutoHunt.TryRead(configBytes, out var autoHunt)
                     ? autoHunt
@@ -476,6 +456,7 @@ public sealed class EnterWorldService(
                 Halo: character.Halo,
                 RebirthCount: character.RebirthCount,
                 Experience: character.Experience,
+                Money: character.Money,
                 ContributionPoints: character.ContributionPoints,
                 TeacherPoint: character.TeacherPoint,
                 Level2: character.Level2,
@@ -516,15 +497,15 @@ public sealed class EnterWorldService(
                 SourceIp: SessionSourceIp.Normalize(zoneSession.RemoteEndPoint),
                 RuneSystem: runeSystem,
                 RuneSystemStat: runeSystemStat,
-                ActionSort: packet.Action.Sort,
-                ActionSkillNumber: packet.Action.SkillNumber,
-                ActionSkillGradeNum1: packet.Action.SkillGradeNum1,
-                ActionSkillGradeNum2: packet.Action.SkillGradeNum2,
-                PetActionSort: packet.Action.PetSort,
-                PetActionFront: packet.Action.PetFront,
-                PetActionTargetLocationX: packet.Action.PetTargetLocation[0],
-                PetActionTargetLocationY: packet.Action.PetTargetLocation[1],
-                PetActionTargetLocationZ: packet.Action.PetTargetLocation[2],
+                ActionSort: 0,
+                ActionSkillNumber: 0,
+                ActionSkillGradeNum1: 0,
+                ActionSkillGradeNum2: 0,
+                PetActionSort: 0,
+                PetActionFront: 0,
+                PetActionTargetLocationX: entryPosX,
+                PetActionTargetLocationY: entryPosY,
+                PetActionTargetLocationZ: entryPosZ,
                 MountItemId: character.MountItemId,
                 MountExpActivity: character.MountExpActivity,
                 MountPower: character.MountPower,
@@ -570,12 +551,14 @@ public sealed class EnterWorldService(
                 ProtectForCostume: character.ProtectForCostume,
                 ProtectForDestroy2: character.ProtectForDestroy2,
                 LodRounds: character.LodRounds,
-                StellarCoreExpireDate: StellarCoreExpireDateCodec.Decode(character.StellarCoreExpireDate),
+                StellarCoreIndex: stellarCoreIndex,
+                StellarCoreWardrobe: stellarCoreWardrobe,
+                StellarCoreExpireDate: stellarCoreExpireDate,
                 EliteDungeonTime: character.EliteDungeonTime,
                 DungeonKeyTime: character.DungeonKeyTime,
                 IvyHallTicketTime: character.IvyHallTicketTime,
                 ScrollOfSeekersTime: character.ScrollOfSeekersTime,
-                FightingGodForDestroy: character.FightingGodForDestroy)));
+                FightingGodForDestroy: character.FightingGodForDestroy), enterSnapshot));
 
             if (!entered)
             {
@@ -587,17 +570,85 @@ public sealed class EnterWorldService(
             }
 
             zoneSession.CurrentZone = zone;
-            zoneSession.MarkRegistering();
 
-            logger.LogInformation(
-                "Character {CharacterId} (account {AccountId}) entered world on map {MapId} -- awaiting zone-ready",
-                characterId, accountId, character.MapId);
+            var admitted = await enterSnapshot.Task.WaitAsync(TimeSpan.FromSeconds(2), cancellationToken)
+                .ConfigureAwait(false);
+
+            if (admitted is null)
+            {
+                logger.LogError(
+                    "Zone {MapId} did not admit character {CharacterId} after accepting Enter -- aborting session",
+                    zone.MapId, characterId);
+                zoneSession.Abort(DisconnectReason.Faulted);
+                return;
+            }
+
+            var partyRoster = partyRegistry.GetRoster(characterId);
+            var projectionSocial = socialSnapshot with
+            {
+                PartyNames = partyRoster.Select(static member => member.Name).ToArray(),
+                PartyName = PartyIdentityResolver.ResolveCurrentPartyName(partyRegistry, characterId, admitted.Name,
+                    static _ => null)
+            };
+            var avatarProjection = AvatarInfoFactory.CreateWorldEntryProjection(admitted, projectionSocial);
+
+            if (adjustedZone241TimeForEntry is { } adjustedZone241Time)
+                zoneSession.Send(new AvatarStateFlagResponse
+                {
+                    ServerIndex = characterId,
+                    UniqueNumber = unchecked((uint)characterId),
+                    Sort = Zone241TimeAvatarChangeInfoSort,
+                    Value01 = admitted.ContributionPoints,
+                    Value02 = admitted.RebirthCount,
+                    Value03 = adjustedZone241Time
+                });
+
+            zoneSession.Send(new EnterWorldResponse
+            {
+                AvatarInfo = avatarProjection.AvatarInfo,
+                BuffInfo = avatarProjection.BuffInfo
+            });
+
+            zoneSession.Send(new WorldSnapshotResponse
+            {
+                WorldInfo = ZoneCenterSiegeProjection.Apply(
+                    WorldStateProjection.Apply(
+                        PopupEventWorldProjection.Apply(
+                            GuildRankingProjection.Apply(WorldStateTemplates.ZeroedWorldInfo, guildRanking.Top),
+                            popupEventState),
+                        worldState) with { Zone200TypeState = valleyWarCampaign.GetWorldInfoState() },
+                    zoneCenterSiegeState, tribeGuardCorridorState),
+                TribeInfo = WorldStateTemplates.ZeroedTribeInfo
+            });
+
+            var avatarAction = zone.BuildAvatarActionRecv(admitted, avatarProjection.Pose,
+                EnterWorldAvatarActionState);
+            zoneSession.Send(avatarAction with
+            {
+                Data = avatarAction.Data with { PartyName = avatarProjection.PartyName }
+            });
+
+            SendRatioEventMessages(zoneSession, zone);
+
+            if (admitted.HeroRankPoints > 0)
+                zoneSession.Send(new AvatarStatUpdateResponse
+                {
+                    Sort = HeroRankPointStatSort,
+                    Value = admitted.HeroRankPoints,
+                    Value2 = 0
+                });
+
+            await characterPresenceOwnership.PublishAsync(characterId, zoneSession.SessionId,
+                    publishCancellationToken => characterShardLocations.UpsertAsync(characterId, options.Value.ShardId,
+                        character.MapId, character.Name, character.Tribe, publishCancellationToken), cancellationToken)
+                .ConfigureAwait(false);
+            presencePublished = true;
 
             try
             {
                 await logoutState.UpsertAsync(characterId, character.MapId,
-                    (int)claimedPosX, (int)claimedPosY, (int)claimedPosZ,
-                    character.Life, character.Mana, cancellationToken);
+                    (int)entryPosX, (int)entryPosY, (int)entryPosZ,
+                    admitted.Life, admitted.Mana, cancellationToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -608,6 +659,26 @@ public sealed class EnterWorldService(
             }
 
             zoneSession.Send(towerWar.BuildStatusSnapshot());
+
+            var bootstrapAcknowledgement = new TaskCompletionSource<ZoneCommandResult>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            if (!zone.Post(ZoneCommand.AcknowledgeEnterBootstrap(characterId, zoneSession.SessionId,
+                    bootstrapAcknowledgement)))
+                throw new InvalidOperationException(
+                    $"Zone {zone.MapId} inbox rejected the bootstrap acknowledgement for character {characterId}.");
+
+            var acknowledgement = await bootstrapAcknowledgement.Task.WaitAsync(TimeSpan.FromSeconds(2),
+                cancellationToken).ConfigureAwait(false);
+            if (acknowledgement.Kind != ZoneCommandResultKind.Applied)
+                throw new InvalidOperationException(
+                    $"Zone {zone.MapId} rejected the bootstrap acknowledgement for character {characterId}: " +
+                    acknowledgement.Cause);
+
+            zoneSession.MarkRegistering();
+
+            logger.LogInformation(
+                "Character {CharacterId} (account {AccountId}) entered world on map {MapId} -- awaiting zone-ready",
+                characterId, accountId, character.MapId);
         }
 
         try
@@ -616,12 +687,18 @@ public sealed class EnterWorldService(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            await RemovePublishedPresenceAsync();
             logger.LogError(ex,
                 "Enter-world processing faulted for account {AccountId} character {CharacterId} on map {MapId} -- " +
                 "the client may already hold a partial handshake if some of the three response payloads were " +
                 "already sent; aborting session",
                 accountId, characterId, character.MapId);
             zoneSession.Abort(DisconnectReason.ProcessingFault);
+        }
+        catch (OperationCanceledException)
+        {
+            await RemovePublishedPresenceAsync();
+            throw;
         }
     }
 
@@ -689,16 +766,168 @@ public sealed class EnterWorldService(
         };
     }
 
-    private static ImmutableDictionary<byte, ItemStack> BuildEquipmentContainer(
-        IReadOnlyList<CharacterItemSlotDto> items)
+    private static CharacterItemSlotTvp[] BuildContainerSlots(IReadOnlyList<CharacterItemSlotDto> items,
+        byte container)
     {
-        var builder = ImmutableDictionary.CreateBuilder<byte, ItemStack>();
+        return items.Where(item => item.Container == container)
+            .Select(item => new CharacterItemSlotTvp(item.Slot, item.ItemId, item.Quantity, item.Enchant,
+                item.Combine, item.Refine, item.Socket, item.SocketGem1, item.SocketGem2, item.SocketGem3,
+                item.ExpireDate, item.Serial, item.XPos, item.YPos))
+            .ToArray();
+    }
 
-        foreach (var item in items)
-            if (item.Container == ContainerMatrix.Equipment)
-                builder[item.Slot] = ItemStack.FromRow(item);
+    private static CharacterCostumeSlotDto[] BuildCostumeSlots(ImmutableArray<int> wardrobe,
+        ImmutableArray<int> date, ImmutableArray<int> expireDate)
+    {
+        var slots = new List<CharacterCostumeSlotDto>();
 
-        return builder.ToImmutable();
+        for (var slot = 0; slot < CostumePersistenceCodec.SlotCount && slot < wardrobe.Length; slot++)
+        {
+            var itemId = wardrobe[slot];
+            if (itemId == 0)
+                continue;
+
+            slots.Add(new CharacterCostumeSlotDto((byte)slot, itemId,
+                slot < date.Length ? date[slot] : 0, slot < expireDate.Length ? expireDate[slot] : 0));
+        }
+
+        return [.. slots];
+    }
+
+    private static CharacterCostumeSlotTvp[] BuildCostumeSlotTvps(int characterId,
+        IReadOnlyList<CharacterCostumeSlotDto> slots)
+    {
+        return slots.Select(slot => new CharacterCostumeSlotTvp(characterId, slot.Slot, slot.ItemId,
+            slot.ItemValue, slot.ExpireDate)).ToArray();
+    }
+
+    private static CharacterMountSlotTvp[] BuildMountSlots(int characterId,
+        ImmutableArray<(int ItemId, int ExpActivity, int Power)> garage)
+    {
+        var slots = new List<CharacterMountSlotTvp>();
+
+        for (var slot = 0; slot < MountPersistenceCodec.SlotCount && slot < garage.Length; slot++)
+            if (garage[slot].ItemId > 0)
+                slots.Add(new CharacterMountSlotTvp(characterId, (byte)slot, garage[slot].ItemId,
+                    garage[slot].ExpActivity, garage[slot].Power));
+
+        return [.. slots];
+    }
+
+    private static CharacterStellarCoreSlotTvp[] BuildStellarCoreSlots(int characterId,
+        ImmutableArray<int> wardrobe)
+    {
+        var slots = new List<CharacterStellarCoreSlotTvp>();
+
+        for (var slot = 0; slot < StellarCorePersistenceCodec.SlotCount && slot < wardrobe.Length; slot++)
+            if (wardrobe[slot] > 0)
+                slots.Add(new CharacterStellarCoreSlotTvp(characterId, (byte)slot, wardrobe[slot]));
+
+        return [.. slots];
+    }
+
+    private static CharacterProgressTvp BuildEntryProgress(CharacterWorldSnapshotDto character, int costumeIndex,
+        int stellarCoreIndex, ImmutableArray<int> stellarCoreExpireDate)
+    {
+        return new CharacterProgressTvp(
+            character.CharacterId,
+            character.FlushSequence,
+            character.Level,
+            character.Level2,
+            character.Experience,
+            character.Life,
+            character.MaxLife,
+            character.Mana,
+            character.MaxMana,
+            character.StatVit,
+            character.StatStr,
+            character.StatInt,
+            character.StatDex,
+            character.StatPoints,
+            character.SkillPoints,
+            character.ContributionPoints,
+            character.Exp2,
+            character.RebirthCount,
+            character.EatLifePotion,
+            character.EatManaPotion,
+            character.EatStrPotion,
+            character.EatDexPotion,
+            character.EatElePotion,
+            character.DropItemTime,
+            character.M15PetLuckyBoxPity,
+            character.MountItemId,
+            character.MountExpActivity,
+            character.MountPower,
+            character.MountSlotIndex,
+            character.MountTime,
+            character.VisibleState,
+            character.SpecialState,
+            character.UseOrnament ? 1 : 0,
+            character.Title,
+            character.Halo,
+            character.TeacherPoint,
+            0,
+            0,
+            character.PetExpX2Time,
+            character.AnimalAbsorbTime,
+            character.AnimalAbsorbState,
+            costumeIndex,
+            character.ProtectForHalo,
+            character.BonusItemLevel,
+            character.BonusItemValue,
+            character.TribeNotifyScrollCount,
+            character.TribeFourReturnAllowance,
+            character.BottleSlots,
+            character.DrunkBottleIndex,
+            character.AutoBuffTime,
+            character.AutoBuffSkill,
+            character.RankPointDate,
+            character.RankBuffType,
+            character.AutoTime,
+            character.AutoTime2,
+            character.BuffX2Time,
+            character.PremiumExpireUtc,
+            character.PetGrowth,
+            character.PetActivity,
+            character.ImproveItemValue,
+            character.AddItemValue,
+            character.HighItemValue,
+            character.TaiyanKeyTimer,
+            character.RankPoint,
+            character.CloakLuckyBoxPity,
+            character.CloakVariantBoxPity,
+            character.MountVariantBoxPity,
+            character.ProtectForRefine,
+            character.ProtectForDestroy,
+            character.ProtectForCostume,
+            character.ProtectForDestroy2,
+            character.LodRounds,
+            StellarCoreExpireDateCodec.Encode(stellarCoreExpireDate),
+            character.EliteDungeonTime,
+            character.DungeonKeyTime,
+            character.IvyHallTicketTime,
+            character.ScrollOfSeekersTime,
+            character.FightingGodForDestroy,
+            character.PetBagDate,
+            character.PlayTime1,
+            character.PlayTime3,
+            character.HsbStoneRewardClaimed,
+            character.TowerCpMilestoneCounter,
+            character.InventoryDate,
+            character.StoreDate,
+            character.WarriorPill,
+            character.WarriorScroll,
+            character.SilverTime,
+            character.GoldTime,
+            character.DoubleKillNumTime,
+            character.DoubleKillExpTime,
+            character.DoubleKillNumTime2,
+            character.ProtectForDeath,
+            character.AnimalDoubleExp,
+            character.DmgBoost,
+            character.HPBoost,
+            character.CriBoost,
+            stellarCoreIndex);
     }
 
     private static BuffInfo BuildBuffInfo(IReadOnlyList<CharacterBuffDto> buffs)
@@ -715,16 +944,6 @@ public sealed class EnterWorldService(
         }
 
         return WorldStateTemplates.ZeroedBuffInfo with { Buff = buff };
-    }
-
-    private static int[] BuildEffectValueForView(BuffInfo buffs)
-    {
-        var effectValueForView = new int[35];
-
-        for (var slot = 0; slot < 35; slot++)
-            effectValueForView[slot] = buffs.Buff[slot * 2];
-
-        return effectValueForView;
     }
 
     private static (ImmutableArray<int> RuneSystem, ImmutableArray<int> RuneSystemStat) BuildRuneArrays(

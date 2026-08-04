@@ -36,6 +36,8 @@ public sealed class RerollItemHandler(IRerollItemService rerollItemService, ILog
 
             switch (result.Outcome)
             {
+                case RerollItemOutcome.Disconnected:
+                    return;
                 case RerollItemOutcome.Rejected:
                     session.Send(new RerollItemResponse { Result = 1, Cost = 0, Value = new int[6] });
                     return;

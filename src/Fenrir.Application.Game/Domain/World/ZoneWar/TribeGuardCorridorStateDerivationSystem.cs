@@ -1,37 +1,20 @@
-using System.Collections.Concurrent;
+using System.Buffers.Binary;
 using Fenrir.Application.Game.Domain.Simulation;
 
 namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
-internal sealed class CorridorZoneState
-{
-    public bool BootPassDone;
-}
-
 public sealed class TribeGuardCorridorStateDerivationSystem(
     TribeGuardCorridorCatalog catalog,
-    TribeGuardCorridorState state) : ISimulationSystem
+    TribeGuardCorridorState state,
+    Lazy<ZoneCenterBroadcastIngestor> broadcastIngestor) : ISimulationSystem
 {
     public const int GuardPostsPerSegment = 5;
-
-    private readonly ConcurrentDictionary<short, CorridorZoneState> _stateByZone = new();
 
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
         var owned = catalog.GetSegmentsOwnedByZone(zone.MapId);
         if (owned.Count == 0)
             return;
-
-        var zoneState = _stateByZone.GetOrAdd(zone.MapId, static _ => new CorridorZoneState());
-
-        if (!zoneState.BootPassDone)
-        {
-            zoneState.BootPassDone = true;
-            foreach (var (tribeId, segmentIndex) in owned)
-                state.TrySetOpen(tribeId, segmentIndex, true);
-
-            return;
-        }
 
         foreach (var (tribeId, segmentIndex) in owned)
             EvaluateSegment(zone, tribeId, segmentIndex);
@@ -50,10 +33,16 @@ public sealed class TribeGuardCorridorStateDerivationSystem(
                 break;
             }
 
-        var currentlyOpen = state.IsOpen(tribeId, segmentIndex);
-        if (!anyAlive && !currentlyOpen)
-            state.TrySetOpen(tribeId, segmentIndex, true);
-        else if (anyAlive && currentlyOpen)
-            state.TrySetOpen(tribeId, segmentIndex, false);
+        var isOpen = !anyAlive;
+        if (!state.TrySetOpen(tribeId, segmentIndex, isOpen))
+            return;
+
+        Span<byte> payload = stackalloc byte[ZoneCenterBroadcastIngestor.PayloadSize];
+        payload.Clear();
+        BinaryPrimitives.WriteInt32LittleEndian(payload, tribeId);
+        BinaryPrimitives.WriteInt32LittleEndian(payload[sizeof(int)..], segmentIndex);
+        broadcastIngestor.Value.Ingest(
+            isOpen ? TribeGuardCorridorState.PassageOpenedEventCode : TribeGuardCorridorState.PassageBlockedEventCode,
+            payload);
     }
 }

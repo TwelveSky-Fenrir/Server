@@ -127,8 +127,17 @@ public sealed class PartyInviteService(
             return new PartyInviteResult(PartyInviteResultKind.InviterMustDisconnect);
         }
 
+        if (inviter.CombinedLevel is < 1 or > byte.MaxValue)
+        {
+            logger.LogWarning(
+                "Party invite rejected: character {InviterCharacterId} has an unsupported combined level {CombinedLevel} for the cross-shard request",
+                inviter.CharacterId, inviter.CombinedLevel);
+            return new PartyInviteResult(PartyInviteResultKind.InviterMustDisconnect);
+        }
+
         var outcome = parties.TryInviteCrossShard(inviter.CharacterId,
-            new CrossShardOutboundAsk(remote.ShardId, remote.CharacterId, remote.AvatarName));
+            new CrossShardOutboundAsk(remote.ShardId, remote.CharacterId, remote.AvatarName,
+                inviter.CombinedLevel));
 
         switch (outcome)
         {
@@ -148,7 +157,10 @@ public sealed class PartyInviteService(
                     inviter.Name,
                     remote.ShardId,
                     remote.CharacterId,
-                    null));
+                    null)
+                {
+                    SourceCombinedLevel = (byte)inviter.CombinedLevel
+                });
 
                 logger.LogDebug(
                     "Party invite published cross-shard: character {InviterCharacterId} ({InviterName}) -> character {TargetCharacterId} on shard {TargetShardId}",

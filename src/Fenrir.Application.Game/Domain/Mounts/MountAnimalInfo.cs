@@ -8,13 +8,32 @@ public readonly record struct MountAnimalInfo(int Slot, int Activity, int Exp)
 
     public const int ActiveCompanionSlotCount = 10;
 
+    public static bool TryResolve(int animalIndex, ImmutableArray<int> mountActivity,
+        ImmutableArray<int> mountAccumulatedExp, out MountAnimalInfo animal)
+    {
+        if (animalIndex < ActiveCompanionSlotBase ||
+            animalIndex >= ActiveCompanionSlotBase + ActiveCompanionSlotCount)
+        {
+            animal = default;
+            return false;
+        }
+
+        var slot = animalIndex - ActiveCompanionSlotBase;
+        if (mountActivity.IsDefault || mountAccumulatedExp.IsDefault ||
+            slot >= mountActivity.Length || slot >= mountAccumulatedExp.Length)
+        {
+            animal = default;
+            return false;
+        }
+
+        animal = new MountAnimalInfo(slot, MountActivityExpCodec.ClampActivity(mountActivity[slot]),
+            MountActivityExpCodec.ClampExp(mountAccumulatedExp[slot]));
+        return true;
+    }
+
     public static MountAnimalInfo Resolve(int animalIndex, ImmutableArray<int> mountActivity,
         ImmutableArray<int> mountAccumulatedExp)
     {
-        if (animalIndex < ActiveCompanionSlotBase || animalIndex >= ActiveCompanionSlotBase + ActiveCompanionSlotCount)
-            return default;
-
-        var slot = animalIndex - ActiveCompanionSlotBase;
-        return new MountAnimalInfo(slot, mountActivity[slot], mountAccumulatedExp[slot]);
+        return TryResolve(animalIndex, mountActivity, mountAccumulatedExp, out var animal) ? animal : default;
     }
 }

@@ -213,7 +213,8 @@ public sealed partial class MonsterAiSystem
         var monsterCellY = (int)(monster.PosY / cellSize);
         var monsterCellZ = (int)(monster.PosZ / cellSize);
 
-        foreach (var characterId in zone.NeighborsOfPosition(monster.PosX, monster.PosZ))
+        foreach (var characterId in StableNeighborsOfPosition(zone, monster.PosX, monster.PosZ,
+                     ThrowCarDetectionCellTolerance))
         {
             if (!zone.TryGetPlayer(characterId, out var player) || !IsCandidateValid(player))
                 continue;
@@ -240,8 +241,10 @@ public sealed partial class MonsterAiSystem
             if (_random.NextInt32(2) != 0)
                 continue;
 
-            monster.AssignTarget(characterId, player.UniqueNumber, player.PosX, player.PosY, player.PosZ);
-            monster.RegisterAcquisition(characterId, player);
+            monster.AssignTarget(characterId, player.Incarnation, player.UniqueNumber, player.PosX, player.PosY,
+                player.PosZ);
+            monster.RegisterAcquisition(characterId, player.Incarnation);
+            monster.ArmAttackPacketConfirmation();
             monster.AiState = MonsterAiState.AttackWindup;
             monster.StateTicks = 0;
             zone.BroadcastMonsterActionChange(monster);
@@ -284,9 +287,9 @@ public sealed partial class MonsterAiSystem
     {
         var aggro = zone.BorrowBossAggroScratch();
 
-        foreach (var characterId in zone.NeighborsOfPosition(monster.PosX, monster.PosZ))
+        foreach (var player in zone.Players)
         {
-            if (!zone.TryGetPlayer(characterId, out var player) || !IsCandidateValid(player))
+            if (!IsCandidateValid(player))
                 continue;
 
             if (player.ActionSort is 0 or 33)
@@ -302,9 +305,9 @@ public sealed partial class MonsterAiSystem
             if (_random.NextInt32(2) != 0)
                 continue;
 
-            monster.RegisterAcquisition(characterId, player);
-            aggro.Add(new MonsterAggroCandidate(characterId, player.UniqueNumber, distanceSq, player.PosX,
-                player.PosY, player.PosZ));
+            monster.RegisterAcquisition(player.CharacterId, player.Incarnation);
+            aggro.Add(new MonsterAggroCandidate(player.CharacterId, player.Incarnation, player.UniqueNumber, distanceSq,
+                player.PosX, player.PosY, player.PosZ));
 
             if (aggro.Count >= Zone175BossAggroCapacity)
                 break;
@@ -338,7 +341,10 @@ public sealed partial class MonsterAiSystem
     private static void CommitBossTarget(Zone zone, MonsterEntity monster, MonsterAggroCandidate target,
         MonsterAiState nextState)
     {
-        monster.AssignTarget(target.CharacterId, target.UniqueNumber, target.PosX, target.PosY, target.PosZ);
+        monster.AssignTarget(target.CharacterId, target.Incarnation, target.UniqueNumber, target.PosX, target.PosY,
+            target.PosZ);
+        if (nextState is MonsterAiState.AttackWindup or MonsterAiState.RangedAttackWindup)
+            monster.ArmAttackPacketConfirmation();
         monster.AiState = nextState;
         monster.StateTicks = 0;
         zone.BroadcastMonsterActionChange(monster);
@@ -384,7 +390,8 @@ public sealed partial class MonsterAiSystem
         var monsterCellY = (int)(monster.PosY / cellSize);
         var monsterCellZ = (int)(monster.PosZ / cellSize);
 
-        foreach (var characterId in zone.NeighborsOfPosition(monster.PosX, monster.PosZ))
+        foreach (var characterId in StableNeighborsOfPosition(zone, monster.PosX, monster.PosZ,
+                     GuardDetectionCellTolerance))
         {
             if (!zone.TryGetPlayer(characterId, out var player) || !IsCandidateValid(player))
                 continue;
@@ -406,8 +413,10 @@ public sealed partial class MonsterAiSystem
             if (_random.NextInt32(2) != 0)
                 continue;
 
-            monster.AssignTarget(characterId, player.UniqueNumber, player.PosX, player.PosY, player.PosZ);
-            monster.RegisterAcquisition(characterId, player);
+            monster.AssignTarget(characterId, player.Incarnation, player.UniqueNumber, player.PosX, player.PosY,
+                player.PosZ);
+            monster.RegisterAcquisition(characterId, player.Incarnation);
+            monster.ArmAttackPacketConfirmation();
             monster.AiState = MonsterAiState.AttackWindup;
             monster.StateTicks = 0;
             zone.BroadcastMonsterActionChange(monster);

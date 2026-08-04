@@ -1,9 +1,11 @@
+using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Hosting.World.ZoneWar;
 
@@ -24,7 +26,8 @@ public enum ZoneWarKind : byte
     Zone335 = 6
 }
 
-public sealed class ZoneWarTickService(ZoneRegistry zones, ILogger<ZoneWarTickService> logger) : BackgroundService
+public sealed class ZoneWarTickService(ZoneRegistry zones, IOptions<GameServerOptions> options,
+    ILogger<ZoneWarTickService> logger) : BackgroundService
 {
     public const int TribeCount = WorldStateService.TribeCount;
 
@@ -76,8 +79,11 @@ public sealed class ZoneWarTickService(ZoneRegistry zones, ILogger<ZoneWarTickSe
         }
     }
 
-    public void StartWar(ZoneWarKind kind, int remainTimeSeconds)
+    public bool StartWar(ZoneWarKind kind, int remainTimeSeconds)
     {
+        if (kind == ZoneWarKind.Zone241 && !options.Value.ChallengeContentEnabled)
+            return false;
+
         lock (_lock)
         {
             _activeKind = kind;
@@ -88,6 +94,8 @@ public sealed class ZoneWarTickService(ZoneRegistry zones, ILogger<ZoneWarTickSe
             _extraValue1 = 0;
             _extraValue2 = 0;
         }
+
+        return true;
     }
 
     public void EndWar()

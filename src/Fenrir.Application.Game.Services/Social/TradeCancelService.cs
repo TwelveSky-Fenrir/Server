@@ -10,24 +10,46 @@ public sealed class TradeCancelService(TradeRegistry trades, ZoneRegistry zones,
 {
     public TradeCancelResult Cancel(int askerId)
     {
-        if (!trades.TryCancel(askerId, out var targetId))
+        if (!trades.TryPeekPending(askerId, out var targetId, out var isAsker) || !isAsker)
         {
             logger.LogDebug("Trade cancel ignored: character {AskerId} has no pending ask to cancel", askerId);
             return new TradeCancelResult(false, 0);
         }
 
-        if (!zones.TryGetPlayer(targetId, out var target) || target.IsMovingZone)
+        var transition = trades.TryEnterTransition(askerId, targetId);
+        if (transition is null)
         {
             logger.LogDebug(
-                "Trade cancel: character {AskerId} withdrew its own pending ask, but target {TargetId} is unreachable or mid zone-transfer -- no notice sent, target's own record left as-is",
+                "Trade cancel ignored: character {AskerId} / target {TargetId} already have an in-flight transition",
                 askerId, targetId);
             return new TradeCancelResult(false, 0);
         }
 
-        trades.ClearTargetAfterCancel(targetId, askerId);
+        using (transition)
+        {
+            if (!trades.TryPeekPending(askerId, out targetId, out isAsker) || !isAsker)
+            {
+                logger.LogDebug("Trade cancel ignored: character {AskerId} has no pending ask to cancel", askerId);
+                return new TradeCancelResult(false, 0);
+            }
 
-        logger.LogDebug("Trade ask cancelled: character {AskerId} withdrew ask to character {TargetId}", askerId,
-            targetId);
-        return new TradeCancelResult(true, targetId);
+            if (!zones.TryGetPlayer(targetId, out var target) || target.IsMovingZone)
+            {
+                logger.LogDebug(
+                    "Trade cancel rejected: character {AskerId}'s target {TargetId} is unreachable or mid zone-transfer -- pending pair left unchanged",
+                    askerId, targetId);
+                return new TradeCancelResult(false, 0);
+            }
+
+            if (!trades.TryCancel(askerId, out var cancelledTargetId) || cancelledTargetId != targetId)
+            {
+                logger.LogDebug("Trade cancel ignored: character {AskerId} has no matching pending ask", askerId);
+                return new TradeCancelResult(false, 0);
+            }
+
+            logger.LogDebug("Trade ask cancelled: character {AskerId} withdrew ask to character {TargetId}", askerId,
+                targetId);
+            return new TradeCancelResult(true, targetId);
+        }
     }
 }

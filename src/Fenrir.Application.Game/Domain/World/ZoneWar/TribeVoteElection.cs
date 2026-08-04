@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Microsoft.Extensions.Logging;
@@ -38,7 +39,7 @@ public enum TribeVoteCastOutcome
 }
 
 public sealed class TribeVoteElection(
-    WorldStateService worldState,
+    ITribeVoteElectionRepository repository,
     ITribeRepository tribes,
     ZoneRegistry zones,
     ILogger<TribeVoteElection> logger)
@@ -48,73 +49,88 @@ public sealed class TribeVoteElection(
     public const int MinimumContributionPoints = 1000;
 
     private const int VoteLevelBaseline = 112;
+    private const int TribeCount = WorldStateService.TribeCount;
 
     private readonly Lock _lock = new();
-    private readonly HashSet<int> _votedThisWindow = [];
+    private readonly SemaphoreSlim _transitionGate = new(1, 1);
 
-    private Guid _cycleId;
+    private ImmutableArray<TribeVoteElectionTribeStateDto> _tribeStates = [];
+    private Guid? _cycleId;
 
-    private TribeVotePhase _phase = TribeVotePhase.Closed;
+    public TribeVotePhase Phase => GetPhase(0);
 
-    public TribeVotePhase Phase
+    public Guid? CycleId
     {
         get
         {
             lock (_lock)
             {
-                return _phase;
+                return _cycleId;
             }
+        }
+    }
+
+    public TribeVotePhase GetPhase(byte tribeId)
+    {
+        lock (_lock)
+        {
+            foreach (var state in _tribeStates)
+                if (state.TribeId == tribeId)
+                    return ToPhase(state.Phase);
+
+            return TribeVotePhase.Closed;
+        }
+    }
+
+    public async ValueTask LoadDurableSnapshotAsync(CancellationToken ct)
+    {
+        await _transitionGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            await repository.EnsureInitializedAsync(ct).ConfigureAwait(false);
+            await ReloadSnapshotAsync(ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            _transitionGate.Release();
         }
     }
 
     public async ValueTask OpenCandidacyWindowAsync(CancellationToken ct)
     {
-        _cycleId = Guid.NewGuid();
-        using var scope = logger.BeginScope("TribeVoteCycle {TribeVoteCycleId}", _cycleId);
-
-        for (byte tribeId = 0; tribeId < WorldStateService.TribeCount; tribeId++)
-            await worldState.ResetTribeVotesAsync(tribeId, ct).ConfigureAwait(false);
-
-        lock (_lock)
+        await _transitionGate.WaitAsync(ct).ConfigureAwait(false);
+        try
         {
-            _phase = TribeVotePhase.Candidacy;
-            _votedThisWindow.Clear();
-        }
+            var cycleId = Guid.NewGuid();
+            await repository.OpenCandidacyAsync(cycleId, ct).ConfigureAwait(false);
+            await ReloadSnapshotAsync(ct).ConfigureAwait(false);
 
-        logger.LogInformation(
-            "Tribe vote cycle {TribeVoteCycleId} opened candidacy for all {TribeCount} tribes",
-            _cycleId, WorldStateService.TribeCount);
+            logger.LogInformation(
+                "Tribe vote cycle {TribeVoteCycleId} opened candidacy for all {TribeCount} tribes",
+                cycleId, TribeCount);
+        }
+        finally
+        {
+            _transitionGate.Release();
+        }
     }
 
-    public void OpenVotingWindow()
+    public async ValueTask<bool> OpenVotingWindowAsync(CancellationToken ct)
     {
-        using var scope = logger.BeginScope("TribeVoteCycle {TribeVoteCycleId}", _cycleId);
-
-        lock (_lock)
-        {
-            _phase = TribeVotePhase.Voting;
-            _votedThisWindow.Clear();
-        }
-
-        logger.LogInformation("Tribe vote cycle {TribeVoteCycleId} opened voting", _cycleId);
+        return await TryAdvancePhaseAsync(TribeVotePhase.Candidacy, TribeVotePhase.Voting,
+            "opened voting", ct).ConfigureAwait(false);
     }
 
-    public void CloseWindow()
+    public async ValueTask<bool> CloseVotingWindowAsync(CancellationToken ct)
     {
-        using var scope = logger.BeginScope("TribeVoteCycle {TribeVoteCycleId}", _cycleId);
-
-        lock (_lock)
-        {
-            _phase = TribeVotePhase.Closed;
-        }
-
-        logger.LogInformation("Tribe vote cycle {TribeVoteCycleId} closed", _cycleId);
+        return await TryAdvancePhaseAsync(TribeVotePhase.Voting, TribeVotePhase.VotingClosed,
+            "closed voting, awaiting results", ct).ConfigureAwait(false);
     }
 
     public async ValueTask<TribeVoteCandidacyOutcome> TryRegisterCandidacyAsync(PlayerRuntimeState player,
         byte slotIndex, CancellationToken ct)
     {
-        if (Phase != TribeVotePhase.Candidacy)
+        if (GetPhase(player.Tribe) != TribeVotePhase.Candidacy)
             return TribeVoteCandidacyOutcome.WindowClosed;
 
         if (CombinedEligibilityLevel(player) < MinimumEligibilityLevel)
@@ -123,68 +139,149 @@ public sealed class TribeVoteElection(
         if (player.ContributionPoints < MinimumContributionPoints)
             return TribeVoteCandidacyOutcome.NotEnoughContribution;
 
-        var candidates = await worldState.GetTribeVotesAsync(player.Tribe, ct).ConfigureAwait(false);
-
-        foreach (var candidate in candidates)
-            if (candidate.CandidateCharacterId == player.CharacterId && candidate.SlotIndex != slotIndex)
-                return TribeVoteCandidacyOutcome.AlreadyRegisteredInAnotherSlot;
-
-        foreach (var candidate in candidates)
-            if (candidate.SlotIndex == slotIndex && player.ContributionPoints <= candidate.KillOtherTribeCount)
-                return TribeVoteCandidacyOutcome.SlotHeldByStrongerCandidate;
+        var cycleId = CycleId;
+        if (cycleId is null)
+            return TribeVoteCandidacyOutcome.WindowClosed;
 
         var candidateLevel = (short)(player.CombinedLevel - VoteLevelBaseline);
+        var persistenceOutcome = await repository.TryRegisterCandidateAsync(cycleId.Value, player.Tribe, slotIndex,
+            player.CharacterId, candidateLevel, player.ContributionPoints, ct).ConfigureAwait(false);
 
-        await worldState.RegisterTribeVoteCandidateAsync(player.Tribe, slotIndex, player.CharacterId, candidateLevel,
-            player.ContributionPoints, ct).ConfigureAwait(false);
-
-        return TribeVoteCandidacyOutcome.Registered;
+        return persistenceOutcome switch
+        {
+            TribeVoteElectionCandidateRegistrationOutcome.Registered => TribeVoteCandidacyOutcome.Registered,
+            TribeVoteElectionCandidateRegistrationOutcome.WindowClosed => TribeVoteCandidacyOutcome.WindowClosed,
+            TribeVoteElectionCandidateRegistrationOutcome.AlreadyRegisteredInAnotherSlot =>
+                TribeVoteCandidacyOutcome.AlreadyRegisteredInAnotherSlot,
+            TribeVoteElectionCandidateRegistrationOutcome.SlotHeldByStrongerCandidate =>
+                TribeVoteCandidacyOutcome.SlotHeldByStrongerCandidate,
+            _ => throw new ArgumentOutOfRangeException(nameof(persistenceOutcome), persistenceOutcome,
+                "Unknown durable tribe-vote candidacy outcome.")
+        };
     }
 
     public async ValueTask<TribeVoteCastOutcome> TryCastVoteAsync(PlayerRuntimeState player, byte slotIndex,
         CancellationToken ct)
     {
-        if (Phase != TribeVotePhase.Voting)
+        if (GetPhase(player.Tribe) != TribeVotePhase.Voting)
             return TribeVoteCastOutcome.WindowClosed;
 
         if (player.Level < MinimumEligibilityLevel)
             return TribeVoteCastOutcome.LevelTooLow;
 
-        var candidates = await worldState.GetTribeVotesAsync(player.Tribe, ct).ConfigureAwait(false);
-
-        var slotOccupied = false;
-        foreach (var candidate in candidates)
-            if (candidate.SlotIndex == slotIndex)
-            {
-                slotOccupied = true;
-                break;
-            }
-
-        if (!slotOccupied)
-            return TribeVoteCastOutcome.SlotEmpty;
-
-        bool alreadyVoted;
-        lock (_lock)
-        {
-            alreadyVoted = !_votedThisWindow.Add(player.CharacterId);
-        }
-
-        if (alreadyVoted)
-            return TribeVoteCastOutcome.AlreadyVotedThisWindow;
+        var cycleId = CycleId;
+        if (cycleId is null)
+            return TribeVoteCastOutcome.WindowClosed;
 
         var votePoints = player.Level + (player.Level2 + player.RebirthCount) * 3 - VoteLevelBaseline;
+        var persistenceOutcome = await repository.TryCastVoteAsync(cycleId.Value, player.CharacterId, player.Tribe,
+            slotIndex, votePoints, ct).ConfigureAwait(false);
 
-        await worldState.CastTribeVoteAsync(player.Tribe, slotIndex, votePoints, ct).ConfigureAwait(false);
-
-        return TribeVoteCastOutcome.Cast;
+        return persistenceOutcome switch
+        {
+            TribeVoteElectionVoteCastOutcome.Cast => TribeVoteCastOutcome.Cast,
+            TribeVoteElectionVoteCastOutcome.WindowClosed => TribeVoteCastOutcome.WindowClosed,
+            TribeVoteElectionVoteCastOutcome.SlotEmpty => TribeVoteCastOutcome.SlotEmpty,
+            TribeVoteElectionVoteCastOutcome.AlreadyVotedThisCycle => TribeVoteCastOutcome.AlreadyVotedThisWindow,
+            _ => throw new ArgumentOutOfRangeException(nameof(persistenceOutcome), persistenceOutcome,
+                "Unknown durable tribe-vote casting outcome.")
+        };
     }
 
     public async ValueTask<int?> TallyForceLeaderAsync(byte tribeId, CancellationToken ct)
     {
-        using var scope = logger.BeginScope("TribeVoteCycle {TribeVoteCycleId} Tribe {TribeId}", _cycleId, tribeId);
+        var snapshot = await repository.LoadSnapshotAsync(ct).ConfigureAwait(false);
+        return await TallyForceLeaderAsync(tribeId, snapshot.Candidates, ct).ConfigureAwait(false);
+    }
 
-        var candidates = await worldState.GetTribeVotesAsync(tribeId, ct).ConfigureAwait(false);
-        var winner = candidates.Count > 0 && candidates[0].VotePoint >= 1 ? candidates[0] : null;
+    public async ValueTask AnnounceResultsAsync(CancellationToken ct)
+    {
+        await _transitionGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var snapshot = await ReloadSnapshotAsync(ct).ConfigureAwait(false);
+            var cycleId = GetCurrentCycleId(snapshot);
+            if (cycleId is null || !HasPhase(snapshot, TribeVotePhase.VotingClosed))
+                return;
+
+            using var scope = logger.BeginScope("TribeVoteCycle {TribeVoteCycleId}", cycleId);
+
+            for (byte tribeId = 0; tribeId < TribeCount; tribeId++)
+            {
+                await TallyForceLeaderAsync(tribeId, snapshot.Candidates, ct).ConfigureAwait(false);
+                await ClearSubMastersAsync(tribeId, ct).ConfigureAwait(false);
+            }
+
+            if (!await repository.TryAdvancePhaseAsync(cycleId.Value, (byte)TribeVotePhase.VotingClosed,
+                    (byte)TribeVotePhase.ResultsAnnounced, ct).ConfigureAwait(false))
+                return;
+
+            await ReloadSnapshotAsync(ct).ConfigureAwait(false);
+
+            logger.LogInformation(
+                "Tribe vote cycle {TribeVoteCycleId} announced results for all {TribeCount} tribes",
+                cycleId, TribeCount);
+        }
+        finally
+        {
+            _transitionGate.Release();
+        }
+    }
+
+    public async ValueTask ResetToIdleAsync(CancellationToken ct)
+    {
+        await _transitionGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var cycleId = CycleId;
+            using var scope = logger.BeginScope("TribeVoteCycle {TribeVoteCycleId}", cycleId);
+
+            await repository.ResetToIdleAsync(ct).ConfigureAwait(false);
+            await ReloadSnapshotAsync(ct).ConfigureAwait(false);
+
+            logger.LogInformation("Tribe vote cycle {TribeVoteCycleId} reset to idle", cycleId);
+        }
+        finally
+        {
+            _transitionGate.Release();
+        }
+    }
+
+    private async ValueTask<bool> TryAdvancePhaseAsync(TribeVotePhase expectedPhase, TribeVotePhase nextPhase,
+        string action, CancellationToken ct)
+    {
+        await _transitionGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var cycleId = CycleId;
+            if (cycleId is null || !HasPhase(expectedPhase))
+                return false;
+
+            using var scope = logger.BeginScope("TribeVoteCycle {TribeVoteCycleId}", cycleId);
+
+            if (!await repository.TryAdvancePhaseAsync(cycleId.Value, (byte)expectedPhase, (byte)nextPhase, ct)
+                    .ConfigureAwait(false))
+            {
+                await ReloadSnapshotAsync(ct).ConfigureAwait(false);
+                return false;
+            }
+
+            await ReloadSnapshotAsync(ct).ConfigureAwait(false);
+            logger.LogInformation("Tribe vote cycle {TribeVoteCycleId} {Action}", cycleId, action);
+            return true;
+        }
+        finally
+        {
+            _transitionGate.Release();
+        }
+    }
+
+    private async ValueTask<int?> TallyForceLeaderAsync(byte tribeId,
+        ImmutableArray<TribeVoteElectionCandidateDto> candidates, CancellationToken ct)
+    {
+        var winner = TribeVoteElectionTally.SelectWinner(candidates, tribeId);
+        var cycleId = CycleId;
+        using var scope = logger.BeginScope("TribeVoteCycle {TribeVoteCycleId} Tribe {TribeId}", cycleId, tribeId);
 
         var tribeSummaries = await tribes.GetAllAsync(ct).ConfigureAwait(false);
         var previousLeaderId = tribeSummaries.FirstOrDefault(t => t.TribeId == tribeId)?.MasterCharacterId;
@@ -201,57 +298,9 @@ public sealed class TribeVoteElection(
 
         logger.LogInformation(
             "Tribe vote cycle {TribeVoteCycleId} tallied tribe {TribeId}: winner={WinnerCharacterId}",
-            _cycleId, tribeId, winner?.CandidateCharacterId);
+            cycleId, tribeId, winner?.CandidateCharacterId);
 
         return winner?.CandidateCharacterId;
-    }
-
-    public void CloseVotingWindow()
-    {
-        using var scope = logger.BeginScope("TribeVoteCycle {TribeVoteCycleId}", _cycleId);
-
-        lock (_lock)
-        {
-            _phase = TribeVotePhase.VotingClosed;
-        }
-
-        logger.LogInformation("Tribe vote cycle {TribeVoteCycleId} closed voting, awaiting results", _cycleId);
-    }
-
-    public async ValueTask AnnounceResultsAsync(CancellationToken ct)
-    {
-        using var scope = logger.BeginScope("TribeVoteCycle {TribeVoteCycleId}", _cycleId);
-
-        for (byte tribeId = 0; tribeId < WorldStateService.TribeCount; tribeId++)
-        {
-            await TallyForceLeaderAsync(tribeId, ct).ConfigureAwait(false);
-            await ClearSubMastersAsync(tribeId, ct).ConfigureAwait(false);
-        }
-
-        lock (_lock)
-        {
-            _phase = TribeVotePhase.ResultsAnnounced;
-        }
-
-        logger.LogInformation(
-            "Tribe vote cycle {TribeVoteCycleId} announced results for all {TribeCount} tribes",
-            _cycleId, WorldStateService.TribeCount);
-    }
-
-    public async ValueTask ResetToIdleAsync(CancellationToken ct)
-    {
-        using var scope = logger.BeginScope("TribeVoteCycle {TribeVoteCycleId}", _cycleId);
-
-        for (byte tribeId = 0; tribeId < WorldStateService.TribeCount; tribeId++)
-            await worldState.ResetTribeVotesAsync(tribeId, ct).ConfigureAwait(false);
-
-        lock (_lock)
-        {
-            _phase = TribeVotePhase.Closed;
-            _votedThisWindow.Clear();
-        }
-
-        logger.LogInformation("Tribe vote cycle {TribeVoteCycleId} reset to idle", _cycleId);
     }
 
     private async ValueTask ClearSubMastersAsync(byte tribeId, CancellationToken ct)
@@ -265,6 +314,80 @@ public sealed class TribeVoteElection(
             if (zones.TryGetPlayerAndZone(subMaster.CharacterId, out _, out var zone))
                 zone.PostTribeProgressCommand(new TribeProgressZoneCommand(subMaster.CharacterId, TribeRole: 0));
         }
+    }
+
+    private async ValueTask<TribeVoteElectionSnapshot> ReloadSnapshotAsync(CancellationToken ct)
+    {
+        var snapshot = await repository.LoadSnapshotAsync(ct).ConfigureAwait(false);
+        ApplySnapshot(snapshot);
+        return snapshot;
+    }
+
+    private void ApplySnapshot(TribeVoteElectionSnapshot snapshot)
+    {
+        if (snapshot.TribeStates.Length != TribeCount)
+            throw new InvalidOperationException(
+                $"Durable tribe-vote election snapshot must contain {TribeCount} tribe states.");
+
+        var orderedStates = snapshot.TribeStates.OrderBy(static state => state.TribeId).ToImmutableArray();
+        for (byte tribeId = 0; tribeId < TribeCount; tribeId++)
+        {
+            var state = orderedStates[tribeId];
+            if (state.TribeId != tribeId)
+                throw new InvalidOperationException("Durable tribe-vote election snapshot has non-canonical tribe ids.");
+
+            _ = ToPhase(state.Phase);
+        }
+
+        var cycleId = orderedStates[0].CycleId;
+        if (orderedStates.Any(state => state.CycleId != cycleId))
+            throw new InvalidOperationException("Durable tribe-vote election snapshot has inconsistent cycle identities.");
+
+        foreach (var candidate in snapshot.Candidates)
+            if (candidate.TribeId >= TribeCount || candidate.CycleId != cycleId || candidate.VotePoint < 0)
+                throw new InvalidOperationException("Durable tribe-vote election snapshot has an invalid candidate tally.");
+
+        lock (_lock)
+        {
+            _tribeStates = orderedStates;
+            _cycleId = cycleId;
+        }
+    }
+
+    private bool HasPhase(TribeVotePhase phase)
+    {
+        lock (_lock)
+        {
+            return _tribeStates.Length == TribeCount && _tribeStates.All(state => ToPhase(state.Phase) == phase);
+        }
+    }
+
+    private static bool HasPhase(TribeVoteElectionSnapshot snapshot, TribeVotePhase phase)
+    {
+        return snapshot.TribeStates.Length == TribeCount &&
+               snapshot.TribeStates.All(state => ToPhase(state.Phase) == phase);
+    }
+
+    private static Guid? GetCurrentCycleId(TribeVoteElectionSnapshot snapshot)
+    {
+        return snapshot.TribeStates.Length == TribeCount &&
+               snapshot.TribeStates.All(state => state.CycleId == snapshot.TribeStates[0].CycleId)
+            ? snapshot.TribeStates[0].CycleId
+            : null;
+    }
+
+    private static TribeVotePhase ToPhase(byte phase)
+    {
+        return phase switch
+        {
+            (byte)TribeVotePhase.Closed => TribeVotePhase.Closed,
+            (byte)TribeVotePhase.Candidacy => TribeVotePhase.Candidacy,
+            (byte)TribeVotePhase.Voting => TribeVotePhase.Voting,
+            (byte)TribeVotePhase.VotingClosed => TribeVotePhase.VotingClosed,
+            (byte)TribeVotePhase.ResultsAnnounced => TribeVotePhase.ResultsAnnounced,
+            _ => throw new ArgumentOutOfRangeException(nameof(phase), phase,
+                "Unknown durable tribe-vote election phase.")
+        };
     }
 
     private static int CombinedEligibilityLevel(PlayerRuntimeState player)

@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Protocol.Game;
@@ -14,6 +15,9 @@ public sealed class SupportSkillTimeUpRatioMaintenanceSystem(DirtyTracker<int> d
 
     private const int PremiumStatSort = 116;
 
+    private static readonly FrozenSet<short> DoubleBuffPausedMaps =
+        new short[] { 1, 6, 11, 140, 37 }.ToFrozenSet();
+
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
         foreach (var state in zone.Players)
@@ -22,6 +26,9 @@ public sealed class SupportSkillTimeUpRatioMaintenanceSystem(DirtyTracker<int> d
 
     private void TickPlayer(PlayerRuntimeState state, int legacyTicksElapsed, short mapId)
     {
+        if (state.IsMovingZone)
+            return;
+
         state.SupportSkillTimeUpRatioAccrualTicks += legacyTicksElapsed;
         var minutesElapsed =
             state.SupportSkillTimeUpRatioAccrualTicks / SimulationClock.PlayTimeAccrualLegacyTicks;
@@ -31,7 +38,7 @@ public sealed class SupportSkillTimeUpRatioMaintenanceSystem(DirtyTracker<int> d
         state.SupportSkillTimeUpRatioAccrualTicks -= minutesElapsed * SimulationClock.PlayTimeAccrualLegacyTicks;
 
         var recomputeNeeded = false;
-        if (state.BuffX2Time > 0)
+        if (state.BuffX2Time > 0 && !DoubleBuffPausedMaps.Contains(mapId))
         {
             state.BuffX2Time = Math.Max(0, state.BuffX2Time - minutesElapsed);
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);

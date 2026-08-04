@@ -37,15 +37,17 @@ public sealed class CostumeStateHandler(ICostumeStateService service, ILogger<Co
 
                 case CostumeStateOutcome.Disconnect:
                     logger.LogWarning(
-                        "Costume-state rejected for character {CharacterId}: sort {Sort} value {Value} -- ignoring (game-logic condition, not malformed wire input)",
+                        "Costume-state rejected for character {CharacterId}: sort {Sort} value {Value}; terminating session",
                         characterId, packet.Sort, packet.Value);
+                    zoneSession.Abort(DisconnectReason.Faulted);
                     return;
 
                 case CostumeStateOutcome.Reply:
                     session.Send(new CostumeStateResponse
                     {
                         Result = result.ResultCode, Sort = packet.Sort, Value = packet.Value, Page = result.Page,
-                        PosX = result.PosX, PosY = result.PosY, ItemIndex = result.ItemIndex, CostumeDate = 0
+                        PosX = result.PosX, PosY = result.PosY, ItemIndex = result.ItemIndex,
+                        CostumeDate = result.CostumeDate
                     });
                     return;
             }

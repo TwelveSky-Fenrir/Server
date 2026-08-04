@@ -33,30 +33,61 @@ public static class MountStateResolver
 
     public const int StatSlotCount = 8;
 
+    public static bool IsOrdinarySlot(int animalIndex)
+    {
+        return animalIndex is >= 0 and < SlotCount;
+    }
+
+    public static bool IsMountedSlot(int animalIndex)
+    {
+        return animalIndex is >= SlotCount and <= MountedMax;
+    }
+
+    public static bool TryGetOwnedMount(ImmutableArray<int> garage, int garageSlot, out int itemId)
+    {
+        if (garageSlot is >= 0 and < SlotCount && !garage.IsDefault && garageSlot < garage.Length &&
+            garage[garageSlot] > 0)
+        {
+            itemId = garage[garageSlot];
+            return true;
+        }
+
+        itemId = 0;
+        return false;
+    }
+
+    public static bool TryResolveActiveMountedMount(int animalIndex, int animalNumber, ImmutableArray<int> garage,
+        out int garageSlot)
+    {
+        garageSlot = animalIndex - SlotCount;
+        return IsMountedSlot(animalIndex) && animalNumber > 0 &&
+               TryGetOwnedMount(garage, garageSlot, out var rosterItemId) && rosterItemId == animalNumber;
+    }
+
     public static Result Resolve(int sort, int value, in Context ctx)
     {
         switch (sort)
         {
             case 1:
-                return value is < 0 or >= SlotCount
+                return !TryGetOwnedMount(ctx.Garage, value, out _)
                     ? new Result(ResultKind.NoReply)
                     : new Result(ResultKind.Select, value);
 
             case 2:
-                if (value < 0 || value >= SlotCount || ctx.AnimalIndex >= SlotCount)
+                if (!IsOrdinarySlot(value) || !IsOrdinarySlot(ctx.AnimalIndex))
                     return new Result(ResultKind.NoReply);
                 return new Result(ResultKind.Deselect, -1);
 
             case 3:
-                if (ctx.AnimalIndex < 0 || ctx.AnimalIndex >= SlotCount || ctx.AnimalTime < 1 || ctx.ActionSort != 1)
+                if (!IsOrdinarySlot(ctx.AnimalIndex) || ctx.AnimalTime < 1 || ctx.ActionSort != 1 ||
+                    !TryGetOwnedMount(ctx.Garage, ctx.AnimalIndex, out var animalNumber))
                     return new Result(ResultKind.NoReply);
 
                 var mountedIndex = ctx.AnimalIndex + SlotCount;
-                var animalNumber = ctx.Garage[ctx.AnimalIndex];
                 return new Result(ResultKind.Mount, mountedIndex, animalNumber);
 
             case 4:
-                return ctx.AnimalIndex is < SlotCount or > MountedMax
+                return !IsMountedSlot(ctx.AnimalIndex)
                     ? new Result(ResultKind.NoReply)
                     : new Result(ResultKind.Dismount, ctx.AnimalIndex - SlotCount);
 
@@ -89,14 +120,14 @@ public static class MountStateResolver
 
     private static Result ResolveDeleteMount(int value, in Context ctx)
     {
-        if (ctx.AnimalIndex < 0 || ctx.AnimalIndex >= SlotCount)
+        if (!IsOrdinarySlot(ctx.AnimalIndex))
             return new Result(ResultKind.Disconnect);
 
         if (value == 0)
             return new Result(ResultKind.Disconnect);
 
         for (var i = 0; i < SlotCount; i++)
-            if (ctx.Garage[i] == value)
+            if (TryGetOwnedMount(ctx.Garage, i, out var itemId) && itemId == value)
                 return new Result(ResultKind.DeleteMount, GarageSlot: i);
 
         return new Result(ResultKind.Disconnect);
@@ -109,10 +140,13 @@ public static class MountStateResolver
 
         var slot = GarageSlotOf(ctx.AnimalIndex);
 
-        if (ctx.AccumulatedExp[slot] != MaxMountExp)
+        if (!TryGetOwnedMount(ctx.Garage, slot, out _))
             return new Result(ResultKind.Disconnect);
 
-        if (ctx.RolledAttributeTotal[slot] >= MaxRolledAttributeTotal)
+        if (ValueAt(ctx.AccumulatedExp, slot) != MaxMountExp)
+            return new Result(ResultKind.Disconnect);
+
+        if (ValueAt(ctx.RolledAttributeTotal, slot) >= MaxRolledAttributeTotal)
             return new Result(ResultKind.Disconnect);
 
         return new Result(ResultKind.Convert, GarageSlot: slot);
@@ -130,6 +164,8 @@ public static class MountStateResolver
             return new Result(ResultKind.Disconnect);
 
         var slot = GarageSlotOf(ctx.AnimalIndex);
+        if (!TryGetOwnedMount(ctx.Garage, slot, out _))
+            return new Result(ResultKind.Disconnect);
         return new Result(ResultKind.DeleteAttribute, GarageSlot: slot, StatSlotIndex: value - 1);
     }
 
@@ -145,7 +181,14 @@ public static class MountStateResolver
             return new Result(ResultKind.Disconnect);
 
         var slot = GarageSlotOf(ctx.AnimalIndex);
+        if (!TryGetOwnedMount(ctx.Garage, slot, out _))
+            return new Result(ResultKind.Disconnect);
         return new Result(ResultKind.Transfer, GarageSlot: slot, StatSlotIndex: value - 1);
+    }
+
+    private static int ValueAt(ImmutableArray<int> values, int index)
+    {
+        return !values.IsDefault && index >= 0 && index < values.Length ? values[index] : 0;
     }
 
     public readonly record struct Result(

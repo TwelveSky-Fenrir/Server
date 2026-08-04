@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Microsoft.Extensions.Logging;
@@ -77,9 +78,60 @@ public sealed class RegularWarRewardGrantSink(ZoneRegistry zones, ILogger<Regula
 
     public void OnMonstersShouldDespawn(short mapId)
     {
+        if (!zones.TryGet(mapId, out var zone))
+        {
+            logger.LogWarning(
+                "RegularWar {MapId}: boss cleanup due but this shard no longer hosts the map -- not applied",
+                mapId);
+            return;
+        }
+
+        var completion = new TaskCompletionSource<ZoneCommandResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (!zone.Post(ZoneCommand.DespawnRegularWarBosses(completion)))
+        {
+            logger.LogWarning("RegularWar {MapId}: boss cleanup was backpressured", mapId);
+            return;
+        }
+
+        _ = ObserveBossCleanupAsync(mapId, completion.Task);
     }
 
     public void OnAllSessionsShouldDisconnect(short mapId)
     {
+        if (!zones.TryGet(mapId, out var zone))
+        {
+            logger.LogWarning(
+                "RegularWar {MapId}: forced-reset disconnect due but this shard no longer hosts the map -- dropped",
+                mapId);
+            return;
+        }
+
+        var players = zone.Players.ToList();
+        players.Sort(static (left, right) => left.CharacterId.CompareTo(right.CharacterId));
+
+        foreach (var player in players)
+            player.Session.Abort(DisconnectReason.Evicted);
+
+        logger.LogInformation("RegularWar {MapId}: forced-reset aborted {SessionCount} hosted player session(s)",
+            mapId, players.Count);
+    }
+
+    private async Task ObserveBossCleanupAsync(short mapId, Task<ZoneCommandResult> completion)
+    {
+        try
+        {
+            var result = await completion.WaitAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
+            if (result.Kind != ZoneCommandResultKind.Applied)
+                logger.LogWarning("RegularWar {MapId}: boss cleanup was not applied ({Result}, {Cause})", mapId,
+                    result.Kind, result.Cause);
+        }
+        catch (TimeoutException)
+        {
+            logger.LogWarning("RegularWar {MapId}: boss cleanup actor acknowledgement timed out", mapId);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "RegularWar {MapId}: boss cleanup acknowledgement faulted", mapId);
+        }
     }
 }

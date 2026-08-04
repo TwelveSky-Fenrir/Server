@@ -64,7 +64,7 @@ public sealed class UseHotkeyItemService(
             state.MountAccumulatedExp);
 
         var resolved = HotkeyItemConsumptionResolver.Resolve(page, index, slot, state.IsStunned, state.IsDead,
-            state.CanUseConsumables, itemResolved, itemCategory, potionType1, potionType2,
+            state.CanUseConsumableEffects, itemResolved, itemCategory, potionType1, potionType2,
             state.Life, maxLife, state.Mana, maxMana,
             isDarkAttackScrollZoneAllowed, state.DarkAttackKind,
             petFoodEligible, state.PetActivity, mountFoodEligible, mountAnimalInfo.Activity);

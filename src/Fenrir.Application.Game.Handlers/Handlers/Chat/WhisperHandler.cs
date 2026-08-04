@@ -32,7 +32,7 @@ public sealed class WhisperHandler(IWhisperService whisperService, ILogger<Whisp
             return;
 
         var resolution = await whisperService
-            .ResolveAsync(sender, targetName, content, zoneSession.IsGm ? 1 : 0, cancellationToken)
+            .ResolveAsync(sender, targetName, content, packet.Link, zoneSession.IsGm ? 1 : 0, cancellationToken)
             .ConfigureAwait(false);
 
         switch (resolution.Outcome)

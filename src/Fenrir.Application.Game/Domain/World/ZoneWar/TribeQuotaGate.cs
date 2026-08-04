@@ -6,9 +6,21 @@ public enum TribeQuotaGroup : byte
 
     ThreeWay = 1,
 
-    FourWay = 2,
+    FourWay = 2
+}
 
-    RvrInstancedNoGate = 3
+public static class TribeQuotaGroupPolicy
+{
+    public static TribeQuotaGroup ForMap(short mapId)
+    {
+        return mapId switch
+        {
+            49 or 51 or 53 or >= 146 and <= 153 or 267 => TribeQuotaGroup.ThreeWay,
+            >= 154 and <= 164 or >= 120 and <= 122 or 194 or 200 or 268 or 269 or 295 or 296 =>
+                TribeQuotaGroup.FourWay,
+            _ => TribeQuotaGroup.None
+        };
+    }
 }
 
 public enum TribeQuotaOutcome

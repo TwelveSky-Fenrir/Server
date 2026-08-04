@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.ItemModification;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Application.Game.Domain.Forge;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Simulation;
@@ -74,24 +75,20 @@ public sealed class DestroyItemService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex,
-                "Character {CharacterId} destroy-item AdjustMoneyAndReplaceContainerAsync failed (treated as money-cap overflow)",
-                characterId);
-            return new DestroyItemResult(DestroyItemOutcome.Rejected, 0, 0, 0, 0);
+            return AbortAfterUncertainPersistence(state, characterId, ex);
         }
+
+        var containers = ImmutableArray.Create(new InventoryContainerSnapshot((byte)page1, projected));
+
+        var inventoryResult = await zone.PostInventoryCommandAndWaitForResultAsync(
+            new InventoryZoneCommand(characterId, containers, null), cancellationToken);
+        if (inventoryResult.Kind != ZoneCommandResultKind.Applied)
+            return AbortAfterDurableMutation(state, characterId, inventoryResult);
 
         await eventLog.LogAsync(DestroyItemEventCode, EventLogCategory.ItemDestroy, accountId, characterId,
             null, null, null, resolved.Money, null, target.ItemId, target.Quantity, SuccessOutcome,
             $"StoneItemId={resolved.StoneItemId};StoneQuantity={quantity};Enchant={target.Enchant};Serial={target.Serial}",
             cancellationToken);
-
-        var containers = ImmutableArray.Create(new InventoryContainerSnapshot((byte)page1, projected));
-
-        if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
-                cancellationToken))
-            logger.LogError(
-                "Zone {MapId} inventory inbox full: dropped destroy-item mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
 
         logger.LogInformation(
             "Character {CharacterId} destroy-item applied: target {TargetItemId} dissolved into {Money} money + {StoneItemId} x{Quantity}",
@@ -99,6 +96,26 @@ public sealed class DestroyItemService(
 
         return new DestroyItemResult(DestroyItemOutcome.Applied, resolved.Money, resolved.StoneItemId, quantity,
             target.Serial);
+    }
+
+    private DestroyItemResult AbortAfterUncertainPersistence(PlayerRuntimeState state, int characterId,
+        Exception exception)
+    {
+        logger.LogError(exception,
+            "Character {CharacterId} destroy-item persistence failed after submission; durability is uncertain, disconnecting without success response",
+            characterId);
+        ((IZoneSession)state.Session).Abort(DisconnectReason.Faulted);
+        return new DestroyItemResult(DestroyItemOutcome.Disconnected, 0, 0, 0, 0);
+    }
+
+    private DestroyItemResult AbortAfterDurableMutation(PlayerRuntimeState state, int characterId,
+        ZoneCommandResult result)
+    {
+        logger.LogError(
+            "Character {CharacterId} destroy-item persisted but inventory actor mutation was not acknowledged as applied ({Kind}: {Cause}); disconnecting without success response",
+            characterId, result.Kind, result.Cause);
+        ((IZoneSession)state.Session).Abort(DisconnectReason.Faulted);
+        return new DestroyItemResult(DestroyItemOutcome.Disconnected, 0, 0, 0, 0);
     }
 
     private static List<CharacterItemSlotTvp> ToTvps(ImmutableDictionary<byte, ItemStack> container)

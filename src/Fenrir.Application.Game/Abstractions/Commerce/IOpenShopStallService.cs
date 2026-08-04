@@ -21,12 +21,19 @@ public readonly record struct OpenShopStallPrepareResult(
     PshopInfo Listing,
     List<OfflineShopItemSlotTvp>? OfflineItems);
 
+public readonly record struct ProxyShopInventoryClear(int Page, int Index);
+
+public readonly record struct OpenProxyShopOpenResult(
+    OpenShopStallResponse Response,
+    GetProxyShopResponse? Snapshot,
+    IReadOnlyList<ProxyShopInventoryClear> InventoryClears);
+
 public interface IOpenShopStallService
 {
     public ValueTask<OpenShopStallPrepareResult> PrepareAsync(OpenShopStallRequest packet, PlayerRuntimeState state,
         CancellationToken cancellationToken);
 
-    public ValueTask<OpenShopStallResponse> OpenProxyShopAsync(OpenShopStallRequest packet, Zone zone,
+    public ValueTask<OpenProxyShopOpenResult> OpenProxyShopAsync(OpenShopStallRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, int accountId, PshopInfo listing,
         List<OfflineShopItemSlotTvp> offlineItems, CancellationToken cancellationToken);
 }

@@ -11,6 +11,11 @@ namespace Fenrir.Network.Dispatch;
 
 public static class SessionLoop
 {
+    private const int LoginMaxInboundBufferedBytes = 40_960;
+    private const int ZoneMaxInboundBufferedBytes = 1_024_000;
+    private const int LoginMaxInboundFramesPerRead = 128;
+    private const int ZoneMaxInboundFramesPerRead = 1_024;
+
     public static async Task RunConnectionAsync(
         SocketConnection connection,
         ClientSession session,
@@ -21,6 +26,15 @@ public static class SessionLoop
         CancellationToken cancellationToken,
         ILogger? logger = null)
     {
+        void AbortForTransportFault(Exception exception)
+        {
+            logger?.LogDebug(exception,
+                "Session {SessionId} ({Server}, {RemoteEndPoint}): transport I/O faulted; aborting",
+                session.SessionId, session.Server, session.RemoteEndPoint);
+            session.Abort(DisconnectReason.Faulted);
+        }
+
+        connection.TransportFaulted += AbortForTransportFault;
         var ioTask = connection.RunIoAsync(cancellationToken);
 
         try
@@ -42,6 +56,8 @@ public static class SessionLoop
                     "Session {SessionId} ({Server}, {RemoteEndPoint}): transport I/O loop ended with an exception while tearing the connection down",
                     session.SessionId, session.Server, session.RemoteEndPoint);
             }
+
+            connection.TransportFaulted -= AbortForTransportFault;
         }
     }
 
@@ -54,7 +70,7 @@ public static class SessionLoop
         CancellationToken cancellationToken,
         ILogger? logger = null)
     {
-        var reader = session.Transport.Input;
+        var reader = session.Input;
 
         try
         {
@@ -63,11 +79,28 @@ public static class SessionLoop
                 var result = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
 
                 if (result.IsCanceled)
+                {
+                    if (session.DisconnectReason is null)
+                        session.Abort(cancellationToken.IsCancellationRequested
+                            ? DisconnectReason.ServerShutdown
+                            : DisconnectReason.Faulted);
                     break;
+                }
+
+                var limits = InboundLimits.For(session.Server);
+                if (result.Buffer.Length > limits.MaxBytes)
+                {
+                    logger?.LogWarning(
+                        "Session {SessionId} ({RemoteEndPoint}): inbound buffer reached {BufferedBytes} bytes, exceeding the {MaxBytes}-byte cap; aborting",
+                        session.SessionId, session.RemoteEndPoint, result.Buffer.Length, limits.MaxBytes);
+                    reader.AdvanceTo(result.Buffer.End);
+                    session.Abort(DisconnectReason.Malformed);
+                    break;
+                }
 
                 var outcome =
                     await ProcessBufferAsync(session, dispatcher, registry, rateLimiter, ipFloodGuard, result.Buffer,
-                            cancellationToken, logger)
+                            limits.MaxFrames, cancellationToken, logger)
                         .ConfigureAwait(false);
 
                 reader.AdvanceTo(outcome.Consumed, outcome.Examined);
@@ -76,12 +109,23 @@ public static class SessionLoop
                     break;
 
                 if (!result.IsCompleted) continue;
-                session.Abort(DisconnectReason.ClientClosed);
+                session.Abort(outcome.HasPartialFrame ? DisconnectReason.Malformed : DisconnectReason.ClientClosed);
                 break;
             }
         }
         catch (OperationCanceledException)
         {
+            if (session.DisconnectReason is null)
+                session.Abort(cancellationToken.IsCancellationRequested
+                    ? DisconnectReason.ServerShutdown
+                    : DisconnectReason.Faulted);
+        }
+        catch (Exception ex)
+        {
+            logger?.LogError(ex,
+                "Session {SessionId} ({Server}, {RemoteEndPoint}): receive, framing, or dispatch loop faulted; aborting",
+                session.SessionId, session.Server, session.RemoteEndPoint);
+            session.Abort(DisconnectReason.Faulted);
         }
         finally
         {
@@ -105,10 +149,12 @@ public static class SessionLoop
         ISessionRateLimiter? rateLimiter,
         IpFloodGuard? ipFloodGuard,
         ReadOnlySequence<byte> buffer,
+        int maxFrames,
         CancellationToken cancellationToken,
         ILogger? logger)
     {
         var remaining = buffer;
+        var frameCount = 0;
 
         var debugEnabled = logger is not null && logger.IsEnabled(LogLevel.Debug);
 
@@ -146,11 +192,23 @@ public static class SessionLoop
             }
 
             if (!decoded)
-                return new BufferOutcome(remaining.Start, remaining.End, false);
+                return new BufferOutcome(remaining.Start, remaining.End, false, !remaining.IsEmpty);
+
+            if (++frameCount > maxFrames)
+            {
+                logger?.LogWarning(
+                    "Session {SessionId} ({RemoteEndPoint}): inbound read contains more than the {MaxFrames}-frame cap; aborting",
+                    session.SessionId, session.RemoteEndPoint, maxFrames);
+                session.Abort(DisconnectReason.Malformed);
+                return new BufferOutcome(remaining.Start, remaining.End, true, false);
+            }
 
             if (debugEnabled)
                 logger!.PacketReceived(session.SessionId, frameServer, frameOpcode, (int)framePayload.Length,
                     Stopwatch.GetElapsedTime(decodeStartTimestamp).TotalMicroseconds);
+
+            if (session.ShouldWithholdOpcode(frameOpcode))
+                return new BufferOutcome(frameStart, remaining.End, false);
 
             if (!session.IsOpcodeAllowed(frameOpcode))
             {
@@ -182,6 +240,9 @@ public static class SessionLoop
                 if (dispatchOutcome == FrameDispatchOutcome.Withheld)
                     return new BufferOutcome(frameStart, remaining.End, false);
 
+                if (dispatchOutcome == FrameDispatchOutcome.Terminated)
+                    return new BufferOutcome(remaining.Start, remaining.End, true);
+
                 if (debugEnabled)
                     logger!.PacketDispatched(session.SessionId, frameServer, frameOpcode,
                         Stopwatch.GetElapsedTime(dispatchStartTimestamp).TotalMicroseconds);
@@ -211,10 +272,25 @@ public static class SessionLoop
         }
     }
 
-    private readonly struct BufferOutcome(SequencePosition consumed, SequencePosition examined, bool shouldStop)
+    private readonly struct BufferOutcome(SequencePosition consumed, SequencePosition examined, bool shouldStop,
+        bool hasPartialFrame = false)
     {
         public SequencePosition Consumed { get; } = consumed;
         public SequencePosition Examined { get; } = examined;
         public bool ShouldStop { get; } = shouldStop;
+        public bool HasPartialFrame { get; } = hasPartialFrame;
+    }
+
+    private readonly record struct InboundLimits(long MaxBytes, int MaxFrames)
+    {
+        public static InboundLimits For(FenrirServer server)
+        {
+            return server switch
+            {
+                FenrirServer.Login => new InboundLimits(LoginMaxInboundBufferedBytes, LoginMaxInboundFramesPerRead),
+                FenrirServer.Zone => new InboundLimits(ZoneMaxInboundBufferedBytes, ZoneMaxInboundFramesPerRead),
+                _ => throw new ArgumentOutOfRangeException(nameof(server), server, null)
+            };
+        }
     }
 }

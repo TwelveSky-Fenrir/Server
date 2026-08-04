@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Skills;
+using Fenrir.Application.Game.Domain.World.Runtime;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Domain.Game.Stats;
 
@@ -9,8 +10,13 @@ namespace Fenrir.Application.Game.Domain.World;
 public sealed partial class PlayerRuntimeState
 {
     public required int CharacterId { get; init; }
+    public RuntimeIncarnation Incarnation { get; } = RuntimeIncarnation.Create();
     public required IPacketSession Session { get; init; }
     public required string Name { get; init; }
+
+    public required short AccountGrade { get; init; }
+
+    public required int UserSort { get; init; }
 
     public required byte Tribe { get; set; }
 
@@ -44,6 +50,8 @@ public sealed partial class PlayerRuntimeState
         ImmutableDictionary<byte, LearnedSkill>.Empty;
 
     public long Experience { get; set; }
+
+    public long Money { get; set; }
 
     public short Level2 { get; set; }
 

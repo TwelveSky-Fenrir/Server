@@ -1,3 +1,5 @@
+using Fenrir.Application.Game.Domain.Inventory;
+
 namespace Fenrir.Application.Game.Domain.Quests;
 
 public static class QuestStateMachine
@@ -107,7 +109,7 @@ public static class QuestStateMachine
     }
 
     public static CompleteResult Complete(QuestProgress progress, byte tribe, short level, QuestCatalog catalog,
-        Func<int, bool> hasItem, Func<int, byte?> itemSort)
+        Func<int, bool> hasItem, Func<int, byte?> itemSort, long moneyOnHand)
     {
         if (!ComputeEndConditionMet(progress, tribe, level, catalog, hasItem))
             return default;
@@ -118,6 +120,7 @@ public static class QuestStateMachine
 
         var q = quest.Quest;
 
+        var moneyBalance = Math.Clamp(moneyOnHand, 0, StoreMoneyPolicy.MaxMoney);
         long money = 0;
         var killOtherTribeCount = 0;
         var exp = 0;
@@ -125,10 +128,18 @@ public static class QuestStateMachine
         var rewardItemId = 0;
         var rewardItemSlot = -1;
 
-        foreach (var reward in quest.Rewards)
+        foreach (var reward in quest.Rewards.OrderBy(static reward => reward.SlotIndex))
             switch (reward.RewardType)
             {
-                case 2: money += reward.Amount ?? 0; break;
+                case 2:
+                    var amount = Math.Max(0, reward.Amount ?? 0);
+                    if (amount <= StoreMoneyPolicy.MaxMoney - moneyBalance)
+                    {
+                        money += amount;
+                        moneyBalance += amount;
+                    }
+
+                    break;
                 case 3: killOtherTribeCount += reward.Amount ?? 0; break;
                 case 4: exp += reward.Amount ?? 0; break;
                 case 5: teacherPoint += reward.Amount ?? 0; break;

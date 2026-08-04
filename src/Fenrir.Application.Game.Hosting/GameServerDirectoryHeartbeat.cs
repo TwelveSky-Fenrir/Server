@@ -10,6 +10,7 @@ public sealed class GameServerDirectoryHeartbeat(
     IGameServerDirectoryRepository directory,
     IShardMapAssignmentRepository shardMapAssignments,
     ZoneRegistry zones,
+    GameConnectionReadiness connectionReadiness,
     IOptions<GameServerOptions> options,
     ILogger<GameServerDirectoryHeartbeat> logger) : BackgroundService
 {
@@ -17,10 +18,12 @@ public sealed class GameServerDirectoryHeartbeat(
     {
         var opts = options.Value;
 
+        await connectionReadiness.WaitUntilReadyAsync(stoppingToken).ConfigureAwait(false);
+
         logger.LogInformation(
-            "GameServerDirectory heartbeat host started for shard {ShardId}; first registration attempt to " +
-            "runtime.GameServerDirectory as {Host}:{Port} follows (every {IntervalSeconds}s)", opts.ShardId,
-            opts.PublicHost, opts.Port, opts.HeartbeatIntervalSeconds);
+            "GameServerDirectory heartbeat host started for shard {ShardId} after every local zone listener was " +
+            "armed; first registration attempt to runtime.GameServerDirectory as {Host}:{Port} follows (every " +
+            "{IntervalSeconds}s)", opts.ShardId, opts.PublicHost, opts.Port, opts.HeartbeatIntervalSeconds);
 
         var hostedMapIds = zones.Zones.Select(static zone => zone.MapId).ToArray();
 

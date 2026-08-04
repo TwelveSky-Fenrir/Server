@@ -53,7 +53,10 @@ public sealed class GuildChatService(
             link.Value,
             link.Socket[0],
             link.Socket[1],
-            link.Socket[2]));
+            link.Socket[2])
+        {
+            SourceCharacterId = sender.CharacterId
+        });
 
         logger.LogDebug(
             "Character {CharacterId} sent guild chat to guild {GuildId} ({RecipientCount} same-shard recipients, {ContentLength} chars)",

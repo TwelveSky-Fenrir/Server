@@ -29,9 +29,16 @@ public sealed record GroundItemEntity(
 
     private static readonly TimeSpan CreateStateWindow = TimeSpan.FromSeconds(1);
 
+    public uint CreateTime => ToWireTime(CreatedAtZoneClock);
+
     public int CreateStateAt(TimeSpan nowZoneClock)
     {
         return nowZoneClock - CreatedAtZoneClock < CreateStateWindow ? 1 : 0;
+    }
+
+    public uint PresentTimeAt(TimeSpan nowZoneClock)
+    {
+        return ToWireTime(nowZoneClock);
     }
 
     public bool IsExpired(TimeSpan nowZoneClock)
@@ -60,5 +67,10 @@ public sealed record GroundItemEntity(
             return true;
 
         return false;
+    }
+
+    private static uint ToWireTime(TimeSpan zoneClock)
+    {
+        return unchecked((uint)zoneClock.TotalMilliseconds);
     }
 }

@@ -9,4 +9,8 @@
     <PackageReference Include="Microsoft.Data.SqlClient"/>
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions"/>
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Fenrir.Game.Tests"/>
+  </ItemGroup>
 </Project>

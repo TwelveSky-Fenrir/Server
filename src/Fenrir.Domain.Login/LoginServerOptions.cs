@@ -22,5 +22,7 @@ public sealed class LoginServerOptions
 
     public int IdleSweepIntervalSeconds { get; set; } = 1;
 
+        public int PreAuthenticationHandshakeTimeoutSeconds { get; set; } = 10;
+
     public bool OnlyAdminCanLogin { get; set; }
 }

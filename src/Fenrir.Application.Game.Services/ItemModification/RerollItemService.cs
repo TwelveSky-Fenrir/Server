@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.ItemModification;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Forge;
 using Fenrir.Application.Game.Domain.Inventory;
@@ -65,16 +66,12 @@ public sealed class RerollItemService(
             try
             {
                 await characters.AdjustMoneyAsync(characterId, -resolved.Cost, 0, cancellationToken);
+                await characters.AdjustMoneyAsync(characterId, resolved.Cost, 0, cancellationToken);
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex,
-                    "Character {CharacterId} reroll-item funds check failed for no-candidate cost {Cost} (treated as insufficient funds)",
-                    characterId, resolved.Cost);
-                return new RerollItemResult(RerollItemOutcome.Rejected, 0, [0, 0, 0, 0, 0, 0]);
+                return AbortAfterUncertainPersistence(state, characterId, "reroll no-candidate funds check", ex);
             }
-
-            await characters.AdjustMoneyAsync(characterId, resolved.Cost, 0, cancellationToken);
 
             logger.LogInformation(
                 "Character {CharacterId} reroll-item found no candidate result item for target {TargetItemId}",
@@ -92,23 +89,19 @@ public sealed class RerollItemService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex,
-                "Character {CharacterId} reroll-item AdjustMoneyAndReplaceContainerAsync failed (treated as insufficient funds)",
-                characterId);
-            return new RerollItemResult(RerollItemOutcome.Rejected, 0, [0, 0, 0, 0, 0, 0]);
+            return AbortAfterUncertainPersistence(state, characterId, "reroll persistence", ex);
         }
-
-        zone.CreditNpcServiceTribeTax(state.Tribe, resolved.Cost);
 
         var packedValue = ItemValueCodec.Encode(target.Enchant, target.Combine, target.Refine, target.Socket);
 
         var containers = ImmutableArray.Create(new InventoryContainerSnapshot((byte)page1, projected));
 
-        if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
-                cancellationToken))
-            logger.LogError(
-                "Zone {MapId} inventory inbox full: dropped reroll mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
+        var inventoryResult = await zone.PostInventoryCommandAndWaitForResultAsync(
+            new InventoryZoneCommand(characterId, containers, null), cancellationToken);
+        if (inventoryResult.Kind != ZoneCommandResultKind.Applied)
+            return AbortAfterDurableMutation(state, characterId, "reroll inventory", inventoryResult);
+
+        zone.CreditNpcServiceTribeTax(state.Tribe, resolved.Cost);
 
         logger.LogInformation(
             "Character {CharacterId} reroll-item applied: target {TargetItemId} -> {ResultItemId}, cost {Cost}",
@@ -116,6 +109,26 @@ public sealed class RerollItemService(
 
         return new RerollItemResult(RerollItemOutcome.Applied, resolved.Cost,
             [resolved.ResultItemId, 0, 0, target.Quantity, packedValue, target.Serial]);
+    }
+
+    private RerollItemResult AbortAfterUncertainPersistence(PlayerRuntimeState state, int characterId,
+        string mutation, Exception exception)
+    {
+        logger.LogError(exception,
+            "Character {CharacterId} reroll-item {Mutation} failed after submission; durability is uncertain, disconnecting without success response",
+            characterId, mutation);
+        ((IZoneSession)state.Session).Abort(DisconnectReason.Faulted);
+        return new RerollItemResult(RerollItemOutcome.Disconnected, 0, [0, 0, 0, 0, 0, 0]);
+    }
+
+    private RerollItemResult AbortAfterDurableMutation(PlayerRuntimeState state, int characterId,
+        string mutation, ZoneCommandResult result)
+    {
+        logger.LogError(
+            "Character {CharacterId} reroll-item persisted but {Mutation} actor mutation was not acknowledged as applied ({Kind}: {Cause}); disconnecting without success response",
+            characterId, mutation, result.Kind, result.Cause);
+        ((IZoneSession)state.Session).Abort(DisconnectReason.Faulted);
+        return new RerollItemResult(RerollItemOutcome.Disconnected, 0, [0, 0, 0, 0, 0, 0]);
     }
 
     private static List<CharacterItemSlotTvp> ToTvps(ImmutableDictionary<byte, ItemStack> container)

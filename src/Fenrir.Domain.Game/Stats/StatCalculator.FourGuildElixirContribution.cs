@@ -52,7 +52,8 @@ public static partial class StatCalculator
         if (b4gFlag == 1 && p.FixedOverrideSlots.Contains(fourGuildSlot))
             return p.FixedOverride;
 
-        var eventMatches = eventTribe >= 0 &&
+        var eventMatches = avatarTribe is >= 0 and < AllTribesEventTribeSentinel &&
+                           eventTribe is >= 0 and <= AllTribesEventTribeSentinel &&
                            (eventTribe == avatarTribe || eventTribe == AllTribesEventTribeSentinel);
         if (eventMatches)
             return eventTier switch

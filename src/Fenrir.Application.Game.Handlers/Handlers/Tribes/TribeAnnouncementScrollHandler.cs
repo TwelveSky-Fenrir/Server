@@ -34,6 +34,15 @@ public sealed class TribeAnnouncementScrollHandler(
         if (!zone.TryGetPlayer(characterId, out var sender) || sender is null)
             return;
 
-        announcementService.TryBroadcast(zone, sender, characterId, session, content);
+        if (sender.IsMuted)
+            return;
+
+        if (!announcementService.TryBroadcast(zone, sender, characterId, session, content))
+        {
+            logger?.LogWarning(
+                "Character {CharacterId} tribe-notify scroll precondition failed; disconnecting with no response sent (session {SessionId})",
+                characterId, session.SessionId);
+            session.Abort(DisconnectReason.Faulted);
+        }
     }
 }

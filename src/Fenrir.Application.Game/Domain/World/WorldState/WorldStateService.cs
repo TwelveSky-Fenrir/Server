@@ -13,7 +13,15 @@ public sealed class WorldStateService(
     private readonly Dictionary<(byte From, byte To), AllianceOfferState> _allianceOffers = new();
     private readonly Lock _lock = new();
 
+    private readonly Dictionary<(byte From, byte To), PendingAllianceOfferMutation> _pendingAllianceOffers = new();
+
+    private readonly Dictionary<byte, PendingTribeStateMutation> _pendingTribeStates = new();
+
+    private readonly SemaphoreSlim _persistenceGate = new(1, 1);
+
     private readonly int[] _pendingTribePointDeltas = new int[TribeCount];
+
+    private readonly int?[] _pendingTribePointTotals = new int?[TribeCount];
 
     private readonly byte[] _tribeFormationAbility = new byte[TribeCount];
 
@@ -24,9 +32,15 @@ public sealed class WorldStateService(
     private bool _dirty;
     private bool _initialized;
 
-    private int _scalarVersion;
+    private long _nextMutationVersion;
+
+    private PendingWorldMutation? _pendingWorld;
+
+    private long _revision;
 
     private WorldRvrState _world;
+
+    private const int MaxConflictReplayAttempts = 3;
 
     public bool IsDirty
     {
@@ -81,6 +95,7 @@ public sealed class WorldStateService(
                 _allianceOffers[(offer.FromTribeId, offer.ToTribeId)] =
                     new AllianceOfferState(offer.FromTribeId, offer.ToTribeId, offer.IsAccepted);
 
+            _revision = row.Revision;
             _initialized = true;
             _dirty = false;
         }
@@ -174,8 +189,7 @@ public sealed class WorldStateService(
         lock (_lock)
         {
             _world = _world with { Zone038WinTribe = tribeId, Zone038WinTribeTime = NowAsLegacyHhMm() };
-            _dirty = true;
-            _scalarVersion++;
+            QueueWorldMutation();
         }
     }
 
@@ -198,10 +212,10 @@ public sealed class WorldStateService(
             {
                 _tribes[i] = _tribes[i] with { TribeId = i, HasSymbol = true, SymbolDate = now };
                 _tribeSymbolOwner[i] = i;
+                QueueTribeStateMutation(i);
             }
 
-            _dirty = true;
-            _scalarVersion++;
+            QueueWorldMutation();
         }
 
         logger.LogInformation("WorldState: tribe symbol battle window opened at {SymbolBattleStarted:O}", now);
@@ -213,8 +227,7 @@ public sealed class WorldStateService(
         {
             _world = _world with { TribeSymbolBattle = false };
             Array.Clear(_tribeFormationAbility);
-            _dirty = true;
-            _scalarVersion++;
+            QueueWorldMutation();
         }
 
         logger.LogInformation("WorldState: tribe symbol battle window closed");
@@ -234,8 +247,7 @@ public sealed class WorldStateService(
                 SymbolDate = now
             };
             _tribeSymbolOwner[slotTribeId] = winnerTribeId;
-            _dirty = true;
-            _scalarVersion++;
+            QueueTribeStateMutation(slotTribeId);
         }
 
         logger.LogInformation(
@@ -249,8 +261,7 @@ public sealed class WorldStateService(
         lock (_lock)
         {
             _world = _world with { MonsterSymbol = winnerTribeId, MonsterSymbolEndTime = NowAsLegacyHhMm() };
-            _dirty = true;
-            _scalarVersion++;
+            QueueWorldMutation();
         }
 
         logger.LogInformation("WorldState: neutral monster symbol resolved -- winner={WinnerTribeId}", winnerTribeId);
@@ -264,7 +275,7 @@ public sealed class WorldStateService(
             var delta = points - _tribes[tribeId].Points;
             _tribes[tribeId] = _tribes[tribeId] with { TribeId = tribeId, Points = points };
             _pendingTribePointDeltas[tribeId] += delta;
-            _dirty = true;
+            RefreshDirtyLocked();
         }
     }
 
@@ -276,7 +287,7 @@ public sealed class WorldStateService(
             var updated = _tribes[tribeId].Points + delta;
             _tribes[tribeId] = _tribes[tribeId] with { TribeId = tribeId, Points = updated };
             _pendingTribePointDeltas[tribeId] += delta;
-            _dirty = true;
+            RefreshDirtyLocked();
             return updated;
         }
     }
@@ -287,8 +298,7 @@ public sealed class WorldStateService(
         lock (_lock)
         {
             _tribes[tribeId] = _tribes[tribeId] with { TribeId = tribeId, IsClosed = isClosed };
-            _dirty = true;
-            _scalarVersion++;
+            QueueTribeStateMutation(tribeId);
         }
     }
 
@@ -300,8 +310,7 @@ public sealed class WorldStateService(
         lock (_lock)
         {
             _world = _world with { HighTribe = tribeId };
-            _dirty = true;
-            _scalarVersion++;
+            QueueWorldMutation();
         }
     }
 
@@ -310,46 +319,80 @@ public sealed class WorldStateService(
         lock (_lock)
         {
             _world = _world with { UpdateTribePoint = value };
-            _dirty = true;
-            _scalarVersion++;
+            QueueWorldMutation();
         }
     }
 
     public async ValueTask<bool> TryConsumeUpdateTribePointFlagAsync(short expectedPendingValue, short consumedValue,
         CancellationToken ct)
     {
-        WorldRvrState snapshot;
-        lock (_lock)
-        {
-            if (_world.UpdateTribePoint != expectedPendingValue)
-                return false;
-            snapshot = _world;
-        }
-
+        await _persistenceGate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            await repository.UpdateAsync(snapshot.Zone038WinTribe, snapshot.Zone038WinTribeTime,
-                    snapshot.TribeSymbolBattle, snapshot.MonsterSymbol, snapshot.MonsterSymbolEndTime,
-                    snapshot.HighTribe, consumedValue, ct)
-                .ConfigureAwait(false);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            logger.LogError(ex,
-                "WorldState: immediate persist of UpdateTribePoint flag consumption failed -- flag left pending, next poll retries the whole sequence");
-            return false;
-        }
-
-        lock (_lock)
-        {
-            if (_world.UpdateTribePoint == expectedPendingValue)
+            WorldRvrState snapshot;
+            long expectedRevision;
+            PendingWorldMutation? persistedWorldMutation;
+            lock (_lock)
             {
-                _world = _world with { UpdateTribePoint = consumedValue };
-                _scalarVersion++;
-            }
-        }
+                if (_world.UpdateTribePoint != expectedPendingValue)
+                    return false;
 
-        return true;
+                snapshot = _world;
+                expectedRevision = _revision;
+                persistedWorldMutation = _pendingWorld;
+            }
+
+            try
+            {
+                var updated = await repository.TryUpdateAsync(snapshot.Zone038WinTribe, snapshot.Zone038WinTribeTime,
+                        snapshot.TribeSymbolBattle, snapshot.MonsterSymbol, snapshot.MonsterSymbolEndTime,
+                        snapshot.HighTribe, consumedValue, expectedRevision, ct)
+                    .ConfigureAwait(false);
+
+                if (!updated)
+                {
+                    logger.LogWarning(
+                        "WorldState: immediate UpdateTribePoint flag consumption conflicted at revision {ExpectedRevision}; reloading before the next poll",
+                        expectedRevision);
+                    await ReconcileCoreAsync(ct).ConfigureAwait(false);
+                    return false;
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogError(ex,
+                    "WorldState: immediate persist of UpdateTribePoint flag consumption failed -- flag left pending, next poll retries the whole sequence");
+                return false;
+            }
+
+            lock (_lock)
+            {
+                UpdateRevisionAfterSuccessfulWrite(expectedRevision);
+
+                if (_world.UpdateTribePoint == expectedPendingValue)
+                {
+                    _world = _world with { UpdateTribePoint = consumedValue };
+                }
+
+                if (persistedWorldMutation is { } persisted && _pendingWorld is { } pending &&
+                    pending.Version == persisted.Version)
+                    _pendingWorld = null;
+                else if (_pendingWorld is { } currentPending &&
+                         currentPending.State.UpdateTribePoint == expectedPendingValue)
+                    _pendingWorld = currentPending with
+                    {
+                        State = currentPending.State with { UpdateTribePoint = consumedValue }
+                    };
+
+                RefreshDirtyLocked();
+            }
+
+            return true;
+        }
+        finally
+        {
+            _persistenceGate.Release();
+        }
     }
 
     public async ValueTask<bool> TryOverwriteTribePointTotalsAsync(IReadOnlyList<int> totals, CancellationToken ct)
@@ -357,38 +400,67 @@ public sealed class WorldStateService(
         if (totals.Count != TribeCount)
             throw new ArgumentException($"Expected exactly {TribeCount} totals.", nameof(totals));
 
-        TribeRvrState[] updated;
-        byte[] symbolOwners;
-        lock (_lock)
+        await _persistenceGate.WaitAsync(ct).ConfigureAwait(false);
+        try
         {
-            updated = new TribeRvrState[TribeCount];
-            for (byte i = 0; i < TribeCount; i++)
+            TribeRvrState[] updated;
+            var requestedTotals = totals.ToArray();
+            long expectedRevision;
+            lock (_lock)
             {
-                _tribes[i] = _tribes[i] with { TribeId = i, Points = totals[i] };
-                updated[i] = _tribes[i];
+                updated = new TribeRvrState[TribeCount];
+                for (byte i = 0; i < TribeCount; i++)
+                {
+                    _tribes[i] = _tribes[i] with { TribeId = i, Points = requestedTotals[i] };
+                    updated[i] = _tribes[i];
+                }
+
+                Array.Clear(_pendingTribePointDeltas);
+                Array.Clear(_pendingTribePointTotals);
+                expectedRevision = _revision;
             }
 
-            symbolOwners = (byte[])_tribeSymbolOwner.Clone();
+            lock (_lock)
+            {
+                RefreshDirtyLocked();
+            }
 
-            Array.Clear(_pendingTribePointDeltas);
+            foreach (var tribe in updated)
+            {
+                bool updatedTribe;
+                try
+                {
+                    updatedTribe = await repository.TryUpdateTribePointsAsync(tribe.TribeId, tribe.Points,
+                            expectedRevision, ct)
+                        .ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    logger.LogError(ex,
+                        "WorldState: immediate persist of tribe {TribeId} point total failed -- retaining totals for retry",
+                        tribe.TribeId);
+                    await RetainTribePointTotalsAfterFailedWriteAsync(requestedTotals, ct).ConfigureAwait(false);
+                    return false;
+                }
+
+                if (!updatedTribe)
+                {
+                    logger.LogWarning(
+                        "WorldState: immediate persist of tribe {TribeId} point total conflicted at revision {ExpectedRevision}; retaining totals for retry",
+                        tribe.TribeId, expectedRevision);
+                    await RetainTribePointTotalsAfterFailedWriteAsync(requestedTotals, ct).ConfigureAwait(false);
+                    return false;
+                }
+
+                AdvanceRevisionAfterSuccessfulWrite(ref expectedRevision);
+            }
+
+            return true;
         }
-
-        var allSucceeded = true;
-        foreach (var tribe in updated)
-            try
-            {
-                await repository.UpdateTribeAsync(tribe.TribeId, tribe.SymbolDate, tribe.HasSymbol, tribe.Points,
-                    tribe.IsClosed, symbolOwners[tribe.TribeId], ct).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                allSucceeded = false;
-                logger.LogError(ex,
-                    "WorldState: immediate persist of tribe {TribeId} point total failed -- in-memory mirror already changed and will not be retried for this request",
-                    tribe.TribeId);
-            }
-
-        return allSucceeded;
+        finally
+        {
+            _persistenceGate.Release();
+        }
     }
 
     public void SetAllianceOffer(byte fromTribeId, byte toTribeId, bool isAccepted)
@@ -402,8 +474,7 @@ public sealed class WorldStateService(
         lock (_lock)
         {
             _allianceOffers[(fromTribeId, toTribeId)] = new AllianceOfferState(fromTribeId, toTribeId, isAccepted);
-            _dirty = true;
-            _scalarVersion++;
+            QueueAllianceOfferMutation(fromTribeId, toTribeId);
         }
     }
 
@@ -426,8 +497,7 @@ public sealed class WorldStateService(
                     continue;
 
                 _allianceOffers[key] = offer with { IsAccepted = false };
-                _dirty = true;
-                _scalarVersion++;
+                QueueAllianceOfferMutation(key.From, key.To);
             }
         }
     }
@@ -458,95 +528,211 @@ public sealed class WorldStateService(
         return repository.ClearTribeVotesAsync(tribeId, ct);
     }
 
-    public async ValueTask FlushIfDirtyAsync(CancellationToken ct)
+    public async ValueTask<bool> FlushIfDirtyAsync(CancellationToken ct)
     {
-        WorldRvrState world;
-        TribeRvrState[] tribes;
-        byte[] symbolOwners;
-        AllianceOfferState[] allianceOffers;
-        int[] pointDeltaSnapshot;
-        int scalarVersionBeforeFlush;
-
-        lock (_lock)
-        {
-            if (!_dirty)
-                return;
-
-            scalarVersionBeforeFlush = _scalarVersion;
-            world = _world;
-            tribes = (TribeRvrState[])_tribes.Clone();
-            symbolOwners = (byte[])_tribeSymbolOwner.Clone();
-            allianceOffers = [.. _allianceOffers.Values];
-
-            pointDeltaSnapshot = (int[])_pendingTribePointDeltas.Clone();
-            Array.Clear(_pendingTribePointDeltas);
-        }
-
+        await _persistenceGate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            await repository.UpdateAsync(world.Zone038WinTribe, world.Zone038WinTribeTime, world.TribeSymbolBattle,
-                    world.MonsterSymbol, world.MonsterSymbolEndTime, world.HighTribe, world.UpdateTribePoint, ct)
-                .ConfigureAwait(false);
-
-            foreach (var tribe in tribes)
-                await repository.UpdateTribeSymbolStateAsync(tribe.TribeId, tribe.SymbolDate, tribe.HasSymbol,
-                    tribe.IsClosed, symbolOwners[tribe.TribeId], ct).ConfigureAwait(false);
-
-            foreach (var offer in allianceOffers)
-                await repository.SetAllianceOfferAsync(offer.FromTribeId, offer.ToTribeId, offer.IsAccepted, ct)
-                    .ConfigureAwait(false);
-
-            lock (_lock)
+            for (var conflictAttempt = 0; ; conflictAttempt++)
             {
-                var noNewPointDelta = !Array.Exists(_pendingTribePointDeltas, d => d != 0);
-                if (_scalarVersion == scalarVersionBeforeFlush && noNewPointDelta)
-                    _dirty = false;
-            }
-        }
-        catch (Exception ex)
-        {
-            lock (_lock)
-            {
-                for (byte i = 0; i < TribeCount; i++)
-                    _pendingTribePointDeltas[i] += pointDeltaSnapshot[i];
-            }
+                var plan = CaptureFlushPlan();
+                if (plan is null)
+                    return true;
 
-            logger.LogError(ex, "WorldState flush failed -- will retry next interval");
-            return;
-        }
+                var result = await FlushPlanAsync(plan, ct).ConfigureAwait(false);
+                if (result == FlushPlanResult.Succeeded)
+                    continue;
 
-        for (byte i = 0; i < TribeCount; i++)
-        {
-            if (pointDeltaSnapshot[i] == 0)
-                continue;
+                if (result == FlushPlanResult.Failed)
+                    return false;
 
-            try
-            {
-                await repository.AddTribePointsAsync(i, pointDeltaSnapshot[i], ct).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                lock (_lock)
+                if (!await ReconcileCoreAsync(ct).ConfigureAwait(false))
+                    return false;
+
+                if (conflictAttempt == MaxConflictReplayAttempts)
                 {
-                    _pendingTribePointDeltas[i] += pointDeltaSnapshot[i];
-                    _dirty = true;
+                    logger.LogError(
+                        "WorldState flush exhausted {ConflictReplayAttempts} CAS conflict replays; dirty mutations remain queued for the next flush",
+                        MaxConflictReplayAttempts + 1);
+                    return false;
                 }
 
-                logger.LogError(ex,
-                    "WorldState tribe {TribeId} point-delta flush failed -- delta re-queued for next interval", i);
+                await Task.Delay(ConflictReplayBackoff(conflictAttempt), ct).ConfigureAwait(false);
             }
+        }
+        finally
+        {
+            _persistenceGate.Release();
         }
     }
 
-    public async ValueTask ReconcileAsync(CancellationToken ct)
+    public async ValueTask<bool> ReconcileAsync(CancellationToken ct)
     {
-        if (!_initialized)
-            return;
+        await _persistenceGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            return await ReconcileCoreAsync(ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            _persistenceGate.Release();
+        }
+    }
 
-        int scalarVersionBeforeRead;
+    private FlushPlan? CaptureFlushPlan()
+    {
         lock (_lock)
         {
-            scalarVersionBeforeRead = _scalarVersion;
+            if (!_dirty)
+                return null;
+
+            var plan = new FlushPlan(
+                _revision,
+                _pendingWorld,
+                [.. _pendingTribeStates.Values.OrderBy(static mutation => mutation.State.TribeId)],
+                [.. _pendingAllianceOffers.Values
+                    .OrderBy(static mutation => mutation.State.FromTribeId)
+                    .ThenBy(static mutation => mutation.State.ToTribeId)],
+                (int?[])_pendingTribePointTotals.Clone(),
+                (int[])_pendingTribePointDeltas.Clone());
+
+            _pendingWorld = null;
+            _pendingTribeStates.Clear();
+            _pendingAllianceOffers.Clear();
+            Array.Clear(_pendingTribePointTotals);
+            Array.Clear(_pendingTribePointDeltas);
+            RefreshDirtyLocked();
+            return plan;
+        }
+    }
+
+    private async ValueTask<FlushPlanResult> FlushPlanAsync(FlushPlan plan, CancellationToken ct)
+    {
+        var expectedRevision = plan.ExpectedRevision;
+        var worldCommitted = plan.World is null;
+        var firstTribeStateIndex = 0;
+        var firstAllianceOfferIndex = 0;
+        var firstPointTotalTribeId = 0;
+        var firstPointDeltaTribeId = 0;
+
+        try
+        {
+            if (plan.World is { } world)
+            {
+                var updated = await repository.TryUpdateAsync(world.State.Zone038WinTribe,
+                        world.State.Zone038WinTribeTime, world.State.TribeSymbolBattle, world.State.MonsterSymbol,
+                        world.State.MonsterSymbolEndTime, world.State.HighTribe, world.State.UpdateTribePoint,
+                        expectedRevision, ct)
+                    .ConfigureAwait(false);
+                if (!updated)
+                    return Conflict(plan, true, 0, 0, 0, 0, "singleton world-state", expectedRevision);
+
+                AdvanceRevisionAfterSuccessfulWrite(ref expectedRevision);
+                worldCommitted = true;
+            }
+
+            for (var tribeIndex = 0; tribeIndex < plan.TribeStates.Length; tribeIndex++)
+            {
+                firstTribeStateIndex = tribeIndex;
+                var tribe = plan.TribeStates[tribeIndex];
+                var updated = await repository.TryUpdateTribeSymbolStateAsync(tribe.State.TribeId,
+                        tribe.State.SymbolDate, tribe.State.HasSymbol, tribe.State.IsClosed, tribe.SymbolOwner,
+                        expectedRevision, ct)
+                    .ConfigureAwait(false);
+                if (!updated)
+                    return Conflict(plan, false, tribeIndex, 0, 0, 0,
+                        $"tribe {tribe.State.TribeId} symbol state", expectedRevision);
+
+                AdvanceRevisionAfterSuccessfulWrite(ref expectedRevision);
+                firstTribeStateIndex = tribeIndex + 1;
+            }
+
+            for (var offerIndex = 0; offerIndex < plan.AllianceOffers.Length; offerIndex++)
+            {
+                firstAllianceOfferIndex = offerIndex;
+                var offer = plan.AllianceOffers[offerIndex].State;
+                var updated = await repository.TrySetAllianceOfferAsync(offer.FromTribeId, offer.ToTribeId,
+                        offer.IsAccepted, expectedRevision, ct)
+                    .ConfigureAwait(false);
+                if (!updated)
+                    return Conflict(plan, false, plan.TribeStates.Length, offerIndex, 0, 0,
+                        $"alliance offer {offer.FromTribeId}->{offer.ToTribeId}", expectedRevision);
+
+                AdvanceRevisionAfterSuccessfulWrite(ref expectedRevision);
+                firstAllianceOfferIndex = offerIndex + 1;
+            }
+
+            for (var tribeId = 0; tribeId < TribeCount; tribeId++)
+            {
+                if (plan.PointTotals[tribeId] is not { } points)
+                    continue;
+
+                firstPointTotalTribeId = tribeId;
+                var updated = await repository.TryUpdateTribePointsAsync((byte)tribeId, points, expectedRevision, ct)
+                    .ConfigureAwait(false);
+                if (!updated)
+                    return Conflict(plan, false, plan.TribeStates.Length, plan.AllianceOffers.Length, tribeId, 0,
+                        $"tribe {tribeId} point total", expectedRevision);
+
+                AdvanceRevisionAfterSuccessfulWrite(ref expectedRevision);
+                firstPointTotalTribeId = tribeId + 1;
+            }
+
+            for (var tribeId = 0; tribeId < TribeCount; tribeId++)
+            {
+                if (plan.PointDeltas[tribeId] == 0)
+                    continue;
+
+                firstPointDeltaTribeId = tribeId;
+                var updated = await repository.TryAddTribePointsAsync((byte)tribeId, plan.PointDeltas[tribeId],
+                        expectedRevision, ct)
+                    .ConfigureAwait(false);
+                if (!updated)
+                    return Conflict(plan, false, plan.TribeStates.Length, plan.AllianceOffers.Length, TribeCount, tribeId,
+                        $"tribe {tribeId} point delta", expectedRevision);
+
+                AdvanceRevisionAfterSuccessfulWrite(ref expectedRevision);
+                firstPointDeltaTribeId = tribeId + 1;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            RequeueUnpersistedPlan(plan, !worldCommitted, firstTribeStateIndex, firstAllianceOfferIndex,
+                firstPointTotalTribeId, firstPointDeltaTribeId);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            RequeueUnpersistedPlan(plan, !worldCommitted, firstTribeStateIndex, firstAllianceOfferIndex,
+                firstPointTotalTribeId, firstPointDeltaTribeId);
+            logger.LogError(ex, "WorldState flush failed -- dirty mutations remain queued for retry");
+            return FlushPlanResult.Failed;
+        }
+
+        return FlushPlanResult.Succeeded;
+    }
+
+    private FlushPlanResult Conflict(FlushPlan plan, bool includeWorld, int firstTribeStateIndex,
+        int firstAllianceOfferIndex, int firstPointTotalTribeId, int firstPointDeltaTribeId, string mutation,
+        long expectedRevision)
+    {
+        RequeueUnpersistedPlan(plan, includeWorld, firstTribeStateIndex, firstAllianceOfferIndex,
+            firstPointTotalTribeId, firstPointDeltaTribeId);
+        logger.LogWarning(
+            "WorldState flush {Mutation} conflicted at revision {ExpectedRevision}; rebasing retained mutations",
+            mutation, expectedRevision);
+        return FlushPlanResult.Conflict;
+    }
+
+    private async ValueTask<bool> ReconcileCoreAsync(CancellationToken ct)
+    {
+        if (!_initialized)
+            return true;
+
+        long revisionBeforeRead;
+        lock (_lock)
+        {
+            revisionBeforeRead = _revision;
         }
 
         WorldStateRowDto? row;
@@ -557,63 +743,71 @@ public sealed class WorldStateService(
         {
             (row, tribes, allianceOffers) = await repository.GetAsync(ct).ConfigureAwait(false);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            logger.LogError(ex, "WorldState reconcile read failed -- will retry next interval");
-            return;
+            logger.LogError(ex, "WorldState reconcile read failed -- dirty mutations remain queued for retry");
+            return false;
         }
 
         if (row is null)
         {
             logger.LogError(
-                "WorldState reconcile: game.WorldState has no singleton row -- skipping this cycle (boot-time invariant should have prevented this)");
-            return;
+                "WorldState reconcile: game.WorldState has no singleton row -- dirty mutations remain queued for retry");
+            return false;
         }
 
         lock (_lock)
         {
-            var scalarUnchangedSinceRead = _scalarVersion == scalarVersionBeforeRead;
+            if (_revision != revisionBeforeRead)
+                return true;
+
+            _revision = row.Revision;
+            _world = new WorldRvrState(row.Zone038WinTribe, row.Zone038WinTribeTime, row.TribeSymbolBattle,
+                row.MonsterSymbol, row.MonsterSymbolEndTime, row.HighTribe, row.UpdateTribePoint);
 
             foreach (var tribe in tribes)
             {
                 if (tribe.TribeId >= TribeCount)
                     continue;
 
-                var mergedPoints = tribe.Points + _pendingTribePointDeltas[tribe.TribeId];
-                _tribes[tribe.TribeId] = scalarUnchangedSinceRead
-                    ? _tribes[tribe.TribeId] with
-                    {
-                        TribeId = tribe.TribeId,
-                        SymbolDate = tribe.SymbolDateUtc,
-                        HasSymbol = tribe.HasSymbol,
-                        IsClosed = tribe.IsClosed,
-                        Points = mergedPoints
-                    }
-                    : _tribes[tribe.TribeId] with { Points = mergedPoints };
-
-                if (scalarUnchangedSinceRead)
-                    _tribeSymbolOwner[tribe.TribeId] = tribe.SymbolOwnerTribeId;
+                var rebasedPoints = (_pendingTribePointTotals[tribe.TribeId] ?? tribe.Points) +
+                                    _pendingTribePointDeltas[tribe.TribeId];
+                _tribes[tribe.TribeId] = new TribeRvrState(tribe.TribeId, tribe.SymbolDateUtc, tribe.HasSymbol,
+                    rebasedPoints, tribe.IsClosed);
+                _tribeSymbolOwner[tribe.TribeId] = tribe.SymbolOwnerTribeId;
             }
 
-            if (scalarUnchangedSinceRead)
+            _allianceOffers.Clear();
+            foreach (var offer in allianceOffers)
+                _allianceOffers[(offer.FromTribeId, offer.ToTribeId)] =
+                    new AllianceOfferState(offer.FromTribeId, offer.ToTribeId, offer.IsAccepted);
+
+            if (_pendingWorld is { } pendingWorld)
+                _world = pendingWorld.State;
+
+            foreach (var pendingTribe in _pendingTribeStates.Values)
             {
-                _world = _world with
+                var tribeId = pendingTribe.State.TribeId;
+                _tribes[tribeId] = _tribes[tribeId] with
                 {
-                    Zone038WinTribe = row.Zone038WinTribe,
-                    Zone038WinTribeTime = row.Zone038WinTribeTime,
-                    TribeSymbolBattle = row.TribeSymbolBattle,
-                    MonsterSymbol = row.MonsterSymbol,
-                    MonsterSymbolEndTime = row.MonsterSymbolEndTime,
-                    HighTribe = row.HighTribe,
-                    UpdateTribePoint = row.UpdateTribePoint
+                    TribeId = tribeId,
+                    SymbolDate = pendingTribe.State.SymbolDate,
+                    HasSymbol = pendingTribe.State.HasSymbol,
+                    IsClosed = pendingTribe.State.IsClosed
                 };
-
-                _allianceOffers.Clear();
-                foreach (var offer in allianceOffers)
-                    _allianceOffers[(offer.FromTribeId, offer.ToTribeId)] =
-                        new AllianceOfferState(offer.FromTribeId, offer.ToTribeId, offer.IsAccepted);
+                _tribeSymbolOwner[tribeId] = pendingTribe.SymbolOwner;
             }
+
+            foreach (var pendingOffer in _pendingAllianceOffers.Values)
+            {
+                var offer = pendingOffer.State;
+                _allianceOffers[(offer.FromTribeId, offer.ToTribeId)] = offer;
+            }
+
+            RefreshDirtyLocked();
         }
+
+        return true;
     }
 
     private void EnsureInitialized()
@@ -627,6 +821,137 @@ public sealed class WorldStateService(
     {
         if (tribeId >= TribeCount)
             throw new ArgumentOutOfRangeException(nameof(tribeId), tribeId, $"TribeId must be 0-{TribeCount - 1}.");
+    }
+
+    private async ValueTask RetainTribePointTotalsAfterFailedWriteAsync(IReadOnlyList<int> requestedTotals,
+        CancellationToken ct)
+    {
+        if (!await ReconcileCoreAsync(ct).ConfigureAwait(false))
+        {
+            lock (_lock)
+            {
+                for (var tribeId = 0; tribeId < TribeCount; tribeId++)
+                    _pendingTribePointTotals[tribeId] = requestedTotals[tribeId];
+
+                RefreshDirtyLocked();
+            }
+
+            return;
+        }
+
+        lock (_lock)
+        {
+            for (var tribeId = 0; tribeId < TribeCount; tribeId++)
+            {
+                var requestedTotalWithNewDeltas = requestedTotals[tribeId] + _pendingTribePointDeltas[tribeId];
+                var delta = requestedTotalWithNewDeltas - _tribes[tribeId].Points;
+                _tribes[tribeId] = _tribes[tribeId] with
+                {
+                    TribeId = (byte)tribeId,
+                    Points = requestedTotalWithNewDeltas
+                };
+                _pendingTribePointDeltas[tribeId] += delta;
+            }
+
+            RefreshDirtyLocked();
+        }
+    }
+
+    private void QueueWorldMutation()
+    {
+        _pendingWorld = new PendingWorldMutation(NextMutationVersion(), _world);
+        RefreshDirtyLocked();
+    }
+
+    private void QueueTribeStateMutation(byte tribeId)
+    {
+        _pendingTribeStates[tribeId] =
+            new PendingTribeStateMutation(NextMutationVersion(), _tribes[tribeId], _tribeSymbolOwner[tribeId]);
+        RefreshDirtyLocked();
+    }
+
+    private void QueueAllianceOfferMutation(byte fromTribeId, byte toTribeId)
+    {
+        var key = (fromTribeId, toTribeId);
+        _pendingAllianceOffers[key] = new PendingAllianceOfferMutation(NextMutationVersion(), _allianceOffers[key]);
+        RefreshDirtyLocked();
+    }
+
+    private void RequeueUnpersistedPlan(FlushPlan plan, bool includeWorld, int firstTribeStateIndex,
+        int firstAllianceOfferIndex, int firstPointTotalTribeId, int firstPointDeltaTribeId)
+    {
+        lock (_lock)
+        {
+            if (includeWorld && plan.World is { } world && _pendingWorld is null)
+                _pendingWorld = world;
+
+            for (var tribeIndex = firstTribeStateIndex; tribeIndex < plan.TribeStates.Length; tribeIndex++)
+            {
+                var tribe = plan.TribeStates[tribeIndex];
+                _pendingTribeStates.TryAdd(tribe.State.TribeId, tribe);
+            }
+
+            for (var offerIndex = firstAllianceOfferIndex; offerIndex < plan.AllianceOffers.Length; offerIndex++)
+            {
+                var offer = plan.AllianceOffers[offerIndex];
+                _pendingAllianceOffers.TryAdd((offer.State.FromTribeId, offer.State.ToTribeId), offer);
+            }
+
+            for (var tribeId = firstPointTotalTribeId; tribeId < TribeCount; tribeId++)
+            {
+                if (plan.PointTotals[tribeId] is { } total && _pendingTribePointTotals[tribeId] is null)
+                    _pendingTribePointTotals[tribeId] = total;
+            }
+
+            for (var tribeId = firstPointDeltaTribeId; tribeId < TribeCount; tribeId++)
+                _pendingTribePointDeltas[tribeId] += plan.PointDeltas[tribeId];
+
+            RefreshDirtyLocked();
+        }
+    }
+
+    private long NextMutationVersion() => ++_nextMutationVersion;
+
+    private void RefreshDirtyLocked()
+    {
+        _dirty = _pendingWorld.HasValue || _pendingTribeStates.Count != 0 || _pendingAllianceOffers.Count != 0 ||
+                 Array.Exists(_pendingTribePointTotals, static total => total.HasValue) ||
+                 Array.Exists(_pendingTribePointDeltas, static delta => delta != 0);
+    }
+
+    private static TimeSpan ConflictReplayBackoff(int conflictAttempt) =>
+        TimeSpan.FromMilliseconds(25 * (1 << conflictAttempt));
+
+    private enum FlushPlanResult
+    {
+        Succeeded,
+        Conflict,
+        Failed
+    }
+
+    private readonly record struct PendingWorldMutation(long Version, WorldRvrState State);
+
+    private readonly record struct PendingTribeStateMutation(long Version, TribeRvrState State, byte SymbolOwner);
+
+    private readonly record struct PendingAllianceOfferMutation(long Version, AllianceOfferState State);
+
+    private sealed record FlushPlan(long ExpectedRevision, PendingWorldMutation? World,
+        PendingTribeStateMutation[] TribeStates, PendingAllianceOfferMutation[] AllianceOffers,
+        int?[] PointTotals, int[] PointDeltas);
+
+    private void AdvanceRevisionAfterSuccessfulWrite(ref long expectedRevision)
+    {
+        lock (_lock)
+        {
+            UpdateRevisionAfterSuccessfulWrite(expectedRevision);
+        }
+
+        expectedRevision++;
+    }
+
+    private void UpdateRevisionAfterSuccessfulWrite(long expectedRevision)
+    {
+        _revision = Math.Max(_revision, expectedRevision + 1);
     }
 
     private static int NowAsLegacyHhMm()

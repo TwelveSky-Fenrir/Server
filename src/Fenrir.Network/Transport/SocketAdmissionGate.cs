@@ -1,10 +1,18 @@
 namespace Fenrir.Network.Transport;
 
-public sealed class SocketAdmissionGate(int maxConcurrentSockets)
+public sealed class SocketAdmissionGate
 {
     private int _current;
 
-    public int MaxConcurrentSockets { get; } = maxConcurrentSockets;
+    public SocketAdmissionGate(int maxConcurrentSockets)
+    {
+        if (maxConcurrentSockets <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maxConcurrentSockets));
+
+        MaxConcurrentSockets = maxConcurrentSockets;
+    }
+
+    public int MaxConcurrentSockets { get; }
 
     public int Current => Volatile.Read(ref _current);
 

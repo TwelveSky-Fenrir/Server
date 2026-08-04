@@ -6,7 +6,6 @@ namespace Fenrir.Application.Game.Hosting.World.WorldState;
 
 public sealed class TribePointRecomputeHost(
     TribePointLevelRecomputeService levelRecompute,
-    FavoredTribeRankBonusLadderService ladder,
     ILogger<TribePointRecomputeHost> logger) : BackgroundService
 {
     public const int TickGate = 6;
@@ -32,7 +31,6 @@ public sealed class TribePointRecomputeHost(
     private async Task RunOnceAsync(CancellationToken ct)
     {
         await levelRecompute.RecomputeAsync(ct).ConfigureAwait(false);
-        await ladder.TickIfPendingAsync(ct).ConfigureAwait(false);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

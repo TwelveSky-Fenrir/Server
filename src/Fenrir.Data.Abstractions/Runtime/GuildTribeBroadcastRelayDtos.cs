@@ -9,7 +9,14 @@ public enum GuildTribeBroadcastKind : byte
     TribeAnnouncement = 2,
     TribeAnnouncementScroll = 3,
     WorldChat = 4,
-    GlobalAnnouncement = 5
+    GlobalAnnouncement = 5,
+    Whisper = 6,
+    PartyChat = 7
+}
+
+public enum GuildTribeBroadcastSystemCause : byte
+{
+    WorldNotice = 1
 }
 
 public sealed record GuildTribeBroadcastRelayEntry(
@@ -28,6 +35,11 @@ public sealed record GuildTribeBroadcastRelayEntry(
     int? ItemLinkSocket1,
     int? ItemLinkSocket2)
 {
+
+        public int? SourceCharacterId { get; init; }
+
+        public GuildTribeBroadcastSystemCause? SystemCause { get; init; }
+
     public Guid CorrelationId { get; init; } = Guid.NewGuid();
 }
 
@@ -35,6 +47,9 @@ public sealed record GuildTribeBroadcastRelayEntry(
 public sealed partial record GuildTribeBroadcastRelayDto(
     long RelayId,
     byte Kind,
+    byte SourceShardId,
+    int? SourceCharacterId,
+    byte? SystemCause,
     int? GuildId,
     byte? Tribe,
     byte RoleField,
@@ -46,4 +61,5 @@ public sealed partial record GuildTribeBroadcastRelayDto(
     int? ItemLinkValue,
     int? ItemLinkSocket0,
     int? ItemLinkSocket1,
-    int? ItemLinkSocket2);
+    int? ItemLinkSocket2,
+    Guid CorrelationId);

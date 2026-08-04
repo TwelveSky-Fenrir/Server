@@ -1,6 +1,8 @@
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.Hosting.Relay;
+using Fenrir.Application.Game.Hosting.World.ZoneWar;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -9,67 +11,157 @@ namespace Fenrir.Application.Game.Hosting;
 public sealed class RvrSiegeEventRelayHost(
     Lazy<ZoneCenterBroadcastIngestor> ingestor,
     IRvrSiegeEventRelayRepository relay,
+    IZoneEventRelayOutboxRepository outbox,
+    IZoneEventRelayOutboxWakeSignal wakeSignal,
     IOptions<GameServerOptions> options,
-    ILogger<RvrSiegeEventRelayHost> logger)
-    : ClusterRelayPumpBase<RvrSiegeEventRelayEntry, RvrSiegeEventRelayDto>(
-            relay,
-            options.Value.ShardId,
-            QueueCapacity,
-            TimeSpan.FromSeconds(options.Value.RvrSiegeEventRelayPollIntervalSeconds),
-            options.Value.RvrSiegeEventRelayRetentionSeconds),
-        IRvrSiegeEventRelayQueue
+    ILogger<RvrSiegeEventRelayHost> logger) : BackgroundService
 {
-    private const int QueueCapacity = 256;
+    public const int MaximumOutboundBatchSize = 32;
+    public const int OutboundLeaseSeconds = 30;
+    private static readonly TimeSpan OutboundRetryInterval = TimeSpan.FromSeconds(1);
 
-    protected override ValueTask DeliverAsync(RvrSiegeEventRelayDto dto, CancellationToken ct)
+    public async ValueTask PollOnceAsync(CancellationToken ct)
     {
-        DeliverLocally(dto);
-        return ValueTask.CompletedTask;
+        await PublishOutboundOnceAsync(ct).ConfigureAwait(false);
+        await DeliverInboundOnceAsync(ct).ConfigureAwait(false);
     }
 
-    private void DeliverLocally(RvrSiegeEventRelayDto dto)
+    public async ValueTask PublishOutboundOnceAsync(CancellationToken ct)
+    {
+        var shardId = options.Value.ShardId;
+        var leaseId = Guid.NewGuid();
+        var entries = await outbox.ClaimAsync(
+                new ZoneEventRelayOutboxClaimRequest(shardId, leaseId, MaximumOutboundBatchSize,
+                    OutboundLeaseSeconds), ct)
+            .ConfigureAwait(false);
+
+        foreach (var entry in entries)
+        {
+            try
+            {
+                ValidateOutboundEntry(entry, shardId);
+                await CrossShardRelayRetry.RunAsync(
+                        () => relay.PublishAsync(new RvrSiegeEventRelayEntry(entry.SourceShardId, entry.Sort,
+                        entry.Data) { CorrelationId = entry.CorrelationId }, ct), ct)
+                    .ConfigureAwait(false);
+
+                var acknowledged = await outbox.AcknowledgeAsync(
+                        new ZoneEventRelayOutboxAcknowledgement(entry.OutboxId, shardId, leaseId), ct)
+                    .ConfigureAwait(false);
+                if (!acknowledged)
+                    throw new InvalidOperationException(
+                        $"Zone-event relay outbox entry {entry.OutboxId} was published but could not be acknowledged.");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogError(ex,
+                    "Zone-event relay outbox entry {OutboxId} ({OperationId}, correlation {CorrelationId}) was not fully published from shard {ShardId}; it remains durable for idempotent retry",
+                    entry.OutboxId, entry.OperationId, entry.CorrelationId, shardId);
+                break;
+            }
+        }
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        var outbound = RunOutboundLoopAsync(stoppingToken);
+        var inbound = RunInboundLoopAsync(stoppingToken);
+        await Task.WhenAll(outbound, inbound).ConfigureAwait(false);
+    }
+
+    private async Task RunOutboundLoopAsync(CancellationToken stoppingToken)
+    {
+        do
+        {
+            try
+            {
+                await PublishOutboundOnceAsync(stoppingToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogError(ex,
+                    "RvR-siege durable relay publication failed on shard {ShardId}; unacknowledged work remains retryable",
+                    options.Value.ShardId);
+            }
+
+            using var signalCancellation = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+            var signal = wakeSignal.WaitAsync(signalCancellation.Token).AsTask();
+            var retry = Task.Delay(OutboundRetryInterval, stoppingToken);
+            if (await Task.WhenAny(signal, retry).ConfigureAwait(false) != signal)
+            {
+                await signalCancellation.CancelAsync().ConfigureAwait(false);
+                try
+                {
+                    await signal.ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
+                {
+                }
+            }
+            stoppingToken.ThrowIfCancellationRequested();
+        } while (true);
+    }
+
+    private async Task RunInboundLoopAsync(CancellationToken stoppingToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(options.Value.RvrSiegeEventRelayPollIntervalSeconds));
+
+        do
+        {
+            try
+            {
+                await DeliverInboundOnceAsync(stoppingToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogError(ex,
+                    "RvR-siege durable relay delivery failed on shard {ShardId}; the inbound cursor was not advanced",
+                    options.Value.ShardId);
+            }
+        } while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false));
+    }
+
+    private async ValueTask DeliverInboundOnceAsync(CancellationToken ct)
+    {
+        var shardId = options.Value.ShardId;
+        var incoming = await relay.PollAsync(shardId, options.Value.RvrSiegeEventRelayRetentionSeconds, ct)
+            .ConfigureAwait(false);
+
+        foreach (var dto in incoming)
+            try
+            {
+                await DeliverAsync(dto, ct).ConfigureAwait(false);
+                await CrossShardRelayRetry.RunAsync(() => relay.AcknowledgeAsync(shardId, dto.RelayId, ct), ct)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogError(ex,
+                    "Failed to deliver or acknowledge relayed rvr-siege event {RelayId} (sort {Sort}) on shard {ShardId}; the cursor was not advanced",
+                    dto.RelayId, dto.Sort, shardId);
+                break;
+            }
+    }
+
+    private ValueTask DeliverAsync(RvrSiegeEventRelayDto dto, CancellationToken ct)
     {
         if (!KnownTSortRegistry.IsKnown(dto.Sort))
         {
             logger.LogWarning(
-                "Cross-shard rvr-siege relay {RelayId} sort {Sort} rejected: not in the known-sort allowlist " +
-                "-- dropped without state effect and without broadcast", dto.RelayId, dto.Sort);
-            return;
+                "Cross-shard rvr-siege relay {RelayId} sort {Sort} rejected: not in the known-sort allowlist",
+                dto.RelayId, dto.Sort);
+            return ValueTask.CompletedTask;
         }
 
         ingestor.Value.ApplyRelayedEvent(dto.Sort, dto.Data);
+        return ValueTask.CompletedTask;
     }
 
-    protected override void OnOutboxFull(RvrSiegeEventRelayEntry entry)
+    private static void ValidateOutboundEntry(ZoneEventRelayOutboxDeliveryDto entry, byte shardId)
     {
-        logger.LogWarning(
-            "Cross-shard rvr-siege relay outbox full on shard {ShardId}; dropping the cross-shard fan-out for " +
-            "sort {Sort} (same-shard delivery already happened, only the cross-shard leg is lost)",
-            options.Value.ShardId, entry.Sort);
-    }
-
-    protected override void OnOutboundFlushFailed(Exception ex)
-    {
-        logger.LogError(ex, "RvR-siege relay outbound flush failed for shard {ShardId}", options.Value.ShardId);
-    }
-
-    protected override void OnInboundDeliveryFailed(Exception ex)
-    {
-        logger.LogError(ex, "RvR-siege relay inbound delivery failed for shard {ShardId}", options.Value.ShardId);
-    }
-
-    protected override void OnPublishFailed(RvrSiegeEventRelayEntry entry, Exception ex)
-    {
-        logger.LogError(ex,
-            "Failed to publish an rvr-siege relay row (sort {Sort}) from shard {ShardId}; cross-shard " +
-            "fan-out for this one event is lost (same-shard delivery already happened)",
-            entry.Sort, options.Value.ShardId);
-    }
-
-    protected override void OnDeliveryFailed(RvrSiegeEventRelayDto dto, Exception ex)
-    {
-        logger.LogError(ex,
-            "Failed to locally deliver relayed rvr-siege event {RelayId} (sort {Sort}) on shard {ShardId}",
-            dto.RelayId, dto.Sort, options.Value.ShardId);
+        if (entry.OutboxId <= 0 || entry.SourceShardId != shardId || entry.Data is not { Length: 130 } ||
+            entry.OperationId == Guid.Empty || entry.CorrelationId == Guid.Empty || entry.AttemptCount <= 0 ||
+            !KnownTSortRegistry.IsKnown(entry.Sort))
+            throw new InvalidOperationException("The durable zone-event relay entry is invalid.");
     }
 }

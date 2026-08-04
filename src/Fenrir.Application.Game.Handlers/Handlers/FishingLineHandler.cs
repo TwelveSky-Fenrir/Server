@@ -1,5 +1,6 @@
 using Fenrir.Application.Game.Abstractions.FishingConsumables;
 using Fenrir.Application.Game.Abstractions.Sessions;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -7,59 +8,63 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
 public sealed class FishingLineHandler(IFishingLineService fishingLineService, ILogger<FishingLineHandler> logger)
-    : IInlinePacketHandler<FishingLineRequest>
+    : IAsyncPacketHandler<FishingLineRequest>
 {
     public const short FishingZoneNumber = 52;
 
-    public void Handle(in FishingLineRequest packet, IPacketSession session)
+    public async ValueTask HandleAsync(FishingLineRequest packet, IPacketSession session,
+        CancellationToken cancellationToken)
     {
         var zoneSession = (IZoneSession)session;
-
-        if (packet.Sort is not (1 or 2))
-        {
-            logger.LogDebug(
-                "Fishing-line request (op103) on session {SessionId}: malformed sort {Sort} -- legacy default disconnects, no response (S04_MyWork02.cpp:13502-13504)",
-                session.SessionId, packet.Sort);
-            zoneSession.Abort(DisconnectReason.Faulted);
-            return;
-        }
-
         var characterId = zoneSession.CharacterId!.Value;
 
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
             return;
 
-        logger.LogDebug(
-            "Session {SessionId}: FishingLineRequest (op103) received for character {CharacterId}, sort {Sort}",
-            session.SessionId, characterId, packet.Sort);
-
         if (zone.MapId != FishingZoneNumber)
         {
             logger.LogDebug(
-                "Fishing-line request ignored for character {CharacterId}: map {MapId} is not the fishing zone",
+                "Fishing-line request on character {CharacterId}: map {MapId} does not accept op103",
                 characterId, zone.MapId);
+            zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 
-        FishingLineResult result;
-        if (packet.Sort == 1)
+        if (packet.Sort is not (1 or 2))
         {
-            result = fishingLineService.Cast(zone, state, characterId);
-            logger.LogInformation("Character {CharacterId} cast fishing line (result {Result})", characterId,
-                result.Result);
+            logger.LogDebug(
+                "Fishing-line request (op103) on session {SessionId}: malformed sort {Sort}; closing without a response",
+                session.SessionId, packet.Sort);
+            zoneSession.Abort(DisconnectReason.Faulted);
+            return;
         }
+
+        FishingLineResult? result;
+        if (packet.Sort == 1)
+            result = await fishingLineService.CastAsync(zone, state, characterId, cancellationToken);
         else
+            result = await fishingLineService.ReelAsync(zone, state, characterId, cancellationToken);
+
+        if (result is not { } value)
         {
-            result = fishingLineService.Reel(zone, state, characterId);
-            logger.LogInformation("Character {CharacterId} reeled fishing line (result {Result})", characterId,
-                result.Result);
+            logger.LogError("Zone {MapId} did not acknowledge fishing-line state for character {CharacterId}",
+                zone.MapId, characterId);
+            zoneSession.Abort(DisconnectReason.Faulted);
+            return;
         }
 
         session.Send(new FishingLineResponse
         {
-            ServerIndex = characterId, UniqueNumber = state.UniqueNumber, Result = result.Result,
-            FishingState = result.FishingState, FishingStep = result.FishingStep
+            ServerIndex = characterId, UniqueNumber = state.UniqueNumber, Result = value.Result,
+            FishingState = value.FishingState, FishingStep = value.FishingStep
         });
+
+        if (packet.Sort == 1 && value.Result == 1 &&
+            (await zone.PostFishingCommandAndWaitForResultAsync(
+                new FishingZoneCommand(characterId, 0, 0, false, true, 92, ApplyState: false), cancellationToken)).Kind !=
+            ZoneCommandResultKind.Applied)
+            logger.LogError("Zone {MapId} did not acknowledge fishing-line action for character {CharacterId}",
+                zone.MapId, characterId);
     }
 }

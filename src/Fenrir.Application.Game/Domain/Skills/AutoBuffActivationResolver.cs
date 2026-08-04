@@ -7,6 +7,9 @@ public static class AutoBuffActivationResolver
         NoReply,
 
         Disconnect,
+
+        Rejected,
+
         Activate,
         Tick
     }

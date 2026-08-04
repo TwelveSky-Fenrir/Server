@@ -24,7 +24,11 @@ public sealed record PartyResyncRelayEntry(
     string PartyName,
     string AvatarName)
 {
+    public int RecipientCharacterId { get; init; }
+
     public Guid CorrelationId { get; init; } = Guid.NewGuid();
+
+    public Guid RequestCorrelationId { get; init; }
 
     public int MemberId1 { get; init; }
 
@@ -64,4 +68,7 @@ public sealed partial record PartyResyncRelayDto(
     int MemberId4,
     string MemberName4,
     int MemberId5,
-    string MemberName5);
+    string MemberName5,
+    int RecipientCharacterId,
+    Guid CorrelationId,
+    Guid RequestCorrelationId);

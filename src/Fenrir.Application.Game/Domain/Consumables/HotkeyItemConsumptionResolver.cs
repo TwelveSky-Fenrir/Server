@@ -169,7 +169,7 @@ public static class HotkeyItemConsumptionResolver
             }
 
             default:
-                return Result.RejectedCleanResult;
+                return Result.DisconnectResult;
         }
     }
 

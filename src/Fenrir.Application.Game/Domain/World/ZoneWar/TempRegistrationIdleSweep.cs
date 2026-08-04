@@ -16,7 +16,7 @@ public sealed class TempRegistrationIdleSweep(TribeQuotaRegistry registry, ILogg
 
             entry.Session.Abort(DisconnectReason.IdleTimeout);
 
-            registry.Release(entry.Session.SessionId);
+            registry.Release(entry.Session);
         }
     }
 }

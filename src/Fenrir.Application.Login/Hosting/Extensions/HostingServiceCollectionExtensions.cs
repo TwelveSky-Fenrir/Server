@@ -19,9 +19,6 @@ public static class HostingServiceCollectionExtensions
 
         services.AddSingleton<IValidateOptions<LoginSocketAdmissionOptions>, LoginSocketAdmissionOptionsValidator>();
         services.AddOptions<LoginSocketAdmissionOptions>().ValidateOnStart();
-        services.AddSingleton(sp => new LoginSocketAdmissionGate(
-            sp.GetRequiredService<IOptions<LoginSocketAdmissionOptions>>().Value.MaxConcurrentConnections));
-
         services.AddHostedService<LoginConnectionHost>();
 
         services.AddSingleton<LoginSessionLivenessSweep>();

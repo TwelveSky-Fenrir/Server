@@ -38,15 +38,11 @@ public sealed class GenericActionService(
     DuelRegistry? duels = null)
     : IGenericActionService
 {
+    private const long MaximumMoneyBalance = 2_000_000_000;
+
     private const short TimeExchangeEventCode = 1;
 
     private const byte TimeExchangeOutcome = 1;
-
-    private const short NpcShopSellDefaultEventCode = 1;
-
-    private const short NpcShopBuyEventCode = 2;
-
-    private const short NpcShopSellQuantityEventCode = 3;
 
     private const short VaultTransferDepositEventCode = 1;
 
@@ -66,9 +62,9 @@ public sealed class GenericActionService(
         {
             case GmStubCommandOutcome.NotAuthorized:
                 logger.LogDebug(
-                    "Character {CharacterId} attempted GM stub sort {Sort} without the {RequiredTier} tier: rejected, no state change, no disconnect",
+                    "Character {CharacterId} attempted GM stub sort {Sort} without the {RequiredTier} tier: disconnecting without a response",
                     characterId, sort, GmStubCommandResolver.RequiredTier);
-                return GenericActionResult.Failed;
+                return GenericActionResult.Aborted;
 
             case GmStubCommandOutcome.NoOpFailure:
                 logger.LogInformation(
@@ -84,10 +80,10 @@ public sealed class GenericActionService(
         {
             case GmLevel2CommandOutcome.NotAuthorized:
                 logger.LogDebug(
-                    "Character {CharacterId} attempted GM command {Command} (sort {Sort}) without the {RequiredTier} tier: refused, no state change, no disconnect",
+                    "Character {CharacterId} attempted GM command {Command} (sort {Sort}) without the {RequiredTier} tier: disconnecting without a response",
                     characterId, GmLevel2CommandResolver.CommandName, GmLevel2CommandResolver.Sort,
                     GmLevel2CommandResolver.RequiredTier);
-                return GenericActionResult.Failed;
+                return GenericActionResult.Aborted;
 
             case GmLevel2CommandOutcome.Refused:
                 logger.LogInformation(
@@ -104,10 +100,10 @@ public sealed class GenericActionService(
         {
             case GmDeleteItemCommandOutcome.NotAuthorized:
                 logger.LogDebug(
-                    "Character {CharacterId} attempted GM command {Command} (sort {Sort}) without the {RequiredTier} tier: refused, no state change, no disconnect",
+                    "Character {CharacterId} attempted GM command {Command} (sort {Sort}) without the {RequiredTier} tier: disconnecting without a response",
                     characterId, GmDeleteItemCommandResolver.CommandName, GmDeleteItemCommandResolver.Sort,
                     GmDeleteItemCommandResolver.RequiredTier);
-                return GenericActionResult.Failed;
+                return GenericActionResult.Aborted;
 
             case GmDeleteItemCommandOutcome.Refused:
                 logger.LogInformation(
@@ -124,10 +120,10 @@ public sealed class GenericActionService(
         {
             case GmMonsterKillCommandOutcome.NotAuthorized:
                 logger.LogDebug(
-                    "Character {CharacterId} attempted GM command {Command} (sort {Sort}) without the {RequiredTier} tier: refused, no state change, no disconnect",
+                    "Character {CharacterId} attempted GM command {Command} (sort {Sort}) without the {RequiredTier} tier: disconnecting without a response",
                     characterId, GmMonsterKillCommandResolver.CommandName, GmMonsterKillCommandResolver.Sort,
                     GmMonsterKillCommandResolver.RequiredTier);
-                return GenericActionResult.Failed;
+                return GenericActionResult.Aborted;
 
             case GmMonsterKillCommandOutcome.Refused:
                 logger.LogInformation(
@@ -144,10 +140,10 @@ public sealed class GenericActionService(
         {
             case Zone124DuelReadyOutcome.NotAuthorized:
                 logger.LogDebug(
-                    "Character {CharacterId} attempted GM command {Command} (sort {Sort}) without the {RequiredTier} tier: refused, no state change, no disconnect",
+                    "Character {CharacterId} attempted GM command {Command} (sort {Sort}) without the {RequiredTier} tier: disconnecting without a response",
                     characterId, Zone124DuelReadyResolver.CommandName, Zone124DuelReadyResolver.Sort,
                     Zone124DuelReadyResolver.RequiredTier);
-                return GenericActionResult.Failed;
+                return GenericActionResult.Aborted;
 
             case Zone124DuelReadyOutcome.WrongMap:
                 logger.LogInformation(
@@ -168,10 +164,10 @@ public sealed class GenericActionService(
         {
             case Zone124DuelStartOutcome.NotAuthorized:
                 logger.LogDebug(
-                    "Character {CharacterId} attempted GM command {Command} (sort {Sort}) without the {RequiredTier} tier: refused, no state change, no disconnect",
+                    "Character {CharacterId} attempted GM command {Command} (sort {Sort}) without the {RequiredTier} tier: disconnecting without a response",
                     characterId, Zone124DuelStartResolver.CommandName, Zone124DuelStartResolver.Sort,
                     Zone124DuelStartResolver.RequiredTier);
-                return GenericActionResult.Failed;
+                return GenericActionResult.Aborted;
 
             case Zone124DuelStartOutcome.WrongMap:
                 logger.LogInformation(
@@ -192,10 +188,10 @@ public sealed class GenericActionService(
         {
             case Zone124DuelEndOutcome.NotAuthorized:
                 logger.LogDebug(
-                    "Character {CharacterId} attempted GM command {Command} (sort {Sort}) without the {RequiredTier} tier: refused, no state change, no disconnect",
+                    "Character {CharacterId} attempted GM command {Command} (sort {Sort}) without the {RequiredTier} tier: disconnecting without a response",
                     characterId, Zone124DuelEndResolver.CommandName, Zone124DuelEndResolver.Sort,
                     Zone124DuelEndResolver.RequiredTier);
-                return GenericActionResult.Failed;
+                return GenericActionResult.Aborted;
 
             case Zone124DuelEndOutcome.WrongMap:
                 logger.LogInformation(
@@ -216,10 +212,10 @@ public sealed class GenericActionService(
         {
             case Zone124DuelOutOutcome.NotAuthorized:
                 logger.LogDebug(
-                    "Character {CharacterId} attempted GM command {Command} (sort {Sort}) without the {RequiredTier} tier: refused, no state change, no disconnect",
+                    "Character {CharacterId} attempted GM command {Command} (sort {Sort}) without the {RequiredTier} tier: disconnecting without a response",
                     characterId, Zone124DuelOutResolver.CommandName, Zone124DuelOutResolver.Sort,
                     Zone124DuelOutResolver.RequiredTier);
-                return GenericActionResult.Failed;
+                return GenericActionResult.Aborted;
 
             case Zone124DuelOutOutcome.WrongMap:
                 logger.LogInformation(
@@ -250,13 +246,14 @@ public sealed class GenericActionService(
             return GenericActionResult.Aborted;
         }
 
+        var isEquipmentTransfer = sort is 210 or 213;
         var dragDropOutcome = InventoryEquipDragDropTransferGate.Evaluate(sort, move, state.InventoryDate);
         if (dragDropOutcome != InventoryEquipDragDropTransferGate.Outcome.Valid)
         {
             logger.LogInformation(
                 "Character {CharacterId} container-move rejected: {DragDropOutcome} (sort {Sort}, {Page1}:{Index1} -> {Page2}:{Index2})",
                 characterId, dragDropOutcome, sort, move.Page1, move.Index1, move.Page2, move.Index2);
-            return GenericActionResult.Failed;
+            return isEquipmentTransfer ? GenericActionResult.Aborted : GenericActionResult.Failed;
         }
 
         if (sort == 208 && !IsInventoryToInventoryRequestValid(move, state.InventoryDate))
@@ -268,31 +265,13 @@ public sealed class GenericActionService(
             return GenericActionResult.Failed;
         }
 
-        var isInventoryToEquip = sort == 210;
-
         if (!ContainerMatrix.TryResolveContainers(sort, move.Page1, move.Page2, out var fromContainer,
                 out var toContainer))
         {
             logger.LogDebug(
                 "Character {CharacterId} container-move rejected: unresolvable containers (sort {Sort}, page1 {Page1}, page2 {Page2})",
                 characterId, sort, move.Page1, move.Page2);
-            return GenericActionResult.Failed;
-        }
-
-        if (TouchesLiveTradeReservation(characterId, fromContainer, move.Index1, toContainer, move.Index2))
-        {
-            logger.LogInformation(
-                "Character {CharacterId} container-move rejected: sort {Sort} touches an inventory slot ({FromContainer}:{Index1} or {ToContainer}:{Index2}) reserved by a live trade offer",
-                characterId, sort, fromContainer, move.Index1, toContainer, move.Index2);
-            return GenericActionResult.Failed;
-        }
-
-        if (isInventoryToEquip && state.ActionSort != IdleActionSort)
-        {
-            logger.LogInformation(
-                "Character {CharacterId} equip rejected: not in idle pose (ActionSort {ActionSort})",
-                characterId, state.ActionSort);
-            return GenericActionResult.Failed;
+            return isEquipmentTransfer ? GenericActionResult.Aborted : GenericActionResult.Failed;
         }
 
         var sourceStack = ContainerMatrix.IsValidSlot(fromContainer, move.Index1)
@@ -307,10 +286,50 @@ public sealed class GenericActionService(
             logger.LogInformation(
                 "Character {CharacterId} container-move rejected: source slot empty ({FromContainer}:{Index1})",
                 characterId, fromContainer, move.Index1);
-            return GenericActionResult.Failed;
+            return isEquipmentTransfer ? GenericActionResult.Aborted : GenericActionResult.Failed;
         }
 
         var touchesEquipment = toContainer == ContainerMatrix.Equipment || fromContainer == ContainerMatrix.Equipment;
+
+        if (!worldData.ItemsById.TryGetValue(sourceItem.ItemId, out var sourceDefinition))
+        {
+            logger.LogInformation(
+                "Character {CharacterId} container-move rejected: item {ItemId} is absent from the catalog",
+                characterId, sourceItem.ItemId);
+            return isEquipmentTransfer ? GenericActionResult.Aborted : GenericActionResult.Failed;
+        }
+
+        if (isEquipmentTransfer && destinationStack is not null)
+        {
+            logger.LogInformation(
+                "Character {CharacterId} equipment transfer aborted: destination {ToContainer}:{Index2} is occupied",
+                characterId, toContainer, move.Index2);
+            return GenericActionResult.Aborted;
+        }
+
+        if (toContainer == ContainerMatrix.Equipment)
+        {
+            var equipOutcome = EquipItemValidationGate.Evaluate(
+                EquipItemValidationGate.EquipCandidate.FromRow(sourceDefinition.Item),
+                state.PreviousTribe, move.Index2, state.Level + state.Level2, state.RebirthCount);
+
+            if (equipOutcome != EquipItemValidationGate.Outcome.Success)
+            {
+                logger.LogInformation(
+                    "Character {CharacterId} equip rejected by validation gate: outcome {EquipOutcome}, item {ItemId}",
+                    characterId, equipOutcome, sourceItem.ItemId);
+                return isEquipmentTransfer ? GenericActionResult.Aborted : GenericActionResult.Failed;
+            }
+        }
+
+        if (TouchesLiveTradeReservation(characterId, fromContainer, move.Index1, toContainer, move.Index2))
+        {
+            logger.LogInformation(
+                "Character {CharacterId} container-move rejected: sort {Sort} touches an inventory slot ({FromContainer}:{Index1} or {ToContainer}:{Index2}) reserved by a live trade offer",
+                characterId, sort, fromContainer, move.Index1, toContainer, move.Index2);
+            return GenericActionResult.Failed;
+        }
+
         if (touchesEquipment && state.ActionSort != IdleActionSort)
         {
             logger.LogInformation(
@@ -319,28 +338,7 @@ public sealed class GenericActionService(
             return GenericActionResult.Failed;
         }
 
-        if (toContainer == ContainerMatrix.Equipment)
-        {
-            EquipItemValidationGate.EquipCandidate? candidate = null;
-            if (worldData.ItemsById.TryGetValue(sourceItem.ItemId, out var equipDefinition))
-                candidate = EquipItemValidationGate.EquipCandidate.FromRow(equipDefinition.Item);
-
-            var equipOutcome = EquipItemValidationGate.Evaluate(candidate,
-                state.PreviousTribe, move.Index2, state.Level + state.Level2, state.RebirthCount);
-
-            if (equipOutcome != EquipItemValidationGate.Outcome.Success)
-            {
-                logger.LogInformation(
-                    "Character {CharacterId} equip rejected by validation gate: outcome {EquipOutcome}, item {ItemId}",
-                    characterId, equipOutcome, sourceItem.ItemId);
-                return GenericActionResult.Failed;
-            }
-        }
-
-        var sourceIsStackable = worldData.ItemsById.TryGetValue(sourceItem.ItemId, out var sourceDefinition) &&
-                                ContainerMatrix.IsStackableSort(sourceDefinition.Item.Sort);
-
-        if (move.XPost2 is < 0 or > 7 || move.YPost2 is < 0 or > 7)
+        if (!isEquipmentTransfer && (move.XPost2 is < 0 or > 7 || move.YPost2 is < 0 or > 7))
         {
             logger.LogInformation(
                 "Character {CharacterId} container-move aborted: invalid destination grid position ({XPost2},{YPost2})",
@@ -348,26 +346,46 @@ public sealed class GenericActionService(
             return GenericActionResult.Aborted;
         }
 
-        var requestedQuantity = touchesEquipment ? 0 : move.Quantity1;
+        var sourceItemSort = sourceDefinition.Item.Sort;
+        var hasLegacySingleQuantity = sourceItemSort switch
+        {
+            ItemQuantityPolicy.PetSort => sourceItem.Quantity is >= ItemQuantityPolicy.MinStackQuantity and <=
+                ItemQuantityPolicy.MaxPetActivity,
+            _ when ItemQuantityPolicy.CarriesNoQuantity(sourceItemSort) => sourceItem.Quantity is 0 or 1,
+            _ => false
+        };
+        var requestedQuantity = move.Quantity1 == 0 && hasLegacySingleQuantity
+            ? 1
+            : move.Quantity1;
 
         var resolved = ContainerMatrix.ResolveMove(fromContainer, move.Index1, requestedQuantity, toContainer,
-            move.Index2, (byte)move.XPost2, (byte)move.YPost2, sourceStack, destinationStack, sourceIsStackable);
+            move.Index2, (byte)move.XPost2, (byte)move.YPost2, sourceStack, destinationStack,
+            sourceItemSort);
 
         if (!resolved.Succeeded)
         {
             logger.LogInformation(
                 "Character {CharacterId} container-move rejected by policy (sort {Sort}, {FromContainer}:{Index1} -> {ToContainer}:{Index2})",
                 characterId, sort, fromContainer, move.Index1, toContainer, move.Index2);
-            return GenericActionResult.Failed;
+            return isEquipmentTransfer ? GenericActionResult.Aborted : GenericActionResult.Failed;
         }
 
         if (resolved.Outcome == ContainerMatrix.MoveOutcome.NoOp)
             return GenericActionResult.Succeeded;
 
-        if (isInventoryToEquip && resolved.NewDestination is { } equippedStack)
+        if (resolved.NewDestination is { } movedStack)
         {
-            var expireDate = NpcShopPolicy.IsRentItem(equippedStack.ItemId) ? equippedStack.ExpireDate : 0;
-            resolved = resolved with { NewDestination = equippedStack with { ExpireDate = expireDate } };
+            if (fromContainer == ContainerMatrix.Equipment && move.Index1 == PetSlots.EquipmentSlot)
+                movedStack = PetItemState.WithState(movedStack, state.PetGrowth, state.PetActivity);
+
+            var movesPet = (fromContainer == ContainerMatrix.Equipment &&
+                            move.Index1 == PetSlots.EquipmentSlot) ||
+                           (toContainer == ContainerMatrix.Equipment &&
+                            move.Index2 == PetSlots.EquipmentSlot);
+            if (touchesEquipment && !movesPet)
+                movedStack = FilterSocketState(movedStack, sourceDefinition.Item.Sort, sourceDefinition.Item.Type);
+
+            resolved = resolved with { NewDestination = movedStack };
         }
 
         var projected = ContainerMatrix.ApplyMove(resolved, fromContainer, move.Index1,
@@ -375,6 +393,8 @@ public sealed class GenericActionService(
             state.Inventory.GetContainer(toContainer));
 
         EffectiveStats? updatedStats = null;
+        int? petGrowth = null;
+        byte? petActivity = null;
         if (fromContainer == ContainerMatrix.Equipment || toContainer == ContainerMatrix.Equipment)
         {
             var equipmentContainer = fromContainer == ContainerMatrix.Equipment ? projected.From : projected.To;
@@ -385,7 +405,16 @@ public sealed class GenericActionService(
             var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
                 ? petStack.ItemId
                 : 0;
-            var petContribution = PetGrowthCalculator.Compute(petItemId, state.PetGrowth, state.PetActivity,
+            if ((fromContainer == ContainerMatrix.Equipment && move.Index1 == PetSlots.EquipmentSlot) ||
+                (toContainer == ContainerMatrix.Equipment && move.Index2 == PetSlots.EquipmentSlot))
+            {
+                petGrowth = petStack is { } nextPet ? PetItemState.Growth(nextPet) : 0;
+                petActivity = petStack is { } nextPetActivity ? PetItemState.Activity(nextPetActivity) : (byte)0;
+            }
+
+            var effectivePetGrowth = petGrowth ?? state.PetGrowth;
+            var effectivePetActivity = petActivity ?? state.PetActivity;
+            var petContribution = PetGrowthCalculator.Compute(petItemId, effectivePetGrowth, effectivePetActivity,
                 worldData.ItemsById);
 
             updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
@@ -407,7 +436,10 @@ public sealed class GenericActionService(
 
         if (!await zone.PostInventoryCommandAndWaitAsync(
                 new InventoryZoneCommand(characterId, containers, updatedStats,
-                    RecomputeCombatPoseAfterEquip: touchesEquipment),
+                    RecomputeCombatPoseAfterEquip: touchesEquipment,
+                    ClearEffectsAfterWeaponUnequip: fromContainer == ContainerMatrix.Equipment &&
+                                                    move.Index1 == EquipmentSlots.WeaponSlot,
+                    PetGrowth: petGrowth, PetActivity: petActivity),
                 cancellationToken))
             logger.LogError(
                 "Zone {MapId} inventory inbox full: dropped container-move mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
@@ -440,10 +472,26 @@ public sealed class GenericActionService(
             return GenericActionResult.Aborted;
         }
 
+        if (!RentedInventoryPageGate.IsPageAccessible(move.Page2, state.InventoryDate, GameDate.Today()))
+        {
+            logger.LogInformation(
+                "Character {CharacterId} ground-item pickup aborted: rented inventory page {DestinationPage} expired (InventoryDate {InventoryDate})",
+                characterId, move.Page2, state.InventoryDate);
+            return GenericActionResult.Aborted;
+        }
+
+        if (move.Page1 is < 0 or >= InventoryToWorldDropPolicy.GroundItemCapacity)
+        {
+            logger.LogInformation(
+                "Character {CharacterId} ground-item pickup aborted: invalid ground-item slot {ServerIndex}",
+                characterId, move.Page1);
+            return GenericActionResult.Aborted;
+        }
+
         var claimantPartyName = PartyIdentityResolver.ResolveCurrentPartyName(partyRegistry, characterId,
             state.Name, memberId => zone.TryGetPlayer(memberId, out var member) ? member?.Name : null);
 
-        var claimOutcome = zone.TryClaimGroundItem(move.Page1, unchecked((uint)move.Index1), state.Name,
+        var claimOutcome = zone.TryReserveGroundItem(move.Page1, unchecked((uint)move.Index1), state.Name,
             claimantPartyName, state.PosX, state.PosY, state.PosZ, out var groundItem);
 
         if (claimOutcome != GroundItemClaimOutcome.Success || groundItem is null)
@@ -454,87 +502,132 @@ public sealed class GenericActionService(
             return GenericActionResult.Failed;
         }
 
-        if (!worldData.ItemsById.TryGetValue(groundItem.ItemId, out var itemDefinition))
-        {
-            logger.LogInformation(
-                "Character {CharacterId} ground-item pickup aborted: item {ItemId} not found in catalog",
-                characterId, groundItem.ItemId);
-            return GenericActionResult.Aborted;
-        }
+        var reservationHeld = true;
 
-        var destinationContainer = (byte)move.Page2;
-        var destinationSlot = (byte)move.Index2;
-        var existingStack = state.Inventory.GetSlot(destinationContainer, destinationSlot);
-
-        var resolved = GroundItemPickupPolicy.Resolve(itemDefinition, groundItem, existingStack,
-            (byte)move.XPost2, (byte)move.YPost2);
-        if (!resolved.Succeeded)
+        try
         {
-            logger.LogDebug(
-                "Character {CharacterId} ground-item pickup rejected by policy (item {ItemId})", characterId,
-                groundItem.ItemId);
-            return GenericActionResult.Failed;
-        }
-
-        if (resolved.Outcome == GroundItemPickupPolicy.Outcome.Money)
-        {
-            try
+            if (!worldData.ItemsById.TryGetValue(groundItem.ItemId, out var itemDefinition))
             {
-                await characters.AdjustMoneyAsync(characterId, resolved.MoneyAmount, 0, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex,
-                    "Character {CharacterId} ground-item money pickup AdjustMoneyAsync failed", characterId);
+                logger.LogInformation(
+                    "Character {CharacterId} ground-item pickup aborted: item {ItemId} not found in catalog",
+                    characterId, groundItem.ItemId);
                 return GenericActionResult.Aborted;
             }
 
-            logger.LogInformation(
-                "Character {CharacterId} ground-item pickup applied: money +{MoneyAmount}", characterId,
-                resolved.MoneyAmount);
+            var destinationContainer = (byte)move.Page2;
+            var destinationSlot = (byte)move.Index2;
+            var existingStack = state.Inventory.GetSlot(destinationContainer, destinationSlot);
 
-            return GenericActionResult.Succeeded;
-        }
-
-        var projectedContainer = state.Inventory.GetContainer(destinationContainer)
-            .SetItem(destinationSlot, resolved.NewSlot!.Value);
-
-        await characters.ReplaceContainerAsync(characterId, destinationContainer, ToTvps(projectedContainer),
-            cancellationToken);
-
-        var containers =
-            ImmutableArray.Create(new InventoryContainerSnapshot(destinationContainer, projectedContainer));
-        if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
-                cancellationToken))
-            logger.LogError(
-                "Zone {MapId} inventory inbox full: dropped pickup mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
-
-        await eventLog.LogGroundItemGainAsync(accountId, characterId, groundItem.ItemId,
-            resolved.NewSlot!.Value.Quantity, itemDefinition.Item.Type, cancellationToken);
-
-        var notifyQuestProgress = false;
-        if (state.QuestActiveFlag == 1 && state.QuestSort == 2 && state.QuestTargetPhase == groundItem.ItemId)
-        {
-            bool HasItem(int itemId)
+            var resolved = GroundItemPickupPolicy.Resolve(itemDefinition, groundItem, existingStack,
+                (byte)move.XPost2, (byte)move.YPost2);
+            if (!resolved.Succeeded)
             {
-                return state.Inventory.GetContainer(ContainerMatrix.InventoryPage0).Values
-                           .Any(s => s.ItemId == itemId) ||
-                       state.Inventory.GetContainer(ContainerMatrix.InventoryPage1).Values.Any(s => s.ItemId == itemId);
+                logger.LogDebug(
+                    "Character {CharacterId} ground-item pickup rejected by policy (item {ItemId})", characterId,
+                    groundItem.ItemId);
+                return GenericActionResult.Failed;
             }
 
-            var progress = new QuestProgress(state.QuestStepPermanent, state.QuestActiveFlag, state.QuestSort,
-                state.QuestTargetPhase, state.QuestKillCounter);
-            if (QuestStateMachine.ComputePresentState(progress, state.Tribe, state.Level, questCatalog, HasItem) ==
-                QuestStateMachine.StateInProgress)
-                notifyQuestProgress = true;
+            if (resolved.Outcome == GroundItemPickupPolicy.Outcome.Money)
+            {
+                await characters.AdjustMoneyAsync(characterId, resolved.MoneyAmount, 0, cancellationToken);
+
+                if (!zone.TryFinalizeGroundItemReservation(groundItem.ServerIndex, groundItem.UniqueNumber))
+                {
+                    logger.LogError(
+                        "Character {CharacterId} ground-item money pickup could not finalize reserved slot {ServerIndex}",
+                        characterId, groundItem.ServerIndex);
+                    return GenericActionResult.Failed;
+                }
+
+                reservationHeld = false;
+                logger.LogInformation(
+                    "Character {CharacterId} ground-item pickup applied: money +{MoneyAmount}", characterId,
+                    resolved.MoneyAmount);
+
+                return GenericActionResult.Succeeded;
+            }
+
+            var originalContainer = state.Inventory.GetContainer(destinationContainer);
+            var projectedContainer = originalContainer.SetItem(destinationSlot, resolved.NewSlot!.Value);
+
+            await characters.ReplaceContainerAsync(characterId, destinationContainer, ToTvps(projectedContainer),
+                cancellationToken);
+
+            var containers =
+                ImmutableArray.Create(new InventoryContainerSnapshot(destinationContainer, projectedContainer));
+            if ((await zone.PostInventoryCommandAndWaitForResultAsync(
+                    new InventoryZoneCommand(characterId, containers, null), cancellationToken)).Kind !=
+                ZoneCommandResultKind.Applied || state.Inventory.GetSlot(destinationContainer, destinationSlot) !=
+                resolved.NewSlot)
+            {
+                await characters.ReplaceContainerAsync(characterId, destinationContainer, ToTvps(originalContainer),
+                    cancellationToken);
+                logger.LogWarning(
+                    "Zone {MapId} did not apply the ground-item pickup mirror for character {CharacterId}; restored the persisted inventory container",
+                    zone.MapId, characterId);
+                return GenericActionResult.Failed;
+            }
+
+            try
+            {
+                await eventLog.LogGroundItemGainAsync(accountId, characterId, groundItem.ItemId,
+                    resolved.NewSlot!.Value.Quantity, itemDefinition.Item.Type, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex,
+                    "Character {CharacterId} ground-item pickup completed without an event-log record", characterId);
+            }
+
+            if (!zone.TryFinalizeGroundItemReservation(groundItem.ServerIndex, groundItem.UniqueNumber))
+            {
+                logger.LogError(
+                    "Character {CharacterId} ground-item pickup could not finalize reserved slot {ServerIndex}",
+                    characterId, groundItem.ServerIndex);
+                return GenericActionResult.Failed;
+            }
+
+            reservationHeld = false;
+
+            var notifyQuestProgress = false;
+            if (state.QuestActiveFlag == 1 && state.QuestSort == 2 && state.QuestTargetPhase == groundItem.ItemId)
+            {
+                bool HasItem(int itemId)
+                {
+                    return state.Inventory.GetContainer(ContainerMatrix.InventoryPage0).Values
+                               .Any(s => s.ItemId == itemId) ||
+                           state.Inventory.GetContainer(ContainerMatrix.InventoryPage1).Values
+                               .Any(s => s.ItemId == itemId);
+                }
+
+                var progress = new QuestProgress(state.QuestStepPermanent, state.QuestActiveFlag, state.QuestSort,
+                    state.QuestTargetPhase, state.QuestKillCounter);
+                if (QuestStateMachine.ComputePresentState(progress, state.Tribe, state.Level, questCatalog,
+                        HasItem) == QuestStateMachine.StateInProgress)
+                    notifyQuestProgress = true;
+            }
+
+            logger.LogInformation(
+                "Character {CharacterId} ground-item pickup applied: item {ItemId} -> {DestinationContainer}:{DestinationSlot}",
+                characterId, groundItem.ItemId, destinationContainer, destinationSlot);
+
+            return new GenericActionResult(GenericActionStatus.Succeeded, notifyQuestProgress);
         }
-
-        logger.LogInformation(
-            "Character {CharacterId} ground-item pickup applied: item {ItemId} -> {DestinationContainer}:{DestinationSlot}",
-            characterId, groundItem.ItemId, destinationContainer, destinationSlot);
-
-        return new GenericActionResult(GenericActionStatus.Succeeded, notifyQuestProgress);
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Character {CharacterId} ground-item pickup failed before finalization", characterId);
+            return GenericActionResult.Failed;
+        }
+        finally
+        {
+            if (reservationHeld)
+                zone.ReleaseGroundItemReservation(groundItem.ServerIndex, groundItem.UniqueNumber);
+        }
     }
 
     public async ValueTask<GenericActionResult> PayTeleportTollAsync(byte[] data, int characterId,
@@ -587,7 +680,8 @@ public sealed class GenericActionService(
 
         if (!worldData.NpcsById.TryGetValue(request.NpcId, out var npc) ||
             !worldData.ZonesByNumber.TryGetValue(zone.MapId, out var zoneDefinition) ||
-            !NpcFunctionGate.IsAvailable(zoneDefinition, worldData, functionId, state.PosX, state.PosY, state.PosZ))
+            !NpcFunctionGate.IsAvailableAtNpc(zoneDefinition, npc, functionId, state.PosX, state.PosY,
+                state.PosZ))
         {
             logger.LogInformation(
                 "Character {CharacterId} skill-learn aborted: NPC {NpcId} unavailable/out of range", characterId,
@@ -611,13 +705,18 @@ public sealed class GenericActionService(
         var learned = new LearnedSkill(request.SkillId, result.Cost);
         var newSkillPoints = state.SkillPoints - result.Cost;
 
+        var actorResult = await zone.PostSkillCommandAndWaitForResultAsync(
+            new SkillZoneCommand(characterId, result.Slot, learned, newSkillPoints), cancellationToken);
+        if (actorResult.Kind != ZoneCommandResultKind.Applied)
+        {
+            logger.LogWarning(
+                "Character {CharacterId} skill-learn rejected by zone actor: skill {SkillId}, outcome {Outcome}",
+                characterId, request.SkillId, actorResult.Kind);
+            return GenericActionResult.Aborted;
+        }
+
         await characters.UpsertSkillSlotAsync(characterId, result.Slot, request.SkillId, result.Cost,
             cancellationToken);
-
-        if (!zone.PostSkillCommand(new SkillZoneCommand(characterId, result.Slot, learned, newSkillPoints)))
-            logger.LogError(
-                "Zone {MapId} skill inbox full: dropped learn mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
 
         logger.LogInformation(
             "Character {CharacterId} skill-learn applied: skill {SkillId} into slot {Slot}, cost {Cost}, skillPoints now {NewSkillPoints}",
@@ -656,13 +755,18 @@ public sealed class GenericActionService(
         var upgraded = new LearnedSkill(learned.SkillId, result.NewGrade);
         var newSkillPoints = state.SkillPoints - 1;
 
+        var actorResult = await zone.PostSkillCommandAndWaitForResultAsync(
+            new SkillZoneCommand(characterId, slot, upgraded, newSkillPoints), cancellationToken);
+        if (actorResult.Kind != ZoneCommandResultKind.Applied)
+        {
+            logger.LogWarning(
+                "Character {CharacterId} skill-upgrade rejected by zone actor: slot {Slot}, outcome {Outcome}",
+                characterId, slot, actorResult.Kind);
+            return GenericActionResult.Aborted;
+        }
+
         await characters.UpsertSkillSlotAsync(characterId, slot, learned.SkillId, result.NewGrade,
             cancellationToken);
-
-        if (!zone.PostSkillCommand(new SkillZoneCommand(characterId, slot, upgraded, newSkillPoints)))
-            logger.LogError(
-                "Zone {MapId} skill inbox full: dropped upgrade mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
 
         logger.LogInformation(
             "Character {CharacterId} skill-upgrade applied: skill {SkillId} slot {Slot} -> grade {NewGrade}, skillPoints now {NewSkillPoints}",
@@ -671,7 +775,7 @@ public sealed class GenericActionService(
         return GenericActionResult.Succeeded;
     }
 
-    public async ValueTask<GenericActionResult> SellToNpcShopAsync(Zone zone, PlayerRuntimeState state,
+    public ValueTask<GenericActionResult> SellToNpcShopAsync(Zone zone, PlayerRuntimeState state,
         int accountId, int characterId, DefaultPData move, CancellationToken cancellationToken)
     {
         if (!NpcShopPolicy.TownZoneNumbers.Contains(zone.MapId))
@@ -679,7 +783,7 @@ public sealed class GenericActionService(
             logger.LogInformation(
                 "Character {CharacterId} NPC-shop-sell disconnected: zone {MapId} is not a valid town server",
                 characterId, zone.MapId);
-            return GenericActionResult.Aborted;
+            return ValueTask.FromResult(GenericActionResult.Aborted);
         }
 
         if (!worldData.ZonesByNumber.TryGetValue(zone.MapId, out var zoneDefinition) ||
@@ -689,7 +793,7 @@ public sealed class GenericActionService(
             logger.LogInformation(
                 "Character {CharacterId} NPC-shop-sell aborted: shop out of range (zone {MapId})", characterId,
                 zone.MapId);
-            return GenericActionResult.Failed;
+            return ValueTask.FromResult(GenericActionResult.Failed);
         }
 
         var page1 = move.Page1;
@@ -701,7 +805,7 @@ public sealed class GenericActionService(
             logger.LogInformation(
                 "Character {CharacterId} NPC-shop-sell disconnected: invalid slot ({Page1}:{Index1})", characterId,
                 page1, index1);
-            return GenericActionResult.Aborted;
+            return ValueTask.FromResult(GenericActionResult.Aborted);
         }
 
         if (page1 == ContainerMatrix.InventoryPage1 && state.InventoryDate < GameDate.Today())
@@ -709,7 +813,7 @@ public sealed class GenericActionService(
             logger.LogInformation(
                 "Character {CharacterId} NPC-shop-sell disconnected: dated-vault last page expired (InventoryDate {InventoryDate})",
                 characterId, state.InventoryDate);
-            return GenericActionResult.Aborted;
+            return ValueTask.FromResult(GenericActionResult.Aborted);
         }
 
         var sourceStack = state.Inventory.GetSlot((byte)page1, (byte)index1);
@@ -717,7 +821,7 @@ public sealed class GenericActionService(
         {
             logger.LogInformation(
                 "Character {CharacterId} NPC-shop-sell disconnected: source slot empty/unresolvable", characterId);
-            return GenericActionResult.Aborted;
+            return ValueTask.FromResult(GenericActionResult.Aborted);
         }
 
         var resolved = NpcShopPolicy.ResolveSell(itemDefinition, source, move.Quantity1);
@@ -726,46 +830,22 @@ public sealed class GenericActionService(
             logger.LogInformation(
                 "Character {CharacterId} NPC-shop-sell disconnected by resolver (item {ItemId} x{Quantity})",
                 characterId, source.ItemId, move.Quantity1);
-            return GenericActionResult.Aborted;
+            return ValueTask.FromResult(GenericActionResult.Aborted);
         }
 
-        var currentContainer = state.Inventory.GetContainer((byte)page1);
-        var projectedContainer = resolved.RemainingSourceStack is { } remaining
-            ? currentContainer.SetItem((byte)index1, remaining)
-            : currentContainer.Remove((byte)index1);
-
-        var soldQuantity = source.Quantity - (resolved.RemainingSourceStack?.Quantity ?? 0);
-        var sellEventCode = NpcShopPolicy.IsStackableSellSort(itemDefinition.Item.Sort)
-            ? NpcShopSellQuantityEventCode
-            : NpcShopSellDefaultEventCode;
-
-        try
+        if (!HasAuthoritativeNonNegativeSellAmount(itemDefinition, move.Quantity1, resolved.MoneyGained) ||
+            state.Money is < 0 or > MaximumMoneyBalance)
         {
-            await characters.AdjustMoneyAndReplaceContainerAsync(characterId, resolved.MoneyGained, 0, (byte)page1,
-                ToTvps(projectedContainer), cancellationToken,
-                accountId, sellEventCode, source.ItemId,
-                soldQuantity);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex,
-                "Character {CharacterId} NPC-shop-sell disconnected: AdjustMoneyAndReplaceContainerAsync failed (treated as money-cap breach)",
-                characterId);
-            return GenericActionResult.Aborted;
+            logger.LogWarning(
+                "Character {CharacterId} NPC-shop-sell rejected: invalid authoritative amount or in-memory money balance (item {ItemId})",
+                characterId, source.ItemId);
+            return ValueTask.FromResult(GenericActionResult.Failed);
         }
 
-        var containers = ImmutableArray.Create(new InventoryContainerSnapshot((byte)page1, projectedContainer));
-        if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
-                cancellationToken))
-            logger.LogError(
-                "Zone {MapId} inventory inbox full: dropped NPC-sell mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
-
-        logger.LogInformation(
-            "Character {CharacterId} NPC-shop-sell applied: item {ItemId} x{SoldQuantity}, money +{MoneyGained}",
-            characterId, source.ItemId, soldQuantity, resolved.MoneyGained);
-
-        return GenericActionResult.Succeeded;
+        logger.LogWarning(
+            "Character {CharacterId} NPC-shop-sell backpressured: ICharacterRepository lacks an idempotent money-and-container transaction (item {ItemId})",
+            characterId, source.ItemId);
+        return ValueTask.FromResult(GenericActionResult.Failed);
     }
 
     public async ValueTask<GenericActionResult> BuyFromNpcShopAsync(Zone zone, PlayerRuntimeState state,
@@ -779,22 +859,29 @@ public sealed class GenericActionService(
             return GenericActionResult.Aborted;
         }
 
+        if (!worldData.NpcsById.TryGetValue(move.Page1, out var npc))
+        {
+            logger.LogInformation(
+                "Character {CharacterId} NPC-shop-buy disconnected: NPC {NpcId} not found", characterId,
+                move.Page1);
+            return GenericActionResult.Aborted;
+        }
+
         if (!worldData.ZonesByNumber.TryGetValue(zone.MapId, out var zoneDefinition) ||
-            !NpcFunctionGate.IsAvailable(zoneDefinition, worldData, NpcFunctionGate.NpcShop, state.PosX, state.PosY,
+            !NpcFunctionGate.IsAvailableAtNpc(zoneDefinition, npc, NpcFunctionGate.NpcShop, state.PosX, state.PosY,
                 state.PosZ))
         {
             logger.LogInformation(
-                "Character {CharacterId} NPC-shop-buy aborted: shop out of range (zone {MapId})", characterId,
-                zone.MapId);
+                "Character {CharacterId} NPC-shop-buy aborted: requested shop NPC {NpcId} is unavailable (zone {MapId})",
+                characterId, move.Page1, zone.MapId);
             return GenericActionResult.Failed;
         }
 
-        if (!worldData.NpcsById.TryGetValue(move.Page1, out var npc) ||
-            !worldData.ItemsById.TryGetValue(move.Index1, out var itemDefinition))
+        if (!worldData.ItemsById.TryGetValue(move.Index1, out var itemDefinition))
         {
             logger.LogInformation(
-                "Character {CharacterId} NPC-shop-buy disconnected: NPC {NpcId} or item {ItemId} not found",
-                characterId, move.Page1, move.Index1);
+                "Character {CharacterId} NPC-shop-buy disconnected: item {ItemId} not found", characterId,
+                move.Index1);
             return GenericActionResult.Aborted;
         }
 
@@ -823,15 +910,22 @@ public sealed class GenericActionService(
         if (warPointShop is not null)
         {
             var warPointResult = await warPointShop.TryBuyAsync(zone, state, accountId, characterId, move.Page1,
-                move.Index1, move.Quantity1, (byte)page2, (byte)index2, cancellationToken);
+                move.Index1, move.Quantity1, (byte)page2, (byte)index2, (byte)move.XPost2, (byte)move.YPost2,
+                cancellationToken);
 
             switch (warPointResult.Status)
             {
-                case WarPointBuyStatus.Aborted or WarPointBuyStatus.SoftRejected:
+                case WarPointBuyStatus.Aborted:
                     logger.LogInformation(
-                        "Character {CharacterId} NPC-shop-buy disconnected by War-Point routing ({Status}, NPC {NpcId}, item {ItemId})",
+                        "Character {CharacterId} NPC-shop-buy rejected by War-Point routing ({Status}, NPC {NpcId}, item {ItemId})",
                         characterId, warPointResult.Status, move.Page1, move.Index1);
-                    return GenericActionResult.Aborted;
+                    return GenericActionResult.Failed;
+
+                case WarPointBuyStatus.SoftRejected:
+                    logger.LogInformation(
+                        "Character {CharacterId} NPC-shop-buy backpressured by War-Point routing (NPC {NpcId}, item {ItemId})",
+                        characterId, move.Page1, move.Index1);
+                    return GenericActionResult.Failed;
 
                 case WarPointBuyStatus.Succeeded:
                     return GenericActionResult.Succeeded;
@@ -852,51 +946,19 @@ public sealed class GenericActionService(
             return GenericActionResult.Aborted;
         }
 
-        var projectedContainer = state.Inventory.GetContainer((byte)page2)
-            .SetItem((byte)index2, resolved.NewDestinationStack!.Value);
-
-        var purchasedQuantity = resolved.NewDestinationStack!.Value.Quantity - (destinationSlot?.Quantity ?? 0);
-        var contributionPointsAfter = state.ContributionPoints - resolved.CpCost;
-        var auditPayload = resolved.CpCost > 0
-            ? $"ContributionPointsBefore={state.ContributionPoints};ContributionPointsAfter={contributionPointsAfter}"
-            : null;
-
-        try
+        if (!HasAuthoritativeNonNegativeBuyAmounts(itemDefinition, move.Quantity1, resolved) ||
+            state.Money is < 0 or > MaximumMoneyBalance || state.ContributionPoints < 0)
         {
-            await characters.AdjustMoneyAndReplaceContainerAsync(characterId, -resolved.MoneyCost, 0, (byte)page2,
-                ToTvps(projectedContainer), cancellationToken,
-                accountId, NpcShopBuyEventCode,
-                itemDefinition.Item.ItemId, purchasedQuantity,
-                auditPayload);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex,
-                "Character {CharacterId} NPC-shop-buy disconnected: AdjustMoneyAndReplaceContainerAsync failed (insufficient funds)",
-                characterId);
-            return GenericActionResult.Aborted;
+            logger.LogWarning(
+                "Character {CharacterId} NPC-shop-buy rejected: invalid authoritative amount or in-memory balance (item {ItemId})",
+                characterId, itemDefinition.Item.ItemId);
+            return GenericActionResult.Failed;
         }
 
-        var containers = ImmutableArray.Create(new InventoryContainerSnapshot((byte)page2, projectedContainer));
-        if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
-                cancellationToken))
-            logger.LogError(
-                "Zone {MapId} inventory inbox full: dropped NPC-buy mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
-
-        if (resolved.CpCost > 0 &&
-            !await zone.PostTribeProgressCommandAndWaitAsync(
-                new TribeProgressZoneCommand(characterId, contributionPointsAfter),
-                cancellationToken))
-            logger.LogError(
-                "Zone {MapId} tribe-progress inbox full: dropped CP mirror for character {CharacterId} after NPC-shop-buy",
-                zone.MapId, characterId);
-
-        logger.LogInformation(
-            "Character {CharacterId} NPC-shop-buy applied: item {ItemId} x{PurchasedQuantity}, money -{MoneyCost}, CP -{CpCost}",
-            characterId, itemDefinition.Item.ItemId, purchasedQuantity, resolved.MoneyCost, resolved.CpCost);
-
-        return GenericActionResult.Succeeded;
+        logger.LogWarning(
+            "Character {CharacterId} NPC-shop-buy backpressured: ICharacterRepository lacks an idempotent money-and-container transaction (item {ItemId})",
+            characterId, itemDefinition.Item.ItemId);
+        return GenericActionResult.Failed;
     }
 
     public async ValueTask<GenericActionResult> TransferStoreItemAsync(int sort, byte[] data, Zone zone,
@@ -926,9 +988,9 @@ public sealed class GenericActionService(
                     !StoreItemTransferPolicy.TryResolveStoreContainer(move.Page2, out toContainer))
                 {
                     logger.LogDebug(
-                        "Character {CharacterId} Store-item-transfer rejected: unresolvable containers (sort {Sort})",
+                        "Character {CharacterId} Store-item-transfer aborted: unresolvable containers (sort {Sort})",
                         characterId, sort);
-                    return GenericActionResult.Failed;
+                    return GenericActionResult.Aborted;
                 }
 
                 var (source, sourceIsStackable, sourceSupportsSocket) =
@@ -947,9 +1009,9 @@ public sealed class GenericActionService(
                     !StoreItemTransferPolicy.TryResolveInventoryContainer(move.Page2, out toContainer))
                 {
                     logger.LogDebug(
-                        "Character {CharacterId} Store-item-transfer rejected: unresolvable containers (sort {Sort})",
+                        "Character {CharacterId} Store-item-transfer aborted: unresolvable containers (sort {Sort})",
                         characterId, sort);
-                    return GenericActionResult.Failed;
+                    return GenericActionResult.Aborted;
                 }
 
                 var (source, sourceIsStackable, sourceSupportsSocket) =
@@ -969,18 +1031,18 @@ public sealed class GenericActionService(
                     !StoreItemTransferPolicy.TryResolveStoreContainer(move.Page2, out toContainer))
                 {
                     logger.LogDebug(
-                        "Character {CharacterId} Store-item-transfer rejected: unresolvable containers (sort {Sort})",
+                        "Character {CharacterId} Store-item-transfer aborted: unresolvable containers (sort {Sort})",
                         characterId, sort);
-                    return GenericActionResult.Failed;
+                    return GenericActionResult.Aborted;
                 }
 
-                var (source, sourceIsStackable, _) =
+                var (source, sourceIsStackable, sourceSupportsSocket) =
                     ResolveTransferSource(GetSlotOrNull(state, fromContainer, move.Index1));
                 var destination = GetSlotOrNull(state, toContainer, move.Index2);
 
                 resolved = StoreItemTransferPolicy.ResolveRearrangeWithinStore(fromContainer, move.Index1,
                     move.Quantity1, toContainer, move.Index2, source, destination, sourceIsStackable,
-                    secondStorePageAccessible);
+                    sourceSupportsSocket, secondStorePageAccessible);
                 break;
             }
             default:
@@ -990,8 +1052,9 @@ public sealed class GenericActionService(
         if (!resolved.Succeeded)
         {
             logger.LogInformation(
-                "Character {CharacterId} Store-item-transfer rejected by policy (sort {Sort})", characterId, sort);
-            return GenericActionResult.Failed;
+                "Character {CharacterId} Store-item-transfer aborted by policy: {Outcome} (sort {Sort})",
+                characterId, resolved.Outcome, sort);
+            return GenericActionResult.Aborted;
         }
 
         if (resolved.Outcome == StoreItemTransferPolicy.TransferOutcome.NoOp)
@@ -1107,11 +1170,12 @@ public sealed class GenericActionService(
             return GenericActionResult.Aborted;
         }
 
-        var (_, vaultRows) = await accountVault.GetAsync(accountId, cancellationToken);
+        var (vaultBalance, vaultRows) = await accountVault.GetAsync(accountId, cancellationToken);
+        var expectedVaultRevision = vaultBalance?.Revision ?? 0;
         var vaultBySlot = new Dictionary<short, ItemStack>(vaultRows.Count);
         foreach (var row in vaultRows)
             if (row.ItemId is not null)
-                vaultBySlot[row.SlotIndex] = ItemStack.FromVaultRow(row);
+                vaultBySlot[row.SlotIndex] = ItemStack.FromVaultRowV2(row);
 
         var secondInventoryPageAccessible = state.InventoryDate >= GameDate.Today();
 
@@ -1151,8 +1215,20 @@ public sealed class GenericActionService(
                     (byte)move.Index1, resolved.NewSource);
                 ApplyVaultSlotChange(vaultBySlot, (short)move.Index2, resolved.NewDestination);
 
-                await accountVault.TransferItemWithCharacterAsync(characterId, inventoryContainer,
-                    ToTvps(newInventoryContainer), accountId, ToVaultTvps(vaultBySlot), cancellationToken);
+                var applied = await accountVault.TryTransferItemWithCharacterAsync(accountId, characterId,
+                    inventoryContainer, expectedVaultRevision,
+                    new AccountVaultCharacterSlotMutation((byte)move.Index1,
+                        ToCharacterItemSnapshot(source), ToCharacterItemSnapshot(resolved.NewSource)),
+                    new AccountVaultItemSlotMutation((short)move.Index2, ToVaultItemSnapshot(destination),
+                        ToVaultItemSnapshot(resolved.NewDestination)), cancellationToken);
+
+                if (!applied)
+                {
+                    logger.LogInformation(
+                        "Character {CharacterId} Save-item-transfer aborted: stale deposit precondition",
+                        characterId);
+                    return GenericActionResult.Aborted;
+                }
 
                 if (resolved.IsNonStackableTransfer)
                     await eventLog.LogAsync(VaultTransferDepositEventCode, EventLogCategory.SaveSlotItem,
@@ -1200,8 +1276,20 @@ public sealed class GenericActionService(
                     (byte)move.Index2, resolved.NewDestination);
                 ApplyVaultSlotChange(vaultBySlot, (short)move.Index1, resolved.NewSource);
 
-                await accountVault.TransferItemWithCharacterAsync(characterId, inventoryContainer,
-                    ToTvps(newInventoryContainer), accountId, ToVaultTvps(vaultBySlot), cancellationToken);
+                var applied = await accountVault.TryTransferItemWithCharacterAsync(accountId, characterId,
+                    inventoryContainer, expectedVaultRevision,
+                    new AccountVaultCharacterSlotMutation((byte)move.Index2,
+                        ToCharacterItemSnapshot(destination), ToCharacterItemSnapshot(resolved.NewDestination)),
+                    new AccountVaultItemSlotMutation((short)move.Index1, ToVaultItemSnapshot(source),
+                        ToVaultItemSnapshot(resolved.NewSource)), cancellationToken);
+
+                if (!applied)
+                {
+                    logger.LogInformation(
+                        "Character {CharacterId} Save-item-transfer aborted: stale withdrawal precondition",
+                        characterId);
+                    return GenericActionResult.Aborted;
+                }
 
                 if (resolved.IsNonStackableTransfer)
                     await eventLog.LogAsync(VaultTransferWithdrawEventCode, EventLogCategory.SaveSlotItem,
@@ -1237,7 +1325,19 @@ public sealed class GenericActionService(
                 ApplyVaultSlotChange(vaultBySlot, (short)move.Index1, resolved.NewSource);
                 ApplyVaultSlotChange(vaultBySlot, (short)move.Index2, resolved.NewDestination);
 
-                await accountVault.SetItemsAsync(accountId, ToVaultTvps(vaultBySlot), cancellationToken);
+                var applied = await accountVault.TryRearrangeItemsAsync(accountId, expectedVaultRevision,
+                    new AccountVaultItemSlotMutation((short)move.Index1, ToVaultItemSnapshot(source),
+                        ToVaultItemSnapshot(resolved.NewSource)),
+                    new AccountVaultItemSlotMutation((short)move.Index2, ToVaultItemSnapshot(destination),
+                        ToVaultItemSnapshot(resolved.NewDestination)), cancellationToken);
+
+                if (!applied)
+                {
+                    logger.LogInformation(
+                        "Character {CharacterId} Save-item-transfer aborted: stale rearrange precondition",
+                        characterId);
+                    return GenericActionResult.Aborted;
+                }
                 logger.LogInformation(
                     "Character {CharacterId} Save-item-transfer applied: rearrange, vault {Index1} <-> {Index2}",
                     characterId, move.Index1, move.Index2);
@@ -1402,7 +1502,7 @@ public sealed class GenericActionService(
             logger.LogInformation(
                 "Character {CharacterId} stat-point allocation aborted: illegal category or unaffordable amount (statSort {StatSort}, addValue {AddValue}, available {StatPoints})",
                 characterId, statSort, addValue, state.StatPoints);
-            return GenericActionResult.Failed;
+            return GenericActionResult.Aborted;
         }
 
         var newVit = state.StatVit + (resolved.Stat == StatAllocationResolver.BaseStat.Vitality ? resolved.Amount : 0);
@@ -1427,10 +1527,14 @@ public sealed class GenericActionService(
         if (!await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
                 StatVit: newVit, StatStr: newStr, StatInt: newInt, StatDex: newDex,
                 StatPoints: resolved.NewStatPoints, MaxLife: updatedStats.MaxLife, MaxMana: updatedStats.MaxMana,
-                UpdatedStats: updatedStats), cancellationToken))
+                UpdatedStats: updatedStats), cancellationToken) ||
+            !zone.TryGetPlayer(characterId, out var mirroredState) || !ReferenceEquals(mirroredState, state))
+        {
             logger.LogError(
-                "Zone {MapId} tribe-progress inbox full: dropped stat-allocation mirror for character {CharacterId}",
+                "Zone {MapId} could not confirm the stat-allocation mirror for character {CharacterId}",
                 zone.MapId, characterId);
+            return GenericActionResult.Failed;
+        }
 
         logger.LogInformation(
             "Character {CharacterId} stat-point allocation applied: {Stat} +{Amount}, statPoints now {NewStatPoints}",
@@ -1945,12 +2049,22 @@ public sealed class GenericActionService(
             vaultBySlot.Remove(slot);
     }
 
-    private static List<AccountVaultItemSlotTvp> ToVaultTvps(Dictionary<short, ItemStack> vaultBySlot)
+    private static AccountVaultCharacterItemSnapshot? ToCharacterItemSnapshot(ItemStack? stack)
     {
-        var list = new List<AccountVaultItemSlotTvp>(vaultBySlot.Count);
-        foreach (var (slot, stack) in vaultBySlot)
-            list.Add(stack.ToVaultTvp(slot));
-        return list;
+        return stack is not { } value
+            ? null
+            : new AccountVaultCharacterItemSnapshot(value.ItemId, value.Quantity, value.Enchant, value.Combine,
+                value.Refine, value.Socket, value.SocketGem1, value.SocketGem2, value.SocketGem3,
+                value.ExpireDate, value.Serial, value.XPos, value.YPos);
+    }
+
+    private static AccountVaultItemSnapshot? ToVaultItemSnapshot(ItemStack? stack)
+    {
+        return stack is not { } value
+            ? null
+            : new AccountVaultItemSnapshot(value.ItemId, value.Quantity,
+                ItemValueCodec.Encode(value.Enchant, value.Combine, value.Refine, value.Socket), value.Serial, null,
+                value.SocketGem1, value.SocketGem2, value.SocketGem3, value.ExpireDate);
     }
 
     private static ImmutableDictionary<byte, ItemStack> ApplySlotChange(
@@ -1966,6 +2080,55 @@ public sealed class GenericActionService(
 
         return (stack, ContainerMatrix.IsStackableSort(definition.Item.Sort),
             ContainerMatrix.IsSocketableItem(definition.Item.Sort, definition.Item.Type));
+    }
+
+    private static ItemStack FilterSocketState(ItemStack stack, byte itemSort, byte itemType)
+    {
+        if (ContainerMatrix.IsSocketableItem(itemSort, itemType))
+            return stack;
+
+        return stack with { Socket = 0, SocketGem1 = 0, SocketGem2 = 0, SocketGem3 = 0 };
+    }
+
+    private static bool HasAuthoritativeNonNegativeSellAmount(ItemDefinition itemDefinition, int requestedQuantity,
+        long resolvedMoneyGained)
+    {
+        var effectiveQuantity = NpcShopPolicy.IsStackableSellSort(itemDefinition.Item.Sort) ? requestedQuantity : 1;
+        if (effectiveQuantity < 1)
+            return false;
+
+        try
+        {
+            var expectedMoneyGained = checked((long)itemDefinition.Item.SellCost * effectiveQuantity);
+            return expectedMoneyGained is >= 0 and <= MaximumMoneyBalance &&
+                   resolvedMoneyGained == expectedMoneyGained;
+        }
+        catch (OverflowException)
+        {
+            return false;
+        }
+    }
+
+    private static bool HasAuthoritativeNonNegativeBuyAmounts(ItemDefinition itemDefinition, int requestedQuantity,
+        NpcShopPolicy.BuyResult resolution)
+    {
+        var effectiveQuantity = ContainerMatrix.IsStackableSort(itemDefinition.Item.Sort) ? requestedQuantity : 1;
+        if (effectiveQuantity < 1)
+            return false;
+
+        try
+        {
+            var expectedMoneyCost = checked((long)itemDefinition.Item.BuyCost * effectiveQuantity);
+            var expectedContributionPointCost = checked((long)itemDefinition.Item.BuyCost2 * effectiveQuantity);
+            return expectedMoneyCost is >= 0 and <= MaximumMoneyBalance &&
+                   expectedContributionPointCost is >= 0 and <= MaximumMoneyBalance &&
+                   resolution.MoneyCost == expectedMoneyCost &&
+                   resolution.CpCost == expectedContributionPointCost;
+        }
+        catch (OverflowException)
+        {
+            return false;
+        }
     }
 
     private async ValueTask MirrorInventoryContainerAsync(Zone zone, int characterId, byte container,

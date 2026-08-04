@@ -13,7 +13,9 @@ public enum HolyStoneWarPhase : byte
 
     Contest,
 
-    ChallengePending
+    ChallengePending,
+
+    CaptureFinalizationPending
 }
 
 public sealed record HolyStoneWarSite(
@@ -45,12 +47,82 @@ public sealed class HolyStoneWarCycle(
 
     private readonly MinuteCountdown _minuteCountdown = new();
     private readonly IRandomSource _random = random ?? SystemRandomSource.Instance;
+    private bool _dirty;
 
     public HolyStoneWarPhase Phase { get; private set; } = HolyStoneWarPhase.Cooldown;
 
-    public TimeSpan CooldownRemaining { get; private set; } = testMode ? TestModeCooldown : NormalCooldown;
+    public TimeSpan CooldownRemaining { get; private set; } = TimeSpan.Zero;
 
     public int? PendingCandidateCharacterId { get; private set; }
+
+    public bool HasPendingCaptureFinalization => Phase == HolyStoneWarPhase.CaptureFinalizationPending;
+
+    public bool TryGetDirtySnapshot(out HolyStoneWarCycleSnapshot snapshot)
+    {
+        if (!_dirty)
+        {
+            snapshot = default;
+            return false;
+        }
+
+        snapshot = Snapshot();
+        return true;
+    }
+
+    public HolyStoneWarCycleSnapshot Snapshot()
+    {
+        return new HolyStoneWarCycleSnapshot(Phase, CooldownRemaining.Ticks, _minuteCountdown.Snapshot(),
+            PendingCandidateCharacterId);
+    }
+
+    public void Restore(in HolyStoneWarCycleSnapshot snapshot)
+    {
+        if (!snapshot.HasExpectedShape)
+            throw new ArgumentException("The Holy Stone cycle snapshot is invalid.", nameof(snapshot));
+
+        Phase = snapshot.Phase;
+        CooldownRemaining = TimeSpan.FromTicks(snapshot.CooldownRemainingTicks);
+        _minuteCountdown.Restore(snapshot.Countdown);
+        PendingCandidateCharacterId = snapshot.PendingCandidateCharacterId;
+        _dirty = false;
+    }
+
+    public void AcknowledgePersisted(in HolyStoneWarCycleSnapshot snapshot)
+    {
+        if (Snapshot() == snapshot)
+            _dirty = false;
+    }
+
+    public void CloseRecoveredCaptureFinalization()
+    {
+        if (Phase != HolyStoneWarPhase.CaptureFinalizationPending)
+            return;
+
+        ResetToCooldown();
+    }
+
+    public void FinalizePersistedCapture()
+    {
+        if (Phase != HolyStoneWarPhase.CaptureFinalizationPending || PendingCandidateCharacterId is not { } candidateId)
+            return;
+
+        try
+        {
+            if (!zones.TryGet(site.MapId, out var zone) || zone is null || !zone.TryGetPlayer(candidateId, out var candidate) ||
+                candidate is null || !IsEligibleCandidate(candidate))
+            {
+                CancelChallenge();
+                return;
+            }
+
+            ResolveCapture(zone, candidate);
+        }
+        catch
+        {
+            ResetToCooldown();
+            throw;
+        }
+    }
 
     public void Tick(TimeSpan elapsed)
     {
@@ -68,6 +140,8 @@ public sealed class HolyStoneWarCycle(
             case HolyStoneWarPhase.ChallengePending:
                 AdvanceChallenge(elapsed);
                 break;
+            case HolyStoneWarPhase.CaptureFinalizationPending:
+                break;
         }
     }
 
@@ -78,16 +152,23 @@ public sealed class HolyStoneWarCycle(
 
         CooldownRemaining -= elapsed;
         if (CooldownRemaining > TimeSpan.Zero)
+        {
+            MarkChanged();
             return;
+        }
 
+        CooldownRemaining = TimeSpan.Zero;
         Phase = HolyStoneWarPhase.OpeningCountdown;
         _minuteCountdown.Reset();
+        MarkChanged();
         logger.LogInformation("HolyStoneWar: cooldown elapsed -- opening countdown armed");
     }
 
     private void AdvanceOpeningCountdown(TimeSpan elapsed)
     {
         var wholeMinutes = _minuteCountdown.Advance(elapsed);
+        if (elapsed > TimeSpan.Zero)
+            MarkChanged();
         for (var i = 0; i < wholeMinutes; i++)
         {
             var minute = _minuteCountdown.MinutesElapsed;
@@ -106,6 +187,7 @@ public sealed class HolyStoneWarCycle(
             logger.LogInformation("HolyStoneWar: war zone now open -- contest phase begins");
             broadcaster.AnnounceHolyStoneWarZoneOpen();
             Phase = HolyStoneWarPhase.Contest;
+            MarkChanged();
             return;
         }
     }
@@ -133,6 +215,7 @@ public sealed class HolyStoneWarCycle(
             PendingCandidateCharacterId = player.CharacterId;
             Phase = HolyStoneWarPhase.ChallengePending;
             _minuteCountdown.Reset();
+            MarkChanged();
             logger.LogInformation(
                 "HolyStoneWar: challenger {CharacterId} (tribe {Tribe}) approaches -- {Minutes}-minute countdown begins",
                 player.CharacterId, player.Tribe, ChallengeCountdownMinutes);
@@ -150,17 +233,15 @@ public sealed class HolyStoneWarCycle(
             return;
         }
 
-        var captureRadiusSq = site.CaptureRadius * site.CaptureRadius;
-
-        if (!zone.TryGetPlayer(candidateId, out var candidate) || candidate is null || candidate.IsDead ||
-            candidate.IsMovingZone || candidate.VisibleState == 0 ||
-            DistanceSquared(candidate, site) > captureRadiusSq)
+        if (!zone.TryGetPlayer(candidateId, out var candidate) || candidate is null || !IsEligibleCandidate(candidate))
         {
             CancelChallenge();
             return;
         }
 
         var wholeMinutes = _minuteCountdown.Advance(elapsed);
+        if (elapsed > TimeSpan.Zero)
+            MarkChanged();
         for (var i = 0; i < wholeMinutes; i++)
         {
             var minute = _minuteCountdown.MinutesElapsed;
@@ -174,7 +255,8 @@ public sealed class HolyStoneWarCycle(
             if (minute != ChallengeCountdownMinutes + 1)
                 continue;
 
-            ResolveCapture(zone, candidate);
+            Phase = HolyStoneWarPhase.CaptureFinalizationPending;
+            MarkChanged();
             return;
         }
     }
@@ -188,6 +270,7 @@ public sealed class HolyStoneWarCycle(
 
         PendingCandidateCharacterId = null;
         Phase = HolyStoneWarPhase.Contest;
+        MarkChanged();
     }
 
     private void ResolveCapture(Zone zone, PlayerRuntimeState capturer)
@@ -216,9 +299,7 @@ public sealed class HolyStoneWarCycle(
         GrantTribeWideParticipationRewards(zone, capturer);
         PostZone038OccupationCredits(zone, capturer.Tribe);
 
-        Phase = HolyStoneWarPhase.Cooldown;
-        CooldownRemaining = testMode ? TestModeCooldown : NormalCooldown;
-        PendingCandidateCharacterId = null;
+        ResetToCooldown();
         logger.LogInformation("HolyStoneWar: cycle reset -- cooldown armed for {Cooldown}", CooldownRemaining);
     }
 
@@ -274,5 +355,55 @@ public sealed class HolyStoneWarCycle(
         var dy = player.PosY - site.StoneY;
         var dz = player.PosZ - site.StoneZ;
         return dx * dx + dy * dy + dz * dz;
+    }
+
+    private bool IsEligibleCandidate(PlayerRuntimeState player)
+    {
+        if (player.IsMovingZone || player.VisibleState == 0 || player.IsDead)
+            return false;
+
+        var holderTribe = worldState.World.Zone038WinTribe;
+        var allyOfHolder = holderTribe is { } holder ? worldState.GetAllyOf(holder) : null;
+        return !HolyStoneTribeMatch.Matches(player.Tribe, holderTribe, allyOfHolder) &&
+               DistanceSquared(player, site) <= site.CaptureRadius * site.CaptureRadius;
+    }
+
+    private void ResetToCooldown()
+    {
+        Phase = HolyStoneWarPhase.Cooldown;
+        CooldownRemaining = testMode ? TestModeCooldown : NormalCooldown;
+        PendingCandidateCharacterId = null;
+        _minuteCountdown.Reset();
+        MarkChanged();
+    }
+
+    private void MarkChanged()
+    {
+        _dirty = true;
+    }
+}
+
+public readonly record struct HolyStoneWarCycleSnapshot(
+    HolyStoneWarPhase Phase,
+    long CooldownRemainingTicks,
+    MinuteCountdownSnapshot Countdown,
+    int? PendingCandidateCharacterId)
+{
+    public bool HasExpectedShape
+    {
+        get
+        {
+            if (!Enum.IsDefined(Phase) || CooldownRemainingTicks < 0 || !Countdown.HasExpectedShape)
+                return false;
+
+            return Phase switch
+            {
+                HolyStoneWarPhase.Cooldown or HolyStoneWarPhase.OpeningCountdown or HolyStoneWarPhase.Contest =>
+                    PendingCandidateCharacterId is null,
+                HolyStoneWarPhase.ChallengePending or HolyStoneWarPhase.CaptureFinalizationPending =>
+                    PendingCandidateCharacterId is > 0,
+                _ => false
+            };
+        }
     }
 }

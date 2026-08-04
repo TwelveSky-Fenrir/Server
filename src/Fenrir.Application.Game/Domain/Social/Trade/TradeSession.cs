@@ -1,4 +1,5 @@
 using Fenrir.Application.Game.Domain.Inventory;
+using System.Collections.Immutable;
 
 namespace Fenrir.Application.Game.Domain.Social.Trade;
 
@@ -54,8 +55,19 @@ public sealed class TradeOfferSide
     }
 }
 
+public readonly record struct TradeOfferSnapshot(
+    ImmutableArray<(byte Container, byte Slot, ItemStack Stack)?> Slots,
+    long Money,
+    int BigMoney);
+
 public sealed class TradeSession
 {
+    private const int Open = 0;
+    private const int Committing = 1;
+    private const int Closed = 2;
+
+    private int _commitState;
+
     public required int PlayerAId { get; init; }
     public required int PlayerBId { get; init; }
 
@@ -63,6 +75,8 @@ public sealed class TradeSession
     public TradeOfferSide SideB { get; } = new();
 
     public bool BothFullyConfirmed => SideA.IsFullyConfirmed && SideB.IsFullyConfirmed;
+
+    public bool IsCommitInProgress => Volatile.Read(ref _commitState) == Committing;
 
     public TradeOfferSide SideOf(int characterId)
     {
@@ -90,5 +104,36 @@ public sealed class TradeSession
             TradeLimits.FrozenMenuState => opponent.IsOfferFrozen,
             _ => false
         };
+    }
+
+    public bool TryAdvanceConfirmation(int characterId)
+    {
+        if (Volatile.Read(ref _commitState) != Open || !CanAdvanceConfirmation(characterId))
+            return false;
+
+        SideOf(characterId).MenuState++;
+        return true;
+    }
+
+    public bool TryBeginCommit()
+    {
+        return BothFullyConfirmed &&
+               Interlocked.CompareExchange(ref _commitState, Committing, Open) == Open;
+    }
+
+    public bool TryClose()
+    {
+        return Interlocked.CompareExchange(ref _commitState, Closed, Open) == Open;
+    }
+
+    public void CompleteCommit()
+    {
+        Interlocked.Exchange(ref _commitState, Closed);
+    }
+
+    public TradeOfferSnapshot SnapshotSide(int characterId)
+    {
+        var side = SideOf(characterId);
+        return new TradeOfferSnapshot(ImmutableArray.CreateRange(side.Slots), side.Money, side.BigMoney);
     }
 }

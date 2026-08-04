@@ -2,6 +2,7 @@ using Fenrir.Application.Game.Abstractions.ItemModification;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Enchant;
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Microsoft.Extensions.Logging;
@@ -19,23 +20,48 @@ public sealed partial class EnchantItemService
     private const int CostumeEnchantFailureResultCode = 8;
 
     private async ValueTask<EnchantItemResult> EnchantCostumeSwapAsync(Zone zone, PlayerRuntimeState state,
-        int characterId, EnchantSlots slots, ItemStack target, ItemStack material,
+        int characterId, DateTime attemptUtc, EnchantSlots slots, ItemStack target, ItemStack material,
         CancellationToken cancellationToken)
     {
         var resolved = CostumeImproveResolver.ResolveSwap(target.Enchant, material.Enchant);
 
         if (resolved.Outcome == CostumeImproveResolver.CostumeSwapOutcome.Rejected)
-            return AbortAndRejectSilently(state, characterId,
+            return AbortAndDisconnect(state, characterId,
                 "costume swap ordering rule violated (IsCostumeForSwap)");
 
-        var newTargetStack = target with { Enchant = (byte)resolved.NewImproveA };
-        var newMaterialStack = material with { Enchant = (byte)resolved.NewImproveB };
+        var newTargetStack = target with
+        {
+            Enchant = material.Enchant,
+            Combine = material.Combine,
+            Refine = material.Refine,
+            Socket = material.Socket
+        };
+        var newMaterialStack = material with
+        {
+            Enchant = target.Enchant,
+            Combine = target.Combine,
+            Refine = target.Refine,
+            Socket = target.Socket
+        };
 
         var (projectedTarget, projectedMaterial) = ProjectContainers(state, slots, newTargetStack, newMaterialStack);
 
-        if (!await TryPersistContainersAsync(characterId, -resolved.MoneyCost, slots, projectedTarget,
-                projectedMaterial, cancellationToken))
-            return AbortAndRejectSilently(state, characterId, "costume swap insufficient funds");
+        try
+        {
+            await PersistContainersAsync(characterId, -resolved.MoneyCost, slots, projectedTarget, projectedMaterial,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            return AbortAfterUncertainPersistence(state, characterId, "costume swap", ex);
+        }
+
+        var inventoryResult = await PostInventoryMirrorAsync(zone, characterId, slots, projectedTarget,
+            projectedMaterial, cancellationToken);
+        if (inventoryResult.Kind != ZoneCommandResultKind.Applied)
+            return AbortAfterDurableMutation(state, characterId, "costume swap inventory", inventoryResult);
+
+        state.LastEnchantAttemptUtc = attemptUtc;
 
         zone.CreditNpcServiceTribeTax(state.Tribe, resolved.MoneyCost);
 
@@ -49,9 +75,6 @@ public sealed partial class EnchantItemService
                 "game.EventLog write-behind queue full: dropped costume-swap audit row for character {CharacterId}",
                 characterId);
 
-        await PostInventoryMirrorAsync(zone, characterId, slots, projectedTarget, projectedMaterial,
-            cancellationToken);
-
         logger.LogInformation(
             "Character {CharacterId} costume swap applied: target {TargetItemId} <-> material {MaterialItemId}, cost {Cost}",
             characterId, target.ItemId, material.ItemId, resolved.MoneyCost);
@@ -60,18 +83,18 @@ public sealed partial class EnchantItemService
     }
 
     private async ValueTask<EnchantItemResult> EnchantCostumeEnchantAsync(Zone zone, PlayerRuntimeState state,
-        int characterId, EnchantSlots slots, ItemStack target, ItemStack material,
+        int characterId, DateTime attemptUtc, EnchantSlots slots, ItemStack target, ItemStack material,
         CancellationToken cancellationToken)
     {
         var resolved = CostumeImproveResolver.ResolveEnchant(target.Enchant, material.ItemId,
             SystemRandomSource.Instance);
 
         if (resolved.Outcome == CostumeImproveResolver.CostumeEnchantOutcome.Rejected)
-            return AbortAndRejectSilently(state, characterId,
+            return AbortAndDisconnect(state, characterId,
                 "costume enchant rejected (cap already reached or invalid material)");
 
         if (state.ContributionPoints < resolved.ContributionPointCost)
-            return AbortAndRejectSilently(state, characterId,
+            return AbortAndDisconnect(state, characterId,
                 "costume enchant insufficient contribution points");
 
         var remainingMaterialQuantity = material.Quantity - 1;
@@ -84,18 +107,30 @@ public sealed partial class EnchantItemService
 
         var (projectedTarget, projectedMaterial) = ProjectContainers(state, slots, newTargetStack, newMaterialStack);
 
-        if (!await TryPersistContainersAsync(characterId, -resolved.MoneyCost, slots, projectedTarget,
-                projectedMaterial, cancellationToken))
-            return AbortAndRejectSilently(state, characterId, "costume enchant insufficient funds");
+        try
+        {
+            await PersistContainersAsync(characterId, -resolved.MoneyCost, slots, projectedTarget, projectedMaterial,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            return AbortAfterUncertainPersistence(state, characterId, "costume enchant", ex);
+        }
 
-        zone.CreditNpcServiceTribeTax(state.Tribe, resolved.MoneyCost);
+        var inventoryResult = await PostInventoryMirrorAsync(zone, characterId, slots, projectedTarget,
+            projectedMaterial, cancellationToken);
+        if (inventoryResult.Kind != ZoneCommandResultKind.Applied)
+            return AbortAfterDurableMutation(state, characterId, "costume enchant inventory", inventoryResult);
 
         var newContributionPoints = state.ContributionPoints - resolved.ContributionPointCost;
-        if (!await zone.PostTribeProgressCommandAndWaitAsync(
-                new TribeProgressZoneCommand(characterId, newContributionPoints), cancellationToken))
-            logger.LogError(
-                "Zone {MapId} tribe-progress inbox full: dropped CP mirror for character {CharacterId} after costume enchant -- SQL write-behind will retry on next dirty flush",
-                zone.MapId, characterId);
+        var tribeResult = await zone.PostTribeProgressCommandAndWaitForResultAsync(
+            new TribeProgressZoneCommand(characterId, newContributionPoints), cancellationToken);
+        if (tribeResult.Kind != ZoneCommandResultKind.Applied)
+            return AbortAfterDurableMutation(state, characterId, "costume enchant progress", tribeResult);
+
+        state.LastEnchantAttemptUtc = attemptUtc;
+
+        zone.CreditNpcServiceTribeTax(state.Tribe, resolved.MoneyCost);
 
         if (succeeded && resolved.ReachedCap)
             CenterRelayNoticeLog.LogCostumeEnchantCap(logger, state.Tribe, state.Name, resolved.NewImprove);
@@ -110,9 +145,6 @@ public sealed partial class EnchantItemService
             logger.LogWarning(
                 "game.EventLog write-behind queue full: dropped costume-enchant audit row for character {CharacterId}",
                 characterId);
-
-        await PostInventoryMirrorAsync(zone, characterId, slots, projectedTarget, projectedMaterial,
-            cancellationToken);
 
         logger.LogInformation(
             "Character {CharacterId} costume enchant applied: target {TargetItemId} outcome {Outcome} -> enchant {NewEnchant}, cost {MoneyCost}/{CpCost}",

@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.ItemModification;
+using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Forge;
 using Fenrir.Application.Game.Domain.Inventory;
@@ -28,7 +29,8 @@ public sealed class CombineItemService(
         var page2 = packet.Page2;
         var index2 = packet.Index2;
 
-        if (!IsValidInventorySlot(page1, index1) || !IsValidInventorySlot(page2, index2))
+        if (!IsValidInventorySlot(page1, index1) || !IsValidInventorySlot(page2, index2) ||
+            page1 == page2 && index1 == index2)
         {
             logger.LogDebug(
                 "Character {CharacterId} combine-item rejected: invalid slot(s) ({Page1}:{Index1} / {Page2}:{Index2})",
@@ -51,7 +53,9 @@ public sealed class CombineItemService(
 
         if (targetStack is not { } target || materialStack is not { } material ||
             !worldData.ItemsById.TryGetValue(target.ItemId, out var targetDefinition) ||
-            !worldData.ItemsById.TryGetValue(material.ItemId, out var materialDefinition))
+            !worldData.ItemsById.TryGetValue(material.ItemId, out var materialDefinition) ||
+            !ItemQuantityPolicy.IsWithinLegalRange(targetDefinition.Item.Sort, target.Quantity) ||
+            !ItemQuantityPolicy.IsWithinLegalRange(materialDefinition.Item.Sort, material.Quantity))
         {
             logger.LogDebug(
                 "Character {CharacterId} combine-item rejected: target or material slot empty/unresolvable",
@@ -110,25 +114,7 @@ public sealed class CombineItemService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex,
-                "Character {CharacterId} combine-item AdjustMoney...ReplaceContainer(s)Async failed (treated as insufficient funds)",
-                characterId);
-            return new CombineItemResult(CombineItemOutcome.Disconnect, 0, 0);
-        }
-
-        zone.CreditNpcServiceTribeTax(state.Tribe, resolved.Cost);
-
-        if (resolved.ConsumesLuckyCharge)
-        {
-            var newAddItemValue = state.AddItemValue - 1;
-            state.Session.Send(new AvatarStatUpdateResponse
-                { Sort = LuckyCombineStatSort, Value = newAddItemValue, Value2 = 0 });
-
-            if (!await zone.PostTribeProgressCommandAndWaitAsync(
-                    new TribeProgressZoneCommand(characterId, AddItemValue: newAddItemValue), cancellationToken))
-                logger.LogError(
-                    "Zone {MapId} tribe-progress inbox full: dropped lucky-combine charge mirror for character {CharacterId}",
-                    zone.MapId, characterId);
+            return AbortAfterUncertainPersistence(state, characterId, ex);
         }
 
         var containers = page1 == page2
@@ -137,17 +123,50 @@ public sealed class CombineItemService(
                 new InventoryContainerSnapshot((byte)page1, projectedTargetContainer),
                 new InventoryContainerSnapshot((byte)page2, projectedMaterialContainer));
 
-        if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
-                cancellationToken))
-            logger.LogError(
-                "Zone {MapId} inventory inbox full: dropped combine mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
+        var inventoryResult = await zone.PostInventoryCommandAndWaitForResultAsync(
+            new InventoryZoneCommand(characterId, containers, null), cancellationToken);
+        if (inventoryResult.Kind != ZoneCommandResultKind.Applied)
+            return AbortAfterDurableMutation(state, characterId, "combine inventory", inventoryResult);
+
+        if (resolved.ConsumesLuckyCharge)
+        {
+            var newAddItemValue = state.AddItemValue - 1;
+            var tribeResult = await zone.PostTribeProgressCommandAndWaitForResultAsync(
+                new TribeProgressZoneCommand(characterId, AddItemValue: newAddItemValue), cancellationToken);
+            if (tribeResult.Kind != ZoneCommandResultKind.Applied)
+                return AbortAfterDurableMutation(state, characterId, "combine lucky-charge", tribeResult);
+
+            state.Session.Send(new AvatarStatUpdateResponse
+                { Sort = LuckyCombineStatSort, Value = newAddItemValue, Value2 = 0 });
+        }
+
+        zone.CreditNpcServiceTribeTax(state.Tribe, resolved.Cost);
 
         logger.LogInformation(
             "Character {CharacterId} combine-item applied: target {TargetItemId} now Combine={NewCombine}, cost {Cost}, resultCode {ResultCode}",
             characterId, target.ItemId, resolved.NewCombine, resolved.Cost, resolved.ResultCode);
 
         return new CombineItemResult(CombineItemOutcome.Applied, resolved.ResultCode, resolved.Cost);
+    }
+
+    private CombineItemResult AbortAfterDurableMutation(PlayerRuntimeState state, int characterId,
+        string mutation, ZoneCommandResult result)
+    {
+        logger.LogError(
+            "Character {CharacterId} combine-item persisted but {Mutation} actor mutation was not acknowledged as applied ({Kind}: {Cause}); disconnecting without success response",
+            characterId, mutation, result.Kind, result.Cause);
+        ((IZoneSession)state.Session).Abort(DisconnectReason.Faulted);
+        return new CombineItemResult(CombineItemOutcome.Disconnect, 0, 0);
+    }
+
+    private CombineItemResult AbortAfterUncertainPersistence(PlayerRuntimeState state, int characterId,
+        Exception exception)
+    {
+        logger.LogError(exception,
+            "Character {CharacterId} combine-item persistence failed after submission; durability is uncertain, disconnecting without success response",
+            characterId);
+        ((IZoneSession)state.Session).Abort(DisconnectReason.Faulted);
+        return new CombineItemResult(CombineItemOutcome.Disconnect, 0, 0);
     }
 
     private static bool IsValidInventorySlot(int page, int index)

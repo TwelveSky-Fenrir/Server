@@ -4,7 +4,7 @@ public sealed class SimulationTickAccumulator
 {
     private TimeSpan _accumulated;
 
-    public int Advance(TimeSpan elapsed)
+        public int Advance(TimeSpan elapsed)
     {
         if (elapsed <= TimeSpan.Zero)
             return 0;
@@ -12,9 +12,10 @@ public sealed class SimulationTickAccumulator
         _accumulated += elapsed;
 
         var dueTicks = (int)(_accumulated.Ticks / SimulationClock.LegacyTick.Ticks);
-        if (dueTicks > 0)
-            _accumulated -= SimulationClock.ToTimeSpan(dueTicks);
+        if (dueTicks <= 0)
+            return 0;
 
-        return dueTicks;
+        _accumulated -= SimulationClock.ToTimeSpan(dueTicks);
+        return 1;
     }
 }

@@ -12,6 +12,8 @@ public sealed class ZoneTransferHandler(IZoneTransferService zoneTransferService
 
     private const int ClosedZonePort = 0;
 
+    private const int ZoneTransferCapabilityLength = 43;
+
     public async ValueTask HandleAsync(ZoneTransferRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
@@ -41,14 +43,37 @@ public sealed class ZoneTransferHandler(IZoneTransferService zoneTransferService
                 loginSession.Abort(DisconnectReason.Malformed);
                 return;
             case ZoneTransferOutcome.CharacterNotFound:
+            case ZoneTransferOutcome.DeathPending:
             case ZoneTransferOutcome.ShardUnavailable:
                 logger.LogWarning(
                     "Zone transfer rejected: account {AccountId} slot {Slot} outcome {Outcome}", accountId,
                     packet.AvatarPost, result.Outcome);
                 session.Send(new ZoneTransferResponse
-                    { Result = 1, Ip = result.Ip, Port = ClosedZonePort, Zone = result.Zone });
+                {
+                    Result = 1,
+                    Ip = result.Ip,
+                    Port = ClosedZonePort,
+                    Zone = result.Zone,
+                    Capability = string.Empty
+                });
                 return;
             case ZoneTransferOutcome.Success:
+                if (result.Capability is not { Length: ZoneTransferCapabilityLength })
+                {
+                    logger.LogError(
+                        "Zone transfer rejected: successful endpoint response for account {AccountId} slot {Slot} " +
+                        "did not carry a valid capability", accountId, packet.AvatarPost);
+                    session.Send(new ZoneTransferResponse
+                    {
+                        Result = 1,
+                        Ip = string.Empty,
+                        Port = ClosedZonePort,
+                        Zone = 0,
+                        Capability = string.Empty
+                    });
+                    return;
+                }
+
                 loginSession.MarkHandoverIssued();
 
                 logger.LogInformation(
@@ -56,7 +81,13 @@ public sealed class ZoneTransferHandler(IZoneTransferService zoneTransferService
                     accountId, packet.AvatarPost, result.Ip, result.Port, result.Zone);
 
                 session.Send(new ZoneTransferResponse
-                    { Result = 0, Ip = result.Ip, Port = result.Port, Zone = result.Zone });
+                {
+                    Result = 0,
+                    Ip = result.Ip,
+                    Port = result.Port,
+                    Zone = result.Zone,
+                    Capability = result.Capability
+                });
                 return;
             default:
                 throw new ArgumentOutOfRangeException(nameof(result), result.Outcome, null);

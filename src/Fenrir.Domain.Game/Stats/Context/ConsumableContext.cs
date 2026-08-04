@@ -11,4 +11,4 @@ public readonly record struct ConsumableContext(
     bool DmgBoostActive = false,
     bool CriBoostActive = false,
     int MaxPotionEventNum = 0,
-    byte EventTribe = 0);
+    int EventTribe = -1);

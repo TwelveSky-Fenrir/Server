@@ -33,6 +33,9 @@ public sealed class RuneSocketHandler(IRuneSocketService runeSocketService, ILog
                     var result = await runeSocketService.InsertAsync(packet, zone, state, characterId,
                         cancellationToken);
 
+                    if (result.Outcome == RuneSocketOutcome.Disconnected)
+                        return;
+
                     if (result.Outcome != RuneSocketOutcome.Applied)
                     {
                         logger.LogInformation(
@@ -60,6 +63,8 @@ public sealed class RuneSocketHandler(IRuneSocketService runeSocketService, ILog
 
                     switch (result.Outcome)
                     {
+                        case RuneSocketOutcome.Disconnected:
+                            return;
                         case RuneSocketOutcome.Rejected:
                             logger.LogDebug(
                                 "Rune remove rejected for character {CharacterId}: runeIndex {RuneIndex} (invalid slot or item not found)",

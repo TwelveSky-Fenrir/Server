@@ -29,6 +29,7 @@ public sealed class FriendAddHandler(IFriendService friendService, ILogger<Frien
         switch (result.Kind)
         {
             case FriendAddResultKind.InvalidSlot:
+                zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             case FriendAddResultKind.NoPendingAccept:
                 return;

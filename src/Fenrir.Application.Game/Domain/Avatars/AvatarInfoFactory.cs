@@ -66,7 +66,7 @@ public static class AvatarInfoFactory
             FaceType = character.FaceType,
             Level1 = character.Level,
             Level2 = character.Level2,
-            Exp1 = MaxGeneralExperience,
+            Exp1 = (int)Math.Clamp(character.Experience, 0, MaxGeneralExperience),
             Exp2 = character.Exp2,
             Vit = character.StatVit,
             Str = character.StatStr,
@@ -108,7 +108,7 @@ public static class AvatarInfoFactory
             AnimalTime = character.MountTime,
             AnimalPower = animalPower,
             AnimalExpActivity = animalExpActivity,
-            Equip = BuildEquipArrayFromRows(items, character.PetGrowth, character.PetActivity),
+            Equip = BuildEquipArrayFromRows(items),
             Inventory = BuildInventoryArrayFromRows(items),
             StoreItem = BuildStoreItemArrayFromRows(items),
             Skill = BuildSkillArrayFromRows(skills ?? []),
@@ -136,9 +136,9 @@ public static class AvatarInfoFactory
         };
     }
 
-    public static AvatarInfo CreateForRuntimeState(PlayerRuntimeState state, short mapId, float posX, float posY,
-        float posZ)
+        public static AvatarInfo CreateForRuntimeState(PlayerRuntimeState state, AvatarSocialSnapshot? social = null)
     {
+        var s = social ?? AvatarSocialSnapshot.Empty;
         var (animal, animalExpActivity, animalPower) = BuildMountSlotArrays(state);
 
         return AvatarInfoTemplates.Zeroed with
@@ -152,6 +152,12 @@ public static class AvatarInfoFactory
             CostumeDate = [.. state.CostumeDate],
             CostumeExpireDate = [.. state.CostumeExpireDate],
             CostumeIndex = state.CostumeIndex,
+            StellarCore = [.. state.StellarCoreWardrobe],
+            StellarCoreExpireDate = [.. state.StellarCoreExpireDate],
+            StellarCoreIndex = state.StellarCoreIndex,
+            PlayTime1 = state.PlayTime1,
+            PlayTime2 = state.PlayTime2,
+            PlayTime3 = state.PlayTime3,
             PetExpX2Time = state.PetExpX2Time,
             AnimalAbsorbTime = state.AnimalAbsorbTime,
             AnimalAbsorbState = state.AnimalAbsorbState,
@@ -166,7 +172,7 @@ public static class AvatarInfoFactory
             FaceType = state.FaceType,
             Level1 = state.Level,
             Level2 = state.Level2,
-            Exp1 = MaxGeneralExperience,
+            Exp1 = (int)Math.Clamp(state.Experience, 0, MaxGeneralExperience),
             Exp2 = state.Exp2,
             Vit = state.StatVit,
             Str = state.StatStr,
@@ -174,27 +180,71 @@ public static class AvatarInfoFactory
             Dex = state.StatDex,
             StatPoint = state.StatPoints,
             SkillPoint = state.SkillPoints,
+            Money = (int)state.Money,
+            InventoryDate = state.InventoryDate,
+            StoreDate = state.StoreDate,
+            StoreMoney = (int)state.StoreMoney,
+            BigMoney = state.BigMoney,
             Title = state.Title,
             Halo = state.Halo,
             RebirthNum = state.RebirthCount,
             Zone241Time = state.Zone241Time,
             PetBagDate = state.PetBagDate,
             WarPoint = state.WarPoint,
+            BloodCoin = state.BloodCoin,
             EatLifePotion = state.EatLifePotion,
             EatManaPotion = state.EatManaPotion,
             EatStrPotion = state.EatStrPotion,
             EatDexPotion = state.EatDexPotion,
             EatElePotion = state.EatElePotion,
+            ProtectForDeath = state.ProtectForDeath,
+            ProtectForDestroy = state.ProtectForDestroy,
+            ProtectForDestroy2 = state.ProtectForDestroy2,
+            ProtectForRefine = state.ProtectForRefine,
+            ProtectForCostume = state.ProtectForCostume,
+            ProtectForHalo = state.ProtectForHalo,
+            FightingGodForDestroy = state.FightingGodForDestroy,
+            DmgBoost = state.DmgBoost,
+            HPBoost = state.HPBoost,
+            CriBoost = state.CriBoost,
             AutoBuffTime = state.AutoBuffTime,
+            AutoBuffSkill = BuildAutoBuffSkillArray(state.AutoBuffSkill),
+            AutoLifeRatio = state.AutoLifeRatio,
+            AutoManaRatio = state.AutoManaRatio,
+            AutoTime = state.AutoHuntPaidDayBudget,
+            AutoTime2 = state.AutoHuntPaidMinuteBudget,
+            AutoState = state.AutoHuntEnabled ? 1 : 0,
+            AutoHunt = state.AutoHuntConfig ?? AvatarInfoTemplates.Zeroed.AutoHunt,
+            ImproveItemValue = state.ImproveItemValue,
+            AddItemValue = state.AddItemValue,
+            HighItemValue = state.HighItemValue,
+            DropItemTime = state.DropItemTime,
+            BonusItemLevel = state.BonusItemLevel,
+            BonusItemValue = state.BonusItemValue ? 1 : 0,
+            TribeNotifyNum = state.TribeNotifyScrollCount,
+            RankPoint = state.RankPoint,
+            RankPointDate = state.RankPointDate,
+            RankBuffType = state.RankBuffType,
+            AnimalDoubleExp = state.AnimalDoubleExp,
+            WarriorPill = state.WarriorPill,
+            WarriorScroll = state.WarriorScroll,
             SilverTime = state.SilverTime,
             GoldTime = state.GoldTime,
+            DoubleExpTime1 = state.DoubleExpTime1,
+            DoubleExpTime2 = state.DoubleExpTime2,
             DoubleKillNumTime = state.DoubleKillNumTime,
             DoubleKillExpTime = state.DoubleKillExpTime,
             DoubleKillNumTime2 = state.DoubleKillNumTime2,
+            Premium = state.PremiumExpireUtc,
+            TeacherPoint = state.TeacherPoint,
+            Friend = s.BuildFriendArray(),
+            Teacher = s.Teacher,
+            Student = s.Student,
+            GuildName = state.GuildName,
             GuildRole = GuildRoleCodec.DbRoleToWire(state.GuildRoleDb),
             CallName = state.GuildCallName,
-            Equip = BuildEquipArrayFromContainer(state.Inventory.GetContainer(ContainerMatrix.Equipment),
-                state.PetGrowth, state.PetActivity),
+            PartyName = s.BuildPartyArray(),
+            Equip = BuildEquipArrayFromContainer(state.Inventory.GetContainer(ContainerMatrix.Equipment)),
             Inventory = BuildInventoryArrayFromContainers(
                 state.Inventory.GetContainer(ContainerMatrix.InventoryPage0),
                 state.Inventory.GetContainer(ContainerMatrix.InventoryPage1)),
@@ -207,8 +257,60 @@ public static class AvatarInfoFactory
                 state.QuestStepPermanent, state.QuestActiveFlag, state.QuestSort, state.QuestTargetPhase,
                 state.QuestKillCounter
             ],
-            LogoutInfo = [mapId, (int)posX, (int)posY, (int)posZ, state.Life, state.Mana]
+            LogoutInfo = [state.MapId, (int)state.PosX, (int)state.PosY, (int)state.PosZ, state.Life, state.Mana]
         };
+    }
+
+        public static WorldEntryAvatarProjection CreateWorldEntryProjection(PlayerRuntimeState state,
+        AvatarSocialSnapshot? social = null)
+    {
+        var s = social ?? AvatarSocialSnapshot.Empty;
+
+        return new WorldEntryAvatarProjection(
+            state.Incarnation,
+            CreateForRuntimeState(state, s),
+            state.Buffs with { Buff = [.. state.Buffs.Buff] },
+            CreateCurrentPose(state),
+            s.PartyName);
+    }
+
+    private static ActionInfo CreateCurrentPose(PlayerRuntimeState state)
+    {
+        return new ActionInfo
+        {
+            Type = state.ActionType,
+            Sort = state.ActionSort,
+            Frame = 0,
+            Location = [state.PosX, state.PosY, state.PosZ],
+            TargetLocation = [state.PosX, state.PosY, state.PosZ],
+            Front = state.Heading,
+            TargetFront = state.Heading,
+            PetLocation = [state.PetActionLocationX, state.PetActionLocationY, state.PetActionLocationZ],
+            PetTargetLocation =
+                [state.PetActionTargetLocationX, state.PetActionTargetLocationY, state.PetActionTargetLocationZ],
+            PetFront = state.PetActionFront,
+            PetSort = state.PetActionSort,
+            TargetObjectSort = 0,
+            TargetObjectIndex = state.ActionTargetObjectIndex,
+            TargetObjectUniqueNumber = state.ActionTargetObjectUniqueNumber,
+            SkillNumber = state.ActionSkillNumber,
+            SkillGradeNum1 = state.ActionSkillGradeNum1,
+            SkillGradeNum2 = state.ActionSkillGradeNum2,
+            SkillValue = 0
+        };
+    }
+
+    private static int[] BuildAutoBuffSkillArray(ImmutableArray<(int SkillId, int Grade)> skills)
+    {
+        var values = new int[16];
+
+        for (var slot = 0; slot < skills.Length && slot < values.Length / 2; slot++)
+        {
+            values[slot * 2] = skills[slot].SkillId;
+            values[slot * 2 + 1] = skills[slot].Grade;
+        }
+
+        return values;
     }
 
     private static (int[] ItemIds, int[] ExpActivities, int[] Powers) BuildMountSlotArrays(
@@ -245,8 +347,7 @@ public static class AvatarInfoFactory
         return (itemIds, expActivities, powers);
     }
 
-    private static int[] BuildEquipArrayFromRows(IReadOnlyList<CharacterItemSlotDto> items, int petGrowth,
-        byte petActivity)
+    private static int[] BuildEquipArrayFromRows(IReadOnlyList<CharacterItemSlotDto> items)
     {
         var equip = new int[52];
 
@@ -260,8 +361,8 @@ public static class AvatarInfoFactory
 
             if (item.Slot == PetSlots.EquipmentSlot)
             {
-                equip[baseIndex + 1] = petActivity;
-                equip[baseIndex + 2] = petGrowth;
+                equip[baseIndex + 1] = Math.Clamp(item.Quantity, 0, ItemQuantityPolicy.MaxPetActivity);
+                equip[baseIndex + 2] = PetItemState.Growth(item.Enchant, item.Combine, item.Refine, item.Socket);
             }
             else
             {
@@ -273,8 +374,7 @@ public static class AvatarInfoFactory
         return equip;
     }
 
-    private static int[] BuildEquipArrayFromContainer(IReadOnlyDictionary<byte, ItemStack> equipmentContainer,
-        int petGrowth, byte petActivity)
+    private static int[] BuildEquipArrayFromContainer(IReadOnlyDictionary<byte, ItemStack> equipmentContainer)
     {
         var equip = new int[52];
 
@@ -288,8 +388,8 @@ public static class AvatarInfoFactory
 
             if (slot == PetSlots.EquipmentSlot)
             {
-                equip[baseIndex + 1] = petActivity;
-                equip[baseIndex + 2] = petGrowth;
+                equip[baseIndex + 1] = PetItemState.Activity(stack);
+                equip[baseIndex + 2] = PetItemState.Growth(stack);
             }
             else
             {
@@ -471,7 +571,9 @@ public sealed record AvatarSocialSnapshot(
     string Student,
     string GuildName,
     int GuildRoleWire,
-    string CallName = "")
+    string CallName = "",
+    IReadOnlyList<string>? PartyNames = null,
+    string PartyName = "")
 {
     public static readonly AvatarSocialSnapshot Empty =
         new(new Dictionary<byte, string>(), "", "", "", 0);
@@ -486,5 +588,19 @@ public sealed record AvatarSocialSnapshot(
                 friends[slot] = name;
 
         return friends;
+    }
+
+    public string[] BuildPartyArray()
+    {
+        var names = new string[5];
+        Array.Fill(names, "");
+
+        if (PartyNames is null)
+            return names;
+
+        for (var index = 0; index < PartyNames.Count && index < names.Length; index++)
+            names[index] = PartyNames[index];
+
+        return names;
     }
 }

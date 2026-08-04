@@ -78,8 +78,13 @@ public sealed class AoiGrid(float cellSize)
 
     public void Neighbors(List<int> buffer, (int X, int Z) cell)
     {
-        for (var dx = -1; dx <= 1; dx++)
-        for (var dz = -1; dz <= 1; dz++)
+        Neighbors(buffer, cell, 1);
+    }
+
+    public void Neighbors(List<int> buffer, (int X, int Z) cell, int scale)
+    {
+        for (var dx = -scale; dx <= scale; dx++)
+        for (var dz = -scale; dz <= scale; dz++)
             if (_cells.TryGetValue((cell.X + dx, cell.Z + dz), out var members))
                 foreach (var id in members)
                     buffer.Add(id);

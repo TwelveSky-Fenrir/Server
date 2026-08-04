@@ -7,7 +7,7 @@ public sealed class HoisundoCountdownSystem : ISimulationSystem
 {
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
-        if (ResolveBroadcastSort(zone.MapId) is not { } sort)
+        if (!zone.IsTimedChallengeMap || ResolveBroadcastSort(zone.MapId) is not { } sort)
             return;
 
         List<PlayerRuntimeState>? toDisconnect = null;

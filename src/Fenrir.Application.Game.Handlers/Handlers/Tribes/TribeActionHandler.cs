@@ -104,8 +104,9 @@ public sealed class TribeActionHandler(
                 return;
             default:
                 logger?.LogWarning(
-                    "Character {CharacterId} sent CZ_TRIBE_WORK_SEND with unrecognized sort {Sort} -- ignoring session {SessionId}",
+                    "Character {CharacterId} sent CZ_TRIBE_WORK_SEND with unrecognized sort {Sort} -- disconnecting with no response sent (session {SessionId})",
                     characterId, packet.Sort, session.SessionId);
+                session.Abort(DisconnectReason.Faulted);
                 return;
         }
     }
@@ -116,8 +117,9 @@ public sealed class TribeActionHandler(
         if (outcome.Aborted)
         {
             logger?.LogWarning(
-                "Character {CharacterId} tribe action sort {Sort} precondition/authorization gate failed (session {SessionId})",
+                "Character {CharacterId} tribe action sort {Sort} precondition/authorization gate failed; disconnecting with no response sent (session {SessionId})",
                 characterId, packet.Sort, session.SessionId);
+            session.Abort(DisconnectReason.Faulted);
             return;
         }
 

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.World.WorldState;
 
 namespace Fenrir.Application.Game.Domain.World.ZoneWar;
@@ -7,6 +8,16 @@ public enum DenOfRebirthChallengeState : byte
     Idle = 0,
     ChallengeStarted = 1,
     Ended = 2
+}
+
+public readonly record struct Zone38TribeEffectSnapshot(ImmutableArray<int> Values)
+{
+    public static Zone38TribeEffectSnapshot Empty { get; } = new(ImmutableArray<int>.Empty);
+
+    public int GetEffect(byte tribeId)
+    {
+        return tribeId < Values.Length ? Values[tribeId] : 0;
+    }
 }
 
 public sealed class ZoneCenterSiegeState
@@ -232,6 +243,14 @@ public sealed class ZoneCenterSiegeState
         lock (_lock)
         {
             _zone038DtmValue[tribeId] = value;
+        }
+    }
+
+    public Zone38TribeEffectSnapshot CaptureZone38TribeEffects()
+    {
+        lock (_lock)
+        {
+            return new Zone38TribeEffectSnapshot(ImmutableArray.CreateRange(_zone038DtmValue));
         }
     }
 

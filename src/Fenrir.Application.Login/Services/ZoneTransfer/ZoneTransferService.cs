@@ -30,7 +30,7 @@ public sealed class ZoneTransferService(
             logger.LogWarning(
                 "Zone transfer rejected: account {AccountId} slot {AvatarPost} holds no character", accountId,
                 avatarPost);
-            return new ZoneTransferResult(ZoneTransferOutcome.SlotEmpty, "", 0, 0);
+            return new ZoneTransferResult(ZoneTransferOutcome.SlotEmpty, "", 0, 0, "");
         }
 
         var character = await characters.GetForWorldEntryAsync(summary.CharacterId, cancellationToken);
@@ -39,7 +39,15 @@ public sealed class ZoneTransferService(
             logger.LogWarning(
                 "Zone transfer rejected: character {CharacterId} (account {AccountId} slot {AvatarPost}) vanished between reads",
                 summary.CharacterId, accountId, avatarPost);
-            return new ZoneTransferResult(ZoneTransferOutcome.CharacterNotFound, "", 0, 0);
+            return new ZoneTransferResult(ZoneTransferOutcome.CharacterNotFound, "", 0, 0, "");
+        }
+
+        if (character.Life <= 0)
+        {
+            logger.LogInformation(
+                "Zone transfer deferred: character {CharacterId} is dead and no validated resurrection has completed",
+                character.CharacterId);
+            return new ZoneTransferResult(ZoneTransferOutcome.DeathPending, "", 0, character.MapId, "");
         }
 
         await ClampVitalsFloorIfNeededAsync(character, cancellationToken);
@@ -54,7 +62,7 @@ public sealed class ZoneTransferService(
             logger.LogWarning(
                 "Zone transfer rejected: no shard available for character {CharacterId} (account {AccountId}, MapId {MapId})",
                 character.CharacterId, accountId, healedMapId);
-            return new ZoneTransferResult(ZoneTransferOutcome.ShardUnavailable, "", 0, healedMapId);
+            return new ZoneTransferResult(ZoneTransferOutcome.ShardUnavailable, "", 0, healedMapId, "");
         }
 
         var zonePort = options.Value.ZoneBasePort + healedMapId;
@@ -65,7 +73,8 @@ public sealed class ZoneTransferService(
                 "Zone transfer rejected: zone endpoint {Host}:{Port} (MapId {MapId}) failed a reachability probe for " +
                 "character {CharacterId} (account {AccountId}); that zone's listener is not accepting on shard {ShardId}",
                 shard.Host, zonePort, healedMapId, character.CharacterId, accountId, shard.ShardId);
-            return new ZoneTransferResult(ZoneTransferOutcome.ShardUnavailable, shard.Host, zonePort, healedMapId);
+            return new ZoneTransferResult(ZoneTransferOutcome.ShardUnavailable, shard.Host, zonePort, healedMapId,
+                "");
         }
 
         if (sourceAddress is null)
@@ -74,17 +83,19 @@ public sealed class ZoneTransferService(
                 "Zone transfer rejected: account {AccountId} character {CharacterId} has no source address on the " +
                 "requesting login socket; minting the handoff ticket would leave it consumable from any address",
                 accountId, character.CharacterId);
-            return new ZoneTransferResult(ZoneTransferOutcome.ShardUnavailable, shard.Host, zonePort, healedMapId);
+            return new ZoneTransferResult(ZoneTransferOutcome.ShardUnavailable, shard.Host, zonePort, healedMapId,
+                "");
         }
 
-        await tickets.CreateAsync(accountId, summary.CharacterId, shard.ShardId, options.Value.TicketTtlSeconds,
+        var ticket = await tickets.CreateAsync(accountId, summary.CharacterId, shard.ShardId, options.Value.TicketTtlSeconds,
             sessionToken, accountGrade, healedMapId, sourceAddress, cancellationToken);
 
         logger.LogInformation(
             "Zone transfer ticket minted: account {AccountId} character {CharacterId} -> zone {MapId} at {Host}:{Port} (shard {ShardId})",
             accountId, character.CharacterId, healedMapId, shard.Host, zonePort, shard.ShardId);
 
-        return new ZoneTransferResult(ZoneTransferOutcome.Success, shard.Host, zonePort, healedMapId);
+        return new ZoneTransferResult(ZoneTransferOutcome.Success, shard.Host, zonePort, healedMapId,
+            ticket.Capability);
     }
 
     private async ValueTask ClampVitalsFloorIfNeededAsync(CharacterWorldEntryDto character,

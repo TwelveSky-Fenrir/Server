@@ -38,4 +38,40 @@ public static class ProxyShopWireMapper
             BigMoney = shop?.BigMoney ?? 0
         };
     }
+
+    public static ProxyShopUserInfo BuildFromSlots(string avatarName, OfflineShopRowDto shop,
+        IReadOnlyList<OfflineShopItemSlotTvp> items)
+    {
+        var wireItems = new ProxyShopItem[MaxSlots];
+        var sockets = new int[MaxSlots * 3];
+
+        foreach (var item in items)
+        {
+            if (item.SlotIndex is < 0 or >= MaxSlots || item.ItemId is not { } itemId)
+                continue;
+
+            wireItems[item.SlotIndex] = new ProxyShopItem
+            {
+                Id = itemId,
+                Quantity = item.Quantity,
+                Value = item.Value,
+                Serial = item.SerialNumber,
+                Price = item.Price
+            };
+
+            var socketBase = item.SlotIndex * 3;
+            sockets[socketBase] = item.SocketGem1;
+            sockets[socketBase + 1] = item.SocketGem2;
+            sockets[socketBase + 2] = item.SocketGem3;
+        }
+
+        return new ProxyShopUserInfo
+        {
+            AvatarName = avatarName,
+            Items = wireItems,
+            Sockets = sockets,
+            Money = shop.Money,
+            BigMoney = shop.BigMoney
+        };
+    }
 }

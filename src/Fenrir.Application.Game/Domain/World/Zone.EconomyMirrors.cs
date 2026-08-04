@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Quests;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Social.Mentor;
 using Fenrir.Application.Game.Domain.Tribes;
@@ -46,65 +47,123 @@ public sealed partial class Zone
     private readonly Channel<GuildMembershipZoneCommand> _guildInbox =
         Channel.CreateBounded<GuildMembershipZoneCommand>(
             new BoundedChannelOptions(GuildInboxCapacity)
-                { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+                { SingleReader = true, FullMode = BoundedChannelFullMode.Wait });
 
     private readonly Channel<InventoryZoneCommand> _inventoryInbox = Channel.CreateBounded<InventoryZoneCommand>(
         new BoundedChannelOptions(InventoryInboxCapacity)
-            { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+            { SingleReader = true, FullMode = BoundedChannelFullMode.Wait });
 
     private readonly Channel<MentorZoneCommand> _mentorInbox =
         Channel.CreateBounded<MentorZoneCommand>(
             new BoundedChannelOptions(MentorInboxCapacity)
-                { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+                { SingleReader = true, FullMode = BoundedChannelFullMode.Wait });
 
     private readonly Channel<MissionZoneCommand> _missionInbox =
         Channel.CreateBounded<MissionZoneCommand>(
             new BoundedChannelOptions(MissionInboxCapacity)
-                { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+                { SingleReader = true, FullMode = BoundedChannelFullMode.Wait });
 
     private readonly Channel<QuestZoneCommand> _questInbox = Channel.CreateBounded<QuestZoneCommand>(
         new BoundedChannelOptions(QuestInboxCapacity)
-            { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+            { SingleReader = true, FullMode = BoundedChannelFullMode.Wait });
 
     private readonly Channel<SkillZoneCommand> _skillInbox = Channel.CreateBounded<SkillZoneCommand>(
         new BoundedChannelOptions(SkillInboxCapacity)
-            { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+            { SingleReader = true, FullMode = BoundedChannelFullMode.Wait });
 
     private readonly List<int> _statPotionFullActionNeighborScratch = [];
 
     private readonly Channel<TribeProgressZoneCommand> _tribeInbox =
         Channel.CreateBounded<TribeProgressZoneCommand>(
             new BoundedChannelOptions(TribeInboxCapacity)
-                { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+                { SingleReader = true, FullMode = BoundedChannelFullMode.Wait });
 
     public bool PostInventoryCommand(in InventoryZoneCommand command)
     {
-        return _inventoryInbox.Writer.TryWrite(command);
+        if (_inventoryInbox.Writer.TryWrite(command))
+            return true;
+
+        command.Applied?.TrySetResult(ZoneCommandResult.Backpressured("Inventory inbox is full."));
+        return false;
+    }
+
+    public async Task<ZoneCommandResult> PostInventoryCommandAndWaitForResultAsync(InventoryZoneCommand command,
+        CancellationToken ct,
+        TimeSpan? timeout = null)
+    {
+        var applied = new TaskCompletionSource<ZoneCommandResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var withSignal = command with { Applied = applied };
+
+        if (!PostInventoryCommand(in withSignal))
+            return ZoneCommandResult.Backpressured("Inventory inbox is full.");
+
+        try
+        {
+            return await applied.Task.WaitAsync(timeout ?? TimeSpan.FromSeconds(2), ct).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            return ZoneCommandResult.Cancelled("Inventory command timed out.");
+        }
+        catch (OperationCanceledException)
+        {
+            return ZoneCommandResult.Cancelled("Inventory command wait was cancelled.");
+        }
     }
 
     public async Task<bool> PostInventoryCommandAndWaitAsync(InventoryZoneCommand command, CancellationToken ct,
         TimeSpan? timeout = null)
     {
-        var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var withSignal = command with { Applied = applied };
+        return (await PostInventoryCommandAndWaitForResultAsync(command, ct, timeout).ConfigureAwait(false)).Kind ==
+               ZoneCommandResultKind.Applied;
+    }
 
-        if (!PostInventoryCommand(in withSignal))
-            return false;
+    public async Task<ZoneCommandResult> PostInventoryAndGroundItemCommandAndWaitForResultAsync(
+        InventoryZoneCommand command, CancellationToken ct, TimeSpan? timeout = null)
+    {
+        if (command.GroundItemSpawn is null)
+            throw new ArgumentException("A ground-item spawn plan is required.", nameof(command));
 
-        try
-        {
-            await applied.Task.WaitAsync(timeout ?? TimeSpan.FromSeconds(2), ct).ConfigureAwait(false);
-        }
-        catch (TimeoutException)
-        {
-        }
+        return await PostInventoryCommandAndWaitForResultAsync(command, ct, timeout).ConfigureAwait(false);
+    }
 
-        return true;
+    public async Task<bool> PostInventoryAndGroundItemCommandAndWaitAsync(InventoryZoneCommand command,
+        CancellationToken ct, TimeSpan? timeout = null)
+    {
+        return (await PostInventoryAndGroundItemCommandAndWaitForResultAsync(command, ct, timeout)
+                .ConfigureAwait(false)).Kind == ZoneCommandResultKind.Applied;
     }
 
     public bool PostSkillCommand(in SkillZoneCommand command)
     {
-        return _skillInbox.Writer.TryWrite(command);
+        if (_skillInbox.Writer.TryWrite(command))
+            return true;
+
+        command.Applied?.TrySetResult(ZoneCommandResult.Backpressured("Skill inbox is full."));
+        return false;
+    }
+
+    public async Task<ZoneCommandResult> PostSkillCommandAndWaitForResultAsync(SkillZoneCommand command,
+        CancellationToken ct, TimeSpan? timeout = null)
+    {
+        var applied = new TaskCompletionSource<ZoneCommandResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var withSignal = command with { Applied = applied };
+
+        if (!PostSkillCommand(in withSignal))
+            return ZoneCommandResult.Backpressured("Skill inbox is full.");
+
+        try
+        {
+            return await applied.Task.WaitAsync(timeout ?? TimeSpan.FromSeconds(2), ct).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            return ZoneCommandResult.Cancelled("Skill command timed out.");
+        }
+        catch (OperationCanceledException)
+        {
+            return ZoneCommandResult.Cancelled("Skill command wait was cancelled.");
+        }
     }
 
     public bool PostMentorCommand(in MentorZoneCommand command)
@@ -132,6 +191,7 @@ public sealed partial class Zone
         }
         catch (TimeoutException)
         {
+            return false;
         }
 
         return true;
@@ -139,27 +199,41 @@ public sealed partial class Zone
 
     public bool PostTribeProgressCommand(in TribeProgressZoneCommand command)
     {
-        return _tribeInbox.Writer.TryWrite(command);
+        if (_tribeInbox.Writer.TryWrite(command))
+            return true;
+
+        command.Applied?.TrySetResult(ZoneCommandResult.Backpressured("Tribe-progress inbox is full."));
+        return false;
     }
 
     public async Task<bool> PostTribeProgressCommandAndWaitAsync(TribeProgressZoneCommand command,
         CancellationToken ct, TimeSpan? timeout = null)
     {
-        var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        return (await PostTribeProgressCommandAndWaitForResultAsync(command, ct, timeout).ConfigureAwait(false)).Kind
+               == ZoneCommandResultKind.Applied;
+    }
+
+    public async Task<ZoneCommandResult> PostTribeProgressCommandAndWaitForResultAsync(
+        TribeProgressZoneCommand command, CancellationToken ct, TimeSpan? timeout = null)
+    {
+        var applied = new TaskCompletionSource<ZoneCommandResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         var withSignal = command with { Applied = applied };
 
         if (!PostTribeProgressCommand(in withSignal))
-            return false;
+            return ZoneCommandResult.Backpressured("Tribe-progress inbox is full.");
 
         try
         {
-            await applied.Task.WaitAsync(timeout ?? TimeSpan.FromSeconds(2), ct).ConfigureAwait(false);
+            return await applied.Task.WaitAsync(timeout ?? TimeSpan.FromSeconds(2), ct).ConfigureAwait(false);
         }
         catch (TimeoutException)
         {
+            return ZoneCommandResult.Cancelled("Tribe-progress command timed out.");
         }
-
-        return true;
+        catch (OperationCanceledException)
+        {
+            return ZoneCommandResult.Cancelled("Tribe-progress command wait was cancelled.");
+        }
     }
 
     private bool PostQuestCommand(in QuestZoneCommand command)
@@ -182,6 +256,7 @@ public sealed partial class Zone
         }
         catch (TimeoutException)
         {
+            return false;
         }
 
         return true;
@@ -207,33 +282,41 @@ public sealed partial class Zone
         }
         catch (TimeoutException)
         {
+            return false;
         }
 
         return true;
     }
 
-    private void DrainInventoryCommands()
+    private void DrainInventoryCommands(int maximum)
     {
-        while (_inventoryInbox.Reader.TryRead(out var command))
+        for (var processed = 0; processed < maximum && _inventoryInbox.Reader.TryRead(out var command); processed++)
             try
             {
-                ApplyInventoryCommand(in command);
-                command.Applied?.TrySetResult();
+                var result = ApplyInventoryCommand(in command)
+                    ? ZoneCommandResult.Applied()
+                    : ZoneCommandResult.Rejected("Inventory command could not be applied.");
+                command.Applied?.TrySetResult(result);
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Zone {MapId} inventory command for character {CharacterId} failed", MapId,
                     command.CharacterId);
-                command.Applied?.TrySetException(ex);
+                command.Applied?.TrySetResult(ZoneCommandResult.Faulted(ex.Message));
             }
     }
 
-    private void ApplyInventoryCommand(in InventoryZoneCommand command)
+    private bool ApplyInventoryCommand(in InventoryZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
-            return;
+            return false;
 
-        var weaponBefore = state.Inventory.GetSlot(ContainerMatrix.Equipment, EquipmentSlots.WeaponSlot);
+        var equippedPetBefore = state.Inventory.GetSlot(ContainerMatrix.Equipment, PetSlots.EquipmentSlot);
+        var equipmentUpdated = false;
+
+        if (command.GroundItemSpawn is { } groundItemSpawn &&
+            !SpawnGroundItem(in groundItemSpawn, state.DungeonInstanceId))
+            return false;
 
         foreach (var snapshot in command.Containers)
         {
@@ -241,18 +324,58 @@ public sealed partial class Zone
 
             if (snapshot.Container == ContainerMatrix.Equipment)
             {
-                var newPetItemId = snapshot.Slots.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
+                equipmentUpdated = true;
+                state.LastSeenPetItemId = snapshot.Slots.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
                     ? petStack.ItemId
                     : 0;
-                if (newPetItemId != state.LastSeenPetItemId)
-                {
-                    state.LastSeenPetItemId = newPetItemId;
-                    state.PetGrowth = 0;
-                    state.PetActivity = 0;
-                    state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
-                }
             }
         }
+
+        if (!command.SkillChanges.IsDefaultOrEmpty)
+        {
+            foreach (var change in command.SkillChanges)
+                state.LearnedSkills = change.Skill.SkillId == 0
+                    ? state.LearnedSkills.Remove(change.Slot)
+                    : state.LearnedSkills.SetItem(change.Slot, change.Skill);
+        }
+
+        if (command.SkillPoints is { } skillPoints)
+            state.SkillPoints = skillPoints;
+
+        if (!command.SkillChanges.IsDefaultOrEmpty || command.SkillPoints is not null)
+            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+
+        var petStateChanged = false;
+        if (command.PetGrowth is { } petGrowth)
+        {
+            state.PetGrowth = petGrowth;
+            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+            petStateChanged = true;
+        }
+
+        if (command.PetActivity is { } petActivity)
+        {
+            state.PetActivity = petActivity;
+            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+            petStateChanged = true;
+        }
+
+        if (!petStateChanged && equipmentUpdated)
+        {
+            var equippedPetAfter = state.Inventory.GetSlot(ContainerMatrix.Equipment, PetSlots.EquipmentSlot);
+            if (equippedPetAfter != equippedPetBefore)
+            {
+                state.PetGrowth = equippedPetAfter is { } nextPet ? PetItemState.Growth(nextPet) : 0;
+                state.PetActivity = equippedPetAfter is { } nextPetActivity
+                    ? PetItemState.Activity(nextPetActivity)
+                    : (byte)0;
+                state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+                petStateChanged = true;
+            }
+        }
+
+        if (petStateChanged)
+            PetItemState.SynchronizeEquippedState(state.Inventory, state.PetGrowth, state.PetActivity);
 
         if (command.UpdatedStats is { } stats)
         {
@@ -292,12 +415,13 @@ public sealed partial class Zone
         if (vaultDateChanged)
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
 
-        if (command.RecomputeCombatPoseAfterEquip &&
-            state.Inventory.GetSlot(ContainerMatrix.Equipment, EquipmentSlots.WeaponSlot) != weaponBefore)
+        if (command.ClearEffectsAfterWeaponUnequip)
             ClearEffectsOnWeaponSlotWrite(state);
 
         if (command.RecomputeCombatPoseAfterEquip)
             BroadcastIdleActionState(state);
+
+        return true;
     }
 
     private void ClearEffectsOnWeaponSlotWrite(PlayerRuntimeState state)
@@ -313,35 +437,39 @@ public sealed partial class Zone
         Array.Clear(autoHuntConfig.AttackType);
     }
 
-    private void DrainSkillCommands()
+    private void DrainSkillCommands(int maximum)
     {
-        while (_skillInbox.Reader.TryRead(out var command))
+        for (var processed = 0; processed < maximum && _skillInbox.Reader.TryRead(out var command); processed++)
             try
             {
-                ApplySkillCommand(in command);
+                command.Applied?.TrySetResult(ApplySkillCommand(in command)
+                    ? ZoneCommandResult.Applied()
+                    : ZoneCommandResult.Rejected("Skill command could not be applied."));
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Zone {MapId} skill command for character {CharacterId} failed", MapId,
                     command.CharacterId);
+                command.Applied?.TrySetResult(ZoneCommandResult.Faulted(ex.Message));
             }
     }
 
-    private void ApplySkillCommand(in SkillZoneCommand command)
+    private bool ApplySkillCommand(in SkillZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
-            return;
+            return false;
 
         state.LearnedSkills = command.Skill.SkillId == 0
             ? state.LearnedSkills.Remove(command.Slot)
             : state.LearnedSkills.SetItem(command.Slot, command.Skill);
         state.SkillPoints = command.NewSkillPoints;
         state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+        return true;
     }
 
-    private void DrainMentorCommands()
+    private void DrainMentorCommands(int maximum)
     {
-        while (_mentorInbox.Reader.TryRead(out var command))
+        for (var processed = 0; processed < maximum && _mentorInbox.Reader.TryRead(out var command); processed++)
             try
             {
                 ApplyMentorCommand(in command);
@@ -361,9 +489,9 @@ public sealed partial class Zone
         state.TeacherCharacterId = command.TeacherCharacterId;
     }
 
-    private void DrainGuildCommands()
+    private void DrainGuildCommands(int maximum)
     {
-        while (_guildInbox.Reader.TryRead(out var command))
+        for (var processed = 0; processed < maximum && _guildInbox.Reader.TryRead(out var command); processed++)
             try
             {
                 ApplyGuildMembershipCommand(in command);
@@ -388,26 +516,28 @@ public sealed partial class Zone
         state.GuildCallName = command.GuildCallName;
     }
 
-    private void DrainTribeProgressCommands()
+    private void DrainTribeProgressCommands(int maximum)
     {
-        while (_tribeInbox.Reader.TryRead(out var command))
+        for (var processed = 0; processed < maximum && _tribeInbox.Reader.TryRead(out var command); processed++)
             try
             {
-                ApplyTribeProgressCommand(in command);
-                command.Applied?.TrySetResult();
+                var result = ApplyTribeProgressCommand(in command)
+                    ? ZoneCommandResult.Applied()
+                    : ZoneCommandResult.Rejected("Tribe-progress command could not be applied.");
+                command.Applied?.TrySetResult(result);
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Zone {MapId} tribe progress command for character {CharacterId} failed", MapId,
                     command.CharacterId);
-                command.Applied?.TrySetException(ex);
+                command.Applied?.TrySetResult(ZoneCommandResult.Faulted(ex.Message));
             }
     }
 
-    private void ApplyTribeProgressCommand(in TribeProgressZoneCommand command)
+    private bool ApplyTribeProgressCommand(in TribeProgressZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
-            return;
+            return false;
 
         var changed = false;
 
@@ -792,6 +922,9 @@ public sealed partial class Zone
         if (command.BigMoneyDelta is { } bigMoneyDelta)
             state.BigMoney += bigMoneyDelta;
 
+        if (command.Money is { } money)
+            state.Money = money;
+
         if (command.SkillPoints is { } skillPoints)
         {
             state.SkillPoints = skillPoints;
@@ -930,8 +1063,9 @@ public sealed partial class Zone
                 SpawnGroundItem(drop.ItemId, drop.Quantity, state.PosX, state.PosY, state.PosZ, state.Name, "",
                     drop.DropSort);
 
-        if (command.GmSummonMonsterTemplateId is { } gmSummonMonsterTemplateId)
-            SpawnGmSummonedMonster(gmSummonMonsterTemplateId, state);
+        if (command.GmSummonMonsterTemplateId is { } gmSummonMonsterTemplateId &&
+            !SpawnGmSummonedMonster(gmSummonMonsterTemplateId, state))
+            return false;
 
         if (command.GmForceKillMonsterServerIndex is { } gmForceKillMonsterServerIndex &&
             TryGetMonster(gmForceKillMonsterServerIndex, out var gmForceKillMonster) &&
@@ -953,11 +1087,12 @@ public sealed partial class Zone
                 state.PosX, state.PosY, state.PosZ);
             BroadcastAvatarAction(_statPotionFullActionNeighborScratch, state);
         }
+        return true;
     }
 
-    private void DrainQuestCommands()
+    private void DrainQuestCommands(int maximum)
     {
-        while (_questInbox.Reader.TryRead(out var command))
+        for (var processed = 0; processed < maximum && _questInbox.Reader.TryRead(out var command); processed++)
             try
             {
                 ApplyQuestCommand(in command);
@@ -985,6 +1120,9 @@ public sealed partial class Zone
         foreach (var snapshot in command.Containers)
             state.Inventory.ReplaceContainer(snapshot.Container, snapshot.Slots);
 
+        if (command.MoneyDelta != 0)
+            state.Money += command.MoneyDelta;
+
         if (command.ExperienceDelta > 0)
             ApplyCharacterExperienceGain(state, command.ExperienceDelta);
 
@@ -996,9 +1134,9 @@ public sealed partial class Zone
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
     }
 
-    private void DrainMissionCommands()
+    private void DrainMissionCommands(int maximum)
     {
-        while (_missionInbox.Reader.TryRead(out var command))
+        for (var processed = 0; processed < maximum && _missionInbox.Reader.TryRead(out var command); processed++)
             try
             {
                 ApplyMissionCommand(in command);

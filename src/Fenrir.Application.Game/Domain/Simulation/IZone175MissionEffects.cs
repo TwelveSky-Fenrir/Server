@@ -6,15 +6,17 @@ public interface IZone175MissionEffects
 
     public int CountLivingWaveBosses(int stage);
 
-    public void SummonWaveBoss(int stage);
+    public bool TryLoadWaveStage(int stage);
 
-    public void SummonTrickle(int stage);
+    public void MaintainWaveStage();
 
     public void RemoveMissionMonsters();
 
     public void RewardQualifyingPlayers(int stage);
 
     public void ForceDisconnectAll();
+
+    public void PublishStateChange(int eventCode, int value = 0);
 
     public void Notify(Zone175MissionEvent missionEvent, int wave, int remaining);
 }
@@ -33,11 +35,12 @@ public sealed class NullZone175MissionEffects : IZone175MissionEffects
         return 0;
     }
 
-    public void SummonWaveBoss(int stage)
+    public bool TryLoadWaveStage(int stage)
     {
+        return false;
     }
 
-    public void SummonTrickle(int stage)
+    public void MaintainWaveStage()
     {
     }
 
@@ -50,6 +53,10 @@ public sealed class NullZone175MissionEffects : IZone175MissionEffects
     }
 
     public void ForceDisconnectAll()
+    {
+    }
+
+    public void PublishStateChange(int eventCode, int value = 0)
     {
     }
 

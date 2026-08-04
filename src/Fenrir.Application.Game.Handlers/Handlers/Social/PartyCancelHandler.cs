@@ -21,7 +21,7 @@ public sealed class PartyCancelHandler(
         var inviterId = zoneSession.CharacterId!.Value;
 
         var result = partyCancelService.Cancel(inviterId);
-        if (!result.Handled)
+        if (!result.Handled || result.IsCrossShard)
             return;
 
         if (zones.TryGetPlayer(result.InviteeId, out var invitee))

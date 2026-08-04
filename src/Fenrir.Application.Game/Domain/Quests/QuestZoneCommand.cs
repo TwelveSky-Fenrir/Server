@@ -10,4 +10,5 @@ public readonly record struct QuestZoneCommand(
     int KillOtherTribeCountDelta,
     ImmutableArray<InventoryContainerSnapshot> Containers,
     TaskCompletionSource? Applied = null,
-    int TeacherPointDelta = 0);
+    int TeacherPointDelta = 0,
+    long MoneyDelta = 0);

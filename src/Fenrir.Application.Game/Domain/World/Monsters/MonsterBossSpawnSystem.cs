@@ -77,9 +77,7 @@ public sealed class MonsterBossSpawnSystem(
                 return;
 
             var entity = MonsterEntity.Create(serverIndex, zone.NextMonsterUniqueNumber(), template, serverIndex,
-                candidate.X, candidate.Y, candidate.Z);
-
-            entity.Heading = random.Next(360);
+                candidate.X, candidate.Y, candidate.Z, random: new RandomSourceAdapter(random));
 
             zone.SpawnMonster(entity);
         }

@@ -270,11 +270,10 @@ public static class WorldDataCacheBuilder
 
     private static void ValidateItems(IReadOnlyList<ItemRowDto> items)
     {
+        ValidateCatalogIdentifiers(items, static item => item.ItemId, "world.Items");
+
         foreach (var item in items.OrderBy(static item => item.ItemId))
         {
-            if (item.ItemId == 0)
-                continue;
-
             if (item.Level is < MinItemLevel or > MaxLevelIndex)
                 throw new InvalidOperationException(
                     $"world.Items row ItemId={item.ItemId} has Level={item.Level} outside the legacy " +
@@ -378,6 +377,8 @@ public static class WorldDataCacheBuilder
         IReadOnlyList<MonsterDropExtraItemRowDto> dropExtraItems,
         IReadOnlyList<MonsterDropQuestItemRowDto> dropQuestItems)
     {
+        ValidateCatalogIdentifiers(monsters, static monster => monster.MonsterId, "world.Monsters");
+
         foreach (var monster in monsters.OrderBy(static monster => monster.MonsterId))
         {
             if (monster.Name.Length > MaxMonsterNameLength)
@@ -604,16 +605,10 @@ public static class WorldDataCacheBuilder
         IReadOnlyList<SkillDescriptionRowDto> descriptions,
         IReadOnlyList<SkillGradeRowDto> grades)
     {
+        ValidateCatalogIdentifiers(skills, static skill => skill.SkillId, "world.Skills", MaxSkillIndex);
+
         foreach (var skill in skills.OrderBy(static skill => skill.SkillId))
         {
-            if (skill.SkillId == 0)
-                continue;
-
-            if (skill.SkillId is < MinReferenceIndex or > MaxSkillIndex)
-                throw new InvalidOperationException(
-                    $"world.Skills row SkillId={skill.SkillId} is outside the legacy {MinReferenceIndex}-" +
-                    $"{MaxSkillIndex} index cap (the fixed skill-table capacity).");
-
             if (skill.Name.Length > MaxSkillNameLength)
                 throw new InvalidOperationException(
                     $"world.Skills row SkillId={skill.SkillId} has a Name longer than {MaxSkillNameLength} " +
@@ -803,6 +798,8 @@ public static class WorldDataCacheBuilder
         IReadOnlyList<ItemRowDto> items,
         IReadOnlyList<ItemBonusSkillRowDto> bonusSkills)
     {
+        ValidateCatalogIdentifiers(items, static item => item.ItemId, "world.Items");
+
         var bonusSkillsByItem = GroupToLists(bonusSkills, static row => row.ItemId);
         var result = new Dictionary<int, ItemDefinition>(items.Count);
 
@@ -816,6 +813,8 @@ public static class WorldDataCacheBuilder
         FrozenDictionary<MartialItemBucketKey, ImmutableArray<ItemRowDto>> MartialItemSearchBuckets)
         BuildItemSearchBuckets(IReadOnlyList<ItemRowDto> items)
     {
+        ValidateCatalogIdentifiers(items, static item => item.ItemId, "world.Items");
+
         var buckets = new Dictionary<ItemBucketKey, List<ItemRowDto>>();
         var martialBuckets = new Dictionary<MartialItemBucketKey, List<ItemRowDto>>();
 
@@ -839,6 +838,8 @@ public static class WorldDataCacheBuilder
         IReadOnlyList<SkillDescriptionRowDto> descriptions,
         IReadOnlyList<SkillGradeRowDto> grades)
     {
+        ValidateCatalogIdentifiers(skills, static skill => skill.SkillId, "world.Skills", MaxSkillIndex);
+
         var descriptionsBySkill = GroupToLists(descriptions, static row => row.SkillId);
         var gradesBySkill = GroupToLists(grades, static row => row.SkillId);
         var result = new Dictionary<int, SkillDefinition>(skills.Count);
@@ -860,6 +861,8 @@ public static class WorldDataCacheBuilder
         IReadOnlyList<MonsterDropCategoryRateRowDto> dropCategoryRates,
         IReadOnlyList<MonsterDropQuestItemRowDto> dropQuestItems)
     {
+        ValidateCatalogIdentifiers(monsters, static monster => monster.MonsterId, "world.Monsters");
+
         var moneyByMonster = new Dictionary<int, MonsterDropMoneyRowDto>(dropMoney.Count);
         foreach (var row in dropMoney)
             moneyByMonster.Add(row.MonsterId, row);
@@ -968,6 +971,7 @@ public static class WorldDataCacheBuilder
         var spawnRegionsWithoutZone = 0;
         var spawnRegionsWithoutMonster = 0;
         var fieldSpawnRegionsByZone = new Dictionary<short, List<MonsterSpawnRegionRowDto>>();
+        var zone175MissionSpawnRegionsByZone = new Dictionary<short, List<MonsterSpawnRegionRowDto>>();
         var bossSpawnRegionsByZone = new Dictionary<short, List<MonsterSpawnRegionRowDto>>();
         foreach (var region in spawnRegions)
         {
@@ -985,21 +989,24 @@ public static class WorldDataCacheBuilder
 
             var targetGroup = IsBossMonsterSpawnRegionFile(region.SourceFileName)
                 ? bossSpawnRegionsByZone
-                : fieldSpawnRegionsByZone;
+                : IsZone175MissionSpawnRegionFile(region.SourceFileName)
+                    ? zone175MissionSpawnRegionsByZone
+                    : fieldSpawnRegionsByZone;
             AddToGroup(targetGroup, zoneNumber, region);
         }
 
         var result = new Dictionary<short, ZoneDefinition>(zones.Count);
         foreach (var zone in zones)
         {
-            var canonicalSpawnZoneId = ZoneCanonicalSpawnRegionMap.ResolveCanonicalSpawnZoneId(zone.ZoneNumber);
+            var spawnRegionZone = ZoneCanonicalSpawnRegionMap.Resolve(zone.ZoneNumber);
             result.Add(zone.ZoneNumber, new ZoneDefinition(
                 zone,
                 TakeGroup(portalsByZone, zone.ZoneNumber),
                 TakeGroup(spawnPointsByZone, zone.ZoneNumber),
                 TakeGroup(npcSpawnsByZone, zone.ZoneNumber),
-                TakeGroup(fieldSpawnRegionsByZone, canonicalSpawnZoneId),
-                TakeGroup(bossSpawnRegionsByZone, canonicalSpawnZoneId)));
+                TakeNormalSpawnRegionGroup(fieldSpawnRegionsByZone, spawnRegionZone),
+                TakeGroup(zone175MissionSpawnRegionsByZone, spawnRegionZone.CanonicalZoneId),
+                TakeNonFixSpawnRegionGroup(bossSpawnRegionsByZone, spawnRegionZone.CanonicalZoneId)));
         }
 
         var stats = new WorldDataFilterStats(
@@ -1029,12 +1036,72 @@ public static class WorldDataCacheBuilder
         return sourceFileName.Contains("SUMMONBOSSMONSTER", StringComparison.OrdinalIgnoreCase);
     }
 
+    private static bool IsZone175MissionSpawnRegionFile(string sourceFileName)
+    {
+        return Zone175MissionSpawnRegionFile.TryGetStage(sourceFileName, out _);
+    }
+
+    private static ImmutableArray<MonsterSpawnRegionRowDto> TakeNormalSpawnRegionGroup(
+        Dictionary<short, List<MonsterSpawnRegionRowDto>> groups,
+        SpawnRegionCanonicalZone zone)
+    {
+        return TakeSpawnRegionGroup(groups, zone.CanonicalZoneId,
+            region => HasFixSuffix(region.SourceFileName) == zone.UsesFixSuffix);
+    }
+
+    private static ImmutableArray<MonsterSpawnRegionRowDto> TakeNonFixSpawnRegionGroup(
+        Dictionary<short, List<MonsterSpawnRegionRowDto>> groups,
+        short canonicalZoneId)
+    {
+        return TakeSpawnRegionGroup(groups, canonicalZoneId,
+            static region => !HasFixSuffix(region.SourceFileName));
+    }
+
+    private static ImmutableArray<MonsterSpawnRegionRowDto> TakeSpawnRegionGroup(
+        Dictionary<short, List<MonsterSpawnRegionRowDto>> groups,
+        short zoneId,
+        Func<MonsterSpawnRegionRowDto, bool> predicate)
+    {
+        return groups.TryGetValue(zoneId, out var list)
+            ? list.Where(predicate).ToImmutableArray()
+            : ImmutableArray<MonsterSpawnRegionRowDto>.Empty;
+    }
+
+    private static bool HasFixSuffix(string sourceFileName)
+    {
+        return sourceFileName.Contains("_FIX", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static void EnsureCriticalDatasetNotEmpty(int rowCount, string datasetName)
     {
         if (rowCount == 0)
             throw new InvalidOperationException(
                 $"Critical world dataset '{datasetName}' is empty -- the database is not seeded, and the " +
                 "GameServer must not accept a single connection without its reference data (ADR-0011).");
+    }
+
+    private static void ValidateCatalogIdentifiers<TRow>(
+        IReadOnlyList<TRow> rows,
+        Func<TRow, int> identifierSelector,
+        string catalogName,
+        int? maximumIdentifier = null)
+    {
+        var identifiers = new HashSet<int>();
+        foreach (var row in rows)
+        {
+            var identifier = identifierSelector(row);
+            if (identifier < MinReferenceIndex)
+                throw new InvalidOperationException(
+                    $"{catalogName} catalog validation failed: identifiers must be positive.");
+
+            if (maximumIdentifier is { } maximum && identifier > maximum)
+                throw new InvalidOperationException(
+                    $"{catalogName} catalog validation failed: an identifier is outside the supported range.");
+
+            if (!identifiers.Add(identifier))
+                throw new InvalidOperationException(
+                    $"{catalogName} catalog validation failed: identifiers must be unique.");
+        }
     }
 
     private static Dictionary<TKey, List<TRow>> GroupToLists<TKey, TRow>(

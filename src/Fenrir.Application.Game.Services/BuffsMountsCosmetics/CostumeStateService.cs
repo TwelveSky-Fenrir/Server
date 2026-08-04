@@ -112,7 +112,7 @@ public sealed class CostumeStateService(
             characterId, result.GrantedItemId, destination.Container, destination.Slot);
 
         return new CostumeStateResult(CostumeStateOutcome.Reply, 0, destination.Container,
-            destination.Slot, destination.GridIndex, result.GrantedItemId);
+            destination.Slot, destination.GridIndex, result.GrantedItemId, result.GrantedCostumeValue);
     }
 
     private static List<CharacterItemSlotTvp> ToTvps(ImmutableDictionary<byte, ItemStack> container)

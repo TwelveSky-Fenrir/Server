@@ -36,6 +36,11 @@ public static class InventoryToWorldDropPolicy
 
     public const float MonsterMoneyGroundReductionRatio = 0.15f;
 
+    public static bool IsPremiumPageAccessAllowed(long premiumExpireUnixSeconds, long nowUnixSeconds)
+    {
+        return premiumExpireUnixSeconds >= nowUnixSeconds;
+    }
+
     public static Result Resolve(
         int sourcePage,
         int sourceSlot,
@@ -65,16 +70,14 @@ public static class InventoryToWorldDropPolicy
         if (!sourceIsDroppableByPlayer)
             return Fail(Outcome.NonDroppableItem);
 
-        var isStackable = ContainerMatrix.IsStackableSort(itemDefinition.Item.Sort);
+        var itemSort = itemDefinition.Item.Sort;
+        var isStackable = ContainerMatrix.IsStackableSort(itemSort);
 
-        if (isStackable)
-        {
-            if (requestedQuantity < 0 || requestedQuantity > GroundItemPickupPolicy.MaxStackQuantity)
-                return Fail(Outcome.QuantityOutOfRange);
+        if (!TryResolveDropQuantity(itemSort, src.Quantity, requestedQuantity, out var groundQuantity))
+            return Fail(Outcome.QuantityOutOfRange);
 
-            if (requestedQuantity > src.Quantity)
-                return Fail(Outcome.InsufficientQuantity);
-        }
+        if (isStackable && groundQuantity > src.Quantity)
+            return Fail(Outcome.InsufficientQuantity);
 
         var eligibility = evaluateSpawnEligibility(itemDefinition);
         if (eligibility == GroundItemSpawnEligibility.UnsupportedItemType)
@@ -85,22 +88,22 @@ public static class InventoryToWorldDropPolicy
         if (currentGroundItemCount >= GroundItemCapacity)
             return Fail(Outcome.GroundItemTableFull);
 
-        var owner = string.IsNullOrEmpty(dropperPartyName) ? dropperName : dropperPartyName;
+        var master = string.IsNullOrEmpty(dropperPartyName) ? dropperName : dropperPartyName;
 
         if (isStackable)
         {
-            var groundQuantity = requestedQuantity == 0 ? 1 : requestedQuantity;
             var spawn = new GroundItemSpawnPlan(itemDefinition.Item.ItemId, groundQuantity, 0, 0, 0, 0, 0,
-                dropperPosX, dropperPosY, dropperPosZ, owner, GroundItemEntity.ManualGroundDropSort);
+                dropperPosX, dropperPosY, dropperPosZ, master, "",
+                GroundItemEntity.ManualGroundDropSort);
 
-            var remaining = src.Quantity - requestedQuantity;
+            var remaining = src.Quantity - groundQuantity;
             var newSource = remaining > 0 ? src with { Quantity = remaining } : (ItemStack?)null;
             return new Result(Outcome.Success, newSource, spawn);
         }
 
         var value = ItemValueCodec.Encode(src.Enchant, src.Combine, src.Refine, src.Socket);
-        var uniqueSpawn = new GroundItemSpawnPlan(itemDefinition.Item.ItemId, src.Quantity, value, src.Serial,
-            src.SocketGem1, src.SocketGem2, src.SocketGem3, dropperPosX, dropperPosY, dropperPosZ, owner,
+        var uniqueSpawn = new GroundItemSpawnPlan(itemDefinition.Item.ItemId, groundQuantity, value, src.Serial,
+            src.SocketGem1, src.SocketGem2, src.SocketGem3, dropperPosX, dropperPosY, dropperPosZ, master, "",
             GroundItemEntity.ManualGroundDropSort);
 
         return new Result(Outcome.Success, null, uniqueSpawn);
@@ -109,6 +112,44 @@ public static class InventoryToWorldDropPolicy
     private static Result Fail(Outcome outcome)
     {
         return new Result(outcome, null, null);
+    }
+
+    private static bool TryResolveDropQuantity(byte itemSort, int sourceQuantity, int requestedQuantity,
+        out int groundQuantity)
+    {
+        groundQuantity = 0;
+
+        if (requestedQuantity <= 0)
+            return false;
+
+        if (ContainerMatrix.IsStackableSort(itemSort))
+        {
+            if (sourceQuantity is < ItemQuantityPolicy.MinStackQuantity or > ItemQuantityPolicy.MaxStackQuantity ||
+                requestedQuantity > ItemQuantityPolicy.MaxStackQuantity)
+                return false;
+
+            groundQuantity = requestedQuantity;
+            return true;
+        }
+
+        if (requestedQuantity != 1)
+            return false;
+
+        switch (itemSort)
+        {
+            case ItemQuantityPolicy.PetSort when sourceQuantity is >= ItemQuantityPolicy.MinStackQuantity and <=
+                ItemQuantityPolicy.MaxPetActivity:
+                groundQuantity = sourceQuantity;
+                return true;
+
+            case not ItemQuantityPolicy.PetSort when ItemQuantityPolicy.CarriesNoQuantity(itemSort) &&
+                sourceQuantity is 0 or 1:
+                groundQuantity = 1;
+                return true;
+
+            default:
+                return false;
+        }
     }
 
     public static GroundDropReshape ReshapeGroundDrop(byte itemSort, int dropSort, int incomingQuantity,
@@ -121,41 +162,33 @@ public static class InventoryToWorldDropPolicy
 
             case 2 or 99:
             {
-                var quantity = incomingQuantity;
-                if (dropSort == GroundItemEntity.GmCreateItemDropSort && quantity == 0)
-                    quantity = GroundItemPickupPolicy.MaxStackQuantity;
-                else if (quantity == 0)
-                    quantity = 1;
-
-                if (quantity < 1 || quantity > GroundItemPickupPolicy.MaxStackQuantity)
+                if (incomingQuantity < ItemQuantityPolicy.MinStackQuantity ||
+                    incomingQuantity > GroundItemPickupPolicy.MaxStackQuantity)
                     return GroundDropReshape.Reject(GroundDropReshapeOutcome.RejectedQuantityRange);
 
-                return new GroundDropReshape(GroundDropReshapeOutcome.Reshaped, quantity, 0, 0);
+                return new GroundDropReshape(GroundDropReshapeOutcome.Reshaped, incomingQuantity, 0, 0);
             }
 
             case 3 or 4 or 5 or 6:
-                return new GroundDropReshape(GroundDropReshapeOutcome.Reshaped, 0, 0, 0);
+                return new GroundDropReshape(GroundDropReshapeOutcome.Reshaped, 1, 0, 0);
 
             case >= 7 and <= 21:
-                return new GroundDropReshape(GroundDropReshapeOutcome.Reshaped, 0, incomingValue, 0);
+                return new GroundDropReshape(GroundDropReshapeOutcome.Reshaped, 1, incomingValue, 0);
 
             case ItemQuantityPolicy.PetSort:
             {
-                var activity = dropSort == GroundItemEntity.GmCreateItemDropSort
-                    ? ItemQuantityPolicy.MaxPetActivity
-                    : incomingQuantity;
-
-                if (activity < 0 || activity > ItemQuantityPolicy.MaxPetActivity)
+                if (incomingQuantity < ItemQuantityPolicy.MinStackQuantity ||
+                    incomingQuantity > ItemQuantityPolicy.MaxPetActivity)
                     return GroundDropReshape.Reject(GroundDropReshapeOutcome.RejectedQuantityRange);
 
                 if (incomingValue < 0 || incomingValue > MaxNumberSentinel)
                     return GroundDropReshape.Reject(GroundDropReshapeOutcome.RejectedPackedValueRange);
 
-                return new GroundDropReshape(GroundDropReshapeOutcome.Reshaped, activity, incomingValue, 0);
+                return new GroundDropReshape(GroundDropReshapeOutcome.Reshaped, incomingQuantity, incomingValue, 0);
             }
 
             case >= 23 and <= 33:
-                return new GroundDropReshape(GroundDropReshapeOutcome.Reshaped, incomingQuantity, incomingValue, 0);
+                return new GroundDropReshape(GroundDropReshapeOutcome.Reshaped, 1, incomingValue, 0);
 
             default:
                 return GroundDropReshape.Reject(GroundDropReshapeOutcome.RejectedUnhandledSort);
@@ -261,9 +294,6 @@ public static class EliteDropNoticeResolver
 
     private static bool ShouldShowName(GroundDropOrigin origin, int itemId)
     {
-        if (origin == GroundDropOrigin.PvpToWorld)
-            return true;
-
         if (itemId is >= 1002 and <= 1005)
             return origin is GroundDropOrigin.TreasureChestToWorld or GroundDropOrigin.TreasureChest175ToWorld;
 

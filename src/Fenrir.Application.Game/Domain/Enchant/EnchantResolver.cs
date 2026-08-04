@@ -11,6 +11,8 @@ public static class EnchantResolver
     {
         Rejected,
 
+        Disconnect,
+
         Unsealed,
 
         Success,
@@ -27,8 +29,6 @@ public static class EnchantResolver
     }
 
     public const int RegimeBoundary = 40;
-
-    public const int MaxImprove = 50;
 
     public const int SafeImproveValue = 20;
 
@@ -47,18 +47,20 @@ public static class EnchantResolver
         int protectForDestroyCharges,
         int improveItemValueCharges,
         IRandomSource random,
+        GameRuleset ruleset,
         int protectForDestroy2Charges = 0,
         int protectForWingCharges = 0,
         bool premiumActive = false)
     {
         var targetItem = targetItemDefinition.Item;
         var currentImprove = targetStack.Enchant;
+        var maxImprove = GameRulesetRules.MaxEnchant(ruleset);
 
         if (targetItem.Sort is < WingSort or > 29 || targetItem.CheckImprove != 2)
             return Rejected();
 
-        if (currentImprove >= MaxImprove)
-            return Rejected();
+        if (currentImprove >= maxImprove)
+            return Disconnect();
 
         var isWing = targetItem.Sort == WingSort;
 
@@ -67,7 +69,7 @@ public static class EnchantResolver
 
         var result = currentImprove >= RegimeBoundary
             ? ResolveAdvanced(targetItem, materialItemDefinition.Item, currentImprove, luck, protectForDestroyCharges,
-                improveItemValueCharges, random, protectForDestroy2Charges, premiumActive)
+                improveItemValueCharges, random, protectForDestroy2Charges, premiumActive, maxImprove)
             : ResolveStandard(targetItem, materialItemDefinition.Item, currentImprove, luck,
                 protectForDestroyCharges, improveItemValueCharges, random, isWing, protectForWingCharges,
                 premiumActive);
@@ -232,7 +234,8 @@ public static class EnchantResolver
 
     private static EnchantResult ResolveAdvanced(ItemRowDto targetItem,
         ItemRowDto materialItem, byte currentImprove, int luck, int protectForDestroyCharges,
-        int improveItemValueCharges, IRandomSource random, int protectForDestroy2Charges, bool premiumActive)
+        int improveItemValueCharges, IRandomSource random, int protectForDestroy2Charges, bool premiumActive,
+        int maxImprove)
     {
         if (targetItem.Type != RareItemType && targetItem.Type != EliteItemType)
             return Rejected();
@@ -246,8 +249,8 @@ public static class EnchantResolver
             return Rejected();
 
         var value = material.Value;
-        if (currentImprove + value >= MaxImprove)
-            value = MaxImprove - currentImprove;
+        if (currentImprove + value >= maxImprove)
+            value = maxImprove - currentImprove;
 
         var newImprove = currentImprove + value;
 
@@ -311,6 +314,11 @@ public static class EnchantResolver
         return new EnchantResult(EnchantOutcome.Rejected, 0, 0, false);
     }
 
+    private static EnchantResult Disconnect()
+    {
+        return new EnchantResult(EnchantOutcome.Disconnect, 0, 0, false);
+    }
+
     public readonly record struct EnchantResult(
         EnchantOutcome Outcome,
         int NewEnchant,
@@ -321,6 +329,6 @@ public static class EnchantResolver
         bool ConsumesProtectCharge2 = false,
         bool ConsumesWingProtectCharge = false)
     {
-        public bool ConsumesMaterial => Outcome is not EnchantOutcome.Rejected;
+        public bool ConsumesMaterial => Outcome is not (EnchantOutcome.Rejected or EnchantOutcome.Disconnect);
     }
 }

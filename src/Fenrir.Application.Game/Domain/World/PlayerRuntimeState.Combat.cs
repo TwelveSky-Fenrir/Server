@@ -28,10 +28,16 @@ public partial class PlayerRuntimeState
 
     public int ActionType { get; set; }
 
+    public ActionInfo? LastAcceptedAction { get; set; }
+
     public int ActionSkillNumber { get; set; }
 
     public int ActionSkillGradeNum1 { get; set; }
     public int ActionSkillGradeNum2 { get; set; }
+
+    public int ActionTargetObjectIndex { get; set; }
+
+    public int ActionTargetObjectUniqueNumber { get; set; }
 
     public bool AttackBudgetEnforced { get; set; } = true;
 
@@ -51,7 +57,7 @@ public partial class PlayerRuntimeState
 
     public bool IsStunned { get; set; }
 
-    public int StunDurationSeconds { get; set; }
+    public int StunDurationTicks { get; set; }
 
     public long LastOneSecondGateTick { get; set; }
 
@@ -59,9 +65,16 @@ public partial class PlayerRuntimeState
 
     public int RepeatedStunCount { get; set; }
 
+    public HashSet<int> TeamStunRewardCandidateIds { get; } = [];
+
     public bool CanUseConsumables { get; set; } = true;
 
     public bool IsUnderDarkAttackPotionDebuff { get; set; }
 
     public DateTime DarkAttackDebuffActivatedAtUtc { get; set; }
+
+    public bool CanIssueGameplayActions => !IsDead && !IsStunned;
+
+    public bool CanUseConsumableEffects =>
+        CanUseConsumables && !IsDead && !IsStunned && !IsUnderDarkAttackPotionDebuff;
 }

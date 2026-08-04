@@ -25,8 +25,9 @@ public sealed class CloseShopStallHandler(ICloseShopStallService service, ILogge
         if (zone.MapId != OpenShopStallHandler.PshopZoneNumber)
         {
             logger.LogWarning(
-                "Close shop stall rejected: character {CharacterId} is outside the market district (zone {MapId})",
+                "Close shop stall rejected: character {CharacterId} is outside the market district (zone {MapId}); terminating session",
                 characterId, zone.MapId);
+            zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 

@@ -15,7 +15,8 @@ public enum SocialCrossShardRelayKind : byte
 public enum SocialCrossShardRelayMessageType : byte
 {
     Ask = 0,
-    Answer = 1
+    Answer = 1,
+    Cancel = 2
 }
 
 public sealed record SocialCrossShardRelayEntry(
@@ -31,6 +32,8 @@ public sealed record SocialCrossShardRelayEntry(
     long? AskRelayId)
 {
     public Guid CorrelationId { get; init; } = Guid.NewGuid();
+
+    public byte? SourceCombinedLevel { get; init; }
 }
 
 [GenerateDto]
@@ -45,4 +48,11 @@ public sealed partial record SocialCrossShardRelayDto(
     string SourceAvatarName,
     byte TargetShardId,
     int TargetCharacterId,
-    long? AskRelayId);
+    long? AskRelayId)
+{
+    public byte? SourceCombinedLevel =>
+        Kind == (byte)SocialCrossShardRelayKind.Party &&
+        MessageType == (byte)SocialCrossShardRelayMessageType.Ask
+            ? ReasonCode
+            : null;
+}

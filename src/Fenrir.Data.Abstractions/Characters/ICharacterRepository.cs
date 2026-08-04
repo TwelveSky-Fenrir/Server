@@ -76,13 +76,17 @@ public interface ICharacterRepository
     public ValueTask<ReadOnlyCollection<CharacterMountSlotDto>> GetMountsAsync(int characterId,
         CancellationToken ct);
 
+    public ValueTask<ReadOnlyCollection<CharacterStellarCoreSlotDto>> GetStellarCoresAsync(int characterId,
+        CancellationToken ct);
+
     public ValueTask PersistProgressAsync(IReadOnlyList<CharacterProgressTvp> rows,
         IReadOnlyList<CharacterCostumeSlotTvp> costumes, IReadOnlyList<CharacterMountSlotTvp> mounts,
-        CancellationToken ct);
+        CancellationToken ct, IReadOnlyList<CharacterStellarCoreSlotTvp>? stellarCores = null);
 
     public ValueTask PersistFinalFlushAsync(CharacterProgressTvp progress, CharacterPositionTvp position,
         IReadOnlyList<CharacterCostumeSlotTvp> costumes, IReadOnlyList<CharacterBuffSlotTvp> buffs,
-        IReadOnlyList<CharacterMountSlotTvp> mounts, CancellationToken ct);
+        IReadOnlyList<CharacterMountSlotTvp> mounts, CancellationToken ct,
+        IReadOnlyList<CharacterStellarCoreSlotTvp>? stellarCores = null);
 
     public ValueTask AdjustMoneyAsync(int characterId, long deltaMoney, int deltaBigMoney, CancellationToken ct);
 

@@ -3,6 +3,10 @@ CREATE PROCEDURE game.usp_OfflineShop_RetrieveItemAndReplaceContainer @Character
                                                                       @ExpectedItemId INT,
                                                                       @ExpectedQuantity INT,
                                                                       @ExpectedValue INT,
+                                                                      @ExpectedSerialNumber INT,
+                                                                      @ExpectedSocketGem1 INT,
+                                                                      @ExpectedSocketGem2 INT,
+                                                                      @ExpectedSocketGem3 INT,
                                                                       @Container TINYINT,
                                                                       @Items game.tvp_CharacterItemSlot READONLY
 AS
@@ -22,11 +26,19 @@ BEGIN
       AND ItemId = @ExpectedItemId
       AND Quantity = @ExpectedQuantity
       AND Value = @ExpectedValue
+      AND SerialNumber = @ExpectedSerialNumber
+      AND SocketGem1 = @ExpectedSocketGem1
+      AND SocketGem2 = @ExpectedSocketGem2
+      AND SocketGem3 = @ExpectedSocketGem3
       AND EXISTS (SELECT 1 FROM game.OfflineShops WHERE CharacterId = @CharacterId AND ShopState = 0);
 
     IF
         @@ROWCOUNT = 0
-        THROW 50272, N'Offline shop is not closed, or the slot no longer matches the expected item.', 1;
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT Applied = CAST(0 AS INT);
+            RETURN;
+        END;
 
     DELETE
     FROM game.CharacterItems
@@ -53,4 +65,6 @@ BEGIN
     FROM @Items;
 
     COMMIT TRANSACTION;
+
+    SELECT Applied = CAST(1 AS INT);
 END;

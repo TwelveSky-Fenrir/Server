@@ -1,5 +1,7 @@
 CREATE PROCEDURE game.usp_Character_PersistProgressBatch @Progress game.tvp_CharacterProgress READONLY,
-                                                         @Costumes game.tvp_CharacterCostumeSlot READONLY
+                                                         @Costumes game.tvp_CharacterCostumeSlot READONLY,
+                                                         @Mounts game.tvp_CharacterMountSlot READONLY,
+                                                         @StellarCores game.tvp_CharacterStellarCoreSlot READONLY
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -54,6 +56,7 @@ BEGIN
         c.AnimalAbsorbTime         = s.AnimalAbsorbTime,
         c.AnimalAbsorbState        = s.AnimalAbsorbState,
         c.CostumeIndex             = s.CostumeIndex,
+        c.StellarCoreIndex         = s.StellarCoreIndex,
         c.ProtectForHalo           = s.ProtectForHalo,
         c.BonusItemLevel           = s.BonusItemLevel,
         c.BonusItemValue           = s.BonusItemValue,
@@ -127,6 +130,30 @@ BEGIN
            cs.ExpireDate
     FROM @Costumes AS cs
              JOIN @Applied AS a ON a.CharacterId = cs.CharacterId;
+
+    DELETE cm
+    FROM game.CharacterMounts AS cm
+             JOIN @Applied AS a ON a.CharacterId = cm.CharacterId;
+
+    INSERT INTO game.CharacterMounts (CharacterId, Slot, ItemId, ExpActivity, Power)
+    SELECT ms.CharacterId,
+           ms.Slot,
+           ms.ItemId,
+           ms.ExpActivity,
+           ms.Power
+    FROM @Mounts AS ms
+             JOIN @Applied AS a ON a.CharacterId = ms.CharacterId;
+
+    DELETE cc
+    FROM game.CharacterStellarCoreSlots AS cc
+             JOIN @Applied AS a ON a.CharacterId = cc.CharacterId;
+
+    INSERT INTO game.CharacterStellarCoreSlots (CharacterId, Slot, ItemId)
+    SELECT sc.CharacterId,
+           sc.Slot,
+           sc.ItemId
+    FROM @StellarCores AS sc
+             JOIN @Applied AS a ON a.CharacterId = sc.CharacterId;
 
     COMMIT TRANSACTION;
 END;

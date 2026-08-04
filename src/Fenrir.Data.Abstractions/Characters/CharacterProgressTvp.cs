@@ -100,4 +100,5 @@ public sealed partial record CharacterProgressTvp(
     int AnimalDoubleExp,
     int DmgBoost,
     int HPBoost,
-    int CriBoost);
+    int CriBoost,
+    int StellarCoreIndex = -1);

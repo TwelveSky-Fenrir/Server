@@ -3,6 +3,10 @@ CREATE OR ALTER PROCEDURE game.usp_OfflineShop_ExecutePurchase @SellerCharacterI
                                                                @ExpectedItemId INT,
                                                                @ExpectedQuantity INT,
                                                                @ExpectedValue INT,
+                                                               @ExpectedSerialNumber INT,
+                                                               @ExpectedSocketGem1 INT,
+                                                               @ExpectedSocketGem2 INT,
+                                                               @ExpectedSocketGem3 INT,
                                                                @Price INT,
                                                                @BuyerCharacterId INT,
                                                                @BuyerContainer TINYINT,
@@ -21,11 +25,19 @@ BEGIN
       AND ItemId = @ExpectedItemId
       AND Quantity = @ExpectedQuantity
       AND Value = @ExpectedValue
+      AND SerialNumber = @ExpectedSerialNumber
+      AND SocketGem1 = @ExpectedSocketGem1
+      AND SocketGem2 = @ExpectedSocketGem2
+      AND SocketGem3 = @ExpectedSocketGem3
       AND Price = @Price
       AND EXISTS (SELECT 1 FROM game.OfflineShops WHERE CharacterId = @SellerCharacterId AND ShopState = 1);
 
     IF @@ROWCOUNT = 0
-        THROW 50272, N'Offline shop item no longer matches the expected listing, or the shop is not open.', 1;
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT Applied = CAST(0 AS INT);
+            RETURN;
+        END;
 
     UPDATE game.Characters
     SET Money        = Money - @Price,
@@ -86,4 +98,6 @@ BEGIN
           AND ShopState = 1;
 
     COMMIT TRANSACTION;
+
+    SELECT Applied = CAST(1 AS INT);
 END;

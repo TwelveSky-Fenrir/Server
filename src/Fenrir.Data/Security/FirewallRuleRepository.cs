@@ -10,10 +10,9 @@ namespace Fenrir.Data.Security;
 
 public sealed record FirewallRuleRepository(ICaeriusNetDbContext Db) : IFirewallRuleRepository
 {
-    public static readonly TimeSpan AutoBlockDuration = TimeSpan.FromHours(1);
-
     private const byte RuleTypeTcpBlock = 1;
     private const byte RuleTypeAnyBlock = 3;
+    public static readonly TimeSpan AutoBlockDuration = TimeSpan.FromHours(1);
 
     public async ValueTask<bool> IsBlockedAsync(string ipAddress, CancellationToken ct)
     {
@@ -37,15 +36,6 @@ public sealed record FirewallRuleRepository(ICaeriusNetDbContext Db) : IFirewall
         await Db.ExecuteAsync(sp, ct).ConfigureAwait(false);
     }
 
-    public async ValueTask<int> RemoveAsync(string ipAddress, CancellationToken ct)
-    {
-        var sp = new StoredProcedureParametersBuilder("admin", "usp_FirewallRule_Remove", 1)
-            .AddParameter("IpAddress", ipAddress, SqlDbType.VarChar)
-            .Build();
-
-        return await Db.ExecuteScalarAsync<int>(sp, ct);
-    }
-
     public async ValueTask ReconcileAllowlistAsync(CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("admin", "usp_FirewallRule_ReconcileAllowlist", 0).Build();
@@ -57,6 +47,15 @@ public sealed record FirewallRuleRepository(ICaeriusNetDbContext Db) : IFirewall
         var sp = new StoredProcedureParametersBuilder("admin", "usp_FirewallRule_Add", 1)
             .AddParameter("IpAddress", ipAddress, SqlDbType.VarChar)
             .AddParameter("RuleType", ruleType, SqlDbType.TinyInt)
+            .Build();
+
+        return await Db.ExecuteScalarAsync<int>(sp, ct);
+    }
+
+    public async ValueTask<int> RemoveAsync(string ipAddress, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("admin", "usp_FirewallRule_Remove", 1)
+            .AddParameter("IpAddress", ipAddress, SqlDbType.VarChar)
             .Build();
 
         return await Db.ExecuteScalarAsync<int>(sp, ct);

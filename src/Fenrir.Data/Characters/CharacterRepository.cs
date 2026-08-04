@@ -247,9 +247,19 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return await Db.QueryAsReadOnlyCollectionAsync<CharacterMountSlotDto>(sp, ct);
     }
 
+    public async ValueTask<ReadOnlyCollection<CharacterStellarCoreSlotDto>> GetStellarCoresAsync(int characterId,
+        CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetStellarCores", 10)
+            .AddParameter("CharacterId", characterId, SqlDbType.Int)
+            .Build();
+
+        return await Db.QueryAsReadOnlyCollectionAsync<CharacterStellarCoreSlotDto>(sp, ct);
+    }
+
     public async ValueTask PersistProgressAsync(IReadOnlyList<CharacterProgressTvp> rows,
         IReadOnlyList<CharacterCostumeSlotTvp> costumes, IReadOnlyList<CharacterMountSlotTvp> mounts,
-        CancellationToken ct)
+        CancellationToken ct, IReadOnlyList<CharacterStellarCoreSlotTvp>? stellarCores = null)
     {
         if (rows.Count == 0)
             return;
@@ -263,12 +273,16 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         if (mounts.Count > 0)
             builder.AddTvpParameter("Mounts", mounts);
 
+        if (stellarCores is { Count: > 0 })
+            builder.AddTvpParameter("StellarCores", stellarCores);
+
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
     public async ValueTask PersistFinalFlushAsync(CharacterProgressTvp progress, CharacterPositionTvp position,
         IReadOnlyList<CharacterCostumeSlotTvp> costumes, IReadOnlyList<CharacterBuffSlotTvp> buffs,
-        IReadOnlyList<CharacterMountSlotTvp> mounts, CancellationToken ct)
+        IReadOnlyList<CharacterMountSlotTvp> mounts, CancellationToken ct,
+        IReadOnlyList<CharacterStellarCoreSlotTvp>? stellarCores = null)
     {
         IReadOnlyList<CharacterProgressTvp> progressRows = [progress];
         IReadOnlyList<CharacterPositionTvp> positionRows = [position];
@@ -285,6 +299,9 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
 
         if (mounts.Count > 0)
             builder.AddTvpParameter("Mounts", mounts);
+
+        if (stellarCores is { Count: > 0 })
+            builder.AddTvpParameter("StellarCores", stellarCores);
 
         await Db.ExecuteAsync(builder.Build(), ct);
     }

@@ -28,4 +28,13 @@ public sealed record BlockedIpRepository(ICaeriusNetDbContext Db) : IBlockedIpRe
 
         return await Db.ExecuteScalarAsync<int>(sp, ct);
     }
+
+    public async ValueTask<int> RemoveAsync(string ipAddress, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("admin", "usp_BlockedIp_Remove", 1)
+            .AddParameter("IpAddress", ipAddress, SqlDbType.VarChar)
+            .Build();
+
+        return await Db.ExecuteScalarAsync<int>(sp, ct);
+    }
 }

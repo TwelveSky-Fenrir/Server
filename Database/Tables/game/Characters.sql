@@ -304,6 +304,10 @@ CREATE TABLE game.Characters
         CONSTRAINT DF_Characters_CostumeIndex DEFAULT -1
         CONSTRAINT CK_Characters_CostumeIndex CHECK (CostumeIndex BETWEEN -1 AND 19),
 
+    StellarCoreIndex         INT                                               NOT NULL
+        CONSTRAINT DF_Characters_StellarCoreIndex DEFAULT -1
+        CONSTRAINT CK_Characters_StellarCoreIndex CHECK (StellarCoreIndex BETWEEN -1 AND 19),
+
     ProtectForHalo           INT                                               NOT NULL
         CONSTRAINT DF_Characters_ProtectForHalo DEFAULT 0
         CONSTRAINT CK_Characters_ProtectForHalo CHECK (ProtectForHalo >= 0),

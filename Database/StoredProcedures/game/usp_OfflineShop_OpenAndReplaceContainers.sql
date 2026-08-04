@@ -44,7 +44,8 @@ BEGIN
                                        LocationX, LocationY, LocationZ, ShopName)
         VALUES (@CharacterId, @ZoneNumber, 1, @ShopDate, 0, 0, @LocationX, @LocationY, @LocationZ, @ShopName);
 
-    INSERT INTO game.OfflineShopItems (CharacterId, SlotIndex, ItemId, Quantity, Value, SerialNumber, Price, SocketData)
+    INSERT INTO game.OfflineShopItems (CharacterId, SlotIndex, ItemId, Quantity, Value, SerialNumber, Price,
+                                       SocketData, SocketGem1, SocketGem2, SocketGem3)
     SELECT @CharacterId,
            SlotIndex,
            ItemId,
@@ -52,7 +53,10 @@ BEGIN
            Value,
            SerialNumber,
            Price,
-           SocketData
+           SocketData,
+           SocketGem1,
+           SocketGem2,
+           SocketGem3
     FROM @Items;
 
     DELETE

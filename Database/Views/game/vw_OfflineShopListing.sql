@@ -18,7 +18,10 @@ SELECT s.CharacterId,
        i.Value,
        i.SerialNumber,
        i.Price,
-       i.SocketData
+       i.SocketData,
+       i.SocketGem1,
+       i.SocketGem2,
+       i.SocketGem3
 FROM game.OfflineShops s
          INNER JOIN game.OfflineShopItems i ON i.CharacterId = s.CharacterId
          INNER JOIN world.Items it ON it.ItemId = i.ItemId;

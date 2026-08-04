@@ -2,7 +2,8 @@ CREATE PROCEDURE game.usp_Character_PersistFinalFlush @Progress game.tvp_Charact
                                                       @Position game.tvp_CharacterPosition READONLY,
                                                       @Costumes game.tvp_CharacterCostumeSlot READONLY,
                                                       @Buffs game.tvp_CharacterBuffSlot READONLY,
-                                                      @Mounts game.tvp_CharacterMountSlot READONLY
+                                                      @Mounts game.tvp_CharacterMountSlot READONLY,
+                                                      @StellarCores game.tvp_CharacterStellarCoreSlot READONLY
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -57,6 +58,7 @@ BEGIN
         c.AnimalAbsorbTime         = p.AnimalAbsorbTime,
         c.AnimalAbsorbState        = p.AnimalAbsorbState,
         c.CostumeIndex             = p.CostumeIndex,
+        c.StellarCoreIndex         = p.StellarCoreIndex,
         c.ProtectForHalo           = p.ProtectForHalo,
         c.BonusItemLevel           = p.BonusItemLevel,
         c.BonusItemValue           = p.BonusItemValue,
@@ -161,6 +163,17 @@ BEGIN
            ms.Power
     FROM @Mounts AS ms
              JOIN @Applied AS a ON a.CharacterId = ms.CharacterId;
+
+    DELETE cc
+    FROM game.CharacterStellarCoreSlots AS cc
+             JOIN @Applied AS a ON a.CharacterId = cc.CharacterId;
+
+    INSERT INTO game.CharacterStellarCoreSlots (CharacterId, Slot, ItemId)
+    SELECT sc.CharacterId,
+           sc.Slot,
+           sc.ItemId
+    FROM @StellarCores AS sc
+             JOIN @Applied AS a ON a.CharacterId = sc.CharacterId;
 
     COMMIT TRANSACTION;
 END;

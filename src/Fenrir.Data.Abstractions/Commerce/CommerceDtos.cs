@@ -27,7 +27,10 @@ public sealed partial record OfflineShopItemRowDto(
     int Value,
     int SerialNumber,
     int Price,
-    string? SocketData);
+    string? SocketData,
+    int SocketGem1,
+    int SocketGem2,
+    int SocketGem3);
 
 [GenerateDto]
 public sealed partial record ProxyShopNameRowDto(int CharacterId, string ShopName);
@@ -42,7 +45,10 @@ public sealed partial record OfflineShopOpenListingRowDto(
     int Value,
     int SerialNumber,
     int Price,
-    string? SocketData);
+    string? SocketData,
+    int SocketGem1,
+    int SocketGem2,
+    int SocketGem3);
 
 [GenerateTvp(Schema = "game", TvpName = "tvp_OfflineShopItemSlot")]
 public sealed partial record OfflineShopItemSlotTvp(
@@ -52,4 +58,17 @@ public sealed partial record OfflineShopItemSlotTvp(
     int Value,
     int SerialNumber,
     int Price,
-    string? SocketData);
+    string? SocketData,
+    int SocketGem1,
+    int SocketGem2,
+    int SocketGem3);
+
+public readonly record struct OfflineShopListingKey(
+    short SlotIndex,
+    int ItemId,
+    int Quantity,
+    int Value,
+    int SerialNumber,
+    int SocketGem1,
+    int SocketGem2,
+    int SocketGem3);

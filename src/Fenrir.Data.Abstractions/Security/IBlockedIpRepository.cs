@@ -5,4 +5,6 @@ public interface IBlockedIpRepository
     public ValueTask<bool> IsBlockedAsync(string ipAddress, CancellationToken ct);
 
     public ValueTask<int> AddAsync(string ipAddress, CancellationToken ct);
+
+    public ValueTask<int> RemoveAsync(string ipAddress, CancellationToken ct);
 }

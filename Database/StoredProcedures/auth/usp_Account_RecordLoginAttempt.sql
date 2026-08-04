@@ -15,7 +15,7 @@ BEGIN
                                WHEN @Success = 1 THEN 0
                                WHEN LockoutUntilUtc IS NULL OR LockoutUntilUtc <= @NowUtc THEN 1
                                ELSE FailedLoginCount + 1
-            END,
+        END,
         LockoutUntilUtc  = CASE
                                WHEN @Success = 1 THEN NULL
                                WHEN LockoutUntilUtc IS NULL OR LockoutUntilUtc <= @NowUtc

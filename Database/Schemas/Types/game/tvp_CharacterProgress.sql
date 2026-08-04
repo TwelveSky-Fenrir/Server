@@ -96,5 +96,6 @@ CREATE TYPE game.tvp_CharacterProgress AS TABLE
     AnimalDoubleExp          INT          NOT NULL,
     DmgBoost                 INT          NOT NULL,
     HPBoost                  INT          NOT NULL,
-    CriBoost                 INT          NOT NULL
+    CriBoost                 INT          NOT NULL,
+    StellarCoreIndex         INT          NOT NULL
 );

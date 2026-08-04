@@ -19,13 +19,12 @@ public interface IOfflineShopRepository
 
     public ValueTask SetStateAsync(int characterId, byte shopState, CancellationToken ct);
 
-    public ValueTask RetrieveItemAndReplaceContainerAsync(int characterId, short slotIndex, int expectedItemId,
-        int expectedQuantity, int expectedValue, byte container, IReadOnlyList<CharacterItemSlotTvp> items,
-        CancellationToken ct);
+    public ValueTask<bool> RetrieveItemAndReplaceContainerAsync(int characterId, OfflineShopListingKey expected,
+        byte container, IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct);
 
-    public ValueTask ExecutePurchaseAsync(int sellerCharacterId, short slotIndex, int expectedItemId,
-        int expectedQuantity, int expectedValue, int price, int buyerCharacterId, byte buyerContainer,
-        IReadOnlyList<CharacterItemSlotTvp> buyerItems, CancellationToken ct);
+    public ValueTask<bool> ExecutePurchaseAsync(int sellerCharacterId, OfflineShopListingKey expected, int price,
+        int buyerCharacterId, byte buyerContainer, IReadOnlyList<CharacterItemSlotTvp> buyerItems,
+        CancellationToken ct);
 
     public ValueTask WithdrawMoneyAsync(int characterId, int expectedMoney, int expectedBigMoney, int todayDate,
         CancellationToken ct);

@@ -12,6 +12,12 @@ CREATE TABLE game.OfflineShopItems
     Price        INT          NOT NULL
         CONSTRAINT DF_OfflineShopItems_Price DEFAULT 0,
     SocketData   NVARCHAR(50) NULL,
+    SocketGem1   INT          NOT NULL
+        CONSTRAINT DF_OfflineShopItems_SocketGem1 DEFAULT 0,
+    SocketGem2   INT          NOT NULL
+        CONSTRAINT DF_OfflineShopItems_SocketGem2 DEFAULT 0,
+    SocketGem3   INT          NOT NULL
+        CONSTRAINT DF_OfflineShopItems_SocketGem3 DEFAULT 0,
     CONSTRAINT PK_OfflineShopItems PRIMARY KEY CLUSTERED (CharacterId, SlotIndex),
     CONSTRAINT CK_OfflineShopItems_SlotIndex CHECK (SlotIndex BETWEEN 0 AND 24),
     CONSTRAINT CK_OfflineShopItems_Quantity CHECK (Quantity BETWEEN 0 AND 999),

@@ -11,7 +11,7 @@ BEGIN
     DECLARE @ExpiresAtUtc DATETIME2(3) = CASE
                                              WHEN @TtlSeconds IS NULL THEN NULL
                                              ELSE DATEADD(SECOND, @TtlSeconds, SYSUTCDATETIME())
-                                             END;
+        END;
 
     BEGIN TRANSACTION;
 
@@ -21,7 +21,7 @@ BEGIN
                            WHEN RuleType IN (1, 3) AND ExpiresAtUtc IS NULL THEN NULL
                            WHEN RuleType IN (1, 3) AND ExpiresAtUtc >= @ExpiresAtUtc THEN ExpiresAtUtc
                            ELSE @ExpiresAtUtc
-                           END
+            END
     WHERE IpAddress = @IpAddress;
 
     IF

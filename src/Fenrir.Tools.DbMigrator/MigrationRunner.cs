@@ -5,6 +5,8 @@ namespace Fenrir.Tools.DbMigrator;
 
 public static class MigrationRunner
 {
+    private const int BatchCommandTimeout = 900;
+
     public static async Task<int> RunAsync(MigratorOptions options)
     {
         var stopwatch = Stopwatch.StartNew();
@@ -106,7 +108,7 @@ public static class MigrationRunner
 
             try
             {
-                await using var command = new SqlCommand(batch, connection) { CommandTimeout = 120 };
+                await using var command = new SqlCommand(batch, connection) { CommandTimeout = BatchCommandTimeout };
                 await command.ExecuteNonQueryAsync();
             }
             catch (SqlException ex)

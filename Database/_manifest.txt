@@ -108,6 +108,7 @@ Tables/game/CharacterPetBag.sql
 Tables/game/CharacterCostumeSlots.sql
 
 Tables/game/CharacterMounts.sql
+Tables/game/CharacterStellarCoreSlots.sql
 
 Tables/game/CharacterFriends.sql
 Tables/game/CharacterSkills.sql
@@ -139,6 +140,7 @@ Schemas/Types/game/tvp_CharacterItemSlot.sql
 Schemas/Types/game/tvp_CharacterCostumeSlot.sql
 Schemas/Types/game/tvp_CharacterBuffSlot.sql
 Schemas/Types/game/tvp_CharacterMountSlot.sql
+Schemas/Types/game/tvp_CharacterStellarCoreSlot.sql
 Schemas/Types/game/tvp_CharacterProgress.sql
 Schemas/Types/game/tvp_CharacterSkillSlot.sql
 Schemas/Types/game/tvp_CharacterHotkeySlot.sql
@@ -191,6 +193,7 @@ StoredProcedures/game/usp_Character_GetForWorldEntry.sql
 StoredProcedures/game/usp_Character_GetForWorldEntrySummary.sql
 StoredProcedures/game/usp_Character_GetCostumes.sql
 StoredProcedures/game/usp_Character_GetMounts.sql
+StoredProcedures/game/usp_Character_GetStellarCores.sql
 StoredProcedures/game/usp_Character_PersistProgressBatch.sql
 StoredProcedures/game/usp_Character_PersistBatch.sql
 StoredProcedures/game/usp_Character_PersistFinalFlush.sql
@@ -450,6 +453,7 @@ StoredProcedures/admin/usp_FirewallRule_Add.sql
 StoredProcedures/admin/usp_FirewallRule_Upsert.sql
 StoredProcedures/admin/usp_FirewallRule_GetAll.sql
 StoredProcedures/admin/usp_FirewallRule_Remove.sql
+StoredProcedures/admin/usp_BlockedIp_Remove.sql
 
 StoredProcedures/admin/usp_FirewallRule_ReconcileAllowlist.sql
 

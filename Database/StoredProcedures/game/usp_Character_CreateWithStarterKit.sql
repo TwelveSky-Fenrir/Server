@@ -52,7 +52,7 @@ BEGIN
          DoubleExpTime1, DoubleExpTime2, AutoBuffTime, InventoryDate, StoreDate, PremiumExpireUtc)
         OUTPUT INSERTED.CharacterId INTO @CharacterId
         VALUES (@AccountId, @Slot, @Name, @Tribe, @PreviousTribe, @Gender, @HeadType, @FaceType, @MapId, @PosX,
-                @PosY, @PosZ, @Life, @MaxLife, @Mana, @MaxMana, 1, 1, 1, 1, 640000000, 100, 1, 0, 0, 0, 0, 50, 0,
+                @PosY, @PosZ, @Life, @MaxLife, @Mana, @MaxMana, 1, 1, 1, 1, 640000000, 100, 1, 0, 0, 0, 0, 0, 0,
                 1314, 0, 10, 0, 99999999, 5, 1440, 300, 300, @WelcomeBuffUntilDate, @WelcomeBuffUntilDate,
                 @WelcomeBuffUntilDate, @PremiumUntilUnixSeconds);
 

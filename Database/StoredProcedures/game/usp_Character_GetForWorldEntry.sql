@@ -132,7 +132,8 @@ BEGIN
            c.AnimalDoubleExp,
            c.DmgBoost,
            c.HPBoost,
-           c.CriBoost
+           c.CriBoost,
+           c.StellarCoreIndex
     FROM game.Characters AS c
              LEFT JOIN game.CharacterQuests AS q
                        ON q.CharacterId = c.CharacterId

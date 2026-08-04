@@ -53,6 +53,9 @@ BEGIN
     DELETE
     FROM game.CharacterMounts
     WHERE CharacterId = @CharacterId;
+    DELETE
+    FROM game.CharacterLogoutState
+    WHERE CharacterId = @CharacterId;
 
     DELETE
     FROM game.HeroRankings
@@ -60,6 +63,26 @@ BEGIN
     DELETE
     FROM game.OfflineShops
     WHERE CharacterId = @CharacterId;
+    DELETE
+    FROM game.ProxyShopNames WITH (SNAPSHOT)
+    WHERE CharacterId = @CharacterId;
+
+    DELETE
+    FROM game.GuildMembers
+    WHERE CharacterId = @CharacterId;
+    UPDATE game.Guilds
+    SET MasterCharacterId = NULL
+    WHERE MasterCharacterId = @CharacterId;
+
+    DELETE
+    FROM game.TribeVotes
+    WHERE CandidateCharacterId = @CharacterId;
+    DELETE
+    FROM game.TribeSubMasters
+    WHERE CharacterId = @CharacterId;
+    UPDATE game.Tribes
+    SET MasterCharacterId = NULL
+    WHERE MasterCharacterId = @CharacterId;
 
     UPDATE admin.Bans
     SET CharacterId = NULL

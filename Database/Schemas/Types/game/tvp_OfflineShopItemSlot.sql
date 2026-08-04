@@ -6,5 +6,8 @@ CREATE TYPE game.tvp_OfflineShopItemSlot AS TABLE
     Value        INT          NOT NULL,
     SerialNumber INT          NOT NULL,
     Price        INT          NOT NULL,
-    SocketData   NVARCHAR(50) NULL
+    SocketData   NVARCHAR(50) NULL,
+    SocketGem1   INT          NOT NULL,
+    SocketGem2   INT          NOT NULL,
+    SocketGem3   INT          NOT NULL
 );

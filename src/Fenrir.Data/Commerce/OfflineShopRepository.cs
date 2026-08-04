@@ -61,40 +61,48 @@ public sealed record OfflineShopRepository(ICaeriusNetDbContext Db) : IOfflineSh
         await Db.ExecuteAsync(sp, ct);
     }
 
-    public async ValueTask RetrieveItemAndReplaceContainerAsync(int characterId, short slotIndex, int expectedItemId,
-        int expectedQuantity, int expectedValue, byte container, IReadOnlyList<CharacterItemSlotTvp> items,
+    public async ValueTask<bool> RetrieveItemAndReplaceContainerAsync(int characterId,
+        OfflineShopListingKey expected, byte container, IReadOnlyList<CharacterItemSlotTvp> items,
         CancellationToken ct)
     {
-        var builder = new StoredProcedureParametersBuilder("game", "usp_OfflineShop_RetrieveItemAndReplaceContainer", 0)
+        var builder = new StoredProcedureParametersBuilder("game", "usp_OfflineShop_RetrieveItemAndReplaceContainer", 1)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
-            .AddParameter("SlotIndex", slotIndex, SqlDbType.SmallInt)
-            .AddParameter("ExpectedItemId", expectedItemId, SqlDbType.Int)
-            .AddParameter("ExpectedQuantity", expectedQuantity, SqlDbType.Int)
-            .AddParameter("ExpectedValue", expectedValue, SqlDbType.Int)
+            .AddParameter("SlotIndex", expected.SlotIndex, SqlDbType.SmallInt)
+            .AddParameter("ExpectedItemId", expected.ItemId, SqlDbType.Int)
+            .AddParameter("ExpectedQuantity", expected.Quantity, SqlDbType.Int)
+            .AddParameter("ExpectedValue", expected.Value, SqlDbType.Int)
+            .AddParameter("ExpectedSerialNumber", expected.SerialNumber, SqlDbType.Int)
+            .AddParameter("ExpectedSocketGem1", expected.SocketGem1, SqlDbType.Int)
+            .AddParameter("ExpectedSocketGem2", expected.SocketGem2, SqlDbType.Int)
+            .AddParameter("ExpectedSocketGem3", expected.SocketGem3, SqlDbType.Int)
             .AddParameter("Container", container, SqlDbType.TinyInt);
 
         if (items.Count > 0) builder.AddTvpParameter("Items", items);
 
-        await Db.ExecuteAsync(builder.Build(), ct);
+        return await Db.ExecuteScalarAsync<int>(builder.Build(), ct) == 1;
     }
 
-    public async ValueTask ExecutePurchaseAsync(int sellerCharacterId, short slotIndex, int expectedItemId,
-        int expectedQuantity, int expectedValue, int price, int buyerCharacterId, byte buyerContainer,
-        IReadOnlyList<CharacterItemSlotTvp> buyerItems, CancellationToken ct)
+    public async ValueTask<bool> ExecutePurchaseAsync(int sellerCharacterId, OfflineShopListingKey expected,
+        int price, int buyerCharacterId, byte buyerContainer, IReadOnlyList<CharacterItemSlotTvp> buyerItems,
+        CancellationToken ct)
     {
-        var builder = new StoredProcedureParametersBuilder("game", "usp_OfflineShop_ExecutePurchase", 0)
+        var builder = new StoredProcedureParametersBuilder("game", "usp_OfflineShop_ExecutePurchase", 1)
             .AddParameter("SellerCharacterId", sellerCharacterId, SqlDbType.Int)
-            .AddParameter("SlotIndex", slotIndex, SqlDbType.SmallInt)
-            .AddParameter("ExpectedItemId", expectedItemId, SqlDbType.Int)
-            .AddParameter("ExpectedQuantity", expectedQuantity, SqlDbType.Int)
-            .AddParameter("ExpectedValue", expectedValue, SqlDbType.Int)
+            .AddParameter("SlotIndex", expected.SlotIndex, SqlDbType.SmallInt)
+            .AddParameter("ExpectedItemId", expected.ItemId, SqlDbType.Int)
+            .AddParameter("ExpectedQuantity", expected.Quantity, SqlDbType.Int)
+            .AddParameter("ExpectedValue", expected.Value, SqlDbType.Int)
+            .AddParameter("ExpectedSerialNumber", expected.SerialNumber, SqlDbType.Int)
+            .AddParameter("ExpectedSocketGem1", expected.SocketGem1, SqlDbType.Int)
+            .AddParameter("ExpectedSocketGem2", expected.SocketGem2, SqlDbType.Int)
+            .AddParameter("ExpectedSocketGem3", expected.SocketGem3, SqlDbType.Int)
             .AddParameter("Price", price, SqlDbType.Int)
             .AddParameter("BuyerCharacterId", buyerCharacterId, SqlDbType.Int)
             .AddParameter("BuyerContainer", buyerContainer, SqlDbType.TinyInt);
 
         if (buyerItems.Count > 0) builder.AddTvpParameter("BuyerItems", buyerItems);
 
-        await Db.ExecuteAsync(builder.Build(), ct);
+        return await Db.ExecuteScalarAsync<int>(builder.Build(), ct) == 1;
     }
 
     public async ValueTask WithdrawMoneyAsync(int characterId, int expectedMoney, int expectedBigMoney,

@@ -27,7 +27,12 @@ BEGIN
         WITH (SNAPSHOT)
     SET Amount = 0
     WHERE TribeId = @TribeId
-      AND SlotIndex = @SlotIndex;
+      AND SlotIndex = @SlotIndex
+      AND Amount = @Amount;
+
+    IF
+        @@ROWCOUNT = 0
+        THROW 50210, N'Insufficient tribe bank balance for this withdrawal.', 1;
 
     UPDATE game.Characters
     SET Money        = Money + @Amount,

@@ -28,7 +28,7 @@ public sealed class ZoneReadyService(ILogger<ZoneReadyService>? logger = null) :
             return ZoneReadyOutcome.Rejected;
         }
 
-        if (autoState > 0 && !state.AutoHuntEnabled)
+        if (autoState > 0 && state.AutoHuntPaidDayBudget < 1 && state.AutoHuntPaidMinuteBudget < 1)
         {
             state.AutoTimeHack++;
             if (state.AutoTimeHack >= AutoHuntHackStrikeLimit)

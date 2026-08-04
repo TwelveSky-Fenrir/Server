@@ -1426,7 +1426,8 @@ public sealed class GenericActionService(
 
         if (!await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
                 StatVit: newVit, StatStr: newStr, StatInt: newInt, StatDex: newDex,
-                StatPoints: resolved.NewStatPoints, UpdatedStats: updatedStats), cancellationToken))
+                StatPoints: resolved.NewStatPoints, MaxLife: updatedStats.MaxLife, MaxMana: updatedStats.MaxMana,
+                UpdatedStats: updatedStats), cancellationToken))
             logger.LogError(
                 "Zone {MapId} tribe-progress inbox full: dropped stat-allocation mirror for character {CharacterId}",
                 zone.MapId, characterId);

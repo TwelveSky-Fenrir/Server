@@ -18,7 +18,8 @@ public sealed class DrinkBottleService(WorldDataCache worldData) : IDrinkBottleS
             ? petStack.ItemId
             : 0;
 
-        var resolved = BottleResolver.ResolveDrink(state.BottleSlots, sort, value, petItemId != 0);
+        var resolved = BottleResolver.ResolveDrink(state.BottleSlots, sort, value,
+            BottleResolver.MountBlocksDrinking(state.AnimalNumber, state.AnimalAbsorbState));
 
         switch (resolved.Outcome)
         {
@@ -45,7 +46,8 @@ public sealed class DrinkBottleService(WorldDataCache worldData) : IDrinkBottleS
             petContribution, state, zoneOverride: zoneOverride);
 
         zone.PostDrinkBottleCommand(new DrinkBottleZoneCommand(characterId, value, resolved.NewCount,
-            updatedStats.MaxLife, UpdatedStats: updatedStats, DrunkTicksRemaining: BottleResolver.DrunkDurationTicks,
+            Math.Min(state.Life, updatedStats.MaxLife), UpdatedStats: updatedStats,
+            DrunkTicksRemaining: BottleResolver.DrunkDurationTicks,
             DrunkActiveIndex: value));
 
         return new DrinkBottleResult(DrinkBottleOutcome.Success, value, BottleResolver.DrunkDurationTicks);

@@ -11,7 +11,6 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Game.Services.Gm;
 
 public sealed class GmCallPvpService(
-    ZoneRegistry zones,
     IEventLogRepository eventLog,
     ILogger<GmCallPvpService> logger,
     DuelRegistry? duelRegistry = null) : IGmCallPvpService
@@ -45,6 +44,11 @@ public sealed class GmCallPvpService(
                 logger.LogDebug(
                     "Character {CharacterId} GM-CALLPVP rejected: invalid duel slot {DuelSlot}",
                     zoneSession.CharacterId, packet.DuelSlot);
+            await eventLog.LogAsync(GmDuelAndInventoryActionEventCodes.CallPvpRelocate, EventLogCategory.GmAction,
+                zoneSession.AccountId, zoneSession.CharacterId, null, null, null, null, null, null, null,
+                GmCommandCatalog.OutcomeRejected,
+                $"Command=CALLPVP;Sort={Sort};DuelSlot={packet.DuelSlot};Reason=InvalidDuelSlot",
+                cancellationToken);
             zoneSession.Send(new GenericActionResponse
                 { Result = RejectedResult, Sort = Sort, Data = data, RuneValue = 0 });
             return;
@@ -57,49 +61,58 @@ public sealed class GmCallPvpService(
 
         var callerCharacterId = zoneSession.CharacterId!.Value;
         var callerAccountId = zoneSession.AccountId;
+        var relocatedCount = 0;
 
-        foreach (var zone in zones.Zones)
-        foreach (var candidate in zone.Players)
-        {
-            if (!string.Equals(candidate.Name, packet.TargetName, StringComparison.Ordinal))
-                continue;
-
-            if (candidate.IsMovingZone)
+        if (zoneSession.CurrentZone is Zone zone)
+            foreach (var candidate in zone.Players)
             {
-                if (logger.IsEnabled(LogLevel.Debug))
-                    logger.LogDebug(
-                        "GM-CALLPVP: candidate character {CandidateCharacterId} ({CandidateName}) skipped -- mid zone-transfer",
-                        candidate.CharacterId, candidate.Name);
-                continue;
+                if (!string.Equals(candidate.Name, packet.TargetName, StringComparison.Ordinal))
+                    continue;
+
+                if (candidate.IsMovingZone)
+                {
+                    if (logger.IsEnabled(LogLevel.Debug))
+                        logger.LogDebug(
+                            "GM-CALLPVP: candidate character {CandidateCharacterId} ({CandidateName}) skipped -- mid zone-transfer",
+                            candidate.CharacterId, candidate.Name);
+                    continue;
+                }
+
+                if (duelRegistry is not null &&
+                    (duelRegistry.IsNegotiating(candidate.CharacterId) ||
+                     duelRegistry.TryGetActiveDuel(candidate.CharacterId, out _)))
+                {
+                    if (logger.IsEnabled(LogLevel.Debug))
+                        logger.LogDebug(
+                            "GM-CALLPVP: candidate character {CandidateCharacterId} ({CandidateName}) skipped -- already engaged in a duel-related state",
+                            candidate.CharacterId, candidate.Name);
+                    continue;
+                }
+
+                if (!await zone.PostTribeProgressCommandAndWaitAsync(
+                        new TribeProgressZoneCommand(candidate.CharacterId, TeleportTo: destination,
+                            NeighborActionBroadcast: true, ResetAfkTick: true), cancellationToken))
+                    logger.LogError(
+                        "Zone {MapId} tribe-progress inbox full: dropped GM-CALLPVP relocation mirror for character {CharacterId}",
+                        zone.MapId, candidate.CharacterId);
+
+                await eventLog.LogAsync(GmDuelAndInventoryActionEventCodes.CallPvpRelocate,
+                    EventLogCategory.GmAction, callerAccountId, callerCharacterId,
+                    ((IZoneSession)candidate.Session).AccountId, candidate.CharacterId, null, null, null, null,
+                    null, 1, $"DuelSlot={packet.DuelSlot};TargetName={candidate.Name}", cancellationToken);
+
+                relocatedCount++;
+
+                logger.LogInformation(
+                    "Character {CharacterId} applied the Basic-tier GM-CALLPVP command against character {TargetCharacterId} ({TargetName}), duel slot {DuelSlot}",
+                    callerCharacterId, candidate.CharacterId, candidate.Name, packet.DuelSlot);
             }
 
-            if (duelRegistry is not null &&
-                (duelRegistry.IsNegotiating(candidate.CharacterId) ||
-                 duelRegistry.TryGetActiveDuel(candidate.CharacterId, out _)))
-            {
-                if (logger.IsEnabled(LogLevel.Debug))
-                    logger.LogDebug(
-                        "GM-CALLPVP: candidate character {CandidateCharacterId} ({CandidateName}) skipped -- already engaged in a duel-related state",
-                        candidate.CharacterId, candidate.Name);
-                continue;
-            }
-
-            if (!await zone.PostTribeProgressCommandAndWaitAsync(
-                    new TribeProgressZoneCommand(candidate.CharacterId, TeleportTo: destination,
-                        NeighborActionBroadcast: true, ResetAfkTick: true), cancellationToken))
-                logger.LogError(
-                    "Zone {MapId} tribe-progress inbox full: dropped GM-CALLPVP relocation mirror for character {CharacterId}",
-                    zone.MapId, candidate.CharacterId);
-
-
+        if (relocatedCount == 0)
             await eventLog.LogAsync(GmDuelAndInventoryActionEventCodes.CallPvpRelocate, EventLogCategory.GmAction,
-                callerAccountId, callerCharacterId, ((IZoneSession)candidate.Session).AccountId,
-                candidate.CharacterId, null, null, null, null, null, 1,
-                $"DuelSlot={packet.DuelSlot};TargetName={candidate.Name}", cancellationToken);
-
-            logger.LogInformation(
-                "Character {CharacterId} applied the Basic-tier GM-CALLPVP command against character {TargetCharacterId} ({TargetName}), duel slot {DuelSlot}",
-                callerCharacterId, candidate.CharacterId, candidate.Name, packet.DuelSlot);
-        }
+                callerAccountId, callerCharacterId, null, null, null, null, null, null, null,
+                GmCommandCatalog.OutcomeRejected,
+                $"Command=CALLPVP;Sort={Sort};DuelSlot={packet.DuelSlot};TargetName={packet.TargetName};Reason=NoEligibleTarget",
+                cancellationToken);
     }
 }

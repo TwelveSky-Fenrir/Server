@@ -59,8 +59,6 @@ public sealed class SearchShopListingsService(
 
             var page = row.SlotIndex / PshopPurchasePolicy.MaxSlots;
             var slot = row.SlotIndex % PshopPurchasePolicy.MaxSlots;
-            var (gem1, gem2, gem3) = PshopPurchasePolicy.DecodeSocketData(row.SocketData);
-
             results.Add(new SearchShopListingsResponse
             {
                 UniqueNumber = unchecked((uint)(row.CharacterId * 2 + 1)),
@@ -68,7 +66,7 @@ public sealed class SearchShopListingsService(
                 Page = page,
                 Index = slot,
                 PshopItemInfo = [row.ItemId, row.Quantity, row.Value, row.SerialNumber, row.Price, 0, 0, 0, 0],
-                SocketInfo = [gem1, gem2, gem3],
+                SocketInfo = [row.SocketGem1, row.SocketGem2, row.SocketGem3],
                 CycleTick = cycleTick
             });
         }

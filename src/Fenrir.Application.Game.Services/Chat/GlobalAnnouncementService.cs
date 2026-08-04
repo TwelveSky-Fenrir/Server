@@ -1,6 +1,7 @@
 using Fenrir.Application.Game.Abstractions.Chat;
 using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Application.Game.Domain;
+using Fenrir.Application.Game.Domain.Gm;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -11,6 +12,7 @@ namespace Fenrir.Application.Game.Services.Chat;
 public sealed class GlobalAnnouncementService(
     ZoneRegistry zones,
     IGuildTribeBroadcastRelayQueue relay,
+    IEventLogQueue eventLogQueue,
     IOptions<GameServerOptions> options,
     ILogger<GlobalAnnouncementService> logger) : IGlobalAnnouncementService
 {
@@ -53,8 +55,21 @@ public sealed class GlobalAnnouncementService(
             null,
             null));
 
+        Audit(zoneSession, GmCommandCatalog.OutcomeExecuted,
+            $"Command=NOTICE;RecipientCount={recipientCount};Content={content}");
+
         logger.LogInformation(
             "Character {CharacterId} broadcast a global announcement cluster-wide ({RecipientCount} same-shard recipients, {ContentLength} chars)",
             zoneSession.CharacterId, recipientCount, content.Length);
+    }
+
+    private void Audit(IZoneSession zoneSession, byte outcome, string payload)
+    {
+        if (!eventLogQueue.Enqueue(new EventLogEntryTvp(GmCommandCatalog.GlobalAnnouncementAudit,
+                (byte)EventLogCategory.GmAction, zoneSession.AccountId, zoneSession.CharacterId, null, null, null,
+                null, null, null, null, outcome, payload, DateTime.UtcNow)))
+            logger.LogWarning(
+                "game.EventLog write-behind queue full: dropped GM global-announcement audit row for character {CharacterId}",
+                zoneSession.CharacterId);
     }
 }

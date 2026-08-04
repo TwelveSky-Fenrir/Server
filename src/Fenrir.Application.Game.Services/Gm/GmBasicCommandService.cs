@@ -120,8 +120,6 @@ public sealed class GmBasicCommandService(
         var result = FailureResult;
         var index = payload.MonsterIndex;
 
-        // Negative indices are tower-war guardians (TowerWarState.GuardianServerIndex); legacy rejects tValue < 0
-        // outright (S04_MyWork04.cpp:1169), so GM DIE must not reach them and bypass the tower engagement gates.
         if (index >= 0 && zone.TryGetMonster(index, out var monster) && monster is not null)
         {
             await eventLog.LogAsync(GmCommandCatalog.Resolve(DieSort).AuditEventCode, EventLogCategory.GmAction,
@@ -546,6 +544,11 @@ public sealed class GmBasicCommandService(
             await AuditAsync(CallSort, zoneSession, ((IZoneSession)member.Session).AccountId, member.CharacterId,
                 GmCommandCatalog.OutcomeExecuted, $"TargetName={member.Name};PartyName={targetPartyName}",
                 cancellationToken);
+
+        if (pulled.Count == 0)
+            await AuditAsync(CallSort, zoneSession, ((IZoneSession)target.Session).AccountId, target.CharacterId,
+                GmCommandCatalog.OutcomeRejected,
+                $"TargetName={target.Name};PartyName={targetPartyName};Reason=NobodyPulled", cancellationToken);
 
         SendAck(zoneSession, CallSort, data, SuccessResult);
     }

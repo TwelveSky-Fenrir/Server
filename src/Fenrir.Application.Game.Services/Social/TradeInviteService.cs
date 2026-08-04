@@ -41,6 +41,13 @@ public sealed class TradeInviteService(
         if (!zones.TryGetPlayerByName(targetAvatarName, out var target))
             return await InviteCrossShardAsync(asker, targetAvatarName, cancellationToken).ConfigureAwait(false);
 
+        if (target.CharacterId == asker.CharacterId)
+        {
+            logger.LogDebug("Trade invite rejected: character {AskerCharacterId} targeted its own avatar name",
+                asker.CharacterId);
+            return new TradeInviteResult(TradeInviteResultKind.TargetNotFound);
+        }
+
         var allyOfAskerTribe = worldState.GetAllyOf(asker.Tribe);
         var interTribeAllowed = zone.MapId is 37 or 119 or 124;
         if (!interTribeAllowed && asker.Tribe != target.Tribe && target.Tribe != allyOfAskerTribe)

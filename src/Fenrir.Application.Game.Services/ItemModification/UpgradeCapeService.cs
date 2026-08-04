@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Abstractions.ItemModification;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Enchant;
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Loot;
 using Fenrir.Domain.Game.GameData;
@@ -25,6 +26,8 @@ public sealed class UpgradeCapeService(
     private const byte SuccessOutcome = 0;
 
     private const byte FailedOutcome = 1;
+
+    private const int LuckyUpgradeStatSort = 29;
 
     public async ValueTask<UpgradeCapeResult> UpgradeAsync(UpgradeCapeRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
@@ -49,8 +52,8 @@ public sealed class UpgradeCapeService(
         var luck = state.Stats?.Luck ?? 0;
         var nowUnixSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         var premiumActive = state.PremiumExpireUtc >= nowUnixSeconds;
-        var resolved = CapeUpgradeResolver.Resolve(target.ItemId, material.ItemId, luck, 0, premiumActive,
-            SystemRandomSource.Instance);
+        var resolved = CapeUpgradeResolver.Resolve(target.ItemId, material.ItemId, luck, state.HighItemValue,
+            premiumActive, SystemRandomSource.Instance);
 
         if (resolved.Outcome == CapeUpgradeResolver.Outcome.Rejected)
             return new UpgradeCapeResult(UpgradeCapeOutcome.Rejected, false, [0, 0, 0, 0, 0, 0]);
@@ -96,6 +99,19 @@ public sealed class UpgradeCapeService(
                 "Character {CharacterId} cape-upgrade AdjustMoney...ReplaceContainer(s)Async failed (treated as insufficient funds)",
                 characterId);
             return new UpgradeCapeResult(UpgradeCapeOutcome.Rejected, false, [0, 0, 0, 0, 0, 0]);
+        }
+
+        if (resolved.ConsumesLuckyCharge)
+        {
+            var newHighItemValue = state.HighItemValue - 1;
+            state.Session.Send(new AvatarStatUpdateResponse
+                { Sort = LuckyUpgradeStatSort, Value = newHighItemValue, Value2 = 0 });
+
+            if (!await zone.PostTribeProgressCommandAndWaitAsync(
+                    new TribeProgressZoneCommand(characterId, HighItemValue: newHighItemValue), cancellationToken))
+                logger.LogError(
+                    "Zone {MapId} tribe-progress inbox full: dropped lucky-upgrade charge mirror for character {CharacterId}",
+                    zone.MapId, characterId);
         }
 
         if (!eventLogQueue.Enqueue(new EventLogEntryTvp(UpgradeCapeEventCode, (byte)EventLogCategory.Enchant, null,

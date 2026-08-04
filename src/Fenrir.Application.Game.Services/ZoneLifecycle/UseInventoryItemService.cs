@@ -51,6 +51,16 @@ public sealed class UseInventoryItemService(
 
     private const int DeathProtectionScrollAmount = 20;
 
+    private const int MountExpAlreadyMaxedResult = 2;
+
+    private const int GuildScrollRejectedResult = 3;
+
+    private const int GuildScrollNoGuildResult = 4;
+
+    private const int RebirthResetZone101TimeRefund = 10000;
+
+    private const int RebirthResetElixirCap = 200;
+
     private const int TowerConstructItemId = 665;
 
     private const int TowerHealItemId = 667;
@@ -134,8 +144,15 @@ public sealed class UseInventoryItemService(
 
     private const int AutoHuntAttackTypeLength = 4;
 
+    private const int PetInventoryRenewalItemId = 829;
+
+    private const int PetInventoryRenewalDays = 30;
+
     private static readonly ImmutableHashSet<int> TribeConversionBookItemIds =
         ImmutableHashSet.Create(99014, 99015, 99016);
+
+    private static readonly ImmutableHashSet<int> RebirthOnlyStatBoostItemIds =
+        ImmutableHashSet.Create(1191, 1192, 1193, 1194, 1195, 1196, 1197, 1198, 1199, 626, 627, 628, 17037);
 
     public async ValueTask<UseInventoryItemResponse?> ResolveAsync(Zone zone, PlayerRuntimeState state,
         int characterId, int accountId, byte page, byte index, int value, IPacketSession session,
@@ -258,29 +275,13 @@ public sealed class UseInventoryItemService(
                 cancellationToken);
         }
 
-        if (ResolveDmgBoostMinutes(item.ItemId) is { } dbMin)
-            return await ResolveTimedCounterItemAsync(zone, state, characterId, page, index, item,
-                dbMin, 46, static s => s.DmgBoost,
-                static (id, v) => new TribeProgressZoneCommand(id, DmgBoost: v),
-                cancellationToken);
-
-        if (ResolveHpBoostMinutes(item.ItemId) is { } hbMin)
-            return await ResolveTimedCounterItemAsync(zone, state, characterId, page, index, item,
-                hbMin, 47, static s => s.HPBoost,
-                static (id, v) => new TribeProgressZoneCommand(id, HPBoost: v),
-                cancellationToken);
-
-        if (ResolveCriBoostMinutes(item.ItemId) is { } cbMin)
-            return await ResolveTimedCounterItemAsync(zone, state, characterId, page, index, item,
-                cbMin, 48, static s => s.CriBoost,
-                static (id, v) => new TribeProgressZoneCommand(id, CriBoost: v),
-                cancellationToken);
-
-        if (ResolveWarriorPillMinutes(item.ItemId) is { } wpMin)
-            return await ResolveTimedCounterItemAsync(zone, state, characterId, page, index, item,
-                wpMin, 91, static s => s.WarriorPill,
-                static (id, v) => new TribeProgressZoneCommand(id, WarriorPill: v),
-                cancellationToken);
+        if (RebirthOnlyStatBoostItemIds.Contains(item.ItemId))
+        {
+            logger.LogInformation(
+                "Character {CharacterId} use-inventory-item (stat-boost scroll {ItemId}): dead feature -- WUSE_ITEM_1191/WUSE_ITEM_626 are guarded by __REBIRTH__ (Server/Header/use_inventory.h:104-107), which has its only #define inside the dead #else of #ifdef M33 (Server/Header/Protocol/DEFINE.h:28); the legacy drops the session here, so the four counters are permanently 0 -- item kept",
+                characterId, item.ItemId);
+            return Fail(characterId, item, page, index);
+        }
 
         if (item.ItemId is 1227 or 8439)
             return await ResolveTimedCounterItemAsync(zone, state, characterId, page, index, item,
@@ -380,6 +381,18 @@ public sealed class UseInventoryItemService(
         if (item.ItemId == WarPointBoxItemId)
             return await ResolveWarPointBoxAsync(zone, state, characterId, page, index, item, cancellationToken);
 
+        if (ResolveHermitsVaultRenewalDays(item.ItemId) is { } hermitsVaultDays)
+            return await ResolveVaultRenewalAsync(zone, state, characterId, page, index, item, hermitsVaultDays,
+                VaultRenewalTarget.HermitsVault, cancellationToken);
+
+        if (ResolveStorageVaultRenewalDays(item.ItemId) is { } storageVaultDays)
+            return await ResolveVaultRenewalAsync(zone, state, characterId, page, index, item, storageVaultDays,
+                VaultRenewalTarget.StorageVault, cancellationToken);
+
+        if (item.ItemId == PetInventoryRenewalItemId)
+            return await ResolveVaultRenewalAsync(zone, state, characterId, page, index, item,
+                PetInventoryRenewalDays, VaultRenewalTarget.PetInventory, cancellationToken);
+
         if (useItemRegistry?.Resolve(item, itemDefinition) is { } useItemHandler)
             return await useItemHandler.HandleAsync(
                 new UseItemContext(zone, state, characterId, accountId, page, index, item, itemDefinition, value,
@@ -467,7 +480,7 @@ public sealed class UseInventoryItemService(
     private static int PotionGain(bool isPercent, int potionType2, int effectiveMax, int current)
     {
         var raw = isPercent ? effectiveMax * potionType2 / 100 : potionType2;
-        return Math.Clamp(raw, 0, effectiveMax - current);
+        return Math.Clamp(raw, 0, Math.Max(0, effectiveMax - current));
     }
 
     private UseInventoryItemResponse Unrecognized(PlayerRuntimeState state, int characterId, int accountId,
@@ -613,11 +626,23 @@ public sealed class UseInventoryItemService(
         int characterId, byte page, byte index, ItemStack item, int minutes, CancellationToken cancellationToken)
     {
         if (state.GuildId is not { } guildId)
-            return Fail(characterId, item, page, index);
+        {
+            logger.LogDebug(
+                "Character {CharacterId} guild scroll rejected: not in a guild (item {ItemId})",
+                characterId, item.ItemId);
+            return new UseInventoryItemResponse
+                { Result = GuildScrollNoGuildResult, Page = page, Index = index, Value = 0, Value2 = 0 };
+        }
 
         var guild = await guilds.GetByIdAsync(guildId, cancellationToken);
         if (guild is null)
-            return Fail(characterId, item, page, index);
+        {
+            logger.LogWarning(
+                "Character {CharacterId} guild scroll rejected: guild {GuildId} not found (item {ItemId})",
+                characterId, guildId, item.ItemId);
+            return new UseInventoryItemResponse
+                { Result = GuildScrollRejectedResult, Page = page, Index = index, Value = 0, Value2 = 0 };
+        }
 
         GuildBuffTopUp.Result topUp;
         try
@@ -920,8 +945,8 @@ public sealed class UseInventoryItemService(
         {
             1137 => StatResetResolver.LevelBand.UpTo99,
             1138 => StatResetResolver.LevelBand.Level100To112,
-            1139 => StatResetResolver.LevelBand.Level113PlusNoGrade,
-            1143 or 2022 or 8417 => StatResetResolver.LevelBand.Level145PlusWithGrade,
+            1139 or 8417 => StatResetResolver.LevelBand.Level113PlusNoGrade,
+            1143 or 2022 => StatResetResolver.LevelBand.Level145PlusWithGrade,
             _ => null
         };
     }
@@ -1008,10 +1033,12 @@ public sealed class UseInventoryItemService(
     }
 
     private EffectiveStats RecomputeStatsAfterReset(PlayerRuntimeState state, int statVit, int statStr,
-        int statInt, int statDex, ConsumableContext? consumableOverride = null)
+        int statInt, int statDex, ConsumableContext? consumableOverride = null, int? rebirthCountOverride = null,
+        short? level2Override = null)
     {
         var attributes = new CharacterBaseAttributes(statVit, statStr, statInt, statDex, state.Level, state.Tribe,
-            state.PreviousTribe, state.Title, state.Halo, state.RebirthCount, state.Level2);
+            state.PreviousTribe, state.Title, state.Halo, rebirthCountOverride ?? state.RebirthCount,
+            level2Override ?? state.Level2);
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
         var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
             ? petStack.ItemId
@@ -1027,12 +1054,13 @@ public sealed class UseInventoryItemService(
         return itemId switch
         {
             593 or 1218 => new CharmChargeSpec(ProtectionCharmCounterKind.Refine, 1),
-            1103 or 1358 or 1455 => new CharmChargeSpec(ProtectionCharmCounterKind.Destroy, 1),
-            8418 => new CharmChargeSpec(ProtectionCharmCounterKind.Destroy, 5),
+            1103 or 1455 or 8418 => new CharmChargeSpec(ProtectionCharmCounterKind.Destroy, 1),
+            1358 => new CharmChargeSpec(ProtectionCharmCounterKind.Destroy, 5),
             8103 or 8436 => new CharmChargeSpec(ProtectionCharmCounterKind.Costume, 1),
             828 or 837 => new CharmChargeSpec(ProtectionCharmCounterKind.Destroy2, 1),
-            1166 or 8435 or 17033 or 99405 => new CharmChargeSpec(ProtectionCharmCounterKind.Halo, 1),
+            1166 or 8435 or 17033 => new CharmChargeSpec(ProtectionCharmCounterKind.Halo, 1),
             1188 => new CharmChargeSpec(ProtectionCharmCounterKind.Halo, 3),
+            1237 or 8437 => new CharmChargeSpec(ProtectionCharmCounterKind.Wing, 1),
             _ => null
         };
     }
@@ -1050,6 +1078,7 @@ public sealed class UseInventoryItemService(
             ProtectionCharmCounterKind.Costume => state.ProtectForCostume,
             ProtectionCharmCounterKind.Destroy2 => state.ProtectForDestroy2,
             ProtectionCharmCounterKind.Halo => state.ProtectForHalo,
+            ProtectionCharmCounterKind.Wing => state.ProtectForWing,
             _ => 0
         };
 
@@ -1072,6 +1101,8 @@ public sealed class UseInventoryItemService(
                 new TribeProgressZoneCommand(characterId, ProtectForDestroy2: charged.NewCounterValue),
             ProtectionCharmCounterKind.Halo =>
                 new TribeProgressZoneCommand(characterId, ProtectForHalo: charged.NewCounterValue),
+            ProtectionCharmCounterKind.Wing =>
+                new TribeProgressZoneCommand(characterId, ProtectForWing: charged.NewCounterValue),
             _ => new TribeProgressZoneCommand(characterId)
         };
 
@@ -1584,35 +1615,76 @@ public sealed class UseInventoryItemService(
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
 
-    private static int? ResolveDmgBoostMinutes(int itemId)
+    private static int? ResolveStorageVaultRenewalDays(int itemId)
     {
         return itemId switch
         {
-            1191 => 180, 1192 => 90, 1193 => 30, _ => null
+            1101 or 1130 or 2020 => 30,
+            1140 => 60,
+            1357 => 180,
+            8408 => 7,
+            _ => null
         };
     }
 
-    private static int? ResolveHpBoostMinutes(int itemId)
+    private static int? ResolveHermitsVaultRenewalDays(int itemId)
     {
         return itemId switch
         {
-            1194 => 180, 1195 => 90, 1196 => 30, _ => null
+            1102 or 1129 or 2019 => 30,
+            807 or 8407 => 7,
+            1141 => 60,
+            1356 => 180,
+            _ => null
         };
     }
 
-    private static int? ResolveCriBoostMinutes(int itemId)
+    private async ValueTask<UseInventoryItemResponse> ResolveVaultRenewalAsync(
+        Zone zone, PlayerRuntimeState state, int characterId, byte page, byte index, ItemStack item, int days,
+        VaultRenewalTarget target, CancellationToken cancellationToken)
     {
-        return itemId switch
+        var currentExpiry = ReadVaultExpiry(state, target);
+
+        if (!HermitsVaultRenewalPolicy.TryComputeRenewedExpiry(currentExpiry, GameDate.Today(), days,
+                out var newExpiry))
+            return Fail(characterId, item, page, index);
+
+        var command = target switch
         {
-            1197 => 180, 1198 => 90, 1199 => 30, _ => null
+            VaultRenewalTarget.HermitsVault => new InventoryZoneCommand(characterId,
+                ImmutableArray<InventoryContainerSnapshot>.Empty, null, InventoryDate: newExpiry),
+            VaultRenewalTarget.StorageVault => new InventoryZoneCommand(characterId,
+                ImmutableArray<InventoryContainerSnapshot>.Empty, null, StoreDate: newExpiry),
+            _ => new InventoryZoneCommand(characterId, ImmutableArray<InventoryContainerSnapshot>.Empty, null,
+                PetBagDate: newExpiry)
         };
+
+        var posted = await zone.PostInventoryCommandAndWaitAsync(command, cancellationToken);
+
+        if (!posted || ReadVaultExpiry(state, target) != newExpiry)
+        {
+            logger.LogError(
+                "Zone {MapId} did not apply the {Target} renewal for character {CharacterId} (item {ItemId}, {Days}d, {Current} -> {New}): item kept, nothing granted",
+                zone.MapId, target, characterId, item.ItemId, days, currentExpiry, newExpiry);
+            return Fail(characterId, item, page, index);
+        }
+
+        logger.LogInformation(
+            "Character {CharacterId} {Target} renewal applied: item {ItemId} +{Days} day(s), expiry {Current} -> {New}",
+            characterId, target, item.ItemId, days, currentExpiry, newExpiry);
+
+        var consumed = await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
+
+        return consumed with { Value = newExpiry };
     }
 
-    private static int? ResolveWarriorPillMinutes(int itemId)
+    private static int ReadVaultExpiry(PlayerRuntimeState state, VaultRenewalTarget target)
     {
-        return itemId switch
+        return target switch
         {
-            626 or 17037 => 180, 627 => 90, 628 => 30, _ => null
+            VaultRenewalTarget.HermitsVault => state.InventoryDate,
+            VaultRenewalTarget.StorageVault => state.StoreDate,
+            _ => state.PetBagDate
         };
     }
 
@@ -1727,27 +1799,46 @@ public sealed class UseInventoryItemService(
             return Fail(characterId, item, page, index);
 
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
-        foreach (var (slot, stack) in equipmentContainer)
-            if (slot != PetSlots.EquipmentSlot && stack.ItemId != 0)
+        foreach (var (_, stack) in equipmentContainer)
+            if (stack.ItemId != 0)
                 return Fail(characterId, item, page, index);
 
         const int resetStat = 1;
         const int resetStatPoints = 1775;
 
-        var updatedStats = RecomputeStatsAfterReset(state, resetStat, resetStat, resetStat, resetStat);
+        var newEatLife = Math.Min(state.EatLifePotion, RebirthResetElixirCap);
+        var newEatMana = Math.Min(state.EatManaPotion, RebirthResetElixirCap);
+        var newEatStr = Math.Min(state.EatStrPotion, RebirthResetElixirCap);
+        var newEatDex = Math.Min(state.EatDexPotion, RebirthResetElixirCap);
+        var newEatEle =
+            Math.Min(ElementalPotionPacking.DamageSubValue(state.EatElePotion), RebirthResetElixirCap) *
+            ElementalPotionPacking.Modulus +
+            Math.Min(ElementalPotionPacking.DefenseSubValue(state.EatElePotion), RebirthResetElixirCap);
+
+        var consumableOverride = new ConsumableContext(newEatLife, newEatMana, newEatStr, newEatDex, newEatEle,
+            state.HPBoost > 0, state.WarriorPill > 0, state.DmgBoost > 0, state.CriBoost > 0);
+
+        var updatedStats = RecomputeStatsAfterReset(state, resetStat, resetStat, resetStat, resetStat,
+            consumableOverride, 0, 0);
+
+        var newEliteDungeonTime = Math.Max(0, state.EliteDungeonTime - RebirthResetZone101TimeRefund);
 
         if (!await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
                 StatVit: resetStat, StatStr: resetStat, StatInt: resetStat, StatDex: resetStat,
                 StatPoints: resetStatPoints, Level2: 0, Exp2: 0, RebirthCount: 0,
                 SkillPoints: state.SkillPoints - spCost,
+                Life: 1, Mana: 0,
+                EatLifePotion: newEatLife, EatManaPotion: newEatMana, EatStrPotion: newEatStr,
+                EatDexPotion: newEatDex, EatElePotion: newEatEle,
+                EliteDungeonTime: newEliteDungeonTime,
                 UpdatedStats: updatedStats), cancellationToken))
             logger.LogError(
                 "Zone {MapId} tribe-progress inbox full: dropped rebirth-reset-scroll mirror for character {CharacterId}",
                 zone.MapId, characterId);
 
         logger.LogInformation(
-            "Character {CharacterId} rebirth-reset-scroll applied: level2={Level2} spCost={SpCost}",
-            characterId, state.Level2, spCost);
+            "Character {CharacterId} rebirth-reset-scroll applied: level2={Level2} spCost={SpCost} eliteDungeonTime {Old}->{New}",
+            characterId, state.Level2, spCost, state.EliteDungeonTime, newEliteDungeonTime);
 
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
@@ -1856,7 +1947,12 @@ public sealed class UseInventoryItemService(
             "Character {CharacterId} premium-service item {ItemId} applied: +{Days} day(s), expiry now {Expiry} (UTC)",
             characterId, item.ItemId, days, DateTimeOffset.FromUnixTimeSeconds(newExpiry).UtcDateTime);
 
-        return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
+        var consumed = await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
+
+        return consumed with
+        {
+            Value = unchecked((int)(newExpiry & 0xFFFFFFFFL)), Value2 = unchecked((int)(newExpiry >> 32))
+        };
     }
 
     private static int? ResolvePremiumDays(int itemId)
@@ -2091,12 +2187,15 @@ public sealed class UseInventoryItemService(
                     "Zone {MapId} hotkey-move inbox full: dropped book-of-amnesia skill-hotkey-clear mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                     zone.MapId, characterId);
 
-        var clearedAutoHuntConfig = ClearAutoHuntSkillArrays(state.AutoHuntConfig ?? EmptyAutoHuntConfig());
-        await PersistAutoHuntConfigAsync(characterId, false, clearedAutoHuntConfig, cancellationToken);
+        var clearedAutoHuntConfig = state.AutoHuntConfig is { } currentAutoHuntConfig
+            ? ClearAutoHuntSkillArrays(currentAutoHuntConfig)
+            : EmptyAutoHuntConfig();
+        await PersistAutoHuntConfigAsync(characterId, state.AutoHuntEnabled, clearedAutoHuntConfig,
+            cancellationToken);
 
         if (!zone.PostAutoBuffCommand(
                 new AutoBuffZoneCommand(characterId, AutoBuffSkillCodec.Empty,
-                    NewAutoHuntConfig: clearedAutoHuntConfig, DisableAutoHunt: true)))
+                    NewAutoHuntConfig: clearedAutoHuntConfig)))
             logger.LogError(
                 "Zone {MapId} auto-buff inbox full: dropped book-of-amnesia auto-buff/auto-hunt-clear mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
@@ -2224,9 +2323,6 @@ public sealed class UseInventoryItemService(
         Zone zone, PlayerRuntimeState state, int characterId, byte page, byte index,
         ItemStack item, int expAmount, bool requiresVip, CancellationToken cancellationToken)
     {
-        if (requiresVip && state.UserSort < 1)
-            return Fail(characterId, item, page, index);
-
         if (state.AnimalIndex is < 10 or > 19)
             return Fail(characterId, item, page, index);
 
@@ -2239,6 +2335,10 @@ public sealed class UseInventoryItemService(
 
         var currentExp = state.MountAccumulatedExp[slot];
         if (currentExp >= MountStateResolver.MaxMountExp)
+            return new UseInventoryItemResponse
+                { Result = MountExpAlreadyMaxedResult, Page = page, Index = index, Value = 0, Value2 = 0 };
+
+        if (requiresVip && state.UserSort < 1)
             return Fail(characterId, item, page, index);
 
         var newExp = Math.Min(currentExp + expAmount, MountStateResolver.MaxMountExp);
@@ -2290,6 +2390,15 @@ public sealed class UseInventoryItemService(
         return list;
     }
 
+    private enum VaultRenewalTarget
+    {
+        HermitsVault,
+
+        StorageVault,
+
+        PetInventory
+    }
+
     private enum StatPotionKind
     {
         Life,
@@ -2317,7 +2426,8 @@ public sealed class UseInventoryItemService(
         Destroy,
         Costume,
         Destroy2,
-        Halo
+        Halo,
+        Wing
     }
 
     private readonly record struct ScrollChargeSpec(ProtectionScrollCounterKind Kind, int FixedAmount);

@@ -3,7 +3,6 @@ using Fenrir.Application.Game.Abstractions.Commerce;
 using Fenrir.Application.Game.Domain.Commerce;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Simulation;
-using Fenrir.Application.Game.Domain.Social.Pshop;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Loot;
 using Fenrir.Domain.Game.GameData;
@@ -87,25 +86,36 @@ public sealed class UpdateProxyShopService(
 
         var finalQuantity = destination is { } d ? d.Quantity + listing.Quantity : listing.Quantity;
         var (enchant, combine, refine, socket) = ItemValueCodec.Decode(listing.Value);
-        var (gem1, gem2, gem3) = PshopPurchasePolicy.DecodeSocketData(listing.SocketData);
+        var (gem1, gem2, gem3) = (listing.SocketGem1, listing.SocketGem2, listing.SocketGem3);
         var newStack = new ItemStack(packet.SellItemIndex, finalQuantity, enchant, combine, refine, socket,
             gem1, gem2, gem3, 0, listing.SerialNumber);
 
         var projectedContainer = state.Inventory.GetContainer((byte)packet.SelfPage)
             .SetItem((byte)packet.SelfIndex, newStack);
 
+        var expected = new OfflineShopListingKey(slotIndex, packet.SellItemIndex, listing.Quantity, listing.Value,
+            listing.SerialNumber, gem1, gem2, gem3);
+
+        bool applied;
         try
         {
-            await offlineShops.RetrieveItemAndReplaceContainerAsync(characterId, slotIndex, packet.SellItemIndex,
-                listing.Quantity, listing.Value, (byte)packet.SelfPage, ToTvps(projectedContainer),
-                cancellationToken);
+            applied = await offlineShops.RetrieveItemAndReplaceContainerAsync(characterId, expected,
+                (byte)packet.SelfPage, ToTvps(projectedContainer), cancellationToken);
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex,
                 "Character {CharacterId} offline-shop retrieve RetrieveItemAndReplaceContainerAsync failed",
                 characterId);
-            return BuildReply(1, packet.SelfPage, packet.SelfIndex, newStack, 0);
+            return BuildReply(1, packet.SelfPage, packet.SelfIndex, null, 0);
+        }
+
+        if (!applied)
+        {
+            logger.LogInformation(
+                "Offline-shop retrieve rejected: character {CharacterId} slot {SlotIndex} changed between read and delete (shop reopened or slot already emptied)",
+                characterId, slotIndex);
+            return BuildReply(1, packet.SelfPage, packet.SelfIndex, null, 0);
         }
 
         var response = BuildReply(0, packet.SelfPage, packet.SelfIndex, newStack, 0);
@@ -194,30 +204,34 @@ public sealed class UpdateProxyShopService(
 
         var finalQuantity = destination is { } d ? d.Quantity + listing.Quantity : listing.Quantity;
         var (enchant, combine, refine, socket) = ItemValueCodec.Decode(listing.Value);
-        var (gem1, gem2, gem3) = PshopPurchasePolicy.DecodeSocketData(listing.SocketData);
+        var (gem1, gem2, gem3) = (listing.SocketGem1, listing.SocketGem2, listing.SocketGem3);
         var newStack = new ItemStack(packet.SellItemIndex, finalQuantity, enchant, combine, refine, socket,
             gem1, gem2, gem3, 0, listing.SerialNumber);
 
         var projectedContainer = state.Inventory.GetContainer((byte)packet.SelfPage)
             .SetItem((byte)packet.SelfIndex, newStack);
 
+        var expected = new OfflineShopListingKey(slotIndex, packet.SellItemIndex, listing.Quantity, listing.Value,
+            listing.SerialNumber, gem1, gem2, gem3);
+
+        bool applied;
         try
         {
-            await offlineShops.ExecutePurchaseAsync(sellerId.Value, slotIndex, packet.SellItemIndex, listing.Quantity,
-                listing.Value, listing.Price, characterId, (byte)packet.SelfPage, ToTvps(projectedContainer),
-                cancellationToken);
-        }
-        catch (Exception ex) when (ProxyShopDeputyFailureClassifier.IsStaleListingFailure(ex))
-        {
-            logger.LogInformation(ex,
-                "Offline-shop purchase rejected: character {CharacterId} proxy listing changed since it was read (stale purchase) -- session will be disconnected",
-                characterId);
-            return null;
+            applied = await offlineShops.ExecutePurchaseAsync(sellerId.Value, expected, listing.Price, characterId,
+                (byte)packet.SelfPage, ToTvps(projectedContainer), cancellationToken);
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Character {CharacterId} offline-shop purchase ExecutePurchaseAsync failed",
                 characterId);
+            return BuildReply(2, packet.SelfPage, packet.SelfIndex, null, 0);
+        }
+
+        if (!applied)
+        {
+            logger.LogInformation(
+                "Offline-shop purchase rejected: character {CharacterId} seller {SellerId} slot {SlotIndex} changed between read and delete (lost the race)",
+                characterId, sellerId.Value, slotIndex);
             return BuildReply(2, packet.SelfPage, packet.SelfIndex, null, 0);
         }
 

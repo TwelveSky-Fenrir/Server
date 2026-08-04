@@ -19,9 +19,7 @@ public sealed class MountAbsorbService : IMountAbsorbService
 
     public void Release(Zone zone, PlayerRuntimeState state, int characterId)
     {
-        var maxLife = state.Stats?.MaxLife ?? state.MaxLife;
-        var maxMana = state.Stats?.MaxMana ?? state.MaxMana;
-        zone.PostMountCommand(new MountZoneCommand(characterId, AnimalAbsorbState: 0, Life: maxLife,
-            Mana: maxMana, Broadcast: MountBroadcastKind.AbsorbToggle));
+        zone.PostMountCommand(new MountZoneCommand(characterId, AnimalAbsorbState: 0,
+            Broadcast: MountBroadcastKind.AbsorbToggle));
     }
 }

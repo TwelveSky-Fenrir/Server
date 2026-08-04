@@ -122,9 +122,8 @@ public sealed class OpenShopStallService(
 
             if (isProxy)
                 offlineItems.Add(new OfflineShopItemSlotTvp((short)(page * PshopPurchasePolicy.MaxSlots + slot),
-                    view.ItemId, view.Quantity, view.Value, view.Serial, view.Price,
-                    PshopPurchasePolicy.EncodeSocketData(liveSlot!.Value.SocketGem1, liveSlot.Value.SocketGem2,
-                        liveSlot.Value.SocketGem3)));
+                    view.ItemId, view.Quantity, view.Value, view.Serial, view.Price, null,
+                    liveSlot.Value.SocketGem1, liveSlot.Value.SocketGem2, liveSlot.Value.SocketGem3));
         }
 
         var uniqueNumber = unchecked((uint)(state.CharacterId * 2 + (isProxy ? 1 : 0)));

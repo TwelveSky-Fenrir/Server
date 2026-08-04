@@ -52,6 +52,13 @@ public sealed class FriendService(
         var target = FindPlayerByName(zone, targetAvatarName);
         if (target is not null)
         {
+            if (target.CharacterId == asker.CharacterId)
+            {
+                logger.LogDebug("Friend ask rejected: character {AskerId} targeted its own avatar name",
+                    asker.CharacterId);
+                return FriendAskResultKind.TargetNotFound;
+            }
+
             if (asker.Friends.Values.Contains(target.CharacterId))
             {
                 logger.LogWarning(
@@ -319,6 +326,14 @@ public sealed class FriendService(
         {
             logger.LogDebug(
                 "Friend ask rejected: character {AskerId} target {TargetAvatarName} not found on any shard",
+                asker.CharacterId, targetAvatarName);
+            return FriendAskResultKind.TargetNotFound;
+        }
+
+        if (remote.CharacterId == asker.CharacterId)
+        {
+            logger.LogDebug(
+                "Friend ask rejected: character {AskerId} resolved its own directory row for {TargetAvatarName}",
                 asker.CharacterId, targetAvatarName);
             return FriendAskResultKind.TargetNotFound;
         }

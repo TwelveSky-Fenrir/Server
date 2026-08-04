@@ -2,6 +2,7 @@ using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
+using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -63,8 +64,39 @@ public sealed class AllianceDiplomacyCeremonyHost(
         if (result.Notice == AllianceCeremonyNotice.None)
             return;
 
+        var sort = AllianceCeremonyNoticeWireSort.Of(result.Notice);
+        if (sort != 0)
+        {
+            var response = new TribeAllianceStatusResponse { Sort = sort, Value = result.RemainingCountdown };
+            SendCeremonyNotice(zone, result.RecipientOne, response);
+            SendCeremonyNotice(zone, result.RecipientTwo, response);
+        }
+
+        if (result.Notice is AllianceCeremonyNotice.NewAllianceProgress
+            or AllianceCeremonyNotice.AlreadyAlliedProgress)
+            return;
+
         logger.LogInformation(
             "AllianceDiplomacyCeremony: {Notice} -- post one {RecipientOne}, post two {RecipientTwo}, remaining {Remaining}",
             result.Notice, result.RecipientOne, result.RecipientTwo, result.RemainingCountdown);
+    }
+
+    private void SendCeremonyNotice(Zone zone, AllianceCeremonyCandidate? recipient,
+        in TribeAllianceStatusResponse response)
+    {
+        if (recipient is not { } candidate)
+            return;
+
+        if (!zone.TryGetPlayer(candidate.CharacterId, out var state) || state is null || state.IsMovingZone)
+            return;
+
+        try
+        {
+            state.Session.Send(response);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Alliance ceremony notice to character {CharacterId} failed", candidate.CharacterId);
+        }
     }
 }

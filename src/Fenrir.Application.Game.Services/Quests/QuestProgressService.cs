@@ -56,10 +56,16 @@ public sealed class QuestProgressService(
                 new ItemStack(depositItemId, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, (byte)packet.XPost, (byte)packet.YPost));
         }
 
-        await PersistAndMirrorAsync(zone, characterId, result.NewProgress, 0, 0, 0, 0, edits, ct);
+        var mirrored = await PersistAndMirrorAsync(zone, characterId, result.NewProgress, 0, 0, 0, 0, edits, ct);
 
         logger.LogInformation("Character {CharacterId} accepted quest step {StepPermanent} (activeFlag {ActiveFlag})",
             characterId, result.NewProgress.StepPermanent, result.NewProgress.ActiveFlag);
+
+        if (!mirrored)
+        {
+            LogDroppedQuestMirror(zone, characterId, "accept", result.NewProgress.StepPermanent);
+            return new QuestActionResult(false);
+        }
 
         return new QuestActionResult(true);
     }
@@ -111,7 +117,7 @@ public sealed class QuestProgressService(
         if (result.DeleteItemId > 0)
             edits.DeleteFirstMatch(result.DeleteItemId);
 
-        await PersistAndMirrorAsync(zone, characterId, result.NewProgress, result.MoneyReward,
+        var mirrored = await PersistAndMirrorAsync(zone, characterId, result.NewProgress, result.MoneyReward,
             result.ExperienceReward, result.KillOtherTribeCountReward, result.TeacherPointReward, edits, ct);
 
         var hasNumericReward = result.MoneyReward != 0 || result.ExperienceReward != 0 ||
@@ -133,6 +139,12 @@ public sealed class QuestProgressService(
             "Character {CharacterId} completed quest step {StepPermanent}: money {MoneyReward}, experience {ExperienceReward}, item {RewardItemId}x{RewardItemQuantity} declared={ItemRewardDeclared}",
             characterId, result.NewProgress.StepPermanent, result.MoneyReward, result.ExperienceReward,
             result.RewardItemId, result.RewardItemQuantity, itemRewardDeclared);
+
+        if (!mirrored)
+        {
+            LogDroppedQuestMirror(zone, characterId, "complete", result.NewProgress.StepPermanent);
+            return new QuestActionResult(false);
+        }
 
         return new QuestActionResult(true);
     }
@@ -197,11 +209,17 @@ public sealed class QuestProgressService(
         edits.TryReplaceFirstMatch(result.FromItemId, previous =>
             new ItemStack(result.ToItemId, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, previous.XPos, previous.YPos));
 
-        await PersistAndMirrorAsync(zone, characterId, result.NewProgress, 0, 0, 0, 0, edits, ct);
+        var mirrored = await PersistAndMirrorAsync(zone, characterId, result.NewProgress, 0, 0, 0, 0, edits, ct);
 
         logger.LogInformation(
             "Character {CharacterId} exchanged quest item {FromItemId} for {ToItemId} (step {StepPermanent})",
             characterId, result.FromItemId, result.ToItemId, result.NewProgress.StepPermanent);
+
+        if (!mirrored)
+        {
+            LogDroppedQuestMirror(zone, characterId, "exchange", result.NewProgress.StepPermanent);
+            return new QuestActionResult(false);
+        }
 
         return new QuestActionResult(true);
     }
@@ -227,20 +245,23 @@ public sealed class QuestProgressService(
             newProgress.QSort, newProgress.TargetPhase, newProgress.KillCounter, 0,
             null, [], null, [], ct);
 
-        if (!await zone.PostQuestCommandAndWaitAsync(
-                new QuestZoneCommand(characterId, newProgress, 0, 0,
-                    ImmutableArray<InventoryContainerSnapshot>.Empty), ct))
-            logger.LogError(
-                "Zone {MapId} quest inbox full: dropped abandon mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
+        var mirrored = await zone.PostQuestCommandAndWaitAsync(
+            new QuestZoneCommand(characterId, newProgress, 0, 0,
+                ImmutableArray<InventoryContainerSnapshot>.Empty), ct);
 
         logger.LogInformation("Character {CharacterId} abandoned quest step {StepPermanent}", characterId,
             newProgress.StepPermanent);
 
+        if (!mirrored)
+        {
+            LogDroppedQuestMirror(zone, characterId, "abandon", newProgress.StepPermanent);
+            return new QuestActionResult(false);
+        }
+
         return new QuestActionResult(true);
     }
 
-    private async ValueTask PersistAndMirrorAsync(Zone zone, int characterId, QuestProgress newProgress,
+    private async ValueTask<bool> PersistAndMirrorAsync(Zone zone, int characterId, QuestProgress newProgress,
         long deltaMoney, int experienceDelta, int killOtherTribeCountDelta, int teacherPointDelta,
         ContainerEdits edits, CancellationToken ct)
     {
@@ -250,12 +271,16 @@ public sealed class QuestProgressService(
             newProgress.QSort, newProgress.TargetPhase, newProgress.KillCounter, deltaMoney,
             container1, items1, container2, items2, ct);
 
-        if (!await zone.PostQuestCommandAndWaitAsync(
-                new QuestZoneCommand(characterId, newProgress, experienceDelta, killOtherTribeCountDelta,
-                    edits.ToSnapshots(), TeacherPointDelta: teacherPointDelta), ct))
-            logger.LogError(
-                "Zone {MapId} quest inbox full: dropped mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
+        return await zone.PostQuestCommandAndWaitAsync(
+            new QuestZoneCommand(characterId, newProgress, experienceDelta, killOtherTribeCountDelta,
+                edits.ToSnapshots(), TeacherPointDelta: teacherPointDelta), ct);
+    }
+
+    private void LogDroppedQuestMirror(Zone zone, int characterId, string transition, int stepPermanent)
+    {
+        logger.LogError(
+            "Zone {MapId} quest inbox full: dropped the {Transition} mirror for character {CharacterId} at step {StepPermanent} after the SQL commit -- tearing the session down so the client reloads the committed quest state instead of replaying the transition against stale in-memory progress",
+            zone.MapId, transition, characterId, stepPermanent);
     }
 
     private static QuestProgress CurrentProgress(PlayerRuntimeState state)

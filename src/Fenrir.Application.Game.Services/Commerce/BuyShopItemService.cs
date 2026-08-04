@@ -24,8 +24,6 @@ public sealed class BuyShopItemService(
 {
     private const int SellerMoneyCapExceededErrorNumber = 50275;
 
-    private const int ProxyListingStaleErrorNumber = 50272;
-
     private const int ProxyBigMoneyCapExceededErrorNumber = 50273;
 
     private const short ProxyShopPurchaseEventCode = 3;
@@ -266,21 +264,14 @@ public sealed class BuyShopItemService(
         var projectedBuyerContainer = buyer.Inventory.GetContainer((byte)packet.Page2)
             .SetItem((byte)packet.Index2, resolved.NewDestinationStack!.Value);
 
+        var expected = new OfflineShopListingKey(slotIndex, slot.ItemId, slot.Quantity, slot.Value, slot.Serial,
+            slot.SocketGem1, slot.SocketGem2, slot.SocketGem3);
+
+        bool applied;
         try
         {
-            await offlineShops.ExecutePurchaseAsync(sellerId, slotIndex, slot.ItemId, slot.Quantity, slot.Value,
-                slot.Price, buyer.CharacterId, (byte)packet.Page2, ToTvps(projectedBuyerContainer),
-                cancellationToken);
-        }
-        catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException
-                                                {
-                                                    Number: ProxyListingStaleErrorNumber
-                                                })
-        {
-            logger.LogInformation(
-                "Proxy PShop purchase rejected: proxy seller {SellerId} slot {Page1}/{Index1} changed since it was listed (stale purchase, buyer {BuyerId})",
-                sellerId, packet.Page1, packet.Index1, buyer.CharacterId);
-            return new BuyShopItemCommitResult(false, BuildReply(4, 0, 0, 0), null);
+            applied = await offlineShops.ExecutePurchaseAsync(sellerId, expected, slot.Price, buyer.CharacterId,
+                (byte)packet.Page2, ToTvps(projectedBuyerContainer), cancellationToken);
         }
         catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException
                                                 {
@@ -298,6 +289,14 @@ public sealed class BuyShopItemService(
                 "Proxy PShop purchase ExecutePurchaseAsync failed for buyer {BuyerId}/proxy seller {SellerId} (treated as insufficient funds)",
                 buyer.CharacterId, sellerId);
             return new BuyShopItemCommitResult(true, null, null);
+        }
+
+        if (!applied)
+        {
+            logger.LogInformation(
+                "Proxy PShop purchase rejected: proxy seller {SellerId} slot {Page1}/{Index1} changed between read and delete (stale purchase, buyer {BuyerId})",
+                sellerId, packet.Page1, packet.Index1, buyer.CharacterId);
+            return new BuyShopItemCommitResult(false, BuildReply(4, 0, 0, 0), null);
         }
 
         var newStack = resolved.NewDestinationStack!.Value;
@@ -372,9 +371,8 @@ public sealed class BuyShopItemService(
             return new BuyShopItemSellerResult(BuyShopItemSellerOutcome.Abort, null, null, default);
         }
 
-        var (gem1, gem2, gem3) = PshopPurchasePolicy.DecodeSocketData(item.SocketData);
         var slot = new PshopPurchasePolicy.SlotView(itemId, item.Quantity, item.Value, item.SerialNumber,
-            item.Price, 0, 0, 0, 0, gem1, gem2, gem3);
+            item.Price, 0, 0, 0, 0, item.SocketGem1, item.SocketGem2, item.SocketGem3);
         return new BuyShopItemSellerResult(BuyShopItemSellerOutcome.ProxyProceed, null, null, slot, sellerId.Value);
     }
 

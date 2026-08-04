@@ -38,9 +38,9 @@ public sealed class TribeBankWithdrawService(ITribeRepository tribes, ILogger<Tr
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning(ex,
-                "Character {CharacterId} tribe-bank withdraw (tribe {Tribe} slot {Slot}) failed", characterId,
-                state.Tribe, slotValue);
-            return TribeBankResult.Aborted;
+                "Character {CharacterId} tribe-bank withdraw (tribe {Tribe} slot {Slot}) failed -- disconnecting, the legacy Quit()s on any non-zero playuser result (Server/ts25zone/S04_MyWork02.cpp:11307-11309)",
+                characterId, state.Tribe, slotValue);
+            return TribeBankResult.Disconnected;
         }
 
         logger.LogInformation(

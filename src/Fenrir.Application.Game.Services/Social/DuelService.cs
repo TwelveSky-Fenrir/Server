@@ -7,6 +7,7 @@ using Fenrir.Application.Game.Domain.Social.Mentor;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -20,6 +21,7 @@ public sealed class DuelService(
     PartyRegistry parties,
     MentorRegistry mentors,
     GuildInviteRegistry guildInvites,
+    WorldStateService worldState,
     ILogger<DuelService> logger) : IDuelService
 {
     public ValueTask<DuelAskResultKind> AskAsync(Zone zone, PlayerRuntimeState challenger,
@@ -66,8 +68,19 @@ public sealed class DuelService(
             return ValueTask.FromResult(DuelAskResultKind.TargetNotFound);
         }
 
+        if (target.CharacterId == challenger.CharacterId)
+        {
+            logger.LogInformation(
+                "Duel ask rejected: challenger {ChallengerId} named itself as the target",
+                challenger.CharacterId);
+            return ValueTask.FromResult(DuelAskResultKind.TargetNotFound);
+        }
+
+        var allyOfChallengerTribe = challenger.Tribe < WorldStateService.TribeCount
+            ? worldState.GetAllyOf(challenger.Tribe)
+            : null;
         var interTribeAllowed = zone.MapId is 37 or 119 or 124;
-        if (!interTribeAllowed && challenger.Tribe != target.Tribe)
+        if (!interTribeAllowed && challenger.Tribe != target.Tribe && target.Tribe != allyOfChallengerTribe)
         {
             logger.LogInformation(
                 "Duel ask rejected and challenger {ChallengerId}'s session terminated: cross-tribe duel with target {TargetId} not allowed on map {MapId} (desynced client)",
@@ -197,8 +210,9 @@ public sealed class DuelService(
         if (!zones.TryGetPlayerAndZone(duel.PlayerA, out var playerA, out var requesterZone) ||
             !zones.TryGetPlayer(duel.PlayerB, out var playerB))
         {
+            duels.TryEndActiveDuel(callerId, out _);
             logger.LogWarning(
-                "Duel {UniqueNumber} start aborted: a participant was not found in any zone on this shard (playerA {PlayerA}, playerB {PlayerB})",
+                "Duel {UniqueNumber} start aborted and registration rolled back: a participant was not found in any zone on this shard (playerA {PlayerA}, playerB {PlayerB})",
                 duel.UniqueNumber, duel.PlayerA, duel.PlayerB);
             return;
         }
@@ -213,6 +227,9 @@ public sealed class DuelService(
         }
 
         var eatDrugState = duel.NoPotions ? 1 : 0;
+
+        playerA.CanUseConsumables = !duel.NoPotions;
+        playerB.CanUseConsumables = !duel.NoPotions;
 
         logger.LogInformation(
             "Duel {UniqueNumber} started: {PlayerA} vs {PlayerB} (noPotions {NoPotions}, remainingTicks {RemainingTicks})",

@@ -38,27 +38,18 @@ public sealed class CostumeStateService(
                 return new CostumeStateResult(CostumeStateOutcome.Reply);
 
             case CostumeStateResolver.ResultKind.Equip:
-            {
-                var maxLife = state.Stats?.MaxLife ?? state.MaxLife;
-                var maxMana = state.Stats?.MaxMana ?? state.MaxMana;
                 zone.PostCostumeCommand(new CostumeZoneCommand(characterId, result.NewCostumeIndex,
-                    result.NewCostumeNumber, Life: maxLife, Mana: maxMana,
-                    Broadcast: CostumeBroadcastKind.Equip));
+                    result.NewCostumeNumber, Broadcast: CostumeBroadcastKind.Equip));
                 logger.LogInformation("Character {CharacterId} equipped costume {CostumeNumber} at slot {CostumeIndex}",
                     characterId, result.NewCostumeNumber, result.NewCostumeIndex);
                 return new CostumeStateResult(CostumeStateOutcome.Reply);
-            }
 
             case CostumeStateResolver.ResultKind.Remove:
-            {
-                var maxLife = state.Stats?.MaxLife ?? state.MaxLife;
-                var maxMana = state.Stats?.MaxMana ?? state.MaxMana;
                 zone.PostCostumeCommand(new CostumeZoneCommand(characterId, result.NewCostumeIndex,
-                    0, Life: maxLife, Mana: maxMana, Broadcast: CostumeBroadcastKind.Remove));
+                    0, Broadcast: CostumeBroadcastKind.Remove));
                 logger.LogInformation("Character {CharacterId} removed costume at slot {CostumeIndex}",
                     characterId, result.NewCostumeIndex);
                 return new CostumeStateResult(CostumeStateOutcome.Reply);
-            }
 
             case CostumeStateResolver.ResultKind.ReturnToInventoryMismatch:
                 return new CostumeStateResult(CostumeStateOutcome.Reply, 1);

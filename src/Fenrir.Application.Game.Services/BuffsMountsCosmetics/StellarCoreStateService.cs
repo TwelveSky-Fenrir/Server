@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.StellarCores;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Domain.World.Npcs;
 using Fenrir.Domain.Game.GameData;
 using Microsoft.Extensions.Logging;
 
@@ -33,28 +34,20 @@ public sealed class StellarCoreStateService(
                 return new StellarCoreStateResult(StellarCoreStateOutcome.Reply);
 
             case StellarCoreStateResolver.ResultKind.Equip:
-            {
-                var maxLife = state.Stats?.MaxLife ?? state.MaxLife;
-                var maxMana = state.Stats?.MaxMana ?? state.MaxMana;
                 zone.PostStellarCoreCommand(new StellarCoreZoneCommand(characterId,
-                    result.NewCoreIndex, result.NewCoreNumber, Life: maxLife, Mana: maxMana,
+                    result.NewCoreIndex, result.NewCoreNumber,
                     Broadcast: StellarCoreBroadcastKind.Equip));
                 logger.LogInformation("Character {CharacterId} equipped stellar core {CoreNumber} at slot {CoreIndex}",
                     characterId, result.NewCoreNumber, result.NewCoreIndex);
                 return new StellarCoreStateResult(StellarCoreStateOutcome.Reply);
-            }
 
             case StellarCoreStateResolver.ResultKind.Remove:
-            {
-                var maxLife = state.Stats?.MaxLife ?? state.MaxLife;
-                var maxMana = state.Stats?.MaxMana ?? state.MaxMana;
                 zone.PostStellarCoreCommand(new StellarCoreZoneCommand(characterId,
-                    result.NewCoreIndex, 0, Life: maxLife, Mana: maxMana,
+                    result.NewCoreIndex, 0,
                     Broadcast: StellarCoreBroadcastKind.Remove));
                 logger.LogInformation("Character {CharacterId} removed stellar core at slot {CoreIndex}",
                     characterId, result.NewCoreIndex);
                 return new StellarCoreStateResult(StellarCoreStateOutcome.Reply);
-            }
 
             case StellarCoreStateResolver.ResultKind.ReturnToInventoryMismatch:
                 return new StellarCoreStateResult(StellarCoreStateOutcome.Reply, 1);
@@ -87,7 +80,11 @@ public sealed class StellarCoreStateService(
             return new StellarCoreStateResult(StellarCoreStateOutcome.Reply, 2);
         }
 
-        var newStack = new ItemStack(result.GrantedItemId, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, destination.X,
+        var grantedExpireDate = NpcShopPolicy.IsRentItem(result.GrantedItemId)
+            ? ExpireDateAt(state.StellarCoreExpireDate, result.ClearedSlot)
+            : 0;
+
+        var newStack = new ItemStack(result.GrantedItemId, 0, 0, 0, 0, 0, 0, 0, 0, grantedExpireDate, 0, destination.X,
             destination.Y);
         var projectedContainer =
             state.Inventory.GetContainer(destination.Container).SetItem(destination.Slot, newStack);
@@ -112,6 +109,11 @@ public sealed class StellarCoreStateService(
 
         return new StellarCoreStateResult(StellarCoreStateOutcome.Reply, 0, destination.Container,
             destination.Slot, destination.GridIndex, result.GrantedItemId);
+    }
+
+    private static int ExpireDateAt(ImmutableArray<int> expireDates, int slot)
+    {
+        return !expireDates.IsDefault && slot >= 0 && slot < expireDates.Length ? expireDates[slot] : 0;
     }
 
     private static List<CharacterItemSlotTvp> ToTvps(ImmutableDictionary<byte, ItemStack> container)

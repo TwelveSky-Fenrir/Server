@@ -138,7 +138,7 @@ public sealed class LocalChatService(
                 return;
 
             default:
-                SendSystemChat(sender, "Usage: ygdrop on|off|status");
+                SendSystemChat(sender, "Usage: ?ygdrop on|off|status");
                 await AuditAsync(LocalChatGmCommandKind.YgDrop, zoneSession, GmCommandCatalog.OutcomeRejected,
                     $"Argument={argument}", cancellationToken);
                 return;
@@ -171,7 +171,7 @@ public sealed class LocalChatService(
                 return;
 
             default:
-                SendSystemChat(sender, "Usage: lab on|off|status");
+                SendSystemChat(sender, "Usage: ?lab on|off|status");
                 await AuditAsync(LocalChatGmCommandKind.Lab, zoneSession, GmCommandCatalog.OutcomeRejected,
                     $"Argument={argument}", cancellationToken);
                 return;

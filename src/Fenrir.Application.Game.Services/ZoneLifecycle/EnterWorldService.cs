@@ -63,6 +63,8 @@ public sealed class EnterWorldService(
 
     private const int HeroRankPointStatSort = 904;
 
+    private const int EnterWorldAvatarActionState = 1;
+
     public async ValueTask HandleAsync(EnterWorldRequest packet, IZoneSession zoneSession,
         CancellationToken cancellationToken)
     {
@@ -376,7 +378,7 @@ public sealed class EnterWorldService(
                     LifeValue = character.Life,
                     MaxManaValue = character.MaxMana,
                     ManaValue = character.Mana,
-                    EffectValueForView = BuildEffectValueForView(bundle.Buffs),
+                    EffectValueForView = BuildEffectValueForView(persistedBuffs),
                     PartyName = "",
                     DuelState = new int[3],
                     PShopState = 0,
@@ -402,7 +404,7 @@ public sealed class EnterWorldService(
                     CostumeState = 0,
                     StellarCoreNumber = 0
                 },
-                CheckChangeActionState = 0
+                CheckChangeActionState = EnterWorldAvatarActionState
             });
 
             SendRatioEventMessages(zoneSession, zone);
@@ -556,7 +558,24 @@ public sealed class EnterWorldService(
                 HPBoost: character.HPBoost,
                 CriBoost: character.CriBoost,
                 MountGarageSlots: mountGarageSlots,
-                Buffs: persistedBuffs)));
+                Buffs: persistedBuffs,
+                SkillPoints: character.SkillPoints,
+                ProtectForHalo: character.ProtectForHalo,
+                BonusItemLevel: character.BonusItemLevel,
+                BonusItemValue: character.BonusItemValue,
+                TribeNotifyScrollCount: character.TribeNotifyScrollCount,
+                TribeFourReturnAllowance: character.TribeFourReturnAllowance,
+                ProtectForRefine: character.ProtectForRefine,
+                ProtectForDestroy: character.ProtectForDestroy,
+                ProtectForCostume: character.ProtectForCostume,
+                ProtectForDestroy2: character.ProtectForDestroy2,
+                LodRounds: character.LodRounds,
+                StellarCoreExpireDate: StellarCoreExpireDateCodec.Decode(character.StellarCoreExpireDate),
+                EliteDungeonTime: character.EliteDungeonTime,
+                DungeonKeyTime: character.DungeonKeyTime,
+                IvyHallTicketTime: character.IvyHallTicketTime,
+                ScrollOfSeekersTime: character.ScrollOfSeekersTime,
+                FightingGodForDestroy: character.FightingGodForDestroy)));
 
             if (!entered)
             {
@@ -698,13 +717,12 @@ public sealed class EnterWorldService(
         return WorldStateTemplates.ZeroedBuffInfo with { Buff = buff };
     }
 
-    private static int[] BuildEffectValueForView(IReadOnlyList<CharacterBuffDto> buffs)
+    private static int[] BuildEffectValueForView(BuffInfo buffs)
     {
         var effectValueForView = new int[35];
 
-        foreach (var row in buffs)
-            if (row.SlotIndex < 35)
-                effectValueForView[row.SlotIndex] = row.Value;
+        for (var slot = 0; slot < 35; slot++)
+            effectValueForView[slot] = buffs.Buff[slot * 2];
 
         return effectValueForView;
     }

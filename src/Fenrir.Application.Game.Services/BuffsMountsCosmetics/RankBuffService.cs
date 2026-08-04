@@ -15,7 +15,8 @@ public sealed class RankBuffService(WorldStateService worldState) : IRankBuffSer
         if (!resolved.Succeeded)
             return new RankBuffResult(resolved.Outcome);
 
-        zone.PostAvatarBuffCommand(new AvatarBuffZoneCommand(characterId, RankBuffType: sort, HealToMax: true));
+        zone.PostAvatarBuffCommand(new AvatarBuffZoneCommand(characterId, RankBuffType: sort,
+            RecomputeAndClampVitals: true));
 
         return new RankBuffResult(RankBuffResolver.Outcome.Success);
     }

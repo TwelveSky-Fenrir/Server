@@ -111,14 +111,9 @@ public sealed class MountStateService(
             }
 
             case MountStateResolver.ResultKind.Dismount:
-            {
-                var maxLife = state.Stats?.MaxLife ?? state.MaxLife;
-                var maxMana = state.Stats?.MaxMana ?? state.MaxMana;
                 zone.PostMountCommand(new MountZoneCommand(characterId, result.NewAnimalIndex,
-                    0, 0, maxLife, maxMana,
-                    Broadcast: MountBroadcastKind.Dismount));
+                    0, 0, Broadcast: MountBroadcastKind.Dismount));
                 return new MountStateResult(MountStateOutcome.Dismount);
-            }
 
             case MountStateResolver.ResultKind.DeleteMount:
                 await ApplyDeleteMountAsync(zone, state, characterId, accountId, result.GarageSlot,

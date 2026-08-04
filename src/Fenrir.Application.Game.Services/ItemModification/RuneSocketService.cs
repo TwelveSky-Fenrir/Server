@@ -56,7 +56,7 @@ public sealed class RuneSocketService(
                 characterId);
 
         if (!await zone.PostRuneSocketCommandAndWaitAsync(
-                new RuneSocketZoneCommand(characterId, packet.RuneIndex, packet.ItemIndex, packedStat, null),
+                new RuneSocketZoneCommand(characterId, packet.RuneIndex, packet.ItemIndex, packedStat),
                 cancellationToken))
             logger.LogError(
                 "Zone {MapId} rune-socket inbox full: dropped insert mirror for character {CharacterId}",
@@ -76,7 +76,7 @@ public sealed class RuneSocketService(
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
     {
         var resolved = RuneSocketResolver.ResolveRemove(packet.RuneIndex, state.RuneSystem,
-            hasFreeInventorySlot: true);
+            true);
         if (resolved.Outcome == RuneSocketResolver.RemoveOutcome.Rejected ||
             !worldData.ItemsById.ContainsKey(resolved.ItemId))
             return new RuneRemoveResult(RuneSocketOutcome.Rejected, 0, 0, 0);
@@ -108,7 +108,7 @@ public sealed class RuneSocketService(
                 characterId);
 
         if (!await zone.PostRuneSocketCommandAndWaitAsync(
-                new RuneSocketZoneCommand(characterId, packet.RuneIndex, null, null, null), cancellationToken))
+                new RuneSocketZoneCommand(characterId, packet.RuneIndex, null, null), cancellationToken))
             logger.LogError(
                 "Zone {MapId} rune-socket inbox full: dropped remove mirror for character {CharacterId}",
                 zone.MapId, characterId);

@@ -60,8 +60,11 @@ public sealed class RegularWarSchedulerHost(
             var schedule = GetOrCreateSchedule(mapConfig);
             var snapshot = BuildSnapshot(zone);
 
+            _activeMapTracker.DrainPendingKills(mapConfig.MapId, schedule);
+
             var result = schedule.Tick(snapshot);
             _activeMapTracker.ReportPhase(mapConfig.MapId, result.Phase);
+            _activeMapTracker.ReportWarCycle(mapConfig.MapId, schedule.WarCycleNumber);
 
             if (result.CountdownAnnounceValue is { } remaining)
                 sink.OnCountdownAnnounced(mapConfig.MapId, remaining);
@@ -146,6 +149,9 @@ public sealed class RegularWarSchedulerHost(
 
         foreach (var player in zone.Players)
         {
+            if (player.IsMovingZone || player.VisibleState == 0)
+                continue;
+
             totalPresent++;
             if (player.Tribe < RegularWarSchedule.TribeCount)
                 perTribe[player.Tribe]++;
@@ -158,8 +164,13 @@ public sealed class RegularWarSchedulerHost(
     {
         var participants = new List<RegularWarParticipant>();
         foreach (var player in zone.Players)
+        {
+            if (player.IsMovingZone)
+                continue;
+
             participants.Add(new RegularWarParticipant(player.CharacterId, player.Tribe, player.Level,
                 player.Level2, player.RebirthCount));
+        }
 
         return participants;
     }

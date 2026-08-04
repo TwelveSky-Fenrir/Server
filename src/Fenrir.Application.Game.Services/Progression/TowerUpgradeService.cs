@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.Progression;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Progression;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -38,8 +39,11 @@ public sealed class TowerUpgradeService(
         var page0 = state.Inventory.GetContainer(ContainerMatrix.InventoryPage0);
         var page1 = state.Inventory.GetContainer(ContainerMatrix.InventoryPage1);
 
-        if (!TowerUpgradeResolver.TryFindMaterial(page0, page1, HerbItemId, out var herbPage, out var herbSlot) ||
-            !TowerUpgradeResolver.TryFindMaterial(page0, page1, BarItemId, out var barPage, out var barSlot))
+        var today = GameDate.Today();
+        if (!TowerUpgradeResolver.TryFindMaterial(page0, page1, HerbItemId, state.InventoryDate, today,
+                out var herbPage, out var herbSlot) ||
+            !TowerUpgradeResolver.TryFindMaterial(page0, page1, BarItemId, state.InventoryDate, today,
+                out var barPage, out var barSlot))
             return new TowerUpgradeResult(TowerUpgradeOutcome.Aborted, 0, 0);
 
         var projectedHerb = ConsumeOne(herbPage == ContainerMatrix.InventoryPage0 ? page0 : page1, herbSlot);
@@ -116,7 +120,7 @@ public sealed class TowerUpgradeService(
             towerWar.GetPendingConstructKind(towerIndex) != 0 || zone.TryGetMonster(guardianIndex, out _))
             return Fail(characterId, page, index, "tower not idle");
 
-        if (towerWar.CountTowersOfKind(constructType) > TowerWarState.MaxTowersPerKind)
+        if (towerWar.CountTowersOfKind(constructType) >= TowerWarState.MaxTowersPerKind)
             return Fail(characterId, page, index, "too many towers of this kind");
 
         if (towerWar.IsKindPresentInTribeGroup(towerIndex, constructType))

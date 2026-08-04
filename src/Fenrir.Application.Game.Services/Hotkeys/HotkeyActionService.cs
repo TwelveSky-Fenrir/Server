@@ -190,7 +190,7 @@ public sealed class HotkeyActionService(
                 ItemId = resolved.NewDestinationItemId, Quantity = resolved.NewDestinationQuantity
             }
             : new ItemStack(resolved.NewDestinationItemId, resolved.NewDestinationQuantity, 0, 0, 0, 0, 0, 0, 0, 0,
-                0);
+                0, (byte)move.XPost2, (byte)move.YPost2);
         var projectedContainer = state.Inventory.GetContainer(destinationContainer)
             .SetItem((byte)destinationIndex, newDestinationStack);
 

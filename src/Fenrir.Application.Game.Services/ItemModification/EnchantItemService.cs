@@ -122,9 +122,11 @@ public sealed partial class EnchantItemService(
     {
         var luck = state.Stats?.Luck ?? 0;
 
+        var premiumActive = state.PremiumExpireUtc >= DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
         var resolved = EnchantResolver.Resolve(targetDefinition, target, materialDefinition, luck,
             state.ProtectForDestroy, state.ImproveItemValue, SystemRandomSource.Instance,
-            state.ProtectForDestroy2, state.ProtectForWing);
+            state.ProtectForDestroy2, state.ProtectForWing, premiumActive);
 
         if (resolved.Outcome == EnchantResolver.EnchantOutcome.Rejected)
         {
@@ -208,7 +210,7 @@ public sealed partial class EnchantItemService(
             state.Session.Send(new AvatarStatUpdateResponse
                 { Sort = WingProtectStatSort, Value = remainingWingProtectCharges, Value2 = 0 });
 
-        var resultCode = MapResultCode(resolved.Outcome, resolved.IsWing);
+        var resultCode = MapResultCode(in resolved);
 
         if (resolved.Outcome == EnchantResolver.EnchantOutcome.Success)
         {
@@ -245,17 +247,17 @@ public sealed partial class EnchantItemService(
         return new EnchantItemResult(EnchantItemOutcome.Applied, resultCode, resolved.Cost, resolved.NewEnchant);
     }
 
-    private static int MapResultCode(EnchantResolver.EnchantOutcome outcome, bool isWing)
+    private static int MapResultCode(in EnchantResolver.EnchantResult resolved)
     {
-        return outcome switch
+        return resolved.Outcome switch
         {
             EnchantResolver.EnchantOutcome.Unsealed => 0,
             EnchantResolver.EnchantOutcome.Success => 0,
             EnchantResolver.EnchantOutcome.Failed => 1,
             EnchantResolver.EnchantOutcome.Destroyed => 2,
             EnchantResolver.EnchantOutcome.ResetToForty => 3,
-            EnchantResolver.EnchantOutcome.Protected => 4,
-            EnchantResolver.EnchantOutcome.NoChange => isWing ? 9 : 8,
+            EnchantResolver.EnchantOutcome.Protected => resolved.ConsumesProtectCharge2 ? 4 : 1,
+            EnchantResolver.EnchantOutcome.NoChange => resolved.IsWing ? 9 : 8,
             _ => 1
         };
     }

@@ -19,7 +19,7 @@ public sealed class PopupEventScheduleHost(
             while (await poll.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
                 try
                 {
-                    timer.Tick(DateTime.UtcNow);
+                    timer.Tick(DateTime.Now);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {

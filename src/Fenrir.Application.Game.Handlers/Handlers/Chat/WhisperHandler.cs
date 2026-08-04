@@ -2,7 +2,6 @@ using Fenrir.Application.Game.Abstractions.Chat;
 using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Application.Game.Domain.Social.Chat;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Core.Packets.Shared;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
@@ -11,8 +10,6 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Chat;
 public sealed class WhisperHandler(IWhisperService whisperService, ILogger<WhisperHandler> logger)
     : IAsyncPacketHandler<WhisperRequest>
 {
-    private static readonly ItemLinkInfo EmptyLink = new() { Index = 0, Activity = 0, Value = 0, Socket = new int[3] };
-
     public async ValueTask HandleAsync(WhisperRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
@@ -51,7 +48,7 @@ public sealed class WhisperHandler(IWhisperService whisperService, ILogger<Whisp
                     AvatarName = targetName,
                     Content = content,
                     AuthType = 0,
-                    Link = EmptyLink
+                    Link = packet.Link
                 });
                 return;
 

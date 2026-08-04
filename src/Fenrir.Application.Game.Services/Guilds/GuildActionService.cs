@@ -130,6 +130,10 @@ public sealed class GuildActionService(
             inviteeZone.PostGuildCommand(new GuildMembershipZoneCommand(inviteeId, guildId, guild.Name,
                 GuildRoleCodec.WireRoleToDb(2), ""));
 
+        guildStateRelay.Enqueue(new GuildStateRelayEntry(GuildStateRelayKind.MembershipRoleChanged,
+            options.Value.ShardId, guildId, inviteeId, guildId, guild.Name, GuildRoleCodec.WireRoleToDb(2), "", 0,
+            false));
+
         logger.LogInformation("Character {InviteeId} joined guild {GuildId} (invited by {CharacterId})", inviteeId,
             guildId, characterId);
 
@@ -323,7 +327,6 @@ public sealed class GuildActionService(
 
         var newRole = payload.GuildRole == 1 ? dbSubMaster : dbMember;
         await guilds.SetRoleAsync(guildId, target.CharacterId, newRole, ct);
-        await guilds.SetCallNameAsync(guildId, target.CharacterId, "", ct);
 
         var info = await BuildGuildInfoAsync(guildId, ct);
         GuildInfoBroadcaster.BroadcastGuildInfo(zones, guildId, 9, info, state.CharacterId);

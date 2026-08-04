@@ -27,8 +27,9 @@ public sealed class UpdateProxyShopHandler(IUpdateProxyShopService service, ILog
         if (zone.MapId != OpenShopStallHandler.PshopZoneNumber)
         {
             logger.LogWarning(
-                "Update proxy shop rejected: character {CharacterId} is outside the market district (zone {MapId})",
+                "Update proxy shop rejected: character {CharacterId} is outside the market district (zone {MapId}), terminating session (Server/ts25zone/S04_MyWork02.cpp:13649 IsValidZoneForProxyShop -> Quit())",
                 characterId, zone.MapId);
+            zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 

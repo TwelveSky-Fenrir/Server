@@ -13,6 +13,16 @@ public sealed class ContinueSkillUseHandler(IContinueSkillUseService service, IL
     public void Handle(in ContinueSkillUseRequest packet, IPacketSession session)
     {
         var zoneSession = (IZoneSession)session;
+
+        if (packet.Sort is not (1 or 2))
+        {
+            logger.LogWarning(
+                "Session {SessionId}: ContinueSkillUseRequest (op95) carried out-of-range sort {Sort}, terminating session (Server/ts25zone/S04_MyWork02.cpp:12769-12771 default: Quit())",
+                session.SessionId, packet.Sort);
+            zoneSession.Abort(DisconnectReason.Faulted);
+            return;
+        }
+
         if (zoneSession.CurrentZone is not Zone zone)
             return;
 
@@ -35,7 +45,7 @@ public sealed class ContinueSkillUseHandler(IContinueSkillUseService service, IL
 
             case AutoBuffActivationResolver.ResultKind.Disconnect:
                 logger.LogWarning(
-                    "Auto-buff activation rejected for character {CharacterId}: sort {Sort} -- ignoring (game-logic condition, not malformed wire input)",
+                    "Auto-buff activation rejected for character {CharacterId}: insufficient mana on sort {Sort} -- ignoring (game-logic condition, not malformed wire input)",
                     characterId, packet.Sort);
                 return;
 

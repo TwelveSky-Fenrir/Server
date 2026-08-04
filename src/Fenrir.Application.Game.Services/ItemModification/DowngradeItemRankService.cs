@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Forge;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Simulation;
+using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Loot;
 using Fenrir.Domain.Game.GameData;
@@ -24,6 +25,8 @@ public sealed class DowngradeItemRankService(
     private const byte SuccessOutcome = 0;
 
     private const byte FailedOutcome = 1;
+
+    private const int LuckyUpgradeStatSort = 29;
 
     public async ValueTask<DowngradeItemRankResult> DowngradeAsync(DowngradeItemRankRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
@@ -66,8 +69,10 @@ public sealed class DowngradeItemRankService(
 
         var luck = state.Stats?.Luck ?? 0;
 
-        var resolved = RankChangeResolver.ResolveDowngrade(targetDefinition, target, materialDefinition.Item, luck, 0,
-            worldData.ItemsById.Values, SystemRandomSource.Instance);
+        var premiumActive = state.PremiumExpireUtc >= DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
+        var resolved = RankChangeResolver.ResolveDowngrade(targetDefinition, target, materialDefinition.Item, luck,
+            state.HighItemValue, worldData.ItemsById.Values, SystemRandomSource.Instance, premiumActive);
 
         switch (resolved.Outcome)
         {
@@ -129,6 +134,19 @@ public sealed class DowngradeItemRankService(
         }
 
         zone.CreditNpcServiceTribeTax(state.Tribe, resolved.Cost);
+
+        if (resolved.ConsumesLuckyCharge)
+        {
+            var newHighItemValue = state.HighItemValue - 1;
+            state.Session.Send(new AvatarStatUpdateResponse
+                { Sort = LuckyUpgradeStatSort, Value = newHighItemValue, Value2 = 0 });
+
+            if (!await zone.PostTribeProgressCommandAndWaitAsync(
+                    new TribeProgressZoneCommand(characterId, HighItemValue: newHighItemValue), cancellationToken))
+                logger.LogError(
+                    "Zone {MapId} tribe-progress inbox full: dropped lucky-upgrade charge mirror for character {CharacterId}",
+                    zone.MapId, characterId);
+        }
 
         if (!eventLogQueue.Enqueue(new EventLogEntryTvp(DowngradeItemRankEventCode, (byte)EventLogCategory.Enchant,
                 null, characterId, null, null, null, -(long)resolved.Cost, null, target.ItemId, target.Quantity,

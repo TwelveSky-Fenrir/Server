@@ -47,7 +47,7 @@ foreach (var shardId in shardIds)
 {
     var anchorZonePort = zoneBasePort + shardId;
 
-    builder.AddProject<Fenrir_GameServer>($"game-shard-{shardId:00}", launchProfileName: null)
+    builder.AddProject<Fenrir_GameServer>($"game-server", launchProfileName: null)
         .WithReference(fenrirDb)
         .WaitForCompletion(migrator)
         .WithEndpoint(name: "zone-anchor-tcp", scheme: "tcp", port: anchorZonePort, targetPort: anchorZonePort,

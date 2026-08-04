@@ -154,8 +154,8 @@ public sealed class CraftItemService(
         var freeSlot = InventoryFreeSlotFinder.Find(state.Inventory, worldData,
             CraftRecipeCatalog.AdvancedElixirResultBaseItemId, state.InventoryDate, GameDate.Today());
         var hasFreeSlot = freeSlot is not null;
-        var resultPage = freeSlot?.Container ?? (byte)0;
-        var resultIndex = freeSlot?.Slot ?? (byte)0;
+        var resultPage = freeSlot?.Container ?? 0;
+        var resultIndex = freeSlot?.Slot ?? 0;
 
         var resolved = CraftResolver.ResolveAdvancedElixir(material, hasFreeSlot, SystemRandomSource.Instance);
 

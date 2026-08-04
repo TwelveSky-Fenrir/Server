@@ -51,6 +51,14 @@ public sealed class PartyInviteService(
         if (!zones.TryGetPlayerByName(targetAvatarName, out var target))
             return await InviteCrossShardAsync(inviter, targetAvatarName, cancellationToken).ConfigureAwait(false);
 
+        if (target.CharacterId == inviter.CharacterId)
+        {
+            logger.LogDebug(
+                "Party invite rejected: character {InviterCharacterId} targeted its own avatar name",
+                inviter.CharacterId);
+            return new PartyInviteResult(PartyInviteResultKind.TargetNotFound);
+        }
+
         var targetBusyExternally =
             CommunityWorkGate.IsBusy(target, duels, trades, friends, parties, mentors, guildInvites) ||
             target.IsStunned || target.IsDead || target.IsMovingZone;
@@ -98,6 +106,14 @@ public sealed class PartyInviteService(
         {
             logger.LogDebug(
                 "Party invite rejected: character {InviterCharacterId} target {TargetAvatarName} not found on any shard",
+                inviter.CharacterId, targetAvatarName);
+            return new PartyInviteResult(PartyInviteResultKind.TargetNotFound);
+        }
+
+        if (remote.CharacterId == inviter.CharacterId)
+        {
+            logger.LogDebug(
+                "Party invite rejected: character {InviterCharacterId} resolved its own directory row for {TargetAvatarName}",
                 inviter.CharacterId, targetAvatarName);
             return new PartyInviteResult(PartyInviteResultKind.TargetNotFound);
         }

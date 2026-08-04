@@ -10,6 +10,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Core.Packets.Shared;
+using Fenrir.Core.Wire;
 using Fenrir.Domain.Game.GameData;
 using Fenrir.Domain.Game.Stats;
 using Fenrir.Domain.Game.Stats.Context;
@@ -35,6 +36,10 @@ public sealed class TribeActionService(
     private const int AlertCharmCpCost = 10;
 
     private const int ProtectHaloStatSort = 31;
+
+    private const int MaxHalo = 96;
+    private const int MaxHaloReachedEventCode = 672;
+    private const int BroadcastNameFieldSize = 13;
 
     public async ValueTask<TribeActionOutcome> ResetStatsAsync(Zone zone, PlayerRuntimeState state, int characterId,
         CancellationToken ct)
@@ -282,7 +287,7 @@ public sealed class TribeActionService(
 
         state.LastHaloEnchantAttemptUtc = now;
 
-        if (state.ContributionPoints < HaloEnchantCpCost || state.Halo >= 96)
+        if (state.ContributionPoints < HaloEnchantCpCost || state.Halo >= MaxHalo)
             return TribeActionOutcome.Abort;
 
         try
@@ -328,6 +333,9 @@ public sealed class TribeActionService(
         if (outcome == TribeHaloEnchantOutcome.ProtectionConsumed)
             state.Session.Send(new AvatarStatUpdateResponse
                 { Sort = ProtectHaloStatSort, Value = newProtect, Value2 = 0 });
+
+        if (outcome == TribeHaloEnchantOutcome.Success && newHalo == MaxHalo && siegeIngestor is not null)
+            siegeIngestor.Ingest(MaxHaloReachedEventCode, BuildMaxHaloPayload(state.Tribe, state.Name));
 
         logger.LogInformation("Character {CharacterId} halo-enchant {Outcome}: halo {OldHalo} -> {NewHalo}",
             characterId, outcome, state.Halo, newHalo);
@@ -431,6 +439,14 @@ public sealed class TribeActionService(
             cpCost);
 
         return TribeActionOutcome.Ok();
+    }
+
+    private static byte[] BuildMaxHaloPayload(byte tribe, string avatarName)
+    {
+        var payload = new byte[ZoneCenterBroadcastIngestor.PayloadSize];
+        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(0, 4), tribe);
+        LegacyWireCodec.WriteFixedString(payload.AsSpan(4, BroadcastNameFieldSize), avatarName);
+        return payload;
     }
 
     private static bool IsValidTown(byte tribe, short mapId)

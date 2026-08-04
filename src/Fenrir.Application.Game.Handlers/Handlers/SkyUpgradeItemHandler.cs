@@ -1,59 +1,18 @@
-using Fenrir.Application.Game.Abstractions.ItemModification;
-using Fenrir.Application.Game.Abstractions.Sessions;
-using Fenrir.Application.Game.Domain.Enchant;
-using Fenrir.Application.Game.Domain.World;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
-public sealed class SkyUpgradeItemHandler(
-    ISkyUpgradeItemService skyUpgradeItemService,
-    ILogger<SkyUpgradeItemHandler> logger)
-    : IAsyncPacketHandler<SkyUpgradeItemRequest>
+public sealed class SkyUpgradeItemHandler(ILogger<SkyUpgradeItemHandler> logger)
+    : IInlinePacketHandler<SkyUpgradeItemRequest>
 {
-    public async ValueTask HandleAsync(SkyUpgradeItemRequest packet, IPacketSession session,
-        CancellationToken cancellationToken)
+    public void Handle(in SkyUpgradeItemRequest packet, IPacketSession session)
     {
-        var zoneSession = (IZoneSession)session;
-        var characterId = zoneSession.CharacterId!.Value;
-
-        if (logger.IsEnabled(LogLevel.Debug))
-            logger.LogDebug(
-                "Session {SessionId} character {CharacterId}: SkyUpgradeItemRequest received ({Page1}:{Index1} + {Page2}:{Index2})",
-                zoneSession.SessionId, characterId, packet.Page1, packet.Index1, packet.Page2, packet.Index2);
-
-        if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
-            state is null)
-        {
-            logger.LogDebug(
-                "Session {SessionId} character {CharacterId}: SkyUpgradeItemRequest dropped, no live zone/player state",
-                zoneSession.SessionId, characterId);
-            return;
-        }
-
-        await state.EconomyActionLock.WaitAsync(cancellationToken);
-        try
-        {
-            var result = await skyUpgradeItemService.UpgradeAsync(packet, zone, state, characterId,
-                cancellationToken);
-
-            if (result.Outcome != SkyUpgradeItemOutcome.Applied)
-            {
-                session.Send(new SkyUpgradeItemResponse { Result = 1, Cost = 0, Value = new int[6] });
-                return;
-            }
-
-            session.Send(new SkyUpgradeItemResponse
-            {
-                Result = result.Succeeded ? 0 : 1,
-                Cost = SkyUpgradeResolver.Cost,
-                Value = result.Value
-            });
-        }
-        finally
-        {
-            state.EconomyActionLock.Release();
-        }
+        logger.LogWarning(
+            "Session {SessionId}: SkyUpgradeItemRequest received — op93 P_SKY_UP_ITEM_SEND has its REGWORK1 line " +
+            "wrapped in #ifdef __REBIRTH__ (Server/ts25zone/S04_MyWork01.cpp:97-99), and __REBIRTH__ is defined only " +
+            "at Server/Header/Protocol/DEFINE.h:28 inside the dead #else of #ifdef M33, so W_FUNCTION[93].PROC stays " +
+            "NULL and the legacy server logs Unknown Header then quits the session (:292-301); silently ignored",
+            session.SessionId);
     }
 }

@@ -1,6 +1,11 @@
 using Fenrir.Application.Game.Domain;
+using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Social;
+using Fenrir.Application.Game.Domain.Social.Duel;
+using Fenrir.Application.Game.Domain.Social.Friends;
+using Fenrir.Application.Game.Domain.Social.Mentor;
 using Fenrir.Application.Game.Domain.Social.Party;
+using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -11,6 +16,11 @@ namespace Fenrir.Application.Game.Services.Social;
 public sealed class PartyCrossShardRelayHandler(
     ZoneRegistry zones,
     PartyRegistry parties,
+    DuelRegistry duels,
+    TradeRegistry trades,
+    FriendRegistry friends,
+    MentorRegistry mentors,
+    GuildInviteRegistry guildInvites,
     Lazy<ISocialCrossShardRelayQueue> crossShardRelay,
     Lazy<IPartyResyncRelayQueue> partyResyncRelay,
     IOptions<GameServerOptions> options,
@@ -23,6 +33,19 @@ public sealed class PartyCrossShardRelayHandler(
         if (!zones.TryGetPlayer(ask.TargetCharacterId, out var target))
         {
             PublishDecline(ask, 4);
+            return ValueTask.CompletedTask;
+        }
+
+        if (parties.IsInParty(target.CharacterId))
+        {
+            PublishDecline(ask, 6);
+            return ValueTask.CompletedTask;
+        }
+
+        if (CommunityWorkGate.IsBusy(target, duels, trades, friends, parties, mentors, guildInvites) ||
+            target.IsStunned || target.IsDead || target.IsMovingZone)
+        {
+            PublishDecline(ask, 5);
             return ValueTask.CompletedTask;
         }
 

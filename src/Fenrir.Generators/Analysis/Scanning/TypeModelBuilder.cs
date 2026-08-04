@@ -26,7 +26,13 @@ internal static class TypeModelBuilder
         var obfuscation = (WireObfuscationMode)attribute.GetNamedByteEnum("Obfuscation", 0);
         var compressed = attribute.GetNamedBool("Compressed", false);
         var expectedSize = attribute.GetNamedInt32("ExpectedSize", -1);
-        var allowedStates = attribute.GetNamedByteArray("AllowedStates");
+        var allowedStates = attribute.GetNamedByteArray("AllowedStates", out var unreadableAllowedState);
+
+        if (unreadableAllowedState)
+            diagnostics.Add(DiagnosticInfo.Create(
+                FenrirDiagnostics.UnreadableAllowedStatesElement,
+                typeSymbol.Locations.FirstOrDefault(),
+                typeSymbol.Name));
 
         if (direction == FenrirDirection.Outgoing && allowedStates.Length > 0)
             diagnostics.Add(DiagnosticInfo.Create(

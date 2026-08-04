@@ -25,10 +25,25 @@ public sealed class ProtocolIncrementalGenerator : IIncrementalGenerator
             static (node, _) => node is TypeDeclarationSyntax,
             static (ctx, _) => TypeModelBuilder.BuildWireType(ctx));
 
-        context.RegisterSourceOutput(packetResults, static (spc, result) => EmitTypeResult(spc, result));
-        context.RegisterSourceOutput(wireTypeResults, static (spc, result) => EmitTypeResult(spc, result));
+        var nestedSizes = wireTypeResults
+            .Collect()
+            .Select(static (results, _) => NestedSizeResolver.BuildTable(results))
+            .WithTrackingName(TrackingNames.NestedSizes);
 
-        var packetModels = packetResults
+        var resolvedPacketResults = packetResults
+            .Combine(nestedSizes)
+            .Select(static (pair, _) => NestedSizeResolver.Resolve(pair.Left, pair.Right))
+            .WithTrackingName(TrackingNames.ResolvedPacketResults);
+
+        var resolvedWireTypeResults = wireTypeResults
+            .Combine(nestedSizes)
+            .Select(static (pair, _) => NestedSizeResolver.Resolve(pair.Left, pair.Right))
+            .WithTrackingName(TrackingNames.ResolvedWireTypeResults);
+
+        context.RegisterSourceOutput(resolvedPacketResults, static (spc, result) => EmitTypeResult(spc, result));
+        context.RegisterSourceOutput(resolvedWireTypeResults, static (spc, result) => EmitTypeResult(spc, result));
+
+        var packetModels = resolvedPacketResults
             .Select(static (r, _) => r.Model)
             .Where(static m => m is not null)
             .Select(static (m, _) => m!)

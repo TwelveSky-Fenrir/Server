@@ -74,8 +74,11 @@ internal static class AttributeValueReader
         return defaultValue;
     }
 
-    public static ImmutableArray<byte> GetNamedByteArray(this AttributeData attribute, string name)
+    public static ImmutableArray<byte> GetNamedByteArray(this AttributeData attribute, string name,
+        out bool hasUnreadableElement)
     {
+        hasUnreadableElement = false;
+
         foreach (var pair in attribute.NamedArguments)
         {
             if (pair.Key != name || pair.Value.Kind != TypedConstantKind.Array)
@@ -84,8 +87,28 @@ internal static class AttributeValueReader
             var values = pair.Value.Values;
             var builder = ImmutableArray.CreateBuilder<byte>(values.Length);
             foreach (var value in values)
-                if (value.Value is byte b)
-                    builder.Add(b);
+            {
+                byte? element = value.Value switch
+                {
+                    byte b => b,
+                    sbyte sb => unchecked((byte)sb),
+                    short sh => unchecked((byte)sh),
+                    ushort ush => unchecked((byte)ush),
+                    int i => unchecked((byte)i),
+                    uint u => unchecked((byte)u),
+                    long l => unchecked((byte)l),
+                    ulong ul => unchecked((byte)ul),
+                    _ => null
+                };
+
+                if (element is null)
+                {
+                    hasUnreadableElement = true;
+                    continue;
+                }
+
+                builder.Add(element.Value);
+            }
 
             return builder.ToImmutable();
         }

@@ -236,6 +236,16 @@ internal static class FenrirDiagnostics
         DiagnosticSeverity.Error,
         true);
 
+    public static readonly DiagnosticDescriptor UnreadableAllowedStatesElement = new(
+        "FEN021",
+        "AllowedStates element cannot be folded to a byte",
+        "Type '{0}' declares AllowedStates with at least one element the generator cannot fold to a byte " +
+        "constant. Such an element is dropped from the emitted SessionStateGate arm, which silently narrows " +
+        "the set of session states the opcode is legal in; declare every element as a byte constant.",
+        Category,
+        DiagnosticSeverity.Error,
+        true);
+
     public static readonly DiagnosticDescriptor PositionalRecordStructUnsupported = new(
         "FEN018",
         "Positional record struct syntax is unsupported",

@@ -79,6 +79,29 @@ public abstract class ClientSession(
             return;
         }
 
+        if (Volatile.Read(ref _completed) != 0)
+        {
+            _sendLock.Release();
+            return;
+        }
+
+        if (_pendingSends.Reader.TryPeek(out _))
+        {
+            if (!TryReservePendingSendBytes(total))
+            {
+                _sendLock.Release();
+                AbortForPendingSendOverflow(TPacket.Opcode);
+                return;
+            }
+
+            var ordered = new byte[total];
+            FrameWriter.WriteFrame(in packet, ordered);
+            _pendingSends.Writer.TryWrite(ordered);
+            LogPacketSent(TPacket.Opcode, total);
+            FlushLocked();
+            return;
+        }
+
         try
         {
             var span = Transport.Output.GetSpan(total);
@@ -111,6 +134,27 @@ public abstract class ClientSession(
             _pendingSends.Writer.TryWrite(rawFrame.ToArray());
             ClaimOwnershipIfNowFreeToAvoidStrandedFrame();
             LogPacketSent(OpcodeOf(rawFrame), rawFrame.Length);
+            return;
+        }
+
+        if (Volatile.Read(ref _completed) != 0)
+        {
+            _sendLock.Release();
+            return;
+        }
+
+        if (_pendingSends.Reader.TryPeek(out _))
+        {
+            if (!TryReservePendingSendBytes(rawFrame.Length))
+            {
+                _sendLock.Release();
+                AbortForPendingSendOverflow(OpcodeOf(rawFrame));
+                return;
+            }
+
+            _pendingSends.Writer.TryWrite(rawFrame.ToArray());
+            LogPacketSent(OpcodeOf(rawFrame), rawFrame.Length);
+            FlushLocked();
             return;
         }
 
@@ -218,6 +262,10 @@ public abstract class ClientSession(
 
             if (!_pendingSends.Reader.TryPeek(out _) || !_sendLock.Wait(0))
                 return;
+
+            if (Volatile.Read(ref _completed) == 0) continue;
+            _sendLock.Release();
+            return;
         }
     }
 
@@ -247,8 +295,16 @@ public abstract class ClientSession(
 
     private void ClaimOwnershipIfNowFreeToAvoidStrandedFrame()
     {
-        if (_sendLock.Wait(0))
+        if (!_sendLock.Wait(0))
+            return;
+
+        if (Volatile.Read(ref _completed) == 0)
+        {
             FlushLocked();
+            return;
+        }
+
+        _sendLock.Release();
     }
 
     private async ValueTask ObserveFlushAsync(ValueTask<FlushResult> flush)

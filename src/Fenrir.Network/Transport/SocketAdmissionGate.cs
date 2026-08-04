@@ -26,6 +26,15 @@ public sealed class SocketAdmissionGate(int maxConcurrentSockets)
 
     public void Release()
     {
-        Interlocked.Decrement(ref _current);
+        var observed = Volatile.Read(ref _current);
+
+        while (observed > 0)
+        {
+            var previous = Interlocked.CompareExchange(ref _current, observed - 1, observed);
+            if (previous == observed)
+                return;
+
+            observed = previous;
+        }
     }
 }

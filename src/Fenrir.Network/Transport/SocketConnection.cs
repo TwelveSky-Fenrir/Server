@@ -126,6 +126,12 @@ public sealed class SocketConnection : IDuplexPipe, IAsyncDisposable
                     {
                         var sent = await _socket.SendAsync(remaining, SocketFlags.None, cancellationToken)
                             .ConfigureAwait(false);
+
+                        if (sent <= 0)
+                            throw new IOException(
+                                $"Socket.SendAsync reported {sent} byte(s) sent for a {remaining.Length}-byte " +
+                                "segment; the send loop cannot make progress and would spin.");
+
                         remaining = remaining[sent..];
                     }
                 }

@@ -5,13 +5,17 @@ namespace Fenrir.Security.RateLimiting;
 
 public static class OpcodeRateLimiterPolicy
 {
-    private static readonly (int Capacity, double TokensPerSecond) Auth = (3, 1d / 5d);
+    private static readonly (int Capacity, double TokensPerSecond) LoginAttempt = (12, 0.5d);
+
+    private static readonly (int Capacity, double TokensPerSecond) ZoneAuth = (3, 1d / 5d);
 
     private static readonly (int Capacity, double TokensPerSecond) Movement = (10, 30d);
 
-    private static readonly (int Capacity, double TokensPerSecond) Heartbeat = (2, 1d / 5d);
+    private static readonly (int Capacity, double TokensPerSecond) Heartbeat = (10, 2d);
 
-    private static readonly (int Capacity, double TokensPerSecond) Attack = (8, 4d);
+    private static readonly (int Capacity, double TokensPerSecond) Attack = (40, 20d);
+
+    private static readonly (int Capacity, double TokensPerSecond) Interaction = (25, 12d);
 
     private static readonly (int Capacity, double TokensPerSecond) Default = (5, 5d);
 
@@ -22,9 +26,9 @@ public static class OpcodeRateLimiterPolicy
     {
         return (server, opcode) switch
         {
-            (FenrirServer.Login, Opcodes.Login.Incoming.Loggedin) => Auth,
-            (FenrirServer.Zone, Opcodes.Zone.Incoming.ZoneHandshake) => Auth,
-            (FenrirServer.Zone, Opcodes.Zone.Incoming.EnterWorld) => Auth,
+            (FenrirServer.Login, Opcodes.Login.Incoming.Loggedin) => LoginAttempt,
+            (FenrirServer.Zone, Opcodes.Zone.Incoming.ZoneHandshake) => ZoneAuth,
+            (FenrirServer.Zone, Opcodes.Zone.Incoming.EnterWorld) => ZoneAuth,
 
             (FenrirServer.Zone, Opcodes.Zone.Incoming.AvatarAction) => Movement,
             (FenrirServer.Zone, Opcodes.Zone.Incoming.AvatarActionResume) => Movement,
@@ -33,6 +37,10 @@ public static class OpcodeRateLimiterPolicy
 
 
             (FenrirServer.Zone, Opcodes.Zone.Incoming.Attack) => Attack,
+
+            (FenrirServer.Zone, Opcodes.Zone.Incoming.GenericAction) => Interaction,
+            (FenrirServer.Zone, Opcodes.Zone.Incoming.UseHotkeyItem) => Interaction,
+            (FenrirServer.Zone, Opcodes.Zone.Incoming.UseInventoryItem) => Interaction,
 
             _ => Default
         };

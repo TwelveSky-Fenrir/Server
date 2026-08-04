@@ -3,7 +3,6 @@ using System.Net;
 using Fenrir.Application.Login.Abstractions.ZoneTransfer;
 using Fenrir.Domain.Login;
 using Fenrir.Domain.Login.Avatars;
-using Fenrir.Network.Dispatch.Sessions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -15,12 +14,11 @@ public sealed class ZoneTransferService(
     IShardMapAssignmentRepository shardMapAssignments,
     ISessionTicketRepository tickets,
     IShardReachabilityProbe reachabilityProbe,
-    SessionRegistry sessions,
     IOptions<LoginServerOptions> options,
     ILogger<ZoneTransferService> logger) : IZoneTransferService
 {
     public async ValueTask<ZoneTransferResult> RequestZoneTransferAsync(int accountId, byte avatarPost,
-        Guid sessionToken, short accountGrade, CancellationToken cancellationToken)
+        Guid sessionToken, short accountGrade, IPAddress? sourceAddress, CancellationToken cancellationToken)
     {
         logger.LogInformation("Zone transfer requested: account {AccountId} slot {AvatarPost}", accountId,
             avatarPost);
@@ -70,26 +68,23 @@ public sealed class ZoneTransferService(
             return new ZoneTransferResult(ZoneTransferOutcome.ShardUnavailable, shard.Host, zonePort, healedMapId);
         }
 
+        if (sourceAddress is null)
+        {
+            logger.LogError(
+                "Zone transfer rejected: account {AccountId} character {CharacterId} has no source address on the " +
+                "requesting login socket; minting the handoff ticket would leave it consumable from any address",
+                accountId, character.CharacterId);
+            return new ZoneTransferResult(ZoneTransferOutcome.ShardUnavailable, shard.Host, zonePort, healedMapId);
+        }
+
         await tickets.CreateAsync(accountId, summary.CharacterId, shard.ShardId, options.Value.TicketTtlSeconds,
-            sessionToken, accountGrade, healedMapId, ResolveLoginSourceAddress(accountId), cancellationToken);
+            sessionToken, accountGrade, healedMapId, sourceAddress, cancellationToken);
 
         logger.LogInformation(
             "Zone transfer ticket minted: account {AccountId} character {CharacterId} -> zone {MapId} at {Host}:{Port} (shard {ShardId})",
             accountId, character.CharacterId, healedMapId, shard.Host, zonePort, shard.ShardId);
 
         return new ZoneTransferResult(ZoneTransferOutcome.Success, shard.Host, zonePort, healedMapId);
-    }
-
-    private IPAddress? ResolveLoginSourceAddress(int accountId)
-    {
-        if (sessions.TryGetByAccount(accountId, out var session) && session?.RemoteEndPoint is { } endPoint)
-            return endPoint.Address;
-
-        logger.LogWarning(
-            "Zone transfer: account {AccountId} has no live login session endpoint; its handoff ticket is minted unbound " +
-            "and the zone will accept it from any source address",
-            accountId);
-        return null;
     }
 
     private async ValueTask ClampVitalsFloorIfNeededAsync(CharacterWorldEntryDto character,

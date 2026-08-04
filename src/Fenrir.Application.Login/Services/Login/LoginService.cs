@@ -81,26 +81,31 @@ public sealed class LoginService(
             return Failure(ResultCustomMessage, RateLimitedMessage, false);
         }
 
-        if (!await firewall.IsAllowedAsync(remoteEndPoint, cancellationToken))
-        {
-            logger.LogWarning("Login rejected: IP {RemoteIp} is blocked by the application firewall", remoteEndPoint);
-            return Failure(ResultIpBlocked, "", true);
-        }
-
-        switch (capacity.TryReserveSlot())
-        {
-            case LoginCapacityOutcome.Maintenance:
-                logger.LogWarning("Login rejected: server is under maintenance (login {Id})", packet.Id);
-                return Failure(ResultMaintenance, "", false);
-            case LoginCapacityOutcome.ServerFull:
-                logger.LogWarning("Login rejected: server is full (login {Id})", packet.Id);
-                return Failure(ResultServerFull, "", false);
-        }
-
+        var slotReserved = false;
         var reservationConsumed = false;
+        var verificationReached = false;
 
         try
         {
+            if (!await firewall.IsAllowedAsync(remoteEndPoint, cancellationToken))
+            {
+                logger.LogWarning("Login rejected: IP {RemoteIp} is blocked by the application firewall",
+                    remoteEndPoint);
+                return Failure(ResultIpBlocked, "", true);
+            }
+
+            switch (capacity.TryReserveSlot())
+            {
+                case LoginCapacityOutcome.Maintenance:
+                    logger.LogWarning("Login rejected: server is under maintenance (login {Id})", packet.Id);
+                    return Failure(ResultMaintenance, "", false);
+                case LoginCapacityOutcome.ServerFull:
+                    logger.LogWarning("Login rejected: server is full (login {Id})", packet.Id);
+                    return Failure(ResultServerFull, "", false);
+            }
+
+            slotReserved = true;
+
             if (packet.Version != options.Value.ExpectedClientVersion)
             {
                 logger.LogWarning("Login rejected: client version mismatch (login {Id}, version {Version})", packet.Id,
@@ -124,36 +129,33 @@ public sealed class LoginService(
 
             var remoteIp = remoteEndPoint?.Address.ToString();
 
-            if (account is not null && account.AccountGrade >= DeviceSpoofingGuard.GmGradeThreshold &&
-                remoteIp is not null && !await IsGmLoginIpAllowedAsync(remoteIp, cancellationToken))
-            {
-                _ = PasswordHasher.Verify(packet.Password, account.PasswordHash, account.PasswordSalt);
-                logger.LogWarning(
-                    "Login rejected: GM-tier account {AccountId} attempted login from non-allowlisted IP {RemoteIp}",
-                    account.AccountId, remoteIp);
-                return Failure(ResultIpBlocked, "", true);
-            }
-
             var throttle = ipRateLimiter.Snapshot(remoteEndPoint, account?.AccountId ?? 0);
 
             if (AccountBlockGate.EvaluateThrottle(throttle.SourceAccountFailureCount,
-                    throttle.SourceTotalFailureCount, account?.FailedLoginCount ?? 0,
+                    throttle.SourceSprayFailureCount, account?.FailedLoginCount ?? 0,
                     throttle.DistinctOtherSourceCount, account?.LockoutUntilUtc, DateTime.UtcNow) is
                 AccountBlockOutcome.AutoLockedOut)
             {
                 var retryDelaySeconds = AccountBlockGate.RetryDelaySeconds(throttle.SourceAccountFailureCount,
-                    throttle.SourceTotalFailureCount);
+                    throttle.SourceSprayFailureCount);
 
-                if (!ipRateLimiter.TryTakeRetrySlot(remoteEndPoint, retryDelaySeconds))
+                var sprayScoped = throttle.SourceSprayFailureCount >= AccountBlockGate.SourceTotalFailureThreshold;
+
+                var admitted = sprayScoped
+                    ? ipRateLimiter.TryTakeSourceRetrySlot(remoteEndPoint, retryDelaySeconds)
+                    : ipRateLimiter.TryTakeAccountRetrySlot(remoteEndPoint, account?.AccountId ?? 0,
+                        retryDelaySeconds);
+
+                if (!admitted)
                 {
                     logger.LogWarning(
-                        "Login rejected before credential verification: IP {RemoteIp} is over its failed-attempt budget for login {Id}; next paced attempt in {RetryDelaySeconds}s",
-                        remoteEndPoint, packet.Id, retryDelaySeconds);
+                        "Login rejected before credential verification: IP {RemoteIp} is over its failed-attempt budget for login {Id} (source-wide spray pacing: {SprayScoped}); next paced attempt in {RetryDelaySeconds}s",
+                        remoteEndPoint, packet.Id, sprayScoped, retryDelaySeconds);
 
                     if (account is not null &&
                         ipRateLimiter.TryClaimThrottleReport(remoteEndPoint, account.AccountId))
                         await LogThrottleRejectionAsync(account.AccountId,
-                            Math.Max(throttle.SourceAccountFailureCount, throttle.SourceTotalFailureCount), remoteIp,
+                            Math.Max(throttle.SourceAccountFailureCount, throttle.SourceSprayFailureCount), remoteIp,
                             cancellationToken);
 
                     return Failure(ResultCustomMessage, AccountLockedOutMessage, true);
@@ -165,6 +167,7 @@ public sealed class LoginService(
             }
 
             AuthenticationOutcome authentication;
+            verificationReached = true;
             try
             {
                 authentication = await AuthenticateConstantTimeAsync(account, packet.Password, remoteEndPoint,
@@ -193,6 +196,15 @@ public sealed class LoginService(
             }
 
             var accountId = account!.AccountId;
+
+            if (account.AccountGrade >= DeviceSpoofingGuard.GmGradeThreshold &&
+                !await IsGmLoginIpAllowedAsync(remoteIp, cancellationToken))
+            {
+                logger.LogWarning(
+                    "Login rejected: GM-tier account {AccountId} authenticated from non-allowlisted IP {RemoteIp}",
+                    accountId, remoteIp);
+                return Failure(ResultIpBlocked, "", true);
+            }
 
             if (string.IsNullOrEmpty(packet.Adapter.AdapterName))
             {
@@ -353,8 +365,6 @@ public sealed class LoginService(
                     break;
             }
 
-            await retiredItems.PurgeAsync(roster.Items, cancellationToken);
-
             if (registry.AssociateAccount(sessionId, accountId) is { } supersededLocal)
             {
                 logger.LogWarning(
@@ -362,6 +372,8 @@ public sealed class LoginService(
                     accountId);
                 supersededLocal.Abort(DisconnectReason.Evicted);
             }
+
+            await retiredItems.PurgeAsync(roster.Items, cancellationToken);
 
             try
             {
@@ -385,8 +397,11 @@ public sealed class LoginService(
         }
         finally
         {
-            if (!reservationConsumed)
+            if (slotReserved && !reservationConsumed)
                 capacity.ReleaseReservedSlot();
+
+            if (!verificationReached)
+                ipRateLimiter.RefundUnverifiedAttempt(remoteEndPoint);
         }
     }
 
@@ -441,8 +456,15 @@ public sealed class LoginService(
         return entries.ToImmutable();
     }
 
-    private async ValueTask<bool> IsGmLoginIpAllowedAsync(string remoteIp, CancellationToken ct)
+    private async ValueTask<bool> IsGmLoginIpAllowedAsync(string? remoteIp, CancellationToken ct)
     {
+        if (remoteIp is null)
+        {
+            logger.LogError(
+                "Login: a GM-tier account presented no resolvable remote address; the allowlist cannot be evaluated so the login is refused");
+            return false;
+        }
+
         try
         {
             return await gmAllowlist.IsAllowedAsync(remoteIp, ct);
@@ -479,13 +501,12 @@ public sealed class LoginService(
             return AuthenticationOutcome.WrongPassword;
         }
 
-        ipRateLimiter.ClearFailures(remoteEndPoint, account.AccountId);
-
         var loggedBan = await bans.IsActiveForAccountAsync(account.AccountId, ct);
 
         if (AccountBlockGate.EvaluateAdminBan(account.IsBanned, loggedBan) is AccountBlockOutcome.AdminBanned)
             return AuthenticationOutcome.AdminBanned;
 
+        ipRateLimiter.RecordSuccess(remoteEndPoint, account.AccountId);
         await accounts.RecordLoginAttemptAsync(account.AccountId, true, ct);
         return AuthenticationOutcome.Success;
     }

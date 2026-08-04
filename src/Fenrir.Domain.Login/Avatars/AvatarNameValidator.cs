@@ -2,9 +2,11 @@ namespace Fenrir.Domain.Login.Avatars;
 
 public static class AvatarNameValidator
 {
+    public const int MaxNameLength = 12;
+
     public static bool HasOnlyWhitelistedCharacters(string name)
     {
-        if (name.Length == 0)
+        if (name.Length is 0 or > MaxNameLength)
             return false;
 
         foreach (var character in name)

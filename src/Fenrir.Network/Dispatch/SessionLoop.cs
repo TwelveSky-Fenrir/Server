@@ -31,9 +31,18 @@ public static class SessionLoop
         finally
         {
             connection.Abort();
-        }
 
-        await ioTask.ConfigureAwait(false);
+            try
+            {
+                await ioTask.ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                logger?.LogDebug(ex,
+                    "Session {SessionId} ({Server}, {RemoteEndPoint}): transport I/O loop ended with an exception while tearing the connection down",
+                    session.SessionId, session.Server, session.RemoteEndPoint);
+            }
+        }
     }
 
     public static async Task RunAsync(

@@ -29,12 +29,7 @@ public sealed class TokenBucket
 
         lock (_gate)
         {
-            var elapsedSeconds = (now - _lastRefillTimestamp) / (double)Stopwatch.Frequency;
-            if (elapsedSeconds > 0)
-            {
-                _tokens = Math.Min(Capacity, _tokens + elapsedSeconds * TokensPerSecond);
-                _lastRefillTimestamp = now;
-            }
+            Refill(now);
 
             if (_tokens < count)
                 return false;
@@ -42,5 +37,29 @@ public sealed class TokenBucket
             _tokens -= count;
             return true;
         }
+    }
+
+    public void Refund(int count = 1)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(count);
+
+        var now = Stopwatch.GetTimestamp();
+
+        lock (_gate)
+        {
+            Refill(now);
+            _tokens = Math.Min(Capacity, _tokens + count);
+        }
+    }
+
+    private void Refill(long now)
+    {
+        var elapsedSeconds = (now - _lastRefillTimestamp) / (double)Stopwatch.Frequency;
+
+        if (elapsedSeconds <= 0)
+            return;
+
+        _tokens = Math.Min(Capacity, _tokens + elapsedSeconds * TokensPerSecond);
+        _lastRefillTimestamp = now;
     }
 }

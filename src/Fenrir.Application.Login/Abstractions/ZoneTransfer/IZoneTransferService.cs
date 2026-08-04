@@ -1,3 +1,5 @@
+using System.Net;
+
 namespace Fenrir.Application.Login.Abstractions.ZoneTransfer;
 
 public enum ZoneTransferOutcome
@@ -13,5 +15,5 @@ public readonly record struct ZoneTransferResult(ZoneTransferOutcome Outcome, st
 public interface IZoneTransferService
 {
     public ValueTask<ZoneTransferResult> RequestZoneTransferAsync(int accountId, byte avatarPost, Guid sessionToken,
-        short accountGrade, CancellationToken cancellationToken);
+        short accountGrade, IPAddress? sourceAddress, CancellationToken cancellationToken);
 }

@@ -1,6 +1,8 @@
+using CaeriusNet.Exceptions;
 using Fenrir.Application.Login.Abstractions.RenameAvatar;
 using Fenrir.Application.Login.Services.AccountSecurity;
 using Fenrir.Domain.Login.Avatars;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Login.Services.RenameAvatar;
@@ -18,6 +20,9 @@ public sealed class RenameAvatarService(
 {
     private const int InventoryPageCount = 2;
     private const int InventorySlotCount = 64;
+
+    private const int SqlErrorUniqueConstraintViolation = 2627;
+    private const int SqlErrorDuplicateKeyIndex = 2601;
 
     public async ValueTask<RenameAvatarResult> RenameAvatarAsync(int accountId, byte avatarPost,
         string changeAvatarName, int itemContainer, int itemSlot, CancellationToken cancellationToken)
@@ -50,6 +55,17 @@ public sealed class RenameAvatarService(
         {
             code = await renames.RenameAndConsumeItemAsync(accountId, avatarPost, changeAvatarName,
                 (byte)itemContainer, (byte)itemSlot, cancellationToken);
+        }
+        catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException
+                                                {
+                                                    Number: SqlErrorUniqueConstraintViolation
+                                                    or SqlErrorDuplicateKeyIndex
+                                                })
+        {
+            logger.LogWarning(ex,
+                "Character rename rejected for account {AccountId} slot {AvatarPost}: name {NewName} was claimed concurrently",
+                accountId, avatarPost, changeAvatarName);
+            return new RenameAvatarResult(RenameAvatarOutcome.NameTaken);
         }
         catch (Exception ex)
         {

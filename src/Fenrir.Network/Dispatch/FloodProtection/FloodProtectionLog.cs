@@ -17,15 +17,16 @@ internal static partial class FloodProtectionLog
         EventName = "IpBlockPersistFailed",
         Level = LogLevel.Error,
         Message =
-            "Failed to persist IP block for {IpAddress} -- in-memory counters still gate this IP for the lifetime of this process, but the block will not survive a restart")]
-    public static partial void IpBlockPersistFailed(this ILogger logger, Exception exception, string ipAddress);
+            "Failed to persist IP block for {IpAddress} -- {KickedSessionCount} local session(s) were already aborted, the IP is NOT recorded as blocked, and the escalation claim was re-armed, so the next violation from this IP retries the write instead of waiting out the full re-escalation interval")]
+    public static partial void IpBlockPersistFailed(this ILogger logger, Exception exception, string ipAddress,
+        int kickedSessionCount);
 
     [LoggerMessage(
         EventId = 4103,
         EventName = "IpBlockSkippedForOperatorAllowlist",
         Level = LogLevel.Warning,
         Message =
-            "Flood-guard escalation for {IpAddress} suppressed: the IP is on admin.GmAllowlists, so no persistent block row was written and no session was kicked -- the in-memory per-IP connection cap still applies")]
+            "Flood-guard escalation for {IpAddress} suppressed: the IP is on admin.GmAllowlists, so no persistent block row was written, no session was kicked, and the guard does not record the IP as blocked -- the in-memory per-IP connection cap still applies")]
     public static partial void IpBlockSkippedForOperatorAllowlist(this ILogger logger, string ipAddress);
 
     [LoggerMessage(

@@ -99,8 +99,11 @@ public static class AvatarInfoFactory
 
             var baseIndex = item.Slot * InventoryWireIntsPerSlot;
             inventory[baseIndex] = item.ItemId;
+            inventory[baseIndex + 1] = item.XPos;
+            inventory[baseIndex + 2] = item.YPos;
             inventory[baseIndex + 3] = item.Quantity;
             inventory[baseIndex + 4] = item.Enchant | (item.Combine << 8) | (item.Refine << 16) | (item.Socket << 24);
+            inventory[baseIndex + 5] = item.Serial;
         }
 
         return inventory;
@@ -175,8 +178,11 @@ public static class AvatarInfoFactory
 
             var baseIndex = (page * InventorySlotsPerPage + item.Slot) * InventoryWireIntsPerSlot;
             inventory[baseIndex] = item.ItemId;
+            inventory[baseIndex + 1] = item.XPos;
+            inventory[baseIndex + 2] = item.YPos;
             inventory[baseIndex + 3] = item.Quantity;
             inventory[baseIndex + 4] = item.Enchant | (item.Combine << 8) | (item.Refine << 16) | (item.Socket << 24);
+            inventory[baseIndex + 5] = item.Serial;
         }
 
         return inventory;

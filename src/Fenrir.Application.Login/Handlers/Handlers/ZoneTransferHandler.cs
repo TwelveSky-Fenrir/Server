@@ -30,7 +30,7 @@ public sealed class ZoneTransferHandler(IZoneTransferService zoneTransferService
         var sessionToken = loginSession.AccountSessionToken!.Value;
 
         var result = await zoneTransferService.RequestZoneTransferAsync(accountId, (byte)packet.AvatarPost,
-            sessionToken, loginSession.AccountGrade, cancellationToken);
+            sessionToken, loginSession.AccountGrade, loginSession.RemoteEndPoint?.Address, cancellationToken);
 
         switch (result.Outcome)
         {

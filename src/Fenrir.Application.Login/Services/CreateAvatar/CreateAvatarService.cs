@@ -24,17 +24,22 @@ public sealed class CreateAvatarService(
     private const int StartMaxLife = 100;
     private const int StartMaxMana = 50;
 
+    private const int SqlErrorSlotAlreadyOccupied = 50201;
     private const int SqlErrorNameAlreadyTaken = 50202;
 
     private const byte ArmorEquipSlot = 2;
+    private const byte GlovesEquipSlot = 3;
+    private const byte BootsEquipSlot = 5;
     private const byte WeaponEquipSlot = 7;
+
+    private const int InventoryGridWidth = 8;
 
     private const byte StarterGearEnchant = 0;
     private const byte StarterGearCombine = 0;
 
     private const int WelcomeBuffDurationDays = 7;
 
-    private const int StartingStatPoint = 50;
+    private const int StartingStatPoint = 0;
     private const int StartingSkillPoint = 0;
 
     private const int WelcomeDoubleExpTimeCounter = 300;
@@ -177,6 +182,16 @@ public sealed class CreateAvatarService(
 
             return new CreateAvatarResult(CreateAvatarOutcome.Success, avatarInfo);
         }
+        catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException
+                                                {
+                                                    Number: SqlErrorSlotAlreadyOccupied
+                                                })
+        {
+            logger.LogWarning(ex,
+                "Character creation rejected for account {AccountId}: slot {AvatarPost} was claimed concurrently",
+                accountId, avatarPost);
+            return new CreateAvatarResult(CreateAvatarOutcome.SlotOccupied, AvatarInfoFactory.Zeroed);
+        }
         catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException { Number: SqlErrorNameAlreadyTaken })
         {
             logger.LogWarning(ex,
@@ -251,15 +266,19 @@ public sealed class CreateAvatarService(
     private static List<CharacterItemSlotTvp> BuildEquipmentRows(IReadOnlyList<StarterKitEquipmentRowDto> catalog,
         int weaponItemId)
     {
-        var rows = new List<CharacterItemSlotTvp>(2);
+        var rows = new List<CharacterItemSlotTvp>(4);
 
         foreach (var row in catalog)
         {
-            if (row.EquipSlot == WeaponEquipSlot && row.ItemId != weaponItemId)
+            if (row.EquipSlot == WeaponEquipSlot)
+            {
+                if (row.ItemId != weaponItemId)
+                    continue;
+            }
+            else if (row.EquipSlot is not (ArmorEquipSlot or GlovesEquipSlot or BootsEquipSlot))
+            {
                 continue;
-
-            if (row.EquipSlot != WeaponEquipSlot && row.EquipSlot != ArmorEquipSlot)
-                continue;
+            }
 
             rows.Add(new CharacterItemSlotTvp(row.EquipSlot, row.ItemId, 1, StarterGearEnchant, StarterGearCombine, 0,
                 0, 0, 0, 0, 0, 0));
@@ -295,7 +314,8 @@ public sealed class CreateAvatarService(
         var rows = new List<CharacterItemSlotTvp>(catalog.Count);
 
         foreach (var row in catalog)
-            rows.Add(new CharacterItemSlotTvp(row.SlotIndex, row.ItemId, row.Quantity, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+            rows.Add(new CharacterItemSlotTvp(row.SlotIndex, row.ItemId, row.Quantity, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                (byte)(row.SlotIndex % InventoryGridWidth), (byte)(row.SlotIndex / InventoryGridWidth)));
 
         return rows;
     }

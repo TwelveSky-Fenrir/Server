@@ -25,6 +25,7 @@ public readonly record struct BanCreationRequest(
             throw new ArgumentOutOfRangeException(nameof(Reason), "A ban reason is outside the supported range.");
 
         if (string.IsNullOrWhiteSpace(AuditPayload) || AuditPayload.Length > 512)
-            throw new ArgumentException("A ban requires an audit payload of at most 512 characters.", nameof(AuditPayload));
+            throw new ArgumentException("A ban requires an audit payload of at most 512 characters.",
+                nameof(AuditPayload));
     }
 }

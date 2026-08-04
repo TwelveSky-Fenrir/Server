@@ -32,22 +32,21 @@ BEGIN
         WHERE ShardId = @ShardId;
 
         IF EXISTS
-        (
-            SELECT 1
-            FROM runtime.PartyResyncRelay WITH (SNAPSHOT)
-            WHERE RelayId > COALESCE(@CurrentRelayId, 0)
-              AND RelayId < @RelayId
-              AND SourceShardId <> @ShardId
-        )
+            (SELECT 1
+             FROM runtime.PartyResyncRelay WITH (SNAPSHOT)
+             WHERE RelayId > COALESCE(@CurrentRelayId, 0)
+               AND RelayId < @RelayId
+               AND SourceShardId <> @ShardId)
             THROW 51091, 'Party resync relay acknowledgement cannot skip an earlier delivery.', 1;
 
         IF @CurrentRelayId IS NULL
             INSERT INTO runtime.PartyResyncRelayCursor (ShardId, LastRelayId)
             VALUES (@ShardId, @RelayId);
-        ELSE IF @CurrentRelayId < @RelayId
-            UPDATE runtime.PartyResyncRelayCursor
-            SET LastRelayId = @RelayId
-            WHERE ShardId = @ShardId;
+        ELSE
+            IF @CurrentRelayId < @RelayId
+                UPDATE runtime.PartyResyncRelayCursor
+                SET LastRelayId = @RelayId
+                WHERE ShardId = @ShardId;
 
         COMMIT TRANSACTION;
     END TRY

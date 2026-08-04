@@ -200,7 +200,7 @@ public static class SessionLoop
                     "Session {SessionId} ({RemoteEndPoint}): inbound read contains more than the {MaxFrames}-frame cap; aborting",
                     session.SessionId, session.RemoteEndPoint, maxFrames);
                 session.Abort(DisconnectReason.Malformed);
-                return new BufferOutcome(remaining.Start, remaining.End, true, false);
+                return new BufferOutcome(remaining.Start, remaining.End, true);
             }
 
             if (debugEnabled)
@@ -272,7 +272,10 @@ public static class SessionLoop
         }
     }
 
-    private readonly struct BufferOutcome(SequencePosition consumed, SequencePosition examined, bool shouldStop,
+    private readonly struct BufferOutcome(
+        SequencePosition consumed,
+        SequencePosition examined,
+        bool shouldStop,
         bool hasPartialFrame = false)
     {
         public SequencePosition Consumed { get; } = consumed;

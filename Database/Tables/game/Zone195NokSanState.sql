@@ -25,31 +25,31 @@ CREATE TABLE game.Zone195NokSanStates
 
 CREATE TABLE game.Zone195NokSanCaptures
 (
-    MapId                  SMALLINT      NOT NULL
+    MapId                 SMALLINT     NOT NULL
         CONSTRAINT PK_Zone195NokSanCaptures PRIMARY KEY
         CONSTRAINT CK_Zone195NokSanCaptures_MapId CHECK (MapId IN (99, 100, 196)),
-    StateId                TINYINT       NOT NULL
+    StateId               TINYINT      NOT NULL
         CONSTRAINT DF_Zone195NokSanCaptures_StateId DEFAULT 1
         CONSTRAINT FK_Zone195NokSanCaptures_StateId REFERENCES game.Zone195NokSanStates (StateId)
         CONSTRAINT CK_Zone195NokSanCaptures_StateId CHECK (StateId = 1),
-    Phase                  TINYINT       NOT NULL
+    Phase                 TINYINT      NOT NULL
         CONSTRAINT CK_Zone195NokSanCaptures_Phase CHECK (Phase BETWEEN 0 AND 2),
-    CapturerCharacterId    INT           NOT NULL
+    CapturerCharacterId   INT          NOT NULL
         CONSTRAINT CK_Zone195NokSanCaptures_CapturerCharacterId CHECK (CapturerCharacterId >= -1),
-    CapturerTribe          TINYINT       NOT NULL
+    CapturerTribe         TINYINT      NOT NULL
         CONSTRAINT CK_Zone195NokSanCaptures_CapturerTribe CHECK (CapturerTribe BETWEEN 0 AND 3),
-    CapturerName           NVARCHAR(13)  NOT NULL,
-    RemainingTime          INT           NOT NULL
+    CapturerName          NVARCHAR(13) NOT NULL,
+    RemainingTime         INT          NOT NULL
         CONSTRAINT CK_Zone195NokSanCaptures_RemainingTime CHECK (RemainingTime >= 0),
-    PhaseAccumulatorTicks  INT           NOT NULL
+    PhaseAccumulatorTicks INT          NOT NULL
         CONSTRAINT CK_Zone195NokSanCaptures_PhaseAccumulatorTicks CHECK (PhaseAccumulatorTicks >= 0),
-    UpdatedAtUtc           DATETIME2(3)  NOT NULL
+    UpdatedAtUtc          DATETIME2(3) NOT NULL
         CONSTRAINT DF_Zone195NokSanCaptures_UpdatedAtUtc DEFAULT SYSUTCDATETIME(),
     CONSTRAINT CK_Zone195NokSanCaptures_IdleShape CHECK
-    (
+        (
         (Phase = 0 AND CapturerCharacterId = -1 AND CapturerTribe = 0 AND CapturerName = N'' AND
          RemainingTime = 0 AND PhaseAccumulatorTicks = 0)
-        OR
+            OR
         (Phase IN (1, 2) AND CapturerCharacterId > 0 AND CapturerName <> N'')
-    )
+        )
 );

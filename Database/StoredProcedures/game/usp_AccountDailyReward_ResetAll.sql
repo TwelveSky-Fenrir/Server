@@ -1,5 +1,5 @@
 CREATE OR ALTER PROCEDURE game.usp_AccountDailyReward_ResetAll @OccurrenceDate INT,
-                                                             @ClearWeeklyDayCounter BIT
+                                                               @ClearWeeklyDayCounter BIT
 AS
 BEGIN
     SET
@@ -22,7 +22,8 @@ BEGIN
     BEGIN TRANSACTION;
 
     IF NOT EXISTS (SELECT 1
-                   FROM game.DailyRewardResetOccurrences WITH (UPDLOCK, HOLDLOCK)
+                   FROM game.DailyRewardResetOccurrences
+                   WITH (UPDLOCK, HOLDLOCK)
                    WHERE OccurrenceDate = @OccurrenceDate)
         BEGIN
             UPDATE game.AccountDailyRewards

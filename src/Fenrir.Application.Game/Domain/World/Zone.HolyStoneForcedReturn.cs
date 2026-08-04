@@ -20,7 +20,9 @@ public sealed partial class Zone
 
     private void DrainHolyStoneForcedReturnCommands(int maximum)
     {
-        for (var processed = 0; processed < maximum && _holyStoneForcedReturnInbox.Reader.TryRead(out var command); processed++)
+        for (var processed = 0;
+             processed < maximum && _holyStoneForcedReturnInbox.Reader.TryRead(out var command);
+             processed++)
             try
             {
                 ApplyHolyStoneForcedReturn(command.CharacterId);

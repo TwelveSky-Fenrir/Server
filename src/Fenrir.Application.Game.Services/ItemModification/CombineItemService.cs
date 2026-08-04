@@ -30,7 +30,7 @@ public sealed class CombineItemService(
         var index2 = packet.Index2;
 
         if (!IsValidInventorySlot(page1, index1) || !IsValidInventorySlot(page2, index2) ||
-            page1 == page2 && index1 == index2)
+            (page1 == page2 && index1 == index2))
         {
             logger.LogDebug(
                 "Character {CharacterId} combine-item rejected: invalid slot(s) ({Page1}:{Index1} / {Page2}:{Index2})",

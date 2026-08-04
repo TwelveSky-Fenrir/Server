@@ -294,7 +294,7 @@ public sealed class TradeLockService(
     private bool IsValidOffer(TradeOfferSnapshot offer)
     {
         if (offer.Money is < 0 or > TradeMoneyPlacementResolver.MoneyCeiling ||
-            offer.BigMoney < 0 || (long)offer.BigMoney > TradeBigMoneyPlacementResolver.BigMoneyCap)
+            offer.BigMoney < 0 || offer.BigMoney > TradeBigMoneyPlacementResolver.BigMoneyCap)
             return false;
 
         foreach (var offered in offer.Slots)

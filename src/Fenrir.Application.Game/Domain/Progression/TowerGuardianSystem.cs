@@ -32,6 +32,7 @@ public sealed class TowerGuardianSystem(
                     towerWar.BeginSiege(towerIndex, DateTime.UtcNow);
                     zoneEventBroadcaster?.Value.AnnounceTowerStatus(towerWar);
                 }
+
                 break;
 
             case TowerSiegePhase.Sieged:

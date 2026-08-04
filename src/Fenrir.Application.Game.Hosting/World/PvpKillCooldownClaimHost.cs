@@ -2,7 +2,6 @@ using System.Collections.Concurrent;
 using System.Threading.Channels;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Data.Abstractions.Characters;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 

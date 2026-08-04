@@ -87,7 +87,8 @@ public sealed class ZoneTransferService(
                 "");
         }
 
-        var ticket = await tickets.CreateAsync(accountId, summary.CharacterId, shard.ShardId, options.Value.TicketTtlSeconds,
+        var ticket = await tickets.CreateAsync(accountId, summary.CharacterId, shard.ShardId,
+            options.Value.TicketTtlSeconds,
             sessionToken, accountGrade, healedMapId, sourceAddress, cancellationToken);
 
         logger.LogInformation(

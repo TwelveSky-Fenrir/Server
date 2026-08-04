@@ -1,4 +1,3 @@
-using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Commerce;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Inventory.UseItems;

@@ -33,8 +33,8 @@ public sealed partial class Zone
     public bool IsTimedChallengeMap => ChallengeContentEnabled && MapId is >= 234 and <= 240;
 
     public bool IsZone241TypeZone => ChallengeContentEnabled &&
-                                      (options.Zone241DungeonMapIds.Contains(MapId) ||
-                                       WrapCheckSpecialDestinationCatalog.IsInstancedDestination(MapId));
+                                     (options.Zone241DungeonMapIds.Contains(MapId) ||
+                                      WrapCheckSpecialDestinationCatalog.IsInstancedDestination(MapId));
 
     public DungeonInstanceEntryOutcome TryEnterZone241PersonalInstance(int characterId)
     {

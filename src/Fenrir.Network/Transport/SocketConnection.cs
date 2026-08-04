@@ -19,7 +19,6 @@ public sealed class SocketConnection : IBufferedDuplexPipe, IAsyncDisposable
 
     private readonly Socket _socket;
     private readonly Pipe _txPipe;
-    private readonly PipeWriter _txWriter;
 
     private long _bufferedOutputBytes;
     private int _disposed;
@@ -41,16 +40,12 @@ public sealed class SocketConnection : IBufferedDuplexPipe, IAsyncDisposable
 
         _rxPipe = new Pipe(PipeOptionsFactory.Rx);
         _txPipe = new Pipe(PipeOptionsFactory.Tx);
-        _txWriter = new CountingPipeWriter(_txPipe.Writer, OnOutputBytesWritten);
+        Output = new CountingPipeWriter(_txPipe.Writer, OnOutputBytesWritten);
     }
 
     public IPEndPoint? RemoteEndPoint { get; }
 
     public Func<byte> GetInboundXorKey { get; set; } = static () => 0;
-
-    public long BufferedOutputBytes => Volatile.Read(ref _bufferedOutputBytes);
-
-    public event Action<long>? OutputBytesConsumed;
 
     public async ValueTask DisposeAsync()
     {
@@ -68,8 +63,12 @@ public sealed class SocketConnection : IBufferedDuplexPipe, IAsyncDisposable
         _abortCts.Dispose();
     }
 
+    public long BufferedOutputBytes => Volatile.Read(ref _bufferedOutputBytes);
+
+    public event Action<long>? OutputBytesConsumed;
+
     public PipeReader Input => _rxPipe.Reader;
-    public PipeWriter Output => _txWriter;
+    public PipeWriter Output { get; }
 
     public async Task RunIoAsync(CancellationToken cancellationToken)
     {

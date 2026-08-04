@@ -23,7 +23,7 @@ public sealed class PopupEventScheduleTimer(
                 Publish(occurrence);
     }
 
-        public IEnumerable<PopupEventScheduleOccurrence> GetDueOccurrences(DateTime localNow)
+    public IEnumerable<PopupEventScheduleOccurrence> GetDueOccurrences(DateTime localNow)
     {
         var scheduledMinute = new DateTime(localNow.Year, localNow.Month, localNow.Day, localNow.Hour,
             localNow.Minute, 0, localNow.Kind);
@@ -41,7 +41,7 @@ public sealed class PopupEventScheduleTimer(
             yield return invasionOccurrence;
     }
 
-        public void Publish(PopupEventScheduleOccurrence occurrence)
+    public void Publish(PopupEventScheduleOccurrence occurrence)
     {
         switch (occurrence.Kind)
         {

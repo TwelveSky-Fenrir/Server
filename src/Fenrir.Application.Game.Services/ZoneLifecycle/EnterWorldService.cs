@@ -8,7 +8,6 @@ using Fenrir.Application.Game.Domain.Costumes;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Mounts;
-using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.Simulation;
@@ -613,16 +612,18 @@ public sealed class EnterWorldService(
             {
                 WorldInfo = ZoneCenterSiegeProjection.Apply(
                     WorldStateProjection.Apply(
-                        PopupEventWorldProjection.Apply(
-                            GuildRankingProjection.Apply(WorldStateTemplates.ZeroedWorldInfo, guildRanking.Top),
-                            popupEventState),
-                        worldState) with { Zone200TypeState = valleyWarCampaign.GetWorldInfoState() },
+                            PopupEventWorldProjection.Apply(
+                                GuildRankingProjection.Apply(WorldStateTemplates.ZeroedWorldInfo, guildRanking.Top),
+                                popupEventState),
+                            worldState) with
+                        {
+                            Zone200TypeState = valleyWarCampaign.GetWorldInfoState()
+                        },
                     zoneCenterSiegeState, tribeGuardCorridorState),
                 TribeInfo = WorldStateTemplates.ZeroedTribeInfo
             });
 
-            var avatarAction = zone.BuildAvatarActionRecv(admitted, avatarProjection.Pose,
-                EnterWorldAvatarActionState);
+            var avatarAction = zone.BuildAvatarActionRecv(admitted, avatarProjection.Pose);
             zoneSession.Send(avatarAction with
             {
                 Data = avatarAction.Data with { PartyName = avatarProjection.PartyName }

@@ -34,7 +34,7 @@ public sealed class Zone195NokSanStateService(
         }
     }
 
-        public async ValueTask<Zone195NokSanPersistenceOutcome> FlushIfDirtyAsync(CancellationToken ct)
+    public async ValueTask<Zone195NokSanPersistenceOutcome> FlushIfDirtyAsync(CancellationToken ct)
     {
         await _persistenceGate.WaitAsync(ct).ConfigureAwait(false);
         try
@@ -123,7 +123,8 @@ public sealed class Zone195NokSanStateService(
 
     private static ImmutableArray<Zone195NokSanCaptureRowDto> ToRows(in Zone195NokSanDurableSnapshot snapshot)
     {
-        return [
+        return
+        [
             ToRow(GetCapture(snapshot.Captures, 99)),
             ToRow(GetCapture(snapshot.Captures, 100)),
             ToRow(GetCapture(snapshot.Captures, 196))
@@ -170,7 +171,8 @@ public sealed class Zone195NokSanStateService(
                 continue;
 
             if (match is not null)
-                throw new InvalidOperationException($"Nok-San map {mapId} appears more than once in the local snapshot.");
+                throw new InvalidOperationException(
+                    $"Nok-San map {mapId} appears more than once in the local snapshot.");
 
             match = capture;
         }

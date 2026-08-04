@@ -108,7 +108,6 @@ public sealed class ValleyWarSystem(
 
         if (result.AllSessionsShouldDisconnect)
             broadcaster.Value.DisconnectValleyWarCampaign();
-
     }
 
     private void LogMonsterSummonGap(Zone zone, string what)
@@ -126,5 +125,4 @@ public sealed class ValleyWarSystem(
         killRegistry.MarkUnavailable();
         return false;
     }
-
 }

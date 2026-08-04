@@ -42,7 +42,7 @@ public static class RuneStoneCraftResolver
     {
         if (!IsValidInventorySlot(request.SourcePage, request.SourceSlot) ||
             !IsValidInventorySlot(request.DestinationPage, request.DestinationSlot) ||
-            request.SourcePage == request.DestinationPage && request.SourceSlot == request.DestinationSlot)
+            (request.SourcePage == request.DestinationPage && request.SourceSlot == request.DestinationSlot))
             return RuneStoneCraftResult.Disconnect;
 
         if ((request.SourcePage == ContainerMatrix.InventoryPage1 ||

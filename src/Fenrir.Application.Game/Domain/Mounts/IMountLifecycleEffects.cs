@@ -4,6 +4,6 @@ namespace Fenrir.Application.Game.Domain.Mounts;
 
 public interface IMountLifecycleEffects
 {
-    void ApplyExperience(Zone zone, PlayerRuntimeState state, int garageSlot,
+    public void ApplyExperience(Zone zone, PlayerRuntimeState state, int garageSlot,
         in MountExperienceCreditResult credit);
 }

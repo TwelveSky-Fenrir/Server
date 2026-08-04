@@ -35,9 +35,9 @@ BEGIN
         TRANSACTION;
 
     DECLARE @CatalogItemId INT,
-            @CatalogQuantity INT,
-            @CatalogCost INT,
-            @ItemSort TINYINT;
+        @CatalogQuantity INT,
+        @CatalogCost INT,
+        @ItemSort TINYINT;
 
     SELECT @CatalogItemId = p.ItemId,
            @CatalogQuantity = p.Quantity,
@@ -55,7 +55,7 @@ BEGIN
     DECLARE @UnitsPerPurchase INT = CASE
                                         WHEN @ItemSort IN (2, 99) AND @CatalogQuantity > 0 THEN @CatalogQuantity
                                         ELSE 1
-                                    END;
+        END;
 
     IF (@ItemSort IN (2, 99) AND @CatalogQuantity NOT BETWEEN 0 AND 999) OR
        @UnitsPerPurchase > 999 OR
@@ -87,28 +87,41 @@ BEGIN
         THROW 50240, N'Insufficient cash balance for this debit.', 1;
 
     DECLARE @ExistingItems TABLE
-            (
-                Slot       TINYINT NOT NULL PRIMARY KEY,
-                ItemId     INT     NOT NULL,
-                Quantity   INT     NOT NULL,
-                Enchant    TINYINT NOT NULL,
-                Combine    TINYINT NOT NULL,
-                Refine     TINYINT NOT NULL,
-                Socket     TINYINT NOT NULL,
-                SocketGem1 INT     NOT NULL,
-                SocketGem2 INT     NOT NULL,
-                SocketGem3 INT     NOT NULL,
-                ExpireDate INT     NOT NULL,
-                Serial     INT     NOT NULL,
-                XPos       TINYINT NOT NULL,
-                YPos       TINYINT NOT NULL
-            );
+                           (
+                               Slot       TINYINT NOT NULL PRIMARY KEY,
+                               ItemId     INT     NOT NULL,
+                               Quantity   INT     NOT NULL,
+                               Enchant    TINYINT NOT NULL,
+                               Combine    TINYINT NOT NULL,
+                               Refine     TINYINT NOT NULL,
+                               Socket     TINYINT NOT NULL,
+                               SocketGem1 INT     NOT NULL,
+                               SocketGem2 INT     NOT NULL,
+                               SocketGem3 INT     NOT NULL,
+                               ExpireDate INT     NOT NULL,
+                               Serial     INT     NOT NULL,
+                               XPos       TINYINT NOT NULL,
+                               YPos       TINYINT NOT NULL
+                           );
 
     INSERT INTO @ExistingItems (Slot, ItemId, Quantity, Enchant, Combine, Refine, Socket, SocketGem1, SocketGem2,
                                 SocketGem3, ExpireDate, Serial, XPos, YPos)
-    SELECT Slot, ItemId, Quantity, Enchant, Combine, Refine, Socket, SocketGem1, SocketGem2, SocketGem3,
-           ExpireDate, Serial, XPos, YPos
-    FROM game.CharacterItems WITH (UPDLOCK, HOLDLOCK)
+    SELECT Slot,
+           ItemId,
+           Quantity,
+           Enchant,
+           Combine,
+           Refine,
+           Socket,
+           SocketGem1,
+           SocketGem2,
+           SocketGem3,
+           ExpireDate,
+           Serial,
+           XPos,
+           YPos
+    FROM game.CharacterItems
+    WITH (UPDLOCK, HOLDLOCK)
     WHERE CharacterId = @CharacterId
       AND Container = @Container;
 
@@ -118,14 +131,16 @@ BEGIN
                HAVING COUNT(*) > 1) OR
        EXISTS (SELECT 1
                FROM @Items
-               WHERE Slot > 63 OR Quantity NOT BETWEEN 0 AND 999 OR XPos NOT BETWEEN 0 AND 7 OR
-                     YPos NOT BETWEEN 0 AND 7)
+               WHERE Slot > 63
+                  OR Quantity NOT BETWEEN 0 AND 999
+                  OR XPos NOT BETWEEN 0 AND 7
+                  OR YPos NOT BETWEEN 0 AND 7)
         THROW 50241, N'Cash item grant supplied an invalid inventory snapshot.', 1;
 
     DECLARE @GrantSlots TABLE
-            (
-                Slot TINYINT NOT NULL PRIMARY KEY
-            );
+                        (
+                            Slot TINYINT NOT NULL PRIMARY KEY
+                        );
 
     INSERT INTO @GrantSlots (Slot)
     SELECT incoming.Slot
@@ -192,8 +207,8 @@ BEGIN
            Serial,
            XPos,
            YPos
-     FROM @Items
-     WHERE Slot = @GrantSlot;
+    FROM @Items
+    WHERE Slot = @GrantSlot;
 
     DECLARE @AuditPayload NVARCHAR(MAX) = CASE
                                               WHEN @AuditSerial = 0 THEN NULL

@@ -1,10 +1,12 @@
+using Fenrir.Application.Game.Domain.World.ZoneWar;
+
 namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
     private readonly List<int> _zone38TribeEffectNeighborScratch = [];
 
-    private void ApplyZone38TribeEffects(ZoneWar.Zone38TribeEffectSnapshot snapshot)
+    private void ApplyZone38TribeEffects(Zone38TribeEffectSnapshot snapshot)
     {
         var previous = _zone38TribeEffects;
         _zone38TribeEffects = snapshot;

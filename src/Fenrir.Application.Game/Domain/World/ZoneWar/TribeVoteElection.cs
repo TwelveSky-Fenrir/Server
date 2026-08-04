@@ -53,9 +53,9 @@ public sealed class TribeVoteElection(
 
     private readonly Lock _lock = new();
     private readonly SemaphoreSlim _transitionGate = new(1, 1);
+    private Guid? _cycleId;
 
     private ImmutableArray<TribeVoteElectionTribeStateDto> _tribeStates = [];
-    private Guid? _cycleId;
 
     public TribeVotePhase Phase => GetPhase(0);
 
@@ -334,18 +334,21 @@ public sealed class TribeVoteElection(
         {
             var state = orderedStates[tribeId];
             if (state.TribeId != tribeId)
-                throw new InvalidOperationException("Durable tribe-vote election snapshot has non-canonical tribe ids.");
+                throw new InvalidOperationException(
+                    "Durable tribe-vote election snapshot has non-canonical tribe ids.");
 
             _ = ToPhase(state.Phase);
         }
 
         var cycleId = orderedStates[0].CycleId;
         if (orderedStates.Any(state => state.CycleId != cycleId))
-            throw new InvalidOperationException("Durable tribe-vote election snapshot has inconsistent cycle identities.");
+            throw new InvalidOperationException(
+                "Durable tribe-vote election snapshot has inconsistent cycle identities.");
 
         foreach (var candidate in snapshot.Candidates)
             if (candidate.TribeId >= TribeCount || candidate.CycleId != cycleId || candidate.VotePoint < 0)
-                throw new InvalidOperationException("Durable tribe-vote election snapshot has an invalid candidate tally.");
+                throw new InvalidOperationException(
+                    "Durable tribe-vote election snapshot has an invalid candidate tally.");
 
         lock (_lock)
         {

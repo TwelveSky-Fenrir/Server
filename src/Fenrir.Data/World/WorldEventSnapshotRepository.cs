@@ -17,7 +17,7 @@ public sealed record WorldEventSnapshotRepository(ICaeriusNetDbContext Db) : IWo
 
     public async ValueTask<ReadOnlyCollection<WorldEventSnapshotRowDto>> LoadAllAsync(CancellationToken ct)
     {
-        var sp = new StoredProcedureParametersBuilder("game", "usp_WorldEventSnapshot_LoadAll", 16).Build();
+        var sp = new StoredProcedureParametersBuilder("game", "usp_WorldEventSnapshot_LoadAll").Build();
 
         return await Db.QueryAsReadOnlyCollectionAsync<WorldEventSnapshotRowDto>(sp, ct);
     }

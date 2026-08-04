@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
-using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Simulation;
+using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Domain.Game.GameData;
 
@@ -14,7 +14,7 @@ public sealed class ContinueSkillStatService(WorldDataCache worldData) : IContin
         var registered = AutoBuffSkillResolver.ResolveRegistration(skill, state.LearnedSkills,
             worldData.SkillsById.ContainsKey);
         return (await zone.PostAutoBuffCommandAndWaitForResultAsync(
-                new AutoBuffZoneCommand(characterId, registered), cancellationToken).ConfigureAwait(false)).Kind ==
+                   new AutoBuffZoneCommand(characterId, registered), cancellationToken).ConfigureAwait(false)).Kind ==
                ZoneCommandResultKind.Applied;
     }
 }

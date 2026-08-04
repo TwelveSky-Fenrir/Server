@@ -6,6 +6,6 @@ public interface IWorldEventSnapshotRepository
 {
     public ValueTask<ReadOnlyCollection<WorldEventSnapshotRowDto>> LoadAllAsync(CancellationToken ct);
 
-        public ValueTask<bool> TryApplyAsync(string eventKind, string occurrenceKey, long expectedRevision, string phase,
+    public ValueTask<bool> TryApplyAsync(string eventKind, string occurrenceKey, long expectedRevision, string phase,
         string canonicalPayload, byte[] canonicalPayloadHash, CancellationToken ct);
 }

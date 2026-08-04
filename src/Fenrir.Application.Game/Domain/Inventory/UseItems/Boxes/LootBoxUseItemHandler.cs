@@ -252,9 +252,11 @@ public sealed class LootBoxUseItemHandler(
             ZoneCommandResultKind.Applied)
         {
             if (page0Changed && page1Changed)
+            {
                 await characters.ReplaceTwoContainersAsync(context.CharacterId,
                     ContainerMatrix.InventoryPage0, ToTvps(originalPage0),
                     ContainerMatrix.InventoryPage1, ToTvps(originalPage1), cancellationToken);
+            }
             else
             {
                 var container = page1Changed ? ContainerMatrix.InventoryPage1 : ContainerMatrix.InventoryPage0;

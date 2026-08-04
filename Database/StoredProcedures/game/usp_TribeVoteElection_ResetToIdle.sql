@@ -23,8 +23,8 @@ BEGIN
     DELETE FROM game.TribeVoteElectionCandidates;
 
     UPDATE game.TribeVoteElectionStates
-    SET CycleId = NULL,
-        Phase = 0,
+    SET CycleId      = NULL,
+        Phase        = 0,
         UpdatedAtUtc = SYSUTCDATETIME();
 
     IF @@ROWCOUNT <> 4

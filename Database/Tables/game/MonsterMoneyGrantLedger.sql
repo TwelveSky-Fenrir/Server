@@ -16,6 +16,5 @@ CREATE TABLE game.MonsterMoneyGrantLedger
     CONSTRAINT CK_MonsterMoneyGrantLedger_CharacterId CHECK (CharacterId > 0),
     CONSTRAINT CK_MonsterMoneyGrantLedger_AccountId CHECK (AccountId > 0),
     CONSTRAINT CK_MonsterMoneyGrantLedger_Amount CHECK (Amount BETWEEN 1 AND 2000000000),
-    INDEX IX_MonsterMoneyGrantLedger_CharacterId_AppliedAtUtc NONCLUSTERED (CharacterId, AppliedAtUtc)
-        INCLUDE (Amount, CorrelationId)
+    INDEX IX_MonsterMoneyGrantLedger_CharacterId_AppliedAtUtc NONCLUSTERED (CharacterId, AppliedAtUtc) INCLUDE (Amount, CorrelationId)
 );

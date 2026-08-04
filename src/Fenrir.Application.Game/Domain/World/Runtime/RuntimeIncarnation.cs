@@ -11,13 +11,13 @@ public readonly record struct RuntimeIncarnation
         _value = value;
     }
 
-        public Guid Value => IsValid
+    public Guid Value => IsValid
         ? _value
         : throw new InvalidOperationException("A runtime incarnation must be generated before it is used.");
 
-        public bool IsValid => _value != Guid.Empty;
+    public bool IsValid => _value != Guid.Empty;
 
-        public static RuntimeIncarnation Create()
+    public static RuntimeIncarnation Create()
     {
         Span<byte> bytes = stackalloc byte[16];
         Guid value;
@@ -26,8 +26,7 @@ public readonly record struct RuntimeIncarnation
         {
             RandomNumberGenerator.Fill(bytes);
             value = new Guid(bytes);
-        }
-        while (value == Guid.Empty);
+        } while (value == Guid.Empty);
 
         return new RuntimeIncarnation(value);
     }

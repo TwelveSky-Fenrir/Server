@@ -20,7 +20,9 @@ public sealed partial class Zone
 
     private void DrainGuildBuffActivationCommands(int maximum)
     {
-        for (var processed = 0; processed < maximum && _guildBuffActivationInbox.Reader.TryRead(out var command); processed++)
+        for (var processed = 0;
+             processed < maximum && _guildBuffActivationInbox.Reader.TryRead(out var command);
+             processed++)
             try
             {
                 ApplyGuildBuffActivationCommand(in command);

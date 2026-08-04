@@ -124,6 +124,8 @@ public sealed partial class Zone
     private static readonly KillDropEntry[] CityDropTierD =
         [KillDropEntry.Elixir, KillDropEntry.Binary(695, 696)];
 
+    private readonly HashSet<Guid> _appliedPvpKillCooldownClaims = [];
+
     private readonly Channel<CombatCommand> _combatInbox = Channel.CreateBounded<CombatCommand>(
         new BoundedChannelOptions(CombatInboxCapacity)
             { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
@@ -132,11 +134,9 @@ public sealed partial class Zone
 
     private readonly HashSet<int> _combatRecipientScratch = [];
 
-    private readonly HashSet<Guid> _appliedPvpKillCooldownClaims = [];
+    private readonly HashSet<int> _pvmAttackRecipientScratch = [];
 
     private readonly Lazy<IPvpKillCooldownClaimQueue>? _pvpKillCooldownClaims = pvpKillCooldownClaims;
-
-    private readonly HashSet<int> _pvmAttackRecipientScratch = [];
 
     private readonly QuestCatalog _questCatalog = questCatalog ?? new QuestCatalog(worldData);
 
@@ -431,7 +431,8 @@ public sealed partial class Zone
         ClearKillFeedLeaderboard();
     }
 
-    private PvpKillRewardOutcome QueuePvpKillRewardClaim(PlayerRuntimeState attackerState, PlayerRuntimeState defenderState,
+    private PvpKillRewardOutcome QueuePvpKillRewardClaim(PlayerRuntimeState attackerState,
+        PlayerRuntimeState defenderState,
         bool isStunTrigger = false)
     {
         if (attackerState.CharacterId == defenderState.CharacterId ||
@@ -522,6 +523,7 @@ public sealed partial class Zone
 
         return PvpKillRewardOutcome.Granted;
     }
+
     private bool IsMap38DailyMissionKillWindowOpen(PlayerRuntimeState attackerState, bool symbolBattleActive)
     {
         if (MapId != PvpKillExtendedRewardZones.DtmZoneId)
@@ -683,14 +685,14 @@ public sealed partial class Zone
                 ? itemSort
                 : null;
         var credit = MountExperienceCreditResolver.Resolve(new MountExperienceCreditRequest(
-            IsMounted: true,
-            Activity: attackerState.MountActivity[slot],
-            CurrentExperience: attackerState.MountAccumulatedExp[slot],
-            DoubleExperienceActive: attackerState.AnimalDoubleExp > 0,
-            SessionExperienceUpActive: attackerState.MountExpUp,
-            BaseExperience: options.MountKillExperiencePerKill,
-            ZoneExperienceMultiplier: zoneConfig.MountExperienceRatio,
-            AuthoritativeItemSort: authoritativeItemSort));
+            true,
+            attackerState.MountActivity[slot],
+            attackerState.MountAccumulatedExp[slot],
+            attackerState.AnimalDoubleExp > 0,
+            attackerState.MountExpUp,
+            options.MountKillExperiencePerKill,
+            zoneConfig.MountExperienceRatio,
+            authoritativeItemSort));
 
         ApplyMountExperienceCredit(attackerState, slot, in credit);
     }

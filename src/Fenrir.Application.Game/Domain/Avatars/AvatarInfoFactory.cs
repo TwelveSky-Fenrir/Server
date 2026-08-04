@@ -136,7 +136,7 @@ public static class AvatarInfoFactory
         };
     }
 
-        public static AvatarInfo CreateForRuntimeState(PlayerRuntimeState state, AvatarSocialSnapshot? social = null)
+    public static AvatarInfo CreateForRuntimeState(PlayerRuntimeState state, AvatarSocialSnapshot? social = null)
     {
         var s = social ?? AvatarSocialSnapshot.Empty;
         var (animal, animalExpActivity, animalPower) = BuildMountSlotArrays(state);
@@ -261,7 +261,7 @@ public static class AvatarInfoFactory
         };
     }
 
-        public static WorldEntryAvatarProjection CreateWorldEntryProjection(PlayerRuntimeState state,
+    public static WorldEntryAvatarProjection CreateWorldEntryProjection(PlayerRuntimeState state,
         AvatarSocialSnapshot? social = null)
     {
         var s = social ?? AvatarSocialSnapshot.Empty;

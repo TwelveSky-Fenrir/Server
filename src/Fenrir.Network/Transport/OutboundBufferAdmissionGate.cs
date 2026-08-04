@@ -3,8 +3,8 @@ namespace Fenrir.Network.Transport;
 public sealed class OutboundBufferAdmissionGate
 {
     private readonly object _gate = new();
-    private int _currentPendingFrames;
     private long _currentPendingBytes;
+    private int _currentPendingFrames;
 
     public OutboundBufferAdmissionGate(int maxPendingFrames, long maxPendingBytes)
     {
@@ -34,9 +34,7 @@ public sealed class OutboundBufferAdmissionGate
         {
             if (_currentPendingFrames >= MaxPendingFrames ||
                 _currentPendingBytes > MaxPendingBytes - byteCount)
-            {
                 return false;
-            }
 
             _currentPendingFrames++;
             _currentPendingBytes += byteCount;

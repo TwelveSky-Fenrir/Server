@@ -28,7 +28,7 @@ public static class MountExpiryPolicy
                 absorbTime, absorptionExpired);
 
         return new MountMinuteTransition(Dismounted(state.AnimalIndex), 0, 0, 0, absorbTime,
-            absorptionExpired, RideExpired: true);
+            absorptionExpired, true);
     }
 
     public static MountActivityTransition AdvanceThirtySeconds(in MountActivityState state)

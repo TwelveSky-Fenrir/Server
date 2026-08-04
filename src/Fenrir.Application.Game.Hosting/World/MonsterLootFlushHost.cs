@@ -23,10 +23,11 @@ public sealed class MonsterLootFlushHost : BackgroundService
         "fenrir.monster_loot.money_grant.reconciliation.holds", "{grant}",
         "Money grants retained for reconciliation with their stable correlation identifier.");
 
-    private readonly ConcurrentDictionary<Guid, FaultHeldMoneyGrant> _faultHeldGrants = new();
     private readonly ICharacterRepository _characters;
-    private readonly ILogger<MonsterLootFlushHost> _logger;
     private readonly ObservableGauge<long> _faultHeldBacklog;
+
+    private readonly ConcurrentDictionary<Guid, FaultHeldMoneyGrant> _faultHeldGrants = new();
+    private readonly ILogger<MonsterLootFlushHost> _logger;
     private readonly IMonsterMoneyGrantRepository _monsterMoneyGrants;
     private readonly ObservableGauge<long> _pendingBacklog;
     private readonly ZoneRegistry _zones;
@@ -41,10 +42,10 @@ public sealed class MonsterLootFlushHost : BackgroundService
         _characters = characters;
         _monsterMoneyGrants = monsterMoneyGrants;
         _logger = logger;
-        _pendingBacklog = Meter.CreateObservableGauge<long>(
+        _pendingBacklog = Meter.CreateObservableGauge(
             "fenrir.monster_loot.money_grant.pending.backlog", PendingGrantCount,
             "{grant}", "Money grants waiting for their first persistence attempt.");
-        _faultHeldBacklog = Meter.CreateObservableGauge<long>(
+        _faultHeldBacklog = Meter.CreateObservableGauge(
             "fenrir.monster_loot.money_grant.reconciliation.backlog", FaultHeldGrantCount,
             "{grant}", "Money grants withheld from retry until their commit outcome is reconciled.");
     }
@@ -163,7 +164,6 @@ public sealed class MonsterLootFlushHost : BackgroundService
     private async Task ReconcileFaultHeldGrantsAsync(CancellationToken stoppingToken)
     {
         foreach (var (correlationId, held) in _faultHeldGrants)
-        {
             try
             {
                 var grant = held.Grant;
@@ -192,7 +192,6 @@ public sealed class MonsterLootFlushHost : BackgroundService
                     "{CharacterId} (CorrelationId={CorrelationId}); it remains fault-held",
                     held.MapId, held.Grant.Amount, held.Grant.CharacterId, correlationId);
             }
-        }
     }
 
     private static void EnsureAppliedOrAlreadyApplied(MonsterMoneyGrantResultDto result, Guid correlationId)

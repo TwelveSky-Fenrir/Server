@@ -62,7 +62,8 @@ public sealed class FishingLineHandler(IFishingLineService fishingLineService, I
 
         if (packet.Sort == 1 && value.Result == 1 &&
             (await zone.PostFishingCommandAndWaitForResultAsync(
-                new FishingZoneCommand(characterId, 0, 0, false, true, 92, ApplyState: false), cancellationToken)).Kind !=
+                new FishingZoneCommand(characterId, 0, 0, false, true, 92, ApplyState: false), cancellationToken))
+            .Kind !=
             ZoneCommandResultKind.Applied)
             logger.LogError("Zone {MapId} did not acknowledge fishing-line action for character {CharacterId}",
                 zone.MapId, characterId);

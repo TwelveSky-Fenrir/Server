@@ -27,7 +27,7 @@ public sealed class Zone195CaptureMachine
 
     public int PhaseAccumulatorTicks { get; set; }
 
-        public Zone195NokSanCaptureSnapshot Snapshot(short mapId)
+    public Zone195NokSanCaptureSnapshot Snapshot(short mapId)
     {
         return new Zone195NokSanCaptureSnapshot(mapId, Phase, CapturerCharacterId, CapturerTribe, CapturerName,
             RemainingTime, PhaseAccumulatorTicks);

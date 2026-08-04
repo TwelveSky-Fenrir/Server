@@ -10,18 +10,20 @@ public sealed class WorldStateService(
 {
     public const int TribeCount = 4;
 
+    private const int MaxConflictReplayAttempts = 3;
+
     private readonly Dictionary<(byte From, byte To), AllianceOfferState> _allianceOffers = new();
     private readonly Lock _lock = new();
 
     private readonly Dictionary<(byte From, byte To), PendingAllianceOfferMutation> _pendingAllianceOffers = new();
 
-    private readonly Dictionary<byte, PendingTribeStateMutation> _pendingTribeStates = new();
-
-    private readonly SemaphoreSlim _persistenceGate = new(1, 1);
-
     private readonly int[] _pendingTribePointDeltas = new int[TribeCount];
 
     private readonly int?[] _pendingTribePointTotals = new int?[TribeCount];
+
+    private readonly Dictionary<byte, PendingTribeStateMutation> _pendingTribeStates = new();
+
+    private readonly SemaphoreSlim _persistenceGate = new(1, 1);
 
     private readonly byte[] _tribeFormationAbility = new byte[TribeCount];
 
@@ -39,8 +41,6 @@ public sealed class WorldStateService(
     private long _revision;
 
     private WorldRvrState _world;
-
-    private const int MaxConflictReplayAttempts = 3;
 
     public bool IsDirty
     {
@@ -370,9 +370,7 @@ public sealed class WorldStateService(
                 UpdateRevisionAfterSuccessfulWrite(expectedRevision);
 
                 if (_world.UpdateTribePoint == expectedPendingValue)
-                {
                     _world = _world with { UpdateTribePoint = consumedValue };
-                }
 
                 if (persistedWorldMutation is { } persisted && _pendingWorld is { } pending &&
                     pending.Version == persisted.Version)
@@ -533,7 +531,7 @@ public sealed class WorldStateService(
         await _persistenceGate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            for (var conflictAttempt = 0; ; conflictAttempt++)
+            for (var conflictAttempt = 0;; conflictAttempt++)
             {
                 var plan = CaptureFlushPlan();
                 if (plan is null)
@@ -590,9 +588,11 @@ public sealed class WorldStateService(
                 _revision,
                 _pendingWorld,
                 [.. _pendingTribeStates.Values.OrderBy(static mutation => mutation.State.TribeId)],
-                [.. _pendingAllianceOffers.Values
-                    .OrderBy(static mutation => mutation.State.FromTribeId)
-                    .ThenBy(static mutation => mutation.State.ToTribeId)],
+                [
+                    .. _pendingAllianceOffers.Values
+                        .OrderBy(static mutation => mutation.State.FromTribeId)
+                        .ThenBy(static mutation => mutation.State.ToTribeId)
+                ],
                 (int?[])_pendingTribePointTotals.Clone(),
                 (int[])_pendingTribePointDeltas.Clone());
 
@@ -688,7 +688,8 @@ public sealed class WorldStateService(
                         expectedRevision, ct)
                     .ConfigureAwait(false);
                 if (!updated)
-                    return Conflict(plan, false, plan.TribeStates.Length, plan.AllianceOffers.Length, TribeCount, tribeId,
+                    return Conflict(plan, false, plan.TribeStates.Length, plan.AllianceOffers.Length, TribeCount,
+                        tribeId,
                         $"tribe {tribeId} point delta", expectedRevision);
 
                 AdvanceRevisionAfterSuccessfulWrite(ref expectedRevision);
@@ -898,10 +899,8 @@ public sealed class WorldStateService(
             }
 
             for (var tribeId = firstPointTotalTribeId; tribeId < TribeCount; tribeId++)
-            {
                 if (plan.PointTotals[tribeId] is { } total && _pendingTribePointTotals[tribeId] is null)
                     _pendingTribePointTotals[tribeId] = total;
-            }
 
             for (var tribeId = firstPointDeltaTribeId; tribeId < TribeCount; tribeId++)
                 _pendingTribePointDeltas[tribeId] += plan.PointDeltas[tribeId];
@@ -910,7 +909,10 @@ public sealed class WorldStateService(
         }
     }
 
-    private long NextMutationVersion() => ++_nextMutationVersion;
+    private long NextMutationVersion()
+    {
+        return ++_nextMutationVersion;
+    }
 
     private void RefreshDirtyLocked()
     {
@@ -919,25 +921,10 @@ public sealed class WorldStateService(
                  Array.Exists(_pendingTribePointDeltas, static delta => delta != 0);
     }
 
-    private static TimeSpan ConflictReplayBackoff(int conflictAttempt) =>
-        TimeSpan.FromMilliseconds(25 * (1 << conflictAttempt));
-
-    private enum FlushPlanResult
+    private static TimeSpan ConflictReplayBackoff(int conflictAttempt)
     {
-        Succeeded,
-        Conflict,
-        Failed
+        return TimeSpan.FromMilliseconds(25 * (1 << conflictAttempt));
     }
-
-    private readonly record struct PendingWorldMutation(long Version, WorldRvrState State);
-
-    private readonly record struct PendingTribeStateMutation(long Version, TribeRvrState State, byte SymbolOwner);
-
-    private readonly record struct PendingAllianceOfferMutation(long Version, AllianceOfferState State);
-
-    private sealed record FlushPlan(long ExpectedRevision, PendingWorldMutation? World,
-        PendingTribeStateMutation[] TribeStates, PendingAllianceOfferMutation[] AllianceOffers,
-        int?[] PointTotals, int[] PointDeltas);
 
     private void AdvanceRevisionAfterSuccessfulWrite(ref long expectedRevision)
     {
@@ -959,4 +946,25 @@ public sealed class WorldStateService(
         var now = DateTime.UtcNow;
         return now.Hour * 100 + now.Minute;
     }
+
+    private enum FlushPlanResult
+    {
+        Succeeded,
+        Conflict,
+        Failed
+    }
+
+    private readonly record struct PendingWorldMutation(long Version, WorldRvrState State);
+
+    private readonly record struct PendingTribeStateMutation(long Version, TribeRvrState State, byte SymbolOwner);
+
+    private readonly record struct PendingAllianceOfferMutation(long Version, AllianceOfferState State);
+
+    private sealed record FlushPlan(
+        long ExpectedRevision,
+        PendingWorldMutation? World,
+        PendingTribeStateMutation[] TribeStates,
+        PendingAllianceOfferMutation[] AllianceOffers,
+        int?[] PointTotals,
+        int[] PointDeltas);
 }

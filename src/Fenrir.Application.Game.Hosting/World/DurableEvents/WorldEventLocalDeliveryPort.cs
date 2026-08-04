@@ -22,12 +22,14 @@ public readonly record struct ZoneWarWorldEvent(WorldEventDeliveryContext Contex
 
 public readonly record struct WorldNoticeWorldEvent(WorldEventDeliveryContext Context, ReadOnlyMemory<byte> Payload);
 
-public readonly record struct CrossShardSocialWorldEvent(WorldEventDeliveryContext Context,
+public readonly record struct CrossShardSocialWorldEvent(
+    WorldEventDeliveryContext Context,
     ReadOnlyMemory<byte> Payload);
 
 public readonly record struct EconomyWorldEvent(WorldEventDeliveryContext Context, ReadOnlyMemory<byte> Payload);
 
-public readonly record struct AdministrationWorldEvent(WorldEventDeliveryContext Context,
+public readonly record struct AdministrationWorldEvent(
+    WorldEventDeliveryContext Context,
     ReadOnlyMemory<byte> Payload);
 
 public readonly record struct WorldEventLocalEffectCompletion(Guid OperationKey)
@@ -43,11 +45,13 @@ public readonly record struct WorldEventLocalEffectCompletion(Guid OperationKey)
 
 public interface IWorldEventLocalDeliveryPort
 {
-    public ValueTask<WorldEventLocalEffectCompletion> DeliverAsync(WorldStateWorldEvent worldEvent, CancellationToken ct);
+    public ValueTask<WorldEventLocalEffectCompletion> DeliverAsync(WorldStateWorldEvent worldEvent,
+        CancellationToken ct);
 
     public ValueTask<WorldEventLocalEffectCompletion> DeliverAsync(ZoneWarWorldEvent worldEvent, CancellationToken ct);
 
-    public ValueTask<WorldEventLocalEffectCompletion> DeliverAsync(WorldNoticeWorldEvent worldEvent, CancellationToken ct);
+    public ValueTask<WorldEventLocalEffectCompletion> DeliverAsync(WorldNoticeWorldEvent worldEvent,
+        CancellationToken ct);
 
     public ValueTask<WorldEventLocalEffectCompletion> DeliverAsync(CrossShardSocialWorldEvent worldEvent,
         CancellationToken ct);
@@ -60,7 +64,8 @@ public interface IWorldEventLocalDeliveryPort
 
 public sealed class UnconfiguredWorldEventLocalDeliveryPort : IWorldEventLocalDeliveryPort
 {
-    public ValueTask<WorldEventLocalEffectCompletion> DeliverAsync(WorldStateWorldEvent worldEvent, CancellationToken ct)
+    public ValueTask<WorldEventLocalEffectCompletion> DeliverAsync(WorldStateWorldEvent worldEvent,
+        CancellationToken ct)
     {
         return MissingBindingAsync();
     }
@@ -70,7 +75,8 @@ public sealed class UnconfiguredWorldEventLocalDeliveryPort : IWorldEventLocalDe
         return MissingBindingAsync();
     }
 
-    public ValueTask<WorldEventLocalEffectCompletion> DeliverAsync(WorldNoticeWorldEvent worldEvent, CancellationToken ct)
+    public ValueTask<WorldEventLocalEffectCompletion> DeliverAsync(WorldNoticeWorldEvent worldEvent,
+        CancellationToken ct)
     {
         return MissingBindingAsync();
     }

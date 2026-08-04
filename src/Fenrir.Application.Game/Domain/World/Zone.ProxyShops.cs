@@ -37,7 +37,9 @@ public sealed partial class Zone
 
     private void DrainClosedProxyShopBroadcasts(int maximum)
     {
-        for (var processed = 0; processed < maximum && _closedProxyShopBroadcasts.TryDequeue(out var entry); processed++)
+        for (var processed = 0;
+             processed < maximum && _closedProxyShopBroadcasts.TryDequeue(out var entry);
+             processed++)
             BroadcastProxyShopState(entry, 3);
     }
 

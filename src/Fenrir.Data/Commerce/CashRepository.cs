@@ -30,44 +30,6 @@ public sealed record CashRepository(ICaeriusNetDbContext Db) : ICashRepository
         return await Db.ExecuteScalarAsync<int>(sp, ct);
     }
 
-    internal static StoredProcedureParameters CreateDebitAndGrantItemParameters(int accountId, int amount,
-        byte reason, int productId, int characterId, byte container, IReadOnlyList<CharacterItemSlotTvp> items,
-        int auditItemId, int auditQuantity, int auditSerial)
-    {
-        if (items.Count == 0)
-        {
-            return new StoredProcedureParameters("game", "usp_Cash_DebitAndGrantItem", 1,
-            [
-                CreateParameter("AccountId", accountId, SqlDbType.Int),
-                CreateParameter("Amount", amount, SqlDbType.Int),
-                CreateParameter("Reason", reason, SqlDbType.TinyInt),
-                CreateParameter("ProductId", productId, SqlDbType.Int),
-                CreateParameter("CharacterId", characterId, SqlDbType.Int),
-                CreateParameter("Container", container, SqlDbType.TinyInt),
-                CreateEmptyItemsParameter(),
-                CreateParameter("AuditItemId", auditItemId, SqlDbType.Int),
-                CreateParameter("AuditQuantity", auditQuantity, SqlDbType.Int),
-                CreateParameter("AuditSerial", auditSerial, SqlDbType.Int)
-            ], null!, null, null, 30);
-        }
-
-        var builder = new StoredProcedureParametersBuilder("game", "usp_Cash_DebitAndGrantItem", 1)
-            .AddParameter("AccountId", accountId, SqlDbType.Int)
-            .AddParameter("Amount", amount, SqlDbType.Int)
-            .AddParameter("Reason", reason, SqlDbType.TinyInt)
-            .AddParameter("ProductId", productId, SqlDbType.Int)
-            .AddParameter("CharacterId", characterId, SqlDbType.Int)
-            .AddParameter("Container", container, SqlDbType.TinyInt);
-
-        builder.AddTvpParameter("Items", items);
-
-        builder.AddParameter("AuditItemId", auditItemId, SqlDbType.Int)
-            .AddParameter("AuditQuantity", auditQuantity, SqlDbType.Int)
-            .AddParameter("AuditSerial", auditSerial, SqlDbType.Int);
-
-        return builder.Build();
-    }
-
     public async ValueTask CreditAsync(int accountId, int amount, byte reason, int? productId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Cash_Credit", 0)
@@ -94,7 +56,7 @@ public sealed record CashRepository(ICaeriusNetDbContext Db) : ICashRepository
                 CreateParameter("CharacterId", characterId, SqlDbType.Int),
                 CreateParameter("Container", container, SqlDbType.TinyInt),
                 CreateEmptyItemsParameter()
-            ], null!, null, null, 30);
+            ], null!, null, null);
 
             return await Db.ExecuteScalarAsync<int>(emptyItemsParameters, ct);
         }
@@ -130,13 +92,48 @@ public sealed record CashRepository(ICaeriusNetDbContext Db) : ICashRepository
         return await Db.ExecuteScalarAsync<int>(sp, ct);
     }
 
+    internal static StoredProcedureParameters CreateDebitAndGrantItemParameters(int accountId, int amount,
+        byte reason, int productId, int characterId, byte container, IReadOnlyList<CharacterItemSlotTvp> items,
+        int auditItemId, int auditQuantity, int auditSerial)
+    {
+        if (items.Count == 0)
+            return new StoredProcedureParameters("game", "usp_Cash_DebitAndGrantItem", 1,
+            [
+                CreateParameter("AccountId", accountId, SqlDbType.Int),
+                CreateParameter("Amount", amount, SqlDbType.Int),
+                CreateParameter("Reason", reason, SqlDbType.TinyInt),
+                CreateParameter("ProductId", productId, SqlDbType.Int),
+                CreateParameter("CharacterId", characterId, SqlDbType.Int),
+                CreateParameter("Container", container, SqlDbType.TinyInt),
+                CreateEmptyItemsParameter(),
+                CreateParameter("AuditItemId", auditItemId, SqlDbType.Int),
+                CreateParameter("AuditQuantity", auditQuantity, SqlDbType.Int),
+                CreateParameter("AuditSerial", auditSerial, SqlDbType.Int)
+            ], null!, null, null);
+
+        var builder = new StoredProcedureParametersBuilder("game", "usp_Cash_DebitAndGrantItem", 1)
+            .AddParameter("AccountId", accountId, SqlDbType.Int)
+            .AddParameter("Amount", amount, SqlDbType.Int)
+            .AddParameter("Reason", reason, SqlDbType.TinyInt)
+            .AddParameter("ProductId", productId, SqlDbType.Int)
+            .AddParameter("CharacterId", characterId, SqlDbType.Int)
+            .AddParameter("Container", container, SqlDbType.TinyInt);
+
+        builder.AddTvpParameter("Items", items);
+
+        builder.AddParameter("AuditItemId", auditItemId, SqlDbType.Int)
+            .AddParameter("AuditQuantity", auditQuantity, SqlDbType.Int)
+            .AddParameter("AuditSerial", auditSerial, SqlDbType.Int);
+
+        return builder.Build();
+    }
+
     internal static StoredProcedureParameters CreateDebitAndGrantItemIdempotentParameters(Guid operationId,
         byte[] idempotencyKeyHash, byte[] requestHash, int accountId, int amount, byte reason, int productId,
         int characterId, byte container, IReadOnlyList<CharacterItemSlotTvp> items, int auditItemId,
         int auditQuantity, int auditSerial)
     {
         if (items.Count == 0)
-        {
             return new StoredProcedureParameters("game", "usp_Cash_DebitAndGrantItem_Idempotent", 1,
             [
                 CreateParameter("OperationId", operationId, SqlDbType.UniqueIdentifier),
@@ -152,8 +149,7 @@ public sealed record CashRepository(ICaeriusNetDbContext Db) : ICashRepository
                 CreateParameter("AuditItemId", auditItemId, SqlDbType.Int),
                 CreateParameter("AuditQuantity", auditQuantity, SqlDbType.Int),
                 CreateParameter("AuditSerial", auditSerial, SqlDbType.Int)
-            ], null!, null, null, 30);
-        }
+            ], null!, null, null);
 
         var builder = new StoredProcedureParametersBuilder("game", "usp_Cash_DebitAndGrantItem_Idempotent", 1)
             .AddParameter("OperationId", operationId, SqlDbType.UniqueIdentifier)

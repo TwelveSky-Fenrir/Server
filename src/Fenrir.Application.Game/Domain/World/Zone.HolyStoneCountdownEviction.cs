@@ -21,7 +21,9 @@ public sealed partial class Zone
 
     private void DrainHolyStoneCountdownEvictionCommands(int maximum)
     {
-        for (var processed = 0; processed < maximum && _holyStoneCountdownEvictionInbox.Reader.TryRead(out _); processed++)
+        for (var processed = 0;
+             processed < maximum && _holyStoneCountdownEvictionInbox.Reader.TryRead(out _);
+             processed++)
             try
             {
                 ApplyHolyStoneCountdownEviction();

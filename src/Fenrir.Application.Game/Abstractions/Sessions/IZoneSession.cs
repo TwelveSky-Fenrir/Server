@@ -33,7 +33,7 @@ public interface IZoneSession : IPacketSession
 
     public bool IsZoneTransferPending { get; }
 
-        public bool IsZoneTransferHandoffCommitted { get; }
+    public bool IsZoneTransferHandoffCommitted { get; }
 
     public bool MeetsGmTier(GmCommandTier tier);
 

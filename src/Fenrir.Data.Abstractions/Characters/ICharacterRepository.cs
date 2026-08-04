@@ -83,7 +83,8 @@ public interface ICharacterRepository
         IReadOnlyList<CharacterCostumeSlotTvp> costumes, IReadOnlyList<CharacterMountSlotTvp> mounts,
         CancellationToken ct, IReadOnlyList<CharacterStellarCoreSlotTvp>? stellarCores = null);
 
-    public ValueTask<CharacterFinalFlushResultDto> PersistFinalFlushAsync(CharacterProgressTvp progress, CharacterPositionTvp position,
+    public ValueTask<CharacterFinalFlushResultDto> PersistFinalFlushAsync(CharacterProgressTvp progress,
+        CharacterPositionTvp position,
         IReadOnlyList<CharacterCostumeSlotTvp> costumes, IReadOnlyList<CharacterBuffSlotTvp> buffs,
         IReadOnlyList<CharacterMountSlotTvp> mounts, CancellationToken ct,
         IReadOnlyList<CharacterStellarCoreSlotTvp>? stellarCores = null);

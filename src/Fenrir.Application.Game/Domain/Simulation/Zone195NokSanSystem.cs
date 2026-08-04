@@ -56,7 +56,8 @@ public sealed class Zone195NokSanSystem(
                 AdvanceCountdown(zone, site, capture, legacyTicksElapsed);
                 break;
             case Zone195CapturePhase.Commit:
-                logger.LogWarning("Zone195 Nok-San map {MapId} persisted an invalid transient Commit phase", zone.MapId);
+                logger.LogWarning("Zone195 Nok-San map {MapId} persisted an invalid transient Commit phase",
+                    zone.MapId);
                 break;
         }
     }
@@ -69,7 +70,7 @@ public sealed class Zone195NokSanSystem(
         foreach (var player in zone.Players)
         {
             if (!IsEligibleCandidate(player, site, captureRadiusSq) ||
-                holderTribe is { } holder && player.Tribe == holder)
+                (holderTribe is { } holder && player.Tribe == holder))
                 continue;
 
             var appeared = false;
@@ -239,7 +240,8 @@ public sealed class Zone195NokSanSystem(
         var allyRadiusSq = AllyRewardRadius * AllyRewardRadius;
         foreach (var player in zone.Players)
         {
-            if (player.CharacterId == capturerId || player.Tribe != winningTribe || player.IsMovingZone || player.IsDead)
+            if (player.CharacterId == capturerId || player.Tribe != winningTribe || player.IsMovingZone ||
+                player.IsDead)
                 continue;
 
             var dx = player.PosX - site.PostX;

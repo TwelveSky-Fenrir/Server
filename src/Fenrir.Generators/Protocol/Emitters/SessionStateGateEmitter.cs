@@ -55,7 +55,7 @@ internal static class SessionStateGateEmitter
         foreach (var packet in entries)
         {
             IEnumerable<byte> allowedStates = server == FenrirServer.Zone &&
-                                             packet.AllowedStates.Contains(ZoneInWorldState)
+                                              packet.AllowedStates.Contains(ZoneInWorldState)
                 ? [ZoneInWorldState]
                 : packet.AllowedStates;
             var condition = string.Join(" || ", allowedStates.Select(s => $"state == ({stateEnum}){s}"));

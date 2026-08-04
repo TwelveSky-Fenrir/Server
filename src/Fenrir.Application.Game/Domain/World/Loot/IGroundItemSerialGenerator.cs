@@ -2,7 +2,7 @@ namespace Fenrir.Application.Game.Domain.World.Loot;
 
 public interface IGroundItemSerialGenerator
 {
-    int Generate(in GroundItemSerialGenerationRequest request);
+    public int Generate(in GroundItemSerialGenerationRequest request);
 }
 
 public readonly record struct GroundItemSerialGenerationRequest(

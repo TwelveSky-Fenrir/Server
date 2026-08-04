@@ -6,7 +6,14 @@ BEGIN
 
     BEGIN TRANSACTION;
 
-    SELECT Revision, OwnerSlot0, OwnerSlot2, OwnerSlot3, StonesHeld0, StonesHeld1, StonesHeld2, StonesHeld3,
+    SELECT Revision,
+           OwnerSlot0,
+           OwnerSlot2,
+           OwnerSlot3,
+           StonesHeld0,
+           StonesHeld1,
+           StonesHeld2,
+           StonesHeld3,
            UpdatedAtUtc
     FROM game.Zone195NokSanStates WITH (HOLDLOCK)
     WHERE StateId = 1;

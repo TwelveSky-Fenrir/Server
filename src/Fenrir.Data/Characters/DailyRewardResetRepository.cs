@@ -56,5 +56,8 @@ public sealed record DailyRewardResetRepository(ICaeriusNetDbContext Db) : IDail
         return await Db.ExecuteScalarAsync<bool>(sp, ct);
     }
 
-    private static int ToOccurrenceDate(DateOnly value) => value.Year * 10_000 + value.Month * 100 + value.Day;
+    private static int ToOccurrenceDate(DateOnly value)
+    {
+        return value.Year * 10_000 + value.Month * 100 + value.Day;
+    }
 }

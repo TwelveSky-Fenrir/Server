@@ -129,15 +129,6 @@ public sealed class ZoneRegistry
 
     public ImmutableArray<Zone> Zones => _zones.Values;
 
-    public void ApplyZone38TribeEffects(Zone38TribeEffectSnapshot snapshot)
-    {
-        foreach (var zone in _zones.Values)
-            if (!zone.Post(ZoneCommand.ApplyZone38TribeEffects(snapshot)))
-                _zoneLogger.LogError(
-                    "Zone {MapId} rejected the Zone38 tribe-effect snapshot; the actor must be reconciled before combat proceeds",
-                    zone.MapId);
-    }
-
     public Zone this[short mapId] => _zones[mapId];
 
     public int TotalPlayerCount
@@ -149,6 +140,15 @@ public sealed class ZoneRegistry
                 total += zone.PlayerCount;
             return total;
         }
+    }
+
+    public void ApplyZone38TribeEffects(Zone38TribeEffectSnapshot snapshot)
+    {
+        foreach (var zone in _zones.Values)
+            if (!zone.Post(ZoneCommand.ApplyZone38TribeEffects(snapshot)))
+                _zoneLogger.LogError(
+                    "Zone {MapId} rejected the Zone38 tribe-effect snapshot; the actor must be reconciled before combat proceeds",
+                    zone.MapId);
     }
 
     public void Initialize(IReadOnlyCollection<short> maps)

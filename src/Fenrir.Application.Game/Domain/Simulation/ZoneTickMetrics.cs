@@ -40,7 +40,8 @@ internal static class ZoneTickMetrics
         "fenrir.zone.command.queue.age", "ms", "Time spent waiting in the zone core command queue.");
 
     public static readonly Counter<long> CommandQueueRejections = Meter.CreateCounter<long>(
-        "fenrir.zone.command.queue.rejections", "commands", "Commands rejected because the zone core command queue was full.");
+        "fenrir.zone.command.queue.rejections", "commands",
+        "Commands rejected because the zone core command queue was full.");
 
     public static KeyValuePair<string, object?> MapTag(short mapId)
     {

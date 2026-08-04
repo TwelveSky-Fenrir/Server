@@ -34,50 +34,50 @@ BEGIN
     BEGIN TRANSACTION;
 
     SELECT @OutboxId = OutboxId
-    FROM runtime.WorldOutbox WITH (UPDLOCK, HOLDLOCK)
+    FROM runtime.WorldOutbox
+    WITH (UPDLOCK, HOLDLOCK)
     WHERE IdempotencyKey = @IdempotencyKey;
 
     IF @OutboxId IS NOT NULL
-    BEGIN
-        IF NOT EXISTS
-        (
-            SELECT 1
-            FROM runtime.WorldOutbox
-            WHERE OutboxId = @OutboxId
-              AND AuthenticatedSource = @AuthenticatedSource
-              AND SourceShardId = @SourceShardId
-              AND SourceSequence = @SourceSequence
-              AND DestinationShardId = @DestinationShardId
-              AND PayloadCategory = @PayloadCategory
-              AND Payload = @Payload
-              AND PayloadHash = @PayloadHash
-              AND CorrelationId = @CorrelationId
-        )
-            THROW 51003, 'World outbox idempotency key was reused with a different envelope.', 1;
-    END
+        BEGIN
+            IF NOT EXISTS
+                (SELECT 1
+                 FROM runtime.WorldOutbox
+                 WHERE OutboxId = @OutboxId
+                   AND AuthenticatedSource = @AuthenticatedSource
+                   AND SourceShardId = @SourceShardId
+                   AND SourceSequence = @SourceSequence
+                   AND DestinationShardId = @DestinationShardId
+                   AND PayloadCategory = @PayloadCategory
+                   AND Payload = @Payload
+                   AND PayloadHash = @PayloadHash
+                   AND CorrelationId = @CorrelationId)
+                THROW 51003, 'World outbox idempotency key was reused with a different envelope.', 1;
+        END
     ELSE
-    BEGIN
-        SELECT @ExistingSourceSequence = MAX(SourceSequence)
-        FROM runtime.WorldOutbox WITH (UPDLOCK, HOLDLOCK, INDEX(UQ_WorldOutbox_SourceSequence))
-        WHERE AuthenticatedSource = @AuthenticatedSource
-          AND SourceShardId = @SourceShardId;
+        BEGIN
+            SELECT @ExistingSourceSequence = MAX(SourceSequence)
+            FROM runtime.WorldOutbox
+            WITH (UPDLOCK, HOLDLOCK, INDEX (UQ_WorldOutbox_SourceSequence))
+            WHERE AuthenticatedSource = @AuthenticatedSource
+              AND SourceShardId = @SourceShardId;
 
-        IF @ExistingSourceSequence IS NOT NULL AND @SourceSequence <= @ExistingSourceSequence
-            THROW 51004, 'World outbox source sequence must increase monotonically.', 1;
+            IF @ExistingSourceSequence IS NOT NULL AND @SourceSequence <= @ExistingSourceSequence
+                THROW 51004, 'World outbox source sequence must increase monotonically.', 1;
 
-        INSERT INTO runtime.WorldOutbox
+            INSERT INTO runtime.WorldOutbox
             (AuthenticatedSource, SourceShardId, SourceSequence, DestinationShardId, PayloadCategory, Payload,
              PayloadHash, CorrelationId, IdempotencyKey, DeliveryStatus, AttemptCount, NextAttemptAtUtc,
              LastAttemptedAtUtc, DeliveryLeaseId, LeaseExpiresAtUtc, AcknowledgedAtUtc, AcknowledgedByShardId,
              CreatedAtUtc)
-        VALUES
-            (@AuthenticatedSource, @SourceShardId, @SourceSequence, @DestinationShardId, @PayloadCategory, @Payload,
-             @PayloadHash, @CorrelationId, @IdempotencyKey, 0, 0, SYSUTCDATETIME(), NULL, NULL, NULL, NULL, NULL,
-             SYSUTCDATETIME());
+            VALUES (@AuthenticatedSource, @SourceShardId, @SourceSequence, @DestinationShardId, @PayloadCategory,
+                    @Payload,
+                    @PayloadHash, @CorrelationId, @IdempotencyKey, 0, 0, SYSUTCDATETIME(), NULL, NULL, NULL, NULL, NULL,
+                    SYSUTCDATETIME());
 
-        SET @OutboxId = SCOPE_IDENTITY();
-        SET @WasEnqueued = 1;
-    END;
+            SET @OutboxId = SCOPE_IDENTITY();
+            SET @WasEnqueued = 1;
+        END;
 
     COMMIT TRANSACTION;
 

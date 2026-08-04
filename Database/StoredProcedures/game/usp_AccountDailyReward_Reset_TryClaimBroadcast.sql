@@ -1,7 +1,7 @@
 CREATE OR ALTER PROCEDURE game.usp_AccountDailyReward_Reset_TryClaimBroadcast @OccurrenceDate INT,
-                                                                                @ShardId TINYINT,
-                                                                                @LeaseId UNIQUEIDENTIFIER,
-                                                                                @LeaseDurationSeconds INT
+                                                                              @ShardId TINYINT,
+                                                                              @LeaseId UNIQUEIDENTIFIER,
+                                                                              @LeaseDurationSeconds INT
 AS
 BEGIN
     SET
@@ -30,13 +30,15 @@ BEGIN
     BEGIN TRANSACTION;
 
     IF NOT EXISTS (SELECT 1
-                   FROM game.DailyRewardResetOccurrences WITH (UPDLOCK, HOLDLOCK)
+                   FROM game.DailyRewardResetOccurrences
+                   WITH (UPDLOCK, HOLDLOCK)
                    WHERE OccurrenceDate = @OccurrenceDate)
         THROW 50774, N'The daily reward reset occurrence has not been durably applied.', 1;
 
     SELECT @BroadcastCompletedAtUtc = BroadcastCompletedAtUtc,
            @BroadcastLeaseExpiresAtUtc = BroadcastLeaseExpiresAtUtc
-    FROM game.DailyRewardResetBroadcastDeliveries WITH (UPDLOCK, HOLDLOCK)
+    FROM game.DailyRewardResetBroadcastDeliveries
+    WITH (UPDLOCK, HOLDLOCK)
     WHERE OccurrenceDate = @OccurrenceDate
       AND ShardId = @ShardId;
 
@@ -48,18 +50,20 @@ BEGIN
 
             SET @ClaimState = 0;
         END
-    ELSE IF @BroadcastCompletedAtUtc IS NOT NULL
-        SET @ClaimState = 1;
-    ELSE IF @BroadcastLeaseExpiresAtUtc IS NULL OR @BroadcastLeaseExpiresAtUtc <= @NowUtc
-        BEGIN
-            UPDATE game.DailyRewardResetBroadcastDeliveries
-            SET BroadcastLeaseId = @LeaseId,
-                BroadcastLeaseExpiresAtUtc = DATEADD(SECOND, @LeaseDurationSeconds, @NowUtc)
-            WHERE OccurrenceDate = @OccurrenceDate
-              AND ShardId = @ShardId;
+    ELSE
+        IF @BroadcastCompletedAtUtc IS NOT NULL
+            SET @ClaimState = 1;
+        ELSE
+            IF @BroadcastLeaseExpiresAtUtc IS NULL OR @BroadcastLeaseExpiresAtUtc <= @NowUtc
+                BEGIN
+                    UPDATE game.DailyRewardResetBroadcastDeliveries
+                    SET BroadcastLeaseId           = @LeaseId,
+                        BroadcastLeaseExpiresAtUtc = DATEADD(SECOND, @LeaseDurationSeconds, @NowUtc)
+                    WHERE OccurrenceDate = @OccurrenceDate
+                      AND ShardId = @ShardId;
 
-            SET @ClaimState = 0;
-        END;
+                    SET @ClaimState = 0;
+                END;
 
     COMMIT TRANSACTION;
 

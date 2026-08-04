@@ -24,7 +24,8 @@ BEGIN
     FROM game.Tribes AS tribe
     WHERE tribe.TribeId BETWEEN 0 AND 3
       AND NOT EXISTS (SELECT 1
-                      FROM game.TribeVoteElectionStates AS state WITH (UPDLOCK, HOLDLOCK)
+                      FROM game.TribeVoteElectionStates AS state
+                      WITH (UPDLOCK, HOLDLOCK)
                       WHERE state.TribeId = tribe.TribeId);
 
     IF (SELECT COUNT(*) FROM game.TribeVoteElectionStates WHERE TribeId BETWEEN 0 AND 3) <> 4

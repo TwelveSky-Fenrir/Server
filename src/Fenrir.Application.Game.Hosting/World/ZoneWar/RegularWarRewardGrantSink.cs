@@ -86,7 +86,8 @@ public sealed class RegularWarRewardGrantSink(ZoneRegistry zones, ILogger<Regula
             return;
         }
 
-        var completion = new TaskCompletionSource<ZoneCommandResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completion =
+            new TaskCompletionSource<ZoneCommandResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         if (!zone.Post(ZoneCommand.DespawnRegularWarBosses(completion)))
         {
             logger.LogWarning("RegularWar {MapId}: boss cleanup was backpressured", mapId);

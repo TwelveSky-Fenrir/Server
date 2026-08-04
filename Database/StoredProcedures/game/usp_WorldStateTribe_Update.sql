@@ -23,9 +23,9 @@ BEGIN
 
     IF @@ROWCOUNT = 1
         BEGIN
-    UPDATE game.WorldStateTribes
-    SET Points = @Points
-    WHERE TribeId = @TribeId;
+            UPDATE game.WorldStateTribes
+            SET Points = @Points
+            WHERE TribeId = @TribeId;
 
             IF @@ROWCOUNT <> 1
                 BEGIN

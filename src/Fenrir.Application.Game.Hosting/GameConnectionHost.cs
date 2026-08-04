@@ -45,14 +45,14 @@ public sealed class GameConnectionHost(
 
     private readonly SocketAdmissionGate _admissionGate = new(ResolveMaxConcurrentSockets(options.Value));
 
-    private readonly OutboundBufferAdmissionGate _outboundAdmissionGate = new(MaxProcessPendingOutboundFrames,
-        MaxProcessPendingOutboundBytes);
+    private readonly ConcurrentDictionary<Task, byte> _deferredLeaveFinalizations = new();
 
     private readonly SemaphoreSlim _disconnectSqlGate = new(1, 1);
 
     private readonly ConcurrentDictionary<Task, byte> _inFlightConnections = new();
 
-    private readonly ConcurrentDictionary<Task, byte> _deferredLeaveFinalizations = new();
+    private readonly OutboundBufferAdmissionGate _outboundAdmissionGate = new(MaxProcessPendingOutboundFrames,
+        MaxProcessPendingOutboundBytes);
 
     private readonly List<(short MapId, int Port, TcpServer<ZoneClientSession> Server)> _servers = [];
 
@@ -246,7 +246,7 @@ public sealed class GameConnectionHost(
                 ipFloodGuard.ReleaseConnection(remoteIp);
 
             var completedHandoff = zoneSession.IsZoneTransferPending &&
-                zoneSession.IsZoneTransferHandoffCommitted;
+                                   zoneSession.IsZoneTransferHandoffCommitted;
 
             if (zoneSession is { CharacterId: { } characterId, CurrentZone: Zone zone })
             {
@@ -273,7 +273,9 @@ public sealed class GameConnectionHost(
                 }
             }
             else if (zoneSession is { AccountId: { } accountId } && !completedHandoff)
+            {
                 await TearDownAccountSessionAsync(accountId, zoneSession.AccountSessionToken).ConfigureAwait(false);
+            }
 
             tribeQuota.Release(zoneSession);
 

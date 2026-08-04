@@ -17,40 +17,59 @@ public sealed class Zone195NokSanState
     public const float DefaultPostZ = 2510.0f;
 
     public static readonly int TribeCount = WorldStateService.TribeCount;
-
-    private readonly Lock _lock = new();
-    private readonly Zone195CaptureMachine _capture99 = new();
     private readonly Zone195CaptureMachine _capture100 = new();
     private readonly Zone195CaptureMachine _capture196 = new();
+    private readonly Zone195CaptureMachine _capture99 = new();
+    private readonly List<Zone195NokSanConfirmedCapture> _confirmedCaptures = [];
+
+    private readonly Lock _lock = new();
     private readonly int[] _owners = new int[StoneSlotCount];
-    private readonly int[] _stonesHeld = new int[TribeCount];
     private readonly int[] _publishedOwners = new int[StoneSlotCount];
     private readonly int[] _publishedStonesHeld = new int[TribeCount];
+    private readonly int[] _stonesHeld = new int[TribeCount];
+    private Zone195NokSanDurableSnapshot _durableBaseline;
+    private bool _initialized;
 
     private long _lastPersistedGeneration;
     private long _mutationGeneration;
     private long _revision;
-    private Zone195NokSanDurableSnapshot _durableBaseline;
-    private readonly List<Zone195NokSanConfirmedCapture> _confirmedCaptures = [];
-    private bool _initialized;
 
     public bool IsInitialized
     {
         get
         {
             lock (_lock)
+            {
                 return _initialized;
+            }
         }
     }
 
-    public static bool IsValidSlot(int slotIndex) => slotIndex is >= 0 and < StoneSlotCount;
+    private static ReadOnlySpan<int> ActiveSlots =>
+        [Server196StoneSlotIndex, Server99StoneSlotIndex, Server100StoneSlotIndex];
 
-    public static bool IsActiveSlot(int slotIndex) => slotIndex is Server196StoneSlotIndex or Server99StoneSlotIndex
-        or Server100StoneSlotIndex;
+    private static ReadOnlySpan<short> ActiveMapIds => [99, 100, 196];
 
-    public static bool IsValidTribe(int tribeId) => tribeId >= 0 && tribeId < TribeCount;
+    public static bool IsValidSlot(int slotIndex)
+    {
+        return slotIndex is >= 0 and < StoneSlotCount;
+    }
 
-    public static bool IsActiveMapId(short mapId) => mapId is 99 or 100 or 196;
+    public static bool IsActiveSlot(int slotIndex)
+    {
+        return slotIndex is Server196StoneSlotIndex or Server99StoneSlotIndex
+            or Server100StoneSlotIndex;
+    }
+
+    public static bool IsValidTribe(int tribeId)
+    {
+        return tribeId >= 0 && tribeId < TribeCount;
+    }
+
+    public static bool IsActiveMapId(short mapId)
+    {
+        return mapId is 99 or 100 or 196;
+    }
 
     public static bool HasExpectedSlot(short mapId, int slotIndex)
     {
@@ -67,7 +86,9 @@ public sealed class Zone195NokSanState
     {
         ValidateSlot(slotIndex);
         lock (_lock)
+        {
             return _publishedOwners[slotIndex];
+        }
     }
 
     public byte? GetOwningTribe(int slotIndex)
@@ -86,7 +107,9 @@ public sealed class Zone195NokSanState
     {
         ValidateTribe(tribeId);
         lock (_lock)
+        {
             return _publishedStonesHeld[tribeId];
+        }
     }
 
     public int GetMonsterDamageBonus(byte tribeId)
@@ -228,7 +251,9 @@ public sealed class Zone195NokSanState
     public Zone195NokSanStateSnapshot Snapshot()
     {
         lock (_lock)
+        {
             return PublishedSnapshotUnsafe();
+        }
     }
 
     public bool TryGetDirtySnapshot(out Zone195NokSanDurableSnapshot snapshot)
@@ -541,11 +566,6 @@ public sealed class Zone195NokSanState
         if (!IsValidTribe(tribeId))
             throw new ArgumentOutOfRangeException(nameof(tribeId), tribeId, $"TribeId must be 0-{TribeCount - 1}.");
     }
-
-    private static ReadOnlySpan<int> ActiveSlots =>
-    [Server196StoneSlotIndex, Server99StoneSlotIndex, Server100StoneSlotIndex];
-
-    private static ReadOnlySpan<short> ActiveMapIds => [99, 100, 196];
 }
 
 public readonly record struct Zone195NokSanStateSnapshot(
@@ -556,7 +576,8 @@ public readonly record struct Zone195NokSanStateSnapshot(
     {
         get
         {
-            if (StonesHeld.Length != Zone195NokSanState.TribeCount || Owners.Length != Zone195NokSanState.StoneSlotCount)
+            if (StonesHeld.Length != Zone195NokSanState.TribeCount ||
+                Owners.Length != Zone195NokSanState.StoneSlotCount)
                 return false;
 
             for (var tribeId = 0; tribeId < StonesHeld.Length; tribeId++)

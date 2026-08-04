@@ -123,7 +123,7 @@ public sealed class ValleyWarCampaignStateService(
             throw new InvalidOperationException("The Zone 200 campaign durable snapshot hash is invalid.");
 
         var schedule = JsonSerializer.Deserialize(matched.CanonicalPayload,
-            ValleyWarScheduleJsonContext.Default.ValleyWarScheduleState) ??
+                           ValleyWarScheduleJsonContext.Default.ValleyWarScheduleState) ??
                        throw new InvalidOperationException("The Zone 200 campaign durable snapshot has no schedule.");
         if (!string.Equals(matched.Phase, schedule.Phase.ToString(), StringComparison.Ordinal))
             throw new InvalidOperationException("The Zone 200 campaign durable phase disagrees with its schedule.");

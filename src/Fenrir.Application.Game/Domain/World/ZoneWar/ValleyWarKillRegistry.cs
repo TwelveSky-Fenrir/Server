@@ -6,18 +6,20 @@ public sealed class ValleyWarKillRegistry
 {
     private readonly ConcurrentDictionary<ValleyWarCampaignKey, ValleyWarSchedule> _schedules = new();
     private readonly Lock _stateLock = new();
+    private bool _available;
+    private bool _initialized;
     private long _lastPersistedGeneration;
     private long _mutationGeneration;
     private long _revision;
-    private bool _initialized;
-    private bool _available;
 
     public bool IsAvailable
     {
         get
         {
             lock (_stateLock)
+            {
                 return _initialized && _available;
+            }
         }
     }
 
@@ -46,7 +48,8 @@ public sealed class ValleyWarKillRegistry
         if (!ValleyWarMapCatalog.TryGetCampaignKey(mapId, out var campaignKey) || !IsAvailable)
             return false;
 
-        var accepted = _schedules.GetOrAdd(campaignKey, static _ => new ValleyWarSchedule()).RegisterMonsterKill(tribeId);
+        var accepted = _schedules.GetOrAdd(campaignKey, static _ => new ValleyWarSchedule())
+            .RegisterMonsterKill(tribeId);
         if (accepted)
             MarkChanged();
 
@@ -142,7 +145,9 @@ public sealed class ValleyWarKillRegistry
     public void MarkUnavailable()
     {
         lock (_stateLock)
+        {
             _available = false;
+        }
     }
 
     private void MarkChanged()

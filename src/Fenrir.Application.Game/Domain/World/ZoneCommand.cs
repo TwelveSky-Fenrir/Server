@@ -75,17 +75,30 @@ public readonly record struct ZoneLeaveResult(
     PlayerRuntimeState? DepartingState,
     string? Cause = null)
 {
-    public static ZoneLeaveResult Applied(PlayerRuntimeState state) => new(ZoneLeaveResultKind.Applied, state);
+    public static ZoneLeaveResult Applied(PlayerRuntimeState state)
+    {
+        return new ZoneLeaveResult(ZoneLeaveResultKind.Applied, state);
+    }
 
-    public static ZoneLeaveResult Rejected(string? cause = null) => new(ZoneLeaveResultKind.Rejected, null, cause);
+    public static ZoneLeaveResult Rejected(string? cause = null)
+    {
+        return new ZoneLeaveResult(ZoneLeaveResultKind.Rejected, null, cause);
+    }
 
-    public static ZoneLeaveResult Faulted(PlayerRuntimeState? departingState, string? cause = null) =>
-        new(ZoneLeaveResultKind.Faulted, departingState, cause);
+    public static ZoneLeaveResult Faulted(PlayerRuntimeState? departingState, string? cause = null)
+    {
+        return new ZoneLeaveResult(ZoneLeaveResultKind.Faulted, departingState, cause);
+    }
 
-    public static ZoneLeaveResult Unknown(string? cause = null) => new(ZoneLeaveResultKind.Unknown, null, cause);
+    public static ZoneLeaveResult Unknown(string? cause = null)
+    {
+        return new ZoneLeaveResult(ZoneLeaveResultKind.Unknown, null, cause);
+    }
 
-    public static ZoneLeaveResult Cancelled(string? cause = null) =>
-        new(ZoneLeaveResultKind.Cancelled, null, cause);
+    public static ZoneLeaveResult Cancelled(string? cause = null)
+    {
+        return new ZoneLeaveResult(ZoneLeaveResultKind.Cancelled, null, cause);
+    }
 }
 
 public readonly record struct ZoneLeaveSubmission(ZoneLeaveResult Result, Task<ZoneLeaveResult>? PendingResult);

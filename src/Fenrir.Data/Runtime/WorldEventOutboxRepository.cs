@@ -88,7 +88,8 @@ public sealed record WorldEventOutboxRepository(ICaeriusNetDbContext Db) : IWorl
         if (entry.SourceShardId == entry.DestinationShardId)
             throw new ArgumentException("A world event cannot target its source shard.", nameof(entry));
         if (!Enum.IsDefined(entry.PayloadCategory))
-            throw new ArgumentOutOfRangeException(nameof(entry), "The payload category is not part of the fixed contract.");
+            throw new ArgumentOutOfRangeException(nameof(entry),
+                "The payload category is not part of the fixed contract.");
         if (entry.Payload is not { Length: > 0 and <= WorldEventOutboxLimits.MaximumPayloadBytes })
             throw new ArgumentOutOfRangeException(nameof(entry),
                 $"Payloads must contain from 1 to {WorldEventOutboxLimits.MaximumPayloadBytes} bytes.");
@@ -107,7 +108,8 @@ public sealed record WorldEventOutboxRepository(ICaeriusNetDbContext Db) : IWorl
         if (request.MaximumCount is < 1 or > WorldEventOutboxLimits.MaximumReadCount)
             throw new ArgumentOutOfRangeException(nameof(request),
                 $"At most {WorldEventOutboxLimits.MaximumReadCount} rows may be leased at once.");
-        if (request.LeaseSeconds is < WorldEventOutboxLimits.MinimumLeaseSeconds or > WorldEventOutboxLimits.MaximumLeaseSeconds)
+        if (request.LeaseSeconds is < WorldEventOutboxLimits.MinimumLeaseSeconds
+            or > WorldEventOutboxLimits.MaximumLeaseSeconds)
             throw new ArgumentOutOfRangeException(nameof(request),
                 $"Lease duration must be from {WorldEventOutboxLimits.MinimumLeaseSeconds} to " +
                 $"{WorldEventOutboxLimits.MaximumLeaseSeconds} seconds.");

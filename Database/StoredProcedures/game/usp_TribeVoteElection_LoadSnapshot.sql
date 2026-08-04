@@ -35,9 +35,9 @@ BEGIN
            candidate.VotePoint,
            candidate.RegisteredAtUtc
     FROM game.TribeVoteElectionCandidates AS candidate
-        INNER JOIN game.TribeVoteElectionStates AS state
-            ON state.TribeId = candidate.TribeId
-               AND state.CycleId = candidate.CycleId
+             INNER JOIN game.TribeVoteElectionStates AS state
+                        ON state.TribeId = candidate.TribeId
+                            AND state.CycleId = candidate.CycleId
     ORDER BY candidate.TribeId, candidate.SlotIndex;
 
     COMMIT TRANSACTION;

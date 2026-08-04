@@ -1,6 +1,6 @@
 CREATE OR ALTER PROCEDURE runtime.usp_PopupEventLease_TryAcquire @OccurrenceKey VARCHAR(96),
-                                                                   @LeaseOwnerId UNIQUEIDENTIFIER,
-                                                                   @LeaseDurationSeconds SMALLINT
+                                                                 @LeaseOwnerId UNIQUEIDENTIFIER,
+                                                                 @LeaseDurationSeconds SMALLINT
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -26,45 +26,47 @@ BEGIN
 
     SELECT @ExistingLeaseOwnerId = LeaseOwnerId,
            @ExistingLeaseExpiresAtUtc = LeaseExpiresAtUtc
-    FROM runtime.PopupEventLease WITH (UPDLOCK, HOLDLOCK)
+    FROM runtime.PopupEventLease
+    WITH (UPDLOCK, HOLDLOCK)
     WHERE OccurrenceKey = @OccurrenceKey;
 
     IF @ExistingLeaseOwnerId IS NULL
         BEGIN
             INSERT INTO runtime.PopupEventLease
-                (OccurrenceKey, LeaseOwnerId, LeaseExpiresAtUtc, AcquiredAtUtc, RenewedAtUtc)
-            VALUES
-                (@OccurrenceKey, @LeaseOwnerId, @NewLeaseExpiresAtUtc, @NowUtc, @NowUtc);
-
-            SET @Acquired = 1;
-            SET @LeaseExpiresAtUtc = @NewLeaseExpiresAtUtc;
-        END
-    ELSE IF @ExistingLeaseOwnerId = @LeaseOwnerId
-        BEGIN
-            UPDATE runtime.PopupEventLease
-            SET LeaseExpiresAtUtc = @NewLeaseExpiresAtUtc,
-                RenewedAtUtc = @NowUtc
-            WHERE OccurrenceKey = @OccurrenceKey;
-
-            SET @LeaseExpiresAtUtc = @NewLeaseExpiresAtUtc;
-        END
-    ELSE IF @ExistingLeaseExpiresAtUtc <= @NowUtc
-        BEGIN
-            UPDATE runtime.PopupEventLease
-            SET LeaseOwnerId = @LeaseOwnerId,
-                LeaseExpiresAtUtc = @NewLeaseExpiresAtUtc,
-                AcquiredAtUtc = @NowUtc,
-                RenewedAtUtc = @NowUtc
-            WHERE OccurrenceKey = @OccurrenceKey;
+            (OccurrenceKey, LeaseOwnerId, LeaseExpiresAtUtc, AcquiredAtUtc, RenewedAtUtc)
+            VALUES (@OccurrenceKey, @LeaseOwnerId, @NewLeaseExpiresAtUtc, @NowUtc, @NowUtc);
 
             SET @Acquired = 1;
             SET @LeaseExpiresAtUtc = @NewLeaseExpiresAtUtc;
         END
     ELSE
-        SET @LeaseExpiresAtUtc = @ExistingLeaseExpiresAtUtc;
+        IF @ExistingLeaseOwnerId = @LeaseOwnerId
+            BEGIN
+                UPDATE runtime.PopupEventLease
+                SET LeaseExpiresAtUtc = @NewLeaseExpiresAtUtc,
+                    RenewedAtUtc      = @NowUtc
+                WHERE OccurrenceKey = @OccurrenceKey;
+
+                SET @LeaseExpiresAtUtc = @NewLeaseExpiresAtUtc;
+            END
+        ELSE
+            IF @ExistingLeaseExpiresAtUtc <= @NowUtc
+                BEGIN
+                    UPDATE runtime.PopupEventLease
+                    SET LeaseOwnerId      = @LeaseOwnerId,
+                        LeaseExpiresAtUtc = @NewLeaseExpiresAtUtc,
+                        AcquiredAtUtc     = @NowUtc,
+                        RenewedAtUtc      = @NowUtc
+                    WHERE OccurrenceKey = @OccurrenceKey;
+
+                    SET @Acquired = 1;
+                    SET @LeaseExpiresAtUtc = @NewLeaseExpiresAtUtc;
+                END
+            ELSE
+                SET @LeaseExpiresAtUtc = @ExistingLeaseExpiresAtUtc;
 
     COMMIT TRANSACTION;
 
-    SELECT @Acquired AS Acquired,
+    SELECT @Acquired          AS Acquired,
            @LeaseExpiresAtUtc AS LeaseExpiresAtUtc;
 END;

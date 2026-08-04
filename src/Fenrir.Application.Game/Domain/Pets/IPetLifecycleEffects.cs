@@ -4,5 +4,5 @@ namespace Fenrir.Application.Game.Domain.Pets;
 
 public interface IPetLifecycleEffects
 {
-    void Apply(Zone zone, PlayerRuntimeState state, in PetLifecycleTransition transition);
+    public void Apply(Zone zone, PlayerRuntimeState state, in PetLifecycleTransition transition);
 }

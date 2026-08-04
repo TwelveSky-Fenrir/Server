@@ -97,9 +97,9 @@ public sealed class ValleyWarSchedule
 
     public const int BossMonsterId = 756;
 
-    private readonly object _sync = new();
-
     private readonly int[] _killRaceQuota = new int[TribeCount];
+
+    private readonly object _sync = new();
 
     private bool _bossObservedPresent;
 
@@ -110,16 +110,22 @@ public sealed class ValleyWarSchedule
     private int _idleTicksElapsed;
     private int _killRaceTicksRemaining;
     private int _minuteTicksElapsed;
+
+    private ValleyWarPhase _phase = ValleyWarPhase.Idle;
     private int _postWinTicksElapsed;
     private int _preResetTicksElapsed;
     private int _scrollPendingTicksElapsed;
+
+    private byte? _winningTribe;
 
     public ValleyWarPhase Phase
     {
         get
         {
             lock (_sync)
+            {
                 return _phase;
+            }
         }
         private set => _phase = value;
     }
@@ -129,19 +135,19 @@ public sealed class ValleyWarSchedule
         get
         {
             lock (_sync)
+            {
                 return _winningTribe;
+            }
         }
         private set => _winningTribe = value;
     }
 
-    private ValleyWarPhase _phase = ValleyWarPhase.Idle;
-
-    private byte? _winningTribe;
-
     public ValleyWarTickResult Tick(ValleyWarEnvironmentSnapshot snapshot)
     {
         lock (_sync)
+        {
             return TickCore(snapshot);
+        }
     }
 
     private ValleyWarTickResult TickCore(ValleyWarEnvironmentSnapshot snapshot)
@@ -255,7 +261,9 @@ public sealed class ValleyWarSchedule
     public int GetKillQuota(byte tribeId)
     {
         lock (_sync)
+        {
             return tribeId < TribeCount ? _killRaceQuota[tribeId] : 0;
+        }
     }
 
     public ValleyWarScheduleState Snapshot()
@@ -503,7 +511,7 @@ public sealed class ValleyWarSchedule
 
     private static void ValidateState(ValleyWarScheduleState state)
     {
-        if (!Enum.IsDefined(state.Phase) || state.WinningTribe is { } winner && winner >= TribeCount ||
+        if (!Enum.IsDefined(state.Phase) || (state.WinningTribe is { } winner && winner >= TribeCount) ||
             state.KillRaceQuotas is not { Length: TribeCount })
             throw new ArgumentException("The valley-war schedule snapshot has an invalid shape.", nameof(state));
 

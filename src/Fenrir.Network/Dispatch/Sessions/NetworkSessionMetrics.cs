@@ -21,7 +21,8 @@ internal static class NetworkSessionMetrics
         "fenrir.network.outbound.queue.rejections", "frames", "Outbound frames rejected by a session queue limit.");
 
     public static readonly Counter<long> SessionTerminations = Meter.CreateCounter<long>(
-        "fenrir.network.sessions.terminated", "sessions", "Terminal session outcomes grouped by bounded disconnect reason.");
+        "fenrir.network.sessions.terminated", "sessions",
+        "Terminal session outcomes grouped by bounded disconnect reason.");
 
     private static readonly KeyValuePair<string, object?> LoginServerTag = new("server", "login");
 

@@ -1,7 +1,7 @@
+using System.Diagnostics;
 using System.IO.Pipelines;
 using System.Net;
 using System.Threading.Channels;
-using System.Diagnostics;
 using Fenrir.Network.Dispatch.Logging;
 using Fenrir.Network.Framing;
 using Fenrir.Network.Transport;
@@ -20,14 +20,14 @@ public abstract class ClientSession : IPacketSession
     private const int NoDisconnectReason = -1;
 
     private readonly IBufferedDuplexPipe? _bufferedTransport;
-    private readonly ILogger? logger;
-    private readonly object _outboundGate = new();
-    private readonly Channel<OutboundFrame> _outboundFrames;
-    private readonly Queue<PendingFrame> _pendingFrames = [];
-    private readonly object _sendPumpGate = new();
     private readonly int _maxPendingSendBytes;
     private readonly int _maxPendingSendFrames;
     private readonly OutboundBufferAdmissionGate? _outboundAdmissionGate;
+    private readonly Channel<OutboundFrame> _outboundFrames;
+    private readonly object _outboundGate = new();
+    private readonly Queue<PendingFrame> _pendingFrames = [];
+    private readonly object _sendPumpGate = new();
+    private readonly ILogger? logger;
 
     private int _backpressureStreak;
     private int _cleanupStarted;
@@ -332,7 +332,8 @@ public abstract class ClientSession : IPacketSession
                     if (!await FlushFrameAsync().ConfigureAwait(false))
                         return;
 
-                    NetworkSessionMetrics.OutboundBytes.Add(frame.Bytes.Length, NetworkSessionMetrics.ServerTag(Server));
+                    NetworkSessionMetrics.OutboundBytes.Add(frame.Bytes.Length,
+                        NetworkSessionMetrics.ServerTag(Server));
                     NetworkSessionMetrics.OutboundQueueAgeMs.Record(
                         Stopwatch.GetElapsedTime(frame.EnqueuedAtTimestamp).TotalMilliseconds,
                         NetworkSessionMetrics.ServerTag(Server));
@@ -357,7 +358,9 @@ public abstract class ClientSession : IPacketSession
         finally
         {
             lock (_sendPumpGate)
+            {
                 _sendPumpRunning = false;
+            }
 
             if (_outboundFrames.Reader.TryPeek(out _))
                 StartSendPump();
@@ -420,7 +423,9 @@ public abstract class ClientSession : IPacketSession
     private void ReleaseSentBytes(long bytes)
     {
         lock (_outboundGate)
+        {
             ReleaseSentBytesUnsafe(bytes);
+        }
     }
 
     private void ReleaseSentBytesUnsafe(long bytes)
@@ -476,7 +481,9 @@ public abstract class ClientSession : IPacketSession
     {
         Task? task;
         lock (_sendPumpGate)
+        {
             task = _sendPumpTask;
+        }
 
         if (task is null || task.IsCompleted)
             return true;

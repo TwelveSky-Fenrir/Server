@@ -1,6 +1,6 @@
 CREATE OR ALTER PROCEDURE runtime.usp_ZoneEventRelayOutbox_Acknowledge @OutboxId BIGINT,
-                                                                        @SourceShardId TINYINT,
-                                                                        @LeaseId UNIQUEIDENTIFIER
+                                                                       @SourceShardId TINYINT,
+                                                                       @LeaseId UNIQUEIDENTIFIER
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -15,10 +15,10 @@ BEGIN
     BEGIN TRANSACTION;
 
     UPDATE runtime.ZoneEventRelayOutbox WITH (UPDLOCK, HOLDLOCK)
-    SET PublishStatus = 2,
-        LeaseId = NULL,
+    SET PublishStatus     = 2,
+        LeaseId           = NULL,
         LeaseExpiresAtUtc = NULL,
-        PublishedAtUtc = COALESCE(PublishedAtUtc, SYSUTCDATETIME())
+        PublishedAtUtc    = COALESCE(PublishedAtUtc, SYSUTCDATETIME())
     WHERE OutboxId = @OutboxId
       AND SourceShardId = @SourceShardId
       AND PublishStatus = 1
@@ -26,15 +26,15 @@ BEGIN
 
     IF @@ROWCOUNT = 1
         SET @Acknowledged = 1;
-    ELSE IF EXISTS
-    (
-        SELECT 1
-        FROM runtime.ZoneEventRelayOutbox WITH (UPDLOCK, HOLDLOCK)
-        WHERE OutboxId = @OutboxId
-          AND SourceShardId = @SourceShardId
-          AND PublishStatus = 2
-    )
-        SET @Acknowledged = 1;
+    ELSE
+        IF EXISTS
+            (SELECT 1
+             FROM runtime.ZoneEventRelayOutbox
+             WITH (UPDLOCK, HOLDLOCK)
+             WHERE OutboxId = @OutboxId
+               AND SourceShardId = @SourceShardId
+               AND PublishStatus = 2)
+            SET @Acknowledged = 1;
 
     COMMIT TRANSACTION;
 

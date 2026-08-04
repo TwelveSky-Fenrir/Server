@@ -16,11 +16,10 @@ BEGIN
         TRANSACTION;
 
     DECLARE @CatalogBundleCost INT,
-            @CatalogItemSort TINYINT;
+        @CatalogItemSort TINYINT;
 
-    SELECT TOP (1)
-           @CatalogBundleCost = c.Cost,
-           @CatalogItemSort = i.Sort
+    SELECT TOP (1) @CatalogBundleCost = c.Cost,
+                   @CatalogItemSort = i.Sort
     FROM world.BloodExchangeCatalog AS c WITH (UPDLOCK, HOLDLOCK)
              INNER JOIN world.Items AS i WITH (HOLDLOCK)
                         ON i.ItemId = c.ItemId
@@ -67,15 +66,28 @@ BEGIN
 
     INSERT INTO @Existing (Slot, ItemId, Quantity, Enchant, Combine, Refine, Socket, SocketGem1, SocketGem2,
                            SocketGem3, ExpireDate, Serial, XPos, YPos)
-    SELECT Slot, ItemId, Quantity, Enchant, Combine, Refine, Socket, SocketGem1, SocketGem2, SocketGem3,
-           ExpireDate, Serial, XPos, YPos
-    FROM game.CharacterItems WITH (UPDLOCK, HOLDLOCK)
+    SELECT Slot,
+           ItemId,
+           Quantity,
+           Enchant,
+           Combine,
+           Refine,
+           Socket,
+           SocketGem1,
+           SocketGem2,
+           SocketGem3,
+           ExpireDate,
+           Serial,
+           XPos,
+           YPos
+    FROM game.CharacterItems
+    WITH (UPDLOCK, HOLDLOCK)
     WHERE CharacterId = @CharacterId
       AND Container = @Container;
 
     DECLARE @ExistingItemId INT,
-            @ExistingQuantity INT,
-            @ExpectedQuantity INT;
+        @ExistingQuantity INT,
+        @ExpectedQuantity INT;
 
     SELECT @ExistingItemId = ItemId,
            @ExistingQuantity = Quantity
@@ -84,11 +96,12 @@ BEGIN
 
     IF @ExistingItemId IS NULL
         SET @ExpectedQuantity = @CatalogQuantity;
-    ELSE IF @CatalogItemSort IN (2, 99) AND @ExistingItemId = @CatalogItemId AND
-            @ExistingQuantity BETWEEN 1 AND 999 AND @ExistingQuantity + @CatalogQuantity <= 999
-        SET @ExpectedQuantity = @ExistingQuantity + @CatalogQuantity;
     ELSE
-        THROW 50271, N'Blood-mark purchase destination no longer permits the catalog bundle.', 1;
+        IF @CatalogItemSort IN (2, 99) AND @ExistingItemId = @CatalogItemId AND
+           @ExistingQuantity BETWEEN 1 AND 999 AND @ExistingQuantity + @CatalogQuantity <= 999
+            SET @ExpectedQuantity = @ExistingQuantity + @CatalogQuantity;
+        ELSE
+            THROW 50271, N'Blood-mark purchase destination no longer permits the catalog bundle.', 1;
 
     IF NOT EXISTS (SELECT 1
                    FROM @Items
@@ -97,22 +110,70 @@ BEGIN
                      AND Quantity = @ExpectedQuantity)
         THROW 50271, N'Blood-mark purchase grant does not match the server catalog bundle.', 1;
 
-    IF EXISTS (SELECT Slot, ItemId, Quantity, Enchant, Combine, Refine, Socket, SocketGem1, SocketGem2,
-                      SocketGem3, ExpireDate, Serial, XPos, YPos
+    IF EXISTS (SELECT Slot,
+                      ItemId,
+                      Quantity,
+                      Enchant,
+                      Combine,
+                      Refine,
+                      Socket,
+                      SocketGem1,
+                      SocketGem2,
+                      SocketGem3,
+                      ExpireDate,
+                      Serial,
+                      XPos,
+                      YPos
                FROM @Existing
                WHERE Slot <> @TargetSlot
                EXCEPT
-               SELECT Slot, ItemId, Quantity, Enchant, Combine, Refine, Socket, SocketGem1, SocketGem2,
-                      SocketGem3, ExpireDate, Serial, XPos, YPos
+               SELECT Slot,
+                      ItemId,
+                      Quantity,
+                      Enchant,
+                      Combine,
+                      Refine,
+                      Socket,
+                      SocketGem1,
+                      SocketGem2,
+                      SocketGem3,
+                      ExpireDate,
+                      Serial,
+                      XPos,
+                      YPos
                FROM @Items
                WHERE Slot <> @TargetSlot) OR
-       EXISTS (SELECT Slot, ItemId, Quantity, Enchant, Combine, Refine, Socket, SocketGem1, SocketGem2,
-                      SocketGem3, ExpireDate, Serial, XPos, YPos
+       EXISTS (SELECT Slot,
+                      ItemId,
+                      Quantity,
+                      Enchant,
+                      Combine,
+                      Refine,
+                      Socket,
+                      SocketGem1,
+                      SocketGem2,
+                      SocketGem3,
+                      ExpireDate,
+                      Serial,
+                      XPos,
+                      YPos
                FROM @Items
                WHERE Slot <> @TargetSlot
                EXCEPT
-               SELECT Slot, ItemId, Quantity, Enchant, Combine, Refine, Socket, SocketGem1, SocketGem2,
-                      SocketGem3, ExpireDate, Serial, XPos, YPos
+               SELECT Slot,
+                      ItemId,
+                      Quantity,
+                      Enchant,
+                      Combine,
+                      Refine,
+                      Socket,
+                      SocketGem1,
+                      SocketGem2,
+                      SocketGem3,
+                      ExpireDate,
+                      Serial,
+                      XPos,
+                      YPos
                FROM @Existing
                WHERE Slot <> @TargetSlot)
         THROW 50271, N'Blood-mark purchase modifies inventory slots outside its destination.', 1;
@@ -127,7 +188,8 @@ BEGIN
     UPDATE game.Characters
     SET BloodCoin    = BloodCoin + @DeltaBloodCoin,
         UpdatedAtUtc = SYSUTCDATETIME()
-    OUTPUT INSERTED.AccountId, INSERTED.BloodCoin
+    OUTPUT INSERTED.AccountId,
+           INSERTED.BloodCoin
         INTO @Debited
     WHERE CharacterId = @CharacterId
       AND BloodCoin + @DeltaBloodCoin >= 0;
@@ -176,8 +238,8 @@ BEGIN
          @ActorCharacterId = @CharacterId,
          @ItemId = @CatalogItemId,
          @Quantity = @CatalogQuantity,
-          @Outcome = 1,
-          @Payload = @EventPayload;
+         @Outcome = 1,
+         @Payload = @EventPayload;
 
     SELECT BloodCoin AS NewBloodCoin
     FROM @Debited;

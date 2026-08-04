@@ -31,13 +31,11 @@ public sealed partial class Zone
 
     private readonly AoiGrid _monsterGrid = new(options.AoiCellSize);
 
-    private readonly ConcurrentDictionary<int, MonsterEntity> _monsters = new();
+    private readonly Lock _monsterOrderLock = new();
 
     private readonly MonsterPursuerIndex _monsterPursuers = new();
 
-    private readonly Lock _monsterOrderLock = new();
-
-    private MonsterEntity[] _monstersInServerIndexOrder = [];
+    private readonly ConcurrentDictionary<int, MonsterEntity> _monsters = new();
 
     private readonly List<int> _mvpAttackNeighborScratch = [];
 
@@ -47,13 +45,17 @@ public sealed partial class Zone
 
     private readonly List<int> _sendExistingMonstersScratch = [];
 
+    private MonsterEntity[] _monstersInServerIndexOrder = [];
+
     private int _monsterUniqueNumberSeed;
 
     public int MonsterCount => _monsters.Count;
 
     internal TimeSpan MonsterRuntimeClock => _clock;
 
-        public IEnumerable<MonsterEntity> MonstersSnapshot => Volatile.Read(ref _monstersInServerIndexOrder);
+    public IEnumerable<MonsterEntity> MonstersSnapshot => Volatile.Read(ref _monstersInServerIndexOrder);
+
+    public int PendingMoneyGrantCount => _pendingMoneyGrants.Count;
 
     public bool TryGetMonster(int serverIndex, out MonsterEntity? monster)
     {
@@ -323,7 +325,7 @@ public sealed partial class Zone
 
         if (target.Life <= 0)
             ApplyDeath(target.CharacterId, DeathCause.MonsterKill, (monster.PosX, monster.PosZ),
-                monster.SpecialSort != MonsterSpecialSort.Standard, originSort: 1, deathSkillNumber: 5);
+                monster.SpecialSort != MonsterSpecialSort.Standard, 1, 5);
     }
 
     private void ApplyMonsterSpecialStun(PlayerRuntimeState target)
@@ -351,7 +353,7 @@ public sealed partial class Zone
         _moneyGrantSignal.Release();
     }
 
-        public bool TryGrantMonsterMoney(PlayerRuntimeState state, long amount)
+    public bool TryGrantMonsterMoney(PlayerRuntimeState state, long amount)
     {
         if (amount <= 0 || state.Money is < 0 or > StoreMoneyPolicy.MaxMoney ||
             amount > StoreMoneyPolicy.MaxMoney - state.Money)
@@ -380,8 +382,6 @@ public sealed partial class Zone
     {
         return _moneyGrantSignal.WaitAsync(ct);
     }
-
-    public int PendingMoneyGrantCount => _pendingMoneyGrants.Count;
 
     public IReadOnlyList<PendingMoneyGrant> DrainPendingMoneyGrants()
     {

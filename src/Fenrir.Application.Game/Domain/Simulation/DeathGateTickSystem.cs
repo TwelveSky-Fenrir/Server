@@ -39,10 +39,10 @@ public sealed class DeathGateTickSystem(WorldStateService worldState) : ISimulat
         switch (outcome)
         {
             case ReviveClearOutcome.ClearDeathWindowAndLock:
-                zone.ReleaseDeathGateWindow(state, clearReviveHackFlag: true);
+                zone.ReleaseDeathGateWindow(state, true);
                 break;
             case ReviveClearOutcome.ClearDeathWindowOnly:
-                zone.ReleaseDeathGateWindow(state, clearReviveHackFlag: false);
+                zone.ReleaseDeathGateWindow(state, false);
                 break;
         }
     }

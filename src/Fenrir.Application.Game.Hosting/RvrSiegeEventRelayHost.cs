@@ -36,13 +36,12 @@ public sealed class RvrSiegeEventRelayHost(
             .ConfigureAwait(false);
 
         foreach (var entry in entries)
-        {
             try
             {
                 ValidateOutboundEntry(entry, shardId);
                 await CrossShardRelayRetry.RunAsync(
                         () => relay.PublishAsync(new RvrSiegeEventRelayEntry(entry.SourceShardId, entry.Sort,
-                        entry.Data) { CorrelationId = entry.CorrelationId }, ct), ct)
+                            entry.Data) { CorrelationId = entry.CorrelationId }, ct), ct)
                     .ConfigureAwait(false);
 
                 var acknowledged = await outbox.AcknowledgeAsync(
@@ -59,7 +58,6 @@ public sealed class RvrSiegeEventRelayHost(
                     entry.OutboxId, entry.OperationId, entry.CorrelationId, shardId);
                 break;
             }
-        }
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -98,6 +96,7 @@ public sealed class RvrSiegeEventRelayHost(
                 {
                 }
             }
+
             stoppingToken.ThrowIfCancellationRequested();
         } while (true);
     }

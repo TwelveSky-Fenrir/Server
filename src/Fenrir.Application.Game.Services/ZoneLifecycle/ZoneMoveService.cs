@@ -36,26 +36,6 @@ public sealed class ZoneMoveService(
 
     private static readonly TimeSpan ZoneActorCommandCompletionTimeout = TimeSpan.FromSeconds(2);
 
-    private enum HandoffBeginOutcomeKind : byte
-    {
-        Applied = 1,
-
-        NotApplied,
-
-        Unknown
-    }
-
-    private readonly record struct HandoffBeginOutcome(HandoffBeginOutcomeKind Kind,
-        ZoneTransferHandoffSnapshot? Snapshot)
-    {
-        public static HandoffBeginOutcome Applied(ZoneTransferHandoffSnapshot snapshot) =>
-            new(HandoffBeginOutcomeKind.Applied, snapshot);
-
-        public static HandoffBeginOutcome NotApplied() => new(HandoffBeginOutcomeKind.NotApplied, null);
-
-        public static HandoffBeginOutcome Unknown() => new(HandoffBeginOutcomeKind.Unknown, null);
-    }
-
     public async ValueTask HandleAsync(ZoneMoveRequest packet, IZoneSession zoneSession,
         CancellationToken cancellationToken)
     {
@@ -372,7 +352,8 @@ public sealed class ZoneMoveService(
 
         var snapshotSignal = new TaskCompletionSource<ZoneTransferHandoffSnapshot?>(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        var completion = new TaskCompletionSource<ZoneCommandResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completion =
+            new TaskCompletionSource<ZoneCommandResult>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         if (!sourceZone.Post(ZoneCommand.BeginZoneTransfer(characterId, targetZoneNumber, snapshotSignal, completion)))
         {
@@ -407,7 +388,8 @@ public sealed class ZoneMoveService(
 
         try
         {
-            var snapshot = await snapshotSignal.Task.WaitAsync(ZoneActorCommandCompletionTimeout, CancellationToken.None)
+            var snapshot = await snapshotSignal.Task
+                .WaitAsync(ZoneActorCommandCompletionTimeout, CancellationToken.None)
                 .ConfigureAwait(false);
             if (snapshot is not null)
                 return HandoffBeginOutcome.Applied(snapshot);
@@ -576,7 +558,8 @@ public sealed class ZoneMoveService(
     private async ValueTask<bool> RollbackHandoffAsync(Zone sourceZone, int characterId,
         DateTime? pendingRegisteredAtUtc)
     {
-        var completion = new TaskCompletionSource<ZoneCommandResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completion =
+            new TaskCompletionSource<ZoneCommandResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         var command = pendingRegisteredAtUtc is { } pendingRegisteredAt
             ? ZoneCommand.RollbackZoneTransfer(characterId, pendingRegisteredAt, completion)
             : ZoneCommand.ClearZoneTransferPending(characterId, completion);
@@ -609,5 +592,34 @@ public sealed class ZoneMoveService(
             "Zone {SourceMapId} ClearZoneTransferPending for character {CharacterId} completed as {ResultKind} ({Cause}) during handoff compensation",
             sourceZone.MapId, characterId, result.Kind, result.Cause);
         return false;
+    }
+
+    private enum HandoffBeginOutcomeKind : byte
+    {
+        Applied = 1,
+
+        NotApplied,
+
+        Unknown
+    }
+
+    private readonly record struct HandoffBeginOutcome(
+        HandoffBeginOutcomeKind Kind,
+        ZoneTransferHandoffSnapshot? Snapshot)
+    {
+        public static HandoffBeginOutcome Applied(ZoneTransferHandoffSnapshot snapshot)
+        {
+            return new HandoffBeginOutcome(HandoffBeginOutcomeKind.Applied, snapshot);
+        }
+
+        public static HandoffBeginOutcome NotApplied()
+        {
+            return new HandoffBeginOutcome(HandoffBeginOutcomeKind.NotApplied, null);
+        }
+
+        public static HandoffBeginOutcome Unknown()
+        {
+            return new HandoffBeginOutcome(HandoffBeginOutcomeKind.Unknown, null);
+        }
     }
 }

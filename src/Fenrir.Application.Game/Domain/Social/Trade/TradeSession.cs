@@ -1,5 +1,5 @@
-using Fenrir.Application.Game.Domain.Inventory;
 using System.Collections.Immutable;
+using Fenrir.Application.Game.Domain.Inventory;
 
 namespace Fenrir.Application.Game.Domain.Social.Trade;
 

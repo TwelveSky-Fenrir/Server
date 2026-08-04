@@ -35,7 +35,8 @@ public sealed record SessionTicketRepository(ICaeriusNetDbContext Db) : ISession
             for (var attempt = 1;; attempt++)
             {
                 var parameters =
-                    new StoredProcedureParametersBuilder("runtime", "usp_SessionTicket_Create", 1, CommandTimeoutSeconds)
+                    new StoredProcedureParametersBuilder("runtime", "usp_SessionTicket_Create", 1,
+                            CommandTimeoutSeconds)
                         .AddParameter("AccountId", accountId, SqlDbType.Int)
                         .AddParameter("CharacterId", characterId, SqlDbType.Int)
                         .AddParameter("ShardId", shardId, SqlDbType.TinyInt)
@@ -83,7 +84,8 @@ public sealed record SessionTicketRepository(ICaeriusNetDbContext Db) : ISession
             for (var attempt = 1;; attempt++)
             {
                 var parameters =
-                    new StoredProcedureParametersBuilder("runtime", "usp_SessionTicket_Consume", 1, CommandTimeoutSeconds)
+                    new StoredProcedureParametersBuilder("runtime", "usp_SessionTicket_Consume", 1,
+                            CommandTimeoutSeconds)
                         .AddParameter("CapabilityHash", capabilityHash, SqlDbType.Binary)
                         .AddParameter("ExpectedShardId", expectedShardId, SqlDbType.TinyInt)
                         .AddParameter("ExpectedTargetMapId", expectedTargetMapId, SqlDbType.SmallInt)

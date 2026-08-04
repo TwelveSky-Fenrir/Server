@@ -29,7 +29,8 @@ BEGIN
         END;
 
     IF NOT EXISTS (SELECT 1
-                   FROM game.TribeVoteElectionStates WITH (UPDLOCK, HOLDLOCK)
+                   FROM game.TribeVoteElectionStates
+                   WITH (UPDLOCK, HOLDLOCK)
                    WHERE TribeId = @TribeId
                      AND CycleId = @CycleId
                      AND Phase = 2)
@@ -40,7 +41,8 @@ BEGIN
         END;
 
     IF NOT EXISTS (SELECT 1
-                   FROM game.TribeVoteElectionCandidates WITH (UPDLOCK, HOLDLOCK)
+                   FROM game.TribeVoteElectionCandidates
+                   WITH (UPDLOCK, HOLDLOCK)
                    WHERE CycleId = @CycleId
                      AND TribeId = @TribeId
                      AND SlotIndex = @SlotIndex)
@@ -52,7 +54,8 @@ BEGIN
         END;
 
     IF EXISTS (SELECT 1
-               FROM game.TribeVoteElectionVoters WITH (UPDLOCK, HOLDLOCK)
+               FROM game.TribeVoteElectionVoters
+               WITH (UPDLOCK, HOLDLOCK)
                WHERE CycleId = @CycleId
                  AND VoterCharacterId = @VoterCharacterId)
         BEGIN
@@ -63,7 +66,8 @@ BEGIN
         END;
 
     IF EXISTS (SELECT 1
-               FROM game.TribeVoteElectionCandidates WITH (UPDLOCK, HOLDLOCK)
+               FROM game.TribeVoteElectionCandidates
+               WITH (UPDLOCK, HOLDLOCK)
                WHERE CycleId = @CycleId
                  AND TribeId = @TribeId
                  AND SlotIndex = @SlotIndex

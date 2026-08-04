@@ -1338,6 +1338,7 @@ public sealed class GenericActionService(
                         characterId);
                     return GenericActionResult.Aborted;
                 }
+
                 logger.LogInformation(
                     "Character {CharacterId} Save-item-transfer applied: rearrange, vault {Index1} <-> {Index2}",
                     characterId, move.Index1, move.Index2);

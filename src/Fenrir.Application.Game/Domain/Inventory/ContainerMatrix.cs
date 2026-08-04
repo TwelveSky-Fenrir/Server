@@ -182,12 +182,11 @@ public static class ContainerMatrix
             return null;
 
         if (sourceIsStackable)
-        {
-            return source.Quantity is >= ItemQuantityPolicy.MinStackQuantity and <= ItemQuantityPolicy.MaxStackQuantity &&
+            return source.Quantity is >= ItemQuantityPolicy.MinStackQuantity
+                       and <= ItemQuantityPolicy.MaxStackQuantity &&
                    requestedQuantity <= ItemQuantityPolicy.MaxStackQuantity
                 ? requestedQuantity
                 : null;
-        }
 
         if (requestedQuantity != 1)
             return null;

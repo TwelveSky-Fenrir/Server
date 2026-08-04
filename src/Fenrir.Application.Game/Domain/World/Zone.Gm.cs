@@ -146,7 +146,9 @@ public sealed partial class Zone
 
     private void DrainGmZone124PartyPullCommands(int maximum)
     {
-        for (var processed = 0; processed < maximum && _gmZone124PartyPullInbox.Reader.TryRead(out var command); processed++)
+        for (var processed = 0;
+             processed < maximum && _gmZone124PartyPullInbox.Reader.TryRead(out var command);
+             processed++)
             try
             {
                 var pulled = ApplyGmZone124PartyPullCommand(in command);

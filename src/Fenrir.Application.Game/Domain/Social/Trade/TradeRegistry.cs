@@ -27,52 +27,14 @@ public readonly record struct TradeDisconnectResult(
 
 public sealed class TradeRegistry
 {
-    internal readonly record struct PairKey(int LowerCharacterId, int HigherCharacterId)
-    {
-        internal static PairKey Create(int firstCharacterId, int secondCharacterId)
-        {
-            return firstCharacterId < secondCharacterId
-                ? new PairKey(firstCharacterId, secondCharacterId)
-                : new PairKey(secondCharacterId, firstCharacterId);
-        }
-    }
-
-    internal sealed class PairGate
-    {
-        public int LeaseCount;
-
-        public SemaphoreSlim Semaphore { get; } = new(1, 1);
-    }
-
-    public sealed class TransitionLease : IDisposable
-    {
-        private TradeRegistry? _owner;
-        private readonly PairKey _pair;
-        private readonly PairGate _gate;
-
-        internal TransitionLease(TradeRegistry owner, PairKey pair, PairGate gate)
-        {
-            _owner = owner;
-            _pair = pair;
-            _gate = gate;
-        }
-
-        public void Dispose()
-        {
-            var owner = Interlocked.Exchange(ref _owner, null);
-            if (owner is not null)
-                owner.ReleaseTransition(_pair, _gate);
-        }
-    }
-
     private readonly Dictionary<int, int> _acceptedPairs = new();
 
     private readonly CrossShardNegotiationTracker _crossShard = new();
 
     private readonly Lock _lock = new();
+    private readonly Dictionary<PairKey, PairGate> _pairGates = new();
     private readonly Dictionary<int, int> _pendingByAsker = new();
     private readonly Dictionary<int, int> _pendingByTarget = new();
-    private readonly Dictionary<PairKey, PairGate> _pairGates = new();
     private readonly Dictionary<int, TradeSession> _sessionByCharacter = new();
 
     public TransitionLease? TryEnterTransition(int firstCharacterId, int secondCharacterId)
@@ -451,5 +413,43 @@ public sealed class TradeRegistry
                lowerCounterpart == pair.HigherCharacterId &&
                map.TryGetValue(pair.HigherCharacterId, out var higherCounterpart) &&
                higherCounterpart == pair.LowerCharacterId;
+    }
+
+    internal readonly record struct PairKey(int LowerCharacterId, int HigherCharacterId)
+    {
+        internal static PairKey Create(int firstCharacterId, int secondCharacterId)
+        {
+            return firstCharacterId < secondCharacterId
+                ? new PairKey(firstCharacterId, secondCharacterId)
+                : new PairKey(secondCharacterId, firstCharacterId);
+        }
+    }
+
+    internal sealed class PairGate
+    {
+        public int LeaseCount;
+
+        public SemaphoreSlim Semaphore { get; } = new(1, 1);
+    }
+
+    public sealed class TransitionLease : IDisposable
+    {
+        private readonly PairGate _gate;
+        private readonly PairKey _pair;
+        private TradeRegistry? _owner;
+
+        internal TransitionLease(TradeRegistry owner, PairKey pair, PairGate gate)
+        {
+            _owner = owner;
+            _pair = pair;
+            _gate = gate;
+        }
+
+        public void Dispose()
+        {
+            var owner = Interlocked.Exchange(ref _owner, null);
+            if (owner is not null)
+                owner.ReleaseTransition(_pair, _gate);
+        }
     }
 }

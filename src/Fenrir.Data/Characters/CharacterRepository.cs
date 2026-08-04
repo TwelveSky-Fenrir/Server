@@ -266,7 +266,8 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-    public async ValueTask<CharacterFinalFlushResultDto> PersistFinalFlushAsync(CharacterProgressTvp progress, CharacterPositionTvp position,
+    public async ValueTask<CharacterFinalFlushResultDto> PersistFinalFlushAsync(CharacterProgressTvp progress,
+        CharacterPositionTvp position,
         IReadOnlyList<CharacterCostumeSlotTvp> costumes, IReadOnlyList<CharacterBuffSlotTvp> buffs,
         IReadOnlyList<CharacterMountSlotTvp> mounts, CancellationToken ct,
         IReadOnlyList<CharacterStellarCoreSlotTvp>? stellarCores = null)

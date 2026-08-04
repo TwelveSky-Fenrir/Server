@@ -19,7 +19,6 @@ using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Loot;
-using Fenrir.Core.Abstractions;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Domain.Game.GameData;
 using Fenrir.Domain.Game.Stats;

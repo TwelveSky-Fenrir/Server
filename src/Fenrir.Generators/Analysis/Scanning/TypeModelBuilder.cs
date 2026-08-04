@@ -46,7 +46,8 @@ internal static class TypeModelBuilder
                 typeSymbol.Name,
                 direction));
 
-        var incomingTransform = direction == FenrirDirection.Incoming && (compressed || obfuscation != WireObfuscationMode.None);
+        var incomingTransform = direction == FenrirDirection.Incoming &&
+                                (compressed || obfuscation != WireObfuscationMode.None);
         if (incomingTransform)
             diagnostics.Add(DiagnosticInfo.Create(
                 FenrirDiagnostics.IncomingPacketTransform,

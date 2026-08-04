@@ -2,8 +2,6 @@ namespace Fenrir.Application.Game.Domain.Consumables;
 
 public static class StatPotionResolver
 {
-    private const int TenStackAmount = 10;
-
     public enum Outcome
     {
         Success,
@@ -12,6 +10,8 @@ public static class StatPotionResolver
 
         PreconditionFailed
     }
+
+    private const int TenStackAmount = 10;
 
     public const int OrdinaryTierCap = 200;
     public const int G12TierCap = 400;

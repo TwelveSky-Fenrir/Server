@@ -1,7 +1,7 @@
 CREATE OR ALTER PROCEDURE runtime.usp_ZoneEventRelayOutbox_Claim @SourceShardId TINYINT,
-                                                                  @LeaseId UNIQUEIDENTIFIER,
-                                                                  @MaximumCount INT,
-                                                                  @LeaseSeconds INT
+                                                                 @LeaseId UNIQUEIDENTIFIER,
+                                                                 @MaximumCount INT,
+                                                                 @LeaseSeconds INT
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -15,37 +15,34 @@ BEGIN
     DECLARE @LeaseExpiresAtUtc DATETIME2(3) = DATEADD(SECOND, @LeaseSeconds, @NowUtc);
 
     DECLARE @Claimed TABLE
-    (
-        OutboxId BIGINT NOT NULL,
-        SourceShardId TINYINT NOT NULL,
-        Sort INT NOT NULL,
-        Data VARBINARY(130) NOT NULL,
-        OperationId UNIQUEIDENTIFIER NOT NULL,
-        CorrelationId UNIQUEIDENTIFIER NOT NULL,
-        AttemptCount INT NOT NULL
-    );
+                     (
+                         OutboxId      BIGINT           NOT NULL,
+                         SourceShardId TINYINT          NOT NULL,
+                         Sort          INT              NOT NULL,
+                         Data          VARBINARY(130)   NOT NULL,
+                         OperationId   UNIQUEIDENTIFIER NOT NULL,
+                         CorrelationId UNIQUEIDENTIFIER NOT NULL,
+                         AttemptCount  INT              NOT NULL
+                     );
 
     BEGIN TRANSACTION;
-
-    ;WITH Claimable AS
-    (
-        SELECT TOP (@MaximumCount) *
-        FROM runtime.ZoneEventRelayOutbox WITH (UPDLOCK, READPAST, READCOMMITTEDLOCK, ROWLOCK,
-                                                 INDEX(IX_ZoneEventRelayOutbox_Claim))
-        WHERE SourceShardId = @SourceShardId
-          AND
-          (
-              (PublishStatus = 0 AND NextAttemptAtUtc <= @NowUtc) OR
-              (PublishStatus = 1 AND LeaseExpiresAtUtc <= @NowUtc)
-          )
-        ORDER BY OutboxId ASC
-    )
+    ;
+    WITH Claimable AS
+             (SELECT TOP (@MaximumCount) *
+              FROM runtime.ZoneEventRelayOutbox
+              WITH (UPDLOCK, READPAST, READCOMMITTEDLOCK, ROWLOCK, INDEX (IX_ZoneEventRelayOutbox_Claim))
+              WHERE SourceShardId = @SourceShardId
+                AND (
+                  (PublishStatus = 0 AND NextAttemptAtUtc <= @NowUtc) OR
+                  (PublishStatus = 1 AND LeaseExpiresAtUtc <= @NowUtc)
+                  )
+              ORDER BY OutboxId ASC)
     UPDATE Claimable
-    SET PublishStatus = 1,
-        AttemptCount = AttemptCount + 1,
+    SET PublishStatus      = 1,
+        AttemptCount       = AttemptCount + 1,
         LastAttemptedAtUtc = @NowUtc,
-        LeaseId = @LeaseId,
-        LeaseExpiresAtUtc = @LeaseExpiresAtUtc
+        LeaseId            = @LeaseId,
+        LeaseExpiresAtUtc  = @LeaseExpiresAtUtc
     OUTPUT INSERTED.OutboxId,
            INSERTED.SourceShardId,
            INSERTED.Sort,
@@ -53,7 +50,7 @@ BEGIN
            INSERTED.OperationId,
            INSERTED.CorrelationId,
            INSERTED.AttemptCount
-    INTO @Claimed;
+        INTO @Claimed;
 
     COMMIT TRANSACTION;
 

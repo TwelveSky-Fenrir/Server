@@ -126,7 +126,7 @@ public sealed class BuyCashItemService(
         var destinationY = (byte)packet.Value[2];
 
         var isStackable = ContainerMatrix.IsStackableSort(itemDefinition.Item.Sort);
-        if (isStackable && (entry.Quantity is < 0 or > GroundItemPickupPolicy.MaxStackQuantity))
+        if (isStackable && entry.Quantity is < 0 or > GroundItemPickupPolicy.MaxStackQuantity)
         {
             logger.LogInformation(
                 "Buy cash item rejected: character {CharacterId} catalog quantity {CatalogQuantity} is outside the supported range",
@@ -234,7 +234,9 @@ public sealed class BuyCashItemService(
                 cancellationToken, entry.ItemId, totalQuantity, newStack.Serial);
         }
         catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException
-                                                { Number: InsufficientCashErrorNumber })
+                                                {
+                                                    Number: InsufficientCashErrorNumber
+                                                })
         {
             logger.LogInformation(ex,
                 "Account {AccountId} cash-shop purchase was rejected for insufficient cash",

@@ -34,11 +34,11 @@ public sealed class Zone38BossSchedule
 
     public const int BossMonsterId = 1407;
 
-    public static Zone38BossSpawnRequest SpawnRequest { get; } = new(BossMonsterId, 1383f, 0f, 3068f);
-
     private readonly HashSet<Zone38BossScheduleOccurrence> _consumedOccurrences = [];
 
     private Zone38BossInstance _activeBoss;
+
+    public static Zone38BossSpawnRequest SpawnRequest { get; } = new(BossMonsterId, 1383f, 0f, 3068f);
 
     public Zone38BossSchedulePhase Phase { get; private set; } = Zone38BossSchedulePhase.WaitingForSchedule;
 

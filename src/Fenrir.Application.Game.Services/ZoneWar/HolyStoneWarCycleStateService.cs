@@ -13,27 +13,25 @@ public sealed class HolyStoneWarCycleStateService(
     ILogger<HolyStoneWarCycleStateService> logger,
     TimeProvider? timeProvider = null)
 {
-    public static readonly TimeSpan FlushInterval = TimeSpan.FromSeconds(5);
-
     private const string EventKind = "holy-stone-war";
     private const string OccurrenceKey = "zone-038";
     private const int PayloadVersion = 1;
+    public static readonly TimeSpan FlushInterval = TimeSpan.FromSeconds(5);
 
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     private bool _captureFinalizationAuthorized;
-    private bool _initialized;
     private DateTimeOffset _lastFlushAtUtc;
     private long _revision;
 
-    public bool IsInitialized => _initialized;
+    public bool IsInitialized { get; private set; }
 
     public async Task InitializeAsync(CancellationToken ct)
     {
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            if (_initialized)
+            if (IsInitialized)
                 throw new InvalidOperationException("Holy Stone cycle state has already been initialized.");
 
             var loaded = await LoadAsync(ct).ConfigureAwait(false);
@@ -42,18 +40,19 @@ public sealed class HolyStoneWarCycleStateService(
                 cycle.Restore(new HolyStoneWarCycleSnapshot(HolyStoneWarPhase.Cooldown, 0,
                     new MinuteCountdownSnapshot(0, 0), null));
                 _revision = 0;
-                _initialized = true;
+                IsInitialized = true;
                 await PersistAsync(cycle.Snapshot(), ct).ConfigureAwait(false);
                 return;
             }
 
             _revision = loaded.Value.Revision;
             cycle.Restore(loaded.Value.Snapshot);
-            _initialized = true;
+            IsInitialized = true;
 
             if (cycle.HasPendingCaptureFinalization)
             {
-                logger.LogWarning("Holy Stone capture finalization was recovered after a restart and is being closed without replaying effects");
+                logger.LogWarning(
+                    "Holy Stone capture finalization was recovered after a restart and is being closed without replaying effects");
                 cycle.CloseRecoveredCaptureFinalization();
                 await FlushDirtyAsync(ct).ConfigureAwait(false);
             }
@@ -163,7 +162,8 @@ public sealed class HolyStoneWarCycleStateService(
                 continue;
 
             if (match is not null)
-                throw new InvalidOperationException("Holy Stone cycle storage contains duplicate snapshot occurrences.");
+                throw new InvalidOperationException(
+                    "Holy Stone cycle storage contains duplicate snapshot occurrences.");
 
             match = row;
         }
@@ -176,11 +176,13 @@ public sealed class HolyStoneWarCycleStateService(
 
         var computedHash = SHA256.HashData(Encoding.UTF8.GetBytes(match.CanonicalPayload));
         if (!CryptographicOperations.FixedTimeEquals(computedHash, match.CanonicalPayloadHash))
-            throw new InvalidOperationException("Holy Stone cycle snapshot payload hash does not match its stored payload.");
+            throw new InvalidOperationException(
+                "Holy Stone cycle snapshot payload hash does not match its stored payload.");
 
         var snapshot = Deserialize(match.CanonicalPayload);
         if (!string.Equals(match.Phase, snapshot.Phase.ToString(), StringComparison.Ordinal))
-            throw new InvalidOperationException("Holy Stone cycle snapshot phase disagrees with its canonical payload.");
+            throw new InvalidOperationException(
+                "Holy Stone cycle snapshot phase disagrees with its canonical payload.");
 
         return new LoadedSnapshot(match.Revision, snapshot);
     }
@@ -217,8 +219,9 @@ public sealed class HolyStoneWarCycleStateService(
 
     private void EnsureInitialized()
     {
-        if (!_initialized)
-            throw new InvalidOperationException("Holy Stone cycle state is unavailable until its durable snapshot is loaded.");
+        if (!IsInitialized)
+            throw new InvalidOperationException(
+                "Holy Stone cycle state is unavailable until its durable snapshot is loaded.");
     }
 
     private readonly record struct LoadedSnapshot(long Revision, HolyStoneWarCycleSnapshot Snapshot);

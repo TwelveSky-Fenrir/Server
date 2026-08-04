@@ -1,9 +1,9 @@
 CREATE PROCEDURE game.usp_WorldEventSnapshot_Apply @EventKind VARCHAR(48),
-                                                    @OccurrenceKey VARCHAR(96),
-                                                    @ExpectedRevision BIGINT,
-                                                    @Phase VARCHAR(48),
-                                                    @CanonicalPayload NVARCHAR(MAX),
-                                                    @CanonicalPayloadHash BINARY(32)
+                                                   @OccurrenceKey VARCHAR(96),
+                                                   @ExpectedRevision BIGINT,
+                                                   @Phase VARCHAR(48),
+                                                   @CanonicalPayload NVARCHAR(MAX),
+                                                   @CanonicalPayloadHash BINARY(32)
 AS
 BEGIN
     SET
@@ -29,7 +29,8 @@ BEGIN
     BEGIN TRANSACTION;
 
     SELECT @CurrentRevision = Revision
-    FROM game.WorldEventSnapshots WITH (UPDLOCK, HOLDLOCK)
+    FROM game.WorldEventSnapshots
+    WITH (UPDLOCK, HOLDLOCK)
     WHERE EventKind = @EventKind
       AND OccurrenceKey = @OccurrenceKey;
 
@@ -38,25 +39,26 @@ BEGIN
             IF @ExpectedRevision = 0
                 BEGIN
                     INSERT INTO game.WorldEventSnapshots
-                        (EventKind, OccurrenceKey, Revision, Phase, CanonicalPayload, CanonicalPayloadHash)
+                    (EventKind, OccurrenceKey, Revision, Phase, CanonicalPayload, CanonicalPayloadHash)
                     VALUES (@EventKind, @OccurrenceKey, 1, @Phase, @CanonicalPayload, @CanonicalPayloadHash);
 
                     SET @Applied = 1;
                 END;
         END
-    ELSE IF @CurrentRevision = @ExpectedRevision
-        BEGIN
-            UPDATE game.WorldEventSnapshots
-            SET Revision             = Revision + 1,
-                Phase                = @Phase,
-                CanonicalPayload     = @CanonicalPayload,
-                CanonicalPayloadHash = @CanonicalPayloadHash,
-                UpdatedAtUtc         = SYSUTCDATETIME()
-            WHERE EventKind = @EventKind
-              AND OccurrenceKey = @OccurrenceKey;
+    ELSE
+        IF @CurrentRevision = @ExpectedRevision
+            BEGIN
+                UPDATE game.WorldEventSnapshots
+                SET Revision             = Revision + 1,
+                    Phase                = @Phase,
+                    CanonicalPayload     = @CanonicalPayload,
+                    CanonicalPayloadHash = @CanonicalPayloadHash,
+                    UpdatedAtUtc         = SYSUTCDATETIME()
+                WHERE EventKind = @EventKind
+                  AND OccurrenceKey = @OccurrenceKey;
 
-            SET @Applied = 1;
-        END;
+                SET @Applied = 1;
+            END;
 
     COMMIT TRANSACTION;
 

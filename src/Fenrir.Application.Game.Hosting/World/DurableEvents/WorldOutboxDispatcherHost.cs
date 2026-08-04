@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using Fenrir.Application.Game.Domain;
-using Fenrir.Data.Abstractions.Runtime;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -37,9 +36,7 @@ public sealed class WorldOutboxDispatcherHost(
         }
 
         foreach (var delivery in deliveries)
-        {
             await DeliverAndAcknowledgeAsync(delivery, deliveryLeaseId, ct).ConfigureAwait(false);
-        }
 
         _deliveryLeaseId = Guid.NewGuid();
     }
@@ -110,14 +107,17 @@ public sealed class WorldOutboxDispatcherHost(
     {
         return category switch
         {
-            WorldEventPayloadCategory.WorldState => localDelivery.DeliverAsync(new WorldStateWorldEvent(context, payload),
+            WorldEventPayloadCategory.WorldState => localDelivery.DeliverAsync(
+                new WorldStateWorldEvent(context, payload),
                 ct),
-            WorldEventPayloadCategory.ZoneWar => localDelivery.DeliverAsync(new ZoneWarWorldEvent(context, payload), ct),
+            WorldEventPayloadCategory.ZoneWar =>
+                localDelivery.DeliverAsync(new ZoneWarWorldEvent(context, payload), ct),
             WorldEventPayloadCategory.WorldNotice => localDelivery.DeliverAsync(
                 new WorldNoticeWorldEvent(context, payload), ct),
             WorldEventPayloadCategory.CrossShardSocial => localDelivery.DeliverAsync(
                 new CrossShardSocialWorldEvent(context, payload), ct),
-            WorldEventPayloadCategory.Economy => localDelivery.DeliverAsync(new EconomyWorldEvent(context, payload), ct),
+            WorldEventPayloadCategory.Economy =>
+                localDelivery.DeliverAsync(new EconomyWorldEvent(context, payload), ct),
             WorldEventPayloadCategory.Administration => localDelivery.DeliverAsync(
                 new AdministrationWorldEvent(context, payload), ct),
             _ => throw new ArgumentOutOfRangeException(nameof(category), category,
@@ -148,7 +148,8 @@ public sealed class WorldOutboxDispatcherHost(
         if (!CryptographicOperations.FixedTimeEquals(SHA256.HashData(delivery.Payload), delivery.PayloadHash))
             throw new InvalidOperationException("World outbox delivery payload hash validation failed.");
         if (delivery.CorrelationId == Guid.Empty || delivery.IdempotencyKey == Guid.Empty)
-            throw new InvalidOperationException("World outbox delivery requires correlation and idempotency identifiers.");
+            throw new InvalidOperationException(
+                "World outbox delivery requires correlation and idempotency identifiers.");
         if (delivery.AttemptCount is < 1 or > WorldEventOutboxLimits.MaximumDeliveryAttempts)
             throw new InvalidOperationException("World outbox delivery has an invalid attempt count.");
 

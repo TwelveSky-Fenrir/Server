@@ -1,13 +1,10 @@
-using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Abstractions.Sessions;
+using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Social;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Hosting.Relay;
 using Fenrir.Core.Packets.Shared;
-using Fenrir.Data.Abstractions.Game;
-using Fenrir.Data.Abstractions.Guilds;
-using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Data.Abstractions.Tribes;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -186,7 +183,8 @@ public sealed class GuildTribeBroadcastRelayHost(
         {
             case GuildTribeBroadcastKind.GuildAnnouncement:
                 DeliverToGuild(authorization.GuildId,
-                    new GuildAnnouncementResponse { AvatarName = authorization.SourceAvatarName, Content = dto.Content });
+                    new GuildAnnouncementResponse
+                        { AvatarName = authorization.SourceAvatarName, Content = dto.Content });
                 break;
 
             case GuildTribeBroadcastKind.GuildChat:
@@ -198,12 +196,16 @@ public sealed class GuildTribeBroadcastRelayHost(
                     Socket = [dto.ItemLinkSocket0 ?? 0, dto.ItemLinkSocket1 ?? 0, dto.ItemLinkSocket2 ?? 0]
                 };
                 DeliverToGuild(authorization.GuildId,
-                    new GuildChatResponse { AvatarName = authorization.SourceAvatarName, Content = dto.Content, Link = link });
+                    new GuildChatResponse
+                        { AvatarName = authorization.SourceAvatarName, Content = dto.Content, Link = link });
                 break;
 
             case GuildTribeBroadcastKind.TribeAnnouncement:
                 DeliverToTribe(authorization.Tribe, new TribeAnnouncementResponse
-                    { TribeRole = authorization.TribeRole, AvatarName = authorization.SourceAvatarName, Content = dto.Content });
+                {
+                    TribeRole = authorization.TribeRole, AvatarName = authorization.SourceAvatarName,
+                    Content = dto.Content
+                });
                 break;
 
             case GuildTribeBroadcastKind.TribeAnnouncementScroll:
@@ -217,7 +219,9 @@ public sealed class GuildTribeBroadcastRelayHost(
 
             case GuildTribeBroadcastKind.WorldChat:
                 DeliverToEveryone(new WorldChatResponse
-                    { TribeRole = WorldChatWireRole, AvatarName = authorization.SourceAvatarName, Content = dto.Content });
+                {
+                    TribeRole = WorldChatWireRole, AvatarName = authorization.SourceAvatarName, Content = dto.Content
+                });
                 break;
 
             case GuildTribeBroadcastKind.GlobalAnnouncement:
@@ -252,7 +256,7 @@ public sealed class GuildTribeBroadcastRelayHost(
                 dto.SourceCharacterId is > 0 ? dto.SourceCharacterId : null,
                 null,
                 null,
-                (short)options.Value.ShardId,
+                options.Value.ShardId,
                 null,
                 null,
                 null,
@@ -417,7 +421,9 @@ public sealed class GuildTribeBroadcastRelayHost(
     private bool IsCompletedCorrelation(Guid correlationId)
     {
         lock (_completedCorrelationGate)
+        {
             return _completedCorrelations.Contains(correlationId);
+        }
     }
 
     private void RememberCompletedCorrelation(Guid correlationId)
@@ -445,15 +451,24 @@ public sealed class GuildTribeBroadcastRelayHost(
     {
         public static RelayAuthorization System { get; } = new(true, "", "", null, null, 0);
 
-        public static RelayAuthorization Rejected(string reason) => new(false, reason, "", null, null, 0);
+        public static RelayAuthorization Rejected(string reason)
+        {
+            return new RelayAuthorization(false, reason, "", null, null, 0);
+        }
 
-        public static RelayAuthorization ForCharacter(string sourceAvatarName, byte tribe) =>
-            new(true, "", sourceAvatarName, null, tribe, 0);
+        public static RelayAuthorization ForCharacter(string sourceAvatarName, byte tribe)
+        {
+            return new RelayAuthorization(true, "", sourceAvatarName, null, tribe, 0);
+        }
 
-        public static RelayAuthorization ForGuild(string sourceAvatarName, int guildId) =>
-            new(true, "", sourceAvatarName, guildId, null, 0);
+        public static RelayAuthorization ForGuild(string sourceAvatarName, int guildId)
+        {
+            return new RelayAuthorization(true, "", sourceAvatarName, guildId, null, 0);
+        }
 
-        public static RelayAuthorization ForTribe(string sourceAvatarName, byte tribe, byte tribeRole) =>
-            new(true, "", sourceAvatarName, null, tribe, tribeRole);
+        public static RelayAuthorization ForTribe(string sourceAvatarName, byte tribe, byte tribeRole)
+        {
+            return new RelayAuthorization(true, "", sourceAvatarName, null, tribe, tribeRole);
+        }
     }
 }

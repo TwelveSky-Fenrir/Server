@@ -1,8 +1,8 @@
 CREATE OR ALTER PROCEDURE runtime.usp_WorldInboxEffect_ApplyWorldStateHighTribe @OutboxId BIGINT,
-                                                                                  @DestinationShardId TINYINT,
-                                                                                  @OperationKey UNIQUEIDENTIFIER,
-                                                                                  @Payload VARBINARY(3),
-                                                                                  @HighTribe TINYINT = NULL
+                                                                                @DestinationShardId TINYINT,
+                                                                                @OperationKey UNIQUEIDENTIFIER,
+                                                                                @Payload VARBINARY(3),
+                                                                                @HighTribe TINYINT = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -30,7 +30,8 @@ BEGIN
            @PayloadHash = PayloadHash,
            @PayloadCategory = PayloadCategory,
            @InboxOperationKey = IdempotencyKey
-    FROM runtime.WorldInbox WITH (UPDLOCK, HOLDLOCK)
+    FROM runtime.WorldInbox
+    WITH (UPDLOCK, HOLDLOCK)
     WHERE OutboxId = @OutboxId
       AND DestinationShardId = @DestinationShardId;
 
@@ -41,29 +42,30 @@ BEGIN
         THROW 51042, 'World-state inbox effect does not match its durable envelope.', 1;
 
     SELECT @ExistingOperationKey = OperationKey
-    FROM runtime.WorldInboxEffectOperation WITH (UPDLOCK, HOLDLOCK)
+    FROM runtime.WorldInboxEffectOperation
+    WITH (UPDLOCK, HOLDLOCK)
     WHERE InboxId = @InboxId;
 
     IF @ExistingOperationKey IS NULL
-    BEGIN
-        UPDATE game.WorldState
-        SET HighTribe = @HighTribe,
-            Revision = Revision + 1,
-            UpdatedAtUtc = SYSUTCDATETIME()
-        WHERE Id = 1;
+        BEGIN
+            UPDATE game.WorldState
+            SET HighTribe    = @HighTribe,
+                Revision     = Revision + 1,
+                UpdatedAtUtc = SYSUTCDATETIME()
+            WHERE Id = 1;
 
-        IF @@ROWCOUNT <> 1
-            THROW 51043, 'World-state singleton is missing.', 1;
+            IF @@ROWCOUNT <> 1
+                THROW 51043, 'World-state singleton is missing.', 1;
 
-        INSERT INTO runtime.WorldInboxEffectOperation
+            INSERT INTO runtime.WorldInboxEffectOperation
             (InboxId, OutboxId, DestinationShardId, OperationKey, PayloadCategory, PayloadHash)
-        VALUES
-            (@InboxId, @OutboxId, @DestinationShardId, @OperationKey, @PayloadCategory, @PayloadHash);
+            VALUES (@InboxId, @OutboxId, @DestinationShardId, @OperationKey, @PayloadCategory, @PayloadHash);
 
-        SET @WasApplied = 1;
-    END
-    ELSE IF @ExistingOperationKey <> @OperationKey
-        THROW 51044, 'World-state inbox effect operation key conflicts with the durable receipt.', 1;
+            SET @WasApplied = 1;
+        END
+    ELSE
+        IF @ExistingOperationKey <> @OperationKey
+            THROW 51044, 'World-state inbox effect operation key conflicts with the durable receipt.', 1;
 
     COMMIT TRANSACTION;
 

@@ -52,9 +52,7 @@ public static class SkillCastGuard
             return SkillCastVerdict.Passed;
 
         if (!HasMatchingActiveHotkey(context.Hotkeys, context.ClaimedSkillNumber, context.ClaimedInvestedGrade))
-        {
             return new SkillCastVerdict(SkillCastOffense.HotkeyMismatch, SkillCastEnforcement.Disconnect);
-        }
 
         if (context.ClaimedBonusGrade != context.ServerBonusGrade)
         {
@@ -98,7 +96,6 @@ public static class SkillCastGuard
 
         return false;
     }
-
 }
 
 public readonly record struct SkillCastGuardContext(

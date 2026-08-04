@@ -104,7 +104,8 @@ public sealed class ZoneTransferCancelService(
             return;
         }
 
-        var completion = new TaskCompletionSource<ZoneCommandResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completion =
+            new TaskCompletionSource<ZoneCommandResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         if (!zone.Post(ZoneCommand.RollbackZoneTransfer(characterId, pendingRegisteredAtUtc, completion)))
         {
             logger.LogError(
@@ -159,7 +160,8 @@ public sealed class ZoneTransferCancelService(
         try
         {
             var heldLeases = await accountSessions.RefreshAndGetHeldLeasesAsync(AccountSessionServerKind.Game,
-                    options.Value.ShardId, [new AccountSessionLeaseTvp(accountId, sessionToken)], CancellationToken.None)
+                    options.Value.ShardId, [new AccountSessionLeaseTvp(accountId, sessionToken)],
+                    CancellationToken.None)
                 .ConfigureAwait(false);
             return !heldLeases.IsEmpty;
         }

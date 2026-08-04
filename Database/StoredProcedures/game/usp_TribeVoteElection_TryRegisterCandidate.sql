@@ -10,7 +10,7 @@ BEGIN
     SET XACT_ABORT ON;
 
     IF @CandidateLevel < 0
-       OR @KillOtherTribeCount < 0
+        OR @KillOtherTribeCount < 0
         THROW 50503, 'usp_TribeVoteElection_TryRegisterCandidate requires non-negative candidate statistics.', 1;
 
     DECLARE @outcome TINYINT = 1;
@@ -31,7 +31,8 @@ BEGIN
         END;
 
     IF NOT EXISTS (SELECT 1
-                   FROM game.TribeVoteElectionStates WITH (UPDLOCK, HOLDLOCK)
+                   FROM game.TribeVoteElectionStates
+                   WITH (UPDLOCK, HOLDLOCK)
                    WHERE TribeId = @TribeId
                      AND CycleId = @CycleId
                      AND Phase = 1)
@@ -42,7 +43,8 @@ BEGIN
         END;
 
     IF EXISTS (SELECT 1
-               FROM game.TribeVoteElectionCandidates WITH (UPDLOCK, HOLDLOCK)
+               FROM game.TribeVoteElectionCandidates
+               WITH (UPDLOCK, HOLDLOCK)
                WHERE CycleId = @CycleId
                  AND TribeId = @TribeId
                  AND CandidateCharacterId = @CandidateCharacterId
@@ -55,13 +57,14 @@ BEGIN
         END;
 
     DECLARE @existingKillOtherTribeCount INT = (SELECT KillOtherTribeCount
-                                                FROM game.TribeVoteElectionCandidates WITH (UPDLOCK, HOLDLOCK)
+                                                FROM game.TribeVoteElectionCandidates
+                                                WITH (UPDLOCK, HOLDLOCK)
                                                 WHERE CycleId = @CycleId
                                                   AND TribeId = @TribeId
                                                   AND SlotIndex = @SlotIndex);
 
     IF @existingKillOtherTribeCount IS NOT NULL
-       AND @KillOtherTribeCount <= @existingKillOtherTribeCount
+        AND @KillOtherTribeCount <= @existingKillOtherTribeCount
         BEGIN
             SET @outcome = 3;
             COMMIT TRANSACTION;
@@ -71,16 +74,16 @@ BEGIN
 
     IF @existingKillOtherTribeCount IS NULL
         INSERT INTO game.TribeVoteElectionCandidates (CycleId, TribeId, SlotIndex, CandidateCharacterId,
-                                                       CandidateLevel, KillOtherTribeCount, VotePoint)
+                                                      CandidateLevel, KillOtherTribeCount, VotePoint)
         VALUES (@CycleId, @TribeId, @SlotIndex, @CandidateCharacterId, @CandidateLevel,
                 @KillOtherTribeCount, 0);
     ELSE
         UPDATE game.TribeVoteElectionCandidates
         SET CandidateCharacterId = @CandidateCharacterId,
-            CandidateLevel = @CandidateLevel,
-            KillOtherTribeCount = @KillOtherTribeCount,
-            VotePoint = 0,
-            RegisteredAtUtc = SYSUTCDATETIME()
+            CandidateLevel       = @CandidateLevel,
+            KillOtherTribeCount  = @KillOtherTribeCount,
+            VotePoint            = 0,
+            RegisteredAtUtc      = SYSUTCDATETIME()
         WHERE CycleId = @CycleId
           AND TribeId = @TribeId
           AND SlotIndex = @SlotIndex;

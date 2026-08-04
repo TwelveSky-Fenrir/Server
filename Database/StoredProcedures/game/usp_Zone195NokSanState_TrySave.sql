@@ -50,39 +50,36 @@ BEGIN
         THROW 50763, N'Nok-San stone counts must exactly match the active-site owners.', 1;
 
     DECLARE @Captures TABLE
-    (
-        MapId                 SMALLINT      NOT NULL PRIMARY KEY,
-        Phase                 TINYINT       NOT NULL,
-        CapturerCharacterId   INT           NOT NULL,
-        CapturerTribe         TINYINT       NOT NULL,
-        CapturerName          NVARCHAR(13)  NOT NULL,
-        RemainingTime         INT           NOT NULL,
-        PhaseAccumulatorTicks INT           NOT NULL
-    );
+                      (
+                          MapId                 SMALLINT     NOT NULL PRIMARY KEY,
+                          Phase                 TINYINT      NOT NULL,
+                          CapturerCharacterId   INT          NOT NULL,
+                          CapturerTribe         TINYINT      NOT NULL,
+                          CapturerName          NVARCHAR(13) NOT NULL,
+                          RemainingTime         INT          NOT NULL,
+                          PhaseAccumulatorTicks INT          NOT NULL
+                      );
 
     INSERT INTO @Captures
-        (MapId, Phase, CapturerCharacterId, CapturerTribe, CapturerName, RemainingTime, PhaseAccumulatorTicks)
-    VALUES
-        (99, @Capture99Phase, @Capture99CharacterId, @Capture99Tribe, @Capture99Name, @Capture99RemainingTime,
-         @Capture99PhaseAccumulatorTicks),
-        (100, @Capture100Phase, @Capture100CharacterId, @Capture100Tribe, @Capture100Name,
-         @Capture100RemainingTime, @Capture100PhaseAccumulatorTicks),
-        (196, @Capture196Phase, @Capture196CharacterId, @Capture196Tribe, @Capture196Name,
-         @Capture196RemainingTime, @Capture196PhaseAccumulatorTicks);
+    (MapId, Phase, CapturerCharacterId, CapturerTribe, CapturerName, RemainingTime, PhaseAccumulatorTicks)
+    VALUES (99, @Capture99Phase, @Capture99CharacterId, @Capture99Tribe, @Capture99Name, @Capture99RemainingTime,
+            @Capture99PhaseAccumulatorTicks),
+           (100, @Capture100Phase, @Capture100CharacterId, @Capture100Tribe, @Capture100Name,
+            @Capture100RemainingTime, @Capture100PhaseAccumulatorTicks),
+           (196, @Capture196Phase, @Capture196CharacterId, @Capture196Tribe, @Capture196Name,
+            @Capture196RemainingTime, @Capture196PhaseAccumulatorTicks);
 
     IF EXISTS
-    (
-        SELECT 1
-        FROM @Captures
-        WHERE Phase NOT BETWEEN 0 AND 2
-           OR CapturerCharacterId < -1
-           OR CapturerTribe > 3
-           OR RemainingTime < 0
-           OR PhaseAccumulatorTicks < 0
-           OR (Phase = 0 AND (CapturerCharacterId <> -1 OR CapturerTribe <> 0 OR CapturerName <> N'' OR
-                              RemainingTime <> 0 OR PhaseAccumulatorTicks <> 0))
-           OR (Phase IN (1, 2) AND (CapturerCharacterId <= 0 OR CapturerName = N''))
-    )
+        (SELECT 1
+         FROM @Captures
+         WHERE Phase NOT BETWEEN 0 AND 2
+            OR CapturerCharacterId < -1
+            OR CapturerTribe > 3
+            OR RemainingTime < 0
+            OR PhaseAccumulatorTicks < 0
+            OR (Phase = 0 AND (CapturerCharacterId <> -1 OR CapturerTribe <> 0 OR CapturerName <> N'' OR
+                               RemainingTime <> 0 OR PhaseAccumulatorTicks <> 0))
+            OR (Phase IN (1, 2) AND (CapturerCharacterId <= 0 OR CapturerName = N'')))
         THROW 50764, N'The Nok-San capture snapshot is structurally invalid.', 1;
 
     DECLARE @CurrentRevision BIGINT;
@@ -91,65 +88,72 @@ BEGIN
     BEGIN TRANSACTION;
 
     SELECT @CurrentRevision = Revision
-    FROM game.Zone195NokSanStates WITH (UPDLOCK, HOLDLOCK)
+    FROM game.Zone195NokSanStates
+    WITH (UPDLOCK, HOLDLOCK)
     WHERE StateId = 1;
 
     IF @CurrentRevision IS NULL
-    BEGIN
-        IF @ExpectedRevision = 0
         BEGIN
-            INSERT INTO game.Zone195NokSanStates
-                (StateId, Revision, OwnerSlot0, OwnerSlot2, OwnerSlot3, StonesHeld0, StonesHeld1, StonesHeld2,
-                 StonesHeld3)
-            VALUES
-                (1, 1, @OwnerSlot0, @OwnerSlot2, @OwnerSlot3, @StonesHeld0, @StonesHeld1, @StonesHeld2,
-                 @StonesHeld3);
+            IF @ExpectedRevision = 0
+                BEGIN
+                    INSERT INTO game.Zone195NokSanStates
+                    (StateId, Revision, OwnerSlot0, OwnerSlot2, OwnerSlot3, StonesHeld0, StonesHeld1, StonesHeld2,
+                     StonesHeld3)
+                    VALUES (1, 1, @OwnerSlot0, @OwnerSlot2, @OwnerSlot3, @StonesHeld0, @StonesHeld1, @StonesHeld2,
+                            @StonesHeld3);
 
-            INSERT INTO game.Zone195NokSanCaptures
-                (MapId, StateId, Phase, CapturerCharacterId, CapturerTribe, CapturerName, RemainingTime,
-                 PhaseAccumulatorTicks)
-            SELECT MapId, 1, Phase, CapturerCharacterId, CapturerTribe, CapturerName, RemainingTime,
-                   PhaseAccumulatorTicks
-            FROM @Captures;
+                    INSERT INTO game.Zone195NokSanCaptures
+                    (MapId, StateId, Phase, CapturerCharacterId, CapturerTribe, CapturerName, RemainingTime,
+                     PhaseAccumulatorTicks)
+                    SELECT MapId,
+                           1,
+                           Phase,
+                           CapturerCharacterId,
+                           CapturerTribe,
+                           CapturerName,
+                           RemainingTime,
+                           PhaseAccumulatorTicks
+                    FROM @Captures;
 
-            SET @Applied = 1;
-        END;
-    END
-    ELSE IF @CurrentRevision = @ExpectedRevision
-    BEGIN
-        UPDATE game.Zone195NokSanStates
-        SET Revision = Revision + 1,
-            OwnerSlot0 = @OwnerSlot0,
-            OwnerSlot2 = @OwnerSlot2,
-            OwnerSlot3 = @OwnerSlot3,
-            StonesHeld0 = @StonesHeld0,
-            StonesHeld1 = @StonesHeld1,
-            StonesHeld2 = @StonesHeld2,
-            StonesHeld3 = @StonesHeld3,
-            UpdatedAtUtc = SYSUTCDATETIME()
-        WHERE StateId = 1
-          AND Revision = @ExpectedRevision;
+                    SET @Applied = 1;
+                END;
+        END
+    ELSE
+        IF @CurrentRevision = @ExpectedRevision
+            BEGIN
+                UPDATE game.Zone195NokSanStates
+                SET Revision     = Revision + 1,
+                    OwnerSlot0   = @OwnerSlot0,
+                    OwnerSlot2   = @OwnerSlot2,
+                    OwnerSlot3   = @OwnerSlot3,
+                    StonesHeld0  = @StonesHeld0,
+                    StonesHeld1  = @StonesHeld1,
+                    StonesHeld2  = @StonesHeld2,
+                    StonesHeld3  = @StonesHeld3,
+                    UpdatedAtUtc = SYSUTCDATETIME()
+                WHERE StateId = 1
+                  AND Revision = @ExpectedRevision;
 
-        IF @@ROWCOUNT = 1
-        BEGIN
-            UPDATE persisted
-            SET Phase = incoming.Phase,
-                CapturerCharacterId = incoming.CapturerCharacterId,
-                CapturerTribe = incoming.CapturerTribe,
-                CapturerName = incoming.CapturerName,
-                RemainingTime = incoming.RemainingTime,
-                PhaseAccumulatorTicks = incoming.PhaseAccumulatorTicks,
-                UpdatedAtUtc = SYSUTCDATETIME()
-            FROM game.Zone195NokSanCaptures AS persisted
-            JOIN @Captures AS incoming ON incoming.MapId = persisted.MapId
-            WHERE persisted.StateId = 1;
+                IF @@ROWCOUNT = 1
+                    BEGIN
+                        UPDATE persisted
+                        SET Phase                 = incoming.Phase,
+                            CapturerCharacterId   = incoming.CapturerCharacterId,
+                            CapturerTribe         = incoming.CapturerTribe,
+                            CapturerName          = incoming.CapturerName,
+                            RemainingTime         = incoming.RemainingTime,
+                            PhaseAccumulatorTicks = incoming.PhaseAccumulatorTicks,
+                            UpdatedAtUtc          = SYSUTCDATETIME()
+                        FROM game.Zone195NokSanCaptures AS persisted
+                                 JOIN @Captures AS incoming ON incoming.MapId = persisted.MapId
+                        WHERE persisted.StateId = 1;
 
-            IF @@ROWCOUNT <> 3
-                THROW 50765, N'The Nok-San capture rows are incomplete for the singleton state.', 1;
+                        IF @@ROWCOUNT <> 3
+                            THROW 50765, N'The Nok-San capture rows are incomplete for the singleton state.', 1;
 
-            SET @Applied = 1;
-        END;
-    END;
+                        SET @Applied = 1;
+                    END;
+            END;
 
     COMMIT TRANSACTION;
 

@@ -59,13 +59,13 @@ public sealed partial class Zone(
 {
     private const int InboxCapacity = 8192;
 
-    private static readonly TimeSpan LeaveCommandObservationTimeout = TimeSpan.FromSeconds(2);
-
     private const int TimerWakeTaskIndex = 0;
 
     private const int QueueDrainLimitPerWake = 64;
 
     private const int DrainedQueueCount = 33;
+
+    private static readonly TimeSpan LeaveCommandObservationTimeout = TimeSpan.FromSeconds(2);
 
     private readonly SimulationTickAccumulator _accumulator = new();
 
@@ -99,11 +99,6 @@ public sealed partial class Zone(
 
     private readonly ISessionTicketRepository? _sessionTickets = sessionTickets;
 
-    private Zone38TribeEffectSnapshot _zone38TribeEffects =
-        siegeState?.CaptureZone38TribeEffects() ?? Zone38TribeEffectSnapshot.Empty;
-
-    private ImmutableArray<PlayerRuntimeState>? _simulationPlayerOrder;
-
     private readonly TradeRegistry _tradeRegistry = tradeRegistry ?? new TradeRegistry();
 
     private readonly ZoneRegistry? _zoneRegistry = zoneRegistry;
@@ -113,6 +108,11 @@ public sealed partial class Zone(
     private int _nextDrainQueue;
 
     private MonsterPathfinder? _pathfinder;
+
+    private ImmutableArray<PlayerRuntimeState>? _simulationPlayerOrder;
+
+    private Zone38TribeEffectSnapshot _zone38TribeEffects =
+        siegeState?.CaptureZone38TribeEffects() ?? Zone38TribeEffectSnapshot.Empty;
 
     public short MapId { get; } = mapId;
 
@@ -166,10 +166,7 @@ public sealed partial class Zone(
         var completion = new TaskCompletionSource<ZoneLeaveResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         var command = ZoneCommand.Leave(characterId, expectedSessionId, completion);
 
-        if (!Post(command))
-        {
-            _ = EnqueueDeferredLeaveAsync(command);
-        }
+        if (!Post(command)) _ = EnqueueDeferredLeaveAsync(command);
 
         return await ObserveLeaveAsync(completion.Task, timeout ?? LeaveCommandObservationTimeout, ct)
             .ConfigureAwait(false);
@@ -179,7 +176,8 @@ public sealed partial class Zone(
     {
         try
         {
-            await _inbox.Writer.WriteAsync(new QueuedZoneCommand(command, Stopwatch.GetTimestamp())).ConfigureAwait(false);
+            await _inbox.Writer.WriteAsync(new QueuedZoneCommand(command, Stopwatch.GetTimestamp()))
+                .ConfigureAwait(false);
         }
         catch (ChannelClosedException ex)
         {
@@ -206,7 +204,8 @@ public sealed partial class Zone(
         catch (OperationCanceledException)
         {
             return new ZoneLeaveSubmission(
-                ZoneLeaveResult.Unknown("Leave command observation was cancelled after actor admission may have occurred."),
+                ZoneLeaveResult.Unknown(
+                    "Leave command observation was cancelled after actor admission may have occurred."),
                 completion);
         }
     }

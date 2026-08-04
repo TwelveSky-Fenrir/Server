@@ -31,7 +31,7 @@ public interface ITribeVoteElectionRepository
         byte tribeId, byte slotIndex, int candidateCharacterId, short candidateLevel, int killOtherTribeCount,
         CancellationToken ct);
 
-        public ValueTask<TribeVoteElectionVoteCastOutcome> TryCastVoteAsync(Guid cycleId, int voterCharacterId,
+    public ValueTask<TribeVoteElectionVoteCastOutcome> TryCastVoteAsync(Guid cycleId, int voterCharacterId,
         byte tribeId, byte slotIndex, int points, CancellationToken ct);
 
     public ValueTask ResetToIdleAsync(CancellationToken ct);

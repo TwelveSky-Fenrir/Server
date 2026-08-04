@@ -35,10 +35,9 @@ public sealed record GuildTribeBroadcastRelayEntry(
     int? ItemLinkSocket1,
     int? ItemLinkSocket2)
 {
+    public int? SourceCharacterId { get; init; }
 
-        public int? SourceCharacterId { get; init; }
-
-        public GuildTribeBroadcastSystemCause? SystemCause { get; init; }
+    public GuildTribeBroadcastSystemCause? SystemCause { get; init; }
 
     public Guid CorrelationId { get; init; } = Guid.NewGuid();
 }

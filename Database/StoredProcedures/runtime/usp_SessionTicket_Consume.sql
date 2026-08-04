@@ -20,12 +20,11 @@ BEGIN
     BEGIN TRANSACTION;
 
     IF NOT EXISTS
-    (
-        SELECT 1
-        FROM admin.ShardMapAssignments WITH (UPDLOCK, HOLDLOCK)
-        WHERE ShardId = @ExpectedShardId
-          AND MapId = @ExpectedTargetMapId
-    )
+        (SELECT 1
+         FROM admin.ShardMapAssignments
+         WITH (UPDLOCK, HOLDLOCK)
+         WHERE ShardId = @ExpectedShardId
+           AND MapId = @ExpectedTargetMapId)
         GOTO Rejected;
 
     SELECT @AccountId = AccountId,
@@ -49,12 +48,11 @@ BEGIN
         GOTO Rejected;
 
     IF EXISTS
-    (
-        SELECT 1
-        FROM admin.Bans WITH (UPDLOCK, HOLDLOCK)
-        WHERE (AccountId = @AccountId OR CharacterId = @CharacterId)
-          AND (ExpiresAtUtc IS NULL OR ExpiresAtUtc > SYSUTCDATETIME())
-    )
+        (SELECT 1
+         FROM admin.Bans
+         WITH (UPDLOCK, HOLDLOCK)
+         WHERE (AccountId = @AccountId OR CharacterId = @CharacterId)
+           AND (ExpiresAtUtc IS NULL OR ExpiresAtUtc > SYSUTCDATETIME()))
         GOTO Rejected;
 
     UPDATE runtime.AccountSessions WITH (SNAPSHOT)
@@ -67,7 +65,8 @@ BEGIN
     IF @@ROWCOUNT <> 1
         GOTO Rejected;
 
-    DELETE FROM runtime.SessionTickets WITH (SNAPSHOT)
+    DELETE
+    FROM runtime.SessionTickets WITH (SNAPSHOT)
     WHERE CapabilityHash = @CapabilityHash
       AND AccountId = @AccountId
       AND CharacterId = @CharacterId

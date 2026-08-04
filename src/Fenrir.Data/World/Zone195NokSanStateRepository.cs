@@ -86,7 +86,8 @@ public sealed record Zone195NokSanStateRepository(ICaeriusNetDbContext Db) : IZo
             match = capture;
         }
 
-        return match ?? throw new ArgumentException($"Nok-San map {mapId} is missing from this save.", nameof(captures));
+        return match ??
+               throw new ArgumentException($"Nok-San map {mapId} is missing from this save.", nameof(captures));
     }
 
     private static void ValidateState(Zone195NokSanStateRowDto state)
@@ -101,10 +102,12 @@ public sealed record Zone195NokSanStateRepository(ICaeriusNetDbContext Db) : IZo
     {
         ArgumentNullException.ThrowIfNull(capture);
         if (capture.MapId is not 99 and not 100 and not 196)
-            throw new ArgumentOutOfRangeException(nameof(capture), "Only active Nok-San maps 99, 100, and 196 persist.");
+            throw new ArgumentOutOfRangeException(nameof(capture),
+                "Only active Nok-San maps 99, 100, and 196 persist.");
         if (capture.Phase > 2 || capture.CapturerCharacterId < -1 || capture.CapturerTribe > 3 ||
             capture.CapturerName is null || capture.CapturerName.Length > AvatarNameLength ||
             capture.RemainingTime < 0 || capture.PhaseAccumulatorTicks < 0)
-            throw new ArgumentOutOfRangeException(nameof(capture), "The Nok-San capture state is structurally invalid.");
+            throw new ArgumentOutOfRangeException(nameof(capture),
+                "The Nok-San capture state is structurally invalid.");
     }
 }

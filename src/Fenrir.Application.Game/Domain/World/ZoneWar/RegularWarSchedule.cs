@@ -114,8 +114,8 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
     private int _countdownAnnounceTicksElapsed;
     private int _countdownAnnounceValue;
     private int _finalWaitTicksElapsed;
-    private int _forcedResetTicksElapsed;
     private bool _forcedResetEffectPending;
+    private int _forcedResetTicksElapsed;
 
     private RegularWarIdleSubPhase _idleSubPhase = RegularWarIdleSubPhase.Cooldown;
     private int _openGateTicksElapsed;

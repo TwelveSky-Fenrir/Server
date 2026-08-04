@@ -9,6 +9,6 @@ BEGIN
            c.Tribe,
            a.AccountGrade
     FROM game.Characters AS c
-    INNER JOIN auth.Accounts AS a ON a.AccountId = c.AccountId
+             INNER JOIN auth.Accounts AS a ON a.AccountId = c.AccountId
     WHERE c.CharacterId = @CharacterId;
 END;

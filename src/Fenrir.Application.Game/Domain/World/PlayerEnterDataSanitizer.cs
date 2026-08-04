@@ -51,11 +51,11 @@ public static class PlayerEnterDataSanitizer
 
             var isItemBinding = hotkey.Value2 == (int)HotkeyBindingKind.Item;
             var isValidItemBinding = !isItemBinding ||
-                                     hotkey.Sort > 0 &&
-                                     itemsById.TryGetValue(hotkey.Sort, out var definition) &&
-                                     ItemQuantityPolicy.IsStackableSort(definition.Item.Sort) &&
-                                     hotkey.Value1 is >= HotkeyActionResolver.MinItemQuantity and <=
-                                         HotkeyActionResolver.MaxItemQuantity;
+                                     (hotkey.Sort > 0 &&
+                                      itemsById.TryGetValue(hotkey.Sort, out var definition) &&
+                                      ItemQuantityPolicy.IsStackableSort(definition.Item.Sort) &&
+                                      hotkey.Value1 is >= HotkeyActionResolver.MinItemQuantity and <=
+                                          HotkeyActionResolver.MaxItemQuantity);
             var isKnownBindingKind = hotkey.Value2 is >= (int)HotkeyBindingKind.None and <=
                 (int)HotkeyBindingKind.Item;
 

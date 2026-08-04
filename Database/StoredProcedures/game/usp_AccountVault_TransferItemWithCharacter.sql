@@ -61,13 +61,13 @@ BEGIN
     SET XACT_ABORT ON;
 
     IF @ExpectedVaultRevision IS NULL
-       OR @ExpectedVaultRevision < 0
-       OR @Vault1Slot IS NULL
-       OR @Vault1Slot NOT BETWEEN 0 AND 27
-       OR (@Vault2Slot IS NOT NULL AND @Vault2Slot NOT BETWEEN 0 AND 27)
-       OR (@Vault2Slot IS NOT NULL AND @Vault2Slot = @Vault1Slot)
-       OR (@CharacterId IS NULL AND (@Container IS NOT NULL OR @CharacterSlot IS NOT NULL))
-       OR (@CharacterId IS NOT NULL AND (@Container IS NULL OR @CharacterSlot IS NULL))
+        OR @ExpectedVaultRevision < 0
+        OR @Vault1Slot IS NULL
+        OR @Vault1Slot NOT BETWEEN 0 AND 27
+        OR (@Vault2Slot IS NOT NULL AND @Vault2Slot NOT BETWEEN 0 AND 27)
+        OR (@Vault2Slot IS NOT NULL AND @Vault2Slot = @Vault1Slot)
+        OR (@CharacterId IS NULL AND (@Container IS NOT NULL OR @CharacterSlot IS NOT NULL))
+        OR (@CharacterId IS NOT NULL AND (@Container IS NULL OR @CharacterSlot IS NULL))
         BEGIN
             SELECT CAST(0 AS BIT);
 
@@ -107,7 +107,8 @@ BEGIN
     IF @CharacterId IS NOT NULL
         BEGIN
             SELECT @CharacterAccountId = AccountId
-            FROM game.Characters WITH (UPDLOCK, HOLDLOCK)
+            FROM game.Characters
+            WITH (UPDLOCK, HOLDLOCK)
             WHERE CharacterId = @CharacterId;
 
             IF @CharacterAccountId IS NULL OR @CharacterAccountId <> @AccountId
@@ -115,7 +116,8 @@ BEGIN
         END;
 
     SELECT @CurrentVaultRevision = Revision
-    FROM game.AccountVault WITH (UPDLOCK, HOLDLOCK)
+    FROM game.AccountVault
+    WITH (UPDLOCK, HOLDLOCK)
     WHERE AccountId = @AccountId;
 
     IF @CurrentVaultRevision IS NULL
@@ -147,7 +149,8 @@ BEGIN
                    @CurrentCharacterSerial = Serial,
                    @CurrentCharacterXPos = XPos,
                    @CurrentCharacterYPos = YPos
-            FROM game.CharacterItems WITH (UPDLOCK, HOLDLOCK)
+            FROM game.CharacterItems
+            WITH (UPDLOCK, HOLDLOCK)
             WHERE CharacterId = @CharacterId
               AND Container = @Container
               AND Slot = @CharacterSlot;
@@ -157,7 +160,8 @@ BEGIN
                     IF @CharacterItemExists = 1
                         GOTO Conflict;
                 END
-            ELSE IF @CharacterItemExists = 0
+            ELSE
+                IF @CharacterItemExists = 0
                     OR @CurrentCharacterItemId <> @ExpectedCharacterItemId
                     OR @CurrentCharacterQuantity <> @ExpectedCharacterQuantity
                     OR @CurrentCharacterEnchant <> @ExpectedCharacterEnchant
@@ -171,14 +175,15 @@ BEGIN
                     OR @CurrentCharacterSerial <> @ExpectedCharacterSerial
                     OR @CurrentCharacterXPos <> @ExpectedCharacterXPos
                     OR @CurrentCharacterYPos <> @ExpectedCharacterYPos
-                GOTO Conflict;
+                    GOTO Conflict;
         END;
 
     SELECT @Vault1ItemExists = 1,
            @CurrentVault1ItemId = ItemId,
            @CurrentVault1Quantity = Quantity,
            @CurrentVault1SerialNumber = SerialNumber
-    FROM game.AccountVaultItems WITH (UPDLOCK, HOLDLOCK)
+    FROM game.AccountVaultItems
+    WITH (UPDLOCK, HOLDLOCK)
     WHERE AccountId = @AccountId
       AND SlotIndex = @Vault1Slot;
 
@@ -187,11 +192,12 @@ BEGIN
             IF @Vault1ItemExists = 1
                 GOTO Conflict;
         END
-    ELSE IF @Vault1ItemExists = 0
+    ELSE
+        IF @Vault1ItemExists = 0
             OR @CurrentVault1ItemId <> @ExpectedVault1ItemId
             OR @CurrentVault1Quantity <> @ExpectedVault1Quantity
             OR @CurrentVault1SerialNumber <> @ExpectedVault1SerialNumber
-        GOTO Conflict;
+            GOTO Conflict;
 
     IF @Vault2Slot IS NOT NULL
         BEGIN
@@ -199,7 +205,8 @@ BEGIN
                    @CurrentVault2ItemId = ItemId,
                    @CurrentVault2Quantity = Quantity,
                    @CurrentVault2SerialNumber = SerialNumber
-            FROM game.AccountVaultItems WITH (UPDLOCK, HOLDLOCK)
+            FROM game.AccountVaultItems
+            WITH (UPDLOCK, HOLDLOCK)
             WHERE AccountId = @AccountId
               AND SlotIndex = @Vault2Slot;
 
@@ -208,11 +215,12 @@ BEGIN
                     IF @Vault2ItemExists = 1
                         GOTO Conflict;
                 END
-            ELSE IF @Vault2ItemExists = 0
+            ELSE
+                IF @Vault2ItemExists = 0
                     OR @CurrentVault2ItemId <> @ExpectedVault2ItemId
                     OR @CurrentVault2Quantity <> @ExpectedVault2Quantity
                     OR @CurrentVault2SerialNumber <> @ExpectedVault2SerialNumber
-                GOTO Conflict;
+                    GOTO Conflict;
         END;
 
     IF @CharacterId IS NOT NULL
@@ -223,32 +231,33 @@ BEGIN
                 WHERE CharacterId = @CharacterId
                   AND Container = @Container
                   AND Slot = @CharacterSlot;
-            ELSE IF @ExpectedCharacterItemId IS NULL
-                INSERT INTO game.CharacterItems (CharacterId, Container, Slot, ItemId, Quantity,
-                                                 Enchant, Combine, Refine, Socket,
-                                                 SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial, XPos, YPos)
-                VALUES (@CharacterId, @Container, @CharacterSlot, @NewCharacterItemId, @NewCharacterQuantity,
-                        @NewCharacterEnchant, @NewCharacterCombine, @NewCharacterRefine, @NewCharacterSocket,
-                        @NewCharacterSocketGem1, @NewCharacterSocketGem2, @NewCharacterSocketGem3,
-                        @NewCharacterExpireDate, @NewCharacterSerial, @NewCharacterXPos, @NewCharacterYPos);
             ELSE
-                UPDATE game.CharacterItems
-                SET ItemId     = @NewCharacterItemId,
-                    Quantity   = @NewCharacterQuantity,
-                    Enchant    = @NewCharacterEnchant,
-                    Combine    = @NewCharacterCombine,
-                    Refine     = @NewCharacterRefine,
-                    Socket     = @NewCharacterSocket,
-                    SocketGem1 = @NewCharacterSocketGem1,
-                    SocketGem2 = @NewCharacterSocketGem2,
-                    SocketGem3 = @NewCharacterSocketGem3,
-                    ExpireDate = @NewCharacterExpireDate,
-                    Serial     = @NewCharacterSerial,
-                    XPos       = @NewCharacterXPos,
-                    YPos       = @NewCharacterYPos
-                WHERE CharacterId = @CharacterId
-                  AND Container = @Container
-                  AND Slot = @CharacterSlot;
+                IF @ExpectedCharacterItemId IS NULL
+                    INSERT INTO game.CharacterItems (CharacterId, Container, Slot, ItemId, Quantity,
+                                                     Enchant, Combine, Refine, Socket,
+                                                     SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial, XPos, YPos)
+                    VALUES (@CharacterId, @Container, @CharacterSlot, @NewCharacterItemId, @NewCharacterQuantity,
+                            @NewCharacterEnchant, @NewCharacterCombine, @NewCharacterRefine, @NewCharacterSocket,
+                            @NewCharacterSocketGem1, @NewCharacterSocketGem2, @NewCharacterSocketGem3,
+                            @NewCharacterExpireDate, @NewCharacterSerial, @NewCharacterXPos, @NewCharacterYPos);
+                ELSE
+                    UPDATE game.CharacterItems
+                    SET ItemId     = @NewCharacterItemId,
+                        Quantity   = @NewCharacterQuantity,
+                        Enchant    = @NewCharacterEnchant,
+                        Combine    = @NewCharacterCombine,
+                        Refine     = @NewCharacterRefine,
+                        Socket     = @NewCharacterSocket,
+                        SocketGem1 = @NewCharacterSocketGem1,
+                        SocketGem2 = @NewCharacterSocketGem2,
+                        SocketGem3 = @NewCharacterSocketGem3,
+                        ExpireDate = @NewCharacterExpireDate,
+                        Serial     = @NewCharacterSerial,
+                        XPos       = @NewCharacterXPos,
+                        YPos       = @NewCharacterYPos
+                    WHERE CharacterId = @CharacterId
+                      AND Container = @Container
+                      AND Slot = @CharacterSlot;
         END;
 
     IF @NewVault1ItemId IS NULL
@@ -256,25 +265,26 @@ BEGIN
         FROM game.AccountVaultItems
         WHERE AccountId = @AccountId
           AND SlotIndex = @Vault1Slot;
-    ELSE IF @ExpectedVault1ItemId IS NULL
-        INSERT INTO game.AccountVaultItems (AccountId, SlotIndex, ItemId, Quantity, Value, SerialNumber, SocketData,
-                                            SocketGem1, SocketGem2, SocketGem3, ExpireDate)
-        VALUES (@AccountId, @Vault1Slot, @NewVault1ItemId, @NewVault1Quantity, @NewVault1Value,
-                @NewVault1SerialNumber, @NewVault1SocketData, @NewVault1SocketGem1, @NewVault1SocketGem2,
-                @NewVault1SocketGem3, @NewVault1ExpireDate);
     ELSE
-        UPDATE game.AccountVaultItems
-        SET ItemId       = @NewVault1ItemId,
-            Quantity     = @NewVault1Quantity,
-            Value        = @NewVault1Value,
-            SerialNumber = @NewVault1SerialNumber,
-            SocketData   = @NewVault1SocketData,
-            SocketGem1   = @NewVault1SocketGem1,
-            SocketGem2   = @NewVault1SocketGem2,
-            SocketGem3   = @NewVault1SocketGem3,
-            ExpireDate   = @NewVault1ExpireDate
-        WHERE AccountId = @AccountId
-          AND SlotIndex = @Vault1Slot;
+        IF @ExpectedVault1ItemId IS NULL
+            INSERT INTO game.AccountVaultItems (AccountId, SlotIndex, ItemId, Quantity, Value, SerialNumber, SocketData,
+                                                SocketGem1, SocketGem2, SocketGem3, ExpireDate)
+            VALUES (@AccountId, @Vault1Slot, @NewVault1ItemId, @NewVault1Quantity, @NewVault1Value,
+                    @NewVault1SerialNumber, @NewVault1SocketData, @NewVault1SocketGem1, @NewVault1SocketGem2,
+                    @NewVault1SocketGem3, @NewVault1ExpireDate);
+        ELSE
+            UPDATE game.AccountVaultItems
+            SET ItemId       = @NewVault1ItemId,
+                Quantity     = @NewVault1Quantity,
+                Value        = @NewVault1Value,
+                SerialNumber = @NewVault1SerialNumber,
+                SocketData   = @NewVault1SocketData,
+                SocketGem1   = @NewVault1SocketGem1,
+                SocketGem2   = @NewVault1SocketGem2,
+                SocketGem3   = @NewVault1SocketGem3,
+                ExpireDate   = @NewVault1ExpireDate
+            WHERE AccountId = @AccountId
+              AND SlotIndex = @Vault1Slot;
 
     IF @Vault2Slot IS NOT NULL
         BEGIN
@@ -283,25 +293,26 @@ BEGIN
                 FROM game.AccountVaultItems
                 WHERE AccountId = @AccountId
                   AND SlotIndex = @Vault2Slot;
-            ELSE IF @ExpectedVault2ItemId IS NULL
-                INSERT INTO game.AccountVaultItems (AccountId, SlotIndex, ItemId, Quantity, Value, SerialNumber,
-                                                    SocketData, SocketGem1, SocketGem2, SocketGem3, ExpireDate)
-                VALUES (@AccountId, @Vault2Slot, @NewVault2ItemId, @NewVault2Quantity, @NewVault2Value,
-                        @NewVault2SerialNumber, @NewVault2SocketData, @NewVault2SocketGem1, @NewVault2SocketGem2,
-                        @NewVault2SocketGem3, @NewVault2ExpireDate);
             ELSE
-                UPDATE game.AccountVaultItems
-                SET ItemId       = @NewVault2ItemId,
-                    Quantity     = @NewVault2Quantity,
-                    Value        = @NewVault2Value,
-                    SerialNumber = @NewVault2SerialNumber,
-                    SocketData   = @NewVault2SocketData,
-                    SocketGem1   = @NewVault2SocketGem1,
-                    SocketGem2   = @NewVault2SocketGem2,
-                    SocketGem3   = @NewVault2SocketGem3,
-                    ExpireDate   = @NewVault2ExpireDate
-                WHERE AccountId = @AccountId
-                  AND SlotIndex = @Vault2Slot;
+                IF @ExpectedVault2ItemId IS NULL
+                    INSERT INTO game.AccountVaultItems (AccountId, SlotIndex, ItemId, Quantity, Value, SerialNumber,
+                                                        SocketData, SocketGem1, SocketGem2, SocketGem3, ExpireDate)
+                    VALUES (@AccountId, @Vault2Slot, @NewVault2ItemId, @NewVault2Quantity, @NewVault2Value,
+                            @NewVault2SerialNumber, @NewVault2SocketData, @NewVault2SocketGem1, @NewVault2SocketGem2,
+                            @NewVault2SocketGem3, @NewVault2ExpireDate);
+                ELSE
+                    UPDATE game.AccountVaultItems
+                    SET ItemId       = @NewVault2ItemId,
+                        Quantity     = @NewVault2Quantity,
+                        Value        = @NewVault2Value,
+                        SerialNumber = @NewVault2SerialNumber,
+                        SocketData   = @NewVault2SocketData,
+                        SocketGem1   = @NewVault2SocketGem1,
+                        SocketGem2   = @NewVault2SocketGem2,
+                        SocketGem3   = @NewVault2SocketGem3,
+                        ExpireDate   = @NewVault2ExpireDate
+                    WHERE AccountId = @AccountId
+                      AND SlotIndex = @Vault2Slot;
         END;
 
     UPDATE game.AccountVault

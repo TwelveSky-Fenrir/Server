@@ -44,7 +44,8 @@ public sealed class FishingProgressService : IFishingProgressService
         var caught = newStep is 4 or 5;
         if ((await zone.PostFishingCommandAndWaitForResultAsync(
                 new FishingZoneCommand(characterId, state.FishingState, newStep,
-                    state.CatchingFish || armCatch, false, null, castAt, BiteWasHit: biteWasHit), cancellationToken)).Kind !=
+                    state.CatchingFish || armCatch, false, null, castAt, BiteWasHit: biteWasHit), cancellationToken))
+            .Kind !=
             ZoneCommandResultKind.Applied)
             return null;
 

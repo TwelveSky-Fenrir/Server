@@ -1,5 +1,4 @@
 using Fenrir.Application.Game.Domain.World.WorldState;
-using Fenrir.Data.Abstractions.Runtime;
 
 namespace Fenrir.Application.Game.Hosting.World.DurableEvents;
 
@@ -20,27 +19,43 @@ public sealed class WorldStateWorldEventLocalDeliveryPort(
             .ConfigureAwait(false);
 
         if (!await worldState.ReconcileAsync(ct).ConfigureAwait(false))
-            throw new InvalidOperationException("The world-state effect committed but the local projection did not reconcile.");
+            throw new InvalidOperationException(
+                "The world-state effect committed but the local projection did not reconcile.");
 
         return WorldEventLocalEffectCompletion.For(worldEvent.Context.IdempotencyKey);
     }
 
-    public ValueTask<WorldEventLocalEffectCompletion> DeliverAsync(ZoneWarWorldEvent worldEvent, CancellationToken ct) =>
-        UnsupportedAsync(WorldEventPayloadCategory.ZoneWar);
+    public ValueTask<WorldEventLocalEffectCompletion> DeliverAsync(ZoneWarWorldEvent worldEvent, CancellationToken ct)
+    {
+        return UnsupportedAsync(WorldEventPayloadCategory.ZoneWar);
+    }
 
     public ValueTask<WorldEventLocalEffectCompletion> DeliverAsync(WorldNoticeWorldEvent worldEvent,
-        CancellationToken ct) => UnsupportedAsync(WorldEventPayloadCategory.WorldNotice);
+        CancellationToken ct)
+    {
+        return UnsupportedAsync(WorldEventPayloadCategory.WorldNotice);
+    }
 
     public ValueTask<WorldEventLocalEffectCompletion> DeliverAsync(CrossShardSocialWorldEvent worldEvent,
-        CancellationToken ct) => UnsupportedAsync(WorldEventPayloadCategory.CrossShardSocial);
+        CancellationToken ct)
+    {
+        return UnsupportedAsync(WorldEventPayloadCategory.CrossShardSocial);
+    }
 
-    public ValueTask<WorldEventLocalEffectCompletion> DeliverAsync(EconomyWorldEvent worldEvent, CancellationToken ct) =>
-        UnsupportedAsync(WorldEventPayloadCategory.Economy);
+    public ValueTask<WorldEventLocalEffectCompletion> DeliverAsync(EconomyWorldEvent worldEvent, CancellationToken ct)
+    {
+        return UnsupportedAsync(WorldEventPayloadCategory.Economy);
+    }
 
     public ValueTask<WorldEventLocalEffectCompletion> DeliverAsync(AdministrationWorldEvent worldEvent,
-        CancellationToken ct) => UnsupportedAsync(WorldEventPayloadCategory.Administration);
+        CancellationToken ct)
+    {
+        return UnsupportedAsync(WorldEventPayloadCategory.Administration);
+    }
 
-    private static ValueTask<WorldEventLocalEffectCompletion> UnsupportedAsync(WorldEventPayloadCategory category) =>
-        ValueTask.FromException<WorldEventLocalEffectCompletion>(new NotSupportedException(
+    private static ValueTask<WorldEventLocalEffectCompletion> UnsupportedAsync(WorldEventPayloadCategory category)
+    {
+        return ValueTask.FromException<WorldEventLocalEffectCompletion>(new NotSupportedException(
             $"Durable local delivery is not configured for {category}."));
+    }
 }

@@ -20,17 +20,18 @@ public sealed class ContinueSkillUseService : IContinueSkillUseService
         {
             case AutoBuffActivationResolver.ResultKind.Activate:
                 return (await zone.PostAutoBuffCommandAndWaitForResultAsync(
-                        new AutoBuffZoneCommand(characterId,
-                            ActivateAutoBuff: true,
-                            ActionSort: AutoBuffActivationResolver.ChannelingActionSort,
-                            Broadcast: true), cancellationToken).ConfigureAwait(false)).Kind == ZoneCommandResultKind.Applied
+                           new AutoBuffZoneCommand(characterId,
+                               ActivateAutoBuff: true,
+                               ActionSort: AutoBuffActivationResolver.ChannelingActionSort,
+                               Broadcast: true), cancellationToken).ConfigureAwait(false)).Kind ==
+                       ZoneCommandResultKind.Applied
                     ? result
                     : new AutoBuffActivationResolver.Result(AutoBuffActivationResolver.ResultKind.Rejected);
 
             case AutoBuffActivationResolver.ResultKind.Tick:
                 return (await zone.PostAutoBuffCommandAndWaitForResultAsync(
                         new AutoBuffZoneCommand(characterId, ApplyRegisteredBuffs: true), cancellationToken)
-                        .ConfigureAwait(false)).Kind == ZoneCommandResultKind.Applied
+                    .ConfigureAwait(false)).Kind == ZoneCommandResultKind.Applied
                     ? result
                     : new AutoBuffActivationResolver.Result(AutoBuffActivationResolver.ResultKind.Rejected);
         }

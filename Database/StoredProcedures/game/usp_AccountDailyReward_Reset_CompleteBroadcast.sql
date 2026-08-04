@@ -1,6 +1,6 @@
 CREATE OR ALTER PROCEDURE game.usp_AccountDailyReward_Reset_CompleteBroadcast @OccurrenceDate INT,
-                                                                                @ShardId TINYINT,
-                                                                                @LeaseId UNIQUEIDENTIFIER
+                                                                              @ShardId TINYINT,
+                                                                              @LeaseId UNIQUEIDENTIFIER
 AS
 BEGIN
     SET
@@ -24,7 +24,8 @@ BEGIN
     BEGIN TRANSACTION;
 
     SELECT @BroadcastCompletedAtUtc = BroadcastCompletedAtUtc
-    FROM game.DailyRewardResetBroadcastDeliveries WITH (UPDLOCK, HOLDLOCK)
+    FROM game.DailyRewardResetBroadcastDeliveries
+    WITH (UPDLOCK, HOLDLOCK)
     WHERE OccurrenceDate = @OccurrenceDate
       AND ShardId = @ShardId;
 
@@ -33,22 +34,23 @@ BEGIN
 
     IF @BroadcastCompletedAtUtc IS NOT NULL
         SET @Completed = 1;
-    ELSE IF EXISTS (SELECT 1
-                    FROM game.DailyRewardResetBroadcastDeliveries
-                    WHERE OccurrenceDate = @OccurrenceDate
-                      AND ShardId = @ShardId
-                      AND BroadcastLeaseId = @LeaseId)
-        BEGIN
-            UPDATE game.DailyRewardResetBroadcastDeliveries
-            SET BroadcastLeaseId = NULL,
-                BroadcastLeaseExpiresAtUtc = NULL,
-                BroadcastCompletedAtUtc = SYSUTCDATETIME()
-            WHERE OccurrenceDate = @OccurrenceDate
-              AND ShardId = @ShardId
-              AND BroadcastLeaseId = @LeaseId;
+    ELSE
+        IF EXISTS (SELECT 1
+                   FROM game.DailyRewardResetBroadcastDeliveries
+                   WHERE OccurrenceDate = @OccurrenceDate
+                     AND ShardId = @ShardId
+                     AND BroadcastLeaseId = @LeaseId)
+            BEGIN
+                UPDATE game.DailyRewardResetBroadcastDeliveries
+                SET BroadcastLeaseId           = NULL,
+                    BroadcastLeaseExpiresAtUtc = NULL,
+                    BroadcastCompletedAtUtc    = SYSUTCDATETIME()
+                WHERE OccurrenceDate = @OccurrenceDate
+                  AND ShardId = @ShardId
+                  AND BroadcastLeaseId = @LeaseId;
 
-            SET @Completed = 1;
-        END;
+                SET @Completed = 1;
+            END;
 
     COMMIT TRANSACTION;
 

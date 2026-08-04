@@ -131,7 +131,7 @@ public sealed partial class Zone
         CancellationToken ct, TimeSpan? timeout = null)
     {
         return (await PostInventoryAndGroundItemCommandAndWaitForResultAsync(command, ct, timeout)
-                .ConfigureAwait(false)).Kind == ZoneCommandResultKind.Applied;
+            .ConfigureAwait(false)).Kind == ZoneCommandResultKind.Applied;
     }
 
     public bool PostSkillCommand(in SkillZoneCommand command)
@@ -332,12 +332,10 @@ public sealed partial class Zone
         }
 
         if (!command.SkillChanges.IsDefaultOrEmpty)
-        {
             foreach (var change in command.SkillChanges)
                 state.LearnedSkills = change.Skill.SkillId == 0
                     ? state.LearnedSkills.Remove(change.Slot)
                     : state.LearnedSkills.SetItem(change.Slot, change.Skill);
-        }
 
         if (command.SkillPoints is { } skillPoints)
             state.SkillPoints = skillPoints;
@@ -1087,6 +1085,7 @@ public sealed partial class Zone
                 state.PosX, state.PosY, state.PosZ);
             BroadcastAvatarAction(_statPotionFullActionNeighborScratch, state);
         }
+
         return true;
     }
 

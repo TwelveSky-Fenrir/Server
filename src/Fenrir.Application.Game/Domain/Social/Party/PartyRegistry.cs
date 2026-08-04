@@ -129,6 +129,8 @@ public sealed class PartyRegistry
 
     public const int MaxLevelGap = 9;
 
+    private static readonly TimeSpan PartyResyncRequestLifetime = TimeSpan.FromSeconds(30);
+
     private readonly CrossShardNegotiationTracker _crossShard = new();
 
     private readonly Dictionary<int, int> _leaderByMember = new();
@@ -142,8 +144,6 @@ public sealed class PartyRegistry
     private readonly Dictionary<int, int> _pendingByInviter = new();
 
     private readonly Dictionary<int, PartyResyncRequest> _pendingResyncByCharacter = new();
-
-    private static readonly TimeSpan PartyResyncRequestLifetime = TimeSpan.FromSeconds(30);
 
     public bool IsInParty(int characterId)
     {
@@ -341,8 +341,6 @@ public sealed class PartyRegistry
             foreach (var characterId in expiredCharacterIds)
                 _pendingResyncByCharacter.Remove(characterId);
     }
-
-    private readonly record struct PartyResyncRequest(Guid CorrelationId, string AvatarName, DateTime ExpiresAtUtc);
 
     public bool TryRemoveMemberByName(int anchorCharacterId, string avatarName, out int removedCharacterId)
     {
@@ -743,4 +741,6 @@ public sealed class PartyRegistry
 
         _partiesByLeader.Remove(party.LeaderId);
     }
+
+    private readonly record struct PartyResyncRequest(Guid CorrelationId, string AvatarName, DateTime ExpiresAtUtc);
 }

@@ -26,12 +26,12 @@ BEGIN
 
     IF @@ROWCOUNT = 1
         BEGIN
-    UPDATE game.WorldStateTribes
-    SET SymbolDateUtc      = @SymbolDateUtc,
-        HasSymbol          = @HasSymbol,
-        IsClosed           = @IsClosed,
-        SymbolOwnerTribeId = @SymbolOwnerTribeId
-    WHERE TribeId = @TribeId;
+            UPDATE game.WorldStateTribes
+            SET SymbolDateUtc      = @SymbolDateUtc,
+                HasSymbol          = @HasSymbol,
+                IsClosed           = @IsClosed,
+                SymbolOwnerTribeId = @SymbolOwnerTribeId
+            WHERE TribeId = @TribeId;
 
             IF @@ROWCOUNT <> 1
                 BEGIN

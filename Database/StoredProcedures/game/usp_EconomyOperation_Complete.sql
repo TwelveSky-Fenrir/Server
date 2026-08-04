@@ -1,6 +1,6 @@
 CREATE OR ALTER PROCEDURE game.usp_EconomyOperation_Complete @OperationId UNIQUEIDENTIFIER,
-                                                              @ActorAccountId INT,
-                                                              @FinalStatus TINYINT
+                                                             @ActorAccountId INT,
+                                                             @FinalStatus TINYINT
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -18,7 +18,7 @@ BEGIN
     BEGIN TRANSACTION;
 
     UPDATE game.EconomyOperationLedger
-    SET Status = @FinalStatus,
+    SET Status         = @FinalStatus,
         CompletedAtUtc = SYSUTCDATETIME()
     WHERE OperationId = @OperationId
       AND ActorAccountId = @ActorAccountId
@@ -31,7 +31,8 @@ BEGIN
            @Status = Status,
            @CreatedAtUtc = CreatedAtUtc,
            @CompletedAtUtc = CompletedAtUtc
-    FROM game.EconomyOperationLedger WITH (UPDLOCK, HOLDLOCK)
+    FROM game.EconomyOperationLedger
+    WITH (UPDLOCK, HOLDLOCK)
     WHERE OperationId = @OperationId
       AND ActorAccountId = @ActorAccountId;
 
@@ -40,10 +41,10 @@ BEGIN
 
     COMMIT TRANSACTION;
 
-    SELECT @OperationId AS OperationId,
-           @CorrelationId AS CorrelationId,
-           @Status AS Status,
-           @CreatedAtUtc AS CreatedAtUtc,
+    SELECT @OperationId    AS OperationId,
+           @CorrelationId  AS CorrelationId,
+           @Status         AS Status,
+           @CreatedAtUtc   AS CreatedAtUtc,
            @CompletedAtUtc AS CompletedAtUtc,
-           @CompletedNow AS CompletedNow;
+           @CompletedNow   AS CompletedNow;
 END;

@@ -63,7 +63,6 @@ public sealed class ZoneEventBroadcaster(
                 guardSpawner.ForceZone038WinnerResummon(zone);
 
         zone039Reactor?.Apply(zones);
-
     }
 
     public void AnnounceTribeSymbolBattleCountdown()
@@ -80,7 +79,6 @@ public sealed class ZoneEventBroadcaster(
 
         foreach (var zone in zones.Zones)
             zone.PostHolyStoneCountdownEviction();
-
     }
 
     public void AnnounceTribeSymbolBattleStarted()
@@ -558,12 +556,12 @@ public sealed class ZoneEventBroadcaster(
 
     private void BroadcastToEveryZone<TPacket>(in TPacket response) where TPacket : struct, IOutgoingPacket
     {
-        BroadcastToZones(in response, valleyWarOnly: false);
+        BroadcastToZones(in response, false);
     }
 
     private void BroadcastToValleyWarCampaign<TPacket>(in TPacket response) where TPacket : struct, IOutgoingPacket
     {
-        BroadcastToZones(in response, valleyWarOnly: true);
+        BroadcastToZones(in response, true);
     }
 
     private void BroadcastToZones<TPacket>(in TPacket response, bool valleyWarOnly)

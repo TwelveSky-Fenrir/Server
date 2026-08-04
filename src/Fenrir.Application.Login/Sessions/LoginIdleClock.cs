@@ -58,16 +58,14 @@ public sealed class LoginIdleClock
         return builder.ToImmutable();
     }
 
-        public ImmutableArray<ExpiredLoginHandshake> SnapshotPreAuthenticationExpired(
+    public ImmutableArray<ExpiredLoginHandshake> SnapshotPreAuthenticationExpired(
         TimeSpan handshakeTimeout, DateTimeOffset nowUtc)
     {
         var builder = ImmutableArray.CreateBuilder<ExpiredLoginHandshake>();
 
         foreach (var clock in _clocks.Values)
-        {
             if (clock.Session.IsPreAuthentication && nowUtc - clock.ArmedUtc > handshakeTimeout)
                 builder.Add(new ExpiredLoginHandshake(clock.Session, clock.ArmedUtc));
-        }
 
         return builder.ToImmutable();
     }

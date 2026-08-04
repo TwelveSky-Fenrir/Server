@@ -1,19 +1,19 @@
 CREATE TABLE game.EconomyOperationLedger
 (
-    OperationId          UNIQUEIDENTIFIER NOT NULL
+    OperationId        UNIQUEIDENTIFIER NOT NULL
         CONSTRAINT DF_EconomyOperationLedger_OperationId DEFAULT NEWSEQUENTIALID(),
-    CorrelationId        UNIQUEIDENTIFIER NOT NULL
+    CorrelationId      UNIQUEIDENTIFIER NOT NULL
         CONSTRAINT DF_EconomyOperationLedger_CorrelationId DEFAULT NEWSEQUENTIALID(),
-    ActorAccountId       INT              NOT NULL,
-    ActorCharacterId     INT              NULL,
-    OperationKind        TINYINT          NOT NULL,
-    Cause                TINYINT          NOT NULL,
-    IdempotencyKeyHash   BINARY(32)       NOT NULL,
-    Status               TINYINT          NOT NULL
+    ActorAccountId     INT              NOT NULL,
+    ActorCharacterId   INT              NULL,
+    OperationKind      TINYINT          NOT NULL,
+    Cause              TINYINT          NOT NULL,
+    IdempotencyKeyHash BINARY(32)       NOT NULL,
+    Status             TINYINT          NOT NULL
         CONSTRAINT DF_EconomyOperationLedger_Status DEFAULT 0,
-    CreatedAtUtc         DATETIME2(3)     NOT NULL
+    CreatedAtUtc       DATETIME2(3)     NOT NULL
         CONSTRAINT DF_EconomyOperationLedger_CreatedAtUtc DEFAULT SYSUTCDATETIME(),
-    CompletedAtUtc       DATETIME2(3)     NULL,
+    CompletedAtUtc     DATETIME2(3)     NULL,
     CONSTRAINT PK_EconomyOperationLedger PRIMARY KEY CLUSTERED (OperationId),
     CONSTRAINT FK_EconomyOperationLedger_ActorAccount FOREIGN KEY (ActorAccountId)
         REFERENCES auth.Accounts (AccountId),
@@ -28,6 +28,5 @@ CREATE TABLE game.EconomyOperationLedger
     CONSTRAINT UQ_EconomyOperationLedger_ActorAccount_IdempotencyKeyHash
         UNIQUE NONCLUSTERED (ActorAccountId, IdempotencyKeyHash),
     INDEX IX_EconomyOperationLedger_CorrelationId NONCLUSTERED (CorrelationId),
-    INDEX IX_EconomyOperationLedger_Status_CreatedAtUtc NONCLUSTERED (Status, CreatedAtUtc)
-        INCLUDE (ActorAccountId, ActorCharacterId, OperationKind, Cause)
+    INDEX IX_EconomyOperationLedger_Status_CreatedAtUtc NONCLUSTERED (Status, CreatedAtUtc) INCLUDE (ActorAccountId, ActorCharacterId, OperationKind, Cause)
 );

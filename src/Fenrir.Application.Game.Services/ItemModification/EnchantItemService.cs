@@ -192,10 +192,10 @@ public sealed partial class EnchantItemService(
         {
             var newContributionPoints = state.ContributionPoints - resolved.Cost;
             var tribeResult = await zone.PostTribeProgressCommandAndWaitForResultAsync(
-                    new TribeProgressZoneCommand(characterId, newContributionPoints,
-                        ProtectForDestroy: newProtectForDestroy, ProtectForDestroy2: newProtectForDestroy2,
-                        ProtectForWing: newProtectForWing, ImproveItemValue: newImproveItemValue),
-                    cancellationToken);
+                new TribeProgressZoneCommand(characterId, newContributionPoints,
+                    ProtectForDestroy: newProtectForDestroy, ProtectForDestroy2: newProtectForDestroy2,
+                    ProtectForWing: newProtectForWing, ImproveItemValue: newImproveItemValue),
+                cancellationToken);
             if (tribeResult.Kind != ZoneCommandResultKind.Applied)
                 return AbortAfterDurableMutation(state, characterId, "wing-enchant progress", tribeResult);
         }
@@ -205,9 +205,9 @@ public sealed partial class EnchantItemService(
                 newImproveItemValue is not null)
             {
                 var tribeResult = await zone.PostTribeProgressCommandAndWaitForResultAsync(
-                        new TribeProgressZoneCommand(characterId, ProtectForDestroy: newProtectForDestroy,
-                            ProtectForDestroy2: newProtectForDestroy2, ImproveItemValue: newImproveItemValue),
-                        cancellationToken);
+                    new TribeProgressZoneCommand(characterId, ProtectForDestroy: newProtectForDestroy,
+                        ProtectForDestroy2: newProtectForDestroy2, ImproveItemValue: newImproveItemValue),
+                    cancellationToken);
                 if (tribeResult.Kind != ZoneCommandResultKind.Applied)
                     return AbortAfterDurableMutation(state, characterId, "enchant charge", tribeResult);
             }

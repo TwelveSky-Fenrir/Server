@@ -24,13 +24,15 @@ public sealed class WorldEventUplink(
 
         if (outbox is null || gameOptions is null)
         {
-            logger.LogError("World event uplink faulted for sort {Sort}: durable outbox services are unavailable", sort);
+            logger.LogError("World event uplink faulted for sort {Sort}: durable outbox services are unavailable",
+                sort);
             return WorldEventUplinkResult.Faulted(identity);
         }
 
         if (!KnownTSortRegistry.IsKnown(sort) || data.Length != ZoneCenterBroadcastIngestor.PayloadSize)
         {
-            logger.LogWarning("World event uplink rejected sort {Sort}: the fixed zone-event envelope is invalid", sort);
+            logger.LogWarning("World event uplink rejected sort {Sort}: the fixed zone-event envelope is invalid",
+                sort);
             return WorldEventUplinkResult.Faulted(identity);
         }
 

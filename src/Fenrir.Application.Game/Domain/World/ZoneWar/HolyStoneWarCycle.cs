@@ -108,7 +108,8 @@ public sealed class HolyStoneWarCycle(
 
         try
         {
-            if (!zones.TryGet(site.MapId, out var zone) || zone is null || !zone.TryGetPlayer(candidateId, out var candidate) ||
+            if (!zones.TryGet(site.MapId, out var zone) || zone is null ||
+                !zone.TryGetPlayer(candidateId, out var candidate) ||
                 candidate is null || !IsEligibleCandidate(candidate))
             {
                 CancelChallenge();

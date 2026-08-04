@@ -21,7 +21,8 @@ public sealed class FishingLineService : IFishingLineService
         }
 
         if ((await zone.PostFishingCommandAndWaitForResultAsync(
-                new FishingZoneCommand(characterId, 1, 2, false, false, null, DateTime.UtcNow), cancellationToken)).Kind !=
+                new FishingZoneCommand(characterId, 1, 2, false, false, null, DateTime.UtcNow), cancellationToken))
+            .Kind !=
             ZoneCommandResultKind.Applied)
             return null;
 

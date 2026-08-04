@@ -80,23 +80,23 @@ public sealed partial class Zone
 
     private readonly List<int> _enterNeighborScratch = [];
 
-    private readonly Dictionary<int, long> _pendingEnterBootstrapSessions = [];
-
     private readonly List<int> _healTargetNeighborScratch = [];
 
     private readonly List<int> _moveNeighborScratch = [];
 
     private readonly ConcurrentQueue<PendingDeathEventLog> _pendingDeathEventLogs = new();
 
-    private readonly List<int> _rebroadcastNeighborScratch = [];
+    private readonly Dictionary<int, long> _pendingEnterBootstrapSessions = [];
 
-    private readonly Dictionary<int, ZoneTransferHandoffSnapshot> _zoneTransferSnapshots = [];
+    private readonly List<int> _rebroadcastNeighborScratch = [];
 
     private readonly ISocialWorldEntryReset? _socialWorldEntryReset =
         simulationSystems.OfType<ISocialWorldEntryReset>().FirstOrDefault();
 
     private readonly WorldClockPushSystem? _worldClockPush =
         simulationSystems.OfType<WorldClockPushSystem>().FirstOrDefault();
+
+    private readonly Dictionary<int, ZoneTransferHandoffSnapshot> _zoneTransferSnapshots = [];
 
     private void QueueDeathEventLog(short eventCode, int characterId, byte? outcome, string? payload)
     {
@@ -851,7 +851,6 @@ public sealed partial class Zone
             state.IsMovingZone = false;
             state.ZoneTransferRegisteredAtUtc = registeredAtUtc;
         }
-
     }
 
     private ZoneCommandResult HandleRefreshZoneTransferRegistrationTimestamp(int characterId)
@@ -1059,7 +1058,7 @@ public sealed partial class Zone
             $"Kind=Experience;Loss={loss};Level={state.Level}");
     }
 
-        public void ReleaseDeathGateWindow(PlayerRuntimeState state, bool clearReviveHackFlag)
+    public void ReleaseDeathGateWindow(PlayerRuntimeState state, bool clearReviveHackFlag)
     {
         var released = new DeathGateState(
                 state.IsDead,

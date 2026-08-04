@@ -42,15 +42,15 @@ public sealed class InventoryToWorldDropService(
             : null;
 
         var hasLegacySingleQuantity = source is { } sourceItem && itemDefinition is { } resolvedDefinition &&
-                                       (resolvedDefinition.Item.Sort switch
-                                       {
-                                           ItemQuantityPolicy.PetSort => sourceItem.Quantity is >=
-                                               ItemQuantityPolicy.MinStackQuantity and <=
-                                               ItemQuantityPolicy.MaxPetActivity,
-                                           _ when ItemQuantityPolicy.CarriesNoQuantity(resolvedDefinition.Item.Sort) =>
-                                               sourceItem.Quantity is 0 or 1,
-                                           _ => false
-                                       });
+                                      resolvedDefinition.Item.Sort switch
+                                      {
+                                          ItemQuantityPolicy.PetSort => sourceItem.Quantity is >=
+                                              ItemQuantityPolicy.MinStackQuantity and <=
+                                              ItemQuantityPolicy.MaxPetActivity,
+                                          _ when ItemQuantityPolicy.CarriesNoQuantity(resolvedDefinition.Item.Sort) =>
+                                              sourceItem.Quantity is 0 or 1,
+                                          _ => false
+                                      };
         var requestedQuantity = move.Quantity1 == 0 && hasLegacySingleQuantity
             ? 1
             : move.Quantity1;

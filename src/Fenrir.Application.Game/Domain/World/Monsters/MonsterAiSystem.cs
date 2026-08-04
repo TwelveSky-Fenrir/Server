@@ -3,7 +3,6 @@ using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World.Geometry;
-using Fenrir.Application.Game.Domain.World.Runtime;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Protocol.Game;
@@ -739,7 +738,7 @@ public sealed partial class MonsterAiSystem(
         return specialType is >= 40 and <= 44;
     }
 
-        private static bool MoveToward(Zone zone, MonsterEntity monster, float targetX, float targetZ, float speed,
+    private static bool MoveToward(Zone zone, MonsterEntity monster, float targetX, float targetZ, float speed,
         float dt, out bool arrived)
     {
         var outcome = StepToward(monster, targetX, targetZ, speed, dt, zone.Geometry);
@@ -762,12 +761,10 @@ public sealed partial class MonsterAiSystem(
             return MonsterStepOutcome.Blocked;
 
         if (distance <= 0.0001f)
-        {
             return geometry.IsWalkable(monster.PosX, monster.PosZ) &&
                    geometry.TryGetGroundHeight(monster.PosX, monster.PosZ, out _)
                 ? MonsterStepOutcome.Arrived
                 : MonsterStepOutcome.Blocked;
-        }
 
         var step = speed * dt;
         if (!float.IsFinite(step) || step <= 0f)

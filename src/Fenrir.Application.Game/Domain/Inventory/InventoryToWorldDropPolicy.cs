@@ -143,7 +143,7 @@ public static class InventoryToWorldDropPolicy
                 return true;
 
             case not ItemQuantityPolicy.PetSort when ItemQuantityPolicy.CarriesNoQuantity(itemSort) &&
-                sourceQuantity is 0 or 1:
+                                                     sourceQuantity is 0 or 1:
                 groundQuantity = 1;
                 return true;
 

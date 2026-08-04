@@ -1,5 +1,3 @@
-using Fenrir.Data.Abstractions.Characters;
-using Fenrir.Application.Game.Domain;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -54,7 +52,8 @@ public sealed class DailyResetBroadcaster(
         catch (Exception ex)
         {
             logger.LogCritical(ex,
-                "Daily reward-claim reset broadcast occurrence could not be claimed for {OccurrenceDate}", occurrenceDate);
+                "Daily reward-claim reset broadcast occurrence could not be claimed for {OccurrenceDate}",
+                occurrenceDate);
             return;
         }
 
@@ -97,7 +96,8 @@ public sealed class DailyResetBroadcaster(
         catch (Exception ex)
         {
             logger.LogCritical(ex,
-                "Daily reward-claim reset broadcast completion could not be persisted for {OccurrenceDate}", occurrenceDate);
+                "Daily reward-claim reset broadcast completion could not be persisted for {OccurrenceDate}",
+                occurrenceDate);
             return;
         }
 

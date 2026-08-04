@@ -14,6 +14,8 @@ public sealed class MonsterEntity
 
     private readonly int[] _tribeSymbolDamage = new int[TribeSymbolDamageSlots];
 
+    private MonsterAiState _aiState = MonsterAiState.Spawning;
+
     private int _deathClaimed;
     private int _life;
 
@@ -44,8 +46,6 @@ public sealed class MonsterEntity
     public required float HomeZ { get; init; }
 
     public int MaxLife { get; init; }
-
-    private MonsterAiState _aiState = MonsterAiState.Spawning;
 
     internal Action<MonsterEntity>? PursuitStateChanged { get; set; }
 
@@ -79,7 +79,7 @@ public sealed class MonsterEntity
 
     public float TargetLocationZ { get; set; }
 
-        public int DeathSkillNumber { get; private set; }
+    public int DeathSkillNumber { get; private set; }
 
     public TimeSpan LastRebroadcastAt { get; set; }
 

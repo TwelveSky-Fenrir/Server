@@ -15,16 +15,18 @@ public sealed partial class PlayerRuntimeState
 
     private PlayerLogoutSnapshot? _logoutSnapshot;
 
-        public PlayerLogoutSnapshot? LogoutSnapshot
+    public PlayerLogoutSnapshot? LogoutSnapshot
     {
         get
         {
             lock (_logoutSnapshotGate)
+            {
                 return _logoutSnapshot;
+            }
         }
     }
 
-        public void CaptureLogoutSnapshot()
+    public void CaptureLogoutSnapshot()
     {
         var snapshot = new PlayerLogoutSnapshot(
             FlushSequence,
@@ -36,13 +38,17 @@ public sealed partial class PlayerRuntimeState
             Mana);
 
         lock (_logoutSnapshotGate)
+        {
             _logoutSnapshot = snapshot;
+        }
     }
 
-        public void AcknowledgePersistedLogoutSnapshot(PlayerLogoutSnapshot snapshot)
+    public void AcknowledgePersistedLogoutSnapshot(PlayerLogoutSnapshot snapshot)
     {
         lock (_logoutSnapshotGate)
+        {
             if (_logoutSnapshot is { } current && current == snapshot)
                 _logoutSnapshot = null;
+        }
     }
 }

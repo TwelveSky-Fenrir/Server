@@ -41,41 +41,44 @@ BEGIN
             THROW 50379, N'The ban actor provenance is not a current Basic-tier GM account and character.', 1;
 
         IF @CharacterId IS NOT NULL AND @AccountId IS NOT NULL AND NOT EXISTS (SELECT 1
-                                                                                FROM game.Characters WITH (UPDLOCK, HOLDLOCK)
-                                                                                WHERE CharacterId = @CharacterId
-                                                                                  AND AccountId = @AccountId)
+                                                                               FROM game.Characters
+                                                                               WITH (UPDLOCK, HOLDLOCK)
+                                                                               WHERE CharacterId = @CharacterId
+                                                                                 AND AccountId = @AccountId)
             THROW 50380, N'The ban target character does not belong to the target account.', 1;
 
         SELECT @BanId = BanId
-        FROM admin.Bans WITH (UPDLOCK, HOLDLOCK)
+        FROM admin.Bans
+        WITH (UPDLOCK, HOLDLOCK)
         WHERE CorrelationId = @CorrelationId;
 
         IF @BanId IS NOT NULL
-        BEGIN
-            IF NOT EXISTS (SELECT 1
-                           FROM admin.Bans
-                           WHERE BanId = @BanId
-                             AND ((AccountId = @AccountId) OR (AccountId IS NULL AND @AccountId IS NULL))
-                             AND ((CharacterId = @CharacterId) OR (CharacterId IS NULL AND @CharacterId IS NULL))
-                             AND Reason = @Reason
-                             AND ((ExpiresAtUtc = @ExpiresAtUtc) OR (ExpiresAtUtc IS NULL AND @ExpiresAtUtc IS NULL))
-                             AND ActorAccountId = @ActorAccountId
-                             AND ActorCharacterId = @ActorCharacterId)
-                THROW 50381, N'The ban correlation identifier was reused with a different command.', 1;
+            BEGIN
+                IF NOT EXISTS (SELECT 1
+                               FROM admin.Bans
+                               WHERE BanId = @BanId
+                                 AND ((AccountId = @AccountId) OR (AccountId IS NULL AND @AccountId IS NULL))
+                                 AND ((CharacterId = @CharacterId) OR (CharacterId IS NULL AND @CharacterId IS NULL))
+                                 AND Reason = @Reason
+                                 AND ((ExpiresAtUtc = @ExpiresAtUtc) OR
+                                      (ExpiresAtUtc IS NULL AND @ExpiresAtUtc IS NULL))
+                                 AND ActorAccountId = @ActorAccountId
+                                 AND ActorCharacterId = @ActorCharacterId)
+                    THROW 50381, N'The ban correlation identifier was reused with a different command.', 1;
 
-            IF NOT EXISTS (SELECT 1
-                           FROM admin.BanAudit
-                           WHERE BanId = @BanId
-                             AND CorrelationId = @CorrelationId
-                             AND ActorAccountId = @ActorAccountId
-                             AND ActorCharacterId = @ActorCharacterId
-                             AND AuditPayload = @AuditPayload)
-                THROW 50382, N'The ban audit does not match the existing ban correlation.', 1;
+                IF NOT EXISTS (SELECT 1
+                               FROM admin.BanAudit
+                               WHERE BanId = @BanId
+                                 AND CorrelationId = @CorrelationId
+                                 AND ActorAccountId = @ActorAccountId
+                                 AND ActorCharacterId = @ActorCharacterId
+                                 AND AuditPayload = @AuditPayload)
+                    THROW 50382, N'The ban audit does not match the existing ban correlation.', 1;
 
-            COMMIT TRANSACTION;
-            SELECT @BanId;
-            RETURN;
-        END;
+                COMMIT TRANSACTION;
+                SELECT @BanId;
+                RETURN;
+            END;
 
         INSERT INTO admin.Bans (AccountId, CharacterId, Reason, ExpiresAtUtc, CorrelationId, ActorAccountId,
                                 ActorCharacterId)

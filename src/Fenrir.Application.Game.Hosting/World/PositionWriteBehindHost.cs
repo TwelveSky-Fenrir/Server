@@ -137,7 +137,8 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
         _disconnectRetrySignal.Dispose();
     }
 
-    private async ValueTask<CharacterSnapshotPersistence> PersistFinalFlushAsync(PlayerRuntimeState state, CancellationToken ct,
+    private async ValueTask<CharacterSnapshotPersistence> PersistFinalFlushAsync(PlayerRuntimeState state,
+        CancellationToken ct,
         bool queueOnFailure)
     {
         var characterId = state.CharacterId;
@@ -247,8 +248,10 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
                 _logger.LogError(
                     "Final flush for character {CharacterId} was rejected because a newer flush sequence is already durable",
                     characterId);
-                return queued is null ? new CharacterSnapshotPersistence(Task.FromException(new InvalidOperationException(
-                    $"Final flush for character {characterId} was rejected."))) : new CharacterSnapshotPersistence(queued.Task);
+                return queued is null
+                    ? new CharacterSnapshotPersistence(Task.FromException(new InvalidOperationException(
+                        $"Final flush for character {characterId} was rejected.")))
+                    : new CharacterSnapshotPersistence(queued.Task);
             }
 
             state.PersistedWarPoint = warPoint;
@@ -280,8 +283,9 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
                     ? "Failed to persist final Position/Vitals/Progression state for character {CharacterId} on disconnect -- queued for retry until it succeeds"
                     : "Failed to persist final Position/Vitals/Progression state for character {CharacterId} during zone handoff -- caller must roll back",
                 characterId);
-            return queued is null ? new CharacterSnapshotPersistence(Task.FromException(ex)) :
-                new CharacterSnapshotPersistence(queued.Task);
+            return queued is null
+                ? new CharacterSnapshotPersistence(Task.FromException(ex))
+                : new CharacterSnapshotPersistence(queued.Task);
         }
     }
 
@@ -382,7 +386,7 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
             foreach (var characterId in _pendingDisconnectRetries.Keys.ToArray())
             {
                 var (progressRow, positionRow, logoutRow, costumeRows, buffRows, mountRows, stellarCoreRows,
-                    capturedState, capturedLogoutSnapshot, capturedWarPoint, capturedBloodCoin, completion) =
+                        capturedState, capturedLogoutSnapshot, capturedWarPoint, capturedBloodCoin, completion) =
                     _pendingDisconnectRetries[characterId];
 
                 try

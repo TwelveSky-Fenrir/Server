@@ -23,7 +23,9 @@ public sealed partial class Zone
 
     private void DrainGuildBuffExpiryCommands(int maximum)
     {
-        for (var processed = 0; processed < maximum && _guildBuffExpiryInbox.Reader.TryRead(out var command); processed++)
+        for (var processed = 0;
+             processed < maximum && _guildBuffExpiryInbox.Reader.TryRead(out var command);
+             processed++)
             try
             {
                 ApplyGuildBuffExpiryCommand(in command);

@@ -1,12 +1,11 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Globalization;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
-using Fenrir.Data.Abstractions.World;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -30,23 +29,21 @@ public sealed class RegularWarSchedulerHost(
     private readonly RegularWarActiveMapTracker
         _activeMapTracker = activeMapTracker ?? new RegularWarActiveMapTracker();
 
+    private readonly HashSet<short> _blockedMapIds = [];
+
+    private readonly HashSet<short> _dirtyMapIds = [];
+
     private readonly Dictionary<short, RegularWarSchedule> _schedules = new();
 
     private readonly Dictionary<short, long> _snapshotRevisionByMapId = new();
 
-    private readonly HashSet<short> _dirtyMapIds = [];
-
-    private readonly HashSet<short> _blockedMapIds = [];
-
-    private bool _initialized;
-
     private int _ticksSinceSnapshotFlush;
 
-    public bool IsInitialized => _initialized;
+    public bool IsInitialized { get; private set; }
 
     public void Tick(TimeSpan elapsed)
     {
-        if (!_initialized)
+        if (!IsInitialized)
             return;
 
         var wholeTicks = _accumulator.Advance(elapsed);
@@ -84,7 +81,7 @@ public sealed class RegularWarSchedulerHost(
 
     public async ValueTask<bool> InitializeAsync(CancellationToken ct)
     {
-        if (_initialized)
+        if (IsInitialized)
             return true;
 
         IReadOnlyCollection<WorldEventSnapshotRowDto> rows;
@@ -134,7 +131,7 @@ public sealed class RegularWarSchedulerHost(
             }
         }
 
-        _initialized = true;
+        IsInitialized = true;
         return true;
     }
 
@@ -148,7 +145,8 @@ public sealed class RegularWarSchedulerHost(
             {
                 var requiresSnapshot = workItem.Result.Phase != workItem.Result.PreviousPhase ||
                                        workItem.Result.AllSessionsShouldDisconnect;
-                if (requiresSnapshot && !await PersistMapSnapshotAsync(workItem.MapConfig.MapId, ct).ConfigureAwait(false))
+                if (requiresSnapshot &&
+                    !await PersistMapSnapshotAsync(workItem.MapConfig.MapId, ct).ConfigureAwait(false))
                 {
                     _blockedMapIds.Add(workItem.MapConfig.MapId);
                     logger.LogCritical(
@@ -301,8 +299,10 @@ public sealed class RegularWarSchedulerHost(
         return state;
     }
 
-    private static string FormatOccurrenceKey(short mapId) =>
-        SnapshotOccurrencePrefix + mapId.ToString(CultureInfo.InvariantCulture);
+    private static string FormatOccurrenceKey(short mapId)
+    {
+        return SnapshotOccurrencePrefix + mapId.ToString(CultureInfo.InvariantCulture);
+    }
 
     private static bool TryParseMapId(string occurrenceKey, out short mapId)
     {

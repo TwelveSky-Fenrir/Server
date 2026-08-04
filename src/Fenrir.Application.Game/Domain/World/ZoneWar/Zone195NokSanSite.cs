@@ -28,8 +28,6 @@ public sealed class Zone195NokSanSiteCatalog
 
     public static readonly Zone195NokSanSiteCatalog Legacy = Default;
 
-        public static bool IsActiveMapId(short mapId) => Zone195NokSanState.IsActiveMapId(mapId);
-
     private readonly FrozenDictionary<short, Zone195NokSanSite> _byMapId;
 
     public Zone195NokSanSiteCatalog(IEnumerable<Zone195NokSanSite> sites)
@@ -42,9 +40,15 @@ public sealed class Zone195NokSanSiteCatalog
                 "Nok-San sites are limited to the compiled pairs 196→0, 99→2, and 100→3.");
 
         if (materializedSites.GroupBy(static site => site.StoneSlotIndex).Any(static group => group.Skip(1).Any()))
-            throw new ArgumentException("Each active Nok-San stone slot may be mapped by only one site.", nameof(sites));
+            throw new ArgumentException("Each active Nok-San stone slot may be mapped by only one site.",
+                nameof(sites));
 
         _byMapId = materializedSites.ToFrozenDictionary(static site => site.MapId);
+    }
+
+    public static bool IsActiveMapId(short mapId)
+    {
+        return Zone195NokSanState.IsActiveMapId(mapId);
     }
 
     public bool TryGet(short mapId, out Zone195NokSanSite? site)

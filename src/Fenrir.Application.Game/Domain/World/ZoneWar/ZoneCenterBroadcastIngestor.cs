@@ -91,13 +91,13 @@ public sealed class ZoneCenterBroadcastIngestor(
         if (!Allow(eventCode, nameof(Ingest)))
             return false;
 
-        if (!ApplyStateEffect(eventCode, data, apply: false))
+        if (!ApplyStateEffect(eventCode, data, false))
             return false;
 
         if (KnownTSortRegistry.CrossesShardBoundary(eventCode) && !TryEnqueueForOtherShards(eventCode, data))
             return false;
 
-        if (!ApplyStateEffect(eventCode, data, apply: true))
+        if (!ApplyStateEffect(eventCode, data, true))
         {
             logger.LogError(
                 "Zone-center event sort {Sort} was accepted by the durable relay but could not be applied locally",
@@ -178,7 +178,7 @@ public sealed class ZoneCenterBroadcastIngestor(
         if (!Allow(eventCode, nameof(ApplyRelayedEvent)))
             return;
 
-        if (!ApplyStateEffect(eventCode, data, apply: true))
+        if (!ApplyStateEffect(eventCode, data, true))
             return;
 
         if (eventCode == PingEventCode)
@@ -354,8 +354,8 @@ public sealed class ZoneCenterBroadcastIngestor(
             return false;
 
         if (apply && eventCode is AllianceProposalCenterEventMap.FinalizeNewAllianceEventCode
-            or AllianceProposalCenterEventMap.BreakAllianceViaRitualEventCode
-            or AllianceProposalCenterEventMap.BreakAllianceViaStoneCaptureEventCode)
+                or AllianceProposalCenterEventMap.BreakAllianceViaRitualEventCode
+                or AllianceProposalCenterEventMap.BreakAllianceViaStoneCaptureEventCode)
             worldReactions?.Value.ApplyRelayedStateAndReactions(eventCode, data);
 
         return true;
@@ -618,7 +618,8 @@ public sealed class ZoneCenterBroadcastIngestor(
 
         if (effectValue is < 0 or > 3)
         {
-            logger.LogWarning("DTM event referenced out-of-range effect {EffectValue} -- ignored, dropped without relay",
+            logger.LogWarning(
+                "DTM event referenced out-of-range effect {EffectValue} -- ignored, dropped without relay",
                 effectValue);
             return false;
         }
@@ -628,6 +629,7 @@ public sealed class ZoneCenterBroadcastIngestor(
             state.SetZone038DtmValue((byte)tribeId, effectValue);
             zones.ApplyZone38TribeEffects(state.CaptureZone38TribeEffects());
         }
+
         return true;
     }
 

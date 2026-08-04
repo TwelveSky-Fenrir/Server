@@ -1,5 +1,4 @@
 using System.Buffers;
-using Fenrir.Application.Game.Domain.World;
 using Fenrir.Core.Wire;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;

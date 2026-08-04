@@ -26,7 +26,9 @@ public enum ZoneWarKind : byte
     Zone335 = 6
 }
 
-public sealed class ZoneWarTickService(ZoneRegistry zones, IOptions<GameServerOptions> options,
+public sealed class ZoneWarTickService(
+    ZoneRegistry zones,
+    IOptions<GameServerOptions> options,
     ILogger<ZoneWarTickService> logger) : BackgroundService
 {
     public const int TribeCount = WorldStateService.TribeCount;

@@ -1,7 +1,7 @@
 CREATE TRIGGER game.tr_AccountVaultItems_BumpRevision
     ON game.AccountVaultItems
     AFTER INSERT, UPDATE, DELETE
-AS
+    AS
 BEGIN
     SET NOCOUNT ON;
 
@@ -9,14 +9,12 @@ BEGIN
     SET Revision     = Revision + 1,
         UpdatedAtUtc = SYSUTCDATETIME()
     FROM game.AccountVault AS vault
-    INNER JOIN
-    (
-        SELECT AccountId
-        FROM inserted
+             INNER JOIN
+         (SELECT AccountId
+          FROM inserted
 
-        UNION
+          UNION
 
-        SELECT AccountId
-        FROM deleted
-    ) AS changed ON changed.AccountId = vault.AccountId;
+          SELECT AccountId
+          FROM deleted) AS changed ON changed.AccountId = vault.AccountId;
 END;

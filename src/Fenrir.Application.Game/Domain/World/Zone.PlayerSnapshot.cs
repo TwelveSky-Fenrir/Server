@@ -33,14 +33,19 @@ public sealed partial class Zone
             }
         }
 
-        public bool ContainsKey(int characterId)
-        {
-            return _players.ContainsKey(characterId);
-        }
-
         public IEnumerator<KeyValuePair<int, PlayerRuntimeState>> GetEnumerator()
         {
             return _players.GetEnumerator();
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
+        public bool ContainsKey(int characterId)
+        {
+            return _players.ContainsKey(characterId);
         }
 
         public bool TryAdd(int characterId, PlayerRuntimeState state)
@@ -64,11 +69,6 @@ public sealed partial class Zone
 
             PublishRemoval(characterId);
             return true;
-        }
-
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
         }
 
         private void PublishAddition(PlayerRuntimeState state)

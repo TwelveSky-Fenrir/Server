@@ -1,6 +1,6 @@
 CREATE PROCEDURE game.usp_PvpKillCooldown_TryClaim @ClaimId UNIQUEIDENTIFIER,
-                                                    @AttackerCharacterId INT,
-                                                    @DefenderCharacterId INT
+                                                   @AttackerCharacterId INT,
+                                                   @DefenderCharacterId INT
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -23,7 +23,8 @@ BEGIN
     SELECT @RecordedAttackerCharacterId = AttackerCharacterId,
            @RecordedDefenderCharacterId = DefenderCharacterId,
            @RecordedWasAccepted = WasAccepted
-    FROM game.PvpKillCooldownLedger WITH (UPDLOCK, HOLDLOCK)
+    FROM game.PvpKillCooldownLedger
+    WITH (UPDLOCK, HOLDLOCK)
     WHERE ClaimId = @ClaimId;
 
     IF @RecordedAttackerCharacterId IS NOT NULL
@@ -38,21 +39,21 @@ BEGIN
             COMMIT TRANSACTION;
 
             SELECT @RecordedWasAccepted AS WasAccepted,
-                   CAST(1 AS BIT) AS WasAlreadyAccepted;
+                   CAST(1 AS BIT)       AS WasAlreadyAccepted;
             RETURN;
         END;
 
     SELECT @CooldownExpiresAtUtc = CooldownExpiresAtUtc
-    FROM game.PvpKillCooldownState WITH (UPDLOCK, HOLDLOCK)
+    FROM game.PvpKillCooldownState
+    WITH (UPDLOCK, HOLDLOCK)
     WHERE AttackerCharacterId = @AttackerCharacterId
       AND DefenderCharacterId = @DefenderCharacterId;
 
     IF @CooldownExpiresAtUtc IS NOT NULL AND @CooldownExpiresAtUtc > @NowUtc
         BEGIN
             INSERT INTO game.PvpKillCooldownLedger
-                (ClaimId, AttackerCharacterId, DefenderCharacterId, WasAccepted, CooldownExpiresAtUtc)
-            VALUES
-                (@ClaimId, @AttackerCharacterId, @DefenderCharacterId, 0, NULL);
+            (ClaimId, AttackerCharacterId, DefenderCharacterId, WasAccepted, CooldownExpiresAtUtc)
+            VALUES (@ClaimId, @AttackerCharacterId, @DefenderCharacterId, 0, NULL);
 
             COMMIT TRANSACTION;
 
@@ -63,21 +64,19 @@ BEGIN
 
     IF @CooldownExpiresAtUtc IS NULL
         INSERT INTO game.PvpKillCooldownState
-            (AttackerCharacterId, DefenderCharacterId, LastClaimId, CooldownExpiresAtUtc)
-        VALUES
-            (@AttackerCharacterId, @DefenderCharacterId, @ClaimId, @NewCooldownExpiresAtUtc);
+        (AttackerCharacterId, DefenderCharacterId, LastClaimId, CooldownExpiresAtUtc)
+        VALUES (@AttackerCharacterId, @DefenderCharacterId, @ClaimId, @NewCooldownExpiresAtUtc);
     ELSE
         UPDATE game.PvpKillCooldownState
-        SET LastClaimId = @ClaimId,
+        SET LastClaimId          = @ClaimId,
             CooldownExpiresAtUtc = @NewCooldownExpiresAtUtc,
-            UpdatedAtUtc = @NowUtc
+            UpdatedAtUtc         = @NowUtc
         WHERE AttackerCharacterId = @AttackerCharacterId
           AND DefenderCharacterId = @DefenderCharacterId;
 
     INSERT INTO game.PvpKillCooldownLedger
-        (ClaimId, AttackerCharacterId, DefenderCharacterId, WasAccepted, CooldownExpiresAtUtc)
-    VALUES
-        (@ClaimId, @AttackerCharacterId, @DefenderCharacterId, 1, @NewCooldownExpiresAtUtc);
+    (ClaimId, AttackerCharacterId, DefenderCharacterId, WasAccepted, CooldownExpiresAtUtc)
+    VALUES (@ClaimId, @AttackerCharacterId, @DefenderCharacterId, 1, @NewCooldownExpiresAtUtc);
 
     COMMIT TRANSACTION;
 

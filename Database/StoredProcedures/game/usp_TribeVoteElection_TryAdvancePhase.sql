@@ -7,7 +7,7 @@ BEGIN
     SET XACT_ABORT ON;
 
     IF @ExpectedPhase NOT BETWEEN 1 AND 3
-       OR @NextPhase <> @ExpectedPhase + 1
+        OR @NextPhase <> @ExpectedPhase + 1
         THROW 50498, 'usp_TribeVoteElection_TryAdvancePhase requires the next legal phase transition.', 1;
 
     BEGIN TRANSACTION;
@@ -26,7 +26,8 @@ BEGIN
         END;
 
     DECLARE @matchingStateCount INT = (SELECT COUNT(*)
-                                       FROM game.TribeVoteElectionStates WITH (UPDLOCK, HOLDLOCK)
+                                       FROM game.TribeVoteElectionStates
+                                       WITH (UPDLOCK, HOLDLOCK)
                                        WHERE CycleId = @CycleId
                                          AND Phase = @ExpectedPhase);
 
@@ -38,7 +39,7 @@ BEGIN
         END;
 
     UPDATE game.TribeVoteElectionStates
-    SET Phase = @NextPhase,
+    SET Phase        = @NextPhase,
         UpdatedAtUtc = SYSUTCDATETIME()
     WHERE CycleId = @CycleId
       AND Phase = @ExpectedPhase;

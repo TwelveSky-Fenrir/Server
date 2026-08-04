@@ -25,7 +25,8 @@ public sealed class FishingCatchService(
 
         if ((await zone.PostFishingCommandAndWaitForResultAsync(
                 new FishingZoneCommand(characterId, state.FishingState, step, state.CatchingFish, false, null,
-                    castAt, BiteWasHit: state.FishingBiteWasHit), cancellationToken)).Kind != ZoneCommandResultKind.Applied)
+                    castAt, BiteWasHit: state.FishingBiteWasHit), cancellationToken)).Kind !=
+            ZoneCommandResultKind.Applied)
         {
             logger.LogError("Zone {MapId} did not acknowledge fishing-catch state for character {CharacterId}",
                 zone.MapId, characterId);
@@ -142,7 +143,7 @@ public sealed class FishingCatchService(
         CancellationToken cancellationToken)
     {
         return (await zone.PostFishingCommandAndWaitForResultAsync(
-            new FishingZoneCommand(characterId, 0, 0, false, false, null, castAt), cancellationToken)).Kind ==
+                   new FishingZoneCommand(characterId, 0, 0, false, false, null, castAt), cancellationToken)).Kind ==
                ZoneCommandResultKind.Applied;
     }
 }

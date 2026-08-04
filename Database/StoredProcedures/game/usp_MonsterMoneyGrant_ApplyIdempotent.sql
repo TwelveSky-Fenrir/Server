@@ -22,7 +22,8 @@ BEGIN
 
     SELECT @StoredCharacterId = CharacterId,
            @StoredAmount = Amount
-    FROM game.MonsterMoneyGrantLedger WITH (UPDLOCK, HOLDLOCK)
+    FROM game.MonsterMoneyGrantLedger
+    WITH (UPDLOCK, HOLDLOCK)
     WHERE CorrelationId = @CorrelationId;
 
     IF @StoredCharacterId IS NOT NULL
@@ -41,9 +42,9 @@ BEGIN
         END;
 
     DECLARE @Credited TABLE
-                           (
-                               AccountId INT NOT NULL
-                           );
+                      (
+                          AccountId INT NOT NULL
+                      );
 
     UPDATE c
     SET Money        = c.Money + @Amount,
@@ -69,23 +70,21 @@ BEGIN
     SELECT @AccountId = AccountId FROM @Credited;
 
     DECLARE @AuditEvent TABLE
-                              (
-                                  EventLogId BIGINT NOT NULL
-                              );
+                        (
+                            EventLogId BIGINT NOT NULL
+                        );
 
     INSERT INTO game.EventLog
-        (EventCode, Category, ActorAccountId, ActorCharacterId, DeltaMoney, Outcome, Payload)
+    (EventCode, Category, ActorAccountId, ActorCharacterId, DeltaMoney, Outcome, Payload)
     OUTPUT inserted.EventLogId INTO @AuditEvent (EventLogId)
-    VALUES
-        (5, 1, @AccountId, @CharacterId, @Amount, 1,
-         CONCAT(N'CorrelationId=', CONVERT(NVARCHAR(36), @CorrelationId), N';Source=MonsterLoot'));
+    VALUES (5, 1, @AccountId, @CharacterId, @Amount, 1,
+            CONCAT(N'CorrelationId=', CONVERT(NVARCHAR(36), @CorrelationId), N';Source=MonsterLoot'));
 
     SELECT @AuditEventLogId = EventLogId FROM @AuditEvent;
 
     INSERT INTO game.MonsterMoneyGrantLedger
         (CorrelationId, CharacterId, AccountId, Amount, AuditEventLogId)
-    VALUES
-        (@CorrelationId, @CharacterId, @AccountId, @Amount, @AuditEventLogId);
+    VALUES (@CorrelationId, @CharacterId, @AccountId, @Amount, @AuditEventLogId);
 
     COMMIT TRANSACTION;
 

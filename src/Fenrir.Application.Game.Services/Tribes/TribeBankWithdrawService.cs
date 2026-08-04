@@ -2,7 +2,6 @@ using Fenrir.Application.Game.Abstractions.Tribes;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Core.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Tribes;

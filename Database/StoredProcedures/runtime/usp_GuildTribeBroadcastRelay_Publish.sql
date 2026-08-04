@@ -28,10 +28,12 @@ BEGIN
 
     IF @ExistingRelayId IS NULL
         INSERT INTO runtime.GuildTribeBroadcastRelay
-        (Kind, SourceShardId, SourceCharacterId, SystemCause, GuildId, Tribe, RoleField, AvatarName, Content, HasItemLink,
+        (Kind, SourceShardId, SourceCharacterId, SystemCause, GuildId, Tribe, RoleField, AvatarName, Content,
+         HasItemLink,
          ItemLinkIndex, ItemLinkActivity, ItemLinkValue, ItemLinkSocket0, ItemLinkSocket1, ItemLinkSocket2,
          CorrelationId, CreatedAtUtc)
-        VALUES (@Kind, @SourceShardId, @SourceCharacterId, @SystemCause, @GuildId, @Tribe, @RoleField, @AvatarName, @Content, @HasItemLink,
+        VALUES (@Kind, @SourceShardId, @SourceCharacterId, @SystemCause, @GuildId, @Tribe, @RoleField, @AvatarName,
+                @Content, @HasItemLink,
                 @ItemLinkIndex, @ItemLinkActivity, @ItemLinkValue, @ItemLinkSocket0, @ItemLinkSocket1,
                 @ItemLinkSocket2, @CorrelationId, SYSUTCDATETIME());
 END;

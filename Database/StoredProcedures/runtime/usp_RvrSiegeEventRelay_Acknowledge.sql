@@ -1,6 +1,6 @@
 CREATE PROCEDURE runtime.usp_RvrSiegeEventRelay_Acknowledge @ShardId TINYINT,
                                                             @RelayId BIGINT
-    WITH NATIVE_COMPILATION, SCHEMABINDING
+    WITH NATIVE_COMPILATION , SCHEMABINDING
 AS
 BEGIN
     ATOMIC
@@ -12,15 +12,15 @@ BEGIN
     WHERE ShardId = @ShardId;
 
     IF @CurrentRelayId IS NULL
-    BEGIN
-        INSERT INTO runtime.RvrSiegeEventRelayCursor (ShardId, LastRelayId)
-        VALUES (@ShardId, @RelayId);
-    END
+        BEGIN
+            INSERT INTO runtime.RvrSiegeEventRelayCursor (ShardId, LastRelayId)
+            VALUES (@ShardId, @RelayId);
+        END
     ELSE
-    BEGIN
-        IF @CurrentRelayId < @RelayId
-            UPDATE runtime.RvrSiegeEventRelayCursor
-            SET LastRelayId = @RelayId
-            WHERE ShardId = @ShardId;
-    END
+        BEGIN
+            IF @CurrentRelayId < @RelayId
+                UPDATE runtime.RvrSiegeEventRelayCursor
+                SET LastRelayId = @RelayId
+                WHERE ShardId = @ShardId;
+        END
 END;

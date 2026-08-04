@@ -11,7 +11,11 @@ public enum ZoneTransferOutcome
     SlotEmpty
 }
 
-public readonly record struct ZoneTransferResult(ZoneTransferOutcome Outcome, string Ip, int Port, short Zone,
+public readonly record struct ZoneTransferResult(
+    ZoneTransferOutcome Outcome,
+    string Ip,
+    int Port,
+    short Zone,
     string Capability);
 
 public interface IZoneTransferService

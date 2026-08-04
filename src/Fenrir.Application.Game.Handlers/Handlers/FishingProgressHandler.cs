@@ -91,7 +91,8 @@ public sealed class FishingProgressHandler(
 
         if (value.BroadcastCapture &&
             (await zone.PostFishingCommandAndWaitForResultAsync(
-                new FishingZoneCommand(characterId, 0, 0, false, true, 93, ApplyState: false), cancellationToken)).Kind !=
+                new FishingZoneCommand(characterId, 0, 0, false, true, 93, ApplyState: false), cancellationToken))
+            .Kind !=
             ZoneCommandResultKind.Applied)
             logger.LogError("Zone {MapId} did not acknowledge fishing-capture action for character {CharacterId}",
                 zone.MapId, characterId);

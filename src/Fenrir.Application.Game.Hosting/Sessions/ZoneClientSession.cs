@@ -17,7 +17,8 @@ public sealed class ZoneClientSession(
     IPEndPoint? remoteEndPoint = null,
     ILogger? logger = null,
     OutboundBufferAdmissionGate? outboundAdmissionGate = null)
-    : ClientSession(sessionId, transport, FenrirServer.Zone, remoteEndPoint, logger, outboundAdmissionGate), IZoneSession
+    : ClientSession(sessionId, transport, FenrirServer.Zone, remoteEndPoint, logger, outboundAdmissionGate),
+        IZoneSession
 {
     public short ListenerMapId { get; } = listenerMapId;
 

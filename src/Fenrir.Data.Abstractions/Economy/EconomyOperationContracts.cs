@@ -47,7 +47,10 @@ public sealed class EconomyOperationIdempotencyKeyHash
         return new EconomyOperationIdempotencyKeyHash(hash.ToArray());
     }
 
-    public byte[] ToArray() => value.ToArray();
+    public byte[] ToArray()
+    {
+        return value.ToArray();
+    }
 }
 
 [GenerateDto]

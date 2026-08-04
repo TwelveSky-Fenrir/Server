@@ -28,12 +28,11 @@ BEGIN
     BEGIN TRANSACTION;
 
     IF NOT EXISTS
-    (
-        SELECT 1
-        FROM admin.ShardMapAssignments WITH (UPDLOCK, HOLDLOCK)
-        WHERE ShardId = @ShardId
-          AND MapId = @TargetMapId
-    )
+        (SELECT 1
+         FROM admin.ShardMapAssignments
+         WITH (UPDLOCK, HOLDLOCK)
+         WHERE ShardId = @ShardId
+           AND MapId = @TargetMapId)
         BEGIN
             ROLLBACK TRANSACTION;
             SELECT CAST(0 AS BIT) AS Accepted;
@@ -41,12 +40,11 @@ BEGIN
         END
 
     IF NOT EXISTS
-    (
-        SELECT 1
-        FROM game.Characters WITH (UPDLOCK, HOLDLOCK)
-        WHERE CharacterId = @CharacterId
-          AND AccountId = @AccountId
-    )
+        (SELECT 1
+         FROM game.Characters
+         WITH (UPDLOCK, HOLDLOCK)
+         WHERE CharacterId = @CharacterId
+           AND AccountId = @AccountId)
         BEGIN
             ROLLBACK TRANSACTION;
             SELECT CAST(0 AS BIT) AS Accepted;
@@ -67,7 +65,8 @@ BEGIN
             RETURN;
         END
 
-    DELETE FROM runtime.SessionTickets WITH (SNAPSHOT)
+    DELETE
+    FROM runtime.SessionTickets WITH (SNAPSHOT)
     WHERE AccountId = @AccountId;
 
     INSERT INTO runtime.SessionTickets (CapabilityHash, AccountId, CharacterId, ShardId, TargetMapId, ExpiresAtUtc,

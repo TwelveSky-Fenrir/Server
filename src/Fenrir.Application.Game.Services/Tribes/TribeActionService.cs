@@ -9,7 +9,6 @@ using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
-using Fenrir.Core.Abstractions;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Core.Wire;
 using Fenrir.Domain.Game.GameData;
@@ -58,8 +57,8 @@ public sealed class TribeActionService(
             pet: ComputePetContribution(state, equipmentContainer), runtimeState: state);
 
         if (!await ApplyRequiredActorMutationAsync(zone, state, new TribeProgressZoneCommand(characterId,
-            StatVit: 1, StatStr: 1, StatInt: 1, StatDex: 1, StatPoints: newStatPoints,
-            Life: 1, Mana: 0, UpdatedStats: updatedStats), "stat reset", false, ct))
+                StatVit: 1, StatStr: 1, StatInt: 1, StatDex: 1, StatPoints: newStatPoints,
+                Life: 1, Mana: 0, UpdatedStats: updatedStats), "stat reset", false, ct))
             return TribeActionOutcome.Abort;
 
         logger.LogInformation("Character {CharacterId} reset base stats, refunding {Refund} points", characterId,
@@ -309,9 +308,10 @@ public sealed class TribeActionService(
             pet: ComputePetContribution(state, equipmentContainer), runtimeState: state);
 
         if (!await ApplyRequiredActorMutationAsync(zone, state, new TribeProgressZoneCommand(characterId,
-            state.ContributionPoints - cost, Title: newTitle,
-            Life: updatedStats.MaxLife, Mana: updatedStats.MaxMana, UpdatedStats: updatedStats), "title purchase",
-            false, ct))
+                    state.ContributionPoints - cost, Title: newTitle,
+                    Life: updatedStats.MaxLife, Mana: updatedStats.MaxMana, UpdatedStats: updatedStats),
+                "title purchase",
+                false, ct))
             return TribeActionOutcome.Abort;
 
         logger.LogInformation(
@@ -370,14 +370,14 @@ public sealed class TribeActionService(
                 pet: ComputePetContribution(state, equipmentContainer), runtimeState: state);
 
             if (!await ApplyRequiredActorMutationAsync(zone, state, new TribeProgressZoneCommand(characterId,
-                state.ContributionPoints - HaloEnchantCpCost, Halo: newHalo,
-                ProtectForHalo: newProtect, UpdatedStats: updatedStats), "halo enchant", true, ct))
+                    state.ContributionPoints - HaloEnchantCpCost, Halo: newHalo,
+                    ProtectForHalo: newProtect, UpdatedStats: updatedStats), "halo enchant", true, ct))
                 return TribeActionOutcome.Abort;
         }
         else
         {
             if (!await ApplyRequiredActorMutationAsync(zone, state, new TribeProgressZoneCommand(characterId,
-                    state.ContributionPoints - HaloEnchantCpCost, ProtectForHalo: newProtect), "halo enchant", true,
+                        state.ContributionPoints - HaloEnchantCpCost, ProtectForHalo: newProtect), "halo enchant", true,
                     ct))
                 return TribeActionOutcome.Abort;
         }
@@ -491,8 +491,8 @@ public sealed class TribeActionService(
             return TribeActionOutcome.Abort;
 
         if (!await ApplyRequiredActorMutationAsync(zone, state, new TribeProgressZoneCommand(characterId,
-            state.ContributionPoints - cpCost,
-            DropItems: [new TribeGroundItemDrop(itemId, 1)]), "tribe scroll redemption", false, ct))
+                state.ContributionPoints - cpCost,
+                DropItems: [new TribeGroundItemDrop(itemId, 1)]), "tribe scroll redemption", false, ct))
             return TribeActionOutcome.Abort;
 
         logger.LogInformation("Character {CharacterId} redeemed item {ItemId} for {CpCost} CP", characterId, itemId,

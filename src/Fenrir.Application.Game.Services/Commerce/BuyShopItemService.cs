@@ -6,7 +6,6 @@ using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Social.Pshop;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Domain.World.Loot;
 using Fenrir.Application.Game.Domain.World.Npcs;
 using Fenrir.Core.Packets.Shared;
 using Fenrir.Domain.Game.GameData;
@@ -220,7 +219,7 @@ public sealed class BuyShopItemService(
         catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException
                                                 {
                                                     Number: SellerMoneyCapExceededErrorNumber or
-                                                        BuyerInsufficientFundsErrorNumber
+                                                    BuyerInsufficientFundsErrorNumber
                                                 })
         {
             logger.LogInformation(
@@ -333,7 +332,7 @@ public sealed class BuyShopItemService(
         catch (CaeriusNetSqlException ex) when (ex.InnerException is SqlException
                                                 {
                                                     Number: ProxyBigMoneyCapExceededErrorNumber or
-                                                        BuyerInsufficientFundsErrorNumber
+                                                    BuyerInsufficientFundsErrorNumber
                                                 })
         {
             logger.LogInformation(

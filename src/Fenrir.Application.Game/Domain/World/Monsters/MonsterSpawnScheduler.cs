@@ -24,10 +24,13 @@ internal sealed class MonsterSpawnSlot
 
 internal sealed class MonsterZoneSpawnState
 {
+    public int DemonLordKillTally;
+
     public int IgnoreRespawnDelayPending;
 
     public int SummonStateResetPending;
     public required List<MonsterSpawnSlot> Slots { get; init; }
+    public required Dictionary<int, MonsterSpawnSlot> SlotsByServerIndex { get; init; }
     public required MonsterDropRoller DropRoller { get; init; }
     public required Random Random { get; init; }
     public bool InitialPopDone { get; set; }
@@ -71,6 +74,8 @@ public sealed class MonsterSpawnScheduler(
 
     private const string SystemDropMasterName = "-System-";
 
+    private const int KillerLocationDropMonsterIdCeiling = 288;
+
     private static readonly DateTime YangGokNormalBossAliveSentinelUtc = DateTime.MinValue;
 
     private readonly BossDropCatalog _bossDropCatalog = bossDropCatalog ?? BossDropCatalog.Default;
@@ -78,8 +83,6 @@ public sealed class MonsterSpawnScheduler(
     private readonly Func<Random> _randomFactory = randomFactory ?? (static () => new Random());
 
     private readonly ConcurrentDictionary<short, MonsterZoneSpawnState> _stateByZone = new();
-
-    private int _demonLordKillTally;
 
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
@@ -214,9 +217,14 @@ public sealed class MonsterSpawnScheduler(
                     slots.Add(slot);
                 }
 
+        var slotsByServerIndex = new Dictionary<int, MonsterSpawnSlot>(slots.Count);
+        foreach (var slot in slots)
+            slotsByServerIndex[slot.ServerIndex] = slot;
+
         return new MonsterZoneSpawnState
         {
             Slots = slots,
+            SlotsByServerIndex = slotsByServerIndex,
             DropRoller = new MonsterDropRoller(worldData, random),
             Random = random
         };
@@ -259,8 +267,7 @@ public sealed class MonsterSpawnScheduler(
     {
         while (zone.TryDequeueInvalidatedMonster(out var monster))
         {
-            var slot = state.Slots.Find(s => s.ServerIndex == monster!.ServerIndex);
-            if (slot is not null)
+            if (state.SlotsByServerIndex.TryGetValue(monster!.ServerIndex, out var slot))
             {
                 slot.Alive = false;
                 var respawnTicks = RollRespawnTicks(slot.Monster, state.Random);
@@ -275,6 +282,11 @@ public sealed class MonsterSpawnScheduler(
                 TribeSymbolIndexOf(monster.Template.SpecialType) is { } symbolIndex &&
                 monster.TryResolveTribeSymbolWinner(out var winnerTribe))
                 zoneEventBroadcaster?.Value.AnnounceSymbolResolved(symbolIndex, winnerTribe);
+
+            if (monster.SpecialSort == MonsterSpecialSort.AllianceStone &&
+                AllianceStoneTribeOf(monster.Template.SpecialType) is { } stoneTribe)
+                siegeIngestor?.Value.AnnounceAllianceStoneDestroyed(stoneTribe, monster.LastAttackerTribe,
+                    monster.LastAttackerName);
         }
     }
 
@@ -371,21 +383,29 @@ public sealed class MonsterSpawnScheduler(
         MonsterDefinition monsterDefinition, PlayerRuntimeState creditedAvatar,
         out bool killRaceInterceptsExperienceGrant)
     {
+        killRaceInterceptsExperienceGrant =
+            valleyWarKillRegistry?.RegisterMonsterKill(zone.MapId, creditedAvatar.Tribe) ?? false;
+
+        if (zone.IsZone200TypeZone)
+            return null;
+
         var dropEligible = MonsterDropRoller.IsEligible(monsterDefinition.Monster, creditedAvatar.Level,
             creditedAvatar.Level2);
         zone.NotifyPopupEventMonsterKill(creditedAvatar, dropEligible);
-
-        killRaceInterceptsExperienceGrant =
-            valleyWarKillRegistry?.RegisterMonsterKill(zone.MapId, creditedAvatar.Tribe) ?? false;
 
         var partyMemberIds = partyRegistry?.GetMembers(creditedAvatar.CharacterId);
 
         bool CreditedAvatarHasItem(int itemId)
         {
-            return creditedAvatar.Inventory.GetContainer(ContainerMatrix.InventoryPage0).Values
-                       .Any(s => s.ItemId == itemId) ||
-                   creditedAvatar.Inventory.GetContainer(ContainerMatrix.InventoryPage1).Values
-                       .Any(s => s.ItemId == itemId);
+            foreach (var entry in creditedAvatar.Inventory.GetContainer(ContainerMatrix.InventoryPage0))
+                if (entry.Value.ItemId == itemId)
+                    return true;
+
+            foreach (var entry in creditedAvatar.Inventory.GetContainer(ContainerMatrix.InventoryPage1))
+                if (entry.Value.ItemId == itemId)
+                    return true;
+
+            return false;
         }
 
         var creditedAvatarQuest = new QuestProgress(creditedAvatar.QuestStepPermanent, creditedAvatar.QuestActiveFlag,
@@ -394,10 +414,10 @@ public sealed class MonsterSpawnScheduler(
         var luck = (creditedAvatar.Stats?.Luck ?? 0) * 10;
 
         var demonLordKillTally = monster.Template.MonsterId == BossEventDropResolver.DemonLordMonsterId
-            ? Interlocked.Increment(ref _demonLordKillTally)
+            ? ++state.DemonLordKillTally
             : 0;
         var bossOutcome = BossEventDropResolver.Resolve(monster.Template.MonsterId, demonLordKillTally, state.Random,
-            worldData, _bossDropCatalog);
+            _bossDropCatalog);
 
         ApplyBossDropSideEffects(zone, creditedAvatar, bossOutcome);
 
@@ -416,40 +436,49 @@ public sealed class MonsterSpawnScheduler(
 
             var result = state.DropRoller.Roll(monsterDefinition, creditedAvatar.Level,
                 creditedAvatar.PreviousTribe, luck, creditedAvatarQuest, CreditedAvatarHasItem,
-                killerPremiumActive: creditedAvatar.PremiumExpireUtc > 0,
-                killerLevel2: creditedAvatar.Level2,
-                killerDropItemTimeActive: creditedAvatar.DropItemTime > 0,
-                isZone039TypeShard: zone.IsZone039TypeZone,
-                killerItemDropUpBuffActive: itemDropUpBuffActive,
-                tribeItemDropBonus: tribeItemDropBonus,
-                tribeRareDropBonus: tribeRareDropBonus);
+                creditedAvatar.PremiumExpireUtc > 0,
+                creditedAvatar.Level2,
+                creditedAvatar.DropItemTime > 0,
+                zone.IsZone039TypeZone,
+                itemDropUpBuffActive,
+                tribeItemDropBonus,
+                tribeRareDropBonus);
 
             money = result.Money;
             genericItems = result.Items;
         }
 
         if (money is { } amount)
-        {
             zone.QueueMoneyGrant(creditedAvatar.CharacterId, amount);
 
-            var tribeTaxBase = amount - (long)(amount * InventoryToWorldDropPolicy.MonsterMoneyGroundReductionRatio);
-            zone.CreditMonsterKillTribeTax(creditedAvatar.Tribe, tribeTaxBase);
-        }
+        var (dropX, dropY, dropZ) = ResolveKillDropLocation(monster, creditedAvatar);
 
         foreach (var publicItem in bossOutcome.PublicItems)
-            zone.SpawnGroundItem(publicItem.ItemId, publicItem.Quantity, monster.PosX, monster.PosY, monster.PosZ,
+            zone.SpawnGroundItem(publicItem.ItemId, publicItem.Quantity, dropX, dropY, dropZ,
                 "", "", 0, monster.InstanceId);
 
         if (bossOutcome.Items.Count > 0 || genericItems.Count > 0)
         {
-            var (partyName, dropSort) = ResolvePartyDrop(zone, creditedAvatar, partyMemberIds);
+            var dropSort = ResolveMonsterDropSort(partyMemberIds);
 
-            foreach (var item in bossOutcome.Items.Concat(genericItems))
-                zone.SpawnGroundItem(item.ItemId, item.Quantity, monster.PosX, monster.PosY, monster.PosZ,
-                    creditedAvatar.Name, partyName, dropSort, monster.InstanceId);
+            foreach (var item in bossOutcome.Items)
+                zone.SpawnGroundItem(item.ItemId, item.Quantity, dropX, dropY, dropZ,
+                    creditedAvatar.Name, "", dropSort, monster.InstanceId);
+
+            foreach (var item in genericItems)
+                zone.SpawnGroundItem(item.ItemId, item.Quantity, dropX, dropY, dropZ,
+                    creditedAvatar.Name, "", dropSort, monster.InstanceId);
         }
 
         return partyMemberIds;
+    }
+
+    private static (float X, float Y, float Z) ResolveKillDropLocation(MonsterEntity monster,
+        PlayerRuntimeState creditedAvatar)
+    {
+        return monster.Template.MonsterId < KillerLocationDropMonsterIdCeiling
+            ? (creditedAvatar.PosX, creditedAvatar.PosY, creditedAvatar.PosZ)
+            : (monster.PosX, monster.PosY, monster.PosZ);
     }
 
     private static void ApplyBossDropSideEffects(Zone zone, PlayerRuntimeState creditedAvatar, BossDropOutcome outcome)
@@ -467,19 +496,9 @@ public sealed class MonsterSpawnScheduler(
             zone.AnnounceEliteBossDefeated(creditedAvatar.Tribe, creditedAvatar.Name);
     }
 
-    private static (string PartyName, int DropSort) ResolvePartyDrop(Zone zone, PlayerRuntimeState creditedAvatar,
-        IReadOnlyList<int>? partyMemberIds)
+    private static int ResolveMonsterDropSort(IReadOnlyList<int>? partyMemberIds)
     {
-        if (partyMemberIds is not { Count: > 0 } members)
-            return ("", 0);
-
-        var leaderId = members[0];
-        if (leaderId == creditedAvatar.CharacterId)
-            return (creditedAvatar.Name, 1);
-
-        return zone.TryGetPlayer(leaderId, out var leader) && leader is not null
-            ? (leader.Name, 1)
-            : (creditedAvatar.Name, 1);
+        return partyMemberIds is { Count: > 0 } ? GroundItemEntity.MonsterKillDropSort : 0;
     }
 
     private void ApplyTowerCpForPvmMilestone(Zone zone, PlayerRuntimeState attacker, int monsterRealLevel)
@@ -504,6 +523,18 @@ public sealed class MonsterSpawnScheduler(
             13 => 2,
             28 => 3,
             14 => 4,
+            _ => null
+        };
+    }
+
+    private static byte? AllianceStoneTribeOf(byte specialType)
+    {
+        return specialType switch
+        {
+            31 => 0,
+            32 => 1,
+            33 => 2,
+            34 => 3,
             _ => null
         };
     }

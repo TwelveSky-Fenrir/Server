@@ -151,20 +151,9 @@ public static class SetBonusTables
 
     public static int GetFlatLifeBonus(int setNumber)
     {
-        var nxtOrSet20 = setNumber switch
-        {
-            101 => 1000,
-            102 => 2000,
-            103 => 3000,
-            20 => 20000,
-            _ => 0
-        };
+        var nxt = setNumber switch { 101 => 1000, 102 => 2000, 103 => 3000, _ => 0 };
 
-        var pieceBonus = (setNumber == 13 ? 1000 : 0) + (setNumber == 18 ? 1100 : 0);
-
-        var anySetBonus = setNumber != 0 ? 15000 : 0;
-
-        return nxtOrSet20 + pieceBonus + anySetBonus;
+        return nxt + (setNumber == 13 ? 1000 : 0) + (setNumber == 18 ? 1100 : 0);
     }
 
     public static int GetFlatManaBonus(int setNumber)

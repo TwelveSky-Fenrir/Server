@@ -22,6 +22,11 @@ public static class ProxyShopWireMapper
                 Id = itemId, Quantity = item.Quantity, Value = item.Value, Serial = item.SerialNumber,
                 Price = item.Price
             };
+
+            var socketBase = item.SlotIndex * 3;
+            sockets[socketBase] = item.SocketGem1;
+            sockets[socketBase + 1] = item.SocketGem2;
+            sockets[socketBase + 2] = item.SocketGem3;
         }
 
         return new ProxyShopUserInfo

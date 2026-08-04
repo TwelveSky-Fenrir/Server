@@ -309,6 +309,7 @@ public sealed class ZoneEventBroadcaster(
                 break;
 
             case 47:
+            case 49:
                 worldState.DissolveAlliance((byte)ReadInt32(data, 0), (byte)ReadInt32(data, 4));
                 break;
         }

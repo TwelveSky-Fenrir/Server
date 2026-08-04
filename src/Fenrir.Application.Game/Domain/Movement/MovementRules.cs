@@ -29,14 +29,6 @@ public sealed class MovementRules(IOptions<GameServerOptions> options)
         if (geometry is null)
             return true;
 
-        geometry.Resolve(toX, toZ, out var walkable, out var groundY);
-
-        if (!walkable)
-            return false;
-
-        if (toY < groundY - MaxBelowGroundTolerance)
-            return false;
-
-        return true;
+        return geometry.TryGetGroundHeight(toX, toZ, out _, toY + MaxBelowGroundTolerance);
     }
 }

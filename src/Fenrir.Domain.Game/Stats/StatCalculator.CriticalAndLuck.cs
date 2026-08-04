@@ -18,19 +18,19 @@ public static partial class StatCalculator
                               SetBonusTables.GetCoefficients(setNumber, i, IsLegendary(slot.Item)).Critical);
         }
 
-        crit = MountGradeCritical(crit, mount);
-
         if (bySlot[4] is { } ring && !IsLegendary(ring.Item))
             crit += ring.Enchant / 4;
-
-        crit += CriBoostContribution(consumable, zone);
-
-        crit += SetBonusTables.GetBaseCriticalFlatBonus(setNumber);
 
         if (bySlot[10] is { } deco2)
             crit += deco2.Item.ItemId switch { 213 or 214 or 215 => 1, 216 or 217 or 218 => 3, _ => 0 };
 
+        crit += CriBoostContribution(consumable, zone);
+
         crit += CostumeCriticalContribution(cosmetic.CostumeEnchantCs);
+
+        crit = MountGradeCritical(crit, mount);
+
+        crit += SetBonusTables.GetBaseCriticalFlatBonus(setNumber);
 
         return crit;
     }
@@ -62,13 +62,13 @@ public static partial class StatCalculator
 
         critDef += halo == 96 ? 10 : halo / 10;
 
+        critDef = ApplyDrunkCriticalDefence(critDef, zone);
+
         critDef += SetBonusTables.CapeIuBonus(bySlot[1], 8, 0.5f);
         if (bySlot[1] is { } cape && cape.Item.ItemId == 1404)
             critDef += 30;
 
         critDef += StellarCoreCriticalDefenceContribution(cosmetic);
-
-        critDef = ApplyDrunkCriticalDefence(critDef, zone);
 
         return critDef;
     }

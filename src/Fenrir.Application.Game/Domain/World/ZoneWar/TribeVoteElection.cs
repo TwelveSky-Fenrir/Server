@@ -47,6 +47,8 @@ public sealed class TribeVoteElection(
 
     public const int MinimumContributionPoints = 1000;
 
+    private const int VoteLevelBaseline = 112;
+
     private readonly Lock _lock = new();
     private readonly HashSet<int> _votedThisWindow = [];
 
@@ -131,7 +133,9 @@ public sealed class TribeVoteElection(
             if (candidate.SlotIndex == slotIndex && player.ContributionPoints <= candidate.KillOtherTribeCount)
                 return TribeVoteCandidacyOutcome.SlotHeldByStrongerCandidate;
 
-        await worldState.RegisterTribeVoteCandidateAsync(player.Tribe, slotIndex, player.CharacterId, player.Level,
+        var candidateLevel = (short)(player.CombinedLevel - VoteLevelBaseline);
+
+        await worldState.RegisterTribeVoteCandidateAsync(player.Tribe, slotIndex, player.CharacterId, candidateLevel,
             player.ContributionPoints, ct).ConfigureAwait(false);
 
         return TribeVoteCandidacyOutcome.Registered;
@@ -168,7 +172,7 @@ public sealed class TribeVoteElection(
         if (alreadyVoted)
             return TribeVoteCastOutcome.AlreadyVotedThisWindow;
 
-        var votePoints = player.Level + (player.Level2 + player.RebirthCount) * 3 - 112;
+        var votePoints = player.Level + (player.Level2 + player.RebirthCount) * 3 - VoteLevelBaseline;
 
         await worldState.CastTribeVoteAsync(player.Tribe, slotIndex, votePoints, ct).ConfigureAwait(false);
 

@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Application.Game.Domain.AntiCheat;
+using Fenrir.Application.Game.Domain.Buffs;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Costumes;
 using Fenrir.Application.Game.Domain.Hotkeys;
@@ -55,6 +56,10 @@ public sealed partial class Zone
 
     private const int ImplausibleMoveDisconnectThreshold = 5;
 
+    private const int EventDrivenAvatarActionState = 1;
+
+    private const int PeriodicRefreshAvatarActionState = 2;
+
     internal const string RegularWarAfkCheckerSenderName = "AFK Checker";
 
     private static readonly TimeSpan HolyShieldReapplyCooldown = TimeSpan.FromSeconds(10);
@@ -82,6 +87,9 @@ public sealed partial class Zone
 
     private readonly ISocialWorldEntryReset? _socialWorldEntryReset =
         simulationSystems.OfType<ISocialWorldEntryReset>().FirstOrDefault();
+
+    private readonly WorldClockPushSystem? _worldClockPush =
+        simulationSystems.OfType<WorldClockPushSystem>().FirstOrDefault();
 
     private void QueueDeathEventLog(short eventCode, int characterId, byte? outcome, string? payload)
     {
@@ -123,7 +131,8 @@ public sealed partial class Zone
             _rebroadcastNeighborScratch.Clear();
             _grid.NeighborsExcludingSelf(_rebroadcastNeighborScratch, state.CurrentCell, characterId, state.PosX,
                 state.PosY, state.PosZ);
-            BroadcastAvatarAction(_rebroadcastNeighborScratch, state);
+            BroadcastAvatarAction(_rebroadcastNeighborScratch, state,
+                checkChangeActionState: PeriodicRefreshAvatarActionState);
         }
     }
 
@@ -239,8 +248,27 @@ public sealed partial class Zone
             AnimalDoubleExp = data.AnimalDoubleExp,
             DmgBoost = data.DmgBoost,
             HPBoost = data.HPBoost,
-            CriBoost = data.CriBoost
+            CriBoost = data.CriBoost,
+            SkillPoints = data.SkillPoints,
+            ProtectForHalo = data.ProtectForHalo,
+            BonusItemLevel = data.BonusItemLevel,
+            BonusItemValue = data.BonusItemValue,
+            TribeNotifyScrollCount = data.TribeNotifyScrollCount,
+            TribeFourReturnAllowance = data.TribeFourReturnAllowance,
+            ProtectForRefine = data.ProtectForRefine,
+            ProtectForDestroy = data.ProtectForDestroy,
+            ProtectForCostume = data.ProtectForCostume,
+            ProtectForDestroy2 = data.ProtectForDestroy2,
+            LodRounds = data.LodRounds,
+            EliteDungeonTime = data.EliteDungeonTime,
+            DungeonKeyTime = data.DungeonKeyTime,
+            IvyHallTicketTime = data.IvyHallTicketTime,
+            ScrollOfSeekersTime = data.ScrollOfSeekersTime,
+            FightingGodForDestroy = data.FightingGodForDestroy
         };
+
+        if (data.StellarCoreExpireDate is { } stellarCoreExpireDate)
+            state.StellarCoreExpireDate = stellarCoreExpireDate;
 
         state.ResetVolatileAntiCheatCountersOnEntry(_clock);
         state.SetDeclaredMoveAnchor(state.PosX, state.PosY, state.PosZ);
@@ -323,7 +351,7 @@ public sealed partial class Zone
         HydrateMountState(state, data);
         HydrateCostumeState(state, data);
 
-        RecomputeAndPublish(state, true);
+        RecomputeAndPublish(state);
 
         var cell = _grid.CellOf(state.PosX, state.PosZ);
         state.CurrentCell = cell;
@@ -356,9 +384,6 @@ public sealed partial class Zone
             }
         }
 
-        // After the duplicate-Enter guard: a no-op duplicate must not wipe the negotiation state of a character who
-        // is still in the world. ClearTradeOnDisconnect first, so a session the Leave drain has not reached yet
-        // still restores its staged BigMoney and notifies the partner.
         ClearTradeOnDisconnect(characterId);
         _duelRegistry.ClearForWorldEntry(characterId);
         _socialWorldEntryReset?.ClearForWorldEntry(characterId);
@@ -376,9 +401,11 @@ public sealed partial class Zone
             if (_players.TryGetValue(otherId, out var other) &&
                 other.VisibleState != 0 &&
                 IsVisibleAcrossDungeonInstance(other.DungeonInstanceId, state.DungeonInstanceId))
-                SendAvatarAction(state.Session, other);
+                SendAvatarAction(state.Session, other, PeriodicRefreshAvatarActionState);
 
         BroadcastAvatarAction(_enterNeighborScratch, state);
+
+        _worldClockPush?.SendForced(state);
 
         SendExistingMonstersTo(state);
 
@@ -715,7 +742,7 @@ public sealed partial class Zone
         var changedSlots = state.BuffChangeScratch;
         var anyChanged = false;
 
-        for (var slot = 0; slot < 35; slot++)
+        for (var slot = 0; slot < BuffCatalog.SlotCount; slot++)
         {
             if (state.Buffs.Buff[slot * 2] == 0 && state.Buffs.Buff[slot * 2 + 1] == 0)
                 continue;
@@ -729,7 +756,7 @@ public sealed partial class Zone
                 anyChanged = true;
             }
 
-            changedSlots[slot] = 1;
+            changedSlots[slot] = BuffCatalog.RemovedStateMarker;
         }
 
         state.DarkAttackKind = 0;
@@ -1282,13 +1309,13 @@ public sealed partial class Zone
             : null;
         var maxLife = state.Stats?.MaxLife ?? state.MaxLife;
 
-        foreach (var (skillId, _) in state.AutoBuffSkill)
+        foreach (var (skillId, registeredGrade) in state.AutoBuffSkill)
         {
             if (skillId == 0)
                 continue;
 
             worldData.SkillsById.TryGetValue(skillId, out var skillDef);
-            var gradePoints = SkillGradeAuthority.GetMaxSkillGradeNum(skillId, state.LearnedSkills) +
+            var gradePoints = registeredGrade +
                               SkillGradeAuthority.GetBonusSkillValue(skillId, equipSlotItems, 0, skillDef,
                                   state.GuildBuffType, state.GuildBuffActive);
 
@@ -1508,25 +1535,29 @@ public sealed partial class Zone
         }
     }
 
-    private void SendAvatarAction(IPacketSession session, PlayerRuntimeState state)
+    private void SendAvatarAction(IPacketSession session, PlayerRuntimeState state,
+        int checkChangeActionState = EventDrivenAvatarActionState)
     {
-        session.Send(BuildAvatarActionRecv(state));
+        session.Send(BuildAvatarActionRecv(state, checkChangeActionState));
     }
 
-    private void SendAvatarAction(IPacketSession session, PlayerRuntimeState state, ActionInfo action)
+    private void SendAvatarAction(IPacketSession session, PlayerRuntimeState state, ActionInfo action,
+        int checkChangeActionState = EventDrivenAvatarActionState)
     {
-        session.Send(BuildAvatarActionRecv(state, action));
+        session.Send(BuildAvatarActionRecv(state, action, checkChangeActionState));
     }
 
     private void BroadcastAvatarAction(IReadOnlyList<int> recipientCharacterIds, PlayerRuntimeState state,
-        ActionInfo? action = null)
+        ActionInfo? action = null, int checkChangeActionState = EventDrivenAvatarActionState)
     {
         state.LastAvatarRebroadcastAt = _clock;
 
         if (recipientCharacterIds.Count == 0 || state.VisibleState == 0)
             return;
 
-        var packet = action is null ? BuildAvatarActionRecv(state) : BuildAvatarActionRecv(state, action.Value);
+        var packet = action is null
+            ? BuildAvatarActionRecv(state, checkChangeActionState)
+            : BuildAvatarActionRecv(state, action.Value, checkChangeActionState);
         var total = FrameWriter.FrameSizeOf<AvatarActionResponse>();
         var rented = ArrayPool<byte>.Shared.Rent(total);
 
@@ -1593,7 +1624,7 @@ public sealed partial class Zone
         return false;
     }
 
-    private AvatarActionResponse BuildAvatarActionRecv(PlayerRuntimeState state)
+    private AvatarActionResponse BuildAvatarActionRecv(PlayerRuntimeState state, int checkChangeActionState)
     {
         var pet = PetActionFieldsOf(state);
 
@@ -1617,7 +1648,7 @@ public sealed partial class Zone
             SkillGradeNum1 = 0,
             SkillGradeNum2 = 0,
             SkillValue = 0
-        });
+        }, checkChangeActionState);
     }
 
     private static (float[] PetLocation, float[] PetTargetLocation, float PetFront, int PetSort) PetActionFieldsOf(
@@ -1630,7 +1661,8 @@ public sealed partial class Zone
             state.PetActionSort);
     }
 
-    public AvatarActionResponse BuildAvatarActionRecv(PlayerRuntimeState state, ActionInfo action)
+    public AvatarActionResponse BuildAvatarActionRecv(PlayerRuntimeState state, ActionInfo action,
+        int checkChangeActionState = EventDrivenAvatarActionState)
     {
         return new AvatarActionResponse
         {
@@ -1692,7 +1724,7 @@ public sealed partial class Zone
                 CostumeState = state.CostumeState,
                 StellarCoreNumber = 0
             },
-            CheckChangeActionState = 0
+            CheckChangeActionState = checkChangeActionState
         };
     }
 

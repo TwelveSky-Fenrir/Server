@@ -27,6 +27,13 @@ public sealed record GroundItemEntity(
 
     public const int GmCreateItemDropSort = 13;
 
+    private static readonly TimeSpan CreateStateWindow = TimeSpan.FromSeconds(1);
+
+    public int CreateStateAt(TimeSpan nowZoneClock)
+    {
+        return nowZoneClock - CreatedAtZoneClock < CreateStateWindow ? 1 : 0;
+    }
+
     public bool IsExpired(TimeSpan nowZoneClock)
     {
         return nowZoneClock - CreatedAtZoneClock >= SimulationClock.GroundItemLifetime;

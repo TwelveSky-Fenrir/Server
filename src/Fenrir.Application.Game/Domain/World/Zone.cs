@@ -206,11 +206,6 @@ public sealed partial class Zone(
             {
                 logger.LogError(ex, "Zone {MapId} tick failed; skipping the remainder of this tick", MapId);
             }
-
-            var tickMs = Stopwatch.GetElapsedTime(now).TotalMilliseconds;
-            if (tickMs > tickInterval.TotalMilliseconds)
-                logger.LogWarning("Zone {MapId} tick took {ElapsedMs:F1} ms (budget {BudgetMs:F1} ms)", MapId,
-                    tickMs, tickInterval.TotalMilliseconds);
         }
     }
 

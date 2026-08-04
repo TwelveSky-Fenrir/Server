@@ -43,7 +43,8 @@ public readonly record struct UnstunAttemptRequest(
     int UsedSkillGradePoints,
     int CurerAnimatingSkillNumber,
     int CurerAnimatingGradePoints,
-    SkillDefinition? UsedSkill);
+    SkillDefinition? UsedSkill,
+    byte? AllyOfTargetTribe = null);
 
 public static class UnstunResolver
 {
@@ -69,7 +70,7 @@ public static class UnstunResolver
         if (!request.TargetIsStunned)
             return UnstunAttemptOutcome.Reject(UnstunRejectReason.TargetNotStunned);
 
-        if (curer.Tribe != target.Tribe)
+        if (curer.Tribe != target.Tribe && curer.Tribe != request.AllyOfTargetTribe)
             return UnstunAttemptOutcome.Reject(UnstunRejectReason.NotAuthorized);
 
         if (request.CurerVerifiesEchoedActionState)

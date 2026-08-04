@@ -37,6 +37,11 @@ public static partial class StatCalculator
         return percent == 100 ? value : (int)((long)value * percent / 100);
     }
 
+    private static int ApplyDrunkPercent(int value, int percent)
+    {
+        return percent == 100 ? value : value + (int)(value * ((percent - 100) / 100f));
+    }
+
     public static DrunkEffect? ResolveDrunkEffect(int drunkStateId)
     {
         return DrunkEffectsById.TryGetValue(drunkStateId, out var effect) ? effect : null;
@@ -51,14 +56,14 @@ public static partial class StatCalculator
     public static int ApplyDrunkMaxLife(int maxLife, ZoneContext zone)
     {
         return DrunkEffectsById.TryGetValue(zone.DrunkStateId, out var e)
-            ? ScaleByPercent(maxLife, e.MaxLifePercent)
+            ? ApplyDrunkPercent(maxLife, e.MaxLifePercent)
             : maxLife;
     }
 
     public static int ApplyDrunkCriticalDefence(int criticalDefence, ZoneContext zone)
     {
         return DrunkEffectsById.TryGetValue(zone.DrunkStateId, out var e)
-            ? ScaleByPercent(criticalDefence, e.CriticalDefencePercent)
+            ? ApplyDrunkPercent(criticalDefence, e.CriticalDefencePercent)
             : criticalDefence;
     }
 
@@ -66,42 +71,42 @@ public static partial class StatCalculator
     public static int ApplyDrunkAttackPower(int attackPower, ZoneContext zone)
     {
         return DrunkEffectsById.TryGetValue(zone.DrunkStateId, out var e)
-            ? ScaleByPercent(attackPower, e.AttackPowerPercent)
+            ? ApplyDrunkPercent(attackPower, e.AttackPowerPercent)
             : attackPower;
     }
 
     public static int ApplyDrunkDefensePower(int defensePower, ZoneContext zone)
     {
         return DrunkEffectsById.TryGetValue(zone.DrunkStateId, out var e)
-            ? ScaleByPercent(defensePower, e.DefensePowerPercent)
+            ? ApplyDrunkPercent(defensePower, e.DefensePowerPercent)
             : defensePower;
     }
 
     public static int ApplyDrunkCritical(int critical, ZoneContext zone)
     {
         return DrunkEffectsById.TryGetValue(zone.DrunkStateId, out var e)
-            ? ScaleByPercent(critical, e.CriticalPercent)
+            ? ApplyDrunkPercent(critical, e.CriticalPercent)
             : critical;
     }
 
     public static int ApplyDrunkAttackSuccess(int attackSuccess, ZoneContext zone)
     {
         return DrunkEffectsById.TryGetValue(zone.DrunkStateId, out var e)
-            ? ScaleByPercent(attackSuccess, e.AttackSuccessPercent)
+            ? ApplyDrunkPercent(attackSuccess, e.AttackSuccessPercent)
             : attackSuccess;
     }
 
     public static int ApplyDrunkElementAttack(int elementAttack, ZoneContext zone)
     {
         return DrunkEffectsById.TryGetValue(zone.DrunkStateId, out var e)
-            ? ScaleByPercent(elementAttack, e.ElementAttackPercent)
+            ? ApplyDrunkPercent(elementAttack, e.ElementAttackPercent)
             : elementAttack;
     }
 
     public static int ApplyDrunkElementDefense(int elementDefense, ZoneContext zone)
     {
         return DrunkEffectsById.TryGetValue(zone.DrunkStateId, out var e)
-            ? ScaleByPercent(elementDefense, e.ElementDefensePercent)
+            ? ApplyDrunkPercent(elementDefense, e.ElementDefensePercent)
             : elementDefense;
     }
 

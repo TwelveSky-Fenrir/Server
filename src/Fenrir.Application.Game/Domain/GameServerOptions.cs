@@ -168,4 +168,6 @@ public sealed class GameServerOptions
     public int GlobalExpDownRatio { get; set; } = 1;
 
     public int TeacherPointUpRatio { get; set; } = 1;
+
+    public float GeneralExpUpRatio { get; set; } = 20f;
 }

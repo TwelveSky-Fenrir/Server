@@ -27,6 +27,22 @@ public enum AllianceCeremonyNotice
     AlreadyAlliedAborted
 }
 
+public static class AllianceCeremonyNoticeWireSort
+{
+    public static int Of(AllianceCeremonyNotice notice)
+    {
+        return notice switch
+        {
+            AllianceCeremonyNotice.Rejected => 1,
+            AllianceCeremonyNotice.NewAllianceProgress => 2,
+            AllianceCeremonyNotice.NewAllianceAborted => 3,
+            AllianceCeremonyNotice.AlreadyAlliedProgress => 4,
+            AllianceCeremonyNotice.AlreadyAlliedAborted => 5,
+            _ => 0
+        };
+    }
+}
+
 public readonly record struct AllianceCeremonyCandidate(int CharacterId, byte TribeId);
 
 public readonly record struct AllianceCeremonyTickResult(
@@ -187,14 +203,15 @@ public sealed class AllianceDiplomacyCeremony
                 leaderOne, leaderTwo, 0);
         }
 
+        var announcedCountdown = _remainingCountdown;
         _remainingCountdown--;
 
+        var progressNotice = isAlreadyAllied
+            ? AllianceCeremonyNotice.AlreadyAlliedProgress
+            : AllianceCeremonyNotice.NewAllianceProgress;
+
         if (_remainingCountdown > 0)
-            return new AllianceCeremonyTickResult(
-                isAlreadyAllied
-                    ? AllianceCeremonyNotice.AlreadyAlliedProgress
-                    : AllianceCeremonyNotice.NewAllianceProgress,
-                leaderOne, leaderTwo, _remainingCountdown);
+            return new AllianceCeremonyTickResult(progressNotice, leaderOne, leaderTwo, announcedCountdown);
 
         if (isAlreadyAllied)
         {
@@ -210,7 +227,7 @@ public sealed class AllianceDiplomacyCeremony
 
 
         EnterPostNegotiationCooldown();
-        return AllianceCeremonyTickResult.None;
+        return new AllianceCeremonyTickResult(progressNotice, leaderOne, leaderTwo, announcedCountdown);
     }
 
     private void EnterNegotiation(AllianceCeremonyPhase phase, AllianceCeremonyCandidate one,

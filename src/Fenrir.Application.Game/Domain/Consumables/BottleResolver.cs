@@ -50,14 +50,22 @@ public static class BottleResolver
             : new AcquireResult(AcquireOutcome.Success, emptyIndex, RefillCount);
     }
 
-    public static DrinkResult ResolveDrink(ImmutableArray<(int ItemId, int Count)> slots, int sort, int index,
-        bool petBlocksDrinking = false)
+    public static bool MountBlocksDrinking(int animalNumber, int animalAbsorbState)
     {
-        if (sort != 0 || index < 0 || index >= slots.Length || petBlocksDrinking)
+        return animalNumber != 0 && animalAbsorbState == 0;
+    }
+
+    public static DrinkResult ResolveDrink(ImmutableArray<(int ItemId, int Count)> slots, int sort, int index,
+        bool mountBlocksDrinking = false)
+    {
+        if (sort != 0 || index < 0 || index >= slots.Length)
             return new DrinkResult(DrinkOutcome.Rejected, 0);
 
         if (slots[index].ItemId == 0 || slots[index].Count < 1)
             return new DrinkResult(DrinkOutcome.Silent, 0);
+
+        if (mountBlocksDrinking)
+            return new DrinkResult(DrinkOutcome.Rejected, 0);
 
         return new DrinkResult(DrinkOutcome.Success, slots[index].Count - 1);
     }

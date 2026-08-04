@@ -41,7 +41,8 @@ public static class SkillCastResolver
 
         if (!effect.RequiredWeaponSorts.IsEmpty &&
             (equippedWeaponSort is not { } sort || !effect.RequiredWeaponSorts.Contains(sort)))
-            return Result.Fail(FailureReason.WrongWeaponClass);
+            return new Result(false, FailureReason.WrongWeaponClass, manaCost,
+                ImmutableArray<BuffWrite>.Empty, SkillEffectKind.None, 0);
 
         var baseDurationTicks = (int)SkillCatalog.ReturnSkillValue(skillDef, gradePoints, SkillValueKind.RunTime);
         var durationTicks = effect.AppliesSupportSkillTimeUpRatio

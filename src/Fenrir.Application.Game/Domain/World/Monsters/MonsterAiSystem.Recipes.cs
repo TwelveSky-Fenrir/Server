@@ -93,6 +93,31 @@ public sealed partial class MonsterAiSystem
         };
     }
 
+    private static bool TryResolveCarThrowerOwnerTribe(byte specialType, out byte? ownerTribe)
+    {
+        switch (specialType)
+        {
+            case 35:
+                ownerTribe = 0;
+                return true;
+            case 36:
+                ownerTribe = 1;
+                return true;
+            case 37:
+                ownerTribe = 2;
+                return true;
+            case 38:
+                ownerTribe = 3;
+                return true;
+            case 18:
+                ownerTribe = null;
+                return true;
+            default:
+                ownerTribe = null;
+                return false;
+        }
+    }
+
     private void PublishStoneIdleReset(int eventCode, int slotIndex)
     {
         if (_siegeIngestor is null)
@@ -176,6 +201,11 @@ public sealed partial class MonsterAiSystem
         if (meleeRadius <= 0)
             return;
 
+        if (!TryResolveCarThrowerOwnerTribe(monster.Template.SpecialType, out var ownerTribe))
+            return;
+
+        var alliedTribe = ownerTribe is { } owned ? _worldState?.GetAllyOf(owned) : null;
+
         var innerBand = ThrowCarInnerRadiusRatio * meleeRadius;
 
         var cellSize = zone.AoiCellSize;
@@ -186,6 +216,10 @@ public sealed partial class MonsterAiSystem
         foreach (var characterId in zone.NeighborsOfPosition(monster.PosX, monster.PosZ))
         {
             if (!zone.TryGetPlayer(characterId, out var player) || !IsCandidateValid(player))
+                continue;
+
+            if (ownerTribe is { } tribe &&
+                (player.Tribe == tribe || (alliedTribe is { } ally && player.Tribe == ally)))
                 continue;
 
             if (player.ActionSort is 0 or 33)

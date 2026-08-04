@@ -56,7 +56,8 @@ public readonly record struct StunAttemptRequest(
     SkillDefinition? UsedSkill,
     SkillDefinition? DefenderStunResistSkill,
     int DefenderStunResistGradePoints,
-    bool DefenderHasStunImmunityBuff);
+    bool DefenderHasStunImmunityBuff,
+    byte? AllyOfAttackerTribe = null);
 
 public static class StunResolver
 {
@@ -95,7 +96,8 @@ public static class StunResolver
             zoneClock - defenderEntry < CombatResolver.ProtectDuration)
             return StunAttemptOutcome.Reject(StunRejectReason.DefenderProtected);
 
-        var authorized = (request.ZoneAllowsEnemyTribeAttack && attacker.Tribe != defender.Tribe) ||
+        var authorized = (request.ZoneAllowsEnemyTribeAttack && attacker.Tribe != defender.Tribe &&
+                          defender.Tribe != request.AllyOfAttackerTribe) ||
                          request.AttackerAndDefenderShareActiveDuel;
         if (!authorized)
             return StunAttemptOutcome.Reject(StunRejectReason.NotAuthorized);

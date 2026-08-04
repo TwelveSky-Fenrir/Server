@@ -135,7 +135,7 @@ public sealed class LootBoxUseItemHandler(
 
         var today = GameDate.Today();
         var plan = LootBoxOpenResolver.OpenSingle(spec, context.Page, context.Index, context.Item, page0, page1,
-            ResolveRewardSort, Random.Shared, today, ResolveRewardIdOverride(context, spec),
+            ResolveRewardSort, worldData, Random.Shared, today, ResolveRewardIdOverride(context, spec),
             state.InventoryDate >= today);
 
         await MirrorM15PetLuckyBoxPityAsync(context, cancellationToken);
@@ -182,7 +182,7 @@ public sealed class LootBoxUseItemHandler(
 
         var today = GameDate.Today();
         var plan = LootBoxOpenResolver.OpenBulk(spec, context.Page, context.Index, context.Item, page0, page1,
-            ResolveRewardSort, Random.Shared, today, context.Value, ResolveRewardIdOverride(context, spec),
+            ResolveRewardSort, worldData, Random.Shared, today, context.Value, ResolveRewardIdOverride(context, spec),
             state.InventoryDate >= today);
 
         await MirrorM15PetLuckyBoxPityAsync(context, cancellationToken);

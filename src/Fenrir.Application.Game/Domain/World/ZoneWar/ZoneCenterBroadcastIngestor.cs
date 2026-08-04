@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Buffers.Binary;
 using Fenrir.Application.Game.Abstractions.World;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Core.Wire;
 using Fenrir.Protocol.Game;
@@ -60,7 +61,13 @@ public sealed class ZoneCenterBroadcastIngestor(
 
     public const int PingEventCode = 4000;
 
+    public const int AllianceStoneCaptureLockoutDays = 28;
+
     private const int MonsterSymbolSlot = WorldStateService.TribeCount;
+
+    private const int AllianceStoneNameOffset = 24;
+
+    private const int AllianceStoneNameSize = 13;
 
     public void Ingest(int eventCode, ReadOnlySpan<byte> data)
     {
@@ -81,6 +88,63 @@ public sealed class ZoneCenterBroadcastIngestor(
 
         if (KnownTSortRegistry.CrossesShardBoundary(eventCode))
             EnqueueForOtherShards(eventCode, data);
+    }
+
+    public void AnnounceAllianceStoneDestroyed(byte stoneTribe, byte lastAttackerTribe, string lastAttackerName)
+    {
+        if (!AllianceProposalCenterState.IsValidTribe(stoneTribe))
+            return;
+
+        if (!TryResolveAllianceHolders(stoneTribe, out var holderA, out var holderB))
+            return;
+
+        if (!GameDate.TryAddDays(GameDate.Today(), AllianceStoneCaptureLockoutDays, out var expiryDate))
+        {
+            logger.LogWarning(
+                "Alliance-stone capture on tribe slot {StoneTribe} could not project a {Days}-day lockout date -- dropped without relay",
+                stoneTribe, AllianceStoneCaptureLockoutDays);
+            return;
+        }
+
+        Span<byte> payload = stackalloc byte[PayloadSize];
+        payload.Clear();
+        BinaryPrimitives.WriteInt32LittleEndian(payload, holderA);
+        BinaryPrimitives.WriteInt32LittleEndian(payload[4..], holderB);
+        BinaryPrimitives.WriteInt32LittleEndian(payload[8..], expiryDate);
+        BinaryPrimitives.WriteInt32LittleEndian(payload[12..], expiryDate);
+        BinaryPrimitives.WriteInt32LittleEndian(payload[16..], stoneTribe);
+        BinaryPrimitives.WriteInt32LittleEndian(payload[20..], lastAttackerTribe);
+        LegacyWireCodec.WriteFixedString(payload.Slice(AllianceStoneNameOffset, AllianceStoneNameSize),
+            lastAttackerName);
+
+        Ingest(AllianceProposalCenterEventMap.BreakAllianceViaStoneCaptureEventCode, payload);
+    }
+
+    private bool TryResolveAllianceHolders(byte stoneTribe, out byte holderA, out byte holderB)
+    {
+        holderA = stoneTribe;
+        holderB = 0;
+
+        if (allianceState is { } shadow)
+            for (var slot = 0; slot < AllianceProposalCenterState.SlotCount; slot++)
+            {
+                var (cellA, cellB) = shadow.GetSlot(slot);
+                if (cellA is not { } tribeA || cellB is not { } tribeB)
+                    continue;
+
+                if (tribeA != stoneTribe && tribeB != stoneTribe)
+                    continue;
+
+                holderA = tribeA;
+                holderB = tribeB;
+                return true;
+            }
+
+        if (worldState?.GetAllyOf(stoneTribe) is not { } allyTribe)
+            return false;
+
+        holderB = allyTribe;
+        return true;
     }
 
     public void ApplyRelayedEvent(int eventCode, ReadOnlySpan<byte> data)
@@ -193,7 +257,8 @@ public sealed class ZoneCenterBroadcastIngestor(
             return false;
 
         if (eventCode is AllianceProposalCenterEventMap.FinalizeNewAllianceEventCode
-            or AllianceProposalCenterEventMap.BreakAllianceViaRitualEventCode)
+            or AllianceProposalCenterEventMap.BreakAllianceViaRitualEventCode
+            or AllianceProposalCenterEventMap.BreakAllianceViaStoneCaptureEventCode)
             worldReactions?.Value.ApplyRelayedStateAndReactions(eventCode, data);
 
         return true;

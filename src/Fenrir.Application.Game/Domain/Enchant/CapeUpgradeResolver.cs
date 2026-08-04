@@ -42,14 +42,20 @@ public static class CapeUpgradeResolver
         if (targetItemId != 1401 && candidateItemId is 1403 or 1404 or 1406 && random.NextInt32(3) == 0)
             candidateItemId = EmperorCapeItemId;
 
-        var probability = 1 + (int)(luck / 500.0f) + (highItemValueCharges > 0 ? 5 : 0);
+        var luckyChargeConsumed = highItemValueCharges > 0;
+
+        var probability = 1 + (int)(luck / 500.0f) + (luckyChargeConsumed ? 5 : 0);
 
         return random.NextInt32(1000) < probability
-            ? new Result(Outcome.Success, cost, candidateItemId)
-            : new Result(Outcome.Failed, cost);
+            ? new Result(Outcome.Success, cost, candidateItemId, luckyChargeConsumed)
+            : new Result(Outcome.Failed, cost, 0, luckyChargeConsumed);
     }
 
-    public readonly record struct Result(Outcome Outcome, int Cost = 0, int NewItemId = 0)
+    public readonly record struct Result(
+        Outcome Outcome,
+        int Cost = 0,
+        int NewItemId = 0,
+        bool ConsumesLuckyCharge = false)
     {
         public bool Succeeded => Outcome == Outcome.Success;
     }

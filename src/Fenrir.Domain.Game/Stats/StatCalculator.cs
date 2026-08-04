@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using Fenrir.Core.Packets.Shared;
+using Fenrir.Domain.Game.Items;
 using Fenrir.Domain.Game.Stats.Context;
 
 namespace Fenrir.Domain.Game.Stats;
@@ -70,51 +71,51 @@ public static partial class StatCalculator
         var setNumber = SetBonusTables.ResolveEffectiveSetNumber(attributes.PreviousTribe, equipment, legacySetNumber);
         var titleRank = attributes.Title % 100;
 
-        var attackPower = ApplyDrunkAttackPower(baseStats.AttackPower, zone);
-        attackPower = ApplyBuffPercent(attackPower, GetBuffPercent(buffs, 0));
+        var attackPower = ApplyBuffPercent(baseStats.AttackPower, GetBuffPercent(buffs, 0));
         attackPower = ApplyPetDoubleRule(attackPower, pet.AttackPower);
-        attackPower += pet.SteppedAttackBonus;
-        attackPower += SetBonusTables.CapeIuBonus(bySlot[1], 1, 50f);
         attackPower += RankBuffAttackPowerBonus(zone);
+        attackPower += pet.SteppedAttackBonus;
+        attackPower = ApplyDrunkAttackPower(attackPower, zone);
         attackPower += TribeRoleAttackPowerBonus(zone);
+        attackPower += SetBonusTables.CapeIuBonus(bySlot[1], 1, 50f);
 
-        var defensePower = ApplyDrunkDefensePower(baseStats.DefensePower, zone);
-        defensePower = ApplyBuffPercent(defensePower, GetBuffPercent(buffs, 1));
+        var defensePower = ApplyBuffPercent(baseStats.DefensePower, GetBuffPercent(buffs, 1));
         defensePower = ApplyPetDoubleRule(defensePower, pet.DefensePower);
-        defensePower += SetBonusTables.CapeIuBonus(bySlot[1], 2, 50f);
         defensePower += RankBuffDefensePowerBonus(zone);
+        defensePower = ApplyDrunkDefensePower(defensePower, zone);
         defensePower += TribeRoleDefensePowerBonus(zone);
+        defensePower += SetBonusTables.CapeIuBonus(bySlot[1], 2, 50f);
 
-        var attackSuccess = ApplyDrunkAttackSuccess(baseStats.AttackSuccess, zone);
-        attackSuccess = ApplyBuffPercent(attackSuccess, GetBuffPercent(buffs, 2));
+        var attackSuccess = ApplyBuffPercent(baseStats.AttackSuccess, GetBuffPercent(buffs, 2));
         attackSuccess = ApplyBuffPercent(attackSuccess, GetBuffPercent(buffs, 17));
         attackSuccess += SetBonusTables.GetWrapperAttackSuccessBonus(setNumber);
         attackSuccess += RankBuffAttackSuccessBonus(zone);
+        attackSuccess = ApplyDrunkAttackSuccess(attackSuccess, zone);
 
         var attackBlock = ApplyBuffPercent(baseStats.AttackBlock, GetBuffPercent(buffs, 3));
         attackBlock = ApplyBuffPercent(attackBlock, GetBuffPercent(buffs, 18));
-        attackBlock += SetBonusTables.GetWrapperAttackBlockBonus(setNumber);
         attackBlock += RankBuffAttackBlockBonus(zone);
+        attackBlock += SetBonusTables.GetWrapperAttackBlockBonus(setNumber);
 
-        var elementAttackPower = ApplyDrunkElementAttack(baseStats.ElementAttackPower, zone);
-        elementAttackPower = ApplyBuffPercent(elementAttackPower, GetBuffPercent(buffs, 4));
-        elementAttackPower = (int)(elementAttackPower * (titleRank + 100) / 100f);
+        var elementAttackPower = ApplyBuffPercent(baseStats.ElementAttackPower, GetBuffPercent(buffs, 4));
+        elementAttackPower = (int)(elementAttackPower * (float)(titleRank + 100) * 0.01f);
         elementAttackPower += SetBonusTables.GetWrapperElementAttackPowerBonus(setNumber);
-        elementAttackPower += SetBonusTables.CapeIuBonus(bySlot[1], 5, 100f);
         elementAttackPower += RankBuffElementAttackPowerBonus(zone);
+        elementAttackPower = ApplyDrunkElementAttack(elementAttackPower, zone);
+        elementAttackPower += SetBonusTables.CapeIuBonus(bySlot[1], 5, 100f);
 
-        var elementDefensePower = ApplyDrunkElementDefense(baseStats.ElementDefensePower, zone);
-        elementDefensePower = ApplyBuffPercent(elementDefensePower, GetBuffPercent(buffs, 5));
-        elementDefensePower = (int)(elementDefensePower * (titleRank + 100) / 100f);
-        elementDefensePower += SetBonusTables.CapeIuBonus(bySlot[1], 6, 100f);
+        var elementDefensePower = ApplyBuffPercent(baseStats.ElementDefensePower, GetBuffPercent(buffs, 5));
+        elementDefensePower = (int)(elementDefensePower * (float)(titleRank + 100) * 0.01f);
         elementDefensePower += RankBuffElementDefensePowerBonus(zone);
+        elementDefensePower = ApplyDrunkElementDefense(elementDefensePower, zone);
+        elementDefensePower += SetBonusTables.CapeIuBonus(bySlot[1], 6, 100f);
 
-        var critical = ApplyDrunkCritical(baseStats.Critical, zone);
-        critical = ApplyBuffPercent(critical, GetBuffPercent(buffs, 10));
+        var critical = ApplyBuffPercent(baseStats.Critical, GetBuffPercent(buffs, 10));
         critical += RebirthCriticalWrapperBonus(attributes.RebirthCount);
         critical += SetBonusTables.GetWrapperCriticalBonus(setNumber);
-        critical += SetBonusTables.CapeIuBonus(bySlot[1], 7, 0.5f);
         critical += TribeRoleCriticalBonus(zone);
+        critical = ApplyDrunkCritical(critical, zone);
+        critical += SetBonusTables.CapeIuBonus(bySlot[1], 7, 0.5f);
 
         var luck = ApplyBuffPercent(baseStats.Luck, GetBuffPercent(buffs, 11));
 
@@ -134,7 +135,12 @@ public static partial class StatCalculator
 
     private static bool IsLegendary(ItemRowDto item)
     {
-        return item.Sort is 1 or 4;
+        return ItemSortClassifier.IsLegendaryGrade(item);
+    }
+
+    private static int ItemSortClass(ItemRowDto item)
+    {
+        return ItemSortClassifier.Classify(item);
     }
 
     private static bool AnyLegendary(EquippedItemSlot?[] bySlot)

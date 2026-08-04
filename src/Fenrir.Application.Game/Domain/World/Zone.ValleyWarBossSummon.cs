@@ -27,6 +27,12 @@ public sealed partial class Zone
         SpawnMonster(monster);
     }
 
+    internal void DespawnValleyWarBossPool()
+    {
+        for (var i = 0; i < ValleyWarBossPoolSize; i++)
+            DespawnMonsterSilently(ValleyWarBossPoolServerIndexBase + i);
+    }
+
     internal bool ValleyWarBossSlotOccupied()
     {
         for (var i = 0; i < ValleyWarBossPoolSize; i++)

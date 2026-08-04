@@ -125,12 +125,17 @@ public sealed class TribeConversionResolver
     {
         newItemId = itemId;
 
-        if (!_costumeGroupBySourceItem.TryGetValue((fromTribe, itemId), out var group))
-            return false;
-        if (!_costumeIdByGroupTribe.TryGetValue((group, toTribe), out var targetItem))
+        if (_costumeGroupBySourceItem.TryGetValue((fromTribe, itemId), out var group) &&
+            _costumeIdByGroupTribe.TryGetValue((group, toTribe), out var targetItem))
+        {
+            newItemId = targetItem;
+            return true;
+        }
+
+        if (itemId < 1 || !IsPlayableTribe(fromTribe) || !IsPlayableTribe(toTribe))
             return false;
 
-        newItemId = targetItem;
+        newItemId = itemId + (toTribe - fromTribe);
         return true;
     }
 

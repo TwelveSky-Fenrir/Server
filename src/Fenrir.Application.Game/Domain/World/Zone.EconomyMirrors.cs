@@ -233,8 +233,7 @@ public sealed partial class Zone
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
 
-        var hadWeaponEquipped =
-            state.Inventory.GetSlot(ContainerMatrix.Equipment, EquipmentSlots.WeaponSlot) is not null;
+        var weaponBefore = state.Inventory.GetSlot(ContainerMatrix.Equipment, EquipmentSlots.WeaponSlot);
 
         foreach (var snapshot in command.Containers)
         {
@@ -270,21 +269,48 @@ public sealed partial class Zone
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
         }
 
-        if (hadWeaponEquipped && state.Inventory.GetSlot(ContainerMatrix.Equipment, EquipmentSlots.WeaponSlot) is null)
-            ClearEffectsOnWeaponUnequip(state);
+        var vaultDateChanged = false;
+
+        if (command.InventoryDate is { } inventoryDate)
+        {
+            state.InventoryDate = inventoryDate;
+            vaultDateChanged = true;
+        }
+
+        if (command.StoreDate is { } storeDate)
+        {
+            state.StoreDate = storeDate;
+            vaultDateChanged = true;
+        }
+
+        if (command.PetBagDate is { } petBagDate)
+        {
+            state.PetBagDate = petBagDate;
+            vaultDateChanged = true;
+        }
+
+        if (vaultDateChanged)
+            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+
+        if (command.RecomputeCombatPoseAfterEquip &&
+            state.Inventory.GetSlot(ContainerMatrix.Equipment, EquipmentSlots.WeaponSlot) != weaponBefore)
+            ClearEffectsOnWeaponSlotWrite(state);
 
         if (command.RecomputeCombatPoseAfterEquip)
             BroadcastIdleActionState(state);
     }
 
-    private void ClearEffectsOnWeaponUnequip(PlayerRuntimeState state)
+    private void ClearEffectsOnWeaponSlotWrite(PlayerRuntimeState state)
     {
         ClearAllBuffs(state);
         ResetPartyBuffMarker(state);
         state.NoManaCount = 0;
 
-        if (state.AutoHuntConfig is { } autoHuntConfig)
-            Array.Clear(autoHuntConfig.BuffStore);
+        if (state.AutoHuntConfig is not { } autoHuntConfig)
+            return;
+
+        Array.Clear(autoHuntConfig.BuffStore);
+        Array.Clear(autoHuntConfig.AttackType);
     }
 
     private void DrainSkillCommands()
@@ -549,6 +575,9 @@ public sealed partial class Zone
 
         if (command.UpdatedStats is { } stats)
             state.Stats = stats;
+
+        if (state.ClampVitalsToMax())
+            changed = true;
 
         if (command.TribeNotifyScrollCount is { } tribeNotifyScrollCount)
         {

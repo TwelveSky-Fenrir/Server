@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
 using Fenrir.Domain.Game.GameData;
 
-namespace Fenrir.Application.Game.Domain.Inventory;
+namespace Fenrir.Application.Game.Domain.Inventory.Placement;
 
 public static class InventoryGridPlacement
 {

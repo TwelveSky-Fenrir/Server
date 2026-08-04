@@ -9,8 +9,6 @@ public static class MonsterCombatResolver
 {
     private const int OwnerNameLockExemptMonsterId = 9002;
 
-    public const int CatapultAttackPowerBonus = 15000;
-
     public const short MalusMinimumAttackerLevel = 112;
 
     public const int DamageUpBonusFlatPerIncrement = 500;
@@ -183,11 +181,7 @@ public static class MonsterCombatResolver
                 return AttackOutcome.Miss();
         }
 
-        var monsterAttackPower = monster.Template.AttackPower;
-        if (monster.SpecialSort == MonsterSpecialSort.CarThrower)
-            monsterAttackPower += CatapultAttackPowerBonus;
-
-        var damage = monsterAttackPower - defender.Stats.DefensePower;
+        var damage = monster.Template.AttackPower - defender.Stats.DefensePower;
         if (damage < 1) damage = 1;
 
         damage = CombatMath.ApplyVariance(damage, rng);

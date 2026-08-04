@@ -58,7 +58,7 @@ public static class ContainerMatrix
 
     public static bool IsStackableSort(byte itemSort)
     {
-        return itemSort is 2 or 99;
+        return ItemQuantityPolicy.IsStackableSort(itemSort);
     }
 
     public static bool IsSocketableItem(byte itemSort, byte itemType)
@@ -75,7 +75,7 @@ public static class ContainerMatrix
                 maxSlotInclusive = 63;
                 return true;
             case Equipment:
-                maxSlotInclusive = 12;
+                maxSlotInclusive = EquipmentSlots.Count - 1;
                 return true;
             case StorePage0:
             case StorePage1:
@@ -142,26 +142,30 @@ public static class ContainerMatrix
         if (fromContainer == toContainer && fromSlot == toSlot)
             return new MoveOutcomeResult(MoveOutcome.NoOp, source, destination);
 
-        if (requestedQuantity < 0 || requestedQuantity > GroundItemPickupPolicy.MaxStackQuantity)
-            return new MoveOutcomeResult(MoveOutcome.InvalidQuantity, source, destination);
+        var quantity = src.Quantity;
 
-        var quantity = requestedQuantity == 0 ? src.Quantity : requestedQuantity;
-        if (quantity > src.Quantity)
-            return new MoveOutcomeResult(MoveOutcome.InsufficientQuantity, source, destination);
+        if (sourceIsStackable)
+        {
+            if (requestedQuantity < 0 || requestedQuantity > ItemQuantityPolicy.MaxStackQuantity)
+                return new MoveOutcomeResult(MoveOutcome.InvalidQuantity, source, destination);
+
+            quantity = requestedQuantity == 0 ? src.Quantity : requestedQuantity;
+            if (quantity > src.Quantity)
+                return new MoveOutcomeResult(MoveOutcome.InsufficientQuantity, source, destination);
+        }
 
         if (destination is not { } dst)
         {
-            var effectiveQuantity = sourceIsStackable ? quantity : src.Quantity;
             var moved = toContainer is InventoryPage0 or InventoryPage1
-                ? src with { Quantity = effectiveQuantity, XPos = toX, YPos = toY }
-                : src with { Quantity = effectiveQuantity };
-            var remaining = src.Quantity - effectiveQuantity;
+                ? src with { Quantity = quantity, XPos = toX, YPos = toY }
+                : src with { Quantity = quantity };
+            var remaining = src.Quantity - quantity;
             ItemStack? newSource = remaining > 0 ? src with { Quantity = remaining } : null;
             return new MoveOutcomeResult(MoveOutcome.Success, newSource, moved);
         }
 
         if (!sourceIsStackable || dst.ItemId != src.ItemId ||
-            dst.Quantity + quantity > GroundItemPickupPolicy.MaxStackQuantity)
+            dst.Quantity + quantity > ItemQuantityPolicy.MaxStackQuantity)
             return new MoveOutcomeResult(MoveOutcome.DestinationOccupied, source, destination);
 
         var merged = dst with { Quantity = dst.Quantity + quantity };

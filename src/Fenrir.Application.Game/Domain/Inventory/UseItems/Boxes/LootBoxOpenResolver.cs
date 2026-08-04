@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Consumables;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World.Loot;
+using Fenrir.Domain.Game.GameData;
 
 namespace Fenrir.Application.Game.Domain.Inventory.UseItems.Boxes;
 
@@ -18,8 +19,9 @@ public static class LootBoxOpenResolver
 
     public static SingleOpenPlan OpenSingle(BoxRewardSpec spec, byte boxContainer, byte boxSlot, ItemStack boxStack,
         ImmutableDictionary<byte, ItemStack> page0, ImmutableDictionary<byte, ItemStack> page1,
-        Func<int, byte?> resolveRewardSort, Random random, int today, Func<int>? rewardIdOverride = null,
-        bool secondPageAccessible = true, Func<int, int>? resolveRewardSerial = null)
+        Func<int, byte?> resolveRewardSort, WorldDataCache worldData, Random random, int today,
+        Func<int>? rewardIdOverride = null, bool secondPageAccessible = true,
+        Func<int, int>? resolveRewardSerial = null)
     {
         var rewardId = rewardIdOverride is not null ? rewardIdOverride() : spec.RollRewardId(random);
 
@@ -36,25 +38,64 @@ public static class LootBoxOpenResolver
         var reward = new BoxRewardPlacementResolver.ResolvedReward(rewardId, quantity.Quantity,
             quantity.IsStackable, 0, 0, 0, 0, expireDate, serial);
 
-        var placement = BoxRewardPlacementResolver.Resolve(reward, boxContainer, boxSlot, page0, page1,
+        var merge = BoxRewardPlacementResolver.Resolve(reward, boxContainer, boxSlot, page0, page1,
             secondPageAccessible);
-        if (!placement.Succeeded)
-            return SingleOpenPlan.Failure(Outcome.InventoryFull, rewardId);
 
-        var (newPage0, newPage1) = ApplySlot(page0, page1, placement.Container, placement.Slot,
-            placement.NewStack);
+        BoxRewardPlacementResolver.Outcome placementOutcome;
+        byte rewardContainer;
+        byte rewardSlot;
+        ItemStack rewardStack;
+
+        if (merge.Outcome == BoxRewardPlacementResolver.Outcome.Merged)
+        {
+            placementOutcome = BoxRewardPlacementResolver.Outcome.Merged;
+            rewardContainer = merge.Container;
+            rewardSlot = merge.Slot;
+            rewardStack = merge.NewStack!.Value;
+        }
+        else if (boxStack.Quantity <= 1)
+        {
+            placementOutcome = BoxRewardPlacementResolver.Outcome.PlacedInEmptySlot;
+            rewardContainer = boxContainer;
+            rewardSlot = boxSlot;
+            rewardStack = BuildRewardStack(reward, boxStack.XPos, boxStack.YPos);
+        }
+        else if (InventoryFreeSlotFinder.FindInPages(page0, page1, worldData, reward.ItemId, secondPageAccessible)
+                 is { } free)
+        {
+            placementOutcome = BoxRewardPlacementResolver.Outcome.PlacedInEmptySlot;
+            rewardContainer = free.Container;
+            rewardSlot = free.Slot;
+            rewardStack = BuildRewardStack(reward, free.X, free.Y);
+        }
+        else
+        {
+            return SingleOpenPlan.Failure(Outcome.InventoryFull, rewardId);
+        }
+
+        var (newPage0, newPage1) = ApplySlot(page0, page1, rewardContainer, rewardSlot, rewardStack);
 
         var boxRemaining = boxStack.Quantity - 1;
-        ItemStack? boxAfter = boxRemaining > 0 ? boxStack with { Quantity = boxRemaining } : null;
-        (newPage0, newPage1) = ApplySlot(newPage0, newPage1, boxContainer, boxSlot, boxAfter);
+        if (rewardContainer != boxContainer || rewardSlot != boxSlot)
+        {
+            ItemStack? boxAfter = boxRemaining > 0 ? boxStack with { Quantity = boxRemaining } : null;
+            (newPage0, newPage1) = ApplySlot(newPage0, newPage1, boxContainer, boxSlot, boxAfter);
+        }
 
-        return new SingleOpenPlan(Outcome.Success, rewardId, reward.Quantity, placement.Outcome,
-            placement.Container, placement.Slot, placement.NewStack!.Value, boxRemaining, newPage0, newPage1);
+        return new SingleOpenPlan(Outcome.Success, rewardId, reward.Quantity, placementOutcome,
+            rewardContainer, rewardSlot, rewardStack, boxRemaining, newPage0, newPage1);
+    }
+
+    private static ItemStack BuildRewardStack(BoxRewardPlacementResolver.ResolvedReward reward, byte x, byte y)
+    {
+        var serial = reward.IsStackable ? 0 : reward.Serial;
+        return new ItemStack(reward.ItemId, reward.Quantity, reward.Enchant, reward.Combine, reward.Refine,
+            reward.Socket, 0, 0, 0, reward.ExpireDate, serial, x, y);
     }
 
     public static BulkOpenPlan OpenBulk(BoxRewardSpec spec, byte boxContainer, byte boxSlot, ItemStack boxStack,
         ImmutableDictionary<byte, ItemStack> page0, ImmutableDictionary<byte, ItemStack> page1,
-        Func<int, byte?> resolveRewardSort, Random random, int today, int requestedCount,
+        Func<int, byte?> resolveRewardSort, WorldDataCache worldData, Random random, int today, int requestedCount,
         Func<int>? rewardIdOverride = null, bool secondPageAccessible = true)
     {
         var maxByStock = Math.Min(boxStack.Quantity, BoxRewardPlacementResolver.MaxStackQuantity);
@@ -73,7 +114,7 @@ public static class LootBoxOpenResolver
         {
             var boxNow = boxStack with { Quantity = remainingBox };
             var plan = OpenSingle(spec, boxContainer, boxSlot, boxNow, currentPage0, currentPage1,
-                resolveRewardSort, random, today, rewardIdOverride, secondPageAccessible);
+                resolveRewardSort, worldData, random, today, rewardIdOverride, secondPageAccessible);
 
             if (plan.Outcome != Outcome.Success)
                 break;

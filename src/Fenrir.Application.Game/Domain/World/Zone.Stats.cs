@@ -7,7 +7,7 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
-    internal EffectiveStats RecomputeAndPublish(PlayerRuntimeState state, bool clampVitals)
+    internal EffectiveStats RecomputeAndPublish(PlayerRuntimeState state, bool clampVitals = true)
     {
         var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
             state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo, state.RebirthCount, state.Level2);
@@ -26,7 +26,7 @@ public sealed partial class Zone
         return stats;
     }
 
-    internal void PublishStats(PlayerRuntimeState state, EffectiveStats stats, bool clampVitals)
+    private void PublishStats(PlayerRuntimeState state, EffectiveStats stats, bool clampVitals)
     {
         state.Stats = stats;
 
@@ -35,20 +35,8 @@ public sealed partial class Zone
         state.MaxLife = stats.MaxLife;
         state.MaxMana = stats.MaxMana;
 
-        if (clampVitals)
-        {
-            if (state.Life > state.MaxLife)
-            {
-                state.Life = state.MaxLife;
-                changed = true;
-            }
-
-            if (state.Mana > state.MaxMana)
-            {
-                state.Mana = state.MaxMana;
-                changed = true;
-            }
-        }
+        if (clampVitals && state.ClampVitalsToMax())
+            changed = true;
 
         if (changed)
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);

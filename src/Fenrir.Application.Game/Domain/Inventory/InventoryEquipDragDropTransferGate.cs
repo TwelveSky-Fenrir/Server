@@ -51,6 +51,6 @@ public static class InventoryEquipDragDropTransferGate
 
     private static bool IsExpiredDatedStoragePage(int page, int inventoryDate)
     {
-        return page == ContainerMatrix.InventoryPage1 && inventoryDate < GameDate.Today();
+        return !RentedInventoryPageGate.IsPageAccessible(page, inventoryDate, GameDate.Today());
     }
 }

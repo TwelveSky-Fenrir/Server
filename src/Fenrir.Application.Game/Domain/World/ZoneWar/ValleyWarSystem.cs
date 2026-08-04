@@ -34,7 +34,7 @@ public sealed class ValleyWarSystem(
         var eligiblePresent = false;
         foreach (var player in zone.Players)
         {
-            if (player.IsMovingZone)
+            if (player.IsMovingZone || player.VisibleState == 0)
                 continue;
 
             eligiblePresent = true;
@@ -88,7 +88,10 @@ public sealed class ValleyWarSystem(
             SendZoneLocalCountdown(zone, RaceOrBossContextTag, bossCountdown);
 
         if (result.BossWindowTimeout)
+        {
+            zone.DespawnValleyWarBossPool();
             broadcaster.Value.AnnounceValleyWarReturnToTown();
+        }
 
         if (result.BossWin)
         {
@@ -99,7 +102,10 @@ public sealed class ValleyWarSystem(
         }
 
         if (result.PostWinReturnToTown)
+        {
+            zone.DespawnValleyWarBossPool();
             broadcaster.Value.AnnounceValleyWarReturnToTown();
+        }
 
         if (result.AllSessionsShouldDisconnect)
             DisconnectEveryone(zone);

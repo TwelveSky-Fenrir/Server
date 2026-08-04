@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Domain.World.Npcs;
 
 namespace Fenrir.Application.Game.Domain.Costumes;
 
@@ -59,8 +60,46 @@ public static class CostumePersistenceCodec
         return costumeIndex < SlotCount ? 0 : ValueAt(wardrobe, costumeIndex % SlotCount);
     }
 
+    public static CostumeRentSweepResult SweepExpiredRentSlots(ImmutableArray<int> wardrobe, ImmutableArray<int> date,
+        ImmutableArray<int> expireDate, int costumeIndex, int today)
+    {
+        var wardrobeBuilder = wardrobe.IsDefaultOrEmpty ? EmptySlots.ToBuilder() : wardrobe.ToBuilder();
+        var dateBuilder = date.IsDefaultOrEmpty ? EmptySlots.ToBuilder() : date.ToBuilder();
+        var expireBuilder = expireDate.IsDefaultOrEmpty ? EmptySlots.ToBuilder() : expireDate.ToBuilder();
+        var swept = false;
+
+        for (var slot = 0; slot < SlotCount && slot < wardrobeBuilder.Count; slot++)
+        {
+            var itemId = wardrobeBuilder[slot];
+            if (itemId == 0 || !NpcShopPolicy.IsRentItem(itemId))
+                continue;
+
+            if (slot < expireBuilder.Count && expireBuilder[slot] > today)
+                continue;
+
+            wardrobeBuilder[slot] = 0;
+            if (slot < dateBuilder.Count)
+                dateBuilder[slot] = 0;
+            if (slot < expireBuilder.Count)
+                expireBuilder[slot] = 0;
+            swept = true;
+        }
+
+        return swept
+            ? new CostumeRentSweepResult(wardrobeBuilder.ToImmutable(), dateBuilder.ToImmutable(),
+                expireBuilder.ToImmutable(), -1, true)
+            : new CostumeRentSweepResult(wardrobe, date, expireDate, costumeIndex, false);
+    }
+
     private static int ValueAt(ImmutableArray<int> slots, int slot)
     {
         return !slots.IsDefault && slot >= 0 && slot < slots.Length ? slots[slot] : 0;
     }
 }
+
+public readonly record struct CostumeRentSweepResult(
+    ImmutableArray<int> Wardrobe,
+    ImmutableArray<int> Date,
+    ImmutableArray<int> ExpireDate,
+    int CostumeIndex,
+    bool Changed);

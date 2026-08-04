@@ -69,6 +69,7 @@ public sealed class TitleRemoveScrollUseItemHandler(
 
         if (!await context.Zone.PostTribeProgressCommandAndWaitAsync(
                 new TribeProgressZoneCommand(context.CharacterId, newContributionPoints, Title: 0,
+                    MaxLife: updatedStats.MaxLife, MaxMana: updatedStats.MaxMana,
                     UpdatedStats: updatedStats), cancellationToken))
             logger.LogError(
                 "Zone {MapId} tribe-progress inbox full: dropped op23 title-remove mirror for character {CharacterId}",

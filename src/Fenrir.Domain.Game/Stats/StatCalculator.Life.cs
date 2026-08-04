@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using Fenrir.Domain.Game.Stats.Context;
 
 namespace Fenrir.Domain.Game.Stats;
@@ -12,6 +13,13 @@ public static partial class StatCalculator
 
     private const short BoostExcludedZoneNumber = 124;
     private const float LifeBoostMultiplier = 1.2f;
+
+    private static readonly FrozenSet<short> LevelBattleZoneNumbers = ((short[])
+    [
+        49, 51, 53, 120, 121, 122,
+        146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164,
+        295, 296, 319, 320, 321, 322, 323
+    ]).ToFrozenSet();
 
     private static int ComputeMaxLife(int vitality, LevelRowDto levelRow, int setNumber, bool isLegendarySet,
         byte previousTribe, EquippedItemSlot?[] bySlot, int petLife,
@@ -35,7 +43,7 @@ public static partial class StatCalculator
         hp += ComputeG12CustomSetBonus(previousTribe, bySlot);
         if (isLegendarySet) hp += 30000;
 
-        if (bySlot[0] is { } amulet)
+        if (bySlot[0] is { } amulet && IsLegendary(amulet.Item))
         {
             var enchant = (int)amulet.Enchant;
             if (enchant > 0)
@@ -101,7 +109,7 @@ public static partial class StatCalculator
         {
             if (i is 1 or 6) continue;
             if (bySlot[i] is not { } slot) continue;
-            if (slot.Item.Sort != 1)
+            if (ItemSortClass(slot.Item) != 1)
                 continue;
 
             var d = slot.Combine / 10;
@@ -126,7 +134,7 @@ public static partial class StatCalculator
             if (slot.Combine >= 12) v7++;
         }
 
-        return (v5 >= 6 ? 5000 : 0) + (v7 >= 6 ? 15000 : 0);
+        return (v5 >= 4 ? 5000 : 0) + (v7 >= 4 ? 15000 : 0);
     }
 
 
@@ -167,12 +175,15 @@ public static partial class StatCalculator
 
     private static bool IsElixirSuppressedZone(short zoneNumber)
     {
-        return false;
+        return LevelBattleZoneNumbers.Contains(zoneNumber) || zoneNumber == 250 || zoneNumber is > 266 and <= 269;
     }
 
     private static bool IsElementElixirZoneAllowed(short zoneNumber)
     {
-        return IsElixirEligibleZone(zoneNumber) && zoneNumber != 84;
+        if (!IsElixirEligibleZone(zoneNumber))
+            return false;
+
+        return (zoneNumber != 84 && zoneNumber < 235) || zoneNumber is > 249 and < 292 || zoneNumber > 294;
     }
 
     private static int DecodeElementAttackCount(int packedElePotion)

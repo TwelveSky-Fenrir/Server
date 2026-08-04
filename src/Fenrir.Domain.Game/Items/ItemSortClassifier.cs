@@ -42,7 +42,6 @@ public static class ItemSortClassifier
         return itemSort == 28 ? 7 : Unclassified;
     }
 
-    // 1 and 4 are ReturnItemSort classifier outputs (S07_MyGame03.cpp:6808), never ItemRowDto.Sort values.
     public static bool IsLegendaryGrade(ItemRowDto item)
     {
         return Classify(item) is 1 or 4;

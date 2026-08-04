@@ -1,6 +1,5 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
-using Fenrir.Application.Game.Domain.Consumables;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Domain.Game.GameData;
 using Fenrir.Protocol.Game;
@@ -17,6 +16,14 @@ public sealed class MultiItemCreateUseItemHandler(
 
     private const int NumBaseStandard = 6000;
     private const int NumBase99Xxx = 8000;
+
+    private const byte StackableSort = 2;
+
+    private const byte MaterialSort = 99;
+
+    private static readonly int[] PagePack = [1, 10, 100, 1000, 10000, 100000, 1000000, 10000000];
+
+    private static readonly int[] IndexPack = [1, 100, 10000, 1000000, 1, 100, 10000, 1000000];
 
     private static readonly FrozenDictionary<int, int[]> ItemListById = new Dictionary<int, int[]>
     {
@@ -66,18 +73,20 @@ public sealed class MultiItemCreateUseItemHandler(
             : page1;
 
         var placedItemIds = new int[ResponseSlots];
+        var packedPage = 0;
+        var packedIndex1 = 0;
+        var packedIndex2 = 0;
+        var packedXy1 = 0;
+        var packedXy2 = 0;
+
         for (var i = 0; i < itemsToCreate.Length; i++)
         {
             var rewardId = itemsToCreate[i];
-            var sort = worldData.ItemsById.TryGetValue(rewardId, out var def) ? def.Item.Sort : (byte)0;
-            var quantity = BoxRewardPlacementResolver.ResolveQuantity(sort, 1);
-            var reward = new BoxRewardPlacementResolver.ResolvedReward(rewardId, quantity.Quantity,
-                quantity.IsStackable, 0, 0, 0, 0, 0);
 
-            var placement = BoxRewardPlacementResolver.Resolve(
-                reward, context.Page, context.Index, projectedPage0, projectedPage1, secondPageAccessible);
+            var placement = InventoryFreeSlotFinder.FindInPages(projectedPage0, projectedPage1, worldData, rewardId,
+                secondPageAccessible);
 
-            if (!placement.Succeeded)
+            if (placement is not { } cell)
             {
                 logger.LogDebug(
                     "Character {CharacterId} multi-item-create item {ItemId}: inventory full after placing {Placed}/{Total} items -- source kept",
@@ -85,13 +94,30 @@ public sealed class MultiItemCreateUseItemHandler(
                 return UseItemResponses.InventoryFull(context.Page, context.Index);
             }
 
-            if (placement.Container == ContainerMatrix.InventoryPage0)
-                projectedPage0 = projectedPage0.SetItem(placement.Slot, placement.NewStack!.Value);
-            else
-                projectedPage1 = projectedPage1.SetItem(placement.Slot, placement.NewStack!.Value);
+            var sort = worldData.ItemsById.TryGetValue(rewardId, out var def) ? def.Item.Sort : (byte)0;
+            var stack = new ItemStack(rewardId, ResolveCreatedQuantity(rewardId, sort), 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                cell.X, cell.Y);
 
-            if (i < ResponseSlots)
-                placedItemIds[i] = rewardId;
+            if (cell.Container == ContainerMatrix.InventoryPage0)
+                projectedPage0 = projectedPage0.SetItem(cell.Slot, stack);
+            else
+                projectedPage1 = projectedPage1.SetItem(cell.Slot, stack);
+
+            if (i >= ResponseSlots)
+                continue;
+
+            placedItemIds[i] = rewardId;
+            packedPage += PagePack[i] * cell.Container;
+            if (i < 4)
+            {
+                packedIndex1 += IndexPack[i] * cell.Slot;
+                packedXy1 += IndexPack[i] * cell.GridIndex;
+            }
+            else
+            {
+                packedIndex2 += IndexPack[i] * cell.Slot;
+                packedXy2 += IndexPack[i] * cell.GridIndex;
+            }
         }
 
         await inventoryWriter.ReplaceProjectedPagesAndMirrorAsync(
@@ -105,11 +131,11 @@ public sealed class MultiItemCreateUseItemHandler(
         context.Session.Send(new MultiItemCreateResponse
         {
             Num = num,
-            Page = context.Page,
-            Index1 = context.Index,
-            Index2 = context.Index,
-            Xy1 = 0,
-            Xy2 = 0,
+            Page = packedPage,
+            Index1 = packedIndex1,
+            Index2 = packedIndex2,
+            Xy1 = packedXy1,
+            Xy2 = packedXy2,
             ItemIndex = placedItemIds,
             Value = [0, 0, 0, 0]
         });
@@ -119,5 +145,15 @@ public sealed class MultiItemCreateUseItemHandler(
             context.CharacterId, itemId, count, num);
 
         return UseItemResponses.Success(context.Page, context.Index);
+    }
+
+    private static int ResolveCreatedQuantity(int rewardItemId, byte sort)
+    {
+        return sort switch
+        {
+            StackableSort => rewardItemId is 1109 or 1224 ? 12 : 99,
+            MaterialSort => 1,
+            _ => 0
+        };
     }
 }

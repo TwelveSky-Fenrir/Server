@@ -117,15 +117,11 @@ public sealed partial class Zone
 
     private readonly HashSet<int> _combatRecipientScratch = [];
 
-    private readonly KillCooldownTracker _ffaCpOverrideCooldown = new();
-
     private readonly KillCooldownTracker _killCooldownTracker = killCooldownTracker ?? new KillCooldownTracker();
 
     private readonly HashSet<int> _pvmAttackRecipientScratch = [];
 
     private readonly QuestCatalog _questCatalog = questCatalog ?? new QuestCatalog(worldData);
-
-    private readonly KillCooldownTracker _regularWarCpOverrideCooldown = new();
 
     private readonly Dictionary<int, int> _regularWarKillDropStreak = new();
 
@@ -134,6 +130,8 @@ public sealed partial class Zone
 
     private readonly Zone175LabyrinthSystem? _zone175LabyrinthSystem =
         simulationSystems.OfType<Zone175LabyrinthSystem>().FirstOrDefault();
+
+    private int _lastObservedRegularWarCycle;
 
     private byte? _regularWarSmallestPresentTribe;
 
@@ -312,12 +310,39 @@ public sealed partial class Zone
         {
             var killType = ClassifyPvpKillType(command.AttackInfo.AttackActionValue2, false);
             ApplyPvpKillRewards(attackerState, defenderState, killType == KillCpType.Stun);
+            RegisterRegularWarKill(attackerState, killType == KillCpType.Stun);
             RecordEnemyKillForFeed(attackerState, defenderState, killType == KillCpType.Stun,
                 regularWarActiveMapTracker?.IsBattleInProgress(MapId) == true ||
                 MapId == KillFeedZoneCatalog.FfaMapNumber);
             ApplyDeath(defenderState.CharacterId, DeathCause.PlayerKill,
                 (attackerState.PosX, attackerState.PosZ));
         }
+    }
+
+    private void RegisterRegularWarKill(PlayerRuntimeState attackerState, bool isStunTrigger)
+    {
+        if (regularWarActiveMapTracker is null)
+            return;
+
+        ClearKillFeedLeaderboardOnNewWarCycle();
+
+        if (isStunTrigger)
+            return;
+
+        regularWarActiveMapTracker.RegisterKill(MapId, attackerState.Tribe, attackerState.CharacterId);
+    }
+
+    private void ClearKillFeedLeaderboardOnNewWarCycle()
+    {
+        if (regularWarActiveMapTracker is null)
+            return;
+
+        var warCycle = regularWarActiveMapTracker.GetWarCycle(MapId);
+        if (warCycle == _lastObservedRegularWarCycle)
+            return;
+
+        _lastObservedRegularWarCycle = warCycle;
+        ClearKillFeedLeaderboard();
     }
 
     private void ApplyPvpKillRewards(PlayerRuntimeState attackerState, PlayerRuntimeState defenderState,
@@ -357,7 +382,7 @@ public sealed partial class Zone
             attackerState.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
         }
 
-        ApplyPvpKillContributionPointFormula(attackerState, defenderState, profile);
+        ApplyPvpKillContributionPointFormula(attackerState, profile);
         ApplyPvpKillHeroPoints(attackerState, profile, attackerCombinedLevel);
         ApplyPvpKillExperience(attackerState, profile, attackerCombinedLevel, defenderCombinedLevel);
         DecrementDoubleKillNumTime2OnKill(attackerState);
@@ -387,42 +412,10 @@ public sealed partial class Zone
         return true;
     }
 
-    private void ApplyTowerCpForPvpBonus(PlayerRuntimeState attackerState)
-    {
-        var bonus = towerWar?.GetTribeBonus(attackerState.Tribe).CpForPvpBonus ?? 0;
-        if (bonus > 0)
-            GrantContributionPoints(attackerState.CharacterId, bonus);
-    }
-
     private void ApplyPvpKillContributionPointFormula(PlayerRuntimeState attackerState,
-        PlayerRuntimeState defenderState, PvpKillZoneRewardProfile profile)
+        PvpKillZoneRewardProfile profile)
     {
-        if (regularWarActiveMapTracker?.IsBattleInProgress(MapId) == true)
-        {
-            if (profile.GrantContributionPoints)
-                ApplyTowerCpForPvpBonus(attackerState);
-            ApplyRegularWarCpOverride(attackerState, defenderState);
-            return;
-        }
-
-        if (MapId == PvpKillRewardZoneCatalog.FfaMapNumber)
-        {
-            if (profile.GrantContributionPoints)
-                ApplyTowerCpForPvpBonus(attackerState);
-
-            if (_ffaCpOverrideCooldown.TryRegisterKill(attackerState.CharacterId, defenderState.CharacterId,
-                    DateTime.UtcNow, PvpKillContributionPointCalculator.FlatOverrideCooldown))
-            {
-                var granted = PvpKillContributionPointCalculator.ClampGrant(attackerState.ContributionPoints,
-                    PvpKillContributionPointCalculator.FfaOverrideFlatAmount,
-                    PvpKillContributionPointCalculator.ContributionPointHardCap);
-                GrantContributionPoints(attackerState.CharacterId, granted);
-            }
-
-            return;
-        }
-
-        if (!profile.GrantContributionPoints)
+        if (!profile.GrantContributionPoints && MapId != PvpKillRewardZoneCatalog.FfaMapNumber)
             return;
 
         var hasCrossTribeAddTimeEffect = attackerState.StateTimeEffect == 300;
@@ -471,22 +464,6 @@ public sealed partial class Zone
         if (totalChanged)
             attackerState.Session.Send(new AvatarStatUpdateResponse
                 { Sort = ContributionPointStatSort, Value = attackerState.ContributionPoints, Value2 = 0 });
-    }
-
-    private void ApplyRegularWarCpOverride(PlayerRuntimeState attackerState, PlayerRuntimeState defenderState)
-    {
-        if (!_regularWarCpOverrideCooldown.TryRegisterKill(attackerState.CharacterId, defenderState.CharacterId,
-                DateTime.UtcNow, PvpKillContributionPointCalculator.FlatOverrideCooldown))
-            return;
-
-        var granted = PvpKillContributionPointCalculator.ClampGrant(attackerState.ContributionPoints,
-            PvpKillContributionPointCalculator.RegularWarOverrideFlatCpAmount,
-            PvpKillContributionPointCalculator.ContributionPointHardCap);
-        GrantContributionPoints(attackerState.CharacterId, granted);
-
-        GrantWarPoints(attackerState.CharacterId, PvpKillContributionPointCalculator.RegularWarOverrideWarPointAmount);
-        GrantBloodPoints(attackerState.CharacterId,
-            PvpKillContributionPointCalculator.RegularWarOverrideBloodPointAmount);
     }
 
     private void HandleSetRegularWarSmallestTribe(byte tribeId)
@@ -1119,10 +1096,17 @@ public sealed partial class Zone
         if (!_players.TryGetValue(killerCharacterId, out var state))
             return;
 
+        if (monsterGeneralExperience < 1)
+            return;
+
         if (IsZone200TypeZone)
             return;
 
-        var fixedLevel = ExperienceFormulas.ReturnFixedLevel(state.Level);
+        var fixedLevel = ExperienceFormulas.ReturnFixedLevel(state.Level + state.Level2);
+
+        if (fixedLevel - monsterLevel > MonsterKillExperienceLevelGapCap)
+            return;
+
         var rawGain = ExperienceFormulas.ComputeMonsterKillExperience(fixedLevel, monsterLevel,
             monsterGeneralExperience);
 
@@ -1159,6 +1143,9 @@ public sealed partial class Zone
             rawGain += (int)(monsterGeneralExperience * 0.5f) * options.TeacherPointUpRatio;
             CreditTeacherPointsFromStudentKill(teacher, monsterItemLevel);
         }
+
+        if (options.GeneralExpUpRatio > 1f)
+            rawGain = (int)(rawGain * options.GeneralExpUpRatio);
 
         var finalGain = ExperienceFormulas.ApplyRebirthDivisor(rawGain, state.Level);
 

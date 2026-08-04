@@ -3,9 +3,7 @@ using System.Collections.Immutable;
 using System.Threading.Channels;
 using Fenrir.Application.Game.Domain.Consumables;
 using Fenrir.Application.Game.Domain.Hotkeys;
-using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Mounts;
-using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Social.Pshop;
 using Fenrir.Core.Packets.Shared;
@@ -52,6 +50,12 @@ public sealed partial class Zone
     private const int PetActivityStatSort = 12;
 
     private const int MountActivityExpStatSort = 71;
+
+    private const int MountAbsorbAuraSort = 7997;
+
+    private const int MountAbsorbAuraDataLength = 130;
+
+    private const int AvatarNameLength = 13;
 
     private readonly Channel<AutoBuffZoneCommand> _autoBuffInbox =
         Channel.CreateBounded<AutoBuffZoneCommand>(
@@ -309,18 +313,7 @@ public sealed partial class Zone
 
         state.DrunkBottleTicksRemaining = 0;
 
-        var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
-            state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo, state.RebirthCount,
-            state.Level2);
-        var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
-        var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
-            ? petStack.ItemId
-            : 0;
-        var petContribution = PetGrowthCalculator.Compute(petItemId, state.PetGrowth, state.PetActivity,
-            worldData.ItemsById);
-
-        state.Stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
-            petContribution, state);
+        RecomputeAndPublish(state);
 
         state.Session.Send(new AvatarStatUpdateResponse { Sort = DrunkDurationStatSort, Value = 0, Value2 = 0 });
     }
@@ -562,9 +555,13 @@ public sealed partial class Zone
 
         var wasAbsorbed = state.AnimalAbsorbState != 0;
         var changed = false;
+        var garageChanged = false;
 
         if (command.AnimalIndex is { } animalIndex)
+        {
             state.AnimalIndex = animalIndex;
+            garageChanged = true;
+        }
 
         if (command.AnimalNumber is { } animalNumber)
         {
@@ -595,7 +592,9 @@ public sealed partial class Zone
 
         if (command.DeleteGarageSlot is { } deleteGarageSlot)
         {
+            garageChanged = true;
             state.MountGarage = state.MountGarage.SetItem(deleteGarageSlot, 0);
+            state.MountActivity = state.MountActivity.SetItem(deleteGarageSlot, 0);
             state.MountAccumulatedExp = state.MountAccumulatedExp.SetItem(deleteGarageSlot, 0);
             state.MountRolledAttributeTotal = state.MountRolledAttributeTotal.SetItem(deleteGarageSlot, 0);
             for (var statSlotIndex = 0; statSlotIndex < MountStateResolver.StatSlotCount; statSlotIndex++)
@@ -606,6 +605,7 @@ public sealed partial class Zone
         if (command.RolledAttributeGarageSlot is { } rolledGarageSlot &&
             command.RolledAttributeNewPower is { } rolledNewPower)
         {
+            garageChanged = true;
             var baseIndex = rolledGarageSlot * MountStateResolver.StatSlotCount;
             var rolled = state.MountRolledAttributes;
             for (var statSlotIndex = 0; statSlotIndex < MountStateResolver.StatSlotCount; statSlotIndex++)
@@ -617,10 +617,14 @@ public sealed partial class Zone
         }
 
         if (command.ResetAccumulatedExpGarageSlot is { } expResetSlot)
+        {
+            garageChanged = true;
             state.MountAccumulatedExp = state.MountAccumulatedExp.SetItem(expResetSlot, 0);
+        }
 
         if (command.MountExpSlot is { } expSlot && command.MountExpNewValue is { } expNewValue)
         {
+            garageChanged = true;
             state.MountAccumulatedExp = state.MountAccumulatedExp.SetItem(expSlot, expNewValue);
             var activity = state.MountActivity[expSlot];
             state.Session.Send(new AvatarStatUpdateResponse
@@ -629,28 +633,37 @@ public sealed partial class Zone
                 Value = MountActivityExpCodec.Pack(activity, expNewValue),
                 Value2 = 0
             });
-            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
         }
 
-        if (changed)
-            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
+        var mountDirtyFlags = (changed ? DirtyFlags.Vitals : DirtyFlags.None) |
+                              (garageChanged ? DirtyFlags.Progression : DirtyFlags.None);
+        if (mountDirtyFlags != DirtyFlags.None)
+            state.MarkProgressDirty(dirtyTracker, mountDirtyFlags);
 
         switch (command.Broadcast)
         {
             case MountBroadcastKind.Mount:
                 state.MountExpiryCountdownAccrualTicks = 0;
+                RecomputeAndPublish(state);
                 BroadcastAvatarStateFlag(state, 12, state.AnimalNumber, 0, 0);
                 BroadcastAvatarStateFlag(state, 26, 0, 0, 0);
                 break;
             case MountBroadcastKind.Dismount:
+                RecomputeAndPublish(state);
                 if (wasAbsorbed)
+                {
                     state.Session.Send(new AvatarStatUpdateResponse { Sort = 79, Value = 0, Value2 = 0 });
+                    BroadcastMountAbsorbAura(state, 0);
+                }
+
                 BroadcastAvatarStateFlag(state, 13, 0, 0, 0);
                 break;
             case MountBroadcastKind.AbsorbToggle:
+                RecomputeAndPublish(state);
                 BroadcastAvatarStateFlag(state, 26, state.AnimalAbsorbState, 0, 0);
                 state.Session.Send(new AvatarStatUpdateResponse
                     { Sort = 79, Value = state.AnimalAbsorbState, Value2 = 0 });
+                BroadcastMountAbsorbAura(state, state.AnimalAbsorbState);
                 break;
         }
     }
@@ -685,6 +698,54 @@ public sealed partial class Zone
         finally
         {
             ArrayPool<byte>.Shared.Return(rented);
+        }
+    }
+
+    private void BroadcastMountAbsorbAura(PlayerRuntimeState state, int absorbState)
+    {
+        var data = new byte[MountAbsorbAuraDataLength];
+        LegacyWireCodec.WriteFixedString(data.AsSpan(0, AvatarNameLength), state.Name);
+
+        var response = new GenericActionResponse
+        {
+            Result = absorbState,
+            Sort = MountAbsorbAuraSort,
+            Data = data,
+            RuneValue = 0
+        };
+
+        var total = FrameWriter.FrameSizeOf<GenericActionResponse>();
+        var rented = ArrayPool<byte>.Shared.Rent(total);
+
+        try
+        {
+            var span = rented.AsSpan(0, total);
+            FrameWriter.WriteFrame(in response, span);
+
+            SendMountAbsorbAuraFrame(state.CharacterId, span);
+            _avatarStateFlagNeighborScratch.Clear();
+            _grid.NeighborsExcludingSelf(_avatarStateFlagNeighborScratch, state.CurrentCell, state.CharacterId,
+                state.PosX, state.PosY, state.PosZ);
+            foreach (var neighborId in _avatarStateFlagNeighborScratch)
+                SendMountAbsorbAuraFrame(neighborId, span);
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(rented);
+        }
+    }
+
+    private void SendMountAbsorbAuraFrame(int recipientId, ReadOnlySpan<byte> frame)
+    {
+        try
+        {
+            if (TryGetBroadcastRecipient(recipientId, out _, out var clientSession))
+                clientSession.SendRaw(frame);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Zone {MapId} mount-absorb-aura broadcast to character {RecipientId} failed", MapId,
+                recipientId);
         }
     }
 
@@ -724,9 +785,13 @@ public sealed partial class Zone
             return;
 
         var changed = false;
+        var wardrobeChanged = false;
 
         if (command.CostumeIndex is { } costumeIndex)
+        {
             state.CostumeIndex = costumeIndex;
+            wardrobeChanged = true;
+        }
 
         if (command.CostumeNumber is { } costumeNumber)
         {
@@ -738,10 +803,16 @@ public sealed partial class Zone
             state.CostumeState = costumeState;
 
         if (command.WardrobeSlotCleared is { } clearedSlot)
-            state.CostumeWardrobe = state.CostumeWardrobe.SetItem(clearedSlot, 0);
+        {
+            wardrobeChanged = true;
+            state.CostumeWardrobe = CompactCosmeticSlots(state.CostumeWardrobe, clearedSlot);
+            state.CostumeDate = CompactCosmeticSlots(state.CostumeDate, clearedSlot);
+            state.CostumeExpireDate = CompactCosmeticSlots(state.CostumeExpireDate, clearedSlot);
+        }
 
         if (command.WardrobeSlotGranted is { } grantedSlot)
         {
+            wardrobeChanged = true;
             state.CostumeWardrobe = state.CostumeWardrobe.SetItem(grantedSlot, command.GrantedItemId ?? 0);
             state.CostumeDate = state.CostumeDate.SetItem(grantedSlot, command.GrantedCostumeDate ?? 0);
             state.CostumeExpireDate = state.CostumeExpireDate.SetItem(grantedSlot, command.GrantedExpireDate ?? 0);
@@ -771,15 +842,19 @@ public sealed partial class Zone
         if (command.UpdatedStats is { } stats)
             state.Stats = stats;
 
-        if (changed)
-            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
+        var costumeDirtyFlags = (changed ? DirtyFlags.Vitals : DirtyFlags.None) |
+                                (wardrobeChanged ? DirtyFlags.Progression : DirtyFlags.None);
+        if (costumeDirtyFlags != DirtyFlags.None)
+            state.MarkProgressDirty(dirtyTracker, costumeDirtyFlags);
 
         switch (command.Broadcast)
         {
             case CostumeBroadcastKind.Equip:
+                RecomputeAndPublish(state);
                 BroadcastAvatarStateFlag(state, 16, state.CostumeNumber, 0, 0);
                 break;
             case CostumeBroadcastKind.Remove:
+                RecomputeAndPublish(state);
                 BroadcastAvatarStateFlag(state, 17, 0, 0, 0);
                 break;
         }
@@ -815,9 +890,13 @@ public sealed partial class Zone
             return;
 
         var changed = false;
+        var wardrobeChanged = false;
 
         if (command.CoreIndex is { } coreIndex)
+        {
             state.StellarCoreIndex = coreIndex;
+            wardrobeChanged = true;
+        }
 
         if (command.CoreNumber is { } coreNumber)
         {
@@ -826,10 +905,15 @@ public sealed partial class Zone
         }
 
         if (command.WardrobeSlotCleared is { } clearedSlot)
-            state.StellarCoreWardrobe = CompactStellarCoreWardrobe(state.StellarCoreWardrobe, clearedSlot);
+        {
+            wardrobeChanged = true;
+            state.StellarCoreWardrobe = CompactCosmeticSlots(state.StellarCoreWardrobe, clearedSlot);
+            state.StellarCoreExpireDate = CompactCosmeticSlots(state.StellarCoreExpireDate, clearedSlot);
+        }
 
         if (command.WardrobeSlotGranted is { } grantedSlot)
         {
+            wardrobeChanged = true;
             state.StellarCoreWardrobe = state.StellarCoreWardrobe.SetItem(grantedSlot, command.GrantedItemId ?? 0);
             state.StellarCoreExpireDate =
                 state.StellarCoreExpireDate.SetItem(grantedSlot, command.GrantedExpireDate ?? 0);
@@ -850,23 +934,30 @@ public sealed partial class Zone
         if (command.UpdatedStats is { } stats)
             state.Stats = stats;
 
-        if (changed)
-            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
+        var stellarDirtyFlags = (changed ? DirtyFlags.Vitals : DirtyFlags.None) |
+                                (wardrobeChanged ? DirtyFlags.Progression : DirtyFlags.None);
+        if (stellarDirtyFlags != DirtyFlags.None)
+            state.MarkProgressDirty(dirtyTracker, stellarDirtyFlags);
 
         switch (command.Broadcast)
         {
             case StellarCoreBroadcastKind.Equip:
+                RecomputeAndPublish(state);
                 BroadcastAvatarStateFlag(state, 37, state.StellarCoreNumber, 0, 0);
                 break;
             case StellarCoreBroadcastKind.Remove:
+                RecomputeAndPublish(state);
                 BroadcastAvatarStateFlag(state, 38, 0, 0, 0);
                 break;
         }
     }
 
-    private static ImmutableArray<int> CompactStellarCoreWardrobe(ImmutableArray<int> wardrobe, int clearedSlot)
+    private static ImmutableArray<int> CompactCosmeticSlots(ImmutableArray<int> slots, int clearedSlot)
     {
-        var builder = wardrobe.ToBuilder();
+        if (slots.IsDefaultOrEmpty || clearedSlot < 0 || clearedSlot >= slots.Length)
+            return slots;
+
+        var builder = slots.ToBuilder();
         for (var i = clearedSlot; i < builder.Count - 1; i++)
             builder[i] = builder[i + 1];
         builder[^1] = 0;
@@ -894,8 +985,6 @@ public sealed partial class Zone
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
 
-        var changed = false;
-
         if (command.StateTimeEffect is { } stateTimeEffect)
             state.StateTimeEffect = stateTimeEffect;
 
@@ -908,18 +997,11 @@ public sealed partial class Zone
         if (command.PlayTime2 is { } playTime2)
             state.PlayTime2 = playTime2;
 
-        if (command.HealToMax)
-        {
-            state.Life = state.Stats?.MaxLife ?? state.MaxLife;
-            state.Mana = state.Stats?.MaxMana ?? state.MaxMana;
-            changed = true;
-        }
-
         if (command.UpdatedStats is { } stats)
             state.Stats = stats;
 
-        if (changed)
-            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
+        if (command.RecomputeAndClampVitals)
+            RecomputeAndPublish(state);
     }
 
     private void DrainRuneSocketCommands()
@@ -946,21 +1028,7 @@ public sealed partial class Zone
         state.RuneSystem = state.RuneSystem.SetItem(command.RuneIndex, command.RuneItemId ?? 0);
         state.RuneSystemStat = state.RuneSystemStat.SetItem(command.RuneIndex, command.RuneStat ?? 0);
 
-        var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
-            state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo, state.RebirthCount,
-            state.Level2);
-        var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
-        var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
-            ? petStack.ItemId
-            : 0;
-        var petContribution = PetGrowthCalculator.Compute(petItemId, state.PetGrowth, state.PetActivity,
-            worldData.ItemsById);
-
-        state.Stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
-            petContribution, state);
-
-        if (command.UpdatedStats is { } stats)
-            state.Stats = stats;
+        RecomputeAndPublish(state);
     }
 
     private void DrainAutoBuffCommands()
@@ -1226,7 +1294,7 @@ public readonly record struct AvatarBuffZoneCommand(
     int CharacterId,
     int? StateTimeEffect = null,
     int? RankBuffType = null,
-    bool HealToMax = false,
+    bool RecomputeAndClampVitals = false,
     EffectiveStats? UpdatedStats = null,
     int? PlayTime2 = null,
     TaskCompletionSource? Applied = null);
@@ -1236,7 +1304,6 @@ public readonly record struct RuneSocketZoneCommand(
     int RuneIndex,
     int? RuneItemId,
     int? RuneStat,
-    EffectiveStats? UpdatedStats,
     TaskCompletionSource? Applied = null);
 
 public readonly record struct AutoBuffZoneCommand(

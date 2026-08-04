@@ -33,7 +33,8 @@ public sealed class EquipSwapUseItemHandler(
 
         var inventoryPage = state.Inventory.GetContainer(context.Page);
         var newInventory = resolved.NewInventoryStack is { } previouslyEquipped
-            ? inventoryPage.SetItem(context.Index, previouslyEquipped)
+            ? inventoryPage.SetItem(context.Index,
+                previouslyEquipped with { XPos = context.Item.XPos, YPos = context.Item.YPos })
             : inventoryPage.Remove(context.Index);
         var newEquipment = equipmentContainer.SetItem(resolved.TargetEquipSlot, resolved.NewEquipStack);
 

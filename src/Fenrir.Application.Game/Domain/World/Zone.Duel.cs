@@ -105,6 +105,8 @@ public sealed partial class Zone
         state.CanUseConsumables = true;
         state.Session.Send(new DuelEndResponse { Result = (int)reason });
 
+        BroadcastDuelStateChanged(state, state.CharacterId, state.UniqueNumber, 0, 0, 0);
+
         _duelEndNeighborScratch.Clear();
         _grid.NeighborsExcludingSelf(_duelEndNeighborScratch, state.CurrentCell, state.CharacterId, state.PosX,
             state.PosY, state.PosZ);
@@ -118,22 +120,22 @@ public sealed partial class Zone
             return;
 
         BroadcastDuelStateChanged(requester, requesterCharacterId, requester.UniqueNumber,
-            duelUniqueNumber, 1);
+            1, duelUniqueNumber, 1);
 
         if (_players.TryGetValue(opponentCharacterId, out var opponent) && !opponent.IsMovingZone)
             BroadcastDuelStateChanged(requester, opponentCharacterId, opponent.UniqueNumber,
-                duelUniqueNumber, 2);
+                1, duelUniqueNumber, 2);
     }
 
     private void BroadcastDuelStateChanged(PlayerRuntimeState anchor, int subjectCharacterId,
-        uint subjectUniqueNumber, int duelUniqueNumber, int roleMarker)
+        uint subjectUniqueNumber, int duelActive, int duelUniqueNumber, int roleMarker)
     {
         var response = new AvatarStateFlagResponse
         {
             ServerIndex = subjectCharacterId,
             UniqueNumber = subjectUniqueNumber,
             Sort = DuelStateChangedSort,
-            Value01 = 1,
+            Value01 = duelActive,
             Value02 = duelUniqueNumber,
             Value03 = roleMarker
         };

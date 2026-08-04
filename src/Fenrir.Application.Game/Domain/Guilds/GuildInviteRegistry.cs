@@ -138,6 +138,9 @@ public sealed class GuildInviteRegistry
             if (!_pendingByTarget.Remove(targetId, out askerId))
                 return false;
 
+            if (!_pendingByAsker.TryGetValue(askerId, out var recordedTargetId) || recordedTargetId != targetId)
+                return false;
+
             if (askerBusyByZoneTransfer)
             {
                 guardBlocked = true;

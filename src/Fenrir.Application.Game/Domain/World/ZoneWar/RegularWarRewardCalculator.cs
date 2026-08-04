@@ -68,7 +68,7 @@ public static class RegularWarRewardCalculator
                 0,
                 isWinningSide ? WinningHeroRankPoints : LosingOrDrawHeroRankPoints,
                 leaderboardCp,
-                !isDraw));
+                false));
         }
 
         return builder.MoveToImmutable();

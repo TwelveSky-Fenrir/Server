@@ -20,15 +20,15 @@ public static partial class StatCalculator
                              SetBonusTables.GetCoefficients(setNumber, i, IsLegendary(slot.Item)).AttackSuccess);
         }
 
-        hit = MountGradeHit(hit, mount);
-
         hit += ComputeGlovesAttackSuccessBonus(bySlot[3]);
         hit += ComputeWeaponAttackSuccessBonus(bySlot[7]);
 
+        if (bySlot[7] is { } weaponIu3 && weaponIu3.Item.CheckSetItem != 2)
+            hit += IUEffectSlotContribution(3, weaponIu3.Item.Sort, weaponIu3.Item.Level, weaponIu3.Combine);
+
         hit += AccuracyElixirContributionWithOverride(consumable, zone);
 
-        if (bySlot[7] is { } weaponIu3)
-            hit += IUEffectSlotContribution(3, weaponIu3.Item.Sort, weaponIu3.Item.Level, weaponIu3.Combine);
+        hit = MountGradeHit(hit, mount);
 
         hit += MountFlatHit(mount);
 
@@ -45,7 +45,7 @@ public static partial class StatCalculator
         {
             var enchant = (int)gloves.Enchant;
             if (enchant >= 100) enchant -= 100;
-            total += enchant * 1500;
+            return enchant * 1500;
         }
 
         if (item.CheckSetItem == 2)
@@ -83,19 +83,19 @@ public static partial class StatCalculator
                                SetBonusTables.GetCoefficients(setNumber, i, IsLegendary(slot.Item)).AttackBlock);
         }
 
-        dodge = MountGradeDodge(dodge, mount);
-
         dodge += ComputeArmorAttackBlockBonus(bySlot[2]);
         dodge += ComputeBootsAttackBlockBonus(bySlot[5]);
 
-        if (bySlot[2] is { } armorIu4)
+        if (bySlot[2] is { } armorIu4 && armorIu4.Item.CheckSetItem != 2)
             dodge += IUEffectSlotContribution(4, armorIu4.Item.Sort, armorIu4.Item.Level, armorIu4.Combine);
-        if (bySlot[5] is { } bootsIu4)
+        if (bySlot[5] is { } bootsIu4 && !IsLegendary(bootsIu4.Item) && bootsIu4.Item.CheckSetItem != 2)
             dodge += IUEffectSlotContribution(4, bootsIu4.Item.Sort, bootsIu4.Item.Level, bootsIu4.Combine);
 
         dodge += DecorationStatContribution(DecorationStatKind.AttackBlock, bySlot);
 
         dodge += BlockElixirContributionWithOverride(consumable, zone);
+
+        dodge = MountGradeDodge(dodge, mount);
 
         dodge += MountFlatDodge(mount);
 
@@ -119,7 +119,7 @@ public static partial class StatCalculator
         {
             var enchant = (int)boots.Enchant;
             if (enchant >= 100) enchant -= 100;
-            total += enchant * 300;
+            return enchant * 300;
         }
 
         if (item.CheckSetItem == 2)

@@ -211,7 +211,7 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
                 _killOrderSeen.Clear();
                 WarCycleNumber++;
                 _countdownAnnounceValue = CountdownAnnounceStartValue;
-                _countdownAnnounceTicksElapsed = 0;
+                _countdownAnnounceTicksElapsed = CountdownAnnounceIntervalTicks;
                 _idleSubPhase = RegularWarIdleSubPhase.CountdownAnnounce;
                 return;
 

@@ -14,6 +14,8 @@ public sealed class EliteDungeonTicketUseItemHandler(
 
     private const byte SuccessOutcome = 1;
 
+    private const short RequiredLevel = 113;
+
     public static IEnumerable<int> HandledItemIds { get; } =
     [
         DungeonAccessTicketResolver.EliteDungeonTicketLargeItemId,
@@ -25,6 +27,15 @@ public sealed class EliteDungeonTicketUseItemHandler(
         CancellationToken cancellationToken)
     {
         var state = context.State;
+
+        if (state.Level < RequiredLevel)
+        {
+            logger.LogDebug(
+                "Character {CharacterId} op23 Elite-Dungeon-Ticket ({ItemId}) rejected: level {Level} below {Required}",
+                context.CharacterId, context.Item.ItemId, state.Level, RequiredLevel);
+            return UseItemResponses.Fail(context.Page, context.Index);
+        }
+
         var amount = AmountFor(context.Item.ItemId);
         var resolved = DungeonAccessTicketResolver.Resolve(state.EliteDungeonTime, amount, context.Item.Quantity);
 

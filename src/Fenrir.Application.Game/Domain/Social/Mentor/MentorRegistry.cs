@@ -124,8 +124,6 @@ public sealed class MentorRegistry
 
             if (masterBusyByZoneTransfer)
             {
-                // A decline always releases the answering side, matching every sibling registry: the student has no
-                // cancel opcode, and the sweep never fires once the master's transfer completes.
                 if (!accepted)
                     _pendingByStudent.Remove(studentId);
 

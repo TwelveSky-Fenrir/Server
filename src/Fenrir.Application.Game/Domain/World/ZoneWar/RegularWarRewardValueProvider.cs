@@ -1,14 +1,15 @@
 using Fenrir.Application.Game.Domain.Combat;
+using Fenrir.Domain.Game.GameData;
 
 namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
-public sealed class RegularWarRewardValueProvider : IRegularWarRewardValueProvider
+public sealed class RegularWarRewardValueProvider(WorldDataCache worldData) : IRegularWarRewardValueProvider
 {
     private const int FirstTierExperienceMultiplier = 10;
 
     private const int SecondTierExperienceMultiplier = 5;
 
-    private const int MaxNumberSizeSentinel = 2_000_000_000;
+    private const long MaxNumberSizeSentinel = 2_000_000_000L;
 
     public long GetMoneyReward(short evolutionTier, short level)
     {
@@ -39,19 +40,26 @@ public sealed class RegularWarRewardValueProvider : IRegularWarRewardValueProvid
 
     public int GetExperienceReward(short level)
     {
+        var (rangeMin, rangeMax) = LevelExperienceRange(level);
+
         var raw = level switch
         {
-            >= ExperienceFormulas.MaxLimitLevel => MaxNumberSizeSentinel,
+            >= ExperienceFormulas.MaxLimitLevel => MaxNumberSizeSentinel - rangeMin,
             >= ExperienceFormulas.RebirthDivisorLevelThreshold =>
-                LevelCurveDifference(level) * SecondTierExperienceMultiplier,
-            _ => LevelCurveDifference(level) * FirstTierExperienceMultiplier
+                (rangeMax - rangeMin) * SecondTierExperienceMultiplier,
+            _ => (rangeMax - rangeMin) * FirstTierExperienceMultiplier
         };
 
-        return (int)Math.Ceiling(raw / 100.0);
+        return raw <= 0 ? 0 : (int)Math.Ceiling(raw / 100.0);
     }
 
-    private static int LevelCurveDifference(short level)
+    private (long RangeMin, long RangeMax) LevelExperienceRange(short level)
     {
-        return ExperienceFormulas.ReturnFixedLevel(level + 1) - ExperienceFormulas.ReturnFixedLevel(level);
+        if (level < 1 || level > ExperienceFormulas.MaxLimitLevel)
+            return (0L, 0L);
+
+        return worldData.LevelsByLevel.TryGetValue(level, out var row)
+            ? (row.ExpRangeMin, row.ExpRangeMax)
+            : (0L, 0L);
     }
 }

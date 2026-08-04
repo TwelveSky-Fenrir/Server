@@ -36,6 +36,8 @@ public static class PetBagItemTransferPolicy
 
     public const byte PetBagEligibleSort = 3;
 
+    public const byte PetBagWithdrawMergeableSort = 99;
+
     public static bool IsValidBagSlot(int slot)
     {
         return slot is >= 0 and <= MaxBagSlotInclusive;
@@ -85,7 +87,8 @@ public static class PetBagItemTransferPolicy
         int sourceBagSlot, int? sourceBagItemId,
         byte destinationInventoryContainer, int destinationInventorySlot, int destinationX, int destinationY,
         ItemStack? destination, int newSerialNumber,
-        bool petEquipped, bool bagUpperHalfEntitlementActive, bool secondInventoryPageEntitlementActive)
+        bool petEquipped, bool bagUpperHalfEntitlementActive, bool secondInventoryPageEntitlementActive,
+        byte sourceItemSort = 0)
     {
         if (!IsValidBagSlot(sourceBagSlot))
             return WithdrawFail(TransferOutcome.SourceOutOfRange);
@@ -108,11 +111,25 @@ public static class PetBagItemTransferPolicy
         if (sourceBagItemId is not { } itemId)
             return WithdrawFail(TransferOutcome.SourceEmpty);
 
-        if (destination is not null)
-            return WithdrawFail(TransferOutcome.DestinationOccupied);
+        if (destination is { } dst)
+        {
+            if (sourceItemSort != PetBagWithdrawMergeableSort || dst.ItemId != itemId ||
+                dst.Quantity + 1 > ItemQuantityPolicy.MaxStackQuantity)
+                return WithdrawFail(TransferOutcome.DestinationOccupied);
 
-        var newSlot = new ItemStack(itemId, 0, 0, 0, 0, 0, 0, 0, 0, 0, newSerialNumber,
-            (byte)destinationX, (byte)destinationY);
+            var mergedSlot = dst with
+            {
+                Quantity = dst.Quantity + 1,
+                Enchant = 0, Combine = 0, Refine = 0, Socket = 0,
+                Serial = newSerialNumber,
+                XPos = (byte)destinationX, YPos = (byte)destinationY
+            };
+            return new WithdrawResult(TransferOutcome.Success, null, mergedSlot, true);
+        }
+
+        var withdrawnQuantity = sourceItemSort == PetBagWithdrawMergeableSort ? 1 : 0;
+        var newSlot = new ItemStack(itemId, withdrawnQuantity, 0, 0, 0, 0, 0, 0, 0, 0,
+            newSerialNumber, (byte)destinationX, (byte)destinationY);
         return new WithdrawResult(TransferOutcome.Success, null, newSlot, true);
     }
 

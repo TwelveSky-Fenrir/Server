@@ -14,6 +14,8 @@ public sealed class IvyHallTicketUseItemHandler(
 
     private const byte SuccessOutcome = 1;
 
+    private const int IvyHallTicketCeiling = 1_576_800;
+
     public static IEnumerable<int> HandledItemIds { get; } =
     [
         DungeonAccessTicketResolver.IvyHallTicketSmallItemId,
@@ -25,7 +27,8 @@ public sealed class IvyHallTicketUseItemHandler(
     {
         var state = context.State;
         var amount = AmountFor(context.Item.ItemId);
-        var resolved = DungeonAccessTicketResolver.Resolve(state.IvyHallTicketTime, amount, context.Item.Quantity);
+        var resolved = DungeonAccessTicketResolver.Resolve(state.IvyHallTicketTime, amount, context.Item.Quantity,
+            IvyHallTicketCeiling);
 
         if (!resolved.Succeeded)
         {

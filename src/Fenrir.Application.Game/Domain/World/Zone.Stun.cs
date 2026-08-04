@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Core.Packets.Shared;
 
@@ -45,6 +46,11 @@ public sealed partial class Zone
             out var stunResistGrade);
         worldData.SkillsById.TryGetValue(stunResistSkillId, out var stunResistSkill);
 
+        if (stunResistSkillId != 0)
+            stunResistGrade += SkillGradeAuthority.GetBonusSkillValue(stunResistSkillId,
+                BuildEquipSlotItems(defenderState), 0, stunResistSkill, defenderState.GuildBuffType,
+                defenderState.GuildBuffActive);
+
         var request = new StunAttemptRequest(
             ToCombatantSnapshot(attackerState),
             ToCombatantSnapshot(defenderState),
@@ -60,7 +66,8 @@ public sealed partial class Zone
             usedSkill,
             stunResistSkillId != 0 ? stunResistSkill : null,
             stunResistGrade,
-            defenderState.Buffs.Buff[StunDefenseBuffSlot * 2 + 1] > 0);
+            defenderState.Buffs.Buff[StunDefenseBuffSlot * 2] > 0,
+            worldState?.GetAllyOf(attackerState.Tribe));
 
         var outcome = StunResolver.Resolve(request, _clock, _random);
         if (outcome.Rejected || !outcome.Success)
@@ -105,7 +112,8 @@ public sealed partial class Zone
             usedSkillGradePoints,
             curerState.ActionSkillNumber,
             curerState.ActionSkillGradeNum1 + curerState.ActionSkillGradeNum2,
-            usedSkill);
+            usedSkill,
+            worldState?.GetAllyOf(targetState.Tribe));
 
         var outcome = UnstunResolver.Resolve(request, _random);
         if (outcome.Rejected || !outcome.Success)
@@ -145,11 +153,11 @@ public sealed partial class Zone
 
         if (defenderState.RepeatedStunCount == 1)
         {
-            var defenderHasCriticalBuff = defenderState.Buffs.Buff[CriticalBuffSlot * 2 + 1] > 0;
+            var defenderHasCriticalBuff = defenderState.Buffs.Buff[CriticalBuffSlot * 2] > 0;
             if (defenderHasCriticalBuff)
                 foreach (var member in present)
                 {
-                    var memberHasCriticalBuff = member.Buffs.Buff[CriticalBuffSlot * 2 + 1] > 0;
+                    var memberHasCriticalBuff = member.Buffs.Buff[CriticalBuffSlot * 2] > 0;
                     if (!memberHasCriticalBuff)
                         continue;
 
@@ -158,7 +166,8 @@ public sealed partial class Zone
         }
 
         if (defenderState.RepeatedStunCount >= TeamStunLockDeathThreshold)
-            ApplyDeath(defenderState.CharacterId, DeathCause.StunLock);
+            ApplyDeath(defenderState.CharacterId, DeathCause.StunLock,
+                (attackerState.PosX, attackerState.PosZ));
     }
 
     private bool SharesActiveDuel(int attackerId, int defenderId)

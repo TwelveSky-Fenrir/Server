@@ -28,12 +28,17 @@ public static partial class StatCalculator
                     enchant -= 100;
                 eatk += enchant * 200;
             }
-
-            if (item.CheckSetItem == 2)
+            else if (item.CheckSetItem == 2)
+            {
                 eatk += SetBonusTables.LinearByCombine(ring4.Combine, 40);
+            }
+            else
+            {
+                eatk += IUEffectSlotContribution(5, item.Sort, item.Level, ring4.Combine);
+            }
         }
 
-        if (bySlot[10] is { } deco2 && deco2.Item.Sort != 2)
+        if (bySlot[10] is { } deco2 && ItemSortClass(deco2.Item) != 2)
         {
             var isWing = deco2.Item.ItemId is 210 or 211 or 212 or 216 or 217 or 218 or 2303 or 2304 or 2305;
             eatk += (int)(deco2.Enchant * (isWing ? 7.8f : 3.9f));
@@ -41,13 +46,10 @@ public static partial class StatCalculator
 
         eatk += levelRow.ElementAttack;
 
-        eatk = MountGradeElementAttack(eatk, mount);
-
         eatk += ElementAttackElixirContribution(consumable, zone);
         eatk += StellarCoreElementAttackContribution(cosmetic);
 
-        if (bySlot[4] is { } ringIu5)
-            eatk += IUEffectSlotContribution(5, ringIu5.Item.Sort, ringIu5.Item.Level, ringIu5.Combine);
+        eatk = MountGradeElementAttack(eatk, mount);
 
         eatk += MountFlatElementAttack(mount);
 
@@ -79,21 +81,21 @@ public static partial class StatCalculator
             edef += enchant * 200;
         }
 
-        if (bySlot[10] is { } deco2 && deco2.Item.Sort != 2)
+        if (bySlot[10] is { } deco2 && ItemSortClass(deco2.Item) != 2)
         {
             var isWing = deco2.Item.ItemId is 207 or 208 or 209 or 216 or 217 or 218 or 2303 or 2304 or 2305;
             edef += (int)(deco2.Enchant * (isWing ? 7.8f : 3.9f));
         }
 
-        edef = MountGradeElementDefense(edef, mount);
+        if (bySlot[0] is { } amuletIu6 && !IsLegendary(amuletIu6.Item) && amuletIu6.Item.CheckSetItem != 2)
+            edef += IUEffectSlotContribution(6, amuletIu6.Item.Sort, amuletIu6.Item.Level, amuletIu6.Combine);
+
+        edef += DecorationStatContribution(DecorationStatKind.ElementDefensePower, bySlot);
 
         edef += ElementDefenseElixirContribution(consumable, zone);
         edef += StellarCoreElementDefenseContribution(cosmetic);
 
-        if (bySlot[0] is { } amuletIu6)
-            edef += IUEffectSlotContribution(6, amuletIu6.Item.Sort, amuletIu6.Item.Level, amuletIu6.Combine);
-
-        edef += DecorationStatContribution(DecorationStatKind.ElementDefensePower, bySlot);
+        edef = MountGradeElementDefense(edef, mount);
 
         edef += MountFlatElementDefense(mount);
 

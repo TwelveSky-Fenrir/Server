@@ -8,6 +8,7 @@ public static partial class StatCalculator
         CosmeticContext cosmetic = default, ZoneContext zone = default, MountContext mount = default)
     {
         var def = (int)(wisdom * 9.63f);
+        def += OrnamentDefenseContribution(zone, bySlot);
         def += levelRow.DefensePower;
 
         for (var i = 0; i < bySlot.Length; i++)
@@ -18,8 +19,6 @@ public static partial class StatCalculator
                 def += (int)(slot.Item.DefensePower *
                              SetBonusTables.GetCoefficients(setNumber, i, IsLegendary(slot.Item)).DefensePower);
         }
-
-        def = MountGradeDefense(def, mount);
 
         def += ComputeCapeDefensePowerBonus(bySlot[1]);
         def += ComputeArmorDefensePowerBonus(bySlot[2]);
@@ -35,18 +34,13 @@ public static partial class StatCalculator
             def += PetAmuletDefenseBonus(petAmulet.Item.ItemId, petAmulet.Item.Sort);
         }
 
-        def += SetBonusTables.GetBaseFlatDefensePowerBonus(setNumber);
-
-        if (bySlot[1] is { } capeSlot)
-            def += capeSlot.Item.ItemId switch { 1404 => 2200, 1401 => 650, _ => 0 };
+        def += DecorationStatContribution(DecorationStatKind.DefensePower, bySlot);
 
         def += StellarCoreDefensePowerContribution(cosmetic);
-        def += OrnamentDefenseContribution(zone, bySlot);
 
-        if (bySlot[1] is { } capeIu2)
-            def += IUEffectSlotContribution(2, capeIu2.Item.Sort, capeIu2.Item.Level, capeIu2.Combine);
+        def = MountGradeDefense(def, mount);
 
-        def += DecorationStatContribution(DecorationStatKind.DefensePower, bySlot);
+        def += SetBonusTables.GetBaseFlatDefensePowerBonus(setNumber);
 
         def += MountFlatDefense(mount);
 
@@ -56,9 +50,15 @@ public static partial class StatCalculator
     private static int ComputeCapeDefensePowerBonus(EquippedItemSlot? capeSlot)
     {
         if (capeSlot is not { } cape) return 0;
-        var total = 0;
-        if (cape.Item.Sort == 29) total += 6 * cape.Enchant;
-        if (cape.Item.CheckSetItem == 2) total += SetBonusTables.CapeDefenseByCombine(cape.Combine);
+
+        var total = 6 * cape.Enchant;
+        if (cape.Item.Sort == 29)
+            return total;
+
+        total += cape.Item.CheckSetItem == 2
+            ? SetBonusTables.CapeDefenseByCombine(cape.Combine)
+            : IUEffectSlotContribution(2, cape.Item.Sort, cape.Item.Level, cape.Combine);
+
         return total;
     }
 
@@ -72,7 +72,7 @@ public static partial class StatCalculator
         {
             var enchant = (int)armor.Enchant;
             if (enchant >= 100) enchant -= 100;
-            total += enchant * 1000;
+            return enchant * 1000;
         }
 
         if (item.CheckSetItem == 2)
@@ -102,7 +102,7 @@ public static partial class StatCalculator
 
     private static int ComputeDeco2DefensePowerBonus(EquippedItemSlot deco2)
     {
-        if (deco2.Item.Sort == 2)
+        if (ItemSortClass(deco2.Item) == 2)
             return 0;
         var isSpecial = deco2.Item.ItemId is 204 or 205 or 206 or 216 or 217 or 218 or 2303 or 2304 or 2305;
         return (int)(deco2.Enchant * (isSpecial ? 48.75f : 24.35f));

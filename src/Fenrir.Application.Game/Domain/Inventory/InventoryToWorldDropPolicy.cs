@@ -139,12 +139,19 @@ public static class InventoryToWorldDropPolicy
             case >= 7 and <= 21:
                 return new GroundDropReshape(GroundDropReshapeOutcome.Reshaped, 0, incomingValue, 0);
 
-            case 22:
+            case ItemQuantityPolicy.PetSort:
             {
+                var activity = dropSort == GroundItemEntity.GmCreateItemDropSort
+                    ? ItemQuantityPolicy.MaxPetActivity
+                    : incomingQuantity;
+
+                if (activity < 0 || activity > ItemQuantityPolicy.MaxPetActivity)
+                    return GroundDropReshape.Reject(GroundDropReshapeOutcome.RejectedQuantityRange);
+
                 if (incomingValue < 0 || incomingValue > MaxNumberSentinel)
                     return GroundDropReshape.Reject(GroundDropReshapeOutcome.RejectedPackedValueRange);
 
-                return new GroundDropReshape(GroundDropReshapeOutcome.Reshaped, incomingQuantity, incomingValue, 0);
+                return new GroundDropReshape(GroundDropReshapeOutcome.Reshaped, activity, incomingValue, 0);
             }
 
             case >= 23 and <= 33:

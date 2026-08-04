@@ -15,6 +15,7 @@ public static partial class StatCalculator
         var weaponSlot = bySlot[7];
         var coefficients = ResolveWeaponAttackCoefficients(weaponSlot);
         var atk = (int)(strength * coefficients.Str) + (int)(ki * coefficients.Ki);
+        atk += OrnamentAttackContribution(zone, bySlot);
         atk += levelRow.AttackPower;
 
         for (var i = 0; i < bySlot.Length; i++)
@@ -29,13 +30,8 @@ public static partial class StatCalculator
                     slot.SocketGem3, gemSocketsByTypeAndValue);
         }
 
-        atk = MountGradeAttack(atk, mount);
-
-        if (bySlot[1] is { } capeSlot)
-        {
-            if (capeSlot.Item.Sort == 29) atk += 6 * capeSlot.Enchant;
-            atk += capeSlot.Item.ItemId switch { 1404 => 1100, 1401 => 100, _ => 0 };
-        }
+        if (bySlot[1] is { } capeSlot && capeSlot.Item.Sort == 29)
+            atk += 6 * capeSlot.Enchant;
 
         atk += ComputeWeaponAttackPowerBonus(weaponSlot);
 
@@ -48,16 +44,17 @@ public static partial class StatCalculator
             atk += PetAmuletAttackBonus(petAmulet.Item.ItemId, petAmulet.Item.Sort);
         }
 
-        atk += SetBonusTables.GetBaseFlatAttackPowerBonus(setNumber);
-
         atk += StrengthElixirAttackContributionWithOverride(consumable, zone);
 
         atk = ApplyAttackBoostMultiplier(atk, consumable, zone);
 
-        atk += StellarCoreAttackPowerContribution(cosmetic);
-        atk += OrnamentAttackContribution(zone, bySlot);
+        atk = MountGradeAttack(atk, mount);
+
+        atk += SetBonusTables.GetBaseFlatAttackPowerBonus(setNumber);
 
         atk += MountFlatAttack(mount);
+
+        atk += StellarCoreAttackPowerContribution(cosmetic);
 
         return atk;
     }
@@ -84,7 +81,7 @@ public static partial class StatCalculator
             var enchant = (int)weapon.Enchant;
             if (enchant >= 100)
                 enchant -= 100;
-            total += enchant * 1200;
+            return enchant * 1200;
         }
 
         if (item.CheckSetItem == 2)
@@ -113,22 +110,12 @@ public static partial class StatCalculator
 
     private static int WeaponAttackEffectValue(ItemRowDto weapon)
     {
-        if (weapon.Sort != 4 && weapon.Sort is < 13 or > 21) return 0;
-
-        var level = (float)weapon.Level;
-        var (baseValue, pivot, slope) = level switch
-        {
-            < 100 => (0f, 45f, 0.10f),
-            < 113 => (6f, 100f, 0.20f),
-            _ => (8f, 113f, 0.50f)
-        };
-
-        return (int)(14.34f + (baseValue + (level - pivot) * slope) * 0.72f);
+        return ReturnIUEffectValue(1, weapon.Sort, weapon.Level);
     }
 
     private static int ComputeDeco2AttackPowerBonus(EquippedItemSlot deco2)
     {
-        if (deco2.Item.Sort == 2) return 0;
+        if (ItemSortClass(deco2.Item) == 2) return 0;
         var isWing =
             deco2.Item.ItemId is 213 or 214 or 215 or 217 or 218 or 2303 or 2304 or 2305;
         return (int)(deco2.Enchant * (isWing ? 23.4f : 11.7f));

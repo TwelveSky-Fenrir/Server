@@ -101,7 +101,17 @@ public sealed class MonsterEntity
 
     public int AllianceStoneFirstAttackElapsedLegacyTicks { get; set; }
 
+    public byte LastAttackerTribe { get; private set; }
+
+    public string LastAttackerName { get; private set; } = string.Empty;
+
     public int Life => Volatile.Read(ref _life);
+
+    public void RecordKillingBlowAttacker(byte tribe, string name)
+    {
+        LastAttackerTribe = tribe;
+        LastAttackerName = name;
+    }
 
     public void ClearPath()
     {

@@ -1,4 +1,5 @@
 using Fenrir.Application.Game.Domain.Combat;
+using Fenrir.Application.Game.Domain.Economy;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Domain.Game.GameData;
 
@@ -47,7 +48,8 @@ public static class EnchantResolver
         int improveItemValueCharges,
         IRandomSource random,
         int protectForDestroy2Charges = 0,
-        int protectForWingCharges = 0)
+        int protectForWingCharges = 0,
+        bool premiumActive = false)
     {
         var targetItem = targetItemDefinition.Item;
         var currentImprove = targetStack.Enchant;
@@ -65,16 +67,18 @@ public static class EnchantResolver
 
         var result = currentImprove >= RegimeBoundary
             ? ResolveAdvanced(targetItem, materialItemDefinition.Item, currentImprove, luck, protectForDestroyCharges,
-                improveItemValueCharges, random, protectForDestroy2Charges)
+                improveItemValueCharges, random, protectForDestroy2Charges, premiumActive)
             : ResolveStandard(targetItem, materialItemDefinition.Item, currentImprove, luck,
-                protectForDestroyCharges, improveItemValueCharges, random, isWing, protectForWingCharges);
+                protectForDestroyCharges, improveItemValueCharges, random, isWing, protectForWingCharges,
+                premiumActive);
 
         return result with { IsWing = isWing };
     }
 
     private static EnchantResult ResolveStandard(ItemRowDto targetItem,
         ItemRowDto materialItem, byte currentImprove, int luck, int protectForDestroyCharges,
-        int improveItemValueCharges, IRandomSource random, bool isWing, int protectForWingCharges)
+        int improveItemValueCharges, IRandomSource random, bool isWing, int protectForWingCharges,
+        bool premiumActive)
     {
         if (isWing)
             return materialItem.ItemId == WingEnchantMaterialWhitelist.ProtectedMaterialItemId
@@ -100,6 +104,8 @@ public static class EnchantResolver
 
         var consumesImproveCharge = improveItemValueCharges > 0;
 
+        var moneyCost = PremiumPricing.ApplyPremiumDiscount(material.MoneyCost, premiumActive);
+
         int p1;
         if (material.ForcesGuaranteedSuccess)
         {
@@ -113,11 +119,11 @@ public static class EnchantResolver
         }
 
         if (random.NextInt32(100) < p1)
-            return new EnchantResult(EnchantOutcome.Success, newImprove, material.MoneyCost, false,
+            return new EnchantResult(EnchantOutcome.Success, newImprove, moneyCost, false,
                 ConsumesImproveCharge: consumesImproveCharge);
 
         if (material.NoChangeOnFailure)
-            return new EnchantResult(EnchantOutcome.NoChange, currentImprove, material.MoneyCost, false,
+            return new EnchantResult(EnchantOutcome.NoChange, currentImprove, moneyCost, false,
                 ConsumesImproveCharge: consumesImproveCharge);
 
         if (currentImprove + value > SafeImproveValue)
@@ -132,17 +138,17 @@ public static class EnchantResolver
                 if (protectForDestroyCharges > 0)
                 {
                     var protectedEnchant = currentImprove > 0 ? currentImprove - 1 : 0;
-                    return new EnchantResult(EnchantOutcome.Protected, protectedEnchant, material.MoneyCost, true,
+                    return new EnchantResult(EnchantOutcome.Protected, protectedEnchant, moneyCost, true,
                         ConsumesImproveCharge: consumesImproveCharge);
                 }
 
-                return new EnchantResult(EnchantOutcome.Destroyed, 0, material.MoneyCost, false,
+                return new EnchantResult(EnchantOutcome.Destroyed, 0, moneyCost, false,
                     ConsumesImproveCharge: consumesImproveCharge);
             }
         }
 
         var failedEnchant = currentImprove > 0 ? currentImprove - 1 : 0;
-        return new EnchantResult(EnchantOutcome.Failed, failedEnchant, material.MoneyCost, false,
+        return new EnchantResult(EnchantOutcome.Failed, failedEnchant, moneyCost, false,
             ConsumesImproveCharge: consumesImproveCharge);
     }
 
@@ -226,7 +232,7 @@ public static class EnchantResolver
 
     private static EnchantResult ResolveAdvanced(ItemRowDto targetItem,
         ItemRowDto materialItem, byte currentImprove, int luck, int protectForDestroyCharges,
-        int improveItemValueCharges, IRandomSource random, int protectForDestroy2Charges)
+        int improveItemValueCharges, IRandomSource random, int protectForDestroy2Charges, bool premiumActive)
     {
         if (targetItem.Type != RareItemType && targetItem.Type != EliteItemType)
             return Rejected();
@@ -254,23 +260,25 @@ public static class EnchantResolver
         if (consumesImproveCharge)
             p1 += SweetPotatoSuccessBonus;
 
+        var moneyCost = PremiumPricing.ApplyPremiumDiscount(material.MoneyCost, premiumActive);
+
         if (random.NextInt32(100) < p1)
-            return new EnchantResult(EnchantOutcome.Success, newImprove, material.MoneyCost, false,
+            return new EnchantResult(EnchantOutcome.Success, newImprove, moneyCost, false,
                 ConsumesImproveCharge: consumesImproveCharge);
 
         if (currentImprove == RegimeBoundary + 1)
-            return new EnchantResult(EnchantOutcome.ResetToForty, RegimeBoundary, material.MoneyCost, false,
+            return new EnchantResult(EnchantOutcome.ResetToForty, RegimeBoundary, moneyCost, false,
                 ConsumesImproveCharge: consumesImproveCharge);
 
         if (protectForDestroy2Charges > 0)
-            return new EnchantResult(EnchantOutcome.Protected, currentImprove, material.MoneyCost, false,
+            return new EnchantResult(EnchantOutcome.Protected, currentImprove, moneyCost, false,
                 ConsumesImproveCharge: consumesImproveCharge, ConsumesProtectCharge2: true);
 
         if (protectForDestroyCharges > 0)
-            return new EnchantResult(EnchantOutcome.Protected, currentImprove - 1, material.MoneyCost, true,
+            return new EnchantResult(EnchantOutcome.Protected, currentImprove - 1, moneyCost, true,
                 ConsumesImproveCharge: consumesImproveCharge);
 
-        return new EnchantResult(EnchantOutcome.ResetToForty, RegimeBoundary, material.MoneyCost, false,
+        return new EnchantResult(EnchantOutcome.ResetToForty, RegimeBoundary, moneyCost, false,
             ConsumesImproveCharge: consumesImproveCharge);
     }
 

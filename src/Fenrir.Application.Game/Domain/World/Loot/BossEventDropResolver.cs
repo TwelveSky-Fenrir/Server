@@ -1,5 +1,3 @@
-using Fenrir.Domain.Game.GameData;
-
 namespace Fenrir.Application.Game.Domain.World.Loot;
 
 public readonly record struct BossDropOutcome(
@@ -28,8 +26,6 @@ public static class BossEventDropResolver
     private const int DemonLordKillCycle = 10;
 
     public const int HolyUnicornMonsterId = 576;
-    private const int LabyrinthKeyItemId = 1048;
-    private const int LabyrinthKeyPublicQuantity = 20;
 
     public const int ThreeItemEventBossMonsterId = 756;
 
@@ -51,18 +47,12 @@ public static class BossEventDropResolver
     public const int VirginGhostMonsterId = 746;
     public const int SharedRandomPoolMonsterId = 9001;
 
-    private const int VirginGhostRareItemId = 93500;
-
-    private const int VirginGhostRareItemDropChance = 300_000;
-
-    private const int VirginGhostWarPoints = 2;
-    private const int VirginGhostBloodPoints = 2;
     private const int SharedRandomPoolContributionPoints = 5;
     private const int SharedRandomPoolWarPoints = 3;
     private const int SharedRandomPoolBloodPoints = 6;
 
     public static BossDropOutcome Resolve(int monsterId, int demonLordKillTally, Random random,
-        WorldDataCache worldData, BossDropCatalog catalog)
+        BossDropCatalog catalog)
     {
         return monsterId switch
         {
@@ -75,11 +65,7 @@ public static class BossEventDropResolver
 
             DemonLordMonsterId => ResolveDemonLord(demonLordKillTally, random, catalog),
 
-            HolyUnicornMonsterId => BossDropOutcome.None with
-            {
-                Items = catalog.HolyUnicornPersonalList,
-                PublicItems = [new DroppedItem(LabyrinthKeyItemId, LabyrinthKeyPublicQuantity)]
-            },
+            HolyUnicornMonsterId => BossDropOutcome.None with { Items = catalog.HolyUnicornPersonalList },
 
             ThreeItemEventBossMonsterId => BossDropOutcome.None with { Items = catalog.ThreeItemEventList },
 
@@ -93,8 +79,7 @@ public static class BossEventDropResolver
 
             FifteenMinuteBossMonsterId => ResolveFifteenMinuteBoss(random, catalog),
 
-            VirginGhostMonsterId or SharedRandomPoolMonsterId =>
-                ResolveSharedRandomPool(monsterId, random, worldData, catalog),
+            VirginGhostMonsterId or SharedRandomPoolMonsterId => ResolveSharedRandomPool(random, catalog),
 
             _ => BossDropOutcome.None
         };
@@ -103,18 +88,18 @@ public static class BossEventDropResolver
     private static BossDropOutcome ResolveCustomTimedBoss(int monsterId, BossDropCatalog catalog)
     {
         return catalog.CustomTimedBossLists.TryGetValue(monsterId, out var list)
-            ? BossDropOutcome.None with { Items = list, SkipGenericTiers = true }
-            : BossDropOutcome.None with { SkipGenericTiers = true };
+            ? BossDropOutcome.None with { Items = list }
+            : BossDropOutcome.None;
     }
 
     private static BossDropOutcome ResolveDemonLord(int demonLordKillTally, Random random, BossDropCatalog catalog)
     {
         var pool = catalog.DemonLordItemPool;
         if (demonLordKillTally <= 0 || demonLordKillTally % DemonLordKillCycle != 0 || pool.Length == 0)
-            return BossDropOutcome.None with { SkipGenericTiers = true };
+            return BossDropOutcome.None;
 
         var item = pool[random.Next(pool.Length)];
-        return BossDropOutcome.None with { Items = [new DroppedItem(item, 1)], SkipGenericTiers = true };
+        return BossDropOutcome.None with { Items = [new DroppedItem(item, 1)] };
     }
 
     private static BossDropOutcome ResolveFifteenMinuteBoss(Random random, BossDropCatalog catalog)
@@ -148,15 +133,8 @@ public static class BossEventDropResolver
         return BossDropOutcome.None with { Items = [new DroppedItem(resolvedItemId, quantity)] };
     }
 
-    private static BossDropOutcome ResolveSharedRandomPool(int monsterId, Random random, WorldDataCache worldData,
-        BossDropCatalog catalog)
+    private static BossDropOutcome ResolveSharedRandomPool(Random random, BossDropCatalog catalog)
     {
-        var isVirginGhost = monsterId == VirginGhostMonsterId;
-
-        var contributionPoints = isVirginGhost ? 0 : SharedRandomPoolContributionPoints;
-        var warPoints = isVirginGhost ? VirginGhostWarPoints : SharedRandomPoolWarPoints;
-        var bloodPoints = isVirginGhost ? VirginGhostBloodPoints : SharedRandomPoolBloodPoints;
-
         var fixedIds = catalog.SharedRandomPoolFixedIds;
         Span<int> pool =
         [
@@ -165,18 +143,11 @@ public static class BossEventDropResolver
             fixedIds[3], fixedIds[4]
         ];
 
-        List<DroppedItem>? items = null;
-
-        if (isVirginGhost && worldData.ItemsById.ContainsKey(VirginGhostRareItemId) &&
-            LootRandomSource.RandomNumber(random) <= VirginGhostRareItemDropChance)
-            (items ??= []).Add(new DroppedItem(VirginGhostRareItemId, 1));
-
         var resolved = pool[random.Next(pool.Length)];
         var abortGenericTiers = resolved != 0;
-        if (abortGenericTiers)
-            (items ??= []).Add(new DroppedItem(resolved, 1));
 
-        return new BossDropOutcome(items ?? [], [], contributionPoints, warPoints, bloodPoints, abortGenericTiers,
-            false);
+        return new BossDropOutcome(abortGenericTiers ? [new DroppedItem(resolved, 1)] : [], [],
+            SharedRandomPoolContributionPoints, SharedRandomPoolWarPoints, SharedRandomPoolBloodPoints,
+            abortGenericTiers, false);
     }
 }

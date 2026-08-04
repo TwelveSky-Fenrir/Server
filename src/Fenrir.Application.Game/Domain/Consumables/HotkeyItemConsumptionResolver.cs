@@ -210,7 +210,7 @@ public static class HotkeyItemConsumptionResolver
     private static int ComputeClampedGain(bool isPercent, int potionType2, int effectiveMax, int current)
     {
         var raw = isPercent ? effectiveMax * potionType2 / 100 : potionType2;
-        var headroom = effectiveMax - current;
+        var headroom = Math.Max(0, effectiveMax - current);
         return Math.Clamp(raw, 0, headroom);
     }
 

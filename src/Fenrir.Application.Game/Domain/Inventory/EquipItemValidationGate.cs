@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Fenrir.Domain.Game.Items;
 
 namespace Fenrir.Application.Game.Domain.Inventory;
 
@@ -19,20 +20,12 @@ public static class EquipItemValidationGate
 
     public const int TribeRestrictionOffset = 2;
 
-    public const int SkipSlotCheck = -1;
-
     public const int ItemSortClassificationNotComputed = 0;
-
-    private const int MinSlotIndex = 0;
-    private const int MaxSlotIndex = 12;
 
     private const int FinalCategoryLow = 6;
     private const int FinalCategoryHigh = 33;
 
     private const int SetItemRebirthGateValue = 3;
-
-    private static readonly ImmutableArray<byte> EquipPartTagBySlot =
-        [2, 3, 4, 5, 6, 7, 0, 9, 10, 11, 12, 13, 14];
 
     private static readonly ImmutableHashSet<int> Rebirth12ClassificationCodes = [1, 2, 4, 8];
 
@@ -55,6 +48,29 @@ public static class EquipItemValidationGate
         int characterCombinedLevel,
         int characterRebirthCount)
     {
+        return Evaluate(item, itemSortClassificationFallback, characterPreviousTribe, true, targetEquipSlotIndex,
+            characterCombinedLevel, characterRebirthCount);
+    }
+
+    public static Outcome EvaluateWithoutSlotCheck(
+        EquipCandidate? item,
+        byte characterPreviousTribe,
+        int characterCombinedLevel,
+        int characterRebirthCount)
+    {
+        return Evaluate(item, ItemSortClassificationNotComputed, characterPreviousTribe, false, 0,
+            characterCombinedLevel, characterRebirthCount);
+    }
+
+    private static Outcome Evaluate(
+        EquipCandidate? item,
+        int itemSortClassificationFallback,
+        byte characterPreviousTribe,
+        bool checkSlotTag,
+        int targetEquipSlotIndex,
+        int characterCombinedLevel,
+        int characterRebirthCount)
+    {
         if (item is not { } resolved)
             return Outcome.ItemNotFound;
 
@@ -62,8 +78,7 @@ public static class EquipItemValidationGate
             resolved.TribeRestriction - TribeRestrictionOffset != characterPreviousTribe)
             return Outcome.WrongTribe;
 
-        if (targetEquipSlotIndex is >= MinSlotIndex and <= MaxSlotIndex &&
-            resolved.EquipPartTag != EquipPartTagBySlot[targetEquipSlotIndex])
+        if (checkSlotTag && !EquipmentSlots.MatchesSlotTag(resolved.EquipPartTag, targetEquipSlotIndex))
             return Outcome.WrongSlotTag;
 
         if (resolved.LevelLimit + resolved.MartialLevelLimit > characterCombinedLevel)

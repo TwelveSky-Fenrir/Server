@@ -195,7 +195,7 @@ public sealed partial class MonsterAiSystem(
         }
 
         var blocked = MoveToward(zone, monster, monster.WanderTargetX, monster.WanderTargetZ,
-            monster.Template.WalkSpeed, dt);
+            monster.Template.WalkSpeed, dt, out _);
         if (blocked)
         {
             monster.AiState = MonsterAiState.Decision;
@@ -738,23 +738,39 @@ public sealed partial class MonsterAiSystem(
             return;
         }
 
-        monster.TargetLocationX = target.PosX;
-        monster.TargetLocationY = target.PosY;
-        monster.TargetLocationZ = target.PosZ;
-
-        if (MoveToward(zone, monster, target.PosX, target.PosZ, monster.Template.RunSpeed, dt,
-                monster.Template.RadiusInfo1))
+        if (MoveToward(zone, monster, monster.TargetLocationX, monster.TargetLocationZ, monster.Template.RunSpeed, dt,
+                out var arrived,
+                (new Vector2(target.PosX, target.PosZ), monster.Template.RadiusInfo1)))
         {
             ReleaseAndReturnToDecision(zone, monster);
             return;
         }
 
         if (IsZone175TypeBoss(monster.Template.SpecialType))
+        {
+            if (arrived)
+                ReturnToDecisionOnArrival(monster);
+
             return;
+        }
 
         var attackRadiusSq = (float)monster.Template.RadiusInfo1 * monster.Template.RadiusInfo1;
         if (DistanceSquared(monster.PosX, monster.PosZ, target.PosX, target.PosZ) <= attackRadiusSq)
+        {
             CommitMeleeEngagementOrGiveUpToHeightMismatch(zone, monster, target);
+            return;
+        }
+
+        if (arrived)
+            ReturnToDecisionOnArrival(monster);
+    }
+
+    private static void ReturnToDecisionOnArrival(MonsterEntity monster)
+    {
+        monster.AiState = MonsterAiState.Decision;
+        monster.StateTicks = 0;
+        monster.StateFrameAccumulator = 0f;
+        monster.ClearPath();
     }
 
     private static void ReleaseAndReturnToDecision(Zone zone, MonsterEntity monster)
@@ -799,19 +815,25 @@ public sealed partial class MonsterAiSystem(
     }
 
     private static bool MoveToward(Zone zone, MonsterEntity monster, float targetX, float targetZ, float speed,
-        float dt, float? tetherRadius = null)
+        float dt, out bool arrived, (Vector2 Anchor, float Radius)? tether = null)
     {
         if (zone.Geometry is not { } geometry)
-            return StepToward(monster, targetX, targetZ, speed, dt, null, false) == MonsterStepOutcome.Blocked;
+        {
+            var freeOutcome = StepToward(monster, targetX, targetZ, speed, dt, null, false);
+            arrived = freeOutcome == MonsterStepOutcome.Arrived;
+            return freeOutcome == MonsterStepOutcome.Blocked;
+        }
 
         if (zone.Pathfinder is { } pathfinder)
-            return MoveAlongPath(pathfinder, geometry, monster, targetX, targetZ, speed, dt, tetherRadius);
+            return MoveAlongPath(pathfinder, geometry, monster, targetX, targetZ, speed, dt, tether, out arrived);
 
-        return StepToward(monster, targetX, targetZ, speed, dt, geometry, true) == MonsterStepOutcome.Blocked;
+        var outcome = StepToward(monster, targetX, targetZ, speed, dt, geometry, true);
+        arrived = outcome == MonsterStepOutcome.Arrived;
+        return outcome == MonsterStepOutcome.Blocked;
     }
 
     private static bool MoveAlongPath(MonsterPathfinder pathfinder, ZoneGeometry geometry, MonsterEntity monster,
-        float targetX, float targetZ, float speed, float dt, float? tetherRadius)
+        float targetX, float targetZ, float speed, float dt, (Vector2 Anchor, float Radius)? tether, out bool arrived)
     {
         var exhausted = monster.WaypointCursor >= monster.PathWaypoints.Count;
         var needReplan = exhausted
@@ -822,9 +844,8 @@ public sealed partial class MonsterAiSystem(
         {
             var from = new Vector3(monster.PosX, monster.PosY, monster.PosZ);
             var to = new Vector3(targetX, monster.PosY, targetZ);
-            var found = tetherRadius is { } radius
-                ? pathfinder.TryFindPursuitPath(from, to, new Vector2(targetX, targetZ), radius,
-                    monster.PathWaypoints)
+            var found = tether is { } pursuit
+                ? pathfinder.TryFindPursuitPath(from, to, pursuit.Anchor, pursuit.Radius, monster.PathWaypoints)
                 : pathfinder.TryFindPathClamped(from, to, monster.PathWaypoints);
             if (found)
             {
@@ -835,12 +856,14 @@ public sealed partial class MonsterAiSystem(
             else
             {
                 monster.ClearPath();
-                return StepToward(monster, targetX, targetZ, speed, dt, geometry, true) ==
-                       MonsterStepOutcome.Blocked;
+                var fallbackOutcome = StepToward(monster, targetX, targetZ, speed, dt, geometry, true);
+                arrived = fallbackOutcome == MonsterStepOutcome.Arrived;
+                return fallbackOutcome == MonsterStepOutcome.Blocked;
             }
         }
 
         FollowWaypoints(monster, geometry, speed, dt);
+        arrived = monster.WaypointCursor >= monster.PathWaypoints.Count;
         return false;
     }
 

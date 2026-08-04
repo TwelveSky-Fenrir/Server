@@ -19,6 +19,12 @@ public sealed partial class Zone
 {
     private const int PersonalDungeonBattleBroadcastCadenceTicks = 20;
 
+    private const int PersonalDungeonBattleBudgetLegacyTicks = 3600;
+
+    private const int PersonalDungeonReturnToTownDelayLegacyTicks = 120;
+
+    private const int PersonalDungeonDisconnectDelayLegacyTicks = 10;
+
     public IPersonalDungeonBossCatalog PersonalDungeonBossCatalog { get; set; } =
         NullPersonalDungeonBossCatalog.Instance;
 
@@ -34,9 +40,6 @@ public sealed partial class Zone
         if (!_players.TryGetValue(characterId, out var state) || state is null)
             return DungeonInstanceEntryOutcome.NotZone241Type;
 
-        if (state.DungeonInstanceRoundsRemaining < 1)
-            return DungeonInstanceEntryOutcome.QuotaExhausted;
-
         state.DungeonInstanceId = state.CharacterId;
         state.DungeonInstanceLifecycleState = DungeonInstanceLifecycle.Summoning;
         state.DungeonInstanceTick = 0;
@@ -50,7 +53,6 @@ public sealed partial class Zone
 
         SummonPersonalBoss(state, monsterDefinition.Monster, PersonalDungeonBossTables.CatalogAAndESummonPosition);
 
-        state.DungeonInstanceRoundsRemaining--;
         state.DungeonInstanceLifecycleState = DungeonInstanceLifecycle.BattleInProgress;
         return DungeonInstanceEntryOutcome.Entered;
     }
@@ -150,21 +152,75 @@ public sealed partial class Zone
 
             state.DungeonInstanceTick += legacyTicksElapsed;
 
-            if (state.DungeonInstanceLifecycleState != DungeonInstanceLifecycle.BattleInProgress)
-                continue;
-
-            var instanceId = state.DungeonInstanceId ?? state.CharacterId;
-            var bossAlive = _monsters.TryGetValue(instanceId, out var boss) && boss is not null &&
-                            boss.InstanceId == instanceId && boss.Life > 0;
-
-            if (!bossAlive)
+            switch (state.DungeonInstanceLifecycleState)
             {
-                state.DungeonInstanceLifecycleState = DungeonInstanceLifecycle.Success;
-                continue;
-            }
+                case DungeonInstanceLifecycle.BattleInProgress:
+                    AdvancePersonalDungeonBattle(state);
+                    break;
 
-            if (state.DungeonInstanceTick % PersonalDungeonBattleBroadcastCadenceTicks == 0)
-                state.Session.Send(new ZoneWar241StatusResponse { RemainTime = 0 });
+                case DungeonInstanceLifecycle.Success:
+                case DungeonInstanceLifecycle.Failure:
+                    state.DungeonInstanceLifecycleState = DungeonInstanceLifecycle.WaitBeforeReturn;
+                    state.DungeonInstanceTick = 0;
+                    break;
+
+                case DungeonInstanceLifecycle.WaitBeforeReturn:
+                    if (state.DungeonInstanceTick >= PersonalDungeonReturnToTownDelayLegacyTicks)
+                    {
+                        state.DungeonInstanceLifecycleState = DungeonInstanceLifecycle.ReturnToTownNotice;
+                        state.DungeonInstanceTick = 0;
+                    }
+
+                    break;
+
+                case DungeonInstanceLifecycle.ReturnToTownNotice:
+                    state.DungeonInstanceLifecycleState = DungeonInstanceLifecycle.DisconnectPending;
+                    state.DungeonInstanceTick = 0;
+                    break;
+
+                case DungeonInstanceLifecycle.DisconnectPending:
+                    if (state.DungeonInstanceTick >= PersonalDungeonDisconnectDelayLegacyTicks)
+                        EvictAtPersonalDungeonEnd(state);
+
+                    break;
+            }
         }
+    }
+
+    private void AdvancePersonalDungeonBattle(PlayerRuntimeState state)
+    {
+        var tick = state.DungeonInstanceTick;
+
+        if (tick < PersonalDungeonBattleBroadcastCadenceTicks)
+            return;
+
+        if (tick % PersonalDungeonBattleBroadcastCadenceTicks == 0)
+            state.Session.Send(new ZoneWar241StatusResponse
+            {
+                RemainTime = PersonalDungeonBattleBudgetLegacyTicks - tick
+            });
+
+        if (tick >= PersonalDungeonBattleBudgetLegacyTicks || state.IsMovingZone)
+        {
+            state.DungeonInstanceLifecycleState = DungeonInstanceLifecycle.Failure;
+            return;
+        }
+
+        var instanceId = state.DungeonInstanceId ?? state.CharacterId;
+        var bossAlive = _monsters.TryGetValue(instanceId, out var boss) && boss is not null &&
+                        boss.InstanceId == instanceId && boss.Life > 0;
+
+        if (!bossAlive)
+            state.DungeonInstanceLifecycleState = DungeonInstanceLifecycle.Success;
+    }
+
+    private void EvictAtPersonalDungeonEnd(PlayerRuntimeState state)
+    {
+        ClearZone241PersonalDungeonInstance(state);
+
+        state.DungeonInstanceId = null;
+        state.DungeonInstanceLifecycleState = DungeonInstanceLifecycle.Idle;
+
+        state.Session.Abort(DisconnectReason.TimedZoneExpired);
     }
 }

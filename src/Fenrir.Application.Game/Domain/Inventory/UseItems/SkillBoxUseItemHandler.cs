@@ -34,6 +34,7 @@ public sealed class SkillBoxUseItemHandler(
             context.Page, context.Index, context.Item,
             page0, page1,
             ResolveRewardSort,
+            worldData,
             Random.Shared,
             today,
             () => RollReward(state.PreviousTribe),

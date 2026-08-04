@@ -53,6 +53,6 @@ public static class TitleContributionCost
         for (var rank = 0; rank < portion; rank++)
             total += CostTable[rank];
 
-        return refundType == RefundTypeReduced ? total * 70 / 100 : total;
+        return refundType == RefundTypeReduced ? (int)(total * 0.70f) : total;
     }
 }

@@ -6,6 +6,7 @@ using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Core.Packets.Shared;
 using Fenrir.Domain.Game.GameData;
 using Fenrir.Protocol.Game;
 using Microsoft.Extensions.Logging;
@@ -14,6 +15,7 @@ namespace Fenrir.Application.Game.Domain.Inventory.UseItems;
 
 public sealed class TribeScrollTransferUseItemHandler(
     ITribeConversionRepository tribeConversion,
+    ICharacterRepository characters,
     TribeConversionResolver resolver,
     ITribeChangeAvailabilityService changeAvailability,
     PartyRegistry partyRegistry,
@@ -100,11 +102,27 @@ public sealed class TribeScrollTransferUseItemHandler(
                 costumeChanges.Add((slot, newCostumeId));
         }
 
+        var remappedAutoHuntConfig = RemapAutoHuntSkills(state.AutoHuntConfig, fromTribe, toTribe);
+
         var projectedPage = state.Inventory.GetContainer(context.Page).Remove(context.Index);
         var items = ToTvps(projectedPage);
 
         await tribeConversion.ApplyTribeScrollConversionAsync(context.CharacterId, context.Item.ItemId, toTribe,
             context.Page, items, cancellationToken);
+
+        if (remappedAutoHuntConfig is { } newAutoHuntConfig)
+        {
+            var configBytes = new byte[AutoHunt.WireSize];
+            newAutoHuntConfig.Write(configBytes);
+            await characters.SetAutoHuntAsync(context.CharacterId, state.AutoHuntEnabled, configBytes,
+                cancellationToken);
+
+            if (!context.Zone.PostAutoBuffCommand(new AutoBuffZoneCommand(context.CharacterId,
+                    NewAutoHuntConfig: newAutoHuntConfig)))
+                logger.LogError(
+                    "Zone {MapId} auto-buff inbox full: dropped op23 faction-transfer auto-hunt skill remap for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
+                    context.Zone.MapId, context.CharacterId);
+        }
 
         if (!await context.Zone.PostTribeProgressCommandAndWaitAsync(
                 new TribeProgressZoneCommand(context.CharacterId, Tribe: toTribe, PreviousTribe: toTribe),
@@ -138,7 +156,7 @@ public sealed class TribeScrollTransferUseItemHandler(
 
         foreach (var (slot, newCostumeId) in costumeChanges)
             context.Zone.PostCostumeCommand(new CostumeZoneCommand(context.CharacterId,
-                CostumeNumber: slot == wornSlot ? newCostumeId : (int?)null,
+                CostumeNumber: slot == wornSlot ? newCostumeId : null,
                 WardrobeSlotGranted: slot,
                 GrantedItemId: newCostumeId,
                 GrantedCostumeDate: ValueAt(state.CostumeDate, slot),
@@ -151,6 +169,39 @@ public sealed class TribeScrollTransferUseItemHandler(
         state.Session.Send(new ReturnToHomeZoneResponse());
 
         return UseItemResponses.Success(context.Page, context.Index);
+    }
+
+    private AutoHunt? RemapAutoHuntSkills(AutoHunt? config, byte fromTribe, byte toTribe)
+    {
+        if (config is not { } current)
+            return null;
+
+        var buffStore = (int[])current.BuffStore.Clone();
+        var attackType = (int[])current.AttackType.Clone();
+        var changed = false;
+
+        for (var i = 0; i + 1 < buffStore.Length; i += 2)
+            if (buffStore[i] >= 1 &&
+                resolver.TryRemapSkill(fromTribe, toTribe, buffStore[i], out var newBuffSkillId) &&
+                newBuffSkillId != buffStore[i])
+            {
+                buffStore[i] = newBuffSkillId;
+                changed = true;
+            }
+
+        for (var i = 0; i + 1 < attackType.Length; i += 2)
+            if (attackType[i] >= 1 &&
+                resolver.TryRemapSkill(fromTribe, toTribe, attackType[i], out var newAttackSkillId) &&
+                newAttackSkillId != attackType[i])
+            {
+                attackType[i] = newAttackSkillId;
+                changed = true;
+            }
+
+        if (!changed)
+            return null;
+
+        return current with { BuffStore = buffStore, AttackType = attackType };
     }
 
     private static int ValueAt(ImmutableArray<int> slots, int slot)

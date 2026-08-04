@@ -21,6 +21,8 @@ public static class BuffCatalog
 {
     public const int SlotCount = 35;
 
+    public const int RemovedStateMarker = 2;
+
     public const int AttackPower = 0;
     public const int DefensePower = 1;
     public const int AttackSuccess = 2;

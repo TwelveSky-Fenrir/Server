@@ -222,7 +222,13 @@ public sealed class DuelRegistry
 
             _noPotionsByChallenger.Remove(characterId);
 
-            _activeByCharacter.Remove(characterId);
+            if (_activeByCharacter.Remove(characterId, out var activeDuel))
+            {
+                var opponentId = activeDuel.OpponentOf(characterId);
+                if (_activeByCharacter.TryGetValue(opponentId, out var opponentDuel) &&
+                    ReferenceEquals(opponentDuel, activeDuel))
+                    _activeByCharacter.Remove(opponentId);
+            }
 
             _crossShard.ClearForCharacter(characterId);
         }

@@ -16,15 +16,6 @@ public sealed class PendingSocialRequestAutoCancelSystem(
     GuildInviteRegistry guildInviteRegistry,
     Lazy<ZoneRegistry> zoneRegistry) : ISimulationSystem, ISocialWorldEntryReset
 {
-    public void ClearForWorldEntry(int characterId)
-    {
-        tradeRegistry.ClearForWorldEntry(characterId);
-        friendRegistry.ClearForWorldEntry(characterId);
-        mentorRegistry.ClearForWorldEntry(characterId);
-        partyRegistry.ClearForWorldEntry(characterId);
-        guildInviteRegistry.ClearForWorldEntry(characterId);
-    }
-
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
         foreach (var state in zone.Players)
@@ -37,6 +28,15 @@ public sealed class PendingSocialRequestAutoCancelSystem(
             SweepParty(characterId);
             SweepGuildInvite(characterId);
         }
+    }
+
+    public void ClearForWorldEntry(int characterId)
+    {
+        tradeRegistry.ClearForWorldEntry(characterId);
+        friendRegistry.ClearForWorldEntry(characterId);
+        mentorRegistry.ClearForWorldEntry(characterId);
+        partyRegistry.ClearForWorldEntry(characterId);
+        guildInviteRegistry.ClearForWorldEntry(characterId);
     }
 
     private bool IsReachable(int characterId)

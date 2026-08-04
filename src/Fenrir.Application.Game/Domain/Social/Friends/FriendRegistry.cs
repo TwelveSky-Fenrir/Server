@@ -176,6 +176,9 @@ public sealed class FriendRegistry
             if (accepted)
                 _acceptedFor[targetId] = askerId;
 
+            if (!_pendingByAsker.TryGetValue(askerId, out var recordedTargetId) || recordedTargetId != targetId)
+                return false;
+
             if (askerBusyByZoneTransfer)
             {
                 guardBlocked = true;

@@ -48,9 +48,16 @@ public sealed class Zone335FfaEventCycleSystem(
 
     public const int WindDownWaitMinutes = 1;
 
+    public const int BattlePrepLegacyTicks = 120;
+
+    public const int BattlePrepCountdownStartSeconds = 60;
+
+    public const int BattlePrepCountdownCadenceLegacyTicks = 10;
+
     private readonly MinuteCountdown _minuteCountdown = new();
 
     private int _battleDurationLegacyTicks = DefaultBattleDurationLegacyTicks;
+    private int _battlePrepTicksElapsed;
     private int _battleTicksRemaining;
     private int _liveCountdownTicksSinceLastBroadcast;
 
@@ -81,7 +88,7 @@ public sealed class Zone335FfaEventCycleSystem(
                 AdvanceEntranceOpen(elapsed);
                 break;
             case Zone335FfaPhase.BattlePrep:
-                AdvanceBattlePrep(elapsed);
+                AdvanceBattlePrep(elapsed, zone, legacyTicksElapsed);
                 break;
             case Zone335FfaPhase.Battle:
                 AdvanceBattle(zone, legacyTicksElapsed);
@@ -167,13 +174,31 @@ public sealed class Zone335FfaEventCycleSystem(
 
             broadcaster.Value.AnnounceFfaEntranceOpen();
             _minuteCountdown.Reset();
+            _battlePrepTicksElapsed = 0;
             Phase = Zone335FfaPhase.BattlePrep;
             return;
         }
     }
 
-    private void AdvanceBattlePrep(TimeSpan elapsed)
+    private void AdvanceBattlePrep(TimeSpan elapsed, Zone zone, int legacyTicksElapsed)
     {
+        for (var tick = 0; tick < legacyTicksElapsed; tick++)
+        {
+            _battlePrepTicksElapsed++;
+            if (_battlePrepTicksElapsed >= BattlePrepLegacyTicks)
+                break;
+
+            if (_battlePrepTicksElapsed == 1)
+            {
+                BroadcastBattlePrepCountdown(zone, BattlePrepCountdownStartSeconds);
+            }
+            else if (_battlePrepTicksElapsed % BattlePrepCountdownCadenceLegacyTicks == 0)
+            {
+                var elapsedSeconds = _battlePrepTicksElapsed / SimulationClock.OneSecondGateLegacyTicks;
+                BroadcastBattlePrepCountdown(zone, BattlePrepCountdownStartSeconds - elapsedSeconds);
+            }
+        }
+
         var wholeMinutes = _minuteCountdown.Advance(elapsed);
         for (var i = 0; i < wholeMinutes; i++)
         {
@@ -182,11 +207,20 @@ public sealed class Zone335FfaEventCycleSystem(
 
             _battleTicksRemaining = _battleDurationLegacyTicks;
             _liveCountdownTicksSinceLastBroadcast = 0;
+            _battlePrepTicksElapsed = 0;
 
             broadcaster.Value.AnnounceFfaBattleStart(_battleTicksRemaining);
             Phase = Zone335FfaPhase.Battle;
             return;
         }
+    }
+
+    private static void BroadcastBattlePrepCountdown(Zone zone, int remainingSeconds)
+    {
+        var response = new ZoneWar335CountdownResponse { RemainTime = remainingSeconds };
+        foreach (var player in zone.Players)
+            if (!player.IsMovingZone)
+                player.Session.Send(response);
     }
 
     private void AdvanceBattle(Zone zone, int legacyTicksElapsed)
@@ -259,6 +293,7 @@ public sealed class Zone335FfaEventCycleSystem(
         _battleTicksRemaining = 0;
         _battleDurationLegacyTicks = DefaultBattleDurationLegacyTicks;
         _liveCountdownTicksSinceLastBroadcast = 0;
+        _battlePrepTicksElapsed = 0;
         _minuteCountdown.Reset();
     }
 
@@ -285,7 +320,7 @@ public sealed class Zone335FfaEventCycleSystem(
     {
         var count = 0;
         foreach (var player in zone.Players)
-            if (!player.IsMovingZone)
+            if (!player.IsMovingZone && player.VisibleState != 0)
                 count++;
 
         return count;

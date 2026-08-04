@@ -165,6 +165,9 @@ public sealed class TradeRegistry
             if (!_pendingByTarget.Remove(targetId, out askerId))
                 return false;
 
+            if (!_pendingByAsker.TryGetValue(askerId, out var recordedTargetId) || recordedTargetId != targetId)
+                return false;
+
             if (accepted)
                 _acceptedPairs[targetId] = askerId;
 

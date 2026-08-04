@@ -4,8 +4,8 @@ namespace Fenrir.Application.Game.Domain.Social.Chat;
 
 public static class LocalChatGmCommandParser
 {
-    private const string YgDropName = "ygdrop";
-    private const string LabName = "lab";
+    private const string YgDropName = "?ygdrop";
+    private const string LabName = "?lab";
     private const string BossPrefix = "boss ";
 
     public static bool TryParse(string content, out LocalChatGmCommand command)

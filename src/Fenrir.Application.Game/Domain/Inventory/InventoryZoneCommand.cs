@@ -8,6 +8,9 @@ public readonly record struct InventoryZoneCommand(
     ImmutableArray<InventoryContainerSnapshot> Containers,
     EffectiveStats? UpdatedStats,
     TaskCompletionSource? Applied = null,
-    bool RecomputeCombatPoseAfterEquip = false);
+    bool RecomputeCombatPoseAfterEquip = false,
+    int? InventoryDate = null,
+    int? StoreDate = null,
+    int? PetBagDate = null);
 
 public readonly record struct InventoryContainerSnapshot(byte Container, ImmutableDictionary<byte, ItemStack> Slots);

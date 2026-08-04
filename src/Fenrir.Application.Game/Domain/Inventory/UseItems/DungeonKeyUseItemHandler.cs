@@ -16,10 +16,21 @@ public sealed class DungeonKeyUseItemHandler(
 
     private const byte SuccessOutcome = 1;
 
+    private const short RequiredLevel = 100;
+
     public async ValueTask<UseInventoryItemResponse> HandleAsync(UseItemContext context,
         CancellationToken cancellationToken)
     {
         var state = context.State;
+
+        if (state.Level < RequiredLevel)
+        {
+            logger.LogDebug(
+                "Character {CharacterId} op23 Dungeon-Key (1048) rejected: level {Level} below {Required}",
+                context.CharacterId, state.Level, RequiredLevel);
+            return UseItemResponses.Fail(context.Page, context.Index);
+        }
+
         var resolved = DungeonAccessTicketResolver.Resolve(state.DungeonKeyTime,
             DungeonAccessTicketResolver.DungeonKeyAmount, context.Item.Quantity);
 

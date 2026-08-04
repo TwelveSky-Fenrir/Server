@@ -1,4 +1,5 @@
 using Fenrir.Application.Game.Domain.Combat;
+using Fenrir.Application.Game.Domain.Economy;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Domain.Game.GameData;
 
@@ -22,6 +23,10 @@ public static class RankChangeResolver
     private const int WarlordRerollEncodedLevel = MaxBaseLevel + MaxMartialLevel;
 
     private const byte CapeSort = 8;
+
+    private const int LuckyUpgradeBonusP1000 = 50;
+
+    private const int LuckyDowngradeBonusP100 = 5;
 
     private const int RareUp145P1024 = 10;
     private const int RareUp145POther = 20;
@@ -85,7 +90,7 @@ public static class RankChangeResolver
         ItemDefinition targetDefinition, ItemStack targetStack,
         ItemRowDto materialItem,
         int luck, int luckyUpgradeCharges,
-        IEnumerable<ItemDefinition> catalog, IRandomSource random)
+        IEnumerable<ItemDefinition> catalog, IRandomSource random, bool premiumActive = false)
     {
         var target = targetDefinition.Item;
 
@@ -96,16 +101,19 @@ public static class RankChangeResolver
 
         var (encodedLevel, probability) = ResolveUpTier(target, materialItem.ItemId);
 
-        var cost = GetTieredMoney(
+        var cost = PremiumPricing.ApplyPremiumDiscount(GetTieredMoney(
             target.Type == RareItemType ? RareHighMoneyLevels : EliteHighMoneyLevels,
             target.Type == RareItemType ? 100_000 : 1_000_000,
-            MaxMartialLevel - 1, target.Level, target.MartialLevel);
+            MaxMartialLevel - 1, target.Level, target.MartialLevel), premiumActive);
 
         var replacement = FindReplacement(targetDefinition, encodedLevel, true, catalog, random);
         if (replacement is null)
             return new RankChangeResult(RankChangeOutcome.NoCandidate, cost, 0, 0, 0, false);
 
         var luckyChargeConsumed = luckyUpgradeCharges > 0;
+
+        if (luckyUpgradeCharges > 0)
+            probability += LuckyUpgradeBonusP1000;
 
         probability += (int)(luck / 300.0f);
 
@@ -126,7 +134,7 @@ public static class RankChangeResolver
         ItemDefinition targetDefinition, ItemStack targetStack,
         ItemRowDto materialItem,
         int luck, int luckyUpgradeCharges,
-        IEnumerable<ItemDefinition> catalog, IRandomSource random)
+        IEnumerable<ItemDefinition> catalog, IRandomSource random, bool premiumActive = false)
     {
         var target = targetDefinition.Item;
 
@@ -137,16 +145,19 @@ public static class RankChangeResolver
 
         var (encodedLevel, probability) = ResolveDownTier(target, materialItem.ItemId);
 
-        var cost = GetTieredMoney(
+        var cost = PremiumPricing.ApplyPremiumDiscount(GetTieredMoney(
             target.Type == RareItemType ? RareLowMoneyLevels : EliteLowMoneyLevels,
             target.Type == RareItemType ? 100_000 : 1_000_000,
-            MaxMartialLevel, target.Level, target.MartialLevel);
+            MaxMartialLevel, target.Level, target.MartialLevel), premiumActive);
 
         var replacement = FindReplacement(targetDefinition, encodedLevel, false, catalog, random);
         if (replacement is null)
             return new RankChangeResult(RankChangeOutcome.NoCandidate, cost, 0, 0, 0, false);
 
         var luckyChargeConsumed = luckyUpgradeCharges > 0;
+
+        if (luckyUpgradeCharges > 0)
+            probability += LuckyDowngradeBonusP100;
 
         probability += (int)(luck / 300.0f);
 

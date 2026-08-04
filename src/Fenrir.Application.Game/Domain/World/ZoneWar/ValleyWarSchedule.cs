@@ -83,6 +83,8 @@ public sealed class ValleyWarSchedule
 
     private readonly int[] _killRaceQuota = new int[TribeCount];
 
+    private bool _bossObservedPresent;
+
     private int _bossWindowTicksArmed;
     private int _bossWindowTicksRemaining;
     private int _doorPendingTicksElapsed;
@@ -143,7 +145,7 @@ public sealed class ValleyWarSchedule
                 break;
 
             case ValleyWarPhase.ScrollPending:
-                TickScrollPending(ref battleScrollDeleted);
+                TickScrollPending(snapshot, ref battleScrollDeleted);
                 break;
 
             case ValleyWarPhase.BossWindow:
@@ -213,7 +215,7 @@ public sealed class ValleyWarSchedule
 
         _idleTicksElapsed = 0;
         _gateCountdownRemaining = GateCountdownStartValue;
-        _minuteTicksElapsed = 0;
+        _minuteTicksElapsed = GateCountdownIntervalTicks;
         Phase = ValleyWarPhase.GateCountdown;
     }
 
@@ -311,13 +313,17 @@ public sealed class ValleyWarSchedule
                 WinningTribe = t;
                 monstersShouldDespawn = true;
                 _scrollPendingTicksElapsed = 0;
+                _bossObservedPresent = false;
                 Phase = ValleyWarPhase.ScrollPending;
                 return;
             }
     }
 
-    private void TickScrollPending(ref bool battleScrollDeleted)
+    private void TickScrollPending(ValleyWarEnvironmentSnapshot snapshot, ref bool battleScrollDeleted)
     {
+        if (snapshot.BossSlotOccupied)
+            _bossObservedPresent = true;
+
         _scrollPendingTicksElapsed++;
         if (_scrollPendingTicksElapsed < ScrollDeleteDelayTicks)
             return;
@@ -330,6 +336,9 @@ public sealed class ValleyWarSchedule
     private void TickBossWindow(ValleyWarEnvironmentSnapshot snapshot, ref int? bossWindowCountdownValue,
         ref bool bossWindowTimeout, ref bool bossWin)
     {
+        if (snapshot.BossSlotOccupied)
+            _bossObservedPresent = true;
+
         _bossWindowTicksRemaining--;
         if (_bossWindowTicksRemaining % 2 != 0)
             return;
@@ -345,6 +354,9 @@ public sealed class ValleyWarSchedule
         }
 
         if (snapshot.BossSlotOccupied)
+            return;
+
+        if (!_bossObservedPresent)
             return;
 
         bossWin = true;
@@ -381,6 +393,7 @@ public sealed class ValleyWarSchedule
         _scrollPendingTicksElapsed = 0;
         _bossWindowTicksArmed = 0;
         _bossWindowTicksRemaining = 0;
+        _bossObservedPresent = false;
         _postWinTicksElapsed = 0;
         WinningTribe = null;
     }

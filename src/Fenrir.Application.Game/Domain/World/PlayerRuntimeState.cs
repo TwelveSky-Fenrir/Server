@@ -83,6 +83,27 @@ public sealed partial class PlayerRuntimeState
 
     public long FlushSequence { get; set; }
 
+    public bool ClampVitalsToMax()
+    {
+        var clamped = false;
+
+        var maxLife = Stats?.MaxLife ?? MaxLife;
+        if (Life > maxLife)
+        {
+            Life = maxLife;
+            clamped = true;
+        }
+
+        var maxMana = Stats?.MaxMana ?? MaxMana;
+        if (Mana > maxMana)
+        {
+            Mana = maxMana;
+            clamped = true;
+        }
+
+        return clamped;
+    }
+
     public void MarkProgressDirty(DirtyTracker<int> dirtyTracker, DirtyFlags flags)
     {
         FlushSequence++;

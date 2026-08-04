@@ -58,7 +58,8 @@ public static class TowerUpgradeResolver
     }
 
     public static bool TryFindMaterial(ImmutableDictionary<byte, ItemStack> page0,
-        ImmutableDictionary<byte, ItemStack> page1, int itemId, out byte page, out byte slot)
+        ImmutableDictionary<byte, ItemStack> page1, int itemId, int inventoryDate, int today, out byte page,
+        out byte slot)
     {
         for (var i = 0; i <= 63; i++)
             if (page0.TryGetValue((byte)i, out var stack) && stack.ItemId == itemId)
@@ -68,13 +69,14 @@ public static class TowerUpgradeResolver
                 return true;
             }
 
-        for (var i = 0; i <= 63; i++)
-            if (page1.TryGetValue((byte)i, out var stack) && stack.ItemId == itemId)
-            {
-                page = ContainerMatrix.InventoryPage1;
-                slot = (byte)i;
-                return true;
-            }
+        if (RentedInventoryPageGate.IsPageAccessible(ContainerMatrix.InventoryPage1, inventoryDate, today))
+            for (var i = 0; i <= 63; i++)
+                if (page1.TryGetValue((byte)i, out var stack) && stack.ItemId == itemId)
+                {
+                    page = ContainerMatrix.InventoryPage1;
+                    slot = (byte)i;
+                    return true;
+                }
 
         page = 0;
         slot = 0;

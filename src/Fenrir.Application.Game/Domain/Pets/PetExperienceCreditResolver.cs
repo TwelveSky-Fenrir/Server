@@ -19,8 +19,8 @@ public static class PetExperienceCreditResolver
             definition.Item.Sort != PetItemCategory)
             return PetExperienceCreditResult.Ineligible;
 
-        var reactivationApplied = currentActivity < 1;
-        var newActivity = reactivationApplied ? 1 : currentActivity;
+        if (currentActivity < 1)
+            return PetExperienceCreditResult.Ineligible;
 
         var creditedAmount =
             PetExperienceCreditCalculator.ComputeCreditedAmount(petItemId, currentGrowth, requestedPetExperience,
@@ -30,7 +30,7 @@ public static class PetExperienceCreditResolver
         var tierIncreased = creditedAmount > 0 &&
                             PetGrowthTierCalculator.HasTierIncreased(petItemId, currentGrowth, newGrowth);
 
-        return new PetExperienceCreditResult(true, reactivationApplied, newActivity, creditedAmount, newGrowth,
+        return new PetExperienceCreditResult(true, false, currentActivity, creditedAmount, newGrowth,
             tierIncreased);
     }
 }

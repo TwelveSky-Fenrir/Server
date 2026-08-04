@@ -338,6 +338,9 @@ public sealed class PartyRegistry
 
     public PartyInviteOutcome TryInviteCrossShard(int inviterId, CrossShardOutboundAsk ask)
     {
+        if (ask.TargetCharacterId == inviterId)
+            return PartyInviteOutcome.TargetBusy;
+
         lock (_lock)
         {
             if (_leaderByMember.TryGetValue(inviterId, out var inviterPartyLeader) && inviterPartyLeader != inviterId)
@@ -356,6 +359,9 @@ public sealed class PartyRegistry
         int inviteeId, int inviteeCumulativeLevel, byte inviteeTribe, byte? allyOfInviterTribe = null,
         bool inviteeBusyExternally = false)
     {
+        if (inviterId == inviteeId)
+            return PartyInviteOutcome.TargetBusy;
+
         lock (_lock)
         {
             if (_leaderByMember.TryGetValue(inviterId, out var inviterPartyLeader) && inviterPartyLeader != inviterId)
@@ -473,6 +479,13 @@ public sealed class PartyRegistry
         {
             if (!_pendingByInvitee.TryGetValue(inviteeId, out inviterId))
                 return false;
+
+            if (!_pendingByInviter.TryGetValue(inviterId, out var recordedInviteeId) ||
+                recordedInviteeId != inviteeId)
+            {
+                _pendingByInvitee.Remove(inviteeId);
+                return false;
+            }
 
             if (!accepted)
             {

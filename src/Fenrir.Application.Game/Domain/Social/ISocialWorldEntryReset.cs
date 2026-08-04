@@ -2,5 +2,5 @@ namespace Fenrir.Application.Game.Domain.Social;
 
 public interface ISocialWorldEntryReset
 {
-    void ClearForWorldEntry(int characterId);
+    public void ClearForWorldEntry(int characterId);
 }

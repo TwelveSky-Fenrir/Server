@@ -32,7 +32,7 @@ public sealed class LuckyTicketUseItemHandler(
         var secondPageAccessible = state.InventoryDate >= today;
 
         var plan = LootBoxOpenResolver.OpenSingle(RewardDrawnDynamicallySpec, context.Page, context.Index, context.Item,
-            page0, page1, ResolveRewardSort, Random.Shared, today,
+            page0, page1, ResolveRewardSort, worldData, Random.Shared, today,
             () => DrawReward(ticketItemId, state),
             secondPageAccessible,
             _ => LuckyTicketRewardResolver.ResolveFamilySerial(ticketItemId));

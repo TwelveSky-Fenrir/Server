@@ -49,6 +49,7 @@ public sealed partial class Zone
             {
                 case CrossAvatarAttackKind.EnemyTribe:
                     ApplyPvpKillRewards(defenderState, attackerState);
+                    RegisterRegularWarKill(defenderState, false);
                     RecordEnemyKillForFeed(defenderState, attackerState, false,
                         regularWarActiveMapTracker?.IsBattleInProgress(MapId) == true ||
                         MapId == KillFeedZoneCatalog.FfaMapNumber);

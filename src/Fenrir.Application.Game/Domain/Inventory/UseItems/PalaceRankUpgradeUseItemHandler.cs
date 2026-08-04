@@ -59,7 +59,8 @@ public sealed class PalaceRankUpgradeUseItemHandler(
             context.Index, context.Item, remaining, null, cancellationToken);
 
         if (!await context.Zone.PostTribeProgressCommandAndWaitAsync(
-                new TribeProgressZoneCommand(context.CharacterId, Halo: newRank, UpdatedStats: updatedStats,
+                new TribeProgressZoneCommand(context.CharacterId, Halo: newRank,
+                    MaxLife: updatedStats.MaxLife, MaxMana: updatedStats.MaxMana, UpdatedStats: updatedStats,
                     FullActionRebroadcast: true), cancellationToken))
             logger.LogError(
                 "Zone {MapId} tribe-progress inbox full: dropped op23 palace-rank mirror for character {CharacterId}",

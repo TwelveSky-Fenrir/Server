@@ -18,7 +18,7 @@ public static class GroundItemPickupPolicy
 
     public const float MaxPickupDistance = 100f;
 
-    public const int MaxStackQuantity = 999;
+    public const int MaxStackQuantity = ItemQuantityPolicy.MaxStackQuantity;
 
     public static Result Resolve(ItemDefinition itemDefinition, GroundItemEntity groundItem,
         ItemStack? destinationSlot, byte requestedX, byte requestedY)
@@ -32,6 +32,10 @@ public static class GroundItemPickupPolicy
 
         if (ContainerMatrix.IsStackableSort(sort))
         {
+            if (groundItem.Quantity < ItemQuantityPolicy.MinStackQuantity ||
+                groundItem.Quantity > MaxStackQuantity)
+                return new Result(Outcome.Rejected, null, 0);
+
             if (destinationSlot is { } existingStack)
             {
                 if (existingStack.ItemId != groundItem.ItemId)
@@ -48,10 +52,15 @@ public static class GroundItemPickupPolicy
                     requestedY), 0);
         }
 
+        var placedQuantity = ItemQuantityPolicy.IsPetSort(sort)
+            ? ItemQuantityPolicy.Normalize(sort, groundItem.Quantity)
+            : 1;
+
         return destinationSlot is not null
             ? new Result(Outcome.Rejected, null, 0)
             : new Result(Outcome.Placed,
-                BuildStack(groundItem, 1, enchant, combine, refine, socket, requestedX, requestedY), 0);
+                BuildStack(groundItem, placedQuantity, enchant, combine, refine, socket, requestedX,
+                    requestedY), 0);
     }
 
     private static ItemStack BuildStack(GroundItemEntity groundItem, int quantity, byte enchant, byte combine,

@@ -97,6 +97,7 @@ public sealed class AutoHuntTickSystem(
 
             var grade = config.BuffStore[i * 2 + 1];
             var maxLearnedGrade = GetMaxLearnedGrade(skillId, state.LearnedSkills);
+
             if (grade > maxLearnedGrade)
             {
                 grade = maxLearnedGrade;
@@ -226,7 +227,7 @@ public sealed class AutoHuntTickSystem(
     {
         bool hasHp = false, hasMp = false, hasHpMp = false, hasPetPrey = false, hasPetFood = false;
 
-        foreach (var slot in state.Hotkeys.Values)
+        foreach (var (_, slot) in state.Hotkeys)
         {
             if (slot.Kind != HotkeyBindingKind.Item || slot.Value2 < 1)
                 continue;
@@ -393,9 +394,9 @@ public sealed class AutoHuntTickSystem(
         return false;
     }
 
-    private static int GetMaxLearnedGrade(int skillId, IReadOnlyDictionary<byte, LearnedSkill> learnedSkills)
+    private static int GetMaxLearnedGrade(int skillId, ImmutableDictionary<byte, LearnedSkill> learnedSkills)
     {
-        foreach (var learned in learnedSkills.Values)
+        foreach (var (_, learned) in learnedSkills)
             if (learned.SkillId == skillId)
                 return learned.Grade;
 

@@ -9,7 +9,7 @@ public static class TribeMigrationConversion
         if (currentTribe != TribeMigrationGate.TribeFour)
             return new TribeMigrationResult(TribeMigrationGate.TribeFour, QuestProgress.None);
 
-        var terminalStep = questCatalog.MaxStep(previousTribe);
+        var terminalStep = questCatalog.MaxStep(currentTribe);
         var restoredProgress = new QuestProgress(terminalStep, 0, 0, 0, 0);
         return new TribeMigrationResult(previousTribe, restoredProgress);
     }

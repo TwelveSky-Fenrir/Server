@@ -112,6 +112,9 @@ public sealed partial class Zone
         died = monster.TakeDamage(amount, out remainingLife);
         if (died)
         {
+            if (attackerState is not null)
+                monster.RecordKillingBlowAttacker(attackerState.Tribe, attackerState.Name);
+
             var creditedCharacterId = SelectMonsterKillCredit(monster, attackerCharacterId);
 
             var killerX = attackerState?.PosX ?? monster.PosX;
@@ -285,8 +288,8 @@ public sealed partial class Zone
         BroadcastAttackResult(_mvpAttackRecipientScratch, response, target.DungeonInstanceId);
 
         if (target.Life <= 0)
-            ApplyDeath(target.CharacterId, DeathCause.MonsterKill,
-                suppressExperienceLoss: monster.SpecialSort != MonsterSpecialSort.Standard);
+            ApplyDeath(target.CharacterId, DeathCause.MonsterKill, (monster.PosX, monster.PosZ),
+                monster.SpecialSort != MonsterSpecialSort.Standard);
     }
 
     private void ApplyMonsterSpecialStun(PlayerRuntimeState target)

@@ -19,8 +19,21 @@ BEGIN
     DECLARE @IsAccepted BIT = 1;
     DECLARE @WasEnqueued BIT = 0;
     DECLARE @NowUtc DATETIME2(3) = SYSUTCDATETIME();
+    DECLARE @CapacityLockResult INT;
 
     BEGIN TRANSACTION;
+
+    EXEC @CapacityLockResult = sys.sp_getapplock
+                               @Resource = N'runtime.ZoneEventRelayOutbox.Capacity',
+                               @LockMode = 'Exclusive',
+                               @LockOwner = 'Transaction',
+                               @LockTimeout = 30000;
+
+    IF @CapacityLockResult < 0
+        BEGIN
+            ROLLBACK TRANSACTION;
+            THROW 51102, 'Zone event relay outbox capacity gate could not be acquired.', 1;
+        END;
 
     SELECT @OutboxId = OutboxId
     FROM runtime.ZoneEventRelayOutbox
@@ -55,7 +68,6 @@ BEGIN
 
             SELECT @ActiveCount = COUNT_BIG(*)
             FROM runtime.ZoneEventRelayOutbox
-            WITH (TABLOCKX, HOLDLOCK)
             WHERE PublishStatus IN (0, 1);
 
             IF @ActiveCount >= 256

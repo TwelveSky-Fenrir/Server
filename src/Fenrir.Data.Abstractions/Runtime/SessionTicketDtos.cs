@@ -2,8 +2,6 @@ using CaeriusNet.Attributes.Dto;
 
 namespace Fenrir.Data.Abstractions.Runtime;
 
-public readonly record struct MintedSessionTicketDto(string Capability);
-
 [GenerateDto]
 public sealed partial record ConsumedTicketDto(
     int AccountId,

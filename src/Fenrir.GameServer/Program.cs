@@ -164,6 +164,7 @@ var unclaimedDesignatedMaps = await SingletonRvrSchedulerGuard.FindUnclaimedDesi
         new SingletonRvrSchedulerValidator.DesignatedMapClaim(nameof(AllianceDiplomacyCeremonyHost),
             gameOptions.AllianceTribeMapId)
     ],
+    hostedMaps,
     host.Services.GetRequiredService<IGameServerDirectoryRepository>(),
     host.Services.GetRequiredService<IShardMapAssignmentRepository>(),
     CancellationToken.None);

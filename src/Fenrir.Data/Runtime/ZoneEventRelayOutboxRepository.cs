@@ -11,11 +11,8 @@ namespace Fenrir.Data.Runtime;
 
 public sealed record ZoneEventRelayOutboxRepository(ICaeriusNetDbContext Db) : IZoneEventRelayOutboxRepository
 {
-    private const int CommandTimeoutSeconds = 5;
     private const int ErrorDeadlockVictim = 1205;
-    private const int ErrorWriteConflict = 41302;
-    private const int ErrorDependencyFailure = 41305;
-    private const int ErrorCommitDependencyAborted = 41325;
+    private const int ErrorExecutionTimeout = -2;
     private const int MaximumRetryAttempts = 3;
 
     public async ValueTask<ZoneEventRelayOutboxEnqueueResultDto> EnqueueAsync(ZoneEventRelayOutboxEntry entry,
@@ -25,8 +22,7 @@ public sealed record ZoneEventRelayOutboxRepository(ICaeriusNetDbContext Db) : I
 
         for (var attempt = 1;; attempt++)
         {
-            var sp = new StoredProcedureParametersBuilder("runtime", "usp_ZoneEventRelayOutbox_Enqueue", 1,
-                    CommandTimeoutSeconds)
+            var sp = new StoredProcedureParametersBuilder("runtime", "usp_ZoneEventRelayOutbox_Enqueue", 1)
                 .AddParameter("SourceShardId", entry.SourceShardId, SqlDbType.TinyInt)
                 .AddParameter("Sort", entry.Sort, SqlDbType.Int)
                 .AddParameter("Data", entry.Data, SqlDbType.VarBinary, ZoneEventRelayOutboxLimits.PayloadSize)
@@ -42,6 +38,7 @@ public sealed record ZoneEventRelayOutboxRepository(ICaeriusNetDbContext Db) : I
             }
             catch (CaeriusNetSqlException ex) when (attempt < MaximumRetryAttempts && IsRetryable(ex))
             {
+                await Task.Delay(GetRetryDelay(attempt), ct).ConfigureAwait(false);
             }
         }
     }
@@ -54,7 +51,7 @@ public sealed record ZoneEventRelayOutboxRepository(ICaeriusNetDbContext Db) : I
         for (var attempt = 1;; attempt++)
         {
             var sp = new StoredProcedureParametersBuilder("runtime", "usp_ZoneEventRelayOutbox_Claim",
-                    request.MaximumCount, CommandTimeoutSeconds)
+                    request.MaximumCount)
                 .AddParameter("SourceShardId", request.SourceShardId, SqlDbType.TinyInt)
                 .AddParameter("LeaseId", request.LeaseId, SqlDbType.UniqueIdentifier)
                 .AddParameter("MaximumCount", request.MaximumCount, SqlDbType.Int)
@@ -68,6 +65,7 @@ public sealed record ZoneEventRelayOutboxRepository(ICaeriusNetDbContext Db) : I
             }
             catch (CaeriusNetSqlException ex) when (attempt < MaximumRetryAttempts && IsRetryable(ex))
             {
+                await Task.Delay(GetRetryDelay(attempt), ct).ConfigureAwait(false);
             }
         }
     }
@@ -84,8 +82,7 @@ public sealed record ZoneEventRelayOutboxRepository(ICaeriusNetDbContext Db) : I
 
         for (var attempt = 1;; attempt++)
         {
-            var sp = new StoredProcedureParametersBuilder("runtime", "usp_ZoneEventRelayOutbox_Acknowledge", 1,
-                    CommandTimeoutSeconds)
+            var sp = new StoredProcedureParametersBuilder("runtime", "usp_ZoneEventRelayOutbox_Acknowledge", 1)
                 .AddParameter("OutboxId", acknowledgement.OutboxId, SqlDbType.BigInt)
                 .AddParameter("SourceShardId", acknowledgement.SourceShardId, SqlDbType.TinyInt)
                 .AddParameter("LeaseId", acknowledgement.LeaseId, SqlDbType.UniqueIdentifier)
@@ -101,6 +98,7 @@ public sealed record ZoneEventRelayOutboxRepository(ICaeriusNetDbContext Db) : I
             }
             catch (CaeriusNetSqlException ex) when (attempt < MaximumRetryAttempts && IsRetryable(ex))
             {
+                await Task.Delay(GetRetryDelay(attempt), ct).ConfigureAwait(false);
             }
         }
     }
@@ -133,7 +131,11 @@ public sealed record ZoneEventRelayOutboxRepository(ICaeriusNetDbContext Db) : I
     private static bool IsRetryable(CaeriusNetSqlException exception)
     {
         return exception.InnerException is SqlException { Number: var errorNumber } &&
-               errorNumber is ErrorDeadlockVictim or ErrorWriteConflict or ErrorDependencyFailure or
-                   ErrorCommitDependencyAborted;
+               errorNumber is ErrorDeadlockVictim or ErrorExecutionTimeout;
+    }
+
+    private static TimeSpan GetRetryDelay(int attempt)
+    {
+        return TimeSpan.FromMilliseconds(25 * attempt);
     }
 }

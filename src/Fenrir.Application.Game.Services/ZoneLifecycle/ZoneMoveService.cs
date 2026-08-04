@@ -32,8 +32,6 @@ public sealed class ZoneMoveService(
 {
     private const short ZoneDepartureEventCode = 5;
 
-    private const int HandoffCapabilityLength = 43;
-
     private static readonly TimeSpan ZoneActorCommandCompletionTimeout = TimeSpan.FromSeconds(2);
 
     public async ValueTask HandleAsync(ZoneMoveRequest packet, IZoneSession zoneSession,
@@ -179,8 +177,7 @@ public sealed class ZoneMoveService(
                 {
                     Result = 1,
                     Ip = options.Value.PublicHost,
-                    Port = options.Value.ZoneBasePort + targetZoneNumber,
-                    Capability = string.Empty
+                    Port = options.Value.ZoneBasePort + targetZoneNumber
                 });
                 zoneSession.Send(new ReturnToHomeZoneResponse());
                 return;
@@ -203,10 +200,10 @@ public sealed class ZoneMoveService(
             return;
         }
 
-        var capability = await CompleteHandoffAsync(sourceZone, zoneSession, characterId, sourceZone.MapId,
+        var handoffCompleted = await CompleteHandoffAsync(sourceZone, zoneSession, characterId, sourceZone.MapId,
                 options.Value.ShardId, targetZoneNumber, sourceAddress, begin.Snapshot!, cancellationToken)
             .ConfigureAwait(false);
-        if (capability is null)
+        if (!handoffCompleted)
         {
             zoneSession.Send(RejectedZoneMoveResponse());
             return;
@@ -223,8 +220,7 @@ public sealed class ZoneMoveService(
         {
             Result = 0,
             Ip = options.Value.PublicHost,
-            Port = options.Value.ZoneBasePort + targetZoneNumber,
-            Capability = capability
+            Port = options.Value.ZoneBasePort + targetZoneNumber
         });
     }
 
@@ -280,8 +276,7 @@ public sealed class ZoneMoveService(
                 {
                     Result = 1,
                     Ip = candidate.Host,
-                    Port = options.Value.ZoneBasePort + targetZoneNumber,
-                    Capability = string.Empty
+                    Port = options.Value.ZoneBasePort + targetZoneNumber
                 });
                 zoneSession.Send(new ReturnToHomeZoneResponse());
                 return;
@@ -314,10 +309,10 @@ public sealed class ZoneMoveService(
                 return;
             }
 
-            var capability = await CompleteHandoffAsync(sourceZone, zoneSession, characterId, originZoneId,
+            var handoffCompleted = await CompleteHandoffAsync(sourceZone, zoneSession, characterId, originZoneId,
                     candidate.ShardId, targetZoneNumber, sourceAddress, begin.Snapshot!, cancellationToken)
                 .ConfigureAwait(false);
-            if (capability is null)
+            if (!handoffCompleted)
             {
                 zoneSession.Send(RejectedZoneMoveResponse());
                 return;
@@ -333,8 +328,7 @@ public sealed class ZoneMoveService(
             {
                 Result = 0,
                 Ip = candidate.Host,
-                Port = options.Value.ZoneBasePort + targetZoneNumber,
-                Capability = capability
+                Port = options.Value.ZoneBasePort + targetZoneNumber
             });
             return;
         }
@@ -434,10 +428,10 @@ public sealed class ZoneMoveService(
 
     private static ZoneMoveResponse RejectedZoneMoveResponse(string ip = "", int port = 0)
     {
-        return new ZoneMoveResponse { Result = 1, Ip = ip, Port = port, Capability = string.Empty };
+        return new ZoneMoveResponse { Result = 1, Ip = ip, Port = port };
     }
 
-    private async ValueTask<string?> CompleteHandoffAsync(Zone sourceZone, IZoneSession zoneSession, int characterId,
+    private async ValueTask<bool> CompleteHandoffAsync(Zone sourceZone, IZoneSession zoneSession, int characterId,
         short sourceZoneNumber, byte targetShardId, short targetZoneNumber, IPAddress sourceAddress,
         ZoneTransferHandoffSnapshot handoff, CancellationToken cancellationToken)
     {
@@ -455,24 +449,24 @@ public sealed class ZoneMoveService(
                 await CompensateFailedHandoffAsync(sourceZone, zoneSession, characterId, sourceZoneNumber, handoff,
                         false, false)
                     .ConfigureAwait(false);
-                return null;
+                return false;
             }
 
             ticketMayExist = true;
-            var ticket = await tickets.CreateAsync(zoneSession.AccountId!.Value, characterId, targetShardId,
+            var ticketCreated = await tickets.CreateAsync(zoneSession.AccountId!.Value, characterId, targetShardId,
                     options.Value.TicketTtlSeconds, zoneSession.AccountSessionToken!.Value, zoneSession.AccountGrade,
                     targetZoneNumber, sourceAddress, cancellationToken)
                 .ConfigureAwait(false);
 
-            if (ticket.Capability is not { Length: HandoffCapabilityLength })
+            if (!ticketCreated)
             {
                 logger.LogError(
-                    "Zone-move rejected for character {CharacterId}: the handoff ticket repository returned an invalid capability",
+                    "Zone-move rejected for character {CharacterId}: the handoff ticket repository rejected ticket creation",
                     characterId);
                 await CompensateFailedHandoffAsync(sourceZone, zoneSession, characterId, sourceZoneNumber, handoff,
                         true, false)
                     .ConfigureAwait(false);
-                return null;
+                return false;
             }
 
             restoreSourceDirectory = true;
@@ -481,7 +475,7 @@ public sealed class ZoneMoveService(
                 .ConfigureAwait(false);
 
             zoneSession.ConfirmZoneTransferHandoff();
-            return ticket.Capability;
+            return true;
         }
         catch (Exception ex)
         {
@@ -491,7 +485,7 @@ public sealed class ZoneMoveService(
             await CompensateFailedHandoffAsync(sourceZone, zoneSession, characterId, sourceZoneNumber, handoff,
                     ticketMayExist, restoreSourceDirectory)
                 .ConfigureAwait(false);
-            return null;
+            return false;
         }
     }
 

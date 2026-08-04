@@ -60,7 +60,7 @@ public sealed class GameServerOptions
 
     public string PublicHost { get; set; } = "127.0.0.1";
 
-    public int TicketTtlSeconds { get; set; } = 15;
+    public int TicketTtlSeconds { get; set; } = 60;
 
     public int ShardReachabilityProbeTimeoutMilliseconds { get; set; } = 750;
 

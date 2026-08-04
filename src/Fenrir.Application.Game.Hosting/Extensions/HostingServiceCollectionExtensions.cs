@@ -72,7 +72,7 @@ public static class HostingServiceCollectionExtensions
         services.AddSingleton<IPvpKillCooldownClaimQueue>(sp => sp.GetRequiredService<PvpKillCooldownClaimHost>());
         services.AddHostedService(sp => sp.GetRequiredService<PvpKillCooldownClaimHost>());
         services.AddSingleton(sp => new Lazy<IPvpKillCooldownClaimQueue>(
-            sp.GetRequiredService<IPvpKillCooldownClaimQueue>));
+            () => sp.GetRequiredService<IPvpKillCooldownClaimQueue>()));
         services.AddHostedService<ProxyShopExpiryFlushHost>();
         services.AddHostedService<DeathEventLogFlushHost>();
 
@@ -115,7 +115,7 @@ public static class HostingServiceCollectionExtensions
         services.AddHostedService(sp => sp.GetRequiredService<PartyResyncRelayHost>());
 
         services.AddSingleton(sp =>
-            new Lazy<IPartyResyncRelayQueue>(sp.GetRequiredService<IPartyResyncRelayQueue>));
+            new Lazy<IPartyResyncRelayQueue>(() => sp.GetRequiredService<IPartyResyncRelayQueue>()));
 
         services.AddSingleton<ChatCrossShardRelayHost>();
         services.AddSingleton<IChatCrossShardRelayQueue>(sp =>
@@ -123,7 +123,7 @@ public static class HostingServiceCollectionExtensions
         services.AddHostedService(sp => sp.GetRequiredService<ChatCrossShardRelayHost>());
 
         services.AddSingleton(sp =>
-            new Lazy<ISocialCrossShardRelayQueue>(sp.GetRequiredService<ISocialCrossShardRelayQueue>));
+            new Lazy<ISocialCrossShardRelayQueue>(() => sp.GetRequiredService<ISocialCrossShardRelayQueue>()));
 
         services.AddSingleton<ProxyShopExpirationRelayHost>();
         services.AddSingleton<IProxyShopExpirationRelayQueue>(sp =>
@@ -192,16 +192,16 @@ public static class HostingServiceCollectionExtensions
 
         services.AddSingleton<Zone38BossSchedule>();
         services.AddSingleton(sp =>
-            new Lazy<IWorldNoticeService>(sp.GetRequiredService<IWorldNoticeService>()));
+            new Lazy<IWorldNoticeService>(() => sp.GetRequiredService<IWorldNoticeService>()));
         services.AddSingleton<IZone38BossScheduleEffects, Zone38BossScheduleEffects>();
         services.AddSingleton<ISimulationSystem, Zone38BossScheduleSystem>();
 
-        services.AddSingleton(sp => new Lazy<ZoneEventBroadcaster>(sp.GetRequiredService<ZoneEventBroadcaster>));
+        services.AddSingleton(sp => new Lazy<ZoneEventBroadcaster>(() => sp.GetRequiredService<ZoneEventBroadcaster>()));
 
         services.AddSingleton(sp =>
-            new Lazy<ZoneCenterBroadcastIngestor>(sp.GetRequiredService<ZoneCenterBroadcastIngestor>));
+            new Lazy<ZoneCenterBroadcastIngestor>(() => sp.GetRequiredService<ZoneCenterBroadcastIngestor>()));
 
-        services.AddSingleton(sp => new Lazy<ZoneRegistry>(sp.GetRequiredService<ZoneRegistry>));
+        services.AddSingleton(sp => new Lazy<ZoneRegistry>(() => sp.GetRequiredService<ZoneRegistry>()));
 
         services.AddSingleton<Zone195NokSanState>();
         services.AddSingleton<Zone195NokSanStateService>();
@@ -214,7 +214,7 @@ public static class HostingServiceCollectionExtensions
         services.AddSingleton<Zone195NokSanBroadcaster>();
         services.AddSingleton<IZone195NokSanBroadcaster>(sp => sp.GetRequiredService<Zone195NokSanBroadcaster>());
         services.AddSingleton(sp =>
-            new Lazy<IZone195NokSanBroadcaster>(sp.GetRequiredService<IZone195NokSanBroadcaster>));
+            new Lazy<IZone195NokSanBroadcaster>(() => sp.GetRequiredService<IZone195NokSanBroadcaster>()));
         services.AddSingleton<ISimulationSystem, Zone195NokSanSystem>();
 
         services.AddSingleton<WorldInfoBootResetVerifier>();

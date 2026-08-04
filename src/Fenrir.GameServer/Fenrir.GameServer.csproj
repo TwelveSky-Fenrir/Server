@@ -8,6 +8,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="GameData\**\*"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest"/>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Fenrir.Core\Fenrir.Core.csproj"/>
     <ProjectReference Include="..\Fenrir.Domain.Game\Fenrir.Domain.Game.csproj"/>
     <ProjectReference Include="..\Fenrir.Network\Fenrir.Network.csproj"/>

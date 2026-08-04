@@ -15,8 +15,7 @@ public readonly record struct ZoneTransferResult(
     ZoneTransferOutcome Outcome,
     string Ip,
     int Port,
-    short Zone,
-    string Capability);
+    short Zone);
 
 public interface IZoneTransferService
 {

@@ -11,6 +11,8 @@ const int zoneBasePort = 1100;
 
 const int maxZoneNumber = 349;
 
+const int handoffTicketTtlSeconds = 60;
+
 var gamePublicHost = Environment.GetEnvironmentVariable("FENRIR_PUBLIC_HOST") is { Length: > 0 } configuredHost
     ? configuredHost
     : ResolvePrimaryLanIPv4();
@@ -42,7 +44,8 @@ builder.AddProject<Fenrir_LoginServer>("login-server", launchProfileName: null)
     .WaitForCompletion(migrator)
     .WithEndpoint(name: "login-tcp", scheme: "tcp", port: loginPort, targetPort: loginPort, isProxied: false)
     .WithEnvironment("Login__Port", loginPort.ToString())
-    .WithEnvironment("Login__ZoneBasePort", zoneBasePort.ToString());
+    .WithEnvironment("Login__ZoneBasePort", zoneBasePort.ToString())
+    .WithEnvironment("Login__TicketTtlSeconds", handoffTicketTtlSeconds.ToString());
 
 const byte gameServerId = 1;
 var gameServerPort = zoneBasePort + gameServerId;
@@ -59,6 +62,7 @@ builder.AddProject<Fenrir_GameServer>("game-server", launchProfileName: null)
     .WithEnvironment("Game__ZonePortRangeEnd", (zoneBasePort + maxZoneNumber).ToString())
     .WithEnvironment("Game__ReservedPorts", loginPort.ToString())
     .WithEnvironment("Game__PublicHost", gamePublicHost)
+    .WithEnvironment("Game__TicketTtlSeconds", handoffTicketTtlSeconds.ToString())
     .WithEnvironment("Game__Ruleset", ruleset);
 
 builder.Build().Run();

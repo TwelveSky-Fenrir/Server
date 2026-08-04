@@ -8,7 +8,7 @@ public sealed class LoginServerOptions
 
     public int ExpectedClientVersion { get; set; } = 90354;
 
-    public int TicketTtlSeconds { get; set; } = 15;
+    public int TicketTtlSeconds { get; set; } = 60;
 
     public int ShardReachabilityProbeTimeoutMilliseconds { get; set; } = 750;
 

@@ -1,4 +1,4 @@
-CREATE PROCEDURE runtime.usp_SessionTicket_Consume @CapabilityHash BINARY(32),
+CREATE PROCEDURE runtime.usp_SessionTicket_Consume @AccountId INT,
                                                    @ExpectedShardId TINYINT,
                                                    @ExpectedTargetMapId SMALLINT,
                                                    @SourceIpPrefix VARCHAR(45)
@@ -8,10 +8,11 @@ BEGIN
     SET XACT_ABORT ON;
 
     DECLARE
-        @AccountId INT, @CharacterId INT, @ShardId TINYINT, @Exp DATETIME2(3), @SessionToken UNIQUEIDENTIFIER,
+        @CapabilityHash BINARY(32), @CharacterId INT, @ShardId TINYINT, @Exp DATETIME2(3), @SessionToken UNIQUEIDENTIFIER,
         @AccountGrade SMALLINT, @TargetMapId SMALLINT, @BoundIpPrefix VARCHAR(45);
 
-    IF @ExpectedShardId = 0
+    IF @AccountId <= 0
+        OR @ExpectedShardId = 0
         OR @ExpectedTargetMapId <= 0
         OR @SourceIpPrefix IS NULL
         OR @SourceIpPrefix = ''
@@ -27,7 +28,7 @@ BEGIN
            AND MapId = @ExpectedTargetMapId)
         GOTO Rejected;
 
-    SELECT @AccountId = AccountId,
+    SELECT @CapabilityHash = CapabilityHash,
            @CharacterId = CharacterId,
            @ShardId = ShardId,
            @Exp = ExpiresAtUtc,
@@ -36,9 +37,9 @@ BEGIN
            @TargetMapId = TargetMapId,
            @BoundIpPrefix = SourceIpPrefix
     FROM runtime.SessionTickets WITH (SNAPSHOT)
-    WHERE CapabilityHash = @CapabilityHash;
+    WHERE AccountId = @AccountId;
 
-    IF @AccountId IS NULL
+    IF @CapabilityHash IS NULL
         GOTO Rejected;
 
     IF @Exp <= SYSUTCDATETIME()

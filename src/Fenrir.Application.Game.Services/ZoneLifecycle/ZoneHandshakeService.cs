@@ -20,9 +20,22 @@ public sealed class ZoneHandshakeService(
 {
     private const short ZoneTransferAcceptedEventCode = 3;
 
-    public async ValueTask<ZoneHandshakeResult> ConsumeTicketAsync(string capability, int declaredTribe,
+    public async ValueTask<ZoneHandshakeResult> ConsumeTicketAsync(string obfuscatedId, int declaredTribe,
         IZoneSession session, CancellationToken cancellationToken)
     {
+        if (!ObfuscatedUidCodec.TryDecodeAccountId(obfuscatedId, out var accountId))
+        {
+            logger?.LogWarning("Zone handshake rejected: malformed obfuscated id");
+            return new ZoneHandshakeResult(ZoneHandshakeOutcome.Rejected);
+        }
+
+        if (accountId <= 0)
+        {
+            logger?.LogWarning("Zone handshake protocol violation: decoded account id {AccountId} is out of range",
+                accountId);
+            return new ZoneHandshakeResult(ZoneHandshakeOutcome.ProtocolViolation);
+        }
+
         var quotaGroup = TribeQuotaGroupPolicy.ForMap(session.ListenerMapId);
         if (!TribeQuotaGate.IsDeclaredTribeInRange(quotaGroup, declaredTribe))
         {
@@ -38,19 +51,18 @@ public sealed class ZoneHandshakeService(
             return new ZoneHandshakeResult(ZoneHandshakeOutcome.Rejected);
         }
 
-        var consumed = await tickets.ConsumeAsync(capability, options.Value.ShardId, session.ListenerMapId,
+        var consumed = await tickets.ConsumeAsync(accountId, options.Value.ShardId, session.ListenerMapId,
             sourceAddress, cancellationToken);
 
         if (consumed is null)
         {
             tribeQuota.Release(session);
             logger?.LogWarning(
-                "Zone handshake rejected from {SourceAddress}: session ticket absent, expired, or bound to a different capability, source address, shard, or map",
+                "Zone handshake rejected for account {AccountId} from {SourceAddress}: session ticket absent, expired, or bound to a different source address, shard, or map",
+                accountId,
                 sourceAddress);
             return new ZoneHandshakeResult(ZoneHandshakeOutcome.Rejected);
         }
-
-        var accountId = consumed.AccountId;
 
         var character = await characters.GetForWorldEntryAsync(consumed.CharacterId, cancellationToken);
         if (character is null)

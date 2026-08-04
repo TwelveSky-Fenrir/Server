@@ -628,4 +628,6 @@ Migrations/Seed/admin/036_error_catalog_pvp_kill_cooldown.sql
 Migrations/Seed/admin/037_error_catalog_economy_operation_idempotency.sql
 Migrations/Seed/admin/038_single_gameserver_map_assignments.sql
 
+Migrations/Seed/admin/039_error_catalog_zone_event_relay_outbox.sql
+
 Migrations/Upgrade/001_economy_operation_idempotency.sql

@@ -246,11 +246,19 @@ public static class WorldDataCacheBuilder
         IReadOnlyList<QuestRewardRowDto> rewards,
         IReadOnlyList<QuestSpeechRowDto> speeches)
     {
+        var categorySteps = new HashSet<(byte Category, short Step)>();
         foreach (var quest in quests.OrderBy(static quest => quest.QuestId))
+        {
             if (quest.Step is < MinQuestStep or > MaxQuestStep)
                 throw new InvalidOperationException(
                     $"world.Quests row QuestId={quest.QuestId} has Step={quest.Step} outside the legacy " +
                     $"{MinQuestStep}-{MaxQuestStep} bound.");
+
+            if (!categorySteps.Add((quest.Category, quest.Step)))
+                throw new InvalidOperationException(
+                    $"world.Quests has more than one row for Category={quest.Category}, Step={quest.Step}; " +
+                    "the quest state machine requires one deterministic definition.");
+        }
 
         foreach (var reward in rewards.OrderBy(static reward => reward.QuestId)
                      .ThenBy(static reward => reward.SlotIndex))

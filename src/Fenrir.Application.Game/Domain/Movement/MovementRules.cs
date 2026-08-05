@@ -7,8 +7,6 @@ namespace Fenrir.Application.Game.Domain.Movement;
 
 public sealed class MovementRules(IOptions<GameServerOptions> options)
 {
-    private const float TerrainHeightTolerance = 20f;
-
     public bool IsPlausible(PlayerRuntimeState current, in ActionInfo intent, ZoneGeometry geometry)
     {
         return IsPlausible(current.PosX, current.PosY, current.PosZ,
@@ -31,8 +29,6 @@ public sealed class MovementRules(IOptions<GameServerOptions> options)
             dx * dx + dy * dy + dz * dz > maxDistance * maxDistance)
             return false;
 
-        return geometry.TryGetGroundHeight(toX, toZ, out var groundY, toY + TerrainHeightTolerance,
-                   firstHitOnly: false) &&
-               MathF.Abs(toY - groundY) <= TerrainHeightTolerance;
+        return true;
     }
 }

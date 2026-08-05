@@ -5,6 +5,7 @@ namespace Fenrir.Domain.Game.GameData;
 
 public sealed class WorldDataLoader(IWorldDataRepository repository, ILogger<WorldDataLoader> logger)
 {
+    private readonly SemaphoreSlim _reloadGate = new(1, 1);
     private WorldDataCache? _cache;
 
     public WorldDataCache Cache => _cache ?? throw new InvalidOperationException(
@@ -15,6 +16,14 @@ public sealed class WorldDataLoader(IWorldDataRepository repository, ILogger<Wor
         if (_cache is not null)
             throw new InvalidOperationException("WorldDataLoader.InitializeAsync must only be called once, at boot.");
 
+        await ReloadAsync(ct).ConfigureAwait(false);
+    }
+
+    public async Task<WorldDataReloadResult> ReloadAsync(CancellationToken ct)
+    {
+        await _reloadGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
         var stopwatch = Stopwatch.StartNew();
 
         var itemsTask = repository.GetItemsAsync(ct);
@@ -154,8 +163,35 @@ public sealed class WorldDataLoader(IWorldDataRepository repository, ILogger<Wor
                 stats.PortalsWithoutDestination, stats.NpcPlacementsWithoutNpc,
                 stats.SpawnRegionsWithoutZone, stats.SpawnRegionsWithoutMonster);
 
-        _cache = cache;
+        if (_cache is null)
+            _cache = cache;
+        else
+            _cache.Publish(cache);
 
-        logger.LogInformation("WorldDataCache ready in {ElapsedMs:F0} ms", stopwatch.Elapsed.TotalMilliseconds);
+        logger.LogInformation("WorldDataCache {Operation} in {ElapsedMs:F0} ms", _cache == cache ? "ready" : "reloaded",
+            stopwatch.Elapsed.TotalMilliseconds);
+
+        return new WorldDataReloadResult(
+            cache.ItemsById.Count,
+            cache.SkillsById.Count,
+            cache.MonstersById.Count,
+            cache.QuestsById.Count,
+            cache.NpcsById.Count,
+            cache.ZonesByNumber.Count,
+            stopwatch.Elapsed);
+        }
+        finally
+        {
+            _reloadGate.Release();
+        }
     }
 }
+
+public readonly record struct WorldDataReloadResult(
+    int ItemCount,
+    int SkillCount,
+    int MonsterCount,
+    int QuestCount,
+    int NpcCount,
+    int ZoneCount,
+    TimeSpan Elapsed);

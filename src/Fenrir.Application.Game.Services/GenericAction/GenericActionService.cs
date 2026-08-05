@@ -1408,9 +1408,9 @@ public sealed class GenericActionService(
         if (!trades.TryGetSession(characterId, out var trade) || trade is null)
         {
             logger.LogInformation(
-                "Character {CharacterId} Trade-item-transfer aborted: no active trade session (sort {Sort})",
+                "Character {CharacterId} Trade-item-transfer rejected: no active trade session (sort {Sort})",
                 characterId, sort);
-            return ValueTask.FromResult(GenericActionResult.Aborted);
+            return ValueTask.FromResult(GenericActionResult.Failed);
         }
 
         var side = trade.SideOf(characterId);
@@ -1460,9 +1460,9 @@ public sealed class GenericActionService(
         if (!trades.TryGetSession(characterId, out var trade) || trade is null)
         {
             logger.LogInformation(
-                "Character {CharacterId} Trade-money-transfer aborted: no active trade session (sort {Sort})",
+                "Character {CharacterId} Trade-money-transfer rejected: no active trade session (sort {Sort})",
                 characterId, sort);
-            return ValueTask.FromResult(GenericActionResult.Aborted);
+            return ValueTask.FromResult(GenericActionResult.Failed);
         }
 
         var side = trade.SideOf(characterId);
@@ -1474,9 +1474,10 @@ public sealed class GenericActionService(
             return ValueTask.FromResult(GenericActionResult.Aborted);
         }
 
+        var availableMoney = state.Money - side.Money;
         var resolved = sort == 221
-            ? TradeMoneyPlacementResolver.ResolveToTradeOffer(long.MaxValue, side.Money, move.Quantity1)
-            : TradeMoneyPlacementResolver.ResolveFromTradeOffer(side.Money, 0, move.Quantity1);
+            ? TradeMoneyPlacementResolver.ResolveToTradeOffer(availableMoney, side.Money, move.Quantity1)
+            : TradeMoneyPlacementResolver.ResolveFromTradeOffer(side.Money, availableMoney, move.Quantity1);
 
         if (!resolved.Succeeded)
         {

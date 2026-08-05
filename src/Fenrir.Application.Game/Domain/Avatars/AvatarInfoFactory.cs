@@ -252,6 +252,7 @@ public static class AvatarInfoFactory
                 state.Inventory.GetContainer(ContainerMatrix.StorePage0),
                 state.Inventory.GetContainer(ContainerMatrix.StorePage1)),
             Skill = BuildSkillArrayFromLearnedSkills(state.LearnedSkills),
+            HotKey = BuildHotKeyArrayFromRuntimeState(state),
             QuestInfo =
             [
                 state.QuestStepPermanent, state.QuestActiveFlag, state.QuestSort, state.QuestTargetPhase,
@@ -559,6 +560,24 @@ public static class AvatarInfoFactory
             hotkey[baseIndex] = row.Sort;
             hotkey[baseIndex + 1] = row.Value1;
             hotkey[baseIndex + 2] = row.Value2;
+        }
+
+        return hotkey;
+    }
+
+    private static int[] BuildHotKeyArrayFromRuntimeState(PlayerRuntimeState state)
+    {
+        var hotkey = new int[HotkeyPageCount * HotkeyKeysPerPage * HotkeyWireIntsPerSlot];
+
+        foreach (var ((page, index), slot) in state.Hotkeys)
+        {
+            if (page >= HotkeyPageCount || index >= HotkeyKeysPerPage)
+                continue;
+
+            var baseIndex = (page * HotkeyKeysPerPage + index) * HotkeyWireIntsPerSlot;
+            hotkey[baseIndex] = slot.Value1;
+            hotkey[baseIndex + 1] = slot.Value2;
+            hotkey[baseIndex + 2] = (int)slot.Kind;
         }
 
         return hotkey;

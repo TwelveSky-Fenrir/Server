@@ -200,8 +200,10 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
     {
         var builder = new StoredProcedureParametersBuilder("game", "usp_CharacterItems_ReplaceContainer", 0)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
-            .AddParameter("Container", container, SqlDbType.TinyInt)
-            .AddTvpParameter("Items", items);
+            .AddParameter("Container", container, SqlDbType.TinyInt);
+
+        if (items.Count > 0)
+            builder.AddTvpParameter("Items", items);
 
         await Db.ExecuteAsync(builder.Build(), ct);
     }
@@ -258,10 +260,16 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
             return;
 
         var builder = new StoredProcedureParametersBuilder("game", "usp_Character_PersistProgressBatch", 0)
-            .AddTvpParameter("Progress", rows)
-            .AddTvpParameter("Costumes", costumes)
-            .AddTvpParameter("Mounts", mounts)
-            .AddTvpParameter("StellarCores", stellarCores ?? Array.Empty<CharacterStellarCoreSlotTvp>());
+            .AddTvpParameter("Progress", rows);
+
+        if (costumes.Count > 0)
+            builder.AddTvpParameter("Costumes", costumes);
+
+        if (mounts.Count > 0)
+            builder.AddTvpParameter("Mounts", mounts);
+
+        if (stellarCores is { Count: > 0 })
+            builder.AddTvpParameter("StellarCores", stellarCores);
 
         await Db.ExecuteAsync(builder.Build(), ct);
     }
@@ -277,11 +285,19 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
 
         var builder = new StoredProcedureParametersBuilder("game", "usp_Character_PersistFinalFlush", 0)
             .AddTvpParameter("Progress", progressRows)
-            .AddTvpParameter("Position", positionRows)
-            .AddTvpParameter("Costumes", costumes)
-            .AddTvpParameter("Buffs", buffs)
-            .AddTvpParameter("Mounts", mounts)
-            .AddTvpParameter("StellarCores", stellarCores ?? Array.Empty<CharacterStellarCoreSlotTvp>());
+            .AddTvpParameter("Position", positionRows);
+
+        if (costumes.Count > 0)
+            builder.AddTvpParameter("Costumes", costumes);
+
+        if (buffs.Count > 0)
+            builder.AddTvpParameter("Buffs", buffs);
+
+        if (mounts.Count > 0)
+            builder.AddTvpParameter("Mounts", mounts);
+
+        if (stellarCores is { Count: > 0 })
+            builder.AddTvpParameter("StellarCores", stellarCores);
 
         return await Db.FirstQueryAsync<CharacterFinalFlushResultDto>(builder.Build(), ct) ??
                throw new InvalidOperationException("usp_Character_PersistFinalFlush always returns a flush result.");

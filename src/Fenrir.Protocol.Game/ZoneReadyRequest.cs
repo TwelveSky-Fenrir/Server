@@ -5,7 +5,7 @@ namespace Fenrir.Protocol.Game;
 
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.ZoneReady,
     ExpectedSize = 25,
-    AllowedStates = [(byte)ZoneSessionState.Registering])]
+    AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
 public readonly partial record struct ZoneReadyRequest : IIncomingPacket<ZoneReadyRequest>
 {
     public required int Tribe { get; init; }

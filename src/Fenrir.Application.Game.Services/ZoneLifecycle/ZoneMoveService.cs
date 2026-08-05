@@ -106,10 +106,11 @@ public sealed class ZoneMoveService(
             return;
         }
 
-        if (state.IsDead || state.Life <= 0)
+        var isDeathRespawn = state.IsDead || state.Life <= 0;
+        if (isDeathRespawn && packet.Sort != (int)ZoneMoveActionCategory.Death)
         {
             logger.LogInformation(
-                "Zone-move rejected for character {CharacterId}: a dead character cannot transfer before a validated resurrection",
+                "Zone-move rejected for character {CharacterId}: a dead character may only use the death-respawn transfer category",
                 characterId);
             zoneSession.Send(RejectedZoneMoveResponse());
             return;
@@ -135,8 +136,8 @@ public sealed class ZoneMoveService(
 
         if (!zones.TryGet(targetZoneNumber, out _))
         {
-            await HandleCrossShardAsync(targetZoneNumber, characterId, state, sourceZone.MapId, zoneSession,
-                cancellationToken);
+            await HandleCrossShardAsync(targetZoneNumber, characterId, state, sourceZone.MapId, isDeathRespawn,
+                zoneSession, cancellationToken);
             return;
         }
 
@@ -192,7 +193,7 @@ public sealed class ZoneMoveService(
             return;
         }
 
-        var begin = await BeginHandoffAsync(sourceZone, characterId, targetZoneNumber, cancellationToken)
+        var begin = await BeginHandoffAsync(sourceZone, characterId, targetZoneNumber, isDeathRespawn, cancellationToken)
             .ConfigureAwait(false);
         if (begin.Kind != HandoffBeginOutcomeKind.Applied)
         {
@@ -225,7 +226,7 @@ public sealed class ZoneMoveService(
     }
 
     private async ValueTask HandleCrossShardAsync(short targetZoneNumber, int characterId, PlayerRuntimeState state,
-        short originZoneId, IZoneSession zoneSession, CancellationToken cancellationToken)
+        short originZoneId, bool reviveForDeathTransfer, IZoneSession zoneSession, CancellationToken cancellationToken)
     {
         var shards = await directory.GetDirectoryAsync(cancellationToken);
         foreach (var candidate in shards)
@@ -300,7 +301,8 @@ public sealed class ZoneMoveService(
                 return;
             }
 
-            var begin = await BeginHandoffAsync(sourceZone, characterId, targetZoneNumber, cancellationToken)
+            var begin = await BeginHandoffAsync(sourceZone, characterId, targetZoneNumber, reviveForDeathTransfer,
+                    cancellationToken)
                 .ConfigureAwait(false);
             if (begin.Kind != HandoffBeginOutcomeKind.Applied)
             {
@@ -340,7 +342,7 @@ public sealed class ZoneMoveService(
     }
 
     private async ValueTask<HandoffBeginOutcome> BeginHandoffAsync(Zone sourceZone, int characterId,
-        short targetZoneNumber, CancellationToken cancellationToken)
+        short targetZoneNumber, bool reviveForDeathTransfer, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -349,7 +351,8 @@ public sealed class ZoneMoveService(
         var completion =
             new TaskCompletionSource<ZoneCommandResult>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        if (!sourceZone.Post(ZoneCommand.BeginZoneTransfer(characterId, targetZoneNumber, snapshotSignal, completion)))
+        if (!sourceZone.Post(ZoneCommand.BeginZoneTransfer(characterId, targetZoneNumber, reviveForDeathTransfer,
+                snapshotSignal, completion)))
         {
             logger.LogError(
                 "Zone {SourceMapId} inbox full: BeginZoneTransfer for character {CharacterId} could not be queued before handoff to zone {TargetZoneNumber}",

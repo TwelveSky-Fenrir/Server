@@ -80,9 +80,9 @@ public sealed class GameServerOptions
 
     public int MutePollIntervalSeconds { get; set; } = 15;
 
-    public int MaxConnectionsPerIp { get; set; } = 40;
+    public int MaxConnectionsPerIp { get; set; } = 512;
 
-    public int MaxProtocolViolationsPerIpPerHour { get; set; } = 30;
+    public int MaxProtocolViolationsPerIpPerHour { get; set; } = 1_000;
 
     public bool VoteTribeEnabled { get; set; }
 

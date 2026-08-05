@@ -39,9 +39,9 @@ public sealed class GameConnectionHost(
 
     private const int SocketAdmissionHeadroomFactor = 2;
 
-    private const int MaxProcessPendingOutboundFrames = 65_536;
+    private const int MaxProcessPendingOutboundFrames = 262_144;
 
-    private const int MaxProcessPendingOutboundBytes = 64 * 1024 * 1024;
+    private const int MaxProcessPendingOutboundBytes = 256 * 1024 * 1024;
 
     private readonly SocketAdmissionGate _admissionGate = new(ResolveMaxConcurrentSockets(options.Value));
 

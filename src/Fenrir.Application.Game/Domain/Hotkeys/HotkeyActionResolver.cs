@@ -128,10 +128,13 @@ public static class HotkeyActionResolver
         if (requestedGrade < MinSkillGrade || requestedGrade > learned.Grade)
             return BindSkillResult.Fail(BindSkillFailure.InvalidGrade);
 
+        var newDestination = new HotkeySlot(HotkeyBindingKind.Skill, learned.SkillId, requestedGrade);
+        if (destination == newDestination)
+            return new BindSkillResult(true, BindSkillFailure.None, newDestination);
+
         if (!destination.IsEmpty)
             return BindSkillResult.Fail(BindSkillFailure.DestinationOccupied);
 
-        var newDestination = new HotkeySlot(HotkeyBindingKind.Skill, learned.SkillId, requestedGrade);
         return new BindSkillResult(true, BindSkillFailure.None, newDestination);
     }
 
@@ -147,10 +150,13 @@ public static class HotkeyActionResolver
         if (emoticonCode < MinEmoticonCode || emoticonCode > MaxEmoticonCode)
             return BindEmoticonResult.Fail(BindEmoticonFailure.InvalidCode);
 
+        var newDestination = new HotkeySlot(HotkeyBindingKind.Emoticon, emoticonCode, 0);
+        if (destination == newDestination)
+            return new BindEmoticonResult(true, BindEmoticonFailure.None, newDestination);
+
         if (!destination.IsEmpty)
             return BindEmoticonResult.Fail(BindEmoticonFailure.DestinationOccupied);
 
-        var newDestination = new HotkeySlot(HotkeyBindingKind.Emoticon, emoticonCode, 0);
         return new BindEmoticonResult(true, BindEmoticonFailure.None, newDestination);
     }
 

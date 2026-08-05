@@ -678,7 +678,8 @@ public sealed partial class Zone(
                         break;
                     case ZoneCommandKind.BeginZoneTransfer:
                     {
-                        var snapshot = HandleBeginZoneTransfer(command.CharacterId, command.ZoneTransferTargetMapId);
+                        var snapshot = HandleBeginZoneTransfer(command.CharacterId, command.ZoneTransferTargetMapId,
+                            command.ReviveForDeathTransfer);
                         command.ZoneTransferSnapshot?.TrySetResult(snapshot);
                         command.Completion?.TrySetResult(snapshot is null
                             ? ZoneCommandResult.Rejected("Character cannot begin a zone transfer.")

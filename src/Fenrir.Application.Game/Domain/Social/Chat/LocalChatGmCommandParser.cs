@@ -10,6 +10,8 @@ public static class LocalChatGmCommandParser
 
     public static bool TryParse(string content, out LocalChatGmCommand command)
     {
+        content = content.Trim();
+
         if (string.Equals(content, "where", StringComparison.Ordinal))
         {
             command = new LocalChatGmCommand
@@ -64,6 +66,34 @@ public static class LocalChatGmCommandParser
             return true;
         }
 
+        if (MatchesReloadCommand(content, "reloadall", "ra"))
+        {
+            command = new LocalChatGmCommand
+                { Kind = LocalChatGmCommandKind.ReloadAll, RequiredTier = GmCommandTier.Admin };
+            return true;
+        }
+
+        if (MatchesReloadCommand(content, "reloadmobs", "rb"))
+        {
+            command = new LocalChatGmCommand
+                { Kind = LocalChatGmCommandKind.ReloadMonsters, RequiredTier = GmCommandTier.Admin };
+            return true;
+        }
+
+        if (MatchesReloadCommand(content, "reloaditems", "ri"))
+        {
+            command = new LocalChatGmCommand
+                { Kind = LocalChatGmCommandKind.ReloadItems, RequiredTier = GmCommandTier.Admin };
+            return true;
+        }
+
+        if (MatchesReloadCommand(content, "reloadquests", "rq"))
+        {
+            command = new LocalChatGmCommand
+                { Kind = LocalChatGmCommandKind.ReloadQuests, RequiredTier = GmCommandTier.Admin };
+            return true;
+        }
+
         command = default;
         return false;
     }
@@ -92,5 +122,15 @@ public static class LocalChatGmCommandParser
 
         var remainder = content[prefixLength..].Trim();
         return remainder.Length == 0 ? null : remainder;
+    }
+
+    private static bool MatchesReloadCommand(string content, string command, string alias)
+    {
+        return string.Equals(content, command, StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(content, alias, StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(content, $"/{command}", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(content, $"/{alias}", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(content, $"?{command}", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(content, $"?{alias}", StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -3,46 +3,33 @@ using Fenrir.Data.Abstractions.Game;
 
 namespace Fenrir.Data.WriteBehind;
 
-public sealed class EventLogQueue : IEventLogQueue, IAsyncDisposable
+public sealed class EventLogQueue(
+    Func<IReadOnlyList<EventLogEntryTvp>, CancellationToken, ValueTask> flushCallback,
+    int capacity = EventLogQueue.DefaultCapacity,
+    int batchSize = EventLogQueue.DefaultBatchSize,
+    TimeSpan? interval = null,
+    Action<Exception, int>? onFlushError = null,
+    Action<int>? onDropped = null)
+    : IEventLogQueue, IAsyncDisposable
 {
     public const int DefaultCapacity = 4096;
     public const int DefaultBatchSize = 256;
     public static readonly TimeSpan DefaultInterval = TimeSpan.FromSeconds(2);
 
-    private readonly int _batchSize;
-    private readonly Channel<EventLogEntryTvp> _channel;
-    private readonly Func<IReadOnlyList<EventLogEntryTvp>, CancellationToken, ValueTask> _flushCallback;
-    private readonly TimeSpan _interval;
+    private readonly Channel<EventLogEntryTvp> _channel = Channel.CreateBounded<EventLogEntryTvp>(new BoundedChannelOptions(capacity)
+    {
+        SingleReader = true,
+        SingleWriter = false,
+        AllowSynchronousContinuations = false,
+        FullMode = BoundedChannelFullMode.Wait
+    });
+
+    private readonly TimeSpan _interval = interval ?? DefaultInterval;
     private readonly TaskCompletionSource _loopExited = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private readonly Action<int>? _onDropped;
-    private readonly Action<Exception, int>? _onFlushError;
 
     private readonly CancellationTokenSource _shutdownCts = new();
     private int _disposed;
     private int _runStarted;
-
-    public EventLogQueue(
-        Func<IReadOnlyList<EventLogEntryTvp>, CancellationToken, ValueTask> flushCallback,
-        int capacity = DefaultCapacity,
-        int batchSize = DefaultBatchSize,
-        TimeSpan? interval = null,
-        Action<Exception, int>? onFlushError = null,
-        Action<int>? onDropped = null)
-    {
-        _flushCallback = flushCallback;
-        _batchSize = batchSize;
-        _interval = interval ?? DefaultInterval;
-        _onFlushError = onFlushError;
-        _onDropped = onDropped;
-
-        _channel = Channel.CreateBounded<EventLogEntryTvp>(new BoundedChannelOptions(capacity)
-        {
-            SingleReader = true,
-            SingleWriter = false,
-            AllowSynchronousContinuations = false,
-            FullMode = BoundedChannelFullMode.Wait
-        });
-    }
 
     public async ValueTask DisposeAsync()
     {
@@ -63,7 +50,7 @@ public sealed class EventLogQueue : IEventLogQueue, IAsyncDisposable
         if (_channel.Writer.TryWrite(entry))
             return true;
 
-        _onDropped?.Invoke(1);
+        onDropped?.Invoke(1);
         return false;
     }
 
@@ -99,8 +86,8 @@ public sealed class EventLogQueue : IEventLogQueue, IAsyncDisposable
                 if (reader.Count == 0)
                     continue;
 
-                var batch = new List<EventLogEntryTvp>(Math.Min(reader.Count, _batchSize));
-                while (batch.Count < _batchSize && reader.TryRead(out var item))
+                var batch = new List<EventLogEntryTvp>(Math.Min(reader.Count, batchSize));
+                while (batch.Count < batchSize && reader.TryRead(out var item))
                     batch.Add(item);
 
                 if (batch.Count > 0)
@@ -119,8 +106,8 @@ public sealed class EventLogQueue : IEventLogQueue, IAsyncDisposable
     {
         while (reader.TryRead(out var first))
         {
-            var batch = new List<EventLogEntryTvp>(_batchSize) { first };
-            while (batch.Count < _batchSize && reader.TryRead(out var item))
+            var batch = new List<EventLogEntryTvp>(batchSize) { first };
+            while (batch.Count < batchSize && reader.TryRead(out var item))
                 batch.Add(item);
 
             await FlushBatchAsync(batch, flushCt).ConfigureAwait(false);
@@ -131,13 +118,13 @@ public sealed class EventLogQueue : IEventLogQueue, IAsyncDisposable
     {
         try
         {
-            await _flushCallback(batch, loopCt).ConfigureAwait(false);
+            await flushCallback(batch, loopCt).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             try
             {
-                _onFlushError?.Invoke(ex, batch.Count);
+                onFlushError?.Invoke(ex, batch.Count);
             }
             catch
             {

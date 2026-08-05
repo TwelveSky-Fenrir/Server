@@ -156,12 +156,12 @@ public sealed class ZoneRegistry
         var sw = Stopwatch.StartNew();
         var canonicalGeometrySources = maps
             .GroupBy(ZoneCanonicalGeometryMap.ResolveCanonicalMapId)
-            .Select(static group => (CanonicalMapId: group.Key, PhysicalMapId: group.First()))
+            .Select(static group => group.Key)
             .ToArray();
         var geometries = new ConcurrentDictionary<short, ZoneGeometry>();
         Parallel.ForEach(canonicalGeometrySources,
             new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
-            source => geometries[source.CanonicalMapId] = Zone.LoadGeometry(source.PhysicalMapId, _options));
+            canonicalMapId => geometries[canonicalMapId] = Zone.LoadGeometry(canonicalMapId, _options));
 
         Func<byte, byte>? resolveTribeBankBeneficiary =
             _worldState is null ? null : _worldState.GetTribeSymbolOwner;

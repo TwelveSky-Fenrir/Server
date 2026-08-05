@@ -1,5 +1,6 @@
 using System.Globalization;
 using Fenrir.Application.Game.Abstractions.Chat;
+using Fenrir.Application.Game.Abstractions.Gm;
 using Fenrir.Application.Game.Abstractions.Sessions;
 using Fenrir.Application.Game.Domain.Gm;
 using Fenrir.Application.Game.Domain.Simulation;
@@ -16,6 +17,7 @@ public sealed class LocalChatService(
     IWorldNoticeService worldNotice,
     IEventLogRepository eventLog,
     ISessionRateLimiter rateLimiter,
+    IGameDataReloadService gameDataReload,
     ILogger<LocalChatService> logger) : ILocalChatService
 {
     private const string SystemSenderName = "SYSTEM";
@@ -61,9 +63,10 @@ public sealed class LocalChatService(
 
         if (!zoneSession.MeetsGmTier(command.RequiredTier))
         {
-            SendSystemChat(sender, "You do not have permission to use this command.");
+            SendSystemChat(sender,
+                $"GM permission denied: account grade {zoneSession.AccountGrade}; required {(short)command.RequiredTier}.");
             await AuditAsync(command.Kind, zoneSession, GmCommandCatalog.OutcomeDenied,
-                $"RequiredTier={(short)command.RequiredTier}", cancellationToken);
+                $"AccountGrade={zoneSession.AccountGrade};RequiredTier={(short)command.RequiredTier}", cancellationToken);
             return;
         }
 
@@ -98,6 +101,26 @@ public sealed class LocalChatService(
                     sender.CharacterId, sender.Name);
                 await AuditAsync(command.Kind, zoneSession, GmCommandCatalog.OutcomeRejected,
                     "NotImplemented", cancellationToken);
+                return;
+
+            case LocalChatGmCommandKind.ReloadAll:
+                await HandleReloadAsync(GameDataReloadScope.All, zoneSession, sender, command.Kind,
+                    cancellationToken);
+                return;
+
+            case LocalChatGmCommandKind.ReloadMonsters:
+                await HandleReloadAsync(GameDataReloadScope.Monsters, zoneSession, sender, command.Kind,
+                    cancellationToken);
+                return;
+
+            case LocalChatGmCommandKind.ReloadItems:
+                await HandleReloadAsync(GameDataReloadScope.Items, zoneSession, sender, command.Kind,
+                    cancellationToken);
+                return;
+
+            case LocalChatGmCommandKind.ReloadQuests:
+                await HandleReloadAsync(GameDataReloadScope.Quests, zoneSession, sender, command.Kind,
+                    cancellationToken);
                 return;
 
             default:
@@ -204,6 +227,26 @@ public sealed class LocalChatService(
             sender.CharacterId, sender.Name);
 
         await AuditAsync(LocalChatGmCommandKind.Kill200, zoneSession, GmCommandCatalog.OutcomeExecuted, null,
+            cancellationToken);
+    }
+
+    private async ValueTask HandleReloadAsync(GameDataReloadScope scope, IZoneSession zoneSession,
+        PlayerRuntimeState sender, LocalChatGmCommandKind commandKind, CancellationToken cancellationToken)
+    {
+        SendSystemChat(sender, $"Reloading game-data snapshot for {scope.ToString().ToLowerInvariant()}...");
+        var outcome = await gameDataReload.ReloadAsync(scope, cancellationToken).ConfigureAwait(false);
+        if (!outcome.Succeeded)
+        {
+            SendSystemChat(sender, "Reload failed. The previous game-data snapshot remains active.");
+            await AuditAsync(commandKind, zoneSession, GmCommandCatalog.OutcomeRejected,
+                $"Scope={scope};Reason={outcome.Failure}", cancellationToken);
+            return;
+        }
+
+        SendSystemChat(sender,
+            $"Reload complete: {outcome.ItemCount} items, {outcome.MonsterCount} monsters, {outcome.QuestCount} quests ({outcome.Elapsed.TotalMilliseconds:F0} ms).");
+        await AuditAsync(commandKind, zoneSession, GmCommandCatalog.OutcomeExecuted,
+            $"Scope={scope};Items={outcome.ItemCount};Monsters={outcome.MonsterCount};Quests={outcome.QuestCount};ElapsedMs={(long)outcome.Elapsed.TotalMilliseconds}",
             cancellationToken);
     }
 

@@ -34,9 +34,11 @@ public sealed class HotkeyActionService(
         if (!resolved.Success)
         {
             logger.LogInformation(
-                "Character {CharacterId} hotkey-bind-skill disconnect: resolver rejected ({Failure})",
+                "Character {CharacterId} hotkey-bind-skill rejected: resolver rejected ({Failure})",
                 characterId, resolved.Failure);
-            return GenericActionResult.Aborted;
+            return resolved.Failure == HotkeyActionResolver.BindSkillFailure.DestinationOccupied
+                ? GenericActionResult.Failed
+                : GenericActionResult.Aborted;
         }
 
         await PersistAndMirrorSingleSlotAsync(zone, characterId, (byte)destinationPage, (byte)destinationIndex,
@@ -61,9 +63,11 @@ public sealed class HotkeyActionService(
         if (!resolved.Success)
         {
             logger.LogInformation(
-                "Character {CharacterId} hotkey-bind-emoticon disconnect: resolver rejected ({Failure})",
+                "Character {CharacterId} hotkey-bind-emoticon rejected: resolver rejected ({Failure})",
                 characterId, resolved.Failure);
-            return GenericActionResult.Aborted;
+            return resolved.Failure == HotkeyActionResolver.BindEmoticonFailure.DestinationOccupied
+                ? GenericActionResult.Failed
+                : GenericActionResult.Aborted;
         }
 
         await PersistAndMirrorSingleSlotAsync(zone, characterId, (byte)destinationPage, (byte)destinationIndex,

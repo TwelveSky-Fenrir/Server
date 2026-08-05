@@ -15,6 +15,7 @@ using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Social;
+using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.StellarCores;
@@ -42,6 +43,8 @@ public sealed partial class Zone
     private const int RestActionSort = 0;
 
     private const int DeathActionSort = 12;
+
+    private const int ReviveActionSort = 0;
 
     private const int DeathSubCounterOnDeath = 4;
 
@@ -188,7 +191,8 @@ public sealed partial class Zone
             FlushSequence = data.FlushSequence,
             LastMoveUtc = DateTime.UtcNow,
             LastOneSecondGateTick = RawLogicTick,
-            LastAvatarRebroadcastAt = _clock,
+            LastAvatarRebroadcastAt = _clock - SimulationClock.RebroadcastStaggerOffset(characterId,
+                SimulationClock.AvatarRebroadcastInterval),
             IsDead = data.IsDead,
             TicksSinceDeath = data.TicksSinceDeath,
             ReviveHackFlag = data.ReviveHackFlag,
@@ -771,12 +775,17 @@ public sealed partial class Zone
         return _zoneRegistry is not null && _zoneRegistry.TryGetPlayer(characterId, out state);
     }
 
-    private ZoneTransferHandoffSnapshot? HandleBeginZoneTransfer(int characterId, short targetMapId)
+    private ZoneTransferHandoffSnapshot? HandleBeginZoneTransfer(int characterId, short targetMapId,
+        bool reviveForDeathTransfer)
     {
         if (!_players.TryGetValue(characterId, out var state))
             return null;
 
-        if (state.IsDead || state.Life <= 0)
+        var isDead = state.IsDead || state.Life <= 0;
+        if (isDead && !reviveForDeathTransfer)
+            return null;
+
+        if (!isDead && reviveForDeathTransfer)
             return null;
 
         if (state.IsMovingZone)
@@ -795,10 +804,18 @@ public sealed partial class Zone
             state.IsMovingZone,
             state.ZoneTransferRegisteredAtUtc,
             pendingRegisteredAtUtc,
-            previousBuffs);
+            previousBuffs,
+            state.IsDead,
+            state.Life,
+            state.DeathSubCounter,
+            state.ReviveHackFlag,
+            state.CanUseConsumables);
 
         try
         {
+            if (reviveForDeathTransfer)
+                ReviveForDeathTransfer(state);
+
             ZoneTransferBuffRules.ClearIfDestinationRequiresIt(state.Buffs, targetMapId);
             state.IsMovingZone = true;
             state.ZoneTransferRegisteredAtUtc = pendingRegisteredAtUtc;
@@ -810,6 +827,7 @@ public sealed partial class Zone
         {
             _zoneTransferSnapshots.Remove(characterId);
             previousBuffs?.CopyTo(state.Buffs.Buff, 0);
+            RestorePreTransferDeathState(state, snapshot);
             state.IsMovingZone = snapshot.WasMovingZone;
             state.ZoneTransferRegisteredAtUtc = snapshot.PreviousRegisteredAtUtc;
             throw;
@@ -843,6 +861,7 @@ public sealed partial class Zone
         if (_zoneTransferSnapshots.Remove(characterId, out var snapshot))
         {
             snapshot.PreviousBuffs?.CopyTo(state.Buffs.Buff, 0);
+            RestorePreTransferDeathState(state, snapshot);
             state.IsMovingZone = snapshot.WasMovingZone;
             state.ZoneTransferRegisteredAtUtc = snapshot.PreviousRegisteredAtUtc;
         }
@@ -851,6 +870,26 @@ public sealed partial class Zone
             state.IsMovingZone = false;
             state.ZoneTransferRegisteredAtUtc = registeredAtUtc;
         }
+    }
+
+    private void ReviveForDeathTransfer(PlayerRuntimeState state)
+    {
+        var maxLife = state.Stats?.MaxLife ?? state.MaxLife;
+        state.Life = Math.Max(1, (maxLife / 3) + 1);
+        state.IsDead = false;
+        state.DeathSubCounter = ReviveEligibilityRules.DeathSubCounterBaseline;
+        state.ReviveHackFlag = false;
+        state.CanUseConsumables = true;
+        state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
+    }
+
+    private static void RestorePreTransferDeathState(PlayerRuntimeState state, ZoneTransferHandoffSnapshot snapshot)
+    {
+        state.IsDead = snapshot.WasDead;
+        state.Life = snapshot.PreviousLife;
+        state.DeathSubCounter = snapshot.PreviousDeathSubCounter;
+        state.ReviveHackFlag = snapshot.PreviousReviveHackFlag;
+        state.CanUseConsumables = snapshot.PreviousCanUseConsumables;
     }
 
     private ZoneCommandResult HandleRefreshZoneTransferRegistrationTimestamp(int characterId)
@@ -964,6 +1003,13 @@ public sealed partial class Zone
         ExpireDrunkBottleEffect(state);
 
         ResetPartyBuffMarker(state);
+
+        if (cause == DeathCause.Duel && _duelRegistry.TryEndActiveDuel(characterId, out var opponentId))
+        {
+            EndActiveDuel(state, DuelEndReason.SelfDied);
+            if (_players.TryGetValue(opponentId, out var opponent))
+                EndActiveDuel(opponent, DuelEndReason.OpponentDied);
+        }
     }
 
     private void ClearAllBuffs(PlayerRuntimeState state)
@@ -1081,7 +1127,10 @@ public sealed partial class Zone
             return;
 
         if (state.IsDead)
-            return;
+        {
+            if (!TryReviveFromAction(state, in action, isResumeAction))
+                return;
+        }
 
         if (state.IsStunned)
         {
@@ -1259,6 +1308,25 @@ public sealed partial class Zone
         {
             AdvanceCasterPartyBuffMarker(state, action.SkillNumber, action.Sort);
         }
+    }
+
+    private bool TryReviveFromAction(PlayerRuntimeState state, in ActionInfo action, bool isResumeAction)
+    {
+        if (isResumeAction || action.Sort != ReviveActionSort || state.ReviveHackFlag)
+            return false;
+
+        var maxLife = state.Stats?.MaxLife ?? state.MaxLife;
+        if (maxLife < 1)
+            return false;
+
+        state.Life = Math.Min(maxLife, (maxLife / 3) + 1);
+        state.IsDead = false;
+        state.CanUseConsumables = true;
+        state.IsStunned = false;
+        state.StunDurationTicks = 0;
+        state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
+        state.Session.Send(new AvatarStatUpdateResponse { Sort = CharacterHpStatSort, Value = state.Life, Value2 = 0 });
+        return true;
     }
 
     private void MaybeResetRegularWarAfkTick(PlayerRuntimeState state, in ActionInfo action)

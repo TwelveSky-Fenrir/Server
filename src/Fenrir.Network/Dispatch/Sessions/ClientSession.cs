@@ -13,9 +13,9 @@ public abstract class ClientSession : IPacketSession
 {
     private const int SlowConsumerBackpressureStreakLimit = 5;
     private const int LoginMaxPendingSendBytes = 40_960;
-    private const int ZoneMaxPendingSendBytes = 1_024_000;
+    private const int ZoneMaxPendingSendBytes = 8 * 1024 * 1024;
     private const int LoginMaxPendingSendFrames = 128;
-    private const int ZoneMaxPendingSendFrames = 1_024;
+    private const int ZoneMaxPendingSendFrames = 8_192;
     private const int SendPumpDrainTimeoutMs = 5_000;
     private const int NoDisconnectReason = -1;
 
@@ -112,11 +112,37 @@ public abstract class ClientSession : IPacketSession
         }
     }
 
+    public bool TrySend<TPacket>(in TPacket packet) where TPacket : struct, IOutgoingPacket
+    {
+        try
+        {
+            return QueuePacket(packet, abortOnOverflow: false);
+        }
+        catch
+        {
+            Abort(Core.Abstractions.DisconnectReason.Faulted);
+            throw;
+        }
+    }
+
     public void SendRaw(ReadOnlySpan<byte> rawFrame)
     {
         try
         {
             QueueRawFrame(rawFrame);
+        }
+        catch
+        {
+            Abort(Core.Abstractions.DisconnectReason.Faulted);
+            throw;
+        }
+    }
+
+    public bool TrySendRaw(ReadOnlySpan<byte> rawFrame)
+    {
+        try
+        {
+            return QueueRawFrame(rawFrame, abortOnOverflow: false);
         }
         catch
         {
@@ -200,7 +226,8 @@ public abstract class ClientSession : IPacketSession
         }
     }
 
-    private void QueuePacket<TPacket>(in TPacket packet) where TPacket : struct, IOutgoingPacket
+    private bool QueuePacket<TPacket>(in TPacket packet, bool abortOnOverflow = true)
+        where TPacket : struct, IOutgoingPacket
     {
         var queued = false;
         var overflowed = false;
@@ -211,7 +238,7 @@ public abstract class ClientSession : IPacketSession
         lock (_outboundGate)
         {
             if (Volatile.Read(ref _closed) != 0)
-                return;
+                return false;
 
             var frame = TPacket.Compressed
                 ? CompressedFrameWriter.WriteCompressedFrame(in packet)
@@ -221,10 +248,10 @@ public abstract class ClientSession : IPacketSession
             queued = TryQueueFrameUnsafe(frame, out overflowed, out queuedDepth);
         }
 
-        CompleteQueueAttempt(opcode, byteSize, queued, overflowed, queuedDepth);
+        return CompleteQueueAttempt(opcode, byteSize, queued, overflowed, queuedDepth, abortOnOverflow);
     }
 
-    private void QueueRawFrame(ReadOnlySpan<byte> rawFrame)
+    private bool QueueRawFrame(ReadOnlySpan<byte> rawFrame, bool abortOnOverflow = true)
     {
         var queued = false;
         var overflowed = false;
@@ -235,7 +262,7 @@ public abstract class ClientSession : IPacketSession
         lock (_outboundGate)
         {
             if (Volatile.Read(ref _closed) != 0)
-                return;
+                return false;
 
             var frame = GC.AllocateUninitializedArray<byte>(rawFrame.Length);
             rawFrame.CopyTo(frame);
@@ -244,7 +271,7 @@ public abstract class ClientSession : IPacketSession
             queued = TryQueueFrameUnsafe(frame, out overflowed, out queuedDepth);
         }
 
-        CompleteQueueAttempt(opcode, byteSize, queued, overflowed, queuedDepth);
+        return CompleteQueueAttempt(opcode, byteSize, queued, overflowed, queuedDepth, abortOnOverflow);
     }
 
     private byte[] WriteFrame<TPacket>(in TPacket packet) where TPacket : struct, IOutgoingPacket
@@ -287,21 +314,25 @@ public abstract class ClientSession : IPacketSession
         return false;
     }
 
-    private void CompleteQueueAttempt(byte opcode, int byteSize, bool queued, bool overflowed, int queuedDepth)
+    private bool CompleteQueueAttempt(byte opcode, int byteSize, bool queued, bool overflowed, int queuedDepth,
+        bool abortOnOverflow)
     {
         if (overflowed)
         {
             NetworkSessionMetrics.OutboundQueueRejections.Add(1, NetworkSessionMetrics.ServerTag(Server));
-            AbortForPendingSendOverflow(opcode);
-            return;
+            if (abortOnOverflow)
+                AbortForPendingSendOverflow(opcode);
+
+            return false;
         }
 
         if (!queued)
-            return;
+            return false;
 
         NetworkSessionMetrics.OutboundQueueDepth.Record(queuedDepth, NetworkSessionMetrics.ServerTag(Server));
         LogPacketSent(opcode, byteSize);
         StartSendPump();
+        return true;
     }
 
     private void AbortForPendingSendOverflow(byte opcode)

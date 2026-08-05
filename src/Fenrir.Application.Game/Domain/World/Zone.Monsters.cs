@@ -226,7 +226,7 @@ public sealed partial class Zone
     public void BroadcastMonsterDeath(MonsterEntity monster)
     {
         monster.AiState = MonsterAiState.Dead;
-        BroadcastMonsterAction(monster, 0);
+        BroadcastMonsterAction(monster, 1);
     }
 
     private void TryApplyPvmFlinch(MonsterEntity monster, int damageDealt)
@@ -416,7 +416,7 @@ public sealed partial class Zone
             if (!_monsterGrid.IsWithinRadius(serverIndex, state.PosX, state.PosY, state.PosZ, scale))
                 continue;
 
-            state.Session.Send(BuildMonsterActionRecv(monster, 2));
+            state.Session.TrySend(BuildMonsterActionRecv(monster, 2));
         }
     }
 
@@ -469,7 +469,7 @@ public sealed partial class Zone
                 {
                     if (TryGetBroadcastRecipient(id, out var recipient, out var clientSession) &&
                         IsVisibleAcrossDungeonInstance(monster.InstanceId, recipient.DungeonInstanceId))
-                        clientSession.SendRaw(span);
+                        clientSession.TrySendRaw(span);
                 }
                 catch (Exception ex)
                 {

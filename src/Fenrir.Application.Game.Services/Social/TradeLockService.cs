@@ -185,6 +185,13 @@ public sealed class TradeLockService(
                 await PostMirrorAndWaitAsync(zoneA, playerA.CharacterId, planA, cancellationToken);
                 await PostMirrorAndWaitAsync(zoneB, playerB.CharacterId, planB, cancellationToken);
 
+                await zoneA.PostTribeProgressCommandAndWaitAsync(
+                    new TribeProgressZoneCommand(playerA.CharacterId, Money: playerA.Money + moneyDeltaA),
+                    cancellationToken);
+                await zoneB.PostTribeProgressCommandAndWaitAsync(
+                    new TribeProgressZoneCommand(playerB.CharacterId, Money: playerB.Money + moneyDeltaB),
+                    cancellationToken);
+
                 if (offerB.BigMoney != 0)
                     await zoneA.PostTribeProgressCommandAndWaitAsync(
                         new TribeProgressZoneCommand(playerA.CharacterId, BigMoneyDelta: offerB.BigMoney),
@@ -299,8 +306,10 @@ public sealed class TradeLockService(
 
         foreach (var offered in offer.Slots)
         {
-            if (offered is not { } slot ||
-                slot.Container is not (ContainerMatrix.InventoryPage0 or ContainerMatrix.InventoryPage1) ||
+            if (offered is not { } slot)
+                continue;
+
+            if (slot.Container is not (ContainerMatrix.InventoryPage0 or ContainerMatrix.InventoryPage1) ||
                 slot.Slot > 63 || slot.Stack.ItemId < 1 || slot.Stack.Quantity < 1 ||
                 !worldData.ItemsById.TryGetValue(slot.Stack.ItemId, out var definition) ||
                 definition.Item.CheckAvatarTrade == 1)

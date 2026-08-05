@@ -62,7 +62,6 @@ ZonePacketHandlerHub.Initialize(host.Services);
 var bootLogger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Fenrir.GameServer.Boot");
 
 var bootStep = "(unknown)";
-byte shardId;
 IReadOnlyList<short> hostedMaps;
 
 using var bootCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
@@ -103,7 +102,7 @@ try
             bootCts.Token);
 
     bootStep = "IShardMapAssignmentRepository.GetHostedMapsAsync";
-    shardId = host.Services.GetRequiredService<IOptions<GameServerOptions>>().Value.ShardId;
+    var shardId = host.Services.GetRequiredService<IOptions<GameServerOptions>>().Value.ShardId;
     hostedMaps = await host.Services.GetRequiredService<IShardMapAssignmentRepository>()
         .GetHostedMapsAsync(shardId, bootCts.Token);
 

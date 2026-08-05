@@ -15,7 +15,15 @@ public enum LocalChatGmCommandKind
 
     Kill200,
 
-    ClearInventory
+    ClearInventory,
+
+    ReloadAll,
+
+    ReloadMonsters,
+
+    ReloadItems,
+
+    ReloadQuests
 }
 
 public readonly record struct LocalChatGmCommand
@@ -38,6 +46,10 @@ public static class LocalChatGmCommandAudit
             LocalChatGmCommandKind.Kill200 => GmCommandCatalog.ChatCommandKill200Audit,
             LocalChatGmCommandKind.Lab => GmCommandCatalog.ChatCommandLabAudit,
             LocalChatGmCommandKind.ClearInventory => GmCommandCatalog.ChatCommandClearInventoryAudit,
+            LocalChatGmCommandKind.ReloadAll => GmCommandCatalog.ChatCommandReloadAllAudit,
+            LocalChatGmCommandKind.ReloadMonsters => GmCommandCatalog.ChatCommandReloadMonstersAudit,
+            LocalChatGmCommandKind.ReloadItems => GmCommandCatalog.ChatCommandReloadItemsAudit,
+            LocalChatGmCommandKind.ReloadQuests => GmCommandCatalog.ChatCommandReloadQuestsAudit,
             _ => 0
         };
     }

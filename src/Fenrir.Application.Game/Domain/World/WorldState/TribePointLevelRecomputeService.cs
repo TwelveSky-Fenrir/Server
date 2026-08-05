@@ -5,8 +5,13 @@ namespace Fenrir.Application.Game.Domain.World.WorldState;
 public sealed class TribePointLevelRecomputeService(
     ITribePointRosterGateway rosterGateway,
     WorldStateService worldState,
+    TimeProvider timeProvider,
     ILogger<TribePointLevelRecomputeService> logger)
 {
+    public static readonly TimeSpan InformationLogInterval = TimeSpan.FromMinutes(15);
+
+    private long _lastInformationLogUtcTicks;
+
     public async Task RecomputeAsync(CancellationToken ct)
     {
         IReadOnlyList<TribeRosterCharacterSnapshot>? roster;
@@ -32,8 +37,23 @@ public sealed class TribePointLevelRecomputeService(
         for (byte tribeId = 0; tribeId < WorldStateService.TribeCount; tribeId++)
             worldState.SetTribePoints(tribeId, totals[tribeId]);
 
-        logger.LogInformation(
-            "TribePointLevelRecompute: totals overwritten -- Tribe0={Tribe0} Tribe1={Tribe1} Tribe2={Tribe2} Tribe3={Tribe3}",
-            totals[0], totals[1], totals[2], totals[3]);
+        if (ShouldWriteInformationLog())
+            logger.LogInformation(
+                "TribePointLevelRecompute: totals overwritten -- Tribe0={Tribe0} Tribe1={Tribe1} Tribe2={Tribe2} Tribe3={Tribe3}",
+                totals[0], totals[1], totals[2], totals[3]);
+        else
+            logger.LogDebug(
+                "TribePointLevelRecompute: totals overwritten -- Tribe0={Tribe0} Tribe1={Tribe1} Tribe2={Tribe2} Tribe3={Tribe3}",
+                totals[0], totals[1], totals[2], totals[3]);
+    }
+
+    private bool ShouldWriteInformationLog()
+    {
+        var nowTicks = timeProvider.GetUtcNow().Ticks;
+        var previousTicks = Interlocked.Read(ref _lastInformationLogUtcTicks);
+        if (nowTicks - previousTicks < InformationLogInterval.Ticks)
+            return false;
+
+        return Interlocked.CompareExchange(ref _lastInformationLogUtcTicks, nowTicks, previousTicks) == previousTicks;
     }
 }

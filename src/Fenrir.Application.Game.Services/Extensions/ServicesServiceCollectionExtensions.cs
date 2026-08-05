@@ -236,6 +236,7 @@ public static class ServicesServiceCollectionExtensions
 
     private static void AddGmServices(IServiceCollection services)
     {
+        services.AddSingleton<IGameDataReloadService, GameDataReloadService>();
         services.AddSingleton<IGmBlockAvatarService, GmBlockAvatarService>();
         services.AddSingleton<IGmCreateItemService, GmCreateItemService>();
         services.AddSingleton<IGmMaxStatService, GmMaxStatService>();

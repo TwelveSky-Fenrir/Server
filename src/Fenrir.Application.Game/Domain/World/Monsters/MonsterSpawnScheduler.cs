@@ -14,8 +14,8 @@ namespace Fenrir.Application.Game.Domain.World.Monsters;
 
 internal sealed class MonsterSpawnSlot
 {
-    public required MonsterSpawnRegionRowDto Region { get; init; }
-    public required MonsterRowDto Monster { get; init; }
+    public required MonsterSpawnRegionRowDto Region { get; set; }
+    public required MonsterRowDto Monster { get; set; }
     public required int ServerIndex { get; init; }
     public bool Alive { get; set; }
     public bool CorpsePending { get; set; }
@@ -40,6 +40,7 @@ internal sealed class MonsterZoneSpawnState
     public int NextServerIndex { get; set; }
     public bool InitialPopDone { get; set; }
     public int TicksSinceLastScan { get; set; }
+    public long AppliedConfigurationRevision { get; set; }
 }
 
 public sealed class MonsterSpawnScheduler(
@@ -90,6 +91,13 @@ public sealed class MonsterSpawnScheduler(
 
     private readonly ConcurrentDictionary<short, MonsterZoneSpawnState> _stateByZone = new();
 
+    private long _configurationRevision;
+
+    public void RequestConfigurationReload()
+    {
+        Interlocked.Increment(ref _configurationRevision);
+    }
+
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
         if (legacyTicksElapsed <= 0)
@@ -97,6 +105,9 @@ public sealed class MonsterSpawnScheduler(
 
         const int elapsedLegacyTicks = 1;
         var state = _stateByZone.GetOrAdd(zone.MapId, _ => BuildState(zone.MapId, zone.IsDungeonServerZone));
+        var configurationRevision = Volatile.Read(ref _configurationRevision);
+        if (state.AppliedConfigurationRevision != configurationRevision)
+            RefreshSlotDefinitions(zone.MapId, state, configurationRevision);
 
         if (!state.InitialPopDone)
         {
@@ -266,7 +277,8 @@ public sealed class MonsterSpawnScheduler(
 
     private MonsterZoneSpawnState BuildState(short mapId, bool isDungeonZone)
     {
-        var regions = worldData.ZonesByNumber.TryGetValue(mapId, out var zoneDef)
+        var snapshot = worldData.Capture();
+        var regions = snapshot.ZonesByNumber.TryGetValue(mapId, out var zoneDef)
             ? zoneDef.MonsterSpawnRegions
             : [];
 
@@ -275,7 +287,7 @@ public sealed class MonsterSpawnScheduler(
         foreach (var region in regions)
         {
             if (region.MonsterId is not { } monsterId ||
-                !worldData.MonstersById.TryGetValue(monsterId, out var monsterDefinition))
+                !snapshot.MonstersById.TryGetValue(monsterId, out var monsterDefinition))
                 continue;
 
             var spawnCount = DungeonSpawnDensityPolicy.ResolveConfiguredSpawnCount(isDungeonZone,
@@ -323,10 +335,36 @@ public sealed class MonsterSpawnScheduler(
         {
             Slots = slots,
             SlotsByServerIndex = slotsByServerIndex,
-            DropRoller = new MonsterDropRoller(worldData, random),
+            DropRoller = new MonsterDropRoller(snapshot, random),
             Random = random,
             NextServerIndex = nextServerIndex
         };
+    }
+
+    private void RefreshSlotDefinitions(short mapId, MonsterZoneSpawnState state, long configurationRevision)
+    {
+        var snapshot = worldData.Capture();
+        if (!snapshot.ZonesByNumber.TryGetValue(mapId, out var zoneDefinition))
+        {
+            state.AppliedConfigurationRevision = configurationRevision;
+            return;
+        }
+
+        var regionsById = new Dictionary<int, MonsterSpawnRegionRowDto>(zoneDefinition.MonsterSpawnRegions.Length);
+        foreach (var region in zoneDefinition.MonsterSpawnRegions)
+            regionsById.TryAdd(region.MonsterSpawnRegionId, region);
+        foreach (var slot in state.Slots)
+        {
+            if (!regionsById.TryGetValue(slot.Region.MonsterSpawnRegionId, out var region) ||
+                region.MonsterId is not { } monsterId ||
+                !snapshot.MonstersById.TryGetValue(monsterId, out var monsterDefinition))
+                continue;
+
+            slot.Region = region;
+            slot.Monster = monsterDefinition.Monster;
+        }
+
+        state.AppliedConfigurationRevision = configurationRevision;
     }
 
     private bool Spawn(Zone zone, MonsterSpawnSlot slot)

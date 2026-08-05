@@ -55,7 +55,12 @@ public sealed record ZoneTransferHandoffSnapshot(
     bool WasMovingZone,
     DateTime PreviousRegisteredAtUtc,
     DateTime PendingRegisteredAtUtc,
-    int[]? PreviousBuffs);
+    int[]? PreviousBuffs,
+    bool WasDead,
+    int PreviousLife,
+    int PreviousDeathSubCounter,
+    bool PreviousReviveHackFlag,
+    bool PreviousCanUseConsumables);
 
 public enum ZoneLeaveResultKind : byte
 {
@@ -119,6 +124,8 @@ public readonly struct ZoneCommand
     public DateTime ZoneTransferRegisteredAtUtc { get; init; }
 
     public short ZoneTransferTargetMapId { get; init; }
+
+    public bool ReviveForDeathTransfer { get; init; }
 
     public byte WinningTribe { get; init; }
 
@@ -191,7 +198,7 @@ public readonly struct ZoneCommand
         return new ZoneCommand { Kind = ZoneCommandKind.PetAction, CharacterId = characterId, Action = action };
     }
 
-    public static ZoneCommand BeginZoneTransfer(int characterId, short targetMapId,
+    public static ZoneCommand BeginZoneTransfer(int characterId, short targetMapId, bool reviveForDeathTransfer,
         TaskCompletionSource<ZoneTransferHandoffSnapshot?> snapshot,
         TaskCompletionSource<ZoneCommandResult> completion)
     {
@@ -200,6 +207,7 @@ public readonly struct ZoneCommand
             Kind = ZoneCommandKind.BeginZoneTransfer,
             CharacterId = characterId,
             ZoneTransferTargetMapId = targetMapId,
+            ReviveForDeathTransfer = reviveForDeathTransfer,
             ZoneTransferSnapshot = snapshot,
             Completion = completion
         };

@@ -10,8 +10,6 @@ namespace Fenrir.Generators.Protocol.Emitters;
 internal static class SessionStateGateEmitter
 {
     public const string HintName = "SessionStateGate.g.cs";
-    private const byte ZoneInWorldState = 3;
-
     public static string Emit(ImmutableArray<TypeModel> packets, string namespaceName)
     {
         var server = packets[0].Server;
@@ -54,11 +52,7 @@ internal static class SessionStateGateEmitter
 
         foreach (var packet in entries)
         {
-            IEnumerable<byte> allowedStates = server == FenrirServer.Zone &&
-                                              packet.AllowedStates.Contains(ZoneInWorldState)
-                ? [ZoneInWorldState]
-                : packet.AllowedStates;
-            var condition = string.Join(" || ", allowedStates.Select(s => $"state == ({stateEnum}){s}"));
+            var condition = string.Join(" || ", packet.AllowedStates.Select(s => $"state == ({stateEnum}){s}"));
             writer.Line($"{packet.Opcode} => {condition},");
         }
 
@@ -66,4 +60,5 @@ internal static class SessionStateGateEmitter
         writer.CloseBraceSemicolon();
         writer.CloseBrace();
     }
+
 }

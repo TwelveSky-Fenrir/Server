@@ -16,9 +16,9 @@ public sealed class LoginServerOptions
 
     public int AccountSessionRefreshIntervalSeconds { get; set; } = 60;
 
-    public int MaxConnectionsPerIp { get; set; } = 40;
+    public int MaxConnectionsPerIp { get; set; } = 512;
 
-    public int MaxProtocolViolationsPerIpPerHour { get; set; } = 30;
+    public int MaxProtocolViolationsPerIpPerHour { get; set; } = 1_000;
 
     public int IdleSweepIntervalSeconds { get; set; } = 1;
 

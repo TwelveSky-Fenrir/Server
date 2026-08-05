@@ -12,8 +12,8 @@ public readonly record struct LoginFailureSnapshot(
 
 public sealed class LoginIpRateLimiter
 {
-    private const int Capacity = 10;
-    private const double TokensPerSecond = 0.25d;
+    private const int Capacity = 120;
+    private const double TokensPerSecond = 5d;
 
     private const int MaxTrackedSources = 100_000;
 

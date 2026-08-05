@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using CaeriusNet.Exceptions;
 using Fenrir.Application.Game.Abstractions.Inventory;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Simulation;
@@ -80,7 +81,17 @@ public sealed class InventoryToWorldDropService(
             ? state.Inventory.GetContainer(container).SetItem(slot, newStack)
             : state.Inventory.GetContainer(container).Remove(slot);
 
-        await characters.ReplaceContainerAsync(characterId, container, ToTvps(projected), cancellationToken);
+        try
+        {
+            await characters.ReplaceContainerAsync(characterId, container, ToTvps(projected), cancellationToken);
+        }
+        catch (CaeriusNetSqlException exception)
+        {
+            logger.LogError(exception,
+                "Character {CharacterId} inventory-to-world drop could not persist its source container; no zone mutation was applied",
+                characterId);
+            return InventoryToWorldDropResult.Failed;
+        }
 
         var containers = ImmutableArray.Create(new InventoryContainerSnapshot(container, projected));
 

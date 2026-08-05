@@ -17,7 +17,7 @@ public sealed class ZoneReadyHandler(IZoneReadyService service, ILogger<ZoneRead
             "Session {SessionId}: ZoneReadyRequest (op13) received for character {CharacterId}, current state {State}, claimed tribe {ClaimedTribe}",
             session.SessionId, zoneSession.CharacterId, zoneSession.State, packet.Tribe);
 
-        if (zoneSession.State != ZoneSessionState.Registering)
+        if (zoneSession.State is not (ZoneSessionState.Registering or ZoneSessionState.InWorld))
         {
             logger?.LogWarning(
                 "Zone-ready request aborted for character {CharacterId} (session {SessionId}): invalid session state {State}",
@@ -46,6 +46,9 @@ public sealed class ZoneReadyHandler(IZoneReadyService service, ILogger<ZoneRead
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
+
+        if (zoneSession.State != ZoneSessionState.Registering)
+            return;
 
         zoneSession.MarkInWorld();
 

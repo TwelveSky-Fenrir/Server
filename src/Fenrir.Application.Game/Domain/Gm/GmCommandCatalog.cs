@@ -48,6 +48,10 @@ public static class GmCommandCatalog
     public const short ChatCommandClearInventoryAudit = 33;
 
     public const short GlobalAnnouncementAudit = 34;
+    public const short ChatCommandReloadAllAudit = 35;
+    public const short ChatCommandReloadMonstersAudit = 36;
+    public const short ChatCommandReloadItemsAudit = 37;
+    public const short ChatCommandReloadQuestsAudit = 38;
 
     public const byte OutcomeDenied = 0;
     public const byte OutcomeExecuted = 1;

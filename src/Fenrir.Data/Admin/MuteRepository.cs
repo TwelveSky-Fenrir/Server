@@ -34,7 +34,7 @@ public sealed record MuteRepository(ICaeriusNetDbContext Db) : IMuteRepository
             .Build();
 
         var muted = await Db.QueryAsImmutableArrayAsync<MutedCharacterIdDto>(sp, ct);
-        return muted.IsEmpty ? ImmutableArray<int>.Empty : muted.Select(m => m.CharacterId).ToImmutableArray();
+        return muted.IsEmpty ? ImmutableArray<int>.Empty : [..muted.Select(m => m.CharacterId)];
     }
 
     public async ValueTask<int> CreateAsync(int? accountId, int? characterId, byte reason, DateTime? expiresAtUtc,
